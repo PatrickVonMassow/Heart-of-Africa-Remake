@@ -1,0 +1,525 @@
+{
+ "model": "GPT-6 Astra",
+ "entries": [
+  {
+   "id": "B1",
+   "file": "docs/model-lanes-inventory-1393.md",
+   "defect": "Treat the attachment as measured search evidence, not inspected implementation: complete source bodies are absent, and the I12 en.ts excerpt visibly ends mid-line; confirm behavior during implementation instead of inventing details beyond the supplied material."
+  },
+  {
+   "id": "B2",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Define three stable lane roles, main, cross, and scarce, because routing identifiers must survive replacement of the models serving those roles."
+  },
+  {
+   "id": "B3",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Treat cross as a stable lane identifier, not an assertion that this lane can review every author; reviewer eligibility must be calculated for the actual author lanes."
+  },
+  {
+   "id": "B4",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Expose immutable lane records containing role, vendor, displayName, modelId, retiredNames, runtime, and scarce, because every consumer needs the same authoritative identity and policy data."
+  },
+  {
+   "id": "B5",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Keep identity descriptors and a selected identity key in this module, deriving each lane's exposed current fields from that selection, because selecting an already-described replacement should require one data-line change without consumer edits."
+  },
+  {
+   "id": "B6",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Preserve previously activated identity descriptors when changing the selected identity, because a one-line switch must not erase the identities needed to verify history; adding a genuinely new identity still requires supplying its descriptor."
+  },
+  {
+   "id": "B7",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Initialize main with Claude Opus 5.5 and claude-opus-5-5[1m], scarce with Fable 5.1 and claude-fable-5-1, and cross with GPT-6.1 Sol and gpt-6.1-sol, because these are the requested current identities and the display-name assumption should remain explicit data."
+  },
+  {
+   "id": "B8",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Store vendor tokens and the required claude/codex runtime values as separate fields, because a runtime is an invocation protocol and must never be used as a proxy for vendor independence."
+  },
+  {
+   "id": "B9",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Represent the existing main-lane fallback as an explicit executable identity belonging to main, because Opus 4.8 must retain its fallback behavior without becoming an independent reviewer lane."
+  },
+  {
+   "id": "B10",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Separate current display aliases, retired display aliases, historical model IDs, and executable fallback identities, because recognizing an old trailer must not authorize execution of an obsolete model."
+  },
+  {
+   "id": "B11",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Include the measured historical variants GPT-6 Astra, GPT-5.6 Sol, Opus 5, Claude Opus 5, Fable 5, Claude Fable 5, Claude Fable 5.1, and the measured historical IDs in their appropriate identity records, because history uses more spellings than the proposed current display names."
+  },
+  {
+   "id": "B12",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Keep unsupported or deliberately fabricated identities out of accepted alias lists, because the inventory's Haiku, Sonnet, Nano, and hypothetical future-model literals include negative tests rather than evidence that those models are permitted."
+  },
+  {
+   "id": "B13",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Store trailer address metadata and any accepted legacy address forms alongside identity data, because consumers must not contain vendor email-domain constants or reconstruct historical addresses from today's configuration."
+  },
+  {
+   "id": "B14",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Reject duplicate roles, ambiguous normalized aliases, missing vendors, invalid runtimes, and inconsistent identity ownership when validating the registry, because an ambiguous lookup would weaken both attribution and review independence."
+  },
+  {
+   "id": "B15",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Provide getLane(role), listLanes(), and resolveIdentity(value, context) helpers with explicit unknown and ambiguous results, because consumers must not implement their own name matching or silently default an unresolved author to main."
+  },
+  {
+   "id": "B16",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Provide sameLane(a, b), differentVendor(a, b), and eligibleReviewLanes(authors) helpers operating on resolved records, because role equivalence and vendor independence are separate predicates that must remain consistent."
+  },
+  {
+   "id": "B17",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Provide identityForExecution(role, selection) and formatTrailer(identity, trailerKind) helpers, because execution and attribution must use the selected identity rather than an unrelated current-name constant."
+  },
+  {
+   "id": "B18",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Keep registry imports free of filesystem reads, subprocesses, probes, and environment-dependent selection, because guards and tests must obtain identical identity data without triggering operational work."
+  },
+  {
+   "id": "B19",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Split fable-switch-core.mjs into model-lanes.mjs for identities and lane-switch-core.mjs for switch behavior, because moving the entire existing switch core into the registry would preserve the wrong dependency boundary."
+  },
+  {
+   "id": "B20",
+   "file": "scripts/lane-switch.mjs",
+   "defect": "Rename fable-switch.mjs and its CLI/core tests to lane-switch equivalents and expose on/off/status by --lane, because the final interface must control every lane while retaining the scarce lane's additional restrictions."
+  },
+  {
+   "id": "B21",
+   "file": "scripts/lane-routing.mjs",
+   "defect": "Rename astra-share.mjs and astra-share-core.mjs, including matching tests, to lane-routing equivalents, because routing policy describes tasks and roles rather than a particular model."
+  },
+  {
+   "id": "B22",
+   "file": "scripts/cross-review.mjs",
+   "defect": "Rename review-astra.mjs, review-astra-core.mjs, and their CLI, contribution, plan, and core tests to cross-review equivalents, because review must work in both directions between vendors."
+  },
+  {
+   "id": "B23",
+   "file": "scripts/ask-lane.mjs",
+   "defect": "Rename ask-astra.mjs and its core/tests to ask-lane equivalents and replace lane-selecting --model values with --lane roles, because an option choosing an organizational lane should not masquerade as a raw model override."
+  },
+  {
+   "id": "B24",
+   "file": "scripts/author-delegate.mjs",
+   "defect": "Consolidate author-astra.mjs and author-fable.mjs into author-delegate.mjs --lane <role>, retaining distinct runtime execution paths behind a common interface, because the small wrapper does not prove both underlying protocols are interchangeable."
+  },
+  {
+   "id": "B25",
+   "file": "scripts/author-delegate-core.mjs",
+   "defect": "Consolidate the author core and session tests around the new interface while preserving lane-specific behavioral cases, because consolidation must not discard safeguards embedded in the larger author implementation."
+  },
+  {
+   "id": "B26",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Replace ASTRA_MODEL, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, FABLE_MODEL, FABLE_MODEL_ID, CLAUDE_MODEL, and OPUS_MODEL variants with lane-record property access, because renaming duplicate constants would retain multiple identity sources."
+  },
+  {
+   "id": "B27",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Replace ASTRA_TRAILER and FABLE_TRAILER with the trailer formatter and replace OPUS_FALLBACK_MODEL variants with main-lane fallback access, because trailers and fallback selection must follow identity data automatically."
+  },
+  {
+   "id": "B28",
+   "file": "scripts/author-routing-core.mjs",
+   "defect": "Rename FABLE_ESCALATION_ROUNDS to SCARCE_ESCALATION_ROUNDS and update its declaration and src/config/fableEscalationDoc.test.ts, renaming that test to scarceEscalationDoc.test.ts, because the threshold belongs to scarce-lane policy."
+  },
+  {
+   "id": "B29",
+   "file": "scripts/runtime-adapters.mjs",
+   "defect": "Rename runCodex, codexArgs, authoringCodexArgs, codexTokens, parseCodexTranscript, and listCodexRollouts to role-neutral operations such as runLane, runtimeArgs, authoringRuntimeArgs, usageTokens, parseRuntimeTranscript, and listRuntimeSessions, because protocol dispatch should be explicit without vendor-bearing exported identifiers."
+  },
+  {
+   "id": "B30",
+   "file": "scripts/lane-routing-core.mjs",
+   "defect": "Rename recordAstraRun, afterAstraRun, astraAuthored, and kindsToAstra to recordLaneRun, afterLaneRun, authoredByLane, and kindsToLane with explicit lane arguments, because replacing a name without parameterizing its hidden fixed-lane assumption would leave the rebuild incomplete."
+  },
+  {
+   "id": "B31",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Rename fableIsOn, fableRefusalReason, fableStateAtCommit, fableAuthoringOutcome, and currentFableState to laneIsOn, laneRefusalReason, laneStateAtCommit, laneAuthoringOutcome, and currentLaneState, because historical and live switch decisions both require a lane parameter."
+  },
+  {
+   "id": "B32",
+   "file": "scripts/model-guard-core.mjs",
+   "defect": "Remove isOpenAiLane and the ALLOWED, FABLE_ALLOWED, MODEL_FAMILY_WORD, and MODEL_VENDOR_ADDRESS identity assumptions in favor of registry resolution and capability checks, because a renamed vendor test would still encode vendor knowledge."
+  },
+  {
+   "id": "B33",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Centralize legacy spelling maps for paths, environment keys, CLI values, and persisted enums as compatibility data, because consumers must read old formats without embedding retired model names throughout the new implementation."
+  },
+  {
+   "id": "B34",
+   "file": "scripts/lane-routing-core.mjs",
+   "defect": "Map ASTRA_SHARE_FILE to LANE_ROUTING_FILE, FABLE_SWITCH_FILE to LANE_SWITCH_FILE, FABLE_SWITCH_SET_BY to LANE_SWITCH_SET_BY, REVIEW_ASTRA_STATE_DIR to CROSS_REVIEW_STATE_DIR, and MEASURE_CODEX_SESSIONS_DIR to MEASURE_RUNTIME_SESSIONS_DIR, because the owned environment interface must become role-neutral."
+  },
+  {
+   "id": "B35",
+   "file": "scripts/runtime-adapters.mjs",
+   "defect": "Replace owned CODEX_BIN and CODEX_HOME identifiers with runtimeBinary and runtimeHome configuration access, while preserving the external CLI's actual CODEX_HOME environment key through registry metadata, because renaming an external protocol variable would break the tool."
+  },
+  {
+   "id": "B36",
+   "file": "scripts/runtime-adapters.mjs",
+   "defect": "Move ASTRA_REASONING_EFFORT to lane execution configuration and use LANE_REASONING_EFFORT only if an environment override is actually supported, because the inventory does not establish that every uppercase identifier is an environment variable."
+  },
+  {
+   "id": "B37",
+   "file": "scripts/lane-routing-core.mjs",
+   "defect": "Read legacy environment aliases during migration, accept equivalent dual settings, and reject conflicting old/new settings with an actionable error, because silently choosing a value could direct execution or state writes to the wrong location."
+  },
+  {
+   "id": "B38",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Replace .claude/fable-switch.json with a versioned .claude/lane-switch.json containing per-role state and attribution, mapping the legacy record only to scarce, because the old single switch does not establish the state of every lane."
+  },
+  {
+   "id": "B39",
+   "file": "scripts/lane-routing-core.mjs",
+   "defect": "Replace .claude/astra-share.json with .claude/lane-routing.json and map claude-only to main-only, default to default, and prefer-astra to prefer-cross, because existing routing intent must survive the vocabulary change."
+  },
+  {
+   "id": "B40",
+   "file": "scripts/author-routing-core.mjs",
+   "defect": "Map astra-authored and sol-authored to cross-authored, astra-only and sol-only to cross-only, and old unavailable outcomes to lane-unavailable with a lane field, because machine-readable results need stable roles without losing which lane failed."
+  },
+  {
+   "id": "B41",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Classify remaining inventory tokens individually before assigning compatibility mappings, especially sole, sol-work, bulk-sol, and temporary-directory prefixes, because search matches alone do not establish equivalent persisted semantics."
+  },
+  {
+   "id": "B42",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Resolve shared control state against the main checkout through the existing authoritative path mechanism, because worktree-local replacement files would create contradictory switch and routing policies."
+  },
+  {
+   "id": "B43",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Make mutable-state migration versioned, locked, atomic, repeatable, and conservative on conflicting legacy/new files, because concurrent sessions and interrupted migrations must not silently overwrite policy."
+  },
+  {
+   "id": "B44",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Preserve the existing effective defaults for main and cross while retaining the scarce lane's explicit authorization requirement, because making every lane switchable must neither disable established routing accidentally nor enable scarce execution implicitly."
+  },
+  {
+   "id": "B45",
+   "file": "scripts/lane-routing-core.mjs",
+   "defect": "Keep operator enablement, routing preference, runtime availability, and scarce authorization as distinct state dimensions, because a successful probe must not turn a lane on or grant scarce access."
+  },
+  {
+   "id": "B46",
+   "file": "scripts/model-trailer-gate.mjs",
+   "defect": "Resolve current and retired trailer names to the same stable lane while preserving their original identity descriptor, because historical validation needs both lane equivalence and accurate historical attribution."
+  },
+  {
+   "id": "B47",
+   "file": "scripts/model-guard-core.mjs",
+   "defect": "Parse complete attribution entries before resolving identities and allow only explicitly supported normalization and suffix grammar, because substring matches, model-like email addresses, and malformed multi-author strings can spoof attribution."
+  },
+  {
+   "id": "B48",
+   "file": "scripts/model-trailer-gate.mjs",
+   "defect": "Emit the actual observed execution identity in new trailers, including an explicitly selected fallback, because printing a lane's preferred model when another model performed the work would falsify provenance."
+  },
+  {
+   "id": "B49",
+   "file": ".claude/mechanism-reviews.jsonl",
+   "defect": "Preserve existing ledger bytes and normalize legacy identities in memory when reading, because rewriting append-only evidence can invalidate hashes, signatures, references, and historical claims."
+  },
+  {
+   "id": "B50",
+   "file": "scripts/mechanism-review-core.mjs",
+   "defect": "Add stable lane roles and explicit schema versions to new ledger records while retaining actual model display names and IDs, because durable records need both model-independent joins and truthful identity evidence."
+  },
+  {
+   "id": "B51",
+   "file": "scripts/mechanism-review-core.mjs",
+   "defect": "Reject disagreement between a record's claimed role, resolved model identity, and available execution evidence, because adding a lane field must not provide a shortcut around existing provenance checks."
+  },
+  {
+   "id": "B52",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Make laneStateAtCommit understand the legacy switch path and legacy schema at the queried revision, because reading today's migrated state cannot establish whether historical scarce-lane authoring was authorized."
+  },
+  {
+   "id": "B53",
+   "file": "scripts/cross-review-core.mjs",
+   "defect": "Require a reviewer lane's vendor field to differ from every relevant author lane's vendor field, because different roles or different model names within one vendor do not satisfy cross-vendor review."
+  },
+  {
+   "id": "B54",
+   "file": "scripts/cross-review-core.mjs",
+   "defect": "Fail closed on missing or unresolved author identities and on an empty eligible-reviewer set, because guessing a vendor or reverting to a same-vendor lane would silently weaken the rule."
+  },
+  {
+   "id": "B55",
+   "file": "scripts/cross-review-core.mjs",
+   "defect": "Resolve GPT-6.1 Sol, GPT-6 Astra, and GPT-5.6 Sol to cross before evaluating self-review, because renaming or upgrading a model cannot make that lane independent of its own earlier work."
+  },
+  {
+   "id": "B56",
+   "file": "scripts/cross-review-core.mjs",
+   "defect": "Collect relevant authors across the reviewed commit range and recorded implementation contributions, retaining existing review-scope semantics, because checking only the latest commit or one nominal author can miss a contributing lane."
+  },
+  {
+   "id": "B57",
+   "file": "scripts/cross-review-core.mjs",
+   "defect": "Report a review conflict when relevant authors collectively cover every available vendor rather than silently dropping one author, because a valid cross-vendor reviewer may genuinely be unavailable for that scope."
+  },
+  {
+   "id": "B58",
+   "file": "scripts/cross-review.mjs",
+   "defect": "Select and invoke any eligible enabled reviewer through its runtime adapter, including main when cross authored the implementation, because replacing the review script's filename alone would leave the reverse review direction unsupported."
+  },
+  {
+   "id": "B59",
+   "file": "scripts/runtime-adapters.mjs",
+   "defect": "Keep executable names, external environment keys, transcript field names, session-directory conventions, and protocol discriminants as centralized runtime metadata with neutral adapter APIs, because external claude/codex contracts are legitimate data rather than policy knowledge."
+  },
+  {
+   "id": "B60",
+   "file": "scripts/runtime-adapters.mjs",
+   "defect": "Reject or verify arbitrary model overrides against the selected lane identity, because a caller must not execute one vendor's model while guards evaluate another lane's declared vendor."
+  },
+  {
+   "id": "B61",
+   "file": "scripts/author-delegate-core.mjs",
+   "defect": "Preserve refusal classification, cancellation, process cleanup, session attribution, token accounting, and existing fallback triggers during the rename, because a structural refactor must not broaden retries or reinterpret execution failures."
+  },
+  {
+   "id": "B62",
+   "file": "scripts/lane-routing-core.mjs",
+   "defect": "Bind reachability evidence to role, selected model ID, runtime, and executable installation, invalidating it when those change, because a successful probe for an older identity or another installation does not establish current availability."
+  },
+  {
+   "id": "B63",
+   "file": "scripts/authorship-check-core.mjs",
+   "defect": "Keep model claims, runtime transcript evidence, and observed author identity separate, because acceptance by an execution backend does not by itself prove which model produced the contribution."
+  },
+  {
+   "id": "B64",
+   "file": "scripts/measure-point-cost-core.mjs",
+   "defect": "Dispatch token/session parsing by runtime metadata and preserve raw historical cost records, because model renaming must neither lose accounting data nor assume both runtime formats are interchangeable."
+  },
+  {
+   "id": "B65",
+   "file": "scripts/model-lanes.test.mjs",
+   "defect": "Test registry structure, uniqueness, lookup rejection, fallback membership, and alias equivalence without repeating concrete identity literals outside model-lanes.mjs, because the registry is the source of identity data but its invariants still need independent verification."
+  },
+  {
+   "id": "B66",
+   "file": "scripts/test-support/lane-fixtures.mjs",
+   "defect": "Provide shared builders drawing current, retired, fallback, and trailer identities from the registry, because the migration must cover all measured tests rather than only the work order's outdated count of 114 literals in 28 files."
+  },
+  {
+   "id": "B67",
+   "file": "scripts/model-guard-core.test.mjs",
+   "defect": "Preserve adversarial attribution cases by composing registry identities with malformed punctuation, multiple authors, misleading addresses, and synthetic unknown identities, because replacing hard-coded names must not erase the parser's negative coverage."
+  },
+  {
+   "id": "B68",
+   "file": "scripts/cross-review-core.test.mjs",
+   "defect": "Exercise all three cross-lane names pairwise against self-review and test different-role/same-vendor rejection, because alias equality and vendor independence are separate regression risks."
+  },
+  {
+   "id": "B69",
+   "file": "scripts/cross-review-core.test.mjs",
+   "defect": "Add synthetic registries with arbitrary vendor labels and a lane whose vendor differs from today's arrangement, because tests using only today's two vendors could pass despite hidden vendor-specific branching."
+  },
+  {
+   "id": "B70",
+   "file": "scripts/lane-routing-core.test.mjs",
+   "defect": "Test legacy-only, new-only, equivalent dual, conflicting dual, malformed, and partially migrated state and environment inputs, because compatibility failures often occur at precedence and recovery boundaries."
+  },
+  {
+   "id": "B71",
+   "file": "scripts/runtime-adapters.test.mjs",
+   "defect": "Verify model-ID forwarding and runtime-specific command, environment, transcript, and fallback behavior using captured or synthetic protocol fixtures, because generic helper names do not prove the correct runtime contract is preserved."
+  },
+  {
+   "id": "B72",
+   "file": "scripts/mechanism-review-core.test.mjs",
+   "defect": "Verify old ledger records and trailers resolve without changing their serialized bytes, and verify new records survive a later lane-model switch, because backward readability and forward durability must both hold."
+  },
+  {
+   "id": "B73",
+   "file": "scripts/model-lanes-boundary.mjs",
+   "defect": "Add a maintained checker for tracked filenames and consumer contents across scripts, tests, operational docs, source, configuration, and command entry points, because checking only imports or scripts/ would miss the inventory's other consumers."
+  },
+  {
+   "id": "B74",
+   "file": "scripts/model-lanes-boundary.mjs",
+   "defect": "Derive forbidden concrete names, IDs, retired spellings, and legacy identifier/path tokens from model-lanes.mjs and inspect comments, strings, identifiers, and paths, because consumers must not hide model coupling in documentation or unused text."
+  },
+  {
+   "id": "B75",
+   "file": "scripts/model-lanes-boundary.mjs",
+   "defect": "Supplement exact identity matching with centrally defined family-pattern detection and review of unmatched inventory-style hits, because an exact-name blacklist alone cannot detect a newly hard-coded model or an unregistered future spelling."
+  },
+  {
+   "id": "B76",
+   "file": "scripts/model-lanes-boundary.test.mjs",
+   "defect": "Test the checker with temporary synthetic violations in filenames, identifiers, comments, strings, and docs, plus justified exclusions, because a green boundary check is meaningful only if its coverage and failure behavior are exercised."
+  },
+  {
+   "id": "B77",
+   "file": "scripts/model-lanes-boundary.mjs",
+   "defect": "Permit historical evidence through an explicit reviewed path manifest with baseline hashes or equivalent immutability checks, because blanket exclusions for docs/, JSON, or fixtures would allow active consumers to evade the rule."
+  },
+  {
+   "id": "B78",
+   "file": "docs/model-lanes-inventory-1393.md",
+   "defect": "Classify this inventory, immutable work-order/design evidence, landed-history artifacts, and historical ledgers as records outside the consumer boundary, because the requirement cannot literally erase the evidence that describes the migration."
+  },
+  {
+   "id": "B79",
+   "file": "scripts/fixtures/",
+   "defect": "Retain concrete names in narrowly identified immutable protocol or historical-evidence fixtures only when exact bytes are the subject of verification; generate ordinary test inputs from lane data, because fixtures are not automatically exempt consumers."
+  },
+  {
+   "id": "B80",
+   "file": "src/",
+   "defect": "Replace concrete-model attribution comments and provenance strings in active source with stable point, artifact, and finding references while preserving their technical content, because active consumer files should meet the stated boundary without erasing the underlying historical evidence."
+  },
+  {
+   "id": "B81",
+   "file": "src/i18n/en.ts",
+   "defect": "Leave unrelated game prose and ordinary words untouched after contextual classification, because the broad case-sensitive inventory pattern produces matches that do not represent model identities and the supplied prose excerpt is incomplete."
+  },
+  {
+   "id": "B82",
+   "file": "scripts/model-lanes-boundary.mjs",
+   "defect": "Document external runtime contracts and the .claude directory as narrow exceptions to vendor-free vocabulary, while allowing no duplicated concrete model names in consumer code, because the mandated runtime values and existing external tool interfaces cannot themselves be renamed."
+  },
+  {
+   "id": "B83",
+   "file": "docs/lane-routing.md",
+   "defect": "Rename docs/astra-routing.md and rewrite active routing guidance around main, cross, and scarce roles, because operational documentation must remain usable after the command interface changes."
+  },
+  {
+   "id": "B84",
+   "file": "docs/command-index.md",
+   "defect": "Update the command index, batch-owner runbook, verify README, batch-autonomy, handover-architecture, four-eyes README, criticality-review, picture-check-levers, and maximum-qa documentation together, because each is a measured source of executable operational guidance."
+  },
+  {
+   "id": "B85",
+   "file": "CLAUDE.md",
+   "defect": "Rewrite §6 around the main chain, cross-vendor reviewer, and scarce lane and delete the obsolete difficult/HIGH-point authoring assignment, because the intended policy must agree with the supplied evidence that default live routing authors on main."
+  },
+  {
+   "id": "B86",
+   "file": ".claude/settings.json",
+   "defect": "Plan no settings edit solely for these renames, because the measured inventory says its hooks are already role-named; require the protected attended procedure only if implementation discovers an actual necessary change."
+  },
+  {
+   "id": "B87",
+   "file": "MEMORY.md",
+   "defect": "Include the external memory files effort-high-for-implementation.md, fable-sparingly.md, findings-carrier.md, hard-cases-go-to-sol.md, and serving-model-watch.md in the migration handoff, because stale instructions outside Git can keep invoking removed scripts after repository checks pass."
+  },
+  {
+   "id": "B88",
+   "file": "scripts/",
+   "defect": "Update imports, dynamic subprocess paths, package commands, test discovery, help output, temporary-file prefixes, error codes, and generated command references, because vendor-bearing filenames can remain operational dependencies even when ordinary imports compile."
+  },
+  {
+   "id": "B89",
+   "file": "scripts/",
+   "defect": "Remove the old executable filenames from the final tree rather than retaining permanent compatibility wrappers, because wrappers with model-bearing names would contradict the specified filename boundary; legacy persisted-data support belongs in readers instead."
+  },
+  {
+   "id": "B90",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "Accept the supplied owner record that global CLI 0.163.0 and the global gpt-6.1-sol OK probe completed steps 1–2, because this read-only design must neither repeat installation nor claim it independently performed the prerequisite."
+  },
+  {
+   "id": "B91",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "Stop execution before rebuilding if the actual implementation environment no longer matches that prerequisite or a required global probe fails, because the amendment explicitly makes global model availability a gate rather than an optional test."
+  },
+  {
+   "id": "B92",
+   "file": "scripts/blind-merge.mjs",
+   "defect": "Preserve blind divergent design outputs and have a distinct third model account for every decision ID in the merge before implementation, because the work order requires an auditable union rather than one designer informally editing the other's list."
+  },
+  {
+   "id": "B93",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Implement the registry and legacy readers before migrating consumers, because temporarily losing identity resolution would disable historical verification during the refactor."
+  },
+  {
+   "id": "B94",
+   "file": "scripts/",
+   "defect": "Migrate guards, attribution, review selection, runtime invocation, routing, and switches through one coherent integration boundary before removing old exports and entry points, because a runnable mixture of old and new interfaces can bypass guards or fail mid-batch."
+  },
+  {
+   "id": "B95",
+   "file": ".claude/lane-switch.json",
+   "defect": "Quiesce affected authoring/review processes before changing shared mutable state, retaining a recoverable legacy copy and avoiding dual writers, because old running sessions may recreate obsolete files after a successful migration."
+  },
+  {
+   "id": "B96",
+   "file": "scripts/",
+   "defect": "Complete test, source-comment, documentation, and memory migrations before enforcing the final boundary checker and deleting transitional compatibility exports, because a strict final gate should evaluate the finished migration rather than force broad temporary exemptions."
+  },
+  {
+   "id": "B97",
+   "file": "scripts/cross-review.mjs",
+   "defect": "Obtain implementation review from an eligible lane of another vendor that did not author the implementation, then invalidate that review if substantive reviewed code changes, because the design merge does not substitute for the required code review."
+  },
+  {
+   "id": "B98",
+   "file": "docs/model-lanes-inventory-1393.md",
+   "defect": "Require the complete unit suite, build, lint, boundary checker, migration tests, and targeted runtime smoke checks to pass before recording completion, because compilation alone cannot prove historical compatibility or correct model selection."
+  },
+  {
+   "id": "B99",
+   "file": "docs/model-lanes-inventory-1393.md",
+   "defect": "Record a final classified before/after inventory and unresolved exceptions rather than reporting a misleading zero for the broad search pattern, because runtime contracts, immutable history, and ordinary prose legitimately remain searchable."
+  },
+  {
+   "id": "B100",
+   "file": "scripts/model-lanes.mjs",
+   "defect": "Treat accidental alias expansion as a security-sensitive risk and review registry edits accordingly, because this single data module will govern both permitted execution and trust decisions about authorship."
+  },
+  {
+   "id": "B101",
+   "file": "scripts/lane-switch-core.mjs",
+   "defect": "Treat lost scarce-lane gating, worktree state divergence, and partial migration rollback as release-blocking risks, because these failures can change who is allowed to act even when all model names look correct."
+  },
+  {
+   "id": "B102",
+   "file": "scripts/runtime-adapters.mjs",
+   "defect": "Treat changed runtime flags, reasoning defaults, fallback behavior, and attribution of the served model as separate integration risks, because a newer CLI accepting a model ID does not prove the old automation semantics remain intact."
+  },
+  {
+   "id": "B103",
+   "file": "scripts/model-lanes-boundary.mjs",
+   "defect": "Treat circular expected-value tests, an expanding exception manifest, and incomplete detection of novel model spellings as verification risks, because a green result can otherwise conceal precisely the coupling this work order removes."
+  },
+  {
+   "id": "B104",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "Land 1393 before point 1347 and make resumption depend on migrated shared state and updated command references, because the specified queue order protects the next point from running against a half-migrated control system."
+  }
+ ]
+}
