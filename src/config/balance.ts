@@ -2872,6 +2872,11 @@ export const VILLAGER_GLTF = {
   /** The walk's share (gaitWeights) from which a walk with no planted foot
    *  standing settles onto its lower sole (a run's flight stays). Calibratable. */
   soleSettleWalk: 0.9,
+  /** How far (person units per unit of leg) the lower heel or ball of a walk
+   *  may stay above the ground after the leg solve before the walk lowers its
+   *  hips onto it (villagerClipPose.ts, a jog's stride coming back to the
+   *  walk). Calibratable. */
+  walkSoleReach: 0.012,
   /** How far below the ground a flat foot's sole contact model may lie
    *  before the flat ankle is raised (person units per unit of leg): the
    *  contacts scale with the leg, the drawn foot does not quite. Calibratable. */

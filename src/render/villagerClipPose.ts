@@ -267,6 +267,10 @@ const _h = new THREE.Vector3()
 const SIDES = ['L', 'R'] as const
 const _target = [new THREE.Vector3(), new THREE.Vector3()]
 const _lift = [0, 0]
+const _preRot: number[] = []
+const _preHips = new THREE.Vector3()
+const _preTarget = [new THREE.Vector3(), new THREE.Vector3()]
+const _clear = [0, 0]
 
 /** Hip joint → knee → ankle at rest: the leg's full reach (person units). */
 function legLength(rest: Float32Array, thigh: number, shin: number, foot: number): number {
@@ -684,7 +688,12 @@ export function clipGaitPose(
   // leg is left alone. The last pass that moves the pelvis or a leg: every
   // trunk layer and hand contact follows it (skinnedFigure.tsx).
   const min = P.legCorrectMin * frame.legScale
-  SIDES.forEach((s, i) => {
+  // the pose and targets before the solve, for a second one under lowered hips
+  _preRot.length = out.rot.length
+  for (let k = 0; k < out.rot.length; k++) _preRot[k] = out.rot[k]
+  _preHips.copy(out.hips)
+  SIDES.forEach((_, i) => _preTarget[i].copy(_target[i]))
+  const solveLegs = () => SIDES.forEach((s, i) => {
     const thigh = asset.bones.indexOf(`thigh.${s}`)
     const shin = asset.bones.indexOf(`shin.${s}`)
     const foot = asset.bones.indexOf(`foot.${s}`)
@@ -734,16 +743,50 @@ export function clipGaitPose(
       g.slip[i].z = world.p[foot].z - _clipAt[i].z
     }
   })
+  solveLegs()
+  // THE WALK SETS A SOLE DOWN (point 1330): a jog's long stride coming back
+  // to the walk leaves no heel or ball within 4 cm of the ground — its
+  // trailing foot rolled up steep on its toes or lifting off them, the
+  // leading one in the air. Where the lower heel or ball lies above
+  // G.walkSoleReach the walk lowers its hips by the rest (at most
+  // G.pelvisDropMax, the runs' own limit) and solves the legs again from the clip's pose, each
+  // foot's target lowered with them as far as its lowest contact clears
+  // the ground (a foot down keeps its spot and rolls about it). From 0 at
+  // that reach: never a step.
+  const sw = smoothstep(Math.min(1, Math.max(0, (gait.walk - G.soleSettleWalk) / Math.max(1e-6, 1 - G.soleSettleWalk))))
+  if (body && sw > 0) {
+    const ce = contactPoints(asset, world, frame.legScale)
+    const sole = Math.min(ce.L.heel.y, ce.L.ball.y, ce.R.heel.y, ce.R.ball.y)
+    const lower = Math.min(sole - G.walkSoleReach * frame.legScale, G.pelvisDropMax * frame.legScale) * sw
+    if (lower > 1e-6) {
+      SIDES.forEach((s, i) => (_clear[i] = Math.max(0, Math.min(ce[s].heel.y, ce[s].ball.y, ce[s].tip.y))))
+      for (let k = 0; k < out.rot.length; k++) out.rot[k] = _preRot[k]
+      out.hips.copy(_preHips)
+      out.hips.y -= lower
+      SIDES.forEach((_, i) => {
+        _target[i].copy(_preTarget[i])
+        _target[i].y -= Math.min(lower, _clear[i])
+      })
+      forwardKinematics(asset, frame.rest0, out, world)
+      solveLegs()
+    }
+  }
   // THE WALK STANDS ON A SOLE: where no planted foot stands after the solve
   // (a run's long stride coming back to the walk leaves its trailing foot
   // beyond reach and the leading one still in the air), the walk settles
-  // onto its lower sole (heel, ball) — never a toe tip below the ground
-  if (!_standing[0] && !_standing[1]) {
+  // onto its lower sole (heel, ball) — never a toe tip below the ground.
+  // A foot counted standing can still be lifting off its held contacts
+  // (point 1330: both soles 4-9 cm up in the first walk frames after a jog),
+  // so wherever no heel or ball lies within G.walkSoleReach the walk settles
+  // too, down to that reach (from 0 at it: never a step).
+  {
     const ce = contactPoints(asset, world, frame.legScale)
     const sole = Math.min(ce.L.heel.y, ce.L.ball.y, ce.R.heel.y, ce.R.ball.y)
     const tip = Math.min(ce.L.tip.y, ce.R.tip.y)
     const w0 = G.soleSettleWalk
-    const rest = Math.max(0, Math.min(sole, tip)) * smoothstep(Math.min(1, Math.max(0, (gait.walk - w0) / Math.max(1e-6, 1 - w0))))
+    const down = !_standing[0] && !_standing[1] ? Math.min(sole, tip) : 0
+    const reach = Math.min(sole - G.walkSoleReach * frame.legScale, tip)
+    const rest = Math.max(0, down, reach) * smoothstep(Math.min(1, Math.max(0, (gait.walk - w0) / Math.max(1e-6, 1 - w0))))
     if (rest > 0) {
       out.hips.y -= rest
       for (let k = 0; k < n; k++) world.p[k].y -= rest

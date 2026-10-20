@@ -363,6 +363,48 @@ describe('the clip gait on the ground', () => {
     }
   })
 
+  it('coming back from a short jog at uneven frames, the lower heel or ball is down from the first walking frame', () => {
+    // point 1330: a jog's stride coming back to the walk left its held foot
+    // beyond the walk's pelvis reach and the other in the air — no heel or
+    // ball within 4 cm of the ground (0.042 on the adult, village-walk 0.0402)
+    const n = asset.bones.length
+    const rng = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        const per = f.legScale * f.scale
+        let worst = 0
+        for (let seed = 1; seed < 40; seed++) {
+          const r = rng(seed)
+          const g = newClipGait()
+          const pose = newPose(n)
+          const world = newWorld(n)
+          let z = 0
+          let speed = 1.45 * per
+          // a dip into the jog of random onset, length and pace, at 25-120 Hz
+          const from = 1 + r() * 1.5
+          const span = 0.15 + r() * 0.8
+          const jog = 1.9 + r() * 0.8
+          for (let t = 0; t < 4.5; ) {
+            const dt = 1 / 120 + r() * (1 / 25)
+            t += dt
+            const want = (t > from && t < from + span ? jog : 1.45) * per
+            speed += (want - speed) * (1 - Math.exp(-dt / 0.12))
+            z += speed * dt
+            stepClipGait(g, asset, f, speed * dt, speed)
+            clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+            forwardKinematics(asset, f.rest0, pose, world)
+            if (t < 1 || gaitWeights(speed / f.scale, f.legScale).walk < 0.98) continue
+            const c = contactPoints(asset, world, f.legScale)
+            worst = Math.max(worst, Math.min(c.L.heel.y, c.L.ball.y, c.R.heel.y, c.R.ball.y) * f.scale)
+          }
+        }
+        // measured at most 0.0347 (20.10.2026); 0.0420 before
+        expect(worst, `${sex} ${age}`).toBeLessThan(0.037)
+      }
+    }
+  }, 120_000)
+
   it('the gait is drawn on its own ground: a contact at 0 lands on the drawn sole', () => {
     const n = asset.bones.length
     const f = adult.frame
