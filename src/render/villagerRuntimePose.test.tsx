@@ -446,13 +446,15 @@ describe('the runtime-pose exporter', () => {
     const before = by('caught').frames.find((f) => f.t < 0.4)!
     expect(face(before.world[bone('head')]).y).toBeGreaterThan(-Math.sin(0.15))
     // the chaser strides at its sprint (its legs froze above the old teleport speed)
-    // the child chaser at 3.4 u/s and the caught child stand at their own
-    // height: no squat (their hips sat at 0.50-0.65 of it in the frozen walk
-    // and the CROUCH_MAX fallback)
-    const hipsOf = (id: string) => by(id).frames.map((fr) => (at(fr.world[bone('hips')]).y - fr.root.p[1]) / by(id).identity.scale)
-    const standing = hipsOf('walk')[0]
-    for (const id of ['chaser', 'caught']) expect(Math.min(...hipsOf(id)) / standing, id).toBeGreaterThan(0.7)
-    expect(Math.min(...hipsOf('caught')) / standing).toBeGreaterThan(0.9)
+    // the child chaser at 3.4 u/s and the caught child stay at a child's
+    // standing height: no squat (their hips sat at 0.50-0.65 of it in the
+    // frozen walk and the CROUCH_MAX fallback). The reference is the caught
+    // child standing before its slump, carried to each body's own scale.
+    const hipsOf = (id: string) => by(id).frames.map((fr) => at(fr.world[bone('hips')]).y - fr.root.p[1])
+    const caughtStanding = by('caught').frames.find((f) => f.t < 0.4)!
+    const childStanding = (id: string) => ((at(caughtStanding.world[bone('hips')]).y - caughtStanding.root.p[1]) * by(id).person.scale) / by('caught').person.scale
+    expect(Math.min(...hipsOf('chaser')) / childStanding('chaser')).toBeGreaterThan(0.75)
+    expect(Math.min(...hipsOf('caught')) / childStanding('caught')).toBeGreaterThan(0.95)
     const feet = by('chaser').frames.map((fr) => at(fr.world[bone('foot.L')]).z - fr.root.p[2])
     expect(Math.max(...feet) - Math.min(...feet)).toBeGreaterThan(0.05)
     // (where the bearing turns slowly: the gaze is damped, 0.18 s)
