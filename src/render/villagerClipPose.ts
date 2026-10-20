@@ -188,7 +188,9 @@ const _tq = new THREE.Quaternion()
 const _toeW = [0, 0]
 const _pivotOn: Contact[] = ['heel', 'heel']
 const _pivoted = [false, false]
+const _yHold: Record<Contact, number> = { heel: 0, ball: 0, tip: 0 }
 const _clipAt = [new THREE.Vector3(), new THREE.Vector3()]
+const _standing = [false, false]
 const _flat = [0, 0]
 const _support = [0, 0]
 const _stanceU = [0, 0]
@@ -223,18 +225,19 @@ function flatAnkle(asset: VillagerAsset, frame: PersonFrame, side: 'L' | 'R'): n
  * A planted foot out of the leg's reach rolls up on its pivot (`toPivot`,
  * ankle → contact, world) instead of being dragged: the ankle target moves
  * to the nearest point the leg reaches at the pivot's distance, and the foot
- * (`footQ`, world; the toes `toeQ` too when they carry the pivot) pitches
- * about the pivot, which stays on its spot. Mutates `target`, `footQ`, `toeQ`.
+ * (`footQ`, world) pitches about the pivot, which stays on its spot (`_hoQ`
+ * keeps that turn). Mutates `target` and `footQ`; 'out' where the pivot lies
+ * beyond the leg's reach.
  */
-function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion, toeQ: THREE.Quaternion | null): boolean {
+function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion): 'reached' | 'rolled' | 'out' {
   const hip = world.p[thigh]
   const reach = (legLength(frame.rest0, thigh, shin, foot) - 1e-4) * G.legReach
-  if (hip.distanceTo(target) <= reach) return false
+  if (hip.distanceTo(target) <= reach) return 'reached'
   const pivot = _hoB.copy(target).add(toPivot)
   const d = toPivot.length()
   const axis = _hoAx.copy(pivot).sub(hip)
   const D = axis.length()
-  if (D < 1e-6 || D >= reach + d) return false
+  if (D < 1e-6 || D >= reach + d) return 'out'
   axis.divideScalar(D)
   // the circle where the spheres about the hip (reach) and the pivot (d) meet
   const a = (D * D + reach * reach - d * d) / (2 * D)
@@ -242,17 +245,15 @@ function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: numb
   const centre = _hoC.copy(hip).addScaledVector(axis, a)
   const u = _hoU.copy(target).sub(centre)
   u.addScaledVector(axis, -u.dot(axis))
-  if (u.lengthSq() < 1e-12) return false
+  if (u.lengthSq() < 1e-12) return 'out'
   target.copy(centre).addScaledVector(u.normalize(), r)
   _hoQ.setFromUnitVectors(_hoV0.copy(toPivot).normalize(), _hoV1.copy(pivot).sub(target).normalize())
   footQ.premultiply(_hoQ)
-  toeQ?.premultiply(_hoQ)
-  return true
+  return 'rolled'
 }
 const _hoV0 = new THREE.Vector3()
 const _qI = new THREE.Quaternion()
 const _hoP = new THREE.Vector3()
-const _hoJ = new THREE.Vector3()
 const _hoV1 = new THREE.Vector3()
 const _hoB = new THREE.Vector3()
 const _hoAx = new THREE.Vector3()
@@ -526,10 +527,28 @@ export function clipGaitPose(
     let tipHold = 0
     const touch = PLANT_TOUCH * frame.legScale
     const letGo = G.plantLetGo * touch
+    // the walk carries a contact through its authored support even where the
+    // retargeted clip lifts it early (its trailing ball and toe ride up to
+    // 2.5 cm before the clip's own support ends)
+    const sup = walkClip.contacts?.support?.[s]
     for (const k of CONTACTS) {
       const p = c[k]
       p.z += shift
-      if (!body || p.y >= letGo) {
+      // the height the hold reads
+      let y = p.y
+      if (sup && sup[k].length) {
+        // its spans as one (the walk's ball touches twice before its toe-off)
+        const a = Math.min(...sup[k].map((x) => x[0]))
+        const b = Math.max(...sup[k].map((x) => x[1]))
+        const x = (((g.phase - a) % 1) + 1) % 1
+        if (x < b - a) {
+          // eased in after the touch and out before the lift, never a step
+          const e = Math.max(1e-6, G.supportEase)
+          y *= 1 - gait.walk * smoothstep(Math.min(1, x / e, (b - a - x) / e))
+        }
+      }
+      _yHold[k] = y
+      if (!body || y >= letGo) {
         held[k] = null
         continue
       }
@@ -538,7 +557,7 @@ export function clipGaitPose(
       // (fully held up to 60 % of the touch height: a short leg's toe still
       // carries where the no-slide test counts it as down), and over a band
       // above the touch height, so its share of the hold fades over frames
-      const w = smoothstep(Math.min(1, (letGo - p.y) / (letGo - 0.6 * touch)))
+      const w = smoothstep(Math.min(1, (letGo - y) / (letGo - 0.6 * touch)))
       if (k === 'tip') tipHold = w
       toPerson(frame, body, held[k]!, _h.set(0, 0, 0))
       _miss.x += w * (_h.x - p.x)
@@ -563,10 +582,11 @@ export function clipGaitPose(
     }
     const far = Math.hypot(_miss.x, _miss.z)
     const limit = G.plantRelease * frame.legScale
-    if (body && far > limit && fw <= 0) {
+    if (body && far > limit && fw <= 0 && !g.planted[i]) {
       // Held too far from the clip's own foot (a gait blend that strides
       // otherwise than its phase, a shove): the hold gives way just enough to
-      // stay within reach — a slip, never a jump.
+      // stay within reach — a slip, never a jump. A planted foot is placed by
+      // its pivot instead and rolls up on it out of reach (`heelOff`).
       _miss.multiplyScalar(limit / far)
       for (const k of CONTACTS) if (held[k]) held[k] = toWorld(frame, body, _h.copy(c[k]).add(_miss))
     }
@@ -578,7 +598,7 @@ export function clipGaitPose(
       // (measured 18.10.2026, natural-villager-motion step 10)
       for (const k of CONTACTS) {
         const p = c[k]
-        if (p.y < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
+        if (_yHold[k] < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
       }
     }
     slip.x = _miss.x
@@ -614,7 +634,8 @@ export function clipGaitPose(
         } else l.applyQuaternion(_fq)
         toPerson(frame, body, held[piv]!, _pv.set(0, 0, 0))
         // the pivot where the flat foot puts it lying flat (the ankle at its
-        // flat height), at the clip's contact's height otherwise
+        // flat height), at the height its hold reads otherwise (on the
+        // ground through its authored support)
         const cp = asset.contactPoints[s]
         const r0 = frame.rest0
         const toe = asset.bones.indexOf(`toe.${s}`)
@@ -670,6 +691,7 @@ export function clipGaitPose(
     const toe = asset.bones.indexOf(`toe.${s}`)
     const fw = _flat[i]
     const tw = _toeW[i]
+    _standing[i] = false
     const far = world.p[foot].distanceTo(_target[i]) > min
     if (!far && fw <= 0 && tw <= 0) return
     // the foot (and its toes) keep their world turn through the solve; a flat
@@ -682,10 +704,14 @@ export function clipGaitPose(
       const k = _pivotOn[i]
       const v = _hoP.copy(asset.contactPoints[s][k]).multiplyScalar(frame.legScale)
       if (k === 'tip') {
+        // on its toes: the toes lie where they carry and the foot rolls
+        // about their joint (its ball stays just under it, near the ground)
         const r0 = frame.rest0
-        v.applyQuaternion(_keepToe).add(_hoJ.set(r0[toe * 3] - r0[foot * 3], r0[toe * 3 + 1] - r0[foot * 3 + 1], r0[toe * 3 + 2] - r0[foot * 3 + 2]).applyQuaternion(_keep))
+        v.set(r0[toe * 3] - r0[foot * 3], r0[toe * 3 + 1] - r0[foot * 3 + 1], r0[toe * 3 + 2] - r0[foot * 3 + 2]).applyQuaternion(_keep)
       } else v.applyQuaternion(_keep)
-      if (heelOff(frame, world, thigh, shin, foot, _target[i], v, _keep, k === 'tip' ? _keepToe : null) && k !== 'tip') {
+      const roll = heelOff(frame, world, thigh, shin, foot, _target[i], v, _keep)
+      _standing[i] = roll !== 'out'
+      if (roll === 'rolled' && k !== 'tip') {
         // the toes rolled over lift their tip a share of the foot's pitch
         // (a flat toe on a pitching foot pushed its tip along the ground)
         _keepToe.premultiply(_hoQ.invert().slerp(_qI, 1 - G.toeLift))
@@ -708,6 +734,21 @@ export function clipGaitPose(
       g.slip[i].z = world.p[foot].z - _clipAt[i].z
     }
   })
+  // THE WALK STANDS ON A SOLE: where no planted foot stands after the solve
+  // (a run's long stride coming back to the walk leaves its trailing foot
+  // beyond reach and the leading one still in the air), the walk settles
+  // onto its lower sole (heel, ball) — never a toe tip below the ground
+  if (!_standing[0] && !_standing[1]) {
+    const ce = contactPoints(asset, world, frame.legScale)
+    const sole = Math.min(ce.L.heel.y, ce.L.ball.y, ce.R.heel.y, ce.R.ball.y)
+    const tip = Math.min(ce.L.tip.y, ce.R.tip.y)
+    const w0 = G.soleSettleWalk
+    const rest = Math.max(0, Math.min(sole, tip)) * smoothstep(Math.min(1, Math.max(0, (gait.walk - w0) / Math.max(1e-6, 1 - w0))))
+    if (rest > 0) {
+      out.hips.y -= rest
+      for (let k = 0; k < n; k++) world.p[k].y -= rest
+    }
+  }
   return out
 }
 

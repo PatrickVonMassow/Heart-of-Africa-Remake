@@ -12,7 +12,7 @@ import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
 import { clipGaitPose, clipPoseAt, gaitFootGround, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
-import { contactPoints, forwardKinematics, gaitAt, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
+import { contactPoints, forwardKinematics, gaitAt, gaitWeights, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
 
 let asset: VillagerAsset
 let adult: GltfPerson
@@ -328,6 +328,37 @@ describe('the clip gait on the ground', () => {
           // each foot flat over a share of the cycle (measured 0.19-0.36; none before)
           for (const k of flat) expect(k / frames, where).toBeGreaterThan(0.15)
         }
+      }
+    }
+  })
+
+  it('coming back from a jog into the walk, a sole is on the ground from the first walking frame', () => {
+    // point 1330: the jog's long stride left the trailing foot planted beyond
+    // reach and the leading one in the air, both soles 5 cm up
+    const n = asset.bones.length
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        const g = newClipGait()
+        const pose = newPose(n)
+        const world = newWorld(n)
+        const dt = 1 / 30
+        let z = 0
+        let worst = 0
+        for (let t = 0; t < 7; t += dt) {
+          // per leg: the walk at its longest stride, a dip into the jog band and back
+          const perLeg = t < 3 ? 1.45 : t < 4 ? 1.45 + (t - 3) * 0.6 : t < 5 ? 2.05 - (t - 4) * 0.6 : 1.45
+          const speed = perLeg * f.legScale * f.scale
+          z += speed * dt
+          stepClipGait(g, asset, f, speed * dt, speed)
+          clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+          forwardKinematics(asset, f.rest0, pose, world)
+          if (t < 1 || gaitWeights(speed / f.scale, f.legScale).walk < 0.98) continue
+          const c = contactPoints(asset, world, f.legScale)
+          worst = Math.max(worst, Math.min(c.L.heel.y, c.L.ball.y, c.R.heel.y, c.R.ball.y))
+        }
+        // measured at most 0.0096 (20.10.2026); 0.055 before
+        expect(worst, `${sex} ${age}`).toBeLessThan(0.02)
       }
     }
   })

@@ -2864,6 +2864,14 @@ export const VILLAGER_GLTF = {
   /** Share of a rolling foot's pitch its toes lift their tip by while the
    *  foot rolls over its ball (villagerClipPose.ts `heelOff`). Calibratable. */
   toeLift: 0.3,
+  /** Share of the cycle over which the walk eases a sole contact onto the
+   *  ground after its authored touch and off it before its authored lift
+   *  (the retargeted clip lifts its trailing ball and toe early).
+   *  Calibratable. */
+  supportEase: 0.06,
+  /** The walk's share (gaitWeights) from which a walk with no planted foot
+   *  standing settles onto its lower sole (a run's flight stays). Calibratable. */
+  soleSettleWalk: 0.9,
   /** How far below the ground a flat foot's sole contact model may lie
    *  before the flat ankle is raised (person units per unit of leg): the
    *  contacts scale with the leg, the drawn foot does not quite. Calibratable. */
