@@ -624,6 +624,9 @@ export function clipPoseAt(asset: VillagerAsset, frame: PersonFrame, clip: Villa
  * The pose carried onto the hung skeleton: per bone the LOCAL rotation that
  * gives the drawn bone the pose's world turn (W · hang⁻¹, the parent's taken
  * out), and the hips' place on the drawn body (figure units, body-mesh frame).
+ * `ground`: the pose's ground (person units) put on the drawn sole — the hung
+ * rest's sole by default; the gait grounds its contacts at 0, where the rest
+ * A-pose's flat foot stands.
  */
 export function toHung(
   asset: VillagerAsset,
@@ -631,6 +634,7 @@ export function toHung(
   pose: VillagerPose,
   outLocal: THREE.Quaternion[],
   outHips: THREE.Vector3,
+  ground = frame.sole,
 ): void {
   const n = asset.bones.length
   const world = ensureWorld(_w, n)
@@ -644,7 +648,7 @@ export function toHung(
     else outLocal[i].copy(_inv.copy(hung[p]).invert()).multiply(hung[i])
   }
   const h = asset.parents.indexOf(-1)
-  outHips.copy(world.p[h]).setY(world.p[h].y - frame.sole).multiplyScalar(frame.scale)
+  outHips.copy(world.p[h]).setY(world.p[h].y - ground).multiplyScalar(frame.scale)
 }
 const _hung: THREE.Quaternion[] = []
 const _inv = new THREE.Quaternion()

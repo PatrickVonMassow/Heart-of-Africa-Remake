@@ -174,7 +174,8 @@ export function applyClipLayers(
   // THE GAIT
   if (walking > 1e-3 && under) {
     clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose)
-    toHung(asset, f, c.pose, c.local, c.hips)
+    // the gait grounds its contacts at 0 (the rest A-pose's sole), not at the hung rest's
+    toHung(asset, f, c.pose, c.local, c.hips, 0)
     const w = walking
     blendInto(asset, bones, LEGS, c.local, w)
     blendHips(bones, c.hips, w)
