@@ -84,8 +84,10 @@ import {
   grabDue,
   handGapToBody,
   handOverArm,
+  holdBearing,
   newTagBodyWeights,
   prepareDue,
+  readySeconds,
   quarryBearing,
   stepTagGame,
   steerGrab,
@@ -1200,13 +1202,14 @@ function Kids({
         const gaze = i === game.chaser ? chaserGaze(game, tagCfg) : 0
         const turn = (grabTurns.current[i] ?? 0) * reach + gaze * (1 - reach)
         // the glTF body's readied arm and caught hold, eased (steps 15/16)
-        weights.prepare = easeWeight(weights.prepare, i === game.chaser && prepareDue(game, tagCfg), VILLAGER_POSE.tagChaser.prepareSeconds, dt)
+        weights.prepare = easeWeight(weights.prepare, i === game.chaser && prepareDue(game, tagCfg), readySeconds(), dt)
         weights.reach = easeWeight(weights.reach, !!bodyAims.current[i], VILLAGER_POSE.tagChaser.prepareSeconds, dt)
         weights.slump = easeWeight(weights.slump, tagBody(game, i) === 'caught', VILLAGER_POSE.caughtSlump.settleSeconds, dt)
         easeHandover(weights, dt)
         const bearing = quarry
           ? Math.atan2(Math.sin(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing), Math.cos(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing))
           : quarryBearing(game, i)
+        holdBearing(weights, bearing)
         if (weights.prepare <= 0 && weights.reach <= 0 && !bodyAims.current[i]) weights.side = null
         else weights.side ??= bearing >= 0 ? 'left' : 'right'
         const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn, tagCfg, {

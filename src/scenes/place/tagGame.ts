@@ -30,7 +30,7 @@
 // frame at a debug-raised sprint speed would otherwise land cleanly on the far
 // side of a fence panel, overlapping nothing.
 
-import { VILLAGER_POSE, type CaughtSlumpConfig, type ChaserBodyConfig } from '../../config/balance'
+import { VILLAGER_GLTF, VILLAGER_POSE, type CaughtSlumpConfig, type ChaserBodyConfig } from '../../config/balance'
 import { deflectedStep } from '../travel/wildlifeBehavior'
 import { FIGURE_LIMBS } from '../../render/figures'
 import {
@@ -1574,8 +1574,25 @@ export interface TagBodyWeights {
    *  and the body drawn the frame before (`handFrom`) blends into the new. */
   handover: number
   handFrom: FigurePose | null
+  /** The quarry's bearing UNWRAPPED across frames (`holdBearing`), for the
+   *  readied arm's blend only; null until the first frame. */
+  heldBearing: number | null
 }
-export const newTagBodyWeights = (): TagBodyWeights => ({ slump: 0, prepare: 0, reach: 0, side: null, handover: 0, handFrom: null })
+export const newTagBodyWeights = (): TagBodyWeights => ({ slump: 0, prepare: 0, reach: 0, side: null, handover: 0, handFrom: null, heldBearing: null })
+
+/**
+ * Carry the quarry's bearing on from the frame before without its ±π wrap.
+ * A part-readied arm blends from the clip's yaw toward a target that turns
+ * with the bearing; as the quarry passes behind, the wrapped bearing jumps by
+ * 2π and the blend by `prepare`·2π, which no pure function of the wrapped
+ * bearing can avoid. The unwrapped one keeps it continuous. It re-centres on
+ * the wrapped bearing whenever a whole turn is invisible in the drawn arm:
+ * not readied (the clip has the arm) or fully readied with no reach out.
+ */
+export function holdBearing(w: TagBodyWeights, bearing: number): void {
+  const invisible = w.prepare <= 0 || (w.prepare >= 1 && w.reach <= 0)
+  w.heldBearing = invisible || w.heldBearing === null ? bearing : w.heldBearing + angleTo(w.heldBearing, bearing)
+}
 
 /**
  * Take the reaching arm's side from a fresh grab aim. When the reach passes to
@@ -1677,6 +1694,14 @@ export function caughtBodyPose(c: CaughtSlumpConfig = VILLAGER_POSE.caughtSlump)
   }
 }
 
+/** Seconds the chaser's readied arm eases in and out over: `prepareSeconds`,
+ *  but never faster than a glTF body's clip hands an arm over
+ *  (`VILLAGER_GLTF.transitionSeconds`), so the arm is fully readied — the
+ *  clip's swing gone from it — once the weight reaches 1. */
+export function readySeconds(c: ChaserBodyConfig = VILLAGER_POSE.tagChaser): number {
+  return Math.max(c.prepareSeconds, VILLAGER_GLTF.transitionSeconds)
+}
+
 /** True while the chaser is free to run and its quarry is inside the prepare
  *  distance — wider than the commit distance, so the readied arm is only
  *  drawn and never gates or delays the grab (`grabDue` is unchanged). */
@@ -1721,15 +1746,26 @@ export function reachBodyPose(
   bearing: number,
   prepare: number,
   c: ChaserBodyConfig = VILLAGER_POSE.tagChaser,
+  held: number = bearing,
 ): FigurePose {
   const p = smooth01(prepare)
   const g = aim ? clamp01(grab) : 0
   const sign = side === 'left' ? 1 : -1
   const other: ArmSide = side === 'left' ? 'right' : 'left'
   const restOf = (s: ArmSide) => (s === 'left' ? REST_POSE.left : REST_POSE.right)
+  // The pivots' trunk turns by the whole pose turn, the gaze's included, while
+  // the glTF trunk takes only the chest's share of a gaze: the readied arm
+  // takes that turn back out, so it is held ahead of the drawn body and never
+  // swept round with the head as the quarry's bearing changes.
+  const turn = (aim?.turn ?? 0) * g + bearing * (1 - g)
   // the reaching side starts from rest (the clip's swing), not from the
-  // primitive's grab, which is aimed for another chain
-  const ready = lerpArm(restOf(side), armAim(sign * 0.1, c.prepareElevation), p)
+  // primitive's grab, which is aimed for another chain. The held yaw is left
+  // UNWRAPPED, and taken from the bearing unwrapped across frames (`held`,
+  // `holdBearing`): a wrapped target flips by 2π as the quarry passes behind,
+  // and the partial blend from the clip's yaw would snap the arm across the
+  // body. Against the drawn `turn` it differs only by whole turns once readied.
+  const armTurn = (aim?.turn ?? 0) * g + held * (1 - g)
+  const ready = lerpArm(restOf(side), armAim(sign * 0.1 - armTurn, c.prepareElevation), p)
   const arm = aim ? lerpArm(ready, armAim(aim.bearing, aim.elevation), g) : ready
   const reach = lerp(lerp(1, c.prepareReach, p), aim?.reach ?? 1, g)
   const protraction = lerp(c.prepareProtraction * p, c.reachProtraction, g)
@@ -1740,15 +1776,18 @@ export function reachBodyPose(
     left: side === 'left' ? arm : { ...own },
     right: side === 'right' ? arm : { ...own },
     lean: Math.min(Math.max(0, runLean), c.leanMax),
-    turn: (aim?.turn ?? 0) * g + bearing * (1 - g),
+    turn,
     shoulders: {
       left: { protraction: side === 'left' ? protraction : 0, elevation: 0 },
       right: { protraction: side === 'right' ? protraction : 0, elevation: 0 },
     },
-    // the lunge only once the reach is fully out and the quarry inside it
-    reach: { [side]: reach, lunge: !!aim && g >= 1 && aim.reach < c.reachMax },
     gaze: { yaw: bearing, pitch: 0, turn: bearing * (1 - g) },
   }
+  // A named reach takes the arm from the clip (a skinned figure's contact):
+  // from the first readied frame on, so the clip lets go of it while the arm
+  // comes up rather than after; an arm left to the swing names none.
+  // The lunge only once the reach is fully out and the quarry inside it.
+  if (p > 0 || g > 0) pose.reach = { [side]: reach, lunge: !!aim && g >= 1 && aim.reach < c.reachMax }
   return pose
 }
 
@@ -1781,7 +1820,7 @@ export function tagFigurePose(
   const side: ArmSide = drawn.aim?.side ?? w.side ?? (drawn.bearing >= 0 ? 'left' : 'right')
   const grab = Math.min(envelope, smooth01(w.reach))
   let under = reaching
-    ? reachBodyPose(shown, grab, drawn.aim, side, runLean, drawn.bearing, w.prepare)
+    ? reachBodyPose(shown, grab, drawn.aim, side, runLean, drawn.bearing, w.prepare, VILLAGER_POSE.tagChaser, w.heldBearing ?? drawn.bearing)
     : { left: shown.left, right: shown.right, lean: Math.max(runLean, shown.lean), turn }
   // the reach handed to the other arm: out of the body drawn before the switch
   if (reaching && w.handFrom && w.handover > 0) under = mixPose(w.handFrom, under, smooth01(1 - w.handover))

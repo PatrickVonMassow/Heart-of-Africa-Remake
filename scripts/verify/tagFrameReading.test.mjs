@@ -4,7 +4,11 @@ import {
   KID_HEIGHT,
   MIN_CHILD_PIXELS,
   VILLAGE_BEHIND,
+  PREPARE_ARMS,
   describeReading,
+  judgePrepareArms,
+  recordArmFrame,
+  ARM_ACQUISITION,
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 
@@ -168,5 +172,122 @@ describe('the reading is reported with its numbers', () => {
   it('probes the child from shin to head', () => {
     expect(AXIS_SAMPLES[0]).toBeLessThan(0.2)
     expect(AXIS_SAMPLES.at(-1)).toBeGreaterThan(0.7)
+  })
+})
+
+describe('the chaser\'s arms inside the prepare window', () => {
+  // a window of frames at 60 Hz: the readied left hand at z ahead plus its own
+  // sweep, the free right hand swinging by `free` over a 0.8 s stride
+  const window = (seconds, readiedSweep, free = 0.2) =>
+    Array.from({ length: Math.round(seconds * 60) + 1 }, (_, i) => {
+      const t = i / 60
+      const phase = Math.sin((2 * Math.PI * t) / 0.8)
+      return {
+        clock: 10 + t,
+        gap: 2.5,
+        side: 'left',
+        chaser: [
+          { hand: 'hand-left', local: { x: 0.2, y: 0.7, z: 0.3 + (readiedSweep / 2) * phase } },
+          { hand: 'hand-right', local: { x: -0.2, y: 0.6, z: 0.1 + (free / 2) * phase } },
+        ],
+      }
+    })
+
+  it('passes a held readied hand beside a swinging free hand', () => {
+    expect(judgePrepareArms([window(0.7, 0.02)]).ok).toBe(true)
+  })
+
+  it('fails a defective short window even when a healthy long one follows', () => {
+    const verdict = judgePrepareArms([window(0.45, 0.2), window(0.7, 0.02)])
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toMatch(/NOT HELD/)
+  })
+
+  it('needs one window long enough to judge the free arm', () => {
+    expect(judgePrepareArms([window(0.45, 0.02)]).ok).toBe(false)
+    expect(PREPARE_ARMS.longSpan).toBeGreaterThanOrEqual(0.6)
+  })
+
+  it('fails a free hand that does not swing', () => {
+    expect(judgePrepareArms([window(0.7, 0.02, 0.05)]).ok).toBe(false)
+  })
+
+  it('fails a short window whose free hand stands still, beside a healthy long one', () => {
+    const verdict = judgePrepareArms([window(0.45, 0.02, 0), window(0.7, 0.02, 0.2)])
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toMatch(/FREE HAND STILL/)
+  })
+
+  it('fails a later long window whose free hand stands still, after a healthy first one', () => {
+    const verdict = judgePrepareArms([window(0.7, 0.02, 0.2), window(0.7, 0.0, 0)])
+    expect(verdict.ok).toBe(false)
+  })
+
+  it('passes a short window whose free hand is mid-swing', () => {
+    expect(judgePrepareArms([window(0.45, 0.02, 0.2), window(0.7, 0.02, 0.2)]).ok).toBe(true)
+  })
+
+  it('names a window too short to measure a swing as unmeasured, never as swinging evidence', () => {
+    // 0.15 s cannot show a stride's swing: it is counted, its readied hand still judged
+    const verdict = judgePrepareArms([window(0.15, 0.02, 0), window(0.7, 0.02, 0.2)])
+    expect(verdict.ok).toBe(true)
+    expect(verdict.detail).toMatch(/1 too short to measure the free hand/)
+    // and alone it is no evidence at all
+    expect(judgePrepareArms([window(0.15, 0.02, 0.2)]).ok).toBe(false)
+    expect(PREPARE_ARMS.measureSpan).toBeLessThan(PREPARE_ARMS.longSpan)
+  })
+})
+
+describe('the prepare window is recorded to its end', () => {
+  // a 0.9 s window whose readied left hand snaps back 0.2 m at 0.7 s; the free
+  // hand swings throughout. The probe ends the window after 0.9 s.
+  const frames = Array.from({ length: Math.round(1.2 * 60) + 1 }, (_, i) => {
+    const t = i / 60
+    if (t > 0.9) return null
+    const phase = Math.sin((2 * Math.PI * t) / 0.8)
+    return {
+      clock: 10 + t,
+      gap: 2.5,
+      side: 'left',
+      chaser: [
+        { hand: 'hand-left', local: { x: 0.2, y: 0.7, z: t >= 0.7 ? 0.1 : 0.3 } },
+        { hand: 'hand-right', local: { x: -0.2, y: 0.6, z: 0.1 + 0.1 * phase } },
+      ],
+    }
+  })
+  const acquire = (cfg) => {
+    const acq = { first: frames[0], all: [frames[0]], frames: 0 }
+    for (const r of frames.slice(1)) {
+      const got = recordArmFrame(acq, r, cfg)
+      if (got) return got
+    }
+    return null
+  }
+
+  it('keeps recording past the minimum span, so a late snap is judged', () => {
+    const got = acquire(ARM_ACQUISITION.near)
+    expect(got.complete).toBe(true)
+    expect(got.all.at(-1).clock - got.all[0].clock).toBeCloseTo(0.9, 6)
+    const verdict = judgePrepareArms([got.all])
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toMatch(/NOT HELD/)
+  })
+
+  it('calls a window that ends before the minimum span incomplete', () => {
+    const acq = { first: frames[0], all: [frames[0]], frames: 0 }
+    const got = recordArmFrame(acq, null, ARM_ACQUISITION.near)
+    expect(got.complete).toBe(false)
+  })
+
+  it('reads the far swing over its span alone', () => {
+    const got = acquire(ARM_ACQUISITION.far)
+    expect(got.complete).toBe(true)
+    expect(got.all.at(-1).clock - got.all[0].clock).toBeLessThan(ARM_ACQUISITION.far.span + 0.02)
+  })
+
+  it('a window cut off by the frame bound is not complete', () => {
+    const acq = { first: frames[0], all: [frames[0]], frames: 0 }
+    const got = frames.slice(1, 50).reduce((r, f) => r ?? recordArmFrame(acq, f, { ...ARM_ACQUISITION.near, maxFrames: 40 }), null)
+    expect(got.complete).toBe(false)
   })
 })

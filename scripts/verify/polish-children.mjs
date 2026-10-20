@@ -5,7 +5,7 @@
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { assertBackend } from './_browser.mjs'
 import { waitForSceneReady } from './frameSubject.mjs'
-import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, describeReading, judgeChildFigure, judgeTagStandpoint } from './tagFrameReading.mjs'
+import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
 import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
 
@@ -512,12 +512,16 @@ if (section('tag-catch')) {
       }
     }
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
-    // read over a span of the game's own clock (far: a whole arm swing; near:
-    // more than half of one, as long as the prepare window reliably holds),
-    // so a SWINGING hand shows its sweep, forward and back, while a HELD one
-    // keeps its place ahead and only rides the run's bob.
-    const SPAN = { far: 0.5, near: 0.35 }
-    const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
+    // read over a span of the game's own clock, so a SWINGING hand shows its
+    // sweep, forward and back, while a HELD one keeps its place ahead and only
+    // rides the run's bob. The near span must cover most of a stride: measured
+    // 19.10.2026 on WebGPU the chaser's arm swings with a 0.7-1.05 s period and
+    // dwells ~0.25 s at its forward end (rising there, not advancing in z), so
+    // 0.35 s centred on that dwell read a correctly swinging hand as 0.09 m.
+    // Only some prepare windows last 0.6 s (11 of 26 measured), hence the
+    // retries below; a shorter window still has its readied hand judged. A
+    // prepare window is recorded to its END (ARM_ACQUISITION, recordArmFrame):
+    // reaching the span never ends the observation, so a late snap is seen.
     // ONE page-side RAF loop waits for the first frame in the window and then
     // records every following frame, so no frame falls into a handoff between
     // separate page calls. The acquisition keeps its own bound outside the page
@@ -530,41 +534,37 @@ if (section('tag-catch')) {
     const readSeriesInPage = (want) =>
       page
         .evaluate(
-          ({ want, span, src }) =>
+          ({ want, cfg, src, stepSrc }) =>
             new Promise((done) => {
               const probe = new Function(`return (${src})`)()
+              const step = new Function(`return (${stepSrc})`)()
               const deadline = performance.now() + 60000
-              let first = null
-              let all = null
-              let frames = 0
+              let acq = null
               const tick = () => {
-                if (!first) {
-                  first = probe({ want, lock: null })
-                  if (first) all = [first]
+                if (!acq) {
+                  const first = probe({ want, lock: null })
+                  if (first) acq = { first, all: [first], frames: 0 }
                   else if (performance.now() > deadline) return done({})
                   return requestAnimationFrame(tick)
                 }
-                const r = probe({ want, lock: first })
-                if (!r || r.side !== first.side) return done({})
-                if (r.clock !== all.at(-1).clock) all.push(r)
-                if (r.clock - first.clock >= span) return done({ all })
-                if (++frames > 600) return done({})
+                const got = step(acq, probe({ want, lock: acq.first }), cfg)
+                if (got) return done(got)
                 requestAnimationFrame(tick)
               }
               requestAnimationFrame(tick)
             }),
-          { want, span: SPAN[want], src: probeArms.toString() },
+          { want, cfg: ARM_ACQUISITION[want], src: probeArms.toString(), stepSrc: recordArmFrame.toString() },
         )
-        .then((got) => got.all ?? null)
+        .then((got) => (got.all ? got : null))
         .catch(() => null)
-    const sweep = (series, side) => {
-      const z = series.map((r) => hand(r, side).local.z)
-      return Math.max(...z) - Math.min(...z)
-    }
-    const minZ = (series, side) => Math.min(...series.map((r) => hand(r, side).local.z))
+    const sweep = armSweep
+    const minZ = armMinZ
     const fmt = (series, side) => `${side} sweep ${sweep(series, side).toFixed(3)} min z ${minZ(series, side).toFixed(3)}`
     let far = null
-    for (let tries = 0; tries < 4 && !far; tries++) far = await readSeries('far')
+    for (let tries = 0; tries < 4 && !far; tries++) {
+      const got = await readSeries('far')
+      far = got?.complete ? got.all : null
+    }
     check(
       "far from its quarry the catcher swings both hands with its run (neither is held out), read off the drawn pivots",
       !!far && ['left', 'right'].every((side) => sweep(far, side) > 0.12),
@@ -576,15 +576,21 @@ if (section('tag-catch')) {
       far ? JSON.stringify(far[0].runner?.map((h) => h.local)) : 'no runner frame',
     )
     // Inside the prepare window the readied hand is HELD out in front while
-    // the free hand keeps swinging.
-    let near = null
-    for (let tries = 0; tries < 8 && !near; tries++) near = await readSeries('near')
-    const side = near && near[0].side
-    const other = side === 'left' ? 'right' : 'left'
+    // the free hand keeps swinging. Every window read until the first long one
+    // is judged (judgePrepareArms), so a short defective window is never
+    // retried away.
+    const nearWindows = []
+    for (let tries = 0; tries < 16; tries++) {
+      const got = await readSeries('near')
+      if (!got) continue
+      nearWindows.push(got.all)
+      if (got.complete) break
+    }
+    const prepared = judgePrepareArms(nearWindows)
     check(
       "inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging",
-      !!near && minZ(near, side) > 0.15 && sweep(near, other) > 0.12 && sweep(near, side) < 0.5 * sweep(near, other),
-      near ? `readied ${fmt(near, side)}; free ${fmt(near, other)} from ${near[0].gap.toFixed(2)} m` : 'no chasing stride inside the prepare window',
+      prepared.ok,
+      prepared.detail,
     )
 
     // Side-on to the pair, a few metres off, on a line the rendered scene

@@ -458,9 +458,13 @@ export function SkinnedFigure({
       // walk. (Every hanging arm used to count, and the primitive's hand at its
       // knee drove the body into a full crouch to reach it: the "seated"
       // walkers of the report.)
+      // A pose that names a hand reach for the side takes that arm whatever its
+      // angle (the tag chaser's readied arm from its first frame on, so the
+      // clip lets go of it while the arm comes up).
       const contactArm = [0, 1].map((i) => {
         const v = arms.current[i]
         if (!pose || !v || !virtualHands.current[i]) return false
+        if ((i === 0 ? extras?.reach?.left : extras?.reach?.right) !== undefined) return true
         const rest = REST_POSE_ARMS[i]
         return !armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, rest)
       })
