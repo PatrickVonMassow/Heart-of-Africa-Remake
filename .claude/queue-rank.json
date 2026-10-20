@@ -1668,6 +1668,12 @@
       "why": "User order 19.10.2026: directly before point 1347, four eyes",
       "origin": "user",
       "place": "ahead"
+    },
+    "1395": {
+      "at": "2026-10-20T04:06:12.822Z",
+      "why": "Belongs with point 1383 (point/reach step on the same arm), which stands directly before it at the end of the work order",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1697,7 +1703,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-20T01:36:09.118Z",
+    "at": "2026-10-20T04:06:12.831Z",
     "points": [
       184,
       200,
@@ -2149,11 +2155,10 @@
       1381,
       1382,
       1383,
-      1384,
       1385,
-      1386,
       1388,
-      1393
+      1393,
+      1395
     ]
   }
 }
