@@ -688,6 +688,7 @@ export function SkinnedFigure({
         gazeHead(gb, g.yaw, g.pitch, 1 - clips.dig)
       }
       // THE HANDS ON THE FINAL BODY: each contact and the steadying hand.
+      let steadyShown = 0
       ;(['L', 'R'] as const).forEach((s, i) => {
         const up = b[`upperArm.${s}`]
         const fore = b[`forearm.${s}`]
@@ -751,7 +752,18 @@ export function SkinnedFigure({
           fore.quaternion.slerp(armBase[i][1], share)
           b[`hand.${s}`].quaternion.slerp(armBase[i][2], share)
         }
+        if (i === steadyArm) steadyShown = done ? 1 - share : 0
       })
+      // Dev: the steadying hand as drawn (which arm, how much of its solve
+      // shows past the clips), for the verification's head-load frames.
+      if (import.meta.env.DEV && outer.current) {
+        outer.current.userData.steady = {
+          arm: steadyArm < 0 ? null : steadyArm === 0 ? 'left' : 'right',
+          weight: steadyShown,
+          load: !!headSteady && loadShown,
+          contact: [contactArm[0], contactArm[1]],
+        }
+      }
       if (gltf && clips) {
         placeShovel(gltf.asset, gltf.person, clips, shovel.current)
         gripShaft(gltf.asset, gltf.person, gb, clips, shovel.current)
