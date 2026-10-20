@@ -72,15 +72,6 @@ export const RED_CHARGES = [
     why: 'Covering WebGPU run on main after point 1343 landed, 19.10.2026: hand 3.2 cm off the trunk at a 3.2 cm hand radius. Point 1340 keeps the catch-frame hand on the caught child (amended 19.10.2026); the charge dies with it.',
   },
   {
-    point: 1386,
-    suite: 'polish-children',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /a caught child was photographed standing slumped clear of the run/i,
-    why: 'Filed 19.10.2026 from the covering WebGPU run on main after point 1343 landed: no caught child inside the acquisition window. Point 1386 owns it; the charge dies with it.',
-  },
-  {
     point: 1344,
     suite: 'polish-children',
     kind: 'check',
