@@ -2662,6 +2662,14 @@ export const VILLAGER_ASSET = {
    *  normal while the covering garment is worn (render/villagerGarmentMask.ts;
    *  figure units, ≈ 5 mm). Calibratable. */
   garmentMaskPush: 0.004,
+  /** A shell garment's offset off the skin (scripts/villager/shells.py, render/
+   *  villagerShell.ts): base + rank × step along the body normal, figure units
+   *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
+  garmentShellBase: 0.003,
+  garmentShellStep: 0.003,
+  /** Per shell mesh name, a base that replaces garmentShellBase (the breast
+   *  cloth's named response raises its own). Calibratable. */
+  garmentShellBaseOverride: {} as Record<string, number>,
   /** How far a body or inner-garment vertex's skin weights may differ from
    *  the covering cloth's (L1: 0 alike, 2 disjoint) and it still counts as
    *  covered: a hand hanging inside a skirt's outline swings out of it and is

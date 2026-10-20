@@ -134,3 +134,19 @@ Judged for holes, cloth reading as skin, beads reading as a torus, beads on a wr
 - Stage 3: column bones with runtime-computed pivots, the driver with its solve, envelopes, chord target, ground bounds and verification pass, hem deltas, partial-panel grid, per-form flare and ease, hold-at-rest routing, junction contract, migration of skirtShort, skirtKnee, loinFlap, apron and girdleTails at the ranks above (`leg.L` and `leg.R` serve their leg splits; their seams over the waist beads and trousers follow the rim rule of this revision), penetration.py garment-against-garment and ground rows, and any inner-thigh residual row two records in stage 1.
 - Stage 4: trunk shells plus driven hems for shirt, robe, both togas and both wraps, the breast cloth's cleft if the stage-1 shell fails its picture; delete `tube`, `sleeve`, `armholes`.
 - Stage 5: cloaks and capes with arm clearance, hood shell, head envelopes and outfit-dependent offsets, the veil as a convex shell hung from the head envelope with region `arm` ≤ 0.2, the 0.2 contour cut extended above neck + 0.002 H, the mouth cavity bridged by the envelope and the round-8 B2 selftest rule, sling, limb rings, hair bag, `finish_rigid`; delete `column_sweep`, `skirt_weights`, `OUTER`, `SKIRTS`, `RIGID_HEAD`, `RIGID_CHEST` and the per-slot layer table.
+
+## 4. Outfit enumeration (recorded by the implementing session, 20.10.2026)
+
+Measured with `outfitCombos()` (scripts/villager/build.mjs) over `appearanceFor`: 158 distinct (sex, age, garments) combinations, 31 (form, wear) pairs. Co-worn stage-1 shells as generated, with the legacy garments worn beside them:
+
+| Shells worn together | Legacy sets beside them |
+| --- | --- |
+| trousers-waist | shirt; shirt, cap; robe, cap; robe, cloak-bothShoulders, cap |
+| breastCloth-chest | loinFlap; skirtShort; skirtKnee; wrapLong-waist; wrapLong-waist, headband; loinFlap, headband; skirtKnee, topknot; skirtKnee, cloak-bothShoulders, topknot |
+| neckBeads-neck | girdleTails; girdleTails, cloak-bothShoulders |
+| neckBeads-chest | loinFlap |
+| waistBeads-waist | apron; loinFlap; skirtShort; wrapLong-chest; skirtShort, robe; loinFlap, robe |
+| neckBeads-chest + waistBeads-waist | skirtShort; skirtShort, cloak-bothShoulders |
+| neckBeads-neck + waistBeads-waist | wrapLong-chest |
+
+No two co-worn shells share a rank and overlap, so the rank table stands without an inserted rank. Beads over trousers, breast cloth with chest collar and both collars together are not generated today; their seams are held by the rim-rule selftests and the forced-outfit pictures.
