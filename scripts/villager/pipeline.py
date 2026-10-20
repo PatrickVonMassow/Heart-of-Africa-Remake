@@ -15,9 +15,9 @@
               with its cover mask)
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report on the masked body and
-              garments; the run FAILS (exit 1) when any value exceeds the
-              tolerance in any frame (--stride N: every Nth pose, a quick look;
-              --baseline <json>: main's report json, for the comparison)
+              garments, information only (no gate; --stride N: every Nth pose,
+              a quick look; --baseline <json>: main's report json, for the
+              comparison)
   runtime     the round trip of the runtime-pose export (--runtime <json>,
               written by src/render/villagerRuntimePose.test.tsx): world joints
               and morph weights rebuilt here must match the game's within
@@ -154,11 +154,8 @@ def main():
         bad, unchecked = P.report(a.verification, body, clips, garments, cfg, a.stride, baseline=a.baseline or None)
         if rt is not None:
             P.runtime_report(a.verification, body, garments, cfg, rt)
-        if bad or unchecked:
-            # an exception, so Blender's --python-exit-code turns it into exit 1
-            raise RuntimeError(f'penetration: {bad} garment(s) over tolerance'
-                               + (f', {len(unchecked)} without a baseline row (unchecked: {", ".join(unchecked)})' if unchecked else '')
-                               + ' (see penetration-report.md)')
+        # information only, no gate (user decision 11.10.2026)
+        print(f'[penetration] {bad} garment(s) over tolerance, {len(unchecked)} without a baseline row (see penetration-report.md)')
 
 
 if __name__ == '__main__':
