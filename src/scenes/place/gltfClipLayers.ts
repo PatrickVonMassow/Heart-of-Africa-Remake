@@ -256,6 +256,8 @@ const _footQ = new THREE.Quaternion()
 const _yawQ = new THREE.Quaternion()
 const _liveW = { x: 0, z: 0 }
 const _liveQ = new THREE.Quaternion()
+/** Per foot, a landed foot's lift (world) as it steps the stand's miss over. */
+const _lift = [0, 0]
 const _plain = LEG_SIDES.map(() => [0, 1, 2, 3].map(() => new THREE.Quaternion()))
 const _yAxis = new THREE.Vector3(0, 1, 0)
 const _ik = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
@@ -318,7 +320,8 @@ function ankleAt(bones: Record<string, THREE.Bone>, s: 'L' | 'R', out: THREE.Vec
  * foot turned between the gait's turn and the stand's; a foot on the stand
  * keeps its world place and turn whatever the blended hips or the body's
  * heading do. As the weight falls those spots are drawn onto the body's own
- * stand (met at 0, where the standing legs take over without a jump). `share` (0 … 1): how much of this correction is drawn over the plain
+ * stand (met at 0, where the standing legs take over without a jump): a foot
+ * in the air as it goes, a landed one by a lifted re-step at the end. `share` (0 … 1): how much of this correction is drawn over the plain
  * bone blend (a kneel setting in takes it out).
  */
 function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: ClipLayers, w: number, share: number): void {
@@ -357,21 +360,36 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
   }
   // the stand's feet where and as they stood as the blend began, drawn onto
   // the body's own stand as the weight falls (the miss by the square of the
-  // weight's share: met at 0, the last frames' share of it small)
-  const keep = w < c.settleW && c.settleW > 0 ? (w / c.settleW) ** 2 : 1
-  c.settleW = w
+  // weight's share: met at 0, the last frames' share of it small) — a foot
+  // in the air only: one landed on the stand holds its spot and turn until
+  // the last G.settleRestep of the weight, then steps the miss over, lifted
+  // (a smooth share of it, met at 0)
+  const shares = settleShares(w, c.settleFirst)
+  const falling = w < c.settleW && c.settleW > 0
+  const keep = falling ? (w / c.settleW) ** 2 : 1
+  const R = G.settleRestep
+  const held = (x: number) => {
+    const u = Math.min(1, x / R)
+    return u * u * (3 - 2 * u)
+  }
+  const restep = falling && w < R ? held(w) / held(c.settleW) : 1
   LEG_SIDES.forEach((_, i) => {
     const yaw = body?.yaw ?? 0
-    if (body && keep < 1) {
+    const k = shares[i] >= 1 ? restep : keep
+    _lift[i] = 0
+    if (body && k < 1) {
       bodyToWorld(body, _stand[i], _liveW)
-      c.settleStand[i].x = _liveW.x + (c.settleStand[i].x - _liveW.x) * keep
-      c.settleStand[i].z = _liveW.z + (c.settleStand[i].z - _liveW.z) * keep
+      const dx = c.settleStand[i].x - _liveW.x
+      const dz = c.settleStand[i].z - _liveW.z
+      if (shares[i] >= 1) _lift[i] = G.settleStepLift * Math.hypot(dx, dz) * Math.sin(Math.PI * (1 - w / R))
+      c.settleStand[i].x = _liveW.x + dx * k
+      c.settleStand[i].z = _liveW.z + dz * k
     }
-    if (keep < 1) c.settleTurn[i].slerp(_liveQ.copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, yaw)), 1 - keep)
+    if (k < 1) c.settleTurn[i].slerp(_liveQ.copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, yaw)), 1 - k)
     if (body) worldToBody(body, c.settleStand[i], _stand[i])
     _standQ[i].copy(c.settleTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -yaw))
   })
-  const shares = settleShares(w, c.settleFirst)
+  c.settleW = w
   LEG_SIDES.forEach((s, i) => {
     const step = shares[i]
     const p = step * step * (3 - 2 * step)
@@ -379,7 +397,7 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     chain.forEach((b, k) => b.quaternion.copy(_codeLeg[i][k]).slerp(gaitLocal(asset, c, s, k), 1 - p))
     const [H, K, A, T, pole] = _ik
     T.copy(_gait[i]).lerp(_stand[i], p)
-    T.y += G.settleStepLift * Math.hypot(_gait[i].x - _stand[i].x, _gait[i].z - _stand[i].z) * Math.sin(Math.PI * step)
+    T.y += G.settleStepLift * Math.hypot(_gait[i].x - _stand[i].x, _gait[i].z - _stand[i].z) * Math.sin(Math.PI * step) + _lift[i] / (body?.unit || 1)
     // the foot turned from the gait's turn to the stand's with its step
     _footQ.copy(_gaitQ[i]).slerp(_standQ[i], p)
     hips.updateMatrixWorld(true)

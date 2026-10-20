@@ -2898,6 +2898,10 @@ export const VILLAGER_GLTF = {
    *  (gltfClipLayers.ts `settleFeet`), lifted at mid-step by this share of
    *  the ground it covers. Calibratable. */
   settleStepLift: 0.35,
+  /** Stopping, a foot landed on the stand holds its spot while the body
+   *  drifts and steps the miss over (lifted as above) over this last share
+   *  of the walk weight. Calibratable. */
+  settleRestep: 0.45,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */
