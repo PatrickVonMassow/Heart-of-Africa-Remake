@@ -1,0 +1,160 @@
+{
+ "model": "Claude Opus 5.5",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "diagnosis",
+   "defect": "The defects come from four mechanisms: hull-tube cloth across both legs blended between the thighs, the fit inflating the rest shape to the union of all poses, weights transferred from the nearest body point, and a pose-independent mask turning cloth errors into holes; the new construction removes all four instead of repairing them."
+  },
+  {
+   "id": "A2",
+   "file": "tight garments",
+   "defect": "Build every tight garment as a shell copied from the drawn body's region (iso-line cut, clean hems), offset along the normal, in the rest pose."
+  },
+  {
+   "id": "A3",
+   "file": "tight garments skinning",
+   "defect": "A shell vertex takes exactly the body's four bone weights and morph deltas at its source point; no weight transfer, no smoothing, no unposing."
+  },
+  {
+   "id": "A4",
+   "file": "tight garments silhouette",
+   "defect": "Allow hull fill only where the region is weighted ≥ 0.9 to one trunk bone, plus up to ~1 cm ease on convex parts tapering to the base offset at creases, plus a rim strip at every open edge."
+  },
+  {
+   "id": "A5",
+   "file": "trousers",
+   "defect": "Trousers become a shell (hips below the girdle, thighs, knees, shins to mid-shin); this is the fix for report (1), whose suspected cause is inner-thigh weights taken from the other leg or the hips."
+  },
+  {
+   "id": "A6",
+   "file": "breast cloth, chest wrap top",
+   "defect": "Shell band with hull fill between chestTop and under the bust; removes the flange and the sternum gape."
+  },
+  {
+   "id": "A7",
+   "file": "shirt, robe, toga trunk",
+   "defect": "Trunk and short sleeves as a shell (toga and Maasai left-shoulder cape with a diagonal top edge); the part below the girdle is a driven skirt welded to the shell's bottom ring."
+  },
+  {
+   "id": "A8",
+   "file": "ornaments",
+   "defect": "Waist beads, girdle bands, neck ring, chest neck beads and limb rings become thin shell bands with exact weights."
+  },
+  {
+   "id": "A9",
+   "file": "loose garments",
+   "defect": "Everything hanging free below the crotch is a cone of columns hung from the girdle ring, rest shape round the hips' hull with a few millimetres of ease and no per-pose inflation."
+  },
+  {
+   "id": "A10",
+   "file": "skirt rig",
+   "defect": "Add 12 column bones × 2 segments round the hips, parented to hips; skirt vertices weighted only to hips and the two nearest columns, never to thighs or shins."
+  },
+  {
+   "id": "A11",
+   "file": "skirt driver",
+   "defect": "One pure driver function per frame after IK and lean: each column's upper segment is pushed outward until it clears both thighs by leg radius plus ease, the lower segment likewise against the shins blended toward gravity; TypeScript in the game, a Python mirror in gamepath.py held equal by the runtime round trip."
+  },
+  {
+   "id": "A12",
+   "file": "short skirt / child hip cloths",
+   "defect": "Short skirt, loin flap and apron panels hang on the driven columns; this is the fix for report (2), the diaper box."
+  },
+  {
+   "id": "A13",
+   "file": "layering",
+   "defect": "Replace the per-slot LAYER table with an explicit per-form offset rank (ornaments 0, bands/breast cloth/veil 1, trousers/skirts/waist wrap 2, shirt/robe/toga/chest wrap 3, hood 4, cape/cloak 5); shell offset and skirt ease grow with the rank."
+  },
+  {
+   "id": "A14",
+   "file": "hood and cloak together",
+   "defect": "Hood is rank 4 under the rank-5 cloak; outfits #83/#85/#87 wear both shoulder-slot garments, so the one-per-slot assumption is dropped."
+  },
+  {
+   "id": "A15",
+   "file": "mask",
+   "defect": "The cover mask becomes exact pose-independent face sets: body or inner-shell faces inside a higher-rank shell's source region are cut; nothing is hidden under a driven panel; the push class and garmentPush are removed."
+  },
+  {
+   "id": "A16",
+   "file": "cloak",
+   "defect": "Cloak = rank-5 shoulder-yoke shell plus a back panel and two front panels open at the sides, upper part rigid on chest/spine as a ruled surface past the bust, lower part on the skirt columns."
+  },
+  {
+   "id": "A17",
+   "file": "cape-chest",
+   "defect": "A rank-5 shell over shoulders and upper arms to above the elbow with a dropped hem lip."
+  },
+  {
+   "id": "A18",
+   "file": "cape-rightShoulder",
+   "defect": "A diagonal shell sash from the covered shoulder to the opposite hip plus a short back panel on chest/spine."
+  },
+  {
+   "id": "A19",
+   "file": "cape-leftShoulder",
+   "defect": "Built with the toga construction at knee length; one builder fewer."
+  },
+  {
+   "id": "A20",
+   "file": "hood",
+   "defect": "Head part rigid as today; shoulder part a rank-4 shell blending from head through neck into body weights."
+  },
+  {
+   "id": "A21",
+   "file": "veil",
+   "defect": "A rank-1 shell over the lower face and the whole neck, continuing ~4 cm under the collar of the robe, shirt or cloak yoke."
+  },
+  {
+   "id": "A22",
+   "file": "baby sling",
+   "defect": "Stays rigid, moved to mid-back on spine1 against the cloak's back panel."
+  },
+  {
+   "id": "A23",
+   "file": "rigid head pieces",
+   "defect": "Turban, cap, headband, head ring, topknot, hair bag, hair cap and eyes stay as built today (no inventory defect)."
+  },
+  {
+   "id": "A24",
+   "file": "expected residuals",
+   "defect": "Accept and judge by picture: inherited body LBS pinching, shell self-intersection inside deep creases, long hems entering the ground in kneel/dig, front-corner creases between columns, a small thigh-top contact under the girdle ring in dig, the tighter look of trousers (OPEN: wide-trouser volume)."
+  },
+  {
+   "id": "A25",
+   "file": "pipeline removal",
+   "defect": "Remove the hull/ring sweep builders, weight transfer, smoothing, skirt_weights, push_out, unskin, armholes, OUTER/SKIRTS, all of fit.py, mask.py's volume/motion/push classes and the VILLAGER_ASSET fit/settle/mask values only they read."
+  },
+  {
+   "id": "A26",
+   "file": "pipeline kept",
+   "defect": "Keep body, mhbody, rig, clips, gltfio, export (plus column bones), gamepath (plus driver mirror), sheets/inventory (applying the driver), the rigid head builders, and penetration.py as information only on the driven pose."
+  },
+  {
+   "id": "A27",
+   "file": "cost",
+   "defect": "Pipeline drops from minutes (fit, settle, per-pose mask) to seconds; runtime stays one merged geometry and one draw call per figure, vertex count of the order of today, ~24 extra bones and ~24 vector operations per figure per frame."
+  },
+  {
+   "id": "A28",
+   "file": "balance values",
+   "defect": "Rank offsets (~3 mm base + ~3 mm per rank), column count, skirt ease and the leg-radius factor go into src/config/balance.ts marked calibratable."
+  },
+  {
+   "id": "A29",
+   "file": "outfit restrictions",
+   "defect": "Restrict no generated combination; keep the §19.15 open-outer-garment rule in the generator; add a build-time error for two worn garments of the same rank."
+  },
+  {
+   "id": "A30",
+   "file": "order of work",
+   "defect": "Shells (trousers, breast cloth) first, then the skirt rig with the short skirt, then robe/toga/wraps, then cloak/cape/hood/veil, then the mask simplification and removals."
+  },
+  {
+   "id": "A31",
+   "file": "acceptance",
+   "defect": "In-game side-on re-shots at 3 m and 7 m of walking and running trouser wearers and of children in short skirt, loin flap and apron, plus robe/toga/wrap wearers in walk/sprint/kneel/dig and the Tuareg rows, and the 158-outfit motion sheets; the picture is the gate."
+  }
+ ]
+}

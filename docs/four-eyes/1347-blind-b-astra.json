@@ -1,0 +1,355 @@
+{
+ "model": "GPT-6 Astra",
+ "entries": [
+  {
+   "id": "B1",
+   "file": "docs/garment-inventory-1347.md",
+   "defect": "Treat the written inventory as observed evidence, distinguish inferred causes, and record that pictures, the truncated mask tail and the omitted pipeline/runtime files were unavailable for this analysis."
+  },
+  {
+   "id": "B2",
+   "file": "scripts/villager/garments.py",
+   "defect": "Replace the universal swept-outline construction with body-derived fitted regions, sewn deformable panels and anatomically attached rigid accessories within one pipeline."
+  },
+  {
+   "id": "B3",
+   "file": "scripts/villager/body.py",
+   "defect": "Establish garment correspondence against the body actually rendered, preserving its topology mapping, morphs and anatomical boundaries rather than fitting only the full-resolution source."
+  },
+  {
+   "id": "B4",
+   "file": "scripts/villager/garments.py",
+   "defect": "Finalize and normalize the exported four skin influences before any inverse posing or fit evaluation so construction and runtime use the same deformation."
+  },
+  {
+   "id": "B5",
+   "file": "scripts/villager/garments.py",
+   "defect": "Build trousers with a connected seat, crotch and separate leg branches, removing the overlapping seat-and-leg tube construction."
+  },
+  {
+   "id": "B6",
+   "file": "scripts/villager/garments.py",
+   "defect": "Make fitted garment regions the visible replacement for their covered body faces, with shared anatomical deformation and deliberate garment ease rather than two competing surfaces."
+  },
+  {
+   "id": "B7",
+   "file": "scripts/villager/garments.py",
+   "defect": "Join shirt and robe sleeves to authored armholes and yokes, preserving shoulder and clavicle deformation instead of cutting intersecting sleeve triangles."
+  },
+  {
+   "id": "B8",
+   "file": "scripts/villager/garments.py",
+   "defect": "Give necklines, cuffs and trouser hems finished boundaries and retained interior skin continuations; keep duplicated seam positions, weights and morphs identical."
+  },
+  {
+   "id": "B9",
+   "file": "scripts/villager/garments.py",
+   "defect": "Construct breast cloths as tensioned front panels with fitted side, back and lower edges, removing the flange without copying the breast anatomy into a painted-on garment."
+  },
+  {
+   "id": "B10",
+   "file": "scripts/villager/garments.py",
+   "defect": "Treat the current knee-length shirt’s hanging lower section as loose cloth while retaining a fitted upper body and sleeves."
+  },
+  {
+   "id": "B11",
+   "file": "scripts/villager/garments.py",
+   "defect": "Build loin flaps and aprons from fitted waistbands and independent front/back panels that move against the thighs and buttocks rather than hang rigidly or average both legs."
+  },
+  {
+   "id": "B12",
+   "file": "scripts/villager/garments.py",
+   "defect": "Preserve the recognizable girdle-tail design while giving its attachments and free tails the same explicit construction contract."
+  },
+  {
+   "id": "B13",
+   "file": "scripts/villager/garments.py",
+   "defect": "Fit children’s short skirts to child pelvis and buttock shapes with modest drape, eliminating the all-round box without converting skirts into shorts or tight body paint."
+  },
+  {
+   "id": "B14",
+   "file": "scripts/villager/garments.py",
+   "defect": "Construct knee skirts, long wraps and robe skirts from sewn panels with controlled gathers and intentional hems instead of one convex envelope around both legs."
+  },
+  {
+   "id": "B15",
+   "file": "scripts/villager/garments.py",
+   "defect": "Give waist and chest wraps real overlapping edges and body-specific attachment fits; use only garment-appropriate openings and preserve overlap through motion."
+  },
+  {
+   "id": "B16",
+   "file": "scripts/villager/garments.py",
+   "defect": "Construct each toga’s supported shoulder, diagonal edge and lower panels explicitly, retaining left/right wearing differences while removing the inflated lower bag."
+  },
+  {
+   "id": "B17",
+   "file": "scripts/villager/garments.py",
+   "defect": "Remove circumferential skirt-weight blurring and the automatic transfer of shin, foot and toe weights to thighs."
+  },
+  {
+   "id": "B18",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Add small cloth control meshes with attachment, stretch, bend and contact constraints for free panels, driven after the complete runtime body pose is known."
+  },
+  {
+   "id": "B19",
+   "file": "src/render/villagerClipPose.ts",
+   "defect": "Evaluate garment attachments and collisions after clip blending, stride changes, lean, clavicle motion, gaze and IK; verify the exact ordering against the omitted implementation."
+  },
+  {
+   "id": "B20",
+   "file": "src/render/villagerRig.ts",
+   "defect": "Maintain complete collision bodies independently of rendered body masks, using efficient anatomical proxies and more accurate surfaces where needed."
+  },
+  {
+   "id": "B21",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Handle swept limb motion and panel face/edge contacts as well as vertex contacts so fast limbs and large triangles cannot bypass collision handling."
+  },
+  {
+   "id": "B22",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Include ground contact and controlled gathering for kneeling and digging so long hems do not become horizontal rings or pass through the ground."
+  },
+  {
+   "id": "B23",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Preserve panel overlap order and resolve relevant cloth self-contact, especially wrap seams and folded skirt regions."
+  },
+  {
+   "id": "B24",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Embed loose render surfaces in solved control-mesh frames, preserve exact fitted-to-loose seam positions and avoid applying skeletal deformation twice."
+  },
+  {
+   "id": "B25",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Reconstruct cloth normals from the final deformation and verify both backends’ position and shading results."
+  },
+  {
+   "id": "B26",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Use strongly damped constrained drape as the baseline, with posed initialization and robust handling of spawning, teleportation, pauses and animation transitions."
+  },
+  {
+   "id": "B27",
+   "file": "scripts/villager/garments.py",
+   "defect": "Build capes and cloaks from shoulder supports, closures and hanging panels rather than an inflated hull enclosing the arms."
+  },
+  {
+   "id": "B28",
+   "file": "scripts/villager/garments.py",
+   "defect": "Give arms intentional routes beneath movable panels or through appropriate openings, and never conceal escaping hands or forearms to simulate correct cloth."
+  },
+  {
+   "id": "B29",
+   "file": "scripts/villager/garments.py",
+   "defect": "Fit one-shoulder cape edges and sash sections to their supports to remove shoulder bunching, waist loops and folding into the torso."
+  },
+  {
+   "id": "B30",
+   "file": "scripts/villager/garments.py",
+   "defect": "Shape chest capes and cloaks to span the torso naturally without a flared collar or transferred breast bulges, preserving required coverage during arm motion."
+  },
+  {
+   "id": "B31",
+   "file": "scripts/villager/mask.py",
+   "defect": "Replace global slot-based layer ordering with explicit acyclic relationships for actual co-worn garment regions, including hood/cloak, sling/cloak and apron/loin-flap pairs."
+  },
+  {
+   "id": "B32",
+   "file": "scripts/villager/fit.py",
+   "defect": "Fit only combinations the generator can actually produce, preventing nonexistent pairings from inflating otherwise valid garments."
+  },
+  {
+   "id": "B33",
+   "file": "scripts/villager/mask.py",
+   "defect": "Derive safe body and inner-garment omissions from explicit regions and supported motion, retaining all surfaces visible through moving openings."
+  },
+  {
+   "id": "B34",
+   "file": "src/render/villagerGarmentMask.ts",
+   "defect": "Replace per-vertex hide-bit union with face-safe coverage decisions so different garments cannot accidentally delete an uncovered triangle together."
+  },
+  {
+   "id": "B35",
+   "file": "src/render/villagerGarmentMask.ts",
+   "defect": "Remove the universal inward-normal garment push as a repair mechanism; resolve visible interfaces with fitted geometry, overlap and contact."
+  },
+  {
+   "id": "B36",
+   "file": "src/systems/appearance.ts",
+   "defect": "Preserve the required seasonal inner garments under Zulu, Tuareg and Hausa wraps while masking safely concealed regions and fitting exposed interfaces."
+  },
+  {
+   "id": "B37",
+   "file": "src/systems/appearance.ts",
+   "defect": "Enforce the everyday open-outer no-inner-top rule together with women’s upper-body coverage, rejecting only wearing arrangements that cannot satisfy both."
+  },
+  {
+   "id": "B38",
+   "file": "src/systems/appearance.ts",
+   "defect": "Preserve children’s hip coverage through all supported poses and do not remove required dress layers merely because an outer garment usually hides them."
+  },
+  {
+   "id": "B39",
+   "file": "scripts/villager/garments.py",
+   "defect": "Separate hood head support from its neck transition and shoulder drape, with explicit overlap against robes, togas and cloaks."
+  },
+  {
+   "id": "B40",
+   "file": "scripts/villager/garments.py",
+   "defect": "Fit the veil’s head section and flexible lower collar overlap separately, checking head turns and clavicle extremes without masking away the neck indiscriminately."
+  },
+  {
+   "id": "B41",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Diagnose the veil’s dark neck band and uniform dark head using actual geometry, material and lighting views before choosing a readability correction."
+  },
+  {
+   "id": "B42",
+   "file": "scripts/villager/garments.py",
+   "defect": "Replace defective chest bead shells with deliberately arranged beadwork while preserving opaque upper-body coverage in Zulu youth and Mongo women’s outfits."
+  },
+  {
+   "id": "B43",
+   "file": "src/systems/appearance.ts",
+   "defect": "Do not replace covering chest beadwork with sparse necklaces unless an authorized same-people garment preserves the dress rule; the supplied excerpts do not establish such a replacement."
+  },
+  {
+   "id": "B44",
+   "file": "scripts/villager/garments.py",
+   "defect": "Fit neck and waist bead paths to each body and actual wearing layer, preserving bead shape and eliminating detached loops and tilted hip gaps."
+  },
+  {
+   "id": "B45",
+   "file": "scripts/villager/garments.py",
+   "defect": "Attach wrist rings rigidly to forearms and ankle rings rigidly to shins, orient them around limb axes and size them per body instead of blending across joints."
+  },
+  {
+   "id": "B46",
+   "file": "scripts/villager/garments.py",
+   "defect": "Retain cap, head-ring, topknot, hair-bag, headband and turban designs unless new evidence requires changes, while verifying morph fit and hood interactions."
+  },
+  {
+   "id": "B47",
+   "file": "scripts/villager/garments.py",
+   "defect": "Construct the baby sling as supported cloth and an exterior pouch with an identifiable infant attached to an upper-torso carrier frame, explicitly fitting its relationship to the cloak."
+  },
+  {
+   "id": "B48",
+   "file": "scripts/villager/body.py",
+   "defect": "Fit garments to the actual supported sex, age and build combinations, including combined build extremes, instead of assuming adult-male offsets or ten isolated corners generalize."
+  },
+  {
+   "id": "B49",
+   "file": "scripts/villager/export.py",
+   "defect": "Export explicit attachment, control-mesh, render-binding and coverage metadata with a versioned schema, keeping logical garment identity separate from render partitions and fit variants."
+  },
+  {
+   "id": "B50",
+   "file": "src/render/villagerBody.ts",
+   "defect": "Verify that geometry morphing, joint adjustment and garment deformation follow the same runtime contract, with exact seam and attachment agreement after export."
+  },
+  {
+   "id": "B51",
+   "file": "scripts/villager/build.mjs",
+   "defect": "Derive supported outfit relationships from the actual generator’s branches and boundaries, retaining all 158 inventory cases without assuming sampled random picks prove exhaustive coverage."
+  },
+  {
+   "id": "B52",
+   "file": "src/systems/appearance.ts",
+   "defect": "Restrict only unsupported or contradictory garment arrangements; retain seasonal layering, cultural distinctions and ordinary walking, running, kneeling and digging."
+  },
+  {
+   "id": "B53",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Share immutable topology and cache outfit coverage while keeping mutable cloth state per person, avoiding cross-person geometry or mask contamination."
+  },
+  {
+   "id": "B54",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Budget approximately 40–120 control vertices for small panels and 100–300 for major loose pieces, then measure solver, memory, vertex and draw costs in representative crowds."
+  },
+  {
+   "id": "B55",
+   "file": "scripts/villager/garments.py",
+   "defect": "Start with hundreds of render triangles for small garments and roughly 600–2,000 for substantial loose pieces, concentrating topology at seams, joints and contact regions rather than uniformly refining."
+  },
+  {
+   "id": "B56",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "Group compatible material parts so beads, rings and fitted/loose partitions do not unnecessarily multiply draw calls; verify actual costs on WebGPU and WebGL 2."
+  },
+  {
+   "id": "B57",
+   "file": "src/config/quality.ts",
+   "defect": "Keep necessary coverage and contact correction functional at every quality level, and validate distance/update simplification without visible popping or stale cloth states."
+  },
+  {
+   "id": "B58",
+   "file": "scripts/villager/pipeline.py",
+   "defect": "Cache garment templates, body fits, deformation bindings and outfit coverage by their real inputs, measuring build time instead of assuming the replacement is faster."
+  },
+  {
+   "id": "B59",
+   "file": "scripts/villager/fit.py",
+   "defect": "Retire worst-pose rest inflation, repeated body/layer settling and automatic armhole deletion as the production garment construction path."
+  },
+  {
+   "id": "B60",
+   "file": "scripts/villager/mask.py",
+   "defect": "Retire capped-volume classification and tolerance-driven hide/push repair as production coverage logic, retaining geometric helpers only where independently useful."
+  },
+  {
+   "id": "B61",
+   "file": "scripts/villager/pipeline.py",
+   "defect": "Remove numeric penetration acceptance failures and stale gate documentation while retaining reports as diagnostics and structural failures for invalid or missing assets."
+  },
+  {
+   "id": "B62",
+   "file": "scripts/villager/pipeline.py",
+   "defect": "Cut over constructors, export schema, runtime consumers and generated asset together, removing obsolete configuration, cache dependencies and selectable legacy garment behavior."
+  },
+  {
+   "id": "B63",
+   "file": "scripts/villager/mhbody.py",
+   "defect": "Preserve MakeHuman source generation, anatomical skeleton and existing animation assets unless inspection identifies a specific incompatibility requiring change."
+  },
+  {
+   "id": "B64",
+   "file": "docs/garment-inventory-1347.md",
+   "defect": "Track expected replacement risks explicitly: tight-joint pinching, painted-on shapes, seam cracks, stiff drape, jitter, stretching, overlap inversion, contact tunneling and shading artifacts."
+  },
+  {
+   "id": "B65",
+   "file": "scripts/verify/polish-settlement.mjs",
+   "defect": "Force walking trouser wearers into side-on port and village shots to reproduce the unresolved bare-thigh report instead of treating clean pipeline sheets as closure."
+  },
+  {
+   "id": "B66",
+   "file": "scripts/verify/polish-settlement.mjs",
+   "defect": "Re-shoot the child short-skirt diaper case and flap cases through full walk/run cycles, then verify kneeling, digging and transitions at normal viewing distances."
+  },
+  {
+   "id": "B67",
+   "file": "scripts/verify/polish-settlement.mjs",
+   "defect": "Visually check all recorded outfits plus newly discovered generator combinations across body builds, required motions, shoulder extremes, both backends and representative lighting."
+  },
+  {
+   "id": "B68",
+   "file": "scripts/verify/polish-settlement.mjs",
+   "defect": "Trace mesh ownership, masks and transforms for the hovering Bambara figure, detached fragments and Hausa spots before assigning a garment-specific fix."
+  },
+  {
+   "id": "B69",
+   "file": "docs/garment-inventory-1347.md",
+   "defect": "Record before/after picture references and remaining defects per garment and outfit; accept the rebuild by moving in-game pictures rather than penetration values."
+  },
+  {
+   "id": "B70",
+   "file": "docs/design-reference.md",
+   "defect": "Update the implementation record and any documented dress deviations to match the final supported wearing arrangements without inventing seasonal or foreign garments."
+  }
+ ]
+}
