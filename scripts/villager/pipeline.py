@@ -79,6 +79,10 @@ def main():
     steps = ['body', 'clips', 'garments', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
     import mask as MK
     MK.selftest()
+    import shells as SHL
+    SHL.selftest()
+    import body as BS
+    BS.selftest_split()
     import gaitplots as GPL
     GPL.selftest()
     import clips as CL
