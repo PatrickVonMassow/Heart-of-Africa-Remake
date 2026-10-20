@@ -34435,3 +34435,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: polish-children --section for the 1239 frames green on both backends; frame judged by looking.
   Bundle: Dorfleben.
   Criticality: low - a test frame's acquisition; blocks the suite's covering run.
+
+- [x] 1345. Child tag chaser at sprint speed squats without a stride (teleport threshold in figure units)
+  Queue position: with the tag poses of point 1343 (Dorfleben); may land before it on its own.
+  Source: findings carrier 12.10.2026 05:58, measured on feat/1316-natural-villager-motion (runtime sheets runtime-chaser-*.png, hips height per frame from the export): at 3.4 u/s the child chaser's hips sit at 0.50 of standing height in every frame with no stride; the same subject at 3.2 u/s (5.8 < 6) runs normally (hips 0.96-1.07, feet alternating +-0.4). Player impact: every child chaser of the port-city tag game at full sprint is drawn squatting and sliding. Related: the river-bank caught child (hips 0.52) and the point gesture's release frame (hips 0.50 at 2.11 s) reach the same CROUCH_MAX fallback.
+  Final state: A child figure (CHILD_FIGURE_SCALE 0.55) moved at the port-city tag sprint speed (TAG.sprintSpeed 3.4 u/s) gets no gait and sinks into a full squat. stepWalk (src/render/figureWalk.ts:441) measures ground speed in units of the figure's world scale (skinnedFigure.tsx:551 unit = world scale), so 3.4 / 0.55 = 6.18 person units/s exceeds VILLAGER_MOTION.teleportSpeed = 6 (balance.ts:2493): every frame counts as "placed, not walked", m.speed stays 0, the figure is "standing", CHASER_ARMS count as contact arms, no knee flex reaches them and contactCrouch (figureRig.ts:39) falls back to CROUCH_MAX (full squat). Fix: compare the teleport threshold against a speed no child or adult gait can reach (or in world units), and do not let contactCrouch return CROUCH_MAX for an arm that no crouch can bring into reach (the same fallback squats the river-bank caught child and the last frame of a point gesture).
+  Verifiable: in the runtime-pose export (src/render/villagerRuntimePose.test.tsx) the chaser's hips stay near standing height (they are 0.50-0.65 of it now) and its feet alternate; a Vitest case at 3.4 u/s for a child figure.
+  Criticality: high - every child chaser of the port-city tag game at full sprint.
+  Bundle: Dorfleben.
