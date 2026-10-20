@@ -637,6 +637,25 @@ def selftest():
     got = with_shoulders(idle, sh)['clips']['shoulders']
     assert sorted(got['shoulders']) == sorted([(0.3, 0.0), (0.0, 0.2), (0.0, -0.12), (0.3, 0.2), (0.3, -0.12)]), got['shoulders']
     assert got['q'] == ['q0'] * 5 and got['hips'] == ['h0'] * 5 and 'shoulders' not in idle['clips']
+    # shell row two (round-8 B3): two parallel slabs; a shell point at the
+    # offset over the near slab lies inside the far one: row two reports it,
+    # row one stays at the offset; with the far slab moved off, nothing
+    from fit import _point_tri
+    for z0, want in ((0.101, True), (0.11, False)):
+        av, at = box(-1.0, 1.0, -1.0, 1.0, 0.0, 0.1)
+        fv, ft = box(-1.0, 1.0, -1.0, 1.0, z0, 0.2)
+        v = np.array(av + fv, float)
+        t = np.array(at + [tuple(i + len(av) for i in x) for x in ft])
+        tree = BVHTree.FromPolygons(v.tolist(), t.tolist(), all_triangles=True)
+        fn = vertex_normals_faces(v, t)
+        p = np.array([0.2, 0.1, 0.1 + 0.003])
+        hit = other_part(tree, fn, t, set(range(len(av))), p, 0.003)
+        assert (hit is not None) == want, (z0, hit)
+        if want:
+            assert abs(hit[0] - (0.103 - z0)) < 1e-6 and hit[1] >= len(at)
+        top = [k for k, x in enumerate(at) if all(av[i][2] == 0.1 for i in x)]
+        d = min(_point_tri(p[None], *(v[t[k][i]][None] for i in range(3)))[0] for k in top)
+        assert abs(d - 0.003) < 1e-9, d
     print('penetration selftest: ok')
 
 
@@ -685,6 +704,194 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
                         t[col].update(value=r[col]['value'], at=r[col]['at'], part=r[col]['part'])
             log(f'penetration: {c if isinstance(c, str) else "{} {} {:+.0f}".format(*c)} done')
     return worst, _S['tol']
+
+
+# ---- the shell garments' rows (shells.py; no gate) ------------------------------
+
+SHELL_CASES = 5
+
+
+def other_part(tree, fn, tris, ring, p, off):
+    """Row two for one shell point `p`: the nearest posed body triangle within
+    `off` with no corner in the source's two-ring `ring`, when `p` lies on its
+    inner side (area normal `fn`) and inside the body by parity: (depth, face)."""
+    from fit import inside
+    best = None
+    for co, _nn, fi, dist in tree.find_nearest_range(p.tolist(), off):
+        if fi is None or ring.intersection(tris[fi].tolist()):
+            continue
+        if best is None or dist < best[1]:
+            best = (fi, dist, co)
+    if best is None:
+        return None
+    fi, dist, co = best
+    if np.dot(p - np.array(co), fn[fi]) >= 0 or not inside(tree, p.tolist()):
+        return None
+    return float(dist), fi
+
+
+def _shell_corner(c):
+    """One body corner: the three shell rows over every pose."""
+    import shells as SHL
+    from fit import _point_tri
+    from mathutils.bvhtree import BVHTree
+    S = _S
+    body, garments, cfg = S['body'], S['garments'], S['cfg']
+    a = cfg['VILLAGER_ASSET']
+    reach, step = a['garmentMaskOpening'], a['garmentShellStep']
+    sex, age, build = c
+    w = corner_weights(sex, age, build)
+    pos, j = morphed(body, w)
+    person = GP.Person(j)
+    bh = person.bake(pos, S['jidx'], S['jw'])
+    tris = np.asarray(body['tris'])
+    mk = garments['mask']
+    out = {}
+    built = {}
+    for n in S['shells']:
+        sd = SHL.corner_dress(body, garments, [n], w, cfg)[1][n]
+        gi, gw = top4(sd['W'])
+        top = np.isclose(sd['off'], sd['off'].max())
+        # the fan of each top-row vertex's source, as (vertex, face) pairs
+        pv = np.concatenate([np.full(len(S['fan'][s_]), k) for k, s_ in enumerate(sd['src']) if top[k]] or [np.zeros(0, int)]).astype(int)
+        pf = np.concatenate([S['fan'][s_] for k, s_ in enumerate(sd['src']) if top[k]] or [np.zeros(0, int)]).astype(int)
+        legacy = {}
+        for o in S['legacy']:
+            if M.layer(o) <= M.layer(n):
+                continue
+            hide, push = M.decode(mk['body'], mk['garments'], [o])
+            so = SHL.corner_dress(body, garments, [n, o], w, cfg)[1][n]
+            ids = np.nonzero(push[so['src']])[0]
+            if len(ids):
+                oi, ow = top4(so['W'])
+                legacy[o] = (person.bake(so['pos'], oi, ow), (oi, ow), ids, person.bake(garment_pos(garments['meshes'][o], w), *S['gskin'][o]))
+        built[n] = (sd, gi, gw, person.bake(sd['pos'], gi, gw), top, pv, pf, legacy)
+        out[n] = {'own': {'min': np.inf, 'max': 0.0, 'under': 0, 'at': None, 'off': float(sd['off'].max())},
+                  'other': {'frames': 0, 'cases': []}, 'legacy': {}, 'checked': 0}
+    for kk, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
+        if kk % S['stride']:
+            continue
+        at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
+        wr, wp = person.pose(q, hips, kst)
+        bv = person.skin(bh, S['jidx'], S['jw'], wr, wp)
+        tree = BVHTree.FromPolygons(bv.tolist(), tris.tolist(), all_triangles=True)
+        fn = np.cross(bv[tris[:, 1]] - bv[tris[:, 0]], bv[tris[:, 2]] - bv[tris[:, 0]])
+        fn /= np.maximum(np.linalg.norm(fn, axis=1), 1e-12)[:, None]
+        for n, (sd, gi, gw, sb, top, pv, pf, legacy) in built.items():
+            r = out[n]
+            r['checked'] += 1
+            sv = person.skin(sb, gi, gw, wr, wp)
+            off = r['own']['off']
+            # row one: each top-row vertex against its own source's fan
+            if len(pv):
+                d = _point_tri(sv[pv], bv[tris[pf, 0]], bv[tris[pf, 1]], bv[tris[pf, 2]])
+                near = np.full(len(sv), np.inf)
+                np.minimum.at(near, pv, d)
+                m = float(near[top].min())
+                r['own']['max'] = max(r['own']['max'], float(near[top].max()))
+                if m < r['own']['min']:
+                    r['own']['min'], r['own']['at'] = m, at
+                if m < 0.5 * off:
+                    r['own']['under'] += 1
+            # row two: another body part within one offset and the shell point inside it
+            worst = None
+            for k in np.nonzero(top)[0]:
+                hit = other_part(tree, fn, tris, S['ring'][sd['src'][k]], sv[k], off)
+                if hit is None:
+                    continue
+                dist, fi = hit
+                if worst is None or dist > worst[0]:
+                    worst = (float(dist), S['bones'][S['dom'][sd['src'][k]]], S['bones'][S['dom'][tris[fi][0]]])
+            if worst is not None:
+                r['other']['frames'] += 1
+                r['other']['cases'].append((worst[0], worst[1], worst[2], at))
+                r['other']['cases'] = sorted(r['other']['cases'], reverse=True)[:SHELL_CASES]
+            # row three: a covered shell point outside a co-worn legacy garment's cloth
+            for o, (sob, (oi, ow), ids, ob) in legacy.items():
+                ov = person.skin(ob, *S['gskin'][o], wr, wp)
+                xv = person.skin(sob, oi, ow, wr, wp)
+                place, dist = S['vol'][o].where(ov, xv, reach, ids=ids)
+                thr = ids[place[ids] == M.THROUGH]
+                v = float(dist[thr].max()) if len(thr) else 0.0
+                e = r['legacy'].setdefault(o, {'value': 0.0, 'at': None, 'frames': 0})
+                if v > 0:
+                    e['frames'] += 1
+                if v > e['value']:
+                    e['value'], e['at'] = v, at
+    return c, out
+
+
+def shell_rows(body, clips, garments, cfg, stride=1, workers=None, log=print):
+    """The three shell rows (docs/garment-merge-r9-1347.md, no gate) per shell
+    over every pose of the exported clips at every body corner: (1) each shell
+    vertex against its own source's incident body triangles, the band [half the
+    offset, the offset plus one step]; (2) a shell vertex inside another body
+    part (no corner in its source's two-ring) within one offset, by bone;
+    (3) a covered shell point outside a co-worn legacy garment of an outer
+    layer through its cloth."""
+    import multiprocessing as mp
+    import shells as SHL
+    names = SHL.names_of(garments['meshes'])
+    if not names:
+        return {}
+    tris = np.asarray(body['tris'])
+    nv = len(body['pos'])
+    fan = [[] for _ in range(nv)]
+    nb = [set() for _ in range(nv)]
+    for f, t in enumerate(tris):
+        for x in t:
+            fan[x].append(f)
+            nb[x].update(int(y) for y in t)
+    ring = [set().union(*(nb[y] for y in nb[x])) for x in range(nv)]
+    legacy = M.garment_names(garments)
+    jidx, jw = top4(body['W'])
+    pose = M.build_pose(body)
+    _S.update(body=body, clips=clips, garments=garments, cfg=cfg, stride=stride, k=0, shells=names, legacy=legacy,
+              fan=[np.array(x, int) for x in fan], ring=ring, jidx=jidx, jw=jw, dom=np.argmax(body['W'], 1), bones=SK.NAMES,
+              gskin={n: top4(garments['meshes'][n]['W']) for n in legacy}, clip_names=EXPORT_CLIPS,
+              vol={n: M.Volume(pose(garments['meshes'][n]['pos'], garments['meshes'][n]['W']), garments['meshes'][n]['tris']) for n in legacy})
+    workers = workers or max(1, min(len(CORNERS), (os.cpu_count() or 2) - 1))
+    total = {}
+    with mp.get_context('fork').Pool(workers) as pool:
+        for c, part in pool.imap(_shell_corner, CORNERS):
+            for n, r in part.items():
+                t = total.setdefault(n, {'own': {'min': np.inf, 'max': 0.0, 'under': 0, 'at': None, 'off': r['own']['off']},
+                                         'other': {'frames': 0, 'cases': []}, 'legacy': {}, 'checked': 0})
+                t['checked'] += r['checked']
+                t['own']['under'] += r['own']['under']
+                t['own']['max'] = max(t['own']['max'], r['own']['max'])
+                t['own']['off'] = max(t['own']['off'], r['own']['off'])
+                if r['own']['min'] < t['own']['min']:
+                    t['own']['min'], t['own']['at'] = r['own']['min'], r['own']['at']
+                t['other']['frames'] += r['other']['frames']
+                t['other']['cases'] = sorted(t['other']['cases'] + r['other']['cases'], reverse=True)[:SHELL_CASES]
+                for o, e in r['legacy'].items():
+                    m = t['legacy'].setdefault(o, {'value': 0.0, 'at': None, 'frames': 0})
+                    m['frames'] += e['frames']
+                    if e['value'] > m['value']:
+                        m['value'], m['at'] = e['value'], e['at']
+            log(f'penetration: shells {"{} {} {:+.0f}".format(*c)} done')
+    return total
+
+
+def shell_lines(rows, cfg):
+    step = cfg['VILLAGER_ASSET']['garmentShellStep']
+    lines = ['## Shell garments (shells.py; information, no gate)', '',
+             'Row one: each shell vertex against its own source vertex\'s incident body triangles, posed (band [half the offset, the offset plus one step]; '
+             'named response: under half the offset on more than one frame raises that shell\'s base by one step). Row two: a shell vertex inside another body '
+             'part within one offset (no corner in its source\'s two-ring; parity confirmed), worst cases with source and hit bone (named response: inspect the '
+             'frame in the picture, never an offset change). Row three: a covered shell point through a co-worn legacy garment of an outer layer '
+             '(named response: raise that garment\'s ease by one rank step). Rim strips are not measured here. Figure units.', '',
+             '| Shell | offset | row one min | at | row one max | frames under half | row two frames | row two worst | row three worst |',
+             '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+    for n, r in sorted(rows.items()):
+        o = r['own']
+        band = f'{o["min"]:.4f}' + ('' if 0.5 * o['off'] <= o['min'] else ' ✗')
+        top = '; '.join(f'{d:.4f} {a} in {b} ({at})' for d, a, b, at in r['other']['cases'][:2]) or '—'
+        leg = '; '.join(f'`{g}` {e["value"]:.4f} ({e["frames"]} frames)' for g, e in sorted(r['legacy'].items(), key=lambda kv: -kv[1]['value'])[:3] if e['value'] > 0) or '—'
+        lines.append(f'| `{n}` | {o["off"]:.4f} | {band} | {o["at"]} | {o["max"]:.4f}{"" if o["max"] <= o["off"] + step else " ✗"} | {o["under"]} of {r["checked"]} | '
+                     f'{r["other"]["frames"]} | {top} | {leg} |')
+    return lines + ['']
 
 
 def build_pose_clips(body, clips):
@@ -739,7 +946,7 @@ def _base_value(clips, key):
     return max((clips.get(f'{col} {c}', 0.0) for c in DERIVED.get(clip, ())), default=0.0)
 
 
-def compare(build, worst, main, a, tol):
+def compare(build, worst, main, a, tol, migrated=()):
     """The `## Against main` lines, the garment/column/clip cases worse than
     main, and the garments main has no row for (in its build pose or every
     pose): those are UNCHECKED — no comparison passes a garment it never saw."""
@@ -765,6 +972,9 @@ def compare(build, worst, main, a, tol):
     lines += [f'Main: {within(main["build"])} of {len(main["build"])} garments within tolerance in the build pose, '
               f'{within(main["garments"])} of {len(main["garments"])} in every frame and layering; now {len(build) - bad_build} and {len(worst) - bad}.', '']
     lines += (worse or ['No garment, column and clip is worse than on main, in the build pose or any other.']) + ['']
+    moved = [n for n in migrated if n in main['garments'] or n in main['build']]
+    if moved:
+        lines += [f'Migrated to shell garments (their own rows above, main\'s legacy rows not compared): ' + ', '.join(f'`{n}` migrated' for n in moved) + '.', '']
     if unchecked:
         lines += [f'**UNCHECKED — {len(unchecked)} garment(s) without a baseline row, the comparison fails:** '
                   + ', '.join(f'`{n}`' for n in unchecked) + '.', '']
@@ -783,11 +993,13 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     names = EXPORT_CLIPS + ('shoulders',)
     worst, tol = measure(body, clips, garments, cfg, stride, clip_names=names)
     frames = sum(1 for _ in GP.poses(clips, names, cfg))
-    lines, unchecked = markdown(out, build, worst, cfg, tol, names, frames, stride, baseline)
+    shells = shell_rows(body, clips, garments, cfg, stride)
+    lines, unchecked = markdown(out, build, worst, cfg, tol, names, frames, stride, baseline, shells=shells)
 
     def plain(w):
         return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
-    json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'garments': plain(worst)},
+    json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'garments': plain(worst),
+               'shells': {n: {**r, 'own': {**r['own'], 'min': float(r['own']['min'])}} for n, r in shells.items()}},
               open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
     print('\n'.join(lines))
     # a garment failing only in the build pose fails the step too
@@ -798,7 +1010,7 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
 MD_CASES = 3
 
 
-def markdown(out, build, worst, cfg, tol, names, frames, stride=1, baseline=None):
+def markdown(out, build, worst, cfg, tol, names, frames, stride=1, baseline=None, shells=None):
     """Write penetration-report.md from the measured `build` and `worst`; returns its lines and the unchecked garments."""
     a = cfg['VILLAGER_ASSET']
     lines = [
@@ -850,12 +1062,14 @@ def markdown(out, build, worst, cfg, tol, names, frames, stride=1, baseline=None
             f'{NAMES[col]} — {part} — {clip}{f" under `{o}`" if o else ""} — {e["value"]:.4f} ({e["at"]}), {e["over"]} frames'
             for (col, clip, part, o), e in cases[:MD_CASES]) + (f'; … and {more} more (penetration-report.json)' if more > 0 else ''))
     lines.append('')
+    if shells:
+        lines += shell_lines(shells, cfg)
     unchecked = []
     if baseline:
         main = json.load(open(baseline))
         if 'build' not in main:
             raise RuntimeError(f'penetration: the baseline {baseline} has no build-pose measurement (`build`)')
-        t, _worse, unchecked = compare(build, worst, main, a, tol)
+        t, _worse, unchecked = compare(build, worst, main, a, tol, migrated=sorted(shells or ()))
         lines += t
     os.makedirs(out, exist_ok=True)
     open(os.path.join(out, 'penetration-report.md'), 'w').write('\n'.join(lines))
@@ -876,7 +1090,8 @@ def runtime_report(out, body, garments, cfg, rt):
             missing = [n for n in s['garments'] if n not in garments['meshes']]
             if missing:
                 raise RuntimeError(f'runtime penetration: {sid} wears {missing}, absent from the built garments — rebuild them (--step garments)')
-            names = list(s['garments'])
+            # shells (shells.py) have their own rows (`shell_rows`)
+            names = [n for n in s['garments'] if n in M.garment_names(garments)]
             if names:
                 rows[sid], tol = measure(body, None, garments, cfg, names=names, corners=[sid], workers=1)
     finally:
