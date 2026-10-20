@@ -33,16 +33,30 @@ export const CROUCH_MAX = 1.1
 /**
  * The contact crouch: the smallest knee flex (0.1 rad steps up to CROUCH_MAX)
  * at which `shortAt(c)` — the hand's shortfall with the hips dropped for that
- * flex — is no longer positive; CROUCH_MAX when none is. Always searched from
- * standing (c = 0), so the same contact gives the same crouch every frame.
+ * flex — is no longer positive. When no flex brings the hand into reach, the
+ * flex that comes closest, and standing unless a deeper one gains more than
+ * CROUCH_GAIN_MIN: a hand no crouch can reach is no reason to squat. Always
+ * searched from standing (c = 0), so the same contact gives the same crouch
+ * every frame.
  */
 export function contactCrouch(shortAt: (c: number) => number): number {
+  let best = 0
+  let bestShort = Infinity
   for (let k = 0; k <= Math.round(CROUCH_MAX * 10); k++) {
     const c = k / 10
-    if (shortAt(c) <= 0) return c
+    const short = shortAt(c)
+    if (short <= 0) return c
+    if (short < bestShort - CROUCH_GAIN_MIN) {
+      best = c
+      bestShort = short
+    }
   }
-  return CROUCH_MAX
+  return best
 }
+
+/** The least shortfall (figure units) a deeper crouch must make up, short of
+ *  reach, to be taken over a shallower one. Calibratable. */
+export const CROUCH_GAIN_MIN = 0.02
 
 /** The largest shortfall (figure units) the lean may make up; a hand further
  *  out than this was a gesture, not a contact, and keeps its direction. */

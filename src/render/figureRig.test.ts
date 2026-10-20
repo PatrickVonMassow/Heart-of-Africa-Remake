@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { armAim, REST_POSE } from './gesture'
 import {
   contactCrouch,
+  CROUCH_GAIN_MIN,
   CROUCH_MAX,
   unsquashHead,
   CONTACT_LEAN_MAX,
@@ -193,6 +194,13 @@ describe('the contact crouch', () => {
     expect(first).toBeCloseTo(0.4, 9)
     for (let i = 0; i < 5; i++) expect(contactCrouch(short)).toBe(first)
     expect(contactCrouch(() => -1)).toBe(0)
-    expect(contactCrouch(() => 1)).toBe(CROUCH_MAX)
+    // out of reach at every flex: no squat for a hand no crouch helps
+    expect(contactCrouch(() => 1)).toBe(0)
+    expect(contactCrouch((c) => 0.5 + c)).toBe(0)
+    // a low contact just beyond reach: the flex that comes closest
+    expect(contactCrouch((c) => 0.5 - 0.4 * Math.min(c, 0.6))).toBeCloseTo(0.6, 9)
+    // a gain below CROUCH_GAIN_MIN keeps the shallower flex
+    expect(contactCrouch((c) => 0.5 - CROUCH_GAIN_MIN * 0.5 * c)).toBe(0)
+    expect(contactCrouch((c) => (c >= CROUCH_MAX - 1e-9 ? 0.1 : 0.5))).toBe(CROUCH_MAX)
   })
 })
