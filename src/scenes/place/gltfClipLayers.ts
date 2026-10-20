@@ -61,9 +61,15 @@ export interface ClipLayers {
   /** While the walk weight blends the legs between the code's stand and the
    *  gait, the foot that steps first (0 left, 1 right; -1 none chosen yet). */
   settleFirst: number
-  /** Per foot, the stand's spot (world x, z) taken as that blend began: the
-   *  stand's feet stay there while the body walks off or jostles. */
+  /** Per foot, the stand's spot (world x, z) and the foot's world turn,
+   *  taken as that blend began: the stand's feet stay there while the body
+   *  walks off, turns or jostles. */
   settleStand: [{ x: number; z: number }, { x: number; z: number }]
+  settleTurn: [THREE.Quaternion, THREE.Quaternion]
+  /** The walk weight the settle last ran at: as it falls, the stand's spots
+   *  are drawn onto the body's own stand (the miss kept as the square of
+   *  the weight's share), met at weight 0. */
+  settleW: number
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -85,6 +91,8 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     hips: new THREE.Vector3(),
     settleFirst: -1,
     settleStand: [{ x: 0, z: 0 }, { x: 0, z: 0 }],
+    settleTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
+    settleW: 1,
   }
 }
 
@@ -190,13 +198,14 @@ export function applyClipLayers(
     toHung(asset, f, c.pose, c.local, c.hips, 0)
     const w = walking
     // starting or stopping, the feet step between the stand and the gait
-    // (a bone blend alone slid a foot on the ground from one to the other)
-    const settle = w < 1 && m.kneel <= 0
-    if (settle) takeCodeLegs(bones)
+    // (a bone blend alone slid a foot on the ground from one to the other);
+    // a kneel setting in takes the step's correction out as it folds the legs
+    const settle = w < 1 ? Math.max(0, 1 - m.kneel) : 0
+    if (settle > 0) takeCodeLegs(bones)
     else c.settleFirst = -1
     blendInto(asset, bones, LEGS, c.local, w)
     blendHips(bones, c.hips, w)
-    if (settle) settleFeet(asset, bones, c, w)
+    if (settle > 0) settleFeet(asset, bones, c, w, settle)
     blendInto(asset, bones, TRUNK, c.local, w)
     blendInto(asset, bones, ARM('L'), c.local, w * c.arms[0])
     // under a carry too, so a carry partly overriding the arm stays continuous
@@ -241,7 +250,14 @@ const _blendHipsQ = new THREE.Quaternion()
 const _blendHipsP = new THREE.Vector3()
 const _stand = [new THREE.Vector3(), new THREE.Vector3()]
 const _gait = [new THREE.Vector3(), new THREE.Vector3()]
-const _ankleQ = new THREE.Quaternion()
+const _standQ = [new THREE.Quaternion(), new THREE.Quaternion()]
+const _gaitQ = [new THREE.Quaternion(), new THREE.Quaternion()]
+const _footQ = new THREE.Quaternion()
+const _yawQ = new THREE.Quaternion()
+const _liveW = { x: 0, z: 0 }
+const _liveQ = new THREE.Quaternion()
+const _plain = LEG_SIDES.map(() => [0, 1, 2, 3].map(() => new THREE.Quaternion()))
+const _yAxis = new THREE.Vector3(0, 1, 0)
 const _ik = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
 
 /** The code-built legs and hips, before the gait blends over them. */
@@ -286,10 +302,10 @@ function worldToBody(b: GroundBody, h: { x: number; z: number }, out: THREE.Vect
   out.z = (dx * s + dz * c) * k
 }
 
-/** The ankle's place (body frame) with the legs and hips as given. */
-function ankleAt(bones: Record<string, THREE.Bone>, s: 'L' | 'R', out: THREE.Vector3): THREE.Vector3 {
+/** The ankle's place and the foot's turn (body frame) with the legs and hips as given. */
+function ankleAt(bones: Record<string, THREE.Bone>, s: 'L' | 'R', out: THREE.Vector3, turn: THREE.Quaternion): THREE.Vector3 {
   bones.hips.updateMatrixWorld(true)
-  inBody(bones[`foot.${s}`], out, _q)
+  inBody(bones[`foot.${s}`], out, turn)
   return out
 }
 
@@ -298,25 +314,30 @@ function ankleAt(bones: Record<string, THREE.Bone>, s: 'L' | 'R', out: THREE.Vec
  * between the code's stand and the gait, each foot steps from the gait's
  * spot to the stand's (or back) instead of sliding there on the ground — one
  * foot at a time (the one off the ground first, so the other stands), lifted
- * on an arc of G.settleStepLift of its travel, the leg solved onto it; a foot
- * not stepping stands on its spot whatever the blended hips do.
+ * on an arc of G.settleStepLift of its travel, the leg solved onto it and the
+ * foot turned between the gait's turn and the stand's; a foot on the stand
+ * keeps its world place and turn whatever the blended hips or the body's
+ * heading do. As the weight falls those spots are drawn onto the body's own
+ * stand (met at 0, where the standing legs take over without a jump). `share` (0 … 1): how much of this correction is drawn over the plain
+ * bone blend (a kneel setting in takes it out).
  */
-function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: ClipLayers, w: number): void {
+function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: ClipLayers, w: number, share: number): void {
   const hips = bones.hips
   if (hips.parent) _base.copy(hips.parent.matrixWorld).invert()
   else _base.identity()
+  LEG_SIDES.forEach((s, i) => legChain(bones, s).forEach((b, k) => _plain[i][k].copy(b.quaternion)))
   _blendHipsQ.copy(hips.quaternion)
   _blendHipsP.copy(hips.position)
   const hi = asset.bones.indexOf('hips')
-  // each foot's two spots: the stand's (code legs and hips) and the gait's
+  // each foot's two spots and turns: the stand's (code legs and hips) and the gait's
   hips.quaternion.copy(_codeHipsQ)
   hips.position.copy(_codeHipsP)
   LEG_SIDES.forEach((s, i) => legChain(bones, s).forEach((b, k) => b.quaternion.copy(_codeLeg[i][k])))
-  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _stand[i]))
+  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _stand[i], _standQ[i]))
   hips.quaternion.copy(c.local[hi])
   hips.position.copy(c.hips)
   LEG_SIDES.forEach((s) => legChain(bones, s).forEach((b, k) => b.quaternion.copy(gaitLocal(asset, c, s, k))))
-  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _gait[i]))
+  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _gait[i], _gaitQ[i]))
   hips.quaternion.copy(_blendHipsQ)
   hips.position.copy(_blendHipsP)
   const body = c.ground
@@ -328,23 +349,43 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     c.settleFirst = Math.abs(air[0] - air[1]) > tol ? (air[0] > air[1] ? 0 : 1) : far[0] >= far[1] ? 0 : 1
     // where the stand stood last frame: a body walking off has left it this one
     const was = c.lastGround ?? body
-    if (was) LEG_SIDES.forEach((_, i) => bodyToWorld(was, _stand[i], c.settleStand[i]))
+    LEG_SIDES.forEach((_, i) => {
+      if (was) bodyToWorld(was, _stand[i], c.settleStand[i])
+      c.settleTurn[i].copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, was?.yaw ?? 0))
+    })
+    c.settleW = w
   }
-  // the stand's feet where they stood as the blend began
-  if (body) LEG_SIDES.forEach((_, i) => worldToBody(body, c.settleStand[i], _stand[i]))
-  const share = settleShares(w, c.settleFirst)
+  // the stand's feet where and as they stood as the blend began, drawn onto
+  // the body's own stand as the weight falls (the miss by the square of the
+  // weight's share: met at 0, the last frames' share of it small)
+  const keep = w < c.settleW && c.settleW > 0 ? (w / c.settleW) ** 2 : 1
+  c.settleW = w
+  LEG_SIDES.forEach((_, i) => {
+    const yaw = body?.yaw ?? 0
+    if (body && keep < 1) {
+      bodyToWorld(body, _stand[i], _liveW)
+      c.settleStand[i].x = _liveW.x + (c.settleStand[i].x - _liveW.x) * keep
+      c.settleStand[i].z = _liveW.z + (c.settleStand[i].z - _liveW.z) * keep
+    }
+    if (keep < 1) c.settleTurn[i].slerp(_liveQ.copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, yaw)), 1 - keep)
+    if (body) worldToBody(body, c.settleStand[i], _stand[i])
+    _standQ[i].copy(c.settleTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -yaw))
+  })
+  const shares = settleShares(w, c.settleFirst)
   LEG_SIDES.forEach((s, i) => {
-    const step = share[i]
+    const step = shares[i]
     const p = step * step * (3 - 2 * step)
     const chain = legChain(bones, s)
     chain.forEach((b, k) => b.quaternion.copy(_codeLeg[i][k]).slerp(gaitLocal(asset, c, s, k), 1 - p))
     const [H, K, A, T, pole] = _ik
     T.copy(_gait[i]).lerp(_stand[i], p)
     T.y += G.settleStepLift * Math.hypot(_gait[i].x - _stand[i].x, _gait[i].z - _stand[i].z) * Math.sin(Math.PI * step)
+    // the foot turned from the gait's turn to the stand's with its step
+    _footQ.copy(_gaitQ[i]).slerp(_standQ[i], p)
     hips.updateMatrixWorld(true)
-    inBody(chain[2], A, _ankleQ)
     inBody(chain[0], H, _q)
     inBody(chain[1], K, _q)
+    inBody(chain[2], A, _q)
     const a = H.distanceTo(K)
     const b = K.distanceTo(A)
     // the knee bends where it bends now (forward where the leg is straight)
@@ -357,10 +398,11 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     inBody(chain[1], K, _q)
     inBody(chain[2], A, _q)
     swing(chain[1], A.clone().sub(K), sol.fore)
-    // the foot keeps the turn its blend gave it
     inBody(chain[1], _s, _q)
-    chain[2].quaternion.copy(_q.invert().multiply(_ankleQ))
-    chain[2].updateMatrixWorld(true)
+    chain[2].quaternion.copy(_q.invert().multiply(_footQ))
+    // drawn over the plain blend by `share`
+    if (share < 1) chain.forEach((bn, k) => bn.quaternion.copy(_plain[i][k].clone().slerp(bn.quaternion, share)))
+    chain[0].updateMatrixWorld(true)
   })
 }
 
