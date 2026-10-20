@@ -256,7 +256,7 @@ const _footQ = new THREE.Quaternion()
 const _yawQ = new THREE.Quaternion()
 const _liveW = { x: 0, z: 0 }
 const _liveQ = new THREE.Quaternion()
-/** Per foot, a landed foot's lift (world) as it steps the stand's miss over. */
+/** Per foot, a landed foot's lift (world) as it steps the stand's miss (place and turn) over. */
 const _lift = [0, 0]
 const _plain = LEG_SIDES.map(() => [0, 1, 2, 3].map(() => new THREE.Quaternion()))
 const _yAxis = new THREE.Vector3(0, 1, 0)
@@ -302,6 +302,11 @@ function worldToBody(b: GroundBody, h: { x: number; z: number }, out: THREE.Vect
   const k = 1 / (b.unit || 1)
   out.x = (dx * c - dz * s) * k
   out.z = (dx * s + dz * c) * k
+}
+
+/** The ankle to the toe's joint (world): the radius a foot's turn sweeps its ball round. */
+function footLength(bones: Record<string, THREE.Bone>, s: 'L' | 'R'): number {
+  return bones[`foot.${s}`].getWorldPosition(_p[0]).distanceTo(bones[`toe.${s}`].getWorldPosition(_p[1]))
 }
 
 /** The ankle's place and the foot's turn (body frame) with the legs and hips as given. */
@@ -381,7 +386,12 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
       bodyToWorld(body, _stand[i], _liveW)
       const dx = c.settleStand[i].x - _liveW.x
       const dz = c.settleStand[i].z - _liveW.z
-      if (shares[i] >= 1) _lift[i] = G.settleStepLift * Math.hypot(dx, dz) * Math.sin(Math.PI * (1 - w / R))
+      if (shares[i] >= 1) {
+        // the step covers the ankle's miss and the sweep of the turn's (heel and ball round the ankle)
+        _liveQ.copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, yaw))
+        const sweep = c.settleTurn[i].angleTo(_liveQ) * footLength(bones, LEG_SIDES[i])
+        _lift[i] = G.settleStepLift * (Math.hypot(dx, dz) + sweep) * Math.sin(Math.PI * (1 - w / R))
+      }
       c.settleStand[i].x = _liveW.x + dx * k
       c.settleStand[i].z = _liveW.z + dz * k
     }
