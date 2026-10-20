@@ -15920,3 +15920,11 @@ to land than a mechanism that needs a review.
   Verifiable: the export's `point` subject keeps its hips at 0.85 or more of standing height in every frame (Vitest in src/render/villagerRuntimePose.test.tsx); skinnedFigureCrouch.test.tsx stays green.
   Criticality: medium - every pointing villager on medium/high presets.
   Bundle: Dorfleben.
+
+- [ ] 1396. Two walking villagers stand inside each other at the village centre
+  Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
+  Source: finding 20.10.2026 10:54 from the point-1330 picture check: verification/1295-village-walker-mid-stride-webgl2.png at f59ddaa0a shows a walking woman and a man behind her standing inside each other at the village centre (WebGL 2). Villager separation, not the planted-soles gait; WebGPU not yet judged for it.
+  Final state: two villagers moving through the village never interpenetrate; their bodies keep a visible gap while walking past or behind each other.
+  Verifiable: a Vitest case on the villager movement layer asserts a minimum body distance between every pair of walking villagers over a simulated village walk; the 1295 walk frame shows no overlapping bodies on both backends.
+  Criticality: medium - visible in the village walk frame.
+  Bundle: Dorfleben.
