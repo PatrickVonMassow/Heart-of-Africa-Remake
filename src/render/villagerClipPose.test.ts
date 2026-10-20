@@ -288,6 +288,64 @@ describe('the clip gait on the ground', () => {
     for (const i of foot) expect(a.p[i].distanceTo(b.p[i])).toBeLessThan(1e-9)
   })
 
+  it('the walk stands on a foot every frame and lies flat through mid-stance, on every body', () => {
+    // point 1330: the retargeted walk floated both feet at the double support
+    // and never set a foot flat (its heel rode 1.5 cm up through mid-stance)
+    const n = asset.bones.length
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [0.6, 1.0, 1.4]) {
+          const speed = perLeg * f.legScale * f.scale
+          const g = newClipGait()
+          const pose = newPose(n)
+          const world = newWorld(n)
+          const dt = 1 / 60
+          let z = 0
+          let frames = 0
+          let worstLow = 0
+          const flat = [0, 0]
+          for (let t = 0; t < 4; t += dt) {
+            z += speed * dt
+            stepClipGait(g, asset, f, speed * dt, speed)
+            clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+            forwardKinematics(asset, f.rest0, pose, world)
+            if (t < 1) continue
+            frames++
+            const c = contactPoints(asset, world, f.legScale)
+            worstLow = Math.max(worstLow, Math.min(...(['L', 'R'] as const).flatMap((s) => [c[s].heel.y, c[s].ball.y, c[s].tip.y])))
+            ;(['L', 'R'] as const).forEach((s, i) => {
+              const foot = asset.bones.indexOf(`foot.${s}`)
+              const q = world.q[foot]
+              // level: no pitch or roll (a turn about the vertical alone)
+              const level = Math.hypot(q.x, q.z) < 0.005
+              if (level && Math.abs(world.p[foot].y - f.rest0[foot * 3 + 1]) < 0.003) flat[i]++
+            })
+          }
+          const where = `${sex} ${age} at ${perLeg} per leg`
+          // measured 0.0011-0.0074 (20.10.2026): before, both feet rode 4-6 cm up
+          expect(worstLow, where).toBeLessThan(0.012)
+          // each foot flat over a share of the cycle (measured 0.19-0.36; none before)
+          for (const k of flat) expect(k / frames, where).toBeGreaterThan(0.15)
+        }
+      }
+    }
+  })
+
+  it('the gait is drawn on its own ground: a contact at 0 lands on the drawn sole', () => {
+    const n = asset.bones.length
+    const f = adult.frame
+    const out = quats(n)
+    const hips = new THREE.Vector3()
+    const pose = newPose(n)
+    pose.hips.set(0, 0.7, 0)
+    toHung(asset, f, pose, out, hips, 0)
+    expect(hips.y).toBeCloseTo(0.7 * f.scale, 9)
+    // the default stays the hung rest's sole (the idle, the dig, the kneel)
+    toHung(asset, f, pose, out, hips)
+    expect(hips.y).toBeCloseTo((0.7 - f.sole) * f.scale, 9)
+  })
+
   it("the tag game's fastest child still jogs: the sprint blend starts above a fresh runner's top pace", () => {
     const tag = balance.villageLife.tag
     const top = tag.sprintSpeed * tag.runnerBoost
