@@ -12,6 +12,7 @@
 
 import * as THREE from 'three/webgpu'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import type { ShellSet } from './villagerShell'
 
 export type VillagerClipKind = 'gait' | 'loop' | 'once' | 'hold'
 
@@ -83,6 +84,8 @@ export interface VillagerAsset {
   stature: number
   /** The garments of the body's cover mask, in bit order (render/villagerGarmentMask.ts); empty without one. */
   garmentMask: string[]
+  /** The shell garments' recipes (render/villagerShell.ts), or null without any. */
+  shells: ShellSet | null
 }
 
 /** The bone name a glTF node carries ('.' is reserved by three's
@@ -105,6 +108,7 @@ interface Meta {
   toolHold: Record<'L' | 'R', { rotation: number[]; offset: number[] }>
   stature: number
   garmentMask?: { garments: string[] }
+  shells?: ShellSet
 }
 
 /** Turn a parsed glTF into the villager asset. */
@@ -201,6 +205,7 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     toolHold: { L: hold('L'), R: hold('R') },
     stature: meta.stature,
     garmentMask: meta.garmentMask?.garments ?? [],
+    shells: meta.shells ?? null,
   }
 }
 

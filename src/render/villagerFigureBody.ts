@@ -22,7 +22,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
 import { bakeMorphs, legScale, morphInfluences, restBounds, restHeads, stylisePeaks } from './villagerBody'
 import { topoOrder } from './villagerAsset'
-import { applyGarmentMask, COVER_ATTRIBUTE } from './villagerGarmentMask'
+import { applyGarmentMask, COVER_ATTRIBUTE, decodeCover, GARMENT_PUSH_ATTRIBUTE, wornBits } from './villagerGarmentMask'
+import { buildShells, cutBodyIndex, faceMasks, REGION_ATTRIBUTE, regionWords, shellBits, type BuiltShell } from './villagerShell'
 
 const DOWN = new THREE.Vector3(0, -1, 0)
 
@@ -194,6 +195,8 @@ export interface GltfPerson {
   frame: PersonFrame
   /** The body's garment cover mask (vertices × 4, render/villagerGarmentMask.ts), or null. */
   cover: Uint16Array | null
+  /** Per body vertex its shell region word (render/villagerShell.ts), or null. */
+  region: Uint32Array | null
 }
 
 /** A person's skeleton before the hang and the transform onto the drawn one:
@@ -254,6 +257,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
   restBounds(g)
   const p = measureProportions(asset, g, dom, rest, p0)
   const cov = asset.geometries.body.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
+  const reg = asset.geometries.body.getAttribute(REGION_ATTRIBUTE) as THREE.BufferAttribute | undefined
   return {
     geometry: g,
     rest,
@@ -261,6 +265,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     hair: hairMask(asset, g, dom, p),
     frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0), influences: w },
     cover: cov ? Uint16Array.from(cov.array as ArrayLike<number>) : null,
+    region: reg ? regionWords(reg.array as ArrayLike<number>) : null,
   }
 }
 
@@ -491,6 +496,61 @@ export const garmentLayer = (l: Pick<DressLayer, 'slot'>): number => SLOT_LAYER[
 /** Dress layers that are no garment (paint on the skin): never a mesh. */
 const isPaint = (l: Pick<DressLayer, 'form'>) => l.form === 'bodyPaint'
 
+/** A layer the file holds as a shell recipe (render/villagerShell.ts). */
+export const isShellLayer = (asset: VillagerAsset, l: Pick<DressLayer, 'form' | 'wear'>): boolean => !!asset.shells?.garments[garmentMeshName(l)]
+
+/**
+ * The worn shells as geometry on the painted body `body` (its positions,
+ * normals, skin and garment push, the person's scale): each vertex at its
+ * source plus its offset along the source's normal, its source's skin,
+ * normal and push, zero live-morph deltas under the body's names, painted
+ * as its layer.
+ */
+export function shellGeometry(person: GltfPerson, body: THREE.BufferGeometry, built: BuiltShell, l: DressLayer): THREE.BufferGeometry {
+  const pos = person.geometry.getAttribute('position') as THREE.BufferAttribute
+  const nor = person.geometry.getAttribute('normal') as THREE.BufferAttribute
+  const si = body.getAttribute('skinIndex') as THREE.BufferAttribute
+  const sw = body.getAttribute('skinWeight') as THREE.BufferAttribute
+  const push = body.getAttribute(GARMENT_PUSH_ATTRIBUTE) as THREE.BufferAttribute
+  const n = built.src.length
+  const P = new Float32Array(n * 3)
+  const N = new Float32Array(n * 3)
+  const I = new Uint16Array(n * 4)
+  const Wt = new Float32Array(n * 4)
+  const G = new Float32Array(n)
+  let bottom = Infinity
+  for (let k = 0; k < n; k++) {
+    const s = built.src[k]
+    const o = built.off[k]
+    for (let c = 0; c < 3; c++) {
+      N[k * 3 + c] = nor.getComponent(s, c)
+      P[k * 3 + c] = pos.getComponent(s, c) + o * N[k * 3 + c]
+    }
+    for (let c = 0; c < 4; c++) {
+      I[k * 4 + c] = si.getComponent(s, c)
+      Wt[k * 4 + c] = sw.getComponent(s, c)
+    }
+    G[k] = push.getX(s)
+    bottom = Math.min(bottom, P[k * 3 + 1])
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3))
+  g.setAttribute('normal', new THREE.BufferAttribute(N, 3))
+  g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(I, 4))
+  g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(Wt, 4))
+  g.setIndex(new THREE.BufferAttribute(n < 65536 ? Uint16Array.from(built.index) : built.index, 1))
+  g.morphAttributes.position = (body.morphAttributes.position ?? []).map((m) => {
+    const z = new THREE.BufferAttribute(new Float32Array(n * 3), 3)
+    z.name = m.name
+    return z
+  })
+  g.morphTargetsRelative = true
+  const second = l.colour2 ?? mixHex(l.colour, '#000000', 0.35)
+  const out = tidy(paintSurface(g, l.colour, surfaceOf(l, person.p, bottom), second, fibreOf(l)))
+  out.setAttribute(GARMENT_PUSH_ATTRIBUTE, new THREE.BufferAttribute(G, 1))
+  return out
+}
+
 /**
  * A pipeline garment on a person: the mesh scripts/villager/ built round this
  * body, fitted to every clip (fit.py) and measured frame by frame in
@@ -555,6 +615,8 @@ const missingGarments = new Set<string>()
  */
 export function gltfLayerGeometry(asset: VillagerAsset, person: GltfPerson, l: DressLayer): THREE.BufferGeometry | null {
   if (isPaint(l)) return null
+  // a shell garment is built with the whole figure (gltfFigureGeometry), never alone
+  if (isShellLayer(asset, l)) return null
   const g = gltfGarment(asset, person, l)
   if (!g && import.meta.env.DEV && !missingGarments.has(garmentMeshName(l))) {
     missingGarments.add(garmentMeshName(l))
@@ -591,12 +653,30 @@ export function gltfFigureGeometry(
     fib.setW(i, FIGURE_FIBRE.none) // the scalp's hair: no skin pores
   })
   const depth = VILLAGER_ASSET.garmentMaskPush * person.frame.scale
+  // shells (render/villagerShell.ts) are built here from the body; the rest go through layerOf
+  const shells = layers.filter((l) => isShellLayer(asset, l) && person.region)
   const drawn = layers.flatMap((l) => {
+    if (isShellLayer(asset, l)) return []
     const g = layerOf(l)
     return g ? [{ l, g }] : []
   })
   const worn = drawn.map(({ l }) => garmentMeshName(l))
-  const parts = [applyGarmentMask(tidy(body), person.cover, asset.garmentMask, worn, depth)]
+  const bodyPart = applyGarmentMask(tidy(body), person.cover, asset.garmentMask, worn, depth)
+  const parts = [bodyPart]
+  if (shells.length && asset.shells && person.region) {
+    const index = person.geometry.getIndex()!.array as ArrayLike<number>
+    const fmask = faceMasks(index, person.region)
+    const names = shells.map(garmentMeshName)
+    const hidden = person.cover ? decodeCover(person.cover, wornBits(asset.garmentMask, worn)).hidden : null
+    const cut = cutBodyIndex(index, fmask, shellBits(asset.shells, names), hidden)
+    const count = bodyPart.getAttribute('position').count
+    bodyPart.setIndex(new THREE.BufferAttribute(count < 65536 ? Uint16Array.from(cut) : Uint32Array.from(cut), 1))
+    const built = buildShells(index, count, fmask, asset.shells, names, person.frame.scale, hidden)
+    for (const l of shells) {
+      const b = built[garmentMeshName(l)]
+      if (b && b.index.length) parts.push(shellGeometry(person, bodyPart, b, l))
+    }
+  }
   for (const { l, g } of drawn) {
     const over = drawn.filter((o) => garmentLayer(o.l) > garmentLayer(l)).map((o) => garmentMeshName(o.l))
     const cov = asset.geometries[garmentMeshName(l)]?.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
