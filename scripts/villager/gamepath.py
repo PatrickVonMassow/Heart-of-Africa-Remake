@@ -322,6 +322,38 @@ def runtime_check(body, rt, cfg, tol=RUNTIME_TOLERANCE, log=print):
     return worst
 
 
+def shell_round_trip(body, garments, rt, cfg, tol=RUNTIME_TOLERANCE, log=print):
+    """The shells' round trip (src/render/villagerRuntimePose.test.tsx): for
+    every exported outfit, the composed rest body's normals recomputed here
+    (body.vertex_normals over the full index) match the game's (D17), and the
+    shells rebuilt here (shells.py `build`) from that rest body with the
+    exported scale match the game's vertex for vertex, rim quads included and
+    a covered seam's inner row on the lower shell's edge. Raises on a miss."""
+    import shells as SHL
+    from body import vertex_normals
+    meshes = garments['meshes']
+    sh = {n: meshes[n] for n in SHL.names_of(meshes)}
+    tris = np.asarray(body['tris'])
+    fm = SHL.face_masks(body['region_bits'], tris)
+    worst = {'normal': 0.0, 'shell': 0.0}
+    bad = []
+    for o in rt.get('shells', []):
+        pos = np.asarray(o['body']['pos'], float).reshape(-1, 3)
+        nrm = vertex_normals(pos, tris)
+        worst['normal'] = max(worst['normal'], float(np.abs(nrm - np.asarray(o['body']['normal'], float).reshape(-1, 3)).max()))
+        g = SHL.build(pos, tris, nrm, fm, sh, o['worn'], cfg['VILLAGER_ASSET']['garmentShellStep'], scale=o['scale'])
+        for n, x in o['shells'].items():
+            if n not in g or len(g[n]['src']) != len(x['src']) or (g[n]['src'] != np.asarray(x['src'])).any() \
+                    or (g[n]['tris'].ravel() != np.asarray(x['index'])).any() or (g[n]['rim'] != np.asarray(x['rim'], bool)).any():
+                bad.append(f"{o['sex']} {o['age']} {'+'.join(o['worn'])}: {n} differs in its vertices, faces or rims")
+                continue
+            worst['shell'] = max(worst['shell'], float(np.abs(g[n]['pos'] - np.asarray(x['pos'], float).reshape(-1, 3)).max()))
+    log(f"shell round trip: {len(rt.get('shells', []))} outfits; worst normal {worst['normal']:.2e}, shell position {worst['shell']:.2e} (tolerance {tol:g})")
+    if bad or not all(v <= tol for v in worst.values()):
+        raise RuntimeError(f'shell round trip FAILED: {bad or worst}')
+    return worst
+
+
 def runtime_hand_deltas(person, pos, body, jidx, jw):
     """Per hand shape (body.HAND_MORPHS) its delta on the person's BAKED body
     (the game carries the live morphs through the hang bake, villagerFigureBody.ts

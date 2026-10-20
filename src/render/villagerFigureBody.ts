@@ -626,6 +626,34 @@ export function gltfLayerGeometry(asset: VillagerAsset, person: GltfPerson, l: D
 }
 
 /**
+ * The worn shell layers `shells` of a figure on its masked body part
+ * `bodyPart` (painted, tidied, legacy mask applied for the legacy garments
+ * `worn`): the body's faces under a worn shell leave its index, and each shell
+ * is built (render/villagerShell.ts) and turned into its geometry.
+ */
+export function gltfShellParts(
+  asset: VillagerAsset,
+  person: GltfPerson,
+  shells: readonly DressLayer[],
+  bodyPart: THREE.BufferGeometry,
+  worn: readonly string[],
+): Array<{ l: DressLayer; built: BuiltShell; geometry: THREE.BufferGeometry }> {
+  if (!shells.length || !asset.shells || !person.region) return []
+  const index = person.geometry.getIndex()!.array as ArrayLike<number>
+  const fmask = faceMasks(index, person.region)
+  const names = shells.map(garmentMeshName)
+  const hidden = person.cover ? decodeCover(person.cover, wornBits(asset.garmentMask, worn)).hidden : null
+  const cut = cutBodyIndex(index, fmask, shellBits(asset.shells, names), hidden)
+  const count = bodyPart.getAttribute('position').count
+  bodyPart.setIndex(new THREE.BufferAttribute(count < 65536 ? Uint16Array.from(cut) : Uint32Array.from(cut), 1))
+  const built = buildShells(index, count, fmask, asset.shells, names, person.frame.scale, hidden)
+  return shells.flatMap((l) => {
+    const b = built[garmentMeshName(l)]
+    return b && b.index.length ? [{ l, built: b, geometry: shellGeometry(person, bodyPart, b, l) }] : []
+  })
+}
+
+/**
  * A person's whole figure as ONE geometry skinned to the asset's bones: the
  * glTF body painted (skin, or skin under body paint; the scalp in the hair
  * colour) and every dress layer as the pipeline's garment
@@ -663,20 +691,7 @@ export function gltfFigureGeometry(
   const worn = drawn.map(({ l }) => garmentMeshName(l))
   const bodyPart = applyGarmentMask(tidy(body), person.cover, asset.garmentMask, worn, depth)
   const parts = [bodyPart]
-  if (shells.length && asset.shells && person.region) {
-    const index = person.geometry.getIndex()!.array as ArrayLike<number>
-    const fmask = faceMasks(index, person.region)
-    const names = shells.map(garmentMeshName)
-    const hidden = person.cover ? decodeCover(person.cover, wornBits(asset.garmentMask, worn)).hidden : null
-    const cut = cutBodyIndex(index, fmask, shellBits(asset.shells, names), hidden)
-    const count = bodyPart.getAttribute('position').count
-    bodyPart.setIndex(new THREE.BufferAttribute(count < 65536 ? Uint16Array.from(cut) : Uint32Array.from(cut), 1))
-    const built = buildShells(index, count, fmask, asset.shells, names, person.frame.scale, hidden)
-    for (const l of shells) {
-      const b = built[garmentMeshName(l)]
-      if (b && b.index.length) parts.push(shellGeometry(person, bodyPart, b, l))
-    }
-  }
+  for (const s of gltfShellParts(asset, person, shells, bodyPart, worn)) parts.push(s.geometry)
   for (const { l, g } of drawn) {
     const over = drawn.filter((o) => garmentLayer(o.l) > garmentLayer(l)).map((o) => garmentMeshName(o.l))
     const cov = asset.geometries[garmentMeshName(l)]?.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined

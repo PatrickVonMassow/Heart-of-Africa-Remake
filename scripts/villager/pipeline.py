@@ -138,7 +138,7 @@ def main():
         import clips as CL
         clips = cached(a.work, 'clips', lambda: CL.build_clips(a.src, body, cfg), force='clips' in steps, key=keys['clips'])
     garments = None
-    if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
+    if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration', 'runtime')):
         import fit as F
         garments = cached(a.work, 'garments', lambda: F.tailor(a.src, mh, body, clips, cfg), force='garments' in steps, key=keys['garments'])
     if garments is not None:
@@ -176,6 +176,8 @@ def main():
         rt = GP.load_runtime(a.runtime)
         # the export is evidence only once the round trip matches (raises otherwise)
         GP.runtime_check(body, rt, cfg)
+        if garments is not None and rt.get('shells'):
+            GP.shell_round_trip(body, garments, rt, cfg)
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)

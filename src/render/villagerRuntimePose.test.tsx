@@ -43,7 +43,10 @@ import {
   type GestureState,
 } from './gesture'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { garmentMeshName, gltfLayerGeometry, gltfPerson } from './villagerFigureBody'
+import { garmentMeshName, gltfLayerGeometry, gltfPerson, gltfShellParts, isShellLayer } from './villagerFigureBody'
+import { tidy } from './figureBody'
+import { applyGarmentMask } from './villagerGarmentMask'
+import type { DressLayer } from '../systems/appearance'
 import { figureIdentity } from '../scenes/place/figureIdentity'
 import type { FigureLook, FigureWork } from '../scenes/place/placeFigureContext'
 import { easeDigWeight, mixDigPose } from '../scenes/place/shovelHold'
@@ -318,7 +321,7 @@ async function play(s: Subject) {
   }
   const person = gltfPerson(asset, id.sex, id.age, id.build)
   const garments = appearanceFor({ peopleId: s.peopleId, sex: id.sex, age: id.age, drivers: look.drivers, year: look.year, cloth: PALETTE[0], palette: PALETTE, pick: id.pick })
-    .filter((l) => gltfLayerGeometry(asset, person, l))
+    .filter((l) => isShellLayer(asset, l) || gltfLayerGeometry(asset, person, l))
     .map(garmentMeshName)
   const caller: Caller = {
     root: new THREE.Group(),
@@ -389,6 +392,40 @@ async function play(s: Subject) {
     garments,
     frames,
   }
+}
+
+/** A forced shell layer (the round trip reads geometry, never its colour). */
+const shellLayer = (name: string): DressLayer => {
+  const [, form, wear] = name.split('-')
+  const slot = form === 'trousers' ? 'hip' : form === 'breastCloth' ? 'torso' : 'ornament'
+  return { slot, form, wear, material: 'cotton', colour: '#888888', colour2: null, pattern: 'plain', source: { guess: 'round trip' } } as DressLayer
+}
+
+/** The shells' round trip (scripts/villager/gamepath.py shell_round_trip): the
+ *  composed rest body (morphs, hang, scale, stylisePeaks) with its normals and
+ *  scale, and every worn shell as the game builds it, for the seam outfits. */
+const SHELL_OUTFITS: Array<{ sex: Sex; age: AgeGroup; worn: string[] }> = [
+  { sex: 'female', age: 'adult', worn: ['g-trousers-waist', 'g-breastCloth-chest', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist'] },
+  { sex: 'female', age: 'adult', worn: ['g-breastCloth-chest', 'g-neckBeads-chest'] },
+  { sex: 'male', age: 'child', worn: ['g-waistBeads-waist', 'g-trousers-waist'] },
+]
+
+function shellRoundTrip() {
+  if (!asset.shells) return []
+  return SHELL_OUTFITS.map((o) => {
+    const person = gltfPerson(asset, o.sex, o.age, 0)
+    const bodyPart = applyGarmentMask(tidy(person.geometry.clone()), person.cover, asset.garmentMask, [], 0)
+    const parts = gltfShellParts(asset, person, o.worn.map(shellLayer), bodyPart, [])
+    const flat = (a: THREE.BufferAttribute) => Array.from(a.array as ArrayLike<number>)
+    return {
+      ...o,
+      scale: person.frame.scale,
+      body: { pos: flat(person.geometry.getAttribute('position') as THREE.BufferAttribute), normal: flat(person.geometry.getAttribute('normal') as THREE.BufferAttribute) },
+      shells: Object.fromEntries(
+        parts.map((p) => [garmentMeshName(p.l), { pos: flat(p.geometry.getAttribute('position') as THREE.BufferAttribute), src: Array.from(p.built.src), index: Array.from(p.built.index), rim: Array.from(p.built.rim) }]),
+      ),
+    }
+  })
 }
 
 describe('the runtime-pose exporter', () => {
@@ -467,7 +504,7 @@ describe('the runtime-pose exporter', () => {
     const path = process.env.VILLAGER_RUNTIME_POSES
     if (path) {
       mkdirSync(dirname(path), { recursive: true })
-      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out }))
+      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out, shells: shellRoundTrip() }))
     }
   }, 120_000)
 })
