@@ -134,7 +134,7 @@ def main():
     body = cached(a.work, 'body', lambda: B.build_body(mh, cfg), force='body' in steps, key=keys['body'])
     have = lambda n: n in steps or os.path.exists(os.path.join(a.work, n + '.pkl'))  # noqa: E731
     clips = None
-    if have('clips') and any(s in steps for s in ('clips', 'export', 'sheets', 'penetration', 'garments')):
+    if have('clips') and any(s in steps for s in ('clips', 'export', 'sheets', 'penetration', 'garments', 'runtime')):
         import clips as CL
         clips = cached(a.work, 'clips', lambda: CL.build_clips(a.src, body, cfg), force='clips' in steps, key=keys['clips'])
     garments = None
