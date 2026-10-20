@@ -5940,4 +5940,80 @@ if (section('figure-micro')) {
   }
 }
 
+// --- Garment picture inventory (work-order "garment rebuild", step 1) --------
+// Opt-in only (`--section=garment-inventory`): a whole run skips it. In each
+// place, up to three of its walkers caught mid-stride (a thigh swung past
+// 0.22 rad), life frozen, framed side-on from 3 m and from 7 m — the dressed
+// villagers as the player meets them in a village and a port city. No check
+// judges the cloth: the frames are the before pictures of the inventory.
+if (section('garment-inventory') && process.env.VERIFY_SECTION === 'garment-inventory') {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await assertBackend(page)
+  const PLACES = (process.env.GARMENT_PLACES ?? 'bambara-village,hausa-village,tuareg-village,zulu-village,maasai-village,somali-village,baganda-village,san-village,cairo,timbuktu').split(',')
+  // A camera spot side-on to walker `i` at `dist` with a clear sight line to its
+  // hips and head (either flank, a little off square); null when none.
+  const sideOn = (i, dist) =>
+    page.evaluate(({ i, dist }) => {
+      const g = window.__placeWalkers.group(i)
+      if (!g?.visible) return null
+      const p = window.__placePlayer
+      for (const turn of [0, 0.25, -0.25, 0.5, -0.5]) {
+        for (const flank of [1, -1]) {
+          const side = g.rotation.y + (flank * Math.PI) / 2 + turn
+          const x = g.position.x + Math.sin(side) * dist
+          const z = g.position.z + Math.cos(side) * dist
+          const eye = [x, g.position.y + 1.6, z]
+          const clear = [0.5, 0.9, 1.4].every((y) => {
+            const hit = window.__placeRayHit?.(g.position.x, g.position.y + y, g.position.z, eye)
+            if (!hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.35) return true
+            return false
+          })
+          if (!clear) continue
+          p.x = x
+          p.z = z
+          p.yaw = side
+          p.pitch = dist > 4 ? -0.05 : -0.1
+          return { x: g.position.x, y: g.position.y, z: g.position.z }
+        }
+      }
+      return null
+    }, { i, dist })
+  for (const place of PLACES) {
+    await goToPlace(place)
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    await nextFrames(30)
+    const n = await page.evaluate(() => window.__placeWalkers?.states.length ?? 0)
+    const picks = [...new Set([0, Math.floor(n / 2), n - 1])].filter((k) => k >= 0 && k < n)
+    let shots = 0
+    for (const who of picks) {
+      const stride = await stepUntil((i) => {
+        const g = window.__placeWalkers.group(i)
+        let mesh = null
+        g?.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        const t = mesh?.skeleton.bones.find((b) => b.name === 'bone-thigh.L')
+        return !!t && Math.abs(t.rotation.x) > 0.22 && window.__placeWalkers.states[i].mode === 'walk'
+      }, who, 600)
+      if (!stride) continue
+      await page.evaluate(() => window.__placeFreezeLife?.(true))
+      try {
+        for (const dist of [3, 7]) {
+          const at = await sideOn(who, dist)
+          if (!at) continue
+          await nextFrames(4)
+          await frame(shot(`1347-inventory-game-${place}-w${who}-${dist}m`), {
+            local: { x: at.x, y: at.y + 0.8, z: at.z },
+            label: `${place}: walker ${who} caught mid-stride, side-on from ${dist} m (garment inventory, before)`,
+          })
+          shots++
+        }
+      } finally {
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+      }
+    }
+    check(`garment inventory: ${place} gave at least one walker frame`, shots > 0, `${n} walkers, picks ${picks.join(',')}`)
+  }
+}
+
 await finishPolishSuite()
