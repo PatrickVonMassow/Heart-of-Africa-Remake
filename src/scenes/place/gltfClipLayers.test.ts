@@ -13,7 +13,7 @@ import { clipGaitPose, clipPoseAt, shovelOnHungHand, toHung } from '../../render
 import { newPose } from '../../render/villagerRig'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { AGE_GROUPS, SEXES } from '../../systems/appearance'
-import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
+import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, settleShares, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
 
 let asset: VillagerAsset
 let person: GltfPerson
@@ -426,5 +426,76 @@ describe('the posable clavicles (natural-villager-motion step 11)', () => {
     expect(g.bones['shoulder.L'].quaternion.angleTo(new THREE.Quaternion())).toBeLessThan(
       VILLAGER_POSE.shoulders.protractionMax + VILLAGER_POSE.shoulders.dropMax + 1e-6,
     )
+  })
+})
+
+describe('starting and stopping on the glTF figure (point 1330)', () => {
+  /** Walk at `v`, stop (or, `start`, stand and then walk off) with the walk
+   *  weight easing as the code walk eases it; per frame each ankle's place on
+   *  the ground (world: the hold's body moves by z, the bones do not). */
+  function settle(cut: number, start: boolean) {
+    const { bones } = createGltfSkeleton(asset, person.rest)
+    const c = clipLayers(asset)
+    const hipRest = bones.hips.position.clone()
+    const dt = 1 / 60
+    const v = 1.48
+    let z = 0
+    let w = start ? 0 : 1
+    let speed = start ? 0 : v
+    const frames: { w: number; feet: THREE.Vector3[] }[] = []
+    for (let t = 0; t < cut + 1; t += dt) {
+      const step = (start ? t >= cut : t < cut) ? v * dt : 0
+      z += step
+      speed += (step / dt - speed) * (1 - Math.exp(-dt / 0.12))
+      w = Math.abs(speed) > 0.08 ? Math.min(1, w + 5 * dt) : Math.max(0, w - 5 * dt)
+      // the code-built stand: every bone at rest
+      for (const b of Object.values(bones)) b.quaternion.identity()
+      bones.hips.position.copy(hipRest)
+      stepClipLayers(asset, person, c, step, speed, { x: 0, z, yaw: 0, unit: 1 }, null, dt)
+      applyClipLayers(asset, person, bones, c, { speed, weight: w, kneel: 0 }, [true, true])
+      bones.hips.updateMatrixWorld(true)
+      frames.push({ w, feet: ['L', 'R'].map((s) => bones[`foot.${s}`].getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0, z))) })
+    }
+    return frames
+  }
+
+  it('each foot steps between the gait and the stand in turn, the other standing: never a foot slid along the ground', () => {
+    // a bone blend alone moved both feet every frame of the 0.2 s blend, a
+    // foot on the ground sliding up to 7 cm (measured 20.10.2026, the
+    // village-walk check on WebGL 2: worstSlip 0.0704)
+    const restY = settle(0.5, true)[0].feet[0].y
+    for (const start of [false, true]) {
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        const frames = settle(cut, start)
+        let blending = 0
+        let worstStill = 0
+        let worstSlide = 0
+        for (let k = 1; k < frames.length; k++) {
+          const a = frames[k - 1]
+          const b = frames[k]
+          if (!(b.w > 0 && b.w < 1) && !(a.w > 0 && a.w < 1)) continue
+          blending++
+          const moved = b.feet.map((p, i) => Math.hypot(p.x - a.feet[i].x, p.z - a.feet[i].z))
+          // one foot stands each frame of the blend
+          worstStill = Math.max(worstStill, Math.min(...moved))
+          // a foot at its standing height moves nowhere along the ground
+          b.feet.forEach((p, i) => {
+            if (Math.abs(p.y - restY) <= 0.003 && Math.abs(a.feet[i].y - restY) <= 0.003) worstSlide = Math.max(worstSlide, moved[i])
+          })
+        }
+        const where = `${start ? 'start' : 'stop'} at ${cut.toFixed(2)} s`
+        expect(blending, where).toBeGreaterThan(5)
+        expect(worstStill, where).toBeLessThan(0.002)
+        expect(worstSlide, where).toBeLessThan(0.002)
+      }
+    }
+  })
+
+  it('the step shares: the first foot over the first half of the way to the stand, the other over the second', () => {
+    expect(settleShares(1, 0)).toEqual([0, 0])
+    expect(settleShares(0, 0)).toEqual([1, 1])
+    expect(settleShares(0.5, 0)).toEqual([1, 0])
+    expect(settleShares(0.5, 1)).toEqual([0, 1])
+    expect(settleShares(0.75, 1)).toEqual([0, 0.5])
   })
 })
