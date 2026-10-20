@@ -116,7 +116,6 @@
    "from": [
     "A14",
     "B3",
-    "B10",
     "B53",
     "B54",
     "B57"
@@ -400,5 +399,6 @@
    "file": "docs/batch-owner-runbook.md",
    "defect": "1393 lands before point 1347 per the work order; 1347 resumes only after the daemon restart (U33) and memory update (U30) so it never runs against half-migrated switch or routing state."
   }
- ]
+ ],
+ "accountingNote": "Count correction by the implementer (Claude Opus 5.5), no design change: B10 was listed in both U3 and U11; it states the alias/fallback separation U3 decides, so it stays in U3 only."
 }
