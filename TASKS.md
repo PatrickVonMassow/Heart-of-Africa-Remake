@@ -94,6 +94,7 @@ put it is the mistake this line exists to stop.
   2. THEN prove that gpt-6.1-sol answers with the GLOBAL installation (a minimal probe prompt answered OK). If it does not answer, stop and report; do not start the rebuild.
   3. ONLY THEN the rebuild of 1393 with four-eyes review across two vendors (CLAUDE.md 6), as the spec of 1393 describes.
   Background measured 19.10.2026 22:07: codex 0.163.0 via npx with ChatGPT login: gpt-6.1-sol answered OK. codex 0.153.0 (the global install): 400 "not supported".
+  Progress 20.10.2026 08:10 (batch owner): steps 1-2 done — global Codex CLI updated 0.153.0 -> 0.163.0 (npm install -g @openai/codex@0.163.0); probe `codex exec -m gpt-6.1-sol` with the global install answered OK. Step 3 (rebuild) is open.
   Goal: switching a model is a one-line data change. No file name, script name or constant name carries a vendor or model name; only data does.
   Final state:
   - scripts/model-lanes.mjs is the ONLY place naming concrete models. Each lane is a record: role, vendor, display name, model id, retired names, runtime (claude/codex), scarce flag. Guards, trailer checks, review chain, routing and tests read lanes only from it.
