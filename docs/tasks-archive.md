@@ -34443,3 +34443,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: in the runtime-pose export (src/render/villagerRuntimePose.test.tsx) the chaser's hips stay near standing height (they are 0.50-0.65 of it now) and its feet alternate; a Vitest case at 3.4 u/s for a child figure.
   Criticality: high - every child chaser of the port-city tag game at full sprint.
   Bundle: Dorfleben.
+
+- [x] 1330. Skinned villager walk keeps the drawn soles on the ground and shows planted stances
+  Queue position: directly after point 1342, whose gait and IK rework touches the same walk; if 1342 lands with `polish-villagers --section=village-walk` green, this point closes with that run as evidence.
+  Source: owner finding 08.10.2026 during point 1313's suites: `village-walk` is RED on origin/main d22f82796 (baseline log local/verify-baseline-logs/polish-villagers-baseline-d22f82796fb1-run1.log: worstGround 0.108 m, stances 0) and on the point 1294 branch already on 06.10.2026 (worstGround 0.205 m, stances 2), so it is pre-existing since the glTF body and not charged to 1313.
+  Final state: on the skinned (medium/high) villager walk the lowest drawn sole of the transformed foot geometry stays within 0.040 m of the ground every frame, at least six planted stances are observed, and a planted foot slides at most 0.040 m per stance; no change to the low-preset primitive (point 1301).
+  Verifiable: `polish-villagers --section=village-walk` green on both backends; Vitest for any gait/IK change in src/render/villagerClipPose.ts; walking frame picture-checked.
+  Criticality: medium - every walking villager on medium/high presets; a standing red in the village suite.
+  Bundle: Dorfleben.
