@@ -13,7 +13,7 @@ import { AGE_GROUPS, appearanceFor, CAST_DRESS, PEOPLE_DRESS, SEXES, type DressL
 
 /** Every dress table the body is drawn in: the peoples' and the non-villager cast's. */
 const DRESS_TABLES = { ...PEOPLE_DRESS, ...CAST_DRESS }
-import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
+import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE, tidy } from './figureBody'
 import { FIGURE_FIBRE } from './materials'
 import { kneelLegs } from './figureRig'
 import { ankleAt, figureCrownOffset, legDims, legExtent, strideReach, walkPose } from './figureWalk'
@@ -28,8 +28,10 @@ import {
   gltfFigureGeometry,
   gltfGarment,
   gltfPerson,
+  gltfShellParts,
+  isShellLayer,
 } from './villagerFigureBody'
-import { GARMENT_PUSH_ATTRIBUTE } from './villagerGarmentMask'
+import { applyGarmentMask, GARMENT_PUSH_ATTRIBUTE } from './villagerGarmentMask'
 
 let asset: VillagerAsset
 
@@ -625,7 +627,8 @@ describe('the pipeline garments on the glTF body', () => {
   }
 
   it('the file holds a garment for every form and wear the outfit generator puts on a figure', () => {
-    const missing = [...generated().entries()].filter(([n, l]) => l.form !== 'bodyPaint' && asset.parts[n] !== 'garment').map(([n]) => n)
+    // a shell garment ships as a recipe (render/villagerShell.ts), not a mesh
+    const missing = [...generated().entries()].filter(([n, l]) => l.form !== 'bodyPaint' && asset.parts[n] !== 'garment' && !asset.shells?.garments[n]).map(([n]) => n)
     expect(missing).toEqual([])
     // every garment the file ships is in the cover mask's order
     const shipped = Object.keys(asset.parts).filter((n) => asset.parts[n] === 'garment')
@@ -638,8 +641,15 @@ describe('the pipeline garments on the glTF body', () => {
       for (const [id, table] of Object.entries(DRESS_TABLES)) {
         const layers = table[sex][age].map((l) => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 }))
         const g = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
-        const garments = layers.filter((l) => l.form !== 'bodyPaint')
-        const want = garments.reduce((t, l) => t + asset.geometries[garmentMeshName(l)].getAttribute('position').count, person.geometry.getAttribute('position').count)
+        const garments = layers.filter((l) => l.form !== 'bodyPaint' && !isShellLayer(asset, l))
+        // the shells: built on the body (render/villagerShell.ts)
+        const worn = garments.map(garmentMeshName)
+        const body = applyGarmentMask(tidy(person.geometry.clone()), person.cover, asset.garmentMask, worn, 0)
+        const shells = gltfShellParts(asset, person, layers.filter((l) => isShellLayer(asset, l)), body, worn)
+        const want = garments.reduce(
+          (t, l) => t + asset.geometries[garmentMeshName(l)].getAttribute('position').count,
+          person.geometry.getAttribute('position').count + shells.reduce((t, p) => t + p.built.src.length, 0),
+        )
         expect(g.getAttribute('position').count, `${id} ${sex} ${age}`).toBe(want)
       }
     }
