@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
-  Queue position: directly after point 1343.
-  Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
-  Final state: in the port-city tag game the glTF chaser's readied arm stays held and its free arm keeps swinging through every prepare window, and the check passes on both backends.
-  Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
-  Bundle: Dorfleben.
-  Criticality: medium - the port-city chaser's arms, both backends.
-
 - [ ] 1386. Caught tag child photographed standing clear of the run at the river bank on WebGPU
   Queue position: directly after point 1384.
   Source: covering WebGPU polish-children run on main 0e2df2c2a after landing point 1343, 19.10.2026 (machine quiet unverified): "a caught child was photographed standing slumped clear of the run, 10-14 m off (work-order 1239) — no caught child could be photographed inside the window" (caughtMoments 741, alone 270, crowded 16499). The same check passed on both backends at feat/1343 (WebGPU 3f4d620d9, WebGL 2 e5fbb1179); test-frame acquisition, no player impact proven.
