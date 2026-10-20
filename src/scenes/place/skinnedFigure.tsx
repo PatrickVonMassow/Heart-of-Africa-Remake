@@ -552,7 +552,8 @@ export function SkinnedFigure({
         let lean = 0
         // a contact short of reach that the one-pivot lean cannot make up
         // (a full squat's dip to the water at the feet) is still searched
-        // through the glTF trunk's distributed bend below, which goes further
+        // through the glTF trunk's distributed bend below, which goes further;
+        // not under a steadied head load, which a deep bend would tip off
         let wants = false
         ;(['L', 'R'] as const).forEach((s, i) => {
           const vh = virtualHands.current[i]
@@ -570,7 +571,8 @@ export function SkinnedFigure({
         const lunge = Math.min(1, Math.max(0, Number(extras?.reach?.lunge ?? 0)))
         const grab = lunge > 0
         if (extras?.reach && !grab) lean = 0
-        if ((lean > 0 || (wants && !extras?.reach) || grab) && gltf) {
+        const steadying = !!headSteady && rig.crown.children.some((c) => c.visible)
+        if ((lean > 0 || (wants && !extras?.reach && !steadying) || grab) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
           // least (in the same steps) that brings every contact within reach
