@@ -11,7 +11,7 @@
   marker (1692 characters of the point cut from the middle), so its inputs were not
   identical to half A's. It was re-run with the verbatim point text from the brief; only the
   second answer is filed.
-- Merge: Fable 5.1 (wrote neither half; Fable switch ON), via
+- Merge: Fable 5.1 (wrote neither half; authorized per `fable-switch.mjs --status` at merge time), via
   `node scripts/ask-astra.mjs --model fable --kind audit --anyway` with both halves and the
   spec on stdin and the inventory as `--file`. Raw answer: `docs/model-lanes-union-1393-raw.txt`;
   union: `docs/model-lanes-union-1393.json` (38 entries).

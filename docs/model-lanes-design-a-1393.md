@@ -88,8 +88,7 @@ half B was commissioned; half B never saw this file.
   `.claude/lane-switch-<role>.json`; for role `scarce`, `.claude/fable-switch.json` is read when
   the new file is absent. Ledger handover reasons `astra-*` and `sol-*` map to `cross-*`
   (extending today's `RETIRED_HANDOVERS`). The recorded switch-fallback reason prefix
-  (`Fable 5.1 is switched off by the recorded Fable switch (node scripts/fable-switch.mjs
-  --status): `) stays recognised by `isSwitchFallbackReason` as a retired prefix; new rows
+  (the `prefix` literal in `isSwitchFallbackReason`, scripts/fable-switch-core.mjs) stays recognised by `isSwitchFallbackReason` as a retired prefix; new rows
   use the role wording. These legacy literals live in `model-lanes.mjs` (`LEGACY` block).
 - **A12 — No compatibility shim scripts under old names.** `.claude/settings.json` names
   none of them (inventory I6), so no hook breaks. Command parsers that classify a call by its
