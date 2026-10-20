@@ -1674,6 +1674,12 @@
       "why": "Belongs with point 1383 (point/reach step on the same arm), which stands directly before it at the end of the work order",
       "origin": "machine",
       "place": "last"
+    },
+    "1396": {
+      "at": "2026-10-20T12:18:29.622Z",
+      "why": "Dorfleben member behind 1395; walker separation follows the open rig and garment points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1703,7 +1709,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-20T05:48:49.822Z",
+    "at": "2026-10-20T12:18:29.631Z",
     "points": [
       184,
       200,
@@ -2141,7 +2147,6 @@
       1309,
       1318,
       1328,
-      1330,
       1333,
       1340,
       1341,
@@ -2157,7 +2162,8 @@
       1385,
       1388,
       1393,
-      1395
+      1395,
+      1396
     ]
   }
 }
