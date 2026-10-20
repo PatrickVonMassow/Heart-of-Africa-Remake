@@ -1663,21 +1663,9 @@
       "origin": "machine",
       "place": "last"
     },
-    "1392": {
-      "at": "2026-10-19T20:07:03.193Z",
-      "why": "User order 19.10.2026: F6 pointer-lock bug and steadying-hand bug go to the front of the queue",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1393": {
       "at": "2026-10-19T20:07:03.299Z",
       "why": "User order 19.10.2026: directly before point 1347, four eyes",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1394": {
-      "at": "2026-10-19T21:56:56.358Z",
-      "why": "user order 19.10.2026 22:52: als erstes in der Queue",
       "origin": "user",
       "place": "ahead"
     }
@@ -1709,7 +1697,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-19T21:56:56.367Z",
+    "at": "2026-10-20T01:36:09.118Z",
     "points": [
       184,
       200,
@@ -2165,9 +2153,7 @@
       1385,
       1386,
       1388,
-      1392,
-      1393,
-      1394
+      1393
     ]
   }
 }
