@@ -28,7 +28,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, newGaze, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, newGaze, palmNormal, palmRollAngle, palmRollCenter, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -277,6 +277,9 @@ const _scale = new THREE.Vector3()
 const _facing = new THREE.Vector3()
 const _grip = new THREE.Vector3()
 const _gazeAt = new THREE.Vector3()
+const _toward = new THREE.Vector3()
+const _palm = new THREE.Vector3()
+const _up = new THREE.Vector3(0, 1, 0)
 const _rs = new THREE.Vector3()
 const _rv = new THREE.Vector3()
 const _rn = new THREE.Vector3()
@@ -685,6 +688,7 @@ export function SkinnedFigure({
         gazeHead(gb, g.yaw, g.pitch, 1 - clips.dig)
       }
       // THE HANDS ON THE FINAL BODY: each contact and the steadying hand.
+      let steadyShown = 0
       ;(['L', 'R'] as const).forEach((s, i) => {
         const up = b[`upperArm.${s}`]
         const fore = b[`forearm.${s}`]
@@ -714,6 +718,17 @@ export function SkinnedFigure({
           body.worldToLocal(rig.crown.localToWorld(_grip.set(g.x, g.y, g.z)))
           _pole.set(i === 0 ? 1 : -1, -0.3, 0.2).applyQuaternion(chestQ())
           done = solveTo(_grip, _pole)
+          // the palm on the load, not the back of the hand: the wrist rolled
+          // toward the load's axis at the grip's height
+          if (done) {
+            body.worldToLocal(rig.crown.localToWorld(_toward.set(0, g.y, 0))).sub(_grip)
+            const side = i === 0 ? 1 : -1
+            // taken near the roll this pose needs, so the split never crosses its cut
+            const roll = palmRollAngle(qIn(fore, _q), palmNormal(rig.gltf ? 'gltf' : 'code', side, _palm), _toward, palmRollCenter(side))
+            // the forearm rolls about its own axis (the hand stays put), the wrist the rest
+            fore.quaternion.multiply(_q.setFromAxisAngle(_up, roll * FOREARM_ROLL_SHARE))
+            b[`hand.${s}`].quaternion.setFromAxisAngle(_up, roll * (1 - FOREARM_ROLL_SHARE))
+          }
         } else if (contactArm[i] && vh) {
           // (reachOf uses _t as scratch: measured before the target is)
           const r = reachOf(s) * 0.999
@@ -737,7 +752,18 @@ export function SkinnedFigure({
           fore.quaternion.slerp(armBase[i][1], share)
           b[`hand.${s}`].quaternion.slerp(armBase[i][2], share)
         }
+        if (i === steadyArm) steadyShown = done ? 1 - share : 0
       })
+      // Dev: the steadying hand as drawn (which arm, how much of its solve
+      // shows past the clips), for the verification's head-load frames.
+      if (import.meta.env.DEV && outer.current) {
+        outer.current.userData.steady = {
+          arm: steadyArm < 0 ? null : steadyArm === 0 ? 'left' : 'right',
+          weight: steadyShown,
+          load: !!headSteady && loadShown,
+          contact: [contactArm[0], contactArm[1]],
+        }
+      }
       if (gltf && clips) {
         placeShovel(gltf.asset, gltf.person, clips, shovel.current)
         gripShaft(gltf.asset, gltf.person, gb, clips, shovel.current)

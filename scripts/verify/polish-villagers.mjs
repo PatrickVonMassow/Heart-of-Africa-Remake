@@ -3790,6 +3790,201 @@ if (section('water-jar-carried')) {
   }
 }
 
+// THE STEADYING HAND ON THE JAR, CLOSE (work-order "steadying hand holds a
+// head load with the palm"). The water carrier walking back under the full jar
+// lays one hand on it (skinnedFigure.tsx, the steadying arm); the user saw the
+// back of that hand on the jar. The 1376 frames above are aimed at the jar and
+// show no hand on it, so this block waits for a carrier whose steadying hand
+// is REALLY drawn — the figure's dev probe `userData.steady` (its arm, and how
+// much of the solve shows past the clips) — freezes life in that frame, and
+// photographs the hand from close by, side-on and from the front: the palm on
+// the jar, the back of the hand outward. At the shutter the probe must still
+// read the arm engaged, and the hand itself must be what the lens sees there
+// (its pixels there change when only it is hidden).
+// The right hand steadies only while the left one is busy (a gesture the
+// carrier makes on a work word aimed to its left): reachable, but not
+// stageable here, so the right side is pinned by
+// src/scenes/place/steadyingPalm.test.tsx alone.
+if (section('steadying-palm')) {
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.dwellSeconds = 1
+    e.digSeconds = 3
+    e.pace = 6
+    e.villagerCount = 10
+  })
+  await goToPlace('bambara-village')
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  await nextFrames(8)
+  await awaitPlaceDrawn('steadying palm: medium preset')
+  const live = await page.evaluate(() => !!window.__placeErrands)
+  check('steadying palm: the Bambara village publishes its errands', live)
+  // Each carrier's figure, its full jar and its steadying-hand probe.
+  const carriers = () => {
+    const out = {}
+    window.__placeScene.traverse((o) => {
+      if (o.name !== 'carried-jar-full') return
+      for (let p = o; p; p = p.parent) {
+        if (p.name === 'inhabitant') {
+          out[o.userData.villager] = { jar: o.visible, steady: p.userData.steady ?? null }
+          return
+        }
+      }
+    })
+    return out
+  }
+  // A carrier on the way back with the full jar on the head and the
+  // steadying hand engaged; life frozen in the frame it is seen.
+  const engaged = live ? await page.waitForFunction((src) => {
+    const carriers = new Function(`return (${src})`)()
+    const e = window.__placeErrands()
+    const seen = carriers()
+    const found = e.villagers.findIndex((v, i) =>
+      v?.work?.situation === 'water-back' && v.carry === 'fullJar' && !v.work.arrived &&
+      seen[i]?.jar && seen[i]?.steady?.arm && seen[i].steady.weight > 0.9)
+    if (found >= 0) {
+      window.__placeFreezeLife(true)
+      return { who: found, steady: seen[found].steady }
+    }
+    if (!e.villagers.some((v) => v.work?.situation?.startsWith('water'))) {
+      const now = performance.now()
+      if (!(window.__jarCastAt > now - 2000)) {
+        window.__jarCastAt = now
+        window.__placeCastErrand('water-out')
+      }
+    }
+    return null
+  }, carriers.toString(), { timeout: 240000 }).then((h) => h.jsonValue()).catch(() => null) : null
+  if (!engaged && live) {
+    // why not: every carrier walking back, with what its probe reads
+    const why = await page.evaluate((src) => {
+      const seen = new Function(`return (${src})`)()()
+      return window.__placeErrands().villagers.map((v, i) => ({ i, situation: v?.work?.situation, carry: v?.carry, ...seen[i] }))
+        .filter((r) => r.carry === 'fullJar')
+    }, carriers.toString())
+    check('steadying palm: a carrier walks back with the full jar and its steadying hand on it', false, JSON.stringify(why))
+  }
+  if (engaged) {
+    const { who } = engaged
+    const arm = engaged.steady.arm
+    const bone = arm === 'left' ? 'L' : 'R'
+    check('steadying palm: a carrier walks back with the full jar and its steadying hand on it', true,
+      `villager ${who}, ${arm} hand, weight ${engaged.steady.weight.toFixed(2)}`)
+    // The hand, the figure's side and heading, in world coordinates.
+    const pose = await page.evaluate(([who, bone]) => {
+      let inh = null
+      window.__placeScene.traverse((o) => {
+        if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+      })
+      const hand = inh.getObjectByName(`bone-hand.${bone}`)
+      const V = hand.position.constructor
+      inh.updateWorldMatrix(true, true)
+      const h = hand.getWorldPosition(new V())
+      const m = inh.matrixWorld.elements
+      const len = (x, z) => Math.hypot(x, z) || 1
+      const sx = { x: m[0] / len(m[0], m[2]), z: m[2] / len(m[0], m[2]) }
+      const fz = { x: m[8] / len(m[8], m[10]), z: m[10] / len(m[8], m[10]) }
+      return { hand: { x: h.x, y: h.y, z: h.z }, side: sx, fwd: fz }
+    }, [who, bone])
+    const sign = arm === 'left' ? 1 : -1
+    // calibratable: the hand's own pixels a frame needs to show it at all
+    const HAND_PIXELS = 250
+    // The hand's own pixels in a box around its projection: drawn, then with
+    // only the hand bone collapsed, so the jar, head and every other occluder
+    // keep their depth and cannot supply the difference themselves.
+    const handPixels = async (name) => {
+      const rect = await page.evaluate(([who, bone]) => {
+        let inh = null
+        window.__placeScene.traverse((o) => {
+          if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+        })
+        const hand = inh.getObjectByName(`bone-hand.${bone}`)
+        const v = hand.getWorldPosition(new hand.position.constructor()).project(window.__placeCamera)
+        if (Math.abs(v.x) > 0.9 || Math.abs(v.y) > 0.9 || v.z > 1) return null
+        const w = window.innerWidth
+        const h = window.innerHeight
+        return { x: Math.round((v.x + 1) / 2 * w) - 40, y: Math.round((1 - v.y) / 2 * h) - 40, width: 80, height: 80 }
+      }, [who, bone])
+      if (!rect) return { changed: 0, rect: null }
+      const shown = await sharp(await capturePixels(page, `${name} shown`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
+      const setShown = (on) => page.evaluate(([who, bone, on]) => {
+        let inh = null
+        window.__placeScene.traverse((o) => {
+          if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+        })
+        inh.getObjectByName(`bone-hand.${bone}`).scale.setScalar(on ? 1 : 1e-3)
+      }, [who, bone, on])
+      await setShown(false)
+      await nextFrames(6)
+      const hidden = await sharp(await capturePixels(page, `${name} hidden`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
+      await setShown(true)
+      await nextFrames(6)
+      return { changed: countChangedPixels(shown.data, hidden.data, shown.info.channels), rect }
+    }
+    const VIEWS = [
+      { view: 'side', label: `close on the water carrier walking back under the full jar, side-on: his steadying ${arm.toUpperCase()} hand on the jar, palm to it`, out: 1, ahead: 0.5 },
+      { view: 'front', label: `close on the water carrier walking back under the full jar, from the front: his steadying ${arm.toUpperCase()} hand on the jar, palm to it`, out: 0.45, ahead: 1 },
+    ]
+    for (const { view, label, out, ahead } of VIEWS) {
+      const name = shotName(`1392-steadying-palm-${arm}-${view}`)
+      let shot = null
+      let best = null
+      for (const dist of [1.4, 1.8, 2.3]) {
+        for (const turn of [0, 0.35, -0.35, 0.7, -0.7]) {
+          // a bearing out from the hand's side and ahead of the carrier, turned a little
+          const bx = sign * pose.side.x * out + pose.fwd.x * ahead
+          const bz = sign * pose.side.z * out + pose.fwd.z * ahead
+          const c = Math.cos(turn)
+          const s = Math.sin(turn)
+          const n = Math.hypot(bx, bz)
+          const dx = (bx * c + bz * s) / n
+          const dz = (-bx * s + bz * c) / n
+          const placed = await page.evaluate(([h, dx, dz, dist]) => {
+            const p = window.__placePlayer
+            p.x = h.x + dx * dist
+            p.z = h.z + dz * dist
+            p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
+            p.pitch = Math.atan2(h.y - window.__placeCamera.position.y, dist)
+            return { x: p.x, z: p.z }
+          }, [pose.hand, dx, dz, dist])
+          await nextFrames(3)
+          // the eye height of where the player now stands, then the aim again
+          await page.evaluate(([h, dist]) => {
+            const p = window.__placePlayer
+            p.pitch = Math.atan2(h.y - window.__placeCamera.position.y, dist)
+          }, [pose.hand, dist])
+          await nextFrames(3)
+          const drift = await page.evaluate((w) => Math.hypot(window.__placePlayer.x - w.x, window.__placePlayer.z - w.z), placed)
+          if (drift > 0.3) continue
+          await awaitPlaceDrawn(`steadying palm ${view}`)
+          const px = await handPixels(name)
+          best = { dist, turn, ...px }
+          if (px.changed < HAND_PIXELS) continue
+          const before = await page.evaluate(carriers)
+          shot = await frame(name, { local: pose.hand, label })
+          const after = await page.evaluate(carriers)
+          check(`steadying palm (${view}): at the shutter the ${arm} hand is engaged on the jar`,
+            [before, after].every((r) => r[who]?.jar && r[who]?.steady?.arm === arm && r[who].steady.weight > 0),
+            `before ${JSON.stringify(before[who])}, after ${JSON.stringify(after[who])}`)
+          break
+        }
+        if (shot) break
+      }
+      check(`steadying palm (${view}): the hand on the jar is photographed close by`, !!shot,
+        best ? `last try ${best.dist} m, turn ${best.turn}: ${best.changed} of 6400 pixels at the hand are the hand's own` : 'no placement accepted')
+    }
+  }
+  if (live) await freezeLife(false)
+}
+
 // GRAIN POUNDING READS AS GRAIN POUNDING (work-order 1274). The stroke itself —
 // foot below the rim at impact, the alternation, hands and shafts apart — is
 // pinned in src/scenes/place/mortarPounding.test.ts; what needs the browser is
