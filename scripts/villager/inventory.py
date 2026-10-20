@@ -1,8 +1,9 @@
 """Picture inventory of the garments (work-order "garment rebuild", step 1):
 every outfit the outfit generator can dress a villager in (enumerated by
 build.mjs from src/systems/appearance.ts) on its sex/age body corner, through
-walk, jog, sprint, kneel and dig, in the cached pipeline garments with their
-cover mask — the frames sheets.py `clip_sheet` draws, laid out as a grid
+walk, jog, sprint, kneel and dig (set `motion`) and the posable clavicles'
+extremes on the idle (set `shoulders`), in the cached pipeline garments with
+their cover mask — the frames sheets.py `clip_sheet` draws, laid out as a grid
 (rows: outfits, columns: poses), each row and column labelled.
 
 Run through `node scripts/villager/build.mjs inventory [--out <dir>]`. Reads
@@ -30,6 +31,11 @@ POSES = [
     ('jog', 0.0, 'run 0'), ('jog', 0.5, 'run .5'), ('sprint', 0.25, 'sprint .25'),
     ('kneel', 0.5, 'kneel'), ('dig', 0.3, 'dig .3'), ('dig', 0.7, 'dig .7'),
 ]
+# the posable clavicles at the extremes of VILLAGER_POSE.shoulders on the idle's
+# first frame (penetration.py `with_shoulders`): (clip, variant index, label)
+SHOULDERS = [('idle', 0.0, 'idle'), ('shoulders', 0, 'fwd'), ('shoulders', 1, 'up'), ('shoulders', 2, 'down'),
+             ('shoulders', 3, 'fwd+up'), ('shoulders', 4, 'fwd+down')]
+SETS = {'motion': POSES, 'shoulders': SHOULDERS}
 ROWS = 5
 COL = 0.8
 ROW = 2.05
@@ -45,6 +51,7 @@ def args():
     p.add_argument('--out', required=True)
     p.add_argument('--prefix', default='1347-inventory')
     p.add_argument('--views', default='35,215')
+    p.add_argument('--sets', default='motion,shoulders')
     return p.parse_args(argv)
 
 
@@ -64,7 +71,12 @@ def frame(body, garments, clips, sex, age, outfit, cfg, clip, frac):
     baked = person.bake(pos, jidx, jw)
     btris, bpush, inner = S.masked(body, garments, list(outfit), cfg)
     c = clips['clips'][clip]
-    q, hips = S.sample(c, c['duration'] * frac)
+    if clip == 'shoulders':
+        import penetration as P
+        q = P.shoulders_q(person, c['q'][frac], c['shoulders'][frac])
+        hips = c['hips'][frac]
+    else:
+        q, hips = S.sample(c, c['duration'] * frac)
     wr, wp = person.pose(q, hips)
     out = [(S.push_in(person.skin(baked, jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, S.SKIN)]
     for k, n in enumerate(outfit):
@@ -88,36 +100,40 @@ def main():
     import mask as MK
     mkey = keys['garments'] + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest() + MK.motion_key(body)
     garments['mask'] = load(a.work, 'mask', mkey)
+    import penetration as P
+    clips = P.with_shoulders(clips, cfg)
     outfits = json.load(open(a.outfits))['outfits']
     os.makedirs(a.out, exist_ok=True)
     index = []
     pages = [outfits[i:i + ROWS] for i in range(0, len(outfits), ROWS)]
-    ncol = len(POSES)
-    width = COL * (ncol - 1) + 1.0
-    for view in [float(v) for v in a.views.split(',')]:
-        az = math.radians(view)
-        right = np.array([math.cos(az), 0.0, -math.sin(az)])
-        for p, page in enumerate(pages):
-            R.clear()
-            for r, o in enumerate(page):
-                up = (len(page) - 1 - r) * ROW
-                missing = [n for n in o['garments'] if n not in garments['meshes']]
-                if missing:
-                    raise RuntimeError(f'inventory: {missing} not built')
-                for c, (clip, frac, _l) in enumerate(POSES):
-                    off = right * (c * COL - (ncol - 1) * COL / 2) + np.array([0, up, 0])
-                    for k, (v, t, col) in enumerate(frame(body, garments, clips, o['sex'], o['age'], o['garments'], cfg, clip, frac)):
-                        R.add_mesh(f'r{r}c{c}k{k}', v + off, t, col)
-                text = f"#{p * ROWS + r} {o['sex']} {o['age']}: " + '  '.join(n[2:] for n in o['garments'])
-                R.label(text, np.array([0, up + 1.78, 0]), 0.075, view)
-            for c, (_clip, _f, lab) in enumerate(POSES):
-                R.label(lab, right * (c * COL - (ncol - 1) * COL / 2) + np.array([0, -0.18, 0]), 0.07, view)
-            lo, hi = -0.25, (len(page) - 1) * ROW + 1.9
-            fname = f"{a.prefix}-sheet-az{int(view)}-{p:02d}.png"
-            R.render(os.path.join(a.out, fname), (0.0, (lo + hi) / 2, 0.0), width, view, (int(PX * width), int(PX * (hi - lo))))
-            for r, o in enumerate(page):
-                index.append({'file': fname, 'row': r, 'id': p * ROWS + r, **o})
-    json.dump(index, open(os.path.join(a.out, f'{a.prefix}-index.json'), 'w'), indent=1)
+    for name in a.sets.split(','):
+        poses = SETS[name]
+        ncol = len(poses)
+        width = COL * (ncol - 1) + 1.0
+        for view in [float(v) for v in a.views.split(',')]:
+            az = math.radians(view)
+            right = np.array([math.cos(az), 0.0, -math.sin(az)])
+            for p, page in enumerate(pages):
+                R.clear()
+                for r, o in enumerate(page):
+                    up = (len(page) - 1 - r) * ROW
+                    missing = [n for n in o['garments'] if n not in garments['meshes']]
+                    if missing:
+                        raise RuntimeError(f'inventory: {missing} not built')
+                    for c, (clip, frac, _l) in enumerate(poses):
+                        off = right * (c * COL - (ncol - 1) * COL / 2) + np.array([0, up, 0])
+                        for k, (v, t, col) in enumerate(frame(body, garments, clips, o['sex'], o['age'], o['garments'], cfg, clip, frac)):
+                            R.add_mesh(f'r{r}c{c}k{k}', v + off, t, col)
+                    text = f"#{p * ROWS + r} {o['sex']} {o['age']}: " + '  '.join(n[2:] for n in o['garments'])
+                    R.label(text, np.array([0, up + 1.78, 0]), 0.075, view)
+                for c, (_clip, _f, lab) in enumerate(poses):
+                    R.label(lab, right * (c * COL - (ncol - 1) * COL / 2) + np.array([0, -0.18, 0]), 0.07, view)
+                lo, hi = -0.25, (len(page) - 1) * ROW + 1.9
+                fname = f"{a.prefix}-{name}-az{int(view)}-{p:02d}.png"
+                R.render(os.path.join(a.out, fname), (0.0, (lo + hi) / 2, 0.0), width, view, (int(PX * width), int(PX * (hi - lo))))
+                for r, o in enumerate(page):
+                    index.append({'file': fname, 'row': r, 'id': p * ROWS + r, **o})
+    json.dump(index, open(os.path.join(a.out, f"{a.prefix}-{a.sets.replace(',', '-')}-index.json"), 'w'), indent=1)
 
 
 if __name__ == '__main__':
