@@ -3799,7 +3799,7 @@ if (section('water-jar-carried')) {
 // much of the solve shows past the clips) — freezes life in that frame, and
 // photographs the hand from close by, side-on and from the front: the palm on
 // the jar, the back of the hand outward. At the shutter the probe must still
-// read the arm engaged, and the carrier must be what the lens sees at the hand
+// read the arm engaged, and the hand itself must be what the lens sees there
 // (its pixels there change when only it is hidden).
 // The right hand steadies only while the left one is busy (a gesture the
 // carrier makes on a work word aimed to its left): reachable, but not
@@ -3895,8 +3895,11 @@ if (section('steadying-palm')) {
       return { hand: { x: h.x, y: h.y, z: h.z }, side: sx, fwd: fz }
     }, [who, bone])
     const sign = arm === 'left' ? 1 : -1
-    // The carrier's pixels in a box around the projected hand, with and
-    // without the carrier drawn.
+    // calibratable: the hand's own pixels a frame needs to show it at all
+    const HAND_PIXELS = 250
+    // The hand's own pixels in a box around its projection: drawn, then with
+    // only the hand bone collapsed, so the jar, head and every other occluder
+    // keep their depth and cannot supply the difference themselves.
     const handPixels = async (name) => {
       const rect = await page.evaluate(([who, bone]) => {
         let inh = null
@@ -3912,11 +3915,13 @@ if (section('steadying-palm')) {
       }, [who, bone])
       if (!rect) return { changed: 0, rect: null }
       const shown = await sharp(await capturePixels(page, `${name} shown`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
-      const setShown = (on) => page.evaluate(([who, on]) => {
+      const setShown = (on) => page.evaluate(([who, bone, on]) => {
+        let inh = null
         window.__placeScene.traverse((o) => {
-          if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p; p = p.parent) if (p.name === 'inhabitant') { p.visible = on; return }
+          if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
         })
-      }, [who, on])
+        inh.getObjectByName(`bone-hand.${bone}`).scale.setScalar(on ? 1 : 1e-3)
+      }, [who, bone, on])
       await setShown(false)
       await nextFrames(6)
       const hidden = await sharp(await capturePixels(page, `${name} hidden`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
@@ -3962,7 +3967,7 @@ if (section('steadying-palm')) {
           await awaitPlaceDrawn(`steadying palm ${view}`)
           const px = await handPixels(name)
           best = { dist, turn, ...px }
-          if (px.changed < 600) continue
+          if (px.changed < HAND_PIXELS) continue
           const before = await page.evaluate(carriers)
           shot = await frame(name, { local: pose.hand, label })
           const after = await page.evaluate(carriers)
@@ -3974,7 +3979,7 @@ if (section('steadying-palm')) {
         if (shot) break
       }
       check(`steadying palm (${view}): the hand on the jar is photographed close by`, !!shot,
-        best ? `last try ${best.dist} m, turn ${best.turn}: ${best.changed} of 6400 pixels at the hand are the carrier's` : 'no placement accepted')
+        best ? `last try ${best.dist} m, turn ${best.turn}: ${best.changed} of 6400 pixels at the hand are the hand's own` : 'no placement accepted')
     }
   }
   if (live) await freezeLife(false)
