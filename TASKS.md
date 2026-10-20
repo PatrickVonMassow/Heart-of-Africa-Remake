@@ -77,18 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1392. Steadying hand holds a head load with the palm
-  Queue position: front of the work order, directly after point 1391 (user order 19.10.2026: "Dieser Bug und der mit dem Debug-Report sollen am Anfang der Queue stehen.").
-  Source: user report 19.10.2026 (findings carrier request "Stützhand hält die Kopflast mit der Handfläche"): villagers carrying a jar on the head hold it with the back of the hand instead of the palm, which looks unnatural.
-  Final state (verbatim from the approved request): Steadying hand on a head load (src/scenes/place/skinnedFigure.tsx, steadyArm branch around the headLoadGrip solve):
-  1. After the arm is solved to the grip, roll the wrist (hand.L / hand.R) so the palm normal faces the load's axis (inward toward the jar/bundle), instead of leaving the hand quaternion at identity, which shows the back of the hand to the load.
-  2. The blend with clip-owned arm shares stays continuous (no snap).
-  3. Vitest (jsdom, browserless pose math): for both sides, the palm normal of the steadying hand points toward the load axis (positive dot product with the hand-to-axis direction).
-  4. Picture check in a village with a head-load carrier, both sides visible: palm on the jar, back of the hand outward.
-  Verifiable: items 3 and 4 above, both backends.
-  Bundle: Dorfleben.
-  Criticality: medium — player-visible on every head-load carrier.
-
 - [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
   Queue position: directly after point 1343.
   Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.

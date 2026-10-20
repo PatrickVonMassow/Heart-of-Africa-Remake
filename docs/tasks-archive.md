@@ -34407,3 +34407,15 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: items 6, the addendum's Vitest and 7.
   Bundle: Modell & Wächter.
   Criticality: medium — the board the user reads loses or misstates every point's description.
+
+- [x] 1392. Steadying hand holds a head load with the palm
+  Queue position: front of the work order, directly after point 1391 (user order 19.10.2026: "Dieser Bug und der mit dem Debug-Report sollen am Anfang der Queue stehen.").
+  Source: user report 19.10.2026 (findings carrier request "Stützhand hält die Kopflast mit der Handfläche"): villagers carrying a jar on the head hold it with the back of the hand instead of the palm, which looks unnatural.
+  Final state (verbatim from the approved request): Steadying hand on a head load (src/scenes/place/skinnedFigure.tsx, steadyArm branch around the headLoadGrip solve):
+  1. After the arm is solved to the grip, roll the wrist (hand.L / hand.R) so the palm normal faces the load's axis (inward toward the jar/bundle), instead of leaving the hand quaternion at identity, which shows the back of the hand to the load.
+  2. The blend with clip-owned arm shares stays continuous (no snap).
+  3. Vitest (jsdom, browserless pose math): for both sides, the palm normal of the steadying hand points toward the load axis (positive dot product with the hand-to-axis direction).
+  4. Picture check in a village with a head-load carrier, both sides visible: palm on the jar, back of the hand outward.
+  Verifiable: items 3 and 4 above, both backends.
+  Bundle: Dorfleben.
+  Criticality: medium — player-visible on every head-load carrier.
