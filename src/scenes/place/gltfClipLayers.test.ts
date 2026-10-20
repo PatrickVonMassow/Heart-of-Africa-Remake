@@ -581,20 +581,23 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  it('a body carried on through the blend: no foot standing on the ground slides more than 4 cm in one stance', () => {
+  it('a body carried on or turning through the blend: no foot standing on the ground slides more than 4 cm in one stance', () => {
     // the stand's spot of the foot landed at mid-blend was drawn onto the
-    // drifting body's stand on the ground: 4.3 cm in one stance at 0.3 m/s
-    // (cross-vendor review of the planted-soles walk, 20.10.2026)
+    // drifting body's stand on the ground: 4.3 cm in one stance at 0.3 m/s;
+    // and its turn onto the turning body's, heel and ball swept round the
+    // held ankle (cross-vendor reviews of the planted-soles walk, 20.10.2026)
     const restY = settle({ cut: 0.5, start: true })[0].feet[0][0].y
     let worstAll = 0
-    for (const drift of [0.3, -0.3]) {
+    for (const [drift, turn] of [0, 1.5, -1.5].flatMap((turn) => [0.3, -0.3, 0].map((drift) => [drift, turn]))) {
+      if (!drift && !turn) continue
       for (let cut = 1; cut < 1.4; cut += 0.1) {
-        const frames = settle({ cut, drift: (t) => (t > cut + 0.2 ? drift : 0) })
+        const frames = settle({ cut, drift: (t) => (t > cut + 0.2 ? drift : 0), yaw: (t) => Math.max(0, t - cut) * turn })
         const blend = blendFrames(frames)
         // the frame the standing legs take over: the handoff's last
         const end = frames.findIndex((f, k) => k > 0 && f.w <= 0 && frames[k - 1].w > 0)
         expect(end).toBeGreaterThan(3)
         let worst = 0
+        let worstFrame = 0
         for (let i = 0; i < 2; i++) {
           // per stance, each point's ground displacement from its touchdown
           let from: THREE.Vector3[] | null = null
@@ -602,14 +605,20 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
             const pts = frames[k].feet[i]
             if (Math.abs(pts[0].y - restY) > 0.003) from = null
             else if (!from) from = pts
-            else pts.forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from![j].x, p.z - from![j].z))))
+            else {
+              pts.forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from![j].x, p.z - from![j].z))))
+              worstFrame = Math.max(worstFrame, moved(frames, k)[i])
+            }
           }
         }
         worstAll = Math.max(worstAll, worst)
-        expect(worst, `drift ${drift} m/s, stop at ${cut.toFixed(1)} s`).toBeLessThanOrEqual(0.04)
+        const where = `drift ${drift} m/s, turning ${turn} rad/s, stop at ${cut.toFixed(1)} s`
+        // what the stand's spot or turn still has to make up is stepped over, lifted
+        expect(worstFrame, where).toBeLessThan(0.002)
+        expect(worst, where).toBeLessThanOrEqual(0.04)
       }
     }
-    console.log(`worst per-stance slide under drift: ${worstAll.toFixed(4)} m`)
+    console.log(`worst per-stance slide under drift and turn: ${worstAll.toFixed(4)} m`)
   })
 
   it('the step shares: the first foot over the first half of the way to the stand, the other over the second', () => {
