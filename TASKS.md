@@ -15573,6 +15573,7 @@ to land than a mechanism that needs a review.
   MEASURED 30.09.2026 07:14Z, `VERIFY_GL=webgl npm test -- polish --section=adult-errands` on feat/1152 6922bdb2c: `the water beyond the plate's rim is the SAME water as the water at the bank (<= 12/255 per channel)` RED, far 11/92/104 against near 139/157/147, median step 127.5; its sibling `the handover zone itself carries neither band's edge` RED, median step 68.3. This is a STEADY red, not point 568's rotation (568 straddled 12-19): the same pair was red at step 99.6-126.1 in the LARGE runs of 26.09 and 28.09 (on both backends at 28.09 18:09Z and 21:55Z). On WebGPU the check was green on feat/1152 at 05:07Z, after point 1151's sky/water fix. Point 1152 (foam patches) did not cause it.
   ALSO RED ON WebGPU, measured 02.10.2026: the same pair red in the full `polish-villagers` pass on feat/1108 d6a9d37aa (median step 148.8 / 75.9; WebGL 2 25.1 / 12.5) and already on feat/1117 06312849a at 19:52Z (step 133.2) — before point 1108, which only moves the errand shots' cameras.
   STILL RED 05.10.2026, WebGPU full `polish-villagers` pass on feat/1295 b96a04e78 and on 85207f7c6 before any 1295 commit: median step 20.4 (beyond the rim) and 13.3 (rim-zone line).
+  STILL RED 20.10.2026 on both backends, `polish-villagers --section=adult-errands` on feat/1347-garment-rebuild with game code identical to main 12e60bb30: the same two river-water checks.
   FINAL STATE: the far water continues the bank water's tone on BOTH backends and both checks are green there.
   Test: `polish --section=adult-errands` on both backends; a Vitest on the layer the fix touches.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
@@ -15927,4 +15928,12 @@ to land than a mechanism that needs a review.
   Final state: two villagers moving through the village never interpenetrate; their bodies keep a visible gap while walking past or behind each other.
   Verifiable: a Vitest case on the villager movement layer asserts a minimum body distance between every pair of walking villagers over a simulated village walk; the 1295 walk frame shows no overlapping bodies on both backends.
   Criticality: medium - visible in the village walk frame.
+  Bundle: Dorfleben.
+
+- [ ] 1397. Village walk: planted-stance and foot-slide checks red on WebGL 2 only
+  Queue position: with point 1396 (Dorfleben), after the planted-soles work of point 1330.
+  Source: finding 20.10.2026 14:43 from the point-1347 inventory run: `polish-villagers --section=village-walk` red on WebGL 2 (planted-stance and foot-slide checks) and green on WebGPU on feat/1347-garment-rebuild, whose game code equals main 12e60bb30. Not investigated; may share a cause with 1330 or 1396.
+  Final state: the village-walk planted-stance and foot-slide checks are green on both backends, or the WebGL 2 difference is named and fixed at its cause.
+  Verifiable: `polish-villagers --section=village-walk` green on WebGL 2 and WebGPU; a Vitest on the layer the fix touches.
+  Criticality: medium - a red regression lane on the fallback backend.
   Bundle: Dorfleben.
