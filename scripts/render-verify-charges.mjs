@@ -266,13 +266,13 @@ export const RED_CHARGES = [
   {
     point: 1381,
     suite: 'polish-villagers',
-    backend: 'webgl',
     kind: 'check',
     match: /at least three unhidden fish are in the frame/i,
     why:
       'FILED AS 1381 ON 19.10.2026 from the WebGL 2 full polish-villagers on main 7690109ce after '
       + 'point 1354: third fish {px:64, seen:false, hit:BoxGeometry}; green on WebGPU at the same '
-      + 'head, and 1354 only touched villager poses.',
+      + 'head, and 1354 only touched villager poses. Seen on WebGPU too on 20.10.2026 (617e5a876, '
+      + 'third fish {px:59, seen:false, hit:BoxGeometry}), so no backend is excluded.',
   },
   {
     point: 939,
