@@ -71,6 +71,29 @@ def cached(work, name, make, force=False, key=None):
     return v
 
 
+def split_report(out, r, mixed=()):
+    """verification/villager-body/split-regression.md from the garments step's
+    clip-frame regression of the body pre-split (fit.split_regression)."""
+    if not r:
+        return
+    import numpy as np
+    wv = np.array(r['worst_vertex'])
+    wt = np.array(r['worst_triangle'])
+    lines = ['# Body pre-split: clip-frame regression', '',
+             'Every inserted vertex against the point of its parent triangle, and the centroid and edge midpoints of every split triangle '
+             'against the split surface, posed along the game path through every exported clip frame at every body corner '
+             '(scripts/villager/fit.py `split_regression`). Figure units; a detector, no gate.', '',
+             f'- inserted vertices: {r["inserted"]}, split triangles: {r["split_triangles"]}, posed frames: {r["frames"]}',
+             f'- worst inserted vertex: {wv.max(initial=0):.5f}; over 1 mm: {len(r["over1"])}; at 3 mm or more: {len(r["over3"])}',
+             f'- worst split-triangle sample: {wt.max(initial=0):.5f}', '']
+    if r['edges3']:
+        lines += ['Edges at 3 mm or more (inserted vertex: edge endpoints, worst):', '']
+        lines += [f'- {v}: {e[0]}-{e[1]}, {d:.5f}' for v, e, d in zip(r['over3'], r['edges3'], r['worst3'])]
+    lines += ['', '## Shell rows with two far surfaces (stage-1 selftest failure, reported)', '']
+    lines += [f'- {m}' for m in mixed] or ['None: every boundary loop of every checked outfit has one far surface.']
+    open(os.path.join(out, 'split-regression.md'), 'w').write('\n'.join(lines) + '\n')
+
+
 def main():
     a = args()
     cfg = json.load(open(a.config))
@@ -118,6 +141,10 @@ def main():
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
         import fit as F
         garments = cached(a.work, 'garments', lambda: F.tailor(a.src, mh, body, clips, cfg), force='garments' in steps, key=keys['garments'])
+    if garments is not None:
+        import shells as SHL
+        mixed = SHL.selftest_body(body, garments, cfg)
+        split_report(a.verification, garments.get('split_regression'), mixed)
     if garments is not None and clips is not None:
         # the mask over every pose costs minutes: cached on its inputs, its own
         # code and what its motion evaluation reads (MK.motion_key)
@@ -137,6 +164,7 @@ def main():
         # and the dress-* frame sheets measure; body and garments carry their
         # cover mask. The hair cap and the eyes stay pipeline-only (the game
         # paints the scalp).
+        # the shell recipes (shells.py) pass too: export.py writes them as extras
         dress = garments and {'meshes': {n: g for n, g in garments['meshes'].items() if n.startswith('g-')}, 'meta': garments['meta']}
         E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, dress, cfg, mask=garments and garments['mask'])
         if garments:

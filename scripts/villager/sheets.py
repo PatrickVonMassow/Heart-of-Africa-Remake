@@ -168,6 +168,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
     person = GP.Person(j)
     baked = person.bake(pos, jidx, jw)
     btris, bpush, inner = masked(body, garments, outfit, cfg)
+    gm = worn_meshes(body, garments, outfit, cw, cfg)
     c = clips['clips'][name]
     d = c['duration']
     spacing = spacing if spacing is not None else (0.55 if view == 'side' else 0.75)
@@ -183,7 +184,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
             v[:, 0] += f * spacing - span / 2
         R.add_mesh(f'f{f}', v, btris, SKIN)
         for k, n in enumerate(outfit):
-            g = garments['meshes'][n]
+            g = gm[n]
             gt, gp = inner[n]
             gv = push_in(GP.drawn_garment(person, g, cw, wr, wp), g['tris'], gp, cfg)
             if view == 'side':
@@ -234,6 +235,8 @@ OUTFITS = [
     ('female', 'adult', ('g-wrapLong-chest', 'g-neckBeads-neck', 'g-headband-aroundHead')),
     ('male', 'elder', ('g-trousers-waist', 'g-shirt-chest', 'g-cloak-chest')),
     ('female', 'youth', ('g-skirtKnee-waist', 'g-cape-chest', 'g-limbRings-limbs')),
+    # every shell garment at once (shells.py): their seams over one another
+    ('female', 'adult', ('g-trousers-waist', 'g-breastCloth-chest', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist')),
 ]
 
 
@@ -264,18 +267,33 @@ def masked(body, garments, worn, cfg):
     triangles and pushed vertices, and per worn garment the same under the
     worn garments of an outer layer — (tris, push, {name: (tris, push)})."""
     import mask as MK
+    import shells as SHL
     mk = (garments or {}).get('mask')
     worn = [n for n in worn if n.startswith('g-')]
     if mk is None or cfg is None:
         return body['tris'], None, {n: (garments['meshes'][n]['tris'], None) for n in worn}
-    hide, push = MK.decode(mk['body'], mk['garments'], worn)
-    inner = {}
-    for n in worn:
-        over = [o for o in worn if MK.layer(o) > MK.layer(n)]
+    # the shells (shells.py): the body's faces under them cut, each built with
+    # its hidden-source cut and its sources' push
+    keep, sd = SHL.corner_dress(body, garments, worn, {}, cfg)
+    legacy = [n for n in worn if n in mk['garments']]
+    hide, push = MK.decode(mk['body'], mk['garments'], legacy)
+    inner = {n: (x['tris'], x['push']) for n, x in sd.items()}
+    for n in legacy:
+        over = [o for o in legacy if MK.layer(o) > MK.layer(n)]
         h, p = MK.decode(mk['inner'][n], mk['garments'], over)
         t = garments['meshes'][n]['tris']
         inner[n] = (t[MK.drawn_tris(t, h)], p)
-    return body['tris'][MK.drawn_tris(body['tris'], hide)], push, inner
+    return body['tris'][MK.drawn_tris(body['tris'], hide) & keep], push, inner
+
+
+def worn_meshes(body, garments, worn, weights, cfg):
+    """name → the mesh drawn for each worn garment at the body corner
+    `weights`: the garment itself, or a shell built at that corner."""
+    import shells as SHL
+    if not garments:
+        return {}
+    sd = SHL.corner_dress(body, garments, worn, weights, cfg)[1] if cfg is not None and 'region_bits' in body else {}
+    return {n: sd.get(n, garments['meshes'].get(n)) for n in worn}
 
 
 def push_in(v, tris, push, cfg):
@@ -294,9 +312,10 @@ def dressed(body, garments, names, weights, q, hips, cfg=None):
     wr, wp = person.pose(q, hips)
     jidx, jw = top4(body['W'])
     btris, bpush, inner = masked(body, garments, names, cfg)
+    gm = worn_meshes(body, garments, names, weights, cfg)
     out = [(push_in(person.skin(person.bake(pos, jidx, jw), jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, SKIN)]
     for k, n in enumerate(names):
-        g = garments['meshes'][n]
+        g = gm[n]
         col = (0.08, 0.06, 0.05, 1) if g.get('part') == 'hair' else (0.95, 0.95, 0.92, 1) if g.get('part') == 'eyes' else GARMENT_COLOURS[k % len(GARMENT_COLOURS)]
         gt, gp = inner.get(n, (g['tris'], None))
         out.append((push_in(GP.drawn_garment(person, g, weights, wr, wp), g['tris'], gp, cfg), gt, col))
@@ -361,8 +380,9 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
             raise RuntimeError(f"runtime sheets: {s['id']} wears {missing}, absent from the built garments — rebuild them (--step garments)")
         worn = list(s['garments'])
         btris, bpush, inner = masked(body, garments, worn, cfg)
-        gskin = {n: top4(garments['meshes'][n]['W']) for n in worn}
-        gbaked = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in worn}
+        gm = worn_meshes(body, garments, worn, w, cfg)
+        gskin = {n: top4(gm[n]['W']) for n in worn}
+        gbaked = {n: person.bake(garment_pos(gm[n], w), *gskin[n]) for n in worn}
         h = s['identity']['scale']
         elev = s.get('elevation', 0)
 
@@ -396,7 +416,7 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
                 top = max(top, float(bv[:, 1].max()))
                 for c, g in enumerate(worn):
                     gt, gp = inner[g]
-                    gv = drawn(f, gbaked[g], *gskin[g], garments['meshes'][g]['tris'], gp)
+                    gv = drawn(f, gbaked[g], *gskin[g], gm[g]['tris'], gp)
                     R.add_mesh(f'f{k}-{g}', gv + move, gt, GARMENT_COLOURS[c % len(GARMENT_COLOURS)])
                     top = max(top, float(gv[:, 1].max()))
                 tool = GP.runtime_tool(f)

@@ -270,6 +270,92 @@ def components(t):
     return len({find(x) for x in par})
 
 
+# ---- the pipeline's readers ---------------------------------------------------------
+
+
+class _NoMorph(dict):
+    """A built shell's morph deltas: none (it is built at the body corner drawn)."""
+
+    def __missing__(self, _k):
+        return 0.0
+
+
+def names_of(meshes):
+    return [n for n in meshes if meshes[n].get('part') == 'shell']
+
+
+def corner_dress(body, garments, worn, weights, cfg):
+    """The worn shells as drawn at the body corner `weights`: built on that
+    corner's rest body (normals recomputed there) with the outfit's worn
+    shell set, cut and pushed by the legacy worn garments' body mask. Returns
+    (per body face drawn under the worn shells, {name: garment-like dict:
+    pos at that corner, tris, W, morph_pos (none), src, rim, push})."""
+    import mask as MK
+    from body import vertex_normals
+    meshes = garments['meshes']
+    sh = {n: meshes[n] for n in names_of(meshes)}
+    worn_sh = [n for n in worn if n in sh]
+    tris = np.asarray(body['tris'])
+    fm = face_masks(body['region_bits'], tris)
+    bits = sum(1 << sh[n]['bit'] for n in worn_sh)
+    if not worn_sh:
+        return cut_body(fm, 0), {}
+    pos = body['pos'].copy()
+    for m, x in weights.items():
+        if x:
+            pos = pos + x * body['morph_pos'][m]
+    mk = garments.get('mask')
+    nv = len(pos)
+    hide, push = (np.zeros(nv, bool), np.zeros(nv, bool))
+    if mk is not None:
+        legacy = [n for n in worn if n in mk['garments']]
+        if legacy:
+            hide, push = MK.decode(mk['body'], mk['garments'], legacy)
+    g = build(pos, tris, vertex_normals(pos, tris), fm, sh, worn_sh, cfg['VILLAGER_ASSET']['garmentShellStep'], hidden=hide)
+    out = {n: {'part': 'shell', 'pos': x['pos'], 'tris': x['tris'], 'W': body['W'][x['src']], 'morph_pos': _NoMorph(),
+               'src': x['src'], 'rim': x['rim'], 'off': x['off'], 'push': push[x['src']]} for n, x in g.items()}
+    return cut_body(fm, bits), out
+
+
+SEAM_OUTFITS = (('g-waistBeads-waist', 'g-trousers-waist'), ('g-breastCloth-chest', 'g-neckBeads-chest'),
+                ('g-neckBeads-neck', 'g-neckBeads-chest'), tuple(NAMES))
+
+
+def selftest_body(body, garments, cfg, log=print):
+    """The stage-1 checks on the real body: the region predicates
+    (`check_regions`); for beads over trousers, breast cloth with the chest
+    collar, both collars and all five, one rim quad per seam edge and one far
+    surface per loop. Raises on a region or double-quad failure; a loop seeing
+    two far surfaces (its rims step at a junction) is the stage-1 invariant
+    failing and is returned, reported, not raised."""
+    meshes = garments['meshes']
+    sh = {n: meshes[n] for n in names_of(meshes)}
+    bad = check_regions(body, sh, log)
+    tris = np.asarray(body['tris'])
+    fm = face_masks(body['region_bits'], tris)
+    from body import vertex_normals
+    nrm = vertex_normals(body['pos'], tris)
+    ef = edge_faces(tris)
+    mixed = []
+    for worn in SEAM_OUTFITS:
+        g = build(body['pos'], tris, nrm, fm, sh, worn, cfg['VILLAGER_ASSET']['garmentShellStep'], ef=ef)
+        q = _rim_quads(g)
+        two = [e for e, v in q.items() if len(v) > 1]
+        if two:
+            bad.append(f'{"+".join(worn)}: {len(two)} seam edges with two rim quads')
+        for n, loops in far_surfaces(tris, fm, sh, worn, ef).items():
+            for k, seen in enumerate(loops):
+                if len(seen - {'covered'}) > 1:
+                    mixed.append(f'{"+".join(worn)}: {n} loop {k} ({len(sh[n]["rows"][k])} vertices) sees {sorted(seen - {"covered"})}')
+        log(f'[shells] {"+".join(worn)}: {sum(len(v) for v in q.values())} rim quads')
+    if bad:
+        raise AssertionError('shell selftest on the body: ' + '; '.join(bad))
+    for m in mixed:
+        log(f'[shells] SELFTEST FAILURE (one far surface per loop): {m}')
+    log('[shells] body selftest: ' + ('ok' if not mixed else f'{len(mixed)} loop(s) with two far surfaces'))
+    return mixed
+
+
 # ---- selftests (no Blender needed) -------------------------------------------------
 
 

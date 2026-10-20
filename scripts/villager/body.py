@@ -396,6 +396,7 @@ def split_level(st, key, c, within=None):
     # barycentric weights (the clip-frame regression and the refit read them)
     st['vparent'] = np.concatenate([st['vparent'], -np.ones(len(keys), int)])
     st['vbary'] = np.concatenate([st['vbary'], np.zeros((len(keys), 3))])
+    st['vedge'] = np.concatenate([st['vedge'], np.stack([a, b], 1)])
     out_t, out_uv, out_o, out_b = [], [], [], []
     for f in range(len(tris)):
         tv = [int(x) for x in tris[f]]
@@ -549,6 +550,7 @@ def presplit(body, cuts, mh=None, refit_weights=True):
     st['region'] = {k: v.copy() for k, v in st['region'].items()}
     st['vparent'] = -np.ones(n0, int)
     st['vbary'] = np.zeros((n0, 3))
+    st['vedge'] = -np.ones((n0, 2), int)
     st['torig'] = np.arange(m0)
     st['cbary'] = np.tile(np.eye(3), (m0, 1, 1))
     for key, c, within in cuts:
@@ -566,7 +568,7 @@ def presplit(body, cuts, mh=None, refit_weights=True):
         i2, b2, o2 = surface_map(mh, body['basis_full'], body['pos'][ids])
         body['map'] = (np.concatenate([idx, i2]), np.concatenate([bary, b2]), np.concatenate([off, o2]))
     body['split'] = {'n0': n0, 'tris0': tris0, 'pos0': W0['pos'], 'W0': W0['W'], 'parent': st['vparent'][ids],
-                     'bary': st['vbary'][ids], 'torig': st['torig']}
+                     'bary': st['vbary'][ids], 'edge': st['vedge'][ids], 'torig': st['torig']}
     return body
 
 

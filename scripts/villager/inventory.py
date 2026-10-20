@@ -75,6 +75,7 @@ def frame(body, garments, clips, sex, age, outfit, cfg, clip, frac, stride=1.0):
     person = GP.Person(j)
     baked = person.bake(pos, jidx, jw)
     btris, bpush, inner = S.masked(body, garments, list(outfit), cfg)
+    gm = S.worn_meshes(body, garments, list(outfit), cw, cfg)
     c = clips['clips'][clip]
     if clip == 'shoulders':
         import penetration as P
@@ -85,7 +86,7 @@ def frame(body, garments, clips, sex, age, outfit, cfg, clip, frac, stride=1.0):
     wr, wp = person.pose(q, hips, stride)
     out = [(S.push_in(person.skin(baked, jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, S.SKIN)]
     for k, n in enumerate(outfit):
-        g = garments['meshes'][n]
+        g = gm[n]
         gt, gp = inner[n]
         out.append((S.push_in(GP.drawn_garment(person, g, cw, wr, wp), g['tris'], gp, cfg), gt, S.GARMENT_COLOURS[k % len(S.GARMENT_COLOURS)]))
     if c.get('tool'):

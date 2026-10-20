@@ -802,6 +802,15 @@ def mesh_name(form, wear):
     return f'g-{form}-{wear}'
 
 
+def cloth_names(meshes):
+    """The garments built as meshes (every `g-` entry but a shell recipe, shells.py)."""
+    return [n for n in meshes if n.startswith('g-') and meshes[n].get('part') != 'shell']
+
+
+def shell_names(meshes):
+    return [n for n in meshes if meshes[n].get('part') == 'shell']
+
+
 def skirt_weights(v, W, crotch, hem):
     """Below the crotch a skirt hangs round both legs: each ring's weights are
     blurred round the ring (the sides still lean to their own leg, the middle
@@ -1036,14 +1045,23 @@ def build_garments(mh, body, clips, cfg):
     L['jaw'] = float(B.v[B.mask_body & (B.head > 0.5)][:, 1].min())
     meshes = {}
     meta = {}
+    import shells as SHL
+    shell = SHL.recipes(body, L, cfg)
     for form, wear in GARMENTS:
+        name = mesh_name(form, wear)
+        if name in shell:
+            # a shell garment: a recipe on the body's own surface (shells.py),
+            # no mesh, no weight transfer, no fit
+            meshes[name] = shell[name]
+            meta[name] = {'form': form, 'wear': wear, 'kind': 'shell'}
+            print(f'garment {name:28s} shell: {len(shell[name]["faces"]):5d} body faces, {len(shell[name]["rows"])} rows')
+            continue
         res = build_form(B, form, wear, L)
         geo, smooth = res[:2]
         limb = res[2] if len(res) > 2 else None
         if geo is None:
             continue
         v, t, uv = geo
-        name = mesh_name(form, wear)
         crotch = L['hip'] - 0.03 * H
         skirt = (crotch, float(v[:, 1].min())) if form in SKIRTS and v[:, 1].min() < crotch else None
         g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings', limb=limb,

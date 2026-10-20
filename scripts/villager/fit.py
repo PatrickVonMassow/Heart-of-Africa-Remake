@@ -25,6 +25,8 @@ import os
 
 import numpy as np
 
+import garments as G_
+
 import rig
 import skeleton as SK
 from body import top4
@@ -210,7 +212,7 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     step = cfg['VILLAGER_ASSET']['garmentFitStep']
     jidx, jw = top4(body['W'])
     import mask as M
-    names = [n for n in garments['meshes'] if n.startswith('g-')]
+    names = G_.cloth_names(garments['meshes'])
     G = garments['meshes']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
@@ -285,7 +287,102 @@ def tailor(src_dir, mh, body, clips, cfg):
     style = cfg['VILLAGER_ASSET']['clipStyle']
     trunk = {c: {k: v for k, v in s.items() if k in ('chestTilt', 'chestTwist')} for c, s in style.items()}
     plain = CL.build_clips(src_dir, body, cfg, style=trunk) if style else clips
-    return settle(body, fit(body, plain, G.build_garments(mh, body, plain, cfg), cfg), cfg)
+    out = settle(body, fit(body, plain, G.build_garments(mh, body, plain, cfg), cfg), cfg)
+    if clips is not None and 'split' in body:
+        out['split_regression'] = split_regression(body, clips, cfg)
+    return out
+
+
+def _point_tri(p, a, b, c):
+    """Distance from points p (n × 3) to triangles (a, b, c) (n × 3 each)."""
+    ab, ac, ap = b - a, c - a, p - a
+    n = np.cross(ab, ac)
+    nn = np.maximum(np.einsum('ij,ij->i', n, n), 1e-30)
+    # the projection's barycentrics; outside the triangle, the nearest edge point
+    v = np.einsum('ij,ij->i', np.cross(ap, ac), n) / nn
+    w = np.einsum('ij,ij->i', np.cross(ab, ap), n) / nn
+    inside = (v >= 0) & (w >= 0) & (v + w <= 1)
+    proj = a + v[:, None] * ab + w[:, None] * ac
+    d = np.where(inside, np.linalg.norm(p - proj, axis=1), np.inf)
+
+    def seg(x, y):
+        e = y - x
+        t = np.clip(np.einsum('ij,ij->i', p - x, e) / np.maximum(np.einsum('ij,ij->i', e, e), 1e-30), 0, 1)
+        return np.linalg.norm(p - (x + t[:, None] * e), axis=1)
+    return np.minimum(d, np.minimum(seg(a, b), np.minimum(seg(b, c), seg(c, a))))
+
+
+def split_regression(body, clips, cfg, log=print):
+    """The pre-split's clip-frame regression (body.py `presplit`): through every
+    exported clip frame at every body corner along the game's path, (a) every
+    inserted vertex against the point of its parent triangle posed with the
+    uncut corners' weights, (b) the centroid and edge midpoints of every split
+    triangle, posed on the uncut triangle, against the posed split surface of
+    that triangle. Per inserted vertex (its edge) the worst distance, against
+    1 mm and 3 mm (figure units); a detector, never a gate."""
+    import gamepath as GP
+    from penetration import CORNERS
+    from sheets import corner_weights
+    sp = body['split']
+    n0 = sp['n0']
+    ids = np.arange(n0, len(body['pos']))
+    tris0 = np.asarray(sp['tris0'])
+    i0, w0 = top4(sp['W0'])
+    i1, w1 = top4(body['W'])
+    torig = np.asarray(sp['torig'])
+    split_t = np.unique(torig[np.nonzero(np.bincount(torig, minlength=len(tris0))[torig] > 1)[0]])
+    S = np.array([[1 / 3, 1 / 3, 1 / 3], [0.5, 0.5, 0], [0, 0.5, 0.5], [0.5, 0, 0.5]])
+    # every (split triangle, sample, sub-triangle) pair, measured at once per frame
+    pos_of = {t: k for k, t in enumerate(split_t)}
+    pp, pt = [], []
+    for f, t in enumerate(torig):
+        if t in pos_of:
+            pp.append(pos_of[t])
+            pt.append(f)
+    pair_p = np.repeat(np.array(pp, int), len(S))
+    pair_t = np.repeat(np.array(pt, int), len(S))
+    pair_s = np.tile(np.arange(len(S)), len(pp))
+    worst_v = np.zeros(len(ids))
+    worst_t = np.zeros(len(split_t))
+    frames = 0
+    for c in CORNERS:
+        w = corner_weights(*c)
+        p0 = sp['pos0'].copy()
+        p1 = body['pos'].copy()
+        j = body['joints'].copy()
+        for m, x in w.items():
+            if x:
+                p0 += x * body['morph_pos'][m][:n0]
+                p1 += x * body['morph_pos'][m]
+                j += x * body['joint_deltas'][m]
+        person = GP.Person(j)
+        b0 = person.bake(p0, i0, w0)
+        b1 = person.bake(p1, i1, w1)
+        for _cn, _f, k, q, hips in GP.poses(clips, EXPORT_CLIPS, cfg):
+            wr, wp = person.pose(q, hips, k)
+            v0 = person.skin(b0, i0, w0, wr, wp)
+            v1 = person.skin(b1[ids], i1[ids], w1[ids], wr, wp)
+            tgt = np.einsum('kj,kji->ki', sp['bary'], v0[tris0[sp['parent']]])
+            np.maximum(worst_v, np.linalg.norm(v1 - tgt, axis=1), out=worst_v)
+            if len(pair_p):
+                full = np.zeros((len(body['pos']), 3))
+                full[:n0] = v0
+                full[ids] = v1
+                pts = np.einsum('kj,kji->ki', S[pair_s], v0[tris0[split_t[pair_p]]])
+                st = body['tris'][pair_t]
+                d = _point_tri(pts, full[st[:, 0]], full[st[:, 1]], full[st[:, 2]])
+                near = np.full(len(split_t) * len(S), np.inf)
+                np.minimum.at(near, pair_p * len(S) + pair_s, d)
+                np.maximum(worst_t, near.reshape(len(split_t), len(S)).max(1), out=worst_t)
+            frames += 1
+    over1 = ids[worst_v > 0.001]
+    over3 = ids[worst_v >= 0.003]
+    log(f'[split regression] {len(ids)} inserted vertices, {len(split_t)} split triangles, {frames} posed frames: '
+        f'worst vertex {worst_v.max(initial=0):.5f}, {len(over1)} over 1 mm, {len(over3)} at 3 mm or more; '
+        f'worst split-triangle sample {worst_t.max(initial=0):.5f}')
+    return {'inserted': len(ids), 'split_triangles': len(split_t), 'frames': frames, 'worst_vertex': worst_v.tolist(),
+            'worst_triangle': worst_t.tolist(), 'over1': over1.tolist(), 'over3': over3.tolist(),
+            'edges3': [[int(x) for x in sp['edge'][k - n0]] for k in over3], 'worst3': worst_v[over3 - n0].tolist()}
 
 
 # The body corners in the order their morphs can be settled: each corner's
@@ -343,7 +440,7 @@ def smooth_cloth(garments, rounds, lam=0.5, mu=-0.53):
     openings) held: the settle's pushes leave the cloth dented, and the
     next settle pass takes it clear of the body again."""
     G = garments['meshes']
-    for n in [n for n in G if n.startswith('g-')]:
+    for n in G_.cloth_names(G):
         g = G[n]
         nb, twins = neighbours(len(g['pos']), g['tris'], g['pos'])
         rep = np.arange(len(g['pos']))
@@ -378,7 +475,7 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
     import mask as M
     from garments import armholes, refine
     G = garments['meshes']
-    for n in [n for n in G if n.startswith('g-')]:
+    for n in G_.cloth_names(G):
         G[n] = refine(G[n], cfg['VILLAGER_ASSET']['garmentEdgeMax'])
         # an armhole where an upper arm passes the trunk cloth; a garment of
         # the shoulder layer drapes the arms instead (garments.build_form)
@@ -396,7 +493,7 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
         settle_layers(body, garments, cfg, log=log)
         split = 0
         if k < passes - 1:
-            for n in [n for n in G if n.startswith('g-')]:
+            for n in G_.cloth_names(G):
                 nv = len(G[n]['pos'])
                 G[n] = refine(G[n], cfg['VILLAGER_ASSET']['garmentEdgeMax'])
                 split += len(G[n]['pos']) - nv
@@ -531,7 +628,7 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     jidx, jw = top4(body['W'])
     q = design_pose(body)
     G = garments['meshes']
-    names = [n for n in G if n.startswith('g-')]
+    names = G_.cloth_names(G)
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
     clear = {n: a['garmentSettleClearance'] + a['garmentLayerGap'] * M.layer(n) for n in names}
