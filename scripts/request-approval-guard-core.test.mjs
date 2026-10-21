@@ -4,7 +4,7 @@
 // deposits quoting the report — is pinned as its own case.
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -807,4 +807,102 @@ describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', 
     const bashCheck = spawnSync(process.execPath, [GUARD, '--check', command], { encoding: 'utf8', windowsHide: true })
     expect(bashCheck.stdout).toContain('a possible request deposit')
   })
+})
+
+describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)', () => {
+  // a chat session that approved nothing: anything judged as a possible deposit is refused
+  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
+  const STAMP =
+    `node -e "console.log(new Intl.DateTimeFormat('de-DE',` +
+    `{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',` +
+    `minute:'2-digit',timeZone:'Europe/Berlin'}).format(new Date()))"`
+  const allowed = (command, shell = 'bash') => {
+    expect(isPossibleDeposit(command, shell), command).toBe(false)
+    expect(evaluate({ command, entries: chat, shell }).block, command).toBe(false)
+  }
+  const judged = (command, shell = 'bash') => {
+    expect(isPossibleDeposit(command, shell), command).toBe(true)
+  }
+
+  it.each([
+    'rg "x" a | head',
+    'git log --oneline | head -5',
+    'cat f | grep y',
+    'grep -n "a\\|b" f',
+    "sed -n '1,20p' f | tail -3",
+    "rg -n 'a|b?' scripts | sort | uniq -c",
+    // U13: the timestamp command the UserPromptSubmit hook prescribes
+    STAMP,
+    // measured 21.10.2026: a quoted ?, ;, | or * in a canonical command is literal
+    'node scripts/board.mjs vdzk-keep "Kartenschrift für die Anweisungstexte?"',
+    'node scripts/ask-astra.mjs --kind enumerate --brief "read problem.md; answer | why *"',
+  ])('allowed: %s', (command) => allowed(command))
+
+  it('the hook timestamp is exactly the command berlin-timestamp.cjs prescribes', () => {
+    const hook = readFileSync(join(REPO_ROOT, 'scripts', 'hooks', 'berlin-timestamp.cjs'), 'utf8')
+    const prescribed = [...hook.matchAll(/`([^`]*)`/g)].map((m) => m[1]).join('')
+    expect(prescribed).toContain(STAMP)
+  })
+
+  it.each([
+    'rg --request scripts/finding.mjs',
+    "rg -n -- '--request' scripts | head",
+    'cat f > g',
+    'cat f | grep y > g',
+    'rg x; node y',
+    'rg x && node y',
+    'cat f || rg x',
+    'rg --pre cmd x | head',
+    'rg --pre=cmd "x?"',
+    "sort --compress-program=gzip f | head",
+    'git -c alias.l=!sh log | head',
+    'git --exec-path=/tmp log | head',
+    "sed -n 's/a/b/w out' f | head",
+    "sed -n '1e ls' f | head",
+    "sed -e '1e ls' -n f | head",
+    "sed 's/a/b/' f | head",
+    "sed -E 's/a/b/p' f | head",
+    'x | bash',
+    'cat f | bash',
+    'cat f | xargs node',
+    'cat "$(ls)" | head',
+    'cat `ls` | head',
+    'cat *.md | head',
+    'ls scripts/fin*.mjs | head',
+    "bash -c 'node scripts/fin*.mjs --re* Hidden'",
+    "eval 'node scripts/fin?ing.mjs --re?uest Hidden'",
+    `node -e "console.log('scripts/finding.mjs')"`,
+    `node -e "require('child_process').execSync('node scripts/fin*.mjs --re*')"`,
+    `node -e "x['constr'+'uctor']('?')"`,
+    `node -e "process.stdout.write('a*')"`,
+    'node scripts/x.mjs "a?" | head',
+    'node --import ./x.mjs scripts/x.mjs "a?"',
+    "find . -name '*.ts'",
+  ])('still judged: %s', (command) => judged(command))
+
+  it('a judged non-canonical read still meets the chat refusal', () => {
+    expect(evaluate({ command: 'cat f > g', entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
+  it.each([
+    'Get-Content f | Select-String y',
+    'Get-ChildItem | Select-String "a|b?"',
+    'get-date',
+    "Get-Content 'notes; draft?.md'",
+    'node scripts\\board.mjs vdzk-keep "Kartenschrift?"',
+  ])('allowed in PowerShell: %s', (command) => allowed(command, 'powershell'))
+
+  it.each([
+    'Get-Content f | Select-String --request',
+    'Get-Content scripts\\finding.mjs | Select-String x',
+    'Get-Content f > g',
+    'Get-Content f; node y',
+    'Get-Content f | pwsh',
+    'Get-Content f | Invoke-Expression',
+    'Get-Content $f | Select-String x',
+    'Get-ChildItem fin*.mjs | Select-String x',
+    'Get-ChildItem @a | Select-String x',
+    "Get-Content f | Select-String 'x?' | bash",
+    "pwsh -Command 'node scripts\\fin*.mjs'",
+  ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
 })
