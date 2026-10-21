@@ -12,7 +12,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { ownsLock } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, ownsLock } from './batch-singleton.mjs'
 import { assessBranchHygiene, formatBranchHygiene, DEFAULT_GRACE_MS, normBranch } from './branch-hygiene-core.mjs'
 import { declarationShields } from './batch-in-flight-core.mjs'
 import { probePid } from './batch-singleton.mjs'
@@ -87,11 +87,15 @@ function parseWorktrees(porcelain) {
 }
 
 /** The guard's I/O half, shared with `--status` and the preflight.
- *  `ignoreOwnership` is for the --status probe alone, which must answer for any session. */
+ *  `ignoreOwnership` is for the --status probe alone: it keeps the foreign-owner stand-down instead of the holder duty. */
 export function gatherBranchHygiene({ sessionId = '', now = Date.now(), ignoreOwnership = false } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (!ignoreOwnership && !ownsLock(sessionId).mine) {
-    return { applicable: false, why: 'this session does not hold the batch lock', cause: 'not-lock-owner' }
+  if (ignoreOwnership ? heldByOtherLiveOwner(sessionId) : !ownsLock(sessionId).mine) {
+    return {
+      applicable: false,
+      why: ignoreOwnership ? 'another live session owns the batch lock' : 'this session does not hold the batch lock',
+      cause: 'not-lock-owner',
+    }
   }
 
   let tips

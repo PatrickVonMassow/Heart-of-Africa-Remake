@@ -14,7 +14,7 @@
 //   node scripts/bundle-first-guard.mjs --status
 import { readFileSync, existsSync } from 'node:fs'
 import { evaluate, statusLine } from './bundle-first-core.mjs'
-import { ownsLock } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
 
@@ -27,14 +27,18 @@ import { repoPath } from './repo-paths.mjs'
 // really happens on the call. What no try in this file can enclose is another
 // module's own top-level initialisation.
 /** The guard's I/O half, shared with the preflight (point 365 D). */
-/** `ignoreOwnership` is for the --status probe alone, which must answer for any session. */
+/** `ignoreOwnership` is for the --status probe alone: it keeps the foreign-owner stand-down instead of the holder duty. */
 export function gatherBundleFirstInputs({ sessionId = '', resolvePath = repoPath, ignoreOwnership = false } = {}) {
   const tasks = resolvePath('TASKS.md')
   const workPackages = resolvePath('docs/work-packages.md')
   const pause = resolvePath('.claude/batch-paused')
   if (existsSync(pause)) return { applicable: false, why: 'the batch is paused' }
-  if (!ignoreOwnership && !ownsLock(sessionId).mine) {
-    return { applicable: false, why: 'this session does not hold the batch lock', cause: 'not-lock-owner' }
+  if (ignoreOwnership ? heldByOtherLiveOwner(sessionId) : !ownsLock(sessionId).mine) {
+    return {
+      applicable: false,
+      why: ignoreOwnership ? 'another live session owns the batch lock' : 'this session does not hold the batch lock',
+      cause: 'not-lock-owner',
+    }
   }
   if (!existsSync(workPackages)) return { applicable: false, why: 'no docs/work-packages.md in this checkout' }
   if (!existsSync(tasks)) return { applicable: false, why: 'no TASKS.md in this checkout' }
@@ -50,7 +54,7 @@ export function gatherBundleFirstInputs({ sessionId = '', resolvePath = repoPath
 if (isMainModule(import.meta.url)) {
   try {
     if (process.argv.includes('--status')) {
-      const gathered = gatherBundleFirstInputs({ ignoreOwnership: true })
+      const gathered = gatherBundleFirstInputs({ sessionId: 'status-run', ignoreOwnership: true })
       if (!gathered.applicable) {
         console.log(`bundle-first-guard: not applicable — ${gathered.why}`)
         process.exit(0)
