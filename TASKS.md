@@ -15965,3 +15965,9 @@ to land than a mechanism that needs a review.
   Verifiable: `polish-villagers --section=village-walk` green on WebGL 2 and WebGPU; a Vitest on the layer the fix touches.
   Criticality: medium - a red regression lane on the fallback backend.
   Bundle: Dorfleben.
+
+- [ ] 1401. Two villagers standing in conversation fidget on the spot
+  Two adult villagers standing face to face in conversation in the village centre fidget restlessly on the spot instead of standing calmly. Done when a conversation pair stands still apart from deliberate small gestures, judged in a moving capture, not a still.
+  Source: user bug report hoa-state-2026-10-21-2694999956.zip (10:19:48Z), user words: "Die beiden stehen da und zappeln herum."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (the point currently in progress, 1347, continues). The five user-report points of 21.10.2026 keep the order given here.
