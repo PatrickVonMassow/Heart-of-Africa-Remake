@@ -891,6 +891,8 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'git log --textconv -p | head',
     'git branch --edit-description | head',
     'git branch --e | head',
+    'git log --textc -p | head',
+    'git diff --ext | head',
     'git diff --output=scripts/x.mjs | head',
     'sort -o scripts/x.mjs payload | head',
     'cat f | sort -uo scripts/x.mjs',

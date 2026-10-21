@@ -322,8 +322,13 @@ const PATTERN_OPTIONS = /^-(pattern|simplematch|casesensitive|notmatch|allmatche
 const GIT_READS = new Set(['log', 'status', 'diff', 'show', 'blame', 'branch', 'rev-parse'])
 /** Option words that make an otherwise reading program run another program or write a file. */
 const EXECUTING = { rg: /^--(pre|hostname-bin)/, sort: /^(--co|--o|-[^-]*o)/ }
-/** git options that run a helper or editor, or write a file (Astra review of ea049bf); `--e` covers git branch's abbreviated --edit-description. */
-const GIT_EXECUTING = /^--(e|textconv|output|upload|open-files|config-env)/
+/** git options that run a helper or editor, or write a file (Astra review of ea049bf). */
+const GIT_EXECUTING = ['--ext-diff', '--textconv', '--output', '--edit-description', '--exec-path', '--upload-pack', '--open-files-in-pager', '--config-env']
+/** Is this word one of them or an abbreviation git would resolve to one (`--e`, `--textc`)? */
+const gitExecuting = (word) => {
+  const name = word.split('=')[0]
+  return name.length > 2 && name.startsWith('--') && GIT_EXECUTING.some((option) => option.startsWith(name))
+}
 /** sed -n scripts: addressed p/=/l/q commands and s/// with harmless flags only (no e, w, r). */
 const SED_ADDR = String.raw`(?:\d+|\$|/(?:\\.|[^/\\])*/)`
 const SED_SCRIPT = new RegExp(
@@ -370,7 +375,7 @@ function isReadSegment(words, quoted, shell, alone, piped) {
     return cmdlet === 'select-string' && piped && positional <= 1 && args.every((a) => !PS_DASH.test(a) || PATTERN_OPTIONS.test(a.replace(PS_DASH, '-')))
   }
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
-  if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))
+  if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some(gitExecuting)
   if (program === 'sed') {
     const options = args.filter((a) => a.startsWith('-'))
     const operands = args.filter((a) => !a.startsWith('-'))
