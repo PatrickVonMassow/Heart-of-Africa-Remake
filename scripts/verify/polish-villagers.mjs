@@ -6184,7 +6184,8 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
     const spots = await page.evaluate(({ fig, scale, bearing, dist }) => {
       const out = []
       for (const side of bearing % Math.PI === 0 ? [1] : [1, -1])
-        for (const turn of [0, 0.12, -0.12, 0.25, -0.25]) {
+        // the wider turns serve a 7 m spot a village fence or hut blocks
+        for (const turn of [0, 0.12, -0.12, 0.25, -0.25, 0.4, -0.4]) {
           const a = fig.yaw + side * bearing + turn
           const x = fig.x + Math.sin(a) * dist
           const z = fig.z + Math.cos(a) * dist
