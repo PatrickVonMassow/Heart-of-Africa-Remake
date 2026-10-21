@@ -177,7 +177,8 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
         t = d * f / frames if c['kind'] in ('gait', 'loop') else d * f / (frames - 1)
         q, hips = sample(c, t)
         wr, wp = person.pose(q, hips)
-        v = push_in(person.skin(baked, jidx, jw, wr, wp), body['tris'], bpush, cfg)
+        bv = person.skin(baked, jidx, jw, wr, wp)
+        v = push_in(bv, body['tris'], bpush, cfg)
         if view == 'side':
             v[:, 2] += f * spacing - span / 2
         else:
@@ -186,7 +187,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
         for k, n in enumerate(outfit):
             g = gm[n]
             gt, gp = inner[n]
-            gv = push_in(GP.drawn_garment(person, g, cw, wr, wp), g['tris'], gp, cfg)
+            gv = push_in(GP.drawn_garment(person, g, cw, wr, wp), g['tris'], gp, cfg, source_normals(g, bv, body['tris']))
             if view == 'side':
                 gv[:, 2] += f * spacing - span / 2
             else:
@@ -296,12 +297,26 @@ def worn_meshes(body, garments, worn, weights, cfg):
     return {n: sd.get(n, garments['meshes'].get(n)) for n in worn}
 
 
-def push_in(v, tris, push, cfg):
+def push_in(v, tris, push, cfg, normals=None, depth=None):
     """Posed positions with the mask's pushed vertices moved inward (the game's vertex shader)."""
     if push is None or not push.any():
         return v
     import mask as MK
-    return MK.pushed(v, tris, push.astype(float), cfg['VILLAGER_ASSET']['garmentMaskPush'])
+    depth = cfg['VILLAGER_ASSET']['garmentMaskPush'] if depth is None else depth
+    if normals is not None:
+        # a shell: along its copied source normals
+        return v - depth * push.astype(float)[:, None] * normals
+    return MK.pushed(v, tris, push.astype(float), depth)
+
+
+def source_normals(g, body_v, body_tris):
+    """A shell's push direction: its source body vertices' normals on the posed
+    body `body_v` (shells copy the source normal, shells.py); None for a
+    legacy garment (pushed along its own normals)."""
+    if g.get('part') != 'shell':
+        return None
+    from body import vertex_normals
+    return vertex_normals(body_v, np.asarray(body_tris))[g['src']]
 
 
 def dressed(body, garments, names, weights, q, hips, cfg=None):
@@ -313,12 +328,13 @@ def dressed(body, garments, names, weights, q, hips, cfg=None):
     jidx, jw = top4(body['W'])
     btris, bpush, inner = masked(body, garments, names, cfg)
     gm = worn_meshes(body, garments, names, weights, cfg)
-    out = [(push_in(person.skin(person.bake(pos, jidx, jw), jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, SKIN)]
+    bv = person.skin(person.bake(pos, jidx, jw), jidx, jw, wr, wp)
+    out = [(push_in(bv, body['tris'], bpush, cfg), btris, SKIN)]
     for k, n in enumerate(names):
         g = gm[n]
         col = (0.08, 0.06, 0.05, 1) if g.get('part') == 'hair' else (0.95, 0.95, 0.92, 1) if g.get('part') == 'eyes' else GARMENT_COLOURS[k % len(GARMENT_COLOURS)]
         gt, gp = inner.get(n, (g['tris'], None))
-        out.append((push_in(GP.drawn_garment(person, g, weights, wr, wp), g['tris'], gp, cfg), gt, col))
+        out.append((push_in(GP.drawn_garment(person, g, weights, wr, wp), g['tris'], gp, cfg, source_normals(g, bv, body['tris'])), gt, col))
     return out
 
 
@@ -366,7 +382,6 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
     three skins them, the root's rotation and scale kept and its travel taken
     out. Every frame labelled with its time and camera.
     verification/villager-body/runtime-<subject>-<view>.png"""
-    import mask as MK
     from fit import garment_pos
     a = cfg['VILLAGER_ASSET']
     jidx, jw = top4(body['W'])
@@ -386,12 +401,12 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
         h = s['identity']['scale']
         elev = s.get('elevation', 0)
 
-        def drawn(f, v, ji, jw_, tris, push):
+        def drawn(f, v, ji, jw_, tris, push, normals=None):
             # the mask push in the figure mesh's own space (pipeline unit → figure:
-            # the person's scale), THEN the root with its squash, as three draws it
+            # the person's scale), THEN the root with its squash, as three draws it;
+            # `normals` a callable giving a shell's source normals in that space
             v = GP.runtime_skin(s, f, v, ji, jw_, 'figure')
-            if push is not None and push.any():
-                v = MK.pushed(v, tris, push.astype(float), a['garmentMaskPush'] * s['person']['scale'])
+            v = push_in(v, tris, push, cfg, normals and normals(), a['garmentMaskPush'] * s['person']['scale'])
             root = GP.runtime_root(f)
             return v @ root[:3, :3].T + root[:3, 3]
         for view in s['views']:
@@ -411,14 +426,18 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
                 off = right * (k * spacing - span / 2)
                 at = np.array([f['root']['p'][0], 0.0, f['root']['p'][2]])
                 move = off - at
-                bv = drawn(f, baked + GP.runtime_hands(f, hand), jidx, jw, body['tris'], bpush)
+                fb = baked + GP.runtime_hands(f, hand)
+                bv = drawn(f, fb, jidx, jw, body['tris'], bpush)
                 R.add_mesh(f'f{k}', bv + move, btris, SKIN)
                 top = max(top, float(bv[:, 1].max()))
+                # a shell's push along its source normals on the posed (unpushed) body, figure space
+                bfig = lambda: GP.runtime_skin(s, f, fb, jidx, jw, 'figure')  # noqa: E731
                 for c, g in enumerate(worn):
                     gt, gp = inner[g]
-                    gv = drawn(f, gbaked[g], *gskin[g], gm[g]['tris'], gp)
+                    sn = (lambda g=g: source_normals(gm[g], bfig(), body['tris'])) if gm[g].get('part') == 'shell' else None
+                    gv = drawn(f, gbaked[g], *gskin[g], gm[g]['tris'], gp, sn)
                     R.add_mesh(f'f{k}-{g}', gv + move, gt, GARMENT_COLOURS[c % len(GARMENT_COLOURS)])
-                    top = max(top, float(gv[:, 1].max()))
+                    top = max(top, float(gv[:, 1].max(initial=top)))
                 tool = GP.runtime_tool(f)
                 if tool is not None:
                     R.add_mesh(f't{k}', sv @ tool[:3, :3].T + tool[:3, 3] + move, st, (0.42, 0.3, 0.16, 1))

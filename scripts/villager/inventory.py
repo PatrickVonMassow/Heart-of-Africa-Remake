@@ -84,11 +84,12 @@ def frame(body, garments, clips, sex, age, outfit, cfg, clip, frac, stride=1.0):
     else:
         q, hips = S.sample(c, c['duration'] * frac)
     wr, wp = person.pose(q, hips, stride)
-    out = [(S.push_in(person.skin(baked, jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, S.SKIN)]
+    bv = person.skin(baked, jidx, jw, wr, wp)
+    out = [(S.push_in(bv, body['tris'], bpush, cfg), btris, S.SKIN)]
     for k, n in enumerate(outfit):
         g = gm[n]
         gt, gp = inner[n]
-        out.append((S.push_in(GP.drawn_garment(person, g, cw, wr, wp), g['tris'], gp, cfg), gt, S.GARMENT_COLOURS[k % len(S.GARMENT_COLOURS)]))
+        out.append((S.push_in(GP.drawn_garment(person, g, cw, wr, wp), g['tris'], gp, cfg, S.source_normals(g, bv, body['tris'])), gt, S.GARMENT_COLOURS[k % len(S.GARMENT_COLOURS)]))
     if c.get('tool'):
         out.append((*S.shovel_mesh(body, c['tool'], wr, wp, S.cfg_shovel(clips)), (0.42, 0.3, 0.16, 1)))
     return out
