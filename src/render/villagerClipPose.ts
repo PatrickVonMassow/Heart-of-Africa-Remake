@@ -226,8 +226,13 @@ function flatAnkle(asset: VillagerAsset, frame: PersonFrame, side: 'L' | 'R'): n
  * ankle → contact, world) instead of being dragged: the ankle target moves
  * to the nearest point the leg reaches at the pivot's distance, and the foot
  * (`footQ`, world) pitches about the pivot, which stays on its spot (`_hoQ`
- * keeps that turn). Mutates `target` and `footQ`; 'out' where the pivot lies
- * beyond the leg's reach.
+ * keeps that turn). Mutates `target` and `footQ`. A pivot beyond the reach
+ * of the leg and foot in one line is lifted off its spot to that line's
+ * limit — the ankle at the leg's reach, the foot pointing at the pivot —
+ * the same pose the roll tends to as the pivot nears the limit, so the foot
+ * never springs back to the clip's pitch for a frame (the trailing foot's
+ * tremble at every toe-off). 'out' only where no direction to the pivot is
+ * defined.
  */
 function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion): 'reached' | 'rolled' | 'out' {
   const hip = world.p[thigh]
@@ -235,18 +240,26 @@ function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: numb
   if (hip.distanceTo(target) <= reach) return 'reached'
   const pivot = _hoB.copy(target).add(toPivot)
   const d = toPivot.length()
+  // beyond the leg and foot in one line the pivot lifts straight up off its
+  // spot to that reach (a toe-off: the contact leaves the ground, it does not
+  // slide along it); dragged toward the hip only where even that falls short
+  const far = reach + d
+  const flat = Math.hypot(pivot.x - hip.x, pivot.z - hip.z)
+  if (pivot.distanceTo(hip) > far && flat < far) pivot.y = Math.max(pivot.y, hip.y - Math.sqrt(far * far - flat * flat))
   const axis = _hoAx.copy(pivot).sub(hip)
   const D = axis.length()
-  if (D < 1e-6 || D >= reach + d) return 'out'
+  if (D < 1e-6) return 'out'
   axis.divideScalar(D)
-  // the circle where the spheres about the hip (reach) and the pivot (d) meet
-  const a = (D * D + reach * reach - d * d) / (2 * D)
+  // the circle where the spheres about the hip (reach) and the pivot (d)
+  // meet; at reach + d it has shrunk to the point at the leg's reach
+  const a = Math.min(reach, (D * D + reach * reach - d * d) / (2 * D))
   const r = Math.sqrt(Math.max(0, reach * reach - a * a))
   const centre = _hoC.copy(hip).addScaledVector(axis, a)
   const u = _hoU.copy(target).sub(centre)
   u.addScaledVector(axis, -u.dot(axis))
-  if (u.lengthSq() < 1e-12) return 'out'
-  target.copy(centre).addScaledVector(u.normalize(), r)
+  if (u.lengthSq() >= 1e-12) target.copy(centre).addScaledVector(u.normalize(), r)
+  else if (r < 1e-9) target.copy(centre)
+  else return 'out'
   _hoQ.setFromUnitVectors(_hoV0.copy(toPivot).normalize(), _hoV1.copy(pivot).sub(target).normalize())
   footQ.premultiply(_hoQ)
   return 'rolled'
@@ -726,6 +739,13 @@ export function clipGaitPose(
         _keepToe.premultiply(_hoQ.invert().slerp(_qI, 1 - G.toeLift))
       }
     }
+    // every leg stretches to the one reach a rolling foot stops at: a target
+    // beyond it straightened the knee fully, so a foot handed between a pivot
+    // and its clip at toe-off snapped its knee open and shut in one frame
+    const hip = world.p[thigh]
+    const reach = (legLength(frame.rest0, thigh, shin, foot) - 1e-4) * G.legReach
+    const away = hip.distanceTo(_target[i])
+    if (away > reach) _target[i].sub(hip).multiplyScalar(reach / away).add(hip)
     if (far || fw > 0 || tw > 0) correctLeg(asset, frame.rest0, out, world, thigh, shin, foot, _target[i], P.kneePoleMin * frame.legScale)
     setWorldRotation(asset, out, world, foot, _keep)
     forwardKinematics(asset, frame.rest0, out, world)

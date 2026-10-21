@@ -436,6 +436,58 @@ describe('the clip gait on the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
   })
 
+  it('the trailing leg rolls off its toes without a tremble: no joint turns back on itself between two frames', () => {
+    // user report 21.10.2026 ("the rear leg trembles at every step"): out of
+    // reach, the rolling foot sprang back to the clip's pitch with the knee
+    // snapped straight for one frame, then rolled again — a one-frame spike of
+    // 0.2 rad at the thigh and 0.5 rad at the foot at every toe-off (thigh
+    // 12-31, foot 40-99 rad/s below; frame-rate bound, as a spike is). A
+    // smooth turn reverses only through rest: its reversal rate goes to 0
+    // with the frame time. Measured after the fix: at most 7.4 rad/s, the
+    // same at 60, 100 and 144 Hz (the toe's lift-off kink, no spike).
+    const n = asset.bones.length
+    const bones = ['thigh', 'shin', 'foot'].flatMap((b) => ['L', 'R'].map((s) => `${b}.${s}`))
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [1.0, 1.4]) {
+          for (const hz of [60, 100, 144]) {
+            const dt = 1 / hz
+            const speed = perLeg * f.legScale * f.scale
+            const g = newClipGait()
+            const pose = newPose(n)
+            const world = newWorld(n)
+            const prev = bones.map(() => new THREE.Quaternion())
+            const step = bones.map(() => new THREE.Vector3())
+            const d = new THREE.Quaternion()
+            const v = new THREE.Vector3()
+            let z = 0
+            for (let k = 0; k * dt < 4; k++) {
+              z += speed * dt
+              stepClipGait(g, asset, f, speed * dt, speed)
+              clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+              forwardKinematics(asset, f.rest0, pose, world)
+              bones.forEach((b, j) => {
+                const q = world.q[asset.bones.indexOf(b)]
+                // this frame's world turn of the bone as a rotation vector
+                d.copy(prev[j]).invert().premultiply(q)
+                if (d.w < 0) d.set(-d.x, -d.y, -d.z, -d.w)
+                const s = Math.hypot(d.x, d.y, d.z)
+                v.set(d.x, d.y, d.z).multiplyScalar(s > 1e-12 ? (2 * Math.atan2(s, d.w)) / s : 0)
+                if (k * dt > 1 && v.dot(step[j]) < 0) {
+                  const rate = Math.min(v.length(), step[j].length()) / dt
+                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${b} at phase ${g.phase.toFixed(3)}`).toBeLessThan(9)
+                }
+                step[j].copy(v)
+                prev[j].copy(q)
+              })
+            }
+          }
+        }
+      }
+    }
+  })
+
   it('walk → jog → sprint is continuous: a small change of pace moves no joint by a jump', () => {
     const n = asset.bones.length
     const f = adult.frame
