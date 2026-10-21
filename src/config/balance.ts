@@ -2641,6 +2641,23 @@ export const VILLAGER_ASSET = {
   buildWeight: 0.3,
   /** Triangles of the decimated body (hands, feet and face kept finer). */
   bodyTriangles: 6000,
+  /** The shell regions' body pre-split (scripts/villager/body.py,
+   *  docs/garment-merge-r10-1347.md), figure units. Before the cut, edges in a
+   *  band of ±band round every cut level are halved while longer than lmax and
+   *  their Σ|Δweight| · length exceeds tau, so a cut vertex bends with a fine
+   *  surface; reach (degrees) is how far the weight refit turns each bone (about
+   *  what the clips turn it); a cut vertex the refit leaves more than snapLimit
+   *  off is snapped to its edge's nearer end; the split regression fails the
+   *  build above gateLimit outside the kneel clips. Calibratable. */
+  bodySplit: {
+    band: { y: 0.05, arm: 0.1 },
+    lmax: 0.015,
+    tau: 0.002,
+    rounds: 8,
+    reach: { spine: 25, spine1: 25, chest: 25, hips: 25, neck: 25, head: 25, shoulder: 20, thigh: 60, shin: 90, foot: 40, toe: 30, upperArm: 60, forearm: 60, hand: 40 },
+    snapLimit: 0.003,
+    gateLimit: 0.003,
+  },
   /** How far a garment vertex may lie inside the body in any frame of any clip
    *  at any morph extreme (figure units, ≈ 4 mm) — the penetration report's
    *  tolerance. */

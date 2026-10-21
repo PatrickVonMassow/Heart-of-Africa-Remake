@@ -339,8 +339,10 @@ def build_body(mh, cfg):
     import shells as SHL
     from garments import landmarks
     L = landmarks(jbasis, cfg['VILLAGER_ASSET']['stature'])
-    body['region'] = region_scalars(pos, W)
-    presplit(body, SHL.cuts(L), mh=mh)
+    split = cfg['VILLAGER_ASSET']['bodySplit']
+    subdivide(body, SHL.cuts(L), split, mh=mh)
+    body['region'] = region_scalars(body['pos'], body['W'])
+    presplit(body, SHL.cuts(L), mh=mh, split=split)
     body['region_bits'] = SHL.region_words(body['region'], L)
     return body
 
@@ -358,7 +360,7 @@ def region_scalars(pos, W):
     return {'y': pos[:, 1].copy(), 'arm': col(ARM_BONES), 'leg.L': col(LEG_BONES['L']), 'leg.R': col(LEG_BONES['R'])}
 
 
-def split_level(st, key, c, within=None):
+def split_level(st, key, c, within=None, tag=-1):
     """Cut the mesh state `st` along the level set `key` = c: a vertex on every
     crossed edge (of the faces `within` selects, every face when None), every
     per-vertex array interpolated there and the cut scalar set to c exactly;
@@ -397,6 +399,7 @@ def split_level(st, key, c, within=None):
     st['vparent'] = np.concatenate([st['vparent'], -np.ones(len(keys), int)])
     st['vbary'] = np.concatenate([st['vbary'], np.zeros((len(keys), 3))])
     st['vedge'] = np.concatenate([st['vedge'], np.stack([a, b], 1)])
+    st['vcut'] = np.concatenate([st['vcut'], np.full(len(keys), tag)])
     out_t, out_uv, out_o, out_b = [], [], [], []
     for f in range(len(tris)):
         tv = [int(x) for x in tris[f]]
@@ -457,34 +460,130 @@ def height_within(lo, hi):
     return sel
 
 
-def refit_poses(joints, bones):
-    """The refit's pose set for the bones a vertex carries: rest, the design
-    pose, and ±45° and ±90° about two axes across each bone."""
+# The body corners the cut vertices are solved at (sheets.corner_weights of
+# penetration.CORNERS): each adds its morphs to the adult man, so the corners'
+# morph rows form a square, invertible system over the basis and the nine
+# shape morphs.
+SOLVE_CORNERS = ({}, {'female': 1}, {'child': 1}, {'youth': 1}, {'elder': 1},
+                 {'female': 1, 'child': 1, 'child_f': 1}, {'female': 1, 'youth': 1, 'youth_f': 1},
+                 {'female': 1, 'elder': 1, 'elder_f': 1}, {'slight': 1}, {'stout': 1})
+DEFAULT_REACH = 45
+
+
+def split_edges(st, edges):
+    """Halve every edge in `edges` ((a, b), a < b) of the mesh state `st`: the
+    midpoint takes the mean of its ends' per-vertex arrays (position, weights,
+    morph deltas) and of `tri_uv`; a face with one, two or three halved edges
+    becomes two, three or four, winding kept, no hanging vertex."""
+    n0 = len(st['pos'])
+    keys = sorted(edges)
+    a = np.array([k[0] for k in keys])
+    b = np.array([k[1] for k in keys])
+    mid = {e: n0 + k for k, e in enumerate(keys)}
+    half = lambda x: 0.5 * (x[a] + x[b])  # noqa: E731
+    st['pos'] = np.concatenate([st['pos'], half(st['pos'])])
+    st['W'] = np.concatenate([st['W'], half(st['W'])])
+    st['morph_pos'] = {m: np.concatenate([v, half(v)]) for m, v in st['morph_pos'].items()}
+    out_t, out_uv = [], []
+    for f, tv in enumerate(st['tris']):
+        tv = [int(x) for x in tv]
+        uv = st['tri_uv'][f]
+        on = [mid.get((min(tv[e], tv[(e + 1) % 3]), max(tv[e], tv[(e + 1) % 3]))) for e in range(3)]
+        cor = [(tv[k], uv[k]) for k in range(3)]
+        m = [None if on[e] is None else (on[e], 0.5 * (uv[e] + uv[(e + 1) % 3])) for e in range(3)]
+        hits = [e for e in range(3) if on[e] is not None]
+        if not hits:
+            parts = [cor]
+        elif len(hits) == 1:
+            e = hits[0]
+            parts = [(cor[e], m[e], cor[(e + 2) % 3]), (m[e], cor[(e + 1) % 3], cor[(e + 2) % 3])]
+        elif len(hits) == 2:
+            i = [k for k in range(3) if k in hits and (k - 1) % 3 in hits][0]
+            m1, m2 = m[i], m[(i - 1) % 3]
+            V, J, K = cor[i], cor[(i + 1) % 3], cor[(i + 2) % 3]
+            parts = [(V, m1, m2), (m1, J, K), (m1, K, m2)]
+        else:
+            parts = [(cor[0], m[0], m[2]), (m[0], cor[1], m[1]), (m[2], m[1], cor[2]), (m[0], m[1], m[2])]
+        for t in parts:
+            out_t.append([x[0] for x in t])
+            out_uv.append(np.array([x[1] for x in t]))
+    st['tris'] = np.array(out_t, int)
+    st['tri_uv'] = np.array(out_uv)
+    return len(keys)
+
+
+def subdivide(body, cuts, split, mh=None):
+    """Halve the long edges in a band round every cut level (revision 10): an
+    edge of a face whose cut-scalar range overlaps c ± band (inside the cut's
+    height interval, if it has one) while longer than `lmax` and its
+    Σ|ΔW| · length above `tau`, round after round. The cut vertices then sit
+    on short edges, where a four-bone vertex can follow the surface; the
+    subdivided, uncut body is the cut's reference (body['split'])."""
+    st = {k: body[k] for k in ('pos', 'tris', 'tri_uv', 'W', 'morph_pos')}
+    n0 = len(st['pos'])
+    for _ in range(split['rounds']):
+        reg = region_scalars(st['pos'], st['W'])
+        tr = st['tris']
+        band = np.zeros(len(tr), bool)
+        for key, c, within in cuts:
+            v = reg[key][tr]
+            d = split['band']['y' if key == 'y' else 'arm']
+            sel = (v.min(1) <= c + d) & (v.max(1) >= c - d)
+            if within is not None:
+                y = reg['y'][tr]
+                sel &= (y.max(1) >= within[0]) & (y.min(1) <= within[1])
+            band |= sel
+        e = np.concatenate([tr[band][:, [0, 1]], tr[band][:, [1, 2]], tr[band][:, [2, 0]]])
+        e = np.unique(np.sort(e, 1), axis=0)
+        P, W = st['pos'], st['W']
+        ln = np.linalg.norm(P[e[:, 0]] - P[e[:, 1]], axis=1)
+        dw = np.abs(W[e[:, 0]] - W[e[:, 1]]).sum(1)
+        e = e[(ln > split['lmax']) & (ln * dw > split['tau'])]
+        if not len(e):
+            break
+        split_edges(st, {(int(x), int(y)) for x, y in e})
+    for k in st:
+        body[k] = st[k]
+    ids = np.arange(n0, len(body['pos']))
+    if mh is not None and len(ids):
+        idx, bary, off = body['map']
+        i2, b2, o2 = surface_map(mh, body['basis_full'], body['pos'][ids])
+        body['map'] = (np.concatenate([idx, i2]), np.concatenate([bary, b2]), np.concatenate([off, o2]))
+    print(f'[body] band subdivision: {n0} -> {len(body["pos"])} vertices, {len(body["tris"])} triangles')
+    return body
+
+
+def refit_poses(joints, bones, reach=None):
+    """The weight refit's pose set for the bones a vertex carries, as A-pose
+    world turns and heads: the design pose (the arms hanging, as the game's
+    hung body nearly stands), and on it ±reach and ±reach/2 about two axes
+    across each carried bone (`reach` degrees per bone name without side)."""
     import rig
     from garments import design_pose
-    from gltfio import qaxis
-    rest = np.tile([0, 0, 0, 1.0], (len(SK.NAMES), 1))
-    out = [rig.fk(joints, rest), rig.fk(joints, design_pose({'joints': joints}))]
+    q0 = design_pose({'joints': joints})
+    out = [rig.fk(joints, q0)]
     for b in bones:
+        r = (reach or {}).get(SK.NAMES[b].split('.')[0], DEFAULT_REACH) * np.pi / 180
         d = joints[b, 3:] - joints[b, :3]
         d = d / (np.linalg.norm(d) or 1)
         a1 = np.cross(d, [0, 1.0, 0]) if abs(d[1]) < 0.9 else np.cross(d, [1.0, 0, 0])
         a1 /= np.linalg.norm(a1)
         a2 = np.cross(d, a1)
         for ax in (a1, a2):
-            for ang in (-np.pi / 2, -np.pi / 4, np.pi / 4, np.pi / 2):
-                q = rest.copy()
-                q[b] = qaxis(ax, ang)
+            for ang in (-r, -r / 2, r / 2, r):
+                q = q0.copy()
+                q[b] = qnorm(qmul(q0[b], qaxis(ax, ang)))
                 out.append(rig.fk(joints, q))
     return out
 
 
-def simplex_lsq(A, y):
-    """min |A w − y|² over w ≥ 0, Σ w = 1 (few columns: every support tried)."""
+def simplex_lsq(A, y, most=None):
+    """min |A w − y|² over w ≥ 0, Σ w = 1 (few columns: every support of at
+    most `most` columns tried)."""
     from itertools import combinations
     n = A.shape[1]
     best, bw = np.inf, None
-    for r in range(1, n + 1):
+    for r in range(1, min(n, most or n) + 1):
         for sup in combinations(range(n), r):
             M = A[:, sup]
             K = np.zeros((r + 1, r + 1))
@@ -507,60 +606,156 @@ def simplex_lsq(A, y):
     return bw
 
 
-def refit(st, joints, W0, tris0, ids):
-    """Each inserted vertex's four bones (`top4` of its interpolated weights)
-    refitted over the pose set to follow the point of its parent triangle
-    posed with the uncut corners' weights; written back as four nonzero
-    full-width entries, so export.py's `top4` is the identity on them."""
-    from garments import skin_full
+def corner_state(body, pos, morph_pos, mw):
+    """One body corner's rest positions and joints for morph weights `mw`."""
+    p = pos.copy()
+    j = body['joints'].copy()
+    jd = body.get('joint_deltas', {})
+    for m, x in mw.items():
+        p += x * morph_pos[m]
+        if m in jd:
+            j += x * jd[m]
+    return p, j
+
+
+def refit(st, body, W0, tris0, ids, reach=None):
+    """The cut vertices made to follow their parent triangle along the game's
+    drawing path (gamepath.Person.draw: the hang bake, then the clip skin,
+    both with the vertex's four weights). Returns each vertex's worst
+    residual over the pose set.
+
+    1. Weights: four bones out of the six heaviest interpolated ones, fitted
+       (non-negative, sum one) so the clip skin of the vertex's hung point
+       follows the point of its parent triangle drawn with the reference
+       corners' weights, over `refit_poses`. Linear: the hung point is the
+       target's.
+    2. Rest position and shape-morph deltas: at every SOLVE_CORNERS corner the
+       A-pose point the hang bake takes exactly onto the parent triangle's
+       hung point (the bake is affine per vertex), then the basis and the
+       shape deltas solved from the corners. The hung body carries every cut
+       vertex on the reference surface at every corner; in the A pose, which
+       the game never draws, it may sit off its edge.
+    Written back as four nonzero full-width entries, so export.py's `top4`
+    is the identity on them."""
+    import gamepath as GP
+    i0, w0 = top4(W0['W'])
+    parent = tris0[st['vparent'][ids]]
+    bary = st['vbary'][ids]
+    person = GP.Person(body['joints'])
+    hung = np.einsum('kj,kji->ki', bary, person.bake(W0['pos'], i0, w0)[parent])
     cache = {}
 
     def poses(b):
         if b not in cache:
-            cache[b] = refit_poses(joints, [b])[2:]
+            cache[b] = [(np.array([qmat(q) for q in person.drawn(wr)]), wp,
+                         np.einsum('kj,kji->ki', bary, person.draw(W0['pos'], i0, w0, wr, wp)[parent]))
+                        for wr, wp in refit_poses(body['joints'], [b], reach)]
         return cache[b]
 
-    base = refit_poses(joints, [])
-    h = joints[:, :3]
-    for v in ids:
-        bi, bw = top4(st['W'][v:v + 1])
-        bi, bw = bi[0], bw[0]
-        bi = bi[bw > 0] if (bw > 0).any() else bi[:1]
-        carried = sorted(set(np.nonzero(st['W'][v] > 1e-3)[0].tolist()) | set(bi.tolist()))
-        ps = base + [p for b in carried for p in poses(b)]
-        x = st['pos'][v]
-        corners = tris0[st['vparent'][v]]
+    resid = np.zeros(len(ids))
+    for k, v in enumerate(ids):
+        cand = np.argsort(-st['W'][v])[:6]
+        cand = cand[st['W'][v, cand] > 1e-3] if (st['W'][v, cand] > 1e-3).any() else cand[:1]
         rows, ys = [], []
-        for wr, wp in ps:
-            tgt = st['vbary'][v] @ skin_full(W0['pos'][corners], W0['W'][corners], joints, wr, wp)
-            cols = [qmat(wr[b]) @ (x - h[b]) + wp[b] for b in bi]
-            rows.append(np.array(cols).T)
-            ys.append(tgt)
-        w = simplex_lsq(np.concatenate(rows), np.concatenate(ys))
+        for b in cand:
+            for Rd, wp, tgt in poses(int(b)):
+                rows.append(np.array([Rd[c] @ (hung[k] - person.heads[c]) + wp[c] for c in cand]).T)
+                ys.append(tgt[k])
+        A, y = np.concatenate(rows), np.concatenate(ys)
+        full = np.zeros(st['W'].shape[1])
+        full[cand] = simplex_lsq(A, y, most=4)
+        bi, bw = top4(full[None])
         st['W'][v] = 0
-        st['W'][v, bi] = w
+        st['W'][v, bi[0]] = bw[0]
+        resid[k] = np.linalg.norm((A @ st['W'][v, cand] - y).reshape(-1, 3), axis=1).max()
+    shape = [m for m in MORPHS if m not in HAND_MORPHS and m in st['morph_pos']]
+    corners = [c for c in SOLVE_CORNERS if all(m in shape for m in c)]
+    used = [m for m in shape if any(m in c for c in corners)]
+    C = np.array([[1.0] + [c.get(m, 0.0) for m in used] for c in corners])
+    if C.shape[0] != C.shape[1]:
+        raise ValueError(f'refit: {len(corners)} corners for {len(used)} shape morphs')
+    i1, w1 = top4(st['W'][ids])
+    n0 = len(W0['pos'])
+    P = []
+    for c in corners:
+        p0, j = corner_state(body, W0['pos'], {m: st['morph_pos'][m][:n0] for m in c}, c)
+        pc = GP.Person(j)
+        tgt = np.einsum('kj,kji->ki', bary, pc.bake(p0, i0, w0)[parent])
+        zero = pc.bake(np.zeros((len(ids), 3)), i1, w1)
+        Rh = np.array([qmat(q) for q in pc.hang])
+        A = np.einsum('vk,vkij->vij', w1, Rh[i1]) / np.maximum(w1.sum(1), 1e-12)[:, None, None]
+        P.append(np.linalg.solve(A, (tgt - zero)[:, :, None])[:, :, 0])
+    X = np.linalg.solve(C, np.array(P).reshape(len(corners), -1)).reshape(len(corners), len(ids), 3)
+    st['pos'][ids] = X[0]
+    for k, m in enumerate(used):
+        st['morph_pos'][m][ids] = X[k + 1]
+    return resid
 
 
-def presplit(body, cuts, mh=None, refit_weights=True):
-    """Cut `body` in place along `cuts` ([(scalar, value, (lo, hi) or None)],
-    in order); inserted vertices take refitted weights (`refit`) and, with
-    `mh`, their surface map. Records body['split'] for the regression."""
+def _cut(body, cuts, refit_weights, reach):
+    """One pass of the cut on `body` (untouched): the mesh state and the
+    inserted vertices' residuals."""
     n0, m0 = len(body['pos']), len(body['tris'])
-    st = {k: body[k] for k in ('pos', 'tris', 'tri_uv', 'W', 'morph_pos', 'region')}
-    st['region'] = {k: v.copy() for k, v in st['region'].items()}
+    st = {k: body[k] for k in ('pos', 'tris', 'tri_uv', 'W', 'morph_pos')}
+    st['morph_pos'] = dict(st['morph_pos'])
+    st['region'] = {k: v.copy() for k, v in body['region'].items()}
     st['vparent'] = -np.ones(n0, int)
     st['vbary'] = np.zeros((n0, 3))
     st['vedge'] = -np.ones((n0, 2), int)
+    st['vcut'] = -np.ones(n0, int)
     st['torig'] = np.arange(m0)
     st['cbary'] = np.tile(np.eye(3), (m0, 1, 1))
-    for key, c, within in cuts:
-        k = split_level(st, key, c, None if within is None else height_within(*within))
-        print(f'[body] split {key} at {c:.4f}: {k} vertices')
+    for k, (key, c, within) in enumerate(cuts):
+        n = split_level(st, key, c, None if within is None else height_within(*within), tag=k)
+        print(f'[body] split {key} at {c:.4f}: {n} vertices')
     ids = np.arange(n0, len(st['pos']))
     W0 = {'pos': body['pos'], 'W': body['W']}
+    resid = refit(st, body, W0, body['tris'], ids, reach) if refit_weights and len(ids) else np.zeros(len(ids))
+    return st, ids, resid
+
+
+def snaps(st, ids, resid, cuts, region, limit):
+    """Revision 10's snap fallback: per cut vertex left more than `limit` off
+    by the refit, whose edge has two reference ends, the nearer end's cut
+    scalar set to the level — unless that carries it across another level of
+    the same scalar. Returns {(scalar, vertex): level}."""
+    out = {}
+    n0 = len(region['y'])
+    for k in np.nonzero(resid > limit)[0]:
+        v = ids[k]
+        a, b = (int(x) for x in st['vedge'][v])
+        key, c, _ = cuts[int(st['vcut'][v])]
+        if a >= n0 or b >= n0:
+            continue
+        s = region[key]
+        end = a if abs(s[a] - c) <= abs(s[b] - c) else b
+        lo, hi = sorted((s[end], c))
+        if any(kk == key and lo < cc < hi for kk, cc, _w in cuts):
+            continue
+        out[(key, end)] = c
+    return out
+
+
+def presplit(body, cuts, mh=None, refit_weights=True, split=None):
+    """Cut `body` in place along `cuts` ([(scalar, value, (lo, hi) or None)],
+    in order); inserted vertices take the refit (`refit`) and, with `mh`,
+    their surface map; a vertex the refit cannot follow within
+    split['snapLimit'] is snapped (`snaps`) and the cut redone. Records
+    body['split'] (the reference: the body before the cut) for the
+    regression."""
+    split = split or {}
+    reach = split.get('reach')
+    n0 = len(body['pos'])
+    st, ids, resid = _cut(body, cuts, refit_weights, reach)
+    snapped = snaps(st, ids, resid, cuts, body['region'], split['snapLimit']) if 'snapLimit' in split else {}
+    if snapped:
+        body['region'] = {k: v.copy() for k, v in body['region'].items()}
+        for (key, v), c in snapped.items():
+            body['region'][key][v] = c
+        print(f'[body] snapped {len(snapped)} cut edges to their nearer end')
+        st, ids, resid = _cut(body, cuts, refit_weights, reach)
     tris0 = body['tris']
-    if refit_weights and len(ids):
-        refit(st, body['joints'], W0, tris0, ids)
+    W0 = {'pos': body['pos'], 'W': body['W']}
     for k in ('pos', 'tris', 'tri_uv', 'W', 'morph_pos', 'region'):
         body[k] = st[k]
     if mh is not None and len(ids):
@@ -568,7 +763,8 @@ def presplit(body, cuts, mh=None, refit_weights=True):
         i2, b2, o2 = surface_map(mh, body['basis_full'], body['pos'][ids])
         body['map'] = (np.concatenate([idx, i2]), np.concatenate([bary, b2]), np.concatenate([off, o2]))
     body['split'] = {'n0': n0, 'tris0': tris0, 'pos0': W0['pos'], 'W0': W0['W'], 'parent': st['vparent'][ids],
-                     'bary': st['vbary'][ids], 'edge': st['vedge'][ids], 'torig': st['torig']}
+                     'bary': st['vbary'][ids], 'edge': st['vedge'][ids], 'torig': st['torig'],
+                     'resid': resid, 'snapped': len(snapped)}
     return body
 
 
@@ -584,10 +780,7 @@ def helper_mesh(mh, group, basis, deltas):
     return basis[used].copy(), np.array(tris), {k: d[used] for k, d in deltas.items()}
 
 
-def selftest_split():
-    """The split tool on a toy triangle (no Blender needed): interpolation,
-    the exact level value, four non-negative normalised refitted weights, the
-    region scalars untouched by the refit, no hanging vertex."""
+def _toy_body():
     pos = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]])
     tris = np.array([[0, 1, 2], [1, 3, 2]])
     W = np.zeros((4, len(SK.NAMES)))
@@ -600,22 +793,12 @@ def selftest_split():
     body = {'pos': pos, 'tris': tris, 'tri_uv': np.zeros((2, 3, 2)), 'W': W, 'joints': joints,
             'morph_pos': {'female': pos * 0.1}}
     body['region'] = region_scalars(pos, W)
-    arm0 = body['region']['arm'].copy()
-    presplit(body, [('y', 0.5, None)])
-    n = len(body['pos'])
-    assert n == 7, n  # edges 0-2, 1-2 (the diagonal) and 1-3
-    assert len(body["tris"]) == 6, len(body["tris"])
-    new = np.arange(4, n)
-    assert np.allclose(body['region']['y'][new], 0.5) and (body['region']['y'][new] == 0.5).all()
-    assert np.allclose(body['pos'][new][:, 1], 0.5)
-    assert np.allclose(body['morph_pos']['female'][new], body['pos'][new] * 0.1)
-    # the arm scalar interpolated, never re-read from the refitted weights
-    on02 = [k for k in new if np.isclose(body['pos'][k, 0], 0.0)][0]
-    assert np.isclose(body['region']['arm'][on02], 0.5 * (arm0[0] + arm0[2]))
-    w = body['W'][new]
-    assert (w >= 0).all() and np.allclose(w.sum(1), 1) and ((w > 0).sum(1) <= 4).all()
-    # every edge of the cut mesh is shared by at most two faces and no face
-    # has a vertex on its edge's interior (no hanging vertex)
+    return body
+
+
+def _check_mesh(body, new):
+    """Every edge shared by at most two faces, no vertex of `new` hanging on
+    another face's edge, every face's normal still +z."""
     edges = {}
     for t in body['tris']:
         for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
@@ -631,8 +814,63 @@ def selftest_split():
                 d = np.linalg.norm(np.cross(b - a, body['pos'][k] - a)) / np.linalg.norm(b - a)
                 s = np.dot(body['pos'][k] - a, b - a) / np.dot(b - a, b - a)
                 assert not (d < 1e-9 and 1e-9 < s < 1 - 1e-9), 'hanging vertex'
-    # windings kept: every face's normal still +z
     for t in body['tris']:
         P = body['pos'][t]
         assert np.cross(P[1] - P[0], P[2] - P[0])[2] > 0
+
+
+def selftest_split():
+    """The split tool on a toy square (no Blender needed): interpolation and
+    the exact level value without the refit; with it, four non-negative
+    normalised weights, the region scalars untouched and every cut vertex's
+    hang bake on its parent triangle at both morph corners; the snap fallback;
+    the band subdivision's conformity and midpoints."""
+    import gamepath as GP
+    # plain cut: interpolation, exact level value
+    body = _toy_body()
+    presplit(body, [('y', 0.5, None)], refit_weights=False)
+    n = len(body['pos'])
+    assert n == 7, n  # edges 0-2, 1-2 (the diagonal) and 1-3
+    assert len(body['tris']) == 6, len(body['tris'])
+    new = np.arange(4, n)
+    assert (body['region']['y'][new] == 0.5).all()
+    assert np.allclose(body['pos'][new][:, 1], 0.5)
+    assert np.allclose(body['morph_pos']['female'][new], body['pos'][new] * 0.1)
+    _check_mesh(body, new)
+    # with the refit
+    body = _toy_body()
+    arm0 = body['region']['arm'].copy()
+    ref = {k: body[k].copy() for k in ('pos', 'W')}
+    ref['female'] = body['morph_pos']['female'].copy()
+    presplit(body, [('y', 0.5, None)])
+    assert len(body['pos']) == 7
+    on02 = [k for k in new if np.isclose(body['region']['arm'][k], 0.5 * (arm0[0] + arm0[2]))]
+    assert on02, 'the arm scalar interpolated, never re-read from the refitted weights'
+    w = body['W'][new]
+    assert (w >= 0).all() and np.allclose(w.sum(1), 1) and ((w > 0).sum(1) <= 4).all()
+    sp = body['split']
+    i0, w0 = top4(ref['W'])
+    i1, w1 = top4(body['W'])
+    P = GP.Person(body['joints'])
+    for x in (0.0, 1.0):
+        tgt = np.einsum('kj,kji->ki', sp['bary'], P.bake(ref['pos'] + x * ref['female'], i0, w0)[sp['tris0'][sp['parent']]])
+        got = P.bake((body['pos'] + x * body['morph_pos']['female'])[new], i1[new], w1[new])
+        assert np.abs(got - tgt).max() < 1e-9, ('hang bake off the parent triangle', x, np.abs(got - tgt).max())
+    # the snap fallback: every cut vertex over a negative limit, so every
+    # crossing moves to its edge's nearer end and nothing is inserted
+    body = _toy_body()
+    presplit(body, [('y', 0.5, None)], split={'snapLimit': -1.0})
+    assert len(body['pos']) == 4 and body['split']['snapped'] == 2, (len(body['pos']), body['split']['snapped'])
+    assert body['region']['y'][0] == 0.5 and body['region']['y'][1] == 0.5 and np.allclose(body['pos'][:2, 1], 0)
+    # band subdivision: every band edge ends at most lmax long, conforming
+    body = _toy_body()
+    subdivide(body, [('y', 0.5, None)], {'rounds': 8, 'band': {'y': 0.1, 'arm': 0.1}, 'lmax': 0.3, 'tau': 0.0})
+    _check_mesh(body, np.arange(4, len(body['pos'])))
+    tr = body['tris']
+    y = body['pos'][tr][:, :, 1]
+    band = (y.min(1) <= 0.6) & (y.max(1) >= 0.4)
+    e = np.concatenate([tr[band][:, [0, 1]], tr[band][:, [1, 2]], tr[band][:, [2, 0]]])
+    assert np.linalg.norm(body['pos'][e[:, 0]] - body['pos'][e[:, 1]], axis=1).max() <= 0.3
+    assert np.allclose(body['morph_pos']['female'], body['pos'] * 0.1) and np.allclose(body['pos'][:, 2], 0)
+    assert np.allclose(body['W'].sum(1), 1)
     print('body split selftest: ok')

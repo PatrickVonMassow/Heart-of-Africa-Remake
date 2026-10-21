@@ -71,6 +71,20 @@ def cached(work, name, make, force=False, key=None):
     return v
 
 
+def split_parents(out, body):
+    """verification/villager-body/split-parents.json: per cut vertex of the
+    shipped body its parent triangle in the reference (vertex ids below n0,
+    kept by the cut) and barycentrics — what villagerSplitBody.test.ts checks
+    the hung body against."""
+    sp = body.get('split')
+    if not sp:
+        return
+    tris0 = sp['tris0']
+    data = {'n0': int(sp['n0']), 'parents': tris0[sp['parent']].astype(int).tolist(),
+            'bary': [[round(float(x), 7) for x in b] for b in sp['bary']]}
+    open(os.path.join(out, 'split-parents.json'), 'w').write(json.dumps(data, separators=(',', ':')) + '\n')
+
+
 def split_report(out, r, mixed=()):
     """verification/villager-body/split-regression.md from the garments step's
     clip-frame regression of the body pre-split (fit.split_regression)."""
@@ -82,10 +96,15 @@ def split_report(out, r, mixed=()):
     lines = ['# Body pre-split: clip-frame regression', '',
              'Every inserted vertex against the point of its parent triangle, and the centroid and edge midpoints of every split triangle '
              'against the split surface, posed along the game path through every exported clip frame at every body corner '
-             '(scripts/villager/fit.py `split_regression`). Figure units; a detector, no gate.', '',
+             '(scripts/villager/fit.py `split_regression`), against the band-subdivided uncut body (body.py `subdivide`). Figure units; '
+             'the garments step fails above VILLAGER_ASSET.bodySplit.gateLimit in any clip but the kneel family (fit.py `split_gate`).', '',
              f'- inserted vertices: {r["inserted"]}, split triangles: {r["split_triangles"]}, posed frames: {r["frames"]}',
              f'- worst inserted vertex: {wv.max(initial=0):.5f}; over 1 mm: {len(r["over1"])}; at 3 mm or more: {len(r["over3"])}',
-             f'- worst split-triangle sample: {wt.max(initial=0):.5f}', '']
+             f'- worst split-triangle sample: {wt.max(initial=0):.5f}',
+             f'- cut edges snapped to their nearer end: {r.get("snapped", 0)}', '',
+             '| clip | worst cut vertex |', '| --- | --- |']
+    lines += [f'| {c} | {d:.5f} |' for c, d in sorted(r.get('per_clip', {}).items())]
+    lines += ['']
     if r['edges3']:
         lines += ['Edges at 3 mm or more (inserted vertex: edge endpoints, worst):', '']
         lines += [f'- {v}: {e[0]}-{e[1]}, {d:.5f}' for v, e, d in zip(r['over3'], r['edges3'], r['worst3'])]
@@ -167,6 +186,7 @@ def main():
         # the shell recipes (shells.py) pass too: export.py writes them as extras
         dress = garments and {'meshes': {n: g for n, g in garments['meshes'].items() if n.startswith('g-')}, 'meta': garments['meta']}
         E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, dress, cfg, mask=garments and garments['mask'])
+        split_parents(a.verification, body)
         if garments:
             import sheets as S
             MK.check(a.verification, garments['mask'], body, [o for _s, _a, o in S.outfits(garments)])

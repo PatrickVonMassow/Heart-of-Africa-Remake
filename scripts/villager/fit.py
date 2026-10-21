@@ -294,13 +294,28 @@ def tailor(src_dir, mh, body, clips, cfg):
     out = settle(legacy, fit(legacy, plain, G.build_garments(mh, legacy, plain, cfg, shell_body=body), cfg), cfg)
     if clips is not None and 'split' in body:
         out['split_regression'] = split_regression(body, clips, cfg)
+        split_gate(out['split_regression'], cfg['VILLAGER_ASSET']['bodySplit']['gateLimit'])
     return out
 
 
+# The clips the split gate leaves to the report and the picture: a kneel bends
+# hip and knee further than the cut vertices' four bones follow (revision 10).
+SPLIT_GATE_EXEMPT = ('kneel', 'kneelDown', 'kneelUp')
+
+
+def split_gate(r, limit):
+    """Revision 10's gate: every cut vertex within `limit` of the reference in
+    every clip but the kneel family, or the garments step fails."""
+    bad = {c: d for c, d in r['per_clip'].items() if c not in SPLIT_GATE_EXEMPT and d > limit}
+    if bad:
+        raise RuntimeError('split regression: cut vertices off the reference beyond '
+                           f'{limit} in ' + ', '.join(f'{c} {d:.5f}' for c, d in sorted(bad.items())))
+
+
 def uncut(body):
-    """The body before the shell pre-split (body.py `presplit`): its own
-    positions, weights, morphs and triangles, every per-vertex array cut back
-    to the uncut vertices. Fitted on the cut body, the legacy cloth met the
+    """The body before the shell pre-split (body.py `presplit`) — the band-
+    subdivided reference (revision 10): its own positions, weights, morphs and
+    triangles, every per-vertex array cut back to the uncut vertices. Fitted on the cut body, the legacy cloth met the
     inserted vertices' refitted weights (the split regression) and the arm
     contour's corners at the armholes and changed: the robe kept sleeve cloth
     inside the upper arm and its layer pushes threw the mantles and the hood
@@ -344,7 +359,9 @@ def split_regression(body, clips, cfg, log=print):
     uncut corners' weights, (b) the centroid and edge midpoints of every split
     triangle, posed on the uncut triangle, against the posed split surface of
     that triangle. Per inserted vertex (its edge) the worst distance, against
-    1 mm and 3 mm (figure units); a detector, never a gate."""
+    1 mm and 3 mm (figure units), and per clip the worst; the reference is the
+    subdivided, uncut body (body.py `subdivide`). `split_gate` turns it into
+    the garments step's gate."""
     import gamepath as GP
     from penetration import CORNERS
     from sheets import corner_weights
@@ -369,6 +386,7 @@ def split_regression(body, clips, cfg, log=print):
     pair_s = np.tile(np.arange(len(S)), len(pp))
     worst_v = np.zeros(len(ids))
     worst_t = np.zeros(len(split_t))
+    per_clip = {}
     frames = 0
     for c in CORNERS:
         w = corner_weights(*c)
@@ -388,7 +406,9 @@ def split_regression(body, clips, cfg, log=print):
             v0 = person.skin(b0, i0, w0, wr, wp)
             v1 = person.skin(b1[ids], i1[ids], w1[ids], wr, wp)
             tgt = np.einsum('kj,kji->ki', sp['bary'], v0[tris0[sp['parent']]])
-            np.maximum(worst_v, np.linalg.norm(v1 - tgt, axis=1), out=worst_v)
+            dv = np.linalg.norm(v1 - tgt, axis=1)
+            np.maximum(worst_v, dv, out=worst_v)
+            per_clip[_cn] = max(per_clip.get(_cn, 0.0), float(dv.max(initial=0)))
             if len(pair_p):
                 full = np.zeros((len(body['pos']), 3))
                 full[:n0] = v0
@@ -406,6 +426,7 @@ def split_regression(body, clips, cfg, log=print):
         f'worst vertex {worst_v.max(initial=0):.5f}, {len(over1)} over 1 mm, {len(over3)} at 3 mm or more; '
         f'worst split-triangle sample {worst_t.max(initial=0):.5f}')
     return {'inserted': len(ids), 'split_triangles': len(split_t), 'frames': frames, 'worst_vertex': worst_v.tolist(),
+            'per_clip': per_clip, 'snapped': int(sp.get('snapped', 0)),
             'worst_triangle': worst_t.tolist(), 'over1': over1.tolist(), 'over3': over3.tolist(),
             'edges3': [[int(x) for x in sp['edge'][k - n0]] for k in over3], 'worst3': worst_v[over3 - n0].tolist()}
 
