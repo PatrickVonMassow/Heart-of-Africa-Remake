@@ -355,8 +355,8 @@ function isReadSegment(words, quoted, shell, alone) {
   const [program, ...args] = words
   if (program === undefined || quoted[0]) return false
   if (alone && program === 'node' && !quoted[1] && LITERAL_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
-  // the cmdlets' -Path expands wildcards even when quoted
-  if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase()) && !args.some((a) => a.replace(/\\/g, '/').split(/[\s;|,]+/).some(globHitsMarker))
+  // the cmdlets' -Path expands wildcards even when quoted, case-insensitively
+  if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase()) && !args.some((a) => a.toLowerCase().replace(/\\/g, '/').split(/[\s;|,]+/).some(globHitsMarker))
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
   if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))
   if (program === 'sed') {

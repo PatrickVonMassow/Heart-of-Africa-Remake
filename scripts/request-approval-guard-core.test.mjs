@@ -930,6 +930,8 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     "pwsh -Command 'node scripts\\fin*.mjs'",
     "Get-Content 'scripts/fin*.mjs'",
     "Get-Content 'scripts\\fin*.mjs'",
+    "Get-Content 'scripts/FIN*.mjs'",
+    "Get-ChildItem 'Scripts\\Fin?ing.MJS' | Select-String x",
     "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
   ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
 })
