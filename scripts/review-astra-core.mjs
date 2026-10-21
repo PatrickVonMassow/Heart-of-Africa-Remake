@@ -5,7 +5,7 @@
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different
 // vendor is the strongest decorrelation available, so REVIEWS go to OpenAI's
-// GPT-6 Astra at reasoning effort HIGH first and to the first eligible Claude
+// GPT-6 Astra at reasoning effort MEDIUM first and to the first eligible Claude
 // reviewer when Astra cannot be reached. Since point 667 Astra also AUTHORS under
 // the role swap (scripts/author-astra.mjs, admitted in the model-guard allowlist);
 // what this file protects is the other half of that swap — no model reviews its
@@ -69,8 +69,8 @@ export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 export { ASTRA_MODEL_ID }
 export const ASTRA_MODEL_NAME = ASTRA_MODEL
 
-/** The reasoning effort the user's decision fixes for reviews (10.08.2026). */
-export const ASTRA_REASONING_EFFORT = 'high'
+/** The reasoning effort the user's decision fixes for every OpenAI call (medium since 21.10.2026). */
+export const ASTRA_REASONING_EFFORT = 'medium'
 
 /** The reviewers that take over whenever Astra did not deliver a verdict, in
  *  order. The ones behind Fable exist because Fable and Opus also AUTHOR here,
