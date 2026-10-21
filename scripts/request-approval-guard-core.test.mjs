@@ -4,7 +4,7 @@
 // deposits quoting the report — is pinned as its own case.
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -654,7 +654,6 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     'cd "$(git rev-parse --show-toplevel)"',
     "echo 'a $b' | wc -l",
     'ls {src,docs}/*.ts',
-    'git log | head',
     'cat scripts/*.json',
     ['ls *.md', 'ls'].join('\n'),
     ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'),
@@ -797,4 +796,155 @@ describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', 
     expect(run.status).toBe(0)
     expect(run.stdout).toBe('')
   })
+
+  it('the hook and --check pre-gate a PowerShell command in its own dialect', () => {
+    // canonical in PowerShell (a backslash is no escape there), non-canonical in bash
+    const command = 'Get-Content C:\\tmp\\notes.md'
+    expect(isPossibleDeposit(command, 'bash')).toBe(true)
+    expect(isPossibleDeposit(command, 'powershell')).toBe(false)
+    const check = spawnSync(process.execPath, [GUARD, '--check', command, '--powershell'], { encoding: 'utf8', windowsHide: true })
+    expect(check.stdout).toContain('OK (not a request deposit)')
+    const bashCheck = spawnSync(process.execPath, [GUARD, '--check', command], { encoding: 'utf8', windowsHide: true })
+    expect(bashCheck.stdout).toContain('a possible request deposit')
+  })
+})
+
+describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)', () => {
+  // a chat session that approved nothing: anything judged as a possible deposit is refused
+  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
+  const STAMP =
+    `node -e "console.log(new Intl.DateTimeFormat('de-DE',` +
+    `{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',` +
+    `minute:'2-digit',timeZone:'Europe/Berlin'}).format(new Date()))"`
+  const allowed = (command, shell = 'bash') => {
+    expect(isPossibleDeposit(command, shell), command).toBe(false)
+    expect(evaluate({ command, entries: chat, shell }).block, command).toBe(false)
+  }
+  const judged = (command, shell = 'bash') => {
+    expect(isPossibleDeposit(command, shell), command).toBe(true)
+  }
+
+  it.each([
+    'rg "x" a | head',
+    'git log --oneline | head -5',
+    'cat f | grep y',
+    'grep -n "a\\|b" f',
+    "sed -n '1,20p' f | tail -3",
+    "rg -n 'a|b?' scripts | sort | uniq -c",
+    // U13: the timestamp command the UserPromptSubmit hook prescribes
+    STAMP,
+    // measured 21.10.2026: a quoted ?, ;, | or * in a canonical command is literal
+    'node scripts/board.mjs vdzk-keep "Kartenschrift für die Anweisungstexte?"',
+    'node scripts/ask-astra.mjs --kind enumerate --brief "read problem.md; answer | why?"',
+    'git diff --stat main | tail -1',
+    'sort -u f | uniq -c',
+  ])('allowed: %s', (command) => allowed(command))
+
+  it('the hook timestamp is exactly the command berlin-timestamp.cjs prescribes', () => {
+    const hook = readFileSync(join(REPO_ROOT, 'scripts', 'hooks', 'berlin-timestamp.cjs'), 'utf8')
+    const prescribed = [...hook.matchAll(/`([^`]*)`/g)].map((m) => m[1]).join('')
+    expect(prescribed).toContain(STAMP)
+  })
+
+  it.each([
+    'rg --request scripts/finding.mjs',
+    "rg -n -- '--request' scripts | head",
+    'cat f > g',
+    'cat f | grep y > g',
+    'rg x; node y',
+    'rg x && node y',
+    'cat f || rg x',
+    'rg --pre cmd x | head',
+    'rg --pre=cmd "x?"',
+    "sort --compress-program=gzip f | head",
+    'git -c alias.l=!sh log | head',
+    'git --exec-path=/tmp log | head',
+    "sed -n 's/a/b/w out' f | head",
+    "sed -n '1e ls' f | head",
+    "sed -e '1e ls' -n f | head",
+    "sed 's/a/b/' f | head",
+    "sed -E 's/a/b/p' f | head",
+    'x | bash',
+    'cat f | bash',
+    'cat f | xargs node',
+    'cat "$(ls)" | head',
+    'cat `ls` | head',
+    'cat *.md | head',
+    'ls scripts/fin*.mjs | head',
+    "bash -c 'node scripts/fin*.mjs --re* Hidden'",
+    "eval 'node scripts/fin?ing.mjs --re?uest Hidden'",
+    `node -e "console.log('scripts/finding.mjs')"`,
+    `node -e "require('child_process').execSync('node scripts/fin*.mjs --re*')"`,
+    `node -e "x['constr'+'uctor']('?')"`,
+    `node -e "process.stdout.write('a*')"`,
+    'node scripts/x.mjs "a?" | head',
+    'node --import ./x.mjs scripts/x.mjs "a?"',
+    "find . -name '*.ts'",
+    // cross-vendor review of ea049bf (GPT-6 Astra): escapes, forwarding helpers, executing and writing modes
+    `node -e 'requ\\u0069re("child_pro"+"cess").execSync("node scripts/fin"+"ding.mjs --re"+"quest Hidden")'`,
+    `cat f | node -e 'requ\\u0069re("child_pro"+"cess")'`,
+    'node -e "`${1}`"',
+    "node scripts/runner.mjs 'node scripts/fin${X:-d}ing.mjs --re${Y:-q}uest Hidden'",
+    'node scripts/runner.mjs "node scripts/fin?ing.mjs x"',
+    'node scripts/runner.mjs "run *"',
+    'git diff --ext-diff HEAD | head',
+    'git log --textconv -p | head',
+    'git branch --edit-description | head',
+    'git branch --e | head',
+    'git log --textc -p | head',
+    'git diff --ext | head',
+    'git diff --output=scripts/x.mjs | head',
+    'sort -o scripts/x.mjs payload | head',
+    'cat f | sort -uo scripts/x.mjs',
+    'cat f | sort --output=scripts/x.mjs',
+    'cat f | uniq - scripts/x.mjs',
+    'cat payload | uniq -- - -out',
+    `node scripts/runner.mjs 'node scripts/"fin"*.mjs X'`,
+    "node scripts/runner.mjs 'node scripts/fin*.mjs</dev/null X'",
+    "node scripts/runner.mjs 'node scripts/fin?ing.mjs</dev/null X'",
+    "node scripts/runner.mjs 'printf %s scripts/fin ding.mjs,--re quest,Hidden | xargs -d , node'",
+    'node scripts/runner.mjs "plain prose?"',
+    `node -e 'Object.getOwnPropertyDescriptor(Object.getPrototypeOf(()=>0),"constr"+"uctor").value("return pro"+"cess")()'`,
+  ])('still judged: %s', (command) => judged(command))
+
+  it('a judged non-canonical read still meets the chat refusal', () => {
+    expect(evaluate({ command: 'cat f > g', entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
+  it.each([
+    'Get-Content f | Select-String y',
+    'Get-ChildItem | Select-String "a|b?"',
+    "Get-Content f | Select-String -Pattern 'a.*b' -CaseSensitive",
+    'get-date',
+    "Get-Content 'notes; draft.md'",
+    'node scripts\\board.mjs vdzk-keep "Kartenschrift?"',
+  ])('allowed in PowerShell: %s', (command) => allowed(command, 'powershell'))
+
+  it.each([
+    'Get-Content f | Select-String --request',
+    'Get-Content scripts\\finding.mjs | Select-String x',
+    'Get-Content f > g',
+    'Get-Content f; node y',
+    'Get-Content f | pwsh',
+    'Get-Content f | Invoke-Expression',
+    'Get-Content $f | Select-String x',
+    'Get-ChildItem fin*.mjs | Select-String x',
+    'Get-ChildItem @a | Select-String x',
+    "Get-Content f | Select-String 'x?' | bash",
+    "pwsh -Command 'node scripts\\fin*.mjs'",
+    "Get-Content 'scripts/fin*.mjs'",
+    "Get-Content 'scripts\\fin*.mjs'",
+    "Get-Content 'scripts/FIN*.mjs'",
+    "Get-ChildItem scripts -Filter 'finding?.mjs'",
+    "Get-Content 'notes?.md'",
+    "Select-String 'x?' scripts/fin*",
+    "Get-Content f | Select-String 'x' -Path 'scripts/f*'",
+    "Get-ChildItem scripts | Select-String -Pattern '.' -Include '*fin[d]ing.mjs'",
+    "Get-ChildItem scripts | Select-String 'x?' -Exclude 'a*'",
+    "Get-ChildItem scripts | Select-String -Pattern '.' \u2013Include '*fin[d]ing.mjs'",
+    "Get-ChildItem scripts | Select-String 'x?' \u2014Path 'a*'",
+    "Get-Content f | Select-String 'x?' 'scripts/fin*.mjs'",
+    "Get-ChildItem 'Scripts\\Fin?ing.MJS' | Select-String x",
+    "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
+  ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
 })
