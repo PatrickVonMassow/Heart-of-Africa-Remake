@@ -835,7 +835,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     STAMP,
     // measured 21.10.2026: a quoted ?, ;, | or * in a canonical command is literal
     'node scripts/board.mjs vdzk-keep "Kartenschrift für die Anweisungstexte?"',
-    'node scripts/ask-astra.mjs --kind enumerate --brief "read problem.md; answer | why *.md"',
+    'node scripts/ask-astra.mjs --kind enumerate --brief "read problem.md; answer | why?"',
     'git diff --stat main | tail -1',
     'sort -u f | uniq -c',
   ])('allowed: %s', (command) => allowed(command))
@@ -897,6 +897,8 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'cat f | uniq - scripts/x.mjs',
     'cat payload | uniq -- - -out',
     `node scripts/runner.mjs 'node scripts/"fin"*.mjs X'`,
+    "node scripts/runner.mjs 'node scripts/fin*.mjs</dev/null X'",
+    "node scripts/runner.mjs 'node scripts/fin?ing.mjs</dev/null X'",
     `node -e 'Object.getOwnPropertyDescriptor(Object.getPrototypeOf(()=>0),"constr"+"uctor").value("return pro"+"cess")()'`,
   ])('still judged: %s', (command) => judged(command))
 
@@ -925,6 +927,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     "Get-Content f | Select-String 'x?' | bash",
     "pwsh -Command 'node scripts\\fin*.mjs'",
     "Get-Content 'scripts/fin*.mjs'",
+    "Get-Content 'scripts\\fin*.mjs'",
     "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
   ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
 })
