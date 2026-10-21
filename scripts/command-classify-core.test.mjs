@@ -552,4 +552,18 @@ describe('scripts whose whole job is to change shared state', () => {
   it('is not fooled by a mere mention of the script name', () => {
     expect(isMutatingSegment('grep land-point scripts/README.md')).toBe(false)
   })
+
+  it('reads a command that only READS the script file, but not one that runs it', () => {
+    for (const c of [
+      'grep -c ownsLock scripts/land-point.mjs',
+      'grep -n -i "a\\|b" scripts/land-point.mjs',
+      'sed -n 1,50p scripts/land-point.mjs',
+      'cat scripts/land-point.mjs',
+    ]) {
+      expect(isMutatingSegment(c)).toBe(false)
+    }
+    for (const c of ['./scripts/land-point.mjs 1', 'xargs node scripts/land-point.mjs', 'bun scripts/land-point.mjs 1']) {
+      expect(isMutatingSegment(c)).toBe(true)
+    }
+  })
 })

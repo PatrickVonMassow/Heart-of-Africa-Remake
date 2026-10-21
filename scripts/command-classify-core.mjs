@@ -720,7 +720,10 @@ function directIntentOfParsed(seg) {
   // A script whose job is mutation stays a write under EVERY flag. In
   // particular, land-point.mjs does not implement a help/version exit path;
   // those words are merely ignored arguments before it merges and pushes.
-  if (argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
+  // Only a RUN counts: the script as the program, or as an interpreter's
+  // argument. `grep x scripts/land-point.mjs` / `sed -n 1p …` merely read it.
+  if (MUTATING_SCRIPTS.has(head)) return 'write'
+  if (INTERPRETERS.has(head) && argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
   if (argsOf(seg).some((a) => !a.quoted && (a.text === '--help' || a.text === '--version'))) return 'read'
   // `find . -delete` / `find . -exec rm {} \;` — the verb stands behind -exec.
