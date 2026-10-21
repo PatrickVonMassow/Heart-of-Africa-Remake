@@ -6068,4 +6068,210 @@ if (section('garment-inventory') && process.env.VERIFY_SECTION === 'garment-inve
   }
 }
 
+// --- Garment picture acceptance (work-order "garment rebuild", stage 1) ------
+// Opt-in only (`--section=garment-acceptance`): a whole run skips it. One
+// forced outfit per acceptance row of docs/garment-merge-r9-1347.md ("Picture
+// acceptance"), staged through the dev lineup (`window.__dressLineup` with
+// `figures`: sex, age, build, the outfit as (form, wear) pairs, the clip and
+// the clip time it freezes life at), then framed from the row's views at 3 m
+// and 7 m in one village and one port city. No check judges the cloth: the
+// checks only prove each frame was staged with its forced figure in its pose.
+if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acceptance') {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await assertBackend(page)
+  const PLACES = (process.env.GARMENT_PLACES ?? 'hausa-village,cairo').split(',')
+  // Views as the bearing from the figure's heading to the camera.
+  const VIEW = { front: 0, front34: Math.PI / 4, side: Math.PI / 2, rear34: (3 * Math.PI) / 4, rear: Math.PI }
+  const VIEW_TEXT = { front: 'front-on', front34: 'front three-quarter', side: 'side-on', rear34: 'rear three-quarter', rear: 'from the rear' }
+  const MAN = { sex: 'male', age: 'adult' }
+  const BOY = { sex: 'male', age: 'child' }
+  const WOMAN = { sex: 'female', age: 'adult' }
+  const GIRL = { sex: 'female', age: 'child' }
+  const YOUNG_WOMAN = { sex: 'female', age: 'youth' }
+  // Clip times: 0.02 just after the left heel strike (the legs spread, the
+  // seat stretched), the leg crossings (`cross-L`/`cross-R`, mid-swing), the
+  // walk frame 12 row two names for the trousers (penetration report), the
+  // dig at mid-stroke, the idle a quarter in.
+  const STRIDE = 0.02
+  const ROWS = []
+  for (const [who, w] of [['man', MAN], ['child', BOY]])
+    for (const clip of ['walk', 'run'])
+      ROWS.push({
+        slug: `trousers-${clip}-${who}`,
+        text: `trousers alone, ${clip}, adult ${who === 'man' ? 'man' : 'boy (child)'}, judged at the seat`,
+        fig: { ...w, garments: ['trousers-waist'], clip, at: STRIDE },
+        views: ['side', 'front34', 'rear34'],
+      })
+  for (const [tag, at, what] of [['cross-l', 'cross-L', 'left leg crossing'], ['cross-r', 'cross-R', 'right leg crossing'], ['walk-f12', { frame: 12 }, 'walk frame 12 (row two)']])
+    ROWS.push({ slug: `trousers-${tag}-man`, text: `trousers alone, walk at the ${what}, adult man, judged at the inner thighs`, fig: { ...MAN, garments: ['trousers-waist'], clip: 'walk', at }, views: ['front', 'rear'] })
+  for (const top of ['shirt', 'robe'])
+    ROWS.push({ slug: `trousers-under-${top}-walk`, text: `trousers under ${top}, walk, adult man`, fig: { ...MAN, garments: ['trousers-waist', `${top}-chest`], clip: 'walk', at: STRIDE }, views: ['side', 'front34'] })
+  for (const [b, build] of [['stout', 0.6], ['slight', -0.6]])
+    for (const [clip, at] of [['walk', STRIDE], ['dig', 0.5]])
+      ROWS.push({
+        slug: `breastcloth-${clip}-${b}`,
+        text: `breast cloth (knee skirt below), ${clip}, adult woman of ${b} build (${build > 0 ? '+' : ''}${build}), judged at the cleft`,
+        fig: { ...WOMAN, build, garments: ['breastCloth-chest', 'skirtKnee-waist'], clip, at },
+        views: ['front'],
+      })
+  for (const [clip, at] of [['idle', 0.25], ['walk', STRIDE]])
+    ROWS.push({ slug: `breastcloth-collar-${clip}`, text: `breast cloth with the chest collar (knee skirt below), ${clip}, adult woman, judged at the seam under the collar`, fig: { ...WOMAN, garments: ['breastCloth-chest', 'neckBeads-chest', 'skirtKnee-waist'], clip, at }, views: ['front'] })
+  for (const [tag, extra, what] of [['veil', [], 'without a hood'], ['veil-hood', ['hood-overHead'], 'with a hood'], ['veil-cap', ['cap-crown'], 'with a cap']])
+    ROWS.push({
+      slug: `${tag}-collar`,
+      text: `legacy veil ${what} over the chest collar (trousers below), idle with the head turned, adult man, judged at the mouth and chin`,
+      fig: { ...MAN, garments: ['veil-face', 'neckBeads-chest', 'trousers-waist', ...extra], clip: 'idle', at: 0.25, headYaw: 0.6 },
+      views: ['front'],
+      dists: [3],
+    })
+  for (const [tag, extra, what] of [['skin', [], 'over bare skin'], ['robe', ['robe-chest'], 'under a robe neckline']])
+    ROWS.push({
+      slug: `collars-${tag}`,
+      text: `chest collar and neck beads ${what} (loin flap below), idle, adult man, judged at the shoulder contour and the row where the collars meet`,
+      fig: { ...MAN, garments: ['neckBeads-chest', 'neckBeads-neck', 'loinFlap-waist', ...extra], clip: 'idle', at: 0.25 },
+      views: ['front'],
+    })
+  for (const [clip, at] of [['idle', 0.25], ['walk', STRIDE]])
+    ROWS.push({ slug: `waistbeads-alone-${clip}`, text: `waist beads alone, ${clip}, girl (child), judged at the hands and wrists`, fig: { ...GIRL, garments: ['waistBeads-waist'], clip, at }, views: ['side'] })
+  for (const over of ['loinFlap', 'apron'])
+    ROWS.push({ slug: `waistbeads-under-${over.toLowerCase()}-walk`, text: `waist beads under ${over === 'apron' ? 'an apron' : 'a loin flap'}, walk, young woman`, fig: { ...YOUNG_WOMAN, garments: ['waistBeads-waist', `${over}-waist`], clip: 'walk', at: STRIDE }, views: ['side'] })
+  ROWS.push({ slug: 'waistbeads-over-trousers-walk', text: 'waist beads over trousers, walk, adult man, judged at the waist seam', fig: { ...MAN, garments: ['waistBeads-waist', 'trousers-waist'], clip: 'walk', at: STRIDE }, views: ['side', 'front34'] })
+
+  // A straight track the figure walks along: `lead` behind the anchor to 3 m
+  // past it, every sight line along it at hip and chest height clear, and the
+  // camera ring 7.5 m round the anchor open in front, behind and on at least
+  // one flank — from the player's spot, on the first of 16 bearings.
+  const LEAD = 6.5
+  const findTrack = () =>
+    page.evaluate((LEAD) => {
+      const p = window.__placePlayer
+      const open = (fx, fy, fz, tx, ty, tz, slack) => {
+        const hit = window.__placeRayHit?.(tx, ty, tz, [fx, fy, fz])
+        return !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - slack
+      }
+      for (const d of [4, 6, 3, 8, 10]) {
+        for (let k = 0; k < 16; k++) {
+          const look = p.yaw + (k * Math.PI) / 8
+          const ax = p.x - Math.sin(look) * d
+          const az = p.z - Math.cos(look) * d
+          for (const turn of [Math.PI / 2, -Math.PI / 2, 0, Math.PI]) {
+            const yaw = look + turn
+            const sx = ax - Math.sin(yaw) * LEAD
+            const sz = az - Math.cos(yaw) * LEAD
+            const ex = ax + Math.sin(yaw) * 3
+            const ez = az + Math.cos(yaw) * 3
+            const track = [0.5, 1.2].every((y) =>
+              [-0.4, 0.4].every((s) => {
+                const ox = Math.cos(yaw) * s
+                const oz = -Math.sin(yaw) * s
+                return open(sx + ox, y, sz + oz, ex + ox, y, ez + oz, 0.05)
+              }),
+            )
+            if (!track) continue
+            // the ring from the track's far end, where the figure stops
+            const ring = (b) => open(ax + Math.sin(yaw) * 1.5, 1.0, az + Math.cos(yaw) * 1.5, ax + Math.sin(yaw) * 1.5 + Math.sin(yaw + b) * 7.5, 1.6, az + Math.cos(yaw) * 1.5 + Math.cos(yaw + b) * 7.5, 0.3)
+            const flank = (sg) => [Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4].every((b) => ring(sg * b))
+            if (ring(0) && ring(Math.PI) && (flank(1) || flank(-1))) return { x: ax, z: az, yaw }
+          }
+        }
+      }
+      return null
+    }, LEAD)
+  // The camera `dist` from the frozen figure at `view` (either flank, small
+  // turns allowed), with clear sight lines to its hips, chest and head; the
+  // first spot the player really stands on and sees the figure from is used.
+  const placeCamera = async (fig, scale, view, dist) => {
+    const spots = await page.evaluate(({ fig, scale, bearing, dist }) => {
+      const out = []
+      for (const side of bearing % Math.PI === 0 ? [1] : [1, -1])
+        for (const turn of [0, 0.12, -0.12, 0.25, -0.25]) {
+          const a = fig.yaw + side * bearing + turn
+          const x = fig.x + Math.sin(a) * dist
+          const z = fig.z + Math.cos(a) * dist
+          const eye = [x, fig.y + 1.6, z]
+          const clear = [0.5, 0.9, 1.4].every((y) => {
+            const hit = window.__placeRayHit?.(fig.x, fig.y + y * scale, fig.z, eye)
+            return !hit || hit.hitDistance == null || fig.meshes.includes(hit.hitUuid) || hit.hitDistance >= hit.targetDistance - 0.35
+          })
+          if (clear) out.push({ x, z, yaw: a, turn, side })
+        }
+      return out
+    }, { fig, scale, bearing: VIEW[view], dist })
+    for (const s of spots) {
+      await page.evaluate(({ s, dist, scale }) => {
+        const p = window.__placePlayer
+        p.x = s.x
+        p.z = s.z
+        p.yaw = s.yaw
+        p.pitch = dist > 4 ? -0.06 : scale < 1 ? -0.2 : -0.1
+      }, { s, dist, scale })
+      await nextFrames(4)
+      const at = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+      if (Math.hypot(at.x - s.x, at.z - s.z) >= 0.05) continue
+      // and from the camera as it really stands: shins to head unhidden
+      const seen = await page.evaluate(({ fig, scale }) =>
+        [0.25, 0.5, 0.75, 1.0, 1.3, 1.55].every((y) => {
+          const hit = window.__placeRayHit?.(fig.x, fig.y + y * scale, fig.z)
+          return !hit || hit.hitDistance == null || fig.meshes.includes(hit.hitUuid) || hit.hitDistance >= hit.targetDistance - 0.3
+        }), { fig, scale })
+      if (seen) return s
+    }
+    return null
+  }
+
+  for (const place of PLACES) {
+    await goToPlace(place)
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    await nextFrames(30)
+    const hasLineup = await page.evaluate(() => typeof window.__dressLineup === 'function')
+    check(`garment acceptance: ${place} mounts the dev dress lineup`, hasLineup, hasLineup ? 'lineup present' : 'no __dressLineup in this place: no forced outfit can be staged here')
+    if (!hasLineup) continue
+    const home = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z, yaw: window.__placePlayer.yaw }))
+    const track = await findTrack()
+    check(`garment acceptance: ${place} has a clear straight track for the forced figures`, !!track, JSON.stringify({ home, track }))
+    if (!track) continue
+    let shots = 0
+    const missed = []
+    for (const row of ROWS) {
+      // back to the spot the track was chosen from, so it stays clear
+      await page.evaluate((h) => Object.assign(window.__placePlayer, { x: h.x, z: h.z, yaw: h.yaw }), home)
+      const scale = row.fig.age === 'child' ? 0.55 : 1 // CHILD_FIGURE_SCALE
+      await page.evaluate(({ track, fig }) => window.__dressLineup({ x: track.x, z: track.z, yaw: track.yaw, figures: [fig] }), { track, fig: row.fig })
+      const held = await stepUntil(() => window.__dressLineup?.state().frozen === true, null, 900)
+      const st = await page.evaluate(() => window.__dressLineup.state())
+      const f0 = st.figures[0]
+      if (!held || !f0) {
+        missed.push(`${row.slug}: the lineup never froze at its clip time (${JSON.stringify(st)})`)
+        await page.evaluate(() => window.__dressLineup(null))
+        continue
+      }
+      // the figure's drawn place and heading, read off its group
+      const fig = { x: f0.x, y: f0.y, z: f0.z, yaw: track.yaw, meshes: f0.meshes }
+      const pose = `${row.fig.clip}${row.fig.clip === 'dig' || !f0.clock ? '' : ` held at phase ${(st.held?.phase ?? 0).toFixed(3)}`}`
+      try {
+        for (const view of row.views) {
+          for (const dist of row.dists ?? [3, 7]) {
+            const cam = await placeCamera(fig, scale, view, dist)
+            if (!cam) {
+              missed.push(`${row.slug} ${view} ${dist} m: no clear camera spot`)
+              continue
+            }
+            await nextFrames(3)
+            const name = `1347-accept-${row.slug}-${view}-${place}-${dist}m`
+            await frame(shot(name), {
+              local: { x: fig.x, y: fig.y + 0.85 * scale, z: fig.z },
+              label: `${place}: acceptance row — ${row.text}; forced outfit ${row.fig.garments.join(' + ')}, ${pose}, ${VIEW_TEXT[view]}${cam.side < 0 ? ' (other flank)' : ''}${cam.turn ? ` (turned ${cam.turn} rad for a clear line)` : ''} from ${dist} m`,
+            })
+            shots++
+          }
+        }
+      } finally {
+        await page.evaluate(() => window.__dressLineup(null))
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+      }
+    }
+    check(`garment acceptance: ${place} staged every row`, missed.length === 0, `${shots} frames; missed: ${missed.join(' | ') || 'none'}`)
+  }
+}
+
 await finishPolishSuite()

@@ -97,7 +97,15 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
     set.state = () => ({
       frozen: run.current.frozen,
       held: run.current.held,
-      figures: groups.current.map((g) => (g ? { x: g.position.x, y: g.position.y, z: g.position.z, clock: clockOf(g) } : null)),
+      figures: groups.current.map((g) => {
+        if (!g) return null
+        // the figure's own meshes: a sight line ending on one of them sees it
+        const meshes: string[] = []
+        g.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh) meshes.push(o.uuid)
+        })
+        return { x: g.position.x, y: g.position.y, z: g.position.z, clock: clockOf(g), meshes }
+      }),
     })
     w.__dressLineup = set
     return () => {
