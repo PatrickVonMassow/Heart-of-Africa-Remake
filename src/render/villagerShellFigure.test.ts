@@ -95,30 +95,55 @@ describe('a worn shell on the drawn body', () => {
     }
   })
 
-  it('closes every seam with exactly one rim strip, owned by the higher shell, its inner row on the lower shell', () => {
+  it('closes exactly the seams face adjacency derives, one strip each from the higher shell down to the far surface', () => {
     const person = gltfPerson(asset, 'female', 'adult')
+    const index = person.geometry.getIndex()!.array as ArrayLike<number>
+    const fmask = faceMasks(index, person.region!)
+    const set = asset.shells!
+    const offOf = (n: string) => (set.garments[n].base + set.garments[n].rank * set.step) * person.frame.scale
+    // every undirected body edge and its faces
+    const faces = new Map<string, number[]>()
+    for (let f = 0; f < index.length / 3; f++)
+      for (let e = 0; e < 3; e++) {
+        const a = index[f * 3 + e]
+        const c = index[f * 3 + ((e + 1) % 3)]
+        const k = `${Math.min(a, c)}|${Math.max(a, c)}`
+        faces.set(k, [...(faces.get(k) ?? []), f])
+      }
     for (const worn of [['g-waistBeads-waist', 'g-trousers-waist'], ['g-neckBeads-neck', 'g-neckBeads-chest'], ['g-breastCloth-chest', 'g-neckBeads-chest'], SHELLS]) {
+      const label = worn.join('+')
+      // the surface on top of a face: its highest-rank worn shell, else the skin
+      const top = (f: number) => {
+        let best: string | null = null
+        for (const n of worn) if (fmask[f] & (1 << set.garments[n].bit) && (best === null || set.garments[n].rank > set.garments[best].rank)) best = n
+        return best
+      }
+      const want = new Map<string, string>()
+      for (const [k, fs] of faces) {
+        const [p, q] = fs.length === 2 ? fs.map(top) : [top(fs[0]), null]
+        const [op, oq] = [p ? offOf(p) : 0, q ? offOf(q) : 0]
+        if (Math.abs(op - oq) < 1e-9) continue
+        want.set(k, op > oq ? `${p}|${oq.toFixed(6)}|${op.toFixed(6)}` : `${q}|${op.toFixed(6)}|${oq.toFixed(6)}`)
+      }
+      const got = new Map<string, string[]>()
       const parts = gltfShellParts(asset, person, worn.map(layer), bodyPart(person, []), [])
-      const quads = new Map<string, number>()
-      const at = new Map<string, Set<string>>()
-      for (const { l, built } of parts) at.set(garmentMeshName(l), new Set([...built.src].map((s, k) => `${s}|${built.off[k].toFixed(6)}`)))
       for (const { l, built } of parts) {
-        const r = asset.shells!.garments[garmentMeshName(l)]
-        for (let f = 0; f < built.rim.length; f += 2) {
-          if (!built.rim[f]) continue
-          const [ah, al, bl] = [built.index[f * 3], built.index[f * 3 + 1], built.index[f * 3 + 2]]
+        const n = garmentMeshName(l)
+        // the rims follow the faces, two triangles per quad
+        for (let f = built.rim.indexOf(1); f >= 0 && f < built.rim.length; f += 2) {
+          expect(built.rim[f + 1], label).toBe(1)
+          const [ah, al, bl, , , bh] = built.index.slice(f * 3, f * 3 + 6)
           const e = `${Math.min(built.src[ah], built.src[bl])}|${Math.max(built.src[ah], built.src[bl])}`
-          quads.set(e, (quads.get(e) ?? 0) + 1)
-          const inner = built.off[al]
-          if (inner > 0) {
-            // a covered seam: the inner row is a lower worn shell's own vertex
-            const lower = parts.filter((p) => asset.shells!.garments[garmentMeshName(p.l)].rank < r.rank)
-            expect(lower.some((p) => at.get(garmentMeshName(p.l))!.has(`${built.src[al]}|${inner.toFixed(6)}`)), `${worn.join('+')}`).toBe(true)
-          }
+          // both endpoints: the high row at the shell's offset, the low row at the far surface's
+          expect(built.off[bh].toFixed(6), label).toBe(built.off[ah].toFixed(6))
+          expect(built.off[bl].toFixed(6), label).toBe(built.off[al].toFixed(6))
+          got.set(e, [...(got.get(e) ?? []), `${n}|${built.off[al].toFixed(6)}|${built.off[ah].toFixed(6)}`])
         }
       }
-      expect(quads.size, worn.join('+')).toBeGreaterThan(0)
-      expect([...quads.values()].every((n) => n === 1), worn.join('+')).toBe(true)
+      expect(want.size, label).toBeGreaterThan(0)
+      expect([...want.keys()].filter((e) => !got.has(e)), `${label}: seams without a strip`).toEqual([])
+      expect([...got.keys()].filter((e) => !want.has(e)), `${label}: strips off a seam`).toEqual([])
+      for (const [e, w] of want) expect(got.get(e), `${label} ${e}`).toEqual([w])
     }
   })
 })

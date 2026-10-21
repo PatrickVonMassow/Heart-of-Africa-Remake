@@ -103,8 +103,8 @@ describe('villager shell garments (render/villagerShell.ts)', () => {
   const quadsOf = (built: ReturnType<typeof buildShells>) => {
     const q = new Map<string, Array<[string, number]>>()
     for (const [n, b] of Object.entries(built)) {
-      for (let f = 0; f < b.rim.length; f += 2) {
-        if (!b.rim[f]) continue
+      // the rims follow the faces, two triangles per quad
+      for (let f = b.rim.indexOf(1); f >= 0 && f < b.rim.length; f += 2) {
         const [ah, al, bl] = [b.index[f * 3], b.index[f * 3 + 1], b.index[f * 3 + 2]]
         const e = `${Math.min(b.src[ah], b.src[bl])}|${Math.max(b.src[ah], b.src[bl])}`
         q.set(e, [...(q.get(e) ?? []), [n, Math.round(b.off[al] * 1e6) / 1e6]])
@@ -153,8 +153,7 @@ describe('villager shell garments (render/villagerShell.ts)', () => {
       const b = buildShells(t.index, t.vertices, fmask, set, worn, 2, null)
       expect(quadsOf(b), worn.join('+')).toEqual(expectedSeams(t.index, fmask, set, worn, 2))
       for (const [n, x] of Object.entries(b))
-        for (let f = 0; f < x.rim.length; f += 2) {
-          if (!x.rim[f]) continue
+        for (let f = x.rim.indexOf(1); f >= 0 && f < x.rim.length; f += 2) {
           const [ah, al, bl, , , bh] = x.index.slice(f * 3, f * 3 + 6)
           const hi = (set.garments[n].base + set.garments[n].rank * set.step) * 2
           expect([x.off[ah], x.off[bh]].map((o) => o.toFixed(6))).toEqual([hi.toFixed(6), hi.toFixed(6)])
