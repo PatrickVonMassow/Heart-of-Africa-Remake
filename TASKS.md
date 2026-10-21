@@ -77,6 +77,26 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1402. A walking villager's rear leg trembles at every step
+  A walking adult villager (the water carrier crossing open ground, seen in profile) trembles with the rear leg at every step. Done when the trailing leg moves smoothly through each stride, judged in a moving capture.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (1).zip (10:20:29Z), user words: "Das hintere Bein zittert bei jedem Schritt."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+- [ ] 1403. Running children move sideways to their facing
+  Running village children move sideways relative to where their body faces. Done when a running child faces its direction of travel, judged in a moving capture.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (2).zip (10:20:42Z), user words: "Die Kinder laufen seitwärts."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+- [ ] 1404. Villagers change walking direction abruptly instead of turning
+  Villagers change walking direction abruptly and unnaturally instead of turning. Done when a direction change reads as a natural turn, judged in a moving capture.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (3).zip (10:22:05Z), user words: "Die Einwohner wechseln apprupt und unnatürlich die Richtung."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+- [ ] 1405. Water carrier sets the jar down too far from the table, his hand misses the water, and the new jar appears from nowhere
+  The Bambara water carrier at the jar table: (a) he sets the jar down while standing much too far from the table, (b) afterwards his hand does not point exactly at the water, (c) the new jar appears in his hand out of nothing. Related closed point 1376 (the water carrier shows his jar for the whole errand): check first whether this is a regression of it. Done when he steps up to the table before setting down, his pointing hand aims at the water, and the jar he carries next is visibly taken up.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (4).zip (10:24:13Z), user words: "Der Wasserholer ist noch viel zu weit weg vom Tisch, wenn er das Wasser abstellt, seine Hand zeigt danach auch nicht genau aufs Wasser und der neue Krug erscheint aus dem Nichts in seiner Hand."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
   Source: user 12.10.2026 (chat), after two bug reports from the current production build eab3d6b (backup local/ClippingBeimLaufen.zip: a walking villager's swing leg leaves its trouser leg behind, bare thigh and knee; local/WindelLook.zip: a child's hip cloth stands off the body all round like a diaper). User: "Ich vermute, dass das nur eines von vielen Symptomen ist, das bestätigt, dass der bisherige Ansatz verkehrt war. Jetzt genau das zu beheben würde vermutlich nur ein Symptom flicken." Order: "Reihe den Neubau als mit 6-Augen-Prinzip für die Analyse als neuen Punkt nach 1330 ein." Both reports are filed as findings in the carrier and are charged to this point, not fixed singly.
