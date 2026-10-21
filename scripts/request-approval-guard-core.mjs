@@ -349,14 +349,20 @@ const forwardSafe = (word) => PROSE.test(word) && !word.split(/[^\p{L}\p{N}._/?=
 
 /**
  * Is one pipeline segment's word list a pure read? `words` are the values,
- * `quoted` marks quoted ones, `alone` says the segment is the whole command.
+ * `quoted` marks quoted ones, `alone` says the segment is the whole command,
+ * `piped` that it reads a previous segment's output.
  */
-function isReadSegment(words, quoted, shell, alone) {
+function isReadSegment(words, quoted, shell, alone, piped) {
   const [program, ...args] = words
   if (program === undefined || quoted[0]) return false
   if (alone && program === 'node' && !quoted[1] && LITERAL_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
-  // the cmdlets' -Path expands wildcards even when quoted, case-insensitively
-  if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase()) && !args.some((a) => a.toLowerCase().replace(/\\/g, '/').split(/[\s;|,]+/).some(globHitsMarker))
+  if (shell === 'powershell') {
+    // -Path expands filesystem wildcards even when quoted (`?` may match nothing);
+    // a glob is a mere pattern only for a piped Select-String without a path
+    const cmdlet = program.toLowerCase()
+    if (!READ_CMDLETS.has(cmdlet) || !args.some((a) => /[*?[]/.test(a))) return READ_CMDLETS.has(cmdlet)
+    return cmdlet === 'select-string' && piped && !args.some((a) => /^-(path|literalpath|pspath|lp)/i.test(a))
+  }
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
   if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))
   if (program === 'sed') {
@@ -385,14 +391,14 @@ function isPureRead(src, shell) {
     segments.push([src.slice(start, i).trim(), blank.slice(start, i).trim()])
     start = i + 1
   }
-  return segments.every(([segment, blanked]) => {
+  return segments.every(([segment, blanked], index) => {
     if (!segment || !isCanonical(segment, shell)) return false
     const words = tokenize(segment, shell)
     const masks = tokenize(blanked, shell)
     if (masks.length !== words.length) return false
     const quoted = masks.map((m) => m.includes('\0'))
     if (masks.some((m) => couldExpandToMarker(m.split('\0').join('')))) return false
-    return isReadSegment(words, quoted, shell, segments.length === 1)
+    return isReadSegment(words, quoted, shell, segments.length === 1, index > 0)
   })
 }
 

@@ -912,7 +912,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'Get-Content f | Select-String y',
     'Get-ChildItem | Select-String "a|b?"',
     'get-date',
-    "Get-Content 'notes; draft?.md'",
+    "Get-Content 'notes; draft.md'",
     'node scripts\\board.mjs vdzk-keep "Kartenschrift?"',
   ])('allowed in PowerShell: %s', (command) => allowed(command, 'powershell'))
 
@@ -931,6 +931,10 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     "Get-Content 'scripts/fin*.mjs'",
     "Get-Content 'scripts\\fin*.mjs'",
     "Get-Content 'scripts/FIN*.mjs'",
+    "Get-ChildItem scripts -Filter 'finding?.mjs'",
+    "Get-Content 'notes?.md'",
+    "Select-String 'x?' scripts/fin*",
+    "Get-Content f | Select-String 'x' -Path 'scripts/f*'",
     "Get-ChildItem 'Scripts\\Fin?ing.MJS' | Select-String x",
     "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
   ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
