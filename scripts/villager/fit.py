@@ -287,9 +287,34 @@ def tailor(src_dir, mh, body, clips, cfg):
     style = cfg['VILLAGER_ASSET']['clipStyle']
     trunk = {c: {k: v for k, v in s.items() if k in ('chestTilt', 'chestTwist')} for c, s in style.items()}
     plain = CL.build_clips(src_dir, body, cfg, style=trunk) if style else clips
-    out = settle(body, fit(body, plain, G.build_garments(mh, body, plain, cfg), cfg), cfg)
+    # the legacy garments are built, fitted and settled on the body as it was
+    # before the shell pre-split, so a garment not migrated stays as it was;
+    # the shell recipes are read off the cut body they are drawn on
+    legacy = uncut(body)
+    out = settle(legacy, fit(legacy, plain, G.build_garments(mh, legacy, plain, cfg, shell_body=body), cfg), cfg)
     if clips is not None and 'split' in body:
         out['split_regression'] = split_regression(body, clips, cfg)
+    return out
+
+
+def uncut(body):
+    """The body before the shell pre-split (body.py `presplit`): its own
+    positions, weights, morphs and triangles, every per-vertex array cut back
+    to the uncut vertices. Fitted on the cut body, the legacy cloth met the
+    inserted vertices' refitted weights (the split regression) and the arm
+    contour's corners at the armholes and changed: the robe kept sleeve cloth
+    inside the upper arm and its layer pushes threw the mantles and the hood
+    out of the body's box (measured 21.10.2026)."""
+    sp = body.get('split')
+    if sp is None:
+        return body
+    n0 = sp['n0']
+    n = len(body['pos'])
+    out = {k: (v[:n0] if isinstance(v, np.ndarray) and v.ndim and len(v) == n else v) for k, v in body.items()}
+    out.update(pos=sp['pos0'], W=sp['W0'], tris=sp['tris0'], morph_pos={m: v[:n0] for m, v in body['morph_pos'].items()})
+    out['map'] = tuple(x[:n0] for x in body['map'])
+    for k in ('region', 'tri_uv', 'split'):
+        out.pop(k, None)
     return out
 
 

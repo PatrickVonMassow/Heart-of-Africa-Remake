@@ -1035,7 +1035,9 @@ def eyes(mh, body):
     return {'pos': v, 'tris': t, 'uv': np.zeros((len(v), 2)), 'W': W, 'morph_pos': morph}
 
 
-def build_garments(mh, body, clips, cfg):
+def build_garments(mh, body, clips, cfg, shell_body=None):
+    """Every garment of GARMENTS on `body`; the shells' recipes (shells.py)
+    on `shell_body`, the cut body they are drawn on (`body` when None)."""
     H = cfg['VILLAGER_ASSET']['stature']
     q = design_pose(body)
     B = Body(mh, body, q)
@@ -1046,7 +1048,7 @@ def build_garments(mh, body, clips, cfg):
     meshes = {}
     meta = {}
     import shells as SHL
-    shell = SHL.recipes(body, L, cfg)
+    shell = SHL.recipes(body if shell_body is None else shell_body, L, cfg)
     for form, wear in GARMENTS:
         name = mesh_name(form, wear)
         if name in shell:
