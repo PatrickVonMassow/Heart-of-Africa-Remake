@@ -335,10 +335,10 @@ const NODE_STAMP = /^console\.log\(new Intl\.DateTimeFormat\('[\w-]+',\{[\w:'\-,
 const REPO_SCRIPT = /^(\.[\\/])?scripts[\\/][\w\\/-]+(\.[\w-]+)*\.m?js$/
 /**
  * May a repo script receive this word even if it hands it to a shell? No
- * substitution, escape, brace, bracket, tilde or extglob, and no piece whose
+ * substitution, escape, inner quote, brace, bracket, tilde or extglob, and no piece whose
  * glob could match a marker (Astra review of ea049bf: a forwarding helper).
  */
-const forwardSafe = (word) => !/[$`\\{}[~]|[@+!]\(/.test(word) && !word.split(/[\s;|&]+/).some(globHitsMarker)
+const forwardSafe = (word) => !/[$`\\{}[~'"]|[@+!]\(/.test(word) && !word.split(/[\s;|&]+/).some(globHitsMarker)
 
 /**
  * Is one pipeline segment's word list a pure read? `words` are the values,
@@ -348,7 +348,8 @@ function isReadSegment(words, quoted, shell, alone) {
   const [program, ...args] = words
   if (program === undefined || quoted[0]) return false
   if (alone && program === 'node' && !quoted[1] && REPO_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
-  if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase())
+  // the cmdlets' -Path expands wildcards even when quoted
+  if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase()) && !args.some((a) => a.split(/[\s;|,]+/).some(globHitsMarker))
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
   if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))
   if (program === 'sed') {

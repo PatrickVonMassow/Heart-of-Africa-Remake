@@ -896,6 +896,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'cat f | sort --output=scripts/x.mjs',
     'cat f | uniq - scripts/x.mjs',
     'cat payload | uniq -- - -out',
+    `node scripts/runner.mjs 'node scripts/"fin"*.mjs X'`,
     `node -e 'Object.getOwnPropertyDescriptor(Object.getPrototypeOf(()=>0),"constr"+"uctor").value("return pro"+"cess")()'`,
   ])('still judged: %s', (command) => judged(command))
 
@@ -923,5 +924,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'Get-ChildItem @a | Select-String x',
     "Get-Content f | Select-String 'x?' | bash",
     "pwsh -Command 'node scripts\\fin*.mjs'",
+    "Get-Content 'scripts/fin*.mjs'",
+    "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
   ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
 })
