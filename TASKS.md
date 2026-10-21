@@ -114,6 +114,7 @@ put it is the mistake this line exists to stop.
   Open points touched: 1341 (pipeline garment surface, head cover, frame cost) and 1346 (stale penetration baseline) are probably absorbed or obsoleted by points 1398-1400; they are removed only on the user's decision. 1342's "penetration gate green" acceptance is to be aligned with 1339 by the same decision.
   Criticality: high - every villager on medium/high presets, visible at first glance in normal play.
   Charged 21.10.2026 (findings carrier, 1347 acceptance frame 1347-accept-trousers-cross-r-man-rear-cairo-3m, WebGPU, 17c892af5): a lighter, rougher hard-edged rectangle on the bare adult male back from the shoulder blades to the waist, visible at 3 m, with only trousers worn. Compare with main before classifying: if main shows it, file it as its own body-skin point; if not, fix it here.
+  Charged 21.10.2026 (CI run 39618569779 on e4edd6979, reproduced locally; main passes): src/render/villagerKneelGround.test.tsx is red on the branch for all three figures - in the held kneel the shins sink 0.033-0.046 figure units below the ground (SHIN_REST 0.03; main measures -0.021 to -0.007), so the rebuilt villager.glb lowers the knelt shins. Repair before landing; the CI job reported success despite the failed file, so the green conclusion covers nothing.
   Bundle: Dorfleben.
 - [ ] 1398. Villager garments stage 3: skirts, loin flap, apron and girdle tails on driven column bones
   Queue position: directly after point 1347.
