@@ -181,11 +181,12 @@ interface Rig {
   gltf: { asset: VillagerAsset; person: GltfPerson } | null
 }
 
-function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string, office?: 'chief'): Rig {
+function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string, office?: 'chief', dress?: readonly DressLayer[]): Rig {
   const asset = look.villager
   const person = asset ? cachedPerson(asset, id) : null
   const p = person ? person.p : bodyProportions(id.sex, id.age, id.build)
-  const layers = appearanceFor({
+  // `dress`: the dev lineup's forced outfit (dressLineup.tsx), never set in play
+  const layers = dress ? dress.map((l) => ({ ...l })) : appearanceFor({
     peopleId: look.peopleId,
     sex: id.sex,
     age: id.age,
@@ -310,6 +311,8 @@ export function SkinnedFigure({
   office,
   permanentLabel,
   ownedByPlayer,
+  dress,
+  build,
 }: {
   look: FigureLook
   cloth: string
@@ -343,11 +346,18 @@ export function SkinnedFigure({
   permanentLabel?: boolean
   /** The player's own figure (the bird's-eye traveller): never named by the Ctrl layer. */
   ownedByPlayer?: boolean
+  /** DEV lineup only (dressLineup.tsx): a forced outfit in place of `appearanceFor`. */
+  dress?: readonly DressLayer[]
+  /** DEV lineup only: a forced build (−1 slight .. +1 stout). */
+  build?: number
 }) {
   const ownKey = useId()
   const key = identityKey ?? ownKey
-  const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
-  const rig = useMemo(() => buildRig(id, look, cloth, skin, office), [id, look, cloth, skin, office])
+  const id = useMemo(() => {
+    const own = figureIdentity(key, scale, sex, age)
+    return build === undefined ? own : { ...own, build }
+  }, [key, scale, sex, age, build])
+  const rig = useMemo(() => buildRig(id, look, cloth, skin, office, dress), [id, look, cloth, skin, office, dress])
   // The skeleton (and its bone texture) is this figure's own; the geometry is
   // shared through the caches, its GPU side held while any figure draws it.
   useEffect(() => {
@@ -836,6 +846,12 @@ export function SkinnedFigure({
         g.userData.walk = m
         const f = rig.gltf?.person.frame
         g.userData.gait = f ? gaitWeights(m.speed / f.scale, f.legScale) : null
+        // the clips' clocks, for the dress lineup's frozen clip time
+        const cl = rig.gltf?.asset.clips
+        g.userData.clipClock =
+          cl && clips
+            ? { gait: clips.gait.phase, idle: cl.idle ? (clips.idleT % cl.idle.duration) / cl.idle.duration : 0, dig: clips.dig, weight: m.weight, speed: m.speed }
+            : null
       }
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
       const actor = g.userData.actor as { height: number } | undefined

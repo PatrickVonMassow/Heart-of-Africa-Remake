@@ -19,7 +19,7 @@ import { markActor } from '../actorLabelSource'
 import { isLifeFrozen } from './lifeFreeze'
 import { ColdCloaksContext, FigureLookContext, LimbDetailContext, REST_POSE_ARMS, type FigureWork } from './placeFigureContext'
 import { SkinnedFigure } from './skinnedFigure'
-import type { AgeGroup, Sex } from '../../systems/appearance'
+import type { AgeGroup, DressLayer, Sex } from '../../systems/appearance'
 
 type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
   /** Who this villager is, when the vignette knows (the pounding women, the
@@ -31,6 +31,9 @@ type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
   work?: RefObject<FigureWork>
   /** An office whose dress the skinned body wears (the primitive keeps its cloth). */
   office?: 'chief'
+  /** DEV lineup only (dressLineup.tsx): the skinned body's forced outfit and build. */
+  dress?: readonly DressLayer[]
+  build?: number
 }
 
 /**
@@ -40,13 +43,13 @@ type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
  * below, unchanged (user decision 04.10.2026). Both take the same props and
  * publish the same pivots, so a vignette never knows which one it drew.
  */
-export function Figure({ sex, age, work, office, ...props }: FigureProps) {
+export function Figure({ sex, age, work, office, dress, build, ...props }: FigureProps) {
   const look = useContext(FigureLookContext)
   // Who this villager is, keyed HERE: this component stays mounted when the
   // detail level swaps the drawn body, so medium → low → medium keeps the person.
   const identityKey = useId()
   return look ? (
-    <SkinnedFigure look={look} sex={sex} age={age} identityKey={identityKey} work={work} office={office} {...props} />
+    <SkinnedFigure look={look} sex={sex} age={age} identityKey={identityKey} work={work} office={office} dress={dress} build={build} {...props} />
   ) : (
     <PrimitiveFigure {...props} />
   )

@@ -4095,6 +4095,7 @@ export function PlaceLife({
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
             <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} radius={radius} bank={bank} observed={observed} />
+            <DressLineup cloth={style.cloth} />
           </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
         </FigureLookContext.Provider>
