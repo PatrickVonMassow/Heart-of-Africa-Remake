@@ -369,7 +369,7 @@ function isPureRead(src, shell) {
     const masks = tokenize(blanked, shell)
     if (masks.length !== words.length) return false
     const quoted = masks.map((m) => m.includes('\0'))
-    if (masks.some((m) => couldExpandToMarker(m.replace(/\0+/g, '')))) return false
+    if (masks.some((m) => couldExpandToMarker(m.split('\0').join('')))) return false
     return isReadSegment(words, quoted, shell, segments.length === 1)
   })
 }
