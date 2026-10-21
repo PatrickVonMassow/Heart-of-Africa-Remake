@@ -21,12 +21,18 @@ interface Report {
   tolerance: number
   build: Record<string, Garment & Record<Column, { value: number }>>
   garments: Record<string, Garment & Record<Column, { value: number }>>
+  /** the shell garments' own rows (render/villagerShell.ts) */
+  shells?: Record<string, unknown>
 }
 
 const dir = resolve(__dirname, '../../verification/villager-body')
 const now = JSON.parse(readFileSync(resolve(dir, 'penetration-report.json'), 'utf8')) as Report
 const main = JSON.parse(readFileSync(resolve(dir, 'penetration-report-main.json'), 'utf8')) as Report
 const md = readFileSync(resolve(dir, 'penetration-report.md'), 'utf8')
+// the garments migrated to shells: measured in their own rows, main's legacy
+// rows of them not compared (penetration.py compare)
+const MIGRATED = ['g-breastCloth-chest', 'g-neckBeads-chest', 'g-neckBeads-neck', 'g-trousers-waist', 'g-waistBeads-waist']
+const legacyOf = <T,>(r: Record<string, T>) => Object.keys(r).filter((n) => !MIGRATED.includes(n)).sort()
 
 // the build-pose layering residuals named in docs/backlog.md (point 1346):
 // garment → the outer garments it may show through in the build pose
@@ -102,8 +108,19 @@ describe('the visible-only penetration report', () => {
     }
   })
 
+  it('names the migrated garments as migrated and measures them in their own shell rows', () => {
+    expect(Object.keys(now.shells ?? {}).sort()).toEqual(MIGRATED)
+    for (const n of MIGRATED) {
+      expect(now.garments[n], n).toBeUndefined()
+      expect(now.build[n], n).toBeUndefined()
+      // a report compared against main (--baseline) names them, never as unchecked
+      const against = md.split('## Against main')[1]
+      if (against && (n in main.garments || n in main.build)) expect(against, n).toContain(`\`${n}\` migrated`)
+    }
+  })
+
   it('measures every garment main measured, per column and clip', () => {
-    expect(Object.keys(now.garments).sort()).toEqual(Object.keys(main.garments).sort())
+    expect(Object.keys(now.garments).sort()).toEqual(legacyOf(main.garments))
     for (const [n, g] of Object.entries(now.garments)) {
       // main counts its frames over its own clips only; a clip main never
       // measured is one penetration.py compares with the clips it derives
@@ -125,6 +142,7 @@ describe('the visible-only penetration report', () => {
     const outermost = Math.max(...Object.values(LAYER))
     const missing: string[] = []
     for (const [n, g] of Object.entries(main.garments)) {
+      if (MIGRATED.includes(n)) continue
       for (const key of Object.keys(g.clips)) {
         if (key in now.garments[n].clips) continue
         const col = key.split(' ')[0]
@@ -184,7 +202,7 @@ describe('the visible-only penetration report', () => {
     // an empty or partial build entry would pass the tolerance check below
     const outermost = Math.max(...Object.values(LAYER))
     expect(Object.keys(now.build).sort()).toEqual(Object.keys(now.garments).sort())
-    expect(Object.keys(now.build).sort()).toEqual(Object.keys(main.build).sort())
+    expect(Object.keys(now.build).sort()).toEqual(legacyOf(main.build))
     for (const [n, g] of Object.entries(now.build)) {
       expect(g.checked, n).toBeGreaterThan(0)
       expect(g.checked, n).toBe(main.build[n].checked)
