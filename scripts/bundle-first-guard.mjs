@@ -14,7 +14,7 @@
 //   node scripts/bundle-first-guard.mjs --status
 import { readFileSync, existsSync } from 'node:fs'
 import { evaluate, statusLine } from './bundle-first-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
 
@@ -27,13 +27,14 @@ import { repoPath } from './repo-paths.mjs'
 // really happens on the call. What no try in this file can enclose is another
 // module's own top-level initialisation.
 /** The guard's I/O half, shared with the preflight (point 365 D). */
-export function gatherBundleFirstInputs({ sessionId = '', resolvePath = repoPath } = {}) {
+/** `ignoreOwnership` is for the --status probe alone, which must answer for any session. */
+export function gatherBundleFirstInputs({ sessionId = '', resolvePath = repoPath, ignoreOwnership = false } = {}) {
   const tasks = resolvePath('TASKS.md')
   const workPackages = resolvePath('docs/work-packages.md')
   const pause = resolvePath('.claude/batch-paused')
   if (existsSync(pause)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  if (!ignoreOwnership && !ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: 'not-lock-owner' }
   }
   if (!existsSync(workPackages)) return { applicable: false, why: 'no docs/work-packages.md in this checkout' }
   if (!existsSync(tasks)) return { applicable: false, why: 'no TASKS.md in this checkout' }
@@ -49,7 +50,7 @@ export function gatherBundleFirstInputs({ sessionId = '', resolvePath = repoPath
 if (isMainModule(import.meta.url)) {
   try {
     if (process.argv.includes('--status')) {
-      const gathered = gatherBundleFirstInputs({ sessionId: 'status-run' })
+      const gathered = gatherBundleFirstInputs({ ignoreOwnership: true })
       if (!gathered.applicable) {
         console.log(`bundle-first-guard: not applicable — ${gathered.why}`)
         process.exit(0)

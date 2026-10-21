@@ -65,6 +65,18 @@ const { gatherDashboardInputs } = await import('./dashboard-guard.mjs')
 const { gatherDashboardIntegrityInputs } = await import('./dashboard-integrity-guard.mjs')
 const { gatherDecisionCardCondition } = await import('./decision-card-guard.mjs')
 const { gatherRetroCurrencyInputs } = await import('./retro-currency-guard.mjs')
+const { gatherDashboardSyncInputs } = await import('./dashboard-sync.mjs')
+const { gatherDashboardConcisenessInputs } = await import('./dashboard-conciseness-guard.mjs')
+const { gatherDashboardCardTopicInputs } = await import('./dashboard-card-topic-guard.mjs')
+const { gatherQueueOrderInputs } = await import('./queue-order-guard.mjs')
+const { gatherPrepInputs } = await import('./prep-guard.mjs')
+const { gatherBundleFirstInputs } = await import('./bundle-first-guard.mjs')
+const { gatherGuideBrevityInputs } = await import('./guide-brevity-guard.mjs')
+const { gatherRuleReviewInputs } = await import('./rule-review-guard.mjs')
+const { gatherGuardHealthInputs } = await import('./guard-health-guard.mjs')
+const { gatherBranchHygiene } = await import('./branch-hygiene-guard.mjs')
+const { gatherTasksSpecInputs } = await import('./tasks-spec-guard.mjs')
+const { gatherRenderVerifyInputs } = await import('./render-verify-guard.mjs')
 
 const dir = mkdtempSync(join(tmpdir(), 'stop-guard-lock-holder-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -156,6 +168,21 @@ describeLockHolderOnly('retro-currency-guard', (sessionId) => gatherRetroCurrenc
 describeLockHolderOnly('decision-card-guard', (sessionId) =>
   gatherDecisionCardCondition({ sessionId, dashboardExists: true, dashboardHtml: '<html></html>' }),
 )
+
+// The further batch-duty Stop guards: board, queue, work order, prep, rule and
+// guide upkeep, guard health, branch hygiene and the render-verify gate.
+describeLockHolderOnly('dashboard-sync', (sessionId) => gatherDashboardSyncInputs({ sessionId }))
+describeLockHolderOnly('dashboard-conciseness-guard', (sessionId) => gatherDashboardConcisenessInputs({ sessionId }))
+describeLockHolderOnly('dashboard-card-topic-guard', (sessionId) => gatherDashboardCardTopicInputs({ sessionId }))
+describeLockHolderOnly('queue-order-guard', (sessionId) => gatherQueueOrderInputs({ sessionId }))
+describeLockHolderOnly('prep-guard', (sessionId) => gatherPrepInputs({ sessionId }))
+describeLockHolderOnly('bundle-first-guard', (sessionId) => gatherBundleFirstInputs({ sessionId }))
+describeLockHolderOnly('guide-brevity-guard', (sessionId) => gatherGuideBrevityInputs({ sessionId }))
+describeLockHolderOnly('rule-review-guard', (sessionId) => gatherRuleReviewInputs({ sessionId }))
+describeLockHolderOnly('guard-health-guard', (sessionId) => gatherGuardHealthInputs({ sessionId }))
+describeLockHolderOnly('branch-hygiene-guard', (sessionId) => gatherBranchHygiene({ sessionId }))
+describeLockHolderOnly('tasks-spec-guard', (sessionId) => gatherTasksSpecInputs({ sessionId }))
+describeLockHolderOnly('render-verify-guard', (sessionId) => gatherRenderVerifyInputs({ sessionId }))
 
 describe('decision-card-guard Stop hook', () => {
   // The hook body runs only as a script, so its order is pinned on the source:

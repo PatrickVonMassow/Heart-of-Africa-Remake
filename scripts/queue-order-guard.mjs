@@ -16,7 +16,7 @@ import { evaluate, releaseBoundaryProblem } from './queue-order-guard-core.mjs'
 import { closedPointsOf, openPointsOf } from './board-queue-core.mjs'
 import { ARCHIVE_PATH } from './tasks-source.mjs'
 import { RANK_RECORD_PATH, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
@@ -33,8 +33,8 @@ const readIfPresent = (path) => (existsSync(path) ? readFileSync(path, 'utf8') :
 /** The guard's I/O half, shared with the preflight (point 365 D). */
 export function gatherQueueOrderInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  if (!ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
   }
   // A checkout without TASKS.md STANDS DOWN — deliberately. Read as empty it
   // would pass too (the core allows when no point is open), but silently; the
