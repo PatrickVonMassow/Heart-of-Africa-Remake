@@ -321,9 +321,9 @@ try {
   //
   // It cannot trap a session: the fence itself refuses these four families of
   // call and nothing else. The main-write and ownership checks below refuse more
-  // of a non-owner's mutations, but reads always continue, and the board duties
-  // stand down for a non-owner, so the Stop chain cannot demand of it the very
-  // publish this refuses.
+  // of a non-owner's mutations, but reads always continue, and the board duty
+  // stands down for a non-owner (the lock-holder exit just before `gather()`
+  // below), so the Stop chain cannot demand of it the very publish this refuses.
   try {
     const fence = fenceDecision({
       fenceState: readFence(),
@@ -492,6 +492,15 @@ try {
   } catch {
     /* fail-OPEN: an unreadable marker must never cost anybody a tool call */
   }
+
+  // THE BOARD DUTY BELONGS TO THE LOCK HOLDER ALONE. Placed after every deny
+  // above (fence, main write, foreign owner, worktree, sealed boundary), which
+  // keep refusing a non-owner exactly as before, and before the board decision:
+  // a session without the lock — an ownerless batch included — gets no
+  // board-first deny and writes no `boardFirstFiredAt`, which would otherwise
+  // consume the real owner's once-per-turn stand-down in the shared state.
+  // Leaving here grants nothing and acquires no lock.
+  if (!ownsLock(payload.session_id || '', { lock: readOwnerLock() }).mine) process.exit(0)
 
   const { state, focus, repoHash, boardPaths, boardHtml } = gather()
   const decision = evaluate({
