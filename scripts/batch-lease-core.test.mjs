@@ -496,6 +496,28 @@ describe('the main-write ownership fence', () => {
     expect(mainWritingAction({ toolName: 'Edit' }).writes).toBe(true)
   })
 
+  it('passes a pure read that merely names the landing script, and still refuses real writes', () => {
+    const root = { checkoutRoot: '/workspace/hoa', cwd: '/workspace/hoa' }
+    for (const command of [
+      'grep -c ownsLock scripts/land-point.mjs',
+      'grep -n -i "a\\|b" scripts/land-point.mjs',
+      'sed -n 1,50p scripts/land-point.mjs',
+    ]) {
+      expect(decide({ command, ownsBatchLock: false, ...root })).toEqual({ block: false, registerWriter: false, reason: '' })
+    }
+    for (const command of [
+      'node scripts/land-point.mjs 1',
+      'find . -maxdepth 0 -exec node scripts/land-point.mjs 1 \\;',
+      "sed --in-place 's/a/b/' scripts/land-point.mjs",
+      "sed --in=.bak 's/a/b/' scripts/land-point.mjs",
+      'echo x > src/a.ts',
+      'git commit -m x',
+    ]) {
+      expect(decide({ command, ownsBatchLock: false, ...root }).block).toBe(true)
+      expect(decide({ command, ownsBatchLock: true, ...root })).toEqual({ block: false, registerWriter: true, reason: '' })
+    }
+  })
+
   it('lets a SHELL write outside the checkout through, like the Edit tool already does', () => {
     // MEASURED 25.08.2026 (point 749): a session correcting one of its own memory
     // files under /home/node/.claude/projects/…/memory — not TASKS.md, not the
