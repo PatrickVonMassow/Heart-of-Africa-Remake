@@ -200,7 +200,7 @@ describe('coverage follows the verified commit', () => {
     const result = JSON.parse(node(main, `
       import { gatherRenderVerifyInputs } from ${JSON.stringify(guardModule)};
       import { evaluate } from ${JSON.stringify(coreModule)};
-      const gathered = gatherRenderVerifyInputs({ deps: { heldByOther: () => false,
+      const gathered = gatherRenderVerifyInputs({ deps: { holdsLock: () => true,
         workOrder: () => '', guardDuty: () => null } });
       console.log(JSON.stringify({ applicable: gathered.applicable, verdict: evaluate(gathered.inputs),
         runs: gathered.inputs.runs }));

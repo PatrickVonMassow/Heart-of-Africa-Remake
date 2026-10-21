@@ -6,12 +6,11 @@
 // The decision logic is pure and Vitest-covered; this wrapper only gathers git
 // facts and is fail-OPEN: any error, an unreadable repo, a detached state we
 // cannot count — all allow the stop, because a guard bug must never trap the
-// session. It stands down while the batch is paused and while another live
-// session owns the batch lock.
+// session. It applies only to the session holding the batch lock.
 import { existsSync, readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { evaluatePushArrival } from './push-arrival-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
 import { IN_FLIGHT_MAX_AGE_MS } from './batch-in-flight-core.mjs'
@@ -53,8 +52,10 @@ function git(args) {
  * under another owner is indistinguishable from "nothing unpushed".
  */
 export function gatherPushArrivalInputs({ sessionId = '', ignoreOwnership = false } = {}) {
-  if (!ignoreOwnership && heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  // Batch duty: only the lock holder owes it. No lock, a dead or foreign owner
+  // and a missing session id all stand down before any git work.
+  if (!ignoreOwnership && !ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
   }
   const branch = git('symbolic-ref --short -q HEAD') ?? ''
   // Commits reachable from HEAD but from NO remote ref: the real question is

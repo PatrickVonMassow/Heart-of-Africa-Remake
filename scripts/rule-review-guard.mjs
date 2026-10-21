@@ -6,13 +6,13 @@
 // bookkeeping and is fail-OPEN for its own errors: any throw allows the stop.
 // An unreadable state file reads as "no review recorded" (which owes one), and
 // an uncountable corpus only switches the growth trigger off. It stands down
-// while the batch is paused and while another live session owns the batch lock.
+// while the batch is paused and for every session not holding the batch lock.
 import { existsSync, readFileSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { evaluateRuleReview } from './rule-review-core.mjs'
 import { countCorpusEntries, STATE_PATH } from './rule-review-state.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
 import { gatherGuardDutyContext } from './guard-duty.mjs'
 
@@ -26,8 +26,8 @@ const PAUSE = repoPath('.claude/batch-paused')
  * when another session owns the lock, or the silence reads as "nothing owed".
  */
 export function gatherRuleReviewInputs({ sessionId = '', ignoreOwnership = false } = {}) {
-  if (!ignoreOwnership && heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  if (!ignoreOwnership && !ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
   }
   let state = {}
   try {

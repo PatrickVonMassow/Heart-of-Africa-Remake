@@ -338,17 +338,17 @@ describe('guide-brevity ownership', () => {
   // document the moment the budget ratchets, which is what happened on 25.08.2026.
   const overBudget = doc(entry('Zu lang', 2)) + `${'zusatz '.repeat(LIMITS.maxWords + 100)}\n`
 
-  it('stands down when another live session owns the batch', () => {
+  it('stands down when this session does not hold the batch lock', () => {
     const gathered = gatherGuideBrevityInputs({
       sessionId: 'non-owner',
       paused: false,
-      otherOwner: true,
+      owner: false,
       guideExists: true,
       guideText: overBudget,
     })
     expect(gathered).toMatchObject({
       applicable: false,
-      why: 'another live session owns the batch lock',
+      why: 'this session does not hold the batch lock',
       cause: 'not-lock-owner',
     })
   })
@@ -357,7 +357,7 @@ describe('guide-brevity ownership', () => {
     const gathered = gatherGuideBrevityInputs({
       sessionId: 'owner',
       paused: false,
-      otherOwner: false,
+      owner: true,
       guideExists: true,
       guideText: overBudget,
     })

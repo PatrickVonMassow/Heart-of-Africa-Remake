@@ -10,7 +10,7 @@ import { resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { ENFORCER_RE, anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
 import { parseHookTable } from './guard-inventory-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
@@ -110,8 +110,8 @@ export function measureWiringSources({
  */
 export function gatherGuardHealthInputs({ sessionId = '', ignoreOwnership = false } = {}) {
   if (!ignoreOwnership) {
-    if (heldByOtherLiveOwner(sessionId)) {
-      return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+    if (!ownsLock(sessionId).mine) {
+      return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
     }
     if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   }
