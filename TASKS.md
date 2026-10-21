@@ -88,6 +88,13 @@ put it is the mistake this line exists to stop.
   Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
   Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Stop-Guards gelten nur für den Halter des Batch-Locks"); approved: "ja, alles ganz vorne in der Queue".
   Bundle: Chat & Tafel.
+- [ ] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
+  Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
+  Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.
+  Source: finding 21.10.2026 18:26 by the 1409 author: with the lock free, the empty transcript after /clear counted as unattended and acquired; batch-progress-guard is fifth in the Stop order, so every later batch-duty guard bound that chat window. Acquisition is frozen by 1409's spec, hence its own point.
+  Queue position: directly after 1409 (it follows its ownership change).
+  Criticality: medium - a real blockade of an attended chat window (infrastructure freeze exemption, CLAUDE.md section 2).
+  Bundle: Chat & Tafel.
 - [ ] 1410. Board-first: the board duty applies only to the lock holder
   Final state: scripts/board-first-guard.mjs exits without a board decision for a session that does not hold the batch lock: `if (!ownsLock(sid, { lock }).mine) process.exit(0)` placed AFTER the fence chokepoint, the main-write fence, the foreign-owner stand-down (`ownershipStandDownDecision`, still called only on an actually detected foreign owner via `heldByOtherLiveOwner`), the worktree exemption and the sealed-boundary check, and immediately BEFORE `gather()`/`evaluate()`. A non-owner thus gets no board-first deny and writes no `boardFirstFiredAt` into the shared state (which today consumes the real owner's once-per-turn stand-down).
   Unchanged: lease and claim renewal, handover handling, pause exemption, `--status`; the end of a board duty grants no write permission and triggers no lock acquisition. Correct the comment claiming "board duties stand down for a non-owner" - it becomes true only with this change.
@@ -106,6 +113,13 @@ put it is the mistake this line exists to stop.
   Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
   Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Main-Write-Schutz: reine Lesebefehle nicht als Schreibzugriff einstufen"); approved: "ja, alles ganz vorne in der Queue".
   Bundle: Chat & Tafel.
+- [ ] 1412. Village bank routing test fails under machine load
+  Queue position: after point 1411 (front-of-queue gate stability: it reddens unrelated branches and CI).
+  Source: finding 21.10.2026 18:14: `src/scenes/place/routing.test.ts` "a villager sent to the BANK gets there" failed in two independent full unit runs (1402 worktree seed 1337; 1410 worktree seeds 7 and 1337) at load average 13-16; the file alone passes 19/19, also on main. Caused red CI run 39625616367 on feat/1402-rear-leg-tremble.
+  Final state: the routing search and its test are deterministic: no wall-clock or time-budget dependency decides whether a route is found, so the bank test passes identically under load.
+  Verifiable: a Vitest case that runs the bank routing with a stalled clock (or artificially slow step) and still reaches all three bank points; the full unit suite green under parallel load.
+  Criticality: medium - a flaky unit gate reddens unrelated branches and CI.
+  Bundle: Dorfleben.
 - [ ] 1407. No user instruction is ever lost: tick the carrier only after commit, the doctor stashes no task files, reconcile the carrier against TASKS.md
   Rank: at the very front of the work order, ahead of 1402 (user order 21.10.2026).
   Four eyes: GPT-6 Astra and Opus 5.5 analyse blind-parallel from identical inputs; a third model merges via scripts/blind-merge.mjs; cross-vendor review of the result.
@@ -16035,10 +16049,3 @@ to land than a mechanism that needs a review.
   Criticality: medium - a red regression lane on the fallback backend.
   Bundle: Dorfleben.
 
-- [ ] 1412. Village bank routing test fails under machine load
-  Queue position: after point 1411 (front-of-queue gate stability: it reddens unrelated branches and CI).
-  Source: finding 21.10.2026 18:14: `src/scenes/place/routing.test.ts` "a villager sent to the BANK gets there" failed in two independent full unit runs (1402 worktree seed 1337; 1410 worktree seeds 7 and 1337) at load average 13-16; the file alone passes 19/19, also on main. Caused red CI run 39625616367 on feat/1402-rear-leg-tremble.
-  Final state: the routing search and its test are deterministic: no wall-clock or time-budget dependency decides whether a route is found, so the bank test passes identically under load.
-  Verifiable: a Vitest case that runs the bank routing with a stalled clock (or artificially slow step) and still reaches all three bank points; the full unit suite green under parallel load.
-  Criticality: medium - a flaky unit gate reddens unrelated branches and CI.
-  Bundle: Dorfleben.
