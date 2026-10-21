@@ -7,9 +7,9 @@
 // lock path and process ancestry are pinned), with git, network and file writes
 // recorded, so a stand-down that did any of that work fails here.
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync as realWriteFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync as realWriteFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 const fixture = vi.hoisted(() => ({ lockPath: '', ancestor: null, calls: [] }))
 
@@ -61,6 +61,10 @@ vi.mock('node:fs', async (importOriginal) => {
 
 const { gatherPushArrivalInputs } = await import('./push-arrival-guard.mjs')
 const { gatherCiStatusInputs } = await import('./ci-status-guard.mjs')
+const { gatherDashboardInputs } = await import('./dashboard-guard.mjs')
+const { gatherDashboardIntegrityInputs } = await import('./dashboard-integrity-guard.mjs')
+const { gatherDecisionCardCondition } = await import('./decision-card-guard.mjs')
+const { gatherRetroCurrencyInputs } = await import('./retro-currency-guard.mjs')
 
 const dir = mkdtempSync(join(tmpdir(), 'stop-guard-lock-holder-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -144,6 +148,32 @@ describeLockHolderOnly('push-arrival-guard', (sessionId) => gatherPushArrivalInp
 // The owner case runs read-only so passing the gate can never write CI state;
 // the stand-down cases run the Stop hook's own (writing) mode.
 describeLockHolderOnly('ci-status-guard', (sessionId, { owner }) => gatherCiStatusInputs({ sessionId, readOnly: owner }))
+
+describeLockHolderOnly('dashboard-guard', (sessionId) => gatherDashboardInputs({ sessionId }))
+describeLockHolderOnly('dashboard-integrity-guard', (sessionId) => gatherDashboardIntegrityInputs({ sessionId }))
+describeLockHolderOnly('retro-currency-guard', (sessionId) => gatherRetroCurrencyInputs({ sessionId }))
+// The board is handed in, so the owner case needs no checkout board.
+describeLockHolderOnly('decision-card-guard', (sessionId) =>
+  gatherDecisionCardCondition({ sessionId, dashboardExists: true, dashboardHtml: '<html></html>' }),
+)
+
+describe('decision-card-guard Stop hook', () => {
+  // The hook body runs only as a script, so its order is pinned on the source:
+  // the ownership exit precedes every state read and write, and no non-owner
+  // branch survives behind it (measured 21.10.2026 17:04: card reviews were
+  // demanded from a chat session while another session held the batch).
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'decision-card-guard.mjs'), 'utf8')
+  const hook = source.slice(source.indexOf('if (isMainModule(import.meta.url))'))
+
+  it('leaves before any state work unless this session holds the lock', () => {
+    const exit = hook.indexOf('if (!ownsLock(sessionId).mine) process.exit(0)')
+    expect(exit).toBeGreaterThan(0)
+    for (const work of ['readDecisionCardState()', 'writeDecisionCardState(', 'readVdzkAnswers()', 'writeVdzkAnswers(']) {
+      expect(exit, work).toBeLessThan(hook.indexOf(work))
+    }
+    expect(source).not.toMatch(/heldByOtherLiveOwner|nonOwner/)
+  })
+})
 
 describe('the harness', () => {
   it('really intercepts git work once a guard passes the gate', async () => {
