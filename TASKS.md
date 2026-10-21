@@ -77,12 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1421. Lower the OpenAI reasoning effort from high to medium
-  Queue position: FRONT of the work order (infrastructure setting, user order 21.10.2026).
-  Final state: every OpenAI (GPT-6 Astra) call - review (scripts/review-astra.mjs), authoring (scripts/author-astra.mjs) and ask (scripts/ask-astra.mjs) - runs at reasoning effort medium. The single source is ASTRA_REASONING_EFFORT in scripts/review-astra-core.mjs:73 ('high' -> 'medium'); its header comment (line 8, "reasoning effort HIGH") says medium.
-  Tests: scripts/author-astra-core.test.mjs:83 expects model_reasoning_effort=medium; review-astra-core.test.mjs (uses the constant) stays green; no other hard-coded 'high' for the OpenAI lane remains in scripts/ (comments recording past reviews "GPT-5.6 Sol at effort high" are history and stay).
-  Criticality: low - cost/latency setting, one constant.
-  Bundle: Chat & Tafel.
 - [ ] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
   Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
   Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.

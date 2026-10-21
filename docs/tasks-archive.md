@@ -34505,3 +34505,10 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
   Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Main-Write-Schutz: reine Lesebefehle nicht als Schreibzugriff einstufen"); approved: "ja, alles ganz vorne in der Queue".
   Bundle: Chat & Tafel.
+
+- [x] 1421. Lower the OpenAI reasoning effort from high to medium
+  Queue position: FRONT of the work order (infrastructure setting, user order 21.10.2026).
+  Final state: every OpenAI (GPT-6 Astra) call - review (scripts/review-astra.mjs), authoring (scripts/author-astra.mjs) and ask (scripts/ask-astra.mjs) - runs at reasoning effort medium. The single source is ASTRA_REASONING_EFFORT in scripts/review-astra-core.mjs:73 ('high' -> 'medium'); its header comment (line 8, "reasoning effort HIGH") says medium.
+  Tests: scripts/author-astra-core.test.mjs:83 expects model_reasoning_effort=medium; review-astra-core.test.mjs (uses the constant) stays green; no other hard-coded 'high' for the OpenAI lane remains in scripts/ (comments recording past reviews "GPT-5.6 Sol at effort high" are history and stay).
+  Criticality: low - cost/latency setting, one constant.
+  Bundle: Chat & Tafel.
