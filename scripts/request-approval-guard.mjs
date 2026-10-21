@@ -25,9 +25,14 @@
 // needing its own approval, one without a readable title denied. The guard keeps
 // a cooperative session from forgetting the rule; it is no shell parser and
 // does not try to win against an adversary.
-// ACCEPTED FALSE POSITIVE: a command that merely MENTIONS
-// `finding.mjs … --request` (echo, grep, a test name) is judged as well. The
-// way out is to rephrase the command.
+// NOT JUDGED (21.10.2026): a pure read pipeline (rg, grep, cat, head, git log
+// … joined only by `|`, see isPureRead) and a direct `node scripts/<name>.mjs`
+// call read their quoted words literally, so a quoted `?`, `*`, `;` or `|`
+// there no longer makes them possible deposits.
+// ACCEPTED FALSE POSITIVES: a command that merely MENTIONS `finding.mjs` or
+// `--request` (echo, grep, a test name) is judged as well; so is any other
+// command holding a quote, pipe or glob outside that allowlist (`git commit
+// -m "Fix?"`, `find -name '*.ts'`). The way out is to rephrase the command.
 //
 // KNOWN GAP: a batch-owner session appending a point directly to TASKS.md from
 // a chat discussion is not covered; there the memory rule alone applies.

@@ -654,7 +654,6 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     'cd "$(git rev-parse --show-toplevel)"',
     "echo 'a $b' | wc -l",
     'ls {src,docs}/*.ts',
-    'git log | head',
     'cat scripts/*.json',
     ['ls *.md', 'ls'].join('\n'),
     ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'),
