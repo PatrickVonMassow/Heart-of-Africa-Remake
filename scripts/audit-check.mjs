@@ -29,6 +29,17 @@ const ALLOW = new Map([
       'that would leave the repository unpushable either way.',
   ],
   [
+    'GHSA-qxg6-89mg-rqv8',
+    'vitest/@vitest/mocker (code injection via unauthenticated manual mock ' +
+      'registration on the dev-server WebSocket): the same interceptorPlugin ' +
+      'handler as GHSA-82fw-gwwq-j7x9, reached only by vitest BROWSER MODE or a ' +
+      'direct mockerPlugin()/interceptorPlugin() call. vitest.config.ts runs jsdom ' +
+      'with no browser block, and no file in src/, tests/ or scripts/ imports ' +
+      '@vitest/mocker; a DEV dependency that never enters the shipped bundle. The ' +
+      'fix (4.1.12/5.0.3, seen 21.10.2026) needs the semver-major vitest jump owned ' +
+      'by point 1079.',
+  ],
+  [
     'GHSA-5gmw-xhrv-c9v3',
     'tinypool (prototype-pollution gadget to RCE in worker options): a DEV ' +
       'dependency of vitest 3.2.7 that never enters the shipped bundle; the gadget ' +
