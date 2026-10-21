@@ -797,4 +797,15 @@ describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', 
     expect(run.status).toBe(0)
     expect(run.stdout).toBe('')
   })
+
+  it('the hook and --check pre-gate a PowerShell command in its own dialect', () => {
+    // canonical in PowerShell (a backslash is no escape there), non-canonical in bash
+    const command = 'Get-Content C:\\tmp\\notes.md'
+    expect(isPossibleDeposit(command, 'bash')).toBe(true)
+    expect(isPossibleDeposit(command, 'powershell')).toBe(false)
+    const check = spawnSync(process.execPath, [GUARD, '--check', command, '--powershell'], { encoding: 'utf8', windowsHide: true })
+    expect(check.stdout).toContain('OK (not a request deposit)')
+    const bashCheck = spawnSync(process.execPath, [GUARD, '--check', command], { encoding: 'utf8', windowsHide: true })
+    expect(bashCheck.stdout).toContain('a possible request deposit')
+  })
 })
