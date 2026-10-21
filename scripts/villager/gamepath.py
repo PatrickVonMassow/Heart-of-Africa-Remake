@@ -333,25 +333,99 @@ def shell_round_trip(body, garments, rt, cfg, tol=RUNTIME_TOLERANCE, log=print):
     from body import vertex_normals
     meshes = garments['meshes']
     sh = {n: meshes[n] for n in SHL.names_of(meshes)}
+    outfits = rt.get('shells') or []
+    if not sh and not outfits:
+        return {'normal': 0.0, 'shell': 0.0}
+    # coverage: every built shell worn by some exported outfit
+    if not outfits or set(sh) - {n for o in outfits for n in o['worn']}:
+        raise RuntimeError(f'shell round trip FAILED: the export covers {len(outfits)} outfits, '
+                           f'leaving {sorted(set(sh) - {n for o in outfits for n in o["worn"]})} unworn')
     tris = np.asarray(body['tris'])
     fm = SHL.face_masks(body['region_bits'], tris)
     worst = {'normal': 0.0, 'shell': 0.0}
     bad = []
-    for o in rt.get('shells', []):
+
+    def finite(*xs):
+        return all(np.isfinite(np.asarray(x, float)).all() for x in xs)
+
+    def note(k, got, want):
+        # a nonfinite value is a miss (max would keep the previous value past a NaN)
+        d = float(np.abs(got - want).max()) if len(got) else 0.0
+        if not math.isfinite(d):
+            return False
+        worst[k] = max(worst[k], d)
+        return True
+
+    for o in outfits:
+        label = f"{o['sex']} {o['age']} {'+'.join(o['worn'])}"
         pos = np.asarray(o['body']['pos'], float).reshape(-1, 3)
+        normal = np.asarray(o['body']['normal'], float).reshape(-1, 3)
+        if not finite(pos, normal, o['scale']) or len(pos) != len(body['pos']):
+            bad.append(f'{label}: nonfinite or wrong-sized rest body')
+            continue
         nrm = vertex_normals(pos, tris)
-        worst['normal'] = max(worst['normal'], float(np.abs(nrm - np.asarray(o['body']['normal'], float).reshape(-1, 3)).max()))
+        if not note('normal', nrm, normal):
+            bad.append(f'{label}: nonfinite normal comparison')
         g = SHL.build(pos, tris, nrm, fm, sh, o['worn'], cfg['VILLAGER_ASSET']['garmentShellStep'], scale=o['scale'])
+        # the exported shell set equals the expected one, and is not empty
+        if not g or set(g) != set(o['shells']):
+            bad.append(f'{label}: exported shells {sorted(o["shells"])}, expected {sorted(g)}')
+            continue
         for n, x in o['shells'].items():
-            if n not in g or len(g[n]['src']) != len(x['src']) or (g[n]['src'] != np.asarray(x['src'])).any() \
-                    or (g[n]['tris'].ravel() != np.asarray(x['index'])).any() or (g[n]['rim'] != np.asarray(x['rim'], bool)).any():
-                bad.append(f"{o['sex']} {o['age']} {'+'.join(o['worn'])}: {n} differs in its vertices, faces or rims")
+            if len(g[n]['src']) != len(x['src']) or (g[n]['src'] != np.asarray(x['src'])).any() \
+                    or len(g[n]['tris'].ravel()) != len(x['index']) or (g[n]['tris'].ravel() != np.asarray(x['index'])).any() \
+                    or len(g[n]['rim']) != len(x['rim']) or (g[n]['rim'] != np.asarray(x['rim'], bool)).any():
+                bad.append(f'{label}: {n} differs in its vertices, faces or rims')
                 continue
-            worst['shell'] = max(worst['shell'], float(np.abs(g[n]['pos'] - np.asarray(x['pos'], float).reshape(-1, 3)).max()))
-    log(f"shell round trip: {len(rt.get('shells', []))} outfits; worst normal {worst['normal']:.2e}, shell position {worst['shell']:.2e} (tolerance {tol:g})")
+            xp = np.asarray(x['pos'], float).reshape(-1, 3)
+            if not finite(xp, g[n]['pos']) or not note('shell', g[n]['pos'], xp):
+                bad.append(f'{label}: {n} carries a nonfinite position')
+    log(f"shell round trip: {len(outfits)} outfits; worst normal {worst['normal']:.2e}, shell position {worst['shell']:.2e} (tolerance {tol:g})")
     if bad or not all(v <= tol for v in worst.values()):
         raise RuntimeError(f'shell round trip FAILED: {bad or worst}')
     return worst
+
+
+def selftest_shell_round_trip():
+    """shell_round_trip on a toy tube (no Blender needed): a faithful export
+    passes; an empty shell dict, a missing outfit, a NaN position or a NaN
+    normal fail."""
+    import copy
+    import shells as SHL
+    from body import vertex_normals
+    pos, tris, _vid = SHL._tube(8, 4)
+    y = pos[:, 1]
+    words = (np.where(y <= 2, 1, 0) | np.where(y >= 2, 2, 0)).astype(np.uint32)
+    fm = SHL.face_masks(words, tris)
+    meshes = {}
+    for n, bit, rank in (('g-a-x', 0, 1), ('g-b-x', 1, 2)):
+        faces = np.nonzero(fm & np.uint32(1 << bit))[0]
+        meshes[n] = {'part': 'shell', 'bit': bit, 'rank': rank, 'base': 0.1, 'faces': faces, 'rows': SHL.boundary_loops(tris, faces)}
+    body = {'pos': pos, 'tris': tris, 'region_bits': words}
+    cfg = {'VILLAGER_ASSET': {'garmentShellStep': 0.05}}
+    nrm = vertex_normals(pos, tris)
+    g = SHL.build(pos, tris, nrm, fm, meshes, ['g-a-x', 'g-b-x'], 0.05, scale=1.5)
+    rt = {'shells': [{'sex': 'female', 'age': 'adult', 'worn': ['g-a-x', 'g-b-x'], 'scale': 1.5,
+                      'body': {'pos': pos.ravel().tolist(), 'normal': nrm.ravel().tolist()},
+                      'shells': {n: {'pos': x['pos'].ravel().tolist(), 'src': x['src'].tolist(), 'index': x['tris'].ravel().tolist(),
+                                     'rim': x['rim'].astype(int).tolist()} for n, x in g.items()}}]}
+    quiet = lambda *_a: None  # noqa: E731
+    shell_round_trip(body, {'meshes': meshes}, rt, cfg, log=quiet)
+
+    def fails(edit, why):
+        bad = copy.deepcopy(rt)
+        edit(bad)
+        try:
+            shell_round_trip(body, {'meshes': meshes}, bad, cfg, log=quiet)
+        except RuntimeError:
+            return
+        raise AssertionError(f'shell round trip passed {why}')
+    fails(lambda r: r['shells'][0].update(shells={}), 'an empty shell dict')
+    fails(lambda r: r.update(shells=[]), 'no outfit')
+    fails(lambda r: r['shells'][0]['shells'].pop('g-b-x'), 'a missing shell')
+    fails(lambda r: r['shells'][0]['shells']['g-a-x']['pos'].__setitem__(0, float('nan')), 'a NaN shell position')
+    fails(lambda r: r['shells'][0]['body']['normal'].__setitem__(0, float('nan')), 'a NaN body normal')
+    print('shell round trip selftest: ok')
 
 
 def runtime_hand_deltas(person, pos, body, jidx, jw):

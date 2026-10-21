@@ -129,6 +129,8 @@ def main():
     GPL.selftest()
     import clips as CL
     CL.selftest()
+    import gamepath as GP
+    GP.selftest_shell_round_trip()
     import sheets as SH
     SH.selftest_hand_layout()
     if 'garments' in steps or 'selftest' in steps:
@@ -196,7 +198,8 @@ def main():
         rt = GP.load_runtime(a.runtime)
         # the export is evidence only once the round trip matches (raises otherwise)
         GP.runtime_check(body, rt, cfg)
-        if garments is not None and rt.get('shells'):
+        if garments is not None:
+            # raises on an export missing a built shell (or carrying one not built)
             GP.shell_round_trip(body, garments, rt, cfg)
     if 'sheets' in steps:
         import sheets as S
