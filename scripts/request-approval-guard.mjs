@@ -26,9 +26,10 @@
 // a cooperative session from forgetting the rule; it is no shell parser and
 // does not try to win against an adversary.
 // NOT JUDGED (21.10.2026): a pure read pipeline (rg, grep, cat, head, git log
-// … joined only by `|`, see isPureRead) and a direct `node scripts/board.mjs`
-// call read their quoted words literally, so a quoted `?`, `*`, `;` or `|`
-// there no longer makes them possible deposits.
+// … joined only by `|`, see isPureRead) reads its quoted words literally, so
+// a quoted `?`, `*`, `;` or `|` there no longer makes it a possible deposit;
+// a direct `node scripts/board.mjs` or `ask-astra.mjs` call passes with prose
+// arguments (`?`, `;`, `|` but no `*`, quote or substitution).
 // ACCEPTED FALSE POSITIVES: a command that merely MENTIONS `finding.mjs` or
 // `--request` (echo, grep, a test name) is judged as well; so is any other
 // command holding a quote, pipe or glob outside that allowlist (`git commit
