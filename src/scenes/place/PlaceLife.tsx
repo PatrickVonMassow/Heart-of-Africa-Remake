@@ -1929,10 +1929,11 @@ function talkerAim(
  * each other and say nothing the player cannot read.
  *
  * THEIR ROOTS STAND STILL. The pair used to swivel ±10° on the spot and hop
- * 3 cm off the ground in turn, every few seconds — the whole body, feet
- * included, so the planted soles skated and lifted: the restless fidget of the
- * 21.10.2026 report. The skinned body's idle clip already breathes and settles
- * the trunk, neck and head; that is the calm life a standing listener shows.
+ * 3 cm off the ground in turn. The skinned body measures its own root
+ * (`stepWalk` in skinnedFigure.tsx), read that swivel as a turn on the spot
+ * and kept stepping and bending its legs to follow it: the restless fidget of
+ * the 21.10.2026 report. The idle clip already breathes and settles the trunk,
+ * neck and head; that is the calm life a standing listener shows.
  *
  * THEY NO LONGER GESTURE ON THEIR OWN (point 580). The pair used to cycle the
  * four gestures as ambient dressing, with no utterance behind any of them — the
