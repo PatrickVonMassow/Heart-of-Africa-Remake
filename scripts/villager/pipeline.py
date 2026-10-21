@@ -108,7 +108,8 @@ def split_report(out, r, mixed=()):
     if r['edges3']:
         lines += ['Edges at 3 mm or more (inserted vertex: edge endpoints, worst):', '']
         lines += [f'- {v}: {e[0]}-{e[1]}, {d:.5f}' for v, e, d in zip(r['over3'], r['edges3'], r['worst3'])]
-    lines += ['', '## Shell rows with two far surfaces (stage-1 selftest failure, reported)', '']
+    lines += ['', '## Shell rows with two far surfaces (junctions, closed per edge; information)', '',
+              'shells.selftest_body raises unless every seam edge face adjacency derives carries exactly one rim quad (shells.check_seams).', '']
     lines += [f'- {m}' for m in mixed] or ['None: every boundary loop of every checked outfit has one far surface.']
     open(os.path.join(out, 'split-regression.md'), 'w').write('\n'.join(lines) + '\n')
 

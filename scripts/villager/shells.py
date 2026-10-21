@@ -317,6 +317,55 @@ def corner_dress(body, garments, worn, weights, cfg):
     return cut_body(fm, bits), out
 
 
+def seams(tris, fmask, shells, worn, scale=1.0, step=0.0):
+    """The rim strips the per-edge rule needs, derived from face adjacency
+    alone: {undirected body edge: (owner, low offset, high offset)} for every
+    edge whose two faces (or one, on an open edge, the other side being skin)
+    carry different top surfaces — the highest-rank worn shell in the face's
+    mask, else the skin at 0."""
+    worn = [n for n in worn if n in shells]
+    off = {n: round(offset(shells[n], step) * scale, 9) for n in worn}
+
+    def top(f):
+        best = None
+        for n in worn:
+            if fmask[f] & np.uint32(1 << shells[n]['bit']) and (best is None or shells[n]['rank'] > shells[best]['rank']):
+                best = n
+        return best
+    faces = {}
+    for f, t in enumerate(np.asarray(tris)):
+        for p, q in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            faces.setdefault((min(int(p), int(q)), max(int(p), int(q))), []).append(f)
+    out = {}
+    for e, fs in faces.items():
+        p, q = top(fs[0]), (top(fs[1]) if len(fs) == 2 else None)
+        op, oq = (off[p] if p else 0.0), (off[q] if q else 0.0)
+        if op != oq:
+            out[e] = (p, oq, op) if op > oq else (q, op, oq)
+    return out
+
+
+def check_seams(tris, fmask, shells, worn, g, scale=1.0, step=0.0):
+    """The built shells `g` against `seams`: every seam edge carries exactly one
+    rim quad, owned by the higher side, from the far offset to its own; no quad
+    lies off a seam. Returns the failures."""
+    want = seams(tris, fmask, shells, worn, scale, step)
+    got = _rim_strips(g)
+    label = '+'.join(worn)
+    bad = []
+    missing = [e for e in want if e not in got]
+    extra = [e for e in got if e not in want]
+    double = [e for e, v in got.items() if len(v) > 1]
+    wrong = [e for e, w in want.items() if e in got and got[e] != [w]]
+    if not want:
+        bad.append(f'{label}: no seam derived')
+    for what, es in (('seam edges without a rim quad', missing), ('rim quads off a seam', extra),
+                     ('seam edges with two rim quads', double), ('rim quads with a wrong owner or offset', wrong)):
+        if es:
+            bad.append(f'{label}: {len(es)} {what} (first {es[:3]})')
+    return bad
+
+
 SEAM_OUTFITS = (('g-waistBeads-waist', 'g-trousers-waist'), ('g-breastCloth-chest', 'g-neckBeads-chest'),
                 ('g-neckBeads-neck', 'g-neckBeads-chest'), tuple(NAMES))
 
@@ -324,10 +373,11 @@ SEAM_OUTFITS = (('g-waistBeads-waist', 'g-trousers-waist'), ('g-breastCloth-ches
 def selftest_body(body, garments, cfg, log=print):
     """The stage-1 checks on the real body: the region predicates
     (`check_regions`); for beads over trousers, breast cloth with the chest
-    collar, both collars and all five, one rim quad per seam edge and one far
-    surface per loop. Raises on a region or double-quad failure; a loop seeing
-    two far surfaces (its rims step at a junction) is the stage-1 invariant
-    failing and is returned, reported, not raised."""
+    collar, both collars and all five, the per-edge seam contract
+    (`check_seams`: every seam edge face adjacency derives carries exactly one
+    rim quad at the right offsets, none off a seam). Raises on any failure.
+    Loops whose far surface changes along them (the rims step at a junction,
+    closed per edge) are returned as information."""
     meshes = garments['meshes']
     sh = {n: meshes[n] for n in names_of(meshes)}
     bad = check_regions(body, sh, log)
@@ -338,11 +388,10 @@ def selftest_body(body, garments, cfg, log=print):
     ef = edge_faces(tris)
     mixed = []
     for worn in SEAM_OUTFITS:
-        g = build(body['pos'], tris, nrm, fm, sh, worn, cfg['VILLAGER_ASSET']['garmentShellStep'], ef=ef)
+        step = cfg['VILLAGER_ASSET']['garmentShellStep']
+        g = build(body['pos'], tris, nrm, fm, sh, worn, step, ef=ef)
         q = _rim_quads(g)
-        two = [e for e, v in q.items() if len(v) > 1]
-        if two:
-            bad.append(f'{"+".join(worn)}: {len(two)} seam edges with two rim quads')
+        bad += check_seams(tris, fm, sh, worn, g, step=step)
         for n, loops in far_surfaces(tris, fm, sh, worn, ef).items():
             for k, seen in enumerate(loops):
                 if len(seen - {'covered'}) > 1:
@@ -351,8 +400,8 @@ def selftest_body(body, garments, cfg, log=print):
     if bad:
         raise AssertionError('shell selftest on the body: ' + '; '.join(bad))
     for m in mixed:
-        log(f'[shells] SELFTEST FAILURE (one far surface per loop): {m}')
-    log('[shells] body selftest: ' + ('ok' if not mixed else f'{len(mixed)} loop(s) with two far surfaces'))
+        log(f'[shells] junction (closed per edge): {m}')
+    log(f'[shells] body selftest: ok; {len(mixed)} loop(s) with two far surfaces, each edge closed')
     return mixed
 
 
@@ -383,6 +432,18 @@ def _rim_quads(g):
             e = (min(x['src'][ah], x['src'][bl]), max(x['src'][ah], x['src'][bl]))
             quads.setdefault(e, []).append((n, round(float(x['off'][al]), 9)))
     return quads
+
+
+def _rim_strips(g):
+    """{undirected source edge: [(shell, low offset, high offset)]} of the rim quads built."""
+    out = {}
+    for n, x in g.items():
+        rt = x['tris'][x['rim']]
+        for k in range(0, len(rt), 2):
+            ah, al, bl = rt[k]
+            e = (min(int(x['src'][ah]), int(x['src'][bl])), max(int(x['src'][ah]), int(x['src'][bl])))
+            out.setdefault(e, []).append((n, round(float(x['off'][al]), 9), round(float(x['off'][ah]), 9)))
+    return out
 
 
 def selftest():
@@ -435,7 +496,23 @@ def selftest():
                 o = round(float(g[n]['off'][v]), 9)
                 if 0 < o < off[n]:
                     assert (int(g[n]['src'][v]), o) in ka
-    # one far surface per loop
+    # the per-edge seam contract holds, and catches a dropped quad
+    assert check_seams(tris, fm, sh, ['A', 'B', 'C'], g, scale, step) == []
+    gd = {n: dict(x) for n, x in g.items()}
+    keep = np.ones(len(gd['B']['tris']), bool)
+    keep[np.nonzero(gd['B']['rim'])[0][:2]] = False
+    gd['B'] = {**gd['B'], 'tris': gd['B']['tris'][keep], 'rim': gd['B']['rim'][keep]}
+    assert any('without a rim quad' in b for b in check_seams(tris, fm, sh, ['A', 'B', 'C'], gd, scale, step))
+    # a junction: D (rank 2) covers half of A's top rows, so D's loop sees A and the skin;
+    # every edge still closes per edge
+    words_j = words | np.where((y >= 5) & (pos[:, 0] >= -1e-9), 8, 0).astype(np.uint32)
+    fmj = face_masks(words_j, tris)
+    dfaces = np.nonzero(fmj & np.uint32(8))[0]
+    shj = {'A': sh['A'], 'D': {'bit': 3, 'rank': 2, 'base': 0.1, 'faces': dfaces, 'rows': boundary_loops(tris, dfaces)}}
+    gj = build(pos, tris, nrm, fmj, shj, ['A', 'D'], step)
+    assert any(len(x - {'covered'}) > 1 for x in far_surfaces(tris, fmj, shj, ['A', 'D'])['D'])
+    assert check_seams(tris, fmj, shj, ['A', 'D'], gj, 1.0, step) == []
+    # one far surface per loop on the nested and abutting set
     fs = far_surfaces(tris, fm, sh, ['A', 'B', 'C'])
     assert fs == {'A': [{'skin'}, {'C'}], 'B': [{'A'}, {'A'}], 'C': [{'A'}, {'skin'}]}, fs
     # alone, A closes to the skin on both of its rows
