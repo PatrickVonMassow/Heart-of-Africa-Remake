@@ -77,6 +77,12 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1421. Lower the OpenAI reasoning effort from high to medium
+  Queue position: FRONT of the work order (infrastructure setting, user order 21.10.2026).
+  Final state: every OpenAI (GPT-6 Astra) call - review (scripts/review-astra.mjs), authoring (scripts/author-astra.mjs) and ask (scripts/ask-astra.mjs) - runs at reasoning effort medium. The single source is ASTRA_REASONING_EFFORT in scripts/review-astra-core.mjs:73 ('high' -> 'medium'); its header comment (line 8, "reasoning effort HIGH") says medium.
+  Tests: scripts/author-astra-core.test.mjs:83 expects model_reasoning_effort=medium; review-astra-core.test.mjs (uses the constant) stays green; no other hard-coded 'high' for the OpenAI lane remains in scripts/ (comments recording past reviews "GPT-5.6 Sol at effort high" are history and stay).
+  Criticality: low - cost/latency setting, one constant.
+  Bundle: Chat & Tafel.
 - [ ] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
   Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
   Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.
@@ -107,6 +113,42 @@ put it is the mistake this line exists to stop.
   Source: user 21.10.2026 (chat): "Wie kann so etwas passieren? Das ist absolut fatal. Wir brauche ganz vorne in der Queue einen neuen Punkt, der das Problem mit vier Augen analysiert und zuverlässig löst. Es darf nie etwas verlorengehen." Approved: "So einreihen".
   Absorbs the carrier findings of 21.10.2026 "Doctor quarantine stash swallows committed-to-carrier TASKS.md appends" and "Doctor quarantine stashes carry unreviewed content" (final-state items 2 and 4).
   Bundle: Chat & Tafel.
+- [ ] 1393. Generic model lanes; the cross-vendor lane switches to GPT-6.1
+  Queue position: directly after point 1407 (user order 21.10.2026; before: directly before point 1347, user order 19.10.2026).
+  Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.
+  Execution: four eyes (CLAUDE.md 6): divergent design work blind-parallel from identical inputs, merged by a third model via scripts/blind-merge.mjs; the code is then reviewed cross-vendor, never by its author.
+  Amendment (user order 19.10.2026, approved "ok. freigegeben"; folded in from the findings carrier, supersedes the carrier finding "Global Codex CLI must go from 0.153.0 to 0.163.0 before gpt-6.1-sol works") — order of work:
+  1. FIRST STEP: update the global Codex CLI installation from 0.153.0 to 0.163.0 or newer (npm install -g). Only the batch owner can run this; the main write guard refuses npm install -g for non-owner sessions.
+  2. THEN prove that gpt-6.1-sol answers with the GLOBAL installation (a minimal probe prompt answered OK). If it does not answer, stop and report; do not start the rebuild.
+  3. ONLY THEN the rebuild of 1393 with four-eyes review across two vendors (CLAUDE.md 6), as the spec of 1393 describes.
+  Background measured 19.10.2026 22:07: codex 0.163.0 via npx with ChatGPT login: gpt-6.1-sol answered OK. codex 0.153.0 (the global install): 400 "not supported".
+  Progress 20.10.2026 08:10 (batch owner): steps 1-2 done — global Codex CLI updated 0.153.0 -> 0.163.0 (npm install -g @openai/codex@0.163.0); probe `codex exec -m gpt-6.1-sol` with the global install answered OK. Step 3 (rebuild) is open.
+  Goal: switching a model is a one-line data change. No file name, script name or constant name carries a vendor or model name; only data does.
+  Final state:
+  - scripts/model-lanes.mjs is the ONLY place naming concrete models. Each lane is a record: role, vendor, display name, model id, retired names, runtime (claude/codex), scarce flag. Guards, trailer checks, review chain, routing and tests read lanes only from it.
+  - The cross-vendor rule compares the vendor field of two lane records; no script knows a vendor name.
+  - Constants named by role (no ASTRA_MODEL, OPENAI_*, FABLE_* etc. in consumer code).
+  - Role-named scripts (proposal, author may refine names but keep them role-only):
+    fable-switch-core.mjs model identities -> model-lanes.mjs
+    fable-switch.mjs -> lane-switch.mjs (on/off per lane, scarce lanes included)
+    astra-share.mjs -> lane-routing.mjs (which task goes to which lane)
+    review-astra.mjs -> cross-review.mjs (review by a lane of another vendor than the author)
+    ask-astra.mjs -> ask-lane.mjs
+    author-astra.mjs / author-fable.mjs -> author-delegate.mjs --lane <role>
+    Matching core/test files follow. Hooks in .claude/settings.json (protected path: attended edit), docs (astra-routing.md, batch-owner-runbook.md, verify README) and memory entries naming old scripts follow.
+  - Tests import lane data instead of hard-coding names (today 114 literal occurrences in 28 test files).
+  - The OpenAI lane switches to GPT-6.1, model id gpt-6.1-sol, display name "GPT-6.1 Sol" (assumed; user may correct). "GPT-6 Astra" and "GPT-5.6 Sol" go into retired names so landed trailers keep verifying and the self-review ban treats all three as one lane. The new id is proven honoured on this machine (probe) before the lane counts as reachable.
+  - CLAUDE.md 6 speaks only of roles (main chain, cross-vendor reviewer, scarce lane); the outdated sentence "GPT-6 Astra authors difficult/complex/error-prone/HIGH points" is deleted. Commit trailers keep real model names, taken from model-lanes.mjs.
+  - Unit suite green; build and lint green.
+  Verifiable: unit suite, build and lint green; no consumer file outside scripts/model-lanes.mjs names a concrete model.
+  Bundle: Modell & Wächter.
+  Criticality: medium — policy text contradicts live routing.
+  Amendment (user request 21.10.2026, from the findings carrier):
+  Add to the final state of 1393:
+  - The OpenAI (cross-vendor) lane runs at reasoning effort HIGH. Its lane record in scripts/model-lanes.mjs carries effort `high`, and every codex invocation (review, author, ask) passes `model_reasoning_effort=high` taken from that record.
+  - 1393 sets this value explicitly, whatever the value on main is when 1393 starts: a point queued before 1393 is expected to lower the OpenAI effort to medium, and 1393 raises it back to high.
+  - A unit test asserts that the OpenAI lane record's effort is `high` and that the codex command line built for review and authoring carries `model_reasoning_effort=high`.
+  Today (HEAD e9249e591) the value is ASTRA_REASONING_EFFORT = 'high' in scripts/review-astra-core.mjs (re-exported by scripts/author-astra-core.mjs).
 - [ ] 1402. A walking villager's rear leg trembles at every step
   A walking adult villager (the water carrier crossing open ground, seen in profile) trembles with the rear leg at every step. Done when the trailing leg moves smoothly through each stride, judged in a moving capture.
   Source: user bug report hoa-state-2026-10-21-2694999956 (1).zip (10:20:29Z), user words: "Das hintere Bein zittert bei jedem Schritt."
@@ -144,6 +186,46 @@ put it is the mistake this line exists to stop.
   Source: user bug report KopfInKorb (/backup/hoa/local/KopfInKorb.zip), filed 21.10.2026 19:12Z.
   Repro for all: seed 3318564123, Bambara village (place mode), position x/z -59.45/-130.99, build production 0562828, WebGPU.
   Queue position: after the user-report points 1402-1405 (append-and-defer of a user-reported defect).
+  Bundle: Dorfleben.
+- [ ] 1416. Villagers at the fish-drying rack jitter in place
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123.zip (21:03:11Z), user words: "Die Figuren zittern herum."
+  Observed: in the Bambara village beach work site (fish-drying rack beside the fire shelter) two women in a deep twisted crouch jitter visibly in place instead of holding or moving smoothly through their work pose.
+  Final state: the villagers at the fish-drying rack hold a steady pose or move continuously; no frame-to-frame pose or position flicker on WebGPU and WebGL 2.
+  Verifiable: a Vitest over the rack workers' runtime pose asserts bounded frame-to-frame change of hips/hand positions across a full work cycle; a capture sequence of the rack shows no jitter, judged by a person.
+  Criticality: medium - visible in every visit to the beach work site.
+  Bundle: Dorfleben.
+- [ ] 1417. Fish-handling woman only rocks the fish, which clips through her clothing
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123 (1).zip (21:04:01Z), user words: "Was macht die da? Sie schaukelt den Fisch nur hin und her und dabei clippt er in ihre Kleidung rein und raus."
+  Observed: a kneeling woman beside a board near the fire shelter only rocks a fish back and forth; the fish passes in and out of her wrap skirt.
+  Final state: the fish work reads as a recognizable task (e.g. cleaning/gutting the fish on the board) and the fish never intersects her body or clothing in any phase.
+  Verifiable: a Vitest asserts fish-to-body clearance over the whole work cycle; a capture of the kneeling woman shows a readable task without clipping, judged by a person.
+  Criticality: medium - visible at the beach work site.
+  Bundle: Dorfleben.
+- [ ] 1418. Villager walks into stacked baskets; baskets have no collision
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123 (3).zip (21:06:07Z), user words: "Er steht mitten in den Körben und die haben auch keine Kollisionsabfrage."
+  Observed: the man in dark blue with the white cap stands hip-deep inside two stacked baskets in the village compound (next to the mortar); the baskets do not block him.
+  Final state: stacked baskets (and comparable set-down props) are obstacles for villagers' paths and for the traveller per the settlement collision (§7.1 criterion 16); no villager is ever placed or walks inside one.
+  Verifiable: a Vitest asserts that no villager path point and no villager position lies inside any basket footprint over a simulated day; a capture of the basket group shows the man beside, not inside, the baskets.
+  Criticality: medium - player-visible clipping and missing collision.
+  Bundle: Dorfleben.
+- [ ] 1419. Village goats have no collision (walk through posts and figures)
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123 (4).zip (21:06:26Z), user words: "Das Tier hat keine Kollisionsabfrage."
+  Observed: a village goat walks unobstructed through settlement objects (posts, figures, the traveller).
+  Final state: village goats respect the settlement collision (§7.1 criterion 16): they path around posts, huts, fences, props and figures and never pass through the traveller.
+  Verifiable: a Vitest asserts that no goat position lies inside any collider over a simulated period; a capture shows a goat stepping around a post.
+  Criticality: medium - player-visible in every village with goats.
+  Bundle: Dorfleben.
+- [ ] 1420. Running children float: flight phase too long, gravity feels low
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123 (5).zip (21:07:23Z), user words: "Es fühlt sich für mich so an, als wäre die Schwerkraft zu niedrig. Die Kinder sind beim Laufen so lange in der Luft."
+  Observed: running village children on the beach spend a long flight phase with both feet clearly off the ground; the run reads as floaty.
+  Final state: the children's run has a natural flight phase for a child's running speed (short airborne share, low apex), so the run reads as grounded.
+  Verifiable: a Vitest over the run cycle asserts the airborne share and apex height stay within calibratable bounds in src/config/balance.ts (or the animation config); a capture sequence of running children, judged by a person.
+  Criticality: low-medium - atmosphere, visible wherever children run.
   Bundle: Dorfleben.
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
@@ -195,36 +277,6 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: high - every villager on medium/high presets.
 
-- [ ] 1393. Generic model lanes; the cross-vendor lane switches to GPT-6.1
-  Queue position: directly BEFORE point 1347 in work-order order (user order 19.10.2026).
-  Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.
-  Execution: four eyes (CLAUDE.md 6): divergent design work blind-parallel from identical inputs, merged by a third model via scripts/blind-merge.mjs; the code is then reviewed cross-vendor, never by its author.
-  Amendment (user order 19.10.2026, approved "ok. freigegeben"; folded in from the findings carrier, supersedes the carrier finding "Global Codex CLI must go from 0.153.0 to 0.163.0 before gpt-6.1-sol works") — order of work:
-  1. FIRST STEP: update the global Codex CLI installation from 0.153.0 to 0.163.0 or newer (npm install -g). Only the batch owner can run this; the main write guard refuses npm install -g for non-owner sessions.
-  2. THEN prove that gpt-6.1-sol answers with the GLOBAL installation (a minimal probe prompt answered OK). If it does not answer, stop and report; do not start the rebuild.
-  3. ONLY THEN the rebuild of 1393 with four-eyes review across two vendors (CLAUDE.md 6), as the spec of 1393 describes.
-  Background measured 19.10.2026 22:07: codex 0.163.0 via npx with ChatGPT login: gpt-6.1-sol answered OK. codex 0.153.0 (the global install): 400 "not supported".
-  Progress 20.10.2026 08:10 (batch owner): steps 1-2 done — global Codex CLI updated 0.153.0 -> 0.163.0 (npm install -g @openai/codex@0.163.0); probe `codex exec -m gpt-6.1-sol` with the global install answered OK. Step 3 (rebuild) is open.
-  Goal: switching a model is a one-line data change. No file name, script name or constant name carries a vendor or model name; only data does.
-  Final state:
-  - scripts/model-lanes.mjs is the ONLY place naming concrete models. Each lane is a record: role, vendor, display name, model id, retired names, runtime (claude/codex), scarce flag. Guards, trailer checks, review chain, routing and tests read lanes only from it.
-  - The cross-vendor rule compares the vendor field of two lane records; no script knows a vendor name.
-  - Constants named by role (no ASTRA_MODEL, OPENAI_*, FABLE_* etc. in consumer code).
-  - Role-named scripts (proposal, author may refine names but keep them role-only):
-    fable-switch-core.mjs model identities -> model-lanes.mjs
-    fable-switch.mjs -> lane-switch.mjs (on/off per lane, scarce lanes included)
-    astra-share.mjs -> lane-routing.mjs (which task goes to which lane)
-    review-astra.mjs -> cross-review.mjs (review by a lane of another vendor than the author)
-    ask-astra.mjs -> ask-lane.mjs
-    author-astra.mjs / author-fable.mjs -> author-delegate.mjs --lane <role>
-    Matching core/test files follow. Hooks in .claude/settings.json (protected path: attended edit), docs (astra-routing.md, batch-owner-runbook.md, verify README) and memory entries naming old scripts follow.
-  - Tests import lane data instead of hard-coding names (today 114 literal occurrences in 28 test files).
-  - The OpenAI lane switches to GPT-6.1, model id gpt-6.1-sol, display name "GPT-6.1 Sol" (assumed; user may correct). "GPT-6 Astra" and "GPT-5.6 Sol" go into retired names so landed trailers keep verifying and the self-review ban treats all three as one lane. The new id is proven honoured on this machine (probe) before the lane counts as reachable.
-  - CLAUDE.md 6 speaks only of roles (main chain, cross-vendor reviewer, scarce lane); the outdated sentence "GPT-6 Astra authors difficult/complex/error-prone/HIGH points" is deleted. Commit trailers keep real model names, taken from model-lanes.mjs.
-  - Unit suite green; build and lint green.
-  Verifiable: unit suite, build and lint green; no consumer file outside scripts/model-lanes.mjs names a concrete model.
-  Bundle: Modell & Wächter.
-  Criticality: medium — policy text contradicts live routing.
 
 - [ ] 1379. Giza tourists and the traveller wear 1890 Western dress: shoes, long sleeves, long trousers or skirts, a seated hat
   Queue position: directly after point 1347 (it needs the rebuilt garment construction); split from point 1378 on 18.10.2026.
@@ -16018,6 +16070,8 @@ to land than a mechanism that needs a review.
   Verifiable: the export's `point` subject keeps its hips at 0.85 or more of standing height in every frame (Vitest in src/render/villagerRuntimePose.test.tsx); skinnedFigureCrouch.test.tsx stays green.
   Criticality: medium - every pointing villager on medium/high presets.
   Bundle: Dorfleben.
+  Further source: user bug report hoa-state-2026-10-21-3318564123 (2).zip (21:05:18Z), user words: "Warum bückt er sich, wenn er zum Häuptlingshütte zeit und warum zeigt seine Hand nicht geradeaus, sondern leicht nach unten." The man in dark blue points toward the chief's hut in a crouch with his arm slightly below horizontal - consistent with the measured release phase (arm pitch -1.71 to -1.50 while the crouch fires).
+  Additional check: after the fix, the pointing hand aims level at the target while the gesture is held (not only at release); if it does not, split a separate point for the aim.
 
 - [ ] 1396. Two walking villagers stand inside each other at the village centre
   Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
