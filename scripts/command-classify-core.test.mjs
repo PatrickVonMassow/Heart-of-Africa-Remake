@@ -574,6 +574,8 @@ describe('scripts whose whole job is to change shared state', () => {
       'env node scripts/land-point.mjs 1',
       'node scripts/land-point.mjs --help',
       'sed -i s/a/b/ scripts/land-point.mjs',
+      "sed --in-place 's/a/b/' scripts/land-point.mjs",
+      "sed --in-place=.bak 's/a/b/' scripts/land-point.mjs",
     ]) {
       expect(isMutatingSegment(c)).toBe(true)
     }

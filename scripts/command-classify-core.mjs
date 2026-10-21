@@ -738,7 +738,8 @@ function directIntentOfParsed(seg) {
   if (head === 'npm' || head === 'pnpm' || head === 'yarn') return packageIntent(seg)
   if (head === 'gh') return ghIntent(seg)
   if (head === 'sed' || head === 'perl') {
-    return argsOf(seg).some((a) => !a.quoted && /^-[A-Za-z]*i/.test(a.text)) ? 'write' : 'read'
+    const inPlace = (t) => /^-[A-Za-z]*i/.test(t) || /^--in-place(?:=|$)/.test(t)
+    return argsOf(seg).some((a) => !a.quoted && inPlace(a.text)) ? 'write' : 'read'
   }
   if (WRITING_HEADS.has(head)) return 'write'
   // Everything else — `node scripts/x.mjs --status`, `grep`, `cat`, an unknown
