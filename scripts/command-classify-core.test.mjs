@@ -559,7 +559,6 @@ describe('scripts whose whole job is to change shared state', () => {
       'grep -n -i "a\\|b" scripts/land-point.mjs',
       'sed -n 1,50p scripts/land-point.mjs',
       'cat scripts/land-point.mjs',
-      'find scripts -name land-point.mjs -exec grep -c ownsLock {} \\;',
     ]) {
       expect(isMutatingSegment(c)).toBe(false)
     }
@@ -569,6 +568,12 @@ describe('scripts whose whole job is to change shared state', () => {
       'bun scripts/land-point.mjs 1',
       'find . -maxdepth 0 -exec node scripts/land-point.mjs 1411 \\;',
       'find . -maxdepth 0 -execdir ./scripts/land-point.mjs 1 \\;',
+      "find . -maxdepth 0 -exec node scripts/land-point.mjs 1411 --help ';'",
+      "find . -maxdepth 0 -exec env node scripts/land-point.mjs 1411 ';'",
+      "find . -maxdepth 0 -exec true ';' -exec node scripts/land-point.mjs 1411 ';'",
+      'env node scripts/land-point.mjs 1',
+      'node scripts/land-point.mjs --help',
+      'sed -i s/a/b/ scripts/land-point.mjs',
     ]) {
       expect(isMutatingSegment(c)).toBe(true)
     }

@@ -720,10 +720,11 @@ function directIntentOfParsed(seg) {
   // A script whose job is mutation stays a write under EVERY flag. In
   // particular, land-point.mjs does not implement a help/version exit path;
   // those words are merely ignored arguments before it merges and pushes.
-  // Only a RUN counts: the script as the program, or as an interpreter's
-  // argument. `grep x scripts/land-point.mjs` / `sed -n 1p …` merely read it.
+  // A pure file reader naming it (`grep x scripts/land-point.mjs`, `sed -n 1p
+  // …`) merely reads it; every other head — interpreters, wrappers, find -exec —
+  // keeps the blanket rule. `sed -i` stays a write by the sed rule below.
   if (MUTATING_SCRIPTS.has(head)) return 'write'
-  if (INTERPRETERS.has(head) && argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
+  if (!SCRIPT_READERS.has(head) && argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
   if (argsOf(seg).some((a) => !a.quoted && (a.text === '--help' || a.text === '--version'))) return 'read'
   // `find . -delete` / `find . -exec rm {} \;` — the verb stands behind -exec.
@@ -731,14 +732,7 @@ function directIntentOfParsed(seg) {
     const args = argsOf(seg)
     if (args.some((a) => a.text === '-delete')) return 'write'
     const i = args.findIndex((a) => a.text === '-exec' || a.text === '-execdir')
-    if (i >= 0 && args[i + 1]) {
-      // The program behind -exec runs: a mutating script there is a run, too.
-      const [prog, ...rest] = args.slice(i + 1).map((a) => baseOf(a.text))
-      if (MUTATING_SCRIPTS.has(prog) || (INTERPRETERS.has(prog) && rest.some((t) => MUTATING_SCRIPTS.has(t)))) {
-        return 'write'
-      }
-      return WRITING_HEADS.has(prog) ? 'write' : 'read'
-    }
+    if (i >= 0 && args[i + 1]) return WRITING_HEADS.has(baseOf(args[i + 1].text)) ? 'write' : 'read'
   }
   if (head === 'git') return gitIntent(seg)
   if (head === 'npm' || head === 'pnpm' || head === 'yarn') return packageIntent(seg)
@@ -785,6 +779,8 @@ function intentOfParsed(seg, depth = 0) {
  * fallback exists. Over-blocking here costs a board publish that was due anyway.
  */
 const MUTATING_SCRIPTS = new Set(['land-point.mjs'])
+// Heads that only read the files they name; awk is absent because system() runs commands.
+const SCRIPT_READERS = new Set(['grep', 'egrep', 'fgrep', 'rg', 'cat', 'head', 'tail', 'wc', 'less', 'more', 'sed', 'diff', 'ls', 'stat', 'file'])
 
 /** An already-parsed segment passes straight through; a string is parsed. */
 function asSegments(input) {
