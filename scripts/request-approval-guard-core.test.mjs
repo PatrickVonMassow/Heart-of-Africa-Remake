@@ -890,6 +890,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'git diff --ext-diff HEAD | head',
     'git log --textconv -p | head',
     'git branch --edit-description | head',
+    'git branch --e | head',
     'git diff --output=scripts/x.mjs | head',
     'sort -o scripts/x.mjs payload | head',
     'cat f | sort -uo scripts/x.mjs',
@@ -940,6 +941,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     "Get-ChildItem scripts | Select-String 'x?' -Exclude 'a*'",
     "Get-ChildItem scripts | Select-String -Pattern '.' \u2013Include '*fin[d]ing.mjs'",
     "Get-ChildItem scripts | Select-String 'x?' \u2014Path 'a*'",
+    "Get-Content f | Select-String 'x?' 'scripts/fin*.mjs'",
     "Get-ChildItem 'Scripts\\Fin?ing.MJS' | Select-String x",
     "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
   ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
