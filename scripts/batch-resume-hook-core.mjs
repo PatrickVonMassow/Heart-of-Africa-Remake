@@ -385,14 +385,15 @@ export function transcriptShowsPerson(text) {
  * must not hand the batch to the window a person is talking to unasked (user
  * 31.08.2026). The invitations of `sessionStartOwnership` apply here too: a lock
  * this session already holds, or a claim it made itself. Without one, only a
- * session NOT demonstrably interactive acquires — the launcher's worker and any
- * other unattended session, exactly as before. `interactive` null (unreadable)
- * is unproven and keeps the never-ownerless path.
+ * session demonstrably unattended acquires — a read transcript holding no person,
+ * as the launcher's worker carries. `interactive` null (empty or unreadable, as a
+ * chat window right after /clear) is unproven and takes nothing: the launcher's
+ * worker, not that window, is the successor (finding 21.10.2026).
  */
 export function turnEndOwnership({ heldHere = false, claimMine = false, interactive = null } = {}) {
   if (heldHere) return { mayAcquire: true, invitation: 'held' }
   if (claimMine) return { mayAcquire: true, invitation: 'claim' }
-  if (interactive === true) return { mayAcquire: false, invitation: null }
+  if (interactive !== false) return { mayAcquire: false, invitation: null }
   return { mayAcquire: true, invitation: 'unattended' }
 }
 
