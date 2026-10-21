@@ -731,25 +731,37 @@ def other_part(tree, fn, tris, ring, p, off):
 
 
 def _shell_corner(c):
-    """One body corner: the three shell rows over every pose."""
+    """One body corner (or, with _S['runtime'], one runtime subject over its
+    recorded frames, wearing its own shell set): the three shell rows over
+    every pose."""
     import shells as SHL
     from fit import _point_tri
     from mathutils.bvhtree import BVHTree
     S = _S
     body, garments, cfg = S['body'], S['garments'], S['cfg']
     a = cfg['VILLAGER_ASSET']
-    reach, step = a['garmentMaskOpening'], a['garmentShellStep']
-    sex, age, build = c
-    w = corner_weights(sex, age, build)
+    reach, step, depth = a['garmentMaskOpening'], a['garmentShellStep'], a['garmentMaskPush']
+    rt = S.get('runtime')
+    if rt is None:
+        sex, age, build = c
+        w = corner_weights(sex, age, build)
+    else:
+        sex, age, build = (rt[c]['identity'][k] for k in ('sex', 'age', 'build'))
+        w = GP.runtime_weights(rt[c]['identity'], cfg)
     pos, j = morphed(body, w)
     person = GP.Person(j)
     bh = person.bake(pos, S['jidx'], S['jw'])
+    hand = GP.runtime_hand_deltas(person, pos, body, S['jidx'], S['jw']) if rt is not None else {}
     tris = np.asarray(body['tris'])
     mk = garments['mask']
     out = {}
     built = {}
-    for n in S['shells']:
-        sd = SHL.corner_dress(body, garments, [n], w, cfg)[1][n]
+    # a runtime subject: its worn shells, built with its whole worn shell set,
+    # against its worn legacy garments; a clip corner: each shell alone, every legacy garment
+    worn = list(rt[c]['garments']) if rt is not None else None
+    with_set = lambda n: [x for x in worn if x in S['shells']] if worn is not None else [n]  # noqa: E731
+    for n in [x for x in S['shells'] if worn is None or x in worn]:
+        sd = SHL.corner_dress(body, garments, with_set(n), w, cfg)[1][n]
         gi, gw = top4(sd['W'])
         top = np.isclose(sd['off'], sd['off'].max())
         # the fan of each top-row vertex's source, as (vertex, face) pairs
@@ -757,30 +769,31 @@ def _shell_corner(c):
         pf = np.concatenate([S['fan'][s_] for k, s_ in enumerate(sd['src']) if top[k]] or [np.zeros(0, int)]).astype(int)
         legacy = {}
         for o in S['legacy']:
-            if M.layer(o) <= M.layer(n):
+            if M.layer(o) <= M.layer(n) or (worn is not None and o not in worn):
                 continue
             hide, push = M.decode(mk['body'], mk['garments'], [o])
-            so = SHL.corner_dress(body, garments, [n, o], w, cfg)[1][n]
+            so = SHL.corner_dress(body, garments, with_set(n) + [o], w, cfg)[1][n]
             ids = np.nonzero(push[so['src']])[0]
             if len(ids):
                 oi, ow = top4(so['W'])
-                legacy[o] = (person.bake(so['pos'], oi, ow), (oi, ow), ids, person.bake(garment_pos(garments['meshes'][o], w), *S['gskin'][o]))
+                legacy[o] = (person.bake(so['pos'], oi, ow), (oi, ow), ids, person.bake(garment_pos(garments['meshes'][o], w), *S['gskin'][o]),
+                             so['src'], push[so['src']])
         built[n] = (sd, gi, gw, person.bake(sd['pos'], gi, gw), top, pv, pf, legacy)
         out[n] = {'own': {'min': np.inf, 'max': 0.0, 'under': 0, 'at': None, 'off': float(sd['off'].max())},
                   'other': {'frames': 0, 'cases': []}, 'legacy': {}, 'checked': 0}
-    for kk, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
-        if kk % S['stride']:
-            continue
-        at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
-        wr, wp = person.pose(q, hips, kst)
-        bv = person.skin(bh, S['jidx'], S['jw'], wr, wp)
+    for _cname, at, skin, post, rframe in _poses(S, c, person, cfg, (sex, age, build)):
+        # unpushed and before the root's squash (`post`), which follows the mask push
+        bvu = skin(bh if rframe is None else bh + GP.runtime_hands(rframe, hand), S['jidx'], S['jw'])
+        bv = bvu if post is None else post(bvu)
+        bnrm = None
         tree = BVHTree.FromPolygons(bv.tolist(), tris.tolist(), all_triangles=True)
         fn = np.cross(bv[tris[:, 1]] - bv[tris[:, 0]], bv[tris[:, 2]] - bv[tris[:, 0]])
         fn /= np.maximum(np.linalg.norm(fn, axis=1), 1e-12)[:, None]
         for n, (sd, gi, gw, sb, top, pv, pf, legacy) in built.items():
             r = out[n]
             r['checked'] += 1
-            sv = person.skin(sb, gi, gw, wr, wp)
+            sv = skin(sb, gi, gw)
+            sv = sv if post is None else post(sv)
             off = r['own']['off']
             # row one: each top-row vertex against its own source's fan
             if len(pv):
@@ -807,9 +820,14 @@ def _shell_corner(c):
                 r['other']['cases'].append((worst[0], worst[1], worst[2], at))
                 r['other']['cases'] = sorted(r['other']['cases'], reverse=True)[:SHELL_CASES]
             # row three: a covered shell point outside a co-worn legacy garment's cloth
-            for o, (sob, (oi, ow), ids, ob) in legacy.items():
-                ov = person.skin(ob, *S['gskin'][o], wr, wp)
-                xv = person.skin(sob, oi, ow, wr, wp)
+            for o, (sob, (oi, ow), ids, ob, osrc, opush) in legacy.items():
+                ov = skin(ob, *S['gskin'][o])
+                ov = ov if post is None else post(ov)
+                # the shell drawn as the game draws it: its covered sources' push
+                # along the copied source normals, then the squash
+                if bnrm is None:
+                    bnrm = vertex_normals(bvu, tris)
+                xv = pushed_surface(skin(sob, oi, ow), None, opush, depth, post, bnrm[osrc])
                 place, dist = S['vol'][o].where(ov, xv, reach, ids=ids)
                 thr = ids[place[ids] == M.THROUGH]
                 v = float(dist[thr].max()) if len(thr) else 0.0
@@ -821,14 +839,15 @@ def _shell_corner(c):
     return c, out
 
 
-def shell_rows(body, clips, garments, cfg, stride=1, workers=None, log=print):
+def shell_rows(body, clips, garments, cfg, stride=1, workers=None, log=print, corners=None):
     """The three shell rows (docs/garment-merge-r9-1347.md, no gate) per shell
     over every pose of the exported clips at every body corner: (1) each shell
     vertex against its own source's incident body triangles, the band [half the
     offset, the offset plus one step]; (2) a shell vertex inside another body
     part (no corner in its source's two-ring) within one offset, by bone;
     (3) a covered shell point outside a co-worn legacy garment of an outer
-    layer through its cloth."""
+    layer through its cloth. `corners`: runtime subject ids instead (with
+    _S['runtime'] set, as `runtime_report` does)."""
     import multiprocessing as mp
     import shells as SHL
     names = SHL.names_of(garments['meshes'])
@@ -850,10 +869,11 @@ def shell_rows(body, clips, garments, cfg, stride=1, workers=None, log=print):
               fan=[np.array(x, int) for x in fan], ring=ring, jidx=jidx, jw=jw, dom=np.argmax(body['W'], 1), bones=SK.NAMES,
               gskin={n: top4(garments['meshes'][n]['W']) for n in legacy}, clip_names=EXPORT_CLIPS,
               vol={n: M.Volume(pose(garments['meshes'][n]['pos'], garments['meshes'][n]['W']), garments['meshes'][n]['tris']) for n in legacy})
-    workers = workers or max(1, min(len(CORNERS), (os.cpu_count() or 2) - 1))
+    corners = corners or CORNERS
+    workers = workers or max(1, min(len(corners), (os.cpu_count() or 2) - 1))
     total = {}
     with mp.get_context('fork').Pool(workers) as pool:
-        for c, part in pool.imap(_shell_corner, CORNERS):
+        for c, part in pool.imap(_shell_corner, corners):
             for n, r in part.items():
                 t = total.setdefault(n, {'own': {'min': np.inf, 'max': 0.0, 'under': 0, 'at': None, 'off': r['own']['off']},
                                          'other': {'frames': 0, 'cases': []}, 'legacy': {}, 'checked': 0})
@@ -870,7 +890,7 @@ def shell_rows(body, clips, garments, cfg, stride=1, workers=None, log=print):
                     m['frames'] += e['frames']
                     if e['value'] > m['value']:
                         m['value'], m['at'] = e['value'], e['at']
-            log(f'penetration: shells {"{} {} {:+.0f}".format(*c)} done')
+            log(f'penetration: shells {c if isinstance(c, str) else "{} {} {:+.0f}".format(*c)} done')
     return total
 
 
@@ -1083,17 +1103,20 @@ def runtime_report(out, body, garments, cfg, rt):
     `report`); written to runtime-penetration-report.md (and .json)."""
     a = cfg['VILLAGER_ASSET']
     subjects = {s['id']: s for s in rt['subjects']}
-    rows, tol = {}, a['garmentPenetrationTolerance']
+    import shells as SHL
+    rows, srows, tol = {}, {}, a['garmentPenetrationTolerance']
     _S['runtime'] = subjects
     try:
         for sid, s in subjects.items():
             missing = [n for n in s['garments'] if n not in garments['meshes']]
             if missing:
                 raise RuntimeError(f'runtime penetration: {sid} wears {missing}, absent from the built garments — rebuild them (--step garments)')
-            # shells (shells.py) have their own rows (`shell_rows`)
             names = [n for n in s['garments'] if n in M.garment_names(garments)]
             if names:
                 rows[sid], tol = measure(body, None, garments, cfg, names=names, corners=[sid], workers=1)
+            # shells (shells.py): their three rows over the same recorded frames
+            if any(n in SHL.names_of(garments['meshes']) for n in s['garments']):
+                srows[sid] = shell_rows(body, None, garments, cfg, workers=1, corners=[sid])
     finally:
         _S.pop('runtime', None)
     lines = [
@@ -1105,18 +1128,23 @@ def runtime_report(out, body, garments, cfg, rt):
         f'Tolerance {tol}. This report gates nothing; the gate is penetration-report.md.',
         '',
     ]
-    for sid, worst in rows.items():
+    for sid in [x for x in subjects if x in rows or x in srows]:
         s = subjects[sid]
         i = s['identity']
         lines += [f'## {s["title"]}', '', f'{i["sex"]} {i["age"]}, build {i["build"]:+.1f}, figure scale {i["scale"]:g}; '
                   f'{len(s["frames"])} frames {s["frames"][0]["t"]:.2f}–{s["frames"][-1]["t"]:.2f} s.', '']
-        t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
-        lines += t + ['', f'{len(worst) - bad} of {len(worst)} worn garments within tolerance in every frame.', '']
+        worst = rows.get(sid)
+        if worst:
+            t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
+            lines += t + ['', f'{len(worst) - bad} of {len(worst)} worn garments within tolerance in every frame.', '']
+        if srows.get(sid):
+            lines += ['#' + x if x.startswith('## ') else x for x in shell_lines(srows[sid], cfg)]
     os.makedirs(out, exist_ok=True)
     open(os.path.join(out, 'runtime-penetration-report.md'), 'w').write('\n'.join(lines))
 
     def plain(w):
         return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
-    json.dump({'tolerance': tol, 'subjects': {sid: plain(w) for sid, w in rows.items()}},
+    json.dump({'tolerance': tol, 'subjects': {sid: plain(w) for sid, w in rows.items()},
+               'shells': {sid: {n: {**r, 'own': {**r['own'], 'min': float(r['own']['min'])}} for n, r in sr.items()} for sid, sr in srows.items()}},
               open(os.path.join(out, 'runtime-penetration-report.json'), 'w'), indent=1)
     print('\n'.join(lines))
