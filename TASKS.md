@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1401. Two villagers standing in conversation fidget on the spot
-  Two adult villagers standing face to face in conversation in the village centre fidget restlessly on the spot instead of standing calmly. Done when a conversation pair stands still apart from deliberate small gestures, judged in a moving capture, not a still.
-  Source: user bug report hoa-state-2026-10-21-2694999956.zip (10:19:48Z), user words: "Die beiden stehen da und zappeln herum."
-  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
-  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (the point currently in progress, 1347, continues). The five user-report points of 21.10.2026 keep the order given here.
-  Bundle: Dorfleben.
-
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
   Source: user 12.10.2026 (chat), after two bug reports from the current production build eab3d6b (backup local/ClippingBeimLaufen.zip: a walking villager's swing leg leaves its trouser leg behind, bare thigh and knee; local/WindelLook.zip: a child's hip cloth stands off the body all round like a diaper). User: "Ich vermute, dass das nur eines von vielen Symptomen ist, das bestätigt, dass der bisherige Ansatz verkehrt war. Jetzt genau das zu beheben würde vermutlich nur ein Symptom flicken." Order: "Reihe den Neubau als mit 6-Augen-Prinzip für die Analyse als neuen Punkt nach 1330 ein." Both reports are filed as findings in the carrier and are charged to this point, not fixed singly.
