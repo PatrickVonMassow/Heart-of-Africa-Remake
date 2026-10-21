@@ -29,7 +29,9 @@ Edges at 3 mm or more (inserted vertex: edge endpoints, worst):
 - 10530: 4247-5704, 0.00368
 - 12696: 1817-3486, 0.00310
 
-## Shell rows with two far surfaces (stage-1 selftest failure, reported)
+## Shell rows with two far surfaces (junctions, closed per edge; information)
+
+shells.selftest_body raises unless every seam edge face adjacency derives carries exactly one rim quad (shells.check_seams).
 
 - g-neckBeads-neck+g-neckBeads-chest: g-neckBeads-neck loop 0 (167 vertices) sees ['g-neckBeads-chest', 'skin']
 - g-neckBeads-neck+g-neckBeads-chest: g-neckBeads-chest loop 1 (496 vertices) sees ['g-neckBeads-neck', 'skin']
