@@ -509,6 +509,7 @@ describe('the main-write ownership fence', () => {
       'node scripts/land-point.mjs 1',
       'find . -maxdepth 0 -exec node scripts/land-point.mjs 1 \\;',
       "sed --in-place 's/a/b/' scripts/land-point.mjs",
+      "sed --in=.bak 's/a/b/' scripts/land-point.mjs",
       'echo x > src/a.ts',
       'git commit -m x',
     ]) {

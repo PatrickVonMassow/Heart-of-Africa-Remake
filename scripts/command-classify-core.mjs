@@ -738,7 +738,9 @@ function directIntentOfParsed(seg) {
   if (head === 'npm' || head === 'pnpm' || head === 'yarn') return packageIntent(seg)
   if (head === 'gh') return ghIntent(seg)
   if (head === 'sed' || head === 'perl') {
-    const inPlace = (t) => /^-[A-Za-z]*i/.test(t) || /^--in-place(?:=|$)/.test(t)
+    // GNU getopt_long takes any unambiguous prefix: `--in-p`, `--i=.bak`.
+    const long = (t) => t.startsWith('--i') && 'in-place'.startsWith(t.slice(2).split('=')[0])
+    const inPlace = (t) => /^-[A-Za-z]*i/.test(t) || long(t)
     return argsOf(seg).some((a) => !a.quoted && inPlace(a.text)) ? 'write' : 'read'
   }
   if (WRITING_HEADS.has(head)) return 'write'
