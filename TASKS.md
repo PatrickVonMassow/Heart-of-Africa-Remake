@@ -93,6 +93,7 @@ put it is the mistake this line exists to stop.
   Verifiable: the six-eyes record (two blind analyses, merge record, final-check verdict per round); the before-picture inventory and the stage-1 acceptance rows, Playwright `polish-villagers --section=garment-acceptance` on both backends, picture-checked; pipeline selftests and Vitest for the shell builder and the outfit generator; cross-vendor review record. Per point 1339 no numeric penetration threshold is an acceptance gate.
   Open points touched: 1341 (pipeline garment surface, head cover, frame cost) and 1346 (stale penetration baseline) are probably absorbed or obsoleted by points 1398-1400; they are removed only on the user's decision. 1342's "penetration gate green" acceptance is to be aligned with 1339 by the same decision.
   Criticality: high - every villager on medium/high presets, visible at first glance in normal play.
+  Charged 21.10.2026 (findings carrier, 1347 acceptance frame 1347-accept-trousers-cross-r-man-rear-cairo-3m, WebGPU, 17c892af5): a lighter, rougher hard-edged rectangle on the bare adult male back from the shoulder blades to the waist, visible at 3 m, with only trousers worn. Compare with main before classifying: if main shows it, file it as its own body-skin point; if not, fix it here.
   Bundle: Dorfleben.
 - [ ] 1398. Villager garments stage 3: skirts, loin flap, apron and girdle tails on driven column bones
   Queue position: directly after point 1347.
