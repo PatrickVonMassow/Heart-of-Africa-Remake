@@ -22,7 +22,7 @@ import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { evaluate, RECENT_COMMIT_COUNT } from './dashboard-integrity-guard-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
@@ -67,8 +67,8 @@ function touchedFiles() {
  *  gather its own (a second copy would drift and hand back a false "clean"). */
 export function gatherDashboardIntegrityInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  if (!ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
   }
   // No board yet — dashboard-guard owns that case.
   if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }

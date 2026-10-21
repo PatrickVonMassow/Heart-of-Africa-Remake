@@ -316,7 +316,7 @@ describe('the four formerly blind guards', () => {
     const decisionCondition = gatherDecisionCardCondition({
       sessionId: 'owner',
       paused: false,
-      otherOwner: false,
+      owner: true,
       dashboardExists: true,
       dashboardHtml: boardHtml({ klaerungExtra: ['Kartenschrift wählen'] }),
     })

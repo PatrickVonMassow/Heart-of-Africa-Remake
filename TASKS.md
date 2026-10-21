@@ -77,25 +77,12 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1409. Stop guards apply only to the holder of the batch lock
-  Final state: every Stop guard that imposes BATCH DUTIES applies only when this session holds the batch lock, tested positively with `ownsLock(sessionId).mine` (ownsLock returns an object; `.mine` is mandatory). A missing, unreadable or dead-owner lock, a live foreign owner and a missing session id all mean "not applicable", returned before any git, network, CI or state work.
-  Concretely: scripts/push-arrival-guard.mjs `gatherPushArrivalInputs`: early exit becomes `!ignoreOwnership && !ownsLock(sessionId).mine`, keep `CAUSE.notLockOwner`, reason text "this session does not hold the batch lock", `--status` stays diagnostic. scripts/ci-status-guard.mjs `gatherCiStatusInputs`: same predicate before git/network/CI work; pause and sealed-boundary exceptions stay; `observeDurableWait`, successor notification and `readOnly` are NOT coupled to the session ownership check. scripts/dashboard-guard.mjs, dashboard-integrity-guard.mjs, decision-card-guard.mjs, retro-currency-guard.mjs: the same early exit (confirm insertion point and diagnostic exceptions per file before patching). decision-card-guard must not demand card reviews from a non-owner even while another session holds the batch (measured 21.10.2026 17:04).
-  Then sort the remaining ~30 importers of `heldByOtherLiveOwner` by purpose and switch ONLY further batch-duty checks; foreign-owner protection, acquisition logic and diagnostics keep `heldByOtherLiveOwner`. `heldByOtherLiveOwner` and `ownsLock` themselves stay unchanged - no global reinterpretation, no lease/handover addition to `ownsLock`.
-  Before changing: read the fail direction of `turnEndOwnership` (batch-resume-hook-core.mjs) for an empty/unreadable transcript right after /clear and the Stop-hook order in .claude/settings.json; do not change acquisition (freeze), but pin the case "lock free, transcript empty, chat session" as a test: neither acquisition nor duties. If it acquires there, file that as its own finding.
-  Tests (Vitest, per switched guard core): no lock / unreadable lock / dead foreign owner / live foreign owner / missing session id -> not applicable with no git, network or state work; own lock -> applicable; process-identity (compaction) case stays owner.
-  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
-  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
-  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
-  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Stop-Guards gelten nur für den Halter des Batch-Locks"); approved: "ja, alles ganz vorne in der Queue".
-  Bundle: Chat & Tafel.
-- [ ] 1410. Board-first: the board duty applies only to the lock holder
-  Final state: scripts/board-first-guard.mjs exits without a board decision for a session that does not hold the batch lock: `if (!ownsLock(sid, { lock }).mine) process.exit(0)` placed AFTER the fence chokepoint, the main-write fence, the foreign-owner stand-down (`ownershipStandDownDecision`, still called only on an actually detected foreign owner via `heldByOtherLiveOwner`), the worktree exemption and the sealed-boundary check, and immediately BEFORE `gather()`/`evaluate()`. A non-owner thus gets no board-first deny and writes no `boardFirstFiredAt` into the shared state (which today consumes the real owner's once-per-turn stand-down).
-  Unchanged: lease and claim renewal, handover handling, pause exemption, `--status`; the end of a board duty grants no write permission and triggers no lock acquisition. Correct the comment claiming "board duties stand down for a non-owner" - it becomes true only with this change.
-  Tests (board-first-core.test.mjs / board-first-guard.test.mjs): non-owner with ownerless batch -> no board deny, no `boardFirstFiredAt` write; ownerless main write still refused; stale-fence holder still refused; owner, sealed boundary and isolated worktree keep today's rules.
-  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
-  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
-  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
-  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Board-first: Board-Pflicht nur für den Lock-Halter"); approved: "ja, alles ganz vorne in der Queue".
+- [ ] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
+  Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
+  Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.
+  Source: finding 21.10.2026 18:26 by the 1409 author: with the lock free, the empty transcript after /clear counted as unattended and acquired; batch-progress-guard is fifth in the Stop order, so every later batch-duty guard bound that chat window. Acquisition is frozen by 1409's spec, hence its own point.
+  Queue position: directly after 1409 (it follows its ownership change).
+  Criticality: medium - a real blockade of an attended chat window (infrastructure freeze exemption, CLAUDE.md section 2).
   Bundle: Chat & Tafel.
 - [ ] 1411. Main-write guard: do not classify pure read commands as writes
   Final state: the main-write classification used by board-first (`mainWriteFenceDecision`, batch-lease-core.mjs, and the command classifier it relies on, e.g. command-classify-core.mjs) judges a command by write semantics, not by mere mention of a path or script name: a pure read such as `grep -c ownsLock scripts/land-point.mjs`, `grep -n -i "a\|b" scripts/land-point.mjs` or `sed -n 1,50p scripts/land-point.mjs` is not a state-changing segment and passes for a non-owner on main. Real writes (redirection into the tree, git commit/push/merge, running land-point.mjs or other mutating scripts, Edit/Write on tracked paths) stay refused without the lock.
@@ -106,6 +93,14 @@ put it is the mistake this line exists to stop.
   Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
   Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Main-Write-Schutz: reine Lesebefehle nicht als Schreibzugriff einstufen"); approved: "ja, alles ganz vorne in der Queue".
   Bundle: Chat & Tafel.
+- [ ] 1412. Village bank routing test fails under machine load
+  Queue position: after point 1411 (front-of-queue gate stability: it reddens unrelated branches and CI).
+  Source: finding 21.10.2026 18:14: `src/scenes/place/routing.test.ts` "a villager sent to the BANK gets there" failed in two independent full unit runs (1402 worktree seed 1337; 1410 worktree seeds 7 and 1337) at load average 13-16; the file alone passes 19/19, also on main. Caused red CI run 39625616367 on feat/1402-rear-leg-tremble.
+  Final state: the routing search and its test are deterministic: no wall-clock or time-budget dependency decides whether a route is found, so the bank test passes identically under load.
+  Verifiable: a Vitest case that runs the bank routing with a stalled clock (or artificially slow step) and still reaches all three bank points; the full unit suite green under parallel load.
+  Charged finding 21.10.2026 ~22:00: the main pre-push unit gate went red under parallel load (a worktree vitest run and an Astra review beside it) and kept no test name; the immediate quiet rerun was green (608 files). Likely this class; unproven because the name is lost.
+  Criticality: medium - a flaky unit gate reddens unrelated branches and CI.
+  Bundle: Dorfleben.
 - [ ] 1407. No user instruction is ever lost: tick the carrier only after commit, the doctor stashes no task files, reconcile the carrier against TASKS.md
   Rank: at the very front of the work order, ahead of 1402 (user order 21.10.2026).
   Four eyes: GPT-6 Astra and Opus 5.5 analyse blind-parallel from identical inputs; a third model merges via scripts/blind-merge.mjs; cross-vendor review of the result.
@@ -144,6 +139,20 @@ put it is the mistake this line exists to stop.
   Source: user bug report hoa-state-2026-10-21-2694999956 (4).zip (10:24:13Z), user words: "Der Wasserholer ist noch viel zu weit weg vom Tisch, wenn er das Wasser abstellt, seine Hand zeigt danach auch nicht genau aufs Wasser und der neue Krug erscheint aus dem Nichts in seiner Hand."
   Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
   Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+  Bundle: Dorfleben.
+- [ ] 1415. Bug-report state dump captures the live place-scene runtime
+  Final state: the bug-report state dump (src/state/stateDump.ts, dumpGameState) carries a `place` section with the live runtime of the place scene the traveller is in, read through a registry like the wildlife section (src/systems/wildlifeDump.ts, point 454). Every place-scene vignette with its own runtime registers a snapshot provider: the river fishery (canoe state and clock, net man position/phase/inBoat/reach/squat, carrier position/phase/clock/kneel, every basket with its holder `at`, fish count and world position), the errand walkers and their head loads, fires and work sites, and any other animated villager group. Each figure entry names id, role, world position, yaw, phase/action, pose values (lean, squat/scale, kneel) and its head/crown world position; each carried or set-down object names its holder and world position. The section is bounded (radius and cap stated, omitted count named) and deterministic for a given runtime state. Rule going forward: a new place vignette with its own runtime registers its provider; a Vitest test asserts that every registered vignette mounted in a test place appears in the dump with these fields, and that the fishery entry contains its baskets with holders.
+  Principle (user order 21.10.2026): the state dump holds everything that is potentially helpful for diagnosing a bug report.
+  Observed problem: bug report "KopfInKorb" (21.10.2026) could not be diagnosed from its state dump: the fishery runtime (which figure, which phase, where the basket was) lives only in React refs and never reaches the dump. User: "Im Spielstand muss alles stehen, was potenziell hilfreich ist."
+  Placement (user order 21.10.2026): queue as a new point directly after point 1405 in the work order.
+  Source: user request 21.10.2026 (chat session 7ee60c4b), spec cut from 3063698ad; approved: "ja".
+  Bundle: Dorfleben.
+- [ ] 1414. Fishery figure at the canoe squats with his head inside the fish basket
+  The man in dark blue squatting at the beached canoe has his head buried in the woven fish basket: the basket stays near standing head height while he crouches and leans to the hull. Done when the basket clears the head in every squat and lean phase, with a Vitest asserting basket-head clearance over the whole swap cycle, judged in a capture.
+  Suspects: RiverFishery.tsx placeBasket case netman (fixed height ground+0.55-0.45*reach, 0.45 m ahead) against the placeNetMan squash and reachPose lean, or the carrier swap bend in carrierWalkPose while the basket is still at the carrier.
+  Source: user bug report KopfInKorb (/backup/hoa/local/KopfInKorb.zip), filed 21.10.2026 19:12Z.
+  Repro for all: seed 3318564123, Bambara village (place mode), position x/z -59.45/-130.99, build production 0562828, WebGPU.
+  Queue position: after the user-report points 1402-1405 (append-and-defer of a user-reported defect).
   Bundle: Dorfleben.
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
@@ -16034,3 +16043,4 @@ to land than a mechanism that needs a review.
   Verifiable: `polish-villagers --section=village-walk` green on WebGL 2 and WebGPU; a Vitest on the layer the fix touches.
   Criticality: medium - a red regression lane on the fallback backend.
   Bundle: Dorfleben.
+
