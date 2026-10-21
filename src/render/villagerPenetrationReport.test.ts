@@ -8,6 +8,7 @@ import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET } from '../config/balance'
 import { parseVillager } from './villagerAsset'
+import type { ShellSet } from './villagerShell'
 
 type Column = 'cloth' | 'shown' | 'hole' | 'cut' | 'inner' | 'innerHole'
 interface Garment {
@@ -17,12 +18,19 @@ interface Garment {
   clips: Record<string, number>
   cases: Record<string, { value: number; at: string; over: number }>
 }
+/** penetration.py shell_rows: one shell's three rows */
+interface ShellRow {
+  checked: number
+  own: { min: number; max: number; under: number; at: string | null; off: number }
+  other: { frames: number; cases: [number, string, string, string][] }
+  legacy: Record<string, { value: number; at: string | null; frames: number }>
+}
 interface Report {
   tolerance: number
   build: Record<string, Garment & Record<Column, { value: number }>>
   garments: Record<string, Garment & Record<Column, { value: number }>>
   /** the shell garments' own rows (render/villagerShell.ts) */
-  shells?: Record<string, unknown>
+  shells?: Record<string, ShellRow>
 }
 
 const dir = resolve(__dirname, '../../verification/villager-body')
@@ -88,9 +96,12 @@ function worseThanMain(r: Report, base: Report, buildOnly = false): string[] {
 
 describe('the visible-only penetration report', () => {
   let exported: string[] = []
+  let shellSet: ShellSet | null = null
   beforeAll(async () => {
     const buf = readFileSync(resolve(__dirname, '../../public/models/villager.glb'))
-    exported = Object.keys((await parseVillager(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))).clips)
+    const asset = await parseVillager(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+    exported = Object.keys(asset.clips)
+    shellSet = asset.shells
   })
 
   it('measures every clip the asset exports that main never measured, with the columns of the clips it derives from', () => {
@@ -116,6 +127,47 @@ describe('the visible-only penetration report', () => {
       // a report compared against main (--baseline) names them, never as unchecked
       const against = md.split('## Against main')[1]
       if (against && (n in main.garments || n in main.build)) expect(against, n).toContain(`\`${n}\` migrated`)
+    }
+  })
+
+  // coverage, finite values and sanity bounds only: no penetration threshold
+  // is a gate (point 1339); the shell rows are information
+  it('measures every migrated shell over every exported pose at every corner, finite and within sanity bounds', () => {
+    expect(shellSet, 'the asset carries its shell set').not.toBeNull()
+    const finite = (x: unknown) => typeof x === 'number' && Number.isFinite(x)
+    // shell_rows walks the exported clips at every corner, the legacy rows add the shoulders clip
+    const anyLegacy = Object.values(now.garments)[0]
+    const poses = anyLegacy.checked - (anyLegacy.checkedClips.shoulders ?? 0)
+    expect(poses).toBeGreaterThan(0)
+    for (const n of MIGRATED) {
+      const r = now.shells?.[n]
+      expect(r, n).toBeDefined()
+      const { own, other, legacy } = r!
+      expect(r!.checked, n).toBe(poses)
+      // the offset the recipe gives, unscaled ((base + rank × step), shells.py offset)
+      const g = shellSet!.garments[n]
+      expect(own.off, n).toBeCloseTo(g.base + g.rank * shellSet!.step, 9)
+      for (const x of [own.min, own.max, own.off, own.under]) expect(finite(x), `${n} row one ${x}`).toBe(true)
+      expect(own.min, n).toBeGreaterThanOrEqual(0)
+      expect(own.min, n).toBeLessThanOrEqual(own.max)
+      // a shell stands at its offset from its own source's triangles
+      expect(own.max, n).toBeLessThanOrEqual(own.off + shellSet!.step)
+      expect(own.under, n).toBeLessThanOrEqual(r!.checked)
+      expect(own.at, n).toMatch(/frame \d+/)
+      expect(other.frames, n).toBeLessThanOrEqual(r!.checked)
+      expect(other.cases.length, n).toBeLessThanOrEqual(Math.max(other.frames, 0))
+      for (const [d, from, hit, at] of other.cases) {
+        // row two searches within one offset
+        expect(finite(d) && d >= 0 && d <= own.off + 1e-9, `${n} row two ${d}`).toBe(true)
+        expect([from, hit, at].every((x) => typeof x === 'string' && x.length > 0), `${n} row two names`).toBe(true)
+      }
+      for (const [o, e] of Object.entries(legacy)) {
+        expect(now.garments[o], `${n} under ${o}`).toBeDefined()
+        expect(layer(o), `${n} under ${o}`).toBeGreaterThan(layer(n))
+        expect(finite(e.value) && e.value >= 0, `${n} under ${o}: ${e.value}`).toBe(true)
+        expect(e.frames, `${n} under ${o}`).toBeLessThanOrEqual(r!.checked)
+        if (e.value > 0) expect(e.at, `${n} under ${o}`).toMatch(/frame \d+/)
+      }
     }
   })
 
