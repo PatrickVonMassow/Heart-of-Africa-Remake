@@ -731,7 +731,14 @@ function directIntentOfParsed(seg) {
     const args = argsOf(seg)
     if (args.some((a) => a.text === '-delete')) return 'write'
     const i = args.findIndex((a) => a.text === '-exec' || a.text === '-execdir')
-    if (i >= 0 && args[i + 1]) return WRITING_HEADS.has(baseOf(args[i + 1].text)) ? 'write' : 'read'
+    if (i >= 0 && args[i + 1]) {
+      // The program behind -exec runs: a mutating script there is a run, too.
+      const [prog, ...rest] = args.slice(i + 1).map((a) => baseOf(a.text))
+      if (MUTATING_SCRIPTS.has(prog) || (INTERPRETERS.has(prog) && rest.some((t) => MUTATING_SCRIPTS.has(t)))) {
+        return 'write'
+      }
+      return WRITING_HEADS.has(prog) ? 'write' : 'read'
+    }
   }
   if (head === 'git') return gitIntent(seg)
   if (head === 'npm' || head === 'pnpm' || head === 'yarn') return packageIntent(seg)

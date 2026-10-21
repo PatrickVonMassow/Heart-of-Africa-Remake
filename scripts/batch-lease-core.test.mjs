@@ -505,7 +505,12 @@ describe('the main-write ownership fence', () => {
     ]) {
       expect(decide({ command, ownsBatchLock: false, ...root })).toEqual({ block: false, registerWriter: false, reason: '' })
     }
-    for (const command of ['node scripts/land-point.mjs 1', 'echo x > src/a.ts', 'git commit -m x']) {
+    for (const command of [
+      'node scripts/land-point.mjs 1',
+      'find . -maxdepth 0 -exec node scripts/land-point.mjs 1 \\;',
+      'echo x > src/a.ts',
+      'git commit -m x',
+    ]) {
       expect(decide({ command, ownsBatchLock: false, ...root }).block).toBe(true)
       expect(decide({ command, ownsBatchLock: true, ...root })).toEqual({ block: false, registerWriter: true, reason: '' })
     }
