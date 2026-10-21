@@ -911,6 +911,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
   it.each([
     'Get-Content f | Select-String y',
     'Get-ChildItem | Select-String "a|b?"',
+    "Get-Content f | Select-String -Pattern 'a.*b' -CaseSensitive",
     'get-date',
     "Get-Content 'notes; draft.md'",
     'node scripts\\board.mjs vdzk-keep "Kartenschrift?"',
@@ -935,6 +936,8 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     "Get-Content 'notes?.md'",
     "Select-String 'x?' scripts/fin*",
     "Get-Content f | Select-String 'x' -Path 'scripts/f*'",
+    "Get-ChildItem scripts | Select-String -Pattern '.' -Include '*fin[d]ing.mjs'",
+    "Get-ChildItem scripts | Select-String 'x?' -Exclude 'a*'",
     "Get-ChildItem 'Scripts\\Fin?ing.MJS' | Select-String x",
     "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
   ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))

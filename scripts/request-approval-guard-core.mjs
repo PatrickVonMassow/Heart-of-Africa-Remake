@@ -315,6 +315,8 @@ const blankQuotes = (src, shell) => src.replace(QUOTED[shell === 'powershell' ? 
 
 const READ_PROGRAMS = new Set(['rg', 'grep', 'cat', 'head', 'tail', 'wc', 'sort', 'uniq', 'cut', 'tr', 'ls', 'date'])
 const READ_CMDLETS = new Set(['select-string', 'get-content', 'get-childitem', 'get-date'])
+/** Select-String options that leave a glob a regex pattern (no -Path, -Include, -Exclude). */
+const PATTERN_OPTIONS = /^-(pattern|simplematch|casesensitive|notmatch|allmatches|quiet|list|noemphasis|raw)$/i
 const GIT_READS = new Set(['log', 'status', 'diff', 'show', 'blame', 'branch', 'rev-parse'])
 /** Option words that make an otherwise reading program run another program or write a file. */
 const EXECUTING = { rg: /^--(pre|hostname-bin)/, sort: /^(--co|--o|-[^-]*o)/ }
@@ -358,10 +360,10 @@ function isReadSegment(words, quoted, shell, alone, piped) {
   if (alone && program === 'node' && !quoted[1] && LITERAL_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
   if (shell === 'powershell') {
     // -Path expands filesystem wildcards even when quoted (`?` may match nothing);
-    // a glob is a mere pattern only for a piped Select-String without a path
+    // a glob is a mere pattern only for a piped Select-String with pattern options only
     const cmdlet = program.toLowerCase()
     if (!READ_CMDLETS.has(cmdlet) || !args.some((a) => /[*?[]/.test(a))) return READ_CMDLETS.has(cmdlet)
-    return cmdlet === 'select-string' && piped && !args.some((a) => /^-(path|literalpath|pspath|lp)/i.test(a))
+    return cmdlet === 'select-string' && piped && args.every((a) => !a.startsWith('-') || PATTERN_OPTIONS.test(a))
   }
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
   if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))
