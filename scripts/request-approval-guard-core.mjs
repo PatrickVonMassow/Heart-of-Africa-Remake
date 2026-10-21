@@ -325,8 +325,12 @@ const SED_ADDR = String.raw`(?:\d+|\$|/(?:\\.|[^/\\])*/)`
 const SED_SCRIPT = new RegExp(
   String.raw`^(?:\s*(?:${SED_ADDR}(?:,${SED_ADDR})?)?\s*!?\s*(?:[p=lq]|s/(?:\\.|[^/\\])*/(?:\\.|[^/\\])*/[gpiI0-9]*)\s*(?:;|$))+$`,
 )
-/** node -e script words that could reach a process, a file write or a re-read; an escape or template could spell any of them. */
-const NODE_ESCAPE = /require|import|process|child_process|\bfs\b|eval|Function|constructor|global|this|module|Reflect|Proxy|\[|\\|`/
+/**
+ * The one node -e script admitted: the Berlin timestamp the UserPromptSubmit
+ * hook prescribes (U13). A keyword blacklist over arbitrary JavaScript does not
+ * converge (Astra review of 9c9ea52: Function via a property descriptor).
+ */
+const NODE_STAMP = /^console\.log\(new Intl\.DateTimeFormat\('[\w-]+',\{[\w:'\-,/]*\}\)\.format\(new Date\(\)\)\)$/
 
 const REPO_SCRIPT = /^(\.[\\/])?scripts[\\/][\w\\/-]+(\.[\w-]+)*\.m?js$/
 /**
@@ -345,7 +349,7 @@ function isReadSegment(words, quoted, shell, alone) {
   if (program === undefined || quoted[0]) return false
   if (alone && program === 'node' && !quoted[1] && REPO_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
   if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase())
-  if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && !mentionsMarker(args[1]) && !NODE_ESCAPE.test(args[1])
+  if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
   if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))
   if (program === 'sed') {
     const options = args.filter((a) => a.startsWith('-'))
@@ -353,8 +357,8 @@ function isReadSegment(words, quoted, shell, alone) {
     return options.length === 1 && options[0] === '-n' && operands.length >= 1 && SED_SCRIPT.test(operands[0])
   }
   if (!READ_PROGRAMS.has(program)) return false
-  // uniq's second operand is an output file
-  if (program === 'uniq' && args.filter((a) => a === '-' || !a.startsWith('-')).length > 1) return false
+  // uniq's second operand is an output file; after `--` any word may be one
+  if (program === 'uniq' && (args.includes('--') || args.filter((a) => a === '-' || !a.startsWith('-')).length > 1)) return false
   return !(EXECUTING[program] && args.some((a) => EXECUTING[program].test(a)))
 }
 

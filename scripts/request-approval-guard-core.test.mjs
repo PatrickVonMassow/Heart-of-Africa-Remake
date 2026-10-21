@@ -895,6 +895,8 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'cat f | sort -uo scripts/x.mjs',
     'cat f | sort --output=scripts/x.mjs',
     'cat f | uniq - scripts/x.mjs',
+    'cat payload | uniq -- - -out',
+    `node -e 'Object.getOwnPropertyDescriptor(Object.getPrototypeOf(()=>0),"constr"+"uctor").value("return pro"+"cess")()'`,
   ])('still judged: %s', (command) => judged(command))
 
   it('a judged non-canonical read still meets the chat refusal', () => {
