@@ -316,17 +316,25 @@ const blankQuotes = (src, shell) => src.replace(QUOTED[shell === 'powershell' ? 
 const READ_PROGRAMS = new Set(['rg', 'grep', 'cat', 'head', 'tail', 'wc', 'sort', 'uniq', 'cut', 'tr', 'ls', 'date'])
 const READ_CMDLETS = new Set(['select-string', 'get-content', 'get-childitem', 'get-date'])
 const GIT_READS = new Set(['log', 'status', 'diff', 'show', 'blame', 'branch', 'rev-parse'])
-/** Option words that make an otherwise reading program run another program. */
-const EXECUTING = { rg: /^--(pre|hostname-bin)/, sort: /^--co/ }
+/** Option words that make an otherwise reading program run another program or write a file. */
+const EXECUTING = { rg: /^--(pre|hostname-bin)/, sort: /^(--co|--o|-[^-]*o)/ }
+/** git options that run a helper or editor, or write a file (Astra review of ea049bf). */
+const GIT_EXECUTING = /^--(ext-diff|textconv|output|edit|exec|upload|open-files|config-env)/
 /** sed -n scripts: addressed p/=/l/q commands and s/// with harmless flags only (no e, w, r). */
 const SED_ADDR = String.raw`(?:\d+|\$|/(?:\\.|[^/\\])*/)`
 const SED_SCRIPT = new RegExp(
   String.raw`^(?:\s*(?:${SED_ADDR}(?:,${SED_ADDR})?)?\s*!?\s*(?:[p=lq]|s/(?:\\.|[^/\\])*/(?:\\.|[^/\\])*/[gpiI0-9]*)\s*(?:;|$))+$`,
 )
-/** node -e script words that could reach a process, a file write or a re-read. */
-const NODE_ESCAPE = /require|import|process|child_process|\bfs\b|eval|Function|constructor|global|this|module|Reflect|Proxy|\[/
+/** node -e script words that could reach a process, a file write or a re-read; an escape or template could spell any of them. */
+const NODE_ESCAPE = /require|import|process|child_process|\bfs\b|eval|Function|constructor|global|this|module|Reflect|Proxy|\[|\\|`/
 
 const REPO_SCRIPT = /^(\.[\\/])?scripts[\\/][\w\\/-]+(\.[\w-]+)*\.m?js$/
+/**
+ * May a repo script receive this word even if it hands it to a shell? No
+ * substitution, escape, brace, bracket, tilde or extglob, and no piece whose
+ * glob could match a marker (Astra review of ea049bf: a forwarding helper).
+ */
+const forwardSafe = (word) => !/[$`\\{}[~]|[@+!]\(/.test(word) && !word.split(/[\s;|&]+/).some(globHitsMarker)
 
 /**
  * Is one pipeline segment's word list a pure read? `words` are the values,
@@ -335,16 +343,18 @@ const REPO_SCRIPT = /^(\.[\\/])?scripts[\\/][\w\\/-]+(\.[\w-]+)*\.m?js$/
 function isReadSegment(words, quoted, shell, alone) {
   const [program, ...args] = words
   if (program === undefined || quoted[0]) return false
-  if (alone && program === 'node' && !quoted[1] && REPO_SCRIPT.test(args[0] ?? '')) return true
+  if (alone && program === 'node' && !quoted[1] && REPO_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
   if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase())
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && !mentionsMarker(args[1]) && !NODE_ESCAPE.test(args[1])
-  if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1]
+  if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))
   if (program === 'sed') {
     const options = args.filter((a) => a.startsWith('-'))
     const operands = args.filter((a) => !a.startsWith('-'))
     return options.length === 1 && options[0] === '-n' && operands.length >= 1 && SED_SCRIPT.test(operands[0])
   }
   if (!READ_PROGRAMS.has(program)) return false
+  // uniq's second operand is an output file
+  if (program === 'uniq' && args.filter((a) => a === '-' || !a.startsWith('-')).length > 1) return false
   return !(EXECUTING[program] && args.some((a) => EXECUTING[program].test(a)))
 }
 

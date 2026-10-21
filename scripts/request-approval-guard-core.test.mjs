@@ -835,7 +835,9 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     STAMP,
     // measured 21.10.2026: a quoted ?, ;, | or * in a canonical command is literal
     'node scripts/board.mjs vdzk-keep "Kartenschrift für die Anweisungstexte?"',
-    'node scripts/ask-astra.mjs --kind enumerate --brief "read problem.md; answer | why *"',
+    'node scripts/ask-astra.mjs --kind enumerate --brief "read problem.md; answer | why *.md"',
+    'git diff --stat main | tail -1',
+    'sort -u f | uniq -c',
   ])('allowed: %s', (command) => allowed(command))
 
   it('the hook timestamp is exactly the command berlin-timestamp.cjs prescribes', () => {
@@ -878,6 +880,21 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'node scripts/x.mjs "a?" | head',
     'node --import ./x.mjs scripts/x.mjs "a?"',
     "find . -name '*.ts'",
+    // cross-vendor review of ea049bf (GPT-6 Astra): escapes, forwarding helpers, executing and writing modes
+    `node -e 'requ\\u0069re("child_pro"+"cess").execSync("node scripts/fin"+"ding.mjs --re"+"quest Hidden")'`,
+    `cat f | node -e 'requ\\u0069re("child_pro"+"cess")'`,
+    'node -e "`${1}`"',
+    "node scripts/runner.mjs 'node scripts/fin${X:-d}ing.mjs --re${Y:-q}uest Hidden'",
+    'node scripts/runner.mjs "node scripts/fin?ing.mjs x"',
+    'node scripts/runner.mjs "run *"',
+    'git diff --ext-diff HEAD | head',
+    'git log --textconv -p | head',
+    'git branch --edit-description | head',
+    'git diff --output=scripts/x.mjs | head',
+    'sort -o scripts/x.mjs payload | head',
+    'cat f | sort -uo scripts/x.mjs',
+    'cat f | sort --output=scripts/x.mjs',
+    'cat f | uniq - scripts/x.mjs',
   ])('still judged: %s', (command) => judged(command))
 
   it('a judged non-canonical read still meets the chat refusal', () => {
