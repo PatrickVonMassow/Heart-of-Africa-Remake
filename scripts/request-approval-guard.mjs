@@ -26,7 +26,7 @@
 // a cooperative session from forgetting the rule; it is no shell parser and
 // does not try to win against an adversary.
 // NOT JUDGED (21.10.2026): a pure read pipeline (rg, grep, cat, head, git log
-// … joined only by `|`, see isPureRead) and a direct `node scripts/<name>.mjs`
+// … joined only by `|`, see isPureRead) and a direct `node scripts/board.mjs`
 // call read their quoted words literally, so a quoted `?`, `*`, `;` or `|`
 // there no longer makes them possible deposits.
 // ACCEPTED FALSE POSITIVES: a command that merely MENTIONS `finding.mjs` or

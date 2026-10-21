@@ -304,7 +304,7 @@ export function isPossibleDeposit(command, shell = 'bash') {
 // A read command hands its words to no shell, so a QUOTED word is literal
 // there: `?`, `*`, `;`, `|`, braces or whitespace inside quotes assemble no
 // marker. Unquoted words are still judged by couldExpandToMarker. The same
-// holds for one direct `node scripts/<name>.mjs` call on its own (measured
+// holds for one direct `node scripts/board.mjs` or `ask-astra.mjs` call on its own (measured
 // 21.10.2026: `board.mjs vdzk-keep "…?"` and `ask-astra.mjs --brief "…; …"`
 // were refused); a re-reader (bash -c, eval, xargs, find -exec …) is on no list.
 
@@ -332,7 +332,12 @@ const SED_SCRIPT = new RegExp(
  */
 const NODE_STAMP = /^console\.log\(new Intl\.DateTimeFormat\('[\w-]+',\{[\w:'\-,/]*\}\)\.format\(new Date\(\)\)\)$/
 
-const REPO_SCRIPT = /^(\.[\\/])?scripts[\\/][\w\\/-]+(\.[\w-]+)*\.m?js$/
+/**
+ * The repo scripts measured refusing a quoted `?`/`;` (21.10.2026). Both take
+ * their arguments as data and pass none to a shell; any other script may
+ * forward one (Astra review of a9c598d), so it is on no list.
+ */
+const LITERAL_SCRIPT = /^(\.[\\/])?scripts[\\/](board|ask-astra)\.mjs$/
 /**
  * May a repo script receive this word even if it hands it to a shell? Only
  * prose characters (letters, digits, whitespace, punctuation without quotes,
@@ -349,7 +354,7 @@ const forwardSafe = (word) => PROSE.test(word) && !word.split(/[^\p{L}\p{N}._/?=
 function isReadSegment(words, quoted, shell, alone) {
   const [program, ...args] = words
   if (program === undefined || quoted[0]) return false
-  if (alone && program === 'node' && !quoted[1] && REPO_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
+  if (alone && program === 'node' && !quoted[1] && LITERAL_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
   // the cmdlets' -Path expands wildcards even when quoted
   if (shell === 'powershell') return READ_CMDLETS.has(program.toLowerCase()) && !args.some((a) => a.replace(/\\/g, '/').split(/[\s;|,]+/).some(globHitsMarker))
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])

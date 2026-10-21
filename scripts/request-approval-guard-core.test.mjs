@@ -899,6 +899,8 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     `node scripts/runner.mjs 'node scripts/"fin"*.mjs X'`,
     "node scripts/runner.mjs 'node scripts/fin*.mjs</dev/null X'",
     "node scripts/runner.mjs 'node scripts/fin?ing.mjs</dev/null X'",
+    "node scripts/runner.mjs 'printf %s scripts/fin ding.mjs,--re quest,Hidden | xargs -d , node'",
+    'node scripts/runner.mjs "plain prose?"',
     `node -e 'Object.getOwnPropertyDescriptor(Object.getPrototypeOf(()=>0),"constr"+"uctor").value("return pro"+"cess")()'`,
   ])('still judged: %s', (command) => judged(command))
 
