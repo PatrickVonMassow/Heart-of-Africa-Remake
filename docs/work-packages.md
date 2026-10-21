@@ -123,6 +123,7 @@ spread out. Its order inside the bundle is 442 first (largest lever, smallest
 change) and 449 last, because the drill is what makes the others more than a claim.
 
 **Not bundled**, each for its own reason:
+- **#1407, #1408, #1409, #1410, #1411** — the user's guard and no-loss orders of 21.10.2026 at the queue front. Each edits its own guard or doctor core (request-approval, Stop guards, board-first, main-write, batch-doctor/finding carrier); 1409 and 1410 share the lock-holder predicate and are not worked beside each other.
 
 - **#184, #200, #203, #205, #207** — the big audits. They sweep the whole codebase and would
   swallow any bundle they were put in.
