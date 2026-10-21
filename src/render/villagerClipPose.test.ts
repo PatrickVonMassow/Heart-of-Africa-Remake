@@ -10,7 +10,7 @@ import { balance, VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../config
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, gaitFootGround, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitFootGround, heelOff, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, gaitAt, gaitWeights, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
 
@@ -486,6 +486,43 @@ describe('the clip gait on the ground', () => {
         }
       }
     }
+  })
+
+  it('a pivot carried across the reach of leg and foot in one line moves the ankle and foot without a jump', () => {
+    // review 21.10.2026: the lift to the reach ended at the horizontal limit,
+    // so a low pivot just past it dropped back down and the pose jumped
+    const n = asset.bones.length
+    const f = adult.frame
+    const world = newWorld(n)
+    forwardKinematics(asset, f.rest0, newPose(n), world)
+    const [thigh, shin, foot] = ['thigh.L', 'shin.L', 'foot.L'].map((b) => asset.bones.indexOf(b))
+    const hip = world.p[thigh]
+    const toPivot = new THREE.Vector3(0, -0.02, 0.1)
+    const solve = (x: number) => {
+      const target = new THREE.Vector3(hip.x, hip.y - 0.4, hip.z + x)
+      const q = new THREE.Quaternion()
+      const out = heelOff(f, world, thigh, shin, foot, target, toPivot, q)
+      return { out, target, q }
+    }
+    // the largest change between neighbouring samples: a steep but continuous
+    // turn shrinks with the sample spacing, a jump keeps its size
+    const largest = (h: number) => {
+      let prev = solve(0.3)
+      let ankle = 0
+      let turn = 0
+      for (let k = 1; 0.3 + k * h <= 3; k++) {
+        const s = solve(0.3 + k * h)
+        expect(s.out).not.toBe('out')
+        ankle = Math.max(ankle, s.target.distanceTo(prev.target))
+        turn = Math.max(turn, s.q.angleTo(prev.q))
+        prev = s
+      }
+      return { ankle, turn }
+    }
+    const coarse = largest(1e-3)
+    const fine = largest(1e-4)
+    expect(fine.ankle).toBeLessThan(coarse.ankle / 2)
+    expect(fine.turn).toBeLessThan(coarse.turn / 2)
   })
 
   it('walk → jog → sprint is continuous: a small change of pace moves no joint by a jump', () => {

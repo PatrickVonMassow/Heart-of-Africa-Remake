@@ -234,7 +234,7 @@ function flatAnkle(asset: VillagerAsset, frame: PersonFrame, side: 'L' | 'R'): n
  * tremble at every toe-off). 'out' only where no direction to the pivot is
  * defined.
  */
-function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion): 'reached' | 'rolled' | 'out' {
+export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion): 'reached' | 'rolled' | 'out' {
   const hip = world.p[thigh]
   const reach = (legLength(frame.rest0, thigh, shin, foot) - 1e-4) * G.legReach
   if (hip.distanceTo(target) <= reach) return 'reached'
@@ -242,10 +242,11 @@ function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: numb
   const d = toPivot.length()
   // beyond the leg and foot in one line the pivot lifts straight up off its
   // spot to that reach (a toe-off: the contact leaves the ground, it does not
-  // slide along it); dragged toward the hip only where even that falls short
+  // slide along it); dragged toward the hip only where even that falls short,
+  // there at hip height, where the lift ends, so the pose does not jump
   const far = reach + d
   const flat = Math.hypot(pivot.x - hip.x, pivot.z - hip.z)
-  if (pivot.distanceTo(hip) > far && flat < far) pivot.y = Math.max(pivot.y, hip.y - Math.sqrt(far * far - flat * flat))
+  if (pivot.distanceTo(hip) > far) pivot.y = Math.max(pivot.y, hip.y - Math.sqrt(Math.max(0, far * far - flat * flat)))
   const axis = _hoAx.copy(pivot).sub(hip)
   const D = axis.length()
   if (D < 1e-6) return 'out'
