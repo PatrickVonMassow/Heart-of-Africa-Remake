@@ -316,6 +316,8 @@ const blankQuotes = (src, shell) => src.replace(QUOTED[shell === 'powershell' ? 
 const READ_PROGRAMS = new Set(['rg', 'grep', 'cat', 'head', 'tail', 'wc', 'sort', 'uniq', 'cut', 'tr', 'ls', 'date'])
 const READ_CMDLETS = new Set(['select-string', 'get-content', 'get-childitem', 'get-date'])
 /** Select-String options that leave a glob a regex pattern (no -Path, -Include, -Exclude). */
+/** Every dash PowerShell's tokenizer reads as a parameter prefix. */
+const PS_DASH = /^[-\u2013\u2014\u2015]/
 const PATTERN_OPTIONS = /^-(pattern|simplematch|casesensitive|notmatch|allmatches|quiet|list|noemphasis|raw)$/i
 const GIT_READS = new Set(['log', 'status', 'diff', 'show', 'blame', 'branch', 'rev-parse'])
 /** Option words that make an otherwise reading program run another program or write a file. */
@@ -363,7 +365,7 @@ function isReadSegment(words, quoted, shell, alone, piped) {
     // a glob is a mere pattern only for a piped Select-String with pattern options only
     const cmdlet = program.toLowerCase()
     if (!READ_CMDLETS.has(cmdlet) || !args.some((a) => /[*?[]/.test(a))) return READ_CMDLETS.has(cmdlet)
-    return cmdlet === 'select-string' && piped && args.every((a) => !a.startsWith('-') || PATTERN_OPTIONS.test(a))
+    return cmdlet === 'select-string' && piped && args.every((a) => !PS_DASH.test(a) || PATTERN_OPTIONS.test(a.replace(PS_DASH, '-')))
   }
   if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
   if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some((a) => GIT_EXECUTING.test(a))

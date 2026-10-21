@@ -938,6 +938,8 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     "Get-Content f | Select-String 'x' -Path 'scripts/f*'",
     "Get-ChildItem scripts | Select-String -Pattern '.' -Include '*fin[d]ing.mjs'",
     "Get-ChildItem scripts | Select-String 'x?' -Exclude 'a*'",
+    "Get-ChildItem scripts | Select-String -Pattern '.' \u2013Include '*fin[d]ing.mjs'",
+    "Get-ChildItem scripts | Select-String 'x?' \u2014Path 'a*'",
     "Get-ChildItem 'Scripts\\Fin?ing.MJS' | Select-String x",
     "Get-ChildItem 'scripts/fin*.mjs' | Select-String x",
   ])('still judged in PowerShell: %s', (command) => judged(command, 'powershell'))
