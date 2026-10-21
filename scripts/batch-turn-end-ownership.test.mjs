@@ -57,9 +57,10 @@ describe('turnEndOwnership — the acquire decision', () => {
   it('an interactive non-claimant does NOT take a freed lock', () => {
     expect(turnEndOwnership({ interactive: true })).toEqual({ mayAcquire: false, invitation: null })
   })
-  it('an unattended session takes it, and an unproven one keeps the never-ownerless path', () => {
+  it('an unattended session takes it; an unproven one (empty or unreadable transcript) takes nothing', () => {
     expect(turnEndOwnership({ interactive: false })).toEqual({ mayAcquire: true, invitation: 'unattended' })
-    expect(turnEndOwnership({ interactive: null })).toEqual({ mayAcquire: true, invitation: 'unattended' })
+    expect(turnEndOwnership({ interactive: null })).toEqual({ mayAcquire: false, invitation: null })
+    expect(turnEndOwnership({})).toEqual({ mayAcquire: false, invitation: null })
   })
   it("a lock held here or the window's own claim invites even an interactive window", () => {
     expect(turnEndOwnership({ heldHere: true, interactive: true })).toMatchObject({ mayAcquire: true, invitation: 'held' })
@@ -150,12 +151,10 @@ describe('drill: an owner dies beside a live interactive window', () => {
     expect(readOwnerLock(lockPath).sessionId).toBe('worker-9')
   })
 
-  // PINNED TARGET, NOT YET MET (reported as its own finding 21.10.2026): right
-  // after /clear a chat window's transcript is empty, `transcriptShowsPerson`
-  // reads it as unproven, and the never-ownerless path lets the window take a
-  // free lock — after which every later batch-duty Stop guard binds it. The
-  // acquisition rule is frozen here; `it.fails` turns red once it is fixed.
-  it.fails('a chat window right after /clear (lock free, transcript empty) neither acquires nor owes duties', () => {
+  // Right after /clear a chat window's transcript is empty, `transcriptShowsPerson`
+  // reads it as unproven, and an unproven transcript takes nothing (finding
+  // 21.10.2026) — else every later batch-duty Stop guard would bind the window.
+  it('a chat window right after /clear (lock free, transcript empty) neither acquires nor owes duties', () => {
     const plan = invitation('chat-after-clear', transcript('cleared', ''))
     expect(plan.mayAcquire).toBe(false)
   })
