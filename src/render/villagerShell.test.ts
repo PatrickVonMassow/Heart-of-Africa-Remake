@@ -45,6 +45,37 @@ function loops(index: number[], faces: number[]): number[][] {
   return out
 }
 
+/** Every seam the stacked outfit needs, derived from face adjacency alone: per
+ *  undirected edge whose two faces show different surfaces on top (the
+ *  highest-rank worn shell drawn there, or the skin), the higher side's shell
+ *  and the lower side's offset — one strip each, nothing elsewhere. */
+function expectedSeams(index: number[], fmask: Uint32Array, set: ShellSet, worn: string[], scale: number) {
+  const off = (n: string) => (set.garments[n].base + set.garments[n].rank * set.step) * scale
+  const top = (f: number) => {
+    let best: string | null = null
+    for (const n of worn) if (fmask[f] & (1 << set.garments[n].bit) && (best === null || set.garments[n].rank > set.garments[best].rank)) best = n
+    return best
+  }
+  const faces = new Map<string, number[]>()
+  for (let f = 0; f < index.length / 3; f++)
+    for (let e = 0; e < 3; e++) {
+      const a = index[f * 3 + e]
+      const b = index[f * 3 + ((e + 1) % 3)]
+      const k = `${Math.min(a, b)}|${Math.max(a, b)}`
+      faces.set(k, [...(faces.get(k) ?? []), f])
+    }
+  const out = new Map<string, Array<[string, number]>>()
+  for (const [k, fs] of faces) {
+    // an open mesh edge (the tube's ends) has the skin across it
+    const [p, q] = fs.length === 2 ? fs.map(top) : [top(fs[0]), null]
+    const [op, oq] = [p ? off(p) : 0, q ? off(q) : 0]
+    if (Math.abs(op - oq) < 1e-9) continue
+    const [hi, lo] = op > oq ? [p!, oq] : [q!, op]
+    out.set(k, [[hi, Math.round(lo * 1e6) / 1e6]])
+  }
+  return out
+}
+
 describe('villager shell garments (render/villagerShell.ts)', () => {
   const nx = 8
   const t = tube(nx, 8)
@@ -115,6 +146,54 @@ describe('villager shell garments (render/villagerShell.ts)', () => {
     // the strip's inner row coincides with the lower shell's edge vertices
     const onA = new Set([...b.A.src].map((s, k) => `${s}|${b.A.off[k].toFixed(6)}`))
     for (let k = 0; k < b.B.src.length; k++) if (b.B.off[k] > 0 && b.B.off[k] < 0.6 - 1e-6) expect(onA.has(`${b.B.src[k]}|${b.B.off[k].toFixed(6)}`)).toBe(true)
+  })
+
+  it('emits exactly the seams face adjacency derives, both endpoints at the two offsets', () => {
+    for (const worn of [['A'], ['A', 'B'], ['A', 'C'], ['B', 'C'], ['A', 'B', 'C']]) {
+      const b = buildShells(t.index, t.vertices, fmask, set, worn, 2, null)
+      expect(quadsOf(b), worn.join('+')).toEqual(expectedSeams(t.index, fmask, set, worn, 2))
+      for (const [n, x] of Object.entries(b))
+        for (let f = 0; f < x.rim.length; f += 2) {
+          if (!x.rim[f]) continue
+          const [ah, al, bl, , , bh] = x.index.slice(f * 3, f * 3 + 6)
+          const hi = (set.garments[n].base + set.garments[n].rank * set.step) * 2
+          expect([x.off[ah], x.off[bh]].map((o) => o.toFixed(6))).toEqual([hi.toFixed(6), hi.toFixed(6)])
+          expect(x.off[al]).toBeCloseTo(x.off[bl], 9)
+        }
+    }
+  })
+
+  it('steps a seam per edge where the far surface changes along one loop (two collars crossing)', () => {
+    // N rank 1 on rows 4..6 all round; K rank 2 on rows 2..4 over half the
+    // circumference only: K's row 4 meets N on one half, its side edges and
+    // row 2 meet the skin, and N's row 4 meets K on one half and skin on the other
+    const w2 = new Uint32Array(t.vertices)
+    for (let v = 0; v < t.vertices; v++) {
+      const y = t.y(v)
+      const i = v % nx
+      w2[v] = (y >= 4 && y <= 6 ? 1 : 0) | (y >= 2 && y <= 4 && i <= nx / 2 ? 2 : 0)
+    }
+    const fm2 = faceMasks(t.index, w2)
+    const of = (bit: number) => [...fm2.keys()].filter((f) => fm2[f] & (1 << bit))
+    const s2: ShellSet = {
+      step: 0.1,
+      bits: ['N', 'K'],
+      garments: { N: { bit: 0, rank: 1, base: 0.1, rows: loops(t.index, of(0)) }, K: { bit: 1, rank: 2, base: 0.1, rows: loops(t.index, of(1)) } },
+    }
+    expect(s2.garments.K.rows.length).toBe(1)
+    const b = buildShells(t.index, t.vertices, fm2, s2, ['N', 'K'], 1, null)
+    const q = quadsOf(b)
+    const want = expectedSeams(t.index, fm2, s2, ['N', 'K'], 1)
+    expect(q).toEqual(want)
+    // K's one loop sees both far surfaces: N (0.2) along row 4, the skin elsewhere
+    const kFar = new Set([...q.values()].flat().filter(([n]) => n === 'K').map(([, o]) => o))
+    expect([...kFar].sort()).toEqual([0, 0.2])
+    // N's row 4 closes to the skin only where K does not stand over it
+    for (let i = 0; i < nx; i++) {
+      const a = t.vid(i, 4)
+      const c = t.vid(i + 1, 4)
+      expect(q.get(`${Math.min(a, c)}|${Math.max(a, c)}`)).toEqual(i < nx / 2 ? [['K', 0.2]] : [['N', 0]])
+    }
   })
 
   it('closes a shell alone to the skin, and cuts hidden sources', () => {
