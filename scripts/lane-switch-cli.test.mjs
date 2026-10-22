@@ -4,8 +4,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { currentLaneState } from './lane-switch.mjs'
-import { mergerModel } from './lane-switch-core.mjs'
+import { currentLaneState, usage } from './lane-switch.mjs'
+import { mergerModel, SWITCH_ROLES } from './lane-switch-core.mjs'
+import { usage as askUsage } from './ask-lane.mjs'
+import { EXECUTION_ROLES } from './model-lanes.mjs'
 import { CROSS, LEGACY, SCARCE } from './model-lanes.mjs'
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), 'lane-switch.mjs')
@@ -106,5 +108,16 @@ describe('lane-switch.mjs', () => {
     const result = run('--status')
     expect(result.status).toBe(1)
     expect(result.out).toContain('not valid JSON')
+  })
+})
+
+// The command index is generated from the usage SOURCE text, so the role lists
+// are literal there; these pins keep them equal to the registry.
+describe('literal role lists in usage text', () => {
+  it('lane-switch names every switch role', () => {
+    expect(usage()).toContain(`<${SWITCH_ROLES.join('|')}>`)
+  })
+  it('ask-lane names every execution role', () => {
+    expect(askUsage()).toContain(`--lane ${EXECUTION_ROLES.join('|')}]`)
   })
 })

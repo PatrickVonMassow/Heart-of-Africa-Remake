@@ -93,7 +93,8 @@ function gatherSections({ stdin = '', logs = [], diff = '', files = [] } = {}) {
 
 export const usage = () =>
   [
-    `usage: node scripts/ask-lane.mjs [--lane ${EXECUTION_ROLES.join('|')}] --kind <` + KINDS.join('|') + '> --brief "<the question>" \\',
+    // Literal role names: docs/command-index.md is generated from this source text.
+    'usage: node scripts/ask-lane.mjs [--lane main|cross|scarce|main-fallback] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
     '           [--file <path>]… [--log <path>]… [--diff <range>] [--timeout <ms>] [--anyway] [--json]',
     '',
     'Material also comes from stdin. Nothing is fetched by the model: this container cannot',
@@ -152,6 +153,13 @@ if (isMainModule(import.meta.url)) {
     if (argv.includes('--help') || argv.includes('-h')) {
       console.log(usage())
       process.exit(0)
+    }
+    // The retired selector is refused, never ignored: ignoring it would send the
+    // material to the default lane instead of the one asked for.
+    if (argv.includes('--model')) {
+      console.error('ask-lane: --model is retired; select the lane with --lane.\n')
+      console.error(usage())
+      process.exit(2)
     }
     const kind = normaliseKind(flag('--kind'))
     const brief = flag('--brief')

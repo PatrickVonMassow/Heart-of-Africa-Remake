@@ -9,7 +9,7 @@
 | `alert-escalation-core.mjs` | THE ESCALATION LADDER (point 434, the remainder of part 1) — the pure half. | — |
 | `alert-escalation.mjs` | THE ESCALATION LADDER (point 434, remainder of part 1) — the I/O half. | — |
 | `ask-lane-core.mjs` | THE READ-ONLY PATH TO THE CROSS LANE, GENERALISED BEYOND REVIEWS (point 654, A1). | — |
-| `ask-lane.mjs` | ASK A LANE FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-lane.mjs [--lane ${EXECUTION_ROLES.join('\|')}] --kind <` + KINDS.join('\|') + '> --brief "<the question>" \\ |
+| `ask-lane.mjs` | ASK A LANE FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-lane.mjs [--lane main\|cross\|scarce\|main-fallback] --kind <' + KINDS.join('\|') + '> --brief "<the question>" \\ |
 | `assertionHealth.mjs` | Pure detector for assertions whose outcome is FIXED (mostly: that cannot fail). | — |
 | `atomic-write.mjs` | Atomic JSON writes that survive a Windows moment (point 388, first live finding 28.07.2026). | — |
 | `attended-context-notice.mjs` | Durable once-per-session state for the attended context-ceiling notice. | — |
@@ -241,7 +241,7 @@
 | `lane-routing-core.mjs` | THE SWITCH THAT MOVES WORK BETWEEN THE MAIN CHAIN AND THE CROSS LANE (point 654, widened by 667). | — |
 | `lane-routing.mjs` | THE SWITCH THAT MOVES WORK TOWARDS THE CROSS LANE (work-order point 654, A2; widened by 667). | usage: node scripts/lane-routing.mjs --status \| --more \| --less \| --set <setting> [--json] |
 | `lane-switch-core.mjs` | The per-lane switch decisions (may a lane be used at all), plus the result-JSON parsing and the merger roster those decisions are read against. | — |
-| `lane-switch.mjs` | The only writer for the shared per-lane switch decisions. | usage: node scripts/lane-switch.mjs [--lane <${SWITCH_ROLES.join('\|')}>] --status \| |
+| `lane-switch.mjs` | The only writer for the shared per-lane switch decisions. | usage: node scripts/lane-switch.mjs [--lane <main\|cross\|scarce>] --status \| |
 | `launcher-stall-core.mjs` | Pure decision core of the launcher's OWN stall alarm (point 859). | — |
 | `local-bin.mjs` | WHERE A LOCALLY INSTALLED TOOL ACTUALLY IS — one resolver, not five copies. | — |
 | `lock-heartbeat-hook.mjs` | PostToolUse hook (matcher: every tool). | — |

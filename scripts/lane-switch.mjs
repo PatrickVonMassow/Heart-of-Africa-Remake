@@ -79,8 +79,9 @@ function allStatus() {
   })
 }
 
+// Literal role names: docs/command-index.md is generated from this source text.
 export const usage = () =>
-  `usage: node scripts/lane-switch.mjs [--lane <${SWITCH_ROLES.join('|')}>] --status | ` +
+  'usage: node scripts/lane-switch.mjs [--lane <main|cross|scarce>] --status | ' +
   '--lane <role> --on --why "<user instruction>" | --lane <role> --off --why "<user instruction>"'
 
 /** Parse argv into { role, action, why } or null. */
