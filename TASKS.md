@@ -77,21 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1407. No user instruction is ever lost: tick the carrier only after commit, the doctor stashes no task files, reconcile the carrier against TASKS.md
-  Rank: at the very front of the work order, ahead of 1402 (user order 21.10.2026).
-  Four eyes: GPT-6 Astra and Opus 5.5 analyse blind-parallel from identical inputs; a third model merges via scripts/blind-merge.mjs; cross-vendor review of the result.
-  What happened 21.10.2026: the carrier ticked "queued 1402..1406" at 10:31Z while the TASKS.md appends were only in the working tree, uncommitted. At 11:15Z batch-doctor --repair (ownerAlive=false, unhandled parallel alert) moved all dirty files incl. TASKS.md into stash doctor-quarantine-2026-10-21T11-15-21-622Z and judged "consistent". No check compared carrier ticks against TASKS.md; the loss was found only at 16:40 and restored by hand in 5ba920079. 218 quarantine stashes exist, none ever audited.
-  FINAL STATE:
-  1. A carrier entry becomes "queued N" only after a commit containing point N is pushed to main; until then it stays open.
-  2. batch-doctor never stashes TASKS.md, docs/tasks-archive.md or .claude/queue-rank.json silently; it secures them as a commit on a rescue branch and raises a loud alert.
-  3. A reconciliation runs at every doctor run, session start and in the post-merge gate: every "queued N" carrier entry must exist in TASKS.md or the archive; a mismatch is a red finding, never "consistent".
-  4. One-time sweep of all existing stashes for content not on main (user orders, quotes, points); findings are restored or filed.
-  VERIFIABLE: a Vitest replays the 21.10. sequence (append point, tick carrier, doctor --repair with ownerAlive=false) and ends with the point still in TASKS.md or with an alert, never a silent loss; a Vitest that a queued carrier entry without its TASKS.md point turns the reconciliation red.
-  Refs: scripts/batch-doctor.mjs, scripts/batch-doctor-core.mjs (quarantineStash, planRemediation), scripts/finding.mjs, .claude/doctor.log 2026-10-21T11:15, commit 5ba920079.
-  Criticality: HIGH - user orders were lost silently (data loss / false approval class, exempt from the infrastructure freeze per CLAUDE.md section 2).
-  Source: user 21.10.2026 (chat): "Wie kann so etwas passieren? Das ist absolut fatal. Wir brauche ganz vorne in der Queue einen neuen Punkt, der das Problem mit vier Augen analysiert und zuverlässig löst. Es darf nie etwas verlorengehen." Approved: "So einreihen".
-  Absorbs the carrier findings of 21.10.2026 "Doctor quarantine stash swallows committed-to-carrier TASKS.md appends" and "Doctor quarantine stashes carry unreviewed content" (final-state items 2 and 4).
-  Bundle: Chat & Tafel.
 - [ ] 1393. Generic model lanes; the cross-vendor lane switches to GPT-6.1
   Queue position: directly after point 1407 (user order 21.10.2026; before: directly before point 1347, user order 19.10.2026).
   Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.

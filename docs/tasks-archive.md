@@ -34529,3 +34529,19 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Charged finding 21.10.2026 ~22:00: the main pre-push unit gate went red under parallel load (a worktree vitest run and an Astra review beside it) and kept no test name; the immediate quiet rerun was green (608 files). Likely this class; unproven because the name is lost.
   Criticality: medium - a flaky unit gate reddens unrelated branches and CI.
   Bundle: Dorfleben.
+
+- [x] 1407. No user instruction is ever lost: tick the carrier only after commit, the doctor stashes no task files, reconcile the carrier against TASKS.md
+  Rank: at the very front of the work order, ahead of 1402 (user order 21.10.2026).
+  Four eyes: GPT-6 Astra and Opus 5.5 analyse blind-parallel from identical inputs; a third model merges via scripts/blind-merge.mjs; cross-vendor review of the result.
+  What happened 21.10.2026: the carrier ticked "queued 1402..1406" at 10:31Z while the TASKS.md appends were only in the working tree, uncommitted. At 11:15Z batch-doctor --repair (ownerAlive=false, unhandled parallel alert) moved all dirty files incl. TASKS.md into stash doctor-quarantine-2026-10-21T11-15-21-622Z and judged "consistent". No check compared carrier ticks against TASKS.md; the loss was found only at 16:40 and restored by hand in 5ba920079. 218 quarantine stashes exist, none ever audited.
+  FINAL STATE:
+  1. A carrier entry becomes "queued N" only after a commit containing point N is pushed to main; until then it stays open.
+  2. batch-doctor never stashes TASKS.md, docs/tasks-archive.md or .claude/queue-rank.json silently; it secures them as a commit on a rescue branch and raises a loud alert.
+  3. A reconciliation runs at every doctor run, session start and in the post-merge gate: every "queued N" carrier entry must exist in TASKS.md or the archive; a mismatch is a red finding, never "consistent".
+  4. One-time sweep of all existing stashes for content not on main (user orders, quotes, points); findings are restored or filed.
+  VERIFIABLE: a Vitest replays the 21.10. sequence (append point, tick carrier, doctor --repair with ownerAlive=false) and ends with the point still in TASKS.md or with an alert, never a silent loss; a Vitest that a queued carrier entry without its TASKS.md point turns the reconciliation red.
+  Refs: scripts/batch-doctor.mjs, scripts/batch-doctor-core.mjs (quarantineStash, planRemediation), scripts/finding.mjs, .claude/doctor.log 2026-10-21T11:15, commit 5ba920079.
+  Criticality: HIGH - user orders were lost silently (data loss / false approval class, exempt from the infrastructure freeze per CLAUDE.md section 2).
+  Source: user 21.10.2026 (chat): "Wie kann so etwas passieren? Das ist absolut fatal. Wir brauche ganz vorne in der Queue einen neuen Punkt, der das Problem mit vier Augen analysiert und zuverlässig löst. Es darf nie etwas verlorengehen." Approved: "So einreihen".
+  Absorbs the carrier findings of 21.10.2026 "Doctor quarantine stash swallows committed-to-carrier TASKS.md appends" and "Doctor quarantine stashes carry unreviewed content" (final-state items 2 and 4).
+  Bundle: Chat & Tafel.
