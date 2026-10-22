@@ -148,6 +148,9 @@ export interface TagConfig extends StaminaProfile {
    * goats already do; this is the same easing.
    */
   turnRate: number
+  /** Largest angle (rad) between a RUNNING child's body and its way before it
+   *  sets off; past it, the child turns on the spot first (`turnBeforeRun`). */
+  setOffTurn: number
   /** Seconds the freshly caught child stands before it gives chase (work-order
    *  1176). Only the caught child pauses; the pause is clamped to
    *  `immunitySeconds`, which protects its catcher. */
@@ -771,6 +774,63 @@ export function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: Ta
   else resetProgress(c)
 }
 
+/** The static world plus the other bodies, as every probe of a step reads it. */
+function stepBlocked(world: TagWorld, occupied?: (x: number, z: number) => boolean): (x: number, z: number) => boolean {
+  return occupied ? (x: number, z: number) => world.blocked(x, z) || occupied(x, z) : world.blocked
+}
+
+/** Going round something and the way it wants has opened: it is past whatever
+ *  it was going round, and takes its own heading again. */
+function releaseEdge(
+  c: TagChild,
+  desired: number,
+  world: TagWorld,
+  blockedAt: (x: number, z: number) => boolean,
+  stopAt?: { x: number; z: number },
+): void {
+  const remaining = stopAt ? Math.hypot(stopAt.x - c.x, stopAt.z - c.z) : Infinity
+  if (c.edgeFor > 0 && wayOpen(c, desired, world, blockedAt, remaining)) {
+    c.edgeSide = 0
+    c.edgeFor = 0
+  }
+}
+
+/**
+ * Whether a child about to RUN must first turn its body toward its way. The
+ * travel heading may jump — a new phase, a reversal, a sharp deflection — and
+ * the body only follows at `turnRate`; set off at once and the child sprinted
+ * sideways or backwards until its body caught up (user report 21.10.2026,
+ * measured 0.3-0.65 s and up to 2.5 m at a time at the bambara village). Points
+ * the heading at the way so the caller's facing ease turns into it, and the
+ * child stands until it is within `setOffTurn`. Running only: a walking child
+ * may look aside (the bank round's roaming watcher) without stopping.
+ */
+export function turnBeforeRun(
+  c: TagChild,
+  desired: number,
+  cfg: TagConfig,
+  world: TagWorld,
+  /** As `moveChild`'s: the bodies it steers round, and a contact stand. */
+  occupied?: (x: number, z: number) => boolean,
+  stopAt?: { x: number; z: number },
+): boolean {
+  // A pinned child is left to `moveChild`, whose quarter turns and rescue
+  // free it; it is not running anywhere meanwhile.
+  if (c.pinned > 0) return false
+  // The commitment is settled BEFORE the course is judged: a way that opened
+  // ends it, and the child would otherwise be judged on the edge course it is
+  // about to leave and run off backwards along `desired`.
+  releaseEdge(c, desired, world, stepBlocked(world, occupied), stopAt)
+  // While going round something the child steers on its committed course.
+  const way = c.edgeFor > 0 ? c.heading : desired
+  if (Math.abs(angleTo(c.facing, way)) <= cfg.setOffTurn) return false
+  c.heading = way
+  // A turn on the spot is a commanded stand: the legs settle and the stall
+  // watches read the child as still, not as stuck.
+  c.held = true
+  return true
+}
+
 /**
  * Move one child `distance` along `desired`, substepped so nothing is stepped over,
  * deflected around whatever is in the way, and nudged free if it is genuinely
@@ -809,20 +869,12 @@ export function moveChild(
    * requiring walkable ground beyond it inside the stone being touched. */
   stopAt?: { x: number; z: number },
 ): void {
-  const blockedAt = occupied
-    ? (x: number, z: number) => world.blocked(x, z) || occupied(x, z)
-    : world.blocked
+  const blockedAt = stepBlocked(world, occupied)
   const maxStep = Math.max(0.05, world.childRadius * 0.9)
   const steps = Math.max(1, Math.ceil(distance / maxStep))
   const len = distance / steps
   const look = Math.max(len, world.childRadius * 2)
-  // Going round something and the way it wants has opened: it is past whatever
-  // it was going round, and takes its own heading again.
-  const remaining = stopAt ? Math.hypot(stopAt.x - c.x, stopAt.z - c.z) : Infinity
-  if (c.edgeFor > 0 && wayOpen(c, desired, world, blockedAt, remaining)) {
-    c.edgeSide = 0
-    c.edgeFor = 0
-  }
+  releaseEdge(c, desired, world, blockedAt, stopAt)
   // What it steers on this frame: where it wants to go, or — while it is going
   // round something — the course it is already on along that obstacle's edge.
   let heading = c.edgeFor > 0 ? c.heading : desired
@@ -1168,7 +1220,9 @@ function advanceTagGame(
     // A commanded stillness moves nothing — `walked` stays, and the stall watch
     // reads the child as still (clearing `pinned`) rather than stuck on
     // geometry, so its legs stay still.
-    if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
+    if (c.pace > 0 && (claim || !turnBeforeRun(c, desired, cfg, world, occAt))) {
+      moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
+    }
     trackProgress(c, dt, cfg, world)
     // Whatever its legs did this frame, they did it while the round was on.
     c.walkedWhilePlaying += c.walked - walkedBefore

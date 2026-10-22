@@ -867,6 +867,9 @@ interface BalanceConfig {
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
       turnRate: number
+      /** Largest angle (rad) between a running child's body and its way
+       *  before it sets off: past it, it turns on the spot first. */
+      setOffTurn: number
       /** Seconds the freshly caught child stands before it chases (work-order
        *  1176); never longer than `immunitySeconds`. */
       caughtPauseSeconds: number
@@ -938,6 +941,8 @@ interface BalanceConfig {
       dodgeReach: number
       /** How fast a roaming child's heading drifts (rad/s). */
       roamTurn: number
+      /** How near a playmate ahead bends a roaming child's walk away (m). */
+      roamGap: number
       /** How long the climber may make no progress toward the boulder before giving up. */
       roamGoalSeconds: number
       /** How far outside the boulder's own collider the climber stops before it
@@ -1806,6 +1811,11 @@ export const balance: BalanceConfig = {
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
       turnRate: 3.6,
+      // Calibratable estimate: a running child turns on the spot until its body
+      // is within a quarter turn of its way, so it never sprints off sideways or
+      // backwards. 45° made children near a waypoint stop for single frames
+      // over and over, which slowed the bank round's gather to its backstop.
+      setOffTurn: Math.PI / 2,
       // Work-order 1176, calibratable estimates. The caught child's beat of
       // frustration; the tag-back window (1.4 s) covers it plus a first step.
       caughtPauseSeconds: 0.7,
@@ -1895,6 +1905,9 @@ export const balance: BalanceConfig = {
       // A quarter turn a second at the most: a wander that reads as wandering
       // rather than as a figure being blown about.
       roamTurn: 1.4,
+      // Calibratable estimate: about two body lengths, so the bend — turned at
+      // `turnRate` — is done before the two bodies meet.
+      roamGap: 1.6,
       // A reachable stone keeps resetting this watch as the climber gets
       // closer. Thirty seconds without gaining any ground toward it means a
       // hut, pocket or other collider has made the approach impossible.
