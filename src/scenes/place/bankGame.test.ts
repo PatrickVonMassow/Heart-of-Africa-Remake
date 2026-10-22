@@ -1808,7 +1808,10 @@ describe('the tapper walks back into the catcher line before the charge', () => 
       expect(Math.abs(touchReach(STAGE, 'upstream', c)!.gap)).toBeGreaterThan(TOUCH_GAP)
     })
     const runner = s.children[count]
-    stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+    // Released at once: it turns its body to its way first, then runs.
+    for (let t = 0; t < Math.PI / cfg.turnRate + 0.1 && dist(runner, held[count]) === 0; t += 1 / 60) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+    }
     expect(runner.held).toBe(false)
     expect(dist(runner, held[count])).toBeGreaterThan(0)
   })

@@ -148,6 +148,9 @@ export interface TagConfig extends StaminaProfile {
    * goats already do; this is the same easing.
    */
   turnRate: number
+  /** Largest angle (rad) between a RUNNING child's body and its way before it
+   *  sets off; past it, the child turns on the spot first (`turnBeforeRun`). */
+  setOffTurn: number
   /** Seconds the freshly caught child stands before it gives chase (work-order
    *  1176). Only the caught child pauses; the pause is clamped to
    *  `immunitySeconds`, which protects its catcher. */
@@ -772,6 +775,30 @@ export function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: Ta
 }
 
 /**
+ * Whether a child about to RUN must first turn its body toward its way. The
+ * travel heading may jump — a new phase, a reversal, a sharp deflection — and
+ * the body only follows at `turnRate`; set off at once and the child sprinted
+ * sideways or backwards until its body caught up (user report 21.10.2026,
+ * measured 0.3-0.65 s and up to 2.5 m at a time at the bambara village). Points
+ * the heading at the way so the caller's facing ease turns into it, and the
+ * child stands until it is within `setOffTurn`. Running only: a walking child
+ * may look aside (the bank round's roaming watcher) without stopping.
+ */
+export function turnBeforeRun(c: TagChild, desired: number, cfg: TagConfig): boolean {
+  // A pinned child is left to `moveChild`, whose quarter turns and rescue
+  // free it; it is not running anywhere meanwhile.
+  if (c.pinned > 0) return false
+  // While going round something the child steers on its committed course.
+  const way = c.edgeFor > 0 ? c.heading : desired
+  if (Math.abs(angleTo(c.facing, way)) <= cfg.setOffTurn) return false
+  c.heading = way
+  // A turn on the spot is a commanded stand: the legs settle and the stall
+  // watches read the child as still, not as stuck.
+  c.held = true
+  return true
+}
+
+/**
  * Move one child `distance` along `desired`, substepped so nothing is stepped over,
  * deflected around whatever is in the way, and nudged free if it is genuinely
  * pinned. The heading it ends on is the one it TRAVELLED — and that heading is
@@ -1168,7 +1195,9 @@ function advanceTagGame(
     // A commanded stillness moves nothing — `walked` stays, and the stall watch
     // reads the child as still (clearing `pinned`) rather than stuck on
     // geometry, so its legs stay still.
-    if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
+    if (c.pace > 0 && (claim || !turnBeforeRun(c, desired, cfg))) {
+      moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
+    }
     trackProgress(c, dt, cfg, world)
     // Whatever its legs did this frame, they did it while the round was on.
     c.walkedWhilePlaying += c.walked - walkedBefore

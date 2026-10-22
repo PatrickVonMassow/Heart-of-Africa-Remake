@@ -1370,7 +1370,9 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
       (st) => {
         if (!st.playing) return
         st.children.forEach((c, i) => {
-          if (i % 2 === 0 || i === st.chaser) expect(c.pace).toBeGreaterThanOrEqual(floor - 1e-6)
+          // The freshly caught chaser's beat is a commanded stand, not a stall.
+          const beat = i === st.chaser && (st.pauseFor > 0 || st.turning)
+          if ((i % 2 === 0 || i === st.chaser) && !beat) expect(c.pace).toBeGreaterThanOrEqual(floor - 1e-6)
         })
       },
       (i) => (i % 2 === 1 ? { heading: 0, pace: 2 } : null),
@@ -1654,7 +1656,8 @@ describe('the rescue is a finding, not an escape (point 656)', () => {
     ])
     // Without the caught child's beat (work-order 1176): a commanded stand
     // resets the stall watch by design, and this pins the watch itself.
-    const cfg = { ...CFG, caughtPauseSeconds: 0 }
+    // Nor the turn before a run, which stands the child before it ever probes.
+    const cfg = { ...CFG, caughtPauseSeconds: 0, setOffTurn: Math.PI }
     run(s, 1.4, world, cfg)
     expect(s.children[0].nudges).toBe(0) // still inside its window
     expect(s.children[0].pinned).toBeGreaterThan(1.2)
@@ -2087,5 +2090,33 @@ describe('a caught child stands slumped (work-order 1239)', () => {
     // The only y-scale a settlement figure still takes is the adult's jar fill.
     expect(src.match(/\bg\.scale\.set\(1, /g) ?? []).toHaveLength(1)
     expect(src).toMatch(/g\.scale\.set\(1, squash, 1\)/)
+  })
+})
+
+describe('a running child faces where it runs', () => {
+  // User report 21.10.2026, "Die Kinder laufen seitwärts": the travel heading
+  // jumps on a reversal and the body eases after it at `turnRate`, so a child
+  // that set off at once ran sideways or backwards until its body caught up
+  // (measured 154-176° off its travel in this open round). It now turns on the
+  // spot first and only runs within `setOffTurn` of its way.
+  it.each([1, 7, 42])('keeps every running frame within the set-off turn at seed %i', (seed) => {
+    const s = game([[0, 0], [3, 1], [-2, 4], [1, -5], [5, 5]], seed)
+    const prev = s.children.map((c) => ({ x: c.x, z: c.z }))
+    let running = 0
+    let worst = 0
+    run(s, 120, OPEN, CFG, 1 / 60, (st) => {
+      st.children.forEach((c, i) => {
+        const dx = c.x - prev[i].x
+        const dz = c.z - prev[i].z
+        prev[i] = { x: c.x, z: c.z }
+        // A run, not a walk or a separation nudge: over 2.5 m/s.
+        if (Math.hypot(dx, dz) * 60 <= 2.5) return
+        running++
+        const travel = Math.atan2(dx, dz)
+        worst = Math.max(worst, Math.abs(Math.atan2(Math.sin(c.facing - travel), Math.cos(c.facing - travel))))
+      })
+    })
+    expect(running).toBeGreaterThan(1000)
+    expect(worst).toBeLessThanOrEqual(CFG.setOffTurn + 1e-6)
   })
 })
