@@ -168,7 +168,7 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { PORT_TALKERS, portTraderSpots, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
+import { PORT_TALKERS, portTraderSpots, talkerStances, type TalkerStance, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
 import { HELPER_SIDE_OFFSET, WARP_STAKE_RADIUS, WEAVER_SIDE_OFFSET, type LoomStation } from './loom'
 import {
   createLoomWork,
@@ -1894,12 +1894,6 @@ function Porters({
   )
 }
 
-/** Where a talker stands and which way it faces. */
-interface TalkerStance {
-  x: number
-  z: number
-  yaw: number
-}
 
 /** Widest bearing a figure points at. Beyond it the arm would reach back over
  *  its own shoulder at something the speaker is not even facing. */
@@ -1931,9 +1925,15 @@ function talkerAim(
 }
 
 /**
- * Two inhabitants standing together in conversation (point 479): they turn
- * toward each other and shift their weight, and they say nothing the player
- * cannot read.
+ * Two inhabitants standing together in conversation (point 479): they face
+ * each other and say nothing the player cannot read.
+ *
+ * THEIR ROOTS STAND STILL. The pair used to swivel ±10° on the spot and hop
+ * 3 cm off the ground in turn. The skinned body measures its own root
+ * (`stepWalk` in skinnedFigure.tsx), read that swivel as a turn on the spot
+ * and kept stepping and bending its legs to follow it: the restless fidget of
+ * the 21.10.2026 report. The idle clip already breathes and settles the trunk,
+ * neck and head; that is the calm life a standing listener shows.
  *
  * THEY NO LONGER GESTURE ON THEIR OWN (point 580). The pair used to cycle the
  * four gestures as ambient dressing, with no utterance behind any of them — the
@@ -1953,38 +1953,16 @@ function talkerAim(
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const groundHeight = usePlaceGround()
-  const a = useRef<THREE.Group>(null)
-  const b = useRef<THREE.Group>(null)
   const gestureA = useRef<GestureState>(restGesture())
   const gestureB = useRef<GestureState>(restGesture())
 
   // The two stand a metre apart facing each other, so figure A looks along
   // world +x and figure B along −x. Their aims are computed in each one's own
   // frame from that facing.
-  const stances = useMemo<TalkerStance[]>(
-    () => [
-      { x: x - 0.5, z, yaw: Math.PI / 2 },
-      { x: x + 0.5, z, yaw: -Math.PI / 2 },
-    ],
-    [x, z],
-  )
+  const stances = useMemo<TalkerStance[]>(() => talkerStances(x, z), [x, z])
   // Two bodies the passers-by go round (point 578); the pair stands a metre
   // apart, well clear of the separation distance, so it never pushes itself.
   useStandingBodies(stances)
-
-  useFrame(({ clock }) => {
-    if (isLifeFrozen()) return
-    const t = clock.elapsedTime
-    // Slight turns toward each other — the conversation's idle, and all of it.
-    if (a.current) {
-      a.current.rotation.y = Math.PI / 2 + Math.sin(t * 1.15) * 0.18
-      a.current.position.y = Math.max(0, Math.sin(t * 2.3)) * 0.03
-    }
-    if (b.current) {
-      b.current.rotation.y = -Math.PI / 2 + Math.sin(t * 1.15 + Math.PI) * 0.18
-      b.current.position.y = Math.max(0, Math.sin(t * 2.3 + Math.PI)) * 0.03
-    }
-  })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): the live gesture
   // state and the pose it draws, plus a way to hold one pose for a screenshot.
@@ -2018,12 +1996,12 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 
   return (
     <group position={[x, groundHeight(x, z), z]}>
-      <group ref={a} position={[-0.5, 0, 0]}>
+      <group position={[stances[0].x - x, 0, stances[0].z - z]} rotation={[0, stances[0].yaw, 0]}>
         {/* The conversing pair: the notable elder and a young man (work-order
             "villager dress": the pair the age-readability judgement compares). */}
         <Figure cloth={cloth[0]} gesture={gestureA} sex="male" age="elder" />
       </group>
-      <group ref={b} position={[0.5, 0, 0]}>
+      <group position={[stances[1].x - x, 0, stances[1].z - z]} rotation={[0, stances[1].yaw, 0]}>
         <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} sex="male" age="youth" />
       </group>
     </group>

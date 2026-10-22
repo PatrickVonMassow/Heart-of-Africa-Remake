@@ -585,3 +585,139 @@ export function rescueAndReset({ git, rescue } = {}) {
   git(['reset', '--hard', 'origin/main'])
 }
 
+
+// ---------------------------------------------------------------------------
+// THE PROTECTED WORK-ORDER FILES ARE SECURED, NEVER STASHED (21.10.2026)
+// ---------------------------------------------------------------------------
+//
+// A quarantine stash took the uncommitted appends of five user orders, and the
+// run that made it said "consistent". The protected files are therefore
+// committed through a TEMPORARY index — HEAD, the real index and the working
+// tree stay exactly as they were — onto a branch whose name cannot collide
+// (time AND pid; `update-ref` refuses an existing ref), and pushed. The push
+// skips the client hooks: this is evidence, not code, and a pre-push gate that
+// runs the suites must not stand between a user order and its safety copy.
+
+/** Where a rescue tree keeps the REAL index's staged versions of the protected files. */
+export const INDEX_RESCUE_DIR = '.doctor-rescue/index'
+
+/** The real index's entries for `files` (stage 0 and conflict stages), as { mode, sha, path }. */
+function stagedEntries({ repo, env, files }) {
+  const out = execFileSync('git', ['ls-files', '-s', '-z', '--', ...files], { cwd: repo, env, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  return out
+    .split('\0')
+    .filter(Boolean)
+    .map((rec) => {
+      const m = /^(\d+) ([0-9a-f]+) (\d)\t(.*)$/s.exec(rec)
+      return m ? { mode: m[1], sha: m[2], stage: Number(m[3]), path: m[3] === '0' ? m[4] : `${m[4]}.stage${m[3]}` } : null
+    })
+    .filter(Boolean)
+}
+
+/** The newest rescue branch whose tree equals `tree`, so a second run reuses it. */
+function existingRescueWithTree(run, tree) {
+  try {
+    const refs = run(['for-each-ref', '--sort=-creatordate', '--format=%(refname)', 'refs/heads/rescue/'])
+      .split(/\r?\n/)
+      .filter((ref) => ref.startsWith('refs/heads/rescue/doctor-'))
+    for (const ref of refs.slice(0, 20)) {
+      if (run(['rev-parse', `${ref}^{tree}`]) === tree) return ref
+    }
+  } catch {
+    /* none */
+  }
+  return null
+}
+
+/**
+ * Commit `paths` (as they stand in the working tree, deletions included) onto
+ * `refs/heads/rescue/doctor-<iso>-<pid>` and push it. Returns
+ * `{ ref, branch, commit, files, pushed, reused, pushError }`; throws when the
+ * commit itself cannot be made (the caller then must not overwrite the files).
+ */
+export function rescueProtectedCommit({ repo, paths = [], now = Date.now(), pid = process.pid, push = true, env = process.env } = {}) {
+  const files = [...new Set(paths)].filter(Boolean)
+  if (files.length === 0) throw new Error('no protected path to rescue')
+  const baseEnv = { ...env }
+  for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY']) delete baseEnv[k]
+  const gitDir = execFileSync('git', ['rev-parse', '--absolute-git-dir'], { cwd: repo, env: baseEnv, encoding: 'utf8', windowsHide: true }).trim()
+  const tmpIndex = join(gitDir, `doctor-rescue-index-${pid}-${now}`)
+  const run = (args, { timeout = 30000 } = {}) =>
+    execFileSync('git', ['-c', 'user.name=batch-doctor', '-c', 'user.email=batch-doctor@localhost', '-c', 'commit.gpgsign=false', ...args], {
+      cwd: repo,
+      env: { ...baseEnv, GIT_INDEX_FILE: tmpIndex },
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim()
+  try {
+    let head = ''
+    try {
+      head = run(['rev-parse', '--verify', 'HEAD^{commit}'])
+    } catch {
+      head = ''
+    }
+    // THE REAL INDEX IS READ FIRST (review 22.10.2026), before the temporary
+    // index exists: its staged entries are what a reset or merge abort destroys.
+    const staged = stagedEntries({ repo, env: baseEnv, files })
+    if (head) run(['read-tree', head])
+    else run(['read-tree', '--empty'])
+    // The working copy, path by path: a file on disk is added; one that is gone is
+    // removed from the temporary index (a path HEAD never had is simply absent) —
+    // `add -A` on a path the temp index does not know and the disk lacks fails.
+    for (const file of files) {
+      if (existsSync(join(repo, file))) run(['add', '-f', '--', file])
+      else run(['rm', '--cached', '-q', '--ignore-unmatch', '--', file])
+    }
+    // THE STAGED VERSION TOO: a protected file staged and then changed or removed
+    // in the working copy has a second version that only the REAL index holds.
+    // Every staged entry that differs from HEAD is kept under INDEX_RESCUE_DIR.
+    for (const entry of staged) {
+      let headBlob = ''
+      try {
+        headBlob = head ? run(['rev-parse', '--verify', '-q', `${head}:${entry.path}`]) : ''
+      } catch {
+        headBlob = ''
+      }
+      if (headBlob === entry.sha) continue
+      run(['update-index', '--add', '--cacheinfo', `${entry.mode},${entry.sha},${INDEX_RESCUE_DIR}/${entry.path}`])
+    }
+    const tree = run(['write-tree'])
+    // A second run over the same bytes reuses the branch (and re-pushes it)
+    // instead of minting one rescue branch per doctor tick.
+    let ref = existingRescueWithTree(run, tree)
+    const reused = ref !== null
+    let commit
+    if (reused) {
+      commit = run(['rev-parse', ref])
+    } else {
+      const stamp = new Date(now).toISOString().replace(/[:.]/g, '-')
+      ref = `refs/heads/rescue/doctor-${stamp}-${pid}`
+      const message =
+        `batch-doctor rescue: protected work-order files secured before a repair\n\n` +
+        `Files: ${files.join(', ')}\nBase: ${head || '(none)'}\nNever stashed; left in the working tree as they were.`
+      commit = run(head ? ['commit-tree', tree, '-p', head, '-m', message] : ['commit-tree', tree, '-m', message])
+      // The all-zero old value makes update-ref CREATE only — two runs can never overwrite each other.
+      run(['update-ref', ref, commit, '0'.repeat(40)])
+    }
+    const branch = ref.replace('refs/heads/', '')
+    let pushed = false
+    let pushError = null
+    if (push) {
+      try {
+        run(['push', '--no-verify', '--quiet', 'origin', `${ref}:${ref}`], { timeout: 120000 })
+        pushed = true
+      } catch (e) {
+        pushError = `${(e && (e.stderr || e.message)) || e}`.trim().split('\n')[0]
+      }
+    }
+    return { ref, branch, commit, files, pushed, reused, pushError }
+  } finally {
+    try {
+      rmSync(tmpIndex, { force: true })
+    } catch {
+      /* a leftover temp index is harmless */
+    }
+  }
+}

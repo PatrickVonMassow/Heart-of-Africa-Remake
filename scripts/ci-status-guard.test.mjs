@@ -9,7 +9,7 @@ describe('the CI guard wires the durable observer', () => {
   it('stands down before creating or repairing a wait', () => {
     const gather = code.slice(code.indexOf('export async function gatherCiStatusInputs'))
     expect(gather.indexOf('existsSync(PAUSE)')).toBeLessThan(gather.indexOf('startWaitObserver'))
-    expect(gather.indexOf('heldByOtherLiveOwner(sessionId)')).toBeLessThan(gather.indexOf('startWaitObserver'))
+    expect(gather.indexOf('!ownsLock(sessionId).mine')).toBeLessThan(gather.indexOf('startWaitObserver'))
   })
 
   it('checks author liveness without running the unrelated slot census', () => {

@@ -402,7 +402,8 @@ function requestQueueRemedy(count, context) {
     `${count} Anfrage(n) eines anderen Fensters liegen im Träger, und ${context}. ` +
     'Der Nutzer hat sie einem Fenster gesagt, das den Stapel nicht hielt — ohne Übernahme ' +
     'warten sie unbemerkt. Spec ansehen: node scripts/finding.mjs --show "<Titel>", dann VERBATIM in ' +
-    'TASKS.md anhängen und node scripts/finding.mjs --queued "<Titel>" --point <N>. Offene Fragen ' +
+    'TASKS.md anhängen, node scripts/finding.mjs --appending "<Titel>" --point <N>, committen, main pushen, ' +
+    'und ERST DANN node scripts/finding.mjs --queued "<Titel>" --point <N> (es prüft origin/main). Offene Fragen ' +
     'gehen NIE in den Arbeitsauftrag, sondern als Karte an den Nutzer; undurchführbar: ' +
     'node scripts/finding.mjs --blocked "<Titel>" --why "<Grund>". Vertagen ist kein --blocked: an der ' +
     'Wassermarke bleibt die Anfrage offen, und batch-boundary.mjs --commit --context übergibt sie dem Nachfolger.'
@@ -424,7 +425,8 @@ export function boundaryRequestRefusal(read) {
     } catch (e) {
       if (e?.code !== 'ENOENT') throw e
     }
-    requests = parseCarrier(text).requests.length
+    const parsed = parseCarrier(text)
+    requests = parsed.requests.length + parsed.appending.length
   } catch (e) {
     return (
       `The findings carrier could not be read (${e?.message ?? e}), so waiting user requests cannot be ruled out. ` +
@@ -506,20 +508,28 @@ export function parseHead(line) {
 export function parseCarrier(text = '') {
   const pending = []
   const requests = []
+  // `appending N` (point N is in TASKS.md but not yet pushed) is still OPEN:
+  // counted apart, because the turn-end gate must not push a premature tick,
+  // while the boundary must not hand it over unqueued.
+  const appending = []
   let drained = 0
   for (const line of String(text ?? '').split(/\r?\n/)) {
     const head = parseHead(line)
     if (!head) continue
+    const entry = { at: head.at, session: head.session, title: head.title }
+    if (head.kind === 'request' && !head.done && /^appending\b/.test(head.state)) {
+      appending.push({ ...entry, state: head.state })
+      continue
+    }
     const waiting = !head.done && head.state === 'pending'
     if (!waiting) {
       drained++
       continue
     }
-    const entry = { at: head.at, session: head.session, title: head.title }
     if (head.kind === 'request') requests.push(entry)
     else pending.push(entry)
   }
-  return { pending, requests, drained }
+  return { pending, requests, appending, drained }
 }
 
 /**
@@ -554,12 +564,21 @@ export function carrierEntry({ at, session, title, detail }) {
  * it did not perform; refusing an ambiguous match is what keeps it from
  * retiring the wrong finding while saying the right one.
  */
-export function markDrained(text, title) {
+export function markDrained(text, title, note = '') {
   const hits = findPending(text, title, 'finding')
   if (hits === null || hits.length === 0) return null
   if (hits.length > 1) return { ambiguous: hits.map((h) => h.title) }
   const lines = String(text ?? '').split(/\r?\n/)
-  lines[hits[0].index] = lines[hits[0].index].replace('- [ ] ', '- [x] ')
+  const at = hits[0].index
+  lines[at] = lines[at].replace('- [ ] ', '- [x] ')
+  // WHERE IT WENT is kept with the entry (`drained into point N @<sha>`), at
+  // the end of its indented detail, so the reconciliation can re-check it.
+  const clean = String(note ?? '').replace(/\s+/g, ' ').trim()
+  if (clean) {
+    let end = at + 1
+    while (end < lines.length && /^ {6}\S/.test(lines[end])) end++
+    lines.splice(end, 0, `      ${clean}`)
+  }
   return { text: lines.join('\n'), title: hits[0].title }
 }
 
@@ -569,14 +588,15 @@ export function markDrained(text, title) {
  * transitions share, so "which entry did you mean" is decided in one place.
  * Returns null on an empty needle.
  */
-export function findPending(text, title, kind = 'finding') {
+export function findPending(text, title, kind = 'finding', { states = ['pending'] } = {}) {
   const needle = String(title ?? '').trim().toLowerCase()
   if (!needle) return null
   const hits = []
   const lines = String(text ?? '').split(/\r?\n/)
+  const open = (state) => states.some((s) => state === s || state.startsWith(`${s} `))
   for (let i = 0; i < lines.length; i++) {
     const head = parseHead(lines[i])
-    if (!head || head.kind !== kind || head.done || head.state !== 'pending') continue
+    if (!head || head.kind !== kind || head.done || !open(head.state)) continue
     if (!head.title.toLowerCase().includes(needle)) continue
     hits.push({ index: i, title: head.title, head })
   }

@@ -281,11 +281,13 @@ function expandsToMarker(text) {
  * Could this command deposit a request? True when its loose view spells
  * `finding.mjs` or `--request`. A canonical command also counts when one of
  * its words could expand to a marker once a shell re-reads it (`bash -c
- * 'node scripts/fin*.mjs …'`). A non-canonical one counts when it holds any
- * character outside PLAIN (sound by construction; accepted over-block for
- * quotes, pipes and the like in a chat session), or a `*`/`?` glob anywhere
- * but in one plain `ls` line whose globs cannot match a marker — a matched
- * filename may carry a whole command for eval, bash and the like.
+ * 'node scripts/fin*.mjs …'`). Neither counts when it is a pure read
+ * pipeline (isPureRead), whose quoted words are literal. Otherwise a
+ * non-canonical one counts when it holds any character outside PLAIN (sound
+ * by construction; accepted over-block for quotes, pipes and the like outside
+ * the read allowlist), or a `*`/`?` glob anywhere but in one plain `ls` line
+ * whose globs cannot match a marker — a matched filename may carry a whole
+ * command for eval, bash and the like.
  */
 export function isPossibleDeposit(command, shell = 'bash') {
   const src = String(command ?? '')
@@ -293,8 +295,122 @@ export function isPossibleDeposit(command, shell = 'bash') {
   const plain = PLAIN.test(src) && !src.includes('\n')
   // one plain ls line in either shell: its globs only list, unless they could match a marker
   if (plain && src.trim().split(/ +/)[0] === 'ls') return src.split(/ +/).some(globHitsMarker) || SPLAT.test(src)
-  if (isCanonical(src, shell)) return tokenize(src, shell).some(couldExpandToMarker)
+  if (isCanonical(src, shell) && !tokenize(src, shell).some(couldExpandToMarker)) return false
+  if (isPureRead(src, shell)) return false
   return !PLAIN.test(src) || /[*?]/.test(src) || SPLAT.test(src)
+}
+
+// ── Pure read pipelines (fail-closed allowlist, 21.10.2026) ──────────────
+// A read command hands its words to no shell, so a QUOTED word is literal
+// there: `?`, `*`, `;`, `|`, braces or whitespace inside quotes assemble no
+// marker. Unquoted words are still judged by couldExpandToMarker. The same
+// holds for one direct `node scripts/board.mjs` or `ask-astra.mjs` call on its own (measured
+// 21.10.2026: `board.mjs vdzk-keep "…?"` and `ask-astra.mjs --brief "…; …"`
+// were refused); a re-reader (bash -c, eval, xargs, find -exec …) is on no list.
+
+/** Every quoted string, scanned as isCanonical scans it. */
+const QUOTED = { bash: /'[^']*'|"(?:\\[\s\S]|[^"\\])*"/g, powershell: /'[^']*'|"[^"]*"/g }
+/** The command with each quoted string blanked to NULs of the same length. */
+const blankQuotes = (src, shell) => src.replace(QUOTED[shell === 'powershell' ? 'powershell' : 'bash'], (m) => '\0'.repeat(m.length))
+
+const READ_PROGRAMS = new Set(['rg', 'grep', 'cat', 'head', 'tail', 'wc', 'sort', 'uniq', 'cut', 'tr', 'ls', 'date'])
+const READ_CMDLETS = new Set(['select-string', 'get-content', 'get-childitem', 'get-date'])
+/** Every dash PowerShell's tokenizer reads as a parameter prefix. */
+const PS_DASH = /^[-\u2013\u2014\u2015]/
+/** Select-String options that leave a glob a regex pattern (no -Path, -Include, -Exclude). */
+const PATTERN_OPTIONS = /^-(pattern|simplematch|casesensitive|notmatch|allmatches|quiet|list|noemphasis|raw)$/i
+const GIT_READS = new Set(['log', 'status', 'diff', 'show', 'blame', 'branch', 'rev-parse'])
+/** Option words that make an otherwise reading program run another program or write a file. */
+const EXECUTING = { rg: /^--(pre|hostname-bin)/, sort: /^(--co|--o|-[^-]*o)/ }
+/** git options that run a helper or editor, or write a file (Astra review of ea049bf). */
+const GIT_EXECUTING = ['--ext-diff', '--textconv', '--output', '--edit-description', '--exec-path', '--upload-pack', '--open-files-in-pager', '--config-env']
+/** Is this word one of them or an abbreviation git would resolve to one (`--e`, `--textc`)? */
+const gitExecuting = (word) => {
+  const name = word.split('=')[0]
+  return name.length > 2 && name.startsWith('--') && GIT_EXECUTING.some((option) => option.startsWith(name))
+}
+/** sed -n scripts: addressed p/=/l/q commands and s/// with harmless flags only (no e, w, r). */
+const SED_ADDR = String.raw`(?:\d+|\$|/(?:\\.|[^/\\])*/)`
+const SED_SCRIPT = new RegExp(
+  String.raw`^(?:\s*(?:${SED_ADDR}(?:,${SED_ADDR})?)?\s*!?\s*(?:[p=lq]|s/(?:\\.|[^/\\])*/(?:\\.|[^/\\])*/[gpiI0-9]*)\s*(?:;|$))+$`,
+)
+/**
+ * The one node -e script admitted: the Berlin timestamp the UserPromptSubmit
+ * hook prescribes (U13). A keyword blacklist over arbitrary JavaScript does not
+ * converge (Astra review of 9c9ea52: Function via a property descriptor).
+ */
+const NODE_STAMP = /^console\.log\(new Intl\.DateTimeFormat\('[\w-]+',\{[\w:'\-,/]*\}\)\.format\(new Date\(\)\)\)$/
+
+/**
+ * The repo scripts measured refusing a quoted `?`/`;` (21.10.2026). Both take
+ * their arguments as data and pass none to a shell; any other script may
+ * forward one (Astra review of a9c598d), so it is on no list.
+ */
+const LITERAL_SCRIPT = /^(\.[\\/])?scripts[\\/](board|ask-astra)\.mjs$/
+/**
+ * May a repo script receive this word even if it hands it to a shell? Only
+ * prose characters (letters, digits, whitespace, punctuation without quotes,
+ * redirections, `*`, `$`, escapes or brackets), and no piece whose `?` glob
+ * could match a marker (Astra reviews of ea049bf..c3a9fac: forwarding helper).
+ */
+const PROSE = /^[\p{L}\p{N}\s.,:;!?|_/=%+()\u2013\u2014\u201E\u201C\u00AB\u00BB-]*$/u
+const forwardSafe = (word) => PROSE.test(word) && !word.split(/[^\p{L}\p{N}._/?=-]+/u).some(globHitsMarker)
+
+/**
+ * Is one pipeline segment's word list a pure read? `words` are the values,
+ * `quoted` marks quoted ones, `alone` says the segment is the whole command,
+ * `piped` that it reads a previous segment's output.
+ */
+function isReadSegment(words, quoted, shell, alone, piped) {
+  const [program, ...args] = words
+  if (program === undefined || quoted[0]) return false
+  if (alone && program === 'node' && !quoted[1] && LITERAL_SCRIPT.test(args[0] ?? '')) return args.slice(1).every(forwardSafe)
+  if (shell === 'powershell') {
+    // -Path expands filesystem wildcards even when quoted (`?` may match nothing);
+    // a glob is a mere pattern only for a piped Select-String with pattern options only
+    const cmdlet = program.toLowerCase()
+    if (!READ_CMDLETS.has(cmdlet) || !args.some((a) => /[*?[]/.test(a))) return READ_CMDLETS.has(cmdlet)
+    // a second positional word binds to -Path
+    const positional = args.filter((a) => !PS_DASH.test(a)).length
+    return cmdlet === 'select-string' && piped && positional <= 1 && args.every((a) => !PS_DASH.test(a) || PATTERN_OPTIONS.test(a.replace(PS_DASH, '-')))
+  }
+  if (program === 'node') return args.length === 2 && (args[0] === '-e' || args[0] === '--eval') && NODE_STAMP.test(args[1])
+  if (program === 'git') return GIT_READS.has(args[0]) && !quoted[1] && !args.some(gitExecuting)
+  if (program === 'sed') {
+    const options = args.filter((a) => a.startsWith('-'))
+    const operands = args.filter((a) => !a.startsWith('-'))
+    return options.length === 1 && options[0] === '-n' && operands.length >= 1 && SED_SCRIPT.test(operands[0])
+  }
+  if (!READ_PROGRAMS.has(program)) return false
+  // uniq's second operand is an output file; after `--` any word may be one
+  if (program === 'uniq' && (args.includes('--') || args.filter((a) => a === '-' || !a.startsWith('-')).length > 1)) return false
+  return !(EXECUTING[program] && args.some((a) => EXECUTING[program].test(a)))
+}
+
+/**
+ * Is the command a PURE READ PIPELINE? Split only at unquoted `|` (so `||`,
+ * `;`, `&&`, redirections, newlines, parentheses and substitutions leave a
+ * segment non-canonical), every segment canonical, no unquoted word that could
+ * expand to a marker, and every segment's program on the fixed read list.
+ */
+function isPureRead(src, shell) {
+  const blank = blankQuotes(src, shell)
+  const segments = []
+  let start = 0
+  for (let i = 0; i <= blank.length; i++) {
+    if (i < blank.length && blank[i] !== '|') continue
+    segments.push([src.slice(start, i).trim(), blank.slice(start, i).trim()])
+    start = i + 1
+  }
+  return segments.every(([segment, blanked], index) => {
+    if (!segment || !isCanonical(segment, shell)) return false
+    const words = tokenize(segment, shell)
+    const masks = tokenize(blanked, shell)
+    if (masks.length !== words.length) return false
+    const quoted = masks.map((m) => m.includes('\0'))
+    if (masks.some((m) => couldExpandToMarker(m.split('\0').join('')))) return false
+    return isReadSegment(words, quoted, shell, segments.length === 1, index > 0)
+  })
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')

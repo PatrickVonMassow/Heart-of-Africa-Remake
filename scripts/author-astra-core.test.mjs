@@ -80,7 +80,7 @@ describe('authoringCodexArgs', () => {
     expect(args).not.toContain('--sandbox')
     expect(args.slice(args.indexOf('-C'), args.indexOf('-C') + 2)).toEqual(['-C', '/w'])
     expect(args.slice(args.indexOf('-m'), args.indexOf('-m') + 2)).toEqual(['-m', ASTRA_MODEL_ID])
-    expect(args).toContain('model_reasoning_effort=high')
+    expect(args).toContain('model_reasoning_effort=medium')
     expect(args[args.length - 1]).toBe('p')
   })
 

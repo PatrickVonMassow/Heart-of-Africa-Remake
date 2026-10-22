@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+// A queue tick carries the origin/main proof of its point (no user order is ever lost).
+const PROOF = { sha: 'abcdef123456', anchor: '0badc0de' }
 import {
   auditFindings,
   classifyCall,
@@ -100,15 +102,15 @@ describe('the states and the escape hatch', () => {
   const text = `${deposit()}\n`
 
   it('queues a request against its point number', () => {
-    const hit = markQueued(text, 'Nebenfenster', 481)
+    const hit = markQueued(text, 'Nebenfenster', 481, PROOF)
     expect(hit.title).toBe('Anfragen aus einem Nebenfenster einreihen')
-    expect(requestEntries(hit.text)[0].state).toBe('queued 481')
+    expect(requestEntries(hit.text)[0].state).toBe('queued 481 @abcdef123456 ~0badc0de')
     expect(parseCarrier(hit.text).requests).toEqual([])
     expect(parseCarrier(hit.text).drained).toBe(1)
   })
 
   it('refuses a queue without a real point number rather than writing nonsense', () => {
-    expect(() => markQueued(text, 'Nebenfenster', 'bald')).toThrow(/point number/)
+    expect(() => markQueued(text, 'Nebenfenster', 'bald', PROOF)).toThrow(/point number/)
   })
 
   it('blocks a request WITH its reason kept beside the entry', () => {
@@ -126,20 +128,20 @@ describe('the states and the escape hatch', () => {
 
   it('reports an ambiguous title instead of transitioning the wrong deposit', () => {
     const two = `${deposit()}\n\n${deposit({ title: 'Anfragen aus einem Nebenfenster — Teil 2' })}\n`
-    const verdict = markQueued(two, 'Nebenfenster', 481)
+    const verdict = markQueued(two, 'Nebenfenster', 481, PROOF)
     expect(verdict.ambiguous).toHaveLength(2)
     expect(verdict.text).toBeUndefined()
     expect(pendingRequests(two)).toHaveLength(2)
   })
 
   it('returns null when nothing matches, so the caller can say so', () => {
-    expect(markQueued(text, 'gibt es nicht', 481)).toBeNull()
-    expect(markQueued(text, '', 481)).toBeNull()
+    expect(markQueued(text, 'gibt es nicht', 481, PROOF)).toBeNull()
+    expect(markQueued(text, '', 481, PROOF)).toBeNull()
   })
 
   it('does not transition an already queued request a second time', () => {
-    const once = markQueued(text, 'Nebenfenster', 481)
-    expect(markQueued(once.text, 'Nebenfenster', 482)).toBeNull()
+    const once = markQueued(text, 'Nebenfenster', 481, PROOF)
+    expect(markQueued(once.text, 'Nebenfenster', 482, PROOF)).toBeNull()
   })
 })
 
@@ -151,10 +153,10 @@ describe('the write-back re-applies onto whatever the carrier says NOW', () => {
   const text = `${deposit()}\n`
 
   it('carries a deposit that arrived in the gap through the transition', () => {
-    const hit = markQueued(text, 'Nebenfenster', 481)
+    const hit = markQueued(text, 'Nebenfenster', 481, PROOF)
     const fresh = `${text}\n${deposit({ at: '2026-07-31T06:00:00.000Z', title: 'Zweite Anfrage' })}\n`
     const landed = reapplyTransition(fresh, hit.identity, hit.state)
-    expect(requestEntries(landed.text)[0].state).toBe('queued 481')
+    expect(requestEntries(landed.text)[0].state).toBe('queued 481 @abcdef123456 ~0badc0de')
     expect(pendingRequests(landed.text).map((r) => r.title)).toEqual(['Zweite Anfrage'])
   })
 
@@ -170,14 +172,14 @@ describe('the write-back re-applies onto whatever the carrier says NOW', () => {
   })
 
   it('matches the exact deposit, never a newcomer that shares its title', () => {
-    const hit = markQueued(text, 'Nebenfenster', 481)
+    const hit = markQueued(text, 'Nebenfenster', 481, PROOF)
     const twin = deposit({ at: '2026-07-31T06:00:00.000Z', session: 'ffff0000' })
     const landed = reapplyTransition(`${text}\n${twin}\n`, hit.identity, hit.state)
     expect(pendingRequests(landed.text).map((r) => r.session)).toEqual(['ffff0000'])
   })
 
   it('refuses when the entry is no longer pending instead of overwriting', () => {
-    const hit = markQueued(text, 'Nebenfenster', 481)
+    const hit = markQueued(text, 'Nebenfenster', 481, PROOF)
     expect(reapplyTransition(hit.text, hit.identity, hit.state)).toBeNull()
     expect(reapplyTransition('', hit.identity, hit.state)).toBeNull()
   })
@@ -225,8 +227,8 @@ describe('the route', () => {
     // Four-eyes finding 2 (Fable 5, 31.07.2026): the route was display-only, so
     // "NEVER to a TASKS append" queued fine.
     const open = `${deposit({ openQuestions: 'Soll das auch für die Doku gelten?' })}\n`
-    expect(() => markQueued(open, 'Nebenfenster', 481)).toThrow(/OPEN QUESTIONS/)
-    expect(() => markQueued(open, 'Nebenfenster', 481)).toThrow(/--blocked/)
+    expect(() => markQueued(open, 'Nebenfenster', 481, PROOF)).toThrow(/OPEN QUESTIONS/)
+    expect(() => markQueued(open, 'Nebenfenster', 481, PROOF)).toThrow(/--blocked/)
     expect(pendingRequests(open)).toHaveLength(1)
   })
 

@@ -457,7 +457,7 @@ const findingKey = (f) => `${f?.rule ?? '?'}:${[...(f?.points ?? [])].sort((a, b
  *
  * FAILS CLOSED on a missing "after" verdict: no verdict is not a pass.
  */
-export function transitionAccepted({ before = null, after = null, verdict = null } = {}) {
+export function transitionAccepted({ before = null, after = null, verdict = null, lost = [] } = {}) {
   const post = after ?? verdict
   if (!post || typeof post !== 'object') {
     return { ok: false, findings: [{ rule: 'no-verdict', detail: 'the archive guard returned nothing to judge' }], preexisting: [] }
@@ -468,6 +468,13 @@ export function transitionAccepted({ before = null, after = null, verdict = null
   )
   const introduced = postFindings.filter((f) => !priorKeys.has(findingKey(f)))
   const preexisting = postFindings.filter((f) => priorKeys.has(findingKey(f)))
+  // A TICK MOVES ONE POINT AND LOSES NONE (21.10.2026): any point of the union of
+  // TASKS.md and the archive that the transition removes is refused, whatever
+  // the archive guard says (`lostPoints` in carrier-reconcile-core.mjs).
+  const lostPoints = (Array.isArray(lost) ? lost : []).filter((n) => Number.isInteger(n))
+  if (lostPoints.length) {
+    introduced.push({ rule: 'point-lost', detail: `the transition removes point(s) ${lostPoints.join(', ')} from TASKS.md and the archive` })
+  }
   return { ok: introduced.length === 0, findings: introduced, preexisting }
 }
 

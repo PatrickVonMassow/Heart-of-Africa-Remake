@@ -25,9 +25,15 @@
 // needing its own approval, one without a readable title denied. The guard keeps
 // a cooperative session from forgetting the rule; it is no shell parser and
 // does not try to win against an adversary.
-// ACCEPTED FALSE POSITIVE: a command that merely MENTIONS
-// `finding.mjs … --request` (echo, grep, a test name) is judged as well. The
-// way out is to rephrase the command.
+// NOT JUDGED (21.10.2026): a pure read pipeline (rg, grep, cat, head, git log
+// … joined only by `|`, see isPureRead) reads its quoted words literally, so
+// a quoted `?`, `*`, `;` or `|` there no longer makes it a possible deposit;
+// a direct `node scripts/board.mjs` or `ask-astra.mjs` call passes with prose
+// arguments (`?`, `;`, `|` but no `*`, quote or substitution).
+// ACCEPTED FALSE POSITIVES: a command that merely MENTIONS `finding.mjs` or
+// `--request` (echo, grep, a test name) is judged as well; so is any other
+// command holding a quote, pipe or glob outside that allowlist (`git commit
+// -m "Fix?"`, `find -name '*.ts'`). The way out is to rephrase the command.
 //
 // KNOWN GAP: a batch-owner session appending a point directly to TASKS.md from
 // a chat discussion is not covered; there the memory rule alone applies.
@@ -71,7 +77,7 @@ export function readTranscript(path) {
 export function hookDecision(payload) {
   const command = commandFrom(payload)
   const shell = shellOf(payload && payload.tool_name)
-  if (!command || !isPossibleDeposit(command)) return null
+  if (!command || !isPossibleDeposit(command, shell)) return null
   const transcript = readTranscript(payload.transcript_path)
   const verdict = evaluate({ command, shell, entries: transcript && transcript.entries, malformed: transcript ? transcript.malformed : 0 })
   if (!verdict.block) return null
@@ -124,8 +130,8 @@ if (isMainModule(import.meta.url)) {
     if (checkAt >= 0) {
       const command = process.argv[checkAt + 1] ?? ''
       const tAt = process.argv.indexOf('--transcript')
-      const shell = process.argv.includes('--powershell') ? 'powershell' : 'bash'
-      if (!isPossibleDeposit(command)) {
+      const shell = shellOf(process.argv.includes('--powershell') ? 'PowerShell' : 'Bash')
+      if (!isPossibleDeposit(command, shell)) {
         console.log('request-approval-guard: OK (not a request deposit)')
       } else if (tAt < 0) {
         console.log('request-approval-guard: a possible request deposit — pass --transcript <path.jsonl> to judge its approval')
