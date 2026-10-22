@@ -101,6 +101,7 @@ import {
   joinPatchSections,
   materialShortfall,
   MATERIAL_BUDGET_CHARS,
+  narrowPassStats,
   MAX_PASS_TOTAL,
   passByIndex,
   planPasses,
@@ -430,7 +431,10 @@ export function buildAuthorshipPassPlan({
   let statTruncated = false
   for (const group of authorship.groups) {
     const range = gatherRange(sha, base, group.files)
-    const sized = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
+    const sized = narrowPassStats(
+      planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS }),
+      (files) => git(['diff', '--stat', `${base}..${sha}`, '--', ...files], { raw: true }),
+    )
     rawSize += Number(sized.rawSize ?? 0)
     statTruncated ||= Boolean(sized.statTruncated)
     // No eligible vendor can spend these passes honestly. They stay measured
@@ -659,7 +663,9 @@ function assemblePass(range, pass, plan = null) {
   const sections = patchSectionMap(range.patch)
   const files = pass.files
   return assembleMaterial({
-    stat: range.stat,
+    // A pass of a range whose whole stat exceeds its share carries its own stat
+    // (narrowPassStats).
+    stat: pass.stat ?? range.stat,
     // THE SAME HELPER THE PLAN MEASURED WITH, so the string sized and the
     // string sent cannot drift apart again (see joinPatchSections).
     patch: joinPatchSections(files, sections),

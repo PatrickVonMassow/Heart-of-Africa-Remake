@@ -16,6 +16,7 @@ import {
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
   MAX_PASS_TOTAL,
+  narrowPassStats,
   parseDiffHeader,
   parsePassFiles,
   parsePassSpec,
@@ -1564,5 +1565,44 @@ describe('the composition a set of pass records rests on', () => {
 describe('the budget itself', () => {
   it('is the measured 200k the 17.08.2026 overflow was taken against', () => {
     expect(MATERIAL_BUDGET_CHARS).toBe(200_000)
+  })
+})
+
+describe('a range whose diffstat exceeds its share', () => {
+  const wholeStat = 'x'.repeat(600) // over the 500-character share of a 10k budget
+  const plan = planPasses({
+    stat: wholeStat,
+    patch: patchFor(['a.mjs', 'b.mjs']),
+    files: [file('a.mjs', 4500), file('b.mjs', 4500)],
+    budget: 10_000,
+  })
+
+  it('lets every pass carry its own stat and assemble whole', () => {
+    expect(plan.statTruncated).toBe(true)
+    expect(plan.passes.length).toBeGreaterThan(1)
+    const narrowed = narrowPassStats(plan, (files) => files.map((f) => ` ${f} | 1 +`).join('\n'), 10_000)
+    expect(narrowed.statTruncated).toBe(false)
+    for (const pass of narrowed.passes) {
+      const out = assembleMaterial({
+        stat: pass.stat,
+        patch: joinPatchSections(pass.files, patchSectionMap(patchFor(['a.mjs', 'b.mjs']))),
+        files: [file('a.mjs', 4500), file('b.mjs', 4500)].filter((f) => pass.files.includes(f.path)),
+        budget: 10_000,
+        patchRoom: pass.patchRoom,
+        patchOnly: pass.patchOnly,
+        manifest: formatPassManifest(narrowed, pass),
+      })
+      expect(out.statTruncated).toBe(false)
+      expect(out.fit).toBe(true)
+    }
+  })
+
+  it('stays truncated when the own stat of a pass is still over the share', () => {
+    expect(narrowPassStats(plan, () => wholeStat, 10_000).statTruncated).toBe(true)
+  })
+
+  it('leaves a plan whose stat fits untouched', () => {
+    const fitting = { ...plan, statTruncated: false }
+    expect(narrowPassStats(fitting, () => 'unused')).toBe(fitting)
   })
 })

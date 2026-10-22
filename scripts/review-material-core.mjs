@@ -803,6 +803,25 @@ export function joinPatchSections(paths = [], sections = new Map()) {
 }
 
 /**
+ * A range whose diffstat exceeds its share (roughly 150+ changed files) used
+ * to refuse EVERY pass, because each pass carried the whole stat. Such a plan
+ * hands each pass the stat of its own files instead (`statFor(files)`); the
+ * pass manifest still names the rest of the range. The plan stays truncated
+ * only when a pass's own stat still exceeds the share. The packing already
+ * priced a full stat share, so a smaller stat can only fit.
+ */
+export function narrowPassStats(plan, statFor, budget = MATERIAL_BUDGET_CHARS) {
+  if (!plan?.statTruncated) return plan
+  const statRoom = Math.floor(Math.max(0, Number(budget) || 0) * STAT_SHARE)
+  const passes = (plan.passes ?? []).map((pass) => ({ ...pass, stat: String(statFor(pass.files) ?? '') }))
+  return {
+    ...plan,
+    passes,
+    statTruncated: passes.length === 0 || passes.some((pass) => pass.stat.length > statRoom),
+  }
+}
+
+/**
  * Cut a range that does not fit into PASSES over the FILE SET.
  *
  * Each pass is a set of files whose patch sections and content together fit one
