@@ -3348,11 +3348,16 @@ function ErrandVillagers({
         let handY = null
         let headAspect = null
         let mouthY = null
+        let gait = null
+        let speed = null
         if (g) {
           g.updateWorldMatrix(true, true)
           g.traverse((o) => {
             if (o.name === 'hand-left') handY = o.getWorldPosition(new THREE.Vector3()).y
             if (o.name === 'jar-mouth') mouthY = o.getWorldPosition(new THREE.Vector3()).y
+            // the gait the body is drawn in, at its own measured ground speed
+            if (o.userData.gait && !gait) gait = o.userData.gait
+            if (o.userData.walk && speed === null) speed = (o.userData.walk as { speed: number }).speed
             // THE HEAD AS DRAWN, in world extents: a squat shortens a man, it does
             // not deflate his skull, so the ratio of the head's world height to its
             // world width must stay 1 through the sink (work-order 1085).
@@ -3383,7 +3388,7 @@ function ErrandVillagers({
               ? Math.min(1, task.dug / balance.bankFillSeconds)
               : null,
           yaw: yaws.current[i] ?? 0,
-          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z) },
+          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z), gait, speed },
           carry: carryOf(work, i),
           work: task
             ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,

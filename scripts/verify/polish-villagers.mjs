@@ -2014,8 +2014,10 @@ if (section('adult-errands')) {
       JSON.stringify(swings),
     )
     // THE MOVING CAPTURE the point is judged by (point 1404): one walking adult
-    // whose heading is far off its next way, four frames about 0.3 s apart from
-    // one fixed spot — the turn must read as a turn across them.
+    // whose heading is far off its next way, four frames about 0.3 s apart, the
+    // camera FOLLOWING that one body (4 m off its first flank, re-placed per
+    // frame) so the turner is the figure in the middle of every frame — its yaw,
+    // way heading and drawn gait ride in each frame's label.
     const turner = await page
       .waitForFunction(() => {
         const vs = window.__placeErrands().villagers
@@ -2026,24 +2028,51 @@ if (section('adult-errands')) {
       .catch(() => null)
     check('an errand adult is caught facing away from its next way, to film its turn (point 1404)', turner !== null)
     if (turner !== null) {
-      const at = await page.evaluate((i) => {
-        const v = window.__placeErrands().villagers[i]
-        const side = v.yaw + Math.PI / 2
-        const p = window.__placePlayer
-        p.x = v.x + Math.sin(side) * 4
-        p.z = v.z + Math.cos(side) * 4
-        p.yaw = side
-        p.pitch = -0.15
-        return { x: v.x, z: v.z }
-      }, turner)
+      const side0 = await page.evaluate((i) => window.__placeErrands().villagers[i].yaw + Math.PI / 2, turner)
       for (const k of [1, 2, 3, 4]) {
+        const at = await page.evaluate(({ i, side }) => {
+          const v = window.__placeErrands().villagers[i]
+          const p = window.__placePlayer
+          p.x = v.x + Math.sin(side) * 4
+          p.z = v.z + Math.cos(side) * 4
+          p.yaw = side
+          p.pitch = -0.15
+          const way = v.work ? Math.atan2(v.work.x - v.x, v.work.z - v.z) : null
+          return { x: v.x, z: v.z, yaw: v.yaw, way, gait: v.drawn.gait, speed: v.drawn.speed }
+        }, { i: turner, side: side0 })
+        const deg = (a) => (a === null ? 'n/a' : Math.round((a * 180) / Math.PI))
+        const g = at.gait ? `walk ${at.gait.walk.toFixed(2)} jog ${at.gait.jog.toFixed(2)} sprint ${at.gait.sprint.toFixed(2)}` : 'no gait'
         await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
           local: { x: at.x, y: 0.9, z: at.z },
-          label: `moving capture ${k}/4: one village adult on an errand turning from its old heading toward its next way, filmed from one fixed spot about 4 m off its flank`,
+          label: `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`,
         })
         await page.waitForTimeout(300)
       }
     }
+    // NO VILLAGE ADULT FLIES (point 1404 oddity, frame 1 of 23.10.2026: a woman
+    // drawn near horizontal in mid-air, legs splayed). The drawn gait of every
+    // errand adult over ~10 s: an errand walks; a sprint share means the body's
+    // measured ground speed jumped (a snap, an escape) and the clip flies.
+    const flight = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let worst = { sprint: 0, jog: 0, speed: 0, who: null }
+          let frames = 0
+          const t0 = performance.now()
+          const tick = () => {
+            frames++
+            window.__placeErrands().villagers.forEach((v, i) => {
+              const g = v.drawn.gait
+              if (g && (g.sprint > worst.sprint || (g.sprint === worst.sprint && g.jog > worst.jog)))
+                worst = { sprint: g.sprint, jog: g.jog, speed: v.drawn.speed, who: i, x: v.x, z: v.z, work: v.work?.phase ?? null, arrived: v.work?.arrived ?? null }
+            })
+            if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
+            else resolve({ ...worst, frames })
+          }
+          requestAnimationFrame(tick)
+        }),
+    )
+    check('no village adult on an errand is drawn in a sprint (point 1404 flight oddity)', flight.sprint < 0.5, JSON.stringify(flight))
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared
