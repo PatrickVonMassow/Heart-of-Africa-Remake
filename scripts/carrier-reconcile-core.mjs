@@ -71,6 +71,11 @@ export function parseRequestState(state = '') {
   const sha = /@([0-9a-f]{7,40})/.exec(m[4] ?? '')?.[1] ?? null
   // One anchor per member, in member order (a range carries one per point).
   const anchors = [...(m[4] ?? '').matchAll(/~([0-9a-f]{8})\b/g)].map((a) => a[1])
+  // An endpoint beyond the safe integers would never terminate the expansion
+  // (n + 1 === n): an explicit INVALID claim, red, never a loop (review 22.10.2026).
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) {
+    return { kind: m[1], points: [], sha, anchor: anchors[0] ?? null, anchors, range: true, invalid: { from: m[2], to: m[3] ?? m[2] } }
+  }
   const span = Math.abs(to - from) + 1
   // An oversized range is REJECTED, never silently cut short (review 22.10.2026).
   if (span > MAX_RANGE) return { kind: m[1], points: [], sha, anchor: anchors[0] ?? null, anchors, range: true, tooLarge: { from, to } }
@@ -162,6 +167,11 @@ export function reconcileCarrier({ carriers = [], remote, head, working, mainSha
         open.push({ ...claim, reason: 'appended, not yet proven on origin/main' })
         continue
       }
+      if (claim.invalid) {
+        checked++
+        red.push({ point: claim.invalid.from, title: claim.title, source: claim.source, state: claim.raw, reason: 'invalid-claim' })
+        continue
+      }
       if (claim.tooLarge) {
         checked++
         red.push({ point: claim.tooLarge.from, title: claim.title, source: claim.source, state: claim.raw, reason: 'range-too-large' })
@@ -200,6 +210,7 @@ const RED_WORDS = Object.freeze({
   ...LOCATION_WORDS,
   'no-proof': 'is ticked without an origin/main proof (legacy tick — run node scripts/carrier-reconcile.mjs --backfill)',
   'proof-not-on-main': 'names a proof commit that origin/main does not contain',
+  'invalid-claim': 'names a point number beyond the safe integers — not a point',
   'no-anchor': 'carries no content anchor for this point, so its identity is unproven',
   'range-too-large': `is a range of more than ${MAX_RANGE} points — rejected, not cut short`,
   'anchor-mismatch': 'now names a DIFFERENT point at that number (title anchor differs) — renumbered? record it in docs/carrier-aliases.json',

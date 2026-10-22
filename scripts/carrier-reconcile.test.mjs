@@ -84,6 +84,13 @@ describe('reconcileCarrier — a queued point without its work-order point is RE
     expect(check(tick(1402, { anchor: null }), planes({ remote: [1402] })).red[0].reason).toBe('no-anchor')
   })
 
+  it('an unsafe integer endpoint is an explicit invalid claim, never an endless expansion', () => {
+    for (const state of ['queued 9007199254740992 @abcdef123456', 'queued 1..9007199254740993 @abcdef123456']) {
+      const text = `- [x] 2026-10-21T10:31:00.000Z · s · [request] · ${state} · Unsicher\n`
+      expect(check(text, planes({ remote: [1] })).red).toMatchObject([{ reason: 'invalid-claim' }])
+    }
+  })
+
   it('rejects an oversized range explicitly instead of cutting it short', () => {
     const text = '- [x] 2026-10-21T10:31:00.000Z · s · [request] · queued 1..5000 @abcdef123456 · Zu viel\n'
     expect(check(text, planes({ remote: [1] })).red).toMatchObject([{ reason: 'range-too-large' }])
