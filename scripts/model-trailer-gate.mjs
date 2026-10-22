@@ -3,7 +3,7 @@
 //   node scripts/model-trailer-gate.mjs --message <file>
 //
 // WHY IT EXISTS: on 29.07.2026 five commits of one branch carried the bare
-// `Co-Authored-By: Claude <noreply@anthropic.com>` — a trailer naming no model —
+// `Co-Authored-By: Claude <main-vendor address>` — a trailer naming no model —
 // and the serving-model tripwire blocked the turn end, correctly: from the
 // outside, a trailer that names nothing is indistinguishable from the silent
 // degradation the tripwire exists to catch. The commits were clean, and clearing
@@ -12,15 +12,15 @@
 //
 // Co-Authored-By is authorship; Reviewed-By is review. The distinct keys keep a
 // reviewer out of every author reader. Decision logic: model-guard-core.mjs
-// (pure, Vitest-covered). This wrapper reads the message file and the Fable
+// (pure, Vitest-covered). This wrapper reads the message file and the lane
 // switch state and prints the refusal. FAIL-OPEN on an internal error, like
 // every gate here — a broken gate must never make the tree uncommittable — while
 // a real finding fails CLOSED, which is the whole point. An unreadable or
-// invalid Fable switch state is not an internal error: it is a missing policy
+// invalid lane switch state is not an internal error: it is a missing policy
 // and refuses the commit.
 import { readFileSync } from 'node:fs'
 import { evaluateCommitTrailers, formatCommitTrailerVerdict } from './model-guard-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { isMainModule } from './is-main.mjs'
 
 if (isMainModule(import.meta.url)) {
@@ -35,12 +35,12 @@ if (isMainModule(import.meta.url)) {
     } catch {
       message = ''
     }
-    const fableState = currentFableState()
-    if (!fableState.ok) {
-      process.stderr.write(`model-trailer-gate: refusing because ${fableState.problem}\n`)
+    const scarceState = currentLaneState()
+    if (!scarceState.ok) {
+      process.stderr.write(`model-trailer-gate: refusing because ${scarceState.problem}\n`)
       process.exit(1)
     }
-    const verdict = evaluateCommitTrailers(message, fableState)
+    const verdict = evaluateCommitTrailers(message, scarceState)
     if (verdict.block) {
       process.stderr.write(`${formatCommitTrailerVerdict(verdict)}\n`)
       process.exit(1)

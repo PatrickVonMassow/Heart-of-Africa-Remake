@@ -16,8 +16,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { evaluateCriticalityReview } from './criticality-review-guard-core.mjs'
-import {
-  attachPointFileSets,
+import { attachPointFileSets,
   attachUnavailableClearances,
   baselineFor,
   bootstrapBase,
@@ -32,9 +31,8 @@ import {
   pointLaneCommitsCommand,
   pointLaneRefsCommand,
   readWorkOrder,
-  showAt,
-} from './criticality-review-guard.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
+  showAt } from './criticality-review-guard.mjs'
+import { CROSS, MAIN, SCARCE, VENDORS, trailerFor } from './model-lanes.mjs'
 
 describe('baselineFor', () => {
   it('prefers the branch’s own confirmed baseline, then main’s, then nothing', () => {
@@ -143,12 +141,12 @@ describe('point file-set measurement', () => {
     expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
   })
 
-  // ONE BOUNDARY (28.08.2026): `review-astra` structurally refuses to put the work
+  // ONE BOUNDARY (28.08.2026): `cross-review` structurally refuses to put the work
   // order, its archive or the retrospective in a pass, so a point whose measured
   // file set picked one of them up could never reach a complete composition,
   // whatever was reviewed. The gate reads the planner's exclusion list.
   // The receipt path measured its own set and skipped the boundary (cross-vendor
-  // review, GPT-5.6 Sol): a clearance could then be written for the work order or
+  // review): a clearance could then be written for the work order or
   // the retrospective — paths no review round was ever owed for.
   it('never lets an unavailable receipt claim a path outside the review boundary', () => {
     const sha = 'a'.repeat(40)
@@ -337,7 +335,7 @@ describe('point file-set measurement', () => {
       kind: 'authoring-commission',
       point: 846,
       sha: 'a'.repeat(40),
-      model: 'Fable 5.1',
+      model: SCARCE.displayName,
       at: 1_787_130_000_000,
       reachable: true,
     }
@@ -351,11 +349,11 @@ describe('point file-set measurement', () => {
     const calls = []
     const rows = attachPointFileSets([commission, review], (base, sha) => {
       calls.push([base, sha])
-      return ['scripts/author-fable.mjs', 'scripts/author-astra.mjs']
+      return ['scripts/ask-lane.mjs', 'scripts/author-delegate.mjs']
     })
 
     expect(calls).toEqual([[commission.sha, review.sha]])
-    expect(rows[1].pointFiles).toEqual(['scripts/author-fable.mjs', 'scripts/author-astra.mjs'])
+    expect(rows[1].pointFiles).toEqual(['scripts/ask-lane.mjs', 'scripts/author-delegate.mjs'])
   })
 
   it('verifies unavailable receipts only for Git’s exact unreviewable file set', () => {
@@ -459,7 +457,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
   }
 
   /** Commit everything, naming the AUTHORING model the way this project does. */
-  const commit = (message, model = 'Claude Opus 5') => {
+  const commit = (message, model = MAIN.trailerName) => {
     git('add', '-A')
     const r = git(
       '-c',
@@ -469,7 +467,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
       'commit',
       '-q',
       '-m',
-      `${message}\n\nCo-Authored-By: ${model} <noreply@anthropic.com>`,
+      `${message}\n\nCo-Authored-By: ${model} <${VENDORS[MAIN.vendor].trailerAddress}>`,
     )
     expect(r.status, `commit failed: ${r.stderr}`).toBe(0)
     return git('rev-parse', 'HEAD').stdout.trim()
@@ -583,7 +581,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
         resolve(repo, 'scripts', 'mechanism-review.mjs'),
         '--record', head,
         '--point', '900',
-        '--model', 'Claude Opus 5',
+        '--model', MAIN.trailerName,
         '--verdict', 'merge',
         '--evidence', 'read my own work and liked it very much',
         '--mode', 'review',
@@ -602,7 +600,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
         resolve(repo, 'scripts', 'mechanism-review.mjs'),
         '--record', reviewed,
         '--point', '900',
-        '--model', 'GPT-5.6 Sol',
+        '--model', CROSS.retired[2],
         '--verdict', 'merge',
         '--evidence', 'read the core, ran the gate against a synthetic tick, no side effects found',
         '--mode', 'review',
@@ -685,13 +683,13 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          `Seed the receipt range\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
+          `Seed the receipt range\n\nCo-Authored-By: ${MAIN.trailerName} <${VENDORS[MAIN.vendor].trailerAddress}>`,
         ).status,
       ).toBe(0)
       const base = runGit('rev-parse', 'HEAD').stdout.trim()
       writeFileSync(
         resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'),
-        `${JSON.stringify({ kind: 'authoring-commission', point: 870, sha: base, model: 'GPT-6 Astra', at: 1 })}\n`,
+        `${JSON.stringify({ kind: 'authoring-commission', point: 870, sha: base, model: CROSS.displayName, at: 1 })}\n`,
       )
       mkdirSync(resolve(receiptRepo, 'src'), { recursive: true })
       writeFileSync(resolve(receiptRepo, 'src/both.mjs'), 'export const both = true\n')
@@ -699,7 +697,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          `Add a contribution by every configured reader\n\nCo-Authored-By: GPT-6 Astra <noreply@openai.com>\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`,
+          `Add a contribution by every configured reader\n\nCo-Authored-By: ${trailerFor('cross')}\nCo-Authored-By: ${MAIN.trailerName} <${VENDORS[MAIN.vendor].trailerAddress}>\nCo-Authored-By: ${trailerFor('scarce')}\nCo-Authored-By: ${trailerFor('main-fallback')}`,
         ).status,
       ).toBe(0)
       const head = runGit('rev-parse', 'HEAD').stdout.trim()
@@ -774,13 +772,13 @@ describe('the findings-filed receipt', () => {
   const REVIEW = {
     sha: SHA,
     point: 700,
-    model: 'GPT-5.6 Sol',
+    model: CROSS.retired[2],
     verdict: 'do-not-merge',
     mode: 'review',
     // The recorder always writes the reviewed commit's authorship key, so a row
     // without one can only have arrived by hand — and a hand-edited ledger earns
     // a refusal, never a clearance.
-    authoredBy: `${CLAUDE_MODEL} <noreply@anthropic.com>`,
+    authoredBy: `${MAIN.trailerName} <${VENDORS[MAIN.vendor].trailerAddress}>`,
     evidence: 'read the whole mechanism and found it wrong in two places',
     at: 1_788_000_000_000,
   }
@@ -788,7 +786,7 @@ describe('the findings-filed receipt', () => {
     buildFindingsFiledReceipt({
       sha: SHA,
       point: 700,
-      model: 'GPT-5.6 Sol',
+      model: CROSS.retired[2],
       findingPoints: [801, 802],
       records: [REVIEW],
       openPoints: [801, 802, 900],
@@ -804,7 +802,7 @@ describe('the findings-filed receipt', () => {
       kind: 'review-findings-filed',
       sha: SHA,
       point: 700,
-      model: 'GPT-5.6 Sol',
+      model: CROSS.retired[2],
       reviewAt: REVIEW.at,
       findingPoints: [801, 802],
     })
@@ -857,7 +855,7 @@ describe('the findings-filed receipt', () => {
 
   it('REFUSES when no such review exists at all', () => {
     expect(build({ records: [] }).ok).toBe(false)
-    expect(build({ model: OPUS_MODEL }).ok).toBe(false)
+    expect(build({ model: MAIN.displayName }).ok).toBe(false)
   })
 
   it('REFUSES an empty or malformed finding list', () => {
@@ -872,7 +870,7 @@ describe('the findings-filed receipt', () => {
 
   it('parses its flags strictly, and ignores no unknown token', () => {
     const ok = parseFindingsFiledArgs([
-      '--record-findings-filed', SHA, '--point', '700', '--model', 'GPT-5.6 Sol', '--finding-points', '801, 802',
+      '--record-findings-filed', SHA, '--point', '700', '--model', CROSS.retired[2], '--finding-points', '801, 802',
     ])
     expect(ok.ok).toBe(true)
     expect(ok.values.findingPoints).toEqual([801, 802])

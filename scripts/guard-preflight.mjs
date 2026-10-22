@@ -172,18 +172,18 @@ export const GUARDS = [
     gather: ({ sessionId } = {}) => gatherModelGuardInputs({ sessionId, arm: false }),
     // Both halves of the split (point 397), so the preflight predicts which of
     // the two blocks the session would meet — they have different remedies.
-    decide: ({ log, baselineMs, backupRefs, fableState }) => {
-      if (!fableState?.ok) return { block: true, reason: `SERVING-MODEL TRIPWIRE: ${fableState?.problem}` }
-      const forbidden = findForbiddenCommits(log, baselineMs, fableState)
-      const unidentified = findUnidentifiedCommits(log, baselineMs, fableState)
+    decide: ({ log, baselineMs, backupRefs, scarceState }) => {
+      if (!scarceState?.ok) return { block: true, reason: `SERVING-MODEL TRIPWIRE: ${scarceState?.problem}` }
+      const forbidden = findForbiddenCommits(log, baselineMs, scarceState)
+      const unidentified = findUnidentifiedCommits(log, baselineMs, scarceState)
       if (forbidden.length) {
         return {
           block: true,
-          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified, fableState }),
+          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified, scarceState }),
         }
       }
       if (unidentified.length) {
-        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs, fableState }) }
+        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs, scarceState }) }
       }
       return { block: false }
     },

@@ -100,7 +100,7 @@ import {
   RUNAWAY_FAIL_LIMIT,
   runawayRecoveryDecision,
 } from './batch-autostart-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
@@ -469,7 +469,7 @@ function readRunLogSegment(from) {
 // is the whole point of `firewall-allow.mjs`), and it needs no network of its own
 // beyond DNS.
 //
-// IT IS DETACHED, NOT AWAITED (GPT-5.6 Sol, 11.08.2026). Run synchronously it sat
+// IT IS DETACHED, NOT AWAITED (cross-vendor review, 11.08.2026). Run synchronously it sat
 // in front of every later duty of the tick — the spawn decision, the chat inbox,
 // the leaked-worker sweep — and `timeout` on a sync call is no ceiling at all:
 // node signals the child and then waits for it to actually exit, so a wedged
@@ -1909,7 +1909,7 @@ try {
   const fresh = pendingSinceHandover(pendingChat, state.chatHandedAt)
   const suffix = chatPromptSuffix(fresh)
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
-  const fableState = currentFableState()
+  const fableState = currentLaneState()
   if (!fableState.ok) throw new Error(fableState.problem)
   const emergency = emergencyHandoffPrompt(readJson(join(REPO, 'local', 'batch-emergency-state.json')))
   const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix + emergency)

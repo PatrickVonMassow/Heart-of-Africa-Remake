@@ -10,15 +10,24 @@
 // These cases are that missing binding. They read the shipped artefacts, not
 // fixtures, because the artefacts are the thing under test.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isTrackedInGit } from './git-tracked.mjs'
+import { CROSS, MAIN, SCARCE } from './model-lanes.mjs'
+
+/** A lane spelling as a literal regex fragment. */
+const rx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const read = (rel) => readFileSync(join(REPO_ROOT, rel), 'utf8')
-const HALF_A = 'docs/four-eyes/676-blind-a-opus5'
+// The recorded half's file name carries the model of its day; it is found on disk, never
+// derived from the current lane configuration, because the record is immutable history.
+const HALF_A = `docs/four-eyes/${readdirSync(join(REPO_ROOT, 'docs/four-eyes'))
+  .filter((name) => /^676-blind-a-.+\.json$/.test(name))
+  .map((name) => name.replace(/\.json$/, ''))
+  .join('|')}`
 const HALF_B = 'docs/four-eyes/676-blind-b-sol'
 const UNION = 'docs/four-eyes/676-union.json'
 const DOC = 'docs/handover-architecture.md'
@@ -41,12 +50,13 @@ describe('the 676 stage is auditable from its raw halves', () => {
   })
 
   it('names the author of each half in the file the tooling actually reads', () => {
-    // Half A's own heading claims Fable 5 and is wrong; the transcript metadata
-    // says Claude Opus 5 (676-provenance.md). The file the tooling reads carries
+    // Half A's own heading claims the scarce lane and is wrong; the transcript metadata
+    // says the main lane (676-provenance.md). The file the tooling reads carries
     // the true author, and the verbatim half keeps the mislabel as evidence.
-    expect(JSON.parse(read(`${HALF_A}.json`)).model).toBe('Claude Opus 5')
-    expect(read(`${HALF_A}.md`)).toMatch(/Proposal A — Fable 5/)
-    expect(JSON.parse(read(`${HALF_B}.json`)).model).toBe('GPT-5.6 Sol')
+    // Recorded artefacts keep the spellings of their day, so they read as retired names.
+    expect(JSON.parse(read(`${HALF_A}.json`)).model).toBe(MAIN.retired[1])
+    expect(read(`${HALF_A}.md`)).toMatch(new RegExp(String.raw`Proposal A — ${rx(SCARCE.retired[0])}`))
+    expect(JSON.parse(read(`${HALF_B}.json`)).model).toBe(CROSS.retired[2])
   })
 
   it('keeps the counted union and the published table the same union', () => {
@@ -56,10 +66,10 @@ describe('the 676 stage is auditable from its raw halves', () => {
     const stored = JSON.parse(read(UNION))
     expect(stored.entries).toEqual(unionFromDocument(read(DOC)))
     // THE UNION NAMES ITS VALID MERGER: half A is Claude's and half B is Sol's, so
-    // the model that wrote neither is Fable 5, which folded the stage on 22.08.2026
+    // the model that wrote neither is the scarce lane, which folded the stage on 22.08.2026
     // once the owner had lifted its suspension. The two earlier folds by the halves'
     // own authors remain recorded as the weaker two-model fallback this replaced.
-    expect(stored.mergedBy).toBe('Claude Fable 5')
+    expect(stored.mergedBy).toBe(SCARCE.retired[1])
     expect(stored.mergedByNote).toMatch(/wrote neither half/i)
     expect(stored.mergedByNote).toMatch(/replaces the two recorded fallback folds/i)
     expect(read(DOC)).toMatch(/weaker two-model fallback/i)
@@ -193,7 +203,7 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // next unrelated fold recorded anywhere in the repository would have become
     // the thing under test, and a row naming a HALF-AUTHOR as merger would have
     // satisfied it. The row is picked by the sources it says it read, there must
-    // be exactly one, and it has to name Fable 5 — the model that wrote neither
+    // be exactly one, and it has to name the scarce lane — the model that wrote neither
     // half — as the merger.
     const rows = read(LEDGER)
       .split('\n')

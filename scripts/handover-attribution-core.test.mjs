@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { LEGACY } from './model-lanes.mjs'
 import {
   HANDOVER_ATTRIBUTION_STATUS,
   addHandoverAttributionCheckpoint,
@@ -124,6 +125,8 @@ describe('successor ramp classification', () => {
     { toolName: 'Bash', command: 'rg "npm run test:unit" scripts' },
     { toolName: 'Read', filePath: 'scripts/example.mjs' },
     { toolName: 'Bash', command: 'node scripts/new-ramp-duty.mjs --status' },
+    // A retired script no longer exists, so invoking it is no work.
+    { toolName: 'Bash', command: `node scripts/${LEGACY.askScripts[0]} --brief x` },
   ])('does not infer work from mentions or an unknown process call: %o', (call) => {
     expect(rampCallBearsWork(call)).toBe(false)
     expect(rampStageForCall(call)).toBe('ramp.mechanical-call')

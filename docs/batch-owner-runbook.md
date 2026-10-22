@@ -126,13 +126,21 @@ The first historical run and the reproducible 21 August/four-day fixtures are in
 
 ## Authoring and four eyes
 
-`scripts/author-routing-core.mjs` owns the routing cut. GPT-6 Astra authors the
-hard, complex, error-prone, and high-criticality points; Opus 5.5 authors work
-whose verification is itself the task. Fable 5.1 authors tagged points and automatic
-review-round escalations through `scripts/author-fable.mjs`, as `CLAUDE.md` §6 states. Review is cross-vendor through
-`scripts/review-astra.mjs` for Claude-authored work and Claude for Astra-authored
-work. Serving fallback order is Opus 5.5, Fable 5.1, then Opus 4.8; a different
-serving model pauses the batch.
+`scripts/author-routing-core.mjs` owns the routing cut; the lanes are role
+records in `scripts/model-lanes.mjs`, the only place naming models. At the
+`default` routing the main chain authors; the scarce lane authors tagged points
+and automatic review-round escalations through
+`scripts/author-delegate.mjs --lane scarce`, as `CLAUDE.md` §6 states. Review is
+cross-vendor through `scripts/cross-review.mjs`: a lane of another vendor than
+every author of the range. Serving fallback order is the main chain, the scarce
+lane (when switched on), then the main fallback; a different serving model
+pauses the batch.
+
+**After a lane rename lands** (scripts or state files renamed, as on the
+generic-lane change): the owner restarts the batch daemon before the next
+point starts, because a running daemon keeps invoking the script names its
+loaded code holds, and the memory entries naming old commands are updated in
+the same handoff.
 
 For blind-parallel work, each input entry carries an id. The third model merges
 by meaning through `scripts/blind-merge.mjs`, and every input is counted exactly

@@ -24,6 +24,7 @@ import {
   expandSegments,
   posixNormalizePath,
 } from './command-classify-core.mjs'
+import { CROSS, MAIN } from './model-lanes.mjs'
 
 describe('the lexer', () => {
   it('keeps a separator inside quotes out of the split', () => {
@@ -522,7 +523,7 @@ describe('scripts whose whole job is to change shared state', () => {
   it('reads the landing chain as MUTATING, in every invocation form', () => {
     for (const c of [
       'node scripts/land-point.mjs 594',
-      'node scripts/land-point.mjs 594 --model "Claude Opus 5"',
+      `node scripts/land-point.mjs 594 --model "${MAIN.trailerName}"`,
       'cd /repo && node scripts/land-point.mjs 594',
       'node ./scripts/land-point.mjs 594',
     ]) {
@@ -534,7 +535,7 @@ describe('scripts whose whole job is to change shared state', () => {
     // Same reasoning as the fallback: flags are not decidable from outside.
     // Over-blocking here costs a board publish that was due anyway.
     expect(isMutatingSegment('node scripts/land-point.mjs 594 --dry')).toBe(true)
-    expect(isMutatingSegment('node scripts/land-point.mjs 594 --model "GPT-5.6 Sol" --help')).toBe(true)
+    expect(isMutatingSegment(`node scripts/land-point.mjs 594 --model "${CROSS.displayName}" --help`)).toBe(true)
     expect(isMutatingSegment('node scripts/land-point.mjs 594 --version')).toBe(true)
   })
 

@@ -8,8 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
-import {
-  attachContributionDispositions,
+import { attachContributionDispositions,
   attachCoverage,
   BASELINE_PATH as MECHANISM_BASELINE_PATH,
   BASELINE_RECOVERY_ANCHOR,
@@ -29,20 +28,17 @@ import {
   GATE_SWITCHED_OFF,
   statusReportsFindings,
   resolveMechanismReviewSessionId,
-  shouldSeedRecoveryAnchor,
-} from './mechanism-review-guard.mjs'
+  shouldSeedRecoveryAnchor } from './mechanism-review-guard.mjs'
 import { BASELINE_PATH as CRITICALITY_BASELINE_PATH } from './criticality-review-guard.mjs'
 import { BASELINE_PATH as TASKS_SPEC_BASELINE_PATH } from './tasks-spec-guard.mjs'
-import {
-  CONTRIBUTION_DISPOSITION_KIND,
+import { CONTRIBUTION_DISPOSITION_KIND,
   CONTRIBUTION_SCOPE_BOUNDARY,
   LEGACY_CONTRIBUTION_BASELINE,
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   LEGACY_RANGE_RETIREMENT_REASON,
   mechanismPathsIn,
-  modelsFromTrailers,
-} from './mechanism-review-core.mjs'
+  modelsFromTrailers } from './mechanism-review-core.mjs'
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 
 /** The range parse narrowed to mechanism commits — the view these parser tests pin. */
@@ -52,6 +48,7 @@ const parseMechanismLog = (out, files) =>
     .filter((commit) => commit.files.length)
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
+import { CROSS, LEGACY, MAIN, SCARCE, VENDORS, trailerFor } from './model-lanes.mjs'
 
 // No stored baseline, recovery lands on HEAD: the gather's full path over an
 // empty range, so no case in this file walks the live repository history.
@@ -254,7 +251,7 @@ describe('historical ledger eras', () => {
           sha: shortSha.padEnd(40, '0'),
           subject: `historical refusal ${shortSha}`,
           at: Number(row.at) - 1,
-          authorModel: reviewerIsAnthropic ? 'GPT-5.6 Sol' : 'Claude Opus 5',
+          authorModel: reviewerIsAnthropic ? CROSS.retired[2] : MAIN.trailerName,
           files: [row.pass?.files?.[0] ?? 'scripts/historical-guard.mjs'],
           coveringRecordShas: [row.sha],
         }],
@@ -541,9 +538,9 @@ describe('pending review contributions', () => {
       {
         sha: 'a'.repeat(40),
         files: ['scripts/example-guard.mjs', 'src/ordinary.ts', 'TASKS.md'],
-        authorModels: ['GPT-5.6 Sol'],
+        authorModels: [CROSS.retired[2]],
       },
-      { sha: 'b'.repeat(40), files: ['src/unrelated.ts'], authorModels: ['GPT-5.6 Sol'] },
+      { sha: 'b'.repeat(40), files: ['src/unrelated.ts'], authorModels: [CROSS.retired[2]] },
     ]
     const pending = pendingReviewContributions(
       commits,
@@ -559,11 +556,11 @@ describe('pending review contributions', () => {
   it('excludes a ledger-only append but keeps the ledger beside a real mechanism change', () => {
     const ledger = '.claude/mechanism-reviews.jsonl'
     const commits = [
-      { sha: 'a'.repeat(40), files: [ledger], authorModels: ['GPT-5.6 Sol'] },
+      { sha: 'a'.repeat(40), files: [ledger], authorModels: [CROSS.retired[2]] },
       {
         sha: 'b'.repeat(40),
         files: [ledger, 'scripts/example-guard.mjs'],
-        authorModels: ['GPT-5.6 Sol'],
+        authorModels: [CROSS.retired[2]],
       },
     ]
     const pending = pendingReviewContributions(commits, ['example-guard.mjs'])
@@ -689,9 +686,9 @@ describe('attachCoverage', () => {
     const recSha = 'c'.repeat(40)
     const rec = (index) => ({
       sha: recSha,
-      model: 'GPT-5.6 Sol',
-      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'fixture transcript absent' },
-      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      model: CROSS.retired[2],
+      reviewerAuthorship: { status: 'unverified', claimedModel: CROSS.retired[2], reason: 'fixture transcript absent' },
+      authoredBy: trailerFor('main'),
       verdict: 'merge',
       evidence: 'checked the guard change against its spec end to end',
       mode: 'review',
@@ -706,7 +703,7 @@ describe('attachCoverage', () => {
         {
           sha: '1'.repeat(40),
           subject: 'change a guard',
-          authorModel: 'Claude Opus 5',
+          authorModel: MAIN.trailerName,
           files: ['scripts/x-guard.mjs'],
           coveringRecordShas: [recSha],
         },
@@ -766,7 +763,7 @@ describe('measureReviewGap', () => {
       blocked: true,
       commits: [{ sha: 'c'.repeat(40) }],
       loadPlanner: () => {
-        throw new Error('review-astra.mjs is broken')
+        throw new Error('cross-review.mjs is broken')
       },
     })
     expect(gap).toMatchObject({ gap: false, reason: 'unmeasured' })
@@ -854,23 +851,23 @@ describe('the plan the gate prints names what is OWED, never what the range hold
     const verdict = evaluateMechanismReview({
       baseline: 'base',
       head: 'h'.repeat(40),
-      pendingCommits: [{ sha: owedSha, at: 1, files: ['scripts/y.mjs'], authorModel: 'GPT-5.6 Sol' }],
+      pendingCommits: [{ sha: owedSha, at: 1, files: ['scripts/y.mjs'], authorModel: CROSS.retired[2] }],
       records: [],
     })
     const text = formatMechanismReviewVerdict(verdict, {
       authorshipPlan: {
         groups: [
           {
-            vendor: 'openai',
-            reviewer: 'Opus 5',
-            reviewerVendor: 'anthropic',
+            vendor: CROSS.vendor,
+            reviewer: MAIN.displayName,
+            reviewerVendor: MAIN.vendor,
             files: ['scripts/y.mjs'],
             commits: [owedSha],
           },
           {
-            vendor: 'openai',
-            reviewer: 'Opus 5',
-            reviewerVendor: 'anthropic',
+            vendor: CROSS.vendor,
+            reviewer: MAIN.displayName,
+            reviewerVendor: MAIN.vendor,
             files: ['scripts/settled.mjs'],
             commits: ['c'.repeat(40)],
           },
@@ -895,8 +892,8 @@ describe('the plan the gate prints names what is OWED, never what the range hold
   it('narrows nothing when a finding names no commit, so a demand is never trimmed away', () => {
     const verdict = evaluateMechanismReview({ baseline: 'b', head: 'h'.repeat(40), pendingCommits: [], records: [] })
     const groups = [
-      { vendor: 'openai', reviewer: 'Opus 5', reviewerVendor: 'anthropic', files: ['scripts/y.mjs'], commits: ['d'.repeat(40)] },
-      { vendor: 'anthropic', reviewer: 'GPT-5.6 Sol', reviewerVendor: 'openai', files: ['scripts/z.mjs'], commits: ['e'.repeat(40)] },
+      { vendor: CROSS.vendor, reviewer: MAIN.displayName, reviewerVendor: MAIN.vendor, files: ['scripts/y.mjs'], commits: ['d'.repeat(40)] },
+      { vendor: MAIN.vendor, reviewer: CROSS.retired[2], reviewerVendor: CROSS.vendor, files: ['scripts/z.mjs'], commits: ['e'.repeat(40)] },
     ]
     const text = formatMechanismReviewVerdict({ ...verdict, block: true, findings: [{ kind: 'no-review' }] }, {
       authorshipPlan: { groups, unreviewable: [] },
@@ -934,8 +931,8 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
   ].join('\n')
   const trailers = {
     [MERGE]: '',
-    [MERGED]: 'GPT-5.6 Sol <noreply@openai.com>',
-    [FIRST]: 'Claude Opus 5 <noreply@anthropic.com>',
+    [MERGED]: `${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`,
+    [FIRST]: trailerFor('main'),
   }
 
   it('hands the merged tip trailer to the planner, even when it is in range', () => {
@@ -950,10 +947,10 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     })
 
     expect(commits).toHaveLength(2)
-    expect(commits[0].authorModels).toEqual(['GPT-5.6 Sol <noreply@openai.com>'])
-    expect(commits[0].authorModel).toBe('GPT-5.6 Sol <noreply@openai.com>')
+    expect(commits[0].authorModels).toEqual([`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`])
+    expect(commits[0].authorModel).toBe(`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`)
     // The MERGED tip, not the first parent: a merge inherits from what it took in.
-    expect(commits[0].parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    expect(commits[0].parentAuthorModels).toEqual({ [MERGED]: [`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`] })
     expect(asked).toContain(MERGED)
     expect(Object.keys(commits[0].parentAuthorModels)).not.toContain(FIRST)
   })
@@ -985,18 +982,18 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
       readParents: () => [FIRST, MERGED, THIRD],
       readTrailers: (sha) => ({
         [MERGE]: '',
-        [MERGED]: 'GPT-5.6 Sol <noreply@openai.com>',
-        [THIRD]: 'Claude Fable 5 <noreply@anthropic.com>',
+        [MERGED]: `${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`,
+        [THIRD]: trailerFor('scarce'),
       })[sha] ?? '',
     })
 
     expect(commit.authorModels).toEqual([
-      'GPT-5.6 Sol <noreply@openai.com>',
-      'Claude Fable 5 <noreply@anthropic.com>',
+      `${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`,
+      trailerFor('scarce'),
     ])
     expect(commit.parentAuthorModels).toEqual({
-      [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'],
-      [THIRD]: ['Claude Fable 5 <noreply@anthropic.com>'],
+      [MERGED]: [`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`],
+      [THIRD]: [trailerFor('scarce')],
     })
   })
 
@@ -1011,17 +1008,17 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     const pass = (index, at, authoredBy) => ({
       sha: MERGE,
       authoredBy,
-      model: 'Opus 5',
+      model: MAIN.displayName,
       reviewerAuthorship: {
         status: 'agreement',
-        claimedModel: 'Opus 5',
-        actualModel: 'Opus 5',
+        claimedModel: MAIN.displayName,
+        actualModel: MAIN.displayName,
       },
       verdict: 'merge',
       evidence: `Checked the complete merge end state in pass ${index}.`,
       mode: 'review',
-      handover: 'sol-authored',
-      handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+      handover: Object.keys(LEGACY.handovers)[1],
+      handoverChain: [MAIN.displayName, SCARCE.displayName, MAIN.fallback.displayName],
       pass: {
         index,
         total: 2,
@@ -1035,8 +1032,8 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
       pass(2, 1_788_000_002_000, ''),
     ]
     const afterRepair = [
-      pass(1, 1_788_000_003_000, 'GPT-5.6 Sol <noreply@openai.com>'),
-      pass(2, 1_788_000_004_000, 'GPT-5.6 Sol <noreply@openai.com>'),
+      pass(1, 1_788_000_003_000, `${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`),
+      pass(2, 1_788_000_004_000, `${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`),
     ]
     const verdict = evaluateMechanismReview({
       baseline: 'base',
@@ -1062,7 +1059,7 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
     })
 
     expect(commit.parentShas).toEqual([FIRST, MERGED])
-    expect(commit.parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    expect(commit.parentAuthorModels).toEqual({ [MERGED]: [`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`] })
     const { groups } = planAuthorshipGroups({ commits: [commit], endStateFiles: commit.files })
     expect(groups[0].reviewer).toBeTruthy()
   })
@@ -1076,7 +1073,7 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
         reads += 1
         return [FIRST, MERGED]
       },
-      readTrailers: () => 'Claude Opus 5 <noreply@anthropic.com>',
+      readTrailers: () => trailerFor('main'),
     })
 
     expect(reads).toBe(0)
@@ -1096,7 +1093,7 @@ describe('a trailerless merge is attributed to the tip it merged', () => {
   })
 })
 
-// THE PRODUCTION READ ITSELF, NOT A STAND-IN (cross-vendor review, GPT-5.6 Sol at
+// THE PRODUCTION READ ITSELF, NOT A STAND-IN (cross-vendor review at
 // effort high). Every case above injects `readParents`, which replaces the real
 // command and the real parser — so they stay green if the wiring drops the
 // no-replace flag or starts scanning past the header, and a `parent` line forged
@@ -1158,12 +1155,12 @@ describe('the default parent reader, exercised rather than replaced', () => {
             '',
           ].join('\n')
         }
-        return cmd.includes(MERGED) ? 'GPT-5.6 Sol <noreply@openai.com>' : ''
+        return cmd.includes(MERGED) ? `${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>` : ''
       },
     })
 
     expect(commit.parentShas).toEqual([REAL, MERGED])
-    expect(commit.parentAuthorModels).toEqual({ [MERGED]: ['GPT-5.6 Sol <noreply@openai.com>'] })
+    expect(commit.parentAuthorModels).toEqual({ [MERGED]: [`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`] })
     expect(commands.some((cmd) => cmd.includes('--no-replace-objects') && cmd.includes('cat-file -p'))).toBe(true)
     expect(commands.every((cmd) => cmd.startsWith('--no-replace-objects'))).toBe(true)
   })
@@ -1258,7 +1255,7 @@ describe('an authorship read that fails is typed, never shrugged off', () => {
   it('carries a failing OWN trailer read out the same way — the read that decides everything', () => {
     // It decides `own`, both author fields, and whether the ancestry rule runs at
     // all, so it is the most load-bearing of the three and was the last to be
-    // wrapped (cross-vendor review, GPT-5.6 Sol, second do-not-merge).
+    // wrapped (cross-vendor review, second do-not-merge).
     const REC = String.fromCharCode(0x1e)
     const FLD = String.fromCharCode(0x1f)
     const log = [`${REC}${SHA}${FLD}1788000000${FLD}${REAL}`, '', 'scripts/x-guard.mjs', ''].join('\n')

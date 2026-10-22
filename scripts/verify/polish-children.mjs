@@ -2051,7 +2051,7 @@ if (section('children-bank-game')) {
         // let the loop leave INSIDE a later hold on readings taken during an
         // earlier one, which is the same coin toss in a longer disguise: the
         // trace is therefore restarted at every hold and only a hold that was
-        // read from the word to its far side counts (GPT-6 Astra, second round).
+        // read from the word to its far side counts (cross-vendor review, second round).
         if (holding) {
           if (!inHold) {
             inHold = true

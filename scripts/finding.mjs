@@ -228,7 +228,7 @@ function proveOnMain(point) {
  * Write a resolved request transition back — onto a FRESH read of the carrier,
  * never onto the text the decision was made on. Returns the written text.
  *
- * THE GAP IS REAL (four-eyes finding 1, Fable 5, 31.07.2026). Between the read
+ * THE GAP IS REAL (four-eyes finding 1, 31.07.2026). Between the read
  * that resolved the deposit and this write, another window may have appended one
  * — for `--blocked` the whole board.mjs subprocess sits in that gap — and
  * writing the old text back would erase it without a word, destroying the very
@@ -387,7 +387,7 @@ if (has('--blocked')) {
   const why = flag('--why')
   if (!title) fail('--blocked needs the title (or part of it) of the request that cannot be carried in')
   if (!why) fail('--blocked needs a reason the user can act on: --blocked "<title>" --why "<reason>"')
-  // THE DEPOSIT IS RESOLVED ONCE, on THIS text (four-eyes finding 5, Fable 5):
+  // THE DEPOSIT IS RESOLVED ONCE, on THIS text (four-eyes finding 5):
   // re-RESOLVING by the search string after the card was written could find a
   // second matching deposit appended in between — the very concurrency this
   // carrier is for — and then throw with the user's card already up. The WRITE

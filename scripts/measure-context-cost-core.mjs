@@ -14,7 +14,7 @@
  *
  * These are RATIOS RELATIVE TO AN INPUT TOKEN, not prices: a cache read is cheap, a
  * cache write costs more than a plain input token, an output token costs several. They
- * are the published Anthropic ratios for the Claude 4/5 family and are stated here so
+ * are the published ratios of the main lane's vendor for its model families and are stated here so
  * a reader can see exactly what the "spend" number means — it is a PROXY, and calling
  * it anything else would be the "measured-not-estimated" mistake this project already
  * made once.

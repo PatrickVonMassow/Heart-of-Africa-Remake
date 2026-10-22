@@ -6,7 +6,7 @@
 // model-diverse review of the plan and of the result. Carried by intention, that
 // rule was applied where somebody happened to remember it. Worse (measured
 // 30.07.2026): THE REVIEW CAN OUTLIVE ITS AUTHOR. A delegated agent spawned its
-// Fable-5 reviewer in the background and then stopped; the review landed in the
+// scarce-lane reviewer in the background and then stopped; the review landed in the
 // parent session minutes later with verdict `do-not-merge` and two blockers, one
 // of which would have reddened main's unit gate the moment the branch merged.
 // The branch LOOKED reviewed and was not.
@@ -611,7 +611,7 @@ export function formatCriticalityReviewVerdict(verdict) {
     '',
     `If Git proves no configured vendor can review part of the point, record that exact exception:`,
     '  node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> \\',
-    '      --files "<exact paths printed by review-astra>" --reason "<why no vendor is eligible>"',
+    '      --files "<exact paths printed by cross-review>" --reason "<why no vendor is eligible>"',
     `It writes kind ${REVIEW_UNAVAILABLE_KIND}; it covers only its verified file list and answers no refusal.`,
     '',
     'Inspect the gate with: node scripts/criticality-review-guard.mjs --status',

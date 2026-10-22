@@ -483,7 +483,7 @@ try {
       // A claimant that has already been RELEASED to is just as sanctioned a
       // second session as a pending one — it is the window the batch was freed
       // for, and flagging it would demand the doctor before the takeover it is
-      // waiting to complete (four-eyes review, Fable 5, 30.07.2026, finding 3).
+      // waiting to complete (four-eyes review, 30.07.2026, finding 3).
       exclude: (claimInfo.honour || claimInfo.reserve) && claimInfo.claimantSid ? [claimInfo.claimantSid] : [],
     })
     if (parallel.length > 0) {

@@ -1,6 +1,6 @@
 // LAND A FINISHED POINT — the whole chain, one command (point 594).
 //
-//   node scripts/land-point.mjs 594 --model "Claude Opus 5.5"   land it
+//   node scripts/land-point.mjs 594 --model "<trailer name>"   land it
 //   node scripts/land-point.mjs 594 --dry      print the plan, touch nothing
 //   node scripts/land-point.mjs 594 --model "…" --serial   force the gate serial (--parallel: parallel)
 //   node scripts/land-point.mjs 594 --model "…" --branch feat/594-x   name the branch yourself
@@ -37,7 +37,7 @@ import { lostPoints } from './carrier-reconcile-core.mjs'
 import { ALIASES_PATH, runReconcile, showAtRevision } from './carrier-reconcile.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import {
   branchDeletionBlocker,
   formatCleanupNotes,
@@ -904,7 +904,7 @@ async function main(argv) {
       if (e.repair) console.error(`  repair: ${e.repair}`)
       return 2
     }
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     if (!fableState.ok) {
       console.error(`land-point: ${fableState.problem}`)
       return 2
@@ -913,7 +913,7 @@ async function main(argv) {
     if (trailers.block) {
       console.error(
         `land-point: --model "${model}" is not an allowed authoring model (CLAUDE.md §6).\n` +
-          `  The serving chain is derived by node scripts/fable-switch.mjs --status; name the model actually running this landing.`,
+          `  The serving chain is derived by node scripts/lane-switch.mjs --status; name the model actually running this landing.`,
       )
       return 2
     }

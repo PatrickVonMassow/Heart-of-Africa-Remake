@@ -40,6 +40,7 @@ import {
   resolvedTargetInCheckout,
 } from './batch-lease-core.mjs'
 import { LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
+import { MAIN } from './model-lanes.mjs'
 
 const T0 = 1_800_000_000_000
 const lockAt = (t, extra = {}) => ({ sessionId: 's-owner', claimedAt: t, pid: 4242, ...extra })
@@ -596,7 +597,7 @@ describe('the main-write ownership fence', () => {
     for (const command of [
       'git commit -m x',
       'git push',
-      'node scripts/land-point.mjs 795 --model "Opus 5"',
+      `node scripts/land-point.mjs 795 --model "${MAIN.displayName}"`,
       'npm run build > build-report.txt',
       'bash -lc "git commit -m x"',
     ]) {

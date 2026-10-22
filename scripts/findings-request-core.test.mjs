@@ -145,7 +145,7 @@ describe('the states and the escape hatch', () => {
   })
 })
 
-// Four-eyes finding 1 (Fable 5, 31.07.2026): the transition is decided on the
+// Four-eyes finding 1 (31.07.2026): the transition is decided on the
 // text that was read and WRITTEN onto the text that is there now. The live
 // interleave — a second process depositing inside the gap — is in
 // finding-request-cli.test.mjs; what is swept here is the re-apply itself.
@@ -186,7 +186,7 @@ describe('the write-back re-applies onto whatever the carrier says NOW', () => {
 })
 
 describe('a spec that talks ABOUT this mechanism survives it', () => {
-  // Four-eyes finding 1 (Fable 5, 30.07.2026): the specs most likely to be
+  // Four-eyes finding 1 (30.07.2026): the specs most likely to be
   // deposited here are specs about the carrier itself, and a bare field marker
   // inside one used to truncate the field it was supposed to carry verbatim.
   const spec = ['Die Felder heißen:', '#spec', '#why', 'und der Rest.'].join('\n')
@@ -224,7 +224,7 @@ describe('the route', () => {
   })
 
   it('REFUSES to queue a request with open questions, not merely says so', () => {
-    // Four-eyes finding 2 (Fable 5, 31.07.2026): the route was display-only, so
+    // Four-eyes finding 2 (31.07.2026): the route was display-only, so
     // "NEVER to a TASKS append" queued fine.
     const open = `${deposit({ openQuestions: 'Soll das auch für die Doku gelten?' })}\n`
     expect(() => markQueued(open, 'Nebenfenster', 481, PROOF)).toThrow(/OPEN QUESTIONS/)
@@ -264,7 +264,7 @@ describe('a malformed request warns and never blocks', () => {
   })
 
   it('counts a hand tick with a capital X as ticked instead of losing the entry', () => {
-    // Four-eyes finding 4 (Fable 5): it used to fall through the pending count
+    // Four-eyes finding 4: it used to fall through the pending count
     // AND the malformed report, so the entry vanished from both.
     const ticked = '- [X] 2026-07-29T18:50:00.000Z · 10a2d2e0 · Ein Befund von Hand abgehakt\n'
     expect(parseHead(ticked.trim()).done).toBe(true)

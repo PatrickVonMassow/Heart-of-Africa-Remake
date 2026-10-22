@@ -1,0 +1,290 @@
+#!/usr/bin/env node
+// ASK A LANE FOR PURE TEXT WORK (work-order point 654, A1). `--lane <role>` picks the lane
+// (default `cross`); the claude-runtime lanes (main, scarce, main-fallback) run through
+// runClaudeAsk.
+//
+//   node scripts/ask-lane.mjs --kind diagnose  --brief "why did the place suite go red?" \
+//        --log /tmp/place.log --diff main..HEAD
+//   node scripts/ask-lane.mjs --kind audit     --brief "…" --file src/world/river.ts
+//   node scripts/ask-lane.mjs --lane cross --kind enumerate --brief "…"   # a blind-parallel half
+//   node scripts/ask-lane.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
+//   … and anything piped on stdin is material too.
+//
+// It is `scripts/cross-review.mjs`'s proven path — `codex exec` at the cross lane's recorded
+// reasoning effort in a
+// READ-ONLY sandbox, the artefact on stdin — generalised past reviews to the four kinds
+// of work that need no write access: DIAGNOSE, AUDIT, ENUMERATE, EXPLAIN. The login
+// handling, the unavailability classification and the model-id freshness probe are
+// IMPORTED from that path, not rebuilt.
+//
+// NO LANE AUTHORS ON THIS PATH. The answer is text another session acts on, and no commit
+// carries the asked lane's trailer from here. Authoring is a different command
+// (scripts/author-delegate.mjs, point 667), where the trailer and the allowlist do apply.
+//
+// WHEN THE SHARE SWITCH has moved the load away from the cross lane, or the model did not
+// answer, this says so, names the cause, hands the work back and exits 3, so a script can
+// tell "answered" from "did not" without reading prose. A measured cross-lane outage
+// (point 1194) serves the ask on the main lane instead.
+import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { isMainModule } from './is-main.mjs'
+import { REPO_ROOT } from './repo-paths.mjs'
+import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS } from './cross-review-core.mjs'
+import { ensureModelProven, runCodex } from './cross-review.mjs'
+import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
+import { effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { laneIsOn } from './lane-switch-core.mjs'
+import { authoringClaudeArgs } from './author-delegate-core.mjs'
+import { ASK_LANES, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskLane } from './ask-lane-core.mjs'
+import { EXECUTION_ROLES } from './model-lanes.mjs'
+
+/** The lanes by role, read once: the cross lane is the default, the main lane the outage fallback. */
+const CROSS_LANE = ASK_LANES.cross
+const MAIN_LANE = ASK_LANES.main
+
+/** One git read that never throws — a missing range is reported, not fatal. */
+function git(args) {
+  const res = spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, maxBuffer: 128 * 1024 * 1024 })
+  return res.status === 0 && !res.error ? (res.stdout ?? '').trim() : null
+}
+
+/** Everything piped in, or '' when nothing was. */
+export function readStdin() {
+  if (process.stdin.isTTY) return ''
+  try {
+    return readFileSync(0, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * The material sections, in the order they are worth the budget: what the caller piped
+ * in first (it chose to), then the logs, then the diff, then the files.
+ *
+ * EVERY SECTION SAYS WHETHER IT REALLY CARRIES ITS ARTEFACT (`ok`). A file that could not
+ * be read used to travel as the sentence "(could not be read: …)", which is material a
+ * model can answer ABOUT — shaped, plausible, and about nothing (cross-vendor review,
+ * 12.08.2026). The caller refuses a request whose material is entirely such placeholders,
+ * and names the ones that failed even when the rest went through.
+ */
+function gatherSections({ stdin = '', logs = [], diff = '', files = [] } = {}) {
+  const sections = []
+  const read = (title, path) => {
+    try {
+      return { title, text: readFileSync(path, 'utf8'), ok: true }
+    } catch (e) {
+      return { title, text: `(could not be read: ${e.message})`, ok: false, problem: `${path}: ${e.message}` }
+    }
+  }
+  if (stdin.trim()) sections.push({ title: 'MATERIAL (stdin)', text: stdin, ok: true })
+  for (const path of logs) sections.push(read(`LOG: ${path}`, path))
+  if (diff) {
+    const stat = git(['diff', '--stat', diff])
+    const patch = git(['diff', diff])
+    const failed = stat === null || patch === null
+    sections.push({ title: `DIFFSTAT ${diff}`, text: stat ?? '(the range could not be read)', ok: !failed, problem: failed ? `--diff ${diff}: git could not read the range` : '' })
+    sections.push({ title: `PATCH ${diff}`, text: patch ?? '(the range could not be read)', ok: !failed })
+  }
+  for (const path of files) sections.push(read(`FILE (current content): ${path}`, path))
+  return sections
+}
+
+export const usage = () =>
+  [
+    // Literal role names: docs/command-index.md is generated from this source text.
+    'usage: node scripts/ask-lane.mjs [--lane main|cross|scarce|main-fallback] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
+    '           [--file <path>]… [--log <path>]… [--diff <range>] [--timeout <ms>] [--anyway] [--json]',
+    '',
+    'Material also comes from stdin. Nothing is fetched by the model: this container cannot',
+    'create user namespaces, so everything it may look at must travel with the request.',
+    `Defaults to the cross lane (${CROSS_LANE.name}) at reasoning effort ${CROSS_LANE.effort}; every lane AUTHORS NOTHING —`,
+    'the answer is text another session acts on. The cross lane obeys the share switch; the scarce',
+    'lane obeys its lane switch. A routed refusal exits 3 unless --anyway is allowed for that route.',
+    '  node scripts/lane-routing.mjs --status   # what goes where right now',
+  ].join('\n')
+
+/** Run a Claude-family ask with no tools and prove the serving model from the
+ * CLI's modelUsage receipt. Material travels on stdin, never through a read tool. */
+function runClaudeAsk({ prompt, input = '', model, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
+  const args = authoringClaudeArgs({ modelId: model.id, prompt })
+  const dangerous = args.indexOf('--dangerously-skip-permissions')
+  if (dangerous >= 0) args.splice(dangerous, 1)
+  args.push(
+    '--permission-mode', 'dontAsk',
+    '--tools', '',
+    '--safe-mode',
+    '--no-session-persistence',
+    '--prompt-suggestions', 'false',
+    '--effort', model.effort,
+  )
+  const res = spawn('claude', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+    input,
+    timeout: timeoutMs,
+    maxBuffer: 128 * 1024 * 1024,
+  })
+  const modelResult = parseClaudeAskOutput(res.stdout, model)
+  const timedOut = res.error?.code === 'ETIMEDOUT' || res.signal != null
+  const cause = timedOut
+    ? 'Claude timed out before the ask completed'
+    : res.error
+      ? `Claude could not complete the ask: ${res.error.message}`
+      : res.status !== 0
+        ? `Claude exited with code ${res.status}: ${String(res.stderr ?? '').trim().split('\n').slice(-1)[0] || 'no detail'}`
+        : !modelResult.ok
+          ? modelResult.error
+          : ''
+  return { ok: !cause, cause, finalMessage: modelResult.result, modelResult, exitCode: res.status, timedOut }
+}
+
+if (isMainModule(import.meta.url)) {
+  const argv = process.argv.slice(2)
+  const flag = (name) => {
+    const i = argv.indexOf(name)
+    return i >= 0 && i + 1 < argv.length && !argv[i + 1].startsWith('--') ? argv[i + 1] : ''
+  }
+  const flags = (name) => argv.map((a, i) => (a === name ? argv[i + 1] : null)).filter((v) => v && !v.startsWith('--'))
+  const asJson = argv.includes('--json')
+  try {
+    if (argv.includes('--help') || argv.includes('-h')) {
+      console.log(usage())
+      process.exit(0)
+    }
+    // The retired selector is refused, never ignored: ignoring it would send the
+    // material to the default lane instead of the one asked for.
+    if (argv.includes('--model')) {
+      console.error('ask-lane: --model is retired; select the lane with --lane.\n')
+      console.error(usage())
+      process.exit(2)
+    }
+    const kind = normaliseKind(flag('--kind'))
+    const brief = flag('--brief')
+    // An explicit --lane without a value is malformed, never the default lane.
+    const laneFlag = argv.includes('--lane') ? flag('--lane') : 'cross'
+    let model = laneFlag ? resolveAskLane(laneFlag) : null
+    if (!kind || !brief) {
+      console.error(`ask-lane: --kind (one of ${KINDS.join(', ')}) and --brief are both required.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+    if (!model) {
+      console.error(`ask-lane: --lane must be one of ${EXECUTION_ROLES.join(', ')}.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+
+    // THE SWITCH DECIDES WHETHER THIS RUNS AT ALL, and `--anyway` is the deliberate
+    // override — deliberate, because the whole purpose of the switch is that nobody
+    // spends the scarce allowance by habit.
+    const share = currentSetting()
+    if (model.key === 'cross') {
+      // A fallback nobody is told about is a setting nobody chose (second cross-vendor round).
+      if (share.problem) console.error(settingProblemLine(share, 'ask-lane'))
+      const routed = effectiveRoute(kind, share)
+      // A MEASURED OUTAGE serves the kind on the main lane instead of refusing (point 1194).
+      if (routed.fallback && !argv.includes('--anyway')) {
+        console.error(`ask-lane: ${fallbackLine(share)} — asking ${MAIN_LANE.name} instead.`)
+        model = MAIN_LANE
+      } else if (routed.to !== 'cross' && !argv.includes('--anyway')) {
+        console.error(
+          `ask-lane: the share switch is at \`${share.setting}\`, which routes ${kind} to the main chain — not asking ${CROSS_LANE.name}.\n` +
+            `  Do it in the main chain, or: node scripts/lane-routing.mjs --more until --status routes ${kind} to the cross lane   (override once with --anyway)`,
+        )
+        process.exit(3)
+      }
+    }
+    if (model.key === 'scarce') {
+      const scarce = currentLaneState('scarce')
+      if (!scarce.ok) throw new Error(scarce.problem)
+      if (!laneIsOn(scarce)) {
+        console.error(`ask-lane: ${model.name} is switched off — node scripts/lane-switch.mjs --lane scarce --status`)
+        process.exit(3)
+      }
+    }
+
+    // THE MATERIAL IS GATHERED BEFORE THE PROBE (cross-vendor review, 12.08.2026): a
+    // request that turns out to have nothing to send must cost no codex call at all,
+    // and the probe is a codex call.
+    const sections = gatherSections({ stdin: readStdin(), logs: flags('--log'), diff: flag('--diff'), files: flags('--file') })
+    const { text: material, carried, omitted } = formatAskMaterial({ sections, budget: MATERIAL_BUDGET_CHARS })
+    if (!material.trim()) {
+      console.error('ask-lane: no material at all — give it a --file, a --log, a --diff or something on stdin.')
+      process.exit(2)
+    }
+    // A REQUEST WHOSE MATERIAL IS ALL PLACEHOLDERS IS NOT A REQUEST. An unreadable file
+    // travels as "(could not be read: …)", which is text a model will happily answer
+    // ABOUT — a shaped answer about nothing, reported as an answer.
+    //
+    // WHAT COUNTS AS REAL is asked of what actually TRAVELLED (second cross-vendor
+    // round): a readable but EMPTY file and a section the budget dropped are both
+    // "ok" and carry nothing, so the question is which sections were written with
+    // content, not which reads succeeded.
+    const failed = sections.filter((s) => !s.ok)
+    for (const s of failed) console.error(`ask-lane: material MISSING — ${s.problem ?? s.title}`)
+    for (const title of omitted) {
+      if (!failed.some((s) => s.title === title)) console.error(`ask-lane: material EMPTY or DROPPED for the budget — ${title}`)
+    }
+    const real = carried.filter((title) => sections.find((s) => s.title === title)?.ok)
+    if (!real.length) {
+      console.error('ask-lane: NOTHING of the material actually travelled — refusing to send a request that carries only placeholders.')
+      process.exit(2)
+    }
+
+    // The identity is PROVEN before a word is attributed to the cross lane: nothing in a run's
+    // output names the model that answered, so the whole attribution rests on the server
+    // refusing an unknown id (see cross-review.mjs --probe).
+    if (model.runtime === 'codex' && !ensureModelProven({ who: 'ask-lane' })) {
+      console.error(`ask-lane: the model id is not proven honoured — refusing to attribute an answer to ${model.name}.`)
+      process.exit(2)
+    }
+    console.error(`ask-lane: asking ${model.name} (effort ${model.effort}) for a ${kind} — ${material.length} characters of material …`)
+
+    const startedAt = Date.now()
+    const request = {
+      prompt: buildAskPrompt({ kind, brief, modelName: model.name }),
+      input: material,
+      timeoutMs: Number(flag('--timeout')) || REVIEW_TIMEOUT_MS,
+    }
+    let run = model.runtime === 'codex' ? runCodex({ ...request, modelId: model.id }) : runClaudeAsk({ ...request, model })
+    let outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
+    if (model.runtime === 'codex') {
+      // An outage signature records the fallback and serves this ask on the main lane.
+      const recorded = recordLaneRun({ role: model.key, outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
+      if (recorded.fellBack) {
+        model = MAIN_LANE
+        console.error(`ask-lane: serving the ${kind} on ${model.name} instead …`)
+        run = runClaudeAsk({ ...request, prompt: buildAskPrompt({ kind, brief, modelName: model.name }), model })
+        outcome = run
+      }
+    }
+    const parsed = outcome.ok ? parseAnswer({ kind, text: run.finalMessage }) : { ok: false, error: '' }
+    const elapsedMs = Date.now() - startedAt
+
+    if (!parsed.ok) {
+      const cause = outcome.ok ? `the run produced no usable answer (${parsed.error})` : outcome.cause
+      console.error(formatUnavailable({ kind, cause, setting: share.setting, modelName: model.name }))
+      if (String(run.finalMessage ?? '').trim()) {
+        console.error(`--- what came back, unusable as it is ---\n${String(run.finalMessage).trim()}\n--- end ---`)
+      }
+      process.exit(3)
+    }
+
+    // THE WHOLE ANSWER IS PRINTED, not only its shape: a cause without the reasoning
+    // behind it cannot be acted on, and this is the only place the reader sees it.
+    const said = String(run.finalMessage ?? '').trim()
+    if (said && !asJson) console.log(`--- ${model.name} said ---\n${said}\n--- end ---\n`)
+    if (asJson) {
+      console.log(JSON.stringify({ kind, model: model.name, effort: model.effort, elapsedMs, setting: share.setting, ...parsed, raw: said }, null, 2))
+    } else {
+      console.log(formatAnswerReport({ kind, parsed, elapsedMs, modelName: model.name, effort: model.effort }))
+    }
+    process.exit(0)
+  } catch (e) {
+    console.error(`ask-lane failed: ${(e && e.message) || e}`)
+    process.exit(1)
+  }
+}

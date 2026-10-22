@@ -4,8 +4,8 @@
 // it live, but every commit records its author model in the Co-Authored-By
 // trailer. Any commit after the committed baseline (and within the last 48
 // hours, the log window) authored by a model outside the user's allowlist
-// (Opus 5 / Opus 4.8 / GPT-6 Astra, and Fable while its switch is ON — Sonnet
-// and Haiku are NOT acceptable) transfers the batch to the next recorded allowed
+// (the lanes of scripts/model-lanes.mjs, the scarce one only while its switch is
+// ON — Sonnet and Haiku are NOT acceptable) transfers the batch to the next recorded allowed
 // lane. That fresh lane verifies the trailers; the suspect never advances its
 // own baseline.
 //
@@ -27,7 +27,7 @@ import {
 import { notify } from './notify.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
-import { currentFableState, servingRoute } from './fable-switch.mjs'
+import { currentLaneState, servingRoute } from './lane-switch.mjs'
 import { readTranscriptMessages } from './authorship-check-core.mjs'
 import { modelHandoffDecision } from './model-handoff-core.mjs'
 import { writeJsonAtomic, writeTextAtomic } from './atomic-write.mjs'
@@ -104,7 +104,7 @@ export function gatherModelGuardInputs({ arm = true } = {}) {
     log: recentLog(),
     baselineMs: baselineMs({ arm }),
     backupRefs: backupRefsIn(backupRefListing()),
-    fableState: currentFableState(),
+    scarceState: currentLaneState(),
   }
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused', inputs }
   return { applicable: true, inputs }
@@ -134,21 +134,21 @@ if (isMainModule(import.meta.url)) {
     // the log and the baseline here would let the two drift apart with nothing
     // to notice it (the identity test can only see a shared function).
     const gathered = gatherModelGuardInputs()
-    const { log, baselineMs: baseline, backupRefs, fableState } = gathered.inputs
-    if (!fableState.ok && !gathered.applicable) {
-      if (process.argv[2] === '--status') console.log(JSON.stringify({ applicable: false, fableProblem: fableState.problem }, null, 2))
+    const { log, baselineMs: baseline, backupRefs, scarceState } = gathered.inputs
+    if (!scarceState.ok && !gathered.applicable) {
+      if (process.argv[2] === '--status') console.log(JSON.stringify({ applicable: false, scarceProblem: scarceState.problem }, null, 2))
       process.exit(0)
     }
-    if (!fableState.ok && gathered.applicable) {
+    if (!scarceState.ok && gathered.applicable) {
       if (process.argv[2] === '--status') {
-        console.error(`model-guard: ${fableState.problem}`)
+        console.error(`model-guard: ${scarceState.problem}`)
         process.exit(1)
       }
-      process.stdout.write(JSON.stringify({ decision: 'block', reason: `SERVING-MODEL TRIPWIRE: ${fableState.problem}` }))
+      process.stdout.write(JSON.stringify({ decision: 'block', reason: `SERVING-MODEL TRIPWIRE: ${scarceState.problem}` }))
       process.exit(0)
     }
-    const hits = findForbiddenCommits(log, baseline, fableState)
-    const unidentified = findUnidentifiedCommits(log, baseline, fableState)
+    const hits = findForbiddenCommits(log, baseline, scarceState)
+    const unidentified = findUnidentifiedCommits(log, baseline, scarceState)
     if (process.argv[2] === '--status') {
       console.log(
         JSON.stringify({ baseline: new Date(baseline).toISOString(), hits, unidentified, backupRefs }, null, 2),
@@ -163,7 +163,7 @@ if (isMainModule(import.meta.url)) {
         hits,
         unidentified,
         state: readJson(HANDOFF),
-        route: servingRoute(fableState),
+        route: servingRoute(scarceState),
         sessionId,
         currentModel,
         baselineMs: baseline,
@@ -197,21 +197,21 @@ if (isMainModule(import.meta.url)) {
         } else {
           process.stdout.write(JSON.stringify({
             decision: 'block',
-            reason: `${formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, fableState })}\n` +
+            reason: `${formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, scarceState })}\n` +
               `The trusted handoff could not start (${transferred?.reason ?? transferred?.successorFailure ?? 'unknown failure'}).`,
           }))
         }
       } else {
         process.stdout.write(JSON.stringify({
           decision: 'block',
-          reason: `${formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, fableState })}\n${handoff.reason}`,
+          reason: `${formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, scarceState })}\n${handoff.reason}`,
         }))
       }
     } else if (unidentified.length && gathered.applicable) {
       // The UNNAMED case: blocking, but resolvable in-session from the
       // transcripts — no ntfy, no pause file, no user interruption owed.
       process.stdout.write(
-        JSON.stringify({ decision: 'block', reason: formatUnidentifiedReason(unidentified, { backupRefs, fableState }) }),
+        JSON.stringify({ decision: 'block', reason: formatUnidentifiedReason(unidentified, { backupRefs, scarceState }) }),
       )
     }
     process.exit(0)

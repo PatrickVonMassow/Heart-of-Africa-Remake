@@ -94,7 +94,7 @@ describe('parseWorkablePoints — open minus what waits on the user (point 450)'
     // An OPEN untyped marker, whose prose would once have gated it. It owes
     // migration and stays workable — the ticked leftover below cannot show that,
     // because a ticked point is excluded either way (cross-vendor review,
-    // GPT-5.6 Sol, 23.08.2026).
+    // 23.08.2026).
     '- [ ] 213. Fix AWAITING-USER(2026-01-02; push the version tag; safe prepared state: verified locally and no tag pushed)',
     '- [x] 209. Done AWAITING-USER(2026-01-01; leftover)',
   ].join('\n')
@@ -217,7 +217,7 @@ describe('queueOrderDrift — the rendered sequence against the derived one', ()
     expect(queueOrderDrift([2, 9], [1, 2, 3])).toBeNull()
     expect(queueOrderDrift([3, 1], [1, 2, 3])).toMatchObject({ at: 0, got: 3, want: 1 })
   })
-  // FOUR-EYES FINDING 1 (Fable 5): invariant 4b covers a now-card also sitting
+  // FOUR-EYES FINDING 1 (scarce-lane review): invariant 4b covers a now-card also sitting
   // in the queue, and `parseQueuePoints` returns a Set — a point carded twice
   // INSIDE the Warteschlange was caught by nothing, so delegating it here would
   // have left a real drift unseen.

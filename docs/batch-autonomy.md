@@ -75,7 +75,7 @@ not permission to fold their implementation into this policy-only point.
 | D2 | A parallel-session alert Stop-blocks the owner into `batch-doctor --gate` (`block-remediate` in `scripts/batch-progress-guard.mjs`). | **Self-recovery.** Run the gate and repair path in the owning session; an inconclusive loaded-machine run is retried when quiet. No user decision is involved. | **In place:** point 431. |
 | D3 | An unidentified author blocks until transcript evidence identifies the model; a proved forbidden model then enters P8 (`scripts/model-guard-core.mjs`). | **Self-recovery.** Resolve the author from durable evidence; allowed means advance and continue, forbidden means trusted-lane handoff. | **In place:** evidence lookup plus point 866's trusted handoff and capped probe. |
 | Q1 | A main-session usage-limit refusal produces launcher state `quota` (`scripts/batch-autostart-core.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** No failure count and no pause file; probe on every ordinary launcher tick and resume on the first successful start. | **In place:** point 444, exercised by `scripts/quota-drill.mjs`. |
-| Q2 | An OpenAI author/reviewer run can return `allowance-exhausted` while that vendor's result is mandatory (`scripts/review-astra-core.mjs`, `scripts/review-astra.mjs`, `scripts/author-astra.mjs`). | **Self-recovery.** Route work that policy permits to the other vendor. If cross-vendor evidence is mandatory, park that point with a scheduled provider probe and work another point; automatically resume it when the probe succeeds. | Routing is **in place** (points 654/667); durable per-point probe is **Follow-up point — Cross-vendor quota retry**. |
+| Q2 | A cross-lane author/reviewer run can return `allowance-exhausted` while that vendor's result is mandatory (`scripts/cross-review-core.mjs`, `scripts/cross-review.mjs`, `scripts/author-delegate.mjs`). | **Self-recovery.** Route work that policy permits to the other vendor. If cross-vendor evidence is mandatory, park that point with a scheduled provider probe and work another point; automatically resume it when the probe succeeds. | Routing is **in place** (points 654/667); durable per-point probe is **Follow-up point — Cross-vendor quota retry**. |
 | G1 | The PermissionRequest hook deliberately leaves `AskUserQuestion` to a human while auto-granting other prompts (`scripts/permission-autogrant-core.mjs`). | **Narrow confirm only.** The batch does not invoke it for uncertainty or advice; it decides and records. It is permitted only to obtain a U3 confirmation. | Policy changes **in place here**; the U3 classifier of point 864 (Advisory decision defaults) is **in place** and supplies the enforceable scope. |
 | G2 | `container-ask-guard` blocks a reply that sends the user into the container (`scripts/container-ask-guard-core.mjs`). | **Self-recovery.** Run the repository command in-session and report its result. This is a machine-remedy gate, never a user wait. | **In place.** |
 | G3 | A disabled/unknown launcher blocks the point/context boundary; Linux can self-arm, Windows requires an elevated user command (`launcherRemedy` in `scripts/batch-launcher-core.mjs`, `block-launcher` in `scripts/batch-progress-guard.mjs`). | **Self-recovery where possible.** Linux starts its daemon. On Windows the current owner keeps working and does not take a boundary; the durable fix is an install-time, privilege-bearing watchdog that can re-arm the task without an attended batch turn. | Linux path **in place** (point 474). Windows path is **Follow-up point — Unattended launcher arming**. |
@@ -85,12 +85,12 @@ not permission to fold their implementation into this policy-only point.
 
 ### Blind standstill sweep and composition check (26.08.2026, point 947)
 
-The divergent sweep was genuinely independent: Opus 5 produced 23 entries in
-`docs/four-eyes/947-blind-a-opus5.json`, GPT-5.6 Sol produced 18 in
+The divergent sweep was genuinely independent: the main chain produced 23 entries in
+`docs/four-eyes/947-blind-a-opus5.json`, the cross lane produced 18 in
 `docs/four-eyes/947-blind-b-sol.json`, and the switch-selected third model,
-Fable 5, folded the complete lists into `947-union.json`. The accounting receipt
+the scarce lane, folded the complete lists into `947-union.json`. The accounting receipt
 is **23 A + 18 B → 27 union entries; all 41 inputs accounted for**. The fold was
-reachable through `ask-astra.mjs --model fable`: a read-only, tool-less ask that
+reachable through `ask-lane.mjs --lane scarce`: a read-only, tool-less ask that
 proves the top-level answer model and refuses substitution.
 
 Each row below is one union entry. “Containment” means the independent emergency
@@ -124,13 +124,13 @@ named owner. Only S-12 is allowed to stop the whole batch.
 | S-23 | Individual mechanism inventory misses pair-only wedges, including 944+945. | **Closed here:** this composition table is mandatory input for future hard guards; S-02/S-03 and S-05/S-06/S-25 preserve the measured pairs separately. |
 | S-24 | Dead-owner in-flight records leave every point busy. | **Direct fix:** exclude/reclaim expired records before candidate selection. Emergency independently computes logical workable points with dead in-flight records omitted. |
 | S-25 | Board-first guard forbids the failed landing's remaining cleanup. | **Direct fix:** narrowly permit the authenticated landing-recovery mutation; owned with S-05 by point 937. |
-| S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-astra.mjs --model` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
+| S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-lane.mjs --lane` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
 | S-27 | Owner and its only watcher are both absent or wedged. | **Closed by double safety:** `HoA-Batch-Emergency` is an hourly SYSTEM timer outside those sessions; the watchdog checks/re-registers it, while it starts the authenticated primary task. |
 
 One further stop path was measured while cross-reading the range rather than by
 the sweep, and it belongs to the same class. `mechanism-review-guard.mjs` built
 the sized review plan inside the SAME `try` that assessed the review gap, so a
-throw out of `review-astra.mjs`'s planner left the ruling null and the guard
+throw out of `cross-review.mjs`'s planner left the ruling null and the guard
 blocked — a broken planner turned a suspendable range into a hard block with no
 runnable review, which is exactly what the gap clause exists to prevent. The two
 steps are now separate: `measureReviewGap` sizes the plan in its own `try` and
@@ -392,7 +392,7 @@ launcher's `pauseAttempt`, which is cleared together with `failCount` the moment
 spawn makes progress. Both halves matter — a counter that never reset would make
 every park clockless for ever after three retries in the machine's whole history, and
 a counter only the launcher's own parks carried would leave an unanswered alert or a
-standing outage oscillating at rung 1 all night (four-eyes review, Fable 5).
+standing outage oscillating at rung 1 all night (four-eyes review, the scarce lane).
 **In the current implementation, parking without a clock is a one-entry list**
 (`CLOCKLESS_CAUSES`): the user's own typed stop. A serving model outside the
 CLAUDE.md §6 allowlist runs the fallback chain or probes on a clock (P8), an
@@ -1658,7 +1658,7 @@ block 5.6 %, and no answer-only turn blocks under either. The rate matters as
 much as the rule: a guard that fires on an ordinary turn trains the reader to
 skip it.
 
-**What the fixtures do and do not protect** (four-eyes finding, Fable 5). A
+**What the fixtures do and do not protect** (four-eyes finding, the scarce lane). A
 family's EXPECTATION is written a priori, and membership is read structurally
 from the calls — the record, the agent, the declared wait — against a FROZEN copy
 of the threshold, so re-tuning the core makes family and verdict disagree and
@@ -1744,7 +1744,7 @@ session — the failure the whole singleton exists to prevent.
    then closed a loop — the launcher reaps the dead owner and spawns, the successor
    reads `ownerHolding` off that placeholder, honours the claim with no aging, stands
    down without converting the spawn, and the next tick spawns again (four-eyes
-   review, Fable 5, 30.07.2026).
+   review, the scarce lane, 30.07.2026).
 1a. **A RELEASED claim is NOT a claim** (point 434 (6c), measured 30.07.2026
    10:10-10:16). A record with `releasedAt` AND `releasedBy` both set was still
    honoured: the owning session released to it, the claiming window never took it,
@@ -1786,7 +1786,7 @@ session — the failure the whole singleton exists to prevent.
    learned by `assessOwner`, `spawnDecision`, `heldByOtherLiveOwner`,
    `resolveOwnership`, `acquire`, `release`, the launcher assessment and the
    boundary card, and a reserved lock would read as not-alive and be spawned into
-   (four-eyes review, Fable 5, 30.07.2026 — it corrected the first draft, which put
+   (four-eyes review, the scarce lane, 30.07.2026 — it corrected the first draft, which put
    the reservation on the lock). Every text that mentions a release says what is
    reserved and what ends it: the stand-down's way back, the claim CLI's `--status`
    and the German boundary card.
@@ -2372,8 +2372,8 @@ breach freezes the provenance baseline exactly as an unranked append does — a
 gate that could be answered by forgetting the question would have a one-turn
 life.
 
-WHAT IS GRANDFATHERED IS FROZEN, NOT REMEMBERED (cross-vendor review by GPT-5.6
-Sol, 21.08.2026). The order that stood in front of the release before the rule
+WHAT IS GRANDFATHERED IS FROZEN, NOT REMEMBERED (cross-vendor review by the cross lane,
+21.08.2026). The order that stood in front of the release before the rule
 landed is not re-litigated — that would be a block loop rather than a decision —
 but reading the exemption off the moving provenance baseline made it a two-turn
 bypass: settle anywhere in the order, then move the point in front of the

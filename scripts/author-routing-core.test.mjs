@@ -10,12 +10,12 @@ import {
   AUTHORING_COMMISSION_KIND,
   authorRoundHistory,
   authorLaneFor,
-  FABLE_ESCALATION_ROUNDS,
+  SCARCE_ESCALATION_ROUNDS,
   formatAuthorRoundHistory,
   formatLaneReport,
   HARD_MARKERS,
   LANE_MODEL,
-  LANES,
+  AUTHOR_LANES,
   laneTagIn,
   nextAuthoringStep,
   SPEC_EXAMINATION_ROUND,
@@ -23,24 +23,27 @@ import {
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL, readState, writeState } from './fable-switch-core.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
+import { CROSS, MAIN, VENDORS, trailerFor } from './model-lanes.mjs'
 
-const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
-const OFF = fable('off')
-const ON = fable('on')
-const decision = (input = {}) => authorLaneFor({ fableState: OFF, ...input })
+const scarce = (state) => readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
+const OFF = scarce('off')
+const ON = scarce('on')
+// A round authored under the cross lane's retired name (the name ledger rows carry).
+const RETIRED_CROSS_TRAILER = `${CROSS.retired.at(-2)} <${VENDORS[CROSS.vendor].trailerAddress}>`
+const decision = (input = {}) => authorLaneFor({ scarceState: OFF, ...input })
 const lane = (body, extra = {}) => decision({ body, ...extra }).lane
 
 describe('authorLaneFor — which lane authors a point', () => {
-  it('sends the mechanical and mid-difficulty work to Astra, which is the point', () => {
-    expect(lane('THE DEPLOY DIES ON A FROZEN TAG’S FLAKY DOWNLOAD. Retry the fetch three times.')).toBe('astra')
-    expect(lane('The board card says "stand" for a point nobody is working on. Say what it is.')).toBe('astra')
+  it('sends the mechanical and mid-difficulty work to the cross lane, which is the point', () => {
+    expect(lane('THE DEPLOY DIES ON A FROZEN TAG’S FLAKY DOWNLOAD. Retry the fetch three times.')).toBe('cross')
+    expect(lane('The board card says "stand" for a point nobody is working on. Say what it is.')).toBe('cross')
     // No signal at all is the mechanical case, not a reason to hold the work back.
-    expect(lane('')).toBe('astra')
-    expect(decision()).toMatchObject({ lane: 'astra', model: 'GPT-6 Astra' })
+    expect(lane('')).toBe('cross')
+    expect(decision()).toMatchObject({ lane: 'cross', model: CROSS.displayName })
   })
 
-  it('sends the hard cases straight to Astra, in CLAUDE.md §6’s own words (user 18.08.2026)', () => {
+  it('sends the hard cases straight to the cross lane, in CLAUDE.md §6’s own words (user 18.08.2026)', () => {
     for (const body of [
       'This is difficult: the lock is taken twice.',
       'A complex rebuild of the launcher.',
@@ -50,25 +53,25 @@ describe('authorLaneFor — which lane authors a point', () => {
       'A deadlock between the hook and the gate.',
       'A migration of every recorded review row.',
     ]) {
-      expect(lane(body), body).toBe('astra')
+      expect(lane(body), body).toBe('cross')
     }
     expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
-    // Neither of the two lanes this used to take: not Fable from the start (its
-    // weekly pool is the scarcest, 17.08.) and no longer held back for Opus.
-    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to Astra/)
+    // Neither of the two lanes this used to take: not the scarce lane from the start (its
+    // weekly pool is the scarcest, 17.08.) and no longer held back for the main lane.
+    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to the cross lane/)
     // AND IT OUTRANKS THE VERIFICATION LANE (user 18.08.2026, asked explicitly):
-    // a hard picture point is authored by Astra too — the main session judges the
+    // a hard picture point is authored by the cross lane too — the main session judges the
     // picture whoever wrote the code, so only the authoring moves.
-    expect(lane('A complex screenshot problem on both backends.')).toBe('astra')
+    expect(lane('A complex screenshot problem on both backends.')).toBe('cross')
   })
 
   it('treats a HIGH-criticality tag as a hard case by definition', () => {
-    expect(lane('Anything at all.', { criticality: 'high' })).toBe('astra')
-    expect(lane('The screenshot must hold.', { criticality: 'high' })).toBe('astra')
+    expect(lane('Anything at all.', { criticality: 'high' })).toBe('cross')
+    expect(lane('The screenshot must hold.', { criticality: 'high' })).toBe('cross')
     // …and med/low/none leave the decision to the text.
-    expect(lane('Anything at all.', { criticality: 'med' })).toBe('astra')
-    expect(lane('Anything at all.', { criticality: 'low' })).toBe('astra')
-    expect(lane('Anything at all.', { criticality: null })).toBe('astra')
+    expect(lane('Anything at all.', { criticality: 'med' })).toBe('cross')
+    expect(lane('Anything at all.', { criticality: 'low' })).toBe('cross')
+    expect(lane('Anything at all.', { criticality: null })).toBe('cross')
   })
 
   it('keeps a point whose VERIFICATION is the work with the main session', () => {
@@ -80,73 +83,73 @@ describe('authorLaneFor — which lane authors a point', () => {
       'Run the browser suite for the place scene.',
       'The aesthetic verdict is the user’s.',
     ]) {
-      expect(lane(body), body).toBe('opus')
+      expect(lane(body), body).toBe('main')
     }
   })
 
   it('does NOT read the workflow’s own phrase as picture work (measured 13.08.2026)', () => {
     // The finding from routing all 170 open points: CLAUDE.md §6 says Claude
     // "runs the suites, judges the picture and lands", so every point that merely
-    // MENTIONS the workflow routed itself away from the Astra lane — point 667,
+    // MENTIONS the workflow routed itself away from the cross lane — point 667,
     // which builds this file, first among them.
     const body =
-      'Where Astra authors, Claude reviews, runs the suites, judges the picture and lands. ' +
-      'The commit trailer names Astra and the guard learns the reversed direction.'
-    expect(lane(body)).toBe('astra')
-    expect(lane('The picture judgment stays with the main session.')).toBe('astra')
+      'Where the cross lane authors, the main chain reviews, runs the suites, judges the picture and lands. ' +
+      'The commit trailer names the cross lane and the guard learns the reversed direction.'
+    expect(lane(body)).toBe('cross')
+    expect(lane('The picture judgment stays with the main session.')).toBe('cross')
     // A point whose SUBJECT really is the picture still says so in its own words.
-    expect(lane('Claude judges the picture. The picture shows a black horizon on WebGL.')).toBe('opus')
+    expect(lane('Claude judges the picture. The picture shows a black horizon on WebGL.')).toBe('main')
   })
 
   it('keeps every pre-boundary rework in the lane its other signals demand', () => {
-    for (let reworkRounds = 0; reworkRounds < FABLE_ESCALATION_ROUNDS; reworkRounds += 1) {
-      expect(lane('Something mechanical.', { reworkRounds }), `ordinary round ${reworkRounds}`).toBe('astra')
+    for (let reworkRounds = 0; reworkRounds < SCARCE_ESCALATION_ROUNDS; reworkRounds += 1) {
+      expect(lane('Something mechanical.', { reworkRounds }), `ordinary round ${reworkRounds}`).toBe('cross')
       expect(
         lane('A complex screenshot problem.', { criticality: 'high', reworkRounds }),
         `hard/HIGH round ${reworkRounds}`,
-      ).toBe('astra')
-      expect(lane('A screenshot point.', { reworkRounds }), `verification round ${reworkRounds}`).toBe('opus')
+      ).toBe('cross')
+      expect(lane('A screenshot point.', { reworkRounds }), `verification round ${reworkRounds}`).toBe('main')
     }
   })
 
-  it('sends nothing to Fable at the boundary while the switch refuses it', () => {
-    const reworkRounds = FABLE_ESCALATION_ROUNDS
+  it('sends nothing to the scarce lane at the boundary while the switch refuses it', () => {
+    const reworkRounds = SCARCE_ESCALATION_ROUNDS
     // Past the threshold the point stays in the lane its other signals demand.
-    expect(lane('Something mechanical.', { reworkRounds })).toBe('astra')
-    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('astra')
-    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('astra')
-    expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('opus')
-    expect(lane('x', { reworkRounds, override: 'astra' })).toBe('astra')
+    expect(lane('Something mechanical.', { reworkRounds })).toBe('cross')
+    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('cross')
+    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('cross')
+    expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('main')
+    expect(lane('x', { reworkRounds, override: 'cross' })).toBe('cross')
     // Neither explicit door bypasses the one shared decision.
     expect(decision({ body: 'x\nAuthor lane: fable', reworkRounds: 0 })).toMatchObject({ lane: '', refused: true })
-    expect(decision({ body: 'x', reworkRounds: 0, override: 'fable' })).toMatchObject({ lane: '', refused: true })
+    expect(decision({ body: 'x', reworkRounds: 0, override: 'scarce' })).toMatchObject({ lane: '', refused: true })
   })
 
   it('names the switch at every crossed round instead of hiding the boundary', () => {
-    for (const reworkRounds of [FABLE_ESCALATION_ROUNDS, FABLE_ESCALATION_ROUNDS + 7]) {
+    for (const reworkRounds of [SCARCE_ESCALATION_ROUNDS, SCARCE_ESCALATION_ROUNDS + 7]) {
       const why = decision({ body: 'x', reworkRounds }).why
       expect(why[0]).toBe('mechanical or mid-difficulty, and nothing marks it otherwise')
-      expect(why[1]).toContain('node scripts/fable-switch.mjs --status')
+      expect(why[1]).toContain('node scripts/lane-switch.mjs --status')
       expect(why[1]).toContain('test decision')
     }
     // Below the threshold nothing is said about it at all.
-    expect(decision({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
+    expect(decision({ body: 'x', reworkRounds: SCARCE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
   })
 
-  it('admits the tag, override, and automatic boundary while the switch allows Fable', () => {
-    expect(authorLaneFor({ body: 'x\nAuthor lane: fable', fableState: ON })).toMatchObject({ lane: 'fable', refused: false })
-    expect(authorLaneFor({ body: 'x', override: 'fable', fableState: ON })).toMatchObject({ lane: 'fable' })
-    expect(authorLaneFor({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS, fableState: ON })).toMatchObject({ lane: 'fable' })
+  it('admits the tag, override, and automatic boundary while the switch allows the scarce lane', () => {
+    expect(authorLaneFor({ body: 'x\nAuthor lane: fable', scarceState: ON })).toMatchObject({ lane: 'scarce', refused: false })
+    expect(authorLaneFor({ body: 'x', override: 'scarce', scarceState: ON })).toMatchObject({ lane: 'scarce' })
+    expect(authorLaneFor({ body: 'x', reworkRounds: SCARCE_ESCALATION_ROUNDS, scarceState: ON })).toMatchObject({ lane: 'scarce' })
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {
-    expect(lane('A complex rebuild.\nAuthor lane: sol')).toBe('astra')
-    expect(authorLaneFor({ body: 'Something mechanical.\nAuthor lane: fable', fableState: ON }).lane).toBe('fable')
-    expect(lane('Something mechanical.\nAuthor lane: opus')).toBe('opus')
-    expect(lane('A complex rebuild.\nAuthor lane: sol', { override: 'opus' })).toBe('opus')
+    expect(lane('A complex rebuild.\nAuthor lane: sol')).toBe('cross')
+    expect(authorLaneFor({ body: 'Something mechanical.\nAuthor lane: fable', scarceState: ON }).lane).toBe('scarce')
+    expect(lane('Something mechanical.\nAuthor lane: opus')).toBe('main')
+    expect(lane('A complex rebuild.\nAuthor lane: sol', { override: 'main' })).toBe('main')
     // An override that is not a lane is no override at all.
-    expect(lane('Something mechanical.', { override: 'haiku' })).toBe('astra')
-    expect(authorLaneFor({ body: 'x', override: 'FABLE', fableState: ON }).lane).toBe('fable')
+    expect(lane('Something mechanical.', { override: 'haiku' })).toBe('cross')
+    expect(authorLaneFor({ body: 'x', override: 'SCARCE', scarceState: ON }).lane).toBe('scarce')
   })
 
   it('reads a tag only as a LINE of its own, never inside a sentence', () => {
@@ -158,18 +161,18 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(laneTagIn('A complex rebuild. Author lane: sol')).toBe('')
     expect(laneTagIn('`Author lane: fable`')).toBe('')
     // …and the real thing, however it is bulleted or quoted as markdown.
-    expect(laneTagIn('Author lane: fable')).toBe('fable')
-    expect(laneTagIn('  - Author lane: opus')).toBe('opus')
-    expect(laneTagIn('> Author lane: sol')).toBe('astra')
+    expect(laneTagIn('Author lane: fable')).toBe('scarce')
+    expect(laneTagIn('  - Author lane: opus')).toBe('main')
+    expect(laneTagIn('> Author lane: sol')).toBe('cross')
     // The LAST tag wins: a spec revises itself at the end.
-    expect(laneTagIn('Author lane: sol\n… revised.\nAuthor lane: opus')).toBe('opus')
+    expect(laneTagIn('Author lane: sol\n… revised.\nAuthor lane: opus')).toBe('main')
     // Nor is a tag with prose after it a tag (third cross-vendor round): the
     // anchor had no end, so `Author lane: sol is the example spelling` routed.
     expect(laneTagIn('Author lane: sol is the example spelling')).toBe('')
-    expect(laneTagIn('Author lane: sol.')).toBe('astra')
+    expect(laneTagIn('Author lane: sol.')).toBe('cross')
     // …and a FENCED example is an example, which is where a document shows one.
     expect(laneTagIn('The tag looks like this:\n```\nAuthor lane: sol\n```\n')).toBe('')
-    expect(laneTagIn('~~~\nAuthor lane: fable\n~~~\nAuthor lane: opus')).toBe('opus')
+    expect(laneTagIn('~~~\nAuthor lane: fable\n~~~\nAuthor lane: opus')).toBe('main')
     // The fence remembers WHICH delimiter opened it (fourth round): a `~~~` in a
     // backtick block used to close it and make the next line an operative tag.
     expect(laneTagIn('```\nsome sample text\n~~~\nAuthor lane: sol\n```\n')).toBe('')
@@ -182,26 +185,33 @@ describe('authorLaneFor — which lane authors a point', () => {
     // …and the same indent rule binds the OPENER (sixth round): four spaces are
     // an indented code block, and reading one as a fence swallowed every line
     // after it — suppressing a REAL tag instead of an example.
-    expect(laneTagIn('    ```\nAuthor lane: sol')).toBe('astra')
+    expect(laneTagIn('    ```\nAuthor lane: sol')).toBe('cross')
     expect(laneTagIn('   ```\nAuthor lane: sol\n   ```')).toBe('')
     // …and a TAB is four columns, not zero (seventh round).
-    expect(laneTagIn('\t```\nAuthor lane: sol')).toBe('astra')
-    expect(laneTagIn(' \t```\nAuthor lane: opus')).toBe('opus')
+    expect(laneTagIn('\t```\nAuthor lane: sol')).toBe('cross')
+    expect(laneTagIn(' \t```\nAuthor lane: opus')).toBe('main')
     // A blockquote's markers are not indentation (eighth round): an ordinary
     // quoted example looked over-indented, and its tag became operative.
     expect(laneTagIn('   > ```\n   > Author lane: sol\n   > ```')).toBe('')
     expect(laneTagIn('> ```\n> Author lane: fable\n> ```')).toBe('')
   })
 
+  it('reads a tag spelled with a lane role as well as with an older family word', () => {
+    expect(laneTagIn('Author lane: cross')).toBe('cross')
+    expect(laneTagIn('Author lane: main')).toBe('main')
+    expect(laneTagIn('Author lane: scarce')).toBe('scarce')
+    expect(laneTagIn('Author lane: nobody')).toBe('')
+  })
+
   it('names the subjects its own comments promise (cross-vendor P1)', () => {
     // The list claimed locks and state migration and held only the noun. They
-    // are hard subjects, so since 18.08.2026 they answer `sol` — the marker
+    // are hard subjects, so since 18.08.2026 they answer `cross` — the marker
     // still fires, only the lane it feeds changed.
-    expect(lane('The batch lock is taken twice.')).toBe('astra')
-    expect(lane('Migrating every recorded review row.')).toBe('astra')
+    expect(lane('The batch lock is taken twice.')).toBe('cross')
+    expect(lane('Migrating every recorded review row.')).toBe('cross')
     // …and "visually inspect" is how half the render points are written, which
     // is the verification lane and stays with the main session.
-    expect(lane('Visually inspect the horizon banding.')).toBe('opus')
+    expect(lane('Visually inspect the horizon banding.')).toBe('main')
   })
 
   it('reports every signal it saw, not only the deciding one', () => {
@@ -210,14 +220,14 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(d.signals.hard).toEqual(['complex'])
     expect(d.signals.verification).toEqual(['screenshot'])
     // The two signals now answer DIFFERENTLY, and the order decides: hard wins,
-    // so this point is Astra's while the verification signal is still reported.
-    expect(d.lane).toBe('astra')
+    // so this point is the cross lane's while the verification signal is still reported.
+    expect(d.lane).toBe('cross')
   })
 
   it('answers for every lane and cannot be handed something it throws on', () => {
-    for (const l of LANES) expect(LANE_MODEL[l]).toBeTruthy()
+    for (const l of AUTHOR_LANES) expect(LANE_MODEL[l]).toBeTruthy()
     for (const body of [null, undefined, 42, {}, []]) {
-      expect(LANES).toContain(decision({ body }).lane)
+      expect(AUTHOR_LANES).toContain(decision({ body }).lane)
     }
     expect(HARD_MARKERS.length).toBeGreaterThan(0)
     expect(VERIFICATION_MARKERS.length).toBeGreaterThan(0)
@@ -256,7 +266,7 @@ describe('unsuccessfulReviewRounds — completed ledger evidence only', () => {
   })
 })
 
-describe('re-authoring rounds — decorrelated before Fable', () => {
+describe('re-authoring rounds — decorrelated before the scarce lane', () => {
   const failed = (extra = {}) => ({
     point: 727,
     mode: 'review',
@@ -282,7 +292,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
   it('decorrelates every ordinary round after the first from the one before it', () => {
     const records = [failed(), failed()]
     let preceding = ''
-    for (let round = 2; round <= FABLE_ESCALATION_ROUNDS - 2; round += 1) {
+    for (let round = 2; round <= SCARCE_ESCALATION_ROUNDS - 2; round += 1) {
       const step = nextAuthoringStep({ records, point: 727 })
       expect(step).toMatchObject({ kind: 'commission', round })
       expect(AUTHORING_FRAMINGS).toContain(step.framing)
@@ -391,7 +401,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     }
     const examination = nextAuthoringStep({ records, point: 727 })
     expect(examination).toMatchObject({ kind: 'spec-examination', round: SPEC_EXAMINATION_ROUND })
-    expect(examination.reason).toContain(`threshold of ${FABLE_ESCALATION_ROUNDS}`)
+    expect(examination.reason).toContain(`threshold of ${SCARCE_ESCALATION_ROUNDS}`)
 
     records.push({
       point: 727,
@@ -406,7 +416,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
   })
 
   it('moves every boundary when the one escalation constant moves', () => {
-    const alternateThreshold = FABLE_ESCALATION_ROUNDS + 3
+    const alternateThreshold = SCARCE_ESCALATION_ROUNDS + 3
     const records = [failed()]
     while (authorRoundHistory(records, 727).freshRounds < alternateThreshold - 1) {
       const step = nextAuthoringStep({ records, point: 727, escalationRounds: alternateThreshold })
@@ -421,8 +431,8 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
 
   it('applies a numeric history override to the step boundary without inventing records', () => {
     expect(
-      nextAuthoringStep({ records: [], point: 727, reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }),
-    ).toMatchObject({ kind: 'spec-examination', round: FABLE_ESCALATION_ROUNDS - 1 })
+      nextAuthoringStep({ records: [], point: 727, reworkRounds: SCARCE_ESCALATION_ROUNDS - 1 }),
+    ).toMatchObject({ kind: 'spec-examination', round: SCARCE_ESCALATION_ROUNDS - 1 })
   })
 
   it('renders the count, every framing or repeat, and the examination as one reading', () => {
@@ -450,46 +460,46 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     expect(report).toContain('spec examination: sound — the difficulty is real')
   })
 
-  it('routes the examination to the vendor that did not author the rounds, never Fable', () => {
-    expect(specExaminerFor({ rounds: [{ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }] })).toMatchObject({
-      vendor: 'claude',
-      model: OPUS_MODEL,
-      route: 'claude-read',
+  it('routes the examination to the vendor that did not author the rounds, never the scarce lane', () => {
+    expect(specExaminerFor({ rounds: [{ authoredBy: RETIRED_CROSS_TRAILER }] })).toMatchObject({
+      role: 'main',
+      model: MAIN.displayName,
+      route: 'main-read',
     })
-    expect(specExaminerFor({ rounds: [{ authoredBy: `${CLAUDE_MODEL} <noreply@anthropic.com>` }] })).toMatchObject({
-      vendor: 'astra',
-      model: 'GPT-6 Astra',
-      route: 'ask-astra',
+    expect(specExaminerFor({ rounds: [{ authoredBy: trailerFor('main') }] })).toMatchObject({
+      role: 'cross',
+      model: CROSS.displayName,
+      route: 'ask-lane',
     })
   })
 
   it('does not accept a malformed, aborted or same-vendor examination as the one reading', () => {
-    const astraRound = failed({ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' })
+    const crossRound = failed({ authoredBy: RETIRED_CROSS_TRAILER })
     const examination = (extra = {}) => ({
       point: 727,
       mode: 'review',
       verdict: 'merge',
-      model: OPUS_MODEL,
+      model: MAIN.displayName,
       specExamination: 'sound',
       evidence: 'the point and brief agree with every finding',
       ...extra,
     })
-    expect(authorRoundHistory([astraRound, examination({ aborted: true })], 727).examination).toBeNull()
-    expect(authorRoundHistory([astraRound, examination({ model: 'GPT-5.6 Sol' })], 727).examination).toBeNull()
-    expect(authorRoundHistory([astraRound, examination()], 727).examination).toMatchObject({ specExamination: 'sound' })
+    expect(authorRoundHistory([crossRound, examination({ aborted: true })], 727).examination).toBeNull()
+    expect(authorRoundHistory([crossRound, examination({ model: CROSS.retired.at(-2) })], 727).examination).toBeNull()
+    expect(authorRoundHistory([crossRound, examination()], 727).examination).toMatchObject({ specExamination: 'sound' })
   })
 })
 
 describe('formatLaneReport', () => {
   it('answers the question first: how much actually moves', () => {
     const rows = [
-      { number: 1, lane: 'astra', why: ['mechanical'] },
-      { number: 2, lane: 'astra', why: ['mechanical'] },
-      { number: 3, lane: 'opus', why: ['picture'] },
+      { number: 1, lane: 'cross', why: ['mechanical'] },
+      { number: 2, lane: 'cross', why: ['mechanical'] },
+      { number: 3, lane: 'main', why: ['picture'] },
     ]
     const text = formatLaneReport(rows)
-    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — astra 2 · fable 0 · opus 1 · blocked 0')
-    expect(text).toMatch(/ {4}1 {2}astra {2}mechanical/)
+    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — cross 2 · scarce 0 · main 1 · blocked 0')
+    expect(text).toMatch(/ {4}1 {2}cross {3}mechanical/)
     expect(formatLaneReport()).toContain('0 open point(s)')
   })
 })

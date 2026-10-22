@@ -486,7 +486,7 @@ function executesAttachedStdin(seg) {
 
 // ── The wrappers that HIDE a command ─────────────────────────────────────────
 //
-// Point 473, four-eyes review (Fable 5): the old whole-string regexes matched
+// Point 473, four-eyes review: the old whole-string regexes matched
 // `git push` wherever it stood, so they saw through `bash -c "…"`, `eval` and
 // `$( … )` BY ACCIDENT. Judging the head alone lost that, and at the LEASE FENCE
 // that is a real regression: a dispossessed session could have pushed shared

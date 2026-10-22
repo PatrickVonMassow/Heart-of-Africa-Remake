@@ -5,7 +5,7 @@
 // The report suite prints a member list and one presence check per member. The
 // red-charge table (scripts/render-verify-charges.mjs) matches those printed
 // lines with anchored regexes so a KNOWN red is excused and nothing else is. A
-// cross-vendor review of 30.08.2026 (GPT-5.6 Sol) found the gap that follows
+// cross-vendor review of 30.08.2026 found the gap that follows
 // from writing those two sides independently: the ledger's tests hard-coded the
 // joined string, so production could change its separator, its member order or
 // its name shape and every boundary assertion would stay green while the charges

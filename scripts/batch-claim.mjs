@@ -382,7 +382,7 @@ if (isMain) {
     const pending = readClaim()
     const ours = assessClaim({ claim: pending, sid, ancestor: findClaudeAncestor(), now, maxAgeMs: maxAgeMs(), probePid })
     // A SPENT record goes with the acquire, whoever wrote it (four-eyes review,
-    // Fable 5, 30.07.2026). Left lying about after an override it would keep
+    // 30.07.2026). Left lying about after an override it would keep
     // reserving against the launcher's spawn gate, which is asked BEFORE the
     // owner-alive check — so if this new owner died, crash recovery would wait
     // out the take-up window instead of spawning at once.

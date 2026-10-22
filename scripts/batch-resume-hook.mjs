@@ -61,8 +61,8 @@ import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
-import { currentFableState } from './fable-switch.mjs'
-import { servingPolicyLine } from './fable-switch-core.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { servingPolicyLine } from './lane-switch-core.mjs'
 import { currentVenue } from './cloud-switch.mjs'
 import { venueInstruction } from './cloud-switch-core.mjs'
 
@@ -299,31 +299,31 @@ try {
     if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
-    const fableState = currentFableState()
+    const scarceState = currentLaneState()
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
     // degraded to Haiku and wrecked three points — name the authoring policy at
     // every session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
     // The policy wording also NAMES THE COMMISSION COMMAND (point 1077,
     // 09.09.2026): the cut ran and the command did not — 280 of 379 open points
-    // were routed to Astra and one was commissioned in three days, while
-    // fourteen Astra reviews landed. Announcing the routing without its command
+    // were routed to the cross lane and one was commissioned in three days, while
+    // fourteen cross-lane reviews landed. Announcing the routing without its command
     // is what the measurement found. Kept out of the stamped block below, where
     // nothing but the stamp may stand.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
       // rule:model-policy@2f245cec
-      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
+      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES (role records in scripts/model-lanes.mjs). ' +
       'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
       'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +
-      'reached Fable escalation threshold in scripts/author-routing-core.mjs). scripts/astra-share.mjs --status says what routes now; ' +
-      'an UNREACHABLE Astra lane (exhausted OpenAI volume included) authors on Opus 5.5 instead of ' +
-      'waiting. REVIEW is CROSS-VENDOR (scripts/review-astra.mjs for Anthropic-authored work, Claude ' +
-      'for Astra-authored work); no model reviews its own. AN ASTRA-LANE POINT IS COMMISSIONED, NOT ' +
-      'WRITTEN HERE: node scripts/author-astra.mjs --point <N> in its worktree, then review, suites, ' +
-      'picture, landing (docs/astra-routing.md, "Routed and not commissioned"). ' +
-      (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`) +
+      'reached scarce-lane escalation threshold in scripts/author-routing-core.mjs). scripts/lane-routing.mjs --status says what routes now; ' +
+      'an UNREACHABLE cross lane (exhausted volume included) authors on the main chain instead of ' +
+      'waiting. REVIEW is CROSS-VENDOR (scripts/cross-review.mjs for main-chain work, the main chain ' +
+      'for cross-lane work); no model reviews its own. A CROSS-LANE POINT IS COMMISSIONED, NOT ' +
+      'WRITTEN HERE: node scripts/author-delegate.mjs --lane cross --point <N> in its worktree, then review, suites, ' +
+      'picture, landing (docs/lane-routing.md, "Routed and not commissioned"). ' +
+      (scarceState.ok ? servingPolicyLine(scarceState) : `SCARCE-LANE SWITCH UNKNOWN: ${scarceState.problem}`) +
       // Where authoring delegations start (point 1230): the cloud switch's routing read.
       ` ${cloudVenueLine()}`
     const now = Date.now()

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  commitObjectParents,
+import { commitObjectParents,
   endStateArtefacts,
   formatInvalidatedCoverage,
   newestReading,
@@ -10,10 +9,9 @@ import {
   REVIEW_END_STATE_EXCLUSIONS,
   reviewEndStateExclusion,
   reviewEndStateFiles,
-  vendorOf,
-} from './mechanism-review-range-core.mjs'
+  vendorOf } from './mechanism-review-range-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
+import { CROSS, MAIN, SCARCE, VENDORS } from './model-lanes.mjs'
 
 const sha = (letter) => letter.repeat(40)
 const commit = (id, authorModel, files) => ({ sha: sha(id), authorModel, files })
@@ -22,7 +20,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('owes no pass for a range touching only the two work-order documents', () => {
     const files = ['TASKS.md', 'docs/tasks-archive.md']
     const plan = planAuthorshipGroups({
-      commits: [commit('a', 'GPT-5.6 Sol', files)],
+      commits: [commit('a', CROSS.retired[2], files)],
       endStateFiles: files,
     })
     expect(reviewEndStateFiles(files)).toEqual([])
@@ -48,11 +46,11 @@ describe('authorship-cut mechanism review planning', () => {
   it('still owes the mechanism beside an excluded work-order document', () => {
     const mechanism = 'scripts/four-eyes-guard.mjs'
     const plan = planAuthorshipGroups({
-      commits: [commit('a', 'GPT-5.6 Sol', ['TASKS.md', mechanism])],
+      commits: [commit('a', CROSS.retired[2], ['TASKS.md', mechanism])],
       endStateFiles: ['TASKS.md', mechanism],
     })
     expect(plan.groups).toEqual([
-      expect.objectContaining({ files: [mechanism], reviewer: OPUS_MODEL }),
+      expect.objectContaining({ files: [mechanism], reviewer: MAIN.displayName }),
     ])
     expect(plan.dropped).toEqual([
       expect.objectContaining({ file: 'TASKS.md', reason: REVIEW_END_STATE_EXCLUSIONS['TASKS.md'] }),
@@ -62,17 +60,17 @@ describe('authorship-cut mechanism review planning', () => {
   it('groups single-vendor files and names an other-vendor reviewer', () => {
     const plan = planAuthorshipGroups({
       commits: [
-        commit('a', 'Claude Opus 5', ['scripts/a-guard.mjs']),
-        commit('b', 'Claude Fable 5.1', ['scripts/b-guard.mjs']),
+        commit('a', MAIN.trailerName, ['scripts/a-guard.mjs']),
+        commit('b', SCARCE.trailerName, ['scripts/b-guard.mjs']),
       ],
     })
     expect(plan.groups).toEqual([
       expect.objectContaining({
         kind: 'files',
-        vendor: 'anthropic',
+        vendor: MAIN.vendor,
         files: ['scripts/a-guard.mjs', 'scripts/b-guard.mjs'],
         commits: [sha('a'), sha('b')],
-        reviewer: 'GPT-6 Astra',
+        reviewer: CROSS.displayName,
       }),
     ])
   })
@@ -80,17 +78,19 @@ describe('authorship-cut mechanism review planning', () => {
   it('keeps a historically mixed-vendor file whole and routes around every contributor', () => {
     const file = 'scripts/shared-guard.mjs'
     const plan = planAuthorshipGroups({
-      commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'GPT-5.6 Sol', [file])],
+      commits: [commit('a', MAIN.trailerName, [file]), commit('b', CROSS.retired[2], [file])],
     })
     expect(plan.mixedFiles).toEqual([file])
     expect(plan.groups).toEqual([
       expect.objectContaining({
         kind: 'files',
-        vendor: 'anthropic+openai',
-        authors: ['Claude Opus 5', 'GPT-5.6 Sol'],
+        vendor: `${MAIN.vendor}+${CROSS.vendor}`,
+        authors: [MAIN.trailerName, CROSS.retired[2]],
         commits: [sha('a'), sha('b')],
         files: [file],
-        reviewer: 'GPT-6 Astra',
+        // The retired cross name IS the cross lane (point 1393), so the first exact
+        // non-author is the scarce lane, not the cross lane's current model.
+        reviewer: SCARCE.displayName,
       }),
     ])
   })
@@ -98,13 +98,13 @@ describe('authorship-cut mechanism review planning', () => {
   it('plans one file once after eight commits touch it', () => {
     const file = 'scripts/queue-calibration.mjs'
     const commits = Array.from({ length: 8 }, (_, index) =>
-      commit(String.fromCharCode(97 + index), 'GPT-5.6 Sol', [file]))
+      commit(String.fromCharCode(97 + index), CROSS.retired[2], [file]))
     const plan = planAuthorshipGroups({ commits, endStateFiles: [file] })
     expect(plan.groups).toHaveLength(1)
     expect(plan.groups[0]).toMatchObject({
       kind: 'files',
       files: [file],
-      reviewer: OPUS_MODEL,
+      reviewer: MAIN.displayName,
     })
     expect(plan.groups[0].commits).toHaveLength(8)
     expect(plan.superseded).toEqual([
@@ -115,7 +115,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('drops a path reverted to its base state and names why', () => {
     const file = 'scripts/reverted-guard.mjs'
     const state = endStateArtefacts({
-      commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'Claude Opus 5', [file])],
+      commits: [commit('a', MAIN.trailerName, [file]), commit('b', MAIN.trailerName, [file])],
       endStateFiles: [],
     })
     expect(state.artefacts).toEqual([])
@@ -127,7 +127,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('names a group with no eligible reviewer instead of assigning an author', () => {
     const plan = planAuthorshipGroups({
       commits: [
-        { sha: sha('a'), authorModels: ['GPT-6 Astra', OPUS_MODEL, 'Fable 5.1', 'Opus 4.8'], files: ['x'] },
+        { sha: sha('a'), authorModels: [CROSS.displayName, MAIN.displayName, SCARCE.displayName, MAIN.fallback.displayName], files: ['x'] },
       ],
     })
     expect(plan.groups[0].reviewer).toBe('')
@@ -141,14 +141,16 @@ describe('authorship-cut mechanism review planning', () => {
       commits: [
         {
           sha: sha('a'),
-          authorModels: ['GPT-5.6 Sol', 'Claude Opus 5'],
+          authorModels: [CROSS.retired[2], MAIN.trailerName],
           files: ['scripts/shared-guard.mjs'],
         },
       ],
     })
+    // A retired cross name is the cross lane itself (point 1393): the first exact
+    // non-author is the scarce lane.
     expect(plan.groups[0]).toMatchObject({
-      reviewer: 'GPT-6 Astra',
-      reviewerVendor: 'openai',
+      reviewer: SCARCE.displayName,
+      reviewerVendor: SCARCE.vendor,
     })
     expect(plan.unreviewable).toEqual([])
   })
@@ -156,21 +158,21 @@ describe('authorship-cut mechanism review planning', () => {
   it('splits a mixed-authorship range and names the eligible vendor for each part', () => {
     const plan = planAuthorshipGroups({
       commits: [
-        commit('a', 'Claude Opus 5', ['scripts/claude-guard.mjs']),
-        commit('b', 'GPT-5.6 Sol', ['scripts/sol-guard.mjs']),
+        commit('a', MAIN.trailerName, ['scripts/claude-guard.mjs']),
+        commit('b', CROSS.retired[2], ['scripts/sol-guard.mjs']),
       ],
     })
     expect(plan.groups).toEqual([
       expect.objectContaining({
-        vendor: 'anthropic',
-        reviewer: 'GPT-6 Astra',
-        reviewerVendor: 'openai',
+        vendor: MAIN.vendor,
+        reviewer: CROSS.displayName,
+        reviewerVendor: CROSS.vendor,
         files: ['scripts/claude-guard.mjs'],
       }),
       expect.objectContaining({
-        vendor: 'openai',
-        reviewer: OPUS_MODEL,
-        reviewerVendor: 'anthropic',
+        vendor: CROSS.vendor,
+        reviewer: MAIN.displayName,
+        reviewerVendor: MAIN.vendor,
         files: ['scripts/sol-guard.mjs'],
       }),
     ])
@@ -198,18 +200,18 @@ describe('authorship-cut mechanism review planning', () => {
     const carried = 'scripts/carried-notes.md'
     const plan = planAuthorshipGroups({
       commits: [
-        { ...commit('a', 'GPT-5.6 Sol', ['sol-only']), parentShas: [] },
-        { ...commit('b', 'Claude Opus 5', [carried]), parentShas: [] },
+        { ...commit('a', CROSS.retired[2], ['sol-only']), parentShas: [] },
+        { ...commit('b', MAIN.trailerName, [carried]), parentShas: [] },
         { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [carried] },
       ],
     })
     expect(plan.groups).toEqual([
-      expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: OPUS_MODEL }),
+      expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: MAIN.displayName }),
       expect.objectContaining({
         files: [carried],
         commits: [sha('b'), sha('c')],
-        authors: ['Claude Opus 5'],
-        reviewer: 'GPT-6 Astra',
+        authors: [MAIN.trailerName],
+        reviewer: CROSS.displayName,
       }),
     ])
     expect(plan.unreviewable).toEqual([])
@@ -222,31 +224,32 @@ describe('authorship-cut mechanism review planning', () => {
         {
           sha: sha('c'),
           parentShas: [sha('a'), mergedParent],
-          parentAuthorModels: { [mergedParent]: ['Claude Opus 5'] },
+          parentAuthorModels: { [mergedParent]: [MAIN.trailerName] },
           files: ['scripts/conflict-resolution.mjs'],
         },
       ],
     })
     expect(plan.groups[0]).toMatchObject({
       files: ['scripts/conflict-resolution.mjs'],
-      authors: ['Claude Opus 5'],
-      reviewer: 'GPT-6 Astra',
+      authors: [MAIN.trailerName],
+      reviewer: CROSS.displayName,
     })
     expect(plan.unreviewable).toEqual([])
   })
 
   it('requires the other vendor even when another same-vendor model is not an author', () => {
-    expect(eligibleReviewer(['Claude Fable 5.1'])).toBe('GPT-6 Astra')
-    expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe(OPUS_MODEL)
-    expect(eligibleReviewer(['GPT-6 Astra'])).toBe(OPUS_MODEL)
-    expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('GPT-6 Astra')
-    expect(vendorOf(`${CLAUDE_MODEL} <noreply@anthropic.com>`)).toBe('anthropic')
+    expect(eligibleReviewer([SCARCE.trailerName])).toBe(CROSS.displayName)
+    expect(eligibleReviewer([CROSS.retired[2]])).toBe(MAIN.displayName)
+    expect(eligibleReviewer([CROSS.displayName])).toBe(MAIN.displayName)
+    // Both vendors authored, and the retired cross name is the cross lane (point 1393).
+    expect(eligibleReviewer([CROSS.retired[2], MAIN.trailerName])).toBe(SCARCE.displayName)
+    expect(vendorOf(`${MAIN.trailerName} <${VENDORS[MAIN.vendor].trailerAddress}>`)).toBe(MAIN.vendor)
   })
 })
 
 describe('per-file end-state review baseline', () => {
   const usable = () => true
-  const row = ({ head, files, contained, verdict = 'merge', at = 100, model = 'GPT-5.6 Sol' }) => ({
+  const row = ({ head, files, contained, verdict = 'merge', at = 100, model = CROSS.retired[2] }) => ({
     sha: head,
     model,
     verdict,
@@ -257,14 +260,14 @@ describe('per-file end-state review baseline', () => {
     mode: 'review',
     reviewerAuthorship: {
       status: 'unverified',
-      claimedModel: 'GPT-5.6 Sol',
+      claimedModel: CROSS.retired[2],
       reason: 'external CLI reviewer',
     },
   })
 
   it('keeps a covered file clear after a later commit touches only another file', () => {
-    const first = commit('a', 'Claude Opus 5', ['covered'])
-    const later = commit('b', 'Claude Opus 5', ['other'])
+    const first = commit('a', MAIN.trailerName, ['covered'])
+    const later = commit('b', MAIN.trailerName, ['other'])
     const result = outstandingFiles({
       commits: [first, later],
       endStateFiles: ['covered', 'other'],
@@ -276,8 +279,8 @@ describe('per-file end-state review baseline', () => {
   })
 
   it('owes only a covered file changed by a later commit', () => {
-    const first = commit('a', 'Claude Opus 5', ['covered'])
-    const later = commit('b', 'Claude Opus 5', ['covered'])
+    const first = commit('a', MAIN.trailerName, ['covered'])
+    const later = commit('b', MAIN.trailerName, ['covered'])
     const result = outstandingFiles({
       commits: [first, later],
       endStateFiles: ['covered'],
@@ -290,8 +293,8 @@ describe('per-file end-state review baseline', () => {
 
   it('does not accept a same-vendor reviewer for the file\'s final author', () => {
     const changes = [
-      commit('a', 'Claude Opus 5', ['shared']),
-      commit('b', 'GPT-5.6 Sol', ['shared']),
+      commit('a', MAIN.trailerName, ['shared']),
+      commit('b', CROSS.retired[2], ['shared']),
     ]
     const result = outstandingFiles({
       commits: changes,
@@ -301,7 +304,7 @@ describe('per-file end-state review baseline', () => {
         head: changes[1].sha,
         files: ['shared'],
         contained: changes.map((change) => change.sha),
-        model: 'GPT-5.6 Sol',
+        model: CROSS.retired[2],
       })],
     })
     expect(result.covered).toEqual([])
@@ -309,7 +312,7 @@ describe('per-file end-state review baseline', () => {
   })
 
   it('rescues historical scoped coverage when the review contains the file\'s latest change', () => {
-    const change = commit('a', 'Claude Opus 5', ['shared'])
+    const change = commit('a', MAIN.trailerName, ['shared'])
     const legacy = {
       ...row({ head: change.sha, files: ['shared'], contained: [change.sha] }),
       pass: { index: 1, total: 1, files: ['shared'], commits: [change.sha] },
@@ -325,8 +328,8 @@ describe('per-file end-state review baseline', () => {
   })
 
   it('does not let historical scoped coverage clear a file changed after that review', () => {
-    const reviewed = commit('a', 'Claude Opus 5', ['shared'])
-    const latest = commit('b', 'Claude Opus 5', ['shared'])
+    const reviewed = commit('a', MAIN.trailerName, ['shared'])
+    const latest = commit('b', MAIN.trailerName, ['shared'])
     const legacy = {
       ...row({ head: reviewed.sha, files: ['shared'], contained: [reviewed.sha] }),
       pass: { index: 1, total: 1, files: ['shared'], commits: [reviewed.sha] },
@@ -347,8 +350,8 @@ describe('per-file end-state review baseline', () => {
   })
 
   it('counts and names only the historical readings invalidated by later file states', () => {
-    const first = commit('a', 'Claude Opus 5', ['advanced', 'still-current'])
-    const latest = commit('b', 'Claude Opus 5', ['advanced'])
+    const first = commit('a', MAIN.trailerName, ['advanced', 'still-current'])
+    const latest = commit('b', MAIN.trailerName, ['advanced'])
     const historical = {
       ...row({ head: first.sha, files: ['advanced', 'still-current'], contained: [first.sha] }),
       pass: {
@@ -358,7 +361,7 @@ describe('per-file end-state review baseline', () => {
         commits: [first.sha],
       },
     }
-    const oldSelfReview = { ...historical, model: 'Claude Opus 5' }
+    const oldSelfReview = { ...historical, model: MAIN.trailerName }
     const debt = outstandingFiles({
       commits: [first, latest],
       endStateFiles: ['advanced', 'still-current'],
@@ -375,8 +378,8 @@ describe('per-file end-state review baseline', () => {
   })
 
   it('does not report invalidated history after a current reading clears the file', () => {
-    const first = commit('a', 'Claude Opus 5', ['advanced'])
-    const latest = commit('b', 'Claude Opus 5', ['advanced'])
+    const first = commit('a', MAIN.trailerName, ['advanced'])
+    const latest = commit('b', MAIN.trailerName, ['advanced'])
     const historical = {
       ...row({ head: first.sha, files: ['advanced'], contained: [first.sha] }),
       pass: { index: 1, total: 1, files: ['advanced'], commits: [first.sha] },
@@ -398,7 +401,7 @@ describe('per-file end-state review baseline', () => {
   })
 
   it('keeps a refusal visible until a later clearance descends from its sha', () => {
-    const change = commit('a', 'Claude Opus 5', ['guard'])
+    const change = commit('a', MAIN.trailerName, ['guard'])
     const base = { head: change.sha, files: ['guard'], contained: [change.sha] }
     const refused = outstandingFiles({
       commits: [change],
@@ -434,7 +437,7 @@ describe('per-file end-state review baseline', () => {
   })
 
   it('reports every file of an incomplete scoped split as still owed', () => {
-    const change = commit('a', 'Claude Opus 5', ['a', 'b'])
+    const change = commit('a', MAIN.trailerName, ['a', 'b'])
     const first = {
       ...row({ head: change.sha, files: ['a'], contained: [change.sha], at: 100 }),
       pass: { index: 1, total: 2, files: ['a'], endState: change.sha },
@@ -452,7 +455,7 @@ describe('per-file end-state review baseline', () => {
   it('lets no file of a split clear until every recorded pass is complete', () => {
     const head = sha('a')
     const pending = {
-      ...commit('a', 'Claude Opus 5', ['a', 'shared']),
+      ...commit('a', MAIN.trailerName, ['a', 'shared']),
       subject: 'change two mechanism files',
       coveringRecordShas: [head],
     }
@@ -495,10 +498,10 @@ describe('per-file end-state review baseline', () => {
       mode: 'review',
     }
     const first = {
-      ...commit('a', 'Claude Opus 5', ['covered']),
+      ...commit('a', MAIN.trailerName, ['covered']),
       coveringRecordShas: [reviewed],
     }
-    const other = { ...commit('b', 'Claude Opus 5', ['other']), coveringRecordShas: [] }
+    const other = { ...commit('b', MAIN.trailerName, ['other']), coveringRecordShas: [] }
     const afterOther = evaluateMechanismReview({
       baseline: sha('0'),
       head: other.sha,
@@ -508,7 +511,7 @@ describe('per-file end-state review baseline', () => {
     })
     expect(afterOther.findings.map((finding) => finding.commit.files)).toEqual([['other']])
 
-    const changedAgain = { ...commit('c', 'Claude Opus 5', ['covered']), coveringRecordShas: [] }
+    const changedAgain = { ...commit('c', MAIN.trailerName, ['covered']), coveringRecordShas: [] }
     const afterSame = evaluateMechanismReview({
       baseline: sha('0'),
       head: changedAgain.sha,
@@ -525,8 +528,8 @@ describe('per-file end-state review baseline', () => {
       head: sha('b'),
       records: [],
       pendingCommits: [
-        commit('a', 'Claude Opus 5', ['reverted']),
-        commit('b', 'Claude Opus 5', ['reverted']),
+        commit('a', MAIN.trailerName, ['reverted']),
+        commit('b', MAIN.trailerName, ['reverted']),
       ],
       endStateFiles: [],
     }).block).toBe(false)
@@ -586,7 +589,7 @@ describe('the reading selector on its own', () => {
 // object let a message inject a parent git never recorded, and that forged
 // parent's Co-Authored-By trailers would have become the merge's authorship:
 // the model that wrote a merged tip could name a different one and review its
-// own work (cross-vendor review, GPT-5.6 Sol at effort high, 01.09.2026).
+// own work (cross-vendor review, 01.09.2026).
 describe('commitObjectParents', () => {
   const A = 'a'.repeat(40)
   const B = 'b'.repeat(40)
