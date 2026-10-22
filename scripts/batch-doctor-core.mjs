@@ -79,6 +79,40 @@ export function planRemediation(state) {
     })
   }
 
+  // PROTECTED PATHS ARE NEVER STASHED (21.10.2026: a quarantine took the
+  // uncommitted appends of five user orders into a stash nobody audited). The
+  // work order, its archive, the queue rank and the work packages are SECURED
+  // first — committed onto a unique rescue branch through a temporary index,
+  // HEAD and the working tree untouched, and pushed — whenever anything below
+  // could overwrite or stash them. They stay in the working tree, and the run
+  // is LOUD: an alert, a non-zero exit, never "consistent".
+  const quarantine = quarantineScope(state.dirtyFiles, { verificationWriterLive: state.verificationWriterLive })
+  const diverged = div.ahead > 0 && div.behind > 0
+  const resetPlanned = diverged && !state.verificationWriterLive
+  const quarantinePlanned = quarantine.needed && (state.parallelDetected || state.conflictMarkers || resetPlanned)
+  const restorePlanned = !state.tasksParses && !!state.tasksRecoverable
+  const protectedAtRisk =
+    quarantine.protected.length > 0 && (quarantinePlanned || resetPlanned || restorePlanned || !!state.mergeInProgress || !!state.parallelDetected)
+  if (protectedAtRisk) {
+    plan.push({
+      action: 'rescue-protected-commit',
+      level: 'repair',
+      targets: quarantine.protected,
+      reason:
+        `Protected work-order files are dirty during a repair window (${quarantine.protected.join(', ')}). They are never stashed: ` +
+        'they are committed onto a unique rescue/doctor-<time>-<pid> branch through a temporary index (HEAD and the working tree ' +
+        'untouched), pushed, and left in place. If that fails, nothing below may overwrite them.',
+    })
+    plan.push({
+      action: 'alert-protected-paths',
+      level: 'alert',
+      targets: quarantine.protected,
+      reason:
+        `UNATTRIBUTED CHANGES TO THE WORK ORDER (${quarantine.protected.join(', ')}) — they may carry user orders. ` +
+        'Inspect the rescue branch named in this log, carry what is genuine into main, and commit. This is never "consistent".',
+    })
+  }
+
   if (state.mergeInProgress) {
     plan.push({
       action: 'abort-merge',
@@ -87,14 +121,16 @@ export function planRemediation(state) {
     })
   }
 
-  const quarantine = quarantineScope(state.dirtyFiles, { verificationWriterLive: state.verificationWriterLive })
-  if (quarantine.needed && (state.parallelDetected || state.conflictMarkers)) {
+  if (quarantinePlanned) {
     plan.push({
       action: 'quarantine-stash',
       level: 'repair',
       excludeVerification: quarantine.excludeVerification,
       reason:
-        'Uncommitted changes exist in the shared tree during/after a parallel-session window — they cannot be attributed to one author. Quarantine them in a stash (recoverable, named, logged) rather than build on them.' +
+        (state.parallelDetected || state.conflictMarkers
+          ? 'Uncommitted changes exist in the shared tree during/after a parallel-session window — they cannot be attributed to one author. '
+          : 'Uncommitted changes would be destroyed by the hard reset below. ') +
+        'Quarantine them in a stash (recoverable, named, logged) rather than build on them; the protected work-order files stay out of it.' +
         (quarantine.excludeVerification ? ' verification/ stays: a live verification run is writing it.' : ''),
     })
   }
@@ -598,11 +634,20 @@ export const alertNamesAnother = (args) => otherSessionsIn(args).length > 0
  */
 export const VERIFICATION_DIR = 'verification'
 
+/** Paths the doctor never stashes: the work order and what ranks it (21.10.2026). */
+export const PROTECTED_PATHS = Object.freeze(['TASKS.md', 'docs/tasks-archive.md', '.claude/queue-rank.json', 'docs/work-packages.md'])
+
+export const isProtectedPath = (path) => PROTECTED_PATHS.includes(String(path ?? '').replace(/\\/g, '/'))
+
 export function quarantineScope(dirtyFiles = [], { verificationWriterLive = false } = {}) {
   const paths = dirtyFiles ?? []
-  if (!verificationWriterLive) return { needed: paths.length > 0, excludeVerification: false }
-  const needed = paths.some((path) => !String(path).startsWith(`${VERIFICATION_DIR}/`))
-  return { needed, excludeVerification: true }
+  const protectedPaths = [...new Set(paths.filter(isProtectedPath))]
+  const quarantinable = paths.filter((path) => !isProtectedPath(path))
+  if (!verificationWriterLive) {
+    return { needed: quarantinable.length > 0, excludeVerification: false, protected: protectedPaths, quarantinable }
+  }
+  const needed = quarantinable.some((path) => !String(path).startsWith(`${VERIFICATION_DIR}/`))
+  return { needed, excludeVerification: true, protected: protectedPaths, quarantinable }
 }
 
 /**
@@ -623,9 +668,12 @@ export function parsePorcelainZ(out = '') {
 
 /** The `git stash` arguments of a quarantine; `-u` takes untracked files too. */
 export function quarantineStashArgs(name, { excludeVerification = false } = {}) {
-  const args = ['stash', 'push', '-u', '-m', name]
-  return excludeVerification ? [...args, '--', '.', `:(exclude)${VERIFICATION_DIR}`] : args
+  const args = ['stash', 'push', '-u', '-m', name, '--', '.', ...PROTECTED_PATHS.map((p) => `:(exclude)${p}`)]
+  return excludeVerification ? [...args, `:(exclude)${VERIFICATION_DIR}`] : args
 }
+
+/** Plan actions that would overwrite protected files and so wait for their rescue. */
+export const NEEDS_PROTECTED_SECURED = Object.freeze(['abort-merge', 'rescue-and-reset', 'restore-tasks-from-head'])
 
 /**
  * Does the `batch-in-flight` declaration name a run whose process is still

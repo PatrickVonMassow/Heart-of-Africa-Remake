@@ -37,6 +37,8 @@ export function makeRepoFixture({ points = [], archived = [], titles = {} } = {}
   git('remote', 'add', 'origin', origin)
   mkdirSync(join(root, 'docs'), { recursive: true })
   mkdirSync(join(root, '.claude'), { recursive: true })
+  // The live repository ignores its batch state files; so does the fixture.
+  writeFileSync(join(root, '.gitignore'), '.claude/parallel-alert.json\n.claude/doctor-state.json\n.claude/doctor.log\n.claude/batch-lock.json\n')
   writeFileSync(join(root, 'TASKS.md'), tasksWith(points, titles))
   writeFileSync(
     join(root, 'docs', 'tasks-archive.md'),
