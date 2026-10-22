@@ -163,7 +163,9 @@ if (isMainModule(import.meta.url)) {
     }
     const kind = normaliseKind(flag('--kind'))
     const brief = flag('--brief')
-    let model = resolveAskLane(flag('--lane') || 'cross')
+    // An explicit --lane without a value is malformed, never the default lane.
+    const laneFlag = argv.includes('--lane') ? flag('--lane') : 'cross'
+    let model = laneFlag ? resolveAskLane(laneFlag) : null
     if (!kind || !brief) {
       console.error(`ask-lane: --kind (one of ${KINDS.join(', ')}) and --brief are both required.\n`)
       console.error(usage())

@@ -140,6 +140,14 @@ describe('what it refuses before spending anything', () => {
     expect(bad.status).toBe(2)
   })
 
+  it('refuses an explicit --lane without a value instead of defaulting to the cross lane', () => {
+    clearCalls()
+    const r = run(['--lane', '--kind', 'diagnose', '--brief', 'x', '--file', materialFile, '--anyway'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/--lane must be one of/)
+    expect(calls()).toEqual([])
+  })
+
   it('refuses the retired --model selector instead of defaulting to the cross lane', () => {
     clearCalls()
     const r = run(['--model', 'fable', '--anyway', '--kind', 'diagnose', '--brief', 'x', '--file', materialFile])
