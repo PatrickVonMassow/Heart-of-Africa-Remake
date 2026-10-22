@@ -598,6 +598,22 @@ export function rescueAndReset({ git, rescue } = {}) {
 // skips the client hooks: this is evidence, not code, and a pre-push gate that
 // runs the suites must not stand between a user order and its safety copy.
 
+/** Where a rescue tree keeps the REAL index's staged versions of the protected files. */
+export const INDEX_RESCUE_DIR = '.doctor-rescue/index'
+
+/** The real index's entries for `files` (stage 0 and conflict stages), as { mode, sha, path }. */
+function stagedEntries({ repo, env, files }) {
+  const out = execFileSync('git', ['ls-files', '-s', '-z', '--', ...files], { cwd: repo, env, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  return out
+    .split('\0')
+    .filter(Boolean)
+    .map((rec) => {
+      const m = /^(\d+) ([0-9a-f]+) (\d)\t(.*)$/s.exec(rec)
+      return m ? { mode: m[1], sha: m[2], stage: Number(m[3]), path: m[3] === '0' ? m[4] : `${m[4]}.stage${m[3]}` } : null
+    })
+    .filter(Boolean)
+}
+
 /** The newest rescue branch whose tree equals `tree`, so a second run reuses it. */
 function existingRescueWithTree(run, tree) {
   try {
@@ -645,6 +661,20 @@ export function rescueProtectedCommit({ repo, paths = [], now = Date.now(), pid 
     if (head) run(['read-tree', head])
     else run(['read-tree', '--empty'])
     run(['add', '-A', '-f', '--', ...files])
+    // THE STAGED VERSION TOO (review 22.10.2026): a protected file staged and then
+    // changed or removed in the working copy has a second version that only the
+    // REAL index holds, and a reset or merge abort destroys it. Every staged entry
+    // that differs from HEAD is kept under INDEX_RESCUE_DIR in the same tree.
+    for (const entry of stagedEntries({ repo, env: baseEnv, files })) {
+      let headBlob = ''
+      try {
+        headBlob = head ? run(['rev-parse', '--verify', '-q', `${head}:${entry.path}`]) : ''
+      } catch {
+        headBlob = ''
+      }
+      if (headBlob === entry.sha) continue
+      run(['update-index', '--add', '--cacheinfo', `${entry.mode},${entry.sha},${INDEX_RESCUE_DIR}/${entry.path}`])
+    }
     const tree = run(['write-tree'])
     // A second run over the same bytes reuses the branch (and re-pushes it)
     // instead of minting one rescue branch per doctor tick.

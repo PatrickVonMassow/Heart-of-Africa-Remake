@@ -18,7 +18,7 @@ import {
   quarantineScope,
   quarantineStashArgs,
 } from './batch-doctor-core.mjs'
-import { rescueProtectedCommit } from './batch-doctor-states.mjs'
+import { INDEX_RESCUE_DIR, rescueProtectedCommit } from './batch-doctor-states.mjs'
 import { appendPoint, makeRepoFixture } from './carrier-reconcile-fixture.mjs'
 
 const CLEAN = { dirtyFiles: [], divergence: { ahead: 0, behind: 0 }, tasksParses: true, parallelDetected: false }
@@ -116,6 +116,18 @@ describe('rescueProtectedCommit — a pushed rescue branch through a temporary i
     const again = rescueProtectedCommit({ repo: repo.root, paths: ['TASKS.md'], now: now + 1000, pid: 3 })
     expect(again.reused).toBe(true)
     expect(again.ref).toBe(b.ref)
+  })
+
+  it('keeps the STAGED version of a protected file that was then removed from the working copy', () => {
+    appendPoint(repo.root, 1402, 'Staged only order')
+    repo.git('add', 'TASKS.md')
+    rmSync(join(repo.root, 'TASKS.md'))
+    const r = rescueProtectedCommit({ repo: repo.root, paths: ['TASKS.md'] })
+    expect(r.pushed).toBe(true)
+    // The working copy (deleted) is what the tree holds at its path; the staged bytes survive beside it.
+    expect(repo.git('show', `${r.branch}:${INDEX_RESCUE_DIR}/TASKS.md`)).toContain('- [ ] 1402. Staged only order')
+    // The real index is untouched.
+    expect(repo.git('diff', '--cached', '--name-only')).toBe('TASKS.md')
   })
 
   it('reports a push that fails instead of claiming the rescue is secured', () => {
