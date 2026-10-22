@@ -124,6 +124,8 @@ describe('successor ramp classification', () => {
     { toolName: 'Bash', command: 'rg "npm run test:unit" scripts' },
     { toolName: 'Read', filePath: 'scripts/example.mjs' },
     { toolName: 'Bash', command: 'node scripts/new-ramp-duty.mjs --status' },
+    // A retired script no longer exists, so invoking it is no work.
+    { toolName: 'Bash', command: 'node scripts/author-fable.mjs --brief x' },
   ])('does not infer work from mentions or an unknown process call: %o', (call) => {
     expect(rampCallBearsWork(call)).toBe(false)
     expect(rampStageForCall(call)).toBe('ramp.mechanical-call')

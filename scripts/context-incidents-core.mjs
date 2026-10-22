@@ -101,7 +101,7 @@ const READ_TOOLS = new Set(['Read'])
  *  mirrored). */
 const SUITE_SCRIPTS = ['run-all.mjs', 'run-logged.mjs']
 // Retired names stay: incidents are read from transcripts written before the rename.
-const ASK_SCRIPTS = ['ask-lane.mjs', 'author-delegate.mjs', 'author-fable.mjs', 'cross-review.mjs', ...LEGACY.askScripts]
+const ASK_SCRIPTS = ['ask-lane.mjs', 'author-delegate.mjs', 'cross-review.mjs', ...LEGACY.askScripts]
 const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
 /** npm script names that ARE a browser run, and the fast gates beside them. */
 const NPM_SUITE_ARGS = new Set(['test', 'test:small', 'test:large'])
