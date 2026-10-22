@@ -38,7 +38,8 @@ export function parseClaudeResultOutput(text, expected = {}) {
     Number(row?.cacheCreationInputTokens ?? 0) === Number(usage.cache_creation_input_tokens ?? 0),
   )
   const answerModel = answers.length === 1 ? answers[0][0] : ''
-  const wanted = answers.find(([name, row]) =>
+  // Exactly one row may match the top-level counters; two matches leave the answer unattributed.
+  const wanted = answers.length !== 1 ? undefined : answers.find(([name, row]) =>
     normal(name) === normal(expected.id) || normal(row?.canonicalModel) === normal(expected.id),
   )
   const models = rows.map(([name]) => name)

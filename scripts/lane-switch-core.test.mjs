@@ -18,6 +18,7 @@ import {
   unreadableState,
   writeLaneFile,
   writeState,
+  parseClaudeResultOutput,
 } from './lane-switch-core.mjs'
 
 // Roster names, read from the lane records.
@@ -246,5 +247,25 @@ describe('decisions derived from the state', () => {
     const crossOff = readState(JSON.stringify({ lanes: { cross: entry('off', 'paused') } }), 'cross')
     expect(laneRefusalReason(crossOff)).toContain(`${CROSS_NAME} (the cross lane) is refused`)
     expect(laneRefusalReason(crossOff)).toContain('lane-switch.mjs --status): paused')
+  })
+})
+
+describe('parseClaudeResultOutput', () => {
+  const counters = { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 9 }
+  const output = (modelUsage) => JSON.stringify({
+    result: 'answer',
+    usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 9 },
+    modelUsage,
+  })
+  const expected = { id: SCARCE.modelId, name: SCARCE.displayName }
+
+  it('attributes the answer to the one row matching the top-level counters', () => {
+    const parsed = parseClaudeResultOutput(output({ [SCARCE.modelId]: counters, [TEST_FOREIGN_MODELS.haikuId]: { ...counters, inputTokens: 1 } }), expected)
+    expect(parsed.ok).toBe(true)
+  })
+
+  it('refuses when two rows match the counters, even if one is the expected model', () => {
+    const parsed = parseClaudeResultOutput(output({ [SCARCE.modelId]: counters, [TEST_FOREIGN_MODELS.haikuId]: counters }), expected)
+    expect(parsed.ok).toBe(false)
   })
 })
