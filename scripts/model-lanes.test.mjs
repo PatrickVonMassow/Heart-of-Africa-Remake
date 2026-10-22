@@ -115,6 +115,22 @@ describe('the cross-vendor rule compares vendor fields only', () => {
     for (const retired of CROSS.retired) expect(differentVendor(MAIN.displayName, retired)).toBe(true)
   })
 
+  it('reads a look-alike address domain as nobody', () => {
+    const domain = VENDORS[CROSS.vendor].domain
+    expect(vendorKeyOf(`Mystery <bot@${domain}.com.evil>`)).toBe('unknown')
+    expect(vendorKeyOf(`Mystery <bot@${domain}.com-evil.net>`)).toBe('unknown')
+    expect(vendorKeyOf(`Mystery <bot@${domain}.com>`)).toBe(CROSS.vendor)
+  })
+
+  it('keeps a vendor-prefixed foreign part of a compound whatever its position', () => {
+    const foreign = `${VENDORS[CROSS.vendor].versionedMarkers[0]}-4o`
+    const forward = mentionedIdentities(`${MAIN.retired[0]} / ${foreign}`)
+    const reverse = mentionedIdentities(`${foreign} / ${MAIN.retired[0]}`)
+    expect(forward.some((key) => key.startsWith('other:'))).toBe(true)
+    expect(new Set(forward)).toEqual(new Set(reverse))
+    expect(sharesIdentity(`${MAIN.retired[0]} / ${foreign}`, foreign)).toBe(true)
+  })
+
   it('reads contradictory markers and unknown names as nobody', () => {
     expect(vendorKeyOf(`${MAIN.trailerName} ${CROSS.displayName}`)).toBe('unknown')
     expect(vendorKeyOf('Alice')).toBe('unknown')

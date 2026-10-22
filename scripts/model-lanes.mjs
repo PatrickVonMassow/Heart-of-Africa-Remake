@@ -252,7 +252,8 @@ export function vendorKeyOf(value, registry = LANES) {
     const words = [...registry.filter((r) => r.vendor === key).flatMap((r) => r.familyWords), ...vendor.markerWords]
     const wordHit = words.some((word) => new RegExp(`\\b${word}\\b`).test(text))
     const versionedHit = vendor.versionedMarkers.some((word) => new RegExp(`\\b${word}[- ]?\\d`).test(text))
-    const addressHit = text.includes(`${vendor.domain}.com`)
+    // The whole domain, so a look-alike (`openai.com.evil`) names no vendor.
+    const addressHit = new RegExp(`\\b${vendor.domain}\\.com(?![\\w-]|\\.\\w)`).test(text)
     if (wordHit || versionedHit || addressHit) found.add(key)
   }
   return found.size === 1 ? [...found][0] : 'unknown'
@@ -291,6 +292,7 @@ export function mentionedIdentities(value, registry = LANES) {
   const found = new Set()
   const parts = String(value ?? '').split(/\s*(?:[/,;+&]|\band\b)\s*/i).filter((p) => p.trim())
   for (const part of parts) {
+    const before = found.size
     const key = identityKey(part, registry)
     if (key) {
       found.add(key)
@@ -312,7 +314,7 @@ export function mentionedIdentities(value, registry = LANES) {
     })
     const named = others.filter((word) => !prefixes.has(word))
     // A vendor prefix ("Claude", "GPT-") names a model only when nothing else in the part does.
-    const kept = named.length || found.size ? named : others
+    const kept = named.length || found.size > before ? named : others
     for (const word of kept) found.add(`other:${word}`)
   }
   return [...found]
