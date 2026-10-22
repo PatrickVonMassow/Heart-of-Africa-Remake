@@ -29,7 +29,7 @@ import {
   FABLE_MODEL,
   OPUS_FALLBACK_MODEL,
   OPUS_MODEL,
-  fableIsOn,
+  laneIsOn,
   isSwitchFallbackReason,
   mergeFallbackReason,
   mergerModel,
@@ -357,7 +357,7 @@ export function handoverChainFor(reason, fableState) {
       ? ASTRA_UNAVAILABLE_REVIEW_CHAIN
       : []
   if (!chain.length) return Object.freeze([])
-  if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
+  if (fableState === undefined || laneIsOn(fableState)) return Object.freeze([...chain])
   return Object.freeze(chain.filter((model) => !sameModel(model, FABLE_MODEL)))
 }
 

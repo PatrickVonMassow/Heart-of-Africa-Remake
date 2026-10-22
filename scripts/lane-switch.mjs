@@ -22,7 +22,7 @@ import {
 export { servingRoute } from './lane-switch-core.mjs'
 
 export const STATE_FILE =
-  process.env.FABLE_SWITCH_FILE ||
+  process.env.LANE_SWITCH_FILE ||
   statePathFrom(
     spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
       cwd: REPO_ROOT,
@@ -34,7 +34,7 @@ export const STATE_FILE =
   )
 
 /** Read afresh on every call: a flip must be visible to every reader immediately. */
-export function currentFableState(file = STATE_FILE) {
+export function currentLaneState(file = STATE_FILE) {
   try {
     if (!existsSync(file)) return readState(null)
     return readState(readFileSync(file, 'utf8'))
@@ -44,7 +44,7 @@ export function currentFableState(file = STATE_FILE) {
 }
 
 function setterIdentity() {
-  if (String(process.env.FABLE_SWITCH_SET_BY ?? '').trim()) return process.env.FABLE_SWITCH_SET_BY.trim()
+  if (String(process.env.LANE_SWITCH_SET_BY ?? '').trim()) return process.env.LANE_SWITCH_SET_BY.trim()
   const git = spawnSync('git', ['config', 'user.name'], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
   return String(git.stdout ?? '').trim() || String(process.env.USER ?? process.env.USERNAME ?? '').trim()
 }
@@ -65,7 +65,7 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
     if (argv.length === 1 && argv[0] === '--status') {
-      console.log(statusReport(currentFableState()))
+      console.log(statusReport(currentLaneState()))
       process.exit(0)
     }
     const direction = argv[0] === '--on' ? 'on' : argv[0] === '--off' ? 'off' : ''
@@ -74,7 +74,7 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     save(direction, argv[2])
-    console.log(statusReport(currentFableState()))
+    console.log(statusReport(currentLaneState()))
     process.exit(0)
   } catch (error) {
     console.error(`lane-switch: ${(error && error.message) || error}`)

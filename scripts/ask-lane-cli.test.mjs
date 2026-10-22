@@ -84,13 +84,13 @@ const run = (args, env = {}) =>
     env: {
       ...process.env,
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
-      REVIEW_ASTRA_STATE_DIR: stateDir,
-      ASTRA_SHARE_FILE: shareFile,
+      CROSS_REVIEW_STATE_DIR: stateDir,
+      LANE_ROUTING_FILE: shareFile,
       // The Fable switch lives in the MAIN checkout's .claude/, which is
       // git-ignored: a fresh clone and every CI runner have none, and the two
       // Fable cases below then died on "the switch state is absent" while
       // passing on the developing machine. The fixture owns its own switch.
-      FABLE_SWITCH_FILE: fableFile,
+      LANE_SWITCH_FILE: fableFile,
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
       STUB_PROMPT: join(dir, 'prompt.txt'),

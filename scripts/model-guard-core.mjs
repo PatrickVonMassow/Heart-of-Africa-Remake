@@ -56,8 +56,8 @@ import {
   FABLE_MODEL,
   OPUS_FALLBACK_MODEL,
   OPUS_MODEL,
-  fableIsOn,
-  fableRefusalReason,
+  laneIsOn,
+  laneRefusalReason,
 } from './lane-switch-core.mjs'
 
 /** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
@@ -92,9 +92,9 @@ export const POLICY_NEUTRAL = Symbol('model-policy-neutral')
  * force. Commit-message callers deliberately do not use this function — a new
  * commit is always judged against the policy in force now.
  */
-export function fableStateAtCommit(commitWhen, fableState) {
+export function laneStateAtCommit(commitWhen, fableState) {
   if (fableState === undefined || fableState === POLICY_NEUTRAL) return fableState
-  const currentIsOn = fableIsOn(fableState) // validates the complete state; an unreadable policy never grandfathers history
+  const currentIsOn = laneIsOn(fableState) // validates the complete state; an unreadable policy never grandfathers history
   const when = Number(commitWhen)
   if (!Number.isFinite(when)) throw new Error('the commit timestamp is invalid')
   if (when >= fableState.changedAt) return fableState
@@ -103,7 +103,7 @@ export function fableStateAtCommit(commitWhen, fableState) {
 
 /** Missing switch policy fails closed; policy-neutral parsing must say so at the call site. */
 const admitsFable = (fableState) =>
-  fableState === POLICY_NEUTRAL || (fableState !== undefined && fableIsOn(fableState))
+  fableState === POLICY_NEUTRAL || (fableState !== undefined && laneIsOn(fableState))
 
 /** May this PARSED model name author a commit here? */
 export function isAllowedModelName(name, fableState) {
@@ -455,7 +455,7 @@ export function evaluateCommitTrailers(message, fableState) {
   // policy, not a malformed trailer that may be ignored.
   const trailers = allowedTrailers(fableState)
   const phrase = allowedModelsPhrase(fableState)
-  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? fableRefusalReason(fableState) : ''
+  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? laneRefusalReason(fableState) : ''
   const findings = []
   try {
     for (const [role, values] of [
@@ -550,12 +550,12 @@ function findCommitsClassified(logText, sinceMs, wanted, fableState) {
   // Validate once even for an empty/malformed log: an invalid policy throws
   // here. A missing one (undefined) admits no Fable, so it fails closed per
   // commit rather than making the whole history look compliant.
-  fableStateAtCommit(sinceMs, fableState)
+  laneStateAtCommit(sinceMs, fableState)
   const hits = []
   for (const line of String(logText ?? '').split(/\r?\n/)) {
     const c = parseLogLine(line)
     if (!c || c.when < sinceMs) continue
-    const policyAtCommit = fableStateAtCommit(c.when, fableState)
+    const policyAtCommit = laneStateAtCommit(c.when, fableState)
     if (classifyTrailer(c.trailers, policyAtCommit) === wanted) {
       hits.push({ sha: c.sha, when: c.when, trailer: c.trailers.trim() })
     }
@@ -625,7 +625,7 @@ const shaList = (hits) => (hits ?? []).map((h) => `${h.sha.slice(0, 7)} (${h.tra
 /** Explain why a forbidden Fable trailer is history or a present emergency. */
 function fableTimingNotices(hits, fableState) {
   if (fableState === undefined || fableState === POLICY_NEUTRAL) return []
-  const current = fableIsOn(fableState) ? 'ON' : 'OFF'
+  const current = laneIsOn(fableState) ? 'ON' : 'OFF'
   const changedAt = Number(fableState.changedAt)
   return (hits ?? []).flatMap((hit) => {
     const namesFable = modelNamesIn(hit?.trailer).some((name) => FABLE_ALLOWED.test(name))
@@ -653,7 +653,7 @@ function fableTimingNotices(hits, fableState) {
  *  forbidden ones would otherwise clear them unseen (four-eyes review). */
 export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified = [], fableState } = {}) {
   const unnamed = (alsoUnidentified ?? []).filter(Boolean)
-  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? ` ${fableRefusalReason(fableState)}` : ''
+  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? ` ${laneRefusalReason(fableState)}` : ''
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
       `outside the allowlist in force at each commit's own time (${OPUS_MODEL}, ${OPUS_FALLBACK_MODEL} and ${ASTRA_MODEL} ` +

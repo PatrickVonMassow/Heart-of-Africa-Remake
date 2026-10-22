@@ -36,7 +36,7 @@
 // routes to another lane unless `--anyway` is given. Side-effect free; the work-order reading belongs to
 // scripts/author-delegate.mjs. Pinned by author-routing-core.test.mjs.
 
-import { ASTRA_MODEL, FABLE_MODEL, OPUS_MODEL, fableIsOn, fableRefusalReason, requireState } from './lane-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, OPUS_MODEL, laneIsOn, laneRefusalReason, requireState } from './lane-switch-core.mjs'
 
 /** The authoring lanes, in report order. */
 export const LANES = Object.freeze(['astra', 'fable', 'opus'])
@@ -62,10 +62,10 @@ export const LANE_MODEL = Object.freeze({
  * it. An emergency may raise this FURTHER for a while; when it ends the value
  * returns here, to ten, and never to five.
  */
-export const FABLE_ESCALATION_ROUNDS = 10
+export const SCARCE_ESCALATION_ROUNDS = 10
 
 /** The last Astra/Opus round pauses for a spec reading before Fable may take it. */
-export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
+export const SPEC_EXAMINATION_ROUND = SCARCE_ESCALATION_ROUNDS - 1
 
 /**
  * The hostile-tester stances used to make successive re-authoring commissions
@@ -221,7 +221,7 @@ export function nextAuthoringStep({
   records = [],
   point = '',
   reworkRounds,
-  escalationRounds = FABLE_ESCALATION_ROUNDS,
+  escalationRounds = SCARCE_ESCALATION_ROUNDS,
 } = {}) {
   const history = authorRoundHistory(records, point)
   const examinationRound = escalationRounds - 1
@@ -460,7 +460,7 @@ function hits(markers, text) {
  */
 export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0, override = '', fableState } = {}) {
   const state = requireState(fableState)
-  const fableOn = fableIsOn(state)
+  const fableOn = laneIsOn(state)
   const text = String(body ?? '')
   const tag = laneTagIn(text)
   const hard = hits(HARD_MARKERS, text)
@@ -470,9 +470,9 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
   // A CLOSED ESCALATION SAYS SO WHERE IT WOULD HAVE FIRED. Silently routing
   // such a point onward would read as "the threshold was never reached".
   const withheld =
-    !fableOn && rounds >= FABLE_ESCALATION_ROUNDS
+    !fableOn && rounds >= SCARCE_ESCALATION_ROUNDS
       ? `${rounds} unsuccessful review rounds would have reached the §6 escalation threshold of ` +
-        `${FABLE_ESCALATION_ROUNDS}, but ${fableRefusalReason(state)}`
+        `${SCARCE_ESCALATION_ROUNDS}, but ${laneRefusalReason(state)}`
       : ''
   const decide = (lane, reason) => ({
     lane,
@@ -485,7 +485,7 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
     lane: '',
     model: '',
     refused: true,
-    why: [reason, fableRefusalReason(state)],
+    why: [reason, laneRefusalReason(state)],
     signals,
   })
 
@@ -502,10 +502,10 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
       ? decide(tag, 'the point itself carries `Author lane: fable`')
       : refuseFable('the point itself carries `Author lane: fable`')
   }
-  if (fableOn && rounds >= FABLE_ESCALATION_ROUNDS) {
+  if (fableOn && rounds >= SCARCE_ESCALATION_ROUNDS) {
     return decide(
       'fable',
-      `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
+      `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${SCARCE_ESCALATION_ROUNDS}`,
     )
   }
   if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)

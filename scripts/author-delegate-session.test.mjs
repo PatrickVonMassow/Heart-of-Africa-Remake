@@ -206,7 +206,7 @@ describe('authoring session and log ownership', () => {
       cwd,
       encoding: 'utf8',
       windowsHide: true,
-      env: { ...process.env, HOA_REPO_ROOT: process.cwd(), AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableSwitch },
+      env: { ...process.env, HOA_REPO_ROOT: process.cwd(), AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: fableSwitch },
     })
     expect(result.status, result.stderr).toBe(2)
     expect(result.stdout.split('\n')[0]).toBe(`author-${lane}: log ${log} (append)`)

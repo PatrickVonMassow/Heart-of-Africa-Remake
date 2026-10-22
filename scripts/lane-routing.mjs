@@ -34,7 +34,7 @@ import {
   SAFE_SETTING,
   SETTINGS,
   SETTING_NOTES,
-  afterAstraRun,
+  afterLaneRun,
   effectiveRoute,
   fallbackLine,
   normaliseSetting,
@@ -48,11 +48,11 @@ import {
 
 /**
  * The state file, resolved to the MAIN checkout even from a delegated agent's worktree.
- * `ASTRA_SHARE_FILE` redirects it, which is how the CLI suite exercises the real command
+ * `LANE_ROUTING_FILE` redirects it, which is how the CLI suite exercises the real command
  * without touching the developer's own setting.
  */
 const SETTING_FILE =
-  process.env.ASTRA_SHARE_FILE ||
+  process.env.LANE_ROUTING_FILE ||
   settingPathFrom(
     spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
       cwd: REPO_ROOT,
@@ -103,12 +103,12 @@ function save(setting, { by = '', file = SETTING_FILE } = {}) {
 
 /**
  * Record what one routed Astra run says about the vendor (point 1194): an outage
- * signature writes or renews the fallback, a success lifts it. Returns afterAstraRun's
+ * signature writes or renews the fallback, a success lifts it. Returns afterLaneRun's
  * answer. Never throws — a failed write is printed, and the run's own verdict stands.
  */
-export function recordAstraRun({ outcome, text = '', kind = '', who = 'lane-routing', file = SETTING_FILE } = {}) {
+export function recordLaneRun({ outcome, text = '', kind = '', who = 'lane-routing', file = SETTING_FILE } = {}) {
   const state = currentSetting(file)
-  const next = afterAstraRun({ outcome, text, kind, previous: state.fallback })
+  const next = afterLaneRun({ outcome, text, kind, previous: state.fallback })
   if (state.corrupt || JSON.stringify(next.fallback) === JSON.stringify(state.fallback ?? null)) return next
   try {
     mkdirSync(dirname(file), { recursive: true })

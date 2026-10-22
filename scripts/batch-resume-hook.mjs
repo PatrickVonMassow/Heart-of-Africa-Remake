@@ -61,7 +61,7 @@ import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
-import { currentFableState } from './lane-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { servingPolicyLine } from './lane-switch-core.mjs'
 import { currentVenue } from './cloud-switch.mjs'
 import { venueInstruction } from './cloud-switch-core.mjs'
@@ -299,7 +299,7 @@ try {
     if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
     // degraded to Haiku and wrecked three points — name the authoring policy at
     // every session start; the model-guard Stop hook enforces it at the first

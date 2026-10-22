@@ -9,7 +9,7 @@
 // reviewer when Astra cannot be reached. Since point 667 Astra also AUTHORS under
 // the role swap (scripts/author-delegate.mjs, admitted in the model-guard allowlist);
 // what this file protects is the other half of that swap — no model reviews its
-// own work (`astraAuthored`, the self-review refusal), whoever wrote the commit.
+// own work (`authoredByLane`, the self-review refusal), whoever wrote the commit.
 //
 // THE FAILURE MODE THIS FILE IS SHAPED AROUND: a review nobody ran must never be
 // recorded as done. That is worse than having no second pair of eyes, because
@@ -40,7 +40,7 @@ import {
   OPUS_FALLBACK_MODEL_ID,
   OPUS_MODEL,
   OPUS_MODEL_ID,
-  fableIsOn,
+  laneIsOn,
 } from './lane-switch-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import {
@@ -67,10 +67,11 @@ export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
  *  identities, and re-exported here because this is where every caller of the
  *  review command already looks for them (point 1061). */
 export { ASTRA_MODEL_ID }
+import { CROSS } from './model-lanes.mjs'
 export const ASTRA_MODEL_NAME = ASTRA_MODEL
 
-/** The reasoning effort the user's decision fixes for every OpenAI call (medium since 21.10.2026). */
-export const ASTRA_REASONING_EFFORT = 'medium'
+/** TRANSITIONAL: the reasoning effort is the cross lane record's (scripts/model-lanes.mjs). */
+export const ASTRA_REASONING_EFFORT = CROSS.reasoningEffort
 
 /** The reviewers that take over whenever Astra did not deliver a verdict, in
  *  order. The ones behind Fable exist because Fable and Opus also AUTHOR here,
@@ -109,7 +110,7 @@ export function reviewerDescriptor(value = '') {
 
 /** A review candidate chain with the shared switch applied. */
 function availableReviewChain(chain, fableState) {
-  if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
+  if (fableState === undefined || laneIsOn(fableState)) return Object.freeze([...chain])
   return Object.freeze(chain.filter((model) => !sameModel(model, FABLE_MODEL)))
 }
 
@@ -174,7 +175,7 @@ export function causeTextFor(kind) {
  * the honest answer — every kind here ends at the same fallback, so a
  * misclassification never picks a wrong reviewer; it costs a sentence of
  * explanation and, for the OUTAGE_OUTCOMES kinds, the share switch's measured
- * outage count (recordAstraRun).
+ * outage count (recordLaneRun).
  */
 const FAILURE_PATTERNS = [
   [OUTCOME.MODEL_REFUSED, /not supported when using codex with a chatgpt account|unknown model|model[^.\n]*not (?:supported|available|found)/i],
@@ -537,7 +538,7 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
   // recording it would put a self-review in front of a gate that then reads
   // green. The runner asks the same question before it spends a codex call; this
   // is the backstop for every caller that does not.
-  if (astraAuthored(authorModel)) {
+  if (authoredByLane(authorModel)) {
     const chain = availableReviewChain(CLAUDE_REVIEW_CHAIN, fableState)
     return {
       model: firstNonAuthor(chain, authorModel),
@@ -630,7 +631,7 @@ function firstNonAuthor(chain, authorModels) {
  * "GPT-5.6 Sol" (point 1061). A renamed lane is still the same model: work the
  * lane wrote under its old name is work it may not review under its new one.
  */
-export function astraAuthored(authorModels = '') {
+export function authoredByLane(authorModels = '') {
   return authorList(authorModels).some((a) => isOpenAiLane(a))
 }
 

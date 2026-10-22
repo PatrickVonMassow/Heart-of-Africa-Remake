@@ -272,7 +272,7 @@ function signatureLine(text) {
  * renews one with a fresh probe clock, and every other failure leaves the record as it
  * was and is NOT a fallback.
  */
-export function afterAstraRun({ outcome = {}, text = '', kind = '', previous = null, now = Date.now(), probeMs = OUTAGE_PROBE_MS } = {}) {
+export function afterLaneRun({ outcome = {}, text = '', kind = '', previous = null, now = Date.now(), probeMs = OUTAGE_PROBE_MS } = {}) {
   const prior = readFallback(previous)
   if (outcome.ok) return { fallback: null, fellBack: false }
   if (!OUTAGE_KINDS.includes(outcome.kind)) return { fallback: prior, fellBack: false }
@@ -347,14 +347,14 @@ export function routingTable(setting) {
 }
 
 /** Every kind routed to Astra under this setting. PURE. */
-export function kindsToAstra(setting) {
+export function kindsToLane(setting) {
   return KINDS.filter((kind) => routeFor(kind, setting) === 'astra')
 }
 
 /** `--status` in ONE line: what goes where right now. PURE. */
 export function statusLine(state, now = Date.now()) {
   const { setting: value, fallback } = asState(state, now)
-  const astra = fallback ? [] : kindsToAstra(value)
+  const astra = fallback ? [] : kindsToLane(value)
   const claude = KINDS.filter((kind) => !astra.includes(kind))
   const half = (label, list) => `${label}: ${list.length ? list.join(', ') : 'nothing'}`
   const mark = fallback ? ` (outage FALLBACK until ${new Date(fallback.probeAt).toISOString()})` : ''
@@ -381,7 +381,7 @@ export function briefLine(state) {
     // The brief speaks to a DELEGATED agent, which is authoring already — so it is told
     // about the reading kinds it can hand over, not about the authoring lane it is in.
     return (
-      `- ASTRA ROUTING is at \`prefer-astra\`: hand ${kindsToAstra(value).filter((k) => READ_ONLY_KINDS.includes(k)).join('/')} to ` +
+      `- ASTRA ROUTING is at \`prefer-astra\`: hand ${kindsToLane(value).filter((k) => READ_ONLY_KINDS.includes(k)).join('/')} to ` +
       '`node scripts/ask-lane.mjs --kind <kind> --brief "…"` (material on stdin) instead of doing it in your own\n' +
       `  context. You keep the gates, the suites and the pictures; a read-only ask writes no commit.${mark}`
     )

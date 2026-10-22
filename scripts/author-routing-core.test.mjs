@@ -10,7 +10,7 @@ import {
   AUTHORING_COMMISSION_KIND,
   authorRoundHistory,
   authorLaneFor,
-  FABLE_ESCALATION_ROUNDS,
+  SCARCE_ESCALATION_ROUNDS,
   formatAuthorRoundHistory,
   formatLaneReport,
   HARD_MARKERS,
@@ -99,7 +99,7 @@ describe('authorLaneFor — which lane authors a point', () => {
   })
 
   it('keeps every pre-boundary rework in the lane its other signals demand', () => {
-    for (let reworkRounds = 0; reworkRounds < FABLE_ESCALATION_ROUNDS; reworkRounds += 1) {
+    for (let reworkRounds = 0; reworkRounds < SCARCE_ESCALATION_ROUNDS; reworkRounds += 1) {
       expect(lane('Something mechanical.', { reworkRounds }), `ordinary round ${reworkRounds}`).toBe('astra')
       expect(
         lane('A complex screenshot problem.', { criticality: 'high', reworkRounds }),
@@ -110,7 +110,7 @@ describe('authorLaneFor — which lane authors a point', () => {
   })
 
   it('sends nothing to Fable at the boundary while the switch refuses it', () => {
-    const reworkRounds = FABLE_ESCALATION_ROUNDS
+    const reworkRounds = SCARCE_ESCALATION_ROUNDS
     // Past the threshold the point stays in the lane its other signals demand.
     expect(lane('Something mechanical.', { reworkRounds })).toBe('astra')
     expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('astra')
@@ -123,20 +123,20 @@ describe('authorLaneFor — which lane authors a point', () => {
   })
 
   it('names the switch at every crossed round instead of hiding the boundary', () => {
-    for (const reworkRounds of [FABLE_ESCALATION_ROUNDS, FABLE_ESCALATION_ROUNDS + 7]) {
+    for (const reworkRounds of [SCARCE_ESCALATION_ROUNDS, SCARCE_ESCALATION_ROUNDS + 7]) {
       const why = decision({ body: 'x', reworkRounds }).why
       expect(why[0]).toBe('mechanical or mid-difficulty, and nothing marks it otherwise')
       expect(why[1]).toContain('node scripts/lane-switch.mjs --status')
       expect(why[1]).toContain('test decision')
     }
     // Below the threshold nothing is said about it at all.
-    expect(decision({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
+    expect(decision({ body: 'x', reworkRounds: SCARCE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
   })
 
   it('admits the tag, override, and automatic boundary while the switch allows Fable', () => {
     expect(authorLaneFor({ body: 'x\nAuthor lane: fable', fableState: ON })).toMatchObject({ lane: 'fable', refused: false })
     expect(authorLaneFor({ body: 'x', override: 'fable', fableState: ON })).toMatchObject({ lane: 'fable' })
-    expect(authorLaneFor({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS, fableState: ON })).toMatchObject({ lane: 'fable' })
+    expect(authorLaneFor({ body: 'x', reworkRounds: SCARCE_ESCALATION_ROUNDS, fableState: ON })).toMatchObject({ lane: 'fable' })
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {
@@ -282,7 +282,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
   it('decorrelates every ordinary round after the first from the one before it', () => {
     const records = [failed(), failed()]
     let preceding = ''
-    for (let round = 2; round <= FABLE_ESCALATION_ROUNDS - 2; round += 1) {
+    for (let round = 2; round <= SCARCE_ESCALATION_ROUNDS - 2; round += 1) {
       const step = nextAuthoringStep({ records, point: 727 })
       expect(step).toMatchObject({ kind: 'commission', round })
       expect(AUTHORING_FRAMINGS).toContain(step.framing)
@@ -391,7 +391,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     }
     const examination = nextAuthoringStep({ records, point: 727 })
     expect(examination).toMatchObject({ kind: 'spec-examination', round: SPEC_EXAMINATION_ROUND })
-    expect(examination.reason).toContain(`threshold of ${FABLE_ESCALATION_ROUNDS}`)
+    expect(examination.reason).toContain(`threshold of ${SCARCE_ESCALATION_ROUNDS}`)
 
     records.push({
       point: 727,
@@ -406,7 +406,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
   })
 
   it('moves every boundary when the one escalation constant moves', () => {
-    const alternateThreshold = FABLE_ESCALATION_ROUNDS + 3
+    const alternateThreshold = SCARCE_ESCALATION_ROUNDS + 3
     const records = [failed()]
     while (authorRoundHistory(records, 727).freshRounds < alternateThreshold - 1) {
       const step = nextAuthoringStep({ records, point: 727, escalationRounds: alternateThreshold })
@@ -421,8 +421,8 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
 
   it('applies a numeric history override to the step boundary without inventing records', () => {
     expect(
-      nextAuthoringStep({ records: [], point: 727, reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }),
-    ).toMatchObject({ kind: 'spec-examination', round: FABLE_ESCALATION_ROUNDS - 1 })
+      nextAuthoringStep({ records: [], point: 727, reworkRounds: SCARCE_ESCALATION_ROUNDS - 1 }),
+    ).toMatchObject({ kind: 'spec-examination', round: SCARCE_ESCALATION_ROUNDS - 1 })
   })
 
   it('renders the count, every framing or repeat, and the examination as one reading', () => {

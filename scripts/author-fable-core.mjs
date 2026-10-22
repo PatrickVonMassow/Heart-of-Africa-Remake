@@ -46,7 +46,7 @@ export function parseClaudeAuthoringOutput(text, expectedModel = FABLE_MODEL) {
   return { ok: true, result: String(value?.result ?? ''), models, error: '' }
 }
 
-export function fableAuthoringOutcome(run = {}) {
+export function laneAuthoringOutcome(run = {}) {
   if (run.spawnError) return { ok: false, cause: `Claude could not start: ${run.spawnError.message}` }
   if (run.timedOut) return { ok: false, cause: 'Claude timed out before the authoring run completed' }
   if (run.exitCode !== 0) return { ok: false, cause: `Claude exited with code ${run.exitCode}` }

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
+import { SCARCE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 import { writeState } from './lane-switch-core.mjs'
 
 const root = resolve(process.cwd())
@@ -32,7 +32,7 @@ function run(script, args, state = 'on') {
     env: {
       ...process.env,
       AUTHOR_REVIEW_RECORDS_FILE: files.records,
-      FABLE_SWITCH_FILE: files.fableSwitch,
+      LANE_SWITCH_FILE: files.fableSwitch,
     },
   })
 }
@@ -50,14 +50,14 @@ describe('Fable authoring CLI', () => {
   })
 
   it('names the serving command in the shared routing report', () => {
-    const result = run(astraScript, ['--routing', '--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS)])
+    const result = run(astraScript, ['--routing', '--point', '834', '--rounds', String(SCARCE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain('point 834 → fable (Fable 5.1)')
     expect(result.stdout).toContain('commission: node scripts/author-fable.mjs --point 834')
   })
 
   it('redirects a Sol dry-run to the command that serves the Fable lane instead of refusing it', () => {
-    const result = run(astraScript, ['--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS), '--dry-run'])
+    const result = run(astraScript, ['--point', '834', '--rounds', String(SCARCE_ESCALATION_ROUNDS), '--dry-run'])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stderr).toContain('node scripts/author-fable.mjs --point 834')
     expect(result.stderr).not.toContain('not to GPT-5.6 Sol')
@@ -68,7 +68,7 @@ describe('Fable authoring CLI', () => {
       '--point',
       '999991',
       '--rounds',
-      String(FABLE_ESCALATION_ROUNDS),
+      String(SCARCE_ESCALATION_ROUNDS),
       '--findings',
       '<findings>',
       '--dry-run',
@@ -87,7 +87,7 @@ describe('Fable authoring CLI', () => {
       '--point',
       '999991',
       '--rounds',
-      String(FABLE_ESCALATION_ROUNDS),
+      String(SCARCE_ESCALATION_ROUNDS),
       '--findings',
       '<findings>',
       '--anyway',

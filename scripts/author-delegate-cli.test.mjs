@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSyn
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
+import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, SCARCE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 import { uncommittedSummary } from './author-delegate-core.mjs'
 import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-delegate.mjs'
 import { writeState as writeFableState } from './lane-switch-core.mjs'
@@ -34,7 +34,7 @@ function route(records, extra = []) {
     cwd: root,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
+    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: fableFile() },
   })
 }
 
@@ -48,7 +48,7 @@ function examine(records) {
     // Examination intentionally runs before an authoring worktree exists, so
     // it gives the management checkout explicitly instead of asking the live
     // script's source path to override its cwd.
-    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
+    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: fableFile() },
   })
 }
 
@@ -401,13 +401,13 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
   })
 
   it('derives N non-passing reviews and holds the lane while the switch refuses Fable', () => {
-    const rows = Array.from({ length: FABLE_ESCALATION_ROUNDS }, (_, round) => ({
+    const rows = Array.from({ length: SCARCE_ESCALATION_ROUNDS }, (_, round) => ({
       point: Number(point),
       mode: 'review',
       verdict: 'do-not-merge',
       ...(round > 1 ? { authorFraming: AUTHORING_FRAMINGS[round % AUTHORING_FRAMINGS.length] } : {}),
     }))
-    rows.splice(FABLE_ESCALATION_ROUNDS - 1, 0, {
+    rows.splice(SCARCE_ESCALATION_ROUNDS - 1, 0, {
       point: Number(point),
       mode: 'review',
       verdict: 'merge',
@@ -420,7 +420,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
     expect(result.stdout).toContain(`point ${point} → astra`)
     expect(result.stdout).toContain('node scripts/lane-switch.mjs --status')
     expect(result.stdout).toContain(
-      `review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); ${FABLE_ESCALATION_ROUNDS} fresh attempt(s)`,
+      `review record: ${SCARCE_ESCALATION_ROUNDS} unsuccessful round(s); ${SCARCE_ESCALATION_ROUNDS} fresh attempt(s)`,
     )
     expect(result.stdout).toContain(`round 2: framing — ${AUTHORING_FRAMINGS[0]}`)
     expect(result.stdout).toContain('spec examination: sound')
@@ -428,7 +428,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
 
   it('reports an unframed later review as a repeat and does not advance the lane', () => {
     const rows = []
-    for (let round = 0; round < FABLE_ESCALATION_ROUNDS; round += 1) {
+    for (let round = 0; round < SCARCE_ESCALATION_ROUNDS; round += 1) {
       if (round > 1) {
         rows.push({ point: Number(point), kind: AUTHORING_COMMISSION_KIND, round, authorFraming: '' })
       }
@@ -437,7 +437,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain(`point ${point} → astra`)
-    expect(result.stdout).toContain(`${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); 2 fresh attempt(s)`)
+    expect(result.stdout).toContain(`${SCARCE_ESCALATION_ROUNDS} unsuccessful round(s); 2 fresh attempt(s)`)
     expect(result.stdout).toContain('REPEAT — no author framing was recorded')
   })
 
@@ -454,7 +454,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
   })
 
   it('accepts an explicit numeric override for history outside the ledger', () => {
-    const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS)])
+    const result = route(ledger([]), ['--rounds', String(SCARCE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
     // The override still carries the count; only the lane change is withheld.
     expect(result.stdout).toContain(`point ${point} → astra`)
@@ -462,10 +462,10 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
   })
 
   it('turns the override immediately before the threshold into the examination step', () => {
-    const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS - 1)])
+    const result = route(ledger([]), ['--rounds', String(SCARCE_ESCALATION_ROUNDS - 1)])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain('next step: spec-examination')
-    expect(result.stdout).toContain(`threshold of ${FABLE_ESCALATION_ROUNDS}`)
+    expect(result.stdout).toContain(`threshold of ${SCARCE_ESCALATION_ROUNDS}`)
   })
 
   it('rejects a numeric spelling that cannot be represented as an integer', () => {
@@ -478,7 +478,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
 describe('author-delegate examination does not require an authoring worktree', () => {
   it('prints the read-only examination packet before branch and worktree readiness', () => {
     const records = ledger(
-      Array.from({ length: FABLE_ESCALATION_ROUNDS - 1 }, () => ({
+      Array.from({ length: SCARCE_ESCALATION_ROUNDS - 1 }, () => ({
         point: 727,
         mode: 'review',
         verdict: 'do-not-merge',

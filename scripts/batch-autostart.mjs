@@ -100,7 +100,7 @@ import {
   RUNAWAY_FAIL_LIMIT,
   runawayRecoveryDecision,
 } from './batch-autostart-core.mjs'
-import { currentFableState } from './lane-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
@@ -1909,7 +1909,7 @@ try {
   const fresh = pendingSinceHandover(pendingChat, state.chatHandedAt)
   const suffix = chatPromptSuffix(fresh)
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
-  const fableState = currentFableState()
+  const fableState = currentLaneState()
   if (!fableState.ok) throw new Error(fableState.problem)
   const emergency = emergencyHandoffPrompt(readJson(join(REPO, 'local', 'batch-emergency-state.json')))
   const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix + emergency)

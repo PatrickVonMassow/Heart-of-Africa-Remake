@@ -46,16 +46,16 @@ import { readTasksOpen } from './tasks-source.mjs'
 import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
 import { classifyOutcome } from './cross-review-core.mjs'
 import { ensureModelProven } from './cross-review.mjs'
-import { currentSetting, recordAstraRun, settingProblemLine } from './lane-routing.mjs'
+import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
 import { FALLBACK_AUTHOR, effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
-import { currentFableState } from './lane-switch.mjs'
-import { OPUS_MODEL, fableIsOn } from './lane-switch-core.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { OPUS_MODEL, laneIsOn } from './lane-switch-core.mjs'
 import {
   authoringClaudeArgs,
   FABLE_MODEL,
   FABLE_MODEL_ID,
   FABLE_TRAILER,
-  fableAuthoringOutcome,
+  laneAuthoringOutcome,
   parseClaudeAuthoringOutput,
 } from './author-fable-core.mjs'
 import {
@@ -235,7 +235,7 @@ export function recordAuthoringCommission({
 }
 
 /** The lane a point belongs to, with the reasons that decided it. */
-export function laneFor(number, { override = '', reworkRounds, records, fableState = currentFableState() } = {}) {
+export function laneFor(number, { override = '', reworkRounds, records, fableState = currentLaneState() } = {}) {
   const body = pointBody(number)
   const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
   const roundHistory = authorRoundHistory(rows, number)
@@ -655,7 +655,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       console.error(`${commandName}: --log needs a path.`)
       process.exit(2)
     }
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
 
     // THE ROUTING REPORT: read-only, no allowance spent, no state touched.
     if (argv.includes('--routing')) {
@@ -824,7 +824,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
 
     // THE SHARE SWITCH CAN TURN THE WHOLE LANE OFF (point 654's lever, extended
     // here to the biggest spender of the two vendors).
-    if (config.lane === 'fable' && !fableIsOn(fableState)) {
+    if (config.lane === 'fable' && !laneIsOn(fableState)) {
       console.error(`${commandName}: ${FABLE_MODEL} is switched off; node scripts/lane-switch.mjs --status`)
       process.exit(3)
     }
@@ -956,10 +956,10 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
               : `${commandName}: interim push failed — ${why}`,
         ),
     })
-    const outcome = config.runtime === 'claude' ? fableAuthoringOutcome(run) : classifyOutcome(run)
+    const outcome = config.runtime === 'claude' ? laneAuthoringOutcome(run) : classifyOutcome(run)
     // A vendor outage is a fallback, not the point's red: recorded, then handed to FALLBACK_AUTHOR.
     const outage = config.lane === 'astra'
-      ? recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'author', who: commandName })
+      ? recordLaneRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'author', who: commandName })
       : { fellBack: false }
     const parsed = parseAuthoringAnswer(run.finalMessage)
     // WHERE THE RUN ENDED, not where it began: nothing stops a sandbox-less run

@@ -10,7 +10,7 @@ import {
   classifyTrailer,
   coAuthorTrailers,
   evaluateCommitTrailers,
-  fableStateAtCommit,
+  laneStateAtCommit,
   formatCommitTrailerVerdict,
   findForbiddenCommits,
   findUnidentifiedCommits,
@@ -215,8 +215,8 @@ describe('the historical guard uses the policy at each commit\'s own time', () =
     ].join('\n')
 
     expect(findForbiddenCommits(log, T0, off).map((hit) => hit.sha)).toEqual(['2222222', '3333333'])
-    expect(fableStateAtCommit(before, off).state).toBe('on')
-    expect(fableStateAtCommit(SWITCH_AT, off).state).toBe('off')
+    expect(laneStateAtCommit(before, off).state).toBe('on')
+    expect(laneStateAtCommit(SWITCH_AT, off).state).toBe('off')
   })
 
   it('refuses Fable under the previous OFF policy before an ON flip, then allows it', () => {

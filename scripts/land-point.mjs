@@ -37,7 +37,7 @@ import { lostPoints } from './carrier-reconcile-core.mjs'
 import { ALIASES_PATH, runReconcile, showAtRevision } from './carrier-reconcile.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { currentFableState } from './lane-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import {
   branchDeletionBlocker,
   formatCleanupNotes,
@@ -904,7 +904,7 @@ async function main(argv) {
       if (e.repair) console.error(`  repair: ${e.repair}`)
       return 2
     }
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     if (!fableState.ok) {
       console.error(`land-point: ${fableState.problem}`)
       return 2

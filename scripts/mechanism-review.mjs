@@ -60,7 +60,7 @@ import {
   VERDICTS,
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
-import { currentFableState } from './lane-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import {
   FABLE_MODEL,
   FABLE_MODEL_ID,
@@ -1574,7 +1574,7 @@ if (isMainModule(import.meta.url)) {
     }
 
     const fableState = parsed.values.mode === 'blind-parallel' || parsed.values.handover
-      ? currentFableState()
+      ? currentLaneState()
       : undefined
     if (fableState && !fableState.ok) throw new Error(fableState.problem)
     const built = buildRecord({ ...parsed.values, fableState })

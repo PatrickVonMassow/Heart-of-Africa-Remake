@@ -27,7 +27,7 @@ const judge = (message) => {
     return spawnSync(process.execPath, [GATE, '--message', file], {
       windowsHide: true,
       encoding: 'utf8',
-      env: { ...process.env, FABLE_SWITCH_FILE: stateFile(dir) },
+      env: { ...process.env, LANE_SWITCH_FILE: stateFile(dir) },
     })
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -101,13 +101,13 @@ describe('the commit-msg model-trailer gate', () => {
     const missing = spawnSync(process.execPath, [GATE, '--message', resolve(tmpdir(), 'no-such-msg')], {
       windowsHide: true,
       encoding: 'utf8',
-      env: { ...process.env, FABLE_SWITCH_FILE: stateFile(tmpdir()) },
+      env: { ...process.env, LANE_SWITCH_FILE: stateFile(tmpdir()) },
     })
     expect(missing.status).toBe(0)
     expect(spawnSync(process.execPath, [GATE], {
       windowsHide: true,
       encoding: 'utf8',
-      env: { ...process.env, FABLE_SWITCH_FILE: stateFile(tmpdir()) },
+      env: { ...process.env, LANE_SWITCH_FILE: stateFile(tmpdir()) },
     }).status).toBe(0)
   })
 })
@@ -145,7 +145,7 @@ describe('a real commit through the commit-msg hook', () => {
           cwd: repo,
           windowsHide: true,
           encoding: 'utf8',
-          env: { ...process.env, FABLE_SWITCH_FILE: fable },
+          env: { ...process.env, LANE_SWITCH_FILE: fable },
         })
       vcs('init', '-q')
       vcs('config', 'user.email', 'gate@test.local')

@@ -26,7 +26,7 @@
 // prints and sets the exit code. It fails LOUD — it is a command, not a hook.
 import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
-import { currentFableState } from './lane-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { mergeFallbackReason, mergePromptFraming, mergerModel } from './lane-switch-core.mjs'
 import { canonicalTreePath, isTrackedInGit } from './git-tracked.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
@@ -128,7 +128,7 @@ if (isMainModule(import.meta.url)) {
       authorTranscriptA = '',
       authorTranscriptB = '',
     } = parsed.values
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     if (!fableState.ok) throw new Error(fableState.problem)
     const rawA = readText(pathA)
     const rawB = readText(pathB)

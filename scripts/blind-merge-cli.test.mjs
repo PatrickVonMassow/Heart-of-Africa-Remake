@@ -26,7 +26,7 @@ const write = (name, value) => {
  *  cwd is the sandbox repository, so the tracked-half check answers about the
  *  sandbox's commits rather than the live checkout's. */
 const runWith = (switchFile, ...args) => {
-  const env = { ...process.env, FABLE_SWITCH_FILE: switchFile }
+  const env = { ...process.env, LANE_SWITCH_FILE: switchFile }
   delete env.HOA_REPO_ROOT
   try {
     return {

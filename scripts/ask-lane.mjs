@@ -29,10 +29,10 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './cross-review-core.mjs'
 import { ensureModelProven, runCodex } from './cross-review.mjs'
-import { currentSetting, recordAstraRun, settingProblemLine } from './lane-routing.mjs'
+import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
 import { effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
-import { currentFableState } from './lane-switch.mjs'
-import { fableIsOn } from './lane-switch-core.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { laneIsOn } from './lane-switch-core.mjs'
 import { authoringClaudeArgs } from './author-fable-core.mjs'
 import { ASK_MODELS, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-lane-core.mjs'
 
@@ -181,9 +181,9 @@ if (isMainModule(import.meta.url)) {
       }
     }
     if (model.key === 'fable') {
-      const fable = currentFableState()
+      const fable = currentLaneState()
       if (!fable.ok) throw new Error(fable.problem)
-      if (!fableIsOn(fable)) {
+      if (!laneIsOn(fable)) {
         console.error(`ask-lane: ${model.name} is switched off — node scripts/lane-switch.mjs --status`)
         process.exit(3)
       }
@@ -236,7 +236,7 @@ if (isMainModule(import.meta.url)) {
     let outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
     if (model.runtime === 'codex') {
       // An outage signature records the fallback and serves this ask on Opus 5.5.
-      const recorded = recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
+      const recorded = recordLaneRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
       if (recorded.fellBack) {
         model = ASK_MODELS.opus
         console.error(`ask-lane: serving the ${kind} on ${model.name} instead …`)

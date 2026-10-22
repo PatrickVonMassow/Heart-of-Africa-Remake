@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   FABLE_MODEL,
   ASTRA_MODEL,
-  fableRefusalReason,
-  fableIsOn,
+  laneRefusalReason,
+  laneIsOn,
   isSwitchFallbackReason,
   mergeFallbackReason,
   mergePromptFraming,
@@ -47,7 +47,7 @@ describe('the Fable state record', () => {
     expect(state.ok).toBe(false)
     expect(state.state).toBeNull()
     expect(state.problem).toContain('node scripts/lane-switch.mjs --status')
-    expect(() => fableIsOn(state)).toThrow(/lane-switch\.mjs --status/)
+    expect(() => laneIsOn(state)).toThrow(/lane-switch\.mjs --status/)
     expect(() => mergerModel(state)).toThrow(/lane-switch\.mjs --status/)
   })
 
@@ -201,9 +201,9 @@ describe('decisions derived from the state', () => {
   })
 
   it('generates the route refusal from the same record', () => {
-    expect(fableRefusalReason(off())).toBe(
+    expect(laneRefusalReason(off())).toBe(
       'Fable 5.1 is refused because the recorded Fable switch is OFF (node scripts/lane-switch.mjs --status): not enough volume left',
     )
-    expect(fableRefusalReason(on())).toBe('')
+    expect(laneRefusalReason(on())).toBe('')
   })
 })

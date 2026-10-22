@@ -7,22 +7,18 @@
 
 const SWITCH_COMMAND = 'node scripts/lane-switch.mjs'
 const STATE_FILE_NAME = 'fable-switch.json'
-export const FABLE_MODEL = 'Fable 5.1'
-// The OpenAI lane, stated ONCE here beside the other model identities and imported
-// everywhere else (point 1061). GPT-5.6 Sol held this lane until 05.09.2026.
-export const ASTRA_MODEL = 'GPT-6 Astra'
-export const CLAUDE_MODEL = 'Claude Opus 5.5'
-export const OPUS_MODEL = 'Opus 5.5'
-export const OPUS_FALLBACK_MODEL = 'Opus 4.8'
-// The Anthropic lane, raised from Opus 5 to Opus 5.5 by the user on 22.09.2026.
-// Needs Claude Code >= 2.1.280; older CLIs answer 400 "does not support this model".
-export const OPUS_MODEL_ID = 'claude-opus-5-5[1m]'
-// The NEWEST released Fable, never a pinned older one (user, 01.09.2026): a version
-// recorded here cannot go red on its own, so nothing but this line notices a new release.
-// Needs Claude Code >= 2.1.251; older CLIs answer 400 "does not support this model".
-export const FABLE_MODEL_ID = 'claude-fable-5-1'
-export const ASTRA_MODEL_ID = 'gpt-6-astra'
-export const OPUS_FALLBACK_MODEL_ID = 'claude-opus-4-8[1m]'
+// TRANSITIONAL re-exports: the identities live in scripts/model-lanes.mjs; these
+// names go once every consumer reads the lane records directly.
+import { CROSS, MAIN, SCARCE } from './model-lanes.mjs'
+export const FABLE_MODEL = SCARCE.displayName
+export const ASTRA_MODEL = CROSS.displayName
+export const CLAUDE_MODEL = MAIN.trailerName
+export const OPUS_MODEL = MAIN.displayName
+export const OPUS_FALLBACK_MODEL = MAIN.fallback.displayName
+export const OPUS_MODEL_ID = MAIN.modelId
+export const FABLE_MODEL_ID = SCARCE.modelId
+export const ASTRA_MODEL_ID = CROSS.modelId
+export const OPUS_FALLBACK_MODEL_ID = MAIN.fallback.modelId
 
 /** Read Claude Code's single-result JSON and identify the TOP-LEVEL answer
  * model by the usage counters shared with exactly one modelUsage row. */
@@ -140,7 +136,7 @@ export function requireState(value) {
   return value
 }
 
-export function fableIsOn(value) {
+export function laneIsOn(value) {
   return requireState(value).state === 'on'
 }
 
@@ -153,14 +149,14 @@ export function servingChain(value) {
 export function servingRoute(value) {
   return Object.freeze([
     Object.freeze({ model: OPUS_MODEL, id: OPUS_MODEL_ID }),
-    ...(fableIsOn(value) ? [Object.freeze({ model: FABLE_MODEL, id: FABLE_MODEL_ID })] : []),
+    ...(laneIsOn(value) ? [Object.freeze({ model: FABLE_MODEL, id: FABLE_MODEL_ID })] : []),
     Object.freeze({ model: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID }),
   ])
 }
 
 /** The launcher CLI's first fallback model, from the same serving chain. */
 export function servingFallbackModelId(value) {
-  return fableIsOn(value) ? FABLE_MODEL_ID : OPUS_FALLBACK_MODEL_ID
+  return laneIsOn(value) ? FABLE_MODEL_ID : OPUS_FALLBACK_MODEL_ID
 }
 
 /** The session-start policy sentence, with both sides derived from one state. */
@@ -247,7 +243,7 @@ function sameModelName(a, b) {
 
 /** The model that folds a blind-parallel union. */
 export function mergerModel(value, authors = []) {
-  const on = fableIsOn(value)
+  const on = laneIsOn(value)
   // THE RULE IS "THE MODEL THAT WROTE NEITHER HALF" (CLAUDE.md §6), and for a long
   // time this function could not express it: it answered Fable-or-OpenAI, so with Fable
   // switched off the only merger it would ever name was the OpenAI lane. Measured on the
@@ -298,7 +294,7 @@ export function mergeFallbackReason(value) {
 }
 
 /** The shared refusal text for every route that would otherwise spend Fable. */
-export function fableRefusalReason(value) {
+export function laneRefusalReason(value) {
   const state = requireState(value)
   if (state.state === 'on') return ''
   return (

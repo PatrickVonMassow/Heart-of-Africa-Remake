@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { currentFableState } from './lane-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { mergerModel } from './lane-switch-core.mjs'
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), 'lane-switch.mjs')
@@ -15,7 +15,7 @@ const run = (...args) => {
   const result = spawnSync(process.execPath, [CLI, ...args], {
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, FABLE_SWITCH_FILE: file, FABLE_SWITCH_SET_BY: 'test operator' },
+    env: { ...process.env, LANE_SWITCH_FILE: file, LANE_SWITCH_SET_BY: 'test operator' },
   })
   return { status: result.status ?? -1, out: `${result.stdout ?? ''}${result.stderr ?? ''}` }
 }
@@ -52,12 +52,12 @@ describe('lane-switch.mjs', () => {
       reason: 'not enough volume left',
       setBy: 'test operator',
     })
-    expect(mergerModel(currentFableState(file))).toBe('GPT-6 Astra')
+    expect(mergerModel(currentLaneState(file))).toBe('GPT-6 Astra')
   })
 
   it('makes the opposite flip visible to a fresh reader in the same run', () => {
     expect(run('--on', '--why', 'the user restored capacity').out).toMatch(/^lane-switch: ON/)
-    expect(mergerModel(currentFableState(file))).toBe('Fable 5.1')
+    expect(mergerModel(currentLaneState(file))).toBe('Fable 5.1')
     expect(run('--status').out).toContain('the user restored capacity')
   })
 

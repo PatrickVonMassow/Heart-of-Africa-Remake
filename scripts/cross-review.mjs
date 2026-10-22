@@ -51,9 +51,9 @@ import { dirname, join, sep as sep_ } from 'node:path'
 import { createHash } from 'node:crypto'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { currentSetting, recordAstraRun, settingProblemLine } from './lane-routing.mjs'
+import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
 import { effectiveRoute, fallbackReviewCause } from './lane-routing-core.mjs'
-import { currentFableState } from './lane-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import { mergeProblem, reviewRecordWellFormed, sameModel } from './mechanism-review-core.mjs'
 import { authoringClaudeArgs } from './author-fable-core.mjs'
@@ -79,7 +79,7 @@ import {
   REVIEW_TIMEOUT_MS,
   reviewerDescriptor,
   savedAuthPathFrom,
-  astraAuthored,
+  authoredByLane,
   ASTRA_MODEL_ID,
   ASTRA_MODEL_NAME,
   ASTRA_REASONING_EFFORT,
@@ -121,11 +121,11 @@ const AUTH_FILE = join(CODEX_HOME, 'auth.json')
 /**
  * Where this command keeps its own state: the saved login and the probe receipt.
  * The MAIN checkout's `local/` — never the throwaway worktree's (see the core).
- * `REVIEW_ASTRA_STATE_DIR` redirects it, which is how the CLI suite exercises the
+ * `CROSS_REVIEW_STATE_DIR` redirects it, which is how the CLI suite exercises the
  * real command without writing into the developer's checkout.
  */
 export const STATE_DIR =
-  process.env.REVIEW_ASTRA_STATE_DIR ||
+  process.env.CROSS_REVIEW_STATE_DIR ||
   dirname(
     savedAuthPathFrom(
       spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
@@ -1108,7 +1108,7 @@ if (isMainModule(import.meta.url)) {
     // that authored none of the range, and with NO verdict, because nobody has
     // reviewed it yet.
     const share = currentSetting()
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     if (!fableState.ok) throw new Error(fableState.problem)
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
     if (share.problem) console.error(settingProblemLine(share, 'cross-review'))
@@ -1209,7 +1209,7 @@ if (isMainModule(import.meta.url)) {
     let targetReviewer = requestedReviewer ?? reviewerDescriptor(ASTRA_MODEL_NAME)
     let handover = ''
     if (requestedReviewer?.runtime === 'claude') {
-      handover = astraAuthored(rangeAuthors) ? 'astra-authored' : 'astra-unavailable'
+      handover = authoredByLane(rangeAuthors) ? 'astra-authored' : 'astra-unavailable'
       const routed = decideReview({
         outcome: {
           ok: false,
@@ -1227,7 +1227,7 @@ if (isMainModule(import.meta.url)) {
         )
         process.exit(2)
       }
-    } else if (requestedReviewer && astraAuthored(rangeAuthors)) {
+    } else if (requestedReviewer && authoredByLane(rangeAuthors)) {
       console.error(`cross-review: ${ASTRA_MODEL_NAME} authored part of this range and may not review it.`)
       process.exit(2)
     }
@@ -1273,7 +1273,7 @@ if (isMainModule(import.meta.url)) {
     // call is paid for (point 667). Astra AUTHORS now, and a review it may not
     // give is not worth an allowance: a Astra-authored range goes straight to the
     // Claude reviewer that also runs the suites, judges the picture and lands.
-    if (!requestedReviewer && astraAuthored(rangeAuthors)) {
+    if (!requestedReviewer && authoredByLane(rangeAuthors)) {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
@@ -1343,7 +1343,7 @@ if (isMainModule(import.meta.url)) {
     const outcome = targetReviewer.runtime === 'codex' ? classifyOutcome(run) : run
     // An outage signature records the fallback; the hand-over below says it is one.
     const outage = targetReviewer.runtime === 'codex'
-      ? recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'review', who: 'cross-review' })
+      ? recordLaneRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'review', who: 'cross-review' })
       : { fellBack: false }
     if (outage.fellBack) outcome.cause = fallbackReviewCause(outage.fallback)
     // The RECEIPT is demanded back (finding 8): the token stands only on the

@@ -367,7 +367,7 @@ if (isMainModule(import.meta.url)) {
   // conservative and remains bounded for the last-N command.
   const since = oldest - 12 * HOUR
   const claudeDir = transcriptDir()
-  const codexDir = process.env.MEASURE_CODEX_SESSIONS_DIR || join(homedir(), '.codex', 'sessions')
+  const codexDir = process.env.MEASURE_RUNTIME_SESSIONS_DIR || join(homedir(), '.codex', 'sessions')
   const mainRoot = mainCheckoutOf(REPO_ROOT) ?? REPO_ROOT
   const boundaryPath = process.env.MEASURE_BOUNDARY_LOG || join(mainRoot, '.claude', 'boundary.log')
   const providers = readProviderTurns({ claudeDir, codexDir, since, until, points: landed.map((row) => row.point) })

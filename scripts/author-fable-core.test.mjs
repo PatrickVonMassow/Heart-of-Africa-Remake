@@ -4,7 +4,7 @@ import {
   FABLE_MODEL,
   FABLE_MODEL_ID,
   FABLE_TRAILER,
-  fableAuthoringOutcome,
+  laneAuthoringOutcome,
   parseClaudeAuthoringOutput,
 } from './author-fable-core.mjs'
 
@@ -29,7 +29,7 @@ describe('Fable authoring process', () => {
       JSON.stringify({ result: 'DONE: built\nGATES: green\nOPEN: none', modelUsage: { 'claude-fable-5-1': {} } }),
     )
     expect(parsed).toMatchObject({ ok: true, result: expect.stringContaining('DONE: built') })
-    expect(fableAuthoringOutcome({ exitCode: 0, modelResult: parsed })).toEqual({ ok: true, cause: '' })
+    expect(laneAuthoringOutcome({ exitCode: 0, modelResult: parsed })).toEqual({ ok: true, cause: '' })
   })
 
   it('refuses silent substitution, missing metadata, malformed output, and failed runs', () => {
@@ -41,8 +41,8 @@ describe('Fable authoring process', () => {
     expect(substituted.error).toContain(`not ${FABLE_MODEL}`)
     expect(parseClaudeAuthoringOutput(JSON.stringify({ result: 'done' })).error).toMatch(/no serving model/)
     expect(parseClaudeAuthoringOutput('not json').error).toMatch(/no readable result JSON/)
-    expect(fableAuthoringOutcome({ exitCode: 0, modelResult: substituted }).cause).toContain('Claude served')
-    expect(fableAuthoringOutcome({ exitCode: 2 }).cause).toContain('exited with code 2')
-    expect(fableAuthoringOutcome({ exitCode: 0, timedOut: true }).cause).toContain('timed out')
+    expect(laneAuthoringOutcome({ exitCode: 0, modelResult: substituted }).cause).toContain('Claude served')
+    expect(laneAuthoringOutcome({ exitCode: 2 }).cause).toContain('exited with code 2')
+    expect(laneAuthoringOutcome({ exitCode: 0, timedOut: true }).cause).toContain('timed out')
   })
 })

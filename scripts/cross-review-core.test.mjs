@@ -30,7 +30,7 @@ import {
   probeFreshness,
   savedAuthPathFrom,
   CLAUDE_REVIEW_CHAIN,
-  astraAuthored,
+  authoredByLane,
   SECOND_FALLBACK_MODEL_NAME,
   reviewerDescriptor,
   REVIEWER_ROSTER,
@@ -974,10 +974,10 @@ describe('the reversed direction — where SOL authored', () => {
 
   it('recognises Sol as an author in every spelling of its name', () => {
     for (const author of [ASTRA_COMMIT, 'GPT-5.6 Sol', 'Sol', 'gpt-6-astra', [`${CLAUDE_MODEL}`, ASTRA_COMMIT]]) {
-      expect(astraAuthored(author), String(author)).toBe(true)
+      expect(authoredByLane(author), String(author)).toBe(true)
     }
     for (const author of ['', `${CLAUDE_MODEL} <x@y>`, [`${CLAUDE_MODEL}`, 'Claude Fable 5.1'], 'Patrick <p@x>']) {
-      expect(astraAuthored(author), String(author)).toBe(false)
+      expect(authoredByLane(author), String(author)).toBe(false)
     }
   })
 

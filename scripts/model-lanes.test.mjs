@@ -13,6 +13,8 @@ import {
   identityKey,
   lane,
   laneByFamily,
+  mentionedIdentities,
+  sharesIdentity,
   normaliseName,
   resolveModel,
   sameLane,
@@ -151,5 +153,31 @@ describe('trailers and execution targets come from the records', () => {
   it('maps every retired persisted spelling onto a current one', () => {
     for (const value of Object.values(LEGACY.handovers)) expect(['cross-authored', 'cross-unavailable']).toContain(value)
     for (const value of Object.values(LEGACY.cliKeys)) expect(EXECUTION_ROLES).toContain(value)
+  })
+})
+
+describe('identities a designation mentions', () => {
+  it('collapses every current and retired name to its lane, compound names to each part', () => {
+    for (const record of LANES) {
+      for (const s of [record.displayName, record.trailerName, ...record.retired]) expect(mentionedIdentities(s), s).toEqual([record.role])
+    }
+    expect(mentionedIdentities(CROSS.retired.filter((s) => /\s/.test(s)).join(' / '))).toEqual(['cross'])
+    expect(mentionedIdentities(`${SCARCE.retired[0]} / ${MAIN.retired[1]}`).sort()).toEqual(['main', 'scarce'])
+    expect(sharesIdentity(CROSS.displayName, CROSS.retired[0])).toBe(true)
+  })
+
+  it('keeps the main fallback distinct and names foreign models by their word', () => {
+    expect(mentionedIdentities(MAIN.fallback.trailerName)).toEqual(['main-fallback'])
+    expect(sharesIdentity(MAIN.fallback.displayName, MAIN.displayName)).toBe(false)
+    expect(mentionedIdentities('Claude Haiku 4.5')).toEqual(['other:haiku'])
+    expect(mentionedIdentities('Alice')).toEqual([])
+    expect(sharesIdentity('Alice', 'Alice')).toBe(false)
+  })
+})
+
+describe('the cross lane runs at high reasoning effort (user order 21.10.2026)', () => {
+  it('carries effort high in its record and in its execution target', () => {
+    expect(CROSS.reasoningEffort).toBe('high')
+    expect(executionTarget('cross').effort).toBe('high')
   })
 })

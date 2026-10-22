@@ -203,6 +203,19 @@ export function laneByFamily(value, registry = LANES) {
   return hits.length === 1 ? hits[0] : null
 }
 
+/** The model words that stand in front of a lane's family word in its own names ("Claude",
+ *  "GPT"): vendor prefixes, which on their own name no particular model. */
+function prefixWords(registry = LANES) {
+  const words = new Set()
+  const families = new Set(laneFamilyWords(registry))
+  for (const record of registry) {
+    for (const name of [record.displayName, record.trailerName, ...record.retired]) {
+      for (const word of normaliseName(name).split(/[^a-z]+/)) if (word && !families.has(word)) words.add(word)
+    }
+  }
+  return new Set(modelWords(registry).filter((word) => words.has(word)))
+}
+
 /** Every family word of every lane. */
 export function laneFamilyWords(registry = LANES) {
   return [...new Set(registry.flatMap((record) => record.familyWords))]
@@ -254,6 +267,54 @@ export function differentVendor(a, b, registry = LANES) {
 export function sameLane(a, b, registry = LANES) {
   const x = identityKey(a, registry)
   return Boolean(x) && x === identityKey(b, registry)
+}
+
+/**
+ * Every identity a designation MENTIONS, for self-review and merger checks: a role key
+ * (`main`, `cross`, `scarce`), `main-fallback`, or `other:<word>` for a recognised model
+ * word that is no lane (a foreign family, an unregistered vendor model). A compound name
+ * ("A / B") mentions each part. Current and retired names collapse to their lane; the
+ * version of an unregistered spelling is ignored, except that the main fallback's own
+ * version keeps it a distinct identity. Unknown text mentions nothing.
+ */
+export function mentionedIdentities(value, registry = LANES) {
+  const exact = identityKey(value, registry)
+  if (exact) return [exact]
+  const found = new Set()
+  const parts = String(value ?? '').split(/\s*(?:[/,;+&]|\band\b)\s*/i).filter((p) => p.trim())
+  for (const part of parts) {
+    const key = identityKey(part, registry)
+    if (key) {
+      found.add(key)
+      continue
+    }
+    const text = part.toLowerCase()
+    for (const record of registry) {
+      if (!record.familyWords.some((word) => new RegExp(`\\b${word}\\b`).test(text))) continue
+      const fallbackVersion = record.fallback ? normaliseName(record.fallback.displayName).match(/\d+(?:\.\d+)*/)?.[0] : ''
+      const version = text.match(/\d+(?:\.\d+)*/)?.[0] ?? ''
+      found.add(fallbackVersion && version === fallbackVersion ? `${record.role}-fallback` : record.role)
+    }
+    const laneWords = new Set(laneFamilyWords(registry))
+    const prefixes = prefixWords(registry)
+    const others = modelWords(registry).filter((word) => {
+      if (laneWords.has(word)) return false
+      const versioned = Object.values(VENDORS).some((v) => v.versionedMarkers.includes(word))
+      return new RegExp(versioned ? `\\b${word}[- ]?\\d` : `\\b${word}\\b`).test(text)
+    })
+    const named = others.filter((word) => !prefixes.has(word))
+    // A vendor prefix ("Claude", "GPT-") names a model only when nothing else in the part does.
+    const kept = named.length || found.size ? named : others
+    for (const word of kept) found.add(`other:${word}`)
+  }
+  return [...found]
+}
+
+/** Do two designations mention a common identity? Unknown on either side never matches. */
+export function sharesIdentity(a, b, registry = LANES) {
+  const x = mentionedIdentities(a, registry)
+  const y = new Set(mentionedIdentities(b, registry))
+  return x.some((key) => y.has(key))
 }
 
 /** The lanes that may review work authored by the given designations: a vendor none of them has. */

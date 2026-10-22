@@ -23,7 +23,7 @@
 // runs THAT. Every sha, every range and every author below is a fact of the
 // fixture, identical on any branch, on any machine, at any time.
 //
-// All state is redirected into the fixture too (`REVIEW_ASTRA_STATE_DIR`,
+// All state is redirected into the fixture too (`CROSS_REVIEW_STATE_DIR`,
 // `CODEX_HOME`), so the suite never touches the developer's checkout or login.
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
@@ -257,11 +257,11 @@ const run = (args, env = {}) =>
     cwd: repo,
     env: hermeticEnv({
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
-      REVIEW_ASTRA_STATE_DIR: stateDir,
+      CROSS_REVIEW_STATE_DIR: stateDir,
       CODEX_HOME: join(dir, 'codex-home'),
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
-      FABLE_SWITCH_FILE: fableOnFile,
+      LANE_SWITCH_FILE: fableOnFile,
       ...env,
     }),
   })
@@ -727,7 +727,7 @@ describe('a review that does not run', () => {
     provenId()
     const r = run(['--sha', headSha, '--brief', 'judge the fallback path'], {
       STUB_MODE: 'fail',
-      FABLE_SWITCH_FILE: fableOffFile,
+      LANE_SWITCH_FILE: fableOffFile,
     })
     expect(r.status).toBe(3)
     // Opus 5 authored the fixture range, so the first eligible non-Fable reviewer is Opus 4.8.
@@ -753,7 +753,7 @@ describe('a review that does not run', () => {
     const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', headSha, '--brief', 'judge it'], { ASTRA_SHARE_FILE: shareFile })
+    const r = run(['--sha', headSha, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('FALLBACK')
     expect(r.stdout).toMatch(/claude-only/)
@@ -770,7 +770,7 @@ describe('a review that does not run', () => {
     provenId()
     const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'default' }))
-    const r = run(['--sha', headSha, '--brief', 'judge it'], { STUB_MODE: 'limit', ASTRA_SHARE_FILE: shareFile })
+    const r = run(['--sha', headSha, '--brief', 'judge it'], { STUB_MODE: 'limit', LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('Astra outage FALLBACK')
     expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
@@ -779,7 +779,7 @@ describe('a review that does not run', () => {
     expect(saved.fallback).toMatchObject({ outage: 'allowance-exhausted', kind: 'review' })
     expect(saved.fallback.probeAt).toBeGreaterThan(Date.now())
     writeFileSync(join(dir, 'calls.log'), '')
-    const again = run(['--sha', headSha, '--brief', 'judge it'], { ASTRA_SHARE_FILE: shareFile })
+    const again = run(['--sha', headSha, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
     expect(again.status).toBe(3)
     expect(again.stdout).toContain('Astra outage FALLBACK')
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
@@ -934,7 +934,7 @@ describe('the saved login', () => {
     const state = join(repo, 'local', id)
     mkdirSync(home, { recursive: true })
     if (token) writeFileSync(join(home, 'auth.json'), `{"tokens":{"access_token":"s","account_id":"${id}"}}`)
-    return { id, home, state, env: { CODEX_HOME: home, REVIEW_ASTRA_STATE_DIR: state } }
+    return { id, home, state, env: { CODEX_HOME: home, CROSS_REVIEW_STATE_DIR: state } }
   }
 
   it('says so when there is no login to save', () => {
@@ -968,7 +968,7 @@ describe('the saved login', () => {
   it('REFUSES to write the token where git does not ignore it', () => {
     const w = world()
     const notIgnored = join(repo, 'not-ignored', w.id)
-    const r = run(['--save-login'], { ...w.env, REVIEW_ASTRA_STATE_DIR: notIgnored })
+    const r = run(['--save-login'], { ...w.env, CROSS_REVIEW_STATE_DIR: notIgnored })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/does not ignore/)
     expect(existsSync(join(notIgnored, 'codex-auth.json'))).toBe(false)
@@ -986,7 +986,7 @@ describe('the saved login', () => {
     // (four-eyes finding, 11.08.2026).
     symlinkSync(elsewhere, linked, process.platform === 'win32' ? 'junction' : 'dir')
     writeFileSync(join(elsewhere, 'codex-auth.json'), '{"tokens":{}}')
-    const r = run(['--restore-login'], { ...w.env, REVIEW_ASTRA_STATE_DIR: linked })
+    const r = run(['--restore-login'], { ...w.env, CROSS_REVIEW_STATE_DIR: linked })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/REFUSING/)
     expect(r.stderr).toMatch(/resolves to/)
@@ -994,7 +994,7 @@ describe('the saved login', () => {
 
   it('says what to do when nothing was ever saved', () => {
     const w = world()
-    const r = run(['--restore-login'], { ...w.env, REVIEW_ASTRA_STATE_DIR: join(dir, `${w.id}-nothing-here`) })
+    const r = run(['--restore-login'], { ...w.env, CROSS_REVIEW_STATE_DIR: join(dir, `${w.id}-nothing-here`) })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/nothing saved/)
     expect(r.stderr).toMatch(/--save-login/)
@@ -1043,7 +1043,7 @@ describe('a range SOL authored', () => {
       cwd: repo,
       encoding: 'utf8',
       windowsHide: true,
-      env: hermeticEnv({ FABLE_SWITCH_FILE: fableOnFile }),
+      env: hermeticEnv({ LANE_SWITCH_FILE: fableOnFile }),
     })
     expect(recorded.status, `${recorded.stdout}${recorded.stderr}`).toBe(0)
     const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n').at(-1))
@@ -1123,7 +1123,7 @@ describe('a narrowed --since on the early routes', () => {
     const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { ASTRA_SHARE_FILE: shareFile })
+    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
     expect(r.stdout).toContain(`--since ${headSha}~1`)
@@ -1269,7 +1269,7 @@ describe('a range too large for one round', () => {
     const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { ASTRA_SHARE_FILE: shareFile })
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(4)
     expect(r.stderr).toContain('2 RUNNABLE PASSES')
     expect(r.stderr).toContain('bulk-a.txt')
@@ -1286,7 +1286,7 @@ describe('a range too large for one round', () => {
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'], {
-      ASTRA_SHARE_FILE: shareFile,
+      LANE_ROUTING_FILE: shareFile,
     })
     expect(r.status).toBe(3)
     expect(r.stdout).toMatch(/claude-only/)
@@ -1305,7 +1305,7 @@ describe('a range too large for one round', () => {
     const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'], {
-      ASTRA_SHARE_FILE: shareFile,
+      LANE_ROUTING_FILE: shareFile,
     })
     expect(r.status).toBe(2)
     expect(r.stderr).toContain('splits into 2 pass(es)')
@@ -1317,7 +1317,7 @@ describe('a range too large for one round', () => {
     // must keep its ready-to-run template.
     const shareFile = join(dir, 'astra-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
-    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { ASTRA_SHARE_FILE: shareFile })
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
     rmSync(shareFile, { force: true })

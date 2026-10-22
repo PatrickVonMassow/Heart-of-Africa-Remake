@@ -19,13 +19,13 @@ import {
   SETTINGS,
   SETTING_NOTES,
   OUTAGE_PROBE_MS,
-  afterAstraRun,
+  afterLaneRun,
   applyFooterNote,
   boardNoteSegment,
   effectiveRoute,
   fallbackLine,
   briefLine,
-  kindsToAstra,
+  kindsToLane,
   normaliseSetting,
   readSetting,
   routeFor,
@@ -64,17 +64,17 @@ describe('routing', () => {
     expect(routeFor('review', 'default')).toBe('astra')
     expect(routeFor('enumerate', 'default')).toBe('astra')
     for (const kind of ['diagnose', 'audit', 'explain', 'author']) expect(routeFor(kind, 'default'), kind).toBe('claude')
-    expect(kindsToAstra('default')).toEqual(['review', 'enumerate'])
+    expect(kindsToLane('default')).toEqual(['review', 'enumerate'])
   })
 
   it('sends every read-only kind to Astra at prefer-astra', () => {
     for (const kind of KINDS) expect(routeFor(kind, 'prefer-astra')).toBe('astra')
-    expect(kindsToAstra('prefer-astra')).toEqual(KINDS)
+    expect(kindsToLane('prefer-astra')).toEqual(KINDS)
   })
 
   it('sends NOTHING to Astra at claude-only — the reviews included, that being the point', () => {
     for (const kind of KINDS) expect(routeFor(kind, 'claude-only')).toBe('claude')
-    expect(kindsToAstra('claude-only')).toEqual([])
+    expect(kindsToLane('claude-only')).toEqual([])
   })
 
   // Audit finding, 12.08.2026: an unknown setting used to route as the DEFAULT, and the
@@ -252,7 +252,7 @@ describe('the measured outage fallback (point 1194)', () => {
   const now = Date.UTC(2026, 8, 23, 11, 0)
   const limit = { ok: false, kind: 'allowance-exhausted', cause: 'the ChatGPT allowance for this account is exhausted' }
   const text = 'working …\nERROR: You have hit your usage limit. Try again later.'
-  const fellBack = afterAstraRun({ outcome: limit, text, kind: 'author', now })
+  const fellBack = afterLaneRun({ outcome: limit, text, kind: 'author', now })
   const state = { setting: 'prefer-astra', corrupt: false, fallback: fellBack.fallback }
 
   it('a limit signature yields the Claude lane plus a probe clock', () => {
@@ -264,20 +264,20 @@ describe('the measured outage fallback (point 1194)', () => {
   })
 
   it('an unreachable vendor is an outage too, and a renewal keeps its start and counts the probe', () => {
-    const again = afterAstraRun({ outcome: { ok: false, kind: 'unreachable' }, text: 'stream disconnected', previous: fellBack.fallback, now: now + OUTAGE_PROBE_MS + 5 })
+    const again = afterLaneRun({ outcome: { ok: false, kind: 'unreachable' }, text: 'stream disconnected', previous: fellBack.fallback, now: now + OUTAGE_PROBE_MS + 5 })
     expect(again.fellBack).toBe(true)
     expect(again.fallback).toMatchObject({ outage: 'unreachable', since: now, probes: 2, probeAt: now + 2 * OUTAGE_PROBE_MS + 5 })
   })
 
   it('an ordinary authoring failure is NOT a fallback — it stays the point\'s red', () => {
     for (const kind of ['error-exit', 'timeout', 'no-verdict', 'login-expired', 'model-refused']) {
-      const run = afterAstraRun({ outcome: { ok: false, kind }, text: 'tests failed', kind: 'author', now })
+      const run = afterLaneRun({ outcome: { ok: false, kind }, text: 'tests failed', kind: 'author', now })
       expect(run.fellBack, kind).toBe(false)
       expect(run.fallback, kind).toBeNull()
     }
     expect(effectiveRoute('author', { setting: 'prefer-astra', fallback: null }, now).to).toBe('astra')
     // …and it leaves a standing record exactly as it was.
-    expect(afterAstraRun({ outcome: { ok: false, kind: 'error-exit' }, previous: fellBack.fallback, now }).fallback).toEqual(fellBack.fallback)
+    expect(afterLaneRun({ outcome: { ok: false, kind: 'error-exit' }, previous: fellBack.fallback, now }).fallback).toEqual(fellBack.fallback)
   })
 
   it('an expired probe returns routing to the operator setting, and a success lifts the record', () => {
@@ -286,7 +286,7 @@ describe('the measured outage fallback (point 1194)', () => {
     expect(effectiveRoute('review', { ...state, setting: 'default' }, later).to).toBe('astra')
     expect(effectiveRoute('author', { ...state, setting: 'claude-only' }, now).to).toBe('claude')
     expect(fallbackLine(state, later)).toBe('')
-    expect(afterAstraRun({ outcome: { ok: true }, previous: fellBack.fallback, now: later })).toEqual({ fallback: null, fellBack: false })
+    expect(afterLaneRun({ outcome: { ok: true }, previous: fellBack.fallback, now: later })).toEqual({ fallback: null, fellBack: false })
   })
 
   it('--status, the brief and the board name the active fallback, and keep the operator setting', () => {

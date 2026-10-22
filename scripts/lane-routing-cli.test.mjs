@@ -1,6 +1,6 @@
 // THE SWITCH AS IT IS ACTUALLY RUN — spawned, with its exit code and its file read.
 // The core above proves the decisions; this proves the command persists them, prints one
-// line for the reader and never wraps around at an end. `ASTRA_SHARE_FILE` points it at a
+// line for the reader and never wraps around at an end. `LANE_ROUTING_FILE` points it at a
 // temp file, so nothing here touches the developer's own setting.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
@@ -18,7 +18,7 @@ let file = ''
  * channels are read: the refusals go to stderr and are exactly what a reader must see.
  */
 const run = (...args) => {
-  const r = spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8', env: { ...process.env, ASTRA_SHARE_FILE: file }, windowsHide: true })
+  const r = spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8', env: { ...process.env, LANE_ROUTING_FILE: file }, windowsHide: true })
   return { status: r.status ?? -1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`, stdout: r.stdout ?? '', stderr: r.stderr ?? '' }
 }
 const state = () => JSON.parse(readFileSync(file, 'utf8'))
@@ -122,7 +122,7 @@ describe('the delegation brief carries the switch', () => {
   const brief = (share) => {
     const f = join(dir, 'brief-share.json')
     writeFileSync(f, share)
-    const r = spawnSync(process.execPath, [BRIEF, '654'], { encoding: 'utf8', env: { ...process.env, ASTRA_SHARE_FILE: f }, windowsHide: true })
+    const r = spawnSync(process.execPath, [BRIEF, '654'], { encoding: 'utf8', env: { ...process.env, LANE_ROUTING_FILE: f }, windowsHide: true })
     return `${r.stdout ?? ''}${r.stderr ?? ''}`
   }
 
