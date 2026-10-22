@@ -135,8 +135,8 @@ language means adding one file.
 
 Changes to guards, gates and other load-bearing mechanisms get a second pair of
 eyes from a model of a *different* vendor — different training, less correlated
-blind spots. Claude reviews Astra-authored work; Astra reviews Claude-authored
-work through one command:
+blind spots. The main lane reviews cross-lane work; the cross lane reviews
+main-lane work through one command (lane models: `scripts/model-lanes.mjs`):
 
 ```
 node scripts/cross-review.mjs --sha <sha> --brief "<what to judge>"
