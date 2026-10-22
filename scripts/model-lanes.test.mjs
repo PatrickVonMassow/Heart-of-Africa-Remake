@@ -161,9 +161,10 @@ describe('the cross-vendor rule compares vendor fields only', () => {
   it('selects reviewers from the vendors no author has, with a synthetic third vendor', () => {
     const synthetic = [
       ...LANES,
-      Object.freeze({ ...CROSS, role: 'third', vendor: MAIN.vendor, familyWords: ['zeta'], retired: [], displayName: 'Zeta 1', trailerName: 'Zeta 1', modelId: 'zeta-1' }),
+      Object.freeze({ ...CROSS, role: 'third', vendor: 'third-vendor', familyWords: ['zeta'], retired: [], displayName: 'Zeta 1', trailerName: 'Zeta 1', modelId: 'zeta-1' }),
     ]
-    expect(eligibleReviewers([MAIN.trailerName], synthetic).map((l) => l.role)).toEqual(['cross'])
+    expect(eligibleReviewers([MAIN.trailerName], synthetic).map((l) => l.role).sort()).toEqual(['cross', 'third'])
+    expect(eligibleReviewers([CROSS.displayName], synthetic).map((l) => l.role).sort()).toEqual(['main', 'scarce', 'third'])
     expect(eligibleReviewers([CROSS.displayName]).map((l) => l.role).sort()).toEqual(['main', 'scarce'])
     expect(eligibleReviewers([MAIN.trailerName, CROSS.displayName])).toEqual([])
     expect(eligibleReviewers(['Alice'])).toEqual([])
@@ -275,7 +276,7 @@ function hygienePatterns(registry = LANES) {
  *  them; a reference to one of them names a record, not a model, and is not scanned. */
 function hygieneViolations(paths, read, registry = LANES, records = []) {
   const recordNames = [...new Set(records.flatMap((path) => [path, path.split('/').pop()]))].sort((a, b) => b.length - a.length)
-  const vendorHost = new RegExp(`(?<![@\\w.-])(?:[a-z0-9-]+\\.)+(?:${Object.values(VENDORS).map((v) => v.domain).join('|')})\\.com\\b`, 'gi')
+  const vendorHost = new RegExp(`(?<![@\\w.-])(?:[a-z0-9-]+\\.)+(?:${Object.values(VENDORS).map((v) => v.domain).join('|')})\\.com(?![\\w-]|\\.\\w)`, 'gi')
   const patterns = hygienePatterns(registry)
   const fileWords = [...new Set([...registry.flatMap((record) => record.familyWords), ...Object.keys(VENDORS)])]
   const fileWord = new RegExp(`(?:^|[^a-z])(?:${fileWords.join('|')})(?:[^a-z]|$)`, 'i')
@@ -323,6 +324,8 @@ describe('hygiene: no consumer outside the registry names a concrete model', () 
       const files = {
         'clean.mjs': `import { CROSS } from './model-lanes.mjs'\nexport const reviewer = CROSS.displayName\nconst host = 'api.${VENDORS[CROSS.vendor].domain}.com'\n`,
         'bare-host.mjs': `const host = '${VENDORS[CROSS.vendor].domain}.com'\n`,
+        'lookalike-host.mjs': `const host = 'api.${VENDORS[CROSS.vendor].domain}.com.evil'\n`,
+        'lookalike-host2.mjs': `const host = 'api.${VENDORS[CROSS.vendor].domain}.com-evil.net'\n`,
         'named.mjs': `export const reviewer = '${CROSS.displayName}'\n`,
         'future.mjs': `// reviewed by ${CROSS.familyWords[0].toUpperCase()}-99\n`,
         'address.mjs': `const trailer = 'x <${VENDORS[MAIN.vendor].trailerAddress}>'\n`,
