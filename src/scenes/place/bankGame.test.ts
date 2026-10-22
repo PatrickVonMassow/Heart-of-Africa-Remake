@@ -1049,6 +1049,29 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(CFG.stationSpacing)
   })
 
+  it('bends a roaming walk away from a playmate ahead even with a nearer one behind (point 1403)', () => {
+    const cfg: BankConfig = { ...CFG, roamTurn: 0 }
+    // Child 0 walks +z; child 1 walks head-on toward it 1 m ahead; child 2,
+    // when present, follows 0.5 m behind — nearer than the one ahead.
+    const turnOf = (withBehind: boolean) => {
+      const { x, z } = STAGE.roam
+      const spots = [{ x, z }, { x, z: z + 1 }, ...(withBehind ? [{ x, z: z - 0.5 }] : [])]
+      const s = createBankGame(spots, mulberry32(7), cfg)
+      expect(s.phase).toBe('roam')
+      // No climb: the boulder stands next to the group and would take child 0.
+      s.namedBoulder = true
+      s.children.forEach((c, i) => {
+        c.roamHeading = i === 1 ? Math.PI : 0
+        c.heading = c.roamHeading
+        c.facing = c.roamHeading
+      })
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), mulberry32(7))
+      return Math.abs(s.children[0].roamHeading)
+    }
+    const alone = turnOf(false)
+    expect(alone).toBeGreaterThan(0.5 * cfg.turnRate / 60)
+    expect(turnOf(true)).toBeGreaterThan(0.5 * cfg.turnRate / 60)
+  })
 })
 
 /**

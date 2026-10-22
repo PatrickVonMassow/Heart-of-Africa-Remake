@@ -1625,11 +1625,14 @@ function stepRoam(
     }
     const out = Math.hypot(c.x - stage.roam.x, c.z - stage.roam.z)
     if (out > stage.roam.radius * 0.8) bend((c.x - stage.roam.x) / out, (c.z - stage.roam.z) / out)
+    // Only a playmate AHEAD of the walk counts: a nearer one behind would mask
+    // one coming head-on, and `bend` ignores it anyway.
     let near = cfg.roamGap
     let mate: BankChild | null = null
     for (let j = 0; j < s.children.length; j++) {
       const o = s.children[j]
-      const d = j === i || onStone(o) ? Infinity : dist(c, o)
+      const ahead = Math.sin(aim) * (o.x - c.x) + Math.cos(aim) * (o.z - c.z) > 0
+      const d = j === i || onStone(o) || !ahead ? Infinity : dist(c, o)
       if (d < near && d > 1e-6) {
         near = d
         mate = o
