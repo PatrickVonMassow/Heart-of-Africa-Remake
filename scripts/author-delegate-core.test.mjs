@@ -368,7 +368,7 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
   it('catches a commit that names the wrong author, or none', () => {
     const wrong = judgeAuthoring({
       outcome: okRun,
-      commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers: 'Claude Haiku 4.5 <x@y>' }],
+      commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers: `${TEST_FOREIGN_MODELS.haikuTrailer} <x@y>` }],
       parsed: answered,
     })
     expect(wrong.problems.join(' ')).toMatch(/outside the author allowlist/)
