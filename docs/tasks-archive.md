@@ -34582,3 +34582,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   - 1393 sets this value explicitly, whatever the value on main is when 1393 starts: a point queued before 1393 is expected to lower the OpenAI effort to medium, and 1393 raises it back to high.
   - A unit test asserts that the OpenAI lane record's effort is `high` and that the codex command line built for review and authoring carries `model_reasoning_effort=high`.
   Today (HEAD e9249e591) the value is ASTRA_REASONING_EFFORT = 'high' in scripts/review-astra-core.mjs (re-exported by scripts/author-astra-core.mjs).
+
+- [x] 1402. A walking villager's rear leg trembles at every step
+  A walking adult villager (the water carrier crossing open ground, seen in profile) trembles with the rear leg at every step. Done when the trailing leg moves smoothly through each stride, judged in a moving capture.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (1).zip (10:20:29Z), user words: "Das hintere Bein zittert bei jedem Schritt."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+  State 22.10.2026 (branch ea18eef9b, cheap gate green): the toe-roll spring-back is gone, but at lift-off the trailing knee still jumps from the stretched reach into the clip's bent swing (fixed 60 Hz clock: shin rot.x 0.203 -> 0.457 -> 0.836, up to 36 rad/s; 20 Hz: 0.203 -> 1.384 in one frame). The reversal test misses this monotonic pop: bound each leg joint's angular speed against the clip's own maximum at 15/20/30/60/144 Hz and make the hand-over continuous. Deterministic moving capture: local/probe-1402.mjs (Playwright clock, env FRAMES/STEP/VERIFY_GL). Sharp curves (yaw rate >= 2.5 rad/s) also bring reversal spikes back; judge whether that belongs here or in its own point.
+  Bundle: Dorfleben.
