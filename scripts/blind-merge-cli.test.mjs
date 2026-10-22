@@ -272,7 +272,7 @@ describe('the command', () => {
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/MERGING MODEL — /)
     // The known author of the tracked half is excluded from the selection.
-    expect(r.out).not.toMatch(/MERGING MODEL — [^(\n]*Opus/)
+    expect(r.out).not.toMatch(new RegExp(String.raw`MERGING MODEL — [^(\n]*${rx(MAIN.familyWords[0])}`, 'i'))
     // And with one half untracked, "wrote neither half" is unprovable and unsaid.
     expect(r.out).not.toContain('it wrote neither half')
   })
@@ -333,7 +333,7 @@ describe('the command', () => {
     // sameModel treats a versionless name as its whole family, so a flag like
     // a future versioned name over a committed bare one would shift which exact model the
     // merger is checked against. The committed bytes stand.
-    const r = run('--a', p('claude-a.json'), '--b', p('B.json'), '--model-a', 'Opus')
+    const r = run('--a', p('claude-a.json'), '--b', p('B.json'), '--model-a', MAIN.familyWords[0])
     expect(r.status).toBe(0)
     // The prompt echoes the file's own spelling, not the flag's.
     expect(r.out).toMatch(new RegExp(String.raw`A: 1 entries \(${rx(MAIN.trailerName)}\)`))
