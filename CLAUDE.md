@@ -69,20 +69,20 @@ screenshots, and end-to-end. Strategy and suite map: `scripts/verify/README.md`.
 - A delegated author runs `node scripts/point-brief.mjs <N>`, may read named
   sections on demand, and escalates an ambiguous or insufficient brief instead
   of guessing. Regenerate a brief from an older revision.
-- Daemon-owned durable Astra authors survive handover; session-bound Agent-tool
+- Daemon-owned durable lane authors survive handover; session-bound Agent-tool
   children block it. Delegates test, commit, push, and never merge.
 - Context fence (preventive text, not a pointer): at its refusal mark start no
   agents, suites, points, or authoring; finishing, reading, and the boundary
   stay allowed. Past 122k it refuses while the launcher is armed.
   Mechanics: `docs/batch-owner-runbook.md`.
-- **Model policy.** GPT-6 Astra authors difficult/complex/error-prone/HIGH
-  points; Opus 5.5 authors points whose verification is the work; Fable 5.1
-  authors tagged points and router escalations; an unreachable Astra lane
-  authors on Opus 5.5. Review is cross-vendor, never by an author of the range
-  (`scripts/cross-review.mjs` for Claude work, Claude for Astra work).
-  `node scripts/lane-switch.mjs --status` alone decides Fable authoring,
-  serving, commit trailers, and blind merging; a serving model outside its
-  chain pauses the batch. Every commit names its author model in a
+- **Model policy.** Lanes are role records in `scripts/model-lanes.mjs`, the
+  only place naming models. The main chain authors (routing default) and runs
+  the batch; the cross-vendor lane reviews; the scarce lane authors tagged
+  points and router escalations. Review is cross-vendor, never by an author of
+  the range (`scripts/cross-review.mjs`).
+  `node scripts/lane-switch.mjs --lane scarce --status` alone decides its
+  authoring, serving, commit trailers, and blind merging. A serving model
+  outside its chain pauses the batch. Every commit names its author model in a
   `Co-Authored-By` trailer; a cross-vendor reviewer goes only in a distinct
   `Reviewed-By: <allowed model> <model vendor no-reply address>` trailer.
 - **Four eyes has two modes.** Divergent work runs blind-parallel from identical

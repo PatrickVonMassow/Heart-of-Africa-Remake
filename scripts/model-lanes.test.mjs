@@ -229,8 +229,11 @@ function hygienePatterns(registry = LANES) {
   ]
 }
 
-/** The hygiene violations of the given files: `path:line: why`. */
-function hygieneViolations(paths, read, registry = LANES) {
+/** The hygiene violations of the given files: `path:line: why`. `records` are the paths of
+ *  historical record files (blind halves, unions) whose names carry the model that wrote
+ *  them; a reference to one of them names a record, not a model, and is not scanned. */
+function hygieneViolations(paths, read, registry = LANES, records = []) {
+  const recordNames = [...new Set(records.flatMap((path) => [path, path.split('/').pop()]))].sort((a, b) => b.length - a.length)
   const patterns = hygienePatterns(registry)
   const fileWords = [...new Set([...registry.flatMap((record) => record.familyWords), ...Object.keys(VENDORS)])]
   const fileWord = new RegExp(`(?:^|[^a-z])(?:${fileWords.join('|')})(?:[^a-z]|$)`, 'i')
@@ -240,7 +243,8 @@ function hygieneViolations(paths, read, registry = LANES) {
     if (fileWord.test(base)) out.push(`${path}: file name names a model or vendor`)
     const text = read(path)
     if (text == null) continue
-    text.split('\n').forEach((line, index) => {
+    text.split('\n').forEach((raw, index) => {
+      const line = recordNames.reduce((acc, name) => acc.split(name).join(' '), raw)
       const hit = patterns.find(({ re }) => re.test(line))
       if (hit) out.push(`${path}:${index + 1}: ${hit.why} — ${line.trim().slice(0, 120)}`)
     })
@@ -264,7 +268,10 @@ describe('hygiene: no consumer outside the registry names a concrete model', () 
       .split('\0')
       .filter(Boolean)
       .filter((path) => !EXCLUDED.some((prefix) => path === prefix || (prefix.endsWith('/') && path.startsWith(prefix))))
-    const violations = hygieneViolations(tracked, readText(REPO))
+    const records = execFileSync('git', ['ls-files', '-z', 'docs/four-eyes', 'docs/blind-*'], { cwd: REPO, encoding: 'utf8' })
+      .split('\0')
+      .filter(Boolean)
+    const violations = hygieneViolations(tracked, readText(REPO), LANES, records)
     expect(violations, `${violations.length} violation(s):\n${violations.join('\n')}`).toEqual([])
   })
 

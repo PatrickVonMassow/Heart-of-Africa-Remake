@@ -9,7 +9,7 @@ session/weekly token budget in minutes. Maximum QA runs as ordinary inline
 work: sequential checks (the Phase 8 cleanup's two blind halves excepted), the
 driven visual sweep inspected in the main loop, and at most one model-diverse
 pass per phase that calls for one (Phases 1, 5 and 8) by the OTHER vendor (`scripts/cross-review.mjs`
-/ `scripts/ask-lane.mjs --kind audit`) whose findings are always harvested and verified inline. See the memory
+/ `scripts/ask-lane.mjs --lane cross --kind audit`) whose findings are always harvested and verified inline. See the memory
 `workflows-token-budget`.
 
 Run the phases **in the order below**. Each real finding becomes its own atomic
@@ -92,7 +92,7 @@ must pass clean before any tag.
   rebuilt code for test gaps AND real bugs, reading it against the design.
 <!-- rule:model-policy@2f245cec -->
 - Mix in a **different model than the recent author** for a blind pass — the
-  cross-vendor default, so Astra reads Anthropic-authored code and Claude reads
+  cross-vendor default, so Astra reads main-chain-authored code and Claude reads
   Astra's (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,
   harvested and every finding re-verified inline before it is filed.
 - **Leak & accumulation code-review class (point 285, prong A):** the same

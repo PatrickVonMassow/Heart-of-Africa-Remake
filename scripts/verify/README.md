@@ -2017,7 +2017,7 @@ Node's definitive uncaught-exception marker stays a crash whatever else it
 recorded.
 
 STATED RESIDUAL, because this document states it rather than assuming it away
-(cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only two
+(cross-vendor finding, the scarce lane, 31.08.2026): the legacy reading has only two
 of the three legs the new definition uses — it cannot ask whether stdout
 reached the suite's own terminal report line, because old records did not store
 it. A legacy run that asserted its backend, printed its first red and THEN

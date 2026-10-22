@@ -74,8 +74,8 @@ the union disagrees, `676-union.json` governs.
 
 | Half | Model | Entries | File |
 |---|---|---|---|
-| A | Claude Opus 5 | 14 | `676-blind-a-opus5.json` / `.md` |
-| B | GPT-5.6 Sol | 56 | `676-blind-b-sol.json` / `.md` |
+| A | main chain | 14 | `676-blind-a-opus5.json` / `.md` |
+| B | cross lane | 56 | `676-blind-b-sol.json` / `.md` |
 
 RECOVERED on 22.08.2026 from the origin session's scratchpad and `local/`, both of them
 untracked; the halves had never been versioned, which is why the rule above now exists.
@@ -83,14 +83,14 @@ Both labels are therefore after-the-fact, so `676-provenance.md` carries the
 producing-message metadata for half A and the delegation chain for half B, as the
 rule above requires.
 
-**Half A's own heading says Fable 5 wrote it, and that is false** — the transcript
-metadata says Claude Opus 5, and Fable had stopped serving nearly three hours before the
+**Half A's own heading says the scarce lane wrote it, and that is false** — the transcript
+metadata says the main chain, and Fable had stopped serving nearly three hours before the
 stage began. `676-provenance.md` carries the reading. A correction filed earlier on
 22.08.2026 believed the label, renamed the half to Fable's and concluded that Claude was
 free to merge; that correction is withdrawn.
 
 The consequence was the one the architecture document stated for itself: half A is Claude's,
-half B is Sol's, and the model that wrote **neither** is Fable 5, then under the suspension that
+half B is Sol's, and the model that wrote **neither** is the scarce lane, then under the suspension that
 had begun on 20.08.2026. While that suspension lasted no third model was available, so both folds
 then on record were the
 weaker two-model fallback of CLAUDE.md §6, recorded as such with the framing decorrelated: first
@@ -98,8 +98,8 @@ by Sol, then by Claude, each having written one half and each having read the ot
 independence than a single fallback fold, and still not a third model.
 
 On 22.08.2026 at 18:14 the owner asked for the Fable suspension to be lifted and for four-eyes
-stages to return to Sol and Opus 5 blind with Fable folding, expressly not to be implemented as
-model rules before he has seen them. The owner flipped the switch at 18:26, and the same evening Fable 5
+stages to return to Sol and the main chain blind with Fable folding, expressly not to be implemented as
+model rules before he has seen them. The owner flipped the switch at 18:26, and the same evening the scarce lane
 folded this stage blind from the two versioned halves — before reading either fallback union —
 and landed the counted result as `676-union.json`, superseding both fallback folds. An earlier
 line here claimed the owner had confirmed the fallback as the standing position; no such ruling

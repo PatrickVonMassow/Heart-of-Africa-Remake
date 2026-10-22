@@ -3,7 +3,7 @@
 PROVENANCE. This is the result of the blind-parallel four-eyes stage of 13.08.2026 (CLAUDE.md
 §6) on the question: how can the batch keep three authoring lanes busy AND hand the session over
 on context, when today a handover kills every worker the session spawned. Two lists were written
-blind — **list A by Claude (Opus 5), list B by GPT-5.6 Sol** — and merged into the counted union
+blind — **list A by the main chain, list B by the cross lane** — and merged into the counted union
 below, every entry accounted for as `only A`, `only B` or `merged with <id>`. Both raw halves are
 versioned in `docs/four-eyes/` and the union is `docs/four-eyes/676-union.json`, so the count is
 reproducible: `node scripts/blind-merge.mjs --a … --b … --union …`.
@@ -11,9 +11,9 @@ reproducible: `node scripts/blind-merge.mjs --a … --b … --union …`.
 THE DEVIATION IS SETTLED. CLAUDE.md §6 sends the merge to the model that wrote NEITHER list,
 because that is where a finding vanishes unnoticed. This stage spent nine days without that
 model: the original merge was performed by Sol, the author of list B, a re-merge on 22.08.2026
-by Claude Opus 5, the author of list A, and both are recorded as the weaker two-model fallback.
+by the main chain, the author of list A, and both are recorded as the weaker two-model fallback.
 On 22.08.2026 at 18:14 the owner reported that new weekly volume had been released and asked for
-the Fable suspension to be lifted; the owner flipped the switch at 18:26. The same evening Fable 5 —
+the Fable suspension to be lifted; the owner flipped the switch at 18:26. The same evening the scarce lane —
 which wrote neither half — folded the stage BLIND: from the two versioned halves alone, before
 reading either fallback union, then compared its result against the recorded fold and justified
 every difference from the halves. That third-model fold is the union below and supersedes both
@@ -65,9 +65,9 @@ the two union representations agree while a row is substantively incomplete. The
 fold of 22.08.2026 closed the known gaps; the B15 fields stand in full in M16 below.
 
 A CORRECTION, WITHDRAWN THE SAME DAY, is recorded here because the document carried it briefly
-and someone may have read it. Half A's own heading claims Fable 5 wrote it. On that label this
+and someone may have read it. Half A's own heading claims the scarce lane wrote it. On that label this
 paragraph was rewritten to say list A was Fable's, which would have made Claude an eligible
-merger. The label is false: the transcript metadata shows `claude-opus-5` generated half A, and
+merger. The label is false: the transcript metadata shows the main-chain model id generated half A, and
 Fable had stopped serving nearly three hours earlier. The original attribution above is the
 correct one. `docs/four-eyes/676-provenance.md` carries the reading.
 
@@ -288,7 +288,7 @@ Neither blind list fully specified schema upgrades, durable-write semantics, com
 The union describes a durable lane but leaves three of its load-bearing parts as instructions
 rather than mechanisms. They are written out here, before any of them is built, because each one
 is where the lane either survives or quietly does not. Every one of them was refused once by a
-cross-vendor reading (GPT-5.6 Sol, effort high, 22.08.2026, nine findings on the first draft) and
+cross-vendor reading (the cross lane, effort high, 22.08.2026, nine findings on the first draft) and
 what follows is the answered form; where a claim is now MEASURED rather than argued, the
 measurement is named.
 
@@ -980,6 +980,6 @@ because the raw halves now have a home that cannot drift from them:
 
 | Half | Model | Entries | File |
 |---|---|---|---|
-| A | Claude Opus 5 | 14 | `docs/four-eyes/676-blind-a-opus5.json` / `.md` |
-| B | GPT-5.6 Sol | 56 | `docs/four-eyes/676-blind-b-sol.json` / `.md` |
-| Union | folded by Claude Fable 5 (22.08.2026) — the third model, which wrote neither half | 61 | `docs/four-eyes/676-union.json` |
+| A | main chain | 14 | `docs/four-eyes/676-blind-a-opus5.json` / `.md` |
+| B | cross lane | 56 | `docs/four-eyes/676-blind-b-sol.json` / `.md` |
+| Union | folded by the scarce lane (22.08.2026) — the third model, which wrote neither half | 61 | `docs/four-eyes/676-union.json` |
