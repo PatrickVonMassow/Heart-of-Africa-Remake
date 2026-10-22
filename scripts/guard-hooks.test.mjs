@@ -32,10 +32,22 @@ let repo
 const node = (args, opts = {}) =>
   spawnSync(process.execPath, args, { windowsHide: true, encoding: 'utf8', cwd: repo, maxBuffer: 64 * 1024 * 1024, ...opts })
 
+// A launcher worker's transcript: read, and holding no person, so a turn end
+// may take a free lock (an empty or missing one takes nothing).
+const UNATTENDED_TRANSCRIPT = JSON.stringify({
+  type: 'user',
+  promptSource: 'sdk',
+  turnOrigin: 'sdk',
+  message: { role: 'user', content: 'Autonome Batch-Wiederaufnahme (vom Launcher gestartet).' },
+})
+
 /** `node <repo>/scripts/<name>` with a Stop-hook payload on stdin. */
 function runHook(name, { args = [], session = SESSION, env } = {}) {
+  const transcriptPath = resolve(repo, '.claude', 'hook-test-transcript.jsonl')
+  mkdirSync(resolve(transcriptPath, '..'), { recursive: true })
+  writeFileSync(transcriptPath, UNATTENDED_TRANSCRIPT + '\n')
   const r = node([resolve(repo, 'scripts', name), ...args], {
-    input: JSON.stringify({ session_id: session, hook_event_name: 'Stop' }),
+    input: JSON.stringify({ session_id: session, hook_event_name: 'Stop', transcript_path: transcriptPath }),
     ...(env ? { env: { ...process.env, ...env } } : {}),
   })
   let decision = null
@@ -535,10 +547,13 @@ describe('render-verify-guard', () => {
       const before = JSON.stringify({ clearedHeads: { main: 'deadbeef', master: 'deadbeef' }, runs: [] })
       const statePath = resolve(broken, '.claude/render-verify-state.json')
       writeFileSync(statePath, before)
+      // Owned like the shared runner's sessions, so the guard reaches the gather.
+      const transcriptPath = resolve(broken, '.claude', 'hook-test-transcript.jsonl')
+      writeFileSync(transcriptPath, UNATTENDED_TRANSCRIPT + '\n')
 
       const r = spawnSync(process.execPath, [resolve(broken, 'scripts', 'render-verify-guard.mjs')], {
         windowsHide: true,
-        input: JSON.stringify({ session_id: SESSION, hook_event_name: 'Stop' }),
+        input: JSON.stringify({ session_id: SESSION, hook_event_name: 'Stop', transcript_path: transcriptPath }),
         encoding: 'utf8',
         cwd: broken,
         env: { ...process.env, GIT_CEILING_DIRECTORIES: broken },
