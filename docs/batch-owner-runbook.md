@@ -161,9 +161,12 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
 ## Board and owner-only operating hooks
 
 - Drain waiting findings (`node scripts/finding.mjs --drain` lists them from the
-  memory carrier) into the work order, then run
-  `node scripts/finding.mjs --drained "<title>"`. Queue waiting user requests
-  (`--requests`) with `--show`, a verbatim append and `--queued`; `--blocked`
+  memory carrier) into the work order, commit and push main, then run
+  `node scripts/finding.mjs --drained "<title>" --point <N>` (or `--why` for a
+  backlog/duplicate drain). Queue waiting user requests (`--requests`) in this
+  order: `--show`, a verbatim append, `--appending "<title>" --point <N>`,
+  commit, push main, and only then `--queued` — it proves point N on
+  origin/main and refuses otherwise; `--blocked`
   is only for one that cannot be carried out. A deferral leaves it pending:
   past the watermark, no `--blocked` and no decision card — `--commit
   --context` hands it on in the carrier and the successor queues it.

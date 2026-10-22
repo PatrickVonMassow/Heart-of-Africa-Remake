@@ -1635,7 +1635,7 @@ write, and the recording is deliberately cheap:
     node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]
     node scripts/finding.mjs --none "<reason>"      # the turn was deliberately empty
     node scripts/finding.mjs --drain                # what still waits
-    node scripts/finding.mjs --drained "<title>"    # it reached the work order
+    node scripts/finding.mjs --drained "<title>" --point <N>   # pushed to main (or --why "<backlog/duplicate>")
 
 `findings-guard` (pure core in `scripts/findings-core.mjs`, fail-open like every
 guard here) blocks on two conditions: a turn that INVESTIGATED and left nothing
@@ -1910,7 +1910,8 @@ is a different writer and a different trust model.
          [--doc-impact-file <path>] [--open-questions-file <path>] \
          [--bundle "<deutscher Name>"] [--refs "<…>"] [--rev <sha>]
     node scripts/finding.mjs --requests | --show "<title>"      # what waits, and its spec
-    node scripts/finding.mjs --queued "<title>" --point <N>     # it reached the work order
+    node scripts/finding.mjs --appending "<title>" --point <N>  # appended to TASKS.md, still open
+    node scripts/finding.mjs --queued "<title>" --point <N>     # AFTER commit + push: proven on origin/main
     node scripts/finding.mjs --blocked "<title>" --why "<reason>"
 
 Every long field arrives as a FILE. A final-state spec on a PowerShell command
@@ -1924,8 +1925,11 @@ in the depositing window — the design.md/CLAUDE.md/memory changes the ruling
 implies, a proposed bundle, the refs plus the revision it was cut from, and any
 open questions.
 
-- **`pending` → `queued <point>`** on the drain: the owner appends the spec
-  VERBATIM and numbers it.
+- **`pending` → `appending <point>` → `queued <point> @<sha> ~<anchor>`** on the
+  drain: the owner appends the spec VERBATIM, numbers it, commits and pushes
+  main; only then does `--queued` tick, after proving the point on origin/main
+  (21.10.2026: a tick ahead of the commit let five appends vanish into a doctor
+  stash). `scripts/carrier-reconcile.mjs` re-checks every tick.
 - **A non-empty `openQuestions` routes to a decision card, NEVER to a TASKS
   append** — an undecided spec in the queue is a question standing where an
   instruction belongs. `--queued` REFUSES such a deposit and names `--blocked`;

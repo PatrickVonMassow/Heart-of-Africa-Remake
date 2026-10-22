@@ -14,7 +14,8 @@
 //   node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]
 //   node scripts/finding.mjs --none "<why this turn found nothing>"
 //   node scripts/finding.mjs --drain                      list what still waits
-//   node scripts/finding.mjs --drained "<title substring>" mark one as landed
+//   node scripts/finding.mjs --drained "<title substring>" (--point <N> | --why "<…>")
+//                                                         mark one as landed; --point is proven on origin/main
 //
 //   node scripts/finding.mjs --request "<title>" --spec-file <path> \
 //        --why-file <path> [--constraints-file <path>] [--quotes-file <path>] \
@@ -30,7 +31,9 @@
 //   approval; request-approval-guard.mjs demands it from a chat session.
 //   node scripts/finding.mjs --requests                    list pending requests
 //   node scripts/finding.mjs --show "<title substring>"    the full spec to append
-//   node scripts/finding.mjs --queued "<title>" --point <N>
+//   node scripts/finding.mjs --appending "<title>" --point <N>   appended to TASKS.md, not yet pushed (stays open)
+//   node scripts/finding.mjs --queued "<title>" --point <N>      ONLY after TASKS.md is committed and main pushed:
+//        it proves point N on origin/main and stamps `queued N @<sha> ~<anchor>`, else refuses [--no-fetch]
 //   node scripts/finding.mjs --blocked "<title>" --why "<reason>"
 //   Writing forms take [--session <id>] to stamp the entry's session.
 //
@@ -45,6 +48,7 @@ import { carrierEntry, malformedEntries, markDrained, parseCarrier } from './fin
 import { carrierPath, memoryIndexPath } from './findings-paths.mjs'
 import {
   formatRequest,
+  markAppending,
   markBlocked,
   markQueued,
   pendingRequests,
@@ -56,6 +60,7 @@ import {
   parseRequestDocument,
 } from './findings-request-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { gatherWorkOrder, provePoint } from './carrier-reconcile.mjs'
 import { withBoardEditLock as withCarrierLock } from './board-edit-lock.mjs'
 
 const argv = process.argv.slice(2)
@@ -205,6 +210,20 @@ function headRevision() {
   }
 }
 
+/** Point N on origin/main of the main checkout, or the process ends with where it stands instead. */
+function proveOnMain(point) {
+  if (!/^\d+$/.test(String(point))) fail(`not a point number: ${point}`)
+  let gathered
+  try {
+    gathered = gatherWorkOrder({ fetch: !has('--no-fetch') })
+  } catch (e) {
+    fail(`origin/main could not be read (${String(e.stderr || e.message).trim().split('\n')[0]}) — nothing ticked; the entry stays open`)
+  }
+  const proof = provePoint(point, gathered)
+  if (!proof.ok) fail(`REFUSED: ${proof.reason}`)
+  return proof
+}
+
 /**
  * Write a resolved request transition back — onto a FRESH read of the carrier,
  * never onto the text the decision was made on. Returns the written text.
@@ -315,14 +334,38 @@ if (has('--show')) {
   process.exit(0)
 }
 
+if (has('--appending')) {
+  const title = flag('--appending')
+  const point = flag('--point')
+  if (!title) fail('--appending needs the title (or part of it) of the request just appended to TASKS.md')
+  if (!point) fail('--appending needs the point number it received: --appending "<title>" --point <N>')
+  let result
+  try {
+    result = markAppending(readCarrier(), title, point)
+  } catch (e) {
+    fail(e.message.replace(/^finding: /, ''))
+  }
+  if (result === null) fail(`no pending request matches "${title}" — check: node scripts/finding.mjs --requests`)
+  if (result.ambiguous) {
+    fail(`"${title}" matches ${result.ambiguous.length} pending requests — name it more precisely:\n${result.ambiguous.map((t) => `  · ${t}`).join('\n')}`)
+  }
+  writeBack(result)
+  console.log(`appending as point ${point} (still OPEN): ${result.title}`)
+  console.log(`next: commit TASKS.md, push main, then node scripts/finding.mjs --queued "${result.title}" --point ${point}`)
+  process.exit(0)
+}
+
 if (has('--queued')) {
   const title = flag('--queued')
   const point = flag('--point')
   if (!title) fail('--queued needs the title (or part of it) of the request that landed')
   if (!point) fail('--queued needs the point it became: --queued "<title>" --point <N>')
+  // PUSH FIRST, TICK SECOND (21.10.2026): the tick is only written once
+  // origin/main of the MAIN checkout holds point N; its sha is stamped in.
+  const proof = proveOnMain(point)
   let result
   try {
-    result = markQueued(readCarrier(), title, point)
+    result = markQueued(readCarrier(), title, point, proof)
   } catch (e) {
     fail(e.message.replace(/^finding: /, ''))
   }
@@ -334,7 +377,7 @@ if (has('--queued')) {
     )
   }
   const landed = writeBack(result)
-  console.log(`carried into the work order as point ${point}: ${result.title}`)
+  console.log(`carried into the work order as point ${point} (proven on origin/main @${proof.sha}): ${result.title}`)
   console.log(`(${pendingRequests(landed).length} request(s) still waiting)`)
   process.exit(0)
 }
@@ -408,7 +451,15 @@ if (has('--none')) {
 if (has('--drained')) {
   const title = flag('--drained')
   if (!title) fail('--drained needs the title (or part of it) of the entry that landed')
-  const result = markDrained(readCarrier(), title)
+  // A DRAIN NAMES WHERE IT WENT (21.10.2026): `--point N` is proven on
+  // origin/main like a queue tick; a finding that became no point (backlog,
+  // duplicate) says so in `--why`, and the reason is kept with the entry.
+  const point = flag('--point')
+  const why = flag('--why')
+  if (!point && !why) fail('--drained needs where the finding went: --point <N> (proven on origin/main) or --why "<backlog/duplicate: …>"')
+  const proof = point ? proveOnMain(point) : null
+  const note = proof ? `drained into point ${point} @${proof.sha} ~${proof.anchor}` : `drained without a point: ${why.replace(/\s+/g, ' ').trim()}`
+  const result = markDrained(readCarrier(), title, note)
   if (result === null) fail(`no pending entry matches "${title}" — check: node scripts/finding.mjs --drain`)
   if (result.ambiguous) {
     fail(
@@ -448,9 +499,10 @@ if (!has('--drain') && !has('--requests')) {
   console.log('')
   console.log('usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]')
   console.log('       node scripts/finding.mjs --none "<why this turn found nothing>"')
-  console.log('       node scripts/finding.mjs --drain | --drained "<title>"')
+  console.log('       node scripts/finding.mjs --drain | --drained "<title>" (--point <N> | --why "<…>")')
   console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path|-> --why-file <path|-> [--approved "<words>"] [--once] […]')
   console.log('       node scripts/finding.mjs --request "<title>" --stdin [--approved "<words>"]   (parts: --- spec ---, --- why ---, …)')
   console.log('       node scripts/finding.mjs --requests | --show "<title>"')
-  console.log('       node scripts/finding.mjs --queued "<title>" --point <N> | --blocked "<title>" --why "<reason>"')
+  console.log('       node scripts/finding.mjs --appending "<title>" --point <N>   (after the TASKS.md append)')
+  console.log('       node scripts/finding.mjs --queued "<title>" --point <N>      (after commit AND push of main) | --blocked "<title>" --why "<reason>"')
 }
