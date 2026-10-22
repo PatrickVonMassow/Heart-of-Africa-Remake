@@ -133,6 +133,11 @@ describe('the cross-vendor rule compares vendor fields only', () => {
     expect(sharesIdentity(`${MAIN.retired[0]} / ${foreign}`, foreign)).toBe(true)
   })
 
+  it('reads a dated fallback id as the fallback identity', () => {
+    const dated = `${MAIN.fallback.modelId.replace(/\[1m\]$/, '')}-20251001`
+    expect(sharesIdentity(dated, MAIN.fallback.trailerName)).toBe(true)
+  })
+
   it('reads a parenthesised second model as its own part', () => {
     const both = `${MAIN.fallback.trailerName} (${MAIN.trailerName})`
     expect(sharesIdentity(both, MAIN.trailerName)).toBe(true)
@@ -260,6 +265,7 @@ function hygienePatterns(registry = LANES) {
     { why: 'vendor word', re: new RegExp(`\\b(?:${vendorWords.join('|')})\\b`, 'i') },
     { why: 'constant named after a model or vendor', re: new RegExp(`(?:\\b|_)(?:${named.map((w) => w.toUpperCase()).join('|')})_|\\b[A-Z][A-Z0-9]*_(?:${named.map((w) => w.toUpperCase()).join('|')})\\b`) },
     ...legacyKeys.map((key) => ({ why: `legacy persisted spelling "${key}"`, re: new RegExp(`(?<![A-Za-z0-9])${escapeRe(key)}(?![A-Za-z0-9])`) })),
+    ...LEGACY.askScripts.map((script) => ({ why: `retired script "${script}"`, re: new RegExp(`(?<![A-Za-z0-9-])${escapeRe(script)}`) })),
   ]
 }
 
@@ -321,6 +327,7 @@ describe('hygiene: no consumer outside the registry names a concrete model', () 
         'address.mjs': `const trailer = 'x <${VENDORS[MAIN.vendor].trailerAddress}>'\n`,
         [`${SCARCE.familyWords[0]}-tool.mjs`]: 'export {}\n',
         'ident.mjs': `export const ${SCARCE.familyWords[0].toUpperCase()}_MODEL = 1\n`,
+        'retired.mjs': `// run node scripts/${LEGACY.askScripts[0]}\n`,
       }
       for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text)
       const violations = hygieneViolations(Object.keys(files), readText(dir))

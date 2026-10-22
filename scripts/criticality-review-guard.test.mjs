@@ -349,11 +349,11 @@ describe('point file-set measurement', () => {
     const calls = []
     const rows = attachPointFileSets([commission, review], (base, sha) => {
       calls.push([base, sha])
-      return ['scripts/author-fable.mjs', 'scripts/author-delegate.mjs']
+      return ['scripts/ask-lane.mjs', 'scripts/author-delegate.mjs']
     })
 
     expect(calls).toEqual([[commission.sha, review.sha]])
-    expect(rows[1].pointFiles).toEqual(['scripts/author-fable.mjs', 'scripts/author-delegate.mjs'])
+    expect(rows[1].pointFiles).toEqual(['scripts/ask-lane.mjs', 'scripts/author-delegate.mjs'])
   })
 
   it('verifies unavailable receipts only for Git’s exact unreviewable file set', () => {

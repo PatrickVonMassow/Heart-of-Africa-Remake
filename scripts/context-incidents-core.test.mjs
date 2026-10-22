@@ -85,7 +85,6 @@ describe('callKind / shellKind — the growth is charged to a KIND, read off the
     expect(shellKind('cat material | node scripts/ask-lane.mjs --kind diagnose')).toBe(CALL_KINDS.DELEGATED_ASK)
     // Transcripts from before the lane rename still name the vendor scripts.
     for (const script of LEGACY.askScripts) expect(shellKind(`node scripts/${script} --x`)).toBe(CALL_KINDS.DELEGATED_ASK)
-    expect(shellKind('node scripts/author-fable.mjs --point 834')).toBe(CALL_KINDS.DELEGATED_ASK)
     expect(shellKind('git status --short')).toBe(CALL_KINDS.BASH)
     expect(shellKind('')).toBe(CALL_KINDS.BASH)
   })

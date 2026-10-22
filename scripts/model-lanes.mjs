@@ -303,8 +303,10 @@ export function mentionedIdentities(value, registry = LANES) {
     for (const record of registry) {
       if (!record.familyWords.some((word) => new RegExp(`\\b${word}\\b`).test(text))) continue
       const fallbackVersion = record.fallback ? normaliseName(record.fallback.displayName).match(/\d+(?:\.\d+)*/)?.[0] : ''
-      const version = text.match(/\d+(?:\.\d+)*/)?.[0] ?? ''
-      found.add(fallbackVersion && version === fallbackVersion ? `${record.role}-fallback` : record.role)
+      // A hyphenated id version (`4-8`, dated `4-8-2025…`) reads as its dotted form.
+      const version = text.replace(/(\d)-(?=\d)/g, '$1.').match(/\d+(?:\.\d+)*/)?.[0] ?? ''
+      const isFallback = fallbackVersion && (version === fallbackVersion || version.startsWith(`${fallbackVersion}.`))
+      found.add(isFallback ? `${record.role}-fallback` : record.role)
       partNamesLane = true
     }
     const laneWords = new Set(laneFamilyWords(registry))
