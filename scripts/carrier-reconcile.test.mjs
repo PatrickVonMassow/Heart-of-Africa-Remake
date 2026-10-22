@@ -337,6 +337,25 @@ describe('against a real checkout: worktree invocation, backfill, doctor and lan
       expect(v.lost).toEqual([1401])
     })
 
+    it('judges the merged candidate with its OWN aliases: a merge that removes an alias is blocked', () => {
+      const carrier = join(mem, 'findings-carrier.md')
+      writeFileSync(join(repo.root, 'docs', 'carrier-aliases.json'), JSON.stringify({ points: { 1107: { status: 'deleted', why: 'user' } } }))
+      repo.git('add', 'docs/carrier-aliases.json')
+      repo.git('commit', '-qm', 'alias 1107')
+      repo.git('push', '-q', 'origin', 'main')
+      writeFileSync(carrier, tick(1107, { sha: repo.git('rev-parse', 'HEAD').slice(0, 12), anchor: titleAnchor('x') }))
+      expect(runReconcile({ root: repo.root, carrierPaths: [carrier] }).ok).toBe(true)
+      const preMerge = snapshot()
+      const wt = join(repo.base, 'noalias')
+      repo.git('worktree', 'add', '-q', '-b', 'feat/noalias', wt)
+      execFileSync('git', ['-C', wt, 'rm', '-q', 'docs/carrier-aliases.json'], { windowsHide: true })
+      execFileSync('git', ['-C', wt, 'commit', '-qm', 'drop alias'], { windowsHide: true })
+      repo.git('merge', '--no-ff', '--no-edit', 'feat/noalias')
+      const v = postMergeGate({ preMerge, root: repo.root, carrierPaths: [carrier] })
+      expect(v.blocked).toBe(true)
+      expect(v.introduced).toEqual([1107])
+    })
+
     it('reads a multi-megabyte archive baseline instead of mistaking the buffer overflow for an empty one', () => {
       const big = `# Archive\n\n- [x] 1399. Point 1399 title\n${'  filler line of an old closed point\n'.repeat(80000)}`
       writeFileSync(join(repo.root, 'docs', 'tasks-archive.md'), big)

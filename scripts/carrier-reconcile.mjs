@@ -161,7 +161,10 @@ export function runReconcile({ root = mainCheckoutRoot(), fetch = false, carrier
       head: candidate ?? gathered.head,
       working: candidate ?? gathered.working,
       mainShas,
-      aliases: gathered.aliases,
+      // The candidate is judged WITH its own alias map (review 22.10.2026): a merge
+      // that removes an alias must not keep borrowing origin/main's. Absent text
+      // means no aliases — the strict reading.
+      aliases: override ? parseAliases(override.aliases ?? '') : gathered.aliases,
     })
     return { ran: true, ok: result.ok, result, lines: formatReconcile(result), error: null }
   } catch (e) {
