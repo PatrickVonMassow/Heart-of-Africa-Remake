@@ -21,6 +21,7 @@ import {
   handGapToBody,
   lineClear,
   moveChild,
+  turnBeforeRun,
   nearestCatchable,
   stepTagGame,
   steerGrab,
@@ -2118,5 +2119,30 @@ describe('a running child faces where it runs', () => {
     })
     expect(running).toBeGreaterThan(1000)
     expect(worst).toBeLessThanOrEqual(CFG.setOffTurn + 1e-6)
+  })
+})
+
+describe('the set-off turn judges the course the child will really take', () => {
+  // Cross-vendor review: a commitment to go round something ends inside
+  // `moveChild` the moment the wanted way is open, so the gate must judge that
+  // way, not the edge course being left — or the child runs off backwards.
+  it('turns first when an opened way ends the commitment behind its back', () => {
+    const s = game([[0, 0], [10, 10]])
+    const c = s.children[0]
+    Object.assign(c, { heading: 0, facing: 0, edgeFor: 1, edgeSide: 1, pinned: 0 })
+    expect(turnBeforeRun(c, Math.PI, CFG, OPEN)).toBe(true)
+    expect(c.edgeFor).toBe(0)
+    expect(c.heading).toBe(Math.PI)
+    expect(c.held).toBe(true)
+  })
+
+  it('still runs on its committed edge course while the way stays shut', () => {
+    const s = game([[0, 0], [10, 10]])
+    const c = s.children[0]
+    Object.assign(c, { heading: 0, facing: 0, edgeFor: 1, edgeSide: 1, pinned: 0 })
+    // A wall straight behind it: the wanted way is not open.
+    const walled: TagWorld = { ...OPEN, blocked: (x, z) => z < -0.5 || OPEN.blocked(x, z) }
+    expect(turnBeforeRun(c, Math.PI, CFG, walled)).toBe(false)
+    expect(c.edgeFor).toBe(1)
   })
 })
