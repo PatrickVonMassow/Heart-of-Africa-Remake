@@ -10,7 +10,7 @@
 // These cases are that missing binding. They read the shipped artefacts, not
 // fixtures, because the artefacts are the thing under test.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
@@ -22,8 +22,12 @@ import { CROSS, MAIN, SCARCE } from './model-lanes.mjs'
 const rx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const read = (rel) => readFileSync(join(REPO_ROOT, rel), 'utf8')
-// The recorded half's file name carries the family word and major version of its day.
-const HALF_A = `docs/four-eyes/676-blind-a-${MAIN.familyWords[0]}${MAIN.retired[0].match(/\d+/)[0]}`
+// The recorded half's file name carries the model of its day; it is found on disk, never
+// derived from the current lane configuration, because the record is immutable history.
+const HALF_A = `docs/four-eyes/${readdirSync(join(REPO_ROOT, 'docs/four-eyes'))
+  .filter((name) => /^676-blind-a-.+\.json$/.test(name))
+  .map((name) => name.replace(/\.json$/, ''))
+  .join('|')}`
 const HALF_B = 'docs/four-eyes/676-blind-b-sol'
 const UNION = 'docs/four-eyes/676-union.json'
 const DOC = 'docs/handover-architecture.md'
