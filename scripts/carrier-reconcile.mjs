@@ -140,16 +140,19 @@ const readCarriers = (paths) =>
  * returns `{ ran, ok, result, lines, error }`, and `ran: false` is RED for
  * every caller (fail closed).
  */
-export function runReconcile({ root = mainCheckoutRoot(), fetch = false, carrierPaths = null } = {}) {
+export function runReconcile({ root = mainCheckoutRoot(), fetch = false, carrierPaths = null, override = null } = {}) {
   try {
     const paths = carrierPaths ?? repoCarrierPaths()
     const gathered = gatherWorkOrder({ root, fetch })
     const mainShas = new Set(gathered.mainShas.flatMap((sha) => [sha, sha.slice(0, 12)]))
+    // `override` judges a CANDIDATE work order (a merge about to be pushed) as if
+    // it were origin/main — land-point asks what pushing it would leave red.
+    const candidate = override ? unionHeads({ tasks: override.tasks ?? '', archive: override.archive ?? '' }) : null
     const result = reconcileCarrier({
       carriers: readCarriers(paths),
-      remote: gathered.remote,
-      head: gathered.head,
-      working: gathered.working,
+      remote: candidate ?? gathered.remote,
+      head: candidate ?? gathered.head,
+      working: candidate ?? gathered.working,
       mainShas,
       aliases: gathered.aliases,
     })

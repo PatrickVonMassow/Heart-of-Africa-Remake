@@ -628,6 +628,60 @@ export function postMergeLoss({ preMerge, tasksText = '', archiveText = '' } = {
   })
 }
 
+/**
+ * THE POST-MERGE GATE (21.10.2026, hardened after review 22.10.2026). Decides
+ * whether the merged work order may go on to the gate, the tick and the push.
+ *
+ * The BASELINE is durable: the pre-merge texts of THIS run AND origin/main —
+ * a retry after a rejected merge sees "already merged" locally, so only the
+ * published work order still holds what the merge dropped. Blocked when
+ *   - any point of either baseline is missing from the merged union, or
+ *   - pushing the merged work order would turn a carrier tick red that is not
+ *     red today, or the reconciliation cannot run (fail closed).
+ * On a block the merge THIS run made is rolled back (`reset --keep`), so local
+ * main never carries a rejected merge into the next attempt.
+ */
+export function postMergeGate({ preMerge, root = REPO_ROOT, carrierPaths = null, reconcile = runReconcile } = {}) {
+  const run = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const show = (path) => {
+    try {
+      return run(['show', `origin/main:${path}`])
+    } catch {
+      return ''
+    }
+  }
+  const read = (p) => (existsSync(join(root, p)) ? readFileSync(join(root, p), 'utf8') : '')
+  const after = { tasks: read('TASKS.md'), archive: read('docs/tasks-archive.md') }
+  const lost = [
+    ...new Set([
+      ...postMergeLoss({ preMerge, tasksText: after.tasks, archiveText: after.archive }),
+      ...postMergeLoss({ preMerge: { tasks: show('TASKS.md'), archive: show('docs/tasks-archive.md') }, tasksText: after.tasks, archiveText: after.archive }),
+    ]),
+  ].sort((a, b) => a - b)
+  const today = reconcile({ root, carrierPaths })
+  const pushed = reconcile({ root, carrierPaths, override: after })
+  const redToday = new Set((today.result?.red ?? []).map((r) => `${r.source}|${r.point}`))
+  const introduced = (pushed.result?.red ?? []).filter((r) => !redToday.has(`${r.source}|${r.point}`)).map((r) => r.point)
+  const unrunnable = !today.ran || !pushed.ran
+  const reasons = []
+  if (lost.length) reasons.push(`the merge drops point(s) ${lost.join(', ')} from the work order`)
+  if (introduced.length) reasons.push(`pushing it would leave queued user order(s) ${[...new Set(introduced)].join(', ')} unproven`)
+  if (unrunnable) reasons.push(`the carrier reconciliation could not run (${today.error ?? pushed.error})`)
+  if (!reasons.length) return { blocked: false, lost, introduced, rolledBack: false, message: '' }
+  let rolledBack = false
+  try {
+    const head = run(['rev-parse', 'HEAD'])
+    const parent = run(['rev-parse', '-q', '--verify', 'HEAD^1'])
+    if (preMerge?.sha && head !== preMerge.sha && parent === preMerge.sha) {
+      run(['reset', '--keep', preMerge.sha])
+      rolledBack = true
+    }
+  } catch {
+    rolledBack = false
+  }
+  return { blocked: true, lost, introduced, rolledBack, message: `post-merge reconciliation: ${reasons.join('; ')}` }
+}
+
 /** Print the carrier reconciliation as a RED FINDING when it is not green; never throws. */
 export function reportCarrierReconciliation(when, { run = runReconcile, say = (l) => console.error(l) } = {}) {
   const outcome = run({ root: REPO_ROOT, fetch: false })
@@ -1003,15 +1057,15 @@ async function main(argv) {
     // or a bad conflict resolution can drop points main gained; nothing is pushed
     // yet, so this is where the loss is still free to stop. The carrier's ticks are
     // checked too — a red there is printed as a finding, the landing's own loss blocks.
-    const droppedByMerge = postMergeLoss({ preMerge, tasksText: readIf(TASKS), archiveText: readIf(ARCHIVE) })
-    if (droppedByMerge.length) {
-      error = new LandingError(`the merge drops point(s) ${droppedByMerge.join(', ')} from the work order`, {
+    const verdictAfterMerge = postMergeGate({ preMerge })
+    if (verdictAfterMerge.blocked) {
+      error = new LandingError(verdictAfterMerge.message, {
         step: 'gate',
-        repair:
-          `nothing was pushed — reset local main to the pre-merge commit (git reset --hard ${preMerge.sha || '<pre-merge sha>'}), ` +
-          `bring ${branch} up to date with main WITHOUT deleting those points, then re-run`,
+        repair: verdictAfterMerge.rolledBack
+          ? `nothing was pushed and local main is back on ${preMerge.sha.slice(0, 12)} — bring ${branch} up to date with main WITHOUT deleting those points, then re-run`
+          : `nothing was pushed — reset local main to origin/main (git reset --keep origin/main), bring ${branch} up to date WITHOUT deleting those points, then re-run`,
       })
-      step('gate', VERDICT.failed, `post-merge reconciliation: point(s) ${droppedByMerge.join(', ')} lost`)
+      step('gate', VERDICT.failed, verdictAfterMerge.message)
       throw error
     }
     reportCarrierReconciliation('post-merge')

@@ -19,7 +19,7 @@ import {
 } from './carrier-reconcile-core.mjs'
 import { backfillCarriers, runReconcile } from './carrier-reconcile.mjs'
 import { transitionAccepted } from './land-point-core.mjs'
-import { postMergeLoss } from './land-point.mjs'
+import { postMergeGate, postMergeLoss } from './land-point.mjs'
 import { repoCarrierPaths } from './findings-paths.mjs'
 import { appendPoint, makeRepoFixture, tasksWith } from './carrier-reconcile-fixture.mjs'
 
@@ -302,9 +302,63 @@ describe('against a real checkout: worktree invocation, backfill, doctor and lan
     expect(repo.git('show', 'origin/main:TASKS.md')).toContain('- [ ] 1402.')
   })
 
+  describe('postMergeGate — the land-point function that refuses the landing', () => {
+    const stale = () => {
+      const wt = join(repo.base, 'stale')
+      repo.git('worktree', 'add', '-q', '-b', 'feat/stale', wt)
+      writeFileSync(join(wt, 'TASKS.md'), tasksWith([1400]))
+      execFileSync('git', ['-C', wt, 'commit', '-qam', 'stale copy'], { stdio: 'ignore', windowsHide: true })
+    }
+    const snapshot = () => ({
+      tasks: readFileSync(join(repo.root, 'TASKS.md'), 'utf8'),
+      archive: readFileSync(join(repo.root, 'docs', 'tasks-archive.md'), 'utf8'),
+      sha: repo.git('rev-parse', 'HEAD'),
+    })
+
+    it('blocks a merge that drops a point and rolls local main back to the pre-merge commit', () => {
+      stale()
+      const preMerge = snapshot()
+      repo.git('merge', '--no-ff', '--no-edit', 'feat/stale')
+      const v = postMergeGate({ preMerge, root: repo.root, carrierPaths: [] })
+      expect(v).toMatchObject({ blocked: true, rolledBack: true })
+      expect(v.lost).toContain(1401)
+      expect(repo.git('rev-parse', 'HEAD')).toBe(preMerge.sha)
+      expect(readFileSync(join(repo.root, 'TASKS.md'), 'utf8')).toContain('- [ ] 1401.')
+      expect(repo.git('show', 'origin/main:TASKS.md')).toContain('- [ ] 1401.')
+    })
+
+    it('a RETRY whose local main already carries the bad merge is still blocked by the origin/main baseline', () => {
+      stale()
+      repo.git('merge', '--no-ff', '--no-edit', 'feat/stale')
+      // The retry captures its "pre-merge" state AFTER the earlier merge: it already lacks 1401.
+      const preMerge = snapshot()
+      const v = postMergeGate({ preMerge, root: repo.root, carrierPaths: [] })
+      expect(v.blocked).toBe(true)
+      expect(v.lost).toEqual([1401])
+    })
+
+    it('blocks when pushing would turn a proven carrier tick red, and when the reconciliation cannot run', () => {
+      const carrier = join(mem, 'findings-carrier.md')
+      const sha = repo.git('rev-parse', 'origin/main').slice(0, 12)
+      writeFileSync(carrier, tick(1401, { sha, anchor: titleAnchor(T(1401)) }))
+      const preMerge = snapshot()
+      // A clean candidate passes …
+      expect(postMergeGate({ preMerge, root: repo.root, carrierPaths: [carrier] }).blocked).toBe(false)
+      // … a reconciliation that cannot run does not.
+      const v = postMergeGate({ preMerge, root: repo.root, carrierPaths: [mem] })
+      expect(v.blocked).toBe(true)
+      expect(v.message).toMatch(/could not run/)
+      stale()
+      repo.git('merge', '--no-ff', '--no-edit', 'feat/stale')
+      const w = postMergeGate({ preMerge, root: repo.root, carrierPaths: [carrier] })
+      expect(w.blocked).toBe(true)
+      expect(w.introduced).toEqual([1401])
+    })
+  })
+
   it('the land-point wiring runs the post-merge check before the gate and the push', () => {
     const src = readFileSync(repoPath('scripts', 'land-point.mjs'), 'utf8')
-    const check = src.indexOf('const droppedByMerge = postMergeLoss(')
+    const check = src.indexOf('const verdictAfterMerge = postMergeGate({ preMerge })')
     expect(check).toBeGreaterThan(src.indexOf('// 1. MERGE.'))
     expect(check).toBeLessThan(src.indexOf('// 2. FAST GATE.'))
     expect(check).toBeLessThan(src.indexOf("git(['push', 'origin', 'main']"))
