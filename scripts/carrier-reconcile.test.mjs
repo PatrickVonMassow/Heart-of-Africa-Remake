@@ -207,6 +207,24 @@ describe('against a real checkout: worktree invocation, backfill, doctor and lan
     expect(after.result.red.map((x) => x.point)).toEqual([1402])
   })
 
+  it('the backfill holds the deposit lock for its whole read-modify-write', () => {
+    const carrier = join(mem, 'findings-carrier.md')
+    writeFileSync(carrier, tick(1400, { sha: null, anchor: null }))
+    const late = '- [ ] 2026-10-22T00:00:00.000Z · w · [request] · pending · Arrived while waiting for the lock\n      #spec\n      x\n'
+    const seen = []
+    // The lock is granted only after a concurrent deposit completed: the read must happen INSIDE it.
+    const lock = (work, opts) => {
+      seen.push(opts.lockPath)
+      writeFileSync(carrier, `${readFileSync(carrier, 'utf8')}\n${late}`)
+      return work()
+    }
+    expect(backfillCarriers({ root: repo.root, carrierPaths: [carrier], lock }).stamped).toBe(1)
+    expect(seen).toEqual([`${carrier}.request-lock.json`])
+    const text = readFileSync(carrier, 'utf8')
+    expect(text).toContain('Arrived while waiting for the lock')
+    expect(text).toMatch(/queued 1400 @[0-9a-f]{12} ~[0-9a-f]{8}/)
+  })
+
   it('reads aliases from origin/main: an uncommitted deletion alias never turns a missing order green', () => {
     const carrier = join(mem, 'findings-carrier.md')
     writeFileSync(carrier, tick(1107))

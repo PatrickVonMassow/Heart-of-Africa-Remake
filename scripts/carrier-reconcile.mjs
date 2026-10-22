@@ -16,6 +16,7 @@ import { join } from 'node:path'
 import { COMMON_REPO_ROOT, REPO_ROOT, withoutGitLocalEnvironment } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoCarrierPaths } from './findings-paths.mjs'
+import { withBoardEditLock } from './board-edit-lock.mjs'
 import {
   LOCATION_WORDS,
   carrierClaims,
@@ -165,18 +166,30 @@ export function runReconcile({ root = mainCheckoutRoot(), fetch = false, carrier
  * single point). Rewrites only those exact head lines on a FRESH read, so an
  * entry appended meanwhile survives. Returns { stamped, unproven }.
  */
-export function backfillCarriers({ root = mainCheckoutRoot(), fetch = false, carrierPaths = repoCarrierPaths() } = {}) {
+export function backfillCarriers({ root = mainCheckoutRoot(), fetch = false, carrierPaths = null, lock = withBoardEditLock } = {}) {
   const gathered = gatherWorkOrder({ root, fetch })
   const aliases = gathered.aliases
   const sha = gathered.originSha.slice(0, 12)
   let stamped = 0
   const unproven = []
-  for (const path of carrierPaths) {
+  for (const path of carrierPaths ?? repoCarrierPaths()) {
+    // THE WHOLE READ-MODIFY-WRITE HOLDS THE DEPOSIT LOCK (review 22.10.2026) —
+    // the same lock `finding.mjs --request` takes — so no deposit lands between
+    // the read and the write and is lost.
+    lock(() => {
+      const result = stampOne(path)
+      stamped += result
+    }, { lockPath: `${path}.request-lock.json`, waitMs: 5000 })
+  }
+  return { stamped, unproven }
+
+  function stampOne(path) {
     let text
     try {
       text = readFileSync(path, 'utf8')
-    } catch {
-      continue
+    } catch (e) {
+      if (e?.code === 'ENOENT') return 0
+      throw e
     }
     const replace = new Map()
     for (const line of text.split(/\r?\n/)) {
@@ -192,9 +205,8 @@ export function backfillCarriers({ root = mainCheckoutRoot(), fetch = false, car
       const proof = `@${sha} ${claim.points.map((n) => `~${titleAnchor(gathered.remote.heads.get(n))}`).join(' ')}`
       replace.set(line, line.replace(` · ${claim.raw} · `, ` · ${claim.raw} ${proof} · `))
     }
-    if (replace.size === 0) continue
-    const fresh = readFileSync(path, 'utf8')
-    const out = fresh
+    if (replace.size === 0) return 0
+    const out = text
       .split('\n')
       .map((line) => {
         const key = line.replace(/\r$/, '')
@@ -202,9 +214,8 @@ export function backfillCarriers({ root = mainCheckoutRoot(), fetch = false, car
       })
       .join('\n')
     writeFileSync(path, out, 'utf8')
-    stamped += replace.size
+    return replace.size
   }
-  return { stamped, unproven }
 }
 
 if (isMainModule(import.meta.url)) {
