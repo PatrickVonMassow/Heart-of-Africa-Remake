@@ -34,7 +34,7 @@ import { isMainModule } from './is-main.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { lostPoints } from './carrier-reconcile-core.mjs'
-import { runReconcile } from './carrier-reconcile.mjs'
+import { ALIASES_PATH, runReconcile, showAtRevision } from './carrier-reconcile.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -641,21 +641,24 @@ export function postMergeLoss({ preMerge, tasksText = '', archiveText = '' } = {
  * On a block the merge THIS run made is rolled back (`reset --keep`), so local
  * main never carries a rejected merge into the next attempt.
  */
-export function postMergeGate({ preMerge, root = REPO_ROOT, carrierPaths = null, reconcile = runReconcile } = {}) {
-  const run = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-  const show = (path) => {
-    try {
-      return run(['show', `origin/main:${path}`])
-    } catch {
-      return ''
-    }
-  }
+export function postMergeGate({ preMerge, root = REPO_ROOT, carrierPaths = null, reconcile = runReconcile, gitRun = null } = {}) {
+  // A work order and its archive run to megabytes: the default 1 MB buffer would
+  // fail the read, and a failed read must never pass for an empty baseline.
+  const raw = gitRun ?? ((args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }))
+  const run = (args) => String(raw(args)).trim()
   const read = (p) => (existsSync(join(root, p)) ? readFileSync(join(root, p), 'utf8') : '')
-  const after = { tasks: read('TASKS.md'), archive: read('docs/tasks-archive.md') }
+  const after = { tasks: read('TASKS.md'), archive: read('docs/tasks-archive.md'), aliases: read(ALIASES_PATH) }
+  let baseline
+  try {
+    baseline = { tasks: showAtRevision(raw, 'origin/main', 'TASKS.md'), archive: showAtRevision(raw, 'origin/main', 'docs/tasks-archive.md') }
+  } catch (e) {
+    const why = `${(e && (e.stderr || e.message)) || e}`.trim().split('\n')[0]
+    return { blocked: true, lost: [], introduced: [], rolledBack: rollBack(), message: `post-merge reconciliation: the origin/main baseline could not be read (${why}) — refusing to land blind` }
+  }
   const lost = [
     ...new Set([
       ...postMergeLoss({ preMerge, tasksText: after.tasks, archiveText: after.archive }),
-      ...postMergeLoss({ preMerge: { tasks: show('TASKS.md'), archive: show('docs/tasks-archive.md') }, tasksText: after.tasks, archiveText: after.archive }),
+      ...postMergeLoss({ preMerge: baseline, tasksText: after.tasks, archiveText: after.archive }),
     ]),
   ].sort((a, b) => a - b)
   const today = reconcile({ root, carrierPaths })
@@ -668,18 +671,22 @@ export function postMergeGate({ preMerge, root = REPO_ROOT, carrierPaths = null,
   if (introduced.length) reasons.push(`pushing it would leave queued user order(s) ${[...new Set(introduced)].join(', ')} unproven`)
   if (unrunnable) reasons.push(`the carrier reconciliation could not run (${today.error ?? pushed.error})`)
   if (!reasons.length) return { blocked: false, lost, introduced, rolledBack: false, message: '' }
-  let rolledBack = false
-  try {
-    const head = run(['rev-parse', 'HEAD'])
-    const parent = run(['rev-parse', '-q', '--verify', 'HEAD^1'])
-    if (preMerge?.sha && head !== preMerge.sha && parent === preMerge.sha) {
-      run(['reset', '--keep', preMerge.sha])
-      rolledBack = true
+  return { blocked: true, lost, introduced, rolledBack: rollBack(), message: `post-merge reconciliation: ${reasons.join('; ')}` }
+
+  /** Undo the merge THIS run made, so local main never carries a rejected merge. */
+  function rollBack() {
+    try {
+      const head = run(['rev-parse', 'HEAD'])
+      const parent = run(['rev-parse', '-q', '--verify', 'HEAD^1'])
+      if (preMerge?.sha && head !== preMerge.sha && parent === preMerge.sha) {
+        run(['reset', '--keep', preMerge.sha])
+        return true
+      }
+    } catch {
+      /* not rolled back: the repair text says how */
     }
-  } catch {
-    rolledBack = false
+    return false
   }
-  return { blocked: true, lost, introduced, rolledBack, message: `post-merge reconciliation: ${reasons.join('; ')}` }
 }
 
 /** Print the carrier reconciliation as a RED FINDING when it is not green; never throws. */

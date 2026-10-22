@@ -58,6 +58,19 @@ const readIf = (p) => {
 }
 
 /**
+ * A file at a revision. ONLY PROVEN ABSENCE is empty (review 22.10.2026): the
+ * revision's tree is listed first, and a path it does not list returns ''. Any
+ * other failure — an unreadable revision, a blob too big for the buffer —
+ * THROWS, so no caller mistakes a read error for an empty work order.
+ * `git(args)` must return stdout; give it a large maxBuffer.
+ */
+export function showAtRevision(git, rev, path) {
+  const listed = String(git(['ls-tree', '-z', '--name-only', `${rev}^{tree}`, '--', path]))
+  if (!listed.split('\0').includes(path)) return ''
+  return git(['show', `${rev}:${path}`])
+}
+
+/**
  * The work order on all three planes, plus every commit of origin/main.
  * `fetch` first refreshes origin/main (fail-soft: offline means the last known
  * origin/main, which a successful push has updated anyway). Throws when
@@ -73,13 +86,7 @@ export function gatherWorkOrder({ root = mainCheckoutRoot(), fetch = false } = {
     }
   }
   const originSha = git(['rev-parse', '--verify', 'origin/main^{commit}']).trim()
-  const show = (rev, path) => {
-    try {
-      return git(['show', `${rev}:${path}`])
-    } catch {
-      return ''
-    }
-  }
+  const show = (rev, path) => showAtRevision(git, rev, path)
   const mainShas = git(['rev-list', 'origin/main']).split(/\r?\n/).filter(Boolean)
   return {
     root,

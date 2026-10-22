@@ -337,6 +337,33 @@ describe('against a real checkout: worktree invocation, backfill, doctor and lan
       expect(v.lost).toEqual([1401])
     })
 
+    it('reads a multi-megabyte archive baseline instead of mistaking the buffer overflow for an empty one', () => {
+      const big = `# Archive\n\n- [x] 1399. Point 1399 title\n${'  filler line of an old closed point\n'.repeat(80000)}`
+      writeFileSync(join(repo.root, 'docs', 'tasks-archive.md'), big)
+      repo.git('commit', '-qam', 'big archive')
+      repo.git('push', '-q', 'origin', 'main')
+      // The merged candidate lost 1399 from the archive: only a READ baseline can see it.
+      const preMerge = { tasks: '', archive: '', sha: repo.git('rev-parse', 'HEAD') }
+      writeFileSync(join(repo.root, 'docs', 'tasks-archive.md'), '# Archive\n')
+      const v = postMergeGate({ preMerge, root: repo.root, carrierPaths: [] })
+      expect(v.blocked).toBe(true)
+      expect(v.lost).toContain(1399)
+    })
+
+    it('a baseline read that fails on a RETRY blocks the landing instead of reading as empty', () => {
+      stale()
+      repo.git('merge', '--no-ff', '--no-edit', 'feat/stale')
+      const preMerge = snapshot()
+      const real = (args) => execFileSync('git', args, { cwd: repo.root, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
+      const failingShow = (args) => {
+        if (args[0] === 'show') throw new Error('fatal: unable to read blob')
+        return real(args)
+      }
+      const v = postMergeGate({ preMerge, root: repo.root, carrierPaths: [], gitRun: failingShow })
+      expect(v.blocked).toBe(true)
+      expect(v.message).toMatch(/baseline could not be read/)
+    })
+
     it('blocks when pushing would turn a proven carrier tick red, and when the reconciliation cannot run', () => {
       const carrier = join(mem, 'findings-carrier.md')
       const sha = repo.git('rev-parse', 'origin/main').slice(0, 12)
