@@ -192,6 +192,9 @@ describe('the cross lane runs at high reasoning effort (user order 21.10.2026)',
 // from the registry, so a lane switched to a new model is guarded without editing this test.
 // Scanned: tracked files under scripts/ (names and contents, comments included) and the
 // operational docs. Excluded: the registry, this test, and scripts/fixtures/ (captured data).
+// A network host under a vendor domain (`api.<domain>.com`, at least one subdomain label) is
+// network data, not model naming (the firewall allowlist), and is blanked before scanning;
+// a bare vendor word or a mail address (`…@<domain>.com`) stays a violation.
 // ---------------------------------------------------------------------------------------
 
 const OPERATIONAL_DOCS = [
@@ -234,6 +237,7 @@ function hygienePatterns(registry = LANES) {
  *  them; a reference to one of them names a record, not a model, and is not scanned. */
 function hygieneViolations(paths, read, registry = LANES, records = []) {
   const recordNames = [...new Set(records.flatMap((path) => [path, path.split('/').pop()]))].sort((a, b) => b.length - a.length)
+  const vendorHost = new RegExp(`(?<![@\\w.-])(?:[a-z0-9-]+\\.)+(?:${Object.values(VENDORS).map((v) => v.domain).join('|')})\\.com\\b`, 'gi')
   const patterns = hygienePatterns(registry)
   const fileWords = [...new Set([...registry.flatMap((record) => record.familyWords), ...Object.keys(VENDORS)])]
   const fileWord = new RegExp(`(?:^|[^a-z])(?:${fileWords.join('|')})(?:[^a-z]|$)`, 'i')
@@ -244,7 +248,7 @@ function hygieneViolations(paths, read, registry = LANES, records = []) {
     const text = read(path)
     if (text == null) continue
     text.split('\n').forEach((raw, index) => {
-      const line = recordNames.reduce((acc, name) => acc.split(name).join(' '), raw)
+      const line = recordNames.reduce((acc, name) => acc.split(name).join(' '), raw).replace(vendorHost, ' ')
       const hit = patterns.find(({ re }) => re.test(line))
       if (hit) out.push(`${path}:${index + 1}: ${hit.why} — ${line.trim().slice(0, 120)}`)
     })
@@ -279,7 +283,8 @@ describe('hygiene: no consumer outside the registry names a concrete model', () 
     const dir = mkdtempSync(join(tmpdir(), 'hoa-lane-hygiene-'))
     try {
       const files = {
-        'clean.mjs': `import { CROSS } from './model-lanes.mjs'\nexport const reviewer = CROSS.displayName\n`,
+        'clean.mjs': `import { CROSS } from './model-lanes.mjs'\nexport const reviewer = CROSS.displayName\nconst host = 'api.${VENDORS[CROSS.vendor].domain}.com'\n`,
+        'bare-host.mjs': `const host = '${VENDORS[CROSS.vendor].domain}.com'\n`,
         'named.mjs': `export const reviewer = '${CROSS.displayName}'\n`,
         'future.mjs': `// reviewed by ${CROSS.familyWords[0].toUpperCase()}-99\n`,
         'address.mjs': `const trailer = 'x <${VENDORS[MAIN.vendor].trailerAddress}>'\n`,
