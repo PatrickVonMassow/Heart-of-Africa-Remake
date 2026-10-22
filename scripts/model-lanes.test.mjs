@@ -119,6 +119,8 @@ describe('the cross-vendor rule compares vendor fields only', () => {
     const domain = VENDORS[CROSS.vendor].domain
     expect(vendorKeyOf(`Mystery <bot@${domain}.com.evil>`)).toBe('unknown')
     expect(vendorKeyOf(`Mystery <bot@${domain}.com-evil.net>`)).toBe('unknown')
+    expect(vendorKeyOf(`Mystery <bot@evil-${domain}.com>`)).toBe('unknown')
+    expect(vendorKeyOf(`Mystery <bot@evil.${domain}.com>`)).toBe('unknown')
     expect(vendorKeyOf(`Mystery <bot@${domain}.com>`)).toBe(CROSS.vendor)
   })
 

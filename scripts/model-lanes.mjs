@@ -252,8 +252,8 @@ export function vendorKeyOf(value, registry = LANES) {
     const words = [...registry.filter((r) => r.vendor === key).flatMap((r) => r.familyWords), ...vendor.markerWords]
     const wordHit = words.some((word) => new RegExp(`\\b${word}\\b`).test(text))
     const versionedHit = vendor.versionedMarkers.some((word) => new RegExp(`\\b${word}[- ]?\\d`).test(text))
-    // The whole domain, so a look-alike (`openai.com.evil`) names no vendor.
-    const addressHit = new RegExp(`\\b${vendor.domain}\\.com(?![\\w-]|\\.\\w)`).test(text)
+    // The whole domain, so a look-alike (`x.com.evil`, `evil-x.com`) names no vendor.
+    const addressHit = new RegExp(`(?<![\\w.-])${vendor.domain}\\.com(?![\\w-]|\\.\\w)`).test(text)
     if (wordHit || versionedHit || addressHit) found.add(key)
   }
   return found.size === 1 ? [...found][0] : 'unknown'
