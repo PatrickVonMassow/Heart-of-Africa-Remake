@@ -1600,6 +1600,8 @@ describe('a range whose diffstat exceeds its share', () => {
 
   it('stays truncated when the own stat of a pass is still over the share', () => {
     expect(narrowPassStats(plan, () => wholeStat, 10_000).statTruncated).toBe(true)
+    // Without an explicit budget the plan's own budget sets the share.
+    expect(narrowPassStats(plan, () => wholeStat).statTruncated).toBe(true)
   })
 
   it('leaves a plan whose stat fits untouched', () => {

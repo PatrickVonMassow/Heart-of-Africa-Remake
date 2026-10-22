@@ -812,7 +812,7 @@ export function joinPatchSections(paths = [], sections = new Map()) {
  * only when a pass's own stat still exceeds the share. The packing already
  * priced a full stat share, so a smaller stat can only fit.
  */
-export function narrowPassStats(plan, statFor, budget = MATERIAL_BUDGET_CHARS) {
+export function narrowPassStats(plan, statFor, budget = plan?.budget ?? MATERIAL_BUDGET_CHARS) {
   if (!plan?.statTruncated) return plan
   const statRoom = Math.floor(Math.max(0, Number(budget) || 0) * STAT_SHARE)
   const passes = (plan.passes ?? []).map((pass) => ({ ...pass, stat: String(statFor(pass.files) ?? '') }))
