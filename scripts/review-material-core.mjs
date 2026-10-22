@@ -114,7 +114,9 @@ export function formatPassManifest(plan, pass) {
       ? 'Files no runnable pass can carry are named separately below and remain owed.'
       : 'The runnable passes together cover the complete changed file set.',
     'This material is ONE of those passes. The DIFFSTAT',
-    'below describes the WHOLE range for context: it names files this pass deliberately omits.',
+    pass?.stat != null
+      ? 'below covers ONLY this pass\'s files: the whole-range stat exceeds its share.'
+      : 'below describes the WHOLE range for context: it names files this pass deliberately omits.',
     `THIS PASS CARRIES ${carried.length} file(s), each at the delivery level stated:`,
   ]
   for (const path of carried) {

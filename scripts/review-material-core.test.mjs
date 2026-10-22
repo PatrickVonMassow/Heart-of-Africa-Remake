@@ -1594,6 +1594,7 @@ describe('a range whose diffstat exceeds its share', () => {
       })
       expect(out.statTruncated).toBe(false)
       expect(out.fit).toBe(true)
+      expect(formatPassManifest(narrowed, pass)).toContain('covers ONLY this pass')
     }
   })
 
