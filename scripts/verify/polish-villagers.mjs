@@ -1978,39 +1978,17 @@ if (section('adult-errands')) {
     )
     // A NEW HEADING IS TURNED TO, NEVER SNAPPED (point 1404): over five seconds
     // of errands, words and digging, no adult's body swings further in one
-    // rendered frame than its fastest turn (walking or on the spot) allows for
-    // that frame's own time. Measured before the fix: 1.2-2.9 rad in one frame.
-    const swings = await page.evaluate(
-      () =>
-        new Promise((resolve) => {
-          const m = window.__villagerMotion
-          const rate = Math.max(window.__balance.villageLife.adultErrands.pace / m.turnRadius, m.spotTurnRate)
-          // The baseline is taken INSIDE the first frame: read between frames,
-          // a whole render step could fall before the first measured dt.
-          let prev = null
-          let t = 0
-          let frames = 0
-          let worst = { over: 0, swing: 0, dt: 0, who: null }
-          const tick = () => {
-            const now = performance.now()
-            const dt = (now - t) / 1000
-            t = now
-            const yaws = window.__placeErrands().villagers.map((v) => v.yaw)
-            if (prev) yaws.forEach((y, i) => {
-              const swing = Math.abs(Math.atan2(Math.sin(y - prev[i]), Math.cos(y - prev[i])))
-              const over = swing - (rate * Math.min(dt, 0.1) * 1.5 + 0.01)
-              if (over > worst.over) worst = { over, swing, dt, who: i }
-            })
-            prev = yaws
-            if (++frames < 300) requestAnimationFrame(tick)
-            else resolve({ frames, worst })
-          }
-          requestAnimationFrame(tick)
-        }),
-    )
+    // drawn frame than its fastest turn (walking or on the spot) allows for
+    // that frame's own dt. Measured INSIDE the game frame (`turnWorst`): a
+    // requestAnimationFrame sampler beside it can see two game frames in one
+    // of its own after a hitch and read a bounded turn as a snap.
+    // Measured before the fix: 1.2-2.9 rad in one frame.
+    await page.evaluate(() => window.__placeErrands().resetTurnWorst())
+    await page.waitForTimeout(5000)
+    const swings = await page.evaluate(() => ({ worst: window.__placeErrands().turnWorst }))
     check(
       'no village adult swings round to a new heading in one frame — it turns (point 1404)',
-      swings.worst.over <= 0,
+      swings.worst.over <= 1e-6,
       JSON.stringify(swings),
     )
     // THE MOVING CAPTURE the point is judged by (point 1404): one walking adult
@@ -2022,9 +2000,10 @@ if (section('adult-errands')) {
       .waitForFunction(() => {
         const vs = window.__placeErrands().villagers
         const i = vs.findIndex((v) => v.work && !v.work.arrived && Math.abs(Math.atan2(Math.sin(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw), Math.cos(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw))) > 0.8)
-        return i >= 0 ? i : false
+        return i >= 0 ? { i } : false
       }, null, { timeout: 60000, polling: 50 })
       .then((h) => h.jsonValue())
+      .then((r) => r.i)
       .catch(() => null)
     check('an errand adult is caught facing away from its next way, to film its turn (point 1404)', turner !== null)
     if (turner !== null) {
@@ -2058,21 +2037,26 @@ if (section('adult-errands')) {
         new Promise((resolve) => {
           let worst = { sprint: 0, jog: 0, speed: 0, who: null }
           let frames = 0
+          const seen = new Set()
+          let adults = 0
           const t0 = performance.now()
           const tick = () => {
             frames++
-            window.__placeErrands().villagers.forEach((v, i) => {
+            const vs = window.__placeErrands().villagers
+            adults = vs.length
+            vs.forEach((v, i) => {
               const g = v.drawn.gait
+              if (g) seen.add(i)
               if (g && (g.sprint > worst.sprint || (g.sprint === worst.sprint && g.jog > worst.jog)))
                 worst = { sprint: g.sprint, jog: g.jog, speed: v.drawn.speed, who: i, x: v.x, z: v.z, work: v.work?.phase ?? null, arrived: v.work?.arrived ?? null }
             })
             if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
-            else resolve({ ...worst, frames })
+            else resolve({ ...worst, frames, adults, gaitSeen: seen.size })
           }
           requestAnimationFrame(tick)
         }),
     )
-    check('no village adult on an errand is drawn in a sprint (point 1404 flight oddity)', flight.sprint < 0.5, JSON.stringify(flight))
+    check('no village adult on an errand is drawn in a sprint (point 1404 flight oddity)', flight.adults > 0 && flight.gaitSeen === flight.adults && flight.sprint < 0.5, JSON.stringify(flight))
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared

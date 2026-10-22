@@ -2894,6 +2894,10 @@ function ErrandVillagers({
   }
   // The heading a speaker still turns toward on the spot, or null.
   const faceTo = useRef<Array<number | null>>([])
+  // Dev: each body's yaw as last drawn, and the worst turn beyond the bounded
+  // rate one game frame drew (point 1404) — measured in the frame, with its dt.
+  const drawnYaw = useRef<Array<number | null>>([])
+  const turnWorst = useRef({ over: 0, swing: 0, dt: 0, who: -1 })
 
   // May a body stand here? The settlement boundary and the collider set
   // together — the same question this component's own step asks. The work
@@ -3238,8 +3242,9 @@ function ErrandVillagers({
           figureWork.dig = true
           const siteIndex = task?.siteIndex
           const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
-          // turned to the pit on the spot, not swung round in one frame
-          if (site) yaws.current[i] = turnToward(yaws.current[i], Math.atan2(site.x - me.x, site.z - me.z), VILLAGER_MOTION.spotTurnRate * dt)
+          // turned to the pit on the spot, not swung round in one frame: the
+          // pit is its one aim, so a word's aim never adds a second turn
+          if (site) faceTo.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
         }
         // the shaft along the digging arm: the stroke drives the blade into the pit
         if (digTool) digTool.rotation.x = primitiveToolTilt(state.digK)
@@ -3265,6 +3270,16 @@ function ErrandVillagers({
         else if (aim !== null && aim !== undefined) {
           yaws.current[i] = turnToward(yaws.current[i], aim, VILLAGER_MOTION.spotTurnRate * dt)
           if (yaws.current[i] === aim) faceTo.current[i] = null
+        }
+        if (import.meta.env.DEV) {
+          const was = drawnYaw.current[i]
+          const now = yaws.current[i]
+          if (was !== null && was !== undefined && facing === null) {
+            const swing = Math.abs(Math.atan2(Math.sin(now - was), Math.cos(now - was)))
+            const over = swing - Math.max(cfg.pace / VILLAGER_MOTION.turnRadius, VILLAGER_MOTION.spotTurnRate) * dt
+            if (over > turnWorst.current.over) turnWorst.current = { over, swing, dt, who: i }
+          }
+          drawnYaw.current[i] = now
         }
         g.rotation.y = yaws.current[i]
         // THE SINK, which is half of what makes a fill read as fetching rather
@@ -3337,6 +3352,11 @@ function ErrandVillagers({
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
+      /** The worst turn past the bounded rate any frame drew (point 1404). */
+      turnWorst: { ...turnWorst.current },
+      resetTurnWorst: () => {
+        turnWorst.current = { over: 0, swing: 0, dt: 0, who: -1 }
+      },
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
         // WHAT IS ACTUALLY DRAWN, not what the pose intended (work-order 1085):
