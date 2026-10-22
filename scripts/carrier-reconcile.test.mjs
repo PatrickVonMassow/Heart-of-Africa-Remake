@@ -206,6 +206,18 @@ describe('against a real checkout: worktree invocation, backfill, doctor and lan
     expect(after.result.red.map((x) => x.point)).toEqual([1402])
   })
 
+  it('reads aliases from origin/main: an uncommitted deletion alias never turns a missing order green', () => {
+    const carrier = join(mem, 'findings-carrier.md')
+    writeFileSync(carrier, tick(1107))
+    writeFileSync(join(repo.root, 'docs', 'carrier-aliases.json'), JSON.stringify({ points: { 1107: { status: 'deleted', why: 'x' } } }))
+    expect(runReconcile({ root: repo.root, carrierPaths: [carrier] }).ok).toBe(false)
+    repo.git('add', 'docs/carrier-aliases.json')
+    repo.git('commit', '-qm', 'alias')
+    expect(runReconcile({ root: repo.root, carrierPaths: [carrier] }).ok).toBe(false)
+    repo.git('push', '-q', 'origin', 'main')
+    expect(runReconcile({ root: repo.root, carrierPaths: [carrier] }).ok).toBe(true)
+  })
+
   it('a reconciliation that cannot read origin/main does not run — and that is red', () => {
     repo.git('update-ref', '-d', 'refs/remotes/origin/main')
     const r = runReconcile({ root: repo.root, carrierPaths: [] })

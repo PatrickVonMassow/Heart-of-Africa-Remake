@@ -84,6 +84,9 @@ export function gatherWorkOrder({ root = mainCheckoutRoot(), fetch = false } = {
     root,
     originSha,
     mainShas,
+    // The alias map from the SAME origin/main snapshot (review 22.10.2026): an
+    // uncommitted deletion alias must never turn a missing order green.
+    aliases: parseAliases(show(originSha, ALIASES_PATH)),
     remote: unionHeads({ tasks: show(originSha, TASKS), archive: show(originSha, ARCHIVE) }),
     head: unionHeads({ tasks: show('HEAD', TASKS), archive: show('HEAD', ARCHIVE) }),
     working: unionHeads({ tasks: readIf(join(root, TASKS)), archive: readIf(join(root, ARCHIVE)) }),
@@ -110,14 +113,13 @@ export function provePoint(point, gathered) {
   return { ok: true, sha: gathered.originSha.slice(0, 12), anchor: titleAnchor(gathered.remote.heads.get(n)) }
 }
 
-/** The explicit identity map of deliberately removed or renumbered points. */
-export function readAliases(root = mainCheckoutRoot()) {
-  try {
-    const raw = JSON.parse(readFileSync(join(root, ALIASES_PATH), 'utf8'))
-    return raw && typeof raw === 'object' ? (raw.points ?? raw) : {}
-  } catch {
-    return {}
-  }
+/** The explicit identity map of deliberately removed or renumbered points.
+ *  An absent file is an empty map; an unparseable one THROWS (fail closed). */
+export function parseAliases(text = '') {
+  if (!String(text ?? '').trim()) return {}
+  const raw = JSON.parse(text)
+  if (!raw || typeof raw !== 'object') throw new Error(`${ALIASES_PATH} is not an object`)
+  return raw.points ?? raw
 }
 
 const readCarriers = (paths) =>
@@ -144,7 +146,7 @@ export function runReconcile({ root = mainCheckoutRoot(), fetch = false, carrier
       head: gathered.head,
       working: gathered.working,
       mainShas,
-      aliases: readAliases(root),
+      aliases: gathered.aliases,
     })
     return { ran: true, ok: result.ok, result, lines: formatReconcile(result), error: null }
   } catch (e) {
@@ -161,7 +163,7 @@ export function runReconcile({ root = mainCheckoutRoot(), fetch = false, carrier
  */
 export function backfillCarriers({ root = mainCheckoutRoot(), fetch = false, carrierPaths = repoCarrierPaths() } = {}) {
   const gathered = gatherWorkOrder({ root, fetch })
-  const aliases = readAliases(root)
+  const aliases = gathered.aliases
   const sha = gathered.originSha.slice(0, 12)
   let stamped = 0
   const unproven = []
