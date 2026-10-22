@@ -1464,13 +1464,6 @@ function drive(
   stopAtGoal = false,
 ): void {
   const c = s.children[i]
-  // A walk going round something keeps its way round while its goal still lies
-  // behind it: expired there, the course snapped back 175° in one frame and
-  // the child walked backwards while its body eased after it.
-  if (!wants && to && c.edgeFor > 0 && c.edgeFor <= dt) {
-    const back = Math.atan2(to.x - c.x, to.z - c.z) - c.heading
-    if (Math.abs(Math.atan2(Math.sin(back), Math.cos(back))) > (Math.PI * 3) / 4) c.edgeFor += dt
-  }
   ageEdge(c, dt)
   const walkedBefore = c.walked
   if (!to) {
