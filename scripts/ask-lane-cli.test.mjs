@@ -140,6 +140,14 @@ describe('what it refuses before spending anything', () => {
     expect(bad.status).toBe(2)
   })
 
+  it('refuses the retired --model selector instead of defaulting to the cross lane', () => {
+    clearCalls()
+    const r = run(['--model', 'fable', '--anyway', '--kind', 'diagnose', '--brief', 'x', '--file', materialFile])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/--model is retired/)
+    expect(calls()).toEqual([])
+  })
+
   it.each(['diagnose', 'audit', 'explain'])('sends NOTHING for %s at default, and says which way out', (kind) => {
     setting('default')
     clearCalls()
