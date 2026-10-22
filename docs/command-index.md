@@ -121,7 +121,7 @@
 | `carrier-bell-core.mjs` | THE FINDINGS CARRIER BELL — the deciding half. | — |
 | `carrier-reconcile-core.mjs` | Pure layer of the carrier's PROOF and RECONCILIATION (no user order is ever lost). | — |
 | `carrier-reconcile-fixture.mjs` | Test fixture (Vitest only): a throwaway main checkout with a bare origin, so the carrier's origin/main proof and the doctor's rescue run against real git and never against the live repository. | — |
-| `carrier-reconcile.mjs` | IO layer of the carrier's proof (see carrier-reconcile-core.mjs for the why). | — |
+| `carrier-reconcile.mjs` | IO layer of the carrier's proof (see carrier-reconcile-core.mjs for the why). | Usage: |
 | `chat-core.mjs` | THE CHAT CHANNEL'S DECIDING HALF — pure, no I/O; `now` defaults to Date.now() but every clock reading can be injected. | — |
 | `chat-delivery-core.mjs` | PER-TOOL-CALL DELIVERY — the deciding half. | — |
 | `chat-inbox.mjs` | ONE TICK OF "HAS THE USER WRITTEN ANYTHING" — the reader half of the channel. | — |

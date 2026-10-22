@@ -4,11 +4,29 @@
 // branch may hold a point main does not — on three planes: origin/main (the only
 // one that counts as durable), HEAD (committed, maybe unpushed) and the working
 // tree (uncommitted).
+//
+// Usage:
+//   node scripts/carrier-reconcile.mjs [--fetch] [--json]   every carrier tick vs the work order; exit 1 on RED
+//   node scripts/carrier-reconcile.mjs --backfill [--fetch]  ONE-TIME: stamp `@<sha> ~<anchor>` onto legacy
+//        sha-less ticks whose points origin/main holds; what cannot be proven stays RED
+// Deliberately deleted/absorbed/renumbered points are named in docs/carrier-aliases.json.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { COMMON_REPO_ROOT, REPO_ROOT, withoutGitLocalEnvironment } from './repo-paths.mjs'
-import { LOCATION_WORDS, pointLocation, titleAnchor, unionHeads } from './carrier-reconcile-core.mjs'
+import { isMainModule } from './is-main.mjs'
+import { repoCarrierPaths } from './findings-paths.mjs'
+import {
+  LOCATION_WORDS,
+  carrierClaims,
+  formatReconcile,
+  pointLocation,
+  reconcileCarrier,
+  titleAnchor,
+  unionHeads,
+} from './carrier-reconcile-core.mjs'
+
+export const ALIASES_PATH = 'docs/carrier-aliases.json'
 
 const TASKS = 'TASKS.md'
 const ARCHIVE = 'docs/tasks-archive.md'
@@ -90,4 +108,108 @@ export function provePoint(point, gathered) {
     }
   }
   return { ok: true, sha: gathered.originSha.slice(0, 12), anchor: titleAnchor(gathered.remote.heads.get(n)) }
+}
+
+/** The explicit identity map of deliberately removed or renumbered points. */
+export function readAliases(root = mainCheckoutRoot()) {
+  try {
+    const raw = JSON.parse(readFileSync(join(root, ALIASES_PATH), 'utf8'))
+    return raw && typeof raw === 'object' ? (raw.points ?? raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+const readCarriers = (paths) =>
+  paths.map((path) => {
+    try {
+      return { path, text: readFileSync(path, 'utf8') }
+    } catch {
+      return { path, text: '' }
+    }
+  })
+
+/**
+ * Run the reconciliation over every carrier of this repository. Never throws:
+ * returns `{ ran, ok, result, lines, error }`, and `ran: false` is RED for
+ * every caller (fail closed).
+ */
+export function runReconcile({ root = mainCheckoutRoot(), fetch = false, carrierPaths = repoCarrierPaths() } = {}) {
+  try {
+    const gathered = gatherWorkOrder({ root, fetch })
+    const mainShas = new Set(gathered.mainShas.flatMap((sha) => [sha, sha.slice(0, 12)]))
+    const result = reconcileCarrier({
+      carriers: readCarriers(carrierPaths),
+      remote: gathered.remote,
+      head: gathered.head,
+      working: gathered.working,
+      mainShas,
+      aliases: readAliases(root),
+    })
+    return { ran: true, ok: result.ok, result, lines: formatReconcile(result), error: null }
+  } catch (e) {
+    const error = `${(e && (e.stderr || e.message)) || e}`.trim().split('\n')[0]
+    return { ran: false, ok: false, result: null, lines: [`carrier reconciliation: COULD NOT RUN (${error}) — RED`], error }
+  }
+}
+
+/**
+ * ONE-TIME BACKFILL of legacy ticks. Each sha-less `queued N[..M]` whose every
+ * point origin/main holds gets `@<origin/main sha>` (and `~<anchor>` for a
+ * single point). Rewrites only those exact head lines on a FRESH read, so an
+ * entry appended meanwhile survives. Returns { stamped, unproven }.
+ */
+export function backfillCarriers({ root = mainCheckoutRoot(), fetch = false, carrierPaths = repoCarrierPaths() } = {}) {
+  const gathered = gatherWorkOrder({ root, fetch })
+  const aliases = readAliases(root)
+  const sha = gathered.originSha.slice(0, 12)
+  let stamped = 0
+  const unproven = []
+  for (const path of carrierPaths) {
+    let text
+    try {
+      text = readFileSync(path, 'utf8')
+    } catch {
+      continue
+    }
+    const replace = new Map()
+    for (const line of text.split(/\r?\n/)) {
+      const claim = carrierClaims(line, path)[0]
+      if (!claim || claim.kind !== 'queued' || claim.sha) continue
+      const live = claim.points.filter((n) => !aliases[String(n)])
+      const missing = live.filter((n) => pointLocation(n, gathered) !== 'origin-main')
+      if (missing.length || live.length === 0) {
+        if (missing.length) unproven.push({ path, title: claim.title, points: missing })
+        continue
+      }
+      const proof = claim.range ? `@${sha}` : `@${sha} ~${titleAnchor(gathered.remote.heads.get(claim.points[0]))}`
+      replace.set(line, line.replace(` · ${claim.raw} · `, ` · ${claim.raw} ${proof} · `))
+    }
+    if (replace.size === 0) continue
+    const fresh = readFileSync(path, 'utf8')
+    const out = fresh
+      .split('\n')
+      .map((line) => {
+        const key = line.replace(/\r$/, '')
+        return replace.has(key) ? `${replace.get(key)}${line.endsWith('\r') ? '\r' : ''}` : line
+      })
+      .join('\n')
+    writeFileSync(path, out, 'utf8')
+    stamped += replace.size
+  }
+  return { stamped, unproven }
+}
+
+if (isMainModule(import.meta.url)) {
+  const argv = process.argv.slice(2)
+  const fetch = argv.includes('--fetch')
+  if (argv.includes('--backfill')) {
+    const { stamped, unproven } = backfillCarriers({ fetch })
+    console.log(`backfill: ${stamped} legacy tick(s) stamped with their origin/main proof`)
+    for (const u of unproven) console.log(`  UNPROVEN ${u.points.join(', ')} "${u.title.slice(0, 80)}" (${u.path})`)
+  }
+  const outcome = runReconcile({ fetch: fetch && !argv.includes('--backfill') })
+  if (argv.includes('--json')) console.log(JSON.stringify({ ran: outcome.ran, ok: outcome.ok, ...outcome.result }, null, 2))
+  else for (const line of outcome.lines) console.log(line)
+  process.exit(outcome.ok ? 0 : 1)
 }

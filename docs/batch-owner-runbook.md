@@ -166,7 +166,9 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
   backlog/duplicate drain). Queue waiting user requests (`--requests`) in this
   order: `--show`, a verbatim append, `--appending "<title>" --point <N>`,
   commit, push main, and only then `--queued` — it proves point N on
-  origin/main and refuses otherwise; `--blocked`
+  origin/main and refuses otherwise. `node scripts/carrier-reconcile.mjs`
+  re-checks every tick against TASKS.md + archive (doctor, session start and
+  land-point run it); a RED there is a possibly lost user order. `--blocked`
   is only for one that cannot be carried out. A deferral leaves it pending:
   past the watermark, no `--blocked` and no decision card — `--commit
   --context` hands it on in the carrier and the successor queues it.

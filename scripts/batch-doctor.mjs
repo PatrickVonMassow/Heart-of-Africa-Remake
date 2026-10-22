@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, isAbsolute, join } from 'node:path'
 import { carrierEntry } from './findings-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
+import { runReconcile } from './carrier-reconcile.mjs'
 import { WAIT_LEASE_PATH } from './wait-lease-core.mjs'
 import { liveRecordPaths } from './verify/run-record.mjs'
 import {
@@ -459,10 +460,18 @@ function liveAgentWorktrees() {
   }
 }
 
+// --- Carrier reconciliation (21.10.2026) ----------------------------------------
+// EVERY run, read-only and clean-tree runs included: each carrier tick must name
+// a point origin/main holds. A mismatch — or a reconciliation that cannot run —
+// is a RED finding and the verdict can never be "consistent".
+const reconciled = runReconcile({ root: REPO, fetch: false })
+for (const line of reconciled.lines) log(line)
+const reconcileRed = !reconciled.ok
+
 // --- Verdict -------------------------------------------------------------------
 
 const pendingRepair = needsRepair(plan) && !repair
-const measurementClean = gate && !pendingRepair && !gateFailed && !gateInconclusive && !alertsRemain
+const measurementClean = gate && !pendingRepair && !gateFailed && !gateInconclusive && !alertsRemain && !reconcileRed
 if (gate) recordGateMeasurement(measurementClean)
 // A RESCUE KEEPS THE ALERT ALIVE (21.10.2026): the run that quarantined five
 // user orders also marked the triggering alert handled, so the run two seconds
@@ -487,8 +496,12 @@ if (pendingRepair) {
   log('VERDICT: repairs planned but NOT executed — rerun with --repair to execute them (all actions are logged)')
   process.exit(2)
 }
-if (gateFailed || alertsRemain) {
-  log('VERDICT: findings remain (gate failure or alert-level issues) — fix before continuing the batch')
+if (gateFailed || alertsRemain || reconcileRed) {
+  log(
+    reconcileRed
+      ? 'VERDICT: RED — the carrier reconciliation found ticked user orders that are not proven on origin/main (see above); fix before continuing the batch'
+      : 'VERDICT: findings remain (gate failure or alert-level issues) — fix before continuing the batch',
+  )
   process.exit(1)
 }
 if (gateInconclusive) {

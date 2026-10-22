@@ -165,6 +165,8 @@ describe('REPLAY 21.10.2026: append, tick, doctor --repair with the owner gone a
     expect(first.status).toBe(1)
     expect(out1).not.toMatch(/VERDICT: consistent/)
     expect(out1).toMatch(/EXECUTED rescue-protected-commit/)
+    // The carrier said "queued 1402" while 1402 was only in the working tree: RED.
+    expect(out1).toMatch(/carrier reconciliation: RED[\s\S]*RED point 1402 .* only in the working tree/)
     // Never silently lost: still in the working tree, and on the pushed rescue branch.
     expect(readFileSync(join(repo.root, 'TASKS.md'), 'utf8')).toContain('- [ ] 1402.')
     const rescue = repo.git('for-each-ref', '--format=%(refname:short)', 'refs/heads/rescue/').split('\n').filter(Boolean)

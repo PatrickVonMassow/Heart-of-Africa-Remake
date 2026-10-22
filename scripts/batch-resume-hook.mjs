@@ -76,6 +76,7 @@ function cloudVenueLine() {
 }
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { noteHandoverAttributionSuccessorStart } from './handover-attribution.mjs'
+import { reconcileHookLine } from './carrier-reconcile-core.mjs'
 
 const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
 
@@ -238,6 +239,18 @@ try {
   }
 } catch {
   /* an unreadable or unstartable launcher must never block session orientation */
+}
+
+// NO USER ORDER IS EVER LOST (21.10.2026). The carrier reconciliation runs at
+// EVERY session start — owner or not, whatever the doctor's mandate marker says
+// — and a red result, or one that could not run, is PRINTED here: an exit code
+// nobody reads is how five queued orders went missing for five hours.
+try {
+  const { runReconcile } = await import('./carrier-reconcile.mjs')
+  const line = reconcileHookLine(runReconcile({ fetch: false }))
+  if (line) console.log(`[batch-resume] ${line}`)
+} catch (e) {
+  console.log(`[batch-resume] ${reconcileHookLine({ ran: false, error: (e && e.message) || String(e) })}`)
 }
 
 // Condensed per docs/context-cut-list-1209.md (U158/U159): the workflow rules

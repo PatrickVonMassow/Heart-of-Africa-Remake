@@ -33,6 +33,8 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
+import { lostPoints } from './carrier-reconcile-core.mjs'
+import { runReconcile } from './carrier-reconcile.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -613,6 +615,28 @@ export function deleteLandedBranch({ branch, blocked = '', recheck = null, git: 
  * could not be answered, which reads as PRESENT and blocks the remote deletion,
  * like every other unproven fact in this cleanup.
  */
+/**
+ * Points the merge dropped: in the pre-merge union of TASKS.md + archive, absent
+ * from the merged one (21.10.2026). PURE given its texts.
+ */
+export function postMergeLoss({ preMerge, tasksText = '', archiveText = '' } = {}) {
+  return lostPoints({
+    beforeTasks: preMerge?.tasks ?? '',
+    beforeArchive: preMerge?.archive ?? '',
+    afterTasks: tasksText,
+    afterArchive: archiveText,
+  })
+}
+
+/** Print the carrier reconciliation as a RED FINDING when it is not green; never throws. */
+export function reportCarrierReconciliation(when, { run = runReconcile, say = (l) => console.error(l) } = {}) {
+  const outcome = run({ root: REPO_ROOT, fetch: false })
+  if (outcome.ok) return outcome
+  say(`land-point (${when}): RED FINDING — carrier reconciliation is not green:`)
+  for (const line of outcome.lines) say(`  ${line}`)
+  return outcome
+}
+
 export function localBranchExists(branch, { cwd = REPO_ROOT } = {}) {
   try {
     git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -926,6 +950,14 @@ async function main(argv) {
     return folded.continue
   }
 
+  // The work order BEFORE the merge: the post-merge reconciliation compares the
+  // merged union of TASKS.md + archive against it (21.10.2026).
+  const preMerge = { tasks: readIf(TASKS), archive: readIf(ARCHIVE), sha: '' }
+  try {
+    preMerge.sha = git(['rev-parse', 'HEAD']).trim()
+  } catch {
+    /* reported through the repair text as unknown */
+  }
   try {
     // 1. MERGE. --no-ff always (see MERGE_ARGS in the core for why).
     try {
@@ -967,6 +999,23 @@ async function main(argv) {
       throw error
     }
 
+    // 1b. POST-MERGE RECONCILIATION (21.10.2026). A stale branch copy of TASKS.md
+    // or a bad conflict resolution can drop points main gained; nothing is pushed
+    // yet, so this is where the loss is still free to stop. The carrier's ticks are
+    // checked too — a red there is printed as a finding, the landing's own loss blocks.
+    const droppedByMerge = postMergeLoss({ preMerge, tasksText: readIf(TASKS), archiveText: readIf(ARCHIVE) })
+    if (droppedByMerge.length) {
+      error = new LandingError(`the merge drops point(s) ${droppedByMerge.join(', ')} from the work order`, {
+        step: 'gate',
+        repair:
+          `nothing was pushed — reset local main to the pre-merge commit (git reset --hard ${preMerge.sha || '<pre-merge sha>'}), ` +
+          `bring ${branch} up to date with main WITHOUT deleting those points, then re-run`,
+      })
+      step('gate', VERDICT.failed, `post-merge reconciliation: point(s) ${droppedByMerge.join(', ')} lost`)
+      throw error
+    }
+    reportCarrierReconciliation('post-merge')
+
     // 2. FAST GATE.
     const gateSteps = ['build', 'lint', 'unit', ...(audit.run ? ['audit'] : [])]
     const gateResults = await runGate(gateSteps, gate.mode)
@@ -995,6 +1044,7 @@ async function main(argv) {
     const accepted = transitionAccepted({
       before: evaluateTasksArchive({ tasksText, archiveText }),
       after: evaluateTasksArchive({ tasksText: moved.tasks, archiveText: moved.archive }),
+      lost: lostPoints({ beforeTasks: tasksText, beforeArchive: archiveText, afterTasks: moved.tasks, afterArchive: moved.archive }),
     })
     if (accepted.preexisting?.length) {
       console.error(
@@ -1042,6 +1092,7 @@ async function main(argv) {
     try {
       git(['push', 'origin', 'main'], { stdio: ['ignore', 'pipe', 'pipe'] })
       step('push', VERDICT.ok, 'tick committed, main pushed')
+      reportCarrierReconciliation('after push')
       if (batchId) {
         const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'bookkeeping', evidence: { at: Date.now(), complete: true, commitSha: git(['rev-parse', 'HEAD']) } })
         if (!recorded.ok) throw new Error(`landing journal refused bookkeeping evidence: ${recorded.reason}`)
