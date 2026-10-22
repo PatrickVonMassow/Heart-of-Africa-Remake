@@ -83,6 +83,7 @@ put it is the mistake this line exists to stop.
   Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
   Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
   Bundle: Dorfleben.
+  Handover 23.10.2026 00:10: the full `polish-villagers` pass at branch 983fe682f was KILLED by the 45-min suite wall on BOTH backends (WebGPU: last frames villager-dress 23:07, then 17 min inside village-walk); full passes before took 31-39 min. Next: run `--section=village-walk` alone on the branch and on main, compare durations, and fix the stall if the bounded turn causes it before landing.
 - [ ] 1426. Make the cloud clone able to work: path-scope, request-approval-guard and model-guard stop blocking it
   QUEUE POSITION: front of the work order (user 22.10.2026: "Reihe das ganz vorne in der Queue ein.").
   PROBLEM: a claude.ai/code cloud session on PatrickVonMassow/Heart-of-Africa-Remake (probe 22.10.2026,
