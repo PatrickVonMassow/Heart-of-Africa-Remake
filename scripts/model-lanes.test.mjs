@@ -268,11 +268,11 @@ const readText = (root) => (path) => {
 
 describe('hygiene: no consumer outside the registry names a concrete model', () => {
   it('finds no model, vendor or legacy spelling in scripts/ or the operational docs', () => {
-    const tracked = execFileSync('git', ['ls-files', '-z', 'scripts', ...OPERATIONAL_DOCS], { cwd: REPO, encoding: 'utf8' })
+    const tracked = execFileSync('git', ['ls-files', '-z', 'scripts', ...OPERATIONAL_DOCS], { cwd: REPO, encoding: 'utf8', windowsHide: true })
       .split('\0')
       .filter(Boolean)
       .filter((path) => !EXCLUDED.some((prefix) => path === prefix || (prefix.endsWith('/') && path.startsWith(prefix))))
-    const records = execFileSync('git', ['ls-files', '-z', 'docs/four-eyes', 'docs/blind-*'], { cwd: REPO, encoding: 'utf8' })
+    const records = execFileSync('git', ['ls-files', '-z', 'docs/four-eyes', 'docs/blind-*'], { cwd: REPO, encoding: 'utf8', windowsHide: true })
       .split('\0')
       .filter(Boolean)
     const violations = hygieneViolations(tracked, readText(REPO), LANES, records)

@@ -37,14 +37,11 @@ describe('command index', () => {
     expect(usageLines('const x = 1')).toEqual([])
   })
 
-  it('publishes literal runnable usage for both authoring lane commands', () => {
+  it('publishes literal runnable usage for the authoring lane command', () => {
     const entries = readCommandEntries()
     const usages = (name) => entries.find((entry) => entry.name === name)?.usages
     expect(usages('author-delegate.mjs')).toEqual([
-      'usage: node scripts/author-delegate.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
-    ])
-    expect(usages('author-fable.mjs')).toEqual([
-      'usage: node scripts/author-fable.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
+      'usage: node scripts/author-delegate.mjs [--lane <cross|scarce>] --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
     ])
   })
 

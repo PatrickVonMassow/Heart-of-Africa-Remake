@@ -35,7 +35,7 @@ import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routin
 import { effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
 import { currentLaneState } from './lane-switch.mjs'
 import { laneIsOn } from './lane-switch-core.mjs'
-import { authoringClaudeArgs } from './author-fable-core.mjs'
+import { authoringClaudeArgs } from './author-delegate-core.mjs'
 import { ASK_LANES, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskLane } from './ask-lane-core.mjs'
 import { EXECUTION_ROLES } from './model-lanes.mjs'
 
