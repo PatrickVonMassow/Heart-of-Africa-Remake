@@ -132,9 +132,7 @@ Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflu
 Änderung braucht alles — sonst wird Testen umgangen. **Abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik und Zustand.
-  Sekunden, und kein Browser-Timing kann sie flackern lassen — wohl aber das Zeitlimit pro
-  Fall, wenn ein teurer Fall auf einer ausgelasteten Maschine darüber rutscht. Mach solche
-  Fälle billig, statt das Limit anzuheben.
+  Sekunden, und kein Browser-Timing kann sie flackern lassen.
 - **Klein (bei Sichtbarem/Interaktion):** die schnelle Schicht + ein Kernsatz echter
   Browser-Tests, auf dem Unterbau des Nutzers statt auf dem bequemeren Ersatzweg.
 - **Groß (vor jedem Release):** die volle Regression über alle Suiten und **Ziel-Backends**,
