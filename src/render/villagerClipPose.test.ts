@@ -10,7 +10,7 @@ import { balance, VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../config
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, gaitFootGround, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitFootGround, heelOff, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, gaitAt, gaitWeights, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
 
@@ -434,6 +434,192 @@ describe('the clip gait on the ground', () => {
 
   it('the feet never sink below the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
+  })
+
+  it('the trailing leg rolls off its toes without a tremble: no joint turns back on itself between two frames', () => {
+    // user report 21.10.2026 ("the rear leg trembles at every step"): out of
+    // reach, the rolling foot sprang back to the clip's pitch with the knee
+    // snapped straight for one frame, then rolled again — a one-frame spike of
+    // 0.2 rad at the thigh and 0.5 rad at the foot at every toe-off (thigh
+    // 12-31, foot 40-99 rad/s below; frame-rate bound, as a spike is). A
+    // smooth turn reverses only through rest: its reversal rate goes to 0
+    // with the frame time. Measured after the fix: at most 7.4 rad/s, the
+    // same at 60, 100 and 144 Hz (the toe's lift-off kink, no spike).
+    const n = asset.bones.length
+    const bones = ['thigh', 'shin', 'foot'].flatMap((b) => ['L', 'R'].map((s) => `${b}.${s}`))
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [1.0, 1.4]) {
+          for (const hz of [60, 100, 144]) {
+            const dt = 1 / hz
+            const speed = perLeg * f.legScale * f.scale
+            const g = newClipGait()
+            const pose = newPose(n)
+            const world = newWorld(n)
+            const prev = bones.map(() => new THREE.Quaternion())
+            const step = bones.map(() => new THREE.Vector3())
+            const d = new THREE.Quaternion()
+            const v = new THREE.Vector3()
+            let z = 0
+            for (let k = 0; k * dt < 4; k++) {
+              z += speed * dt
+              stepClipGait(g, asset, f, speed * dt, speed)
+              clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+              forwardKinematics(asset, f.rest0, pose, world)
+              bones.forEach((b, j) => {
+                const q = world.q[asset.bones.indexOf(b)]
+                // this frame's world turn of the bone as a rotation vector
+                d.copy(prev[j]).invert().premultiply(q)
+                if (d.w < 0) d.set(-d.x, -d.y, -d.z, -d.w)
+                const s = Math.hypot(d.x, d.y, d.z)
+                v.set(d.x, d.y, d.z).multiplyScalar(s > 1e-12 ? (2 * Math.atan2(s, d.w)) / s : 0)
+                if (k * dt > 1 && v.dot(step[j]) < 0) {
+                  const rate = Math.min(v.length(), step[j].length()) / dt
+                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${b} at phase ${g.phase.toFixed(3)}`).toBeLessThan(9)
+                }
+                step[j].copy(v)
+                prev[j].copy(q)
+              })
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it('the leg joints turn no faster than the clip drives them, at every frame rate: no pop at lift-off', () => {
+    // user report 21.10.2026, the remaining knee pop: at lift-off the leg
+    // went from the roll's stretched reach into the swing's bent knee in one
+    // frame (shin 0.20 → 1.38 rad at 20 Hz), the rolling foot snapped onto
+    // the line of leg and foot before it lifted, and the toes and the ball →
+    // tip hand-over sprang the foot — rates that grew with the frame rate
+    // (foot up to 34×, shin 4-5×, thigh up to 10× the clip's own maximum at
+    // 144 Hz). Each joint's local turn per frame is bounded against the walk
+    // clip's own fastest turn of that joint at that pace. The margin: the
+    // stride warp (up to 1.35) and the hold's catch-up take the thigh to
+    // 2.1×, the shin to 1.7×, and the heel strike the foot to 2.8× at 144 Hz
+    // (measured 22.10.2026; OPEN: the heel is caught while its clip still
+    // swings it forward, a separate point).
+    const n = asset.bones.length
+    const bones = ['thigh', 'shin', 'foot'].flatMap((b) => ['L', 'R'].map((s) => `${b}.${s}`))
+    const index = bones.map((b) => asset.bones.indexOf(b))
+    const qa = new THREE.Quaternion()
+    const qb = new THREE.Quaternion()
+    const turn = (a: ArrayLike<number>, b: ArrayLike<number>, k: number) => qa.fromArray(a as number[], k * 4).angleTo(qb.fromArray(b as number[], k * 4))
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [1.0, 1.4]) {
+          const speed = perLeg * f.legScale * f.scale
+          const cycle = gaitAt(asset.clips as unknown as GaitClips, speed / f.scale, f.legScale)
+          const perSecond = (speed / f.scale) * cycle.phasePerUnit
+          // the clip's own fastest turn of each joint (rad/s at this pace)
+          const steps = 2000
+          const a = samplePhase(asset.clips.walk, 0, f, newPose(n))
+          const b = newPose(n)
+          const clipMax = index.map(() => 0)
+          for (let k = 1; k <= steps; k++) {
+            samplePhase(asset.clips.walk, k / steps, f, b)
+            index.forEach((bone, j) => (clipMax[j] = Math.max(clipMax[j], turn(a.rot, b.rot, bone) * steps * perSecond)))
+            for (let c = 0; c < b.rot.length; c++) a.rot[c] = b.rot[c]
+          }
+          for (const hz of [15, 20, 30, 60, 144]) {
+            const dt = 1 / hz
+            const g = newClipGait()
+            const pose = newPose(n)
+            const prev = Array.from(pose.rot)
+            let z = 0
+            for (let k = 0; k * dt < 5; k++) {
+              z += speed * dt
+              stepClipGait(g, asset, f, speed * dt, speed)
+              clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+              if (k * dt > 1) {
+                index.forEach((bone, j) => {
+                  const rate = turn(prev, pose.rot, bone) / dt
+                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${bones[j]} at phase ${g.phase.toFixed(3)}`).toBeLessThan(3 * clipMax[j])
+                })
+              }
+              for (let c = 0; c < pose.rot.length; c++) prev[c] = pose.rot[c]
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it('two villagers drawn in turn pose their legs and toes as each drawn alone, through every toe release', () => {
+    // review 22.10.2026: the toes letting go after the tip's hold ended were
+    // flattened onto a heading shared between figures, so a walker drawn in
+    // between with another heading turned the releasing toes
+    const n = asset.bones.length
+    const f = adult.frame
+    const legs = ['thigh', 'shin', 'foot', 'toe'].flatMap((b) => ['L', 'R'].map((s) => asset.bones.indexOf(`${b}.${s}`)))
+    const walkers = [
+      { yaw: 0.3, speed: 1.0 * f.legScale * f.scale },
+      { yaw: -2.1, speed: 1.3 * f.legScale * f.scale },
+    ]
+    const dt = 1 / 60
+    const run = (who: number[]) => {
+      const gaits = who.map(() => newClipGait())
+      const poses = who.map(() => newPose(n))
+      const out: number[][][] = who.map(() => [])
+      for (let k = 0; k * dt < 4; k++) {
+        who.forEach((w, j) => {
+          const { yaw, speed } = walkers[w]
+          const d = speed * dt * (k + 1)
+          stepClipGait(gaits[j], asset, f, speed * dt, speed)
+          clipGaitPose(gaits[j], asset, f, speed, { x: Math.sin(yaw) * d, z: Math.cos(yaw) * d, yaw, unit: 1 }, poses[j])
+          out[j].push(legs.flatMap((b) => Array.from(poses[j].rot.slice(b * 4, b * 4 + 4))))
+        })
+      }
+      return out
+    }
+    const both = run([0, 1])
+    const alone = [run([0])[0], run([1])[0]]
+    // component by component (an angle between float32 quaternions reads
+    // their rounding as a turn)
+    let worst = 0
+    for (const w of [0, 1]) both[w].forEach((frame, k) => frame.forEach((x, c) => (worst = Math.max(worst, Math.abs(x - alone[w][k][c])))))
+    // the same arithmetic on the same state: exactly the same pose
+    expect(worst).toBe(0)
+  })
+
+  it('a pivot carried across the reach of leg and foot in one line moves the ankle and foot without a jump', () => {
+    // review 21.10.2026: the lift to the reach ended at the horizontal limit,
+    // so a low pivot just past it dropped back down and the pose jumped
+    const n = asset.bones.length
+    const f = adult.frame
+    const world = newWorld(n)
+    forwardKinematics(asset, f.rest0, newPose(n), world)
+    const [thigh, shin, foot] = ['thigh.L', 'shin.L', 'foot.L'].map((b) => asset.bones.indexOf(b))
+    const hip = world.p[thigh]
+    const toPivot = new THREE.Vector3(0, -0.02, 0.1)
+    const solve = (x: number) => {
+      const target = new THREE.Vector3(hip.x, hip.y - 0.4, hip.z + x)
+      const q = new THREE.Quaternion()
+      const out = heelOff(f, world, thigh, shin, foot, target, toPivot, q)
+      return { out, target, q }
+    }
+    // the largest change between neighbouring samples: a steep but continuous
+    // turn shrinks with the sample spacing, a jump keeps its size
+    const largest = (h: number) => {
+      let prev = solve(0.3)
+      let ankle = 0
+      let turn = 0
+      for (let k = 1; 0.3 + k * h <= 3; k++) {
+        const s = solve(0.3 + k * h)
+        expect(s.out).not.toBe('out')
+        ankle = Math.max(ankle, s.target.distanceTo(prev.target))
+        turn = Math.max(turn, s.q.angleTo(prev.q))
+        prev = s
+      }
+      return { ankle, turn }
+    }
+    const coarse = largest(1e-3)
+    const fine = largest(1e-4)
+    expect(fine.ankle).toBeLessThan(coarse.ankle / 2)
+    expect(fine.turn).toBeLessThan(coarse.turn / 2)
   })
 
   it('walk → jog → sprint is continuous: a small change of pace moves no joint by a jump', () => {

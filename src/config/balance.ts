@@ -2834,6 +2834,10 @@ export const VILLAGER_GLTF = {
    *  fades back onto the clip's own foot (a shoved or turned foot eases home
    *  in its swing, never jumps). Calibratable. */
   plantFadeCycle: 0.15,
+  /** Share of the gait cycle over which a rolling foot's leg blends from
+   *  the pose drawn on one pivot into the next pivot's, or off its toes into
+   *  the clip's swing (villagerClipPose.ts `LiftOff`). Calibratable. */
+  liftOffBlendCycle: 0.15,
   /** How high (multiples of the touch height) a held sole contact rises
    *  before it lets go; its share of the foot's hold fades from 0.6 touch up
    *  to here. A heel rolling off over a planted ball carries its own miss,
@@ -2864,6 +2868,14 @@ export const VILLAGER_GLTF = {
   /** Share of a rolling foot's pitch its toes lift their tip by while the
    *  foot rolls over its ball (villagerClipPose.ts `heelOff`). Calibratable. */
   toeLift: 0.3,
+  /** Share of the gait cycle over which the toes, lying flat at toe-off,
+   *  let go of the ground at the fastest (villagerClipPose.ts). Calibratable. */
+  toeReleaseCycle: 0.1,
+  /** How far (rad) short of leg and foot in one line a rolling foot's
+   *  pitch levels off, eased in over twice that, so the roll tends to that
+   *  line without its pitch snapping onto it (villagerClipPose.ts `heelOff`).
+   *  Calibratable. */
+  rollSoftPitch: 0.3,
   /** Share of the cycle over which the walk eases a sole contact onto the
    *  ground after its authored touch and off it before its authored lift
    *  (the retargeted clip lifts its trailing ball and toe early).
