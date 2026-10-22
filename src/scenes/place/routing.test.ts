@@ -315,11 +315,13 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
     expectBankReached(seed)
   })
 
-  it('reaches the bank with the clock stalled: no wall-clock reading decides a route', () => {
-    // A frozen clock is what a starved process looks like from inside. If any
-    // time budget sat in the search, layout or walk, this would change the outcome.
-    const now = vi.spyOn(performance, 'now').mockReturnValue(0)
-    const date = vi.spyOn(Date, 'now').mockReturnValue(0)
+  it('reaches the bank on a starved clock: no wall-clock reading decides a route', () => {
+    // A starved process sees every clock read jump far ahead. Each read here
+    // jumps a minute, so any elapsed-time budget in the layout, grid, search or
+    // walk would run out at its first check and change the outcome.
+    let t = 0
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => (t += 60_000))
+    const date = vi.spyOn(Date, 'now').mockImplementation(() => (t += 60_000))
     try {
       expectBankReached(1337)
     } finally {
