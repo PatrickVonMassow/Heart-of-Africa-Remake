@@ -1985,8 +1985,10 @@ if (section('adult-errands')) {
         new Promise((resolve) => {
           const m = window.__villagerMotion
           const rate = Math.max(window.__balance.villageLife.adultErrands.pace / m.turnRadius, m.spotTurnRate)
-          let prev = window.__placeErrands().villagers.map((v) => v.yaw)
-          let t = performance.now()
+          // The baseline is taken INSIDE the first frame: read between frames,
+          // a whole render step could fall before the first measured dt.
+          let prev = null
+          let t = 0
           let frames = 0
           let worst = { over: 0, swing: 0, dt: 0, who: null }
           const tick = () => {
@@ -1994,7 +1996,7 @@ if (section('adult-errands')) {
             const dt = (now - t) / 1000
             t = now
             const yaws = window.__placeErrands().villagers.map((v) => v.yaw)
-            yaws.forEach((y, i) => {
+            if (prev) yaws.forEach((y, i) => {
               const swing = Math.abs(Math.atan2(Math.sin(y - prev[i]), Math.cos(y - prev[i])))
               const over = swing - (rate * Math.min(dt, 0.1) * 1.5 + 0.01)
               if (over > worst.over) worst = { over, swing, dt, who: i }
