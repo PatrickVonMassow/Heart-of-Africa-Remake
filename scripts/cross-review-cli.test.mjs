@@ -274,6 +274,8 @@ const run = (args, env = {}) =>
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
       LANE_SWITCH_FILE: scarceOnFile,
+      // An absent fixture file reads as the default routing, never the host's own setting.
+      LANE_ROUTING_FILE: join(dir, 'no-lane-routing.json'),
       ...env,
     }),
   })
@@ -332,6 +334,7 @@ beforeAll(() => {
   // Windows-specific assertions elsewhere (four-eyes finding, 11.08.2026).
   if (process.platform === 'win32') {
     writeFileSync(join(stubDir, 'codex.cmd'), `@echo off\r\nnode "%~dp0codex" %*\r\n`)
+    writeFileSync(join(stubDir, 'claude.cmd'), `@echo off\r\nnode "%~dp0claude" %*\r\n`)
   }
   writeFileSync(join(dir, 'calls.log'), '')
   writeFileSync(
