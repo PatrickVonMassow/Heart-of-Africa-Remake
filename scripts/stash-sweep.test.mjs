@@ -76,6 +76,12 @@ describe('sweepStashes — strictly read-only over real stashes', () => {
     writeFileSync(join(repo.root, 'übernahme.md'), '- [ ] 1404. Order in a quoted name\n')
     repo.git('stash', 'push', '-u', '-m', 'quoted name')
 
+    // A staged order whose working file was restored to HEAD before the stash: only stash^2 holds it.
+    appendPoint(repo.root, 1405, 'Staged then restored')
+    repo.git('add', 'TASKS.md')
+    writeFileSync(join(repo.root, 'TASKS.md'), repo.git('show', 'HEAD:TASKS.md') + '\n')
+    repo.git('stash', 'push', '-m', 'index only')
+
     const before = { list: repo.git('stash', 'list'), status: repo.git('status', '--porcelain'), tasks: readFileSync(join(repo.root, 'TASKS.md'), 'utf8') }
     const result = sweepStashes({ root: repo.root })
     expect(repo.git('stash', 'list')).toBe(before.list)
@@ -93,6 +99,8 @@ describe('sweepStashes — strictly read-only over real stashes', () => {
     expect(by['branch notes'].missingPoints).toEqual([])
     expect(by['quoted name']).toMatchObject({ disposition: 'user-missing' })
     expect(by['quoted name'].missingPoints[0]).toMatchObject({ point: 1404, path: 'übernahme.md' })
-    expect(renderReport(result, { date: '2026-10-22' })).toMatch(/\| user-missing \| 3 \|/)
+    expect(by['index only']).toMatchObject({ disposition: 'user-missing' })
+    expect(by['index only'].missingPoints.map((p) => p.point)).toEqual([1405])
+    expect(renderReport(result, { date: '2026-10-22' })).toMatch(/\| user-missing \| 4 \|/)
   })
 })
