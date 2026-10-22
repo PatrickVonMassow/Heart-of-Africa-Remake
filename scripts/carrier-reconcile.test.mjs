@@ -20,6 +20,7 @@ import {
 import { backfillCarriers, runReconcile } from './carrier-reconcile.mjs'
 import { transitionAccepted } from './land-point-core.mjs'
 import { postMergeLoss } from './land-point.mjs'
+import { repoCarrierPaths } from './findings-paths.mjs'
 import { appendPoint, makeRepoFixture, tasksWith } from './carrier-reconcile-fixture.mjs'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
@@ -216,6 +217,24 @@ describe('against a real checkout: worktree invocation, backfill, doctor and lan
     expect(runReconcile({ root: repo.root, carrierPaths: [carrier] }).ok).toBe(false)
     repo.git('push', '-q', 'origin', 'main')
     expect(runReconcile({ root: repo.root, carrierPaths: [carrier] }).ok).toBe(true)
+  })
+
+  it('an unreadable carrier is red (fail closed), only a missing one counts as empty', () => {
+    // A directory where the carrier file should be: EISDIR, not ENOENT.
+    const r = runReconcile({ root: repo.root, carrierPaths: [mem] })
+    expect(r).toMatchObject({ ran: false, ok: false })
+    expect(r.error).toMatch(/could not be read/)
+    expect(runReconcile({ root: repo.root, carrierPaths: [join(mem, 'absent.md')] })).toMatchObject({ ran: true, ok: true })
+  })
+
+  it('a carrier directory that cannot be listed propagates instead of shrinking the set', () => {
+    const home = mkdtempSync(join(tmpdir(), 'hoa-home-'))
+    writeFileSync(join(home, '.claude'), 'not a directory')
+    expect(() => repoCarrierPaths({ root: '/workspace/hoa', home, env: {} })).toThrow(/could not be listed/)
+    rmSync(home, { recursive: true, force: true })
+    const empty = mkdtempSync(join(tmpdir(), 'hoa-home-'))
+    expect(repoCarrierPaths({ root: '/workspace/hoa', home: empty, env: {} })).toHaveLength(1)
+    rmSync(empty, { recursive: true, force: true })
   })
 
   it('a reconciliation that cannot read origin/main does not run — and that is red', () => {

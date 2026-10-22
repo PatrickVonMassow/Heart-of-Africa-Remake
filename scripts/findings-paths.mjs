@@ -4,7 +4,7 @@
 // session that does not hold the batch lock may not write the working tree,
 // and that is exactly the session that loses findings. Memory is writable in
 // every state, which is the whole reason this mechanism can bind at all.
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { COMMON_REPO_ROOT, REPO_ROOT } from './repo-paths.mjs'
@@ -36,14 +36,27 @@ export function repoCarrierPaths({ root = mainRoot(), home = homedir(), env = pr
   if (env.FINDINGS_MEMORY_DIR) return [join(env.FINDINGS_MEMORY_DIR, 'findings-carrier.md')]
   const slug = projectSlug(root)
   const base = join(home, '.claude', 'projects')
+  // ONLY A PROVEN ENOENT IS ABSENCE (review 22.10.2026): any other access
+  // failure would silently shrink the set of carriers the reconciliation reads,
+  // so it propagates and the caller fails closed.
   let names = []
   try {
     names = readdirSync(base)
-  } catch {
-    return [carrierPath({ root, home, env })]
+  } catch (e) {
+    if (e?.code === 'ENOENT') return [carrierPath({ root, home, env })]
+    throw new Error(`the project directory ${base} could not be listed (${e?.code ?? e?.message ?? e})`)
   }
   const own = names.filter((n) => n.replace(/-+$/, '') === slug || n.startsWith(`${slug}--claude-worktrees-`))
-  const paths = own.map((n) => join(base, n, 'memory', 'findings-carrier.md')).filter((p) => existsSync(p))
+  const present = (p) => {
+    try {
+      statSync(p)
+      return true
+    } catch (e) {
+      if (e?.code === 'ENOENT') return false
+      throw new Error(`carrier ${p} could not be checked (${e?.code ?? e?.message ?? e})`)
+    }
+  }
+  const paths = own.map((n) => join(base, n, 'memory', 'findings-carrier.md')).filter(present)
   const canonical = carrierPath({ root, home, env })
   return paths.includes(canonical) ? paths : [canonical, ...paths]
 }
