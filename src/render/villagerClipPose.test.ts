@@ -488,6 +488,66 @@ describe('the clip gait on the ground', () => {
     }
   })
 
+  it('the leg joints turn no faster than the clip drives them, at every frame rate: no pop at lift-off', () => {
+    // user report 21.10.2026, the remaining knee pop: at lift-off the leg
+    // went from the roll's stretched reach into the swing's bent knee in one
+    // frame (shin 0.20 → 1.38 rad at 20 Hz), the rolling foot snapped onto
+    // the line of leg and foot before it lifted, and the toes and the ball →
+    // tip hand-over sprang the foot — rates that grew with the frame rate
+    // (foot up to 34×, shin 4-5×, thigh up to 10× the clip's own maximum at
+    // 144 Hz). Each joint's local turn per frame is bounded against the walk
+    // clip's own fastest turn of that joint at that pace. The margin: the
+    // stride warp (up to 1.35) and the hold's catch-up take the thigh to
+    // 2.1×, the shin to 1.7×, and the heel strike the foot to 2.8× at 144 Hz
+    // (measured 22.10.2026; OPEN: the heel is caught while its clip still
+    // swings it forward, a separate point).
+    const n = asset.bones.length
+    const bones = ['thigh', 'shin', 'foot'].flatMap((b) => ['L', 'R'].map((s) => `${b}.${s}`))
+    const index = bones.map((b) => asset.bones.indexOf(b))
+    const qa = new THREE.Quaternion()
+    const qb = new THREE.Quaternion()
+    const turn = (a: ArrayLike<number>, b: ArrayLike<number>, k: number) => qa.fromArray(a as number[], k * 4).angleTo(qb.fromArray(b as number[], k * 4))
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [1.0, 1.4]) {
+          const speed = perLeg * f.legScale * f.scale
+          const cycle = gaitAt(asset.clips as unknown as GaitClips, speed / f.scale, f.legScale)
+          const perSecond = (speed / f.scale) * cycle.phasePerUnit
+          // the clip's own fastest turn of each joint (rad/s at this pace)
+          const steps = 2000
+          const a = samplePhase(asset.clips.walk, 0, f, newPose(n))
+          const b = newPose(n)
+          const clipMax = index.map(() => 0)
+          for (let k = 1; k <= steps; k++) {
+            samplePhase(asset.clips.walk, k / steps, f, b)
+            index.forEach((bone, j) => (clipMax[j] = Math.max(clipMax[j], turn(a.rot, b.rot, bone) * steps * perSecond)))
+            for (let c = 0; c < b.rot.length; c++) a.rot[c] = b.rot[c]
+          }
+          for (const hz of [15, 20, 30, 60, 144]) {
+            const dt = 1 / hz
+            const g = newClipGait()
+            const pose = newPose(n)
+            const prev = Array.from(pose.rot)
+            let z = 0
+            for (let k = 0; k * dt < 5; k++) {
+              z += speed * dt
+              stepClipGait(g, asset, f, speed * dt, speed)
+              clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+              if (k * dt > 1) {
+                index.forEach((bone, j) => {
+                  const rate = turn(prev, pose.rot, bone) / dt
+                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${bones[j]} at phase ${g.phase.toFixed(3)}`).toBeLessThan(3 * clipMax[j])
+                })
+              }
+              for (let c = 0; c < pose.rot.length; c++) prev[c] = pose.rot[c]
+            }
+          }
+        }
+      }
+    }
+  })
+
   it('a pivot carried across the reach of leg and foot in one line moves the ankle and foot without a jump', () => {
     // review 21.10.2026: the lift to the reach ended at the horizontal limit,
     // so a low pivot just past it dropped back down and the pose jumped

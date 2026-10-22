@@ -63,9 +63,36 @@ export interface ClipGait {
   flatYaw: [number | null, number | null]
   /** Per foot, whether the planted foot (rather than the clip's hold) placed it last. */
   planted: [boolean, boolean]
+  /** Per leg, its hand-over from one pivot of the rolling foot to the next
+   *  or to the clip's swing (`LiftOff`). */
+  lift: [LiftOff, LiftOff]
 }
 
-export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false] })
+/** thigh, shin, foot, toe: a quaternion (x, y, z, w) each, plain data */
+const legTurns = (): number[] => [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+/** A leg's hand-over as its foot rolls off (ClipGait.lift). The leg's
+ *  thigh, shin, foot and toe locals are kept as turns onto the clip's
+ *  (drawn local = turn · clip local), as plain numbers (the state is cloned). */
+export interface LiftOff {
+  /** the contact the foot pivoted on last frame (null: none) */
+  on: Contact | null
+  /** the contact handed to (null: the swing) */
+  to: Contact | null
+  /** the share of VILLAGER_GLTF.liftOffBlendCycle still to walk before the
+   *  leg is drawn from its pivot (or the clip's swing) alone */
+  left: number
+  /** the toes' share of lying flat last frame (let go over VILLAGER_GLTF.toeReleaseCycle) */
+  toes: number
+  /** the turns drawn last frame */
+  last: number[]
+  /** the turns drawn when the pivot last changed, blended out over `left` */
+  from: number[]
+}
+
+const freeLift = (): LiftOff => ({ on: null, to: null, left: 0, toes: 0, last: legTurns(), from: legTurns() })
+
+export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], lift: [freeLift(), freeLift()] })
 
 /** Let both feet go (standing: nothing is held for the next walk). */
 export function releaseClipGait(g: ClipGait): void {
@@ -73,6 +100,7 @@ export function releaseClipGait(g: ClipGait): void {
   g.slip = [{ x: 0, z: 0 }, { x: 0, z: 0 }]
   g.flatYaw = [null, null]
   g.planted = [false, false]
+  g.lift = [freeLift(), freeLift()]
 }
 
 /** How far a contact may lie above the ground and still carry (person units). */
@@ -261,12 +289,32 @@ export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shi
   if (u.lengthSq() >= 1e-12) target.copy(centre).addScaledVector(u.normalize(), r)
   else if (r < 1e-9) target.copy(centre)
   else return 'out'
-  _hoQ.setFromUnitVectors(_hoV0.copy(toPivot).normalize(), _hoV1.copy(pivot).sub(target).normalize())
+  const v0 = _hoV0.copy(toPivot).normalize()
+  const v1 = _hoV1.copy(pivot).sub(target).normalize()
+  _hoQ.setFromUnitVectors(v0, v1)
+  // Near the line the pitch grows as the root of the distance the pivot has
+  // left to that limit, so the foot snapped onto the line in the last frames
+  // before the lift (a frame-rate-bound spike at every heel-off). Within
+  // 2·G.rollSoftPitch of it the foot pitches a little less, tending to that
+  // pitch short of the line instead, and the ankle follows round the pivot;
+  // no give on an unrolled foot (the hand-over at the reach stays exact).
+  const w = G.rollSoftPitch
+  const pitch = v0.angleTo(v1)
+  const left = Math.max(0, v0.angleTo(axis) - pitch)
+  if (w > 0 && pitch > 1e-6 && left < 2 * w) {
+    const give = (((2 * w - left) ** 2) / (4 * w)) * Math.min(1, pitch / w)
+    _hoQ.setFromAxisAngle(_hoN.crossVectors(v0, v1).normalize(), Math.max(0, pitch - give))
+    target.copy(pivot).sub(_hoU.copy(toPivot).applyQuaternion(_hoQ))
+  }
   footQ.premultiply(_hoQ)
   return 'rolled'
 }
+const _hoN = new THREE.Vector3()
 const _hoV0 = new THREE.Vector3()
 const _qI = new THREE.Quaternion()
+const _qw2 = new THREE.Quaternion()
+const _qw3 = new THREE.Quaternion()
+const _clipLocal = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()]
 const _hoP = new THREE.Vector3()
 const _hoV1 = new THREE.Vector3()
 const _hoB = new THREE.Vector3()
@@ -522,6 +570,8 @@ export function clipGaitPose(
   const walkedPhase = (((g.phase - g.slipPhase) % 1) + 1) % 1
   g.slipPhase = g.phase
   const fade = Math.min(1, walkedPhase / Math.max(1e-6, G.plantFadeCycle))
+  // a hand-over walks on toward the leg's new pivot (or swing) alone
+  SIDES.forEach((_, i) => (g.lift[i].left = Math.max(0, g.lift[i].left - walkedPhase / Math.max(1e-6, G.liftOffBlendCycle))))
   ;(['L', 'R'] as const).forEach((s, i) => {
     const foot = asset.bones.indexOf(`foot.${s}`)
     // The stride: the foot's reach fore and aft of the hips scaled to the cycle.
@@ -631,6 +681,11 @@ export function clipGaitPose(
     // while their tip carries (the clip's toes, flexed onto another spot,
     // would drag the tip).
     _toeW[i] = Math.max(fw, _stanceU[i] >= G.footPivotSwitch ? tipHold * gait.walk : 0)
+    // the toes let go of the ground by the cycle walked, not by their tip's
+    // height alone: the clip lifts its tip through the hold's band within a
+    // few frames, and the toes sprang off the ground with it
+    if (body) _toeW[i] = Math.max(_toeW[i], g.lift[i].toes - walkedPhase / Math.max(1e-6, G.toeReleaseCycle))
+    g.lift[i].toes = body ? _toeW[i] : 0
     _pivoted[i] = false
     if (_toeW[i] > 0 && body) {
       const first: Contact = _stanceU[i] < G.footPivotSwitch ? 'heel' : 'ball'
@@ -665,6 +720,22 @@ export function clipGaitPose(
       }
     }
     g.planted[i] = _pivoted[i]
+    // THE HAND-OVER: a foot rolling off one contact onto the next, or off its
+    // last into the swing, is drawn otherwise at once — over the ball its
+    // toes lift off the ground, on the tip they lie on it; the roll leaves
+    // the leg stretched at its reach, the clip's swing has its knee bent (near
+    // straight a millimetre of ankle is a tenth of a radian of knee). Handed
+    // over in one frame, the trailing leg jumped at every toe-off; from the
+    // leg last drawn it blends into the new one over the walked cycle.
+    const lift = g.lift[i]
+    const on = _pivoted[i] ? _pivotOn[i] : null
+    if (!body) lift.left = 0
+    else if (lift.on && lift.on !== 'heel' && on !== lift.on) {
+      lift.left = 1
+      lift.to = on
+      for (let k = 0; k < 16; k++) lift.from[k] = lift.last[k]
+    }
+    lift.on = on
   })
   // The pelvis, lowered just as far as both legs need to reach their targets
   // (a long jog stride at its toe-off; natural-villager-motion steps 5 and
@@ -716,7 +787,18 @@ export function clipGaitPose(
     const tw = _toeW[i]
     _standing[i] = false
     const far = world.p[foot].distanceTo(_target[i]) > min
-    if (!far && fw <= 0 && tw <= 0) return
+    const lift = g.lift[i]
+    const legBones = [thigh, shin, foot, toe]
+    // the clip's own locals, which the roll's turns are carried on from
+    legBones.forEach((b, j) => _clipLocal[j].fromArray(out.rot, b * 4))
+    // (only onto the pivot handed to, or into the air: a contact held
+    // otherwise stays where it is)
+    const now = _pivoted[i] ? _pivotOn[i] : null
+    const handing = lift.left > 0 && now === lift.to && CONTACTS.every((k) => k === now || !g.held[i][k])
+    if (!far && fw <= 0 && tw <= 0 && !handing) {
+      for (let k = 0; k < 16; k++) lift.last[k] = k % 4 === 3 ? 1 : 0
+      return
+    }
     // the foot (and its toes) keep their world turn through the solve; a flat
     // share turns them onto their heading alone (the rest foot lies flat)
     _keep.copy(world.q[foot])
@@ -754,6 +836,17 @@ export function clipGaitPose(
       setWorldRotation(asset, out, world, toe, _keepToe)
       forwardKinematics(asset, frame.rest0, out, world)
     }
+    // the hand-over (above): from the turns drawn when the pivot changed
+    if (handing) {
+      const r = smoothstep(lift.left)
+      legBones.forEach((b, j) => {
+        _qw2.fromArray(out.rot, b * 4)
+        _qw3.fromArray(lift.from, j * 4).multiply(_clipLocal[j])
+        _qw2.slerp(_qw3, r).toArray(out.rot, b * 4)
+      })
+      forwardKinematics(asset, frame.rest0, out, world)
+    }
+    legBones.forEach((b, j) => _qw3.fromArray(out.rot, b * 4).multiply(_qw2.copy(_clipLocal[j]).invert()).toArray(lift.last, j * 4))
     // a pivoted flat foot hands its held contacts the places drawn, and its
     // correction is the one drawn: the clip's hold carries on from there
     if (_pivoted[i] && body) {
