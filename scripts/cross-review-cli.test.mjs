@@ -43,7 +43,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { writeState as writeSwitchState } from './lane-switch-core.mjs'
 import { formatContributionPassPlan } from './cross-review.mjs'
-import { CROSS, MAIN, SCARCE, trailerFor } from './model-lanes.mjs'
+import { CROSS, MAIN, SCARCE, TEST_FOREIGN_MODELS, trailerFor } from './model-lanes.mjs'
 
 // Every model name below is read from the lane registry (scripts/model-lanes.mjs).
 const CROSS_NAME = CROSS.displayName
@@ -198,7 +198,7 @@ process.stdout.write(JSON.stringify({
   result: answer,
   usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
   modelUsage: {
-    'claude-haiku-4-5': { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    ${JSON.stringify(TEST_FOREIGN_MODELS.haikuId)}: { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
     [model]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: model },
   },
 }))

@@ -59,7 +59,7 @@ const modelProbe = modelHandoffDecision({
   hits,
   state: firstHandoff.state,
   sessionId: 'trusted-attempt',
-  currentModel: 'Haiku 4.5',
+  currentModel: TEST_FOREIGN_MODELS.haiku,
   now: modelProbeAt,
 })
 
