@@ -2185,3 +2185,5 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 - batch-launcher-daemon test "a HANGING send loses to its budget" timed out under load (finding 22.10.2026 06:57) — load-sensitive timeout.
 - From the 1393 review: unlocked lane-switch read-modify-write; criticality fixture same-vendor review; cross-review `--brief` plan spends a round (finding 22.10.2026 06:57).
 - The 1402 interleave test (src/render/villagerClipPose.test.ts:583) passes trivially without a toe-release frame; assert a release-frame count > 0 (Fable 5.1 review, 22.10.2026).
+
+- polish-villagers full pass walls at 45 min with a 7.9 GB Chrome renderer (23.10.2026, feat/1404 983fe682f; village-walk alone 3:34) — the bundle LARGE cannot cover the suite until per-page memory growth across sections is fixed or the suite split.
