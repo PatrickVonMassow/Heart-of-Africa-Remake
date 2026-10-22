@@ -132,7 +132,9 @@ Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflu
 Änderung braucht alles — sonst wird Testen umgangen. **Abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik und Zustand.
-  Sekunden, und kein Browser-Timing kann sie flackern lassen.
+  Sekunden, und kein Browser-Timing kann sie flackern lassen — wohl aber das Zeitlimit pro
+  Fall, wenn ein teurer Fall auf einer ausgelasteten Maschine darüber rutscht. Mach solche
+  Fälle billig, statt das Limit anzuheben.
 - **Klein (bei Sichtbarem/Interaktion):** die schnelle Schicht + ein Kernsatz echter
   Browser-Tests, auf dem Unterbau des Nutzers statt auf dem bequemeren Ersatzweg.
 - **Groß (vor jedem Release):** die volle Regression über alle Suiten und **Ziel-Backends**,
@@ -713,4 +715,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 6a63fd8aad23c72c1eea7a498fd7b582697644ab9271538b20fe1ace64c21bbf -->
+<!-- GUIDE-FINGERPRINT: 23a39deac8a98bf0bf9d6812075bd6c5a8726711a0c996c825f8e39e7c6b1d87 -->
