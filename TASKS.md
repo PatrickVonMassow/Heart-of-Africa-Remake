@@ -114,6 +114,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium. Deadline: cloud credits expire 05.11.2026 08:59 MEZ.
   After landing (finding 22.10.2026 22:05): a "Von dir zu klären" card asks the user to start a cloud
   session with the probe order and then confirm the credit drop under claude.ai/settings/usage; deadline 05.11.2026.
+  Bundle: Modell & Wächter.
 
 - [ ] 1424. A walking child snaps backwards when its way round an obstacle expires
   Split off 1403 (22.10.2026, after nine non-converging tries): a roaming child walking round an obstacle at 1.4 m/s (bank `drive`, `wants=false`) has its edge commitment end on the CLOCK (`ageEdge`, tagGame.ts) while its goal lies >135° behind; the walk snaps ~185° in one frame and the child walks backwards while its body eases after it. Done when `tagShuffle.facing.test.ts` "never walks a child far backwards" is un-skipped and green at its 0.3 m bound (measured 0.303 m, child 3, the boulder climber, t 80.05 s), with every other place case green, and a moving capture shows no backwards walk.
