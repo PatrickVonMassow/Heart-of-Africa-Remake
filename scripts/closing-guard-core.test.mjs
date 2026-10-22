@@ -22,6 +22,7 @@ import {
   evaluate,
 } from './closing-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { MAIN } from './model-lanes.mjs'
 
 const HEAD = 'abc123def456'
 // The two times the ORDER check is judged against (point 631): every cleanup
@@ -677,14 +678,14 @@ describe('evaluate — the tick gate', () => {
 describe('landingTickNumber — the tick that hides inside a command', () => {
   it('reads the point number out of a landing command', () => {
     expect(landingTickNumber('node scripts/land-point.mjs 594')).toBe(594)
-    expect(landingTickNumber('node scripts/land-point.mjs 594 --model "Claude Opus 5"')).toBe(594)
+    expect(landingTickNumber(`node scripts/land-point.mjs 594 --model "${MAIN.trailerName}"`)).toBe(594)
     expect(landingTickNumber('node scripts/land-point.mjs 594 --serial --branch feat/594-x')).toBe(594)
   })
 
   it('is not fooled by a number inside a quoted value', () => {
-    // `--model "Claude Opus 5"` must never read as point 5.
-    expect(landingTickNumber('node scripts/land-point.mjs --model "Claude Opus 5" 594')).toBe(594)
-    expect(landingTickNumber("node scripts/land-point.mjs --model 'Claude Opus 4.8' 594")).toBe(594)
+    // A quoted model name ending in a version must never read as a point number.
+    expect(landingTickNumber(`node scripts/land-point.mjs --model "${MAIN.trailerName}" 594`)).toBe(594)
+    expect(landingTickNumber(`node scripts/land-point.mjs --model '${MAIN.fallback.trailerName}' 594`)).toBe(594)
   })
 
   it('takes the number from the SEGMENT that invokes it, not from a sibling', () => {
@@ -718,7 +719,7 @@ describe('landingTickNumber — the tick that hides inside a command', () => {
     const tasksText = ['- [ ] 594. A POINT THAT DELIVERS A CLOSING', '  Closing: run the full cycle.'].join('\n')
     const claim = closingTickClaim({
       toolName: 'Bash',
-      toolInput: { command: 'node scripts/land-point.mjs 594 --model "Claude Opus 5"' },
+      toolInput: { command: `node scripts/land-point.mjs 594 --model "${MAIN.trailerName}"` },
       tasksText,
     })
     // The point is still IN the work order at PreToolUse time, spec and all, so

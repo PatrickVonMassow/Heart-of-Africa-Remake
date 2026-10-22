@@ -28,7 +28,7 @@
 // NOT JUDGED (21.10.2026): a pure read pipeline (rg, grep, cat, head, git log
 // … joined only by `|`, see isPureRead) reads its quoted words literally, so
 // a quoted `?`, `*`, `;` or `|` there no longer makes it a possible deposit;
-// a direct `node scripts/board.mjs` or `ask-astra.mjs` call passes with prose
+// a direct `node scripts/board.mjs` or `ask-lane.mjs` call passes with prose
 // arguments (`?`, `;`, `|` but no `*`, quote or substitution).
 // ACCEPTED FALSE POSITIVES: a command that merely MENTIONS `finding.mjs` or
 // `--request` (echo, grep, a test name) is judged as well; so is any other

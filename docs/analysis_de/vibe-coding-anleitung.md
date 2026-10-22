@@ -674,6 +674,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Gemergt heißt nicht laufend.** Ein Dauerprozess läuft nach dem Merge mit altem Code weiter.
   → *Prompt:* „Vor einer **Live**-Messung: Startete der Prozess **nach** dem Merge? Sonst neu
   starten — und die Aufsicht tut das künftig selbst.“
+- **Dein Auftrag gilt als eingereiht, lag aber nur ungespeichert da** — Aufräumen schob ihn weg.
+  → *Prompt:* „**Eingereiht** heißt **committet und gepusht**. Aufräumen **sichert und meldet**
+  fremde ungespeicherte Arbeit, statt sie wegzuschieben.“
 
 ---
 
@@ -713,4 +716,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9f68b981fa4c28bbb623027cc4044fece157b7f6e2632c24c5df72ddf92a860a -->
+<!-- GUIDE-FINGERPRINT: 363b47bd2b34e3eae77a54ade0ad5f50476d623d5eea04d1e8ab5c4ec48740da -->

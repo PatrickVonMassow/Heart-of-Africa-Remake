@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { evaluate } from './dashboard-conciseness-guard-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { taskPointNumbers } from './dashboard-point-reader-core.mjs'
@@ -25,8 +25,8 @@ const TASKS = repoPath('TASKS.md')
  */
 export function gatherDashboardConcisenessInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  if (!ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
   }
   // No board yet — dashboard-guard owns that case.
   if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }

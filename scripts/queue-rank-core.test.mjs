@@ -521,7 +521,7 @@ describe('the LIVE record, which is what every checkout inherits', () => {
 //
 // The FROZEN front (`boundary`) is what grandfathers the order that predates the
 // rule. It was the moving provenance baseline in the first cut, and a
-// cross-vendor review (GPT-5.6 Sol, 21.08.2026) showed that to be a two-turn
+// cross-vendor review (21.08.2026) showed that to be a two-turn
 // bypass: settle anywhere, then move the point in front of the release, and
 // nothing ever asked.
 
@@ -539,7 +539,7 @@ describe('URGENCY is read off what the point STATES', () => {
   it('accepts a NAMED blocking condition without a tag', () => {
     expect(statesHighUrgency('The launcher spawns twice and this stops the batch until it is fixed.')).toBe(true)
     expect(statesHighUrgency('It blocks the release: the tag cannot be cut while it stands.')).toBe(true)
-    expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)
+    expect(statesHighUrgency('It blocks a lane — no cross-lane-authored point can be served.')).toBe(true)
     expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
   })
   it('requires the QUALIFICATION the spec names, not just the word "red"', () => {
@@ -588,7 +588,7 @@ describe('URGENCY is read off what the point STATES', () => {
     expect(statesHighUrgency('It cannot be deferred because it blocks the release.')).toBe(true)
     // …while the condition's OWN "cannot" is not read as a denial of itself.
     expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
-    expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)
+    expect(statesHighUrgency('It blocks a lane — no cross-lane-authored point can be served.')).toBe(true)
   })
 
   it('does not promote a question or hypothetical mention into an assertion', () => {

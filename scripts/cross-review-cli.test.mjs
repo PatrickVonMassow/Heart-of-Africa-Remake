@@ -1,0 +1,1429 @@
+// THE COMMAND ITSELF, NOT ONLY ITS DECISION CORE (point 624).
+//
+// The cross-vendor review's sharpest finding was about the test suite rather
+// than the code: every case ran against the pure core, so the WRAPPER — the exit
+// codes, the range gathering, the probe gate, the handover text, the login
+// refusals — was unproven, and two real defects passed a green run. So the real
+// command is spawned here against a STUB `codex` on PATH: no network, no
+// allowance spent, and every path the operator actually walks is exercised.
+//
+// IT RUNS AGAINST A FIXTURE REPOSITORY, NOT AGAINST THIS CHECKOUT (measured
+// 11.08.2026, at the merge). The first version reviewed `--sha HEAD` of the real
+// tree: on a feature branch HEAD diverges from `main` and the range guard is
+// satisfied, on `main` it does not and the command correctly refuses — so five
+// cases were green on the branch they were written on and red the moment the
+// point landed. A suite whose verdict depends on which branch it sits on is
+// testing the checkout, not the code, and naming the range explicitly would only
+// have hidden that: the material would still have been whatever the repository
+// happened to hold that day.
+//
+// So `beforeAll` builds a small repository with a known history — a `main`, a
+// feature branch above it, and one branch whose commit is authored by the
+// fallback reviewer itself — copies the command and its imports into it, and
+// runs THAT. Every sha, every range and every author below is a fact of the
+// fixture, identical on any branch, on any machine, at any time.
+//
+// All state is redirected into the fixture too (`CROSS_REVIEW_STATE_DIR`,
+// `CODEX_HOME`), so the suite never touches the developer's checkout or login.
+import { describe, expect, it, beforeAll, afterAll } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join, resolve } from 'node:path'
+import { writeState as writeSwitchState } from './lane-switch-core.mjs'
+import { formatContributionPassPlan } from './cross-review.mjs'
+import { CROSS, MAIN, SCARCE, TEST_FOREIGN_MODELS, trailerFor } from './model-lanes.mjs'
+
+// Every model name below is read from the lane registry (scripts/model-lanes.mjs).
+const CROSS_NAME = CROSS.displayName
+const MAIN_NAME = MAIN.displayName
+const SCARCE_NAME = SCARCE.displayName
+const FALLBACK_NAME = MAIN.fallback.displayName
+/** The cross lane's oldest retired display spelling — what landed ledger rows carry. */
+const RETIRED_CROSS = CROSS.retired.filter((name) => /\s/.test(name)).at(-1)
+const CROSS_TRAILER = trailerFor('cross')
+const MAIN_TRAILER = trailerFor('main')
+
+/** The command and everything it imports — copied so REPO_ROOT is the fixture. */
+const SCRIPT_FILES = [
+  'cross-review.mjs',
+  'cross-review-core.mjs',
+  // The material budget, its accounting and the pass plan (point 714): the
+  // command refuses a record whose round did not carry the range, and the suite
+  // exercises that refusal against the real command.
+  'review-material-core.mjs',
+  // The recorder too: the suite RUNS the record command the report prints, which
+  // is the only honest way to claim that command is complete.
+  'mechanism-review.mjs',
+  'mechanism-review-core.mjs',
+  'authorship-check-core.mjs',
+  'authorship-check-io.mjs',
+  'mandatory-duty-core.mjs',
+  'mechanism-review-range-core.mjs',
+  // …which counts a blind-parallel union itself (point 634), so its accounting
+  // core travels with it, and asks the AUTHOR allowlist what a model trailer
+  // looks like (point 667), so that one does too.
+  'blind-merge-core.mjs',
+  'model-guard-core.mjs',
+  'main-checkout-core.mjs',
+  'repo-paths.mjs',
+  'is-main.mjs',
+  // …and the tracked-file probe the recorder asks before it lets a blind half
+  // name its own author (point 834).
+  'git-tracked.mjs',
+  // The share switch the command asks BEFORE it spends an allowance (point 654), and
+  // the atomic write it persists a setting with. The fixture leaves the setting unset,
+  // so every case below runs at `default` — reviews to the cross lane, as before.
+  'lane-routing.mjs',
+  'lane-routing-core.mjs',
+  'lane-switch.mjs',
+  'lane-switch-core.mjs',
+  'ask-lane-core.mjs',
+  'author-delegate-core.mjs',
+  'atomic-write.mjs',
+  // The lane registry every one of them reads model names from.
+  'model-lanes.mjs',
+]
+
+let dir = ''
+let repo = ''
+let stubDir = ''
+let stateDir = ''
+let scarceOnFile = ''
+let scarceOffFile = ''
+let script = ''
+let mainSha = ''
+let headSha = ''
+let scarceSha = ''
+let crossSha = ''
+let crossHeadSha = ''
+let unreviewableSha = ''
+let partlyReviewableSha = ''
+let mergeResolutionSha = ''
+let orphanSha = ''
+let bulkSha = ''
+let oddSha = ''
+let gitlinkSha = ''
+let bulkCrossSha = ''
+let edgeSha = ''
+let manyTouchesSha = ''
+let historicalReviewSha = ''
+let revertedSha = ''
+/** A name git prints QUOTED, because it is not plain ASCII. */
+const ODD_NAME = 'ümlaut.txt'
+/** A name git does NOT quote and a trim would corrupt (POSIX only — Windows
+ *  cannot create it, so its case skips there). */
+const EDGE_NAME = 'edge-space.txt '
+/** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
+let emptyTemplate = ''
+
+/** A `codex` that answers however the case's env asks it to. */
+const STUB = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+if (argv[0] === '--version') {
+  // The fingerprint the probe receipt is bound to reads this.
+  process.stdout.write((process.env.STUB_VERSION || 'codex-cli 0.147.0') + '\\n')
+  process.exit(0)
+}
+const out = argv[argv.indexOf('-o') + 1]
+const model = argv[argv.indexOf('-m') + 1]
+if (process.env.STUB_MODE === 'no-receipt') {
+  // The child this mode plays EXITS WITHOUT EVER READING ITS STDIN (finding 8;
+  // round-1 pass 4): the earlier stub read everything first and only withheld
+  // the token, which tested a different child — one that DID read. Answering
+  // before the first read is what makes the receipt impossible to echo for the
+  // honest reason.
+  const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+  if (out) writeFileSync(out, answer)
+  process.stdout.write(answer)
+  process.exit(0)
+}
+// What arrived on stdin is recorded: the material travels that way, and an
+// assertion on the caller's own log message would stay green without it.
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+appendFileSync(process.env.STUB_LOG, model + '\\n')
+if (model !== ${JSON.stringify(CROSS.modelId)}) {
+  // The unknown-id probe: the real server refuses it, which is what proves -m
+  // is honoured at all.
+  process.stderr.write('The requested model is not supported when using Codex with a ChatGPT account.\\n')
+  process.exit(1)
+}
+if (process.env.STUB_MODE === 'fail') {
+  process.stderr.write('stream error: You are not logged in. Run \`codex login\`.\\n')
+  process.exit(1)
+}
+if (process.env.STUB_MODE === 'limit') {
+  process.stderr.write("ERROR: You've hit your usage limit. Try again later.\\n")
+  process.exit(1)
+}
+// A compliant reviewer reads the material to its end and echoes the RECEIPT
+// token from its last line (finding 8). STUB_MODE=no-receipt plays the child
+// that answered without ever reading its stdin.
+const token = /=== END OF MATERIAL — RECEIPT ([0-9a-f]+) ===/.exec(stdin)
+const receipt = process.env.STUB_MODE === 'no-receipt' || !token ? '' : 'RECEIPT: ' + token[1] + '\\n'
+const answer = receipt + (process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files')
+if (out) writeFileSync(out, answer)
+process.stdout.write(answer)
+process.exit(0)
+`
+
+/** A read-only Claude reviewer whose result proves the requested top-level model. */
+const CLAUDE_STUB = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+const model = argv[argv.indexOf('--model') + 1]
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+appendFileSync(process.env.STUB_LOG, model + '\\n')
+const token = /=== END OF MATERIAL — RECEIPT ([0-9a-f]+) ===/.exec(stdin)
+const answer = (token ? 'RECEIPT: ' + token[1] + '\\n' : '') +
+  'VERDICT: merge\\nEVIDENCE: read the complete bounded end-state files and their patch'
+process.stdout.write(JSON.stringify({
+  session_id: 'fixture-review-session',
+  result: answer,
+  usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
+  modelUsage: {
+    ${JSON.stringify(TEST_FOREIGN_MODELS.haikuId)}: { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    [model]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: model },
+  },
+}))
+`
+
+/**
+ * A hermetic git: the developer's own configuration is NOT inherited.
+ *
+ * `commit.gpgsign=true` in a global config would fail every fixture commit on a
+ * machine without the signer, and a global `core.hooksPath` would run somebody
+ * else's hooks inside our temp repository (four-eyes finding, 11.08.2026). The
+ * suite must answer the same on any machine, which is the whole reason the
+ * fixture exists.
+ */
+const HERMETIC_GIT = Object.freeze({
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_AUTHOR_NAME: 'Fixture',
+  GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+  GIT_COMMITTER_NAME: 'Fixture',
+  GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+})
+
+/**
+ * The environment a fixture git call gets: EVERY inherited `GIT_*` variable is
+ * dropped first.
+ *
+ * Pointing the config FILES at /dev/null is not enough — `GIT_CONFIG_COUNT` with
+ * its `GIT_CONFIG_KEY_n`/`VALUE_n` pairs injects configuration straight from the
+ * environment, and `GIT_TEMPLATE_DIR` seeds a new repository with somebody
+ * else's `info/exclude` (a host template excluding `*.txt` would make the
+ * fixture's first commit empty and fail it). Both survive /dev/null, so the slate
+ * is wiped and only what this suite sets is put back (four-eyes finding,
+ * 11.08.2026).
+ */
+const hermeticEnv = (extra = {}) => {
+  const env = { ...process.env }
+  // Case-INSENSITIVELY: Windows environment names are, so an inherited
+  // `git_config_count` would survive a `startsWith('GIT_')` filter and git would
+  // read it as the uppercase name (four-eyes finding, 11.08.2026).
+  for (const key of Object.keys(env)) if (key.toUpperCase().startsWith('GIT_')) delete env[key]
+  return { ...env, ...HERMETIC_GIT, GIT_TEMPLATE_DIR: emptyTemplate, ...extra }
+}
+
+const git = (...args) => {
+  const r = spawnSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+    encoding: 'utf8',
+    windowsHide: true,
+    env: hermeticEnv(),
+  })
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`)
+  return (r.stdout ?? '').trim()
+}
+
+/** One fixture commit, with the authoring model's full trailer (default: the main chain). */
+const commit = (file, text, subject, trailer = MAIN_TRAILER) => {
+  writeFileSync(join(repo, file), text)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', `${subject}\n\nCo-Authored-By: ${trailer}`)
+  return git('rev-parse', 'HEAD')
+}
+
+const run = (args, env = {}) =>
+  spawnSync(process.execPath, [script, ...args], {
+    windowsHide: true,
+    encoding: 'utf8',
+    cwd: repo,
+    env: hermeticEnv({
+      PATH: `${stubDir}${delimiter}${process.env.PATH}`,
+      CROSS_REVIEW_STATE_DIR: stateDir,
+      CODEX_HOME: join(dir, 'codex-home'),
+      STUB_LOG: join(dir, 'calls.log'),
+      STUB_STDIN: join(dir, 'stdin.txt'),
+      LANE_SWITCH_FILE: scarceOnFile,
+      // An absent fixture file reads as the default routing, never the host's own setting.
+      LANE_ROUTING_FILE: join(dir, 'no-lane-routing.json'),
+      ...env,
+    }),
+  })
+
+/** The record command out of the command's report, as one line. */
+const recordCommandIn = (stdout) => {
+  const line = String(stdout).split('\n').find((l) => l.includes('mechanism-review.mjs --record'))
+  expect(line, 'the report should carry a record command').toBeTruthy()
+  return line.trim()
+}
+
+/** Split a printed command line into argv, honouring its double quotes. */
+const splitCommand = (line) =>
+  (line.match(/"(?:[^"\\]|\\.)*"|\S+/g) ?? []).map((token) =>
+    token.startsWith('"') ? token.slice(1, -1).replace(/\\(["\\$`])/g, '$1') : token,
+  )
+
+const calls = () => {
+  try {
+    return readFileSync(join(dir, 'calls.log'), 'utf8').split('\n').filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Prove the model id once, the way the command itself does.
+ *
+ * A receipt written by hand cannot carry the fingerprint the running codex
+ * hashes to, and would be discarded as untied — which is exactly the behaviour
+ * the fingerprint was added for. So the warm-up runs the real `--probe`.
+ */
+const provenId = () => {
+  const r = run(['--probe'])
+  expect(r.status, r.stderr).toBe(0)
+  writeFileSync(join(dir, 'calls.log'), '')
+}
+
+beforeAll(() => {
+  dir = mkdtempSync(join(tmpdir(), 'cross-review-cli-'))
+  emptyTemplate = join(dir, 'empty-git-template')
+  mkdirSync(emptyTemplate, { recursive: true })
+  repo = join(dir, 'repo')
+  stubDir = join(dir, 'bin')
+  stateDir = join(repo, 'local')
+  scarceOnFile = join(dir, 'scarce-on.json')
+  scarceOffFile = join(dir, 'scarce-off.json')
+  mkdirSync(stubDir, { recursive: true })
+  mkdirSync(join(repo, 'scripts'), { recursive: true })
+
+  writeFileSync(join(stubDir, 'codex'), STUB)
+  chmodSync(join(stubDir, 'codex'), 0o755)
+  writeFileSync(join(stubDir, 'claude'), CLAUDE_STUB)
+  chmodSync(join(stubDir, 'claude'), 0o755)
+  // Windows cannot execute an extensionless shebang script, and this suite makes
+  // Windows-specific assertions elsewhere (four-eyes finding, 11.08.2026).
+  if (process.platform === 'win32') {
+    writeFileSync(join(stubDir, 'codex.cmd'), `@echo off\r\nnode "%~dp0codex" %*\r\n`)
+    writeFileSync(join(stubDir, 'claude.cmd'), `@echo off\r\nnode "%~dp0claude" %*\r\n`)
+  }
+  writeFileSync(join(dir, 'calls.log'), '')
+  writeFileSync(
+    scarceOnFile,
+    JSON.stringify({ lanes: { scarce: writeSwitchState('on', { why: 'fixture default', by: 'test', now: 1 }) } }),
+  )
+  writeFileSync(
+    scarceOffFile,
+    JSON.stringify({ lanes: { scarce: writeSwitchState('off', { why: 'fixture refusal', by: 'test', now: 1 }) } }),
+  )
+
+  // The fixture history: main, a feature branch above it, and a branch whose
+  // commit was authored by the fallback reviewer itself.
+  // `init` gets the hermetic environment too: a developer's `init.templateDir`
+  // would otherwise seed this repository's own config and hooks before the
+  // commands below ever disable the global files (four-eyes finding, 11.08.2026).
+  spawnSync('git', ['init', '-q', '-b', 'main', '--template', emptyTemplate, repo], {
+    windowsHide: true,
+    env: hermeticEnv(),
+  })
+  script = join(repo, 'scripts', 'cross-review.mjs')
+  for (const file of SCRIPT_FILES) copyFileSync(resolve('scripts', file), join(repo, 'scripts', file))
+  // `local/` is ignored here as it is in the real repository — the saved-login
+  // path is refused unless git PROVES it ignored, and that proof is a property
+  // of the checkout the file lives in.
+  writeFileSync(join(repo, '.gitignore'), '/local/\nnode_modules\n')
+  // A path GIT QUOTES lives in the fixture world from the start (cross-vendor
+  // review, second round): its non-ASCII name is written `"\303\274mlaut.txt"`
+  // in `--name-only` and in the diff header alike, and read literally it
+  // resolved in no `git show` and matched no patch section — the file travelled
+  // in no pass and nothing said so.
+  writeFileSync(join(repo, ODD_NAME), 'the original odd-named file\n')
+  // The trailing-space file exists from the start, so the edge branch MODIFIES
+  // it and its current content must travel beside the patch.
+  if (process.platform !== 'win32') writeFileSync(join(repo, EDGE_NAME), 'the original edge-space file\n')
+  mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world')
+
+  git('checkout', '-q', '-b', 'feat')
+  commit('world.txt', 'the fixture world, revised\n', 'Revise the world')
+  headSha = commit('added.txt', 'a file the patch carries whole\n', 'Add a file')
+
+  git('checkout', '-q', '-b', 'scarce-work', 'main')
+  scarceSha = commit('scarce.txt', 'written by the fallback reviewer\n', 'Write something in the scarce lane', trailerFor('scarce'))
+
+  // …and a branch the CROSS LANE authored (point 667), which it may therefore not review.
+  git('checkout', '-q', '-b', 'cross-work', 'main')
+  crossSha = commit('cross.txt', 'written in the cross authoring lane\n', 'Write something in the cross lane', CROSS_TRAILER)
+  // …with a SECOND commit above it, so a `--since` can narrow the cross range.
+  crossHeadSha = commit('cross2.txt', 'a second commit in the cross authoring lane\n', 'Extend the cross work', CROSS_TRAILER)
+
+  // A single contribution authored by both vendors has no independent vendor
+  // left in the configured reviewer pool. Its refusal must still name the
+  // bounded narrowing the operator can use to make progress around it.
+  git('checkout', '-q', '-b', 'unreviewable', 'main')
+  writeFileSync(join(repo, 'unreviewable.txt'), 'written by both authoring lanes\n')
+  git('add', '-A')
+  git(
+    'commit',
+    '--no-verify',
+    '-q',
+    '-m',
+    `Write across both authoring lanes\n\nCo-Authored-By: ${CROSS_TRAILER}\nCo-Authored-By: ${MAIN_TRAILER}`,
+  )
+  unreviewableSha = git('rev-parse', 'HEAD')
+
+  // One independently reviewable file beside one both-vendor file. The latter
+  // remains owed, but it must not suppress the pass the former can earn.
+  git('checkout', '-q', '-b', 'partly-reviewable', 'main')
+  commit('reviewable.txt', 'written by one authoring lane\n', 'Add the reviewable part')
+  writeFileSync(join(repo, 'unavailable.txt'), 'written by both authoring lanes\n')
+  git('add', '-A')
+  git(
+    'commit',
+    '--no-verify',
+    '-q',
+    '-m',
+    `Add the unavailable part\n\nCo-Authored-By: ${CROSS_TRAILER}\nCo-Authored-By: ${MAIN_TRAILER}`,
+  )
+  partlyReviewableSha = git('rev-parse', 'HEAD')
+
+  // A feature branch resolves a conflict while merging a newer main. The
+  // merge itself has no trailer and its second parent is outside `main..head`,
+  // exactly the historical shape that used to turn the cc-only resolution into
+  // unknown authorship and refuse the whole review plan.
+  git('checkout', '-q', '-b', 'merge-resolution', mainSha)
+  commit('world.txt', 'the feature-side world\n', 'Revise the world on the feature')
+  git('checkout', '-q', 'main')
+  commit('world.txt', 'the main-side world\n', 'Revise the world on main')
+  git('checkout', '-q', 'merge-resolution')
+  const merged = spawnSync('git', ['-c', 'core.hooksPath=', 'merge', '--no-ff', '--no-commit', 'main'], {
+    windowsHide: true,
+    cwd: repo,
+    encoding: 'utf8',
+    env: hermeticEnv(),
+  })
+  expect(merged.status).toBe(1)
+  expect(`${merged.stdout}${merged.stderr}`).toContain('CONFLICT')
+  writeFileSync(join(repo, 'world.txt'), 'the resolved world\n')
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Resolve the main merge')
+  mergeResolutionSha = git('rev-parse', 'HEAD')
+
+  // A branch whose material CANNOT fit one round (point 714): two files of 120k
+  // characters, so the range needs more than the 200k budget however it is cut.
+  git('checkout', '-q', '-b', 'bulk', 'main')
+  writeFileSync(join(repo, 'bulk-a.txt'), `${'a'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-b.txt'), `${'b'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', `Add two files no single round can hold\n\nCo-Authored-By: ${MAIN_TRAILER}`)
+  bulkSha = git('rev-parse', 'HEAD')
+
+  // …and a branch that CHANGES that quoted-name file, so the range carries it as
+  // a modification and its current content must travel with the patch.
+  git('checkout', '-q', '-b', 'odd-name', 'main')
+  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file')
+
+  // …and a branch adding a GITLINK (a submodule pointer, mode 160000): its
+  // entry names a COMMIT object, so its body is absent by design. cacheinfo
+  // writes the entry without any submodule machinery.
+  git('checkout', '-q', '-b', 'gitlink', 'main')
+  git('update-index', '--add', '--cacheinfo', `160000,${'f'.repeat(40)},vendor-sub`)
+  git('commit', '--no-verify', '-q', '-m', `Pin the vendored subproject\n\nCo-Authored-By: ${MAIN_TRAILER}`)
+  gitlinkSha = git('rev-parse', 'HEAD')
+
+  // …and a branch touching a path with a TRAILING SPACE, which git prints
+  // UNQUOTED — the spelling a trim corrupts into a different path (point 714,
+  // third round). Windows cannot create such a file, so the branch is POSIX-only.
+  if (process.platform !== 'win32') {
+    git('checkout', '-q', '-b', 'edge-name', 'main')
+    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file')
+  }
+
+  // …and the same bulk, authored by the CROSS LANE: the review goes to the main
+  // chain, and a range no round can hold must be handed on as passes
+  // rather than as a whole-range record template (cross-vendor review, second
+  // round).
+  git('checkout', '-q', '-b', 'bulk-cross', 'main')
+  writeFileSync(join(repo, 'bulk-c.txt'), `${'c'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-d.txt'), `${'d'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', `Add two more files no round can hold\n\nCo-Authored-By: ${CROSS_TRAILER}`)
+  bulkCrossSha = git('rev-parse', 'HEAD')
+
+  // The measured shape behind point 737: history is long, but the end-state
+  // artefact is one small file and therefore one review round.
+  git('checkout', '-q', '-b', 'many-touches', 'main')
+  for (let index = 1; index <= 8; index++) {
+    const touchSha = commit(
+      'shared.txt',
+      `current end state after touch ${index}\n`,
+      `Touch the shared file ${index}`,
+    )
+    if (index === 1) historicalReviewSha = touchSha
+    manyTouchesSha = touchSha
+  }
+
+  // A path changed and then restored has no net artefact to review.
+  git('checkout', '-q', '-b', 'reverted', mainSha)
+  commit('world.txt', 'temporary world\n', 'Temporarily revise the world')
+  revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world')
+
+  // A history sharing no ancestor with the rest: the third form of "not a proper
+  // ancestor", which merge-base answers with nothing at all.
+  git('checkout', '-q', '--orphan', 'unrelated')
+  git('rm', '-rqf', '--ignore-unmatch', '.')
+  orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history')
+  git('checkout', '-q', '-f', 'feat')
+
+  // A genuine contribution-era scoped pass: it read shared.txt after touch 1,
+  // then seven later commits changed that file. The new plan must say why this
+  // once-usable reading no longer reduces the current file debt.
+  mkdirSync(join(repo, '.claude'), { recursive: true })
+  writeFileSync(
+    join(repo, '.claude', 'mechanism-reviews.jsonl'),
+    `${JSON.stringify({
+      sha: historicalReviewSha,
+      model: RETIRED_CROSS,
+      verdict: 'merge',
+      evidence: 'read the complete shared file after its first change',
+      mode: 'review',
+      pass: { index: 1, total: 1, files: ['shared.txt'], commits: [historicalReviewSha] },
+      at: Date.now(),
+      // The fixture commits are created at test time, which is inside the
+      // commit-era reviewer rule, so the row carries what that rule demands of
+      // a codex-runtime reviewer: an explicit unverified claim with its reason.
+      reviewerAuthorship: {
+        status: 'unverified',
+        claimedModel: RETIRED_CROSS,
+        reason: 'external CLI reviewer, no harness transcript',
+      },
+    })}\n`,
+  )
+})
+
+afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+describe('the fixture is hermetic', () => {
+  it('drops an inherited GIT_* variable whatever its case, and seeds no host template', () => {
+    // Measured on the way in: a host template whose info/exclude holds `*.txt`
+    // makes the fixture's first commit fail and skips every case below. The
+    // variable names are case-insensitive on Windows, so the filter is too.
+    const injected = { GIT_CONFIG_COUNT: '1', git_config_key_0: 'core.excludesFile', Git_Template_Dir: '/somewhere' }
+    Object.assign(process.env, injected)
+    try {
+      const env = hermeticEnv()
+      expect(env.GIT_CONFIG_COUNT).toBeUndefined()
+      expect(env.git_config_key_0).toBeUndefined()
+      expect(env.Git_Template_Dir).toBeUndefined()
+      expect(env.GIT_TEMPLATE_DIR).toBe(emptyTemplate)
+      expect(env.GIT_CONFIG_GLOBAL).toBe('/dev/null')
+      // …and nothing outside git's namespace is thrown away with it.
+      expect(env.PATH).toBe(process.env.PATH)
+    } finally {
+      for (const key of Object.keys(injected)) delete process.env[key]
+    }
+  })
+})
+
+describe('a review that runs', () => {
+  it('reviews one current file once after eight commits touched it', () => {
+    provenId()
+    const r = run(['--sha', manyTouchesSha, '--brief', 'judge the current shared file'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).toContain('DROPPED INTERMEDIATE STATES: shared.txt — 7 states were superseded')
+    expect(r.stderr).toContain(
+      'INVALIDATED HISTORICAL COVERAGE: 1 scoped pass record contains a reading that no longer clears 1 end-state file',
+    )
+    expect(r.stderr).toContain(`${historicalReviewSha.slice(0, 7)} pass 1/1: shared.txt`)
+    expect(r.stderr.match(/^  pass 1\/1 →/gm)).toHaveLength(1)
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('current end state after touch 8')
+  })
+
+  it('drops a file restored to its base state and names the reason', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', revertedSha, '--brief', 'judge the net range'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('DROPPED AS NON-MATERIAL: world.txt — end state identical to the base')
+    expect(r.stderr).toContain('no review record is needed')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
+  it('prints the reviewer, its answer and a complete record command, and exits 0', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--point', '624', '--brief', 'judge the fallback path'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).toContain(CROSS_NAME)
+    expect(r.stdout).toContain('read the whole range and both test files')
+    // THE RECORD COMMAND IS RUN, not merely pattern-matched (four-eyes finding,
+    // 11.08.2026): asserting three of its flags leaves a malformed, unrunnable
+    // command green, and "prints a complete record command" is a claim about
+    // whether the recorder ACCEPTS it.
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain(`--model "${CROSS_NAME}"`)
+    expect(printed).toContain('--verdict merge')
+    expect(printed).toContain('--point 624')
+    expect(printed).toContain(headSha)
+    const recorded = spawnSync(process.execPath, splitCommand(printed).slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv(),
+    })
+    expect(recorded.status, recorded.stderr).toBe(0)
+    const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+    expect(JSON.parse(ledger.at(-1))).toMatchObject({
+      sha: headSha,
+      model: CROSS_NAME,
+      verdict: 'merge',
+      mode: 'review',
+      point: 624,
+      authoredBy: expect.stringContaining(MAIN_NAME),
+    })
+    // The material really REACHES the model — asserted on what the process
+    // received, not on the caller's own log line.
+    const received = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(received).toContain('=== DIFFSTAT ===')
+    expect(received).toContain('=== PATCH ===')
+    expect(received).toContain('diff --git')
+    // …WHOLE: the size the command claims for the round is the size the child
+    // process actually read off its stdin — a real transport check, not the
+    // call site's own echo (escalation round).
+    const claimed = Number(/material: (\d+) characters/.exec(r.stderr)?.[1])
+    expect(received.length).toBe(claimed)
+    // …and it is the whole BRANCH, both commits above main, not just the head.
+    expect(received).toContain('the fixture world, revised')
+    expect(received).toContain('a file the patch carries whole')
+    expect(r.stderr).toMatch(/material: \d+ characters/)
+  })
+})
+
+describe('the file bodies travel byte-exact', () => {
+  it('keeps a body’s leading and trailing blank lines, which a trim would eat', () => {
+    // Fourth cross-vendor round, pass 4: gatherRange read bodies through the
+    // trimming git() default, so every file lost its edge whitespace and final
+    // newline — and the assembly recorded the ALTERED string as complete, so
+    // byte-inexact delivery passed the accounting. Asserted on what the child
+    // process actually received, not on any log line.
+    provenId()
+    git('checkout', '-q', '-b', 'padded-work', 'main')
+    // A MODIFIED file, so its body travels as current content — an added one
+    // rides inside the patch and would not exercise the body read.
+    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges')
+    const r = run(['--sha', sha, '--brief', 'judge the padding'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('=== FILE (current content): world.txt ===\n\n\n  body with edges  \n\n')
+  })
+})
+
+describe('a binary file in the range', () => {
+  it('travels absent-by-design in the material rather than vanishing or arriving as mojibake', () => {
+    // Fourth cross-vendor round, pass 4, finding 7: an added binary was
+    // skipped as "covered by the patch" while the ordinary diff carries only
+    // "Binary files differ" — the blob never travelled, nothing was recorded.
+    provenId()
+    git('checkout', '-q', '-b', 'binary-work', 'main')
+    writeFileSync(join(repo, 'blob.bin'), Buffer.from([0, 1, 2, 3, 250, 251, 0, 90]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', `Add a binary blob\n\nCo-Authored-By: ${MAIN_TRAILER}`)
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the blob'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('FILE BODY ABSENT BY DESIGN — binary')
+    expect(sent).toContain('blob.bin')
+    expect(sent).not.toContain('GIT binary patch')
+    expect(sent).not.toContain('literal ')
+    // The declaration is not a loss: the record command is still offered.
+    expect(r.stdout).toContain('mechanism-review.mjs --record')
+  })
+
+  // ROUND-1 PASS 5: invalid UTF-8 without a NUL slipped past the binary check
+  // as replacement characters, and the ALTERED text was recorded as complete
+  // delivery. The strict decode refuses such bytes by name instead.
+  it('refuses a range whose diff bytes are not valid UTF-8, rather than recording mojibake', () => {
+    provenId()
+    git('checkout', '-q', '-b', 'latin1-work', 'main')
+    // 0xFF is not valid UTF-8 anywhere, and there is no NUL — git diffs this
+    // as TEXT, which is exactly the hole: the lenient decode wrote U+FFFD and
+    // called the material complete.
+    writeFileSync(join(repo, 'legacy.txt'), Buffer.from([0x61, 0xff, 0x62, 0x0a]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', `Add a latin1 body\n\nCo-Authored-By: ${MAIN_TRAILER}`)
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the legacy bytes'])
+    expect(r.status).not.toBe(0)
+    expect(`${r.stdout}${r.stderr}`).toContain('not valid UTF-8')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+})
+
+describe('a child that never read its material', () => {
+  it('yields no verdict and no completed record — the receipt closes the unread-stdin hole', () => {
+    // Finding 8: a child can exit 0 with a parseable verdict without ever
+    // reading an input smaller than the pipe buffer, and the process layer
+    // cannot witness the read. The RECEIPT token stands only on the material's
+    // last line, so this stub — which answers without it — is exactly that
+    // child, and its answer must not become a record.
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the change'], { STUB_MODE: 'no-receipt' })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('no parseable verdict')
+    expect(r.stdout).toContain('RECEIPT')
+    expect(r.stdout).toContain('The review is NOT done')
+    // ROUND-2 PASS 4: the stub deliberately answers `VERDICT: merge`, so a
+    // regression that printed a RUNNABLE record command beside the refusal
+    // would have passed every line above. What may travel is the hand-over
+    // TEMPLATE, whose angle-bracket placeholders the recorder refuses — never
+    // the unread child's own verdict as a completed command.
+    const out = `${r.stdout}${r.stderr}`
+    expect(out).not.toContain('--verdict merge ')
+    expect(out).not.toMatch(/--verdict merge$/m)
+    if (out.includes('mechanism-review.mjs --record')) {
+      expect(out).toContain('--verdict <')
+    }
+  })
+})
+
+describe('a review that does not run', () => {
+  it('names the cause, hands the review on, and exits 3 — never 0', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the fallback path'], { STUB_MODE: 'fail' })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('FALLBACK')
+    expect(r.stdout).toMatch(/login/i)
+    expect(r.stdout).toContain(SCARCE_NAME)
+    expect(r.stdout).toContain('The review is NOT done')
+    // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round): the
+    // run errored, so nothing of the range was read, and even a placeholder
+    // template at the whole sha is an offer no completed hand-off backs.
+    expect(r.stdout).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('never hands a review to the scarce lane while its switch is off', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the fallback path'], {
+      STUB_MODE: 'fail',
+      LANE_SWITCH_FILE: scarceOffFile,
+    })
+    expect(r.status).toBe(3)
+    // The main chain authored the fixture range, so the first eligible reviewer past the
+    // switched-off scarce lane is the main chain's fallback model.
+    expect(r.stdout).toContain(FALLBACK_NAME)
+    expect(r.stdout).not.toContain(SCARCE_NAME)
+  })
+
+  it('treats an answer that admits it saw nothing as no review at all', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge it'], {
+      STUB_ANSWER: 'VERDICT: do-not-merge\nEVIDENCE: I could not read the repository, so nothing was verified',
+    })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('FALLBACK')
+  })
+
+  // THE ROUTING SETTING (point 654) at `main-only` means the operator moved the load off
+  // the cross lane, so nothing may be sent — and the review must land exactly where an
+  // unreachable cross lane lands: with a handover reviewer and NO verdict. A "switched
+  // off" that quietly recorded a green review would be the worst of both.
+  it('asks NOTHING at all while the routing setting is at main-only, and still hands the review on', () => {
+    provenId()
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', headSha, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('FALLBACK')
+    expect(r.stdout).toMatch(/main-only/)
+    expect(r.stdout).toContain('The review is NOT done')
+    // The allowance is what the switch protects: no codex call may have happened.
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
+  })
+
+  // THE MEASURED OUTAGE FALLBACK (point 1194): a limit signature is recorded with its
+  // probe clock and the review goes to the same-vendor pair, named as a fallback; while
+  // the clock runs nothing is sent at all.
+  it('records a cross-lane usage limit as an outage fallback and hands the review to the scarce lane', () => {
+    provenId()
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'default' }))
+    const r = run(['--sha', headSha, '--brief', 'judge it'], { STUB_MODE: 'limit', LANE_ROUTING_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('cross-lane outage FALLBACK')
+    expect(r.stdout).toContain(SCARCE_NAME)
+    const saved = JSON.parse(readFileSync(shareFile, 'utf8'))
+    expect(saved.setting).toBe('default')
+    expect(saved.fallback).toMatchObject({ outage: 'allowance-exhausted', kind: 'review' })
+    expect(saved.fallback.probeAt).toBeGreaterThan(Date.now())
+    writeFileSync(join(dir, 'calls.log'), '')
+    const again = run(['--sha', headSha, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
+    expect(again.status).toBe(3)
+    expect(again.stdout).toContain('cross-lane outage FALLBACK')
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('hands a scarce-authored range to the main chain, never back to the scarce lane', () => {
+    provenId()
+    const r = run(['--sha', scarceSha, '--brief', 'judge it'], { STUB_MODE: 'fail' })
+    expect(r.status).toBe(3)
+    // The hand-over names its reviewer in PROSE — after a failed delivery no
+    // record command is printed at all, not even a placeholder template.
+    expect(r.stdout).toContain(MAIN_NAME)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(r.stdout).not.toContain(`Hand it to ${SCARCE_NAME}`)
+  })
+})
+
+describe('the guards around the run', () => {
+  it('reviews a cc-only resolution whose trailer-bearing merged parent is outside the range', () => {
+    provenId()
+    const r = run(['--sha', mergeResolutionSha, '--brief', 'judge the resolved file'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).not.toContain('UNREVIEWABLE')
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('the resolved world')
+  })
+
+  it('refuses a --since ref that does not exist instead of silently reviewing one commit', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--since', 'no-such-branch-here', '--brief', 'judge it'])
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toMatch(/no such commit/)
+  })
+
+  it('refuses a sha that is not a commit', () => {
+    provenId()
+    const r = run(['--sha', 'deadbeefdeadbeef', '--brief', 'judge it'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/not a commit/)
+  })
+
+  it('refuses a commit that does not diverge from main without a named range', () => {
+    // A record covers every commit it CONTAINS, so reviewing one commit while
+    // clearing its ancestors is the hole.
+    provenId()
+    const r = run(['--sha', mainSha, '--brief', 'judge it'])
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toMatch(/does not diverge/)
+    expect(r.stderr).toMatch(/--since/)
+  })
+
+  it('prints a runnable scarce-lane handover when both vendors but not every model authored', () => {
+    const r = run(['--sha', unreviewableSha, '--brief', 'judge it', '--point', '870'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer scarce')
+    expect(r.stdout).toContain('--point 870')
+    expect(r.stderr).not.toMatch(/UNREVIEWABLE/)
+  })
+
+  it('plans and runs the reviewable pass while naming the unavailable remainder', () => {
+    const planned = run(['--sha', partlyReviewableSha, '--brief', 'judge what can be reviewed'])
+    expect(planned.status).toBe(4)
+    expect(planned.stderr).toContain('2 RUNNABLE PASSES')
+    expect(planned.stderr).toContain('reviewable.txt')
+    expect(planned.stderr).toContain('unavailable.txt')
+    expect(planned.stderr).toContain('100% planned coverage (2/2 changed files)')
+
+    provenId()
+    const reviewed = run([
+      '--sha', partlyReviewableSha,
+      '--brief', 'judge what can be reviewed',
+      '--pass', '1',
+    ])
+    expect(reviewed.status, reviewed.stderr).toBe(0)
+    const printed = recordCommandIn(reviewed.stdout)
+    expect(printed).toContain('--pass 1/2')
+    expect(printed).toContain('--pass-files "reviewable.txt"')
+    expect(printed).not.toContain('unavailable.txt')
+    expect(reviewed.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of changed files (1/2)')
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('reviewable.txt')
+    expect(sent).toContain('ABSENT BY DESIGN')
+    expect(sent).toContain('pass 2/2')
+    expect(sent).toContain('unavailable.txt')
+    expect(sent).not.toContain('written by both authoring lanes')
+  })
+
+  it('records a narrowed one-round range as exactly one scoped pass', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'])
+    expect(r.status).toBe(0)
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "added.txt"')
+    expect(printed).not.toContain('--pass-commits')
+    expect(r.stdout).toContain(`clears the listed files at ${headSha.slice(0, 7)}`)
+  })
+
+  it('refuses an explicit --since that is not a proper ancestor, in each of its three forms', () => {
+    provenId()
+    const cases = [
+      // the range start IS the reviewed commit …
+      { sha: headSha, since: headSha },
+      // … a DESCENDANT of it …
+      { sha: `${headSha}~1`, since: headSha },
+      // … and a history with no common ancestor at all.
+      { sha: headSha, since: orphanSha },
+    ]
+    for (const { sha, since } of cases) {
+      const r = run(['--sha', sha, '--since', since, '--brief', 'judge it'])
+      expect(r.status, `${since} should be refused as a range start`).not.toBe(0)
+      expect(r.stderr).toMatch(/--since|does not diverge/)
+      expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    }
+  })
+
+  it('PROVES the model id before attributing a review to it, and remembers the proof', () => {
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', headSha, '--brief', 'judge it'])
+    expect(r.status, r.stderr).toBe(0)
+    // The unknown id was tried first, then the real review ran.
+    expect(calls()[0]).not.toBe(CROSS.modelId)
+    expect(calls()).toContain(CROSS.modelId)
+    expect(JSON.parse(readFileSync(join(stateDir, 'cross-review-probe.json'), 'utf8'))).toMatchObject({ refused: true })
+    // …and the next review does not pay for the probe again.
+    writeFileSync(join(dir, 'calls.log'), '')
+    expect(run(['--sha', headSha, '--brief', 'judge it']).status).toBe(0)
+    expect(calls()).toEqual([CROSS.modelId])
+  })
+
+  it('re-proves it the moment the codex it was proven with changes', () => {
+    // A cached proof is tied to the binary, its version and the account: it
+    // outlives container rebuilds, and an unbound one would let another model's
+    // answer be recorded as the cross lane's.
+    provenId()
+    writeFileSync(join(dir, 'calls.log'), '')
+    expect(run(['--sha', headSha, '--brief', 'judge it'], { STUB_VERSION: 'codex-cli 9.9.9' }).status).toBe(0)
+    expect(calls()).toHaveLength(2)
+    expect(calls()[0]).not.toBe(CROSS.modelId)
+  })
+})
+
+describe('the saved login', () => {
+  // EACH CASE BUILDS ITS OWN WORLD (four-eyes finding, 11.08.2026): the first
+  // version had "restores it again" depending on the token the case above it had
+  // saved, so running one case alone — or in another order — changed the answer.
+  let n = 0
+  const world = ({ token = true } = {}) => {
+    const id = `login-${n++}`
+    const home = join(dir, `${id}-home`)
+    const state = join(repo, 'local', id)
+    mkdirSync(home, { recursive: true })
+    if (token) writeFileSync(join(home, 'auth.json'), `{"tokens":{"access_token":"s","account_id":"${id}"}}`)
+    return { id, home, state, env: { CODEX_HOME: home, CROSS_REVIEW_STATE_DIR: state } }
+  }
+
+  it('says so when there is no login to save', () => {
+    const w = world({ token: false })
+    const r = run(['--save-login'], w.env)
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/no login found/)
+  })
+
+  it('saves a real token into the ignored directory, readable only by its owner', () => {
+    const w = world()
+    const r = run(['--save-login'], w.env)
+    expect(r.status, r.stderr).toBe(0)
+    const saved = join(w.state, 'codex-auth.json')
+    expect(readFileSync(saved, 'utf8')).toContain(w.id)
+    if (process.platform !== 'win32') expect(statSync(saved).mode & 0o777).toBe(0o600)
+    // …and git really does ignore where it landed.
+    expect(git('check-ignore', '-q', saved)).toBe('')
+  })
+
+  it('restores it again, and reports how old it is', () => {
+    const w = world()
+    expect(run(['--save-login'], w.env).status).toBe(0)
+    const restored = join(dir, `${w.id}-restored`)
+    const r = run(['--restore-login'], { ...w.env, CODEX_HOME: restored })
+    expect(r.status, r.stderr).toBe(0)
+    expect(readFileSync(join(restored, 'auth.json'), 'utf8')).toContain(w.id)
+    expect(r.stdout).toMatch(/day\(s\) ago/)
+  })
+
+  it('REFUSES to write the token where git does not ignore it', () => {
+    const w = world()
+    const notIgnored = join(repo, 'not-ignored', w.id)
+    const r = run(['--save-login'], { ...w.env, CROSS_REVIEW_STATE_DIR: notIgnored })
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/does not ignore/)
+    expect(existsSync(join(notIgnored, 'codex-auth.json'))).toBe(false)
+  })
+
+  it('REFUSES a state directory that is a link out of where it claims to be', () => {
+    // The lexical ignore check passes for a symlinked `local/`, and the copy
+    // would then follow the link.
+    const w = world()
+    const elsewhere = join(dir, `${w.id}-elsewhere`)
+    const linked = join(dir, `${w.id}-linked`)
+    mkdirSync(elsewhere, { recursive: true })
+    // A JUNCTION on Windows: a plain directory symlink needs Developer Mode or
+    // elevation there, and a fixture that cannot be built is not a test result
+    // (four-eyes finding, 11.08.2026).
+    symlinkSync(elsewhere, linked, process.platform === 'win32' ? 'junction' : 'dir')
+    writeFileSync(join(elsewhere, 'codex-auth.json'), '{"tokens":{}}')
+    const r = run(['--restore-login'], { ...w.env, CROSS_REVIEW_STATE_DIR: linked })
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/REFUSING/)
+    expect(r.stderr).toMatch(/resolves to/)
+  })
+
+  it('says what to do when nothing was ever saved', () => {
+    const w = world()
+    const r = run(['--restore-login'], { ...w.env, CROSS_REVIEW_STATE_DIR: join(dir, `${w.id}-nothing-here`) })
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/nothing saved/)
+    expect(r.stderr).toMatch(/--save-login/)
+  })
+})
+
+// POINT 667: the cross lane authors too, so the command must recognise the range it
+// may not judge — and must recognise it BEFORE it spends an allowance on it. The
+// first lane of another vendor then reviews it through its own runtime.
+describe('a range the CROSS LANE authored', () => {
+  it('spends no codex call on its own work and runs the main chain through its runtime instead', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', crossSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    // Not one codex call — not even the model-id probe: the question is answered from
+    // the trailers, and paying for a review the cross lane may not give is the waste
+    // this ordering exists to prevent. The one call is the main chain's.
+    expect(calls()).toEqual([MAIN.modelId])
+    expect(r.stdout).toContain(`${MAIN_NAME} (main lane, effort ${MAIN.reasoningEffort}) reviewed`)
+    expect(r.stdout).toContain(`--model "${MAIN_NAME}"`)
+    expect(r.stdout).toContain('--handover cross-authored')
+  })
+
+  it('starts the requested main reader and prints a record command with its model receipt', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--reviewer', 'main', '--sha', crossSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId])
+    expect(r.stdout).toContain(`${MAIN_NAME} (main lane, effort ${MAIN.reasoningEffort}) reviewed`)
+    expect(r.stdout).toContain(`--model "${MAIN_NAME}"`)
+    expect(r.stdout).toContain('--model-result')
+    expect(r.stdout).toContain('--handover cross-authored')
+  })
+
+  it('refuses the cross lane itself, and a same-vendor reader that is not the route', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const self = run(['--reviewer', 'cross', '--sha', crossSha, '--brief', 'judge the authoring lane'])
+    expect(self.status).toBe(2)
+    expect(self.stderr).toContain('may not review it')
+    const skipped = run(['--reviewer', 'scarce', '--sha', crossSha, '--brief', 'judge the authoring lane'])
+    expect(skipped.status).toBe(2)
+    expect(skipped.stderr).toContain("is not this range's first eligible handover")
+    expect(calls()).toEqual([])
+  })
+
+  it('refuses a former model key for --reviewer — roles only', () => {
+    const r = run(['--reviewer', CROSS.familyWords[0], '--sha', crossSha, '--brief', 'judge it'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--reviewer must be one of main, cross, scarce, main-fallback')
+  })
+
+  it('runs the scarce lane for the mixed cross/main end state and the recorder accepts exactly that routed verdict', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run([
+      '--reviewer', 'scarce', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state',
+      '--file', 'unreviewable.txt',
+    ])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual([SCARCE.modelId])
+    const command = splitCommand(recordCommandIn(r.stdout))
+    expect(command.slice(0, 2)).toEqual(['node', 'scripts/mechanism-review.mjs'])
+    const recorded = spawnSync(process.execPath, command.slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv({ LANE_SWITCH_FILE: scarceOnFile }),
+    })
+    expect(recorded.status, `${recorded.stdout}${recorded.stderr}`).toBe(0)
+    const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n').at(-1))
+    expect(row).toMatchObject({
+      sha: unreviewableSha,
+      model: SCARCE_NAME,
+      verdict: 'merge',
+      handover: 'cross-authored',
+      pass: { index: 1, total: 1, files: ['unreviewable.txt'], endState: unreviewableSha },
+      reviewerAuthorship: {
+        status: 'agreement', actualModel: SCARCE_NAME, servedModel: SCARCE.modelId, proof: 'claude-result',
+      },
+    })
+  })
+})
+
+// POINT 714, second cross-vendor round: a file whose name git QUOTES must reach
+// the reviewer like any other, or it is a file the record clears unread.
+describe('a path git writes in quotes', () => {
+  it('sends its content, not an unresolvable quoted name', () => {
+    provenId()
+    const r = run(['--sha', oddSha, '--brief', 'judge the odd name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    // The CONTENT is the proof the path resolved — asserted CONTIGUOUSLY under
+    // ITS OWN header (final-round pass 7): the bare toContain was satisfied by
+    // the PATCH carrying the line, so the odd name's body could resolve empty
+    // while this stayed green. The header must NAME the odd file and the body
+    // must follow it before the next structural marker.
+    // The material spells the DECODED name (git's quoted octal form resolves
+    // to the real path, and needsQuoting has nothing to escape in it).
+    const header = `=== FILE (current content): ${ODD_NAME} ===`
+    expect(sent).toContain(header)
+    const body = sent.slice(sent.indexOf(header) + header.length)
+    const nextMarker = body.indexOf('=== ')
+    expect(body.slice(0, nextMarker < 0 ? undefined : nextMarker)).toContain(
+      'the odd-named file, revised in this range',
+    )
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// A submodule entry points at a COMMIT object, not a file blob. Its body is a
+// named deliberate absence, and the round never tries to read it as content.
+describe('a modified gitlink', () => {
+  it('is named absent-by-design, and the round completes', () => {
+    provenId()
+    const r = run(['--sha', gitlinkSha, '--brief', 'judge the submodule pin'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`+Subproject commit ${'f'.repeat(40)}`)
+    expect(sent).toContain('FILE BODY ABSENT BY DESIGN — submodule pointer: vendor-sub ===')
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+
+  it('keeps a TEXT file text although its hunk holds the pointer line (landing-round pass 8)', () => {
+    // The classifier read the `+Subproject commit <hex>` HUNK line as gitlink
+    // evidence, so a normal text file merely containing that literal line was
+    // assigned no content of its own — silently omitted while the accounting
+    // read complete. Only git's own mode headers prove a 160000 entry.
+    provenId()
+    git('checkout', '-q', '-b', 'fake-gitlink', 'main')
+    const body = `prose about submodules\nSubproject commit ${'a'.repeat(40)}\nmore prose\n`
+    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose')
+    const r = run(['--sha', sha, '--brief', 'judge the prose'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`=== FILE (current content): world.txt ===\n${body}`)
+  })
+})
+
+// A fitting narrowed range is handed over with the same exact contribution
+// scope as a completed cross-lane round; the placeholder still prevents recording a
+// verdict nobody gave.
+describe('a narrowed --since on the early routes', () => {
+  it('prints a scoped runnable reader at main-only while --since narrows the range', () => {
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer scarce')
+    expect(r.stdout).toContain(`--since ${headSha}~1`)
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('records a narrowed cross-authored range as one scoped main-chain pass', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', crossHeadSha, '--since', `${crossHeadSha}~1`, '--brief', 'judge it'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId])
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain(`--model "${MAIN_NAME}"`)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "cross2.txt"')
+  })
+
+  it('records the whole cross-authored range pass-less when no --since narrows it', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', crossHeadSha, '--brief', 'judge it'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId])
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain(`--model "${MAIN_NAME}"`)
+    expect(printed).not.toContain('--pass ')
+  })
+})
+
+// POINT 714, third round: a path with a trailing space is printed UNQUOTED by
+// git, and a trim anywhere on the way turns it into a different path — the real
+// file then reaches no pass and no content list, with nothing said.
+describe('a path with a trailing space', () => {
+  it.skipIf(process.platform === 'win32')('travels byte-exact, content and all', () => {
+    provenId()
+    const r = run(['--sha', edgeSha, '--brief', 'judge the edge name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    // CONTIGUOUS, header and body as one string (fourth landing round,
+    // carried pass 8): asserted separately, the body's presence in the PATCH
+    // kept this green even if the current-content lookup failed.
+    expect(sent).toContain(`=== FILE (current content): "${EDGE_NAME}" ===\ncontent behind the trailing space\n`)
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// POINT 714: a range whose material cannot fit one round must be recognised
+// BEFORE the round is spent, and no record may be offered for what was not read.
+describe('a range too large for one round', () => {
+  it('names the threshold, refuses to spend the round, and prints the pass plan', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'])
+    expect(r.status, r.stderr).toBe(4)
+    expect(r.stderr).toContain('material budget is 200000 characters')
+    expect(r.stderr).toContain("PASSES over the END-STATE FILE SET's reviewable material")
+    expect(r.stderr).toContain('bulk-a.txt')
+    expect(r.stderr).toContain('bulk-b.txt')
+    expect(r.stderr).toContain('--pass 1')
+    // THE ROUND IS NOT SPENT: the whole cost of the old behaviour was a paid
+    // review whose record covered files nobody read.
+    expect(calls()).toEqual([])
+    // And nothing that looks like a record reaches the caller.
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('reviews ONE pass on demand and offers a record for that pass alone', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    expect(r.status, r.stderr).toBe(0)
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toMatch(/--pass 1\/2/)
+    expect(printed).toMatch(/--pass-files "bulk-[ab]\.txt"/)
+    expect(r.stdout).toContain('clears the listed files at')
+    expect(r.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of changed files (1/2); block 1/2.')
+    expect(r.stdout).toContain('assigned to other blocks, not dropped:')
+    expect(r.stdout).toContain('dropped: none')
+    // What actually went to the reviewer stayed inside the budget.
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent.length).toBeLessThanOrEqual(200_000)
+    expect(sent).toContain('=== PATCH ===')
+    // THE ARITHMETIC, measured against a doubting review (landing-round pass
+    // 7): a 120k added file exceeds the standing patch HALF-share, so the plan
+    // widens this pass's patchRoom to the exact joined section — the pass's
+    // patch is mandatory material — and delivers the file PATCH-ONLY. Its
+    // whole body still travels, as the added lines of its own diff; nothing is
+    // truncated, and the completed two-pass record is earned, not fabricated.
+    // THE RECORDED SCOPE IS BOUND TO THE TRANSPORTED BYTES (second landing
+    // round, pass 7): the file the record command names is the file whose
+    // body and diff section actually travelled — not merely "one of the two".
+    const scoped = /--pass-files "bulk-([ab])\.txt"/.exec(printed)?.[1]
+    expect(['a', 'b']).toContain(scoped)
+    const other = scoped === 'a' ? 'b' : 'a'
+    expect(sent).toContain(scoped.repeat(120_000))
+    expect(sent).not.toContain(other.repeat(120_000))
+    expect(sent).toContain(`diff --git a/bulk-${scoped}.txt b/bulk-${scoped}.txt`)
+    // …at the PATCH-ONLY delivery level the manifest declares: the body rides
+    // inside the PATCH section, and the content slot says so.
+    expect(sent).toContain(`its COMPLETE diff is in the PATCH above: bulk-${scoped}.txt ===`)
+    const patchAt = sent.indexOf('=== PATCH ===')
+    expect(patchAt).toBeGreaterThan(-1)
+    expect(sent.indexOf(scoped.repeat(120_000))).toBeGreaterThan(patchAt)
+    expect(sent).not.toContain('[TRUNCATED:')
+    // THE RECORDER ACCEPTS IT, run rather than pattern-matched: a pass command
+    // the recorder refuses is a command that clears nothing.
+    const recorded = spawnSync(process.execPath, splitCommand(printed).slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv(),
+    })
+    expect(recorded.status, recorded.stderr).toBe(0)
+    const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+    expect(JSON.parse(ledger.at(-1))).toMatchObject({
+      sha: bulkSha,
+      partialReview: true,
+      pass: { index: 1, total: 2, files: [expect.stringMatching(/^bulk-[ab]\.txt$/)] },
+    })
+  })
+
+  it('reviews the OTHER pass, and the two together name both files', () => {
+    provenId()
+    const one = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    const two = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '2'])
+    expect(two.status, two.stderr).toBe(0)
+    const files = [one.stdout, two.stdout]
+      .map((out) => /--pass-files "([^"]*)"/.exec(recordCommandIn(out))?.[1] ?? '')
+      .join(',')
+      .split(',')
+    expect([...files].sort()).toEqual(['bulk-a.txt', 'bulk-b.txt'])
+  })
+
+  // A split range must select a pass before any reviewer is started or handed
+  // over; there is no honest whole-range command for material that does not fit.
+  it('offers no whole-range record when the cross lane authored a range too large, and names the passes', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkCrossSha, '--brief', 'judge the bulk cross range'])
+    expect(r.status, r.stderr).toBe(4)
+    expect(r.stderr).toContain('2 RUNNABLE PASSES')
+    expect(r.stderr).toContain(`main lane reviewer ${MAIN_NAME}`)
+    expect(r.stderr).toContain('--pass 1')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
+  it('offers no whole-range record at main-only either, while the range does not fit', () => {
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { LANE_ROUTING_FILE: shareFile })
+    expect(r.status).toBe(4)
+    expect(r.stderr).toContain('2 RUNNABLE PASSES')
+    expect(r.stderr).toContain('bulk-a.txt')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('hands over ONE PASS of a range too large when --pass names it (round-2 pass 5)', () => {
+    // The flag was parsed only after the hand-off exits, so a pass-scoped
+    // hand-off was unreachable: --pass was silently ignored and the report
+    // covered the whole range.
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'], {
+      LANE_ROUTING_FILE: shareFile,
+    })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/main-only/)
+    expect(r.stdout).toContain('--pass 1')
+    expect(r.stdout).toContain('--reviewer scarce')
+    // The hand-off template carries the not-cleared warning and the ledger
+    // pointer too (round-5 pass 6) — a fallback pass template without it read
+    // like a cleared range.
+    expect(r.stdout).toContain('clears the listed files at')
+    expect(r.stdout).toContain('mechanism-review.mjs --list')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('refuses a pass number the hand-off range does not have, exactly like the paid path', () => {
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'], {
+      LANE_ROUTING_FILE: shareFile,
+    })
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('still hands over a runnable reader command where the range DOES fit', () => {
+    // The refusal is about the material, not about the hand-over: a small range
+    // must keep its ready-to-run template.
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { LANE_ROUTING_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer scarce')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('refuses a pass number this range does not have', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
+    expect(calls()).toEqual([])
+  })
+
+  it('refuses --pass on a range that fits, rather than recording a split nobody needs', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range', '--pass', '1'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('fits in one round')
+    expect(calls()).toEqual([])
+  })
+
+  it('says a range that fits does so, before the round', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).toContain('Coverage plan: 100% planned coverage')
+    expect(r.stdout).toContain('Coverage: FULL REVIEW — 100% of changed files')
+  })
+
+  it('runs the exact one-round command the guard planner prints', () => {
+    provenId()
+    const base = git('rev-parse', `${headSha}~1`)
+    const planText = formatContributionPassPlan({
+      passCount: 1,
+      contributions: [{
+        sha: headSha,
+        subject: 'Add a file',
+        base,
+        fits: true,
+        passes: [{
+          index: 1,
+          total: 1,
+          files: ['added.txt'],
+          reviewer: CROSS_NAME,
+        }],
+        uncoverable: [],
+        unreviewable: [],
+      }],
+    })
+    const command = planText.split('\n').find((line) => line.trim().startsWith('node scripts/cross-review.mjs'))?.trim()
+    expect(command).toBeTruthy()
+    expect(command).not.toContain('--pass')
+
+    const r = run(splitCommand(command).slice(2))
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).not.toContain('names a pass of a split this range does not need')
+  })
+
+  it('retires carry planning because recorded contribution coverage now persists directly', () => {
+    provenId()
+    const r = run([
+      '--sha', bulkSha,
+      '--brief', 'judge the remaining contributions',
+      '--carry-from', headSha,
+    ])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--carry-from is obsolete')
+    expect(r.stderr).toContain('end-state files')
+    expect(calls()).toEqual([])
+  })
+
+  it('states the file-scoped convergence cost for answer commits', () => {
+    const r = run([])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('commits touching')
+    expect(r.stderr).toContain('confirming clean pass only for')
+  })
+})

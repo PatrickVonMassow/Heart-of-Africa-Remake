@@ -2175,3 +2175,8 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 - WebGL 2 walker frame passed with an orange slab across the walker (20.10.2026, point 1330): `verification/1295-village-walker-mid-stride-webgl2.png` (11:21) shows a near-lens orange slab over the walker's torso and arms, yet the side-on free-spot check accepted it; the feet stay visible. Possible false approval of that frame's occlusion probe — a point once a second frame shows it.
 - Blocked villager walker jitters ~2 cm per frame (20.10.2026, point 1330 author, sample dump): a walker blocked by another body oscillates back and forth while nearly standing (collision/separation). Not seen in play yet.
 - `village-walk` arm-swing check reddened once on WebGL 2 (20.10.2026, point 1330 diagnostic run, pre-fix code): armVsLeg −0.61 together with the camera free-spot side-on check; not reproduced in later green runs.
+
+- 22.10.2026 (Fable 5.1 review of point 1411): the main-write fence skips quoted
+  arguments, so `sed --in-place='.bak' …` and `sed -i'.bak' …` still classify as
+  reads. Predates 1411 and follows the module's "quoted text never decides" rule;
+  no player impact, collected here.

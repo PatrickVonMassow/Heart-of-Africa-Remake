@@ -103,7 +103,7 @@ function reportEntries(entries, tasksText = '') {
   // quietly falling off the board.
   const gated = gatedEntryPoints(entries)
   if (gated.length) console.log(`  awaiting confirmation (skipped, card says so): ${gated.join(', ')}`)
-  // The report is NOT nested inside that condition (four-eyes review, Fable 5):
+  // The report is NOT nested inside that condition (four-eyes review):
   // an ANSWERED point — back at the head of the queue — and a leftover marker
   // are exactly the states with no gated card to trigger the report.
   const report = gateReport(tasksText)

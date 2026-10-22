@@ -20,6 +20,11 @@
 // entry is REPORTED rather than thrown on (only the transitions throw, to refuse
 // an invalid call), and nothing here can block a turn (findings-guard.mjs is fail-open and owns that direction).
 import { HEAD_SEP, REQUEST_MARKER, findPending, parseHead } from './findings-core.mjs'
+import { queuedState } from './carrier-reconcile-core.mjs'
+
+/** The request states that still WAIT: `pending`, and `appending N` (in TASKS.md, not yet pushed). */
+const OPEN_STATES = ['pending', 'appending']
+const isOpenState = (state) => state === 'pending' || /^appending\b/.test(String(state ?? ''))
 
 /** The body indent — six spaces, the same the finding detail already uses. */
 const INDENT = '      '
@@ -57,7 +62,7 @@ const TAG_LINE_RE = /^(\\*)#([a-z]+)\s*$/
 
 /**
  * A BODY LINE THAT IS ITSELF A FIELD MARKER IS ESCAPED (four-eyes finding 1,
- * Fable 5, 30.07.2026). The spec is appended VERBATIM, and the specs most likely
+ * 30.07.2026). The spec is appended VERBATIM, and the specs most likely
  * to be deposited here are about this very mechanism — one containing a bare
  * `#spec` line would otherwise be truncated on read-back, its tail misfiled into
  * another field, and a `#blocked` line inside a spec would contaminate the very
@@ -214,7 +219,7 @@ function withState(line, state) {
   if (!head) return line
   const cleanState = oneLine(state) || 'pending'
   return (
-    `- [${cleanState === 'pending' ? ' ' : 'x'}] ${head.at}${HEAD_SEP}${head.session}` +
+    `- [${isOpenState(cleanState) ? ' ' : 'x'}] ${head.at}${HEAD_SEP}${head.session}` +
     `${HEAD_SEP}${REQUEST_MARKER}${HEAD_SEP}${cleanState}${HEAD_SEP}${head.title}`
   )
 }
@@ -225,7 +230,7 @@ function withState(line, state) {
  * string happens to match. Returns { text, title } or null when that entry is
  * no longer pending.
  *
- * THIS IS THE WRITE-BACK PATH (four-eyes finding 1, Fable 5, 31.07.2026). The
+ * THIS IS THE WRITE-BACK PATH (four-eyes finding 1, 31.07.2026). The
  * CLI reads the carrier, decides, and only then writes; in that gap another
  * window may append a deposit — the very concurrency this carrier exists for —
  * and text computed from the old read would erase it. So the caller re-reads
@@ -239,7 +244,7 @@ export function reapplyTransition(text, identity, state, extra = null) {
   const lines = String(text ?? '').split(/\r?\n/)
   for (let i = 0; i < lines.length; i++) {
     const head = parseHead(lines[i])
-    if (!head || head.kind !== 'request' || head.done || head.state !== 'pending') continue
+    if (!head || head.kind !== 'request' || head.done || !isOpenState(head.state)) continue
     if (head.at !== want.at || head.session !== want.session || head.title !== want.title) continue
     lines[i] = withState(lines[i], state)
     if (extra && String(extra.value ?? '').trim()) {
@@ -263,7 +268,7 @@ export function reapplyTransition(text, identity, state, extra = null) {
  * directly.
  */
 function transition(text, title, state, extra = null) {
-  const hits = findPending(text, title, 'request')
+  const hits = findPending(text, title, 'request', { states: OPEN_STATES })
   if (hits === null || hits.length === 0) return null
   if (hits.length > 1) return { ambiguous: hits.map((h) => h.title) }
   const identity = { at: hits[0].head.at, session: hits[0].head.session, title: hits[0].title }
@@ -275,7 +280,7 @@ function transition(text, title, state, extra = null) {
 /**
  * `pending` → `queued <point>`: the deposit reached the work order.
  *
- * A REQUEST WITH OPEN QUESTIONS IS REFUSED HERE (four-eyes finding 2, Fable 5,
+ * A REQUEST WITH OPEN QUESTIONS IS REFUSED HERE (four-eyes finding 2,
  * 31.07.2026). `requestRoute` decided it and `formatRequest` printed it, but
  * nothing ENFORCED it: the rule was display-only, so an undecided spec queued
  * cleanly — while the guard's own block text names this very call as the way to
@@ -283,10 +288,14 @@ function transition(text, title, state, extra = null) {
  * failure the route exists to prevent, and this is the last place that can still
  * stop it.
  */
-export function markQueued(text, title, point) {
+export function markQueued(text, title, point, proof = null) {
   const n = Number(point)
   if (!Number.isInteger(n) || n <= 0) throw new Error(`finding: not a point number: ${point}`)
-  const hits = findPending(text, title, 'request')
+  // THE TICK CARRIES ITS PROOF (no user order is ever lost, 21.10.2026): the
+  // origin/main sha that holds point N and the anchor of its title. A tick
+  // without one is what let five appends vanish while the carrier said queued.
+  const state = queuedState(n, proof ?? {})
+  const hits = findPending(text, title, 'request', { states: OPEN_STATES })
   if (hits && hits.length === 1) {
     const entry = requestEntries(text).find((e) => e.index === hits[0].index)
     if (entry && requestRoute(entry) === 'vdzk') {
@@ -296,7 +305,25 @@ export function markQueued(text, title, point) {
       )
     }
   }
-  return transition(text, title, `queued ${n}`)
+  return transition(text, title, state)
+}
+
+/**
+ * `pending` → `appending <point>`: the spec is appended to TASKS.md but not yet
+ * pushed. The entry stays OPEN — the turn-end gate counts it as worked, the
+ * boundary still refuses to hand it over, and the reconciliation lists it.
+ */
+export function markAppending(text, title, point) {
+  const n = Number(point)
+  if (!Number.isInteger(n) || n <= 0) throw new Error(`finding: not a point number: ${point}`)
+  const hits = findPending(text, title, 'request')
+  if (hits && hits.length === 1) {
+    const entry = requestEntries(text).find((e) => e.index === hits[0].index)
+    if (entry && requestRoute(entry) === 'vdzk') {
+      throw new Error(`finding: "${entry.title}" carries OPEN QUESTIONS — it goes to the user as a decision card, never into TASKS.md`)
+    }
+  }
+  return transition(text, title, `appending ${n}`)
 }
 
 /**

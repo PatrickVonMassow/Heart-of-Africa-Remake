@@ -13,6 +13,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { readTasksAll } from './tasks-source.mjs'
+import { CROSS, LEGACY, trailerFor } from './model-lanes.mjs'
+import { readSetting } from './lane-routing-core.mjs'
 import { readDocCorpus } from './doc-corpus.mjs'
 import { CALL_DISCIPLINE_DE, callDisciplineTopics } from './batch-autostart-core.mjs'
 import {
@@ -894,22 +896,23 @@ describe('the durability demand every brief carries (point 629)', () => {
 // THE BRIEF TELLS EVERY AGENT WHERE THE READ-ONLY WORK GOES (point 654 A3). It is one
 // line at every setting: an agent that is never told the lever exists cannot pull it, and
 // a line that appeared only sometimes would train its readers to skip it.
-describe('the astra-routing line', () => {
-  const briefAt = (astraShare) => assembleBrief({ point: { number: 1, done: false, body: 'x' }, astraShare })
+describe('the lane-routing line', () => {
+  const briefAt = (laneRouting) => assembleBrief({ point: { number: 1, done: false, body: 'x' }, laneRouting })
 
-  it('hands enumerate halves to Astra at default and keeps the other work with Claude', () => {
+  it('hands enumerate halves to the cross lane at default and keeps the other work on the main chain', () => {
     const brief = briefAt('default')
-    expect(brief).toMatch(/ASTRA ROUTING is at `default`/)
-    expect(brief).toContain('reviews and enumerate go to GPT-6 Astra')
-    expect(brief).toContain('ask-astra.mjs --kind enumerate')
-    expect(brief).toContain('Diagnose, audit, explain and author stay with Claude')
+    expect(brief).toMatch(/LANE ROUTING is at `default`/)
+    expect(brief).toContain(`reviews and enumerate go to the cross lane (${CROSS.displayName})`)
+    expect(brief).toContain('node scripts/ask-lane.mjs --lane cross --kind enumerate')
+    expect(brief).toContain('Diagnose, audit, explain and author stay with the main chain')
     expect(brief).toContain('a blind audit half uses `--anyway`')
   })
 
-  it('tells the agent WHAT to hand over while the switch prefers Astra', () => {
-    const brief = briefAt('prefer-astra')
+  it('tells the agent WHAT to hand over while the switch prefers the cross lane', () => {
+    const brief = briefAt('prefer-cross')
+    expect(brief).toMatch(/LANE ROUTING is at `prefer-cross`/)
     expect(brief).toMatch(/hand diagnose\/audit\/enumerate\/explain/)
-    expect(brief).toMatch(/ask-astra\.mjs --kind/)
+    expect(brief).toMatch(/ask-lane\.mjs --lane cross --kind/)
     expect(brief).toMatch(/You keep the gates, the suites and the pictures/)
     // The reader of a brief is ALREADY the author, whichever lane it is in
     // (point 667), so the line offers it the READING kinds and no other.
@@ -917,18 +920,31 @@ describe('the astra-routing line', () => {
     expect(brief).not.toMatch(/enumerate\/explain\/author/)
   })
 
-  it('tells it to stay off Astra entirely at claude-only', () => {
-    expect(briefAt('claude-only')).toMatch(/do NOT call `scripts\/ask-astra\.mjs`/)
+  it('tells it to stay off the cross lane entirely at main-only', () => {
+    expect(briefAt('main-only')).toMatch(/LANE ROUTING is at `main-only`/)
+    expect(briefAt('main-only')).toMatch(/do NOT call `scripts\/ask-lane\.mjs`/)
+  })
+
+  // U9: a state file still holding an older spelling is read as the new setting, never shown raw.
+  it('states the new setting name for a state file read from an older spelling', () => {
+    const old = Object.keys(LEGACY.routingSettings).find((key) => LEGACY.routingSettings[key] === 'prefer-cross')
+    const brief = briefAt(readSetting(JSON.stringify({ setting: old })))
+    expect(brief).toMatch(/LANE ROUTING is at `prefer-cross`/)
+    expect(brief).not.toContain(old)
+  })
+
+  it('names the main lane trailer from the registry as the commit-trailer example', () => {
+    expect(briefAt('default')).toContain(`Co-Authored-By: ${trailerFor('main')}`)
   })
 
   it('defaults to the default when the caller passes nothing at all', () => {
-    expect(assembleBrief({ point: { number: 1, done: false, body: 'x' } })).toMatch(/ASTRA ROUTING is at `default`/)
+    expect(assembleBrief({ point: { number: 1, done: false, body: 'x' } })).toMatch(/LANE ROUTING is at `default`/)
   })
 
   it('stands among the house facts, above the call discipline', () => {
-    const brief = briefAt('prefer-astra')
-    expect(brief.indexOf('ASTRA ROUTING')).toBeGreaterThan(brief.indexOf('HOUSE FACTS NO POINT STATES'))
-    expect(brief.indexOf('ASTRA ROUTING')).toBeLessThan(brief.indexOf('HOW TO SPEND A TURN'))
+    const brief = briefAt('prefer-cross')
+    expect(brief.indexOf('LANE ROUTING')).toBeGreaterThan(brief.indexOf('HOUSE FACTS NO POINT STATES'))
+    expect(brief.indexOf('LANE ROUTING')).toBeLessThan(brief.indexOf('HOW TO SPEND A TURN'))
   })
 })
 
@@ -1032,7 +1048,7 @@ describe('the verification ladder', () => {
     }
     // The rung a point owes must be NAMEABLE for every suite: `startup`,
     // `benchmark` and `docs` refuse `--section`, so the suite itself is theirs
-    // (Astra, confirming pass 3/3).
+    // (cross-vendor review, confirming pass 3/3).
     expect(text).toMatch(/CHEAPEST COVERING rung/)
     expect(text).toMatch(/its `--section` block, or the whole suite where that suite declares none/)
     expect(text).toMatch(/Only that gate blocks the merge/)
@@ -1068,14 +1084,14 @@ describe('the verification ladder', () => {
     const text = VERIFICATION_LADDER.join('\n')
     expect(text).toMatch(/run-wait\.mjs --plan/)
     expect(text).toMatch(/0\.2-7\.4 min, median 2\.9/) // one section
-    // …and that band was measured on `polish` alone (Astra, four-eyes round 1):
+    // …and that band was measured on `polish` alone (cross-vendor review, four-eyes round 1):
     // quoting it for another suite's section makes an unmeasured run look
     // classified, which is worse than giving no number at all.
     expect(text).toMatch(/ON `polish` ALONE/)
     expect(text).toMatch(/No other suite's sections were timed/)
     // …and it stops there. Telling a reader to SCALE another suite's section
-    // from an unmeasured fraction dresses a guess as a measurement (Astra,
-    // four-eyes rounds 1 and 2).
+    // from an unmeasured fraction dresses a guess as a measurement (cross-vendor
+    // review, four-eyes rounds 1 and 2).
     expect(text).not.toMatch(/scale from the plan|fraction of ITS OWN pass/)
     expect(text).toMatch(/9\.9-61\.5 min, median 55\.2/) // one whole suite
     expect(text).toMatch(/115\.3-120\.9 min/) // the whole set, both backends
@@ -1217,7 +1233,7 @@ describe('the orientation block', () => {
     expect(text).toMatch(/WHAT THIS POINT OWES IS THE CHEAP GATE/)
     expect(text).toMatch(/the covering suite\(s\) here: world/)
     // The bundle's run is the WHOLE set on BOTH backends — never this point's
-    // covering suites under a bundle heading (Astra, confirming pass 2/3).
+    // covering suites under a bundle heading (cross-vendor review, confirming pass 2/3).
     expect(text).toMatch(/THE BOTH-BACKEND LARGE IS NOT THIS POINT'S GATE/)
     expect(text).toMatch(/over the WHOLE suite set and both backends — never just the suites/)
     expect(text).not.toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
@@ -1226,7 +1242,7 @@ describe('the orientation block', () => {
 
   // The two blocks are GENERATED SEPARATELY and read TOGETHER, which is how one
   // of them kept demanding a per-feature LARGE while the other had dropped it
-  // (Astra, pass 2/3 on this point). So they are asserted in one breath.
+  // (cross-vendor review, pass 2/3 on this point). So they are asserted in one breath.
   it('does not let the ladder and the orientation contradict each other (point 1134)', () => {
     const brief = buildBrief({
       tasksText: '- [ ] 400. A render point.\n  It touches `src/world/rivers.ts` and can move the picture.\n',

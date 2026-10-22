@@ -1810,7 +1810,7 @@ const FILLER_WORDS = new Set([
  * Does this title say only what STAGE the work is in (point 655)?
  *
  * THE RULE, and why it is not simply "begins with a stage word" (four-eyes
- * review, GPT-5.6 Sol, 12.08.2026): the title is stripped of its number prefix,
+ * review, 12.08.2026): the title is stripped of its number prefix,
  * of every stage word and of the FILLER above — and if NOTHING is left, it named
  * no subject. "Abschlussarbeiten zum gerade beendeten Punkt" leaves nothing and
  * is refused; "Vorbereitung der Karten", "Cleanup parser for Windows" and

@@ -1,0 +1,8 @@
+{
+  "_why": "Explicit identity map for carrier ticks whose point was deliberately removed or renumbered. Read by scripts/carrier-reconcile.mjs; a number listed here never satisfies or fails reconciliation by coincidence. Add an entry only with the commit that removed or renumbered the point.",
+  "points": {
+    "1107": { "status": "deleted", "why": "The request itself was 'Delete point 1107 - never commissioned by the user' (user decision); removed in 0e7fd8440." },
+    "1240": { "status": "deleted", "why": "Superseded and deleted by point 1261 ('drop point 1240'); removed in 1b3caf0cb." },
+    "1327": { "status": "absorbed", "why": "Garment clipping fold request; replaced by the single covered-body mask point in 30eb4514f." }
+  }
+}

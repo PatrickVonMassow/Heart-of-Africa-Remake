@@ -10,14 +10,39 @@
 // Pure on purpose. scripts/authorship-check-io.mjs owns file I/O; blind-merge and
 // mechanism-review consume the same verdict rather than reimplementing it.
 import { sameModel } from './mechanism-review-core.mjs'
+import { LANES, VENDORS } from './model-lanes.mjs'
 
-/** Model designations accepted from a prose heading. JSON uses its `model` field.
- *  The OpenAI lane is matched under BOTH its names (point 1061): `GPT-6 Astra`
- *  writes the artefacts from 05.09.2026 on, and the retired `GPT-5.6 Sol` heads
- *  the blind halves already lying in `docs/four-eyes/`, which must keep proving
- *  their author. */
-const MODEL_IN_HEADING =
-  /\b(GPT[\s-]*\d+(?:\.\d+)?[\s-]*(?:Astra|Sol)|(?:Astra|Sol)(?:[\s-]*\d+(?:\.\d+)?)?|Claude[\s-]+(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?|(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?)\b/i
+/**
+ * Model designations accepted from a prose heading, built from scripts/model-lanes.mjs.
+ * JSON uses its `model` field. Every family word of a lane is matched, retired ones
+ * included (point 1061): the blind halves already lying in `docs/four-eyes/` carry
+ * retired lane names and must keep proving their author. Per vendor a heading may
+ * read `<versioned marker>-<version> <family>`, `<prefix word> <family> [version]`
+ * or `<family> [version]`, where the families are the vendor's lane family words and
+ * its non-prefix marker words, and a prefix word is a marker word the lanes' own
+ * trailer names carry in front of their family.
+ */
+const MODEL_IN_HEADING = (() => {
+  const escape = (word) => String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const any = (words) => `(?:${words.map(escape).join('|')})`
+  const version = '(?:[\\s-]*\\d+(?:\\.\\d+)?)?'
+  const nameWords = LANES.flatMap((record) => [record.trailerName, record.fallback?.trailerName ?? '', ...record.retired])
+    .flatMap((name) => String(name).toLowerCase().split(/[^a-z]+/))
+  const leading = []
+  const bare = []
+  for (const [key, vendor] of Object.entries(VENDORS)) {
+    const prefixes = vendor.markerWords.filter((word) => nameWords.includes(word))
+    const families = [
+      ...LANES.filter((record) => record.vendor === key).flatMap((record) => record.familyWords),
+      ...vendor.markerWords.filter((word) => !prefixes.includes(word)),
+    ]
+    if (!families.length) continue
+    if (vendor.versionedMarkers.length) leading.push(`${any(vendor.versionedMarkers)}[\\s-]*\\d+(?:\\.\\d+)?[\\s-]*${any(families)}`)
+    if (prefixes.length) leading.push(`${any(prefixes)}[\\s-]+${any(families)}${version}`)
+    bare.push(`${any(families)}${version}`)
+  }
+  return new RegExp(`\\b(${[...leading, ...bare].join('|')})\\b`, 'i')
+})()
 
 /** Remove HTML comments while retaining any visible content around them. */
 function visibleMarkdownOnLine(line, commentState) {
@@ -101,7 +126,7 @@ export function readTranscriptMessages(text) {
   const eventTimes = []
   let malformedLines = 0
   // Codex writes the selected model on each turn_context and the answer as a
-  // later response_item. This is the OpenAI lane's per-turn equivalent of Claude
+  // later response_item. This is the codex runtime's per-turn equivalent of Claude
   // Code's message.model; retaining it is what makes the second 676 half
   // verifiable from its own transcript too.
   let codexTurnModel = ''

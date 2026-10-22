@@ -1,0 +1,1111 @@
+// Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
+//
+// rule:model-policy@2f245cec
+// WHY IT EXISTS: models of one vendor share training and therefore CORRELATED
+// blind spots, which is exactly what the four-eyes rule is bought against
+// (CLAUDE.md §6). A lane of a different vendor is the strongest decorrelation
+// available, so a review goes to the first enabled lane whose vendor differs
+// from every author's (scripts/model-lanes.mjs: `vendor` fields, never names) —
+// the cross lane for main-chain work, the main chain for cross-lane work. Where
+// the preferred cross lane cannot deliver, the review is HANDED OVER along a role
+// chain (REVIEW_CHAINS) with a recorded reason. What this file protects is that no
+// model reviews its own work (`authoredByLane`, the self-review refusal), whoever
+// wrote the commit.
+//
+// THE FAILURE MODE THIS FILE IS SHAPED AROUND: a review nobody ran must never be
+// recorded as done. That is worse than having no second pair of eyes, because
+// the mechanism/criticality gates then read GREEN on a commit nothing judged.
+// So every path out of a failed cross-lane run yields the first eligible handover
+// reviewer (or none, said plainly, when every one of them authored the range) and
+// NO verdict — the verdict is the reviewer's to give, never the runner's to
+// invent — and the model that is RECORDED is always the one that actually ran,
+// never the one that was preferred.
+//
+// Side-effect free: the process spawn, the temp files and the printing belong to
+// scripts/cross-review.mjs. Pinned by cross-review-core.test.mjs.
+
+import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, VERDICTS } from './mechanism-review-core.mjs'
+import { laneIsOn } from './lane-switch-core.mjs'
+import {
+  CROSS,
+  EXECUTION_ROLES,
+  LANES,
+  eligibleReviewers,
+  executionTarget,
+  lane,
+  mentionedIdentities,
+  resolveModel,
+  sharesIdentity,
+  vendorKeyOf,
+} from './model-lanes.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
+import {
+  assembleMaterial,
+  formatPassFiles,
+  formatReviewCoverage,
+  formatShortfall,
+  MATERIAL_BUDGET_CHARS,
+  parseDiffHeader,
+  PATCH_SHARE,
+} from './review-material-core.mjs'
+
+// Re-exported: the runner and the recorder refuse the same sentence, from one
+// definition (mechanism-review-core.mjs).
+export { BLIND_REVIEWER, blindReviewerAdmission }
+
+// The material budget and its split live with the accounting that spends them
+// (review-material-core.mjs); re-exported here because this is where every
+// caller of the review command already looks for them.
+export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
+
+/**
+ * The handover chains, as ROLE LISTS in data. `crossUnavailable` answers "the cross
+ * lane did not deliver, who else can look at this?" and starts at the scarce lane,
+ * the second-opinion model. `crossAuthored` answers "the cross lane wrote it, who
+ * takes it from here?" — that reviewer ALSO runs the suites, judges the picture and
+ * lands the point, which is the main chain's job, so it starts there. `automatic` is
+ * the order the first vendor-eligible reviewer is looked for in. The scarce lane drops
+ * out of every chain while its switch is not on. Mirrors the recorder's handover chains
+ * (mechanism-review-core.mjs), which verify a recorded handover against the same order.
+ */
+export const REVIEW_CHAINS = Object.freeze({
+  automatic: Object.freeze(['cross', 'main', 'scarce', 'main-fallback']),
+  crossUnavailable: Object.freeze(['scarce', 'main', 'main-fallback']),
+  crossAuthored: Object.freeze(['main', 'scarce', 'main-fallback']),
+})
+
+/** The recorded handover reason of each chain (LEGACY.handovers reads the old spellings). */
+export const HANDOVER_REASONS = Object.freeze({
+  crossUnavailable: 'cross-unavailable',
+  crossAuthored: 'cross-authored',
+})
+
+/** How output names a role: the role plus the record's display name. */
+export function laneLabel(role, registry = LANES) {
+  return `the ${role} lane (${executionTarget(role, registry).name})`
+}
+
+/**
+ * The executable identity of a role, or of a model designation that names exactly one
+ * role (an exact registered spelling, or one lane identity by family word), or null.
+ * `key` is the role — what `--reviewer` takes.
+ */
+export function reviewerDescriptor(value = '', registry = LANES) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return null
+  if (EXECUTION_ROLES.includes(raw)) return executionTarget(raw, registry)
+  const hit = resolveModel(raw, registry)
+  if (hit) return executionTarget(hit.fallback ? `${hit.lane.role}-fallback` : hit.lane.role, registry)
+  const named = mentionedIdentities(raw, registry)
+  if (named.length === 1 && EXECUTION_ROLES.includes(named[0])) return executionTarget(named[0], registry)
+  return null
+}
+
+/** The `--reviewer` value: a role, exactly — no model names, no old keys. */
+export function reviewerForRole(role = '', registry = LANES) {
+  const raw = String(role ?? '').trim()
+  return EXECUTION_ROLES.includes(raw) ? executionTarget(raw, registry) : null
+}
+
+/** Is a role usable under the scarce-lane switch? Only the switch-gated lane can be off. */
+function roleEnabled(role, scarceState, registry = LANES) {
+  const record = lane(role === 'main-fallback' ? 'main' : role, registry)
+  if (!record.scarce) return true
+  return scarceState === undefined || laneIsOn(scarceState)
+}
+
+/** A handover chain's display names, with the scarce switch applied. */
+export function reviewChain(name, scarceState, registry = LANES) {
+  const roles = REVIEW_CHAINS[name] ?? []
+  return Object.freeze(roles.filter((role) => roleEnabled(role, scarceState, registry)).map((role) => executionTarget(role, registry).name))
+}
+
+/** Does any author designation fail to resolve to a vendor? Such a range is refused. */
+export function unresolvedAuthors(authorModels = [], registry = LANES) {
+  const list = authorList(authorModels)
+  if (!list.length) return ['(no author recorded)']
+  return list.filter((author) => vendorKeyOf(author, registry) === 'unknown')
+}
+
+/**
+ * The automatic reviewer: the first enabled role (REVIEW_CHAINS.automatic, then any
+ * further registered lane) whose lane vendor differs from every author's (eligibleReviewers), and which shares no identity
+ * with an author. null when the authors cover every vendor or any author is unresolved.
+ */
+export function automaticReviewer(authorModels = [], { scarceState, registry = LANES } = {}) {
+  const authors = authorList(authorModels)
+  const eligible = new Set(eligibleReviewers(authors, registry).map((record) => record.role))
+  // The data order first, then any further registered lane in table order.
+  const order = [...REVIEW_CHAINS.automatic, ...registry.map((record) => record.role).filter((role) => !REVIEW_CHAINS.automatic.includes(role))]
+  const role = order.find((candidate) => {
+    const base = candidate === 'main-fallback' ? 'main' : candidate
+    if (!eligible.has(base) || !roleEnabled(candidate, scarceState, registry)) return false
+    const name = executionTarget(candidate, registry).name
+    return !authors.some((author) => sharesIdentity(name, author, registry))
+  })
+  return role ? executionTarget(role, registry) : null
+}
+
+/** The binary, and the ceiling a review may take before it counts as stuck. */
+export const CODEX_BIN = 'codex'
+export const REVIEW_TIMEOUT_MS = 15 * 60_000
+
+/**
+ * How a cross-lane run ended. `ok` is the ONLY kind that may be recorded as the cross
+ * lane's; each other kind is a cause the command names in one line before handing the
+ * review to the first eligible handover reviewer.
+ */
+export const OUTCOME = Object.freeze({
+  OK: 'ok',
+  NOT_INSTALLED: 'not-installed',
+  UNREACHABLE: 'unreachable',
+  LOGIN_EXPIRED: 'login-expired',
+  ALLOWANCE_EXHAUSTED: 'allowance-exhausted',
+  MODEL_REFUSED: 'model-refused',
+  TIMEOUT: 'timeout',
+  ERROR_EXIT: 'error-exit',
+  NO_VERDICT: 'no-verdict',
+  // NOT a failure: the operator has moved the load away from the cross lane (point 654).
+  // It ends in the same place every failure does — the review handed over with NO verdict
+  // — because that is the honest state either way: the cross lane has not seen this change.
+  SWITCHED_OFF: 'switched-off',
+  // Also not a failure, and not even a fallback: the cross lane AUTHORED this range, so the
+  // review was never its to give (point 667). It ends in the same place for the same reason.
+  SELF_REVIEW: 'self-review',
+})
+
+/** One human sentence per kind — what the reader is told went wrong. */
+const CAUSE_TEXT = Object.freeze({
+  [OUTCOME.NOT_INSTALLED]: `\`${CODEX_BIN}\` is not on PATH in this container`,
+  [OUTCOME.UNREACHABLE]: "the cross lane's host could not be reached (network or firewall)",
+  [OUTCOME.LOGIN_EXPIRED]: `the ChatGPT login is gone or expired (see \`cross-review.mjs --restore-login\`)`,
+  [OUTCOME.ALLOWANCE_EXHAUSTED]: 'the ChatGPT allowance for this account is exhausted',
+  [OUTCOME.MODEL_REFUSED]: `the server refused the model id "${lane('cross').modelId}"`,
+  [OUTCOME.TIMEOUT]: 'the review did not finish inside its time budget',
+  [OUTCOME.ERROR_EXIT]: 'codex exited with an error',
+  [OUTCOME.NO_VERDICT]: 'the run produced no parseable verdict',
+  [OUTCOME.SWITCHED_OFF]: 'the routing setting is at `main-only` (node scripts/lane-routing.mjs --status)',
+  [OUTCOME.SELF_REVIEW]: `${laneLabel('cross')} AUTHORED part of this range — no model reviews its own work`,
+})
+
+/** The outcomes that are a VENDOR outage rather than a failed run — the signature set
+ *  the share switch's measured fallback keys on (scripts/lane-routing-core.mjs). */
+export const OUTAGE_OUTCOMES = Object.freeze([OUTCOME.ALLOWANCE_EXHAUSTED, OUTCOME.UNREACHABLE])
+
+/** The cause sentence of one outcome kind — for the callers that skip classifyOutcome. */
+export function causeTextFor(kind) {
+  return CAUSE_TEXT[kind] ?? ''
+}
+
+/**
+ * The message patterns each failure kind is recognised by.
+ *
+ * ORDER MATTERS and is the order below: an exhausted allowance and an expired
+ * login both answer with an HTTP status, and the status alone would classify the
+ * wrong one. The specific wording is therefore matched before the bare code.
+ * A pattern that matches nothing simply falls through to ERROR_EXIT, which is
+ * the honest answer — every kind here ends at the same fallback, so a
+ * misclassification never picks a wrong reviewer; it costs a sentence of
+ * explanation and, for the OUTAGE_OUTCOMES kinds, the share switch's measured
+ * outage count (recordLaneRun).
+ */
+const FAILURE_PATTERNS = [
+  [OUTCOME.MODEL_REFUSED, /not supported when using codex with a chatgpt account|unknown model|model[^.\n]*not (?:supported|available|found)/i],
+  // A SPOKEN VERDICT OUTRANKS A DEAD CONNECTION; A DEAD CONNECTION OUTRANKS SILENCE
+  // (11.08.2026, both halves found the hard way).
+  //
+  // First half: reported as an exhausted allowance, a transport failure sent the user
+  // to his billing page while 96 % of his weekly limit stood unused, and it hid a
+  // cause that was ours — a firewall entry gone stale after a container restart. So a
+  // text that ONLY shows a broken connection is unreachable, whatever stray word it
+  // carries.
+  //
+  // Second half (cross-vendor review of the first): the naive fix overshoots. Codex
+  // RETRIES, so one transcript can hold a real `429` from attempt 1 and a
+  // `Reconnecting…` storm after it — and a server that answered 429 DID speak about
+  // the account, however the stream ended. Hence the order below: a definitive quota
+  // verdict is matched first and wins wherever both appear; transport is the answer
+  // only when nothing was ever said. The narrow definitive pattern (the first
+  // ALLOWANCE_EXHAUSTED entry below) is deliberately not the broad allowance pattern — "rate limit" as a hint or a doc line must not
+  // outrank a dead socket, only an actual refusal may.
+  // NOT a bare `429` (second review, 11.08.2026). A real codex transcript reconnects
+  // through repeated websocket 403s and then prints `last status: 429` as the LAST
+  // thing it saw — an account with allowance to spare, whose run died in transport.
+  // A bare code first would call that a spent account, which is the very mistake this
+  // whole ordering exists to prevent, only one round further along. So the definitive
+  // pattern demands the server's own REFUSING WORDS. A naked code matches no pattern
+  // here: the rest of the text decides (transport, then the broad pattern below),
+  // and a bare `429` with nothing else ends at ERROR_EXIT.
+  [OUTCOME.ALLOWANCE_EXHAUSTED, /too many requests|usage limit (?:reached|exceeded|hit)|you(?:'ve| have) hit your usage limit|quota (?:exceeded|exhausted)|credit balance|rate limit exceeded/i],
+  [OUTCOME.UNREACHABLE, /error sending request|stream disconnected|reconnecting\b|connection (?:refused|reset|closed)|enotfound|eai_again|econnrefused|econnreset|etimedout|dns error|failed to lookup|network (?:error|is unreachable)/i],
+  [OUTCOME.ALLOWANCE_EXHAUSTED, /usage limit|rate limit|quota|allowance|plan limit/i],
+  [OUTCOME.LOGIN_EXPIRED, /not logged in|log ?in again|codex login|refresh token|invalid[_ ]api[_ ]key|unauthorized|authentication|\b401\b|\b403\b/i],
+  // Every other transport wording is caught by the first UNREACHABLE entry above;
+  // only these late hints are left for after the broad allowance and login checks.
+  [OUTCOME.UNREACHABLE, /proxy|tls|certificate/i],
+]
+
+/**
+ * Classify one finished `codex exec` run.
+ *
+ * `spawnError` is the Error node gives when the binary itself could not run;
+ * `timedOut` is our own kill. Everything else is decided from the exit code and
+ * from what the process said — stderr first, because that is where codex writes
+ * its refusals, with stdout folded in for the runs that report the failure on
+ * the normal channel.
+ */
+export function classifyOutcome({ spawnError = null, exitCode = 0, stdout = '', stderr = '', timedOut = false } = {}) {
+  // THE TIMEOUT IS ASKED FIRST (four-eyes finding, 10.08.2026). `spawnSync` with
+  // a timeout sets BOTH an ETIMEDOUT error and the kill signal, so asking about
+  // the error first turned every real timeout into a nondescript "error exit".
+  if (timedOut || String(spawnError?.code ?? '') === 'ETIMEDOUT') {
+    return { ok: false, kind: OUTCOME.TIMEOUT, cause: CAUSE_TEXT[OUTCOME.TIMEOUT] }
+  }
+  if (spawnError) {
+    const code = String(spawnError.code ?? '')
+    const kind = code === 'ENOENT' ? OUTCOME.NOT_INSTALLED : OUTCOME.ERROR_EXIT
+    return { ok: false, kind, cause: `${CAUSE_TEXT[kind]}: ${spawnError.message ?? code}` }
+  }
+  const text = `${stderr ?? ''}\n${stdout ?? ''}`
+  if (Number(exitCode) === 0) return { ok: true, kind: OUTCOME.OK, cause: '' }
+
+  for (const [kind, re] of FAILURE_PATTERNS) {
+    if (re.test(text)) return { ok: false, kind, cause: CAUSE_TEXT[kind] }
+  }
+  return { ok: false, kind: OUTCOME.ERROR_EXIT, cause: `${CAUSE_TEXT[OUTCOME.ERROR_EXIT]} (exit ${exitCode})` }
+}
+
+/**
+ * Did the server REFUSE this model id?
+ *
+ * The probe that proves the `-m` flag is honoured at all: an unknown id must be
+ * rejected rather than silently substituted, because a green review against a
+ * substituted model would be worthless — it would be a review by whatever the
+ * account defaults to, recorded under the cross lane's name.
+ */
+export function isUnknownModelRefusal(text) {
+  return FAILURE_PATTERNS[0][1].test(String(text ?? ''))
+}
+
+/** The `codex exec` command line for one review. Read-only sandbox, no writes. */
+export function codexArgs({
+  modelId = lane('cross').modelId,
+  effort = lane('cross').reasoningEffort,
+  cwd = '',
+  outputFile = '',
+  prompt = '',
+} = {}) {
+  const args = [
+    'exec',
+    '--skip-git-repo-check',
+    '--color',
+    'never',
+    '--sandbox',
+    'read-only',
+    '-m',
+    String(modelId),
+    '-c',
+    `model_reasoning_effort=${String(effort)}`,
+  ]
+  if (cwd) args.push('-C', String(cwd))
+  if (outputFile) args.push('-o', String(outputFile))
+  args.push(String(prompt))
+  return args
+}
+
+/**
+ * The prompt the reviewer is given.
+ *
+ * It states the ARTEFACT first and the author's rationale never: CLAUDE.md §6
+ * requires a convergent reviewer to read the diff before any justification, so
+ * the justification cannot anchor it. The answer shape is fixed because it is
+ * transcribed into the ledger verbatim — a verdict word this project's recorder
+ * accepts, and one honest line of what was actually checked.
+ */
+export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass = null, receipt = '' } = {}) {
+  const divergent = String(mode) === 'blind-parallel'
+  const withReceipt = Boolean(String(receipt ?? '').trim())
+  return [
+    'You are the SECOND pair of eyes on a change in this repository, working under the',
+    'four-eyes rule of CLAUDE.md §6. You were chosen because you are a DIFFERENT model',
+    'from the author: your value is the errors the author cannot see, so judge the',
+    'artefact itself and do not assume it is correct.',
+    '',
+    `COMMIT UNDER REVIEW: ${sha}`,
+    'THE MATERIAL IS ATTACHED (the diffstat, the patch, and the content of the files it',
+    'touches). READ IT IN FULL FIRST, before the question below and before forming any',
+    'view: the question is a checklist of what to look at, never a conclusion to check',
+    'against, and no rationale from the author is included on purpose. This container',
+    'cannot create user namespaces, so a shell command of yours would fail before it',
+    'ran — judge the attached material, and if a part of it is marked TRUNCATED, say so',
+    'in your evidence rather than guessing past the cut.',
+    // A PASS REVIEWER IS TOLD THE MATERIAL'S SHAPE UP FRONT (structural finding,
+    // fourth cross-vendor round): without this, every pass verdict degraded into
+    // a coverage refusal over files another pass carries by design.
+    ...(pass
+      ? [
+          '',
+          `THIS IS PASS ${Number(pass.index)} OF ${Number(pass.total)} of a review split over the range's`,
+          'FILE SET, because the whole range does not fit one round. The material OPENS WITH A',
+          'MANIFEST naming which files THIS pass carries (and at which delivery level) and which',
+          'are ABSENT BY DESIGN, each covered by another pass. A file the manifest declares',
+          'absent is NOT truncated: do not refuse a verdict over its absence. Your verdict',
+          'covers exactly the files this pass carries, and the range is cleared only once',
+          'every pass is recorded.',
+        ]
+      : []),
+    '',
+    `WHAT TO JUDGE: ${brief}`,
+    '',
+    divergent
+      ? 'This is a DIVERGENT step: produce your OWN complete list from the inputs, do not\n' +
+        "check somebody else's. Name what could go wrong that nobody has written down.\n" +
+        'Write the list as ONE ENTRY PER LINE in the form `B<n> | <file> | <the defect in\n' +
+        'one line>`, numbered B1, B2, … — your list is list B. A THIRD model merges it with\n' +
+        'list A and every entry is then accounted for by its id (CLAUDE.md §6), so an entry\n' +
+        'without one cannot be counted and would simply disappear.'
+      : 'This is a CONVERGENT review of ONE artefact: is the diff correct, does it match its\n' +
+        'spec, are its tests real tests, what breaks that nobody tested?',
+    '',
+    'Report ONLY findings you can point at a line for. End your final message with',
+    // THE TOKEN IS NEVER IN THE PROMPT (finding 8): it stands only on the
+    // material's last line, so echoing it back is evidence the material was
+    // read through to its end — a child that saw only this prompt cannot know it.
+    ...(withReceipt
+      ? [
+          'EXACTLY these three lines and nothing after them:',
+          'RECEIPT: <the hex token from the material\'s LAST line, "=== END OF MATERIAL — RECEIPT … ===">',
+        ]
+      : ['EXACTLY these two lines and nothing after them:']),
+    `VERDICT: <${VERDICTS.join('|')}>`,
+    'EVIDENCE: <one line naming what you actually checked and what you found>',
+  ].join('\n')
+}
+
+/** The SHAPE-AWARE decoration strip every ruling reads (final-round pass 1,
+ *  third instance): deleting `[*_#>` + backtick] characters outright let a
+ *  FABRICATED label match — `D_ONE:` became `DONE:` — so label recognition
+ *  must unwrap decoration without merging word fragments. Headings and quote
+ *  markers at line starts, backtick runs, and emphasis runs at word edges as
+ *  MATCHED PAIRS (iterated for nesting); a marker inside a word is content.
+ *  Preserves the line count, so stripped and raw lines pair by index. */
+export function stripDecoration(text) {
+  let clean = String(text ?? '')
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*>+[ \t]?/gm, '')
+    // A FENCE LINE IS LINE-START DECORATION like a heading: a line holding
+    // only a backtick run (with an optional language tag) frames content and
+    // is no content itself — left standing it would displace the terminal
+    // label lines the parsers read off the message end.
+    .replace(/^[ \t]*`{3,}[\w-]*[ \t]*$/gm, '')
+  // BACKTICKS AS MATCHED PAIRS TOO (landing-round pass 7): deleting every
+  // backtick run outright merged word fragments exactly like the emphasis
+  // case this function exists to avoid — `` VERD`ICT: `` became `VERDICT:`
+  // and a fabricated label was accepted as the required terminal field. A
+  // backtick run unwraps only against an equal closing run at a word edge; a
+  // marker inside a word is content and stays.
+  for (let i = 0; i < 4; i++) {
+    const next = clean
+      .replace(/(^|[^\w`])(`+)(?=[^\s`])([^`]+?)(?<=[^\s`])\2(?=[^\w`]|`|$)/g, '$1$3')
+      .replace(/(^|[^\w*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[^\w*_]|[*_]|$)/g, '$1$3')
+    if (next === clean) break
+    clean = next
+  }
+  return clean
+}
+
+/** The NET-ONLY spelling beside raw and stripped (final-round pass 1): every
+ *  marker character deleted outright. Mixed nesting (`**_no_**`) defeats both
+ *  the raw scan (markers break the word boundaries) and the pair strip (the
+ *  runs differ), but no decoration survives deletion. It can FABRICATE an
+ *  admission from mid-word markers — which only ever refuses a round
+ *  (fail-closed), never clears one — so it is used only where a hit can only
+ *  refuse (the admission scan and the placeholder test), never for matching
+ *  or quoting. */
+export const charStripped = (text) => String(text ?? '').replace(/[*`_#>~]/g, '')
+
+/** The VALUE of a labelled RAW line: everything after its first colon — the
+ *  label always carries one, and decoration adds none before it. A label
+ *  written `**EVIDENCE:**` closes its decoration right after the colon; that
+ *  one marker run is dropped only when whitespace follows it, so a value that
+ *  genuinely begins with a marker stays.
+ *
+ *  THE BOUNDARY, so nobody re-litigates it (final convergence): a RULING —
+ *  anything that DECIDES by looking at the text: placeholder detection,
+ *  presence, length, any match or classification — reads the STRIPPED copy,
+ *  because decoration must not change a decision. A QUOTE — anything whose
+ *  text reaches output a caller reads, cites or acts on — reads the RAW text
+ *  through this helper, byte for byte, because the strip rewrites content
+ *  (`src/__init__.py` → `src/init.py`). The one deliberate exception is the
+ *  ADMISSION scan, which reads every spelling (raw, stripped and
+ *  charStripped): there the extra readings can only widen the net, never
+ *  shield it.
+ *
+ *  PADDING IS FORMAT, NOT CONTENT (trim sweep, final convergence): a labelled
+ *  single-line field trims the separator whitespace at its edges — after the
+ *  label's colon, around an entry's pipes, at line end — because that padding
+ *  belongs to the `LABEL: value` / `id | file | text` format the prompts
+ *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
+ *  (ask-lane's explain) is not a labelled field and trims NOTHING. */
+export function rawFieldValue(rawLine) {
+  const at = String(rawLine ?? '').indexOf(':')
+  if (at < 0) return ''
+  return String(rawLine)
+    .slice(at + 1)
+    .replace(/^\s*(?:[*_`]+(?=\s))?/, '')
+    .trim()
+}
+
+/**
+ * Pull the verdict and its evidence out of the reviewer's final message.
+ *
+ * Tolerant on the way in — markdown emphasis, a code fence, a leading bullet —
+ * and strict on the way out: a verdict word the recorder does not accept, or an
+ * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
+ * been reviewed, and the caller records nothing — a cross-lane run is handed on, a
+ * selected handover run ends without a record — rather than record a guess.
+ */
+export function parseVerdict(text, { receipt = '' } = {}) {
+  const raw = String(text ?? '')
+  // THE PAIR MUST BE THE END OF THE MESSAGE (four-eyes finding, 10.08.2026). The
+  // prompt asks for exactly two closing lines (three with a RECEIPT); taking the
+  // last match of each INDEPENDENTLY would happily pair a verdict with an
+  // evidence line from some earlier paragraph, so the final non-empty lines are
+  // what is read.
+  //
+  // MATCHED ON THE STRIPPED LINE, QUOTED FROM THE RAW ONE (final convergence):
+  // the decoration strip (stripDecoration) exists so a decorated label still
+  // matches — but it rewrites content (`src/__init__.py` → `src/init.py`), and
+  // the EVIDENCE read here is what `--record` writes into the ledger. The strip
+  // preserves the line count, so lines pair one to one. Stated exceptions, safe by
+  // shape: the RECEIPT (hex token) and the VERDICT word are identifiers the
+  // strip cannot rewrite and are read from the stripped line.
+  const expected = String(receipt ?? '').trim()
+  const pairs = raw
+    .split('\n')
+    .map((line) => ({ raw: line, clean: stripDecoration(line).trim() }))
+    .filter((p) => p.clean)
+  const tailPairs = pairs.slice(expected ? -3 : -2)
+  const tail = tailPairs.map((p) => p.clean)
+  // THE RECEIPT IS DEMANDED WHERE ONE WAS ISSUED (fourth cross-vendor round,
+  // pass 4, finding 8): the token stands only on the material's last line,
+  // never in the prompt, so an answer that cannot repeat it is an answer from
+  // a run whose material is not proven read — and that is not a verdict.
+  if (expected) {
+    const got = (/^[-*]?\s*RECEIPT\s*:\s*([0-9a-f]+)\s*$/i.exec(tail[0] ?? '')?.[1] ?? '').toLowerCase()
+    if (got !== expected.toLowerCase()) {
+      return {
+        ok: false,
+        verdict: '',
+        evidence: '',
+        error: got
+          ? 'the RECEIPT line does not match the material\'s token — what was judged is not proven to be what was sent'
+          : 'the answer carries no RECEIPT line — nothing proves the material was read to its end',
+      }
+    }
+    tail.shift()
+    tailPairs.shift()
+  }
+  const verdict = (/^[-*]?\s*VERDICT\s*:\s*(.+)$/i.exec(tail[0] ?? '')?.[1] ?? '').trim().toLowerCase()
+  const evidenceMatched = /^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.test(tail[1] ?? '')
+  const evidence = evidenceMatched ? rawFieldValue(tailPairs[1]?.raw) : ''
+  if (!VERDICTS.includes(verdict)) {
+    return {
+      ok: false,
+      verdict: '',
+      evidence: '',
+      error: verdict ? `unusable verdict "${verdict}"` : 'the message does not end in the VERDICT/EVIDENCE pair',
+    }
+  }
+  // A REVIEWER THAT SAYS IT COULD NOT LOOK HAS NOT REVIEWED (measured: the very
+  // first run of this command answered `do-not-merge` because none of its
+  // commands reached the repository). Such an answer carries a valid verdict
+  // word and would otherwise be recorded as a review. The check errs towards the
+  // fallback, which costs a second reviewer, never a false green — but it is the
+  // two-tier JUDGMENT, not the raw net: an evidence line that opens with what
+  // was checked and then describes the reviewed code in the net's vocabulary is
+  // a review, and routing its verdict to a fallback would discard it (measured
+  // 18.08.2026, point 714 pass 2 — see blindReviewerAdmission).
+  // Scanned RAW, STRIPPED and char-stripped, any hit admitting: one spelling
+  // may shield the words behind decoration another unwraps.
+  const evidenceClean = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
+  if (
+    blindReviewerAdmission(evidence) ||
+    blindReviewerAdmission(evidenceClean) ||
+    blindReviewerAdmission(charStripped(evidence))
+  ) {
+    return { ok: false, verdict: '', evidence: '', error: 'the reviewer says it could not see the change' }
+  }
+  // A line still in its angle brackets is the PLACEHOLDER echoed back, not an
+  // observation. RULED on the STRIPPED capture (decoration must not change a
+  // decision — `**<placeholder>**` walks a raw `/^</` test), AND on the
+  // net-only spelling (landing round): an UNPAIRED marker survives the pair
+  // strip, so `EVIDENCE: _<one line…>` shielded the anchored test. The quoted
+  // evidence above stays raw.
+  // …and a leading bullet shields neither spelling (fourth landing round,
+  // pass 8): `EVIDENCE: - <one line…>` is still the placeholder.
+  if (
+    evidenceClean.length < 10 ||
+    /^[\s*-]*</.test(evidenceClean) ||
+    /^[\s*-]*</.test(charStripped(evidenceClean).trim())
+  ) {
+    return { ok: false, verdict: '', evidence: '', error: 'no usable EVIDENCE line' }
+  }
+  return { ok: true, verdict, evidence: evidence || evidenceClean, error: '' }
+}
+
+/**
+ * WHO REVIEWED, AND WHAT MAY BE RECORDED — for a run of the cross lane.
+ *
+ * The one rule this function exists for: the recorded model NAMES THE RUN THAT
+ * ACTUALLY HAPPENED, never the preference. The cross lane is preferred, so a
+ * successful cross-lane run records the cross lane — but every failure names the
+ * selected handover reviewer, with an EMPTY verdict, because at that moment no second
+ * pair of eyes has seen the change yet (formatReviewReport decides whether any
+ * template is printed). `ready` says whether a record may be written at all.
+ * `model` is the display name a record stores; `role` the lane it belongs to.
+ */
+export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall, scarceState } = {}) {
+  // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). The cross
+  // lane AUTHORS as well as reviews, and a model may not review its own work — so a
+  // cross-lane run over a cross-authored range is not a review whatever it answered,
+  // and recording it would put a self-review in front of a gate that then reads
+  // green. The runner asks the same question before it spends a codex call; this
+  // is the backstop for every caller that does not.
+  if (authoredByLane('cross', authorModel)) {
+    const chain = reviewChain('crossAuthored', scarceState)
+    const model = firstNonAuthor(chain, authorModel)
+    return {
+      model,
+      role: model ? reviewerDescriptor(model).key : '',
+      chain,
+      ranBy: '',
+      verdict: '',
+      evidence: '',
+      fellBack: true,
+      ready: false,
+      kind: OUTCOME.SELF_REVIEW,
+      cause: CAUSE_TEXT[OUTCOME.SELF_REVIEW],
+    }
+  }
+  if (outcome.ok && parsed.ok) {
+    return {
+      model: CROSS.displayName,
+      role: 'cross',
+      ranBy: CROSS.displayName,
+      verdict: parsed.verdict,
+      evidence: parsed.evidence,
+      fellBack: false,
+      // READY RESTS ON DELIVERY EVIDENCE, not on the exit code (escalation
+      // round): a clean exit with a parseable verdict says nothing about
+      // whether the round CARRIED its material. `shortfall` is the material
+      // accounting's answer — an explicit null (the round provably complete)
+      // is the only value that makes the record ready; a present shortfall
+      // refuses, and a caller that never asked (undefined) refuses too,
+      // because an unknown fit must never read as "everything was seen".
+      ready: shortfall === null,
+      kind: OUTCOME.OK,
+      cause: '',
+    }
+  }
+  const kind = outcome.ok ? OUTCOME.NO_VERDICT : outcome.kind || OUTCOME.ERROR_EXIT
+  const cause = outcome.ok
+    ? `${CAUSE_TEXT[OUTCOME.NO_VERDICT]}${parsed.error ? ` (${parsed.error})` : ''}`
+    : outcome.cause || CAUSE_TEXT[kind] || 'codex did not deliver a review'
+  const chain = reviewChain('crossUnavailable', scarceState)
+  const model = firstNonAuthor(chain, authorModel)
+  return {
+    model,
+    role: model ? reviewerDescriptor(model).key : '',
+    chain,
+    ranBy: '',
+    verdict: '',
+    evidence: '',
+    fellBack: true,
+    ready: false,
+    kind,
+    cause,
+  }
+}
+
+/**
+ * The fallback reviewer when the cross lane did not deliver, given who AUTHORED the change.
+ *
+ * The chain follows the scarce-lane switch. The scarce lane also AUTHORS here (CLAUDE.md
+ * §6), and its review of its own commit is the self-review both gates refuse. That would
+ * leave a scarce-authored change with no reachable reviewer at all whenever the cross lane
+ * is down, so the next role in the chain takes over instead (found by the cross-vendor
+ * review of this very branch, 10.08.2026).
+ *
+ * It takes EVERY author in the reviewed range, not just the head commit's: one
+ * record covers every commit it contains, so a range with one scarce-lane commit under
+ * a main-chain head must be handed to a model that authored NEITHER (second and third
+ * rounds of the same review — the first fix picked the main chain for exactly that
+ * range, which is a self-review of half of it).
+ *
+ * With every model in the chain among the authors it returns '' : there is then
+ * no valid handover reviewer at all, and saying so is the only honest answer —
+ * the review waits for the cross lane rather than being recorded by an author of the work.
+ */
+export function fallbackReviewerFor(authorModels = '', scarceState) {
+  return firstNonAuthor(reviewChain('crossUnavailable', scarceState), authorModels)
+}
+
+/** Every model designation of an author list, however it was handed over. */
+function authorList(authorModels) {
+  return (Array.isArray(authorModels) ? authorModels : [authorModels]).filter(Boolean)
+}
+
+/** The first candidate of a chain that shares no identity with an author, or ''. */
+function firstNonAuthor(chain, authorModels) {
+  const authors = authorList(authorModels)
+  return chain.find((candidate) => !authors.some((a) => sharesIdentity(candidate, a))) ?? ''
+}
+
+/**
+ * Did the lane of `role` author any part of this range (point 667)?
+ *
+ * Judged by lane identity (model-lanes.mjs `mentionedIdentities`), so every spelling of
+ * the lane answers alike — its trailer name, a bare family word, the raw id, and every
+ * RETIRED name (point 1061). A renamed lane is still the same lane: work it wrote under
+ * its old name is work it may not review under its new one.
+ */
+export function authoredByLane(role, authorModels = '', registry = LANES) {
+  return authorList(authorModels).some((a) => mentionedIdentities(a, registry).includes(role))
+}
+
+/**
+ * The review MATERIAL, assembled into what codex receives on stdin.
+ *
+ * WHY IT IS FED RATHER THAN FETCHED (measured 10.08.2026): this dev container
+ * cannot create unprivileged user namespaces, so codex's sandbox launcher
+ * (bubblewrap) fails before ANY command of the reviewer's runs — `git show`
+ * included. The first real run came back `do-not-merge` with the evidence "none
+ * of my commands reached the repository", which is an honest answer to a useless
+ * question: a reviewer that cannot see the artefact is not a second pair of
+ * eyes. So the artefact travels WITH the request. The read-only sandbox stays on
+ * regardless, for the machine where the launcher does work.
+ *
+ * The budget is spent in the order that matters — the patch first (which is
+ * CAPPED TOO: an uncapped diff used to blow the ceiling and leave nothing for the
+ * files, four-eyes finding 10.08.2026), then each changed file — and what does
+ * not fit is CUT VISIBLY, because a reviewer that silently saw half a file would
+ * report on the half it saw.
+ *
+ * THE TEXT IS ONLY HALF THE ANSWER (point 714). What the cut cost is accounted
+ * for in `assembleMaterial`, whose second return half is what decides whether a
+ * record may be printed at all — this wrapper keeps the string-only shape for the
+ * callers that just want the material.
+ */
+export function formatReviewMaterial(options = {}) {
+  return assembleMaterial(options).text
+}
+
+/**
+ * May the added files' content be left out because the patch carries it?
+ *
+ * ONLY while the patch fits whole. Once it is capped, its tail is cut — and an
+ * added file living in that tail would be in neither half of the material, which
+ * is a file the reviewer was asked about and never saw (third cross-vendor
+ * round). The duplicate is the cheaper mistake, so the skip is dropped.
+ */
+export function addedFilesAreCoveredByPatch(patchLength, budget = MATERIAL_BUDGET_CHARS, share = PATCH_SHARE) {
+  return Number(patchLength) <= Math.floor(Number(budget) * Number(share))
+}
+
+/**
+ * The paths a patch ADDS whole, whose current content would be sent twice.
+ *
+ * On this branch the duplicate cost the review its material budget: the patch
+ * already carried every added file in full, and the copies pushed the files the
+ * reviewer was asked to judge out of the ceiling (second cross-vendor round).
+ */
+export function newFilePathsIn(patch) {
+  const paths = new Set()
+  const lines = String(patch ?? '').split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^new file mode /.test(lines[i])) continue
+    for (let j = i; j >= 0 && j > i - 6; j--) {
+      // The SAME header parser the pass split uses, so a path git QUOTED is read
+      // as one path by both — two readers of one line that disagree are how a
+      // file falls out of the material with nothing said (cross-vendor round).
+      const header = parseDiffHeader(lines[j])
+      if (header) {
+        paths.add(header.b)
+        break
+      }
+    }
+  }
+  return paths
+}
+
+/**
+ * EVERY AUTHOR model named in one commit's `Co-Authored-By` field, not just the
+ * first. Reviewer identity lives under `Reviewed-By` and never reaches this
+ * field, so naming a reviewer cannot disqualify that reviewer as an author.
+ *
+ * `modelFromTrailers` deliberately returns the FIRST model co-author, which is
+ * the right answer for "who wrote this" but the wrong one for "who may not
+ * review this": a commit naming two models would hide the second, and the
+ * fallback chain could then pick a model that authored the work (third
+ * cross-vendor round). The separator is the one the git format uses.
+ */
+export function modelsInTrailerField(field) {
+  return String(field ?? '')
+    .split(';')
+    .map((part) => modelFromTrailers(part))
+    .filter(Boolean)
+}
+
+/**
+ * Does this review cover everything a record at that sha would clear?
+ *
+ * Returns null when it does, and the `partial` description when it does not —
+ * which is what stops the record command being printed (formatReviewReport).
+ * ONLY an answer EQUAL to the reviewed base counts as full coverage: an
+ * unanswerable merge-base is not an answer of "everything", and defaulting it to
+ * one switched the whole check off (fourth cross-vendor round). It lives here,
+ * pure, because the wrapper's own version could be reverted without a test
+ * noticing (same round).
+ */
+export function coverageDecision({ reviewedBase = '', coverageBase = '' } = {}) {
+  const reviewed = String(reviewedBase ?? '')
+  const coverage = String(coverageBase ?? '')
+  if (coverage && coverage === reviewed) return null
+  return { reviewedBase: reviewed, coverageBase: coverage || 'an unknown commit' }
+}
+
+/** How long a passed model-id probe stands before it must be repeated. */
+export const PROBE_MAX_AGE_MS = 30 * 86_400_000
+
+/**
+ * Has this machine PROVEN that `-m` is honoured rather than silently substituted?
+ *
+ * Nothing in a run's output names the model that answered (checked against
+ * `codex exec --json`, 10.08.2026: its events carry the thread, the items and the
+ * token usage, no model field). So the identity rests on the server REFUSING an
+ * unknown id — which `--probe` demonstrates — and the honest thing is to say
+ * when that demonstration is missing or old rather than to imply it every time.
+ * The answer is a warning, not a verdict: ensureModelProven (cross-review.mjs)
+ * re-runs the probe on it, and only a probe that then fails blocks the review.
+ */
+export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS, fingerprint = '') {
+  const at = Number(receipt?.at ?? 0)
+  if (!receipt || receipt.refused !== true || !at) {
+    return { fresh: false, warning: `the model id ${lane('cross').modelId} has never been proven honoured on this machine — proving it (node scripts/cross-review.mjs --probe)` }
+  }
+  // THE PROOF IS BOUND TO WHAT PRODUCED IT (fifth cross-vendor round). The
+  // receipt outlives container rebuilds, so a proof taken with another codex
+  // version, another binary or another account says nothing about the run being
+  // attributed now: a changed fingerprint expires it immediately, whatever its
+  // age. An empty CURRENT fingerprint only means "cannot tell", and time alone
+  // decides then; a receipt without one predates fingerprinting and is re-proven.
+  if (fingerprint && receipt.fingerprint && receipt.fingerprint !== fingerprint) {
+    return {
+      fresh: false,
+      warning: 'the codex binary, its version or the logged-in account changed since the model id was proven — re-proving it',
+    }
+  }
+  if (fingerprint && !receipt.fingerprint) {
+    return { fresh: false, warning: 'the model-id proof predates fingerprinting and cannot be tied to this codex — re-proving it' }
+  }
+  const ageDays = Math.floor((now - at) / 86_400_000)
+  if (now - at > maxAgeMs) {
+    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — re-proving it (node scripts/cross-review.mjs --probe)` }
+  }
+  return { fresh: true, warning: '', ageDays }
+}
+
+/**
+ * Where the saved ChatGPT login lives, given git's COMMON dir.
+ *
+ * `local/` is per CHECKOUT, and a delegated agent works in a git WORKTREE that
+ * is deleted when its point lands — a login saved there would vanish with it,
+ * which is the opposite of surviving a rebuild. The login belongs to the
+ * machine, so it is kept in the MAIN checkout's `local/`: `--git-common-dir`
+ * points at the one real `.git` directory from every worktree alike. With no
+ * git answer the current checkout is the honest fallback.
+ */
+export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
+  const owner = mainCheckoutFrom(gitCommonDir, repoRoot) ?? String(repoRoot ?? '')
+  return `${owner}${sep}local${sep}codex-auth.json`
+}
+
+/** Shell-quote one value for the record command line we print. */
+const q = (s) => `"${String(s ?? '').replace(/(["\\$`])/g, '\\$1')}"`
+
+/** A ready-to-run invocation of this same reviewer command for any role. The
+ *  caller supplies the already-bounded request; no prose handoff has to be
+ *  translated back into flags by a human. `model` is a role or a model name. */
+export function formatReviewerCommand({
+  model = '',
+  sha = '',
+  brief = '',
+  mode = 'review',
+  point = '',
+  since = '',
+  timeout = '',
+  pass = '',
+  files = [],
+} = {}) {
+  const reviewer = reviewerDescriptor(model)
+  if (!reviewer || !sha || !String(brief).trim()) return ''
+  const parts = [
+    'node scripts/cross-review.mjs',
+    `--reviewer ${reviewer.key}`,
+    `--sha ${String(sha)}`,
+    `--brief ${q(brief)}`,
+    `--mode ${String(mode || 'review')}`,
+  ]
+  if (String(point).trim()) parts.push(`--point ${String(point).trim()}`)
+  if (String(since).trim()) parts.push(`--since ${String(since).trim()}`)
+  if (String(timeout).trim()) parts.push(`--timeout ${String(timeout).trim()}`)
+  if (String(pass).trim()) parts.push(`--pass ${String(pass).trim()}`)
+  for (const file of Array.isArray(files) ? files : []) parts.push(`--file ${q(file)}`)
+  return parts.join(' ')
+}
+
+/** Shortest readable form of a sha — and unchanged for anything that is not one. */
+const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slice(0, 7) : String(s ?? ''))
+
+/**
+ * The record command, in the shape `mechanism-review.mjs --record` expects.
+ *
+ * After a completed run (the cross lane, or a selected handover reviewer) it is complete and
+ * can be run as printed. In the hand-over template the verdict and the evidence
+ * stand as ANGLE-BRACKET PLACEHOLDERS the recorder refuses — so a hand that
+ * pastes it without the named reviewer's review first gets a refusal, not a
+ * green ledger line.
+ */
+export function formatRecordCommand({
+  sha = '',
+  model = '',
+  verdict = '',
+  evidence = '',
+  mode = 'review',
+  point = '',
+  pass = null,
+  modelAt = '',
+  modelResult = '',
+  handover = '',
+} = {}) {
+  const parts = [
+    'node scripts/mechanism-review.mjs',
+    `--record ${sha || '<sha>'}`,
+    `--model ${q(model)}`,
+    `--verdict ${verdict || `<${VERDICTS.join('|')}>`}`,
+    `--evidence ${verdict ? q(evidence) : '"<what the review actually checked>"'}`,
+    `--mode ${mode}`,
+  ]
+  if (String(point ?? '').trim()) parts.push(`--point ${String(point).trim()}`)
+  if (String(modelAt).trim()) parts.push(`--model-at ${q(modelAt)}`)
+  if (String(modelResult).trim()) parts.push(`--model-result ${q(modelResult)}`)
+  if (String(handover).trim()) parts.push(`--handover ${String(handover).trim()}`)
+  // A PASS RECORD NAMES WHAT IT ACTUALLY READ (points 714 and 737). The record's
+  // sha is the end state at which those files were read; no commit boundaries
+  // travel, because intermediate file states are not review artefacts.
+  // The list is written in the ONE round-trippable representation (a path with
+  // a comma, a quote or edge whitespace travels C-quoted, as git prints it), so
+  // what the recorder stores is byte-identical to what this pass read.
+  if (pass) {
+    parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q(formatPassFiles(pass.files ?? []))}`)
+  }
+  return parts.join(' ')
+}
+
+/**
+ * The whole verdict of a run as the command prints it: one line naming what
+ * happened — LOUD on a fallback, per the point's "name the cause in ONE line" —
+ * then, only where a record may be offered, the record command or the
+ * reviewer command that starts the hand-over.
+ */
+export function formatReviewReport({
+  decision = {},
+  sha = '',
+  mode = 'review',
+  point = '',
+  partial = null,
+  shortfall,
+  plan = null,
+  pass = null,
+  modelAt = '',
+  modelResult = '',
+  handover = '',
+  reviewerCommand = '',
+} = {}) {
+  // THE REPORT RESTS ON decision.ready, NEVER ON A PARAMETER'S DEFAULT (fourth
+  // cross-vendor round, pass 3). decideReview answers ready:false for a round
+  // whose delivery accounting it was never shown — and this function then
+  // printed the record command anyway, because its own `shortfall` parameter
+  // defaulted to null, which is the accounting's word for "provably complete".
+  // That is the fail-open this point exists to close, surviving in the one
+  // function that decides what the caller is told to run. An absent accounting
+  // is now the same refusal the accounting itself makes of an unknown fit; the
+  // deliberate fallback templates (whose placeholders the recorder refuses
+  // anyway) keep their shape, so only the successful-run path is gated here.
+  const gap =
+    shortfall !== null && shortfall !== undefined
+      ? shortfall
+      : !decision.fellBack && decision.ready !== true
+        ? {
+            reason: 'unverified',
+            detail: 'the caller never asked the material accounting whether this round carried its range',
+            truncated: [],
+            omitted: [],
+            budget: MATERIAL_BUDGET_CHARS,
+            size: 0,
+            rawSize: 0,
+          }
+        : null
+  // A RECORD IS NEVER PRINTED FOR LESS THAN IT CLEARS (fourth cross-vendor
+  // round). Both gates treat a record as covering every commit it CONTAINS, so a
+  // narrowed range — `--since <sha>~1` on a branch with older commits — would
+  // produce a ledger line that clears work this reviewer never saw. The verdict
+  // is still reported; the ready-to-run command is not.
+  if (partial) {
+    const said = decision.fellBack
+      ? `${laneLabel('cross')} did not review it: ${decision.cause}`
+      : `${decision.ranBy || CROSS.displayName} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
+    return [
+      `cross-review: ${said}`,
+      '',
+      `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
+      // A hand-over never SAW anything, but the refusal is the same: only the
+      // narrowed range was measured, and a template for the whole sha would
+      // claim the rest (escalation round — both early routes printed one).
+      decision.fellBack
+        ? `  back to ${short(partial.coverageBase)}, and only the range back to ${short(partial.reviewedBase)} was measured here.`
+        : `  back to ${short(partial.coverageBase)}, and this review only saw back to ${short(partial.reviewedBase)}.`,
+      '  Re-run without --since to review the whole range, then record that.',
+      // TWO REASONS ARE NOT ONE (cross-vendor review, second round): a narrowed
+      // range whose round ALSO overflowed used to report only the narrowing, and
+      // the files nobody read went unnamed — while the point demands each one be
+      // named in the refusal, whatever else is wrong with the round.
+      ...(gap ? ['', '  And it did not carry even that much:', formatShortfall(gap, { sha, plan })] : []),
+    ].join('\n')
+  }
+  // A RECORD IS NEVER PRINTED FOR MATERIAL THE ROUND DID NOT CARRY (point 714).
+  // The truncation notice is written INTO the material, so it reached the caller
+  // only if the model chose to mention it — and a model that did not would have
+  // produced a clean-looking record command covering files nobody read. The
+  // verdict is still reported, because the reviewer's findings are worth having;
+  // the ready-to-run command is not.
+  if (gap) {
+    // THE HAND-OVER STILL HAS TO NAME ITS READER. A short-fall on a path that
+    // never ran the cross lane at all — the routing setting, or a range it authored — is
+    // still a review somebody must do, and a refusal that dropped the reviewer's
+    // name left the caller with no idea whose review it was waiting for.
+    const who = decision.model
+    const handOver = who
+      ? `  The review is ${who}'s, and it is NOT done.`
+      : '  No model of the chain may review this range — every one of them authored part of it.'
+    const said = !decision.fellBack
+      ? `${decision.ranBy || CROSS.displayName} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+      : decision.kind === OUTCOME.SELF_REVIEW
+        ? `ROLE SWAP — ${laneLabel('cross')} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
+        : `${laneLabel('cross')} did not review it: ${decision.cause}.\n${handOver}`
+    return [`cross-review: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
+  }
+  const cmd = formatRecordCommand({
+    sha,
+    model: decision.model,
+    verdict: decision.verdict,
+    evidence: decision.evidence,
+    mode,
+    point,
+    pass,
+    modelAt,
+    modelResult,
+    handover,
+  })
+  // Every pass says exactly what its record clears. Passes run in any order, so
+  // the remainder is discovered from the ledger rather than a guessed number.
+  const passWarning = pass
+    ? [
+        '',
+        `  This record clears the listed files at ${String(sha).slice(0, 7)}; unchanged files stay cleared, ` +
+          'and node scripts/mechanism-review.mjs --list shows the remaining file debt.',
+      ]
+    : []
+  if (!decision.fellBack) {
+    const ranBy = decision.ranBy || CROSS.displayName
+    const ran = reviewerDescriptor(ranBy)
+    const detail = ran ? ` (${ran.key} lane, effort ${ran.effort})` : ''
+    const scope = pass
+      ? Number(pass.total) === 1
+        ? ` (SCOPED PASS — ${(pass.files ?? []).length} end-state file(s))`
+        : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
+      : ''
+    return [
+      `cross-review: ${ranBy}${detail} reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
+      `  ${decision.evidence}`,
+      ...(plan ? ['', formatReviewCoverage(plan, pass)] : []),
+      '',
+      'Record it (the model named is the one that actually ran):',
+      `  ${cmd}`,
+      ...passWarning,
+    ].join('\n')
+  }
+  // The prose names the model the DECISION picked, not the usual one. If the
+  // first candidate authored the change another reviewer is selected; an
+  // instruction naming the wrong model beside the command is how a self-review gets
+  // recorded (four-eyes finding, second round, 10.08.2026).
+  const who = decision.model
+  // THE ROLE SWAP IS NOT A FALLBACK (point 667), and calling it one would read as
+  // something having gone wrong. The cross lane authored this range; the review was
+  // always the main chain's, together with the suites, the picture and the landing.
+  if (decision.kind === OUTCOME.SELF_REVIEW) {
+    if (!who) {
+      return [
+        `cross-review: ROLE SWAP — ${laneLabel('cross')} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+        `  And every model of ${(decision.chain ?? reviewChain('crossAuthored')).join(', ')} authored part of it too, so none of them`,
+        '  may either. The review is NOT done and cannot be recorded: review a narrower range.',
+      ].join('\n')
+    }
+    return [
+      `cross-review: ROLE SWAP — ${laneLabel('cross')} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+      `  The review is ${who}'s, which also runs the suites, judges the picture and lands the point.`,
+      reviewerCommand ? '  Start that reader with the same bounded request:' : '  Record what IT says — never a verdict this command invented:',
+      '',
+      `     ${reviewerCommand || cmd}`,
+      ...passWarning,
+    ].join('\n')
+  }
+  if (!who) {
+    return [
+      `cross-review: FALLBACK — ${laneLabel('cross')} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `  And EVERY model in the fallback chain (${(decision.chain ?? reviewChain('crossUnavailable')).join(', ')}) authored part of this`,
+      '  range, so none of them may review it. The review is NOT done and cannot be recorded:',
+      `  fix the cross-lane (${CROSS.displayName}) run, or review a narrower range one of them did not write.`,
+    ].join('\n')
+  }
+  // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round). A record
+  // is offered only for what was actually read — and after a spawn error, a
+  // timeout, a dead host, a refused login or an error exit, nothing is proven
+  // read: whether the material arrived is unknown. The placeholder template used to survive
+  // here for the next reviewer to fill, but a ready-made whole-sha template is
+  // an offer no completed hand-off backs. The two kinds below are different: a
+  // NO_VERDICT run exited cleanly and answered unusably (a missing or wrong
+  // RECEIPT included), and the share
+  // switch never attempted one — both hand-offs rest on a measured, fitting
+  // plan, so their template (whose placeholders the recorder refuses anyway)
+  // stays. Every other kind — the unknown ones included — refuses.
+  if (decision.kind !== OUTCOME.NO_VERDICT && decision.kind !== OUTCOME.SWITCHED_OFF) {
+    return [
+      `cross-review: FALLBACK — ${laneLabel('cross')} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      '  NO RECORD COMMAND IS PRINTED: no completed hand-off proves any of this range was read,',
+      '  so nothing of it may be recorded.',
+      `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
+      '  it reads the range itself, and only what IT actually read may be recorded.',
+      ...(reviewerCommand ? ['', `     ${reviewerCommand}`] : []),
+    ].join('\n')
+  }
+  return [
+    `cross-review: FALLBACK — ${laneLabel('cross')} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+    `  The review is NOT done. Hand it to ${who} and record what IT says:`,
+    '',
+    reviewerCommand ? `  Start it: ${reviewerCommand}` : `  1. give ${who} the commit and the brief above,`,
+    ...(reviewerCommand ? [] : [`  2. then record its verdict — never this command's:`, `     ${cmd}`]),
+    ...passWarning,
+  ].join('\n')
+}

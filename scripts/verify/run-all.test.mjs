@@ -356,7 +356,7 @@ describe('the both-backend sequencer (point 1135)', () => {
   })
 })
 
-// THE THREE DEFECTS THE CROSS-VENDOR REVIEW OF 17.09.2026 FOUND (GPT-6 Astra,
+// THE THREE DEFECTS THE CROSS-VENDOR REVIEW OF 17.09.2026 FOUND (cross-vendor review,
 // pass 3/5 of 264cac0). Each one is a way the deleted retry's safety net used to
 // cover for the runner, and each is pinned here rather than remembered.
 describe('what the ledger classification must not lose (Astra review, 17.09.2026)', () => {

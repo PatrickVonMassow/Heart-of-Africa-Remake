@@ -518,7 +518,7 @@ describe('an empty-detail check keys the same from a run and from a pasted line'
     // label's terminal one and produce the same key; their detail fields differ
     // because only the run parser sees the first delimiter. That exact lossy
     // boundary is pinned rather than being replaced by the ordinary one-dash
-    // empty-detail case (cross-vendor review, GPT-5.6 Sol at effort high).
+    // empty-detail case (cross-vendor review at effort high).
     const printed = 'FAIL  the rock is a class of thing —  — '
     const [parsed] = parseCheckLines(printed)
     const pasted = checkFromName(printed)
@@ -545,7 +545,7 @@ describe('an empty-detail check keys the same from a run and from a pasted line'
 // The lane marker decides whether a suite may stand a block down because the
 // PRE-change app cannot pose it. The classifier spawns BOTH trees through one
 // helper, so a constant there exempted the candidate too, and an omitted marker
-// let a stale environment exempt the pass (GPT-6 Astra, review of fea5ce9).
+// let a stale environment exempt the pass (review of fea5ce9).
 describe('the baseline lane marker', () => {
   it('marks the baseline lane and only the baseline lane', () => {
     expect(onBaselineLane(suiteLaneEnv({ baselineLane: true }))).toBe(true)
@@ -582,7 +582,7 @@ describe('the baseline lane marker', () => {
 
 // The pass drops an inherited marker ONCE, for every child it spawns. Writing
 // the lane per spawn site was incomplete: run-all also starts the cross-browser
-// check and Vitest (GPT-6 Astra, confirming review of a175498).
+// check and Vitest (confirming review of a175498).
 describe('the pass drops an inherited baseline marker', () => {
   it('removes the marker rather than overwriting it with a falsy value', () => {
     const env = { VERIFY_BASELINE_LANE: '1', PATH: '/usr/bin' }

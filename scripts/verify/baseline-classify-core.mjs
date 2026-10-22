@@ -482,7 +482,7 @@ export function formatBaselineReport({
 // The marker is therefore never inherited and never omitted — every spawn
 // states its lane, including the pass's own suites and the classifier's
 // CURRENT-tree run, which shares runSuiteOnce with the baseline run
-// (GPT-6 Astra, cross-vendor review of fea5ce9, 15.09.2026).
+// (cross-vendor review of fea5ce9, 15.09.2026).
 export const BASELINE_LANE_ENV = 'VERIFY_BASELINE_LANE'
 
 export function suiteLaneEnv({ baselineLane = false, baseUrl = null, env = {} } = {}) {
@@ -500,7 +500,7 @@ export function onBaselineLane(env = {}) {
 // THE PASS DROPS AN INHERITED MARKER ONCE, FOR EVERY CHILD IT WILL EVER SPAWN.
 // Writing the lane at each spawn site is incomplete by construction: run-all
 // also starts the cross-browser check and Vitest, and the next spawn added
-// would inherit the marker again (GPT-6 Astra, confirming review of a175498).
+// would inherit the marker again (confirming review of a175498).
 // Clearing it from the pass's OWN environment covers every child at once,
 // present and future, and leaves the classifier free to WRITE the lane it
 // means on the two suites it spawns itself.

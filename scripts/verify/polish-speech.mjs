@@ -2142,7 +2142,7 @@ if (section('chief-to-drummer')) {
     await page.keyboard.press('Space')
     // He must be SEEN on the way, part of the path behind him and part still in
     // front: accepting 'at-drummer' here would let a chief who is teleported to
-    // the drummer's side pass a check that claims he walked (GPT-6 Astra, pass
+    // the drummer's side pass a check that claims he walked (cross-vendor review, pass
     // 3/9). The crossing takes seconds, so a walking man is sampled many times.
     const walking = await page
       .waitForFunction(

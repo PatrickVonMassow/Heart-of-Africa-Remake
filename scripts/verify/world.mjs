@@ -185,7 +185,7 @@ if (section('communication-errand')) {
     // the height the site says the ground is, and the terrain under the block
     // against the water.
     // AND THE COMPARISON IS AGAINST A SECOND SOURCE, not against itself (four-eyes
-    // review by GPT-5.6 Sol, 11.08.2026). This check used to read `r.y` against
+    // review, 11.08.2026). This check used to read `r.y` against
     // `r.groundY` — BOTH fields of the same site object — so it proved only that the
     // scene copied the number it was handed. A block drawn a metre high on a site
     // that also said a metre would have passed. The height the block is drawn at is

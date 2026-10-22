@@ -18,6 +18,7 @@ import {
 } from './batch-resume-hook-core.mjs'
 import { CLAIM_BY, responderClaim } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
+import { MAIN, SCARCE } from './model-lanes.mjs'
 
 const now = 1_700_000_000_000
 const watcherClaim = (responderPid) =>
@@ -322,10 +323,10 @@ describe('the open-point headline (point 440)', () => {
     expect(hook).not.toContain("open point(s): ${nums}")
   })
 
-  it('derives the serving chain from the Fable switch instead of spelling one inline', () => {
+  it('derives the serving chain from the scarce-lane switch instead of spelling one inline', () => {
     const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
-    expect(hook).toContain('servingPolicyLine(fableState)')
-    expect(hook).not.toContain("'Fable 5, then Opus 4.8")
+    expect(hook).toContain('servingPolicyLine(scarceState)')
+    expect(hook).not.toContain(`'${SCARCE.retired[0]}, then ${MAIN.fallback.displayName}`)
   })
 
   it('orients every owning successor through the child-output measurement', () => {

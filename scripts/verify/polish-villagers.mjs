@@ -462,7 +462,7 @@ if (section('villager-canoe')) {
           local: { x: nm.x, y: 0.5, z: nm.z },
           label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
         })
-        // The squat held from the positioning through the shutter (GPT-6 Astra review).
+        // The squat held from the positioning through the shutter (cross-vendor review).
         const after = await squatting()
         check('he was still squatting ashore, unloading, before and after the shutter', before && after, JSON.stringify({ before, after }))
       }
@@ -1619,7 +1619,7 @@ if (section('village-loom')) {
       // The shuttle AND both her hands, in world space: the pixel difference
       // below says that something in the crop changed, and a growing cloth or
       // a thrown shuttle would change it over arms that never moved — which is
-      // the reported defect (GPT-6 Astra review, pass 4).
+      // the reported defect (cross-vendor review, pass 4).
       const shuttleAndHands = () => {
         const m = window.__placeScene.getObjectByName('village-loom-shuttle')
         m.updateWorldMatrix(true, false)
@@ -1697,7 +1697,7 @@ if (section('village-loom')) {
         const s = window.__placeLayout.loom
         return Math.hypot(s.tend.downstream.x - s.seat.x, s.tend.downstream.z - s.seat.z)
       })
-      // PART-WAY, AND WALKING OUT (GPT-6 Astra review, two rounds): a helper
+      // PART-WAY, AND WALKING OUT (cross-vendor review, two rounds): a helper
       // parked at his stand, standing beyond it, or on his way BACK is not a
       // body carrying the word she said. He faces the way he walks (0 toward
       // downstream, π toward upstream) and turns to the warp when he stands
@@ -2024,7 +2024,7 @@ if (section('adult-errands')) {
     // THE UTTERANCE ALREADY STANDING WHEN THE WINDOW OPENS IS NOT ONE OF OURS.
     // `last` survives its own moment, so the first sample would otherwise be
     // counted as a fresh word and measured at a speaker who has since walked on
-    // (GPT-5.6 Sol, confirming round). It is read once, before the loop, and
+    // (cross-vendor review, confirming round). It is read once, before the loop, and
     // becomes the thing every later sample is compared against.
     const first = await page.evaluate(() => window.__placeErrands())
     let seen = first.last
@@ -2053,7 +2053,7 @@ if (section('adult-errands')) {
       // THE POPULATION IS THE GAME'S OWN STATEMENT THAT THE BOUT HAS BEGUN —
       // phase and arrival — NOT `digging`. `digging` already carries the rim
       // test, so a reading taken over it could never fail: the very body that
-      // would prove the defect is the one it drops (GPT-6 Astra, cross-vendor
+      // would prove the defect is the one it drops (cross-vendor
       // round). Read over the bout instead, both halves are real: the village
       // brings BOTH men to the rim, and the stroke therefore plays.
       const atPit = new Map()
@@ -2077,7 +2077,7 @@ if (section('adult-errands')) {
         if (pair.length !== 2) continue
         pairsSeen++
         const site = now.geography.digSites[siteIndex]
-        // ACROSS THE HOLE, MEASURED AS SUCH (GPT-6 Astra, cross-vendor round).
+        // ACROSS THE HOLE, MEASURED AS SUCH (cross-vendor round).
         // A midpoint reading proves nothing: both bodies are already inside
         // `rimLimit`, so their middle always is too — two men side by side on
         // one arc pass it. What must hold is that the site lies BETWEEN them:
@@ -2106,7 +2106,7 @@ if (section('adult-errands')) {
       // measured a man who had walked on: a correct carrier says RIVER at the
       // head of the path and then goes down to the water, which failed the check
       // though nothing was wrong, while a word really spoken at the bank slipped
-      // through as soon as its speaker walked away (GPT-5.6 Sol, first
+      // through as soon as its speaker walked away (cross-vendor review, first
       // cross-vendor round, D1).
       const last = now.last
       const key = last ? `${last.id}/${last.concept}/${last.speaker}` : null
@@ -2117,7 +2117,7 @@ if (section('adult-errands')) {
         if (who) {
           // AGAINST THE CHILDREN THEMSELVES, first. The stage says where they
           // belong; a child on the speaker's side of a rock is nearer him than
-          // the rock is, and it is the child who hears (GPT-5.6 Sol, confirming
+          // the rock is, and it is the child who hears (cross-vendor review, confirming
           // round). The stage points stay as a floor for the moment when the
           // children are elsewhere entirely.
           const kids = await page.evaluate(() => window.__placeTag?.()?.children ?? [])
@@ -2168,7 +2168,7 @@ if (section('adult-errands')) {
     // 09.09.2026.
     const errandsCast = staged['water-out'] ?? 0
     // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
-    // (GPT-6 Astra, cross-vendor round): the game stages 'water-back' at the
+    // (cross-vendor round): the game stages 'water-back' at the
     // moment the fill ends and the carrier turns for home, so it counts the
     // trips that had an empty leg and filled — the full leg home has begun,
     // not necessarily ended. ONE is the honest
@@ -2184,7 +2184,7 @@ if (section('adult-errands')) {
       errandsCast > 0,
       `${errandsCast} water errand(s) cast over 240 samples, ${roundTrips} of them turned for home`,
     )
-    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (GPT-6 Astra,
+    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (cross-vendor review,
     // cross-vendor round). Bundled into the jar assertion it inherited the water
     // errand's sample count, so a broken digging animation in a window with few
     // errands would have read NOT-COVERING instead of red — and the DIG
@@ -2204,7 +2204,7 @@ if (section('adult-errands')) {
     // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
     // the staging, digging and carrying checks are satisfied by animation alone,
     // and the earshot check passed EXPLICITLY when nobody spoke at all — so a
-    // broken speech path would have gone green (GPT-5.6 Sol, first cross-vendor
+    // broken speech path would have gone green (first cross-vendor
     // round, D2).
     check(
       'and both adult words are really spoken — RIVER and DIG',
@@ -3459,7 +3459,7 @@ if (section('adult-errands')) {
   // ONLY THE BASELINE LANE MAY STAND THE BLOCK DOWN. The exemption exists for
   // the PRE-change app, which has no durable dig record; on the candidate the
   // same missing capability IS the regression this block is here to catch, and
-  // a silent SKIP would report it as green (GPT-6 Astra, cross-vendor review of
+  // a silent SKIP would report it as green (cross-vendor review of
   // 23495d5, 14.09.2026). `baseline-classify.mjs` sets the marker when it spawns
   // the suite inside the baseline checkout, and nothing else sets it.
   const baselineLane = onBaselineLane(process.env)

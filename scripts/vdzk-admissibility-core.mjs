@@ -20,7 +20,7 @@ export const USER_OWNED_CATEGORIES = Object.freeze({
 
 const CATEGORY_LABEL = 'User-owned category'
 // THE TAG IS A HEADER AT COLUMN ZERO, and every gap inside it is HORIZONTAL
-// (three cross-vendor rounds, GPT-5.6 Sol, 28.08.2026). Each loosening was the
+// (three cross-vendor rounds, 28.08.2026). Each loosening was the
 // same defect wearing a different hat: a card that merely QUOTES the marker
 // granted itself the authority it was quoting, and `withoutCategoryLine` then
 // deleted the quoted text out of the rendered card — a question reaching the

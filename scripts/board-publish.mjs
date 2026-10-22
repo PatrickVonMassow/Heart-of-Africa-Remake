@@ -55,8 +55,8 @@ import {
 } from './board-core.mjs'
 import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
 import { BOARD_EDIT_LOCK_PATH, withBoardEditLock } from './board-edit-lock.mjs'
-import { currentSetting, settingProblemLine } from './astra-share.mjs'
-import { applyFooterNote } from './astra-share-core.mjs'
+import { currentSetting, settingProblemLine } from './lane-routing.mjs'
+import { applyFooterNote } from './lane-routing-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
 import {

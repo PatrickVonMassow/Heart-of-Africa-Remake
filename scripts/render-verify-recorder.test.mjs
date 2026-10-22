@@ -11,15 +11,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  DECODE_WINDOW_BYTES,
+import { DECODE_WINDOW_BYTES,
   MAX_CAPTURE_CHARS,
   MAX_LINE_CHARS,
   MAX_RED_IDENTITIES,
   TERMINAL_VERDICT_LINE,
   capturedReds,
-  tapOutput,
-} from './render-verify-recorder.mjs'
+  tapOutput } from './render-verify-recorder.mjs'
 import { DEV_SUITES } from './verify/tiers.mjs'
 
 /** Text that is distinct in LETTERS, so the parser's own normalisation (digits,
@@ -921,7 +919,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     chargeReds(capturedReds(state), { suite: 'probe', backend: 'webgl', ledger })[0]
 
   it('separates a real tag but preserves the same shape inside the measurement', () => {
-    // THE FIXTURES SPEAK THE GENERATOR'S OWN SHAPE (four-eyes finding, Fable 5,
+    // THE FIXTURES SPEAK THE GENERATOR'S OWN SHAPE (four-eyes finding, the scarce lane,
     // 31.08.2026). They used to hand-roll a TWO-space tag that `sectionTag`
     // never emits — so a stripper keyed to the real one-space shape would have
     // walked straight past these negative pins. The tag is taken from the

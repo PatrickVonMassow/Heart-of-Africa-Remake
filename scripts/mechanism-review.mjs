@@ -60,16 +60,9 @@ import {
   VERDICTS,
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
-import {
-  FABLE_MODEL,
-  FABLE_MODEL_ID,
-  OPUS_FALLBACK_MODEL,
-  OPUS_FALLBACK_MODEL_ID,
-  OPUS_MODEL,
-  OPUS_MODEL_ID,
-  parseClaudeResultOutput,
-} from './fable-switch-core.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { parseClaudeResultOutput } from './lane-switch-core.mjs'
+import { CROSS, EXECUTION_ROLES, MAIN, executionTarget } from './model-lanes.mjs'
 import { authorshipRefusesPermission } from './authorship-check-core.mjs'
 import { commitObjectParents } from './mechanism-review-range-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
@@ -157,7 +150,7 @@ export function committedHalfModel(path, { at = 'HEAD' } = {}) {
 /** The reviewer-vendor matrix, one place for recorder and carry alike: each
  *  vendor must show exactly the evidence it CAN have (re-review round 4 —
  *  the carry path accepted every "agreement" regardless of vendor, so a
- *  fabricated OpenAI or unknown-vendor agreement could be carried forward). */
+ *  fabricated non-harness or unknown-vendor agreement could be carried forward). */
 export function reviewerVendorProblems(model, authorship = {}) {
   const vendor = modelVendor(model)
   const status = String(authorship?.status ?? '').trim()
@@ -209,14 +202,16 @@ export function reviewerVendorProblems(model, authorship = {}) {
         'can rule out clears nothing, whatever its claimed status',
     ]
   }
-  if (vendor === 'anthropic' && status !== 'agreement') {
+  // The harness runs the main lane's runtime: only that vendor's reviewers leave a
+  // transcript it holds, every other vendor's run outside it.
+  if (vendor === MAIN.vendor && status !== 'agreement') {
     return [
       `the claimed reviewer "${model}" is one whose session transcript the harness holds, so its identity ` +
         'must be VERIFIED: pass --model-at <ISO> with --model-transcript <session.jsonl> or --model-result ' +
         '<result.json> so the claim can be checked against the recorded model — an unverified claim from this vendor no longer clears the gate',
     ]
   }
-  if (vendor === 'openai') {
+  if (vendor !== MAIN.vendor) {
     if (status !== 'unverified') {
       return [
         `the claimed reviewer "${model}" runs outside the harness, so no session transcript can hold its ` +
@@ -237,11 +232,11 @@ export function reviewerVendorProblems(model, authorship = {}) {
  *  top-level model is tied to the result by its exact usage counters; auxiliary
  *  classifier calls neither grant nor spoil reviewer credit. */
 export function checkClaudeResultFile({ claimedModel = '', artefactAt = '', resultPath = '' } = {}) {
-  const descriptor = [
-    { key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID },
-    { key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID },
-    { key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID },
-  ].find((entry) => sameModel(entry.name, claimedModel))
+  // Every lane (and the main fallback) on the harness runtime, scarce lane first.
+  const descriptor = EXECUTION_ROLES.map((role) => executionTarget(role))
+    .filter((target) => target.runtime === MAIN.runtime)
+    .sort((a, b) => (a.key === 'scarce' ? -1 : b.key === 'scarce' ? 1 : 0))
+    .find((entry) => sameModel(entry.name, claimedModel))
   const at = Date.parse(String(artefactAt ?? '')) || Number(artefactAt) || null
   if (!descriptor) {
     return { status: 'unverified', claimedModel, actualModel: '', artefactAt: at, reason: 'the claimed model is not a Claude reviewer' }
@@ -898,7 +893,7 @@ export function buildRecord({
   // Where the merger commits its own union — a merge performed by the session
   // itself — the proxy names the merger as an author of the material and refuses
   // the one model the rule actually allows. Measured on the 13.08.2026 stage: the
-  // halves are Fable's and Sol's, Claude wrote neither and merged, and no record
+  // halves are the scarce lane's and the cross lane's, the main chain wrote neither and merged, and no record
   // of that fact could be written. Supplying --union/--list-a/--list-b replaces the
   // proxy with the halves themselves, which are versioned files a reviewer can read.
   const mergeAuthors = halfAuthors.length === 2
@@ -950,7 +945,7 @@ export function buildRecord({
   // identity above was decided from the RECORDING COMMIT's trailers, and that proxy
   // condemns the one case the rule exists for: a fold committed by the third model
   // names that model as an author of the material. Measured 22.08.2026 on this very
-  // stage — a valid Fable fold was refused, and the message blamed the merger's
+  // stage — a valid scarce-lane fold was refused, and the message blamed the merger's
   // identity without ever saying the halves had not been read. The remedy is one
   // flag triple, so the refusal names it rather than leaving it to be rediscovered.
   if (errors.length && mode === BLIND_PARALLEL && halfAuthors.length !== 2) {
@@ -1172,7 +1167,7 @@ function buildCarriedRecord({
   const src = sources.reduce((x, y) => (Number(y.at ?? 0) >= Number(x.at ?? 0) ? y : x))
   // A CARRY IS WRITTEN ONLY IF THE GATE WILL COMPOSE IT (cross-vendor re-review
   // of point 889): the carried row clears a NEW commit, so it answers to the
-  // commit-era reviewer rule. Copying an unverified Anthropic identity forward
+  // commit-era reviewer rule. Copying an unverified harness-vendor identity forward
   // would report "recorded" for a row the gate then refuses — silent debt. Such
   // a pass is reviewed fresh instead; the identity of the fresh reviewer can be
   // proven, the legacy one's cannot.
@@ -1345,12 +1340,12 @@ export function resolveCommit(sha, { run = git } = {}) {
   }
   const full = commits[0]
   // EVERY read here is replacement-blind, not only the authorship ones
-  // (cross-vendor review, GPT-5.6 Sol at effort high): a replacement can
+  // (cross-vendor review): a replacement can
   // substitute the recorded subject and, worse, the commit TIME — and a forged
   // older timestamp defeats the later "a review cannot predate its commit" check.
   const subject = run(['--no-replace-objects', 'show', '-s', '--format=%s', full])
   // THE COMMIT'S OWN TRAILERS ARE READ THE SAME WAY (cross-vendor review,
-  // GPT-5.6 Sol, third do-not-merge). This read decides whether the ancestry rule
+  // third do-not-merge). This read decides whether the ancestry rule
   // below runs at all: a replacement object that gives the merge a trailer it
   // does not have makes `own` non-empty, and the real merged tip is then never
   // consulted — a forged author rather than a hidden one.
@@ -1374,8 +1369,8 @@ export function resolveCommit(sha, { run = git } = {}) {
   // commit stays authorless-unknown, because absence must not become an
   // assignment.
   //
-  // THE PARENTS ARE READ RAW, NOT THROUGH `%P` (cross-vendor review, GPT-5.6 Sol
-  // at effort high, do-not-merge on the first form). `%P` is GRAFT-AWARE: at a
+  // THE PARENTS ARE READ RAW, NOT THROUGH `%P` (cross-vendor review,
+  // do-not-merge on the first form). `%P` is GRAFT-AWARE: at a
   // shallow boundary it prints the rewritten ancestry, so a merge can arrive
   // looking single-parented. This code would then have inherited nothing and the
   // merge would read as an ordinary authorless commit — and an author that is
@@ -1383,7 +1378,7 @@ export function resolveCommit(sha, { run = git } = {}) {
   // hidden tip would no longer be excluded from reviewing it. `cat-file -p` shows
   // the commit object's own parent lines, which no graft rewrites.
   // AND `--no-replace-objects`, because `cat-file` HONOURS `refs/replace`
-  // (cross-vendor review, GPT-5.6 Sol, second do-not-merge). A replacement
+  // (cross-vendor review, second do-not-merge). A replacement
   // object standing in for the merge can name one parent where the real commit
   // names two, which hides the merged tip's author exactly as a shallow graft
   // would. The same flag guards the trailer reads below: a replaced PARENT could
@@ -1393,8 +1388,8 @@ export function resolveCommit(sha, { run = git } = {}) {
   // parent git never recorded, whose trailers would become this merge's
   // authorship. `commitObjectParents` owns that bound for both gates.
   const rawParents = (sha) => commitObjectParents(run(['--no-replace-objects', 'cat-file', '-p', sha]))
-  // AND THE ANCESTRY IS FOLLOWED AS FAR AS IT GOES (cross-vendor review, GPT-5.6
-  // Sol at effort high). Resolving ONE level left a merged tip that is itself a
+  // AND THE ANCESTRY IS FOLLOWED AS FAR AS IT GOES (cross-vendor review)
+  // . Resolving ONE level left a merged tip that is itself a
   // trailerless machinery merge with no authors at all — the very case this rule
   // exists for, one step further out — while `authorshipResolver` on the gate
   // side recurses. The two would then disagree again, which is the deadlock this
@@ -1464,10 +1459,10 @@ export const usage = () =>
   `       reviewer no harness transcript can hold is recorded as unverified, with a reason.\n` +
   `--author-framing records the hostile-tester stance of a re-authoring commission\n` +
   `       beside the review that followed it. Rounds zero and one have none.\n` +
-  `--spec-examination records the one cross-vendor reading before Fable escalation:\n` +
+  `--spec-examination records the one cross-vendor reading before scarce-lane escalation:\n` +
   `       sound when the text survived the findings, amended when the work order changed.\n` +
   `--merged-by names the model that folded the two lists into the union — selected by\n` +
-  `       node scripts/fable-switch.mjs --status, and checked when explicitly supplied — the one that\n` +
+  `       node scripts/lane-switch.mjs --status, and checked when explicitly supplied — the one that\n` +
   `       wrote NEITHER of them, because a merge can lose a finding silently — and the\n` +
   `       COUNT says none did. Hand over the FILES and it is counted here:\n` +
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
@@ -1476,7 +1471,7 @@ export const usage = () =>
   `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded end-state file scope, or one\n` +
   `       pass of a range whose material no single review round can hold. The passes cut\n` +
   `       through the FILE SET. Once every pass of the split is recorded, each clears the\n` +
-  `       files it names at the reviewed end state; the rest of the range stays owed. review-astra.mjs prints the plan.\n` +
+  `       files it names at the reviewed end state; the rest of the range stays owed. cross-review.mjs prints the plan.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
   `       The record stores the reviewed head as the files' end-state sha. A later commit to\n` +
@@ -1488,13 +1483,13 @@ export const usage = () =>
   `       or --framing. The gates re-verify the blobs and the copied fields on every read;\n` +
   `       a changed file refuses the carry.\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): the first eligible model in the required chain, never\n` +
-  `       an author of the range. Claude authored it → GPT-6 Astra at reasoning effort\n` +
-  `       high, and when Astra is unavailable or ineligible the first of Fable 5 / Opus 5 /\n` +
-  `       Opus 4.8 that wrote no part of it.\n` +
-  `       ASTRA authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
-  `       of it, which also runs the suites, judges the picture and lands the point.\n` +
+  `       an author of the range. The main chain authored it → the cross lane (${CROSS.displayName})\n` +
+  `       at reasoning effort ${CROSS.reasoningEffort}, and when the cross lane is unavailable or ineligible the\n` +
+  `       first of ${handoverChainFor('cross-unavailable').join(' / ')} that wrote no part of it.\n` +
+  `       The CROSS LANE authored it → the first of ${handoverChainFor('cross-authored').join(' / ')} that\n` +
+  `       wrote no part of it, which also runs the suites, judges the picture and lands the point.\n` +
   `       Run it — never a hand-typed codex line — with:\n` +
-  `       node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>"\n` +
+  `       node scripts/cross-review.mjs --sha <sha> --brief "<what to judge>"\n` +
   `\nThe GATES are separate commands and answer --status themselves:\n` +
   `       node scripts/mechanism-review-guard.mjs --status\n` +
   `       node scripts/criticality-review-guard.mjs --status`
@@ -1574,7 +1569,7 @@ if (isMainModule(import.meta.url)) {
     }
 
     const fableState = parsed.values.mode === 'blind-parallel' || parsed.values.handover
-      ? currentFableState()
+      ? currentLaneState()
       : undefined
     if (fableState && !fableState.ok) throw new Error(fableState.problem)
     const built = buildRecord({ ...parsed.values, fableState })

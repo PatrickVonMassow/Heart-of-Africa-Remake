@@ -34473,3 +34473,112 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
   Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Request-Approval-Guard: reine Lesepipelines über eine fail-closed Allowlist freigeben"); approved: "ja, alles ganz vorne in der Queue".
   Bundle: Chat & Tafel.
+
+- [x] 1409. Stop guards apply only to the holder of the batch lock
+  Final state: every Stop guard that imposes BATCH DUTIES applies only when this session holds the batch lock, tested positively with `ownsLock(sessionId).mine` (ownsLock returns an object; `.mine` is mandatory). A missing, unreadable or dead-owner lock, a live foreign owner and a missing session id all mean "not applicable", returned before any git, network, CI or state work.
+  Concretely: scripts/push-arrival-guard.mjs `gatherPushArrivalInputs`: early exit becomes `!ignoreOwnership && !ownsLock(sessionId).mine`, keep `CAUSE.notLockOwner`, reason text "this session does not hold the batch lock", `--status` stays diagnostic. scripts/ci-status-guard.mjs `gatherCiStatusInputs`: same predicate before git/network/CI work; pause and sealed-boundary exceptions stay; `observeDurableWait`, successor notification and `readOnly` are NOT coupled to the session ownership check. scripts/dashboard-guard.mjs, dashboard-integrity-guard.mjs, decision-card-guard.mjs, retro-currency-guard.mjs: the same early exit (confirm insertion point and diagnostic exceptions per file before patching). decision-card-guard must not demand card reviews from a non-owner even while another session holds the batch (measured 21.10.2026 17:04).
+  Then sort the remaining ~30 importers of `heldByOtherLiveOwner` by purpose and switch ONLY further batch-duty checks; foreign-owner protection, acquisition logic and diagnostics keep `heldByOtherLiveOwner`. `heldByOtherLiveOwner` and `ownsLock` themselves stay unchanged - no global reinterpretation, no lease/handover addition to `ownsLock`.
+  Before changing: read the fail direction of `turnEndOwnership` (batch-resume-hook-core.mjs) for an empty/unreadable transcript right after /clear and the Stop-hook order in .claude/settings.json; do not change acquisition (freeze), but pin the case "lock free, transcript empty, chat session" as a test: neither acquisition nor duties. If it acquires there, file that as its own finding.
+  Tests (Vitest, per switched guard core): no lock / unreadable lock / dead foreign owner / live foreign owner / missing session id -> not applicable with no git, network or state work; own lock -> applicable; process-identity (compaction) case stays owner.
+  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
+  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
+  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
+  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Stop-Guards gelten nur für den Halter des Batch-Locks"); approved: "ja, alles ganz vorne in der Queue".
+  Bundle: Chat & Tafel.
+
+- [x] 1410. Board-first: the board duty applies only to the lock holder
+  Final state: scripts/board-first-guard.mjs exits without a board decision for a session that does not hold the batch lock: `if (!ownsLock(sid, { lock }).mine) process.exit(0)` placed AFTER the fence chokepoint, the main-write fence, the foreign-owner stand-down (`ownershipStandDownDecision`, still called only on an actually detected foreign owner via `heldByOtherLiveOwner`), the worktree exemption and the sealed-boundary check, and immediately BEFORE `gather()`/`evaluate()`. A non-owner thus gets no board-first deny and writes no `boardFirstFiredAt` into the shared state (which today consumes the real owner's once-per-turn stand-down).
+  Unchanged: lease and claim renewal, handover handling, pause exemption, `--status`; the end of a board duty grants no write permission and triggers no lock acquisition. Correct the comment claiming "board duties stand down for a non-owner" - it becomes true only with this change.
+  Tests (board-first-core.test.mjs / board-first-guard.test.mjs): non-owner with ownerless batch -> no board deny, no `boardFirstFiredAt` write; ownerless main write still refused; stale-fence holder still refused; owner, sealed boundary and isolated worktree keep today's rules.
+  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
+  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
+  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
+  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Board-first: Board-Pflicht nur für den Lock-Halter"); approved: "ja, alles ganz vorne in der Queue".
+  Bundle: Chat & Tafel.
+
+- [x] 1411. Main-write guard: do not classify pure read commands as writes
+  Final state: the main-write classification used by board-first (`mainWriteFenceDecision`, batch-lease-core.mjs, and the command classifier it relies on, e.g. command-classify-core.mjs) judges a command by write semantics, not by mere mention of a path or script name: a pure read such as `grep -c ownsLock scripts/land-point.mjs`, `grep -n -i "a\|b" scripts/land-point.mjs` or `sed -n 1,50p scripts/land-point.mjs` is not a state-changing segment and passes for a non-owner on main. Real writes (redirection into the tree, git commit/push/merge, running land-point.mjs or other mutating scripts, Edit/Write on tracked paths) stay refused without the lock.
+  First reproduce with the guard's own check path and locate the rule that classifies these reads as writes; change only that rule.
+  Tests: the three read commands above pass for a non-owner on main; `node scripts/land-point.mjs 1`, `echo x > src/a.ts`, `git commit -m x` stay refused; existing owner behaviour unchanged.
+  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
+  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
+  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
+  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Main-Write-Schutz: reine Lesebefehle nicht als Schreibzugriff einstufen"); approved: "ja, alles ganz vorne in der Queue".
+  Bundle: Chat & Tafel.
+
+- [x] 1421. Lower the OpenAI reasoning effort from high to medium
+  Queue position: FRONT of the work order (infrastructure setting, user order 21.10.2026).
+  Final state: every OpenAI (GPT-6 Astra) call - review (scripts/review-astra.mjs), authoring (scripts/author-astra.mjs) and ask (scripts/ask-astra.mjs) - runs at reasoning effort medium. The single source is ASTRA_REASONING_EFFORT in scripts/review-astra-core.mjs:73 ('high' -> 'medium'); its header comment (line 8, "reasoning effort HIGH") says medium.
+  Tests: scripts/author-astra-core.test.mjs:83 expects model_reasoning_effort=medium; review-astra-core.test.mjs (uses the constant) stays green; no other hard-coded 'high' for the OpenAI lane remains in scripts/ (comments recording past reviews "GPT-5.6 Sol at effort high" are history and stay).
+  Criticality: low - cost/latency setting, one constant.
+  Bundle: Chat & Tafel.
+
+- [x] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
+  Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
+  Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.
+  Source: finding 21.10.2026 18:26 by the 1409 author: with the lock free, the empty transcript after /clear counted as unattended and acquired; batch-progress-guard is fifth in the Stop order, so every later batch-duty guard bound that chat window. Acquisition is frozen by 1409's spec, hence its own point.
+  Queue position: directly after 1409 (it follows its ownership change).
+  Criticality: medium - a real blockade of an attended chat window (infrastructure freeze exemption, CLAUDE.md section 2).
+  Bundle: Chat & Tafel.
+
+- [x] 1412. Village bank routing test fails under machine load
+  Queue position: after point 1411 (front-of-queue gate stability: it reddens unrelated branches and CI).
+  Source: finding 21.10.2026 18:14: `src/scenes/place/routing.test.ts` "a villager sent to the BANK gets there" failed in two independent full unit runs (1402 worktree seed 1337; 1410 worktree seeds 7 and 1337) at load average 13-16; the file alone passes 19/19, also on main. Caused red CI run 39625616367 on feat/1402-rear-leg-tremble.
+  Final state: the routing search and its test are deterministic: no wall-clock or time-budget dependency decides whether a route is found, so the bank test passes identically under load.
+  Verifiable: a Vitest case that runs the bank routing with a stalled clock (or artificially slow step) and still reaches all three bank points; the full unit suite green under parallel load.
+  Charged finding 21.10.2026 ~22:00: the main pre-push unit gate went red under parallel load (a worktree vitest run and an Astra review beside it) and kept no test name; the immediate quiet rerun was green (608 files). Likely this class; unproven because the name is lost.
+  Criticality: medium - a flaky unit gate reddens unrelated branches and CI.
+  Bundle: Dorfleben.
+
+- [x] 1407. No user instruction is ever lost: tick the carrier only after commit, the doctor stashes no task files, reconcile the carrier against TASKS.md
+  Rank: at the very front of the work order, ahead of 1402 (user order 21.10.2026).
+  Four eyes: GPT-6 Astra and Opus 5.5 analyse blind-parallel from identical inputs; a third model merges via scripts/blind-merge.mjs; cross-vendor review of the result.
+  What happened 21.10.2026: the carrier ticked "queued 1402..1406" at 10:31Z while the TASKS.md appends were only in the working tree, uncommitted. At 11:15Z batch-doctor --repair (ownerAlive=false, unhandled parallel alert) moved all dirty files incl. TASKS.md into stash doctor-quarantine-2026-10-21T11-15-21-622Z and judged "consistent". No check compared carrier ticks against TASKS.md; the loss was found only at 16:40 and restored by hand in 5ba920079. 218 quarantine stashes exist, none ever audited.
+  FINAL STATE:
+  1. A carrier entry becomes "queued N" only after a commit containing point N is pushed to main; until then it stays open.
+  2. batch-doctor never stashes TASKS.md, docs/tasks-archive.md or .claude/queue-rank.json silently; it secures them as a commit on a rescue branch and raises a loud alert.
+  3. A reconciliation runs at every doctor run, session start and in the post-merge gate: every "queued N" carrier entry must exist in TASKS.md or the archive; a mismatch is a red finding, never "consistent".
+  4. One-time sweep of all existing stashes for content not on main (user orders, quotes, points); findings are restored or filed.
+  VERIFIABLE: a Vitest replays the 21.10. sequence (append point, tick carrier, doctor --repair with ownerAlive=false) and ends with the point still in TASKS.md or with an alert, never a silent loss; a Vitest that a queued carrier entry without its TASKS.md point turns the reconciliation red.
+  Refs: scripts/batch-doctor.mjs, scripts/batch-doctor-core.mjs (quarantineStash, planRemediation), scripts/finding.mjs, .claude/doctor.log 2026-10-21T11:15, commit 5ba920079.
+  Criticality: HIGH - user orders were lost silently (data loss / false approval class, exempt from the infrastructure freeze per CLAUDE.md section 2).
+  Source: user 21.10.2026 (chat): "Wie kann so etwas passieren? Das ist absolut fatal. Wir brauche ganz vorne in der Queue einen neuen Punkt, der das Problem mit vier Augen analysiert und zuverlässig löst. Es darf nie etwas verlorengehen." Approved: "So einreihen".
+  Absorbs the carrier findings of 21.10.2026 "Doctor quarantine stash swallows committed-to-carrier TASKS.md appends" and "Doctor quarantine stashes carry unreviewed content" (final-state items 2 and 4).
+  Bundle: Chat & Tafel.
+
+- [x] 1393. Generic model lanes; the cross-vendor lane switches to GPT-6.1
+  Queue position: directly after point 1407 (user order 21.10.2026; before: directly before point 1347, user order 19.10.2026).
+  Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.
+  Execution: four eyes (CLAUDE.md 6): divergent design work blind-parallel from identical inputs, merged by a third model via scripts/blind-merge.mjs; the code is then reviewed cross-vendor, never by its author.
+  Amendment (user order 19.10.2026, approved "ok. freigegeben"; folded in from the findings carrier, supersedes the carrier finding "Global Codex CLI must go from 0.153.0 to 0.163.0 before gpt-6.1-sol works") — order of work:
+  1. FIRST STEP: update the global Codex CLI installation from 0.153.0 to 0.163.0 or newer (npm install -g). Only the batch owner can run this; the main write guard refuses npm install -g for non-owner sessions.
+  2. THEN prove that gpt-6.1-sol answers with the GLOBAL installation (a minimal probe prompt answered OK). If it does not answer, stop and report; do not start the rebuild.
+  3. ONLY THEN the rebuild of 1393 with four-eyes review across two vendors (CLAUDE.md 6), as the spec of 1393 describes.
+  Background measured 19.10.2026 22:07: codex 0.163.0 via npx with ChatGPT login: gpt-6.1-sol answered OK. codex 0.153.0 (the global install): 400 "not supported".
+  Progress 20.10.2026 08:10 (batch owner): steps 1-2 done — global Codex CLI updated 0.153.0 -> 0.163.0 (npm install -g @openai/codex@0.163.0); probe `codex exec -m gpt-6.1-sol` with the global install answered OK. Step 3 (rebuild) is open.
+  Goal: switching a model is a one-line data change. No file name, script name or constant name carries a vendor or model name; only data does.
+  Final state:
+  - scripts/model-lanes.mjs is the ONLY place naming concrete models. Each lane is a record: role, vendor, display name, model id, retired names, runtime (claude/codex), scarce flag. Guards, trailer checks, review chain, routing and tests read lanes only from it.
+  - The cross-vendor rule compares the vendor field of two lane records; no script knows a vendor name.
+  - Constants named by role (no ASTRA_MODEL, OPENAI_*, FABLE_* etc. in consumer code).
+  - Role-named scripts (proposal, author may refine names but keep them role-only):
+    fable-switch-core.mjs model identities -> model-lanes.mjs
+    fable-switch.mjs -> lane-switch.mjs (on/off per lane, scarce lanes included)
+    astra-share.mjs -> lane-routing.mjs (which task goes to which lane)
+    review-astra.mjs -> cross-review.mjs (review by a lane of another vendor than the author)
+    ask-astra.mjs -> ask-lane.mjs
+    author-astra.mjs / author-fable.mjs -> author-delegate.mjs --lane <role>
+    Matching core/test files follow. Hooks in .claude/settings.json (protected path: attended edit), docs (astra-routing.md, batch-owner-runbook.md, verify README) and memory entries naming old scripts follow.
+  - Tests import lane data instead of hard-coding names (today 114 literal occurrences in 28 test files).
+  - The OpenAI lane switches to GPT-6.1, model id gpt-6.1-sol, display name "GPT-6.1 Sol" (assumed; user may correct). "GPT-6 Astra" and "GPT-5.6 Sol" go into retired names so landed trailers keep verifying and the self-review ban treats all three as one lane. The new id is proven honoured on this machine (probe) before the lane counts as reachable.
+  - CLAUDE.md 6 speaks only of roles (main chain, cross-vendor reviewer, scarce lane); the outdated sentence "GPT-6 Astra authors difficult/complex/error-prone/HIGH points" is deleted. Commit trailers keep real model names, taken from model-lanes.mjs.
+  - Unit suite green; build and lint green.
+  Verifiable: unit suite, build and lint green; no consumer file outside scripts/model-lanes.mjs names a concrete model.
+  Bundle: Modell & Wächter.
+  Criticality: medium — policy text contradicts live routing.
+  Amendment (user request 21.10.2026, from the findings carrier):
+  Add to the final state of 1393:
+  - The OpenAI (cross-vendor) lane runs at reasoning effort HIGH. Its lane record in scripts/model-lanes.mjs carries effort `high`, and every codex invocation (review, author, ask) passes `model_reasoning_effort=high` taken from that record.
+  - 1393 sets this value explicitly, whatever the value on main is when 1393 starts: a point queued before 1393 is expected to lower the OpenAI effort to medium, and 1393 raises it back to high.
+  - A unit test asserts that the OpenAI lane record's effort is `high` and that the codex command line built for review and authoring carries `model_reasoning_effort=high`.
+  Today (HEAD e9249e591) the value is ASTRA_REASONING_EFFORT = 'high' in scripts/review-astra-core.mjs (re-exported by scripts/author-astra-core.mjs).

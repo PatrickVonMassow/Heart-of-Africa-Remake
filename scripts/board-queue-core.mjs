@@ -484,7 +484,7 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   let t = String(title ?? '').replace(/\s+/g, ' ').trim()
   const stem = (path) => (path.split('/').pop() ?? path).replace(/\.[a-z]+$/i, '')
   // A TITLE IS THE ONE FIELD THAT TRAVELS AS AN ARGUMENT (four-eyes finding 2,
-  // Fable 5): the depositing window is told its umlauts do not survive a Windows
+  // scarce-lane review): the depositing window is told its umlauts do not survive a Windows
   // shell, so it writes "fuer"/"pruefen" — and the board audit rejects exactly
   // that, on the OWNER's turn, for text it never wrote. The repair is applied
   // only to the words the audit's own stem list flags, so ordinary German
@@ -510,7 +510,7 @@ const BLOCKED_CARD_PREFIX = 'Anfrage nicht übernehmbar: '
  * The title of the decision card a request that cannot be carried in becomes.
  *
  * The deposit's own title goes through the SAME neutralisation as the queue card
- * (four-eyes finding 4, Fable 5, 31.07.2026): it was written in another window
+ * (four-eyes finding 4, 31.07.2026): it was written in another window
  * and lands on a card the OWNER publishes, so a path, a `§`, a point reference
  * or a shell-mangled umlaut would be judged on the owner's turn, for text it
  * never wrote. The `--blocked` path passed it through raw while the queue card

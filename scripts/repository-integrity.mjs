@@ -194,7 +194,7 @@ export function protectRepository(root = process.cwd()) {
   return () => assertRepositoryUnchanged(before, repositoryState(paths))
 }
 
-/** ANNOUNCE THAT THE RUNNER REALLY CALLED THIS (GPT-5.6 Sol, review of aeedceb).
+/** ANNOUNCE THAT THE RUNNER REALLY CALLED THIS (review of aeedceb).
  *  The wiring is a claim about the CONFIGURATION Vitest loaded, and neither a text
  *  search nor a re-import can prove it: a commented-out line reads identically, and
  *  the config cannot be imported inside the jsdom workers at all. So the setup says

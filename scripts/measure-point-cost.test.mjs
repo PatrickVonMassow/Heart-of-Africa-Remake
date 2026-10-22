@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildSnapshot, formatConsole, formatMarkdown, listCodexRollouts, readProviderTurns } from './measure-point-cost.mjs'
+import { CLAUDE_PROVIDER, CODEX_PROVIDER } from './measure-point-cost-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURES = join(HERE, 'fixtures', 'point-cost')
@@ -35,7 +36,7 @@ describe('point-cost IO over recorded trees', () => {
     expect(listCodexRollouts(join(root, 'codex'))).toHaveLength(4)
     const read = readProviderTurns({ claudeDir: claude, codexDir: join(root, 'codex'), points: [900] })
     expect(read).toMatchObject({ claudeFiles: 2, codexFiles: 3, codexCandidates: 4 })
-    expect(new Set(read.turns.map((turn) => turn.provider))).toEqual(new Set(['anthropic', 'openai']))
+    expect(new Set(read.turns.map((turn) => turn.provider))).toEqual(new Set([CLAUDE_PROVIDER, CODEX_PROVIDER]))
     expect(read.turns.some((turn) => turn.candidateMatch === false && turn.tokens === 200)).toBe(true)
 
     const early = readProviderTurns({ claudeDir: claude, codexDir: join(root, 'codex'), points: [900], until: Date.parse('2026-08-18T08:45:00Z') })
@@ -68,10 +69,10 @@ describe('point-cost IO over recorded trees', () => {
     expect(markdown).toContain('own item size is unmeasured')
     expect(markdown).toContain('not the weighted proxy from measure-context-cost-core.mjs')
     expect(markdown).toContain('node scripts/measure-point-cost.mjs --points 1')
-    expect(snapshot.residualTokens.openai).toMatchObject({ tokens: 200, outsideWindowTokens: 200 })
+    expect(snapshot.residualTokens[CODEX_PROVIDER]).toMatchObject({ tokens: 200, outsideWindowTokens: 200 })
     expect(snapshot.wholeDocumentReads).toEqual({ attributed: 0, sourceWindow: 1 })
     expect(markdown).toContain('not observed within the attributed set (1 in the source window overall)')
-    expect(snapshot.reviewProviderTokens).toEqual({ anthropic: 0, openai: 800 })
-    expect(snapshot.ledger[0].origins.crossVendorReviews).toBe(snapshot.reviewProviderTokens.openai)
+    expect(snapshot.reviewProviderTokens).toEqual({ [CLAUDE_PROVIDER]: 0, [CODEX_PROVIDER]: 800 })
+    expect(snapshot.ledger[0].origins.crossVendorReviews).toBe(snapshot.reviewProviderTokens[CODEX_PROVIDER])
   })
 })

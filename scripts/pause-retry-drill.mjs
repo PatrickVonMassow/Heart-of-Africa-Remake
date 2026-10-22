@@ -17,7 +17,7 @@
 // running batch. The live pause record is read once, before and after, purely to
 // assert that the drill left it alone.
 //
-// WHAT IT THEREFORE DOES NOT MEASURE (four-eyes review, Fable 5, finding 5): the
+// WHAT IT THEREFORE DOES NOT MEASURE (four-eyes review, finding 5): the
 // retry BRANCH — the `rmSync`, the cleared `failCount`, the spawn that follows — does
 // not execute here, because executing it would be the competing session this drill
 // must not start. What the drill proves is the verdict the live tick acts on, in the

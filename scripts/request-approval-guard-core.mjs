@@ -304,8 +304,8 @@ export function isPossibleDeposit(command, shell = 'bash') {
 // A read command hands its words to no shell, so a QUOTED word is literal
 // there: `?`, `*`, `;`, `|`, braces or whitespace inside quotes assemble no
 // marker. Unquoted words are still judged by couldExpandToMarker. The same
-// holds for one direct `node scripts/board.mjs` or `ask-astra.mjs` call on its own (measured
-// 21.10.2026: `board.mjs vdzk-keep "…?"` and `ask-astra.mjs --brief "…; …"`
+// holds for one direct `node scripts/board.mjs` or `ask-lane.mjs` call on its own (measured
+// 21.10.2026: `board.mjs vdzk-keep "…?"` and `ask-lane.mjs --brief "…; …"`
 // were refused); a re-reader (bash -c, eval, xargs, find -exec …) is on no list.
 
 /** Every quoted string, scanned as isCanonical scans it. */
@@ -346,7 +346,7 @@ const NODE_STAMP = /^console\.log\(new Intl\.DateTimeFormat\('[\w-]+',\{[\w:'\-,
  * their arguments as data and pass none to a shell; any other script may
  * forward one (Astra review of a9c598d), so it is on no list.
  */
-const LITERAL_SCRIPT = /^(\.[\\/])?scripts[\\/](board|ask-astra)\.mjs$/
+const LITERAL_SCRIPT = /^(\.[\\/])?scripts[\\/](board|ask-lane)\.mjs$/
 /**
  * May a repo script receive this word even if it hands it to a shell? Only
  * prose characters (letters, digits, whitespace, punctuation without quotes,

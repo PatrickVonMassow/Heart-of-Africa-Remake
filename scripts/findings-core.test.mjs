@@ -291,7 +291,7 @@ describe('the carrier round-trips', () => {
   })
 
   it('keeps a finding titled like a request head a FINDING', () => {
-    // Four-eyes finding 3 (Fable 5, 31.07.2026): the marker prefix made the
+    // Four-eyes finding 3 (31.07.2026): the marker prefix made the
     // entry parse back as a request, and requests are gated only at the point
     // boundary — so it escaped the every-turn-end findings gate.
     const sneaky = carrierEntry({

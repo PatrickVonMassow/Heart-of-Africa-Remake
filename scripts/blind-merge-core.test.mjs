@@ -9,8 +9,7 @@
 // (identical pairs collapsed for free, only the candidates put to the merger).
 import { describe, it, expect } from 'vitest'
 import { ACCOUNTING_RECEIPT } from './mechanism-review-core.mjs'
-import {
-  accountUnion,
+import { accountUnion,
   candidatePairs,
   CANDIDATE_THRESHOLD,
   contentWords,
@@ -26,14 +25,17 @@ import {
   summaryLine,
   validateInputs,
   validateList,
-  validateMerger,
-} from './blind-merge-core.mjs'
-import { mergeFallbackReason, readState, writeState } from './fable-switch-core.mjs'
+  validateMerger } from './blind-merge-core.mjs'
+import { mergeFallbackReason, readState, writeState } from './lane-switch-core.mjs'
+import { CROSS, LEGACY, MAIN, SCARCE } from './model-lanes.mjs'
 
-const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
+/** A lane spelling as a literal regex fragment. */
+const rx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const SCARCE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
 const listA = readList('A', {
-  model: 'Opus 5',
+  model: MAIN.displayName,
   entries: [
     { id: 'A1', file: 'src/world/river.ts', defect: 'the ribbon tears at the delta' },
     { id: 'A2', file: 'src/ui/hud.tsx', defect: 'the health badge overlaps the date' },
@@ -41,7 +43,7 @@ const listA = readList('A', {
   ],
 })
 const listB = readList('B', {
-  model: 'GPT-5.6 Sol',
+  model: CROSS.retired[2],
   entries: [
     { id: 'B1', file: 'src/ui/hud.tsx', defect: 'affliction badge sits on top of the calendar text' },
     { id: 'B2', file: 'src/state/save.ts', defect: 'the snapshot drops the gift inventory' },
@@ -50,7 +52,7 @@ const listB = readList('B', {
 
 /** The union a correct merge produces for the two lists above. */
 const goodUnion = {
-  mergedBy: 'Fable 5',
+  mergedBy: SCARCE.displayName,
   entries: [
     { id: 'U1', from: ['A1'] },
     // A FOLD says what the one finding is; a pass-through entry needs no line.
@@ -65,14 +67,14 @@ describe('reading and validating the two input lists', () => {
     const bare = readList('B', [{ id: 'B1', file: 'x.ts', defect: 'a defect line' }])
     expect(bare.entries).toHaveLength(1)
     expect(bare.model).toBe('')
-    expect(readList('A', { model: 'Opus 5', entries: [] }).model).toBe('Opus 5')
+    expect(readList('A', { model: MAIN.displayName, entries: [] }).model).toBe(MAIN.displayName)
     expect(readList('A', null).entries).toEqual([])
   })
 
   it('retains tracked origin evidence for the permission check', () => {
     expect(
       readList('A', {
-        model: 'Opus 5',
+        model: MAIN.displayName,
         authorship: { at: '2026-08-13T15:34:26.009Z', transcript: '~/.claude/projects/session.jsonl' },
         entries: [],
       }),
@@ -157,8 +159,8 @@ describe('reading and validating the two input lists', () => {
   })
 
   it('prefers JSON when the file is JSON', () => {
-    expect(parseListText('A', '{"model":"Opus 5","entries":[{"id":"A1","file":"x","defect":"y"}]}').model).toBe(
-      'Opus 5',
+    expect(parseListText('A', `{"model":"${MAIN.displayName}","entries":[{"id":"A1","file":"x","defect":"y"}]}`).model).toBe(
+      MAIN.displayName,
     )
   })
 
@@ -322,48 +324,59 @@ describe('the count — every input entry is accounted for', () => {
 
 describe('who may merge', () => {
   it('accepts the model that wrote neither list', () => {
-    expect(validateMerger({ mergedBy: 'Fable 5', authors: ['Opus 5', 'GPT-5.6 Sol'] })).toMatchObject({ ok: true })
+    expect(validateMerger({ mergedBy: SCARCE.displayName, authors: [MAIN.displayName, CROSS.retired[2]] })).toMatchObject({ ok: true })
   })
 
   it('refuses the model that authored one of the lists', () => {
-    const r = validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5', 'GPT-5.6 Sol'] })
+    const r = validateMerger({ mergedBy: MAIN.displayName, authors: [MAIN.displayName, CROSS.retired[2]] })
     expect(r.ok).toBe(false)
     expect(r.errors.join(' ')).toMatch(/may not merge/i)
   })
 
   it('refuses a merge with no model named at all', () => {
-    expect(validateMerger({ mergedBy: '', authors: ['Opus 5', 'GPT-5.6 Sol'] }).ok).toBe(false)
+    expect(validateMerger({ mergedBy: '', authors: [MAIN.displayName, CROSS.retired[2]] }).ok).toBe(false)
   })
 
   it('lets a recorded two-model fallback through, and marks it as one', () => {
     const r = validateMerger({
-      mergedBy: 'Opus 5',
-      authors: ['Opus 5', 'Opus 5'],
-      fallback: 'GPT-5.6 Sol was unreachable and Fable 5 was not available in this session',
+      mergedBy: MAIN.displayName,
+      authors: [MAIN.displayName, MAIN.displayName],
+      fallback: `${CROSS.retired[2]} was unreachable and ${SCARCE.displayName} was not available in this session`,
     })
     expect(r).toMatchObject({ ok: true, fallback: true })
   })
 
-  it('admits the canonical switch reason as the Sol-merged Sol/Opus fallback', () => {
+  it('admits the canonical switch reason as the cross-merged cross/main fallback', () => {
     const r = validateMerger({
-      mergedBy: 'GPT-5.6 Sol',
-      authors: ['Opus 5', 'GPT-5.6 Sol'],
-      fallback: mergeFallbackReason(FABLE_OFF),
+      mergedBy: CROSS.retired[2],
+      authors: [MAIN.displayName, CROSS.retired[2]],
+      fallback: mergeFallbackReason(SCARCE_OFF),
     })
     expect(r).toMatchObject({ ok: true, fallback: true })
     expect(
       validateMerger({
-        mergedBy: 'GPT-5.6 Sol',
-        authors: ['Opus 5', 'GPT-5.6 Sol'],
-        fallback: 'Fable 5 was there',
+        mergedBy: CROSS.retired[2],
+        authors: [MAIN.displayName, CROSS.retired[2]],
+        fallback: `${SCARCE.displayName} was there`,
       }).ok,
     ).toBe(false)
   })
 
+  it('still admits the switch reason a landed ledger row carries in its former wording', () => {
+    for (const prefix of LEGACY.switchFallbackPrefixes) {
+      const r = validateMerger({
+        mergedBy: CROSS.displayName,
+        authors: [MAIN.displayName, CROSS.retired[0]],
+        fallback: `${prefix}test capacity exhausted`,
+      })
+      expect(r, prefix).toMatchObject({ ok: true, fallback: true })
+    }
+  })
+
   it('refuses a fallback that names no model — otherwise it is a free pass', () => {
     const r = validateMerger({
-      mergedBy: 'Opus 5',
-      authors: ['Opus 5'],
+      mergedBy: MAIN.displayName,
+      authors: [MAIN.displayName],
       fallback: 'there was nobody else around today',
     })
     expect(r.ok).toBe(false)
@@ -371,70 +384,70 @@ describe('who may merge', () => {
   })
 
   it('refuses a fallback that names only the merger, or claims no absence at all', () => {
-    // "Opus 5 performed the merge" names a model and excuses nothing.
-    const self = validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5'], fallback: 'Opus 5 performed the merge' })
+    // "the main lane performed the merge" names a model and excuses nothing.
+    const self = validateMerger({ mergedBy: MAIN.displayName, authors: [MAIN.displayName], fallback: `${MAIN.displayName} performed the merge` })
     expect(self.ok).toBe(false)
-    expect(self.errors.join(' ')).toMatch(/only "Opus 5" itself/)
+    expect(self.errors.join(' ')).toMatch(new RegExp(String.raw`only "${rx(MAIN.displayName)}" itself`))
     const noAbsence = validateMerger({
-      mergedBy: 'Opus 5',
-      authors: ['Opus 5'],
-      fallback: 'GPT-5.6 Sol reviewed this one earlier',
+      mergedBy: MAIN.displayName,
+      authors: [MAIN.displayName],
+      fallback: `${CROSS.retired[2]} reviewed this one earlier`,
     })
     expect(noAbsence.ok).toBe(false)
     // …and the two halves have to be ONE claim: naming a present model beside
     // the merger's own absence is the opposite of the exception.
     const split = validateMerger({
-      mergedBy: 'Opus 5',
-      authors: ['Opus 5'],
-      fallback: 'GPT-5.6 Sol was present; Opus 5 was unavailable',
+      mergedBy: MAIN.displayName,
+      authors: [MAIN.displayName],
+      fallback: `${CROSS.retired[2]} was present; ${MAIN.displayName} was unavailable`,
     })
     expect(split.ok).toBe(false)
     expect(split.errors.join(' ')).toMatch(/OTHER model was the absent one/)
     // …and the merger cannot excuse itself under its own other name either.
     const astraItself = validateMerger({
-      mergedBy: 'GPT-5.6 Sol',
-      authors: ['GPT-5.6 Sol'],
+      mergedBy: CROSS.retired[2],
+      authors: [CROSS.retired[2]],
       fallback: 'Sol was unreachable',
     })
     expect(astraItself.ok).toBe(false)
   })
 
   it('reads the absence claim, not the words in it', () => {
-    const fb = (fallback) => validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5'], fallback })
+    const fb = (fallback) => validateMerger({ mergedBy: MAIN.displayName, authors: [MAIN.displayName], fallback })
     // A model that was there, in a sentence that happens to hold "failed" or
     // "unavailable" (four-eyes review, sixth round).
-    expect(fb('GPT-5.6 Sol failed the review').ok).toBe(false)
-    expect(fb('GPT-5.6 Sol was not unavailable').ok).toBe(false)
+    expect(fb(`${CROSS.retired[2]} failed the review`).ok).toBe(false)
+    expect(fb(`${CROSS.retired[2]} was not unavailable`).ok).toBe(false)
     // …and a sentence break without a space is still a sentence break, whether
     // or not a digit follows the period (a version number is the only period
     // that does not split).
-    expect(fb('GPT-5.6 Sol was present.Opus 5 was unavailable').ok).toBe(false)
-    expect(fb('GPT-5.6 Sol was present.5 was unavailable').ok).toBe(false)
+    expect(fb(`${CROSS.retired[2]} was present.${MAIN.displayName} was unavailable`).ok).toBe(false)
+    expect(fb(`${CROSS.retired[2]} was present.5 was unavailable`).ok).toBe(false)
     // The honest forms still pass, version numbers intact.
-    expect(fb('GPT-5.6 Sol was unreachable in this session').ok, 'unreachable').toBe(true)
-    expect(fb('the call to GPT-5.6 Sol timed out twice').ok, 'timed out').toBe(true)
+    expect(fb(`${CROSS.retired[2]} was unreachable in this session`).ok, 'unreachable').toBe(true)
+    expect(fb(`the call to ${CROSS.retired[2]} timed out twice`).ok, 'timed out').toBe(true)
   })
 
   it('lets a merger name another VERSION of its own family as the missing one', () => {
-    // Opus 4.8 and Opus 5 are different models to this project, so an Opus 5
-    // merger naming Opus 4.8 is a legitimate fallback — the family-word test
+    // the main fallback and the main lane are different models to this project, so a main-lane
+    // merger naming the main fallback is a legitimate fallback — the family-word test
     // used to refuse it (four-eyes review, sixth round).
     const r = validateMerger({
-      mergedBy: 'Opus 5',
-      authors: ['Opus 5'],
-      fallback: 'Opus 4.8 was unavailable in this session',
+      mergedBy: MAIN.displayName,
+      authors: [MAIN.displayName],
+      fallback: `${MAIN.fallback.displayName} was unavailable in this session`,
     })
     expect(r.ok, r.errors.join(' ')).toBe(true)
     // …but not its OWN version.
     expect(
-      validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5'], fallback: 'Opus 5 was unavailable' }).ok,
+      validateMerger({ mergedBy: MAIN.displayName, authors: [MAIN.displayName], fallback: `${MAIN.displayName} was unavailable` }).ok,
     ).toBe(false)
   })
 
   it('refuses a fallback claimed where none was needed', () => {
     const r = validateMerger({
-      mergedBy: 'Fable 5',
-      authors: ['Opus 5', 'GPT-5.6 Sol'],
+      mergedBy: SCARCE.displayName,
+      authors: [MAIN.displayName, CROSS.retired[2]],
       fallback: 'no third model was reachable',
     })
     expect(r.ok).toBe(false)
@@ -442,12 +455,12 @@ describe('who may merge', () => {
   })
 
   it('refuses a fallback that says nothing', () => {
-    expect(validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5'], fallback: 'no' }).ok).toBe(false)
+    expect(validateMerger({ mergedBy: MAIN.displayName, authors: [MAIN.displayName], fallback: 'no' }).ok).toBe(false)
   })
 
   it('reads the same model through a differently written name', () => {
-    expect(validateMerger({ mergedBy: 'Claude Opus 5', authors: ['Opus 5'] }).ok).toBe(false)
-    expect(validateMerger({ mergedBy: 'Opus 4.8', authors: ['Opus 5'] }).ok).toBe(true)
+    expect(validateMerger({ mergedBy: MAIN.trailerName, authors: [MAIN.displayName] }).ok).toBe(false)
+    expect(validateMerger({ mergedBy: MAIN.fallback.displayName, authors: [MAIN.displayName] }).ok).toBe(true)
   })
 })
 

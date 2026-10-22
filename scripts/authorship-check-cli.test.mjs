@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from './authorship-check.mjs'
+import { MAIN, SCARCE } from './model-lanes.mjs'
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), 'authorship-check.mjs')
 const dirs = []
 
-function fixture({ artifact = '# Proposal A — Fable 5, written blind', transcript = '' } = {}) {
+function fixture({ artifact = `# Proposal A — ${SCARCE.displayName}, written blind`, transcript = '' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'hoa-authorship-'))
   dirs.push(dir)
   const artifactPath = join(dir, 'half.md')
@@ -39,14 +40,14 @@ describe('authorship-check command', () => {
     const at = '2026-08-13T15:34:26.009Z'
     const { artifactPath, transcriptPath } = fixture({
       transcript: [
-        JSON.stringify({ timestamp: at, type: 'assistant', message: { role: 'assistant', model: 'claude-opus-5' } }),
+        JSON.stringify({ timestamp: at, type: 'assistant', message: { role: 'assistant', model: MAIN.modelId } }),
         JSON.stringify({ timestamp: '2026-08-13T15:34:27.000Z', type: 'user', message: { role: 'user' } }),
       ].join('\n'),
     })
     const result = run('--artefact', artifactPath, '--at', at, '--transcript', transcriptPath)
     expect(result.status).toBe(1)
     expect(result.output).toContain('DISAGREEMENT')
-    expect(result.output).toContain('claude-opus-5')
+    expect(result.output).toContain(MAIN.modelId)
   })
 
   it('prints unverified and exits two when the transcript is gone', () => {

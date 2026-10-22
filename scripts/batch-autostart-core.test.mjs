@@ -76,13 +76,14 @@ import {
   ownerKeepsBatch,
   takeoverHandsOver,
 } from './batch-autostart-core.mjs'
-import { readState, writeState } from './fable-switch-core.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
+import { MAIN, SCARCE } from './model-lanes.mjs'
 import { PAUSE_RETRY_LADDER_MS } from './batch-pause-core.mjs'
 import { checkAgentOutput, registeredFeatureWriters, worktreeActiveAt } from './batch-in-flight.mjs'
 
-const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test', by: 'test', now: 1 })))
-const FABLE_ON = fable('on')
-const FABLE_OFF = fable('off')
+const switchState = (state) => readState(JSON.stringify(writeState(state, { why: 'test', by: 'test', now: 1 })))
+const SCARCE_ON = switchState('on')
+const SCARCE_OFF = switchState('off')
 import { isOwnSpawn } from './batch-singleton.mjs'
 
 describe('registered writer liveness beside detached verification output', () => {
@@ -928,23 +929,23 @@ describe('buildSpawnOptions — the ten-minute execution is switched off', () =>
 
 describe('buildSpawnArgs — print mode, the model chain, and no prompt that can block', () => {
   it('spawns print mode with the resume prompt and the permission flag', () => {
-    const args = buildSpawnArgs({ fableState: FABLE_ON })
+    const args = buildSpawnArgs({ fableState: SCARCE_ON })
     expect(args[0]).toBe('-p')
     expect(args[1]).toBe(RESUME_PROMPT)
     expect(args).toContain('--dangerously-skip-permissions')
   })
 
-  it('carries the switch-selected serving fallback behind Opus 5', () => {
-    const args = buildSpawnArgs({ fableState: FABLE_ON })
+  it('carries the switch-selected serving fallback behind the main lane', () => {
+    const args = buildSpawnArgs({ fableState: SCARCE_ON })
     expect(args[args.indexOf('--model') + 1]).toBe(SPAWN_MODEL)
-    expect(args[args.indexOf('--fallback-model') + 1]).toBe('claude-fable-5-1')
-    expect(SPAWN_MODEL).toMatch(/opus-5/)
-    expect(buildSpawnArgs({ fableState: FABLE_OFF })[args.indexOf('--fallback-model') + 1]).toBe('claude-opus-4-8[1m]')
+    expect(args[args.indexOf('--fallback-model') + 1]).toBe(SCARCE.modelId)
+    expect(SPAWN_MODEL).toBe(MAIN.modelId)
+    expect(buildSpawnArgs({ fableState: SCARCE_OFF })[args.indexOf('--fallback-model') + 1]).toBe(MAIN.fallback.modelId)
   })
 
   it('can pin the last trusted handoff lane without falling back toward the suspect', () => {
-    const args = buildSpawnArgs({ model: 'claude-opus-4-8[1m]', fallbackModel: null })
-    expect(args[args.indexOf('--model') + 1]).toBe('claude-opus-4-8[1m]')
+    const args = buildSpawnArgs({ model: MAIN.fallback.modelId, fallbackModel: null })
+    expect(args[args.indexOf('--model') + 1]).toBe(MAIN.fallback.modelId)
     expect(args).not.toContain('--fallback-model')
   })
 })
@@ -1118,7 +1119,7 @@ describe('chatPromptSuffix', () => {
     for (const empty of [[], null, undefined, 'nope', 42, [{}, { text: '   ' }]]) {
       expect(chatPromptSuffix(empty)).toBe('')
     }
-    expect(buildSpawnArgs({ prompt: RESUME_PROMPT + chatPromptSuffix([]), fableState: FABLE_ON })[1]).toBe(RESUME_PROMPT)
+    expect(buildSpawnArgs({ prompt: RESUME_PROMPT + chatPromptSuffix([]), fableState: SCARCE_ON })[1]).toBe(RESUME_PROMPT)
   })
 
   it('carries the message text and its time', () => {

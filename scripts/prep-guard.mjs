@@ -20,7 +20,7 @@
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { evaluatePrep } from './prep-guard-core.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
 
@@ -31,8 +31,8 @@ const PAUSE = repoPath('.claude/batch-paused')
  *  gather its own (a second copy would drift and hand back a false "clean"). */
 export function gatherPrepInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  if (!ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
   }
   if (!existsSync(MARKER)) return { applicable: true, inputs: { marker: null } }
   let marker = null

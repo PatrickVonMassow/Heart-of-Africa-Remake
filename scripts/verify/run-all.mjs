@@ -99,7 +99,7 @@ const wantBaseline = wantsBaseline({ baseline, env: process.env })
 // documents `node scripts/verify/run-all.mjs <suite>` as an ordinary command
 // and that path answered to nothing — the refusal the point owes was absent
 // from the very command the house uses, and the LARGE run of 11.09.2026 was
-// started through it (four-eyes review, GPT-6 Astra, pass 3/4).
+// started through it (four-eyes review, pass 3/4).
 //
 // ASKED ONCE PER RUN. A parent that already asked sets the marker, so a waiver
 // granted above — `--no-ladder "<why>"`, which run-logged consumes and does not
