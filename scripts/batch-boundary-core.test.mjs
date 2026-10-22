@@ -770,6 +770,8 @@ describe('the boundary card names where the batch actually goes', () => {
     expect(ctx).toMatch(/no `finding\.mjs --blocked`, no decision card/)
     const pt = boundaryRequestDrainLine({ cause: BOUNDARY_CAUSES.POINT })
     expect(pt).toMatch(/--queued "<title>" --point <N>/)
+    // Push first, tick second (21.10.2026): the order is append, commit, push, THEN --queued.
+    expect(pt).toMatch(/--appending[\s\S]*commit, push main, THEN[\s\S]*--queued/)
     expect(pt).toMatch(/a deferral leaves it pending/)
     expect(commitGatesRequests(['--commit', '1305'])).toBe(true)
     expect(commitGatesRequests(['--commit', '--context', '--transcript', 'x'])).toBe(false)
