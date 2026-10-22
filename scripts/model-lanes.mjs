@@ -290,20 +290,22 @@ export function mentionedIdentities(value, registry = LANES) {
   const exact = identityKey(value, registry)
   if (exact) return [exact]
   const found = new Set()
-  const parts = String(value ?? '').split(/\s*(?:[/,;+&]|\band\b)\s*/i).filter((p) => p.trim())
+  // Parentheses separate too: "A (B)" mentions both models.
+  const parts = String(value ?? '').split(/\s*(?:[/,;+&()]|\band\b)\s*/i).filter((p) => p.trim())
   for (const part of parts) {
-    const before = found.size
     const key = identityKey(part, registry)
     if (key) {
       found.add(key)
       continue
     }
+    let partNamesLane = false
     const text = part.toLowerCase()
     for (const record of registry) {
       if (!record.familyWords.some((word) => new RegExp(`\\b${word}\\b`).test(text))) continue
       const fallbackVersion = record.fallback ? normaliseName(record.fallback.displayName).match(/\d+(?:\.\d+)*/)?.[0] : ''
       const version = text.match(/\d+(?:\.\d+)*/)?.[0] ?? ''
       found.add(fallbackVersion && version === fallbackVersion ? `${record.role}-fallback` : record.role)
+      partNamesLane = true
     }
     const laneWords = new Set(laneFamilyWords(registry))
     const prefixes = prefixWords(registry)
@@ -314,7 +316,7 @@ export function mentionedIdentities(value, registry = LANES) {
     })
     const named = others.filter((word) => !prefixes.has(word))
     // A vendor prefix ("Claude", "GPT-") names a model only when nothing else in the part does.
-    const kept = named.length || found.size > before ? named : others
+    const kept = named.length || partNamesLane ? named : others
     for (const word of kept) found.add(`other:${word}`)
   }
   return [...found]

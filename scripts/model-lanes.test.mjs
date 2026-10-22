@@ -133,6 +133,19 @@ describe('the cross-vendor rule compares vendor fields only', () => {
     expect(sharesIdentity(`${MAIN.retired[0]} / ${foreign}`, foreign)).toBe(true)
   })
 
+  it('reads a parenthesised second model as its own part', () => {
+    const both = `${MAIN.fallback.trailerName} (${MAIN.trailerName})`
+    expect(sharesIdentity(both, MAIN.trailerName)).toBe(true)
+  })
+
+  it('adds no foreign identity for a repeated lane family', () => {
+    const marker = VENDORS[CROSS.vendor].versionedMarkers[0]
+    const word = CROSS.familyWords[0]
+    const repeated = `${marker}-90 ${word} / ${marker}-91 ${word}`
+    expect(mentionedIdentities(repeated).some((key) => key.startsWith('other:'))).toBe(false)
+    expect(sharesIdentity(repeated, `${marker}-4o`)).toBe(false)
+  })
+
   it('reads contradictory markers and unknown names as nobody', () => {
     expect(vendorKeyOf(`${MAIN.trailerName} ${CROSS.displayName}`)).toBe('unknown')
     expect(vendorKeyOf('Alice')).toBe('unknown')
