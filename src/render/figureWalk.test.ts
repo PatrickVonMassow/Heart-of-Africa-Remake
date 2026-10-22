@@ -307,6 +307,54 @@ describe('a walker turning a corner keeps its planted foot', () => {
     const b = steerHeading(0, 0.05, 1.1, 1 / 60)
     expect(b.pace).toBeGreaterThan(0.99)
   })
+
+  it('turns the short way across ±π with a bounded per-frame change and converges', () => {
+    const dt = 1 / 60
+    const speed = 1.2
+    const bound = (speed / M.turnRadius + M.spotTurnRate) * dt + 1e-9
+    // From just below +π to just above -π is a small turn through π, not a
+    // turn back through 0.
+    const across = steerHeading(Math.PI - 0.05, -Math.PI + 0.05, speed, dt)
+    expect(across.yaw).toBeGreaterThan(Math.PI - 0.05)
+    // A reversal (the errand villager's new stroll behind it) and a right angle.
+    for (const [from, to] of [[0, Math.PI], [0.3, 0.3 + Math.PI / 2], [-2.9, 2.9]]) {
+      let yaw = from
+      let frames = 0
+      const err = () => Math.abs(Math.atan2(Math.sin(to - yaw), Math.cos(to - yaw)))
+      while (err() > 1e-6 && frames < 600) {
+        const next = steerHeading(yaw, to, speed, dt).yaw
+        expect(Math.abs(next - yaw)).toBeLessThanOrEqual(bound)
+        yaw = next
+        frames++
+      }
+      expect(err()).toBeLessThanOrEqual(1e-6)
+      // never instant: even the right angle takes a visible fraction of a second
+      expect(frames).toBeGreaterThan(10)
+    }
+  })
+
+  it('a walker stepping along its steered heading rounds a corner instead of snapping', () => {
+    const dt = 1 / 60
+    const speed = 1.2
+    const route: Array<[number, number]> = [[0, 4], [4, 4], [0, 0]]
+    let x = 0
+    let z = 0
+    let yaw = 0
+    let seg = 0
+    let worst = 0
+    for (let f = 0; f < 60 * 30 && seg < route.length; f++) {
+      const [tx, tz] = route[seg]
+      const step = Math.min(speed * dt, Math.hypot(tx - x, tz - z))
+      const turn = steerHeading(yaw, Math.atan2(tx - x, tz - z), speed, dt)
+      worst = Math.max(worst, Math.abs(Math.atan2(Math.sin(turn.yaw - yaw), Math.cos(turn.yaw - yaw))))
+      yaw = turn.yaw
+      x += Math.sin(yaw) * step * turn.pace
+      z += Math.cos(yaw) * step * turn.pace
+      if (Math.hypot(tx - x, tz - z) < 0.3) seg++
+    }
+    expect(seg).toBe(route.length)
+    expect(worst).toBeLessThanOrEqual((speed / M.turnRadius + M.spotTurnRate) * dt)
+  })
 })
 
 describe('the task walker gets up before it walks off', () => {

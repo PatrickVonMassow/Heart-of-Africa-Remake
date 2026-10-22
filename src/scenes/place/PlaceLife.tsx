@@ -58,7 +58,7 @@ import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, VILLAGER_POSE, balance } from '../../config/balance'
+import { START_YEAR, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
@@ -1827,7 +1827,7 @@ function Porters({
   // crate's front corners. Constant — a porter holds the load, it does not wave.
   const carry = useRef<FigurePose | null>({ left: armAim(0.3, 0.45), right: armAim(-0.3, 0.45), lean: 0.05, turn: 0 })
   // Where each porter actually stands, so its move can be swept from there.
-  const pos = useRef<Array<{ x: number; z: number } | null>>([])
+  const pos = useRef<Array<{ x: number; z: number; yaw?: number } | null>>([])
   // The body each porter presents to the other inhabitants (point 578).
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(routes.length)
@@ -1867,7 +1867,10 @@ function Porters({
       const px = p.x
       const pz = p.z
       g.position.set(px, groundHeight(px, pz), pz)
-      g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
+      // Turned about at the route's end on the spot, never flipped in a frame.
+      const heading = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
+      p.yaw = turnToward(p.yaw ?? heading, heading, VILLAGER_MOTION.spotTurnRate * dt)
+      g.rotation.y = p.yaw
     })
   })
   return (
@@ -3084,18 +3087,28 @@ function ErrandVillagers({
           // errands send a villager out onto the bank lobe, and a circular rim
           // would have frozen it at the plain radius short of the water.
           const inside = insidePlace({ radius, bank, observed }, wantX, wantZ, NPC_RADIUS * 2)
-          const [nx, nz] = inside
+          const [tx, tz] = inside
             ? resolveMove(colliders, wantX, wantZ, NPC_RADIUS, [me.x, me.z])
+            : [me.x, me.z]
+          // Facing where it WALKS (on a route the waypoint, not the destination
+          // behind the huts) — TURNED toward it, never snapped: a new waypoint or
+          // a fresh stroll used to swing the body round between two frames. A
+          // way far off its heading slows it nearly to a stand while it turns,
+          // and the step goes along the turned heading, like the household walkers.
+          const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
+          yaws.current[i] = turn.yaw
+          const sx = me.x + Math.sin(turn.yaw) * step * turn.pace
+          const sz = me.z + Math.cos(turn.yaw) * step * turn.pace
+          const [nx, nz] = insidePlace({ radius, bank, observed }, sx, sz, NPC_RADIUS * 2)
+            ? resolveMove(colliders, sx, sz, NPC_RADIUS, [me.x, me.z])
             : [me.x, me.z]
           const moved = Math.hypot(nx - me.x, nz - me.z)
           me.x = nx
           me.z = nz
           state.walked += moved
-          // Facing where it WALKS, which on a route is the waypoint rather than
-          // the destination behind the huts.
-          yaws.current[i] = Math.atan2(ax, az)
-          // Use the same escape ladder as the household walkers.
-          if (moved < step * 0.25) {
+          // Use the same escape ladder as the household walkers. A body turning
+          // nearly on the spot is not stuck.
+          if (moved < step * 0.25 && turn.pace >= 0.3) {
             state.stuck += dt
             if (state.stuck > balance.walkerUnstuckSeconds) {
               const anchor = spawnAnchors[i]
@@ -3111,7 +3124,7 @@ function ErrandVillagers({
               }
               state.stuck = 0
             }
-          } else {
+          } else if (moved >= step * 0.25) {
             state.stuck = 0
           }
         }
@@ -3230,7 +3243,8 @@ function ErrandVillagers({
           figureWork.dig = true
           const siteIndex = task?.siteIndex
           const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
-          if (site) yaws.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
+          // turned to the pit on the spot, not swung round in one frame
+          if (site) yaws.current[i] = turnToward(yaws.current[i], Math.atan2(site.x - me.x, site.z - me.z), VILLAGER_MOTION.spotTurnRate * dt)
         }
         // the shaft along the digging arm: the stroke drives the blade into the pit
         if (digTool) digTool.rotation.x = primitiveToolTilt(state.digK)
