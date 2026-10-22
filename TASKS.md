@@ -16011,3 +16011,18 @@ to land than a mechanism that needs a review.
   Criticality: medium - a red regression lane on the fallback backend.
   Bundle: Dorfleben.
 
+
+- [ ] 1422. Villager knee snaps when a walker leaves the walk gait in a corner
+  Source: finding 22.10.2026 09:46 from the point-1402 moving capture (seed 42, walker 0, WebGPU 60 Hz fixed clock): while the walk share drops 1 -> 0 in a ~2.8 rad/s corner the knee jumps 0.49-0.66 rad per frame (shin.L 0.836 -> 1.499) into a deep-knee pose; present on main 9ecb039 before 1402, same on WebGL 2.
+  Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
+  Verifiable: a Vitest on the villager pose layer bounds the per-frame knee change across a gait blend in a turn; a moving capture shows no leg snap on both backends.
+  Criticality: medium - visible leg snap when villagers turn.
+  Bundle: Dorfleben.
+
+- [ ] 1423. Villager heel strike stops the swinging foot dead
+  Also: a flat foot drops its kept heading in sharp curves.
+  Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: the heel is caught while the clip still swings it forward ~2 m/s (foot up to 2.8x clip max speed, shin ~4 rad/s reversal at 144 Hz); at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s). Pre-existing; the 3x margin in villagerClipPose.test.ts exists because of the heel strike.
+  Final state: heel strike decelerates the foot without a dead stop, and a flat foot keeps its heading through sharp curves; the 3x margin in villagerClipPose.test.ts can drop.
+  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; a moving capture on both backends.
+  Criticality: medium - visible foot jerk in village walks.
+  Bundle: Dorfleben.

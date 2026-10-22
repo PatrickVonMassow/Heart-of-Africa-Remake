@@ -2180,3 +2180,8 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
   arguments, so `sed --in-place='.bak' …` and `sed -i'.bak' …` still classify as
   reads. Predates 1411 and follows the module's "quoted text never decides" rule;
   no player impact, collected here.
+
+- mechanism-review-guard `--status` passes on a git ENOBUFS crash (finding 22.10.2026 06:57) — should fail loud.
+- batch-launcher-daemon test "a HANGING send loses to its budget" timed out under load (finding 22.10.2026 06:57) — load-sensitive timeout.
+- From the 1393 review: unlocked lane-switch read-modify-write; criticality fixture same-vendor review; cross-review `--brief` plan spends a round (finding 22.10.2026 06:57).
+- The 1402 interleave test (src/render/villagerClipPose.test.ts:583) passes trivially without a toe-release frame; assert a release-frame count > 0 (Fable 5.1 review, 22.10.2026).
