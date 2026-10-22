@@ -2013,6 +2013,37 @@ if (section('adult-errands')) {
       swings.worst.over <= 0,
       JSON.stringify(swings),
     )
+    // THE MOVING CAPTURE the point is judged by (point 1404): one walking adult
+    // whose heading is far off its next way, four frames about 0.3 s apart from
+    // one fixed spot — the turn must read as a turn across them.
+    const turner = await page
+      .waitForFunction(() => {
+        const vs = window.__placeErrands().villagers
+        const i = vs.findIndex((v) => v.work && !v.work.arrived && Math.abs(Math.atan2(Math.sin(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw), Math.cos(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw))) > 0.8)
+        return i >= 0 ? i : false
+      }, null, { timeout: 60000, polling: 50 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('an errand adult is caught facing away from its next way, to film its turn (point 1404)', turner !== null)
+    if (turner !== null) {
+      const at = await page.evaluate((i) => {
+        const v = window.__placeErrands().villagers[i]
+        const side = v.yaw + Math.PI / 2
+        const p = window.__placePlayer
+        p.x = v.x + Math.sin(side) * 4
+        p.z = v.z + Math.cos(side) * 4
+        p.yaw = side
+        p.pitch = -0.15
+        return { x: v.x, z: v.z }
+      }, turner)
+      for (const k of [1, 2, 3, 4]) {
+        await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
+          local: { x: at.x, y: 0.9, z: at.z },
+          label: `moving capture ${k}/4: one village adult on an errand turning from its old heading toward its next way, filmed from one fixed spot about 4 m off its flank`,
+        })
+        await page.waitForTimeout(300)
+      }
+    }
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared
