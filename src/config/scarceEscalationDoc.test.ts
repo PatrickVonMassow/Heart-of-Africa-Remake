@@ -14,6 +14,8 @@ const EXCLUDED = new Set([
   'scripts/author-routing-core.mjs',
   'src/config/scarceEscalationDoc.test.ts',
 ])
+// Design records of the lane rebuild describe the switch mechanism, not its state.
+const SWITCH_EXCLUDED = new Set(['docs/model-lanes-design-a-1393.md', 'docs/model-lanes-merge-1393.md'])
 
 const laneWords = SCARCE_LANE_WORDS.join('|')
 const routeTerms = String.raw`\b(?:${laneWords}|escalat\w*)\b`
@@ -41,7 +43,7 @@ function trackedProseAndSource() {
 }
 
 const directions = String.raw`\b(?:on|off|enabled|disabled|suspended|active|inactive)\b`
-const laneTerm = String.raw`\b(?:${SCARCE_LANE_WORDS.filter((word) => word !== 'scarce').join('|')})\b`
+const laneTerm = String.raw`\b(?:${SCARCE_LANE_WORDS.join('|')})\b`
 const stateClaim = new RegExp(
   `${laneTerm}[\\s\\S]{0,100}\\bswitch\\b[\\s\\S]{0,100}${directions}|${laneTerm}[\\s\\S]{0,100}${directions}[\\s\\S]{0,100}\\bswitch\\b`,
   'i',
@@ -57,7 +59,7 @@ function trackedDocuments() {
     .filter(Boolean)
     // The work order and archive are specifications/history, not operational
     // restatements; they necessarily preserve the instruction this test enforces.
-    .filter((path) => !EXCLUDED.has(path))
+    .filter((path) => !EXCLUDED.has(path) && !SWITCH_EXCLUDED.has(path))
     .filter((path) => existsSync(resolve(ROOT, path)))
   return new Map(paths.map((path) => [path, readFileSync(resolve(ROOT, path), 'utf8')]))
 }
@@ -88,6 +90,7 @@ describe('the scarce-lane switch state exists in no tracked operational document
     for (const duplicate of [
       `The ${SCARCE_LANE_WORDS[1]} switch is enabled for this run.`,
       `${SCARCE_LANE_WORDS[1]} remains disabled by the shared switch.`,
+      `The ${SCARCE_LANE_WORDS[0]} switch is enabled for this run.`,
     ]) {
       const files = trackedDocuments()
       files.set('docs/duplicate.md', duplicate)
