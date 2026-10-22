@@ -58,14 +58,6 @@ export { BLIND_REVIEWER, blindReviewerAdmission }
 // caller of the review command already looks for them.
 export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 
-// TRANSITIONAL — re-exports other script families still import while they move to
-// scripts/model-lanes.mjs; the coordinator deletes them last. Nothing in the
-// cross-review files uses them.
-export const ASTRA_MODEL_ID = CROSS.modelId
-export const ASTRA_MODEL_NAME = CROSS.displayName
-export const ASTRA_REASONING_EFFORT = CROSS.reasoningEffort
-// END TRANSITIONAL
-
 /**
  * The handover chains, as ROLE LISTS in data. `crossUnavailable` answers "the cross
  * lane did not deliver, who else can look at this?" and starts at the scarce lane,

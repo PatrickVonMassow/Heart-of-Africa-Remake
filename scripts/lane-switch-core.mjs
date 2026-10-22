@@ -1,22 +1,11 @@
-// The per-lane switch decisions (may a lane be used at all), plus the model identities,
-// the result-JSON parsing and the merger roster those decisions are read against.
+// The per-lane switch decisions (may a lane be used at all), plus the
+// result-JSON parsing and the merger roster those decisions are read against.
 //
 // This module is deliberately pure. The state file belongs to the main checkout and
 // scripts/lane-switch.mjs owns its I/O; every policy consumer receives the decoded
 // state of one lane and derives its answer here instead of carrying a second switch.
 
-// TRANSITIONAL re-exports: the identities live in scripts/model-lanes.mjs; these
-// names go once every consumer reads the lane records directly.
 import { CROSS, LANES, LEGACY, MAIN, SCARCE, lane, sharesIdentity } from './model-lanes.mjs'
-export const FABLE_MODEL = SCARCE.displayName
-export const ASTRA_MODEL = CROSS.displayName
-export const CLAUDE_MODEL = MAIN.trailerName
-export const OPUS_MODEL = MAIN.displayName
-export const OPUS_FALLBACK_MODEL = MAIN.fallback.displayName
-export const OPUS_MODEL_ID = MAIN.modelId
-export const FABLE_MODEL_ID = SCARCE.modelId
-export const ASTRA_MODEL_ID = CROSS.modelId
-export const OPUS_FALLBACK_MODEL_ID = MAIN.fallback.modelId
 
 const SWITCH_SCRIPT = 'node scripts/lane-switch.mjs'
 /** The per-lane state file in the main checkout's `.claude/`. */
