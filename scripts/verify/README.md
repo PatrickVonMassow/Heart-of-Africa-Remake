@@ -1201,7 +1201,7 @@ the session. Only the run is skipped — and the NEXT commit on that branch, the
 one that finishes the work, carries neither marker nor trailer and runs CI
 normally.
 
-The timed Sol authoring lane applies that distinction mechanically. Every
+The timed cross-lane authoring applies that distinction mechanically. Every
 author-written checkpoint and the pre-run commission receipt use the rescue
 pair, so its two-minute pushes start no disposable CI chain. Only after the
 author process exits cleanly, leaves a clean tree and reports `test:unit`, build
