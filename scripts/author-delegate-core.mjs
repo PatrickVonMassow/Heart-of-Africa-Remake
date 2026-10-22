@@ -1,4 +1,4 @@
-// THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@2f245cec
+// THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@740d83c2
 //
 // One command for every lane with an authoring path (`--lane <role>`): the lane record
 // (scripts/model-lanes.mjs) supplies the model, the id, the runtime and the trailer, and
@@ -7,9 +7,9 @@
 // `scripts/cross-review.mjs` and `scripts/ask-lane.mjs` send the cross lane work it may
 // only READ. This lane sends it work it WRITES: a point, on its own branch, in its
 // own worktree, committed step by step. The main chain then reviews it, runs the suites,
-// judges the picture and lands it — the role swap of CLAUDE.md §6, which keeps
-// two vendors on a point wherever both are reachable and lets neither review
-// itself (the outage fallback in lane-routing-core is the named exception).
+// judges the picture and lands it — CLAUDE.md §6's cross-vendor review, never by an
+// author of the range, which keeps two vendors on a point wherever both are
+// reachable and lets neither review itself (the outage fallback in lane-routing-core is the named exception).
 //
 // TWO THINGS ARE DIFFERENT FROM THE READ-ONLY PATHS, and both are load-bearing:
 //

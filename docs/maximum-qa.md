@@ -90,7 +90,7 @@ must pass clean before any tag.
 ## Phase 5 — Code audit with model diversity
 - Sweep the subsystems (systems/state, travel/world, render/ui/i18n) of the
   rebuilt code for test gaps AND real bugs, reading it against the design.
-<!-- rule:model-policy@2f245cec -->
+<!-- rule:model-policy@740d83c2 -->
 - Mix in a **different model than the recent author** for a blind pass — the
   cross-vendor default, so the cross lane reads main-chain-authored code and the
   main chain reads cross-lane code (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,

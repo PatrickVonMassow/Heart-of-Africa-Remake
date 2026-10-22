@@ -1,30 +1,27 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@2f245cec
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@740d83c2
 //
-// The user pays two vendors, and authoring is the largest single item of the
-// spend, so it is split across both rather than sitting on one. It does NOT all
-// move: CLAUDE.md §6 names three lanes with different jobs, and the cut between
-// them is decided HERE, from the point's own text, rather than by whoever
-// happens to be dispatching. The SPLIT is the standing policy; how full each
-// pool happens to be on a given day is not a reason this file knows about
-// (cross-vendor audit 17.08.2026 — the header used to argue from one day's
-// quota reading, which then outlived it). An UNREACHABLE lane is different from
-// a full one: where the cross lane's volume is spent, authoring goes to the main chain
-// rather than waiting for the vendor (user 23.09.2026; point 1194 measures and lifts it).
-// That fallback is decided in lane-routing-core.mjs (`effectiveRoute`), not here.
+// CLAUDE.md §6 names three lanes as role records (scripts/model-lanes.mjs): the main
+// chain authors by routing default and runs the batch, the cross-vendor lane reviews,
+// and the scarce lane authors tagged points and router escalations. This file is the
+// CUT: from the point's own text it names the lane a point belongs to when the share
+// switch (lane-routing-core.mjs) lets the cross lane author at all — only at
+// `prefer-cross`; at `default` and `main-only` scripts/author-delegate.mjs keeps a
+// cross-cut point in the main chain unless `--anyway`. How full each pool is on a
+// given day is not a reason this file knows about (cross-vendor audit 17.08.2026). An
+// UNREACHABLE cross lane authors on the main chain rather than waiting (user
+// 23.09.2026; point 1194), decided in lane-routing-core.mjs (`effectiveRoute`).
 //
-//   cross  The cross-vendor lane authors the points, and the main chain then
-//          reviews, runs the suites, judges the picture and lands. Since
-//          18.08.2026 that includes the HARD and CRITICAL ones — difficult,
-//          complex, error-prone or tagged HIGH criticality goes STRAIGHT here,
-//          where it used to be held back for the main lane.
-//   main   The main chain keeps what only the main lane can honestly finish: a point
-//          whose VERIFICATION is the work (a picture judged on both backends is
-//          the main session's job, so authoring it elsewhere buys nothing) —
-//          and only while nothing marks that point hard, because the user's
-//          18.08. ruling outranks this lane, not the other way round.
-//   scarce The scarce lane is the escalation described by CLAUDE.md §6 when the shared
-//          switch admits it. A point's tag, a caller override and the automatic
-//          boundary all consult that same decision.
+//   cross  The cut's lane for the points the cross lane may author once the share
+//          switch admits it — since 18.08.2026 including the HARD and CRITICAL ones
+//          (difficult, complex, error-prone or tagged HIGH criticality). Where it
+//          authors, the main chain reviews, runs the suites, judges the picture and
+//          lands.
+//   main   A point whose VERIFICATION is the work (a picture judged on both
+//          backends is the main session's job, so authoring it elsewhere buys
+//          nothing) — and only while nothing marks that point hard.
+//   scarce The §6 escalation for tagged points and a reached review-round threshold,
+//          when the shared switch admits it. A point's tag, a caller override and
+//          the automatic boundary all consult that same decision.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever

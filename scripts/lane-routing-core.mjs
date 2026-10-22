@@ -1,5 +1,5 @@
 // THE SWITCH THAT MOVES WORK BETWEEN THE MAIN CHAIN AND THE CROSS LANE (point 654,
-// widened by 667). rule:model-policy@2f245cec
+// widened by 667). rule:model-policy@740d83c2
 //
 // WHY IT EXISTS: the user pays two vendors whose allowances run out at different times,
 // and wants the load moved BEFORE one of them is nearly spent. It began as a read-only

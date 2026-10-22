@@ -46,7 +46,7 @@ import { servingFallbackModelId } from './lane-switch-core.mjs'
 import { MAIN } from './model-lanes.mjs'
 import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
-/** Model policy (CLAUDE.md §6). rule:model-policy@2f245cec
+/** Model policy (CLAUDE.md §6). rule:model-policy@740d83c2
  *  The session starts on the main lane's model id (scripts/model-lanes.mjs). Its one CLI fallback is the next member of the
  *  chain reported by scripts/lane-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
