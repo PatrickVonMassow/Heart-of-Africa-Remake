@@ -6,7 +6,7 @@
 // rules are visible, and then on the real PoC village, where the walk is
 // simulated exactly as the scene runs it and has to END at the bank.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   NAV_CELL,
   advancePlaceRoute,
@@ -238,14 +238,18 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
    * collider resolve decides the step, the walkable shape decides whether the
    * step is taken at all. Returns the seconds it took, or null if it never
    * arrived — which is exactly the failure this replaces.
+   *
+   * The grid is built ONCE per layout and passed in: building it is ~90 % of a
+   * walk's cost, and rebuilding it for each of the 24 walks per seed pushed a
+   * case past `testTimeout` under machine load (work-order 1412).
    */
   function walk(
     layout: ReturnType<typeof buildLayout>,
+    grid: ReturnType<typeof buildPlaceNavGrid>,
     from: { x: number; z: number },
     to: { x: number; z: number },
   ): number | null {
     const bounds = { radius: layout.radius, bank: layout.bank }
-    const grid = buildPlaceNavGrid(bounds, layout.colliders, R)
     const me = { ...from }
     let route = null as ReturnType<typeof findPlaceRoute>
     // ErrandVillagers plans at most once a second (`state.replan`). Without that
@@ -285,8 +289,13 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
     return null
   }
 
-  it.each(SEEDS)('reaches all three bank points from anywhere in the village (seed %i)', (seed) => {
+  const gridOf = (layout: ReturnType<typeof buildLayout>) =>
+    buildPlaceNavGrid({ radius: layout.radius, bank: layout.bank }, layout.colliders, R)
+
+  /** Every bank point, from eight starts round the village centre. */
+  function expectBankReached(seed: number): void {
     const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    const grid = gridOf(layout)
     const bank = layout.bank!
     expect(bank).not.toBeNull()
     for (const target of [bank.bank, bank.upstream, bank.downstream]) {
@@ -297,17 +306,35 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
       for (let k = 0; k < 8; k++) {
         const a = (k / 8) * Math.PI * 2
         const from = { x: Math.cos(a) * 7, z: Math.sin(a) * 7 }
-        expect(walk(layout, from, target), `from ${from.x.toFixed(1)},${from.z.toFixed(1)}`).not.toBeNull()
+        expect(walk(layout, grid, from, target), `from ${from.x.toFixed(1)},${from.z.toFixed(1)}`).not.toBeNull()
       }
+    }
+  }
+
+  it.each(SEEDS)('reaches all three bank points from anywhere in the village (seed %i)', (seed) => {
+    expectBankReached(seed)
+  })
+
+  it('reaches the bank with the clock stalled: no wall-clock reading decides a route', () => {
+    // A frozen clock is what a starved process looks like from inside. If any
+    // time budget sat in the search, layout or walk, this would change the outcome.
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0)
+    const date = vi.spyOn(Date, 'now').mockReturnValue(0)
+    try {
+      expectBankReached(1337)
+    } finally {
+      now.mockRestore()
+      date.mockRestore()
     }
   })
 
   it.each([7, 1337, 2987912600])('walks the restored water lane in both directions (seed %i)', (seed) => {
     const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    const grid = gridOf(layout)
     expect(layout.waterPath).not.toBeNull()
     const { head, foot } = layout.waterPath!
-    expect(walk(layout, head, foot)).not.toBeNull()
-    expect(walk(layout, foot, head)).not.toBeNull()
+    expect(walk(layout, grid, head, foot)).not.toBeNull()
+    expect(walk(layout, grid, foot, head)).not.toBeNull()
   })
 
   it('the grid is finer than the walker is wide, so consecutive free cells connect', () => {
