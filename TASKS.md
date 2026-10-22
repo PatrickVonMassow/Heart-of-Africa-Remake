@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1412. Village bank routing test fails under machine load
-  Queue position: after point 1411 (front-of-queue gate stability: it reddens unrelated branches and CI).
-  Source: finding 21.10.2026 18:14: `src/scenes/place/routing.test.ts` "a villager sent to the BANK gets there" failed in two independent full unit runs (1402 worktree seed 1337; 1410 worktree seeds 7 and 1337) at load average 13-16; the file alone passes 19/19, also on main. Caused red CI run 39625616367 on feat/1402-rear-leg-tremble.
-  Final state: the routing search and its test are deterministic: no wall-clock or time-budget dependency decides whether a route is found, so the bank test passes identically under load.
-  Verifiable: a Vitest case that runs the bank routing with a stalled clock (or artificially slow step) and still reaches all three bank points; the full unit suite green under parallel load.
-  Charged finding 21.10.2026 ~22:00: the main pre-push unit gate went red under parallel load (a worktree vitest run and an Astra review beside it) and kept no test name; the immediate quiet rerun was green (608 files). Likely this class; unproven because the name is lost.
-  Criticality: medium - a flaky unit gate reddens unrelated branches and CI.
-  Bundle: Dorfleben.
 - [ ] 1407. No user instruction is ever lost: tick the carrier only after commit, the doctor stashes no task files, reconcile the carrier against TASKS.md
   Rank: at the very front of the work order, ahead of 1402 (user order 21.10.2026).
   Four eyes: GPT-6 Astra and Opus 5.5 analyse blind-parallel from identical inputs; a third model merges via scripts/blind-merge.mjs; cross-vendor review of the result.
