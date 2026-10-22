@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve as resolvePath } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   CROSS,
@@ -179,5 +184,108 @@ describe('the cross lane runs at high reasoning effort (user order 21.10.2026)',
   it('carries effort high in its record and in its execution target', () => {
     expect(CROSS.reasoningEffort).toBe('high')
     expect(executionTarget('cross').effort).toBe('high')
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// HYGIENE: no consumer names a concrete model (union U25/U26). Every token below is DERIVED
+// from the registry, so a lane switched to a new model is guarded without editing this test.
+// Scanned: tracked files under scripts/ (names and contents, comments included) and the
+// operational docs. Excluded: the registry, this test, and scripts/fixtures/ (captured data).
+// ---------------------------------------------------------------------------------------
+
+const OPERATIONAL_DOCS = [
+  'docs/lane-routing.md',
+  'docs/command-index.md',
+  'docs/batch-owner-runbook.md',
+  'scripts/verify/README.md',
+  'docs/batch-autonomy.md',
+  'docs/handover-architecture.md',
+  'docs/four-eyes/README.md',
+  'docs/criticality-review.md',
+  'docs/picture-check-levers.md',
+  'docs/maximum-qa.md',
+]
+const EXCLUDED = ['scripts/model-lanes.mjs', 'scripts/model-lanes.test.mjs', 'scripts/fixtures/']
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+function hygienePatterns(registry = LANES) {
+  const spellingsOfAll = registry.flatMap((record) => spellings(record).map((s) => s.replace(/\[1m\]$/i, '')))
+  const families = [...new Set(registry.flatMap((record) => record.familyWords))]
+  const versioned = Object.values(VENDORS).flatMap((v) => v.versionedMarkers)
+  const vendorWords = [...new Set([...Object.keys(VENDORS), ...Object.values(VENDORS).map((v) => v.domain)])]
+  const legacyKeys = [
+    ...Object.keys(LEGACY.routingSettings),
+    ...Object.keys(LEGACY.handovers),
+    ...Object.values(LEGACY.files),
+  ]
+  const named = [...families, ...vendorWords]
+  return [
+    ...spellingsOfAll.map((s) => ({ why: `model spelling "${s}"`, re: new RegExp(`(?<![A-Za-z0-9])${escapeRe(s)}(?![A-Za-z0-9])`, 'i') })),
+    { why: 'family word with a version', re: new RegExp(`\\b(?:${[...families, ...versioned].join('|')})[\\s-]*v?\\d`, 'i') },
+    { why: 'vendor word', re: new RegExp(`\\b(?:${vendorWords.join('|')})\\b`, 'i') },
+    { why: 'constant named after a model or vendor', re: new RegExp(`(?:\\b|_)(?:${named.map((w) => w.toUpperCase()).join('|')})_|\\b[A-Z][A-Z0-9]*_(?:${named.map((w) => w.toUpperCase()).join('|')})\\b`) },
+    ...legacyKeys.map((key) => ({ why: `legacy persisted spelling "${key}"`, re: new RegExp(`(?<![A-Za-z0-9])${escapeRe(key)}(?![A-Za-z0-9])`) })),
+  ]
+}
+
+/** The hygiene violations of the given files: `path:line: why`. */
+function hygieneViolations(paths, read, registry = LANES) {
+  const patterns = hygienePatterns(registry)
+  const fileWords = [...new Set([...registry.flatMap((record) => record.familyWords), ...Object.keys(VENDORS)])]
+  const fileWord = new RegExp(`(?:^|[^a-z])(?:${fileWords.join('|')})(?:[^a-z]|$)`, 'i')
+  const out = []
+  for (const path of paths) {
+    const base = path.split('/').pop()
+    if (fileWord.test(base)) out.push(`${path}: file name names a model or vendor`)
+    const text = read(path)
+    if (text == null) continue
+    text.split('\n').forEach((line, index) => {
+      const hit = patterns.find(({ re }) => re.test(line))
+      if (hit) out.push(`${path}:${index + 1}: ${hit.why} — ${line.trim().slice(0, 120)}`)
+    })
+  }
+  return out
+}
+
+const REPO = resolvePath(dirname(fileURLToPath(import.meta.url)), '..')
+const readText = (root) => (path) => {
+  try {
+    const buffer = readFileSync(resolvePath(root, path))
+    return buffer.includes(0) ? null : buffer.toString('utf8')
+  } catch {
+    return null
+  }
+}
+
+describe('hygiene: no consumer outside the registry names a concrete model', () => {
+  it('finds no model, vendor or legacy spelling in scripts/ or the operational docs', () => {
+    const tracked = execFileSync('git', ['ls-files', '-z', 'scripts', ...OPERATIONAL_DOCS], { cwd: REPO, encoding: 'utf8' })
+      .split('\0')
+      .filter(Boolean)
+      .filter((path) => !EXCLUDED.some((prefix) => path === prefix || (prefix.endsWith('/') && path.startsWith(prefix))))
+    const violations = hygieneViolations(tracked, readText(REPO))
+    expect(violations, `${violations.length} violation(s):\n${violations.join('\n')}`).toEqual([])
+  })
+
+  it('catches a hard-coded name, a future version of a lane family and a vendor-named file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-lane-hygiene-'))
+    try {
+      const files = {
+        'clean.mjs': `import { CROSS } from './model-lanes.mjs'\nexport const reviewer = CROSS.displayName\n`,
+        'named.mjs': `export const reviewer = '${CROSS.displayName}'\n`,
+        'future.mjs': `// reviewed by ${CROSS.familyWords[0].toUpperCase()}-99\n`,
+        'address.mjs': `const trailer = 'x <${VENDORS[MAIN.vendor].trailerAddress}>'\n`,
+        [`${SCARCE.familyWords[0]}-tool.mjs`]: 'export {}\n',
+        'ident.mjs': `export const ${SCARCE.familyWords[0].toUpperCase()}_MODEL = 1\n`,
+      }
+      for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text)
+      const violations = hygieneViolations(Object.keys(files), readText(dir))
+      const flagged = new Set(violations.map((v) => v.split(':')[0]))
+      expect(flagged.has('clean.mjs')).toBe(false)
+      for (const name of Object.keys(files).filter((n) => n !== 'clean.mjs')) expect(flagged.has(name), name).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
