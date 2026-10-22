@@ -16024,3 +16024,10 @@ to land than a mechanism that needs a review.
   Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; a moving capture on both backends.
   Criticality: medium - visible foot jerk in village walks.
   Bundle: Dorfleben.
+
+- [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
+  Source: finding 22.10.2026 19:24 from the point-1404 moving capture (WebGL 2, seed 42, Bambara village, errand villager 1, frames 255-261 at 60 Hz, branch e962c7841): the carried jar swings from hanging low at the hip to raised beside the shoulder within ~6 frames (~0.1 s) while the carrier walks on.
+  Final state: the jar moves from hip to shoulder as a visible lift over a natural duration, never as a pop between two carry poses.
+  Verifiable: a Vitest on the carry-pose transition bounds the jar's per-frame displacement; a moving capture on both backends shows the lift.
+  Criticality: medium - visible pop on every water carrier.
+  Bundle: Dorfleben.

@@ -1692,6 +1692,12 @@
       "why": "Villager gait finding from the 1402 capture; belongs at the end with the other Dorfleben rig points, after 1397",
       "origin": "machine",
       "place": "last"
+    },
+    "1425": {
+      "at": "2026-10-22T20:27:32.014Z",
+      "why": "finding from the 1404 capture, not a user order; it belongs behind the other villager-rig findings 1422/1423 that already stand last",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1721,7 +1727,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-22T17:45:06.448Z",
+    "at": "2026-10-22T20:27:32.028Z",
     "points": [
       184,
       200,
@@ -2190,7 +2196,8 @@
       1420,
       1422,
       1423,
-      1424
+      1424,
+      1425
     ]
   }
 }
