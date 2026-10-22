@@ -658,14 +658,22 @@ export function rescueProtectedCommit({ repo, paths = [], now = Date.now(), pid 
     } catch {
       head = ''
     }
+    // THE REAL INDEX IS READ FIRST (review 22.10.2026), before the temporary
+    // index exists: its staged entries are what a reset or merge abort destroys.
+    const staged = stagedEntries({ repo, env: baseEnv, files })
     if (head) run(['read-tree', head])
     else run(['read-tree', '--empty'])
-    run(['add', '-A', '-f', '--', ...files])
-    // THE STAGED VERSION TOO (review 22.10.2026): a protected file staged and then
-    // changed or removed in the working copy has a second version that only the
-    // REAL index holds, and a reset or merge abort destroys it. Every staged entry
-    // that differs from HEAD is kept under INDEX_RESCUE_DIR in the same tree.
-    for (const entry of stagedEntries({ repo, env: baseEnv, files })) {
+    // The working copy, path by path: a file on disk is added; one that is gone is
+    // removed from the temporary index (a path HEAD never had is simply absent) —
+    // `add -A` on a path the temp index does not know and the disk lacks fails.
+    for (const file of files) {
+      if (existsSync(join(repo, file))) run(['add', '-f', '--', file])
+      else run(['rm', '--cached', '-q', '--ignore-unmatch', '--', file])
+    }
+    // THE STAGED VERSION TOO: a protected file staged and then changed or removed
+    // in the working copy has a second version that only the REAL index holds.
+    // Every staged entry that differs from HEAD is kept under INDEX_RESCUE_DIR.
+    for (const entry of staged) {
       let headBlob = ''
       try {
         headBlob = head ? run(['rev-parse', '--verify', '-q', `${head}:${entry.path}`]) : ''

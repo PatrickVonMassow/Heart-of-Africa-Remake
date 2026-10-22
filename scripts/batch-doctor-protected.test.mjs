@@ -157,6 +157,15 @@ describe('rescueProtectedCommit — a pushed rescue branch through a temporary i
     expect(repo.git('diff', '--cached', '--name-only')).toBe('TASKS.md')
   })
 
+  it('rescues a protected file that is NEW in the index and then removed from disk', () => {
+    writeFileSync(join(repo.root, 'docs', 'work-packages.md'), '| **Dorfleben** | A | #1402 user order |\n')
+    repo.git('add', 'docs/work-packages.md')
+    rmSync(join(repo.root, 'docs', 'work-packages.md'))
+    const r = rescueProtectedCommit({ repo: repo.root, paths: ['docs/work-packages.md'] })
+    expect(r.pushed).toBe(true)
+    expect(repo.git('show', `${r.branch}:${INDEX_RESCUE_DIR}/docs/work-packages.md`)).toContain('#1402 user order')
+  })
+
   it('reports a push that fails instead of claiming the rescue is secured', () => {
     appendPoint(repo.root, 1402)
     repo.git('remote', 'set-url', 'origin', join(repo.base, 'gone.git'))
