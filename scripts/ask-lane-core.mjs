@@ -1,10 +1,10 @@
-// THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1).
-// It also addresses the Claude-family lanes (fable, opus, opus48; see ASK_MODELS).
+// THE READ-ONLY PATH TO THE CROSS LANE, GENERALISED BEYOND REVIEWS (point 654, A1).
+// It also addresses the other lanes by role (main, scarce, main-fallback; see ASK_LANES).
 //
 // `scripts/cross-review.mjs` proved one shape of this: `codex exec` in a READ-ONLY sandbox
 // with the artefact on stdin, because this container cannot create user namespaces and a
 // shell command of the reviewer's would die before it ran. When point 654 was written, the
-// last twelve recorded mechanism reviews all carried "GPT-6 Astra", so the path worked.
+// last twelve recorded mechanism reviews all carried the cross lane's name, so the path worked.
 //
 // What it did NOT do is carry any other kind of pure text work — and text work is where
 // the volume is: measured 12.08.2026, verification is 41.5 % of the whole spend and
@@ -13,38 +13,27 @@
 //
 // THE RULE THIS FILE IS SHAPED AROUND is the review path's, unchanged: an answer nobody
 // gave must never be reported as an answer. Every path out of a failed run says so
-// (formatUnavailable), names the cause and hands the work back — to the Claude chain for
-// Astra, to another eligible lane otherwise — never silently, never recorded as the model's.
+// (formatUnavailable), names the cause and hands the work back — to the main chain for
+// the cross lane, to another eligible lane otherwise — never silently, never recorded as the model's.
 //
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-lane.mjs. Pinned by ask-lane-core.test.mjs.
 
-import {
-  FABLE_MODEL,
-  FABLE_MODEL_ID,
-  OPUS_FALLBACK_MODEL,
-  OPUS_FALLBACK_MODEL_ID,
-  OPUS_MODEL,
-  OPUS_MODEL_ID,
-  parseClaudeResultOutput,
-} from './lane-switch-core.mjs'
-import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, stripDecoration, ASTRA_REASONING_EFFORT } from './cross-review-core.mjs'
+import { parseClaudeResultOutput } from './lane-switch-core.mjs'
+import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, stripDecoration } from './cross-review-core.mjs'
+import { CROSS, EXECUTION_ROLES, executionTarget } from './model-lanes.mjs'
 
-export { MATERIAL_BUDGET_CHARS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
+export { MATERIAL_BUDGET_CHARS }
 
-/** Every read-only model this command can address. The served model must agree
- *  with this descriptor before any output is attributed to it. */
-export const ASK_MODELS = Object.freeze({
-  astra: Object.freeze({ key: 'astra', name: ASTRA_MODEL_NAME, id: ASTRA_MODEL_ID, runtime: 'codex', effort: ASTRA_REASONING_EFFORT }),
-  fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'medium' }),
-  opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'medium' }),
-  opus48: Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'medium' }),
-})
+/** Every read-only lane this command can address, keyed by role (`--lane <role>`), each
+ *  the record's execution target. The served model must agree with this descriptor before
+ *  any output is attributed to it. */
+export const ASK_LANES = Object.freeze(Object.fromEntries(EXECUTION_ROLES.map((role) => [role, executionTarget(role)])))
 
-/** A supported model descriptor, or null. Astra remains the compatibility default. */
-export function resolveAskModel(value = 'astra') {
-  const key = String(value ?? '').trim().toLowerCase() || 'astra'
-  return ASK_MODELS[key] ?? null
+/** A supported lane descriptor by role, or null. The cross lane is the default. */
+export function resolveAskLane(value = 'cross') {
+  const key = String(value ?? '').trim().toLowerCase() || 'cross'
+  return Object.hasOwn(ASK_LANES, key) ? ASK_LANES[key] : null
 }
 
 /** Read Claude Code's result JSON and prove which model produced the TOP-LEVEL
@@ -77,7 +66,7 @@ export function normaliseKind(value) {
  * blind-merge accounting, into a work-order point — and a free-form answer cannot be
  * transcribed without someone re-reading the whole thing. `enumerate` uses the very entry
  * form `scripts/blind-merge.mjs` counts (`B<n> | <file> | <one line>`), so a divergent
- * half from Astra drops straight into the merge accounting CLAUDE.md §6 demands.
+ * half from the cross lane drops straight into the merge accounting CLAUDE.md §6 demands.
  */
 export const ANSWER_SHAPES = Object.freeze({
   diagnose: ['CAUSE: <the one cause, named>', 'EVIDENCE: <the line(s) in the material that show it>'],
@@ -98,11 +87,11 @@ export function entryPrefix(kind) {
  * The prompt the addressed model is given for one kind.
  *
  * Two facts every kind carries, both learned the hard way on the review path: the
- * material is ATTACHED (a shell command of Astra's cannot run in this container, so it must
+ * material is ATTACHED (a shell command of the cross lane's cannot run in this container, so it must
  * not be told to fetch anything), and a part marked TRUNCATED must be reported as such
  * rather than guessed past.
  */
-export function buildAskPrompt({ kind = '', brief = '', modelName = ASTRA_MODEL_NAME } = {}) {
+export function buildAskPrompt({ kind = '', brief = '', modelName = CROSS.displayName } = {}) {
   const k = normaliseKind(kind)
   if (!k) throw new Error(`ask-lane: not a kind: ${kind}`)
   const shape = ANSWER_SHAPES[k]
@@ -119,7 +108,7 @@ export function buildAskPrompt({ kind = '', brief = '', modelName = ASTRA_MODEL_
     'FIRST. This container cannot create user namespaces, so a shell command of yours would fail',
     'before it ran: judge the attached material only, and where a part is marked TRUNCATED say',
     'so rather than guessing past the cut. You author nothing here — no commit, no patch, no',
-    'file: your answer is text that a Claude session acts on.',
+    'file: your answer is text that a main-chain session acts on.',
     '',
   ]
   if (k === 'enumerate') {
@@ -251,7 +240,7 @@ function parseDiagnose(lines) {
  * not an entry.
  *
  * `allowEmpty` exists for the AUDIT: a sweep that finds nothing is a real answer, and
- * refusing it would report a clean audit as "Astra did not answer" after the allowance was
+ * refusing it would report a clean audit as "the cross lane did not answer" after the allowance was
  * already spent. It must SAY so in the prescribed line — silence is still no answer.
  */
 function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
@@ -399,24 +388,25 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
 
 /**
  * WHAT THE COMMAND SAYS WHEN THE MODEL DID NOT DELIVER: the cause named and the work
- * handed back, in two lines (a third for Astra under the claude-only switch). PURE.
+ * handed back, in two lines (a third for the cross lane under the main-only switch). PURE.
  *
  * The exit code beside it (3, as on the review path) is what lets a script tell "the model
  * answered" from "it did not" without reading prose.
  */
-export function formatUnavailable({ kind = '', cause = '', setting = '', modelName = ASTRA_MODEL_NAME } = {}) {
+export function formatUnavailable({ kind = '', cause = '', setting = '', modelName = CROSS.displayName } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
-  const handoff = modelName === ASTRA_MODEL_NAME ? 'Do it in the Claude chain' : 'Hand it to another eligible lane'
+  const cross = modelName === CROSS.displayName
+  const handoff = cross ? 'Do it in the main chain' : 'Hand it to another eligible lane'
   return [
     `ask-lane: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
     `  The ${k} is NOT done. ${handoff} — nothing here may be recorded as ${modelName}'s work.`,
-    ...(setting === 'claude-only' && modelName === ASTRA_MODEL_NAME ? ['  (The share switch is at `claude-only`; `node scripts/lane-routing.mjs --more` steps toward Astra; at `default` only review and enumerate go there.)'] : []),
+    ...(setting === 'main-only' && cross ? ['  (The share switch is at `main-only`; `node scripts/lane-routing.mjs --more` steps toward the cross lane; at `default` only review and enumerate go there.)'] : []),
   ].join('\n')
 }
 
 /** The whole answer as the command prints it: a head line carrying the summary, then the
  *  diagnose fields or the list entries (explain: the head alone). */
-export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = ASTRA_MODEL_NAME, effort = ASTRA_REASONING_EFFORT } = {}) {
+export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = CROSS.displayName, effort = CROSS.reasoningEffort } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
   const seconds = Number.isFinite(Number(elapsedMs)) ? Math.round(Number(elapsedMs) / 1000) : 0
   const head = `ask-lane: ${modelName} (effort ${effort}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`

@@ -6,7 +6,7 @@
 // model-diverse review of the plan and of the result. Carried by intention, that
 // rule was applied where somebody happened to remember it. Worse (measured
 // 30.07.2026): THE REVIEW CAN OUTLIVE ITS AUTHOR. A delegated agent spawned its
-// Fable-5 reviewer in the background and then stopped; the review landed in the
+// scarce-lane reviewer in the background and then stopped; the review landed in the
 // parent session minutes later with verdict `do-not-merge` and two blockers, one
 // of which would have reddened main's unit gate the moment the branch merged.
 // The branch LOOKED reviewed and was not.

@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { buildContributionPassPlan, formatContributionPassPlan } from './cross-review.mjs'
 import { formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
+import { CROSS, MAIN } from './model-lanes.mjs'
 
 const commit = (letter, files = ['scripts/example-guard.mjs']) => ({
   sha: letter.repeat(40),
   subject: `Change ${letter}`,
   parentShas: [letter.toUpperCase().repeat(40)],
   files,
-  authorModels: ['GPT-5.6 Sol'],
+  authorModels: [CROSS.retired.find((name) => /\s/.test(name))],
 })
 
 const sized = (over = {}) => ({
@@ -86,8 +87,8 @@ describe('the guard plan is bounded by each contribution', () => {
       buildPlan: () => sized({
         fits: false,
         passes: [
-          { index: 1, total: 2, files: ['scripts/a-guard.mjs'], reviewer: 'Opus 5' },
-          { index: 2, total: 2, files: ['scripts/b.mjs'], reviewer: 'Opus 5' },
+          { index: 1, total: 2, files: ['scripts/a-guard.mjs'], reviewer: MAIN.displayName },
+          { index: 2, total: 2, files: ['scripts/b.mjs'], reviewer: MAIN.displayName },
         ],
       }),
     })

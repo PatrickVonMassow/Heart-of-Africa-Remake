@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // THE COMMAND THAT LETS AN OUTSIDE LANE AUTHOR A POINT (work-order point 667):
-// the OpenAI lane by default, the Fable lane through author-fable.mjs.
+// `--lane <role>` picks the lane (cross | scarce); without it the routing decides.
 //
 //   node scripts/author-delegate.mjs --point 651                  # author it, here, on this branch
+//   node scripts/author-delegate.mjs --lane scarce --point 651    # commission the scarce lane
 //   node scripts/author-delegate.mjs --point 651 --findings f.md  # the second leg: answer the review
 //   node scripts/author-delegate.mjs --routing --point 651        # which lane owns it, and why
 //   node scripts/author-delegate.mjs --routing --all              # the whole open queue
@@ -10,7 +11,7 @@
 //
 // Exit codes: 0 clean delivery, 1 failure, 2 usage or readiness refusal,
 // 3 not a clean delivery or routed elsewhere, 4 spec examination due,
-// 5 Astra outage fallback (author in the Claude lane).
+// 5 cross-lane outage fallback (author in the main chain).
 //
 // It is the delegated-agent flow with the author swapped: an isolated worktree,
 // its own `feat/` branch, the point handed over as a BRIEF, atomic commits, and
@@ -20,8 +21,7 @@
 // wrapper judges; the browser suites, the picture and the verdict are the
 // reviewing session's, and nothing here merges. The report ends by naming what that session owes.
 //
-// The decisions are pure and tested (author-delegate-core.mjs, author-routing-core.mjs,
-// author-fable-core.mjs);
+// The decisions are pure and tested (author-delegate-core.mjs, author-routing-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
 import { spawn, spawnSync } from 'node:child_process'
 import { closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs'
@@ -44,25 +44,19 @@ import {
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
-import { classifyOutcome } from './cross-review-core.mjs'
 import { ensureModelProven } from './cross-review.mjs'
 import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
 import { FALLBACK_AUTHOR, effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
+import { CROSS } from './model-lanes.mjs'
 import { currentLaneState } from './lane-switch.mjs'
-import { OPUS_MODEL, laneIsOn } from './lane-switch-core.mjs'
+import { laneIsOn, laneRefusalReason } from './lane-switch-core.mjs'
 import {
-  authoringClaudeArgs,
-  FABLE_MODEL,
-  FABLE_MODEL_ID,
-  FABLE_TRAILER,
-  laneAuthoringOutcome,
-  parseClaudeAuthoringOutput,
-} from './author-fable-core.mjs'
-import {
+  AUTHOR_ROLES,
   AUTHOR_TIMEOUT_MS,
+  DEFAULT_AUTHOR_ROLE,
   authorCommitMessage,
   authorCompletionMessage,
-  authoringCodexArgs,
+  authorLaneConfig,
   buildAuthoringPrompt,
   buildSpecExaminationPrompt,
   childEnv,
@@ -75,10 +69,6 @@ import {
   FINAL_PUSH_TIMEOUT_MS,
   PUSH_TIMEOUT_MS,
   readinessProblems,
-  ASTRA_MODEL_ID,
-  ASTRA_MODEL_NAME,
-  ASTRA_REASONING_EFFORT,
-  ASTRA_TRAILER,
   withheldEnvNames,
 } from './author-delegate-core.mjs'
 
@@ -163,7 +153,7 @@ export function recordAuthoringCommission({
   round = 0,
   framing = '',
   sha = '',
-  model = ASTRA_MODEL_NAME,
+  model = CROSS.displayName,
   now = Date.now(),
   append = () => {},
   commit = () => {},
@@ -235,7 +225,7 @@ export function recordAuthoringCommission({
 }
 
 /** The lane a point belongs to, with the reasons that decided it. */
-export function laneFor(number, { override = '', reworkRounds, records, fableState = currentLaneState() } = {}) {
+export function laneFor(number, { override = '', reworkRounds, records, scarceState = currentLaneState('scarce') } = {}) {
   const body = pointBody(number)
   const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
   const roundHistory = authorRoundHistory(rows, number)
@@ -243,7 +233,7 @@ export function laneFor(number, { override = '', reworkRounds, records, fableSta
   return {
     body,
     roundHistory,
-    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds, fableState }),
+    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds, scarceState }),
   }
 }
 
@@ -347,7 +337,7 @@ export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEO
 }
 
 /**
- * Run the author CLI (codex, or claude for the Fable lane) as an AUTHOR: sandbox
+ * Run the lane's author CLI (its runtime: codex or claude) as an AUTHOR: sandbox
  * bypassed (it cannot work here), credentials stripped from the environment,
  * the worktree as the working root.
  *
@@ -357,26 +347,23 @@ export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEO
  * instead and a commit is durable within two minutes rather than at the end of
  * an hour-long run.
  */
-async function runAuthoringCodex({
+async function runAuthoringLane({
   prompt,
   cwd,
   branch = '',
   timeoutMs = AUTHOR_TIMEOUT_MS,
-  modelId = ASTRA_MODEL_ID,
-  runtime = 'codex',
+  runtime,
   pushEveryMs = PUSH_INTERVAL_MS,
   onPush = () => {},
 }) {
-  const outFile = runtime === 'codex' ? join(tmpdir(), `author-delegate-${process.pid}-${Date.now()}.txt`) : ''
-  const args = runtime === 'claude'
-    ? authoringClaudeArgs({ modelId, prompt })
-    : authoringCodexArgs({ modelId, effort: ASTRA_REASONING_EFFORT, cwd, outputFile: outFile, prompt })
+  const outFile = runtime.writesOutputFile ? join(tmpdir(), `author-delegate-${process.pid}-${Date.now()}.txt`) : ''
+  const args = runtime.args({ cwd, outputFile: outFile, prompt })
   // ITS OWN PROCESS GROUP (third cross-vendor round). Signalling the child alone
   // left its shells and test runners alive: they went on writing to the worktree
   // AFTER the commits had been inspected, pushed and reported, so the report
   // described a branch that was still moving. `detached` makes the run a group
   // leader, and the kill below takes the group.
-  const child = spawn(runtime === 'claude' ? 'claude' : 'codex', args, {
+  const child = spawn(runtime.bin, args, {
     cwd,
     env: childEnv(process.env),
     windowsHide: true,
@@ -464,7 +451,7 @@ async function runAuthoringCodex({
       /* a leftover temp file is not worth an exit code */
     }
   }
-  const modelResult = runtime === 'claude' ? parseClaudeAuthoringOutput(stdout) : null
+  const modelResult = runtime.attribute(stdout)
   return {
     spawnError,
     exitCode,
@@ -479,35 +466,6 @@ async function runAuthoringCodex({
     finalMessage: modelResult?.result || last || stdout || '',
   }
 }
-
-const AUTHOR_LANE_CONFIG = Object.freeze({
-  astra: Object.freeze({
-    lane: 'astra',
-    commandName: 'author-delegate',
-    model: ASTRA_MODEL_NAME,
-    modelId: ASTRA_MODEL_ID,
-    trailer: ASTRA_TRAILER,
-    reviewer: OPUS_MODEL,
-    reviewerLabel: 'Claude',
-    runtime: 'codex',
-    runtimeLabel: 'codex',
-    detail: `(effort ${ASTRA_REASONING_EFFORT})`,
-    laneDescription: 'the hard and critical ones included',
-  }),
-  fable: Object.freeze({
-    lane: 'fable',
-    commandName: 'author-fable',
-    model: FABLE_MODEL,
-    modelId: FABLE_MODEL_ID,
-    trailer: FABLE_TRAILER,
-    reviewer: ASTRA_MODEL_NAME,
-    reviewerLabel: ASTRA_MODEL_NAME,
-    runtime: 'claude',
-    runtimeLabel: 'Claude',
-    detail: '',
-    laneDescription: 'the points the shared router escalates or explicitly tags for Fable',
-  }),
-})
 
 /** Re-exec only the commissioner that still belongs to its caller's session.
  * Node's detached spawn calls setsid on POSIX; the model's existing timeout
@@ -549,7 +507,7 @@ export async function startAuthoringSession({ point, lane, logPath = '' }) {
     }
     process.stdout.write = write
     process.stderr.write = write
-    console.log(`author-${lane}: log ${log} (append)`)
+    console.log(`author-delegate: log ${log} (append)`)
     return null
   }
 
@@ -588,33 +546,33 @@ export async function startAuthoringSession({ point, lane, logPath = '' }) {
   }
 }
 
-export const usage = ({ commandName = 'author-delegate', model = ASTRA_MODEL_NAME, reviewerLabel = 'Claude' } = {}) =>
+export const usage = ({ lane: role = '', model = '', reviewer = '' } = {}) =>
   [
-    'usage: node scripts/author-delegate.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
+    'usage: node scripts/author-delegate.mjs [--lane <cross|scarce>] --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
     '           [--log <path>] [--anyway] [--dry-run]',
     '       node scripts/author-delegate.mjs --routing (--point <N> [--rounds <n>] | --all)',
     '',
-    `${model} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
+    `${model || 'The lane'} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
     'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
     'lint) on its own work and merges nothing: the browser suites, the picture and the landing',
-    `belong to the Claude session that called it and the REVIEW to ${reviewerLabel}, which is what keeps`,
+    `belong to the main-chain session that called it and the REVIEW to ${reviewer || 'a lane of the other vendor'}, which is what keeps`,
     'two vendors on the point and neither reviewing itself.',
     '',
-    `The script appends to local/<point>-${commandName === 'author-fable' ? 'fable' : 'astra'}-author.log in the main checkout (--log overrides it).`,
+    `Without --lane the routing decides the lane (${AUTHOR_ROLES.join(' or ')}; ${DEFAULT_AUTHOR_ROLE} when it names neither).`,
+    `The script appends to local/<point>-${role || '<lane>'}-author.log in the main checkout (--log overrides it).`,
     'It detaches itself, waits for completion and streams the log to stdout.',
     'Use the command alone: no setsid, tee or redirection is needed.',
     'Redirecting or piping through tee onto that SAME log path destroys it and is unsupported.',
     'Redirecting stdout to a different file is supported. Read-only modes create no log.',
     '',
     'The lane is decided by the point itself (--routing shows why). A point the routing gives to',
-    'another lane is refused unless --anyway is given, and the share switch can turn the whole',
-    `lane off:  node scripts/${commandName === 'author-fable' ? 'lane-switch' : 'lane-routing'}.mjs --status`,
-  ].join('\n').replaceAll('scripts/author-delegate.mjs', `scripts/${commandName}.mjs`)
+    'another lane is refused unless --anyway is given; the lane switch can turn a lane off',
+    '(node scripts/lane-switch.mjs --status) and the share setting keeps the cross lane from',
+    'authoring (node scripts/lane-routing.mjs --status).',
+  ].join('\n')
 
-export async function runAuthoringCli({ authorLane = 'astra', argv = process.argv.slice(2) } = {}) {
-  const config = AUTHOR_LANE_CONFIG[authorLane]
-  if (!config) throw new Error(`unknown authoring lane ${authorLane}`)
-  const { commandName, model: authorModel } = config
+export async function runAuthoringCli({ argv = process.argv.slice(2) } = {}) {
+  const commandName = 'author-delegate'
   const knownFlags = new Set([
     '--point',
     '--findings',
@@ -623,6 +581,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     '--log',
     '--anyway',
     '--dry-run',
+    '--lane',
     '--routing',
     '--all',
     '--help',
@@ -633,21 +592,30 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     return i >= 0 && i + 1 < argv.length && !argv[i + 1].startsWith('--') ? argv[i + 1] : ''
   }
   try {
+    const requestedLane = flag('--lane')
+    if (argv.includes('--lane') && !AUTHOR_ROLES.includes(requestedLane)) {
+      console.error(
+        `${commandName}: --lane needs one of ${AUTHOR_ROLES.join(', ')}` +
+          `${requestedLane ? ` — the ${requestedLane} lane has no authoring path here` : ''}.\n`,
+      )
+      console.error(usage())
+      process.exit(2)
+    }
     if (argv.includes('--help') || argv.includes('-h')) {
-      console.log(usage(config))
+      console.log(usage(requestedLane ? authorLaneConfig(requestedLane) : {}))
       process.exit(0)
     }
     const unknown = argv.find((arg) => arg.startsWith('-') && !knownFlags.has(arg))
     if (unknown) {
       console.error(`${commandName}: unknown option ${unknown}.\n`)
-      console.error(usage(config))
+      console.error(usage())
       process.exit(2)
     }
     const roundsText = flag('--rounds')
     const roundsValue = Number(roundsText)
     if (argv.includes('--rounds') && (!/^\d+$/.test(roundsText) || !Number.isSafeInteger(roundsValue))) {
       console.error(`${commandName}: --rounds needs a non-negative integer.\n`)
-      console.error(usage(config))
+      console.error(usage())
       process.exit(2)
     }
     const roundsOverride = argv.includes('--rounds') ? roundsValue : undefined
@@ -655,7 +623,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       console.error(`${commandName}: --log needs a path.`)
       process.exit(2)
     }
-    const fableState = currentLaneState()
+    const scarceState = currentLaneState('scarce')
 
     // THE ROUTING REPORT: read-only, no allowance spent, no state touched.
     if (argv.includes('--routing')) {
@@ -670,7 +638,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
           .map((b) => {
             const roundHistory = authorRoundHistory(records, b.n)
             const reworkRounds = roundHistory.freshRounds
-            const decided = authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level, reworkRounds, fableState })
+            const decided = authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level, reworkRounds, scarceState })
             return {
               number: b.n,
               ...decided,
@@ -686,19 +654,19 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       const number = flag('--point')
       if (!number) {
         console.error(`${commandName}: --routing needs --point <N> or --all.\n`)
-        console.error(usage(config))
+        console.error(usage())
         process.exit(2)
       }
       const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
-      const decided = laneFor(number, { reworkRounds: roundsOverride, records, fableState })
+      const decided = laneFor(number, { reworkRounds: roundsOverride, records, scarceState })
       if (!decided.body) console.error(`${commandName}: point ${number} is not in the OPEN work order — routing what is known.`)
       console.log(`${commandName}: point ${number} → ${decided.lane || 'blocked'} (${decided.model || 'no model'})`)
       console.log(formatAuthorRoundHistory(decided.roundHistory))
       const step = nextAuthoringStep({ records, point: number, reworkRounds: roundsOverride })
       console.log(`  next step: ${step.kind} — ${step.reason}`)
       for (const why of decided.why) console.log(`  because ${why}`)
-      if (decided.lane === 'fable') {
-        console.log(`  commission: node scripts/author-fable.mjs --point ${number}`)
+      if (AUTHOR_ROLES.includes(decided.lane)) {
+        console.log(`  commission: node scripts/author-delegate.mjs --lane ${decided.lane} --point ${number}`)
       }
       process.exit(0)
     }
@@ -706,7 +674,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     const point = flag('--point')
     if (!/^\d+$/.test(point)) {
       console.error(`${commandName}: --point <N> is required.\n`)
-      console.error(usage(config))
+      console.error(usage())
       process.exit(2)
     }
 
@@ -714,7 +682,11 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     // writable feature worktree: the examiner changes no code, starts no author
     // and needs neither the point's branch nor a clean checkout.
     const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
-    const decided = laneFor(point, { reworkRounds: roundsOverride, records, fableState })
+    const decided = laneFor(point, { reworkRounds: roundsOverride, records, scarceState })
+    // THE LANE: the one asked for, else the one the routing names, else the default.
+    const role = requestedLane || (AUTHOR_ROLES.includes(decided.lane) ? decided.lane : DEFAULT_AUTHOR_ROLE)
+    const config = authorLaneConfig(role)
+    const authorModel = config.model
     const authoringStep = nextAuthoringStep({ records, point, reworkRounds: roundsOverride })
     const readFindings = () => {
       const findingsFile = flag('--findings')
@@ -740,9 +712,9 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
         process.exit(2)
       }
       const examinationRoute = specExaminerFor(decided.roundHistory, authorModel)
-      const route = examinationRoute.route === 'claude-read'
-        ? 'Claude reads this packet directly because Astra authored the round.'
-        : 'Run `node scripts/ask-lane.mjs --kind audit` with this packet because Claude authored the round.'
+      const route = examinationRoute.route === 'main-read'
+        ? 'The main chain reads this packet directly because the cross lane authored the round.'
+        : 'Run `node scripts/ask-lane.mjs --kind audit` with this packet because the main chain authored the round.'
       const packet = buildSpecExaminationPrompt({
         point,
         pointText: decided.body,
@@ -810,8 +782,8 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     )
     console.error(formatAuthorRoundHistory(decided.roundHistory))
     if (decided.lane !== config.lane && !argv.includes('--anyway')) {
-      if (dryRun && decided.lane === 'fable' && config.lane === 'astra') {
-        console.error(`author-delegate: this point is commissioned with: node scripts/author-fable.mjs --point ${point}`)
+      if (dryRun && decided.lane === 'scarce' && config.lane === 'cross') {
+        console.error(`${commandName}: this point is commissioned with: node scripts/author-delegate.mjs --lane scarce --point ${point}`)
         process.exit(0)
       }
       console.error(
@@ -822,24 +794,27 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       process.exit(3)
     }
 
-    // THE SHARE SWITCH CAN TURN THE WHOLE LANE OFF (point 654's lever, extended
-    // here to the biggest spender of the two vendors).
-    if (config.lane === 'fable' && !laneIsOn(fableState)) {
-      console.error(`${commandName}: ${FABLE_MODEL} is switched off; node scripts/lane-switch.mjs --status`)
+    // THE LANE SWITCH CAN TURN A WHOLE LANE OFF, and --anyway does not reach past it.
+    const switchState = currentLaneState(role)
+    if (!laneIsOn(switchState)) {
+      console.error(`${commandName}: ${authorModel} is switched off; node scripts/lane-switch.mjs --status`)
+      console.error(`  ${laneRefusalReason(switchState)}`)
       process.exit(3)
     }
-    if (config.lane === 'astra') {
+    // THE SHARE SETTING CAN KEEP THE CROSS LANE FROM AUTHORING (point 654's lever,
+    // extended here to the biggest spender of the two vendors).
+    if (role === 'cross') {
       const share = currentSetting()
       if (share.problem) console.error(settingProblemLine(share, commandName))
       const routed = effectiveRoute('author', share)
-      // A MEASURED OUTAGE: the point is authored in the Claude lane (point 1194).
+      // A MEASURED OUTAGE: the point is authored in the main chain (point 1194).
       if (routed.fallback && !argv.includes('--anyway')) {
-        console.error(`${commandName}: ${fallbackLine(share)}\n  Author point ${point} in the Claude lane on ${FALLBACK_AUTHOR}.`)
+        console.error(`${commandName}: ${fallbackLine(share)}\n  Author point ${point} in the main chain on ${FALLBACK_AUTHOR}.`)
         process.exit(5)
       }
-      if (routed.to !== 'astra' && !argv.includes('--anyway')) {
+      if (routed.to !== role && !argv.includes('--anyway')) {
         console.error(
-          `${commandName}: the share switch is at \`${share.setting}\`, which keeps authoring with Claude.\n` +
+          `${commandName}: the share switch is at \`${share.setting}\`, which keeps authoring in the main chain.\n` +
             '  node scripts/lane-routing.mjs --more   (override once with --anyway)',
         )
         process.exit(3)
@@ -863,25 +838,23 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       framing: authoringStep.framing,
       authorModel,
       authorTrailer: config.trailer,
-      reviewer: config.reviewerLabel,
+      reviewer: config.reviewer,
       laneDescription: config.laneDescription,
     })
     const withheld = withheldEnvNames(process.env)
     if (dryRun) {
       console.log(`${commandName}: DRY RUN — nothing is spent and nothing is written.\n`)
-      const dryArgs = config.runtime === 'claude'
-        ? authoringClaudeArgs({ modelId: config.modelId, prompt: '<the prompt>' })
-        : authoringCodexArgs({ cwd: worktree, prompt: '<the prompt>' })
-      console.log(`  ${config.runtime} ${dryArgs.join(' ')}`)
+      const dryArgs = config.runtime.args({ cwd: worktree, prompt: '<the prompt>' })
+      console.log(`  ${config.runtime.bin} ${dryArgs.join(' ')}`)
       console.log(`  withheld from its environment: ${withheld.length ? withheld.join(', ') : 'nothing matched'}`)
       console.log(`\n--- the prompt ---\n${prompt}\n--- end ---`)
       process.exit(0)
     }
 
-    // The identity is PROVEN before a commit is stamped with Astra's name: nothing
+    // The identity is PROVEN before a commit is stamped with the cross lane's name: nothing
     // in a run's output says which model answered, so the attribution rests on
     // the server refusing an unknown id (cross-review.mjs --probe).
-    if (config.lane === 'astra' && !ensureModelProven({ who: commandName })) {
+    if (role === 'cross' && !ensureModelProven({ who: commandName })) {
       console.error(`${commandName}: the model id is not proven honoured — refusing to attribute commits to ${authorModel}.`)
       process.exit(2)
     }
@@ -940,11 +913,10 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     )
     if (withheld.length) console.error(`  withheld from its environment: ${withheld.join(', ')}`)
 
-    const run = await runAuthoringCodex({
+    const run = await runAuthoringLane({
       prompt,
       cwd: worktree,
       branch,
-      modelId: config.modelId,
       runtime: config.runtime,
       timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS,
       onPush: ({ ok, skipped, head, why }) =>
@@ -956,11 +928,10 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
               : `${commandName}: interim push failed — ${why}`,
         ),
     })
-    const outcome = config.runtime === 'claude' ? laneAuthoringOutcome(run) : classifyOutcome(run)
+    const outcome = config.runtime.outcome(run)
     // A vendor outage is a fallback, not the point's red: recorded, then handed to FALLBACK_AUTHOR.
-    const outage = config.lane === 'astra'
-      ? recordLaneRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'author', who: commandName })
-      : { fellBack: false }
+    // Only the cross lane's outage moves the routing; recordLaneRun ignores the others.
+    const outage = recordLaneRun({ role, outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'author', who: commandName })
     const parsed = parseAuthoringAnswer(run.finalMessage)
     // WHERE THE RUN ENDED, not where it began: nothing stops a sandbox-less run
     // from checking out another branch, and the commits below would then belong
@@ -983,8 +954,8 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       dirty,
       numstat: dirty ? uncommittedNumstat({ cwd }) : '',
       authorModel,
-      fableState,
-      runtime: config.runtimeLabel,
+      scarceState,
+      runtime: config.runtime.label,
     })
     for (const commit of commits) {
       const problem = interimCommitProblem(commit)
@@ -1043,18 +1014,19 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       framing: authoringStep.framing,
       reviewer: config.reviewer,
       commandName,
+      role,
       authorModel,
       authorDetail: config.detail,
       authorTrailer: config.trailer,
-      reviewCommand: config.lane === 'fable'
+      reviewCommand: config.reviewerRole !== 'main'
         ? `node scripts/cross-review.mjs --sha <sha> --brief "review point ${point}" --mode review --point ${point}`
         : '',
     }))
     // 0 only for a clean run that produced work; 3 says "look at this before you
     // treat it as a delivery", which is what a script chaining on it must see;
-    // 5 is the outage fallback — author the point in the Claude lane on FALLBACK_AUTHOR.
+    // 5 is the outage fallback — author the point in the main chain on FALLBACK_AUTHOR.
     if (outage.fellBack) {
-      console.error(`${commandName}: ${ASTRA_MODEL_NAME} is out — author point ${point} in the Claude lane on ${FALLBACK_AUTHOR} (not the point's red).`)
+      console.error(`${commandName}: ${authorModel} is out — author point ${point} in the main chain on ${FALLBACK_AUTHOR} (not the point's red).`)
       process.exitCode = 5
     } else process.exitCode = judged.clean ? 0 : 3
   } catch (e) {

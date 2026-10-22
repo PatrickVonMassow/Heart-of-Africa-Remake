@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
+import { MAIN, trailerFor } from './model-lanes.mjs'
 import { knownPoints, topicViolations } from './dashboard-card-topic-guard-core.mjs'
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { doneCard, doneEntries, hasCurrentWork, nowCard, queueCard } from './board-core.mjs'
@@ -129,8 +130,8 @@ describe('the chain itself', () => {
 // ---------------------------------------------------------------------------
 describe('the argv', () => {
   it('reads the point, the destination, the model and the flags', () => {
-    const a = parseFoldArgs(['613', '--into', '720', '--model', 'Claude Opus 5', '--dry'])
-    expect(a).toMatchObject({ number: 613, into: 720, model: 'Claude Opus 5', dry: true, noCommit: false })
+    const a = parseFoldArgs(['613', '--into', '720', '--model', MAIN.trailerName, '--dry'])
+    expect(a).toMatchObject({ number: 613, into: 720, model: MAIN.trailerName, dry: true, noCommit: false })
   })
 
   it('reads the delivered evidence and --no-commit', () => {
@@ -264,17 +265,17 @@ describe('the Erledigt card text', () => {
 // ---------------------------------------------------------------------------
 describe('the commit message', () => {
   it('names no point number in its subject and carries the model trailer', () => {
-    const msg = foldCommitMessage({ number: 613, into: 720, model: 'Claude Opus 5' })
+    const msg = foldCommitMessage({ number: 613, into: 720, model: MAIN.trailerName })
     expect(msg.split('\n')[0]).toBe('Move a folded point out of the open work order')
     expect(msg.split('\n')[0]).not.toMatch(/\d/)
-    expect(msg).toMatch(/Co-Authored-By: Claude Opus 5 <noreply@anthropic\.com>/)
+    expect(msg).toContain(`Co-Authored-By: ${trailerFor('main')}`)
     // The trailer must satisfy the very gate that reads it.
     expect(evaluateCommitTrailers(msg).block).toBe(false)
   })
 
   it('states in its body where the content went', () => {
-    expect(foldCommitMessage({ number: 613, into: 720, model: 'Claude Opus 5' })).toMatch(/folded into point 720/)
-    expect(foldCommitMessage({ number: 613, delivered: 'schon in main', model: 'Claude Opus 5' })).toMatch(
+    expect(foldCommitMessage({ number: 613, into: 720, model: MAIN.trailerName })).toMatch(/folded into point 720/)
+    expect(foldCommitMessage({ number: 613, delivered: 'schon in main', model: MAIN.trailerName })).toMatch(
       /already delivered: schon in main\./,
     )
   })

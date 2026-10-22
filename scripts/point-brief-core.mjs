@@ -33,7 +33,8 @@
 // This module is pure: text in, text out, no I/O. scripts/point-brief.mjs is the
 // I/O wrapper (same split as doc-budget-core.mjs / doc-budget-guard.mjs).
 import { createHash } from 'node:crypto'
-import { DEFAULT_SETTING as DEFAULT_ASTRA_SHARE, briefLine as astraBriefLine } from './lane-routing-core.mjs'
+import { DEFAULT_SETTING as DEFAULT_LANE_ROUTING, briefLine as laneRoutingBriefLine } from './lane-routing-core.mjs'
+import { MAIN, VENDORS, trailerFor } from './model-lanes.mjs'
 
 /** Thrown for a failure the reader must see: unknown point, dangling section,
  *  adopted point that exists nowhere. */
@@ -1252,23 +1253,23 @@ const HOUSE_FACTS = [
   '  branch is pushed with it — a failed push is REPORTED, never skipped.',
   '- Every commit records its AUTHORING MODEL in the co-author trailer. That trailer is the',
   '  only machine-readable evidence `scripts/model-guard.mjs` has, so the bare',
-  '  `Co-Authored-By: Claude <noreply@anthropic.com>` names no model and trips the tripwire,',
+  `  \`Co-Authored-By: <vendor> <${VENDORS[MAIN.vendor].trailerAddress}>\` names no model and trips the tripwire,`,
   '  which STOPS the batch. Write the name of the model YOU are, in this form:',
-  '  `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.',
+  `  \`Co-Authored-By: ${trailerFor('main')}\` (the main lane's trailer, from scripts/model-lanes.mjs).`,
   '- Point titles use sentence case rather than full uppercase; acronyms and individual',
   '  emphasised words may stay capitalised.',
 ]
 
 /**
- * The header, with the ASTRA ROUTING line the current switch setting dictates (point 654).
+ * The header, with the LANE ROUTING line the current switch setting dictates (point 654).
  *
  * It is one line at EVERY setting, the default included: an agent that is never told the
  * lever exists cannot pull it, and a brief that named it only sometimes would train its
- * readers to skip the line. The setting itself is READ from `.claude/astra-share.json` by
+ * readers to skip the line. The setting itself is READ from `.claude/lane-routing.json` by
  * the wrapper — nothing here keeps its own copy of the routing table.
  */
-function headerLines(astraShare = DEFAULT_ASTRA_SHARE) {
-  return [...HOUSE_FACTS, astraBriefLine(astraShare), '', ...CALL_DISCIPLINE]
+function headerLines(laneRouting = DEFAULT_LANE_ROUTING) {
+  return [...HOUSE_FACTS, laneRoutingBriefLine(laneRouting), '', ...CALL_DISCIPLINE]
 }
 
 /**
@@ -1357,14 +1358,14 @@ export function assembleBrief({
   adopted = [],
   adoptionBeyond = [],
   sliceDocs = [],
-  astraShare = DEFAULT_ASTRA_SHARE,
+  laneRouting = DEFAULT_LANE_ROUTING,
 }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
     'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
     formatRevisionLine(revision ?? {}),
     '',
-    ...headerLines(astraShare),
+    ...headerLines(laneRouting),
     '',
     `--- THE POINT (verbatim, work-order point ${point.number}) ---`,
     point.body,
@@ -1473,7 +1474,7 @@ export function buildBrief({
   revision = {},
   readTree = null,
   diffPaths = [],
-  astraShare = DEFAULT_ASTRA_SHARE,
+  laneRouting = DEFAULT_LANE_ROUTING,
 }) {
   const all = parseWorkOrderPoints(tasksText)
   const point = all.find((p) => p.number === Number(number)) ?? null
@@ -1716,7 +1717,7 @@ export function buildBrief({
     adopted,
     adoptionBeyond,
     sliceDocs,
-    astraShare,
+    laneRouting,
   })
   return {
     brief,

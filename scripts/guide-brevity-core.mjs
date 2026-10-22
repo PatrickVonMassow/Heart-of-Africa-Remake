@@ -278,7 +278,7 @@ export const LIMITS = {
   // chain as ONE change should check.
   // RAISED 01.09.2026 by the measured size of THREE folds, and the split is written down here
   // because the first version of this note attributed all of it to the first one (cross-vendor
-  // reading, GPT-5.6 Sol, 01.09.2026: the refusal entry is +1 line / +22 words while unrelated
+  // reading, 01.09.2026: the refusal entry is +1 line / +22 words while unrelated
   // entries supply the other +2 / +30 — a raise whose reason names the wrong text cannot be
   // audited). The three, measured entry by entry across this commit alone (ea1ab19..dd22289):
   //   +1 line / +22 words — the repeated-refusal lesson (retrospective §3.223): a red gate does
@@ -1033,7 +1033,7 @@ export function measureGuide(text) {
   // A TERMINATING NEWLINE ENDS THE LAST LINE, it does not open another one.
   // `split('\n')` leaves a phantom entry for it, so every POSIX-terminated file
   // measured one line too many and the ceilings above were all ratcheted against
-  // that inflated count (four-eyes finding, GPT-5.6 Sol on 4d88250, 31.08.2026).
+  // that inflated count (four-eyes finding on 4d88250, 31.08.2026).
   // Drop exactly that one sentinel — never all trailing blanks, which are real
   // lines a guide can waste — and read the empty document as no lines at all.
   const split = source.split('\n')

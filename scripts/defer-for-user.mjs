@@ -83,7 +83,7 @@ const read = () => readFileSync(TASKS, 'utf8')
 const write = (text) => writeTextAtomic(TASKS, text)
 
 /**
- * A FLAG IS NEVER A VALUE (fifth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+ * A FLAG IS NEVER A VALUE (fifth cross-vendor round, 23.08.2026).
  * `--detail --prepared "verified locally"` used to store the literal
  * `"--prepared"` as the detail: a typed gate, or a decision card, with a field
  * nobody wrote. A missing value, or one beginning with `--`, is no value, and the
@@ -100,7 +100,7 @@ const option = (args, name) => {
 /** The short spellings this command answers — today only `-h`. A repeat is a
  *  repeat whichever spelling it was written in, so the check compares the flag
  *  a token MEANS, not the characters it was typed with (sixth cross-vendor
- *  round, GPT-5.6 Sol, 23.08.2026: `-h -h` slipped past a check that only ever
+ *  round, 23.08.2026: `-h -h` slipped past a check that only ever
  *  looked at `--`). Single-dash tokens that are NOT a known alias stay out of
  *  it — a field value may legitimately begin with a dash.
  */
@@ -110,12 +110,12 @@ const FLAG_ALIASES = new Map([['-h', '--help']])
  *  `--help`). Every OTHER flag takes the next token unless that token begins
  *  with `--`, and a token sitting in that value slot is never read as a flag — otherwise a
  *  field whose value is spelled like one would be refused for the wrong reason
- *  (sixth cross-vendor round, GPT-5.6 Sol, 23.08.2026). */
+ *  (sixth cross-vendor round, 23.08.2026). */
 const VALUELESS_FLAGS = new Set(['--help', '--list', '--migrate'])
 
 /**
- * A REPEATED FLAG IS A MISTAKE, NOT A CHOICE (fifth cross-vendor round, GPT-5.6
- * Sol, 23.08.2026). `indexOf` keeps the FIRST value and drops the rest in
+ * A REPEATED FLAG IS A MISTAKE, NOT A CHOICE (fifth cross-vendor round,
+ * 23.08.2026). `indexOf` keeps the FIRST value and drops the rest in
  * silence, so `--decision old --decision new` recorded "old" and said nothing.
  * Whichever the author meant, one of them was going to be wrong.
  */
@@ -135,7 +135,7 @@ const repeatedFlag = (args) => {
     // dashes is NO value, and stays visible as a flag of its own. Judging a
     // value by the token in front of it was a heuristic instead, and it lost a
     // real repeat as soon as a value was itself dash-shaped (sixth and seventh
-    // cross-vendor rounds, GPT-5.6 Sol).
+    // cross-vendor rounds).
     if (!VALUELESS_FLAGS.has(flag) && !String(args[i + 1] ?? '').startsWith('--')) i += 1
   }
   return ''
@@ -164,7 +164,7 @@ const args = process.argv.slice(2)
 const [a, b] = args
 
 /* THE REFUSAL COMES FIRST, AND HELP IS NO EXCEPTION (sixth cross-vendor round,
- * GPT-5.6 Sol, 23.08.2026). Answering `--help` before anything was parsed left
+ * 23.08.2026). Answering `--help` before anything was parsed left
  * one command line — `--help --help` — that reached an answer past the refusal,
  * so the rule read as "unless you ask for help". Nothing is lost by closing it:
  * the refusal prints the very usage that line asked for, only on stderr and

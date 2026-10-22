@@ -482,7 +482,7 @@ export const HEAD_SEP = ' · '
  * about instead of silently counting as a finding titled "[request] · …".
  */
 export function parseHead(line) {
-  // `- [X]` counts as ticked (four-eyes finding 4, Fable 5): a hand tick with a
+  // `- [X]` counts as ticked (four-eyes finding 4): a hand tick with a
   // capital X used to fall through BOTH the pending count and the malformed
   // report, so the entry simply vanished — the one thing this carrier may
   // never do.
@@ -534,7 +534,7 @@ export function parseCarrier(text = '') {
 
 /**
  * A FINDING TITLE MAY NOT OPEN WITH THE REQUEST MARKER (four-eyes finding 3,
- * Fable 5, 31.07.2026). `- [ ] <at> · <s> · [request] · pending · X` parses back
+ * 31.07.2026). `- [ ] <at> · <s> · [request] · pending · X` parses back
  * as a REQUEST, which the findings gate does not count as a finding — so it
  * would slip past it altogether. The marker is neutralised rather than refused: dropping a recorded
  * finding is the one thing this carrier may never do, and `(request)` keeps the

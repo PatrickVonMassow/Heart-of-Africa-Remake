@@ -19,17 +19,24 @@ import {
   normaliseKind,
   parseAnswer,
   parseClaudeAskOutput,
-  resolveAskModel,
+  resolveAskLane,
 } from './ask-lane-core.mjs'
-import { OPUS_MODEL } from './lane-switch-core.mjs'
+import { CROSS, LEGACY, MAIN, SCARCE, TEST_FOREIGN_MODELS, executionTarget } from './model-lanes.mjs'
 
 describe('the kinds', () => {
-  it('addresses every model the blind-merger switch can select', () => {
-    expect(resolveAskModel()).toMatchObject({ key: 'astra', runtime: 'codex', name: 'GPT-6 Astra' })
-    expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5.1', id: 'claude-fable-5-1' })
-    expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: OPUS_MODEL })
-    expect(resolveAskModel('sonnet')).toBeNull()
-    expect(resolveAskModel('opus48')).toMatchObject({ name: 'Opus 4.8', id: 'claude-opus-4-8[1m]' })
+  it('addresses every lane by role, each from its record', () => {
+    expect(resolveAskLane()).toMatchObject({ key: 'cross', runtime: CROSS.runtime, name: CROSS.displayName, id: CROSS.modelId, effort: CROSS.reasoningEffort })
+    expect(resolveAskLane('scarce')).toMatchObject({ runtime: SCARCE.runtime, name: SCARCE.displayName, id: SCARCE.modelId })
+    expect(resolveAskLane('main')).toMatchObject({ runtime: MAIN.runtime, name: MAIN.displayName })
+    expect(resolveAskLane('main-fallback')).toMatchObject({ name: MAIN.fallback.displayName, id: MAIN.fallback.modelId })
+    for (const role of ['cross', 'scarce', 'main', 'main-fallback']) expect(resolveAskLane(role)).toEqual(executionTarget(role))
+    expect(resolveAskLane('nobody')).toBeNull()
+    expect(resolveAskLane('toString')).toBeNull()
+  })
+
+  // U13: `--lane <role>` replaces the old model keys, with no alias.
+  it('takes none of the old model keys', () => {
+    for (const key of Object.keys(LEGACY.cliKeys)) expect(resolveAskLane(key), key).toBeNull()
   })
 
   it('are the four read-only ones, each with a task and an answer shape', () => {
@@ -49,36 +56,37 @@ describe('the kinds', () => {
   })
 })
 
-describe('Claude answer attribution', () => {
-  const response = (answerModel = 'claude-fable-5-1') => JSON.stringify({
+describe('claude-runtime answer attribution', () => {
+  const auxiliary = TEST_FOREIGN_MODELS.haikuDatedId
+  const response = (answerModel = SCARCE.modelId) => JSON.stringify({
     result: 'the folded answer',
     usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
     modelUsage: {
-      'claude-haiku-4-5-20251001': { inputTokens: 800, outputTokens: 12, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+      [auxiliary]: { inputTokens: 800, outputTokens: 12, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
       [answerModel]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: answerModel },
     },
   })
 
   it('accepts the selected answer model while recording an auxiliary classifier', () => {
-    expect(parseClaudeAskOutput(response(), resolveAskModel('fable'))).toMatchObject({
+    expect(parseClaudeAskOutput(response(), resolveAskLane('scarce'))).toMatchObject({
       ok: true,
       result: 'the folded answer',
-      answerModel: 'claude-fable-5-1',
-      models: ['claude-haiku-4-5-20251001', 'claude-fable-5-1'],
+      answerModel: SCARCE.modelId,
+      models: [auxiliary, SCARCE.modelId],
     })
   })
 
   it('refuses substitution even when the requested model appears as auxiliary usage', () => {
-    const value = JSON.parse(response('claude-opus-5'))
-    value.modelUsage['claude-fable-5-1'] = { inputTokens: 100, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
-    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable'))).toMatchObject({ ok: false })
+    const value = JSON.parse(response(MAIN.modelId))
+    value.modelUsage[SCARCE.modelId] = { inputTokens: 100, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskLane('scarce'))).toMatchObject({ ok: false })
   })
 
   it('refuses unreadable output and a non-text result', () => {
-    expect(parseClaudeAskOutput('no json', resolveAskModel('fable')).ok).toBe(false)
+    expect(parseClaudeAskOutput('no json', resolveAskLane('scarce')).ok).toBe(false)
     const value = JSON.parse(response())
     value.result = { plan: 'not the answer' }
-    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable')).error).toMatch(/no text result/)
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskLane('scarce')).error).toMatch(/no text result/)
   })
 })
 
@@ -95,9 +103,10 @@ describe('the prompt', () => {
   })
 
   it('names the selected read-only model in the prompt', () => {
-    expect(buildAskPrompt({ kind: 'explain', brief: 'fold these', modelName: 'Fable 5.1' })).toContain(
-      'READ-ONLY work for this repository as Fable 5.1',
+    expect(buildAskPrompt({ kind: 'explain', brief: 'fold these', modelName: SCARCE.displayName })).toContain(
+      `READ-ONLY work for this repository as ${SCARCE.displayName}`,
     )
+    expect(buildAskPrompt({ kind: 'explain', brief: 'x' })).toContain(`as ${CROSS.displayName}`)
   })
 
   it('tells an ENUMERATE it is a divergent half that a third model will merge by id', () => {
@@ -119,13 +128,16 @@ describe('the prompt', () => {
 })
 
 describe('model-specific reports', () => {
-  it('never labels a Fable refusal or answer as Astra', () => {
-    expect(formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: 'Fable 5.1' })).toMatch(
-      /Fable 5.1 did NOT answer/,
+  it('never labels a scarce-lane refusal or answer as the cross lane', () => {
+    const refused = formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: SCARCE.displayName })
+    expect(refused).toContain(`${SCARCE.displayName} did NOT answer`)
+    expect(refused).toMatch(/Hand it to another eligible lane/)
+    expect(refused).not.toContain(CROSS.displayName)
+    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'folded' }, modelName: SCARCE.displayName, effort: 'high' })).toContain(
+      `${SCARCE.displayName} (effort high) answered`,
     )
-    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'folded' }, modelName: 'Fable 5.1', effort: 'high' })).toMatch(
-      /Fable 5.1 \(effort high\) answered/,
-    )
+    // …and the cross lane's report carries its recorded effort by default.
+    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'x' } })).toContain(`ask-lane: ${CROSS.displayName} (effort ${CROSS.reasoningEffort}) answered`)
   })
 })
 
@@ -446,7 +458,7 @@ describe('reading the answer', () => {
   })
 
   // Same round: a sweep may honestly find nothing, and refusing that reported a CLEAN
-  // audit as "Astra did not answer" after the allowance had already been spent.
+  // audit as "the cross lane did not answer" after the allowance had already been spent.
   it('accepts an audit that found nothing, but only when it SAYS so', () => {
     const clean = parseAnswer({ kind: 'audit', text: 'I read every line of both files.\n\nNO FINDINGS: the switch table, the fallback and the three consumers' })
     expect(clean.ok).toBe(true)
@@ -491,15 +503,15 @@ describe('reading the answer', () => {
 })
 
 describe('what the command says', () => {
-  it('names the cause in ONE line and hands the work back — never records it as Astra’s', () => {
-    const out = formatUnavailable({ kind: 'diagnose', cause: 'the ChatGPT allowance for this account is exhausted' })
-    expect(out.split('\n')[0]).toMatch(/did NOT answer this diagnose: the ChatGPT allowance/)
-    expect(out).toMatch(/Do it in the Claude chain/)
+  it('names the cause in ONE line and hands the work back — never records it as the cross lane’s', () => {
+    const out = formatUnavailable({ kind: 'diagnose', cause: 'the allowance for this account is exhausted' })
+    expect(out.split('\n')[0]).toMatch(/did NOT answer this diagnose: the allowance/)
+    expect(out).toMatch(/Do it in the main chain/)
     expect(out).not.toMatch(/lane-routing\.mjs --more/)
   })
 
   it('names the switch where the switch is what stopped it', () => {
-    expect(formatUnavailable({ kind: 'audit', cause: 'x', setting: 'claude-only' })).toMatch(/lane-routing\.mjs --more/)
+    expect(formatUnavailable({ kind: 'audit', cause: 'x', setting: 'main-only' })).toMatch(/lane-routing\.mjs --more/)
   })
 
   it('prints a diagnosis as its pair and a list as its entries', () => {

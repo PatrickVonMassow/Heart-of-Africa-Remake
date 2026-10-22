@@ -61,7 +61,7 @@ const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'
  * deliberately, and the coverage stated (Sol review of d0aebb6, finding 3):
  *   COVERED: the two sanctioned suite launchers (`run-all.mjs`,
  *   `run-logged.mjs` — everything `npm test`/`test:small`/`test:large` also
- *   reaches), delegating an author (`author-delegate.mjs`, `author-fable.mjs`), starting a
+ *   reaches), delegating an author (`author-delegate.mjs`), starting a
  *   cross-vendor review (`cross-review.mjs`) and a delegated ask
  *   (`ask-lane.mjs`) — each begins an expensive new unit of work.
  *   AND TAKING THE BATCH (`batch-claim.mjs`, point 542): a claim is not
@@ -85,7 +85,6 @@ const START_SCRIPTS = {
   'run-all.mjs': 'starting a browser verify run',
   'run-logged.mjs': 'starting a browser verify run',
   'author-delegate.mjs': 'delegating a new authoring run',
-  'author-fable.mjs': 'delegating a new authoring run',
   'cross-review.mjs': 'starting a cross-vendor review run',
   'ask-lane.mjs': 'starting a delegated ask run',
   'batch-claim.mjs': 'taking the batch, which is where a session begins its work',

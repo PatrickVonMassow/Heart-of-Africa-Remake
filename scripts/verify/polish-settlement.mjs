@@ -1021,7 +1021,7 @@ if (section('stone-step')) {
       // there ends the visit: the place unmounts under the camera, which is
       // exactly what the first cut of this section measured as "no player".
       if (Math.hypot(x, z) > layout.radius * 0.8) continue
-      // NOTHING ELSE UNDER THE WHOLE CROSSING (GPT-6 Astra, cross-vendor
+      // NOTHING ELSE UNDER THE WHOLE CROSSING (cross-vendor
       // reviews of d261418 and 7885fe1). Every height this section reads —
       // the three standpoints AND the two resting eyes of the walk, which lie
       // further out than the standpoints — must stand on ground that is flat
@@ -1100,7 +1100,7 @@ if (section('stone-step')) {
       `rise ${rise.toFixed(3)} m against a stone ${stone.top.toFixed(3)} m high ` +
         `(eye ${before.toFixed(3)} / ${on.toFixed(3)} / ${after.toFixed(3)} m)`,
     )
-    // THE WALK ITSELF, on the game's own movement input (GPT-6 Astra,
+    // THE WALK ITSELF, on the game's own movement input (cross-vendor review,
     // cross-vendor review of d261418). Three standpoints prove the surface; the
     // reported bug is that the walk STOPS at the stone, and only a held key
     // crossing it can answer that. The player starts a pace short of the stone,

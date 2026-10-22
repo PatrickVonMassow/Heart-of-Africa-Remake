@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers, POLICY_NEUTRAL } from './model-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
+import { MAIN, SCARCE, trailerFor } from './model-lanes.mjs'
 import {
   closingRunRecords,
   AUDIT_TRIGGER_FILES,
@@ -81,8 +82,8 @@ describe('the chain itself', () => {
 // ---------------------------------------------------------------------------
 describe('the tick commit message', () => {
   it('carries a co-author trailer naming the model it was given', () => {
-    const msg = tickCommitMessage({ number: 594, model: 'Claude Opus 5' })
-    expect(msg).toMatch(/^Co-Authored-By: Claude Opus 5 <noreply@anthropic\.com>$/m)
+    const msg = tickCommitMessage({ number: 594, model: MAIN.trailerName })
+    expect(msg.split('\n')).toContain(`Co-Authored-By: ${trailerFor('main')}`)
     expect(evaluateCommitTrailers(msg).block).toBe(false)
   })
 
@@ -103,13 +104,13 @@ describe('the tick commit message', () => {
   })
 
   it('accepts every model the policy allows', () => {
-    for (const m of ['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8']) {
+    for (const m of [MAIN.trailerName, SCARCE.trailerName, MAIN.fallback.trailerName]) {
       expect(evaluateCommitTrailers(tickCommitMessage({ number: 1, model: m }), POLICY_NEUTRAL).block).toBe(false)
     }
   })
 
   it('names no point number in the subject, per the commit convention', () => {
-    const subject = tickCommitMessage({ number: 594, model: 'Claude Opus 5' }).split('\n')[0]
+    const subject = tickCommitMessage({ number: 594, model: MAIN.trailerName }).split('\n')[0]
     expect(subject).not.toMatch(/594|\bPoint\b/)
   })
 })

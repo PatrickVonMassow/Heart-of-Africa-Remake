@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { SCARCE_ESCALATION_ROUNDS } from '../../scripts/author-routing-core.mjs'
+import { SCARCE_ESCALATION_ROUNDS, SCARCE_LANE_WORDS } from '../../scripts/author-routing-core.mjs'
 
 const ROOT = resolve(process.cwd())
 const EXCLUDED = new Set([
@@ -15,7 +15,8 @@ const EXCLUDED = new Set([
   'src/config/scarceEscalationDoc.test.ts',
 ])
 
-const routeTerms = String.raw`\b(?:fable|escalat\w*)\b`
+const laneWords = SCARCE_LANE_WORDS.join('|')
+const routeTerms = String.raw`\b(?:${laneWords}|escalat\w*)\b`
 const roundTerms =
   String.raw`\b(?:five|${SCARCE_ESCALATION_ROUNDS})\b[\s\S]{0,120}` +
   String.raw`\b(?:unsuccessful|non-passing|failed)\b[\s\S]{0,80}\breview\s+rounds?\b`
@@ -34,11 +35,17 @@ function trackedProseAndSource() {
     .filter(Boolean)
     .filter((path) => !EXCLUDED.has(path))
     .filter((path) => /\.(?:md|mjs|ts|tsx)$/.test(path))
+    // A tracked file deleted in the working tree is not prose any more.
+    .filter((path) => existsSync(resolve(ROOT, path)))
   return new Map(paths.map((path) => [path, readFileSync(resolve(ROOT, path), 'utf8')]))
 }
 
-const stateClaim =
-  /\bfable\b[\s\S]{0,100}\bswitch\b[\s\S]{0,100}\b(?:on|off|enabled|disabled|suspended|active|inactive)\b|\bfable\b[\s\S]{0,100}\b(?:on|off|enabled|disabled|suspended|active|inactive)\b[\s\S]{0,100}\bswitch\b/i
+const directions = String.raw`\b(?:on|off|enabled|disabled|suspended|active|inactive)\b`
+const laneTerm = String.raw`\b(?:${SCARCE_LANE_WORDS.filter((word) => word !== 'scarce').join('|')})\b`
+const stateClaim = new RegExp(
+  `${laneTerm}[\\s\\S]{0,100}\\bswitch\\b[\\s\\S]{0,100}${directions}|${laneTerm}[\\s\\S]{0,100}${directions}[\\s\\S]{0,100}\\bswitch\\b`,
+  'i',
+)
 
 function switchStateClaims(files: Map<string, string>) {
   return [...files].filter(([, text]) => stateClaim.test(text)).map(([path]) => path)
@@ -51,18 +58,19 @@ function trackedDocuments() {
     // The work order and archive are specifications/history, not operational
     // restatements; they necessarily preserve the instruction this test enforces.
     .filter((path) => !EXCLUDED.has(path))
+    .filter((path) => existsSync(resolve(ROOT, path)))
   return new Map(paths.map((path) => [path, readFileSync(resolve(ROOT, path), 'utf8')]))
 }
 
-describe('the Fable escalation boundary has at most one prose statement', () => {
+describe('the scarce-lane escalation boundary has at most one prose statement', () => {
   it('finds the threshold stated in no prose file', () => {
     expect(thresholdClaims(trackedProseAndSource())).toEqual([])
   })
 
   it('would fail the consistency check if a statement appeared', () => {
     for (const duplicate of [
-      'Fable escalates after five unsuccessful review rounds.',
-      'After five unsuccessful review rounds, escalate the point to Fable.',
+      `${SCARCE_LANE_WORDS[1]} escalates after five unsuccessful review rounds.`,
+      'After five unsuccessful review rounds, hand the point to the scarce lane.',
     ]) {
       const files = trackedProseAndSource()
       files.set('docs/duplicate.md', duplicate)
@@ -71,15 +79,15 @@ describe('the Fable escalation boundary has at most one prose statement', () => 
   })
 })
 
-describe('the Fable switch state exists in no tracked operational document', () => {
+describe('the scarce-lane switch state exists in no tracked operational document', () => {
   it('finds no prose claim that the switch has a direction', () => {
     expect(switchStateClaims(trackedDocuments())).toEqual([])
   })
 
   it('catches either direction written around the switch name', () => {
     for (const duplicate of [
-      'The Fable switch is enabled for this run.',
-      'Fable remains disabled by the shared switch.',
+      `The ${SCARCE_LANE_WORDS[1]} switch is enabled for this run.`,
+      `${SCARCE_LANE_WORDS[1]} remains disabled by the shared switch.`,
     ]) {
       const files = trackedDocuments()
       files.set('docs/duplicate.md', duplicate)

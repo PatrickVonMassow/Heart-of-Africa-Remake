@@ -42,14 +42,15 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-import { OPUS_MODEL_ID, servingFallbackModelId } from './lane-switch-core.mjs'
+import { servingFallbackModelId } from './lane-switch-core.mjs'
+import { MAIN } from './model-lanes.mjs'
 import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
 /** Model policy (CLAUDE.md §6). rule:model-policy@2f245cec
- *  The session starts on OPUS_MODEL_ID (scripts/lane-switch-core.mjs). Its one CLI fallback is the next member of the
+ *  The session starts on the main lane's model id (scripts/model-lanes.mjs). Its one CLI fallback is the next member of the
  *  chain reported by scripts/lane-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
-export const SPAWN_MODEL = OPUS_MODEL_ID
+export const SPAWN_MODEL = MAIN.modelId
 
 /**
  * ONE TURN, SEVERAL CALLS (point 593) — the German rendering of the paragraph the
@@ -1494,7 +1495,7 @@ export function announceSpawn({ quota = null } = {}) {
  * which took the whole spawn with it and made the first failure permanent: the pid
  * file is only written after a spawn that never happened. Measured 12.08.2026 —
  * the top-up had not run once since the container came up, and the allowance for
- * api.openai.com aged out twice under it.
+ * the cross vendor's API host aged out twice under it.
  *
  * A LIVE PID IS NOT PROOF OF OUR CHILD either: after pid reuse an unrelated
  * long-lived process would suppress the top-up for as long as IT lives. So the

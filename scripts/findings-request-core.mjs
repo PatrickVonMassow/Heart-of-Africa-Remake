@@ -62,7 +62,7 @@ const TAG_LINE_RE = /^(\\*)#([a-z]+)\s*$/
 
 /**
  * A BODY LINE THAT IS ITSELF A FIELD MARKER IS ESCAPED (four-eyes finding 1,
- * Fable 5, 30.07.2026). The spec is appended VERBATIM, and the specs most likely
+ * 30.07.2026). The spec is appended VERBATIM, and the specs most likely
  * to be deposited here are about this very mechanism — one containing a bare
  * `#spec` line would otherwise be truncated on read-back, its tail misfiled into
  * another field, and a `#blocked` line inside a spec would contaminate the very
@@ -230,7 +230,7 @@ function withState(line, state) {
  * string happens to match. Returns { text, title } or null when that entry is
  * no longer pending.
  *
- * THIS IS THE WRITE-BACK PATH (four-eyes finding 1, Fable 5, 31.07.2026). The
+ * THIS IS THE WRITE-BACK PATH (four-eyes finding 1, 31.07.2026). The
  * CLI reads the carrier, decides, and only then writes; in that gap another
  * window may append a deposit — the very concurrency this carrier exists for —
  * and text computed from the old read would erase it. So the caller re-reads
@@ -280,7 +280,7 @@ function transition(text, title, state, extra = null) {
 /**
  * `pending` → `queued <point>`: the deposit reached the work order.
  *
- * A REQUEST WITH OPEN QUESTIONS IS REFUSED HERE (four-eyes finding 2, Fable 5,
+ * A REQUEST WITH OPEN QUESTIONS IS REFUSED HERE (four-eyes finding 2,
  * 31.07.2026). `requestRoute` decided it and `formatRequest` printed it, but
  * nothing ENFORCED it: the rule was display-only, so an undecided spec queued
  * cleanly — while the guard's own block text names this very call as the way to

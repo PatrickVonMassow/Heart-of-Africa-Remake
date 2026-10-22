@@ -203,7 +203,7 @@ describe('the wrapper payload reader', () => {
   })
 })
 
-describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
+describe('cross-vendor review findings (cross-vendor review, 86cbc8f)', () => {
   const approvedChat = [human('start'), said(TITLE), human('passt so')]
 
   it('1: judges EVERY deposit in a command, not only the first', () => {
@@ -290,7 +290,7 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
   })
 })
 
-describe('confirming review findings (GPT-6 Astra, b9d21dd) — all caught by the textual rule', () => {
+describe('confirming review findings (cross-vendor review, b9d21dd) — all caught by the textual rule', () => {
   const approvedChat = [human('start'), said(TITLE), human('passt so')]
   const caught = (command, shell = 'bash') => {
     expect(requestOf(command, shell), command).toEqual({ title: TITLE, approved: '' })
@@ -448,7 +448,7 @@ describe('the flag word inside a finding detail', () => {
 
 })
 
-describe('shapes of earlier review rounds are denied by the pre-gate (GPT-6 Astra, rounds 6 and 2)', () => {
+describe('shapes of earlier review rounds are denied by the pre-gate (cross-vendor review, rounds 6 and 2)', () => {
   const shapes = [
     'node scripts/finding.mjs --request > /tmp/out Hidden --stdin --approved "passt so"',
     'node scripts/finding.mjs --request 2>/dev/null Hidden',
@@ -490,7 +490,7 @@ describe('shapes of earlier review rounds are denied by the pre-gate (GPT-6 Astr
   })
 })
 
-describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape fixes)', () => {
+describe('coarse fail-closed pre-gate (cross-vendor review, round 3 on the shape fixes)', () => {
   // the transcript approves only some OTHER, visible title
   const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
   const denied = (command) => {
@@ -594,7 +594,7 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
   })
 })
 
-describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra review of 1367, round 5)', () => {
+describe('a deposit assembled by expansion is a possible deposit (cross-vendor review of 1367, round 5)', () => {
   const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
   const tail = ' Hidden --spec-file /tmp/s.md --why-file /tmp/w.md'
   it.each([
@@ -741,7 +741,7 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
   })
 })
 
-describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-parsing', () => {
+describe('cross-vendor review finding (cross-vendor review, 7589d5b): PowerShell stop-parsing', () => {
   it('denies an approved title behind --%, which PowerShell expands as %VAR%', () => {
     const command = 'node scripts/finding.mjs --% --request "%USERNAME%" --spec-file C:/tmp/s.md --why-file C:/tmp/w.md --approved "ok"'
     nonCanonical(command, 'powershell')
@@ -755,7 +755,7 @@ describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-pa
   })
 })
 
-describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', () => {
+describe('the hook wrapper fails closed (cross-vendor review of 1367, round 6)', () => {
   const GUARD = fileURLToPath(new URL('./request-approval-guard.mjs', import.meta.url))
   const spawnGuard = (input, env = {}) =>
     spawnSync(process.execPath, [GUARD], { input, encoding: 'utf8', env: { ...process.env, ...env }, windowsHide: true })
@@ -880,7 +880,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     'node scripts/x.mjs "a?" | head',
     'node --import ./x.mjs scripts/x.mjs "a?"',
     "find . -name '*.ts'",
-    // cross-vendor review of ea049bf (GPT-6 Astra): escapes, forwarding helpers, executing and writing modes
+    // cross-vendor review of ea049bf: escapes, forwarding helpers, executing and writing modes
     `node -e 'requ\\u0069re("child_pro"+"cess").execSync("node scripts/fin"+"ding.mjs --re"+"quest Hidden")'`,
     `cat f | node -e 'requ\\u0069re("child_pro"+"cess")'`,
     'node -e "`${1}`"',

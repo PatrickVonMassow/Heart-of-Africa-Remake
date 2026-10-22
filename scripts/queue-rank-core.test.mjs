@@ -521,7 +521,7 @@ describe('the LIVE record, which is what every checkout inherits', () => {
 //
 // The FROZEN front (`boundary`) is what grandfathers the order that predates the
 // rule. It was the moving provenance baseline in the first cut, and a
-// cross-vendor review (GPT-5.6 Sol, 21.08.2026) showed that to be a two-turn
+// cross-vendor review (21.08.2026) showed that to be a two-turn
 // bypass: settle anywhere, then move the point in front of the release, and
 // nothing ever asked.
 

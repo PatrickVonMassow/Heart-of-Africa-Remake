@@ -17,14 +17,15 @@ import {
   escalationDecision,
 } from './alert-escalation-core.mjs'
 import { MODEL_HANDOFF_PROBE_MS, modelHandoffDecision } from './model-handoff-core.mjs'
+import { MAIN, TEST_FOREIGN_MODELS, VENDORS } from './model-lanes.mjs'
 
 const NOW = Date.parse('2026-08-24T00:00:00Z')
 const point = { point: 866, branch: 'feat/866-capped-failure-retry', briefRevision: 'brief', childId: 'child-866', now: NOW }
 const route = [
-  { model: 'Opus 5', id: 'claude-opus-5[1m]' },
-  { model: 'Opus 4.8', id: 'claude-opus-4-8[1m]' },
+  { model: MAIN.displayName, id: MAIN.modelId },
+  { model: MAIN.fallback.displayName, id: MAIN.fallback.modelId },
 ]
-const hits = [{ sha: 'a'.repeat(40), trailer: 'Claude Haiku 4.5 <noreply@anthropic.com>', when: NOW - 1 }]
+const hits = [{ sha: 'a'.repeat(40), trailer: `${TEST_FOREIGN_MODELS.haikuTrailer} <${VENDORS[MAIN.vendor].trailerAddress}>`, when: NOW - 1 }]
 
 const runaway = runawayRecoveryDecision({
   failCount: 9,

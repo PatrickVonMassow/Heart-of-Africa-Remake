@@ -1,35 +1,38 @@
 #!/usr/bin/env node
-// THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667).
+// THE SWITCH THAT MOVES WORK TOWARDS THE CROSS LANE (work-order point 654, A2; widened by 667).
 //
 //   node scripts/lane-routing.mjs --status     # what goes where right now
-//   node scripts/lane-routing.mjs --more       # one step towards Astra
-//   node scripts/lane-routing.mjs --less       # one step back towards Claude
-//   node scripts/lane-routing.mjs --set prefer-astra|default|claude-only
+//   node scripts/lane-routing.mjs --more       # one step towards the cross lane
+//   node scripts/lane-routing.mjs --less       # one step back towards the main chain
+//   node scripts/lane-routing.mjs --set prefer-cross|default|main-only
 //   node scripts/lane-routing.mjs --json       # the same, machine-readable
 //
 // WHY IT EXISTS (user 11.08.2026): two vendors, two allowances that run out at different
-// times. Rather than wait until the Anthropic volume is nearly spent, the user wants to
-// shift load to OpenAI EARLIER — first the work that needs no write access at all:
+// times. Rather than wait until the main chain's volume is nearly spent, the user wants to
+// shift load to the cross lane EARLIER — first the work that needs no write access at all:
 // diagnoses, audits, enumerations, explanations.
 //
-// AND SINCE POINT 667, AUTHORING TOO. At `prefer-astra` the `author` kind goes to Astra —
-// since 18.08.2026 for the hard and critical points as well, which is the largest single
-// item of the spend; the role swap it needs is built — Astra stands in the author allowlist, the
-// `commit-msg` hook takes its trailer, and Claude reviews, runs the suites, judges the
-// picture and lands. What no setting routes is in NEVER_ROUTED below.
+// AND SINCE POINT 667, AUTHORING TOO. At `prefer-cross` the `author` kind goes to the cross
+// lane — since 18.08.2026 for the hard and critical points as well, which is the largest
+// single item of the spend; the role swap it needs is built — the cross lane stands in the
+// author allowlist, the `commit-msg` hook takes its trailer, and the main chain reviews, runs
+// the suites, judges the picture and lands. What no setting routes is in NEVER_ROUTED below.
 //
-// The setting lives in the MAIN checkout's `.claude/astra-share.json` (git-ignored, this
-// machine's state), and every consumer — `scripts/ask-lane.mjs`, `scripts/cross-review.mjs`,
+// The setting lives in the MAIN checkout's `.claude/lane-routing.json` (git-ignored, this
+// machine's state; the older file name in LEGACY.files.routing is read while the new file is
+// absent and never rewritten), and every consumer — `scripts/ask-lane.mjs`, `scripts/cross-review.mjs`,
 // the delegation brief and the board footer — READS it rather than keeping its own copy.
 // The decisions are pure and Vitest-covered in scripts/lane-routing-core.mjs.
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { dirname, sep as sep_ } from 'node:path'
+import { dirname, join, sep as sep_ } from 'node:path'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { CROSS } from './model-lanes.mjs'
 import {
   KIND_NOTES,
+  LEGACY_SETTING_FILE_NAME,
   NEVER_ROUTED,
   SAFE_SETTING,
   SETTINGS,
@@ -39,6 +42,7 @@ import {
   fallbackLine,
   normaliseSetting,
   readSetting,
+  routeLabel,
   routingTable,
   settingPathFrom,
   statusLine,
@@ -63,18 +67,26 @@ const SETTING_FILE =
     { sep: sep_ },
   )
 
+/** The older state file beside the given one: read while the new file is absent, never written. */
+export function legacySettingFile(file = SETTING_FILE) {
+  return join(dirname(file), LEGACY_SETTING_FILE_NAME)
+}
+
 /**
  * The setting in force, and what (if anything) was wrong with the file.
  *
  * A MISSING file is the default (nothing was ever set); a file that is there and unusable
  * is SAFE_SETTING with the problem named — never a throw. Every caller of this is on the
  * path of some other piece of work, and a switch that can break a diagnosis is worse than
- * no switch.
+ * no switch. While the file is absent, the older file beside it is read instead; the next
+ * write goes to the new file only.
  */
 export function currentSetting(file = SETTING_FILE) {
   let raw = null
   try {
-    raw = existsSync(file) ? readFileSync(file, 'utf8') : null
+    const legacy = legacySettingFile(file)
+    const source = existsSync(file) ? file : existsSync(legacy) ? legacy : null
+    raw = source ? readFileSync(source, 'utf8') : null
   } catch (e) {
     // A file that is there and unreadable is the anomaly SAFE_SETTING exists for.
     return { setting: SAFE_SETTING, changedAt: null, changedBy: '', problem: `the state file could not be read (${e.message})`, corrupt: true }
@@ -102,22 +114,23 @@ function save(setting, { by = '', file = SETTING_FILE } = {}) {
 }
 
 /**
- * Record what one routed Astra run says about the vendor (point 1194): an outage
- * signature writes or renews the fallback, a success lifts it. Returns afterLaneRun's
- * answer. Never throws — a failed write is printed, and the run's own verdict stands.
+ * Record what one routed run of the lane `role` says about its vendor (point 1194): an
+ * outage signature writes or renews the fallback, a success lifts it. Returns
+ * afterLaneRun's answer. Never throws — a failed write is printed, and the run's own
+ * verdict stands.
  */
-export function recordLaneRun({ outcome, text = '', kind = '', who = 'lane-routing', file = SETTING_FILE } = {}) {
+export function recordLaneRun({ role = 'cross', outcome, text = '', kind = '', who = 'lane-routing', file = SETTING_FILE } = {}) {
   const state = currentSetting(file)
-  const next = afterLaneRun({ outcome, text, kind, previous: state.fallback })
+  const next = afterLaneRun({ role, outcome, text, kind, previous: state.fallback })
   if (state.corrupt || JSON.stringify(next.fallback) === JSON.stringify(state.fallback ?? null)) return next
   try {
     mkdirSync(dirname(file), { recursive: true })
     const base = writeState(state.setting, { by: state.changedBy, fallback: next.fallback })
     writeJsonAtomic(file, { ...base, changedAt: state.changedAt ?? base.changedAt })
     if (next.fellBack) console.error(`${who}: ${fallbackLine({ ...state, fallback: next.fallback })}`)
-    else if (!next.fallback && state.fallback) console.error(`${who}: GPT-6 Astra answered — the outage fallback is lifted.`)
+    else if (!next.fallback && state.fallback) console.error(`${who}: ${CROSS.displayName} answered — the outage fallback is lifted.`)
   } catch (e) {
-    console.error(`${who}: could not record the Astra outage fallback (${e.message})`)
+    console.error(`${who}: could not record the cross-lane outage fallback (${e.message})`)
   }
   return next
 }
@@ -131,7 +144,7 @@ export function statusReport(state) {
   lines.push(`  ${SETTING_NOTES[state.setting]}`)
   for (const row of routingTable(state.setting)) {
     const to = effectiveRoute(row.kind, state).to
-    lines.push(`  ${row.kind.padEnd(10)} → ${to === 'astra' ? 'GPT-6 Astra' : 'Claude     '}   ${KIND_NOTES[row.kind]}`)
+    lines.push(`  ${row.kind.padEnd(10)} → ${routeLabel(to).padEnd(14)}   ${KIND_NOTES[row.kind]}`)
   }
   lines.push('  NEVER routed, at any setting:')
   for (const n of NEVER_ROUTED) lines.push(`    · ${n}`)
@@ -143,12 +156,13 @@ export const usage = () =>
   [
     'usage: node scripts/lane-routing.mjs --status | --more | --less | --set <setting> [--json]',
     '',
-    `settings, from the least Astra to the most: ${SETTINGS.join(' → ')}`,
+    `settings, from the least cross-lane work to the most: ${SETTINGS.join(' → ')}`,
     ...SETTINGS.map((s) => `  ${s.padEnd(12)} ${SETTING_NOTES[s]}`),
     '',
     'The board shows a non-default setting while it is on, and the delegation brief tells',
-    'every agent which kinds to hand over. At prefer-astra Astra also AUTHORS every point the',
-    'routing cut does not keep here, the hard and critical ones included; Claude reviews them.',
+    'every agent which kinds to hand over. At prefer-cross the cross lane also AUTHORS every point',
+    'the routing cut does not keep here, the hard and critical ones included; the main chain',
+    'reviews them.',
     'What no setting routes is listed under',
     '"NEVER routed" by --status.',
   ].join('\n')
@@ -185,8 +199,8 @@ if (isMainModule(import.meta.url)) {
       const moved = step(currentSetting().setting, direction)
       if (!moved.changed) {
         // AT AN END IT SAYS SO rather than wrapping: a `--more` that quietly became
-        // `claude-only` would move the load to the very vendor the user was sparing.
-        console.error(`lane-routing: already at \`${moved.from}\` — no setting further ${direction === 'more' ? 'towards Astra' : 'towards Claude'}.`)
+        // `main-only` would move the load to the very vendor the user was sparing.
+        console.error(`lane-routing: already at \`${moved.from}\` — no setting further ${direction === 'more' ? 'towards the cross lane' : 'towards the main chain'}.`)
         emit(currentSetting(), { changed: false })
         process.exit(0)
       }

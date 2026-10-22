@@ -961,7 +961,7 @@ export function isOutputPagerSegment(segment) {
  * chain is the session carrying on, whatever else rides along with it.
  *
  * The SEPARATOR set errs toward splitting. A single `&` was once missing from it
- * (four-eyes review, Fable 5): `node scripts/board.mjs & npm test` then parsed
+ * (four-eyes review): `node scripts/board.mjs & npm test` then parsed
  * as ONE segment whose head matched a closing script, so the handover survived
  * real work — the dangerous direction, because a kept handover plus a long
  * enough silence lets a successor spawn beside a working session. A lone `&` is

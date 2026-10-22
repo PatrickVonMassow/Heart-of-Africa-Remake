@@ -8,13 +8,19 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { CLAUDE_MODEL, writeState } from './lane-switch-core.mjs'
+import { writeState } from './lane-switch-core.mjs'
+import { CROSS, MAIN, VENDORS, trailerFor } from './model-lanes.mjs'
+
+const MAIN_AT = VENDORS[MAIN.vendor].trailerAddress
+const CROSS_AT = VENDORS[CROSS.vendor].trailerAddress
+// A retired cross-lane name: landed reviewer trailers carrying it keep passing.
+const OLDEST_CROSS = CROSS.retired.filter((name) => /[A-Z]/.test(name)).at(-1)
 
 const GATE = resolve(process.cwd(), 'scripts/model-trailer-gate.mjs')
 const HOOK = resolve(process.cwd(), 'scripts/git-hooks/commit-msg')
 
 const stateFile = (dir, state = 'on') => {
-  const file = resolve(dir, 'fable-switch.json')
+  const file = resolve(dir, 'lane-switch.json')
   writeFileSync(file, JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
   return file
 }
@@ -48,10 +54,10 @@ describe('the commit-msg model-trailer gate', () => {
 
   it('accepts every allowed spelling', () => {
     for (const t of [
-      `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
-      `Co-Authored-By: ${CLAUDE_MODEL} (1M context) <noreply@anthropic.com>`,
-      'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
-      'Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>',
+      `Co-Authored-By: ${trailerFor('main')}`,
+      `Co-Authored-By: ${MAIN.trailerName} (1M context) <${MAIN_AT}>`,
+      `Co-Authored-By: ${trailerFor('main-fallback')}`,
+      `Co-Authored-By: ${trailerFor('scarce')}`,
     ]) {
       const r = judge(withTrailer(t))
       expect(r.status, `${t} was refused: ${r.stderr}`).toBe(0)
@@ -61,33 +67,33 @@ describe('the commit-msg model-trailer gate', () => {
   it('accepts the documented reviewer key and refuses an undocumented one', () => {
     const documented = judge(
       withTrailer(
-        `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\n` +
-          'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+        `Co-Authored-By: ${trailerFor('main')}\n` +
+          `Reviewed-By: ${OLDEST_CROSS} <${CROSS_AT}>`,
       ),
     )
     expect(documented.status, documented.stderr).toBe(0)
 
     const undocumented = judge(
       withTrailer(
-        `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\n` +
-          'Reviewer: GPT-5.6 Sol <noreply@openai.com>',
+        `Co-Authored-By: ${trailerFor('main')}\n` +
+          `Reviewer: ${OLDEST_CROSS} <${CROSS_AT}>`,
       ),
     )
     expect(undocumented.status).toBe(1)
     expect(undocumented.stderr).toContain('undocumented-reviewer-trailer')
-    expect(undocumented.stderr).toContain('Reviewed-By: GPT-6 Astra <noreply@openai.com>')
+    expect(undocumented.stderr).toContain(`Reviewed-By: ${trailerFor('cross')}`)
   })
 
   it('REFUSES the bare trailer that cost the batch a round, and says what to write', () => {
-    const r = judge(withTrailer('Co-Authored-By: Claude <noreply@anthropic.com>'))
+    const r = judge(withTrailer(`Co-Authored-By: Claude <${MAIN_AT}>`))
     expect(r.status).toBe(1)
     expect(r.stderr).toContain('unnamed-model-trailer')
-    expect(r.stderr).toContain(`Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
+    expect(r.stderr).toContain(`Co-Authored-By: ${trailerFor('main')}`)
     expect(r.stderr).toContain('~/.claude/projects/')
   })
 
   it('REFUSES a model outside the allowlist', () => {
-    const r = judge(withTrailer('Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>'))
+    const r = judge(withTrailer(`Co-Authored-By: Claude Haiku 4.5 <${MAIN_AT}>`))
     expect(r.status).toBe(1)
     expect(r.stderr).toContain('forbidden-model-trailer')
   })
@@ -124,6 +130,7 @@ describe('a real commit through the commit-msg hook', () => {
     'commit-scope-guard-core.mjs',
     'model-trailer-gate.mjs',
     'model-guard-core.mjs',
+    'model-lanes.mjs',
     'lane-switch.mjs',
     'lane-switch-core.mjs',
     'atomic-write.mjs',
@@ -139,13 +146,13 @@ describe('a real commit through the commit-msg hook', () => {
         copyFileSync(resolve(process.cwd(), 'scripts', name), resolve(repo, 'scripts', name))
       }
       copyFileSync(HOOK, resolve(repo, 'scripts/git-hooks/commit-msg'))
-      const fable = stateFile(repo)
+      const switchFile = stateFile(repo)
       const vcs = (...args) =>
         spawnSync('git', ['-c', 'commit.gpgsign=false', ...args], {
           cwd: repo,
           windowsHide: true,
           encoding: 'utf8',
-          env: { ...process.env, LANE_SWITCH_FILE: fable },
+          env: { ...process.env, LANE_SWITCH_FILE: switchFile },
         })
       vcs('init', '-q')
       vcs('config', 'user.email', 'gate@test.local')
@@ -161,7 +168,7 @@ describe('a real commit through the commit-msg hook', () => {
 
   it('refuses ambiguous trailers and accepts distinct author and reviewer keys', () => {
     inRepo((vcs) => {
-      const refused = vcs('commit', '-m', 'A probe\n\nCo-Authored-By: Claude <noreply@anthropic.com>')
+      const refused = vcs('commit', '-m', `A probe\n\nCo-Authored-By: Claude <${MAIN_AT}>`)
       expect(refused.status, `the hook let the bare trailer through: ${refused.stdout}`).not.toBe(0)
       expect(refused.stderr).toContain('unnamed-model-trailer')
       expect(vcs('log', '--oneline').stdout.trim()).toBe('')
@@ -169,7 +176,7 @@ describe('a real commit through the commit-msg hook', () => {
       const undocumented = vcs(
         'commit',
         '-m',
-        `A probe\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\nReviewer: GPT-5.6 Sol <noreply@openai.com>`,
+        `A probe\n\nCo-Authored-By: ${trailerFor('main')}\nReviewer: ${OLDEST_CROSS} <${CROSS_AT}>`,
       )
       expect(undocumented.status, 'the hook accepted an undocumented reviewer key').not.toBe(0)
       expect(undocumented.stderr).toContain('undocumented-reviewer-trailer')
@@ -179,7 +186,7 @@ describe('a real commit through the commit-msg hook', () => {
         'commit',
         '-q',
         '-m',
-        `A probe\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\nReviewed-By: GPT-5.6 Sol <noreply@openai.com>`,
+        `A probe\n\nCo-Authored-By: ${trailerFor('main')}\nReviewed-By: ${OLDEST_CROSS} <${CROSS_AT}>`,
       )
       expect(ok.status, `the hook refused a named trailer: ${ok.stderr}`).toBe(0)
       expect(vcs('log', '--oneline').stdout.trim()).not.toBe('')

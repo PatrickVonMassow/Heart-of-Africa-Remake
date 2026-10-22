@@ -1,11 +1,12 @@
 // THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@2f245cec
 //
-// Astra (OpenAI, codex) is the default; `author-fable.mjs` drives the same core
-// with its own trailer, runtime, author model and command name.
+// One command for every lane with an authoring path (`--lane <role>`): the lane record
+// (scripts/model-lanes.mjs) supplies the model, the id, the runtime and the trailer, and
+// ONE runtime dispatch (`authoringRuntime`) picks the codex or the claude command line.
 //
-// `scripts/cross-review.mjs` and `scripts/ask-lane.mjs` send Astra work it may only
-// READ. This lane sends it work it WRITES: a point, on its own branch, in its
-// own worktree, committed step by step. Claude then reviews it, runs the suites,
+// `scripts/cross-review.mjs` and `scripts/ask-lane.mjs` send the cross lane work it may
+// only READ. This lane sends it work it WRITES: a point, on its own branch, in its
+// own worktree, committed step by step. The main chain then reviews it, runs the suites,
 // judges the picture and lands it — the role swap of CLAUDE.md §6, which keeps
 // two vendors on a point wherever both are reachable and lets neither review
 // itself (the outage fallback in lane-routing-core is the named exception).
@@ -13,7 +14,7 @@
 // TWO THINGS ARE DIFFERENT FROM THE READ-ONLY PATHS, and both are load-bearing:
 //
 // 1. THE SANDBOX IS OFF, and it has to be. Measured 13.08.2026 (and again on
-//    every earlier Astra path): this container cannot create unprivileged user
+//    every earlier cross-lane path): this container cannot create unprivileged user
 //    namespaces, so codex's bubblewrap launcher dies before ANY command of the
 //    model's runs — `codex sandbox read-only -- echo hi` prints the bwrap error
 //    and nothing else. A read-only reviewer works around it by having the
@@ -35,16 +36,25 @@
 // Side-effect free: the spawn, the git work and the push belong to
 // scripts/author-delegate.mjs. Pinned by author-delegate-core.test.mjs.
 
-import { OPUS_MODEL } from './lane-switch-core.mjs'
-import { allowedTrailers, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
+import { CROSS, MAIN, eligibleReviewers, executionTarget, lane, trailerFor } from './model-lanes.mjs'
+import { classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { charStripped, rawFieldValue, stripDecoration, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './cross-review-core.mjs'
+import { charStripped, classifyOutcome, rawFieldValue, stripDecoration } from './cross-review-core.mjs'
 
-export { ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
+/** The lanes this command can commission as authors. The main chain authors in its own
+ *  session and has no commissioning path here. */
+export const AUTHOR_ROLES = Object.freeze(['cross', 'scarce'])
 
-/** The trailer every commit of this lane carries — the allowlist's own spelling,
- *  so the `commit-msg` gate and the serving-model tripwire both accept it. */
-export const ASTRA_TRAILER = allowedTrailers().find((t) => /astra/i.test(t)) ?? ''
+/** The lane commissioned when nothing names one and the routing names no authoring lane. */
+export const DEFAULT_AUTHOR_ROLE = CROSS.role
+
+/** The trailer every commit of a lane carries — read from the lane record, so the
+ *  `commit-msg` gate and the serving-model tripwire both accept it. */
+export function authorTrailer(role = DEFAULT_AUTHOR_ROLE) {
+  return `Co-Authored-By: ${trailerFor(role)}`
+}
+
+const CROSS_TRAILER = authorTrailer(CROSS.role)
 
 const AUTHOR_COMPLETION_SUBJECT = 'Complete the authored changes'
 
@@ -56,25 +66,25 @@ const AUTHOR_COMPLETION_SUBJECT = 'Complete the authored changes'
  * of carrying either half: it is created only after the author process has
  * exited cleanly and its report accounts for all three required gates.
  *
- * THE TRAILER IS THE LANE'S, NOT THIS FILE'S: `author-fable.mjs` drives the same
- * wrapper, so a hard-coded Astra trailer would sign Fable's checkpoints as Astra's —
- * and that trailer is the only machine-readable record of who authored a commit.
+ * THE TRAILER IS THE LANE'S, NOT THIS FILE'S: every lane drives the same wrapper, so a
+ * hard-coded cross-lane trailer would sign the scarce lane's checkpoints as the cross
+ * lane's — and that trailer is the only machine-readable record of who authored a commit.
  */
-export function authorCommitMessage({ subject = '', rescue = '', final = false, trailer = ASTRA_TRAILER } = {}) {
+export function authorCommitMessage({ subject = '', rescue = '', final = false, trailer = CROSS_TRAILER } = {}) {
   const oneLine = (value) => String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
   const plainSubject = oneLine(subject)
     .replace(/\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/gi, '')
     .replace(/\s+/g, ' ')
     .trim()
   const heading = plainSubject || (final ? AUTHOR_COMPLETION_SUBJECT : 'Checkpoint authoring work')
-  const signature = String(trailer || ASTRA_TRAILER)
+  const signature = String(trailer || CROSS_TRAILER)
   if (final) return `${heading}\n\n${signature}`
   const reason = oneLine(rescue) || 'the authoring run is still in progress'
   return `${heading} [skip ci]\n\nRescue: ${reason}\n${signature}`
 }
 
 /** A completion message exists only for a run the existing judge found clean. */
-export function authorCompletionMessage(judged = {}, trailer = ASTRA_TRAILER) {
+export function authorCompletionMessage(judged = {}, trailer = CROSS_TRAILER) {
   return judged?.clean === true ? authorCommitMessage({ final: true, trailer }) : null
 }
 
@@ -179,28 +189,24 @@ export function withheldEnvNames(env = {}) {
 }
 
 /**
- * The `codex exec` command line for an AUTHORING run.
+ * The `codex exec` command line for an AUTHORING run of a codex-runtime lane.
  *
  * Same shape as the review path's `codexArgs`, with the two differences the lane
  * needs: the sandbox is bypassed (see the header) and the working root is the
- * POINT'S WORKTREE, so every relative path the model uses lands there.
+ * POINT'S WORKTREE, so every relative path the model uses lands there. Model id and
+ * reasoning effort come from the lane record, never from the caller.
  */
-export function authoringCodexArgs({
-  modelId = ASTRA_MODEL_ID,
-  effort = ASTRA_REASONING_EFFORT,
-  cwd = '',
-  outputFile = '',
-  prompt = '',
-} = {}) {
+export function authoringCodexArgs({ role = CROSS.role, cwd = '', outputFile = '', prompt = '' } = {}) {
+  const target = executionTarget(role)
   const args = [
     'exec',
     '--color',
     'never',
     '--dangerously-bypass-approvals-and-sandbox',
     '-m',
-    String(modelId),
+    String(target.id),
     '-c',
-    `model_reasoning_effort=${String(effort)}`,
+    `model_reasoning_effort=${String(lane(role).reasoningEffort)}`,
   ]
   if (cwd) args.push('-C', String(cwd))
   if (outputFile) args.push('-o', String(outputFile))
@@ -214,7 +220,7 @@ export function authoringCodexArgs({
  * The checks are the ones whose absence is unrecoverable rather than merely
  * annoying. Authoring straight onto `main`, or into the main checkout, would put
  * an unreviewed model's commits on the deployed branch — and a dirty tree makes
- * "what did Astra write" unanswerable afterwards, which is the question every
+ * "what did the author write" unanswerable afterwards, which is the question every
  * check below it depends on.
  */
 export function readinessProblems({
@@ -223,7 +229,7 @@ export function readinessProblems({
   mainCheckout = '',
   dirty = '',
   point = '',
-  authorName = 'Astra',
+  authorName = CROSS.displayName,
 } = {}) {
   const problems = []
   const b = String(branch ?? '').trim()
@@ -256,7 +262,7 @@ export function readinessProblems({
  *  trailer. HOUSE_RULES (the default-trailer copy) is exported so the test pins
  *  them: a rule that quietly falls out of the prompt is a rule the lane stops
  *  following, and nothing else would notice. */
-const houseRulesFor = (trailer = ASTRA_TRAILER) => Object.freeze([
+const houseRulesFor = (trailer = CROSS_TRAILER) => Object.freeze([
   `Every commit ends with the trailer \`${trailer}\` — it is the ONLY machine-readable`,
   '  record of who authored it, and a commit without it is REFUSED by a git hook.',
   'COMMIT AT EVERY SELF-CONTAINED STEP, not at the end. An uncommitted tree is the one state',
@@ -289,7 +295,7 @@ export const HOUSE_RULES = houseRulesFor()
  * order and design.md whole are ~108k tokens, the brief ~1.8k, and the whole
  * saving of this lane would be spent on reading if it were not handed over.
  *
- * `findings` turns the same prompt into the SECOND leg of the loop — Claude has
+ * `findings` turns the same prompt into the SECOND leg of the loop — the reviewer has
  * reviewed, and these are the findings to answer. That is where the four eyes
  * actually close, so it is the same command rather than a separate one.
  */
@@ -299,18 +305,18 @@ export function buildAuthoringPrompt({
   branch = '',
   findings = '',
   framing = '',
-  authorModel = ASTRA_MODEL_NAME,
-  authorTrailer = ASTRA_TRAILER,
-  reviewer = 'Claude',
+  authorModel = CROSS.displayName,
+  authorTrailer: trailer = CROSS_TRAILER,
+  reviewer = MAIN.displayName,
   laneDescription = 'the hard and critical ones included',
 } = {}) {
   const answering = String(findings ?? '').trim()
   const stance = String(framing ?? '').trim()
-  const houseRules = houseRulesFor(authorTrailer)
+  const houseRules = houseRulesFor(trailer)
   return [
     `You are AUTHORING work-order point ${point} for this repository as ${authorModel}.`,
     'You were chosen for it: this project runs two authoring lanes from different vendors, and',
-    `the points are yours to write — ${laneDescription}. A ${reviewer} session then REVIEWS what you`,
+    `the points are yours to write — ${laneDescription}. A session on ${reviewer} then REVIEWS what you`,
     'wrote, runs the browser suites, judges the rendered picture and lands it — so write for a',
     'reviewer who will read every line, and leave nothing you would not defend.',
     '',
@@ -358,7 +364,7 @@ export function buildAuthoringPrompt({
 
 /**
  * The non-authoring step at SPEC_EXAMINATION_ROUND, the round before automatic
- * Fable escalation (author-routing-core.mjs). It gives the other vendor the point text, the generated brief and every recorded finding
+ * scarce-lane escalation (author-routing-core.mjs). It gives the other vendor the point text, the generated brief and every recorded finding
  * in one read, and asks for the only two outcomes the ledger accepts.
  */
 export function buildSpecExaminationPrompt({
@@ -553,8 +559,8 @@ export function judgeAuthoring({
   numstat = '',
   branchAfter = '',
   branch = '',
-  authorModel = ASTRA_MODEL_NAME,
-  fableState,
+  authorModel = CROSS.displayName,
+  scarceState,
   runtime = 'codex',
 } = {}) {
   const list = Array.isArray(commits) ? commits : []
@@ -575,7 +581,7 @@ export function judgeAuthoring({
     problems.push(`the run ended on \`${branchAfter}\`, not on \`${branch}\` — what it committed cannot be attributed to this point`)
   }
   for (const commit of list) {
-    const verdict = classifyTrailer(commit?.trailers ?? '', fableState)
+    const verdict = classifyTrailer(commit?.trailers ?? '', scarceState)
     if (verdict === 'forbidden') {
       problems.push(`${short(commit.sha)} names a model outside the author allowlist (${String(commit.trailers).trim()})`)
     } else if (verdict === 'unidentified') {
@@ -626,13 +632,14 @@ export function formatAuthoringReport({
   branch = '',
   judged = {},
   parsed = {},
-  reviewer = OPUS_MODEL,
+  reviewer = MAIN.displayName,
   pushed = null,
   framing = '',
   commandName = 'author-delegate',
-  authorModel = ASTRA_MODEL_NAME,
-  authorDetail = `(effort ${ASTRA_REASONING_EFFORT})`,
-  authorTrailer = ASTRA_TRAILER,
+  role = CROSS.role,
+  authorModel = CROSS.displayName,
+  authorDetail = `(effort ${CROSS.reasoningEffort})`,
+  authorTrailer: trailer = CROSS_TRAILER,
   reviewCommand = '',
 } = {}) {
   const lines = []
@@ -658,7 +665,7 @@ export function formatAuthoringReport({
     lines.push(
       `  UNCOMMITTED SIZE: ${changedPaths} changed path(s), ${insertions} insertion(s), ${deletions} deletion(s)` +
         `${qualifications.length ? `; ${qualifications.join(', ')}` : ''}.`,
-      `  CHECKPOINT IT NOW: git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${authorTrailer}'` +
+      `  CHECKPOINT IT NOW: git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${trailer}'` +
         ` && git push -u origin ${branch}`,
     )
   }
@@ -680,11 +687,124 @@ export function formatAuthoringReport({
     '       before any explanation of it,',
     '    2. run the gates and, for a render change, the picture on both backends,',
     ...(reviewCommand ? [`       Commission the review with: ${reviewCommand}`] : []),
-    `    3. hand the findings back for a second leg:  node scripts/${commandName}.mjs --point ${point} --findings <file>`,
+    `    3. hand the findings back for a second leg:  node scripts/${commandName}.mjs --lane ${role} --point ${point} --findings <file>`,
     '    4. record the review where a mechanism was touched:',
     `       node scripts/mechanism-review.mjs --record <sha> --model "${reviewer}" --verdict <v> --evidence "<what you read>" --mode review --point ${point}` +
       `${String(framing).trim() ? ` --author-framing "${String(framing).trim()}"` : ''}`,
     `    5. then land it:  node scripts/land-point.mjs ${point} --model "${authorModel}"`,
   )
   return lines.join('\n')
+}
+
+/** A headless Claude Code author, with no fallback that could falsify attribution. */
+export function authoringClaudeArgs({ modelId = executionTarget('scarce').id, prompt = '' } = {}) {
+  return [
+    '-p',
+    String(prompt),
+    '--model',
+    String(modelId),
+    '--output-format',
+    'json',
+    '--dangerously-skip-permissions',
+  ]
+}
+
+/** Read Claude Code's single-result JSON and prove which model served it. */
+export function parseClaudeAuthoringOutput(text, expectedModel = executionTarget('scarce').name) {
+  let value
+  try {
+    value = JSON.parse(String(text ?? '').trim())
+  } catch (error) {
+    return { ok: false, result: '', models: [], error: `Claude returned no readable result JSON: ${error.message}` }
+  }
+  const models = Object.keys(value?.modelUsage ?? {})
+  if (!models.length) {
+    return { ok: false, result: String(value?.result ?? ''), models, error: 'Claude reported no serving model' }
+  }
+  if (!models.every((model) => sameModel(model, expectedModel))) {
+    return {
+      ok: false,
+      result: String(value?.result ?? ''),
+      models,
+      error: `Claude served ${models.join(', ')}, not ${expectedModel}`,
+    }
+  }
+  return { ok: true, result: String(value?.result ?? ''), models, error: '' }
+}
+
+/** The outcome of a claude-runtime authoring run, in classifyOutcome's shape. */
+export function laneAuthoringOutcome(run = {}) {
+  if (run.spawnError) return { ok: false, cause: `Claude could not start: ${run.spawnError.message}` }
+  if (run.timedOut) return { ok: false, cause: 'Claude timed out before the authoring run completed' }
+  if (run.exitCode !== 0) return { ok: false, cause: `Claude exited with code ${run.exitCode}` }
+  if (!run.modelResult?.ok) return { ok: false, cause: run.modelResult?.error || 'Claude model attribution is unavailable' }
+  return { ok: true, cause: '' }
+}
+
+/**
+ * THE ONE RUNTIME DISPATCH of an authoring run: the executable, its argv, whether it
+ * writes its answer to a file, how its stdout is attributed, and how its outcome is
+ * classified — all from the lane record's `runtime`.
+ */
+export function authoringRuntime(role) {
+  const target = executionTarget(role)
+  switch (target.runtime) {
+    case 'codex':
+      return Object.freeze({
+        runtime: 'codex',
+        bin: 'codex',
+        label: 'codex',
+        detail: `(effort ${lane(role).reasoningEffort})`,
+        writesOutputFile: true,
+        args: ({ cwd = '', outputFile = '', prompt = '' } = {}) => authoringCodexArgs({ role, cwd, outputFile, prompt }),
+        attribute: () => null,
+        outcome: (run) => classifyOutcome(run),
+      })
+    case 'claude':
+      return Object.freeze({
+        runtime: 'claude',
+        bin: 'claude',
+        label: 'Claude',
+        detail: '',
+        writesOutputFile: false,
+        args: ({ prompt = '' } = {}) => authoringClaudeArgs({ modelId: target.id, prompt }),
+        attribute: (stdout) => parseClaudeAuthoringOutput(stdout, target.name),
+        outcome: (run) => laneAuthoringOutcome(run),
+      })
+    default:
+      throw new Error(`author-delegate: lane "${role}" has no authoring runtime "${target.runtime}"`)
+  }
+}
+
+/** What each authoring lane is told about the points it gets. */
+const LANE_DESCRIPTIONS = Object.freeze({
+  cross: 'the hard and critical ones included',
+  scarce: 'the points the shared router escalates or explicitly tags for the scarce lane',
+})
+
+/**
+ * Everything the command needs to commission one lane as author, derived from its
+ * record: model, id, trailer, runtime, and the reviewer — the non-scarce lane of a
+ * vendor the author does not have. A reviewer that is not the main chain is
+ * commissioned through cross-review; the main chain reviews in its own session.
+ */
+export function authorLaneConfig(role = DEFAULT_AUTHOR_ROLE) {
+  if (!AUTHOR_ROLES.includes(role)) {
+    throw new Error(`author-delegate: no authoring path for the "${role}" lane (lanes: ${AUTHOR_ROLES.join(', ')})`)
+  }
+  const target = executionTarget(role)
+  const runtime = authoringRuntime(role)
+  const reviewer = eligibleReviewers([lane(role).trailerName]).find((record) => !record.scarce) ?? MAIN
+  return Object.freeze({
+    lane: role,
+    commandName: 'author-delegate',
+    model: target.name,
+    modelId: target.id,
+    trailer: authorTrailer(role),
+    reviewer: reviewer.displayName,
+    reviewerRole: reviewer.role,
+    runtime,
+    detail: runtime.detail,
+    laneDescription: LANE_DESCRIPTIONS[role],
+  })
 }

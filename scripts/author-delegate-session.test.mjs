@@ -4,14 +4,14 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { writeState as writeFableState } from './lane-switch-core.mjs'
+import { writeState as writeSwitchState } from './lane-switch-core.mjs'
 
 const moduleUrl = pathToFileURL(resolve('scripts/author-delegate.mjs')).href
 const dirs = []
 const processes = new Set()
 const waitFor = (check) => vi.waitFor(check, { timeout: 10_000, interval: 20 })
 
-function fixture({ lane = 'astra', override = false, worktree = false, detached = false, shell = false, exitCode = 0 } = {}) {
+function fixture({ lane = 'cross', override = false, worktree = false, detached = false, shell = false, exitCode = 0 } = {}) {
   const main = mkdtempSync(join(tmpdir(), 'hoa-author-session-'))
   dirs.push(main)
   const cwd = worktree ? join(main, '.claude/worktrees/point-1133') : main
@@ -87,10 +87,10 @@ afterEach(async () => {
 })
 
 describe('authoring session and log ownership', () => {
-  it.each(['astra', 'fable'])('keeps the default %s log in the main checkout after worktree removal', async (lane) => {
+  it.each(['cross', 'scarce'])('keeps the default %s log in the main checkout after worktree removal', async (lane) => {
     const run = fixture({ lane, worktree: true })
     await running(run)
-    expect(run.stdout().split('\n')[0]).toBe(`author-${lane}: log ${run.log} (append)`)
+    expect(run.stdout().split('\n')[0]).toBe(`author-delegate: log ${run.log} (append)`)
     expect(existsSync(join(run.cwd, 'local'))).toBe(false)
     writeFileSync(run.release, '')
     expect((await run.closed).code).toBe(0)
@@ -137,11 +137,11 @@ describe('authoring session and log ownership', () => {
     expect(run.stdout()).not.toContain('\nDONE\n')
   })
 
-  it('retains an existing session leader and supports the Fable log override', async () => {
-    const run = fixture({ detached: true, lane: 'fable', override: true })
+  it('retains an existing session leader and supports the scarce-lane log override', async () => {
+    const run = fixture({ detached: true, lane: 'scarce', override: true })
     const identity = await running(run)
     expect(identity.pid).toBe(run.child.pid)
-    expect(run.stdout().split('\n')[0]).toBe(`author-fable: log ${run.log} (append)`)
+    expect(run.stdout().split('\n')[0]).toBe(`author-delegate: log ${run.log} (append)`)
     writeFileSync(run.release, '')
     expect((await run.closed).code).toBe(0)
     expect(run.stdout()).toBe(readFileSync(run.log, 'utf8'))
@@ -165,7 +165,7 @@ describe('authoring session and log ownership', () => {
   })
 
   it('appends a second invocation without replaying the first invocation', async () => {
-    const run = fixture({ lane: 'fable' })
+    const run = fixture({ lane: 'scarce' })
     await running(run)
     writeFileSync(run.release, '')
     expect((await run.closed).code).toBe(0)
@@ -190,7 +190,7 @@ describe('authoring session and log ownership', () => {
     expect(missing.stderr).toContain('--log needs a path')
   })
 
-  it.each(['astra', 'fable'])('uses log ownership in the real %s CLI before refusing an invalid worktree', (lane) => {
+  it.each(['cross', 'scarce'])('uses log ownership in the real %s CLI before refusing an invalid worktree', (lane) => {
     const cwd = mkdtempSync(join(tmpdir(), 'hoa-author-cli-log-'))
     dirs.push(cwd)
     const log = join(cwd, 'chosen log.txt')
@@ -200,16 +200,17 @@ describe('authoring session and log ownership', () => {
     // The real switch state is git-ignored, so in a checkout without one the CLI
     // refused for the missing switch before it ever reached the worktree - the
     // ordering this test is about. The fixture carries its own state instead.
-    const fableSwitch = join(cwd, 'fable-switch.json')
-    writeFileSync(fableSwitch, JSON.stringify(writeFableState(lane === 'fable' ? 'on' : 'off', { why: 'test decision', by: 'test', now: 1 })))
-    const result = spawnSync(process.execPath, [resolve(`scripts/author-${lane}.mjs`), '--point', '1133', '--log', log], {
+    const laneSwitch = join(cwd, 'lane-switch.json')
+    const scarce = writeSwitchState(lane === 'scarce' ? 'on' : 'off', { why: 'test decision', by: 'test', now: 1 })
+    writeFileSync(laneSwitch, JSON.stringify({ lanes: { scarce } }))
+    const result = spawnSync(process.execPath, [resolve('scripts/author-delegate.mjs'), '--lane', lane, '--point', '1133', '--log', log], {
       cwd,
       encoding: 'utf8',
       windowsHide: true,
-      env: { ...process.env, HOA_REPO_ROOT: process.cwd(), AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: fableSwitch },
+      env: { ...process.env, HOA_REPO_ROOT: process.cwd(), AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: laneSwitch },
     })
     expect(result.status, result.stderr).toBe(2)
-    expect(result.stdout.split('\n')[0]).toBe(`author-${lane}: log ${log} (append)`)
+    expect(result.stdout.split('\n')[0]).toBe(`author-delegate: log ${log} (append)`)
     expect(result.stdout).toContain('refusing to start')
     expect(result.stderr).toBe('')
     expect(readFileSync(log, 'utf8')).toBe('prior commission\n' + result.stdout)

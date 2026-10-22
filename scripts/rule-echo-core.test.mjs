@@ -269,11 +269,11 @@ describe('memoryDirs', () => {
 
 describe('quoteIsInFile', () => {
   it('accepts a verbatim phrase, across a line break too', () => {
-    expect(quoteIsInFile('the hard cases stay\n  with Opus 5 from now on', 'the hard cases stay with Opus 5').ok).toBe(true)
+    expect(quoteIsInFile('the hard cases stay\n  with the main lane from now on', 'the hard cases stay with the main lane').ok).toBe(true)
   })
 
   it('refuses a phrase that is not in the file — the whole point of it', () => {
-    expect(quoteIsInFile('some other text entirely, at length', 'the hard cases stay with Opus 5')).toMatchObject({
+    expect(quoteIsInFile('some other text entirely, at length', 'the hard cases stay with the main lane')).toMatchObject({
       ok: false,
       reason: 'that phrase does not occur in the file',
     })

@@ -17,7 +17,7 @@
 //
 // * Every marker lives at the END of the point's OWN head line — the `- [ ] N.`
 //   line — exactly where `defer-for-user.mjs` appends them, and nowhere else.
-//   BOTH halves of that are load-bearing (four-eyes review, Fable 5, 07.08.2026):
+//   BOTH halves of that are load-bearing (four-eyes review, 07.08.2026):
 //   the head line keeps a marker out of a point's prose, and the END anchor
 //   keeps it out of the head line's own prose. Without the anchor, a HEADLINE
 //   that merely names the mechanism ("HARDEN THE AWAITING-USER PARSER") gated
@@ -35,7 +35,7 @@
 //   `CONFIRMATION_ACTS` — `release-tag`, `public-release`, `board-contract` —
 //   never described. `formatConfirmationReason` is the only way to build one and
 //   demands at least three words in each field.
-//   WHY SELECTED RATHER THAN DESCRIBED (three cross-vendor rounds, GPT-5.6 Sol,
+//   WHY SELECTED RATHER THAN DESCRIBED (three cross-vendor rounds,
 //   23.08.2026): reading a free sentence for "is this an outward act" is a
 //   bag-of-words guess, and each widening of the patterns produced the next
 //   counterexample — "copy for the withdrawal dialog in production",
@@ -89,8 +89,8 @@ const REASON_MAX = 160
 
 const MARKERS = [CONFIRMATION_MARKER, LEGACY_GATE_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
 /**
- * A TYPED MARKER MUST CARRY ITS PAYLOAD BRACKETS (cross-vendor review, GPT-5.6
- * Sol, 23.08.2026). With the brackets optional for every marker, a head line
+ * A TYPED MARKER MUST CARRY ITS PAYLOAD BRACKETS (cross-vendor review,
+ * 23.08.2026). With the brackets optional for every marker, a head line
  * whose HEADLINE ends in the bare word — "…RENAME THE MARKER TO SELF-DECIDED" —
  * parsed as a marker, and the next rewrite deleted that headline text with
  * `stripMarkers`. Only the LEGACY marker keeps them optional, because untyped
@@ -132,7 +132,7 @@ const readPayload = (marker, payload) => {
  * Every trailing marker of a line, in the order they stand, plus the line with
  * all of them removed. Migration needs each one — `parseGateLine` reads only the
  * LAST, which is the STATE, and a legacy marker standing before a later answer
- * would otherwise never be seen (cross-vendor review, GPT-5.6 Sol, 23.08.2026).
+ * would otherwise never be seen (cross-vendor review,  23.08.2026).
  */
 const peelTrailingMarkers = (line) => {
   let head = String(line)
@@ -161,11 +161,11 @@ export function sanitiseReason(reason, { max = REASON_MAX } = {}) {
 }
 
 // The verbs that make an act outward-facing. UNDOING a released artefact is as
-// hard to reverse as making it (cross-vendor review, GPT-5.6 Sol, 23.08.2026):
+// hard to reverse as making it (cross-vendor review,  23.08.2026):
 // "delete the v1.2.0 release tag" fell to advisory while "push" did not.
 //
 // EVERY FORM IS SPELLED OUT rather than closed with `\w*` (second cross-vendor
-// round, GPT-5.6 Sol, 23.08.2026). A trailing `\w*` turned the verbs into their
+// round,  23.08.2026). A trailing `\w*` turned the verbs into their
 // NOUNS: "copy for the withdrawal dialog in production" — an advisory design
 // question — named an authorized act and parked its point. A closed policy list
 // is spelled out; that is what makes it closed.
@@ -193,7 +193,7 @@ const RELEASE_FORMS = [
 ]
 /**
  * The release lane needs the THING released, not merely a released-sounding
- * word near "production" (third cross-vendor round, GPT-5.6 Sol, 23.08.2026):
+ * word near "production" (third cross-vendor round,  23.08.2026):
  * "typography for the published notice in production" is a design question, and
  * proximity alone made it a gate.
  */
@@ -210,7 +210,7 @@ const RELEASE_VERB = RELEASE_FORMS.join('|')
 const BOARD_VERB = BOARD_FORMS.join('|')
 
 /**
- * A QUESTION IS NEVER A CONFIRMATION (third cross-vendor round, GPT-5.6 Sol,
+ * A QUESTION IS NEVER A CONFIRMATION (third cross-vendor round,
  * 23.08.2026). Two rounds of counterexamples were all the same shape: an
  * advisory question whose words happened to name an authorized act. A reason
  * that asks rather than states is advisory before any act rule runs — which is
@@ -228,7 +228,7 @@ const wordsIn = (text) => String(text ?? '').trim().split(/\s+/).filter(Boolean)
 
 /**
  * A prepared state is NAMED, never merely announced. All of these passed while
- * recording nothing (cross-vendor review, GPT-5.6 Sol, 23.08.2026): the bare
+ * recording nothing (cross-vendor review,  23.08.2026): the bare
  * phrase "safe prepared state:", the bare "prepared locally", and a catch-all
  * third alternative that any prose mentioning "locally … not … publish"
  * satisfied. The record is what the queue skip is bought with, so it must carry
@@ -270,7 +270,7 @@ const STRUCTURED_RE = new RegExp(
  * Compose the one reason a typed confirmation may carry.
  *
  * THE COMPOSED REASON IS RE-READ BEFORE IT IS BLESSED (fourth cross-vendor
- * round, GPT-5.6 Sol, 23.08.2026). Validating the FIELDS and then storing
+ * round,  23.08.2026). Validating the FIELDS and then storing
  * `sanitiseReason(...)` was a lost-gate defect: the 160-character cap cut the
  * `safe prepared state` clause off the end, the writer reported success, the
  * marker went into the work order — and the strict reader then classified it
@@ -310,7 +310,7 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
 /**
  * Classify a reason. THE TYPED FORM IS EXACT, THE PROSE FORM IS A HEURISTIC.
  *
- * WHY THE SPLIT (three cross-vendor rounds, GPT-5.6 Sol, 23.08.2026). Reading a
+ * WHY THE SPLIT (three cross-vendor rounds,  23.08.2026). Reading a
  * free sentence for "does this name an outward act" is a bag-of-words guess, and
  * three rounds of widening produced a new counterexample each time — "copy for
  * the withdrawal dialog in production", "typography for the published notice",
@@ -365,15 +365,15 @@ export function classifyLegacyReason(reason) {
     RELEASE_OBJECT.test(lower) &&
     (new RegExp(`\\b(?:${RELEASE_VERB})\\b[^.]{0,100}\\b(?:public|production)\\b`).test(lower) ||
       new RegExp(`\\b(?:public|production)\\b[^.]{0,100}\\b(?:${RELEASE_VERB})\\b`).test(lower))
-  // BOTH directions demand the PUBLIC qualifier (cross-vendor review, GPT-5.6
-  // Sol, 23.08.2026). Without it on the second alternative, "should the
+  // BOTH directions demand the PUBLIC qualifier (cross-vendor review,
+  // 23.08.2026). Without it on the second alternative, "should the
   // four-section internal draft change font?" — an advisory question — named an
   // authorized act and parked its point, which is the exact inversion this
   // point exists to remove.
   const boardContractAct =
     new RegExp(`\\b(?:${BOARD_VERB})\\b[^.]{0,120}\\b(?:published|public)\\b[^.]{0,80}\\b(?:four[- ]section|4[- ]section|section contract)\\b`).test(lower) ||
     new RegExp(`\\b(?:published|public)\\b[^.]{0,80}\\b(?:four[- ]section|4[- ]section|section contract)\\b[^.]{0,120}\\b(?:${BOARD_VERB})\\b`).test(lower)
-  // The PHRASE alone is not the state (cross-vendor review, GPT-5.6 Sol,
+  // The PHRASE alone is not the state (cross-vendor review,
   // 23.08.2026): "push the release tag; safe prepared state:" named nothing and
   // was accepted, which is precisely the record the gate is bought with.
   const prepared = namesPreparedState(lower) || namesPreparationInWords(lower)
@@ -427,7 +427,7 @@ export function parseGateLine(line) {
     marker,
     legacy: marker === LEGACY_GATE_MARKER,
     selfDecided: live && selfDecided,
-    // ONLY A TYPED MARKER GATES (fourth cross-vendor round, GPT-5.6 Sol,
+    // ONLY A TYPED MARKER GATES (fourth cross-vendor round,
     // 23.08.2026). An untyped line used to gate on the prose heuristic's
     // verdict, which put that heuristic — and every false positive three review
     // rounds found in it — back on the live path of every queue and pool
@@ -510,7 +510,7 @@ export function gateSets(source) {
 /**
  * Replace the head line of `point`, or report that there is none.
  *
- * THE LINE ENDING SURVIVES (four-eyes review, Fable 5). On a CRLF checkout —
+ * THE LINE ENDING SURVIVES (four-eyes review). On a CRLF checkout —
  * which this repository has met before (point 439) — appending to the raw line
  * put the marker AFTER the `\r`, so the next reader that normalises line
  * endings saw the marker on a line of its own and the gate silently evaporated.
@@ -545,7 +545,7 @@ const stripMarkers = (line) => {
 /**
  * Mark a point as awaiting a true confirmation. Returns { text, ok, error }.
  *
- * THE ACT IS SELECTED, NOT DESCRIBED (three cross-vendor rounds, GPT-5.6 Sol,
+ * THE ACT IS SELECTED, NOT DESCRIBED (three cross-vendor rounds,
  * 23.08.2026): the caller names one of `CONFIRMATION_ACTS`, what it does, and
  * what stands safely prepared. Nothing this writes can therefore be an advisory
  * question that merely sounded outward-facing. An already gated point is
@@ -561,7 +561,7 @@ export function markGated(tasksText, point, { since = '', act = '', detail = '',
     }
   }
   const clean = composed.reason
-  // ONLY a real ISO stamp goes in (four-eyes review, Fable 5): a raw fallback
+  // ONLY a real ISO stamp goes in (four-eyes review): a raw fallback
   // let a bracket in `since` close the marker early and strand the rest of the
   // line as junk no re-stamp could remove. The format already tolerates none.
   const stamp = leadingStamp(since)
@@ -651,7 +651,7 @@ export function prepareAdvisoryDecision(tasksText, point, {
  * prepared state: X" form splits exactly; anything else carries the WHOLE
  * reason as the detail and says the state must be re-read from it — never that
  * none was recorded, which was wrong whenever the prose named one in passing
- * (fourth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+ * (fourth cross-vendor round,  23.08.2026).
  */
 const legacySplit = (reason) => {
   const text = String(reason ?? '')
@@ -676,8 +676,8 @@ const legacyDecision = (point, reason) => advisoryDecisionCard(point, {
  * is named (`confirmation-needs-rewrite`); ambiguous open markers become
  * SELF-DECIDED and yield the decision card the CLI must publish.
  *
- * EVERY marker on the line, not only the state (cross-vendor review, GPT-5.6
- * Sol, 23.08.2026). Reading through `parseGateLine` saw the LAST marker alone:
+ * EVERY marker on the line, not only the state (cross-vendor review,
+ * 23.08.2026). Reading through `parseGateLine` saw the LAST marker alone:
  * a legacy gate standing before a later `USER-ANSWERED` was neither rewritten
  * nor reported, and two legacy markers in a row were stripped together but
  * yielded a single verdict — both against the promise that the report names
@@ -771,7 +771,7 @@ export function markAnswered(tasksText, point, { at = '' } = {}) {
  * Remove the markers from a point's line — the answer was worked, the gate was
  * wrong, or a leftover sits on a point that has since been ticked.
  *
- * TICKED LINES INCLUDED (four-eyes review, Fable 5): `gateReport` tells the
+ * TICKED LINES INCLUDED (four-eyes review): `gateReport` tells the
  * operator to clear exactly those, and the only API that could refused them,
  * silently. Removing a marker can never resurrect a closed point — nothing
  * reads a marker off a ticked line as live — so there is nothing to protect.

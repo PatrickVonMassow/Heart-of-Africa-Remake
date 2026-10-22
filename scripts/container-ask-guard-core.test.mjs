@@ -212,7 +212,7 @@ describe('a NEGATED demand is no demand', () => {
 // "du solltest gleich Ergebnisse sehen" are obligation modals by shape, their
 // report sits one clause back, and nothing in the negation list can see them —
 // so the guard blocked the session for closing its turn the way its own remedy
-// prescribes (four-eyes review, Fable 5, 04.08.2026).
+// prescribes (four-eyes review, 04.08.2026).
 describe('a reassurance without a negation word is no demand either', () => {
   const reassurances = [
     ['English, "you should be all set"', "I've run `npm run build`; you should be all set."],
@@ -245,7 +245,7 @@ describe('a reassurance without a negation word is no demand either', () => {
 // The hand-back rungs demand a hand-BACK DIRECTION — "paste it HERE", "schick
 // MIR das Log". Without one, the same verb+object shape is ordinary declarative
 // prose about what a page or a board shows, which this project writes constantly
-// and which the first version of these rungs blocked (four-eyes review, Fable 5,
+// and which the first version of these rungs blocked (four-eyes review,
 // 04.08.2026). A report cue cannot rescue those sentences: cues are clause-local
 // by design, so an "Ich habe publiziert;" one clause earlier never reaches them.
 describe('a hand-back needs a direction, or it is only prose', () => {

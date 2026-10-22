@@ -5,7 +5,10 @@ import {
   formatUnavailableReceiptRoute,
 } from './cross-review.mjs'
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
-import { OPUS_MODEL } from './lane-switch-core.mjs'
+import { CROSS, MAIN, SCARCE } from './model-lanes.mjs'
+
+/** A retired display spelling of the cross lane (not an id). */
+const RETIRED_CROSS = CROSS.retired.find((name) => /\s/.test(name))
 
 const sha = 'a'.repeat(40)
 const base = 'b'.repeat(40)
@@ -16,8 +19,8 @@ const pass = {
   endState: sha,
   rangeBase: base,
   files: ['scripts/example-guard.mjs'],
-  reviewer: OPUS_MODEL,
-  reviewerVendor: 'anthropic',
+  reviewer: MAIN.displayName,
+  reviewerVendor: MAIN.vendor,
 }
 
 describe('printed review pass commands', () => {
@@ -35,7 +38,7 @@ describe('printed review pass commands', () => {
 
     expect(text).toContain(
       `node scripts/cross-review.mjs --sha ${sha} --since ${base} ` +
-        '--reviewer opus --brief "<what to judge>" --pass 1',
+        '--reviewer main --brief "<what to judge>" --pass 1',
     )
   })
 
@@ -54,11 +57,11 @@ describe('printed review pass commands', () => {
 
     expect(text).toContain(
       `node scripts/cross-review.mjs --sha ${sha} --since ${base} ` +
-        '--reviewer opus --brief "<what to judge>"',
+        '--reviewer main --brief "<what to judge>"',
     )
   })
 
-  it('reproduces de7e175 passes 4 and 5 as Opus 5 reviews of Sol-authored files', () => {
+  it('reproduces de7e175 passes 4 and 5 as main-chain reviews of cross-authored files', () => {
     const pass4Files = [
       'src/communication/chiefReply.test.ts',
       'src/communication/chiefReply.ts',
@@ -81,11 +84,11 @@ describe('printed review pass commands', () => {
     ]
     const files = [...pass4Files, ...pass5Files]
     const routed = planAuthorshipGroups({
-      commits: [{ sha, authorModel: 'GPT-5.6 Sol', files }],
+      commits: [{ sha, authorModel: RETIRED_CROSS, files }],
       endStateFiles: files,
     })
     expect(routed.groups).toHaveLength(1)
-    expect(routed.groups[0]).toMatchObject({ reviewer: OPUS_MODEL, files })
+    expect(routed.groups[0]).toMatchObject({ reviewer: MAIN.displayName, files })
 
     const text = formatAuthorshipPlan({
       budget: 200_000,
@@ -101,10 +104,10 @@ describe('printed review pass commands', () => {
       superseded: [],
     }, { sha: 'de7e175213bac848263bd6f59a1b6c6ea45af5d9' })
 
-    expect(text).toContain('pass 4/16 → anthropic reviewer Opus 5')
-    expect(text).toContain('pass 5/16 → anthropic reviewer Opus 5')
-    expect(text).toContain('--reviewer opus --brief "<what to judge>" --pass 4')
-    expect(text).toContain('--reviewer opus --brief "<what to judge>" --pass 5')
+    expect(text).toContain(`pass 4/16 → main lane reviewer ${MAIN.displayName}`)
+    expect(text).toContain(`pass 5/16 → main lane reviewer ${MAIN.displayName}`)
+    expect(text).toContain('--reviewer main --brief "<what to judge>" --pass 4')
+    expect(text).toContain('--reviewer main --brief "<what to judge>" --pass 5')
   })
 
   it('prints a point-bound receipt instead of a runnable index when nobody is eligible', () => {
@@ -112,7 +115,7 @@ describe('printed review pass commands', () => {
     const routed = planAuthorshipGroups({
       commits: [{
         sha,
-        authorModels: ['GPT-6 Astra', OPUS_MODEL, 'Fable 5.1', 'Opus 4.8'],
+        authorModels: [RETIRED_CROSS, MAIN.displayName, SCARCE.displayName, MAIN.fallback.displayName],
         files,
       }],
       endStateFiles: files,

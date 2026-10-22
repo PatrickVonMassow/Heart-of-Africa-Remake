@@ -981,7 +981,7 @@ export const RESPAWN_GRACE_MS = 30 * 60 * 1000
 
 /**
  * How long a FRESH LOG may keep an agent alive whose git output could be measured
- * and has stood still (four-eyes review, Fable 5, 30.07.2026, finding 4).
+ * and has stood still (four-eyes review, 30.07.2026, finding 4).
  *
  * A fresh log is genuine evidence that something is happening, so it refuses the
  * respawn — but it must not refuse it FOREVER: an agent wedged in a printing loop
@@ -1790,10 +1790,10 @@ function gitBranchCreates(seg) {
 function segmentTarget(seg) {
   const none = { points: [], refs: [], how: 'none' }
   const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
-  // An authoring run IS the commissioning of a point, whichever vendor runs it —
+  // An authoring run IS the commissioning of a point, whichever lane runs it —
   // unless it is one of the read-only legs, which produce no work at all.
   if (!/--routing\b|--dry-run\b/.test(seg)) {
-    const authored = uniq([...seg.matchAll(/author-(?:delegate|astra|sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    const authored = uniq([...seg.matchAll(/author-delegate\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
     if (authored.length) return { points: authored, refs: [], how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {

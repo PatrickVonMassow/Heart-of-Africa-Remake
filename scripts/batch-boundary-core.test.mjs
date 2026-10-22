@@ -78,6 +78,7 @@ import {
   durablePrepareReceipt,
   durablePrepareVerdict,
 } from './batch-boundary-plane-core.mjs'
+import { MAIN } from './model-lanes.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -369,7 +370,7 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
   })
 
   it('a single & is a separator too — it hid real work behind a closing head', () => {
-    // Four-eyes review (Fable 5): with `&&` and `;` as the only separators this
+    // Four-eyes review: with `&&` and `;` as the only separators this
     // parsed as ONE segment, matched the closing head and KEPT the handover
     // through `npm test` — a successor could then spawn beside a working session.
     expect(call({ command: 'node scripts/board.mjs & npm test' }).survives).toBe(false)
@@ -1109,7 +1110,7 @@ describe('every Stop-guard remedy is closing work or explicitly deferred at the 
         pendingCommits: [{
           sha: 'a'.repeat(40),
           subject: 'Change a guard',
-          authorModel: 'Claude Opus 5',
+          authorModel: MAIN.trailerName,
           files: ['scripts/pending-guard.mjs'],
           coveringRecordShas: [],
         }],

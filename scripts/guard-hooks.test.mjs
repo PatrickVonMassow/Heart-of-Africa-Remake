@@ -24,6 +24,9 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { AUTO_END, AUTO_START } from './retro-core.mjs'
 import { DOC_BUDGETS } from './doc-budget-core.mjs'
+import { MAIN, TEST_FOREIGN_MODELS, VENDORS, trailerFor } from './model-lanes.mjs'
+
+const MAIN_ADDRESS = VENDORS[MAIN.vendor].trailerAddress
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const SESSION = 'hook-test-session'
@@ -131,8 +134,8 @@ beforeAll(() => {
   // Every real reader fails loud when this shared decision is absent. Keep the
   // guard fixture explicit too, so its model-trailer cases reach the rule they test.
   write(
-    '.claude/fable-switch.json',
-    JSON.stringify({ state: 'on', reason: 'exercise the full fixture allowlist', setBy: 'test', changedAt: 1 }),
+    '.claude/lane-switch.json',
+    JSON.stringify({ lanes: { scarce: { state: 'on', reason: 'exercise the full fixture allowlist', setBy: 'test', changedAt: 1 } } }),
   )
 })
 
@@ -455,7 +458,7 @@ describe('dashboard-guard', () => {
 describe('model-guard', () => {
   const commitAs = (model, message) => {
     write('marker.txt', `${model} ${Date.now()}`)
-    commit(`${message}\n\nCo-Authored-By: ${model} <noreply@anthropic.com>`)
+    commit(`${message}\n\nCo-Authored-By: ${model} <${MAIN_ADDRESS}>`)
   }
 
   it('BLOCKS DIFFERENTLY on a commit whose trailer names no model at all', () => {
@@ -464,7 +467,7 @@ describe('model-guard', () => {
     // the breach ritual.
     write('.claude/model-guard-baseline.json', JSON.stringify({ since: new Date(Date.now() - 3600_000).toISOString() }))
     write('marker.txt', `bare ${Date.now()}`)
-    commit('a change from a session that named nothing\n\nCo-Authored-By: Claude <noreply@anthropic.com>')
+    commit(`a change from a session that named nothing\n\nCo-Authored-By: Claude <${MAIN_ADDRESS}>`)
     const sha = git('rev-parse', 'HEAD').stdout.trim().slice(0, 7)
 
     const hook = expectHookAgrees('model-guard.mjs', 'model-guard', { blocks: true })
@@ -477,7 +480,7 @@ describe('model-guard', () => {
   it('BLOCKS on a commit authored outside the model allowlist', () => {
     // The baseline must predate the commit, or the tripwire looks straight past it.
     write('.claude/model-guard-baseline.json', JSON.stringify({ since: new Date(Date.now() - 3600_000).toISOString() }))
-    commitAs('Claude Haiku 4.5', 'a change from a degraded session')
+    commitAs(TEST_FOREIGN_MODELS.haikuTrailer, 'a change from a degraded session')
     const sha = git('rev-parse', 'HEAD').stdout.trim().slice(0, 7)
 
     expect(preflight()['model-guard'].status).toBe('would-block')
@@ -491,7 +494,7 @@ describe('model-guard', () => {
 
   it('ALLOWS a commit from an allowlisted model', () => {
     write('.claude/model-guard-baseline.json', JSON.stringify({ since: new Date().toISOString() }))
-    commitAs('Claude Opus 5', 'a change from an allowed model')
+    commitAs(MAIN.trailerName, 'a change from an allowed model')
     expectHookAgrees('model-guard.mjs', 'model-guard', { blocks: false })
   })
 
@@ -593,7 +596,7 @@ describe('mechanism-review-guard: the switched-off four-eyes gate', { timeout: 6
   const head = () => git('rev-parse', 'HEAD').stdout.trim()
   const baselineAt = (sha) => write(BASELINE, JSON.stringify({ baselines: { [branch()]: sha } }))
   const review = (args) => node([resolve(repo, 'scripts', 'mechanism-review.mjs'), ...args])
-  const AUTHOR = 'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'
+  const AUTHOR = `Co-Authored-By: ${trailerFor('main')}`
   let guardSha = ''
 
   it('lets a brand-new unreviewed guard through, at the hook and at the preflight', () => {
@@ -632,7 +635,7 @@ describe('mechanism-review-guard: the switched-off four-eyes gate', { timeout: 6
   it('REFUSES to record a self-review instead of warning about it', () => {
     const r = review([
       '--record', guardSha,
-      '--model', 'Claude Opus 5',
+      '--model', MAIN.trailerName,
       '--verdict', 'merge',
       '--evidence', 'I have read my own work again and it still looks right',
       '--mode', 'review',

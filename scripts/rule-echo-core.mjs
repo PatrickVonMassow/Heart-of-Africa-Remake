@@ -6,7 +6,7 @@
 // resume hook's two prompt texts and three memory entries. Changing the rule left
 // all the others asserting the old one, and one of them is read into EVERY
 // session's context at start (the registry below lists today's echoes). This is not a one-off: the same
-// shape produced "the fallback is Opus 4.8" in a memory the code has never
+// shape produced "the fallback is <a retired model>" in a memory the code has never
 // matched, and a memory claiming a guard did not exist while it sat wired in the
 // Stop chain.
 //

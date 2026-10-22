@@ -264,7 +264,7 @@ describe('auditGuide — budget boundaries', () => {
   it('reads a closing newline as the end of the last line, not as another one', () => {
     // The ceilings are ratcheted against this count, so a phantom line here
     // silently bought the guide a line of headroom in every raise ever made
-    // (four-eyes finding, GPT-5.6 Sol on 4d88250, 31.08.2026).
+    // (four-eyes finding on 4d88250, 31.08.2026).
     expect(measureGuide('a\nb\n').lines).toBe(2)
     expect(measureGuide('a\nb').lines).toBe(2)
     expect(measureGuide('').lines).toBe(0)
@@ -425,7 +425,7 @@ describe('the real vibe-coding guide', () => {
     // The entry was WIDENED and, in the same commit, silently stripped of the
     // divergence check and of "Priorisiere das Ziel" — the two halves that make
     // it act. Nothing caught it, because the suite only demanded a prompt
-    // marker (four-eyes finding, GPT-5.6 Sol, 31.08.2026).
+    // marker (four-eyes finding, 31.08.2026).
     const entries = parseEntries(sliceSection(guide, /Fallstrick/i))
     const prose = entries.find((entry) => entry.title.startsWith('Prosa wirkt nicht'))
     const text = prose?.lines.join(' ').replace(/\s+/g, ' ')
@@ -447,12 +447,12 @@ describe('the real vibe-coding guide', () => {
     // satisfy every claim below and re-open the duplication the fold closed.
     // NOT `not.toContain(expect.stringContaining(…))` — `toContain` compares
     // elements by identity, so an asymmetric matcher never matches and the
-    // negated form can never fail (GPT-5.6 Sol, 31.08.2026).
+    // negated form can never fail (cross-vendor review, 31.08.2026).
     // And NOT through `parseEntries` alone: a parser that absorbed the old
     // heading into its host would leave ONE entry, an empty title search and
     // every claim below satisfied — the named regression would pass. The RAW
     // section is what forbids the heading, in its own entry or inside the host
-    // text (GPT-5.6 Sol, 01.09.2026).
+    // text (cross-vendor review, 01.09.2026).
     const rawSection = section.map(({ text }) => text).join('\n')
     expect(rawSection).not.toContain('Die Sperre wächst beim Abtragen')
     expect(entries.some((entry) => entry.title.includes('Die Sperre wächst beim Abtragen'))).toBe(

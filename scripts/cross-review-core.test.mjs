@@ -14,9 +14,8 @@ import {
   codexArgs,
   coverageDecision,
   decideReview,
+  automaticReviewer,
   fallbackReviewerFor,
-  FALLBACK_CHAIN,
-  FALLBACK_MODEL_NAME,
   formatRecordCommand,
   formatReviewerCommand,
   formatReviewMaterial,
@@ -29,18 +28,33 @@ import {
   PROBE_MAX_AGE_MS,
   probeFreshness,
   savedAuthPathFrom,
-  CLAUDE_REVIEW_CHAIN,
   authoredByLane,
-  SECOND_FALLBACK_MODEL_NAME,
+  REVIEW_CHAINS,
+  reviewChain,
   reviewerDescriptor,
-  REVIEWER_ROSTER,
-  ASTRA_MODEL_ID,
-  ASTRA_MODEL_NAME,
-  ASTRA_REASONING_EFFORT,
+  reviewerForRole,
+  unresolvedAuthors,
 } from './cross-review-core.mjs'
-import { CLAUDE_MODEL, OPUS_FALLBACK_MODEL, OPUS_MODEL, readState, writeState } from './lane-switch-core.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
+import { CROSS, EXECUTION_ROLES, LANES, LEGACY, MAIN, SCARCE, VENDORS, executionTarget, lane, trailerFor } from './model-lanes.mjs'
 
-const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test', by: 'test', now: 1 })))
+const SCARCE_OFF = readState(JSON.stringify(writeState('off', { why: 'test', by: 'test', now: 1 })))
+
+// Every name below is read from the lane registry (scripts/model-lanes.mjs).
+const CROSS_NAME = CROSS.displayName
+const MAIN_NAME = MAIN.displayName
+const SCARCE_NAME = SCARCE.displayName
+const FALLBACK_NAME = MAIN.fallback.displayName
+/** The cross lane's retired DISPLAY spellings (not its ids), oldest last. */
+const RETIRED_CROSS = CROSS.retired.filter((name) => /\s/.test(name))
+/** The three names the cross lane has carried — one lane, whichever is used. */
+const CROSS_NAMES = [CROSS_NAME, ...RETIRED_CROSS]
+const crossAddress = VENDORS[CROSS.vendor].trailerAddress
+const MAIN_TRAILER = trailerFor('main')
+const SCARCE_TRAILER_NAME = SCARCE.trailerName
+const FALLBACK_TRAILER_NAME = MAIN.fallback.trailerName
+/** How the trailer reader spells a model name back (hyphens become spaces). */
+const guardSpelling = (name) => name.replace(/-/g, ' ')
 
 const astraSays = (verdict = 'merge', evidence = 'read the diff and the guard test; the fail-open path is covered') =>
   `I checked the change.\n\nVERDICT: ${verdict}\nEVIDENCE: ${evidence}\n`
@@ -100,7 +114,7 @@ describe('classifyOutcome — how a codex run ended', () => {
     // …but a server that actually REFUSED does, however the stream ended afterwards.
     // Codex retries, so a real 429 and a reconnect storm share one transcript, and
     // calling that unreachable would send us hunting a firewall that is fine
-    // (GPT-5.6 Sol, reviewing the first version of this fix).
+    // (cross-vendor review of the first version of this fix).
     expect(
       classifyOutcome({
         exitCode: 1,
@@ -110,7 +124,7 @@ describe('classifyOutcome — how a codex run ended', () => {
     // But a NAKED status code is not the server refusing. Codex reconnects through
     // 403s and prints `last status: 429` as the last thing it saw, on accounts with
     // allowance to spare — that run died in transport, and calling it a spent account
-    // is the original mistake one round further along (GPT-5.6 Sol, second review).
+    // is the original mistake one round further along (cross-vendor review, second round).
     expect(
       classifyOutcome({
         exitCode: 1,
@@ -253,7 +267,7 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
   })
 
   it('does NOT route a real verdict to the fallback because its FINDINGS use the net’s words', () => {
-    // Measured 18.08.2026 (point 714, pass 2): Sol reviewed the review tooling
+    // Measured 18.08.2026 (point 714, pass 2): the cross lane reviewed the review tooling
     // itself, its findings named a file that ends up "with no patch"
     // association, and the clean do-not-merge below it was reported as "the
     // reviewer says it could not see the change" — a FALSE fallback, which is
@@ -308,13 +322,8 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
 
 describe('decideReview — the recorded model follows the RUN, never the preference', () => {
   it('maps every model either review chain can name to this runnable command', () => {
-    expect(REVIEWER_ROSTER.map(({ name }) => name)).toEqual([
-      'GPT-6 Astra',
-      'Fable 5.1',
-      OPUS_MODEL,
-      OPUS_FALLBACK_MODEL,
-    ])
-    for (const model of [...FALLBACK_CHAIN, ...CLAUDE_REVIEW_CHAIN]) {
+    expect(EXECUTION_ROLES.map((role) => reviewerForRole(role).name)).toEqual([MAIN_NAME, CROSS_NAME, SCARCE_NAME, FALLBACK_NAME])
+    for (const model of [...reviewChain('crossUnavailable'), ...reviewChain('crossAuthored')]) {
       const reviewer = reviewerDescriptor(model)
       expect(reviewer, model).toMatchObject({ name: model, runtime: 'claude' })
       expect(formatReviewerCommand({ model, sha: 'a'.repeat(40), brief: 'read both end-state files' })).toContain(
@@ -323,23 +332,23 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     }
   })
 
-  it('turns the real mixed-author ineligibility into a runnable Fable command', () => {
+  it('turns the real mixed-author ineligibility into a runnable scarce-lane command', () => {
     const decision = decideReview({
       ...okRun(),
-      authorModel: ['GPT-5.6 Sol', `${CLAUDE_MODEL}`],
+      authorModel: [RETIRED_CROSS.at(-1), MAIN.trailerName],
     })
-    expect(decision).toMatchObject({ model: 'Fable 5.1', kind: OUTCOME.SELF_REVIEW, ready: false })
+    expect(decision).toMatchObject({ model: SCARCE_NAME, kind: OUTCOME.SELF_REVIEW, ready: false })
     expect(formatReviewerCommand({
       model: decision.model,
       sha: '16793dd'.padEnd(40, '0'),
       brief: 'read the guide and brevity core at their end state',
       point: 977,
-    })).toMatch(/^node scripts\/cross-review\.mjs --reviewer fable /)
+    })).toMatch(/^node scripts\/cross-review\.mjs --reviewer scarce /)
   })
 
-  it('a reachable Sol reviews, and is recorded as the reviewer', () => {
+  it('a reachable cross lane reviews, and is recorded as the reviewer', () => {
     const d = decideReview(okRun())
-    expect(d).toMatchObject({ model: ASTRA_MODEL_NAME, fellBack: false, ready: true, verdict: 'merge' })
+    expect(d).toMatchObject({ model: CROSS_NAME, fellBack: false, ready: true, verdict: 'merge' })
   })
 
   it('is NOT ready without delivery evidence — a clean exit is not a carried round', () => {
@@ -358,84 +367,84 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     ['an expired login', { exitCode: 1, stderr: 'not logged in' }, OUTCOME.LOGIN_EXPIRED],
     ['an exhausted allowance', { exitCode: 1, stderr: 'usage limit reached' }, OUTCOME.ALLOWANCE_EXHAUSTED],
     ['any error exit', { exitCode: 9, stderr: 'panicked at src/main.rs' }, OUTCOME.ERROR_EXIT],
-  ])('%s hands the review to Fable and records NO verdict', (_name, run, kind) => {
+  ])('%s hands the review to the scarce lane and records NO verdict', (_name, run, kind) => {
     const d = decideReview({ outcome: classifyOutcome(run), parsed: { ok: false } })
-    expect(d).toMatchObject({ model: FALLBACK_MODEL_NAME, fellBack: true, ready: false, verdict: '', evidence: '', kind })
+    expect(d).toMatchObject({ model: SCARCE_NAME, fellBack: true, ready: false, verdict: '', evidence: '', kind })
     expect(d.cause).toBeTruthy()
   })
 
   it('a run that exits 0 but says nothing usable is also a fallback — not a green review', () => {
     const d = decideReview(okRun('I had a look and it seems fine.'))
-    expect(d).toMatchObject({ model: FALLBACK_MODEL_NAME, fellBack: true, ready: false, kind: OUTCOME.NO_VERDICT })
+    expect(d).toMatchObject({ model: SCARCE_NAME, fellBack: true, ready: false, kind: OUTCOME.NO_VERDICT })
   })
 
-  it('does not hand a Fable-authored commit to Fable — that is the self-review both gates refuse', () => {
+  it('does not hand a scarce-authored commit to the scarce lane — that is the self-review both gates refuse', () => {
     const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
-    expect(decideReview({ ...failed, authorModel: 'Claude Fable 5.1 <noreply@anthropic.com>' }).model).toBe(
-      SECOND_FALLBACK_MODEL_NAME,
+    expect(decideReview({ ...failed, authorModel: trailerFor('scarce') }).model).toBe(
+      MAIN_NAME,
     )
-    expect(decideReview({ ...failed, authorModel: `${CLAUDE_MODEL} <noreply@anthropic.com>` }).model).toBe(
-      FALLBACK_MODEL_NAME,
+    expect(decideReview({ ...failed, authorModel: MAIN_TRAILER }).model).toBe(
+      SCARCE_NAME,
     )
-    expect(fallbackReviewerFor('')).toBe(FALLBACK_MODEL_NAME)
+    expect(fallbackReviewerFor('')).toBe(SCARCE_NAME)
   })
 
-  it('removes Fable from both review directions while the shared switch refuses it', () => {
+  it('removes the scarce lane from both review directions while its switch refuses it', () => {
     const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
-    expect(decideReview({ ...failed, fableState: FABLE_OFF }).model).toBe(OPUS_MODEL)
-    expect(fallbackReviewerFor('', FABLE_OFF)).toBe(OPUS_MODEL)
-    expect(decideReview({ authorModel: ['GPT-5.6 Sol', OPUS_MODEL], fableState: FABLE_OFF }).model).toBe(OPUS_FALLBACK_MODEL)
-    expect(decideReview({ ...failed, authorModel: [OPUS_MODEL, OPUS_FALLBACK_MODEL], fableState: FABLE_OFF })).toMatchObject({
+    expect(decideReview({ ...failed, scarceState: SCARCE_OFF }).model).toBe(MAIN_NAME)
+    expect(fallbackReviewerFor('', SCARCE_OFF)).toBe(MAIN_NAME)
+    expect(decideReview({ authorModel: [RETIRED_CROSS.at(-1), MAIN_NAME], scarceState: SCARCE_OFF }).model).toBe(FALLBACK_NAME)
+    expect(decideReview({ ...failed, authorModel: [MAIN_NAME, FALLBACK_NAME], scarceState: SCARCE_OFF })).toMatchObject({
       model: '',
-      chain: [OPUS_MODEL, OPUS_FALLBACK_MODEL],
+      chain: [MAIN_NAME, FALLBACK_NAME],
     })
   })
 
   it('looks at EVERY author in the reviewed range, and picks one that wrote none of it', () => {
     // One record clears every commit it contains, so the reviewer must have
-    // authored NO part of the range — picking Opus 5 for an Opus+Fable range
+    // authored NO part of the range — picking the main chain for a main+scarce range
     // (the second round's fix) is a self-review of half of it (third round).
-    expect(fallbackReviewerFor([`${CLAUDE_MODEL}`, 'Claude Fable 5.1'])).toBe(OPUS_FALLBACK_MODEL)
-    expect(fallbackReviewerFor([`${CLAUDE_MODEL}`, 'Claude Opus 4.8'])).toBe(FALLBACK_MODEL_NAME)
-    expect(fallbackReviewerFor(['Claude Fable 5.1'])).toBe(SECOND_FALLBACK_MODEL_NAME)
+    expect(fallbackReviewerFor([MAIN.trailerName, SCARCE_TRAILER_NAME])).toBe(FALLBACK_NAME)
+    expect(fallbackReviewerFor([MAIN.trailerName, FALLBACK_TRAILER_NAME])).toBe(SCARCE_NAME)
+    expect(fallbackReviewerFor([SCARCE_TRAILER_NAME])).toBe(MAIN_NAME)
   })
 
   it('sees BOTH models when one commit names two co-authors', () => {
     // modelFromTrailers answers "who wrote this" with the first name; for "who
     // may not review this" that would hide the second (third round).
-    const field = `${CLAUDE_MODEL} <noreply@anthropic.com>;Claude Fable 5.1 <noreply@anthropic.com>`
+    const field = `${MAIN_TRAILER};${trailerFor('scarce')}`
     expect(modelsInTrailerField(field)).toHaveLength(2)
-    expect(fallbackReviewerFor(modelsInTrailerField(field))).toBe(OPUS_FALLBACK_MODEL)
+    expect(fallbackReviewerFor(modelsInTrailerField(field))).toBe(FALLBACK_NAME)
     expect(modelsInTrailerField('Patrick <p@example.com>')).toEqual([])
   })
 
   it('reads the reviewer separately, so reviewer credit is not authorship', () => {
     const identities = modelTrailerIdentities(
       'Separate review identity\n\n' +
-        `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\n` +
-        'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>\n',
+        `Co-Authored-By: ${MAIN_TRAILER}\n` +
+        `Reviewed-By: ${RETIRED_CROSS.at(-1)} <${crossAddress}>\n`,
     )
-    expect(identities).toEqual({ authors: [OPUS_MODEL], reviewers: ['GPT 5.6 Sol'] })
+    expect(identities).toEqual({ authors: [MAIN_NAME], reviewers: [guardSpelling(RETIRED_CROSS.at(-1))] })
     expect(reviewIdentityProblem(identities.reviewers[0], { authorModels: identities.authors })).toBe('')
   })
 
   it('treats the three pre-fix reviewer credits as ambiguous co-authorship, never inferred review', () => {
-    // These immutable ledger-only commits intended Sol as reviewer and Opus 5
+    // These immutable ledger-only commits intended the cross lane as reviewer and the main chain
     // as author. Their shared Co-Authored-By key cannot prove that intent, so
     // the ledger remains their reviewer record and trailer readers correctly
     // treat both lines as authorship. New commits use Reviewed-By instead.
     for (const [sha, lines] of [
       [
         '836b187bf5c92d086c603e0fe4ba9a09a7408547',
-        ['GPT-5.6 Sol <noreply@openai.com>', `${CLAUDE_MODEL} <noreply@anthropic.com>`],
+        [`${RETIRED_CROSS.at(-1)} <${crossAddress}>`, MAIN_TRAILER],
       ],
       [
         'fd02a519a03e1680f1c6c5b182987c42b4b3424d',
-        ['GPT-5.6 Sol <noreply@openai.com>', `${CLAUDE_MODEL} <noreply@anthropic.com>`],
+        [`${RETIRED_CROSS.at(-1)} <${crossAddress}>`, MAIN_TRAILER],
       ],
       [
         '1f24975053368939872dd1182bf71860e783a7ce',
-        [`${CLAUDE_MODEL} <noreply@anthropic.com>`, 'GPT-5.6 Sol <noreply@openai.com>'],
+        [MAIN_TRAILER, `${RETIRED_CROSS.at(-1)} <${crossAddress}>`],
       ],
     ]) {
       const identities = modelTrailerIdentities(
@@ -443,18 +452,18 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
           lines.map((line) => `Co-Authored-By: ${line}`).join('\n') +
           '\n',
       )
-      expect(new Set(identities.authors), sha).toEqual(new Set([OPUS_MODEL, 'GPT 5.6 Sol']))
+      expect(new Set(identities.authors), sha).toEqual(new Set([MAIN_NAME, guardSpelling(RETIRED_CROSS.at(-1))]))
       expect(identities.reviewers, sha).toEqual([])
     }
   })
 
   it('names NOBODY when every model in the chain authored part of the range', () => {
-    const none = fallbackReviewerFor([`${CLAUDE_MODEL}`, 'Claude Fable 5.1', 'Claude Opus 4.8'])
+    const none = fallbackReviewerFor([MAIN.trailerName, SCARCE_TRAILER_NAME, FALLBACK_TRAILER_NAME])
     expect(none).toBe('')
     const d = decideReview({
       outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }),
       parsed: { ok: false },
-      authorModel: [`${CLAUDE_MODEL}`, 'Claude Fable 5.1', 'Claude Opus 4.8'],
+      authorModel: [MAIN.trailerName, SCARCE_TRAILER_NAME, FALLBACK_TRAILER_NAME],
     })
     const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
     expect(report).toMatch(/cannot be recorded/)
@@ -466,13 +475,13 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     const d = decideReview({
       outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }),
       parsed: { ok: false },
-      authorModel: 'Claude Fable 5.1',
+      authorModel: SCARCE_TRAILER_NAME,
     })
     const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
-    expect(report).toContain(SECOND_FALLBACK_MODEL_NAME)
-    // An instruction naming Fable beside a command naming Opus is how a
-    // self-review gets recorded.
-    expect(report).not.toMatch(/Hand it to Fable/)
+    expect(report).toContain(MAIN_NAME)
+    // An instruction naming the scarce lane beside a command naming the main chain
+    // is how a self-review gets recorded.
+    expect(report).not.toContain(`Hand it to ${SCARCE_NAME}`)
   })
 
   it.each([
@@ -484,7 +493,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
     expect(report).toContain('NO RECORD COMMAND IS PRINTED')
     expect(report).not.toContain('mechanism-review.mjs --record')
-    expect(report).toContain(FALLBACK_MODEL_NAME)
+    expect(report).toContain(SCARCE_NAME)
   })
 
   it('still hands a NO-VERDICT run on with the placeholder template — its transfer completed', () => {
@@ -494,21 +503,21 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(report).toMatch(/--verdict <merge\|merge-with-fixes\|do-not-merge>/)
   })
 
-  it('never names Sol on a failed run, and never names Fable on a successful one', () => {
+  it('never names the cross lane on a failed run, and never a handover reviewer on a successful one', () => {
     expect(decideReview({ outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: parseVerdict(astraSays()) }).model).toBe(
-      FALLBACK_MODEL_NAME,
+      SCARCE_NAME,
     )
     expect(decideReview(okRun(astraSays('do-not-merge', 'the fallback path records a verdict nobody gave'))).model).toBe(
-      ASTRA_MODEL_NAME,
+      CROSS_NAME,
     )
   })
 })
 
 describe('the record the command prints', () => {
-  it('is complete and ACCEPTED by the recorder after an Astra review', () => {
+  it('is complete and ACCEPTED by the recorder after a cross-lane review', () => {
     const d = decideReview(okRun())
     const cmd = formatRecordCommand({ sha: 'a'.repeat(40), ...d, mode: 'review', point: 624 })
-    expect(cmd).toContain('--model "GPT-6 Astra"')
+    expect(cmd).toContain(`--model "${CROSS_NAME}"`)
     expect(cmd).toContain('--verdict merge')
     expect(cmd).toContain('--point 624')
     expect(
@@ -517,7 +526,7 @@ describe('the record the command prints', () => {
         model: d.model,
         verdict: d.verdict,
         evidence: d.evidence,
-        authoredBy: `${CLAUDE_MODEL} <noreply@anthropic.com>`,
+        authoredBy: MAIN_TRAILER,
         mode: 'review',
       }),
     ).toMatchObject({ ok: true })
@@ -526,7 +535,7 @@ describe('the record the command prints', () => {
   it('is REFUSED by the recorder after a fallback — a review nobody ran cannot be recorded', () => {
     const d = decideReview({ outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } })
     const cmd = formatRecordCommand({ sha: 'b'.repeat(40), ...d, mode: 'review' })
-    expect(cmd).toContain(`--model "${FALLBACK_MODEL_NAME}"`)
+    expect(cmd).toContain(`--model "${SCARCE_NAME}"`)
     expect(cmd).toContain(`<${VERDICTS.join('|')}>`)
     expect(
       validateRecord({ sha: 'b'.repeat(40), model: d.model, verdict: '', evidence: '', mode: 'review' }).ok,
@@ -578,7 +587,7 @@ describe('the record the command prints', () => {
     // The two inputs contradicting each other must resolve toward the refusal:
     // ready is the decision's word, and null alone must not outvote it.
     const decision = {
-      model: ASTRA_MODEL_NAME,
+      model: CROSS_NAME,
       fellBack: false,
       ready: false,
       verdict: 'merge',
@@ -639,13 +648,13 @@ describe('the record the command prints', () => {
   // short-fall there must still say WHOSE review it is waiting for.
   it('keeps naming the reviewer when a hand-over is refused a record', () => {
     const swap = formatReviewReport({
-      decision: decideReview({ outcome: { ok: false, kind: 'self-review', cause: 'Sol authored it' }, parsed: {}, authorModel: ['GPT-5.6 Sol'] }),
+      decision: decideReview({ outcome: { ok: false, kind: 'self-review', cause: 'the cross lane authored it' }, parsed: {}, authorModel: [RETIRED_CROSS.at(-1)] }),
       sha: 'a'.repeat(40),
       mode: 'review',
       shortfall: { reason: 'needs-passes', passes: [{ index: 1, files: ['x.mjs'] }], budget: 10, rawSize: 99, truncated: [], omitted: [] },
     })
     expect(swap).toContain('ROLE SWAP')
-    expect(swap).toContain(OPUS_MODEL)
+    expect(swap).toContain(MAIN_NAME)
     expect(swap).toContain('does not fit ONE review round')
     expect(swap).not.toContain('mechanism-review.mjs --record')
 
@@ -655,7 +664,7 @@ describe('the record the command prints', () => {
       mode: 'review',
       shortfall: { reason: 'unplanned', detail: 'never measured', truncated: [], omitted: [], budget: 1, size: 0, rawSize: 0 },
     })
-    expect(down).toContain(FALLBACK_MODEL_NAME)
+    expect(down).toContain(SCARCE_NAME)
     expect(down).toContain('unknown fit refuses')
   })
 
@@ -740,7 +749,7 @@ describe('the record the command prints', () => {
   it('quotes an evidence line containing a double quote instead of breaking the command line', () => {
     const cmd = formatRecordCommand({
       sha: 'd'.repeat(40),
-      model: ASTRA_MODEL_NAME,
+      model: CROSS_NAME,
       verdict: 'merge',
       evidence: 'the "no-verdict" branch is covered',
       mode: 'review',
@@ -750,24 +759,24 @@ describe('the record the command prints', () => {
 })
 
 describe('the recorder accepts the reviewer the rule now prefers (point 624)', () => {
-  it('takes "GPT-5.6 Sol" as a review model', () => {
+  it('takes the cross lane as a review model', () => {
     expect(
       validateRecord({
         sha: 'e'.repeat(40),
-        model: ASTRA_MODEL_NAME,
+        model: CROSS_NAME,
         verdict: 'merge',
         evidence: 'read the diff and both tests; the fallback path is the one that matters',
-        authoredBy: `${CLAUDE_MODEL} <noreply@anthropic.com>`,
+        authoredBy: MAIN_TRAILER,
         mode: 'review',
       }),
     ).toMatchObject({ ok: true })
   })
 
-  it('does not read Sol as a self-review of Claude-authored work', () => {
-    for (const author of [`${CLAUDE_MODEL} <noreply@anthropic.com>`, 'Claude Fable 5.1', 'Claude Opus 4.8']) {
+  it('does not read the cross lane as a self-review of main-chain or scarce-lane work', () => {
+    for (const author of [MAIN_TRAILER, SCARCE_TRAILER_NAME, FALLBACK_TRAILER_NAME]) {
       const check = validateRecord({
         sha: 'f'.repeat(40),
-        model: ASTRA_MODEL_NAME,
+        model: CROSS_NAME,
         verdict: 'merge',
         evidence: 'a cross-vendor reviewer is never the same eyes as the author',
         authoredBy: author,
@@ -911,8 +920,8 @@ describe('the codex command line is the rule, not a preference of the caller', (
     expect(args.slice(0, 2)).toEqual(['exec', '--skip-git-repo-check'])
     expect(args).toContain('--sandbox')
     expect(args[args.indexOf('--sandbox') + 1]).toBe('read-only')
-    expect(args[args.indexOf('-m') + 1]).toBe(ASTRA_MODEL_ID)
-    expect(args).toContain(`model_reasoning_effort=${ASTRA_REASONING_EFFORT}`)
+    expect(args[args.indexOf('-m') + 1]).toBe(lane('cross').modelId)
+    expect(args).toContain(`model_reasoning_effort=${CROSS.reasoningEffort}`)
     expect(args[args.indexOf('-C') + 1]).toBe('/repo')
     expect(args.at(-1)).toBe('judge this')
   })
@@ -965,54 +974,131 @@ describe('the codex command line is the rule, not a preference of the caller', (
   })
 })
 
-// POINT 667: the REVERSED direction. Sol authors too now, and the failure this
-// mechanism exists to prevent has a mirror image: a review recorded as Sol's
-// over a range Sol WROTE. That reads green at both gates and is nobody's second
+describe('the reviewer is chosen by lane vendor, read from the registry', () => {
+  it('takes the reasoning effort of every codex review from the cross lane record', () => {
+    expect(CROSS.reasoningEffort).toBe('high')
+    const args = codexArgs({ cwd: '/repo', outputFile: '/tmp/out.txt', prompt: 'judge this' })
+    expect(args[args.indexOf('-c') + 1]).toBe('model_reasoning_effort=high')
+    expect(args[args.indexOf('-m') + 1]).toBe(lane('cross').modelId)
+  })
+
+  it('treats the three cross-lane names pairwise as ONE lane — none may review another', () => {
+    expect(CROSS_NAMES).toHaveLength(3)
+    for (const reviewer of CROSS_NAMES) {
+      expect(reviewerDescriptor(reviewer), reviewer).toMatchObject({ key: 'cross', runtime: 'codex' })
+      for (const author of CROSS_NAMES) {
+        expect(authoredByLane('cross', author), `${reviewer} / ${author}`).toBe(true)
+        expect(automaticReviewer([author])?.key, author).not.toBe('cross')
+        const d = decideReview({ ...okRun(), authorModel: [author] })
+        expect(d, `${reviewer} reviewing ${author}`).toMatchObject({ kind: OUTCOME.SELF_REVIEW, ready: false, ranBy: '' })
+      }
+    }
+  })
+
+  it('never picks a reviewer of the same vendor as an author, whatever its role', () => {
+    for (const record of LANES) {
+      const reviewer = automaticReviewer([record.displayName])
+      expect(reviewer, record.role).toBeTruthy()
+      expect(reviewer.vendor, record.role).not.toBe(record.vendor)
+    }
+    // A main-chain range goes to the cross lane, never to the scarce lane beside it.
+    expect(automaticReviewer([MAIN_NAME]).key).toBe('cross')
+    expect(automaticReviewer([SCARCE_NAME]).key).toBe('cross')
+    expect(automaticReviewer([CROSS_NAME]).key).toBe('main')
+    // Authors of both vendors leave no vendor-independent lane: the handover chain decides.
+    expect(automaticReviewer([MAIN_NAME, CROSS_NAME])).toBeNull()
+    // The scarce lane drops out while switched off; the main chain is not a fallback for it.
+    expect(automaticReviewer([CROSS_NAME], { scarceState: SCARCE_OFF }).key).toBe('main')
+  })
+
+  it('fails closed on an author of no known vendor', () => {
+    expect(unresolvedAuthors(['Alice'])).toEqual(['Alice'])
+    expect(unresolvedAuthors([])).toHaveLength(1)
+    expect(unresolvedAuthors([MAIN_TRAILER])).toEqual([])
+    expect(automaticReviewer(['Alice'])).toBeNull()
+    expect(automaticReviewer([MAIN_NAME, 'Alice'])).toBeNull()
+  })
+
+  it('finds a third vendor in a synthetic registry, through the registry argument', () => {
+    const third = Object.freeze({
+      role: 'third',
+      vendor: 'synthetic',
+      displayName: 'Nano 2',
+      trailerName: 'Nano 2',
+      modelId: 'nano-2',
+      familyWords: Object.freeze(['nano']),
+      retired: Object.freeze([]),
+      runtime: 'claude',
+      reasoningEffort: 'medium',
+      scarce: false,
+    })
+    const registry = [...LANES, third]
+    expect(automaticReviewer([MAIN_NAME, CROSS_NAME])).toBeNull()
+    expect(automaticReviewer([MAIN_NAME, CROSS_NAME], { registry })).toMatchObject({ key: 'third', name: 'Nano 2' })
+    // The data order still comes first where it has an eligible lane.
+    expect(automaticReviewer([MAIN_NAME], { registry }).key).toBe('cross')
+    expect(reviewerDescriptor('Nano 2', registry)).toMatchObject({ key: 'third' })
+    expect(reviewerDescriptor('Nano 2')).toBeNull()
+    expect(executionTarget('third', registry).name).toBe('Nano 2')
+  })
+
+  it('takes --reviewer as a role only — no model name and no former key', () => {
+    for (const role of EXECUTION_ROLES) expect(reviewerForRole(role).key).toBe(role)
+    for (const key of Object.keys(LEGACY.cliKeys)) expect(reviewerForRole(key), key).toBeNull()
+    expect(reviewerForRole(CROSS_NAME)).toBeNull()
+  })
+})
+
+// POINT 667: the REVERSED direction. The cross lane authors too now, and the failure
+// this mechanism exists to prevent has a mirror image: a review recorded as the cross
+// lane's over a range it WROTE. That reads green at both gates and is nobody's second
 // pair of eyes.
-describe('the reversed direction — where SOL authored', () => {
-  const ASTRA_COMMIT = 'GPT-5.6 Sol <noreply@openai.com>'
+describe('the reversed direction — where the CROSS LANE authored', () => {
+  const CROSS_COMMIT = `${RETIRED_CROSS.at(-1)} <${crossAddress}>`
 
-  it('recognises Sol as an author in every spelling of its name', () => {
-    for (const author of [ASTRA_COMMIT, 'GPT-5.6 Sol', 'Sol', 'gpt-6-astra', [`${CLAUDE_MODEL}`, ASTRA_COMMIT]]) {
-      expect(authoredByLane(author), String(author)).toBe(true)
+  it('recognises the cross lane as an author in every spelling of its name', () => {
+    const familyWord = CROSS.familyWords[0][0].toUpperCase() + CROSS.familyWords[0].slice(1)
+    for (const author of [CROSS_COMMIT, ...CROSS_NAMES, CROSS.modelId, ...CROSS.retired, familyWord, [MAIN.trailerName, CROSS_COMMIT]]) {
+      expect(authoredByLane('cross', author), String(author)).toBe(true)
     }
-    for (const author of ['', `${CLAUDE_MODEL} <x@y>`, [`${CLAUDE_MODEL}`, 'Claude Fable 5.1'], 'Patrick <p@x>']) {
-      expect(authoredByLane(author), String(author)).toBe(false)
+    for (const author of ['', `${MAIN.trailerName} <x@y>`, [MAIN.trailerName, SCARCE_TRAILER_NAME], 'Patrick <p@x>']) {
+      expect(authoredByLane('cross', author), String(author)).toBe(false)
     }
   })
 
-  it('hands a Sol-authored range to Opus 5 — the model that also lands it', () => {
-    expect(CLAUDE_REVIEW_CHAIN[0]).toBe(OPUS_MODEL)
-    expect(decideReview({ authorModel: ASTRA_COMMIT }).model).toBe(OPUS_MODEL)
-    // …and skips a Claude model that authored part of the range.
-    expect(decideReview({ authorModel: [ASTRA_COMMIT, `${CLAUDE_MODEL} <x@y>`] }).model).toBe('Fable 5.1')
-    expect(decideReview({ authorModel: [ASTRA_COMMIT, `${CLAUDE_MODEL} <x@y>`, 'Claude Fable 5.1 <x@y>'] }).model).toBe(OPUS_FALLBACK_MODEL)
+  it('hands a cross-authored range to the main chain — the lane that also lands it', () => {
+    expect(REVIEW_CHAINS.crossAuthored[0]).toBe('main')
+    expect(reviewChain('crossAuthored')[0]).toBe(MAIN_NAME)
+    expect(decideReview({ authorModel: CROSS_COMMIT }).model).toBe(MAIN_NAME)
+    // …and skips a handover model that authored part of the range.
+    expect(decideReview({ authorModel: [CROSS_COMMIT, `${MAIN.trailerName} <x@y>`] }).model).toBe(SCARCE_NAME)
+    expect(decideReview({ authorModel: [CROSS_COMMIT, `${MAIN.trailerName} <x@y>`, `${SCARCE_TRAILER_NAME} <x@y>`] }).model).toBe(FALLBACK_NAME)
     // Every candidate authored part of it: no reviewer, said plainly.
-    expect(decideReview({ authorModel: [ASTRA_COMMIT, `${CLAUDE_MODEL}`, 'Claude Fable 5.1', 'Claude Opus 4.8'] }).model).toBe('')
+    expect(decideReview({ authorModel: [CROSS_COMMIT, MAIN.trailerName, SCARCE_TRAILER_NAME, FALLBACK_TRAILER_NAME] }).model).toBe('')
   })
 
-  it('refuses to record a SUCCESSFUL Sol run over a range Sol authored', () => {
+  it('refuses to record a SUCCESSFUL cross-lane run over a range the cross lane authored', () => {
     // The dangerous case: the run worked and came back with a clean verdict.
     // Recording it would be a self-review that reads green at both gates.
-    const d = decideReview({ ...okRun(), authorModel: [ASTRA_COMMIT] })
+    const d = decideReview({ ...okRun(), authorModel: [CROSS_COMMIT] })
     expect(d.kind).toBe(OUTCOME.SELF_REVIEW)
     expect(d.ready).toBe(false)
     expect(d.verdict).toBe('')
     expect(d.ranBy).toBe('')
-    expect(d.model).toBe(OPUS_MODEL)
+    expect(d.model).toBe(MAIN_NAME)
     expect(d.cause).toMatch(/AUTHORED/)
   })
 
   it('leaves the ordinary direction exactly as it was', () => {
-    const d = decideReview({ ...okRun(), authorModel: [`${CLAUDE_MODEL} <x@y>`] })
-    expect(d).toMatchObject({ model: ASTRA_MODEL_NAME, ranBy: ASTRA_MODEL_NAME, verdict: 'merge', ready: true })
-    // Sol unavailable over Claude-authored work still falls back to Fable.
-    expect(fallbackReviewerFor(`${CLAUDE_MODEL} <x@y>`)).toBe(FALLBACK_MODEL_NAME)
-    expect(fallbackReviewerFor('Claude Fable 5.1 <x@y>')).toBe(SECOND_FALLBACK_MODEL_NAME)
+    const d = decideReview({ ...okRun(), authorModel: [`${MAIN.trailerName} <x@y>`] })
+    expect(d).toMatchObject({ model: CROSS_NAME, ranBy: CROSS_NAME, verdict: 'merge', ready: true })
+    // The cross lane unavailable over main-chain work still falls back to the scarce lane.
+    expect(fallbackReviewerFor(`${MAIN.trailerName} <x@y>`)).toBe(SCARCE_NAME)
+    expect(fallbackReviewerFor(`${SCARCE_TRAILER_NAME} <x@y>`)).toBe(MAIN_NAME)
   })
 
   it('reports a role swap as a role swap, not as a failure, and invents no verdict', () => {
-    const d = decideReview({ ...okRun(), authorModel: [ASTRA_COMMIT] })
+    const d = decideReview({ ...okRun(), authorModel: [CROSS_COMMIT] })
     const text = formatReviewReport({ decision: d, sha: 'abcdef1234567', mode: 'review', point: '667' })
     expect(text).toMatch(/ROLE SWAP/)
     expect(text).not.toMatch(/FALLBACK/)
@@ -1020,14 +1106,14 @@ describe('the reversed direction — where SOL authored', () => {
     expect(text).toMatch(/runs the suites, judges the picture and lands/)
     // The printed record command carries the PLACEHOLDER, so a hand that pastes
     // it without having the review done gets a refusal from the recorder.
-    expect(text).toContain(`--model "${OPUS_MODEL}"`)
+    expect(text).toContain(`--model "${MAIN_NAME}"`)
     expect(text).toContain(`--verdict <${VERDICTS.join('|')}>`)
     expect(validateRecord({
       sha: 'abcdef1234567',
-      model: OPUS_MODEL,
+      model: MAIN_NAME,
       verdict: '<merge|merge-with-fixes|do-not-merge>',
       evidence: '<what the review actually checked>',
-      authoredBy: ASTRA_COMMIT,
+      authoredBy: CROSS_COMMIT,
       mode: 'review',
     }).ok).toBe(false)
   })
@@ -1035,7 +1121,7 @@ describe('the reversed direction — where SOL authored', () => {
   it('says so when the whole chain authored the range', () => {
     const d = decideReview({
       ...okRun(),
-      authorModel: [ASTRA_COMMIT, `${CLAUDE_MODEL}`, 'Claude Fable 5.1', 'Claude Opus 4.8'],
+      authorModel: [CROSS_COMMIT, MAIN.trailerName, SCARCE_TRAILER_NAME, FALLBACK_TRAILER_NAME],
     })
     const text = formatReviewReport({ decision: d, sha: 'abcdef1234567' })
     expect(d.model).toBe('')

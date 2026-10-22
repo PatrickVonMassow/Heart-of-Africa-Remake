@@ -5,10 +5,12 @@
 // around every model that contributed to that retained end-state path. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
 import { independentReviewProblem, modelVendor, sameModel } from './mechanism-review-core.mjs'
-import { ASTRA_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL, OPUS_MODEL } from './lane-switch-core.mjs'
+import { executionTarget } from './model-lanes.mjs'
 import { passComposition } from './review-material-core.mjs'
 
-const REVIEWER_CANDIDATES = Object.freeze([ASTRA_MODEL, OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
+/** The reviewer roster, in preference order: the cross lane, the main chain, the scarce
+ *  lane, the main fallback — as display names (what a record names). */
+const REVIEWER_CANDIDATES = Object.freeze(['cross', 'main', 'scarce', 'main-fallback'].map((role) => executionTarget(role).name))
 const UNREVIEWABLE_NARROWING_REMEDY =
   'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by cross-review.'
 const NO_ELIGIBLE_REVIEWER_REASON =
@@ -89,7 +91,7 @@ const RANGE_HEADER = new RegExp(
 export const mechanismLogCommand = (base, head) => [
   // `--no-replace-objects` FIRST, because %P is what the resolver attributes a
   // trailerless merge by, and `log` HONOURS `refs/replace` (cross-vendor review,
-  // GPT-5.6 Sol at effort high, do-not-merge on the gate half). A replacement
+  // do-not-merge on the gate half). A replacement
   // commit naming one parent where the real merge names two would hand the
   // planner an ancestry that hides the merged tip's author, and an author that
   // is merely invisible has not stopped being one — the model that wrote that
@@ -111,7 +113,7 @@ export const mechanismLogCommand = (base, head) => [
  * The parent shas of a commit OBJECT, read from `cat-file -p` output.
  *
  * BOUNDED TO THE HEADER, and that bound is the whole point (cross-vendor review,
- * GPT-5.6 Sol at effort high, third do-not-merge on this repair). A commit object
+ * third do-not-merge on this repair). A commit object
  * is a header, ONE blank line, then the message — and the message is attacker-
  * shaped text. Filtering every `parent ` line in the whole object let a commit
  * whose MESSAGE carried such a line inject a parent that git never recorded, and
@@ -132,7 +134,7 @@ export function commitObjectParents(out) {
   let terminated = false
   // GIT PUTS THE PARENTS IN ONE CONTIGUOUS BLOCK DIRECTLY AFTER `tree`, and
   // accepting one anywhere in the header is forgeable (cross-vendor review,
-  // GPT-5.6 Sol at effort high, CRITICAL): an object carrying a real parent,
+  // CRITICAL): an object carrying a real parent,
   // then `author`/`committer`, then `parent <forged>` is SINGLE-parented to git
   // and two-parented to a scan — and the forged object's trailers would then be
   // inherited as this merge's authorship. The block closes at the first header
@@ -208,9 +210,9 @@ export function parseRangeLog(out, { decodePath = (path) => path } = {}) {
   return commits
 }
 
-/** The vendor a designation belongs to — the core's one classifier, which knows
- *  both of the OpenAI lane's names (point 1061); a local copy keyed on "gpt-5"
- *  read GPT-6 Astra as nobody. */
+/** The vendor a designation belongs to — the core's one classifier, which reads
+ *  every current and retired name of a lane through the registry (point 1061); a
+ *  local copy keyed on one spelling once read the renamed cross lane as nobody. */
 export function vendorOf(model) {
   return modelVendor(model)
 }
@@ -286,9 +288,8 @@ export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES)
   // assignment made from absence.
   if (!writtenBy.length) return ''
   if (writtenBy.some((author) => vendorOf(author) === 'unknown')) return ''
-  // Cross-vendor first: Claude-only work lands on Astra, OpenAI-only work
-  // (Astra's, or the retired Sol's — same vendor, different version, so
-  // `sameModel` alone would let Astra read Sol's work) lands on Claude. Where
+  // Cross-vendor first: main-vendor-only work lands on the cross lane, cross-vendor-only
+  // work (the cross lane's, under any of its names) lands on the main chain. Where
   // BOTH vendors contributed, vendor separation is impossible; the documented
   // fallback is then the first exact model that wrote no part of the end state.
   const roster = candidates ?? []

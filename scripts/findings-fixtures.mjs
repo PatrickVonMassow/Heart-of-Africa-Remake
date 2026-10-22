@@ -55,7 +55,7 @@ function transcriptDir(env = process.env, home = homedir()) {
  * parent's.
  *
  * A prompt is a user entry whose content is text — either a plain string or, when
- * the user attached an image, an array with a text part and no tool_result (Fable 5,
+ * the user attached an image, an array with a text part and no tool_result (scarce-lane review,
  * four-eyes finding 6: taking only the string form merged every attachment-carrying
  * prompt into the turn before it).
  */
@@ -111,7 +111,7 @@ const ANY_HOME = /(?:\/mnt\/[a-z])?\/(?:home|Users)\/[^/\s"']+|[A-Za-z]:\\Users\
 
 /**
  * Fold machine- and person-specific paths away and drop anything token-shaped
- * (four-eyes finding 2, Fable 5, 08.08.2026 — the first cut committed
+ * (four-eyes finding 2, 08.08.2026 — the first cut committed
  * `/mnt/c/Users/<name>`, full session UUIDs and the worktree-local repo path,
  * while claiming all three were folded).
  *
@@ -175,7 +175,7 @@ function redactTurn(turn, { shorten = true } = {}) {
 // membership test is deliberately NOT the core's own verdict, so the two can
 // disagree and the cut skips and reports the turn.
 //
-// HOW INDEPENDENT IT REALLY IS (four-eyes finding 1, Fable 5, 08.08.2026). The
+// HOW INDEPENDENT IT REALLY IS (four-eyes finding 1, 08.08.2026). The
 // first version computed membership from the core's tally against the core's own
 // threshold, which made every predicate imply its family's verdict by construction:
 // the contradiction check below could not fire, and the claim that an expectation "can never be
@@ -206,7 +206,7 @@ const isAgentCall = (c) => c.name === 'Agent'
  *  The dry run is excluded and the memory path uses the core's pattern (any project
  *  slug under .claude/projects), so the mirror
  *  does not disagree with the core over a case both already agree on (four-eyes
- *  re-review advisory 1, Fable 5). */
+ *  re-review advisory 1). */
 const leavesARecord = (c) => {
   const command = c.command ?? ''
   if (c.name === 'Bash' && /--dry-run\b/.test(command)) return false
@@ -341,7 +341,7 @@ function measureCorpus(turns) {
  * Returns { picked, contradictions }.
  *
  * A turn whose verdict contradicts its family is SKIPPED and REPORTED, not thrown on
- * (four-eyes re-review advisory 1, Fable 5): the throw made one odd turn brick the
+ * (four-eyes re-review advisory 1): the throw made one odd turn brick the
  * whole re-cut until it was resolved by hand, and a tool that cannot be run is a
  * tool nobody runs. The contradictions are carried into the committed JSON and
  * asserted empty by the test, so skipping is not a way to lose one quietly.
@@ -401,7 +401,7 @@ function main() {
 
   console.log(`corpus                : ${dir}`)
   console.log(`turns                 : ${counts.turns}`)
-  // An UPPER BOUND, and said so (four-eyes finding 3, Fable 5): a historical turn
+  // An UPPER BOUND, and said so (four-eyes finding 3): a historical turn
   // has no `.claude/batch-in-flight.json` mtime to check, so a declared wait that
   // the LIVE guard would have honoured on the file half counts as a block here.
   console.log(`blocks (this core)    : ${counts.blocks} (${pct(counts.blocks)}, upper bound)`)
@@ -427,7 +427,7 @@ function main() {
         agentExemptByDeclaredWait: counts.agentWait,
         agentBlocks: counts.agentBlocks,
         // Persisted so the family figures stay replayable after the corpus grows
-        // past this cut (four-eyes re-review advisory 2, Fable 5).
+        // past this cut (four-eyes re-review advisory 2).
         byFamily: counts.byFamily,
       },
       // Turns whose verdict contradicted their family, skipped rather than cut. The

@@ -40,7 +40,7 @@ import { createHash } from 'node:crypto'
  * 200_000 characters, and deliberately unchanged by this point: it is the ceiling
  * the 17.08.2026 measurement was taken against (the material came to 201567
  * characters and was cut here), so moving it would invalidate the one reading we
- * have. It is not a model limit — Astra's context is far larger — but an ATTENTION
+ * have. It is not a model limit — the reviewers' context is far larger — but an ATTENTION
  * and cost limit: a reviewer handed a megabyte reports on the part it read. The
  * answer to a range that does not fit is more passes, not a bigger round; the
  * case that motivated this point (a 1.39M bookkeeping file) is out of reach of
@@ -1047,8 +1047,8 @@ export function formatCoveragePlan(plan) {
  * earlier, from the plan alone.
  *
  * It exists for the paths that print a record command without ever assembling
- * anything (cross-vendor review, second round): the share switch at `claude-only`
- * and a range Astra authored both hand the review to a Claude model and print the
+ * anything (cross-vendor review, second round): the routing setting at `main-only`
+ * and a range the cross lane authored both hand the review over and print the
  * template it must record — for the WHOLE range, whose fit nobody had measured.
  * The point's rule is the same wherever it is asked: an unknown fit refuses.
  */

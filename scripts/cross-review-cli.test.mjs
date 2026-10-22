@@ -41,9 +41,19 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, ASTRA_MODEL_NAME } from './cross-review-core.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL, OPUS_MODEL_ID, writeState as writeFableState } from './lane-switch-core.mjs'
+import { writeState as writeSwitchState } from './lane-switch-core.mjs'
 import { formatContributionPassPlan } from './cross-review.mjs'
+import { CROSS, MAIN, SCARCE, trailerFor } from './model-lanes.mjs'
+
+// Every model name below is read from the lane registry (scripts/model-lanes.mjs).
+const CROSS_NAME = CROSS.displayName
+const MAIN_NAME = MAIN.displayName
+const SCARCE_NAME = SCARCE.displayName
+const FALLBACK_NAME = MAIN.fallback.displayName
+/** The cross lane's oldest retired display spelling — what landed ledger rows carry. */
+const RETIRED_CROSS = CROSS.retired.filter((name) => /\s/.test(name)).at(-1)
+const CROSS_TRAILER = trailerFor('cross')
+const MAIN_TRAILER = trailerFor('main')
 
 /** The command and everything it imports — copied so REPO_ROOT is the fixture. */
 const SCRIPT_FILES = [
@@ -74,28 +84,30 @@ const SCRIPT_FILES = [
   'git-tracked.mjs',
   // The share switch the command asks BEFORE it spends an allowance (point 654), and
   // the atomic write it persists a setting with. The fixture leaves the setting unset,
-  // so every case below runs at `default` — reviews to Sol, as before.
+  // so every case below runs at `default` — reviews to the cross lane, as before.
   'lane-routing.mjs',
   'lane-routing-core.mjs',
   'lane-switch.mjs',
   'lane-switch-core.mjs',
   'ask-lane-core.mjs',
-  'author-fable-core.mjs',
+  'author-delegate-core.mjs',
   'atomic-write.mjs',
+  // The lane registry every one of them reads model names from.
+  'model-lanes.mjs',
 ]
 
 let dir = ''
 let repo = ''
 let stubDir = ''
 let stateDir = ''
-let fableOnFile = ''
-let fableOffFile = ''
+let scarceOnFile = ''
+let scarceOffFile = ''
 let script = ''
 let mainSha = ''
 let headSha = ''
-let fableSha = ''
-let astraSha = ''
-let astraHeadSha = ''
+let scarceSha = ''
+let crossSha = ''
+let crossHeadSha = ''
 let unreviewableSha = ''
 let partlyReviewableSha = ''
 let mergeResolutionSha = ''
@@ -103,7 +115,7 @@ let orphanSha = ''
 let bulkSha = ''
 let oddSha = ''
 let gitlinkSha = ''
-let bulkSolSha = ''
+let bulkCrossSha = ''
 let edgeSha = ''
 let manyTouchesSha = ''
 let historicalReviewSha = ''
@@ -144,7 +156,7 @@ let stdin = ''
 try { stdin = readFileSync(0, 'utf8') } catch {}
 writeFileSync(process.env.STUB_STDIN, stdin)
 appendFileSync(process.env.STUB_LOG, model + '\\n')
-if (model !== 'gpt-6-astra') {
+if (model !== ${JSON.stringify(CROSS.modelId)}) {
   // The unknown-id probe: the real server refuses it, which is what proves -m
   // is honoured at all.
   process.stderr.write('The requested model is not supported when using Codex with a ChatGPT account.\\n')
@@ -242,11 +254,11 @@ const git = (...args) => {
   return (r.stdout ?? '').trim()
 }
 
-/** One fixture commit, with the authoring model in its trailer. */
-const commit = (file, text, subject, model) => {
+/** One fixture commit, with the authoring model's full trailer (default: the main chain). */
+const commit = (file, text, subject, trailer = MAIN_TRAILER) => {
   writeFileSync(join(repo, file), text)
   git('add', '-A')
-  git('commit', '--no-verify', '-q', '-m', `${subject}\n\nCo-Authored-By: Claude ${model} <noreply@anthropic.com>`)
+  git('commit', '--no-verify', '-q', '-m', `${subject}\n\nCo-Authored-By: ${trailer}`)
   return git('rev-parse', 'HEAD')
 }
 
@@ -261,7 +273,7 @@ const run = (args, env = {}) =>
       CODEX_HOME: join(dir, 'codex-home'),
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
-      LANE_SWITCH_FILE: fableOnFile,
+      LANE_SWITCH_FILE: scarceOnFile,
       ...env,
     }),
   })
@@ -307,8 +319,8 @@ beforeAll(() => {
   repo = join(dir, 'repo')
   stubDir = join(dir, 'bin')
   stateDir = join(repo, 'local')
-  fableOnFile = join(dir, 'fable-on.json')
-  fableOffFile = join(dir, 'fable-off.json')
+  scarceOnFile = join(dir, 'scarce-on.json')
+  scarceOffFile = join(dir, 'scarce-off.json')
   mkdirSync(stubDir, { recursive: true })
   mkdirSync(join(repo, 'scripts'), { recursive: true })
 
@@ -323,12 +335,12 @@ beforeAll(() => {
   }
   writeFileSync(join(dir, 'calls.log'), '')
   writeFileSync(
-    fableOnFile,
-    JSON.stringify(writeFableState('on', { why: 'fixture default', by: 'test', now: 1 })),
+    scarceOnFile,
+    JSON.stringify({ lanes: { scarce: writeSwitchState('on', { why: 'fixture default', by: 'test', now: 1 }) } }),
   )
   writeFileSync(
-    fableOffFile,
-    JSON.stringify(writeFableState('off', { why: 'fixture refusal', by: 'test', now: 1 })),
+    scarceOffFile,
+    JSON.stringify({ lanes: { scarce: writeSwitchState('off', { why: 'fixture refusal', by: 'test', now: 1 }) } }),
   )
 
   // The fixture history: main, a feature branch above it, and a branch whose
@@ -355,26 +367,20 @@ beforeAll(() => {
   // The trailing-space file exists from the start, so the edge branch MODIFIES
   // it and its current content must travel beside the patch.
   if (process.platform !== 'win32') writeFileSync(join(repo, EDGE_NAME), 'the original edge-space file\n')
-  mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world', OPUS_MODEL)
+  mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world')
 
   git('checkout', '-q', '-b', 'feat')
-  commit('world.txt', 'the fixture world, revised\n', 'Revise the world', OPUS_MODEL)
-  headSha = commit('added.txt', 'a file the patch carries whole\n', 'Add a file', OPUS_MODEL)
+  commit('world.txt', 'the fixture world, revised\n', 'Revise the world')
+  headSha = commit('added.txt', 'a file the patch carries whole\n', 'Add a file')
 
-  git('checkout', '-q', '-b', 'fable-work', 'main')
-  fableSha = commit('fable.txt', 'written by the fallback reviewer\n', 'Write something as Fable', 'Fable 5.1')
+  git('checkout', '-q', '-b', 'scarce-work', 'main')
+  scarceSha = commit('scarce.txt', 'written by the fallback reviewer\n', 'Write something in the scarce lane', trailerFor('scarce'))
 
-  // …and a branch SOL authored (point 667), which Sol may therefore not review.
-  git('checkout', '-q', '-b', 'sol-work', 'main')
-  writeFileSync(join(repo, 'sol.txt'), 'written in the OpenAI authoring lane\n')
-  git('add', '-A')
-  git('commit', '--no-verify', '-q', '-m', 'Write something as Sol\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-  astraSha = git('rev-parse', 'HEAD')
-  // …with a SECOND commit above it, so a `--since` can narrow the Sol range.
-  writeFileSync(join(repo, 'sol2.txt'), 'a second commit in the OpenAI authoring lane\n')
-  git('add', '-A')
-  git('commit', '--no-verify', '-q', '-m', 'Extend the Sol work\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-  astraHeadSha = git('rev-parse', 'HEAD')
+  // …and a branch the CROSS LANE authored (point 667), which it may therefore not review.
+  git('checkout', '-q', '-b', 'cross-work', 'main')
+  crossSha = commit('cross.txt', 'written in the cross authoring lane\n', 'Write something in the cross lane', CROSS_TRAILER)
+  // …with a SECOND commit above it, so a `--since` can narrow the cross range.
+  crossHeadSha = commit('cross2.txt', 'a second commit in the cross authoring lane\n', 'Extend the cross work', CROSS_TRAILER)
 
   // A single contribution authored by both vendors has no independent vendor
   // left in the configured reviewer pool. Its refusal must still name the
@@ -387,14 +393,14 @@ beforeAll(() => {
     '--no-verify',
     '-q',
     '-m',
-    `Write across both authoring lanes\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
+    `Write across both authoring lanes\n\nCo-Authored-By: ${CROSS_TRAILER}\nCo-Authored-By: ${MAIN_TRAILER}`,
   )
   unreviewableSha = git('rev-parse', 'HEAD')
 
   // One independently reviewable file beside one both-vendor file. The latter
   // remains owed, but it must not suppress the pass the former can earn.
   git('checkout', '-q', '-b', 'partly-reviewable', 'main')
-  commit('reviewable.txt', 'written by one authoring lane\n', 'Add the reviewable part', OPUS_MODEL)
+  commit('reviewable.txt', 'written by one authoring lane\n', 'Add the reviewable part')
   writeFileSync(join(repo, 'unavailable.txt'), 'written by both authoring lanes\n')
   git('add', '-A')
   git(
@@ -402,7 +408,7 @@ beforeAll(() => {
     '--no-verify',
     '-q',
     '-m',
-    `Add the unavailable part\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
+    `Add the unavailable part\n\nCo-Authored-By: ${CROSS_TRAILER}\nCo-Authored-By: ${MAIN_TRAILER}`,
   )
   partlyReviewableSha = git('rev-parse', 'HEAD')
 
@@ -411,9 +417,9 @@ beforeAll(() => {
   // exactly the historical shape that used to turn the cc-only resolution into
   // unknown authorship and refuse the whole review plan.
   git('checkout', '-q', '-b', 'merge-resolution', mainSha)
-  commit('world.txt', 'the feature-side world\n', 'Revise the world on the feature', OPUS_MODEL)
+  commit('world.txt', 'the feature-side world\n', 'Revise the world on the feature')
   git('checkout', '-q', 'main')
-  commit('world.txt', 'the main-side world\n', 'Revise the world on main', OPUS_MODEL)
+  commit('world.txt', 'the main-side world\n', 'Revise the world on main')
   git('checkout', '-q', 'merge-resolution')
   const merged = spawnSync('git', ['-c', 'core.hooksPath=', 'merge', '--no-ff', '--no-commit', 'main'], {
     windowsHide: true,
@@ -434,20 +440,20 @@ beforeAll(() => {
   writeFileSync(join(repo, 'bulk-a.txt'), `${'a'.repeat(120_000)}\n`)
   writeFileSync(join(repo, 'bulk-b.txt'), `${'b'.repeat(120_000)}\n`)
   git('add', '-A')
-  git('commit', '--no-verify', '-q', '-m', `Add two files no single round can hold\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
+  git('commit', '--no-verify', '-q', '-m', `Add two files no single round can hold\n\nCo-Authored-By: ${MAIN_TRAILER}`)
   bulkSha = git('rev-parse', 'HEAD')
 
   // …and a branch that CHANGES that quoted-name file, so the range carries it as
   // a modification and its current content must travel with the patch.
   git('checkout', '-q', '-b', 'odd-name', 'main')
-  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', OPUS_MODEL)
+  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file')
 
   // …and a branch adding a GITLINK (a submodule pointer, mode 160000): its
   // entry names a COMMIT object, so its body is absent by design. cacheinfo
   // writes the entry without any submodule machinery.
   git('checkout', '-q', '-b', 'gitlink', 'main')
   git('update-index', '--add', '--cacheinfo', `160000,${'f'.repeat(40)},vendor-sub`)
-  git('commit', '--no-verify', '-q', '-m', `Pin the vendored subproject\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
+  git('commit', '--no-verify', '-q', '-m', `Pin the vendored subproject\n\nCo-Authored-By: ${MAIN_TRAILER}`)
   gitlinkSha = git('rev-parse', 'HEAD')
 
   // …and a branch touching a path with a TRAILING SPACE, which git prints
@@ -455,19 +461,19 @@ beforeAll(() => {
   // third round). Windows cannot create such a file, so the branch is POSIX-only.
   if (process.platform !== 'win32') {
     git('checkout', '-q', '-b', 'edge-name', 'main')
-    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file', OPUS_MODEL)
+    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file')
   }
 
-  // …and the same bulk, authored by SOL: the role swap hands the whole range to
-  // a Claude reviewer, and a range no round can hold must be handed on as passes
+  // …and the same bulk, authored by the CROSS LANE: the review goes to the main
+  // chain, and a range no round can hold must be handed on as passes
   // rather than as a whole-range record template (cross-vendor review, second
   // round).
-  git('checkout', '-q', '-b', 'bulk-sol', 'main')
+  git('checkout', '-q', '-b', 'bulk-cross', 'main')
   writeFileSync(join(repo, 'bulk-c.txt'), `${'c'.repeat(120_000)}\n`)
   writeFileSync(join(repo, 'bulk-d.txt'), `${'d'.repeat(120_000)}\n`)
   git('add', '-A')
-  git('commit', '--no-verify', '-q', '-m', 'Add two more files no round can hold\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-  bulkSolSha = git('rev-parse', 'HEAD')
+  git('commit', '--no-verify', '-q', '-m', `Add two more files no round can hold\n\nCo-Authored-By: ${CROSS_TRAILER}`)
+  bulkCrossSha = git('rev-parse', 'HEAD')
 
   // The measured shape behind point 737: history is long, but the end-state
   // artefact is one small file and therefore one review round.
@@ -477,7 +483,6 @@ beforeAll(() => {
       'shared.txt',
       `current end state after touch ${index}\n`,
       `Touch the shared file ${index}`,
-      OPUS_MODEL,
     )
     if (index === 1) historicalReviewSha = touchSha
     manyTouchesSha = touchSha
@@ -485,14 +490,14 @@ beforeAll(() => {
 
   // A path changed and then restored has no net artefact to review.
   git('checkout', '-q', '-b', 'reverted', mainSha)
-  commit('world.txt', 'temporary world\n', 'Temporarily revise the world', OPUS_MODEL)
-  revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world', OPUS_MODEL)
+  commit('world.txt', 'temporary world\n', 'Temporarily revise the world')
+  revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world')
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
   git('checkout', '-q', '--orphan', 'unrelated')
   git('rm', '-rqf', '--ignore-unmatch', '.')
-  orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history', OPUS_MODEL)
+  orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history')
   git('checkout', '-q', '-f', 'feat')
 
   // A genuine contribution-era scoped pass: it read shared.txt after touch 1,
@@ -503,7 +508,7 @@ beforeAll(() => {
     join(repo, '.claude', 'mechanism-reviews.jsonl'),
     `${JSON.stringify({
       sha: historicalReviewSha,
-      model: 'GPT-5.6 Sol',
+      model: RETIRED_CROSS,
       verdict: 'merge',
       evidence: 'read the complete shared file after its first change',
       mode: 'review',
@@ -511,10 +516,10 @@ beforeAll(() => {
       at: Date.now(),
       // The fixture commits are created at test time, which is inside the
       // commit-era reviewer rule, so the row carries what that rule demands of
-      // an OpenAI reviewer: an explicit unverified claim with its reason.
+      // a codex-runtime reviewer: an explicit unverified claim with its reason.
       reviewerAuthorship: {
         status: 'unverified',
-        claimedModel: 'GPT-5.6 Sol',
+        claimedModel: RETIRED_CROSS,
         reason: 'external CLI reviewer, no harness transcript',
       },
     })}\n`,
@@ -574,14 +579,14 @@ describe('a review that runs', () => {
     provenId()
     const r = run(['--sha', headSha, '--point', '624', '--brief', 'judge the fallback path'])
     expect(r.status, r.stderr).toBe(0)
-    expect(r.stdout).toContain(ASTRA_MODEL_NAME)
+    expect(r.stdout).toContain(CROSS_NAME)
     expect(r.stdout).toContain('read the whole range and both test files')
     // THE RECORD COMMAND IS RUN, not merely pattern-matched (four-eyes finding,
     // 11.08.2026): asserting three of its flags leaves a malformed, unrunnable
     // command green, and "prints a complete record command" is a claim about
     // whether the recorder ACCEPTS it.
     const printed = recordCommandIn(r.stdout)
-    expect(printed).toContain(`--model "${ASTRA_MODEL_NAME}"`)
+    expect(printed).toContain(`--model "${CROSS_NAME}"`)
     expect(printed).toContain('--verdict merge')
     expect(printed).toContain('--point 624')
     expect(printed).toContain(headSha)
@@ -595,11 +600,11 @@ describe('a review that runs', () => {
     const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
     expect(JSON.parse(ledger.at(-1))).toMatchObject({
       sha: headSha,
-      model: ASTRA_MODEL_NAME,
+      model: CROSS_NAME,
       verdict: 'merge',
       mode: 'review',
       point: 624,
-      authoredBy: expect.stringContaining(OPUS_MODEL),
+      authoredBy: expect.stringContaining(MAIN_NAME),
     })
     // The material really REACHES the model — asserted on what the process
     // received, not on the caller's own log line.
@@ -630,7 +635,7 @@ describe('the file bodies travel byte-exact', () => {
     git('checkout', '-q', '-b', 'padded-work', 'main')
     // A MODIFIED file, so its body travels as current content — an added one
     // rides inside the patch and would not exercise the body read.
-    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges', OPUS_MODEL)
+    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges')
     const r = run(['--sha', sha, '--brief', 'judge the padding'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
@@ -647,7 +652,7 @@ describe('a binary file in the range', () => {
     git('checkout', '-q', '-b', 'binary-work', 'main')
     writeFileSync(join(repo, 'blob.bin'), Buffer.from([0, 1, 2, 3, 250, 251, 0, 90]))
     git('add', '-A')
-    git('commit', '--no-verify', '-q', '-m', `Add a binary blob\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
+    git('commit', '--no-verify', '-q', '-m', `Add a binary blob\n\nCo-Authored-By: ${MAIN_TRAILER}`)
     const sha = git('rev-parse', 'HEAD')
     const r = run(['--sha', sha, '--brief', 'judge the blob'])
     expect(r.status, r.stderr).toBe(0)
@@ -671,7 +676,7 @@ describe('a binary file in the range', () => {
     // called the material complete.
     writeFileSync(join(repo, 'legacy.txt'), Buffer.from([0x61, 0xff, 0x62, 0x0a]))
     git('add', '-A')
-    git('commit', '--no-verify', '-q', '-m', `Add a latin1 body\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
+    git('commit', '--no-verify', '-q', '-m', `Add a latin1 body\n\nCo-Authored-By: ${MAIN_TRAILER}`)
     const sha = git('rev-parse', 'HEAD')
     const r = run(['--sha', sha, '--brief', 'judge the legacy bytes'])
     expect(r.status).not.toBe(0)
@@ -714,7 +719,7 @@ describe('a review that does not run', () => {
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('FALLBACK')
     expect(r.stdout).toMatch(/login/i)
-    expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
+    expect(r.stdout).toContain(SCARCE_NAME)
     expect(r.stdout).toContain('The review is NOT done')
     // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round): the
     // run errored, so nothing of the range was read, and even a placeholder
@@ -723,16 +728,17 @@ describe('a review that does not run', () => {
     expect(r.stdout).not.toContain('mechanism-review.mjs --record')
   })
 
-  it('never hands a review to Fable while the shared switch is off', () => {
+  it('never hands a review to the scarce lane while its switch is off', () => {
     provenId()
     const r = run(['--sha', headSha, '--brief', 'judge the fallback path'], {
       STUB_MODE: 'fail',
-      LANE_SWITCH_FILE: fableOffFile,
+      LANE_SWITCH_FILE: scarceOffFile,
     })
     expect(r.status).toBe(3)
-    // Opus 5 authored the fixture range, so the first eligible non-Fable reviewer is Opus 4.8.
-    expect(r.stdout).toContain('Opus 4.8')
-    expect(r.stdout).not.toContain(FALLBACK_MODEL_NAME)
+    // The main chain authored the fixture range, so the first eligible reviewer past the
+    // switched-off scarce lane is the main chain's fallback model.
+    expect(r.stdout).toContain(FALLBACK_NAME)
+    expect(r.stdout).not.toContain(SCARCE_NAME)
   })
 
   it('treats an answer that admits it saw nothing as no review at all', () => {
@@ -744,19 +750,19 @@ describe('a review that does not run', () => {
     expect(r.stdout).toContain('FALLBACK')
   })
 
-  // THE SHARE SWITCH (point 654) at `claude-only` means the operator moved the load off
-  // OpenAI, so nothing may be sent — and the review must land exactly where an
-  // unreachable Sol lands: with a Claude reviewer and NO verdict. A "switched off" that
-  // quietly recorded a green review would be the worst of both.
-  it('asks NOTHING at all while the share switch is at claude-only, and still hands the review on', () => {
+  // THE ROUTING SETTING (point 654) at `main-only` means the operator moved the load off
+  // the cross lane, so nothing may be sent — and the review must land exactly where an
+  // unreachable cross lane lands: with a handover reviewer and NO verdict. A "switched
+  // off" that quietly recorded a green review would be the worst of both.
+  it('asks NOTHING at all while the routing setting is at main-only, and still hands the review on', () => {
     provenId()
-    const shareFile = join(dir, 'astra-share.json')
-    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', headSha, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('FALLBACK')
-    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toMatch(/main-only/)
     expect(r.stdout).toContain('The review is NOT done')
     // The allowance is what the switch protects: no codex call may have happened.
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
@@ -766,14 +772,14 @@ describe('a review that does not run', () => {
   // THE MEASURED OUTAGE FALLBACK (point 1194): a limit signature is recorded with its
   // probe clock and the review goes to the same-vendor pair, named as a fallback; while
   // the clock runs nothing is sent at all.
-  it('records an Astra usage limit as an outage fallback and hands the review to Fable', () => {
+  it('records a cross-lane usage limit as an outage fallback and hands the review to the scarce lane', () => {
     provenId()
-    const shareFile = join(dir, 'astra-share.json')
+    const shareFile = join(dir, 'lane-routing.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'default' }))
     const r = run(['--sha', headSha, '--brief', 'judge it'], { STUB_MODE: 'limit', LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('Astra outage FALLBACK')
-    expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
+    expect(r.stdout).toContain('cross-lane outage FALLBACK')
+    expect(r.stdout).toContain(SCARCE_NAME)
     const saved = JSON.parse(readFileSync(shareFile, 'utf8'))
     expect(saved.setting).toBe('default')
     expect(saved.fallback).toMatchObject({ outage: 'allowance-exhausted', kind: 'review' })
@@ -781,20 +787,20 @@ describe('a review that does not run', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const again = run(['--sha', headSha, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
     expect(again.status).toBe(3)
-    expect(again.stdout).toContain('Astra outage FALLBACK')
+    expect(again.stdout).toContain('cross-lane outage FALLBACK')
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
   })
 
-  it('hands a Fable-authored range to Opus 5, never back to Fable', () => {
+  it('hands a scarce-authored range to the main chain, never back to the scarce lane', () => {
     provenId()
-    const r = run(['--sha', fableSha, '--brief', 'judge it'], { STUB_MODE: 'fail' })
+    const r = run(['--sha', scarceSha, '--brief', 'judge it'], { STUB_MODE: 'fail' })
     expect(r.status).toBe(3)
     // The hand-over names its reviewer in PROSE — after a failed delivery no
     // record command is printed at all, not even a placeholder template.
-    expect(r.stdout).toContain(SECOND_FALLBACK_MODEL_NAME)
+    expect(r.stdout).toContain(MAIN_NAME)
     expect(r.stdout).not.toContain('mechanism-review.mjs --record')
-    expect(r.stdout).not.toMatch(/Hand it to Fable/)
+    expect(r.stdout).not.toContain(`Hand it to ${SCARCE_NAME}`)
   })
 })
 
@@ -831,10 +837,10 @@ describe('the guards around the run', () => {
     expect(r.stderr).toMatch(/--since/)
   })
 
-  it('prints a runnable Fable handover when both vendors but not every model authored', () => {
+  it('prints a runnable scarce-lane handover when both vendors but not every model authored', () => {
     const r = run(['--sha', unreviewableSha, '--brief', 'judge it', '--point', '870'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer scarce')
     expect(r.stdout).toContain('--point 870')
     expect(r.stderr).not.toMatch(/UNREVIEWABLE/)
   })
@@ -902,24 +908,24 @@ describe('the guards around the run', () => {
     const r = run(['--sha', headSha, '--brief', 'judge it'])
     expect(r.status, r.stderr).toBe(0)
     // The unknown id was tried first, then the real review ran.
-    expect(calls()[0]).not.toBe('gpt-6-astra')
-    expect(calls()).toContain('gpt-6-astra')
+    expect(calls()[0]).not.toBe(CROSS.modelId)
+    expect(calls()).toContain(CROSS.modelId)
     expect(JSON.parse(readFileSync(join(stateDir, 'cross-review-probe.json'), 'utf8'))).toMatchObject({ refused: true })
     // …and the next review does not pay for the probe again.
     writeFileSync(join(dir, 'calls.log'), '')
     expect(run(['--sha', headSha, '--brief', 'judge it']).status).toBe(0)
-    expect(calls()).toEqual(['gpt-6-astra'])
+    expect(calls()).toEqual([CROSS.modelId])
   })
 
   it('re-proves it the moment the codex it was proven with changes', () => {
     // A cached proof is tied to the binary, its version and the account: it
     // outlives container rebuilds, and an unbound one would let another model's
-    // answer be recorded as Sol's.
+    // answer be recorded as the cross lane's.
     provenId()
     writeFileSync(join(dir, 'calls.log'), '')
     expect(run(['--sha', headSha, '--brief', 'judge it'], { STUB_VERSION: 'codex-cli 9.9.9' }).status).toBe(0)
     expect(calls()).toHaveLength(2)
-    expect(calls()[0]).not.toBe('gpt-6-astra')
+    expect(calls()[0]).not.toBe(CROSS.modelId)
   })
 })
 
@@ -1001,60 +1007,77 @@ describe('the saved login', () => {
   })
 })
 
-// POINT 667: Sol authors too, so the command must recognise the range it may not
-// judge — and must recognise it BEFORE it spends an allowance on it.
-describe('a range SOL authored', () => {
-  it('refuses to review its own work, spends no codex call, and prints the runnable Claude reviewer', () => {
+// POINT 667: the cross lane authors too, so the command must recognise the range it
+// may not judge — and must recognise it BEFORE it spends an allowance on it. The
+// first lane of another vendor then reviews it through its own runtime.
+describe('a range the CROSS LANE authored', () => {
+  it('spends no codex call on its own work and runs the main chain through its runtime instead', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', astraSha, '--point', '667', '--brief', 'judge the authoring lane'])
-    expect(r.status, r.stderr).toBe(3)
-    expect(r.stdout).toMatch(/ROLE SWAP/)
-    expect(r.stdout).toMatch(/AUTHORED part of/)
-    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer opus')
-    // Not one call — not even the model-id probe: the question is answered from
-    // the trailers, and paying for a review Sol may not give is the waste this
-    // ordering exists to prevent.
-    expect(calls()).toEqual([])
-    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
-  })
-
-  it('starts the selected Opus reader and prints a record command with its model receipt', () => {
-    writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--reviewer', 'opus', '--sha', astraSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    const r = run(['--sha', crossSha, '--point', '667', '--brief', 'judge the authoring lane'])
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
-    expect(calls()).toEqual([OPUS_MODEL_ID])
-    expect(r.stdout).toContain(`${OPUS_MODEL} reviewed`)
-    expect(r.stdout).toContain(`--model "${OPUS_MODEL}"`)
-    expect(r.stdout).toContain('--model-result')
-    expect(r.stdout).toContain('--handover astra-authored')
+    // Not one codex call — not even the model-id probe: the question is answered from
+    // the trailers, and paying for a review the cross lane may not give is the waste
+    // this ordering exists to prevent. The one call is the main chain's.
+    expect(calls()).toEqual([MAIN.modelId])
+    expect(r.stdout).toContain(`${MAIN_NAME} (main lane, effort ${MAIN.reasoningEffort}) reviewed`)
+    expect(r.stdout).toContain(`--model "${MAIN_NAME}"`)
+    expect(r.stdout).toContain('--handover cross-authored')
   })
 
-  it('runs Fable for the mixed Astra/Opus end state and the recorder accepts exactly that routed verdict', () => {
+  it('starts the requested main reader and prints a record command with its model receipt', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--reviewer', 'main', '--sha', crossSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId])
+    expect(r.stdout).toContain(`${MAIN_NAME} (main lane, effort ${MAIN.reasoningEffort}) reviewed`)
+    expect(r.stdout).toContain(`--model "${MAIN_NAME}"`)
+    expect(r.stdout).toContain('--model-result')
+    expect(r.stdout).toContain('--handover cross-authored')
+  })
+
+  it('refuses the cross lane itself, and a same-vendor reader that is not the route', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const self = run(['--reviewer', 'cross', '--sha', crossSha, '--brief', 'judge the authoring lane'])
+    expect(self.status).toBe(2)
+    expect(self.stderr).toContain('may not review it')
+    const skipped = run(['--reviewer', 'scarce', '--sha', crossSha, '--brief', 'judge the authoring lane'])
+    expect(skipped.status).toBe(2)
+    expect(skipped.stderr).toContain("is not this range's first eligible handover")
+    expect(calls()).toEqual([])
+  })
+
+  it('refuses a former model key for --reviewer — roles only', () => {
+    const r = run(['--reviewer', CROSS.familyWords[0], '--sha', crossSha, '--brief', 'judge it'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--reviewer must be one of main, cross, scarce, main-fallback')
+  })
+
+  it('runs the scarce lane for the mixed cross/main end state and the recorder accepts exactly that routed verdict', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run([
-      '--reviewer', 'fable', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state',
+      '--reviewer', 'scarce', '--sha', unreviewableSha, '--point', '977', '--brief', 'judge the mixed end state',
       '--file', 'unreviewable.txt',
     ])
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
-    expect(calls()).toEqual(['claude-fable-5-1'])
+    expect(calls()).toEqual([SCARCE.modelId])
     const command = splitCommand(recordCommandIn(r.stdout))
     expect(command.slice(0, 2)).toEqual(['node', 'scripts/mechanism-review.mjs'])
     const recorded = spawnSync(process.execPath, command.slice(1), {
       cwd: repo,
       encoding: 'utf8',
       windowsHide: true,
-      env: hermeticEnv({ LANE_SWITCH_FILE: fableOnFile }),
+      env: hermeticEnv({ LANE_SWITCH_FILE: scarceOnFile }),
     })
     expect(recorded.status, `${recorded.stdout}${recorded.stderr}`).toBe(0)
     const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n').at(-1))
     expect(row).toMatchObject({
       sha: unreviewableSha,
-      model: 'Fable 5.1',
+      model: SCARCE_NAME,
       verdict: 'merge',
-      handover: 'astra-authored',
+      handover: 'cross-authored',
       pass: { index: 1, total: 1, files: ['unreviewable.txt'], endState: unreviewableSha },
       reviewerAuthorship: {
-        status: 'agreement', actualModel: 'Fable 5.1', servedModel: 'claude-fable-5-1', proof: 'claude-result',
+        status: 'agreement', actualModel: SCARCE_NAME, servedModel: SCARCE.modelId, proof: 'claude-result',
       },
     })
   })
@@ -1107,7 +1130,7 @@ describe('a modified gitlink', () => {
     provenId()
     git('checkout', '-q', '-b', 'fake-gitlink', 'main')
     const body = `prose about submodules\nSubproject commit ${'a'.repeat(40)}\nmore prose\n`
-    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose', OPUS_MODEL)
+    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose')
     const r = run(['--sha', sha, '--brief', 'judge the prose'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
@@ -1116,37 +1139,40 @@ describe('a modified gitlink', () => {
 })
 
 // A fitting narrowed range is handed over with the same exact contribution
-// scope as a completed Sol round; the placeholder still prevents recording a
+// scope as a completed cross-lane round; the placeholder still prevents recording a
 // verdict nobody gave.
 describe('a narrowed --since on the early routes', () => {
-  it('prints a scoped runnable reader at claude-only while --since narrows the range', () => {
-    const shareFile = join(dir, 'astra-share.json')
-    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+  it('prints a scoped runnable reader at main-only while --since narrows the range', () => {
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer scarce')
     expect(r.stdout).toContain(`--since ${headSha}~1`)
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
   })
 
-  it('prints a scoped runnable reader for a narrowed Sol-authored range too', () => {
+  it('records a narrowed cross-authored range as one scoped main-chain pass', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', astraHeadSha, '--since', `${astraHeadSha}~1`, '--brief', 'judge it'])
-    expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer opus')
-    expect(r.stdout).toContain(`--since ${astraHeadSha}~1`)
-    expect(calls()).toEqual([])
+    const r = run(['--sha', crossHeadSha, '--since', `${crossHeadSha}~1`, '--brief', 'judge it'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId])
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain(`--model "${MAIN_NAME}"`)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "cross2.txt"')
   })
 
-  it('still hands over the full runnable command when no --since narrows the early route', () => {
-    // The refusal is about the narrowing, not about the hand-over itself.
+  it('records the whole cross-authored range pass-less when no --since narrows it', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', astraHeadSha, '--brief', 'judge it'])
-    expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer opus')
-    expect(r.stdout).not.toContain('--since')
+    const r = run(['--sha', crossHeadSha, '--brief', 'judge it'])
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId])
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain(`--model "${MAIN_NAME}"`)
+    expect(printed).not.toContain('--pass ')
   })
 })
 
@@ -1254,20 +1280,20 @@ describe('a range too large for one round', () => {
 
   // A split range must select a pass before any reviewer is started or handed
   // over; there is no honest whole-range command for material that does not fit.
-  it('offers no whole-range record when SOL authored a range too large, and names the passes', () => {
+  it('offers no whole-range record when the cross lane authored a range too large, and names the passes', () => {
     writeFileSync(join(dir, 'calls.log'), '')
-    const r = run(['--sha', bulkSolSha, '--brief', 'judge the bulk Sol range'])
+    const r = run(['--sha', bulkCrossSha, '--brief', 'judge the bulk cross range'])
     expect(r.status, r.stderr).toBe(4)
     expect(r.stderr).toContain('2 RUNNABLE PASSES')
-    expect(r.stderr).toContain('reviewer Opus 5')
+    expect(r.stderr).toContain(`main lane reviewer ${MAIN_NAME}`)
     expect(r.stderr).toContain('--pass 1')
     expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     expect(calls()).toEqual([])
   })
 
-  it('offers no whole-range record at claude-only either, while the range does not fit', () => {
-    const shareFile = join(dir, 'astra-share.json')
-    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+  it('offers no whole-range record at main-only either, while the range does not fit', () => {
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(4)
@@ -1282,16 +1308,16 @@ describe('a range too large for one round', () => {
     // The flag was parsed only after the hand-off exits, so a pass-scoped
     // hand-off was unreachable: --pass was silently ignored and the report
     // covered the whole range.
-    const shareFile = join(dir, 'astra-share.json')
-    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'], {
       LANE_ROUTING_FILE: shareFile,
     })
     expect(r.status).toBe(3)
-    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toMatch(/main-only/)
     expect(r.stdout).toContain('--pass 1')
-    expect(r.stdout).toContain('--reviewer fable')
+    expect(r.stdout).toContain('--reviewer scarce')
     // The hand-off template carries the not-cleared warning and the ledger
     // pointer too (round-5 pass 6) — a fallback pass template without it read
     // like a cleared range.
@@ -1302,8 +1328,8 @@ describe('a range too large for one round', () => {
   })
 
   it('refuses a pass number the hand-off range does not have, exactly like the paid path', () => {
-    const shareFile = join(dir, 'astra-share.json')
-    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'], {
       LANE_ROUTING_FILE: shareFile,
     })
@@ -1315,11 +1341,11 @@ describe('a range too large for one round', () => {
   it('still hands over a runnable reader command where the range DOES fit', () => {
     // The refusal is about the material, not about the hand-over: a small range
     // must keep its ready-to-run template.
-    const shareFile = join(dir, 'astra-share.json')
-    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const shareFile = join(dir, 'lane-routing.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'main-only' }))
     const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { LANE_ROUTING_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer scarce')
     rmSync(shareFile, { force: true })
   })
 
@@ -1362,7 +1388,7 @@ describe('a range too large for one round', () => {
           index: 1,
           total: 1,
           files: ['added.txt'],
-          reviewer: 'GPT-5.6 Sol',
+          reviewer: CROSS_NAME,
         }],
         uncoverable: [],
         unreviewable: [],

@@ -14,6 +14,20 @@
 // record tokens exactly.
 
 import { foldUsage, IDLE_GAP_MS } from './measure-context-cost-core.mjs'
+import { LANES, VENDORS } from './model-lanes.mjs'
+
+/** The provider a transcript runtime records: the vendor of the lane that runs on it
+ *  (scripts/model-lanes.mjs). Stored snapshots carry these vendor keys as written. */
+export function runtimeProvider(runtime) {
+  const record = LANES.find((entry) => entry.runtime === runtime)
+  if (!record) throw new Error(`measure-point-cost: no lane runs on the ${runtime} runtime`)
+  return record.vendor
+}
+
+/** Every provider key a snapshot is split by, in registry order. */
+export const PROVIDERS = Object.freeze(Object.keys(VENDORS))
+export const CLAUDE_PROVIDER = runtimeProvider('claude')
+export const CODEX_PROVIDER = runtimeProvider('codex')
 
 export const LEVERS = [
   'pointBoundary',
@@ -146,14 +160,14 @@ function signalsForTools(tools = [], extraText = '') {
   }
 }
 
-function classifyRole({ scope = 'top-level', prompt = '', provider = 'anthropic' } = {}) {
+function classifyRole({ scope = 'top-level', prompt = '', provider = CLAUDE_PROVIDER } = {}) {
   if (scope === 'top-level') return 'main'
   const opening = String(prompt).slice(0, 6000)
   // Claude subagents are authoring/delegation traffic. Their real hand-over and
   // escalation prompts contain review vocabulary as process guidance, which is not
   // evidence that the transcript itself is a review. Positive review attribution is
-  // restricted to the OpenAI commission emitted by cross-review.mjs.
-  if (provider === 'openai' && REVIEW_COMMISSION.test(opening)) return 'review'
+  // restricted to the codex-runtime commission emitted by cross-review.mjs.
+  if (provider === CODEX_PROVIDER && REVIEW_COMMISSION.test(opening)) return 'review'
   return 'agent'
 }
 
@@ -169,7 +183,7 @@ export function parseClaudeTranscript(text = '', { file = 'session.jsonl', scope
     .filter((row) => row?.type === 'user')
     .map((row) => contentText(row?.message?.content))
     .join('\n')
-  const role = classifyRole({ scope, prompt, provider: 'anthropic' })
+  const role = classifyRole({ scope, prompt, provider: CLAUDE_PROVIDER })
   const toolById = new Map()
   const pendingItems = new Set()
   let pendingText = ''
@@ -198,7 +212,7 @@ export function parseClaudeTranscript(text = '', { file = 'session.jsonl', scope
       group = {
         id: key,
         at,
-        provider: 'anthropic',
+        provider: CLAUDE_PROVIDER,
         session: agent ? `${sessionBase}/agent-${agent}` : sessionBase,
         sessionBase,
         scope: agent || scope === 'subagent' ? 'subagent' : 'top-level',
@@ -273,7 +287,7 @@ export function parseCodexTranscript(text = '', { file = 'rollout.jsonl' } = {})
     .map((row) => row.payload.message ?? '')
     .join('\n')
   const sessionId = meta.session_id ?? meta.id ?? file
-  const role = classifyRole({ scope: 'subagent', prompt, provider: 'openai' })
+  const role = classifyRole({ scope: 'subagent', prompt, provider: CODEX_PROVIDER })
   const toolById = new Map()
   let currentTools = []
   let consumed = new Set()
@@ -310,7 +324,7 @@ export function parseCodexTranscript(text = '', { file = 'rollout.jsonl' } = {})
     turns.push({
       id: `${sessionId}:${turns.length + 1}`,
       at,
-      provider: 'openai',
+      provider: CODEX_PROVIDER,
       session: `codex:${sessionId}`,
       sessionBase: sessionId,
       scope: 'subagent',
@@ -573,7 +587,7 @@ export function aggregatePointLedger({ landed = [], turns = [], boundaryEvents =
     row.sessions.add(turn.session)
     if (turn.pointSource) row.assignedBy[turn.pointSource] += turn.tokens
     if (turn.role === 'main') row.origins.mainSession += turn.tokens
-    else if (turn.role === 'review' && turn.provider === 'openai') {
+    else if (turn.role === 'review' && turn.provider === CODEX_PROVIDER) {
       row.origins.crossVendorReviews += turn.tokens
       row.items.reviewRounds += turn.tokens
     } else {

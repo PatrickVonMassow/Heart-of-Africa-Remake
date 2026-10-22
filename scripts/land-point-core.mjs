@@ -37,7 +37,7 @@
 //     INTRODUCE a finding that guard would block on (pre-existing ones are
 //     tolerated — see transitionAccepted).
 
-import { CLAUDE_MODEL } from './lane-switch-core.mjs'
+import { MAIN, VENDORS } from './model-lanes.mjs'
 
 /** A landing failure that is the CHAIN's own verdict, not a crash. */
 export class LandingError extends Error {
@@ -133,7 +133,7 @@ export function tickCommitMessage({ number, model } = {}) {
   if (!name) {
     throw new LandingError('no authoring model given for the tick commit', {
       step: 'push',
-      repair: `pass --model "${CLAUDE_MODEL}" (the model running this landing) — the trailer is model-guard's only evidence`,
+      repair: `pass --model "${MAIN.trailerName}" (the model running this landing) — the trailer is model-guard's only evidence`,
     })
   }
   return [
@@ -142,7 +142,7 @@ export function tickCommitMessage({ number, model } = {}) {
     `Point ${number} is verified and merged; its block moves verbatim into`,
     'docs/tasks-archive.md so TASKS.md keeps only the open work.',
     '',
-    `Co-Authored-By: ${name} <noreply@anthropic.com>`,
+    `Co-Authored-By: ${name} <${VENDORS[MAIN.vendor].trailerAddress}>`,
     '',
   ].join('\n')
 }

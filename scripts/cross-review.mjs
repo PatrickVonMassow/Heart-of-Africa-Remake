@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624).
 //
-//   node scripts/cross-review.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \
+//   node scripts/cross-review.mjs [--reviewer main|cross|scarce|main-fallback] --sha <sha> --brief "<what to judge>" \
 //        [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \
 //        [--pass <k>] [--file <end-state path>]…
 //   node scripts/cross-review.mjs --probe          # is the -m flag honoured at all?
 //   node scripts/cross-review.mjs --save-login     # keep the login across a rebuild
 //   node scripts/cross-review.mjs --restore-login
 //
-// It runs the review non-interactively — through `codex exec` in a READ-ONLY
-// sandbox for Astra, or a tool-free `claude` run for a --reviewer Claude model —
+// It runs the review non-interactively through the reviewer lane's runtime —
+// `codex exec` in a READ-ONLY sandbox, or a tool-free `claude` run — chosen by
+// `--reviewer <role>` or automatically (the first enabled lane of another vendor
+// than every author, cross-review-core.mjs `automaticReviewer`) —
 // and prints the verdict and the evidence in the shape
 // `mechanism-review.mjs --record` expects. No session types a codex line by
 // hand: the model id, the reasoning effort and the sandbox are decisions of the
@@ -21,8 +23,8 @@
 // cannot create user namespaces and codex's sandbox launcher therefore kills
 // every command the reviewer would run (see formatReviewMaterial).
 //
-// WHEN ASTRA IS NOT AVAILABLE the command says so in ONE line, names the cause,
-// and hands the review to the first eligible Claude reviewer — printing the command
+// WHEN THE CROSS LANE IS NOT AVAILABLE the command says so in ONE line, names the cause,
+// and hands the review to the first eligible handover reviewer — printing the command
 // that starts that reviewer, never a verdict, so nothing can be recorded as reviewed
 // that nobody reviewed. The decision logic is pure (cross-review-core.mjs); this
 // half does the process work and fails LOUD. It is a command, not a hook.
@@ -55,8 +57,9 @@ import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routin
 import { effectiveRoute, fallbackReviewCause } from './lane-routing-core.mjs'
 import { currentLaneState } from './lane-switch.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
-import { mergeProblem, reviewRecordWellFormed, sameModel } from './mechanism-review-core.mjs'
-import { authoringClaudeArgs } from './author-fable-core.mjs'
+import { mergeProblem, reviewRecordWellFormed } from './mechanism-review-core.mjs'
+import { EXECUTION_ROLES, lane, sharesIdentity } from './model-lanes.mjs'
+import { authoringClaudeArgs } from './author-delegate-core.mjs'
 import { parseClaudeAskOutput } from './ask-lane-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
@@ -78,11 +81,14 @@ import {
   PROBE_MAX_AGE_MS,
   REVIEW_TIMEOUT_MS,
   reviewerDescriptor,
+  reviewerForRole,
   savedAuthPathFrom,
   authoredByLane,
-  ASTRA_MODEL_ID,
-  ASTRA_MODEL_NAME,
-  ASTRA_REASONING_EFFORT,
+  automaticReviewer,
+  HANDOVER_REASONS,
+  laneLabel,
+  REVIEW_CHAINS,
+  unresolvedAuthors,
 } from './cross-review-core.mjs'
 import {
   assembleMaterial,
@@ -594,7 +600,7 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   for (const pass of plan.passes ?? []) {
     const reviewer = reviewerDescriptor(pass.reviewer)
     lines.push(
-      `  pass ${pass.index}/${pass.total} → ${pass.reviewerVendor} reviewer ${pass.reviewer}; ` +
+      `  pass ${pass.index}/${pass.total} → ${reviewer ? `${reviewer.key} lane` : 'unknown'} reviewer ${pass.reviewer}; ` +
         `${pass.size} characters; end state ${String(pass.endState).slice(0, 7)}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
       `    node scripts/cross-review.mjs --sha ${sha} --since ${pass.rangeBase} ` +
@@ -726,9 +732,9 @@ function mergeBase(ref, sha, { explicit = false } = {}) {
  * timeout are decisions this file already got right the hard way, and two copies of them
  * would drift the day one is fixed.
  */
-export function runCodex({ prompt, input = '', modelId = ASTRA_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
+export function runCodex({ prompt, input = '', modelId = lane('cross').modelId, timeoutMs = REVIEW_TIMEOUT_MS }) {
   const outFile = join(tmpdir(), `cross-review-${process.pid}-${Date.now()}.txt`)
-  const args = codexArgs({ modelId, effort: ASTRA_REASONING_EFFORT, cwd: REPO_ROOT, outputFile: outFile, prompt })
+  const args = codexArgs({ modelId, effort: lane('cross').reasoningEffort, cwd: REPO_ROOT, outputFile: outFile, prompt })
   const res = spawnSync(CODEX_BIN, args, {
     encoding: 'utf8',
     // codex appends piped stdin to the prompt as a <stdin> block; that is how
@@ -787,7 +793,7 @@ export function runCodex({ prompt, input = '', modelId = ASTRA_MODEL_ID, timeout
   }
 }
 
-/** Run one explicitly selected Claude reviewer with no tools, no persistence
+/** Run one selected claude-runtime reviewer with no tools, no persistence
  *  and no fallback substitution. Its raw result JSON is retained outside Git
  *  so the recorder can verify the top-level model before granting credit. */
 function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
@@ -891,14 +897,14 @@ export function probe() {
     )
     console.log(
       `cross-review --probe: PASS — the server REFUSED the unknown id "${bogus}", so \`-m\` is honoured\n` +
-        `  and a review run with -m ${ASTRA_MODEL_ID} really is ${ASTRA_MODEL_NAME}.`,
+        `  and a review run with -m ${lane('cross').modelId} really is ${laneLabel('cross')}.`,
     )
     return 0
   }
   console.error(
     `cross-review --probe: FAIL — the unknown id "${bogus}" was NOT refused (exit ${res.exitCode}).\n` +
-      '  A model id that is silently substituted makes every recorded Astra review worthless:\n' +
-      '  the ledger would name Astra for work some other model did. Do not record Astra reviews\n' +
+      '  A model id that is silently substituted makes every recorded cross-lane review worthless:\n' +
+      '  the ledger would name the cross lane for work some other model did. Do not record its reviews\n' +
       `  until this passes again.\n  codex said: ${text.trim().split('\n').slice(-3).join(' | ') || '(nothing)'}`,
   )
   return 1
@@ -908,7 +914,7 @@ export function probe() {
  * Is `-m` PROVEN honoured on this machine, proving it now where the receipt is missing
  * or stale? Returns false when the proof could not be obtained.
  *
- * EXPORTED for `scripts/ask-lane.mjs` (point 654): every kind of work attributed to Astra
+ * EXPORTED for `scripts/ask-lane.mjs` (point 654): every kind of work attributed to the cross lane
  * rests on the same proof, since nothing in a run's output names the model that answered.
  * A second implementation of this check would be a second place for it to be skipped.
  */
@@ -1024,7 +1030,7 @@ function restoreLogin() {
 
 export const usage = () =>
   [
-    'usage: node scripts/cross-review.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
+    'usage: node scripts/cross-review.mjs [--reviewer main|cross|scarce|main-fallback] --sha <sha> --brief "<what to judge>" \\',
     '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
     '           [--pass <k>] [--file <current end-state path>]…',
     '       node scripts/cross-review.mjs --probe            (is -m honoured?)',
@@ -1047,12 +1053,15 @@ export const usage = () =>
     'Files with no independent reviewer stay outside runnable pass indices instead of blocking',
     'them. With --point <N>, the plan prints the Git-verified unavailable-receipt command for',
     'that exact remainder; the receipt never claims that a review occurred.',
-    `Without --reviewer, reviews run on ${ASTRA_MODEL_NAME} at reasoning effort ${ASTRA_REASONING_EFFORT} (CLAUDE.md §6). When it`,
-    'cannot be reached, or the share switch routes reviews away from it, the review is',
-    'HANDED OVER to the first eligible Claude model allowed by the shared Fable switch',
-    '(`node scripts/lane-switch.mjs --status`) that authored no part of the reviewed',
-    `range; a range ${ASTRA_MODEL_NAME} authored goes by role swap to the Opus-first Claude chain.`,
-    '--reviewer runs exactly that handover reader. The recorded review always names the',
+    'Without --reviewer, the review runs on the first enabled lane whose vendor differs from',
+    `every author's (CLAUDE.md §6): ${laneLabel('cross')} at reasoning effort ${lane('cross').reasoningEffort}`,
+    `for main-chain and scarce-lane work, ${laneLabel('main')} for cross-lane work. When the`,
+    'cross lane cannot be reached, or the routing setting routes reviews away from it, the',
+    `review is HANDED OVER (cross-unavailable) to the first role of ${REVIEW_CHAINS.crossUnavailable.join(', ')}`,
+    'allowed by the scarce-lane switch (`node scripts/lane-switch.mjs --status`) that authored',
+    'no part of the reviewed range; a range the cross lane co-authored with the other vendor',
+    `goes by role swap (cross-authored) to ${REVIEW_CHAINS.crossAuthored.join(', ')}.`,
+    '--reviewer <role> runs exactly that reader. The recorded review always names the',
     'model that ACTUALLY ran, and none of them may review its own work.',
   ].join('\n')
 
@@ -1076,14 +1085,14 @@ if (isMainModule(import.meta.url)) {
     const timeoutMs = Number(flag('--timeout')) || REVIEW_TIMEOUT_MS
     const reviewerFlag = flag('--reviewer')
     const selectedFiles = [...new Set(flags('--file'))]
-    const requestedReviewer = reviewerFlag ? reviewerDescriptor(reviewerFlag) : null
+    const requestedReviewer = reviewerFlag ? reviewerForRole(reviewerFlag) : null
     if (!sha || !brief) {
       console.error('cross-review: --sha and --brief are both required.\n')
       console.error(usage())
       process.exit(2)
     }
     if (reviewerFlag && !requestedReviewer) {
-      console.error('cross-review: --reviewer must be one of astra, fable, opus, opus48.\n')
+      console.error(`cross-review: --reviewer must be one of ${EXECUTION_ROLES.join(', ')}.\n`)
       console.error(usage())
       process.exit(2)
     }
@@ -1101,15 +1110,15 @@ if (isMainModule(import.meta.url)) {
     }
     const full = (resolved.stdout ?? '').trim()
 
-    // THE SHARE SWITCH IS READ HERE (point 654); its route is decided below, once
-    // the plan and the reviewer checks stand. At `claude-only` the operator has moved
-    // the load off OpenAI, so without an explicit --reviewer no request is sent — the
-    // review lands exactly where every unavailable Astra lands: with a Claude reviewer
-    // that authored none of the range, and with NO verdict, because nobody has
-    // reviewed it yet.
+    // THE ROUTING SETTING IS READ HERE (point 654); its route is decided below, once
+    // the plan and the reviewer checks stand. At `main-only` the operator has moved
+    // the load off the cross lane, so without an explicit --reviewer no request is sent
+    // to it — the review lands exactly where every unavailable cross lane lands: with a
+    // handover reviewer that authored none of the range, and with NO verdict, because
+    // nobody has reviewed it yet.
     const share = currentSetting()
-    const fableState = currentLaneState()
-    if (!fableState.ok) throw new Error(fableState.problem)
+    const scarceState = currentLaneState('scarce')
+    if (!scarceState.ok) throw new Error(scarceState.problem)
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
     if (share.problem) console.error(settingProblemLine(share, 'cross-review'))
     // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
@@ -1206,34 +1215,50 @@ if (isMainModule(import.meta.url)) {
       files: selectedFiles,
     })
 
-    let targetReviewer = requestedReviewer ?? reviewerDescriptor(ASTRA_MODEL_NAME)
+    // FAIL CLOSED ON AN UNRESOLVED AUTHOR: a reviewer is chosen by vendor, and an author
+    // of no known vendor leaves no reviewer provably independent of it.
+    const unresolved = unresolvedAuthors(rangeAuthors)
+    if (unresolved.length) {
+      console.error(
+        `cross-review: REFUSING — the author(s) ${unresolved.join(', ')} of this pass resolve to no lane vendor, ` +
+          'so no reviewer can be proven independent of them.',
+      )
+      process.exit(2)
+    }
+    const crossAuthored = authoredByLane('cross', rangeAuthors)
+    // WHO REVIEWS: the requested role, or the first enabled lane of another vendor than
+    // every author (null when the authors cover every vendor — the handover chain below).
+    const automatic = requestedReviewer ? null : automaticReviewer(rangeAuthors, { scarceState })
+    let targetReviewer = requestedReviewer ?? automatic
     let handover = ''
-    if (requestedReviewer?.runtime === 'claude') {
-      handover = authoredByLane(rangeAuthors) ? 'astra-authored' : 'astra-unavailable'
+    if (targetReviewer?.runtime === 'claude') {
+      // A claude-runtime review is a recorded handover from the preferred cross lane; it
+      // must be the route's own first eligible reader, never a hand-picked same-vendor one.
+      handover = crossAuthored ? HANDOVER_REASONS.crossAuthored : HANDOVER_REASONS.crossUnavailable
       const routed = decideReview({
         outcome: {
           ok: false,
-          kind: handover === 'astra-authored' ? OUTCOME.SELF_REVIEW : OUTCOME.UNREACHABLE,
-          cause: handover === 'astra-authored' ? causeTextFor(OUTCOME.SELF_REVIEW) : 'the preferred reader was unavailable',
+          kind: crossAuthored ? OUTCOME.SELF_REVIEW : OUTCOME.UNREACHABLE,
+          cause: crossAuthored ? causeTextFor(OUTCOME.SELF_REVIEW) : 'the preferred reader was unavailable',
         },
         parsed: { ok: false },
         authorModel: rangeAuthors,
-        fableState,
+        scarceState,
       })
-      if (!routed.model || !sameModel(routed.model, requestedReviewer.name)) {
+      if (!routed.model || !sharesIdentity(routed.model, targetReviewer.name)) {
         console.error(
-          `cross-review: --reviewer ${requestedReviewer.key} is not this range's first eligible handover; ` +
-            `the route names ${routed.model || 'nobody'}.`,
+          `cross-review: --reviewer ${targetReviewer.key} is not this range's first eligible handover; ` +
+            `the route names ${routed.model ? `${routed.role} (${routed.model})` : 'nobody'}.`,
         )
         process.exit(2)
       }
-    } else if (requestedReviewer && authoredByLane(rangeAuthors)) {
-      console.error(`cross-review: ${ASTRA_MODEL_NAME} authored part of this range and may not review it.`)
+    } else if (targetReviewer && crossAuthored) {
+      console.error(`cross-review: ${laneLabel('cross')} authored part of this range and may not review it.`)
       process.exit(2)
     }
 
     const reviewRoute = effectiveRoute('review', share)
-    if (!requestedReviewer && reviewRoute.to !== 'astra') {
+    if (!requestedReviewer && targetReviewer?.key === 'cross' && reviewRoute.to !== 'cross') {
       // Under a measured outage the hand-over names itself a fallback (point 1194).
       const decision = decideReview({
         outcome: reviewRoute.fallback
@@ -1241,7 +1266,7 @@ if (isMainModule(import.meta.url)) {
           : { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
-        fableState,
+        scarceState,
       })
       // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
       // round). No round is spent here, but the command printed for the
@@ -1269,16 +1294,16 @@ if (isMainModule(import.meta.url)) {
       process.exit(3)
     }
 
-    // WHO WROTE IT DECIDES WHO MAY JUDGE IT, and that is asked BEFORE a codex
-    // call is paid for (point 667). Astra AUTHORS now, and a review it may not
-    // give is not worth an allowance: a Astra-authored range goes straight to the
-    // Claude reviewer that also runs the suites, judges the picture and lands.
-    if (!requestedReviewer && authoredByLane(rangeAuthors)) {
+    // NO LANE OF ANOTHER VENDOR IS LEFT (the cross lane co-authored with the other
+    // vendor), and that is asked BEFORE any call is paid for (point 667): the range
+    // goes by role swap along the cross-authored chain, which also runs the suites,
+    // judges the picture and lands.
+    if (!targetReviewer && crossAuthored) {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
-        fableState,
+        scarceState,
       })
       // Same measurement, same reason: the role swap hands the range (or its
       // selected pass) on, and a range no single round can hold goes as its passes.
@@ -1297,6 +1322,13 @@ if (isMainModule(import.meta.url)) {
       )
       process.exit(3)
     }
+    if (!targetReviewer) {
+      console.error(
+        'cross-review: REVIEW CONFLICT — the authors of this pass cover every registered lane vendor, ' +
+          'so no lane is independent of them. Review a narrower range.',
+      )
+      process.exit(2)
+    }
 
     console.error(
       `cross-review: asking ${targetReviewer.name} (effort ${targetReviewer.effort}) to review ${full.slice(0, 7)} …`,
@@ -1304,7 +1336,7 @@ if (isMainModule(import.meta.url)) {
     // THE IDENTITY IS PROVEN BEFORE THE REVIEW, NOT MENTIONED AFTER IT (second
     // cross-vendor round). Nothing in a run's output names the model that
     // answered, so the whole attribution rests on the server refusing an unknown
-    // id. A note under the record was too weak: the record command naming Astra
+    // id. A note under the record was too weak: the record command naming the cross lane
     // was printed either way. The probe therefore RUNS when its receipt is
     // missing or stale, and a failed probe stops the review before a word of it
     // can be attributed to a model that may not have written it.
@@ -1358,14 +1390,15 @@ if (isMainModule(import.meta.url)) {
     // `ready` rests on this answer (escalation round): a clean exit with a
     // parseable verdict is not delivery evidence.
     const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
-    // WHO AUTHORED IT decides who may review it if Astra is unavailable: no model
+    // WHO AUTHORED IT decides who may review it if the cross lane is unavailable: no model
     // can review its own commit (see decideReview), and every author of the
     // selected pass's files counts.
     const decision = targetReviewer.runtime === 'codex'
-      ? decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
+      ? decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, scarceState })
       : outcome.ok && parsed.ok
         ? {
             model: targetReviewer.name,
+            role: targetReviewer.key,
             ranBy: targetReviewer.name,
             verdict: parsed.verdict,
             evidence: parsed.evidence,
@@ -1376,6 +1409,7 @@ if (isMainModule(import.meta.url)) {
           }
         : {
             model: targetReviewer.name,
+            role: targetReviewer.key,
             ranBy: '',
             verdict: '',
             evidence: '',

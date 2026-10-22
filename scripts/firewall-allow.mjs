@@ -32,7 +32,7 @@
 //
 // With NO argument it tops up the project's own set (DEFAULT_TOPUP below) — the
 // Playwright CDNs and their Chrome-for-Testing storage, Hugging Face, jsDelivr,
-// npm, the reviewer's OpenAI hosts and the API host itself — and then VERIFIES each one is actually reachable, so the answer to "did that help?"
+// npm, the cross-vendor reviewer's hosts and the API host itself — and then VERIFIES each one is actually reachable, so the answer to "did that help?"
 // comes from the network rather than from an exit code.
 //
 // A top-up is NOT persistent: the ipset lives in the kernel and a container
@@ -73,15 +73,15 @@ export const DEFAULT_TOPUP = [
   { host: 'cdn.jsdelivr.net', net24: true },
   { host: 'registry.npmjs.org', net24: false },
   // THE REVIEWER'S HOSTS (added 11.08.2026, after a container restart cut them off).
-  // `chatgpt.com` carries the Codex endpoint every Sol review speaks to, and Sol is
-  // the project's cross-vendor reviewer — without it `cross-review.mjs` hands every
+  // `chatgpt.com` carries the Codex endpoint every cross-lane review speaks to, and
+  // that lane is the project's cross-vendor reviewer — without it `cross-review.mjs` hands every
   // review to one of our OWN models and the four-eyes rule quietly loses the
   // decorrelation it exists for. These hosts sit behind Cloudflare and their
   // addresses ROTATE, so a boot-time snapshot goes stale exactly the way
   // storage.googleapis.com did: `.devcontainer/init-firewall.sh` already lists them,
   // yet after the 22:04 restart the resolved addresses were no longer in the set and
   // the review came back as "allowance exhausted" while the account had 96 % left.
-  // NOT as /24, though that was the first attempt (GPT-5.6 Sol, 11.08.2026): a /24
+  // NOT as /24, though that was the first attempt (cross-vendor review, 11.08.2026): a /24
   // around a Cloudflare anycast address is 256 addresses SHARED with unrelated
   // proxied hostnames, so it grants far more than the reviewer's endpoint — and it
   // still misses a rotation into a different block, which is the very thing it was
@@ -96,6 +96,8 @@ export const DEFAULT_TOPUP = [
   // notices. And nothing is ever removed, so yesterday's addresses accumulate for the
   // life of the container; that is a slow widening of the allowlist, and if it ever
   // matters the answer is an expiry on the entries, not a wider mask.
+  // OPEN: the vendor API/auth hosts below and at the top belong in scripts/model-lanes.mjs
+  // (a `hosts` field per VENDORS entry); until the registry carries them they stay spelled here.
   { host: 'chatgpt.com', net24: false },
   { host: 'auth.openai.com', net24: false },
   { host: 'api.openai.com', net24: false },

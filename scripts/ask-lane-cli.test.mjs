@@ -9,7 +9,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { OPUS_MODEL_ID } from './lane-switch-core.mjs'
+import { CROSS, LEGACY, MAIN, SCARCE, TEST_FOREIGN_MODELS } from './model-lanes.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CLI = join(HERE, 'ask-lane.mjs')
@@ -29,7 +29,7 @@ try { stdin = readFileSync(0, 'utf8') } catch {}
 writeFileSync(process.env.STUB_STDIN, stdin)
 writeFileSync(process.env.STUB_PROMPT, argv[argv.length - 1])
 appendFileSync(process.env.STUB_LOG, model + '\\n')
-if (model !== 'gpt-6-astra') {
+if (model !== process.env.STUB_CROSS_ID) {
   process.stderr.write('The requested model is not supported when using Codex with a ChatGPT account.\\n')
   process.exit(1)
 }
@@ -60,7 +60,7 @@ process.stdout.write(JSON.stringify({
   result: answer,
   usage: { input_tokens: 5, output_tokens: 9, cache_read_input_tokens: 0, cache_creation_input_tokens: 20 },
   modelUsage: {
-    'claude-haiku-4-5': { inputTokens: 90, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    '${TEST_FOREIGN_MODELS.haikuId}': { inputTokens: 90, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
     [served]: { inputTokens: 5, outputTokens: 9, cacheReadInputTokens: 0, cacheCreationInputTokens: 20, canonicalModel: served },
   },
 }))
@@ -71,7 +71,7 @@ let dir = ''
 let stubDir = ''
 let stateDir = ''
 let shareFile = ''
-let fableFile = ''
+let switchFile = ''
 let materialFile = ''
 
 const run = (args, env = {}) =>
@@ -86,11 +86,12 @@ const run = (args, env = {}) =>
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
       CROSS_REVIEW_STATE_DIR: stateDir,
       LANE_ROUTING_FILE: shareFile,
-      // The Fable switch lives in the MAIN checkout's .claude/, which is
+      // The lane switch lives in the MAIN checkout's .claude/, which is
       // git-ignored: a fresh clone and every CI runner have none, and the two
-      // Fable cases below then died on "the switch state is absent" while
+      // scarce-lane cases below then died on "the switch state is absent" while
       // passing on the developing machine. The fixture owns its own switch.
-      LANE_SWITCH_FILE: fableFile,
+      LANE_SWITCH_FILE: switchFile,
+      STUB_CROSS_ID: CROSS.modelId,
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
       STUB_PROMPT: join(dir, 'prompt.txt'),
@@ -113,12 +114,16 @@ beforeAll(() => {
   chmodSync(join(stubDir, 'codex'), 0o755)
   writeFileSync(join(stubDir, 'claude'), CLAUDE_STUB)
   chmodSync(join(stubDir, 'claude'), 0o755)
-  shareFile = join(dir, 'astra-share.json')
-  setting('prefer-astra')
-  fableFile = join(dir, 'fable-switch.json')
-  writeFileSync(fableFile, JSON.stringify({
-    state: 'on', reason: 'fixture: the Fable lane is open for this suite',
-    setBy: 'ask-lane-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
+  shareFile = join(dir, 'lane-routing.json')
+  setting('prefer-cross')
+  switchFile = join(dir, 'lane-switch.json')
+  writeFileSync(switchFile, JSON.stringify({
+    lanes: {
+      scarce: {
+        state: 'on', reason: 'fixture: the scarce lane is open for this suite',
+        setBy: 'ask-lane-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
+      },
+    },
   }))
   materialFile = join(dir, 'suite.log')
   writeFileSync(materialFile, 'FAIL place: the frame shows the port, not the village\n')
@@ -145,7 +150,18 @@ describe('what it refuses before spending anything', () => {
     expect(calls()).toEqual([])
   })
 
-  it('sends a blind-parallel enumerate half to Astra at default without an override', () => {
+  // U13: `--lane <role>` replaced the old model keys, with no alias left behind.
+  it('refuses an old model key and an unknown lane before spending anything', () => {
+    clearCalls()
+    for (const key of [...Object.keys(LEGACY.cliKeys), 'nobody']) {
+      const r = run(['--lane', key, '--kind', 'diagnose', '--brief', 'why?', '--file', materialFile])
+      expect(r.status, key).toBe(2)
+      expect(r.stderr).toMatch(/--lane must be one of main, cross, scarce, main-fallback/)
+    }
+    expect(calls()).toEqual([])
+  })
+
+  it('sends a blind-parallel enumerate half to the cross lane at default without an override', () => {
     setting('default')
     clearCalls()
     const r = run(['--kind', 'enumerate', '--brief', 'list the risks', '--file', materialFile], {
@@ -153,7 +169,7 @@ describe('what it refuses before spending anything', () => {
     })
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).not.toMatch(/share switch is at `default`/)
-    expect(calls()).toContain('gpt-6-astra')
+    expect(calls()).toContain(CROSS.modelId)
     expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
   })
 
@@ -175,11 +191,11 @@ describe('what it refuses before spending anything', () => {
     const r = run(['--kind', kind, '--brief', 'inspect this material', '--file', materialFile, '--anyway'],
       kind === 'audit' ? { STUB_ANSWER: 'A1 | scripts/verify/place.mjs | The frame is written before the shutter' } : {})
     expect(r.status, r.stderr).toBe(0)
-    expect(calls()).toContain('gpt-6-astra')
+    expect(calls()).toContain(CROSS.modelId)
   })
 
   it('refuses to send an empty request when nothing was given as material', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     clearCalls()
     // Even with NO probe receipt: a request with nothing to send must cost no codex call
     // at all, and the probe is a codex call (cross-vendor review, 12.08.2026).
@@ -193,7 +209,7 @@ describe('what it refuses before spending anything', () => {
   // Same review: an unreadable file used to travel as "(could not be read: …)", which is
   // text a model will happily answer ABOUT — a shaped answer about nothing.
   it('refuses a request whose material is ENTIRELY placeholders, naming what failed', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     clearCalls()
     rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', join(dir, 'does-not-exist.log')])
@@ -207,7 +223,7 @@ describe('what it refuses before spending anything', () => {
   // readable but EMPTY file carries nothing, and a shaped answer about it would be an
   // answer about nothing.
   it('refuses a request whose only material is a readable but EMPTY file', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     clearCalls()
     rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     const empty = join(dir, 'empty.log')
@@ -219,23 +235,23 @@ describe('what it refuses before spending anything', () => {
   })
 
   it('names a failed read but still runs when the rest of the material is real', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     clearCalls()
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile, '--log', join(dir, 'does-not-exist.log')])
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).toMatch(/material MISSING/)
-    expect(calls()).toContain('gpt-6-astra')
+    expect(calls()).toContain(CROSS.modelId)
   })
 })
 
 describe('an ask that runs', () => {
-  it('runs Fable read-only, proves the served model, and keeps the material off tools', () => {
+  it('runs the scarce lane read-only, proves the served model, and keeps the material off tools', () => {
     clearCalls()
-    const r = run(['--model', 'fable', '--kind', 'diagnose', '--brief', 'fold the stage', '--file', materialFile])
+    const r = run(['--lane', 'scarce', '--kind', 'diagnose', '--brief', 'fold the stage', '--file', materialFile])
     expect(r.status, r.stderr).toBe(0)
-    expect(calls()).toEqual(['claude-fable-5-1'])
+    expect(calls()).toEqual([SCARCE.modelId])
     expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
-    expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain('READ-ONLY work for this repository as Fable 5.1')
+    expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain(`READ-ONLY work for this repository as ${SCARCE.displayName}`)
     const args = JSON.parse(readFileSync(join(dir, 'args.json'), 'utf8'))
     expect(args).toContain('dontAsk')
     expect(args).toContain('--tools')
@@ -243,35 +259,48 @@ describe('an ask that runs', () => {
     expect(args).not.toContain('--dangerously-skip-permissions')
   })
 
-  it('refuses a substituted Claude model instead of misattributing its answer', () => {
+  it('refuses a substituted claude-runtime model instead of misattributing its answer', () => {
     clearCalls()
-    const r = run(['--model', 'fable', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile], {
-      STUB_SERVED_MODEL: 'claude-opus-5',
+    const substitute = MAIN.fallback.modelId
+    const r = run(['--lane', 'scarce', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile], {
+      STUB_SERVED_MODEL: substitute,
     })
     expect(r.status).toBe(3)
-    expect(r.stderr).toMatch(/top-level answer was not attributed to Fable 5.1/)
-    expect(r.stderr).toMatch(/usage named claude-haiku-4-5, claude-opus-5/)
-    expect(r.stderr).toMatch(/Fable 5.1 did NOT answer/)
+    expect(r.stderr).toContain(`top-level answer was not attributed to ${SCARCE.displayName}`)
+    expect(r.stderr).toContain(`usage named ${TEST_FOREIGN_MODELS.haikuId}, ${substitute}`)
+    expect(r.stderr).toContain(`${SCARCE.displayName} did NOT answer`)
   })
 
-  it('supports Opus as the third read-only roster model', () => {
+  it('refuses the scarce lane while its switch is off, before spending anything', () => {
+    const off = join(dir, 'lane-switch-off.json')
+    writeFileSync(off, JSON.stringify({ lanes: { scarce: { state: 'off', reason: 'fixture: off', setBy: 'ask-lane-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z') } } }))
     clearCalls()
-    const r = run(['--model', 'opus', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile])
+    const r = run(['--lane', 'scarce', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile], { LANE_SWITCH_FILE: off })
+    expect(r.status).toBe(3)
+    expect(r.stderr).toMatch(/is switched off/)
+    expect(calls()).toEqual([])
+  })
+
+  it('supports the main lane and the main fallback as read-only lanes', () => {
+    clearCalls()
+    const r = run(['--lane', 'main', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile])
     expect(r.status, r.stderr).toBe(0)
-    expect(calls()).toEqual([OPUS_MODEL_ID])
+    const fb = run(['--lane', 'main-fallback', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile])
+    expect(fb.status, fb.stderr).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId, MAIN.fallback.modelId])
   })
 
   it('proves the model id first, sends the material on stdin and prints the answer', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     clearCalls()
-    // With no receipt the id must be PROVEN before a word is attributed to Astra.
+    // With no receipt the id must be PROVEN before a word is attributed to the cross lane.
     rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     const r = run(['--kind', 'diagnose', '--brief', 'why did the place suite go red?', '--file', materialFile], { INPUT: 'piped material too\n' })
     expect(r.status, r.stderr).toBe(0)
     // The unknown id is asked FIRST (the probe), then the real one: that refusal is the
-    // whole proof that an answer attributed to Astra really is Astra's.
-    expect(calls()[0]).not.toBe('gpt-6-astra')
-    expect(calls().at(-1)).toBe('gpt-6-astra')
+    // whole proof that an answer attributed to the cross lane really is its own.
+    expect(calls()[0]).not.toBe(CROSS.modelId)
+    expect(calls().at(-1)).toBe(CROSS.modelId)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent).toContain('piped material too')
     expect(sent).toContain('FAIL place: the frame shows the port')
@@ -280,32 +309,33 @@ describe('an ask that runs', () => {
   })
 
   it('answers --json machine-readably, with the parsed answer and the setting it ran under', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     const r = run(['--kind', 'enumerate', '--brief', 'what could go wrong?', '--file', materialFile, '--json'], {
       STUB_ANSWER: 'B1 | scripts/x.mjs | the lease is not renewed while a suite runs\nB2 | scripts/y.mjs | the fence is off after a rebuild',
     })
     expect(r.status, r.stderr).toBe(0)
     const json = JSON.parse(r.stdout)
     expect(json.kind).toBe('enumerate')
-    expect(json.model).toBe('GPT-6 Astra')
-    expect(json.setting).toBe('prefer-astra')
+    expect(json.model).toBe(CROSS.displayName)
+    expect(json.effort).toBe(CROSS.reasoningEffort)
+    expect(json.setting).toBe('prefer-cross')
     expect(json.answer.entries.map((e) => e.id)).toEqual(['B1', 'B2'])
   })
 })
 
 describe('an ask that does not run', () => {
   it('names the cause in ONE line, hands the work back and exits 3 — never 0', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     const r = run(['--kind', 'audit', '--brief', 'sweep it', '--file', materialFile], { STUB_MODE: 'fail' })
     expect(r.status).toBe(3)
     // ONE line names the cause — the line itself, not a paragraph the reader must mine.
     const said = r.stderr.split('\n').find((l) => l.includes('did NOT answer'))
     expect(said).toMatch(/did NOT answer this audit: .*login/i)
-    expect(r.stderr).toMatch(/Do it in the Claude chain/)
+    expect(r.stderr).toMatch(/Do it in the main chain/)
   })
 
   it('treats an answer without its shape as no answer at all, and shows what came back', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile], { STUB_ANSWER: 'it is probably a timing thing, hard to say' })
     expect(r.status).toBe(3)
     expect(r.stderr).toMatch(/no usable answer/)
@@ -313,7 +343,7 @@ describe('an ask that does not run', () => {
   })
 
   it('treats a model that says it saw nothing as no answer, whatever shape it wrote', () => {
-    setting('prefer-astra')
+    setting('prefer-cross')
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile], {
       STUB_ANSWER: 'CAUSE: unknown\nEVIDENCE: none of my commands reached the repository, so I inspected nothing',
     })

@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   aggregatePointLedger,
+  CLAUDE_PROVIDER,
+  CODEX_PROVIDER,
   assignPoints,
   associateBoundaryEvents,
   claudeTokens,
@@ -149,13 +151,13 @@ describe('boundary events and the landed-point ledger', () => {
     expect(row.items.reviewRounds).toBe(800)
   })
 
-  it('never puts Anthropic traffic in the cross-vendor review bucket', () => {
+  it('never puts claude-runtime traffic in the cross-vendor review bucket', () => {
     const result = aggregatePointLedger({
       landed: [{ point: 900 }],
-      turns: [{ point: 900, tokens: 50, role: 'review', provider: 'anthropic', session: 'claude-review', sessionBase: 'claude-review' }],
+      turns: [{ point: 900, tokens: 50, role: 'review', provider: CLAUDE_PROVIDER, session: 'claude-review', sessionBase: 'claude-review' }],
     })
     expect(result.ledger[0].origins.crossVendorReviews).toBe(0)
-    expect(result.ledger[0].origins.agents).toEqual({ 'anthropic:claude-review': 50 })
+    expect(result.ledger[0].origins.agents).toEqual({ [`${CLAUDE_PROVIDER}:claude-review`]: 50 })
   })
 
   it('records all six built levers and the exact observed event counts', () => {
@@ -180,7 +182,7 @@ describe('boundary events and the landed-point ledger', () => {
           point: 900,
           tokens: 100,
           role: 'agent',
-          provider: 'openai',
+          provider: CODEX_PROVIDER,
           session: 'one',
           sessionBase: 'one',
           items: ['agentReports', 'rawSuiteLogs'],

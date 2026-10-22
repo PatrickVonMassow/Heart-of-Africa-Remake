@@ -1,4 +1,4 @@
-// Pins the OpenAI authoring lane's decisions (point 667).
+// Pins the authoring lanes' decisions (point 667).
 //
 // The failure this lane must not have is the mirror of the read-only paths':
 // they refuse to record an answer nobody gave, and this one must refuse to
@@ -9,8 +9,15 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { evaluateCommitTrailers, allowedTrailers } from './model-guard-core.mjs'
 import {
+  AUTHOR_ROLES,
   AUTHOR_TIMEOUT_MS,
   authorCommitMessage,
+  authorLaneConfig,
+  authorTrailer,
+  authoringClaudeArgs,
+  authoringRuntime,
+  laneAuthoringOutcome,
+  parseClaudeAuthoringOutput,
   authorCompletionMessage,
   authoringCodexArgs,
   buildAuthoringPrompt,
@@ -24,22 +31,30 @@ import {
   parseAuthoringAnswer,
   PUSH_INTERVAL_MS,
   readinessProblems,
-  ASTRA_MODEL_ID,
-  ASTRA_TRAILER,
   uncommittedSummary,
   withheldEnvNames,
 } from './author-delegate-core.mjs'
 import { evaluateCommitMessage } from './commit-scope-guard-core.mjs'
+import { CROSS, MAIN, SCARCE, TEST_FOREIGN_MODELS, VENDORS, trailerFor } from './model-lanes.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
 
-const astraCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-6 Astra <noreply@openai.com>' })
+const CROSS_TRAILER = `Co-Authored-By: ${trailerFor('cross')}`
+const crossCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: trailerFor('cross') })
+// A credential variable named the way a vendor SDK names it.
+const VENDOR_API_KEY = `${MAIN.vendor.toUpperCase()}_API_KEY`
 const okRun = { ok: true, kind: 'ok', cause: '' }
 const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: test:unit, build and lint all green\nOPEN: none\n')
 
 describe('the commit trailer of the lane', () => {
   it('is the allowlist’s own spelling, and passes the commit-msg gate', () => {
-    expect(ASTRA_TRAILER).toBe('Co-Authored-By: GPT-6 Astra <noreply@openai.com>')
-    expect(allowedTrailers()).toContain(ASTRA_TRAILER)
-    expect(evaluateCommitTrailers(`Do a thing\n\n${ASTRA_TRAILER}\n`).block).toBe(false)
+    expect(authorTrailer('cross')).toBe(`Co-Authored-By: ${CROSS.trailerName} <${VENDORS[CROSS.vendor].trailerAddress}>`)
+    expect(authorTrailer('scarce')).toBe(`Co-Authored-By: ${trailerFor('scarce')}`)
+    // The scarce lane's trailer is allowed while its switch is on.
+    const on = readState(JSON.stringify(writeState('on', { why: 'test', by: 'test', now: 1 })))
+    for (const role of AUTHOR_ROLES) {
+      expect(allowedTrailers(on)).toContain(authorTrailer(role))
+      expect(evaluateCommitTrailers(`Do a thing\n\n${authorTrailer(role)}\n`, on).block).toBe(false)
+    }
   })
 })
 
@@ -48,8 +63,8 @@ describe('author commit messages', () => {
     const message = authorCommitMessage({ subject: 'Add branch selection', rescue: 'the guard tests are still in progress' })
     expect(message.split('\n')[0]).toBe('Add branch selection [skip ci]')
     expect(message).toContain('\nRescue: the guard tests are still in progress\n')
-    expect(message).toContain(`Rescue: the guard tests are still in progress\n${ASTRA_TRAILER}`)
-    expect(message).toContain(ASTRA_TRAILER)
+    expect(message).toContain(`Rescue: the guard tests are still in progress\n${CROSS_TRAILER}`)
+    expect(message).toContain(CROSS_TRAILER)
     expect(evaluateCommitMessage(message).block).toBe(false)
   })
 
@@ -60,7 +75,7 @@ describe('author commit messages', () => {
       final: true,
     })
     expect(message).not.toMatch(/\[skip ci\]|^Rescue:/m)
-    expect(message).toContain(ASTRA_TRAILER)
+    expect(message).toContain(CROSS_TRAILER)
     expect(evaluateCommitMessage(message).block).toBe(false)
   })
 
@@ -79,9 +94,16 @@ describe('authoringCodexArgs', () => {
     expect(args).toContain('--dangerously-bypass-approvals-and-sandbox')
     expect(args).not.toContain('--sandbox')
     expect(args.slice(args.indexOf('-C'), args.indexOf('-C') + 2)).toEqual(['-C', '/w'])
-    expect(args.slice(args.indexOf('-m'), args.indexOf('-m') + 2)).toEqual(['-m', ASTRA_MODEL_ID])
-    expect(args).toContain('model_reasoning_effort=medium')
+    expect(args.slice(args.indexOf('-m'), args.indexOf('-m') + 2)).toEqual(['-m', CROSS.modelId])
     expect(args[args.length - 1]).toBe('p')
+  })
+
+  it('carries the cross lane record\'s high reasoning effort on the authoring command line', () => {
+    expect(CROSS.reasoningEffort).toBe('high')
+    const args = authoringCodexArgs({ prompt: 'p' })
+    expect(args.slice(args.indexOf('-c'), args.indexOf('-c') + 2)).toEqual(['-c', 'model_reasoning_effort=high'])
+    // The runtime dispatch builds the same line for the cross lane.
+    expect(authoringRuntime('cross').args({ prompt: 'p' })).toEqual(args)
   })
 
   it('gives an authoring run room to build and test', () => {
@@ -106,7 +128,7 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
       CODEX_HOME: '/home/node/.codex',
       GH_TOKEN: 'ghp_x',
       GITHUB_TOKEN: 'ghp_y',
-      ANTHROPIC_API_KEY: 'sk-a',
+      [VENDOR_API_KEY]: 'sk-a',
       NPM_TOKEN: 'npm_z',
       MY_SECRET: 's',
       GIT_ASKPASS: '/x',
@@ -130,7 +152,7 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
       GIT_AUTHOR_NAME: 'Fixture',
     })
     expect(withheldEnvNames(env)).toEqual([
-      'ANTHROPIC_API_KEY',
+      VENDOR_API_KEY,
       'AUTH_HEADER',
       'AWS_ACCESS_KEY_ID',
       'CI_JOB_JWT',
@@ -215,13 +237,13 @@ describe('buildAuthoringPrompt', () => {
     for (const rule of HOUSE_RULES) expect(prompt, rule).toContain(rule.trim())
     // A rule spanning two lines reads as one rule, not as two bullets.
     expect(prompt).not.toMatch(/^ {2}- {3}/m)
-    expect(prompt).toContain(ASTRA_TRAILER)
+    expect(prompt).toContain(CROSS_TRAILER)
     expect(prompt).toContain('THE POINT: fix the drum loop')
     expect(prompt).toMatch(/Do NOT read TASKS\.md/)
     expect(prompt).toMatch(/Do NOT push, do NOT merge/)
     expect(prompt).toMatch(/feat\/651-x/)
     // The reviewer is named up front: it changes how the work is written.
-    expect(prompt).toMatch(/A Claude session then REVIEWS/)
+    expect(prompt).toContain(`A session on ${MAIN.displayName} then REVIEWS`)
     expect(prompt).toMatch(/DONE: <what you built/)
   })
 
@@ -317,8 +339,8 @@ describe('parseAuthoringAnswer', () => {
 })
 
 describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
-  it('accepts a clean run that committed under Astra’s name', () => {
-    const j = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: answered })
+  it('accepts a clean run that committed under the cross lane’s name', () => {
+    const j = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: answered })
     expect(j).toMatchObject({ delivered: true, clean: true })
     expect(j.problems).toEqual([])
   })
@@ -359,23 +381,27 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     // An ALLOWED model that is not this lane's is still not this lane's commit.
     const other = judgeAuthoring({
       outcome: okRun,
-      commits: [{ sha: 'd'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <x@y>' }],
+      commits: [{ sha: 'd'.repeat(40), subject: 'x', trailers: `${MAIN.trailerName} <x@y>` }],
       parsed: answered,
     })
-    expect(other.problems.join(' ')).toMatch(/does not name GPT-6 Astra/)
+    expect(other.problems.join(' ')).toContain(`does not name ${CROSS.displayName}`)
   })
 
-  it('does not read a "astra" in an e-mail address as Astra’s authorship (cross-vendor P1)', () => {
-    // `Claude Opus 5 <build@astra.example>` is an allowlisted commit by ANOTHER
-    // model. Tested against the raw trailer, it counted as this lane's work.
+  it('does not read a cross-lane family word in an e-mail address as that lane’s authorship (cross-vendor P1)', () => {
+    // A main-lane trailer whose address carries the cross lane's family word is an
+    // allowlisted commit by ANOTHER model. Tested against the raw trailer, it counted
+    // as this lane's work.
+    const decoy = `${MAIN.trailerName} <build@${CROSS.familyWords.at(-1)}.example>`
     const j = judgeAuthoring({
       outcome: okRun,
-      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <build@astra.example>' }],
+      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: decoy }],
       parsed: answered,
     })
-    expect(j.problems.join(' ')).toMatch(/does not name GPT-6 Astra/)
-    // …while every real spelling of Astra's own trailer is accepted.
-    for (const trailers of ['GPT-6 Astra <noreply@openai.com>', 'Astra <noreply@openai.com>', 'gpt-6-astra <x@y>']) {
+    expect(j.problems.join(' ')).toContain(`does not name ${CROSS.displayName}`)
+    // …while every real spelling of the cross lane's own trailer is accepted.
+    const familyName = CROSS.familyWords[0][0].toUpperCase() + CROSS.familyWords[0].slice(1)
+    const address = VENDORS[CROSS.vendor].trailerAddress
+    for (const trailers of [trailerFor('cross'), `${familyName} <${address}>`, `${CROSS.modelId} <x@y>`]) {
       const ok = judgeAuthoring({ outcome: okRun, commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers }], parsed: answered })
       expect(ok.problems, trailers).toEqual([])
     }
@@ -384,7 +410,7 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
   it('refuses to attribute commits made on another branch (cross-vendor P1)', () => {
     const j = judgeAuthoring({
       outcome: okRun,
-      commits: [astraCommit('c'.repeat(40))],
+      commits: [crossCommit('c'.repeat(40))],
       parsed: answered,
       branch: 'feat/667-x',
       branchAfter: 'main',
@@ -393,7 +419,7 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     expect(j.problems.join(' ')).toMatch(/ended on `main`, not on `feat\/667-x`/)
     // Ending where it started is silent.
     expect(
-      judgeAuthoring({ outcome: okRun, commits: [astraCommit('d'.repeat(40))], parsed: answered, branch: 'b', branchAfter: 'b' }).problems,
+      judgeAuthoring({ outcome: okRun, commits: [crossCommit('d'.repeat(40))], parsed: answered, branch: 'b', branchAfter: 'b' }).problems,
     ).toEqual([])
   })
 
@@ -421,13 +447,13 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       '',
     ]) {
       const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates || 'x'}\nOPEN: none`)
-      const j = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: gates ? parsed : { ok: true, gates: '' } })
+      const j = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: gates ? parsed : { ok: true, gates: '' } })
       expect(j.clean, gates).toBe(false)
       expect(j.problems.join(' '), gates).toMatch(/GATES line/)
     }
     // A report naming all three as green stays clean — including one that says
     // so with a negative WORD in a positive sentence.
-    expect(judgeAuthoring({ outcome: okRun, commits: [astraCommit('b'.repeat(40))], parsed: answered }).clean).toBe(true)
+    expect(judgeAuthoring({ outcome: okRun, commits: [crossCommit('b'.repeat(40))], parsed: answered }).clean).toBe(true)
     for (const gates of [
       'test:unit, build and lint all passed without errors',
       'vitest green, build green, oxlint clean',
@@ -447,7 +473,7 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     // because the run ended badly would discard the only thing that survived.
     const j = judgeAuthoring({
       outcome: { ok: false, kind: 'timeout', cause: 'the review did not finish inside its time budget' },
-      commits: [astraCommit('e'.repeat(40))],
+      commits: [crossCommit('e'.repeat(40))],
       parsed: { ok: false, error: 'no closing lines' },
       dirty: ' M scripts/x.mjs',
       numstat: '118\t6\tscripts/x.mjs',
@@ -474,7 +500,7 @@ describe('uncommittedSummary', () => {
 
 describe('formatAuthoringReport', () => {
   it('hands the rest of the point to the reviewer, in order', () => {
-    const judged = judgeAuthoring({ outcome: okRun, commits: [astraCommit('f'.repeat(40), 'Fix the loop')], parsed: answered })
+    const judged = judgeAuthoring({ outcome: okRun, commits: [crossCommit('f'.repeat(40), 'Fix the loop')], parsed: answered })
     const text = formatAuthoringReport({ point: 651, branch: 'feat/651-x', judged, parsed: answered, pushed: true })
     expect(text).toMatch(/authored 1 commit\(s\) on feat\/651-x/)
     expect(text).toMatch(/ffffff {2}Fix the loop/)
@@ -487,12 +513,12 @@ describe('formatAuthoringReport', () => {
   })
 
   it('says a failed push first, because only that work is at risk', () => {
-    const judged = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: answered })
+    const judged = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: answered })
     expect(formatAuthoringReport({ point: 1, judged, parsed: answered, pushed: false })).toMatch(/PUSH FAILED/)
   })
 
   it('puts the exact author framing on the command that records the following review', () => {
-    const judged = judgeAuthoring({ outcome: okRun, commits: [astraCommit('a'.repeat(40))], parsed: answered })
+    const judged = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: answered })
     const framing = 'Act as a hostile tester and probe every adjacent transition.'
     const text = formatAuthoringReport({ point: 1, judged, parsed: answered, framing })
     expect(text).toContain(`--mode review --point 1 --author-framing "${framing}"`)
@@ -518,7 +544,7 @@ describe('formatAuthoringReport', () => {
     expect(text).toMatch(/left UNCOMMITTED WORK/)
     expect(text).toMatch(/2 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
     expect(text).toContain(
-      `git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${ASTRA_TRAILER}'` +
+      `git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${CROSS_TRAILER}'` +
         ` && git push -u origin feat/792-fable-state`,
     )
     expect(text).not.toMatch(/authored NOTHING/)
@@ -527,7 +553,7 @@ describe('formatAuthoringReport', () => {
   it('reports commits first even when more work remains dirty', () => {
     const judged = judgeAuthoring({
       outcome: okRun,
-      commits: [astraCommit('a'.repeat(40), 'Save the first step')],
+      commits: [crossCommit('a'.repeat(40), 'Save the first step')],
       parsed: answered,
       dirty: '?? scripts/next.mjs',
       numstat: '7\t0\tscripts/next.mjs',
@@ -536,5 +562,92 @@ describe('formatAuthoringReport', () => {
     expect(text).toMatch(/authored 1 commit\(s\)/)
     expect(text).toMatch(/UNCOMMITTED SIZE: 1 changed path\(s\), 7 insertion\(s\)/)
     expect(text).not.toMatch(/authored NOTHING/)
+  })
+})
+
+describe('the scarce lane authoring process (claude runtime)', () => {
+  it('pins the scarce lane without an attribution-breaking fallback', () => {
+    const args = authoringRuntime('scarce').args({ prompt: 'author it' })
+    expect(args).toEqual([
+      '-p',
+      'author it',
+      '--model',
+      SCARCE.modelId,
+      '--output-format',
+      'json',
+      '--dangerously-skip-permissions',
+    ])
+    expect(args).toEqual(authoringClaudeArgs({ modelId: SCARCE.modelId, prompt: 'author it' }))
+    expect(args).not.toContain('--fallback-model')
+    expect(authorTrailer('scarce')).toContain(SCARCE.trailerName)
+  })
+
+  it('extracts the final answer only when Claude reports the scarce lane as the serving model', () => {
+    const parsed = parseClaudeAuthoringOutput(
+      JSON.stringify({ result: 'DONE: built\nGATES: green\nOPEN: none', modelUsage: { [SCARCE.modelId]: {} } }),
+    )
+    expect(parsed).toMatchObject({ ok: true, result: expect.stringContaining('DONE: built') })
+    expect(authoringRuntime('scarce').attribute(JSON.stringify({ result: 'x', modelUsage: { [SCARCE.modelId]: {} } })).ok).toBe(true)
+    expect(laneAuthoringOutcome({ exitCode: 0, modelResult: parsed })).toEqual({ ok: true, cause: '' })
+  })
+
+  it('refuses silent substitution, missing metadata, malformed output, and failed runs', () => {
+    const substitute = MAIN.retired.find((s) => /^[a-z0-9-]+$/.test(s))
+    const substituted = parseClaudeAuthoringOutput(
+      JSON.stringify({ result: 'done', modelUsage: { [substitute]: {} } }),
+      SCARCE.displayName,
+    )
+    expect(substituted).toMatchObject({ ok: false, models: [substitute] })
+    expect(substituted.error).toContain(`not ${SCARCE.displayName}`)
+    expect(parseClaudeAuthoringOutput(JSON.stringify({ result: 'done' })).error).toMatch(/no serving model/)
+    expect(parseClaudeAuthoringOutput('not json').error).toMatch(/no readable result JSON/)
+    expect(laneAuthoringOutcome({ exitCode: 0, modelResult: substituted }).cause).toContain('Claude served')
+    expect(laneAuthoringOutcome({ exitCode: 2 }).cause).toContain('exited with code 2')
+    expect(laneAuthoringOutcome({ exitCode: 0, timedOut: true }).cause).toContain('timed out')
+  })
+})
+
+describe('authorLaneConfig — one command, every lane from its record', () => {
+  it('derives model, id, trailer, runtime and the other-vendor reviewer per lane', () => {
+    expect(authorLaneConfig('cross')).toMatchObject({
+      lane: 'cross',
+      model: CROSS.displayName,
+      modelId: CROSS.modelId,
+      trailer: authorTrailer('cross'),
+      reviewer: MAIN.displayName,
+      reviewerRole: 'main',
+      detail: `(effort ${CROSS.reasoningEffort})`,
+    })
+    expect(authorLaneConfig('cross').runtime.bin).toBe('codex')
+    expect(authorLaneConfig('scarce')).toMatchObject({
+      lane: 'scarce',
+      model: SCARCE.displayName,
+      modelId: SCARCE.modelId,
+      trailer: authorTrailer('scarce'),
+      reviewer: CROSS.displayName,
+      reviewerRole: 'cross',
+      detail: '',
+    })
+    expect(authorLaneConfig('scarce').runtime.bin).toBe('claude')
+  })
+
+  it('has no commissioning path for the main chain or an unknown lane', () => {
+    expect(() => authorLaneConfig('main')).toThrow(/no authoring path/)
+    expect(() => authorLaneConfig(TEST_FOREIGN_MODELS.haiku)).toThrow(/no authoring path/)
+  })
+
+  it('tells the next-step command which lane to hand the findings back to', () => {
+    const report = formatAuthoringReport({
+      point: 7,
+      branch: 'feat/7-x',
+      judged: { delivered: true, commits: [crossCommit('e'.repeat(40))], problems: [] },
+      role: 'scarce',
+      authorModel: SCARCE.displayName,
+      authorDetail: '',
+      authorTrailer: authorTrailer('scarce'),
+      reviewer: CROSS.displayName,
+    })
+    expect(report).toContain('node scripts/author-delegate.mjs --lane scarce --point 7 --findings <file>')
+    expect(report).toContain(`--model "${CROSS.displayName}"`)
   })
 })

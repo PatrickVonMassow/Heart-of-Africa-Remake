@@ -231,7 +231,7 @@ export function finderBeforeOpenFix(cardOrder, tasksOpenSet) {
  * rather than delegated: invariant 4b of dashboard-guard-core covers only a
  * now-card whose point is also queued, and `parseQueuePoints` returns a Set, so
  * a duplicate inside the Warteschlange was caught by nothing (four-eyes finding
- * 1, Fable 5). It also makes the comparison below well-defined — with a point at
+ * 1). It also makes the comparison below well-defined — with a point at
  * two positions there is no single place the work order can agree with.
  *
  * Returns null when they agree, else the FIRST divergence with both sequences.

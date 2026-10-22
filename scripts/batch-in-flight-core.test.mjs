@@ -119,6 +119,7 @@ import {
   tagEvidencePoint,
 } from './batch-in-flight.mjs'
 import { selfCommandLine } from './verify/run-record.mjs'
+import { MAIN } from './model-lanes.mjs'
 
 const NOW = 1_785_100_000_000
 const SID = 'session-owner'
@@ -4500,14 +4501,14 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   })
 
   it('recognises an authoring run as the commissioning it is', () => {
-    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --point 697' })).toEqual({
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --lane cross --point 697' })).toEqual({
       point: 697,
       points: [697],
       refs: [],
       refsLoose: false,
       how: 'author',
     })
-    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' })).toEqual({
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --lane scarce --point 834' })).toEqual({
       point: 834,
       points: [834],
       refs: [],
@@ -4524,7 +4525,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --point 697 --dry-run' }).point,
     ).toBeNull()
     expect(
-      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834 --dry-run' }).point,
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --lane scarce --point 834 --dry-run' }).point,
     ).toBeNull()
     // …and a read-only leg beside a real cut does not shield the cut.
     expect(
@@ -4543,7 +4544,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       'git branch -D feat/697-goat',
       'git merge --no-ff feat/697-goat',
       'git log feat/697-goat',
-      'node scripts/land-point.mjs 697 --model opus-5',
+      `node scripts/land-point.mjs 697 --model "${MAIN.trailerName}"`,
       'node scripts/point-brief.mjs 697',
     ]) {
       expect(commissionTarget({ toolName: 'Bash', command }).point, command).toBeNull()

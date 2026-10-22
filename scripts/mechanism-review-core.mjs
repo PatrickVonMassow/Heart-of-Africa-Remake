@@ -25,10 +25,19 @@ import { resolve } from 'node:path'
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
 import {
-  ASTRA_MODEL,
-  FABLE_MODEL,
-  OPUS_FALLBACK_MODEL,
-  OPUS_MODEL,
+  CROSS,
+  LANES,
+  LEGACY,
+  MAIN,
+  SCARCE,
+  executionTarget,
+  mentionedIdentities,
+  modelWords,
+  normaliseName,
+  sharesIdentity,
+  vendorKeyOf,
+} from './model-lanes.mjs'
+import {
   laneIsOn,
   isSwitchFallbackReason,
   mergeFallbackReason,
@@ -236,43 +245,24 @@ export function mechanismPathsIn(paths, opts) {
 }
 
 /**
- * Split a model designation into the two parts a comparison can be honest about.
- * "Claude Opus 4.8 <noreply@anthropic.com>" → { family: 'opus', version: '4.8' }.
- * The word "Claude" and the address carry no identity and are dropped (other
- * vendor words stay: "GPT-6 Astra" is read as the astra family below).
+ * Read a model designation the way every comparison here reads it: through the
+ * lane registry (scripts/model-lanes.mjs). `identities` are the lane identities it
+ * mentions — a role (`main`, `cross`, `scarce`), `main-fallback`, or `other:<word>`
+ * for a recognised model that is no lane; `family` is the first of them. Current and
+ * retired names of a lane collapse to that lane, so a renamed lane keeps judging
+ * landed records as itself; the main fallback stays a distinct identity. `version`
+ * is the first version written, for callers that only ask whether one is given.
+ * The address carries no identity and is dropped.
  */
-export function parseModel(name) {
+export function parseModel(name, registry = LANES) {
   const raw = String(name ?? '').trim()
-  const cleaned = raw
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\bclaude\b/gi, ' ')
-    .toLowerCase()
-    // AN API ID SEPARATES ITS MINOR WITH A DASH, a human name with a dot, and the
-    // version regex below only ever knew the dot — so `claude-opus-4-8` read as
-    // version "4" and did NOT match "Opus 4.8", i.e. that pair was silently NOT
-    // recognised as one model. It stayed invisible while the only dashed id in use
-    // had no minor at all (`claude-fable-5` vs "Fable 5"); moving that lane to
-    // Fable 5.1 is what surfaced it (point 1041).
-    //
-    // ONLY A SHORT DIGIT RUN IS A MINOR, never a snapshot date (cross-vendor round,
-    // GPT-5.6 Sol, 01.09.2026). Rewriting EVERY digit-dash-digit made the dated
-    // major-only `claude-opus-5-20260801` read as version 5.20260801, which then
-    // compares UNEQUAL to "Opus 5" — and an unequal pair is exactly what lets a
-    // model be picked to review its own work. A date has eight digits and is left
-    // alone; `claude-haiku-4-5-20251001` still reads 4.5.
-    .replace(/(\d)-(?=\d{1,2}(?!\d))/g, '$1.')
+  const identities = mentionedIdentities(raw, registry)
+  const text = raw.replace(/<[^>]*>/g, ' ')
   return {
     raw,
-    // ONE FAMILY PER MODEL, WHICHEVER HALF OF THE NAME IS WRITTEN (point 667).
-    // The OpenAI lane's designation carries its vendor's word in FRONT of it —
-    // "GPT-6 Astra" — so reading the first word as the family made it a different
-    // model from the bare "Astra". Harmless while that lane only reviewed; now
-    // that it also AUTHORS, that difference is how a self-review would pass the
-    // ledger. The RETIRED name is read into the same family (point 1061): the 84
-    // recorded reviews naming "GPT-5.6 Sol" must keep judging as that lane, and a
-    // version tells the two apart where a record needs them told apart.
-    family: /\b(?:astra|sol)\b/.test(cleaned) ? 'astra' : (cleaned.match(/[a-z]+/) ?? [''])[0],
-    version: (cleaned.match(/\d+(?:\.\d+)?/) ?? [''])[0],
+    identities,
+    family: identities[0] ?? '',
+    version: (text.match(/\d+(?:[.-]\d{1,2}(?!\d))?/) ?? [''])[0].replace('-', '.'),
   }
 }
 
@@ -280,21 +270,21 @@ export function parseModel(name) {
  * Are these two designations the SAME model — i.e. would a review by `a` of work
  * authored by `b` be a self-review?
  *
- * Conservative in the direction that matters: an unknown family on either side
- * can never PROVE a self-review (a merge commit carries no model trailer). That
- * is this predicate's answer only: unreadable authorship is refused separately,
- * by reviewIdentityProblem's `unknown-author`. A missing version on one side counts as the same
- * model — "opus" reviewing "Claude Opus 5" is the same pair of eyes — while two
- * KNOWN, different versions are different models, which is what makes the
- * project's Opus 5 / Opus 4.8 fallback usable as a reviewer.
+ * Lane-level identity (scripts/model-lanes.mjs `sharesIdentity`): every current and
+ * retired spelling of a lane is that lane, a bare family word ("opus") is its lane,
+ * and the main fallback is a distinct identity, which is what keeps it usable as a
+ * reviewer of the main chain's work. A compound name ("A / B") is each model it
+ * mentions. Conservative in the direction that matters: an unknown designation can
+ * never PROVE a self-review against a different spelling (a merge commit carries no model
+ * trailer). Unreadable authorship is refused separately, by reviewIdentityProblem's
+ * `unknown-author`.
  */
-export function sameModel(a, b) {
-  const x = parseModel(a)
-  const y = parseModel(b)
-  if (!x.family || !y.family) return false
-  if (x.family !== y.family) return false
-  if (!x.version || !y.version) return true
-  return x.version === y.version
+export function sameModel(a, b, registry = LANES) {
+  if (sharesIdentity(a, b, registry)) return true
+  // A designation the registry cannot place is still the same as ITSELF: two
+  // identical spellings are one pair of eyes, whatever they name.
+  const x = normaliseName(a)
+  return Boolean(x) && x === normaliseName(b)
 }
 
 /**
@@ -319,46 +309,36 @@ export function reviewIdentityProblem(reviewer, commit = {}) {
   return named.some((author) => modelVendor(author) === reviewerVendor) ? 'same-vendor' : ''
 }
 
-/** Every designation the OpenAI lane has carried: GPT-6 Astra since 05.09.2026,
- *  GPT-5.6 Sol before it (point 1061). A guard reading PAST commits and PAST
- *  records must recognise the retired name as the same lane, or a landed commit
- *  stops verifying the day the lane is renamed. */
-const OPENAI_LANE_NAMES = Object.freeze([ASTRA_MODEL, 'GPT-5.6 Sol'])
-
-/** Was this designation written by the OpenAI lane, under either of its names? */
-export function isOpenAiLane(name) {
-  return OPENAI_LANE_NAMES.some((lane) => sameModel(lane, name))
+/** Does this designation name the lane of `role`, under any of its spellings? */
+function namesLane(name, role, registry = LANES) {
+  return mentionedIdentities(name, registry).includes(role)
 }
 
-/** The two reasons the preferred OpenAI reader can legitimately yield to the
- *  Claude chain. They are explicit because a same-vendor review without a
+/** The two reasons the preferred cross-lane reader can legitimately yield to the
+ *  main vendor's chain. They are explicit because a same-vendor review without a
  *  handover would otherwise bypass the cross-vendor preference by assertion. */
-export const REVIEW_HANDOVERS = Object.freeze(['astra-authored', 'astra-unavailable'])
+export const REVIEW_HANDOVERS = Object.freeze(['cross-authored', 'cross-unavailable'])
 
-/** The retired lane's spellings, still standing in recorded reviews (point 1061).
- *  They are READ, never written: `normaliseHandover` maps a stored reason onto
- *  the current one so an old record keeps its meaning. */
-const RETIRED_HANDOVERS = Object.freeze({ 'sol-authored': 'astra-authored', 'sol-unavailable': 'astra-unavailable' })
-
-/** The current spelling of a recorded handover reason. PURE. */
+/** The current spelling of a recorded handover reason. PURE. Former spellings are
+ *  READ through LEGACY.handovers, never written, so an old record keeps its meaning. */
 function normaliseHandover(reason) {
   const raw = String(reason ?? '').trim()
-  return RETIRED_HANDOVERS[raw] ?? raw
+  return LEGACY.handovers[raw] ?? raw
 }
-const ASTRA_UNAVAILABLE_REVIEW_CHAIN = Object.freeze([FABLE_MODEL, OPUS_MODEL, OPUS_FALLBACK_MODEL])
-const ASTRA_AUTHORED_REVIEW_CHAIN = Object.freeze([OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
 
-/** The chain in force for a handover at record time. */
-export function handoverChainFor(reason, fableState) {
-  const reasonNow = normaliseHandover(reason)
-  const chain = reasonNow === 'astra-authored'
-    ? ASTRA_AUTHORED_REVIEW_CHAIN
-    : reasonNow === 'astra-unavailable'
-      ? ASTRA_UNAVAILABLE_REVIEW_CHAIN
-      : []
-  if (!chain.length) return Object.freeze([])
-  if (fableState === undefined || laneIsOn(fableState)) return Object.freeze([...chain])
-  return Object.freeze(chain.filter((model) => !sameModel(model, FABLE_MODEL)))
+/** The roles each handover hands to, in order: with the cross lane absent the scarce
+ *  lane reads first; with the cross lane an author the main chain does. */
+const HANDOVER_CHAIN_ROLES = Object.freeze({
+  'cross-unavailable': Object.freeze(['scarce', 'main', 'main-fallback']),
+  'cross-authored': Object.freeze(['main', 'scarce', 'main-fallback']),
+})
+
+/** The chain in force for a handover at record time, as the models' display names
+ *  (what a record stores). The scarce lane drops out while its switch is not on. */
+export function handoverChainFor(reason, scarceState, registry = LANES) {
+  const roles = HANDOVER_CHAIN_ROLES[normaliseHandover(reason)] ?? []
+  const usable = scarceState === undefined || laneIsOn(scarceState) ? roles : roles.filter((role) => role !== 'scarce')
+  return Object.freeze(usable.map((role) => executionTarget(role, registry).name))
 }
 
 /** What is wrong with a recorded handover, or ''. The selected fallback must
@@ -369,11 +349,11 @@ function reviewHandoverProblem({ reviewer = '', authors = [], handover = '', cha
   const named = (Array.isArray(authors) ? authors : [authors]).map(String).filter(Boolean)
   if (!named.length || named.some((author) => modelVendor(author) === 'unknown')) return 'unknown-author'
   const candidates = Array.isArray(chain) && chain.length ? chain.map(String) : handoverChainFor(reason)
-  if (reason === 'astra-authored' && !named.some((author) => isOpenAiLane(author))) {
-    return 'astra-was-not-an-author'
+  if (reason === 'cross-authored' && !named.some((author) => namesLane(author, 'cross'))) {
+    return 'cross-was-not-an-author'
   }
-  if (reason === 'astra-unavailable' && named.some((author) => isOpenAiLane(author))) {
-    return 'astra-authorship-requires-role-swap'
+  if (reason === 'cross-unavailable' && named.some((author) => namesLane(author, 'cross'))) {
+    return 'cross-authorship-requires-role-swap'
   }
   const expected = candidates.find((candidate) => !named.some((author) => sameModel(candidate, author))) ?? ''
   if (!expected) return 'every-handover-model-authored'
@@ -474,16 +454,16 @@ const commitAuthors = (commit = {}) => {
  * vendor demonstrably fixed and had read by the other vendor.
  *
  * This belongs at refusal evaluation, not in `cross-review`'s authorship cut.
- * Changing the planner per contribution could OFFER an Astra pass for the old
- * Claude contribution, but it could not make the gate accept the Claude review
- * of Astra's answering commit; the command and the decision would still disagree.
+ * Changing the planner per contribution could OFFER a cross-lane pass for the old
+ * main-chain contribution, but it could not make the gate accept the main-chain review
+ * of the cross lane's answering commit; the command and the decision would still disagree.
  * Here both file-scoped and legacy refusal paths consume the same ledger fact.
  *
  * The exception is a CHAIN, never a waiver. Each link is machine-checkable:
  * the answering commit is later, is authored wholly by the vendor that made the
  * refusal, touches the refused file, and has an exact-sha code review whose
  * measured ancestry contains the refusal. That review is judged against the
- * ANSWER'S authors, so the original author may clear Astra's fix without being
+ * ANSWER'S authors, so the original author may clear the cross lane's fix without being
  * allowed to review their own original contribution.
  */
 const filesClearedByRefusingVendor = (refusal, { commits = [], records = [], files = [] } = {}) => {
@@ -602,20 +582,31 @@ const openRefusalsIn = (records = [], chain = {}) => {
   })
 }
 
-/** The family words of a model this project would recognise. */
-const MODEL_FAMILY = 'astra|sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek'
+/** The vendor prefixes standing in front of a lane's family word in its own names
+ *  ("<vendor> <family> <version>"): on their own they name no particular model. */
+const VENDOR_PREFIXES = (() => {
+  const families = new Set(LANES.flatMap((record) => record.familyWords))
+  const words = new Set(modelWords())
+  const found = new Set()
+  for (const record of LANES) {
+    for (const name of [record.displayName, record.trailerName, ...record.retired]) {
+      for (const word of String(name).toLowerCase().split(/[^a-z]+/)) {
+        if (word && words.has(word) && !families.has(word)) found.add(word)
+      }
+    }
+  }
+  return found
+})()
 
-/** A model designation this project would recognise, for the fallback below. */
-const MODEL_NAMED = new RegExp(`\\b(${MODEL_FAMILY})\\b`, 'gi')
-
-/** …with its version where one is given: "Opus 4.8", "GPT-5.6", plain "Astra". */
-const MODEL_WITH_VERSION = new RegExp(`\\b(?:${MODEL_FAMILY})(?:[\\s-]*\\d+(?:\\.\\d+)?)?`, 'gi')
+/** The model identities a text names, a bare vendor prefix not counted. */
+const namedIdentities = (text) =>
+  mentionedIdentities(text).filter((id) => !(id.startsWith('other:') && VENDOR_PREFIXES.has(id.slice(6))))
 
 /**
  * …and the fallback has to say the model was NOT THERE, not merely name one.
  *
  * `failed` and `refused` are deliberately BOUND to what failed (four-eyes
- * review, sixth round): bare, they matched "Sol failed the review", which is a
+ * review, sixth round): bare, they matched "<model> failed the review", which is a
  * model that was very much there.
  */
 const UNAVAILABLE = new RegExp(
@@ -637,24 +628,15 @@ const NEGATED_ABSENCE = /\bnot\s+(unavailable|unreachable|inaccessible|offline|a
 /**
  * Does `text` name a model that is NOT the one that merged?
  *
- * A designation carrying a VERSION is judged by sameModel, so an Opus 5 merger
- * may name Opus 4.8 as the model that was missing (four-eyes review, sixth
- * round: the family-word test refused that legitimate case). A bare family word
- * falls back to the words of the merger's own name, so "Astra was unreachable"
- * cannot be written by GPT-6 Astra about itself.
+ * Judged by lane identity (sameModel's reading), so a main-chain merger may name
+ * the main fallback as the model that was missing (four-eyes review, sixth round:
+ * the family-word test refused that legitimate case), while no spelling of the
+ * merger's own lane — current, retired or a bare family word — counts as another
+ * model: "<family word> was unreachable" cannot be written by that lane about itself.
  */
 function namesOtherModel(text, who) {
-  const mine = new Set([...String(who ?? '').matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase()))
-  for (const [designation] of String(text ?? '').matchAll(MODEL_WITH_VERSION)) {
-    const family = (designation.match(/[a-z]+/i) ?? [''])[0].toLowerCase()
-    if (family === 'claude') continue
-    if (parseModel(designation).version) {
-      if (!sameModel(designation, who)) return true
-      continue
-    }
-    if (!mine.has(family)) return true
-  }
-  return false
+  const mine = new Set(mentionedIdentities(who))
+  return namedIdentities(text).some((id) => !mine.has(id))
 }
 
 /**
@@ -741,9 +723,9 @@ export const AUTHORSHIP_CHECK_SINCE = 1_787_415_913_284
  * unknown actual reviewer could claim an independent model, record the claim
  * with `status: 'unverified'`, and clear the commit — which is the
  * unknown-authorship case the gate exists to refuse. Where the claimed
- * reviewer is an Anthropic model, its session transcript exists in the harness
+ * reviewer is a model of the harness vendor (the main lane's), its session transcript exists in the harness
  * at recording time, so AGREEMENT is achievable and anything less is refused.
- * An OpenAI reviewer runs outside the harness — no Claude transcript can hold
+ * A reviewer of another vendor runs outside the harness — no harness transcript can hold
  * its messages, so demanding one would end every cross-vendor review — and
  * stays recordable as unverified, but only with the reason stated; an unknown
  * vendor is refused outright. The boundary preserves the rows recorded under
@@ -761,7 +743,7 @@ export const VERIFIED_REVIEWER_SINCE = 1_787_588_100_000
  * keeping them apart costs one duplicated review.
  *
  * `fallback` is the honest way past it: where only two models were available — or,
- * for the OpenAI lane, the recorded Fable-switch decision (a decision is not an
+ * for the cross lane, the recorded lane-switch decision (a decision is not an
  * outage) — that is RECORDED as such rather than silently merged by an author. It waives
  * the identity rule, never the counting — the union still has to account for
  * every entry (scripts/blind-merge.mjs).
@@ -794,21 +776,21 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     // A FALLBACK HAS TO SAY WHICH MODEL WAS NOT THERE (four-eyes review of point
     // 634, rounds one and five). Any eight characters would otherwise buy an
     // author the right to merge its own list — the escape hatch would be the
-    // rule — and so would a line that merely mentions a model ("Opus 5 performed
+    // rule — and so would a line that merely mentions a model ("<merger> performed
     // the merge"). Nothing can VERIFY the claim; what is enforced is that it is
     // a checkable one: a model OTHER than the merger, and said to be absent.
-    const named = [...String(reason).matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase())
+    const named = mentionedIdentities(reason)
     // THE NAME AND THE ABSENCE MUST BE THE SAME CLAIM (four-eyes review, sixth
-    // round). Checked apart, "GPT-5.6 Sol was present; Opus 5 was unavailable"
+    // round). Checked apart, "<model A> was present; <merger> was unavailable"
     // satisfied both halves and said the opposite of what the exception means.
     // So one CLAUSE has to carry the other model AND its absence. The period
-    // splits sentences but not version numbers ("GPT-5.6" stays whole).
+    // splits sentences but not version numbers (a dotted version stays whole).
     const clauses = String(reason).split(/[;,]|(?<!\d)\.|\.(?!\d)|\band\b|\bbut\b|\bwhile\b|\bso\b|\bhowever\b/i)
     const bound = clauses.some(
       (c) => UNAVAILABLE.test(c) && !NEGATED_ABSENCE.test(c) && namesOtherModel(c, who),
     )
-    if (switchFallback && !isOpenAiLane(who)) {
-      errors.push(`the Fable-switch fallback is only the recorded reason the OpenAI lane may merge its own blind half`)
+    if (switchFallback && !namesLane(who, 'cross')) {
+      errors.push(`the lane-switch fallback is only the recorded reason the cross lane may merge its own blind half`)
     } else if (switchFallback && !conflict) {
       // The general no-fallback-needed error above remains the one explanation.
     } else if (switchFallback) {
@@ -857,7 +839,7 @@ export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', au
   const derivedReason = conflict ? mergeFallbackReason(fableState) : ''
   const statedReason = String(mergeFallback ?? '').trim()
   if (statedReason && statedReason !== derivedReason) {
-    errors.push('--merge-fallback contradicts the reason generated by the Fable switch')
+    errors.push('--merge-fallback contradicts the reason generated by the lane switch')
   }
   return { mergedBy: expected, mergeFallback: statedReason || derivedReason, errors }
 }
@@ -951,8 +933,8 @@ export function modelFromTrailers(field) {
  * merge its own list (four-eyes review of point 634).
  *
  * IT ASKS THE AUTHOR ALLOWLIST WHAT A MODEL TRAILER LOOKS LIKE (point 667), and
- * no longer "does it say Claude". Since the OpenAI lane authors too, a Claude-only
- * reading would report an Astra-authored commit as having no author at all — and every
+ * no longer "does it name the main vendor". Since the cross lane authors too, a
+ * main-vendor-only reading would report a cross-authored commit as having no author at all — and every
  * self-review refusal downstream is built on knowing who wrote it. Human
  * co-authors still name no model and are still dropped.
  */
@@ -1459,10 +1441,10 @@ export function validateRecord({
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
   if (!String(model ?? '').trim()) {
-    // The example NAMES the reviewers the rule prefers (point 624): the OpenAI lane
+    // The example NAMES the reviewers the rule prefers (point 624): the cross lane
     // first, the handover chain otherwise. The value itself is checked by the
     // independence rules (unknown vendors, handover-less same-vendor reviews).
-    errors.push(`--model <name>: which model performed the review (e.g. "${ASTRA_MODEL}", "${FABLE_MODEL}")`)
+    errors.push(`--model <name>: which model performed the review (e.g. "${CROSS.displayName}", "${SCARCE.displayName}")`)
   }
   if (!VERDICTS.includes(String(verdict ?? '').trim())) {
     errors.push(`--verdict <v>: one of ${VERDICTS.join(' | ')}`)
@@ -1518,10 +1500,10 @@ export function validateRecord({
       // means an EARLIER author of the same file inside the same range is not
       // seen by the independence check. The file's own `sourceCommits` carries
       // that history for anything that needs it.
-      // READ THROUGH THE RETIRED SPELLING (point 1061): a record written while
-      // the lane was Sol carries `sol-authored`, and a raw comparison here would
-      // stop deferring the day the lane was renamed — turning 84 landed records
-      // into same-vendor refusals.
+      // READ THROUGH THE FORMER SPELLINGS (point 1061, LEGACY.handovers): a record
+      // written under an earlier lane name carries that name's handover, and a raw
+      // comparison here would stop deferring the day the lane was renamed —
+      // turning landed records into same-vendor refusals.
       const deferredPassHandover = String(pass ?? '').trim() && REVIEW_HANDOVERS.includes(normaliseHandover(handover))
       const handoverProblem = deferredPassHandover
         ? ''
@@ -1640,11 +1622,11 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
   const vendor = modelVendor(record.model)
   if (vendor === 'unknown') return false
-  // Anthropic agreement became provable only at the later transcript boundary.
-  // Preserve earlier reasoned unverified rows; after it, anything short of the
-  // recorder's agreement stamp is malformed.
-  if (vendor === 'anthropic' && authorship.status !== 'agreement' && at >= VERIFIED_REVIEWER_SINCE) return false
-  if (vendor === 'openai') {
+  // Agreement for the harness vendor (the main lane's) became provable only at the
+  // later transcript boundary. Preserve earlier reasoned unverified rows; after it,
+  // anything short of the recorder's agreement stamp is malformed.
+  if (vendor === MAIN.vendor && authorship.status !== 'agreement' && at >= VERIFIED_REVIEWER_SINCE) return false
+  if (vendor !== MAIN.vendor) {
     if (authorship.status !== 'unverified') return false
     if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
   }
@@ -1752,19 +1734,12 @@ function pendingEndStateFiles(pendingCommits, endStateFiles) {
   return artefacts
 }
 
-export const modelVendor = (model) => {
-  const value = String(model ?? '').toLowerCase()
-  const openai = /\bastra\b|\bsol\b|\bgpt[- ]?\d/.test(value) || /openai\.com/.test(value)
-  const anthropic = /\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)
-  // CONTRADICTORY MARKERS ARE NOBODY, not first-match-wins (re-review round 5):
-  // "Claude Opus 5 GPT-5" reached the OpenAI branch and cleared as
-  // unverified-with-reason, bypassing both the unknown-vendor refusal and the
-  // Anthropic agreement requirement.
-  if (openai && anthropic) return 'unknown'
-  if (openai) return 'openai'
-  if (anthropic) return 'anthropic'
-  return 'unknown'
-}
+/** The vendor key of a designation, or 'unknown' — read through the lane registry
+ *  (scripts/model-lanes.mjs `vendorKeyOf`). CONTRADICTORY MARKERS ARE NOBODY, not
+ *  first-match-wins (re-review round 5): a name carrying both vendors' markers once
+ *  reached one vendor's branch and cleared as unverified-with-reason, bypassing both
+ *  the unknown-vendor refusal and the harness vendor's agreement requirement. */
+export const modelVendor = (model, registry = LANES) => vendorKeyOf(model, registry)
 
 /**
  * The gate itself.

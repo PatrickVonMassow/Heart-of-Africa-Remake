@@ -31,6 +31,7 @@ import {
   worstVerdict,
 } from './review-material-core.mjs'
 import { formatReviewReport, OUTCOME } from './cross-review-core.mjs'
+import { CROSS, MAIN } from './model-lanes.mjs'
 
 const file = (path, size, ch = 'x') => ({ path, text: ch.repeat(size) })
 const patchFor = (paths) =>
@@ -475,7 +476,7 @@ describe('the pass report keeps the range warning and ledger pointer', () => {
         decision: {
           fellBack: false,
           ready: true,
-          model: 'GPT-5.6 Sol',
+          model: CROSS.displayName,
           verdict: 'merge',
           evidence: 'read this pass whole and found no issue',
         },
@@ -490,8 +491,8 @@ describe('the pass report keeps the range warning and ledger pointer', () => {
           fellBack: true,
           ready: false,
           kind: OUTCOME.SWITCHED_OFF,
-          cause: 'the share switch is claude-only',
-          model: 'Opus 5',
+          cause: 'the routing setting is main-only',
+          model: MAIN.displayName,
           verdict: '',
           evidence: '',
         },

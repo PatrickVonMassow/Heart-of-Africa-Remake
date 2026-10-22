@@ -395,7 +395,7 @@ const PARENT_READ_MAX_BYTES = 1024 * 1024
 
 /**
  * The default parent reader, exported so a test can exercise the REAL command
- * rather than replace it (cross-vendor review, GPT-5.6 Sol: a test that injects
+ * rather than replace it (cross-vendor review: a test that injects
  * `readParents` stays green if the production wiring drops the no-replace flag
  * or scans past the header).
  *
@@ -425,8 +425,8 @@ export function readSubject(sha, runGit) {
 }
 
 /** The refusal a typed authorship failure earns, built pure so the answer the
- *  main module emits is pinnable without spawning it (cross-vendor review,
- *  GPT-5.6 Sol: the failure cases stopped at the typed error and never showed
+ *  main module emits is pinnable without spawning it (cross-vendor review:
+ *  the failure cases stopped at the typed error and never showed
  *  what the caller finally sees). */
 export function authorshipBlockResponse(error) {
   return {
@@ -456,7 +456,7 @@ export function authorshipRead(read, what) {
 
 export function rangeCommits(base, head, files, readers = {}) {
   // `runGit` exists so a test can pin the PRODUCTION wiring rather than replace
-  // it (cross-vendor review, GPT-5.6 Sol): injecting `readParents` bypasses both
+  // it (cross-vendor review): injecting `readParents` bypasses both
   // the real command and the real parser, so those cases stayed green even if the
   // default reader stopped being used at all.
   const runGit = readers.runGit ?? git
@@ -486,7 +486,7 @@ export function rangeCommits(base, head, files, readers = {}) {
   // a replaced parent could otherwise answer with somebody else's trailers.
   const trailersOf = (sha) => readTrailers(sha)
   // THE PARENTS THE ANCESTRY RULE USES COME FROM THE COMMIT OBJECT, NOT FROM THE
-  // LOG (cross-vendor review, GPT-5.6 Sol at effort high, second do-not-merge on
+  // LOG (cross-vendor review, second do-not-merge on
   // this half). `--no-replace-objects` disables `refs/replace` and NOTHING ELSE:
   // `log --format=%P` is still GRAFT-aware, so at a shallow boundary a merge
   // prints as single-parented and the resolver inherits nothing — the merged
@@ -496,7 +496,7 @@ export function rangeCommits(base, head, files, readers = {}) {
   const readParents = readers.readParents ?? ((sha) => defaultParentReader(sha, runGit))
   const measured = commits.map((commit) => {
     // THE COMMIT'S OWN TRAILERS ARE AN AUTHORSHIP READ TOO (cross-vendor review,
-    // GPT-5.6 Sol at effort high, second do-not-merge on this end state). It was
+    // second do-not-merge on this end state). It was
     // the one left unwrapped, and it is the most load-bearing of the three: it
     // decides `own`, both author fields, AND whether the ancestry rule is
     // consulted at all. Failing open here switched the gate off exactly as the
@@ -507,7 +507,7 @@ export function rangeCommits(base, head, files, readers = {}) {
     )
     const own = modelsFromTrailers(trailers)
     // A FAILED AUTHORSHIP READ IS A BLOCK, NEVER A SHRUG (cross-vendor review,
-    // GPT-5.6 Sol at effort high, do-not-merge on the end state). Both reads
+    // do-not-merge on the end state). Both reads
     // below can throw — an object too large for the command buffer, a parent
     // missing from a shallow or partial clone, a repository that cannot be
     // reached — and the exception used to travel all the way to this file's
@@ -954,7 +954,7 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
     // THE SAME ANSWER AN UNREADABLE LEDGER GETS, for the same reason (cross-vendor
-    // review, GPT-5.6 Sol at effort high): a read that decides AUTHORSHIP cannot
+    // review): a read that decides AUTHORSHIP cannot
     // fail into the catch below, or one unreadable object switches the gate off.
     if (e && e.authorshipUnreadable) {
       process.stdout.write(JSON.stringify(authorshipBlockResponse(e)))

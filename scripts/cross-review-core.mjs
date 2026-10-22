@@ -1,47 +1,43 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
 // rule:model-policy@2f245cec
-// WHY IT EXISTS: our Claude reviewers are one house, with similar
-// training, therefore CORRELATED blind spots, which is exactly what the
-// four-eyes rule is bought against (CLAUDE.md §6). A model from a different
-// vendor is the strongest decorrelation available, so REVIEWS go to OpenAI's
-// GPT-6 Astra at reasoning effort MEDIUM first and to the first eligible Claude
-// reviewer when Astra cannot be reached. Since point 667 Astra also AUTHORS under
-// the role swap (scripts/author-delegate.mjs, admitted in the model-guard allowlist);
-// what this file protects is the other half of that swap — no model reviews its
-// own work (`authoredByLane`, the self-review refusal), whoever wrote the commit.
+// WHY IT EXISTS: models of one vendor share training and therefore CORRELATED
+// blind spots, which is exactly what the four-eyes rule is bought against
+// (CLAUDE.md §6). A lane of a different vendor is the strongest decorrelation
+// available, so a review goes to the first enabled lane whose vendor differs
+// from every author's (scripts/model-lanes.mjs: `vendor` fields, never names) —
+// the cross lane for main-chain work, the main chain for cross-lane work. Where
+// the preferred cross lane cannot deliver, the review is HANDED OVER along a role
+// chain (REVIEW_CHAINS) with a recorded reason. What this file protects is that no
+// model reviews its own work (`authoredByLane`, the self-review refusal), whoever
+// wrote the commit.
 //
 // THE FAILURE MODE THIS FILE IS SHAPED AROUND: a review nobody ran must never be
 // recorded as done. That is worse than having no second pair of eyes, because
 // the mechanism/criticality gates then read GREEN on a commit nothing judged.
-// So every path out of a failed Astra run yields the first eligible Claude reviewer
-// (or none, said plainly, when every one of them authored the range) and NO
-// verdict — the verdict is the reviewer's to give, never the runner's to
+// So every path out of a failed cross-lane run yields the first eligible handover
+// reviewer (or none, said plainly, when every one of them authored the range) and
+// NO verdict — the verdict is the reviewer's to give, never the runner's to
 // invent — and the model that is RECORDED is always the one that actually ran,
 // never the one that was preferred.
 //
 // Side-effect free: the process spawn, the temp files and the printing belong to
 // scripts/cross-review.mjs. Pinned by cross-review-core.test.mjs.
 
+import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, VERDICTS } from './mechanism-review-core.mjs'
+import { laneIsOn } from './lane-switch-core.mjs'
 import {
-  BLIND_REVIEWER,
-  blindReviewerAdmission,
-  isOpenAiLane,
-  modelFromTrailers,
-  sameModel,
-  VERDICTS,
-} from './mechanism-review-core.mjs'
-import {
-  ASTRA_MODEL,
-  ASTRA_MODEL_ID,
-  FABLE_MODEL,
-  FABLE_MODEL_ID,
-  OPUS_FALLBACK_MODEL,
-  OPUS_FALLBACK_MODEL_ID,
-  OPUS_MODEL,
-  OPUS_MODEL_ID,
-  laneIsOn,
-} from './lane-switch-core.mjs'
+  CROSS,
+  EXECUTION_ROLES,
+  LANES,
+  eligibleReviewers,
+  executionTarget,
+  lane,
+  mentionedIdentities,
+  resolveModel,
+  sharesIdentity,
+  vendorKeyOf,
+} from './model-lanes.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import {
   assembleMaterial,
@@ -62,56 +58,100 @@ export { BLIND_REVIEWER, blindReviewerAdmission }
 // caller of the review command already looks for them.
 export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 
-/** The model id `codex exec -m` is given, and the name a record calls it by.
- *  Both are stated ONCE, in lane-switch-core.mjs beside the other model
- *  identities, and re-exported here because this is where every caller of the
- *  review command already looks for them (point 1061). */
-export { ASTRA_MODEL_ID }
-import { CROSS } from './model-lanes.mjs'
-export const ASTRA_MODEL_NAME = ASTRA_MODEL
-
-/** TRANSITIONAL: the reasoning effort is the cross lane record's (scripts/model-lanes.mjs). */
+// TRANSITIONAL — re-exports other script families still import while they move to
+// scripts/model-lanes.mjs; the coordinator deletes them last. Nothing in the
+// cross-review files uses them.
+export const ASTRA_MODEL_ID = CROSS.modelId
+export const ASTRA_MODEL_NAME = CROSS.displayName
 export const ASTRA_REASONING_EFFORT = CROSS.reasoningEffort
-
-/** The reviewers that take over whenever Astra did not deliver a verdict, in
- *  order. The ones behind Fable exist because Fable and Opus also AUTHOR here,
- *  and no model may review its own work (CLAUDE.md §6). */
-export const FALLBACK_MODEL_NAME = FABLE_MODEL
-export const SECOND_FALLBACK_MODEL_NAME = OPUS_MODEL
-export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, OPUS_FALLBACK_MODEL])
+// END TRANSITIONAL
 
 /**
- * …and the chain for the OTHER direction (point 667): who reviews what ASTRA
- * AUTHORED.
- *
- * A separate order, deliberately. The chain above answers "Astra is unreachable,
- * who else can look at this?" and starts at Fable, the second-opinion model.
- * This one answers "Astra wrote it, who takes it from here?" — and under the role
- * swap that reviewer ALSO runs the suites, judges the picture and lands the
- * point, which is the main authoring session's job. So it starts at the Opus lane.
+ * The handover chains, as ROLE LISTS in data. `crossUnavailable` answers "the cross
+ * lane did not deliver, who else can look at this?" and starts at the scarce lane,
+ * the second-opinion model. `crossAuthored` answers "the cross lane wrote it, who
+ * takes it from here?" — that reviewer ALSO runs the suites, judges the picture and
+ * lands the point, which is the main chain's job, so it starts there. `automatic` is
+ * the order the first vendor-eligible reviewer is looked for in. The scarce lane drops
+ * out of every chain while its switch is not on. Mirrors the recorder's handover chains
+ * (mechanism-review-core.mjs), which verify a recorded handover against the same order.
  */
-export const CLAUDE_REVIEW_CHAIN = Object.freeze([OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
+export const REVIEW_CHAINS = Object.freeze({
+  automatic: Object.freeze(['cross', 'main', 'scarce', 'main-fallback']),
+  crossUnavailable: Object.freeze(['scarce', 'main', 'main-fallback']),
+  crossAuthored: Object.freeze(['main', 'scarce', 'main-fallback']),
+})
 
-/** Every reviewer the policy can name, including the exact CLI identity needed
- *  to start it. Keeping the executable roster beside the decision chains makes
- *  an assignment incomplete unless it is runnable. */
-export const REVIEWER_ROSTER = Object.freeze([
-  Object.freeze({ key: 'astra', name: ASTRA_MODEL_NAME, id: ASTRA_MODEL_ID, runtime: 'codex', effort: ASTRA_REASONING_EFFORT }),
-  Object.freeze({ key: 'fable', name: FALLBACK_MODEL_NAME, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'medium' }),
-  Object.freeze({ key: 'opus', name: SECOND_FALLBACK_MODEL_NAME, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'medium' }),
-  Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'medium' }),
-])
+/** The recorded handover reason of each chain (LEGACY.handovers reads the old spellings). */
+export const HANDOVER_REASONS = Object.freeze({
+  crossUnavailable: 'cross-unavailable',
+  crossAuthored: 'cross-authored',
+})
 
-/** The executable identity for a policy model name/key/id, or null. */
-export function reviewerDescriptor(value = '') {
-  const raw = String(value ?? '').trim()
-  return REVIEWER_ROSTER.find((entry) => entry.key === raw.toLowerCase() || entry.id === raw || sameModel(entry.name, raw)) ?? null
+/** How output names a role: the role plus the record's display name. */
+export function laneLabel(role, registry = LANES) {
+  return `the ${role} lane (${executionTarget(role, registry).name})`
 }
 
-/** A review candidate chain with the shared switch applied. */
-function availableReviewChain(chain, fableState) {
-  if (fableState === undefined || laneIsOn(fableState)) return Object.freeze([...chain])
-  return Object.freeze(chain.filter((model) => !sameModel(model, FABLE_MODEL)))
+/**
+ * The executable identity of a role, or of a model designation that names exactly one
+ * role (an exact registered spelling, or one lane identity by family word), or null.
+ * `key` is the role — what `--reviewer` takes.
+ */
+export function reviewerDescriptor(value = '', registry = LANES) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return null
+  if (EXECUTION_ROLES.includes(raw)) return executionTarget(raw, registry)
+  const hit = resolveModel(raw, registry)
+  if (hit) return executionTarget(hit.fallback ? `${hit.lane.role}-fallback` : hit.lane.role, registry)
+  const named = mentionedIdentities(raw, registry)
+  if (named.length === 1 && EXECUTION_ROLES.includes(named[0])) return executionTarget(named[0], registry)
+  return null
+}
+
+/** The `--reviewer` value: a role, exactly — no model names, no old keys. */
+export function reviewerForRole(role = '', registry = LANES) {
+  const raw = String(role ?? '').trim()
+  return EXECUTION_ROLES.includes(raw) ? executionTarget(raw, registry) : null
+}
+
+/** Is a role usable under the scarce-lane switch? Only the switch-gated lane can be off. */
+function roleEnabled(role, scarceState, registry = LANES) {
+  const record = lane(role === 'main-fallback' ? 'main' : role, registry)
+  if (!record.scarce) return true
+  return scarceState === undefined || laneIsOn(scarceState)
+}
+
+/** A handover chain's display names, with the scarce switch applied. */
+export function reviewChain(name, scarceState, registry = LANES) {
+  const roles = REVIEW_CHAINS[name] ?? []
+  return Object.freeze(roles.filter((role) => roleEnabled(role, scarceState, registry)).map((role) => executionTarget(role, registry).name))
+}
+
+/** Does any author designation fail to resolve to a vendor? Such a range is refused. */
+export function unresolvedAuthors(authorModels = [], registry = LANES) {
+  const list = authorList(authorModels)
+  if (!list.length) return ['(no author recorded)']
+  return list.filter((author) => vendorKeyOf(author, registry) === 'unknown')
+}
+
+/**
+ * The automatic reviewer: the first enabled role (REVIEW_CHAINS.automatic, then any
+ * further registered lane) whose lane vendor differs from every author's (eligibleReviewers), and which shares no identity
+ * with an author. null when the authors cover every vendor or any author is unresolved.
+ */
+export function automaticReviewer(authorModels = [], { scarceState, registry = LANES } = {}) {
+  const authors = authorList(authorModels)
+  const eligible = new Set(eligibleReviewers(authors, registry).map((record) => record.role))
+  // The data order first, then any further registered lane in table order.
+  const order = [...REVIEW_CHAINS.automatic, ...registry.map((record) => record.role).filter((role) => !REVIEW_CHAINS.automatic.includes(role))]
+  const role = order.find((candidate) => {
+    const base = candidate === 'main-fallback' ? 'main' : candidate
+    if (!eligible.has(base) || !roleEnabled(candidate, scarceState, registry)) return false
+    const name = executionTarget(candidate, registry).name
+    return !authors.some((author) => sharesIdentity(name, author, registry))
+  })
+  return role ? executionTarget(role, registry) : null
 }
 
 /** The binary, and the ceiling a review may take before it counts as stuck. */
@@ -119,9 +159,9 @@ export const CODEX_BIN = 'codex'
 export const REVIEW_TIMEOUT_MS = 15 * 60_000
 
 /**
- * How a Astra run ended. `ok` is the ONLY kind that may be recorded as Astra's; each
- * other kind is a cause the command names in one line before handing the review
- * to the first eligible Claude reviewer.
+ * How a cross-lane run ended. `ok` is the ONLY kind that may be recorded as the cross
+ * lane's; each other kind is a cause the command names in one line before handing the
+ * review to the first eligible handover reviewer.
  */
 export const OUTCOME = Object.freeze({
   OK: 'ok',
@@ -133,27 +173,27 @@ export const OUTCOME = Object.freeze({
   TIMEOUT: 'timeout',
   ERROR_EXIT: 'error-exit',
   NO_VERDICT: 'no-verdict',
-  // NOT a failure: the operator has moved the load away from OpenAI (point 654). It ends
-  // in the same place every failure does — the review handed to a Claude reviewer with NO
-  // verdict — because that is the honest state either way: Astra has not seen this change.
+  // NOT a failure: the operator has moved the load away from the cross lane (point 654).
+  // It ends in the same place every failure does — the review handed over with NO verdict
+  // — because that is the honest state either way: the cross lane has not seen this change.
   SWITCHED_OFF: 'switched-off',
-  // Also not a failure, and not even a fallback: Astra AUTHORED this range, so the review
-  // was never Astra's to give (point 667). It ends in the same place for the same reason.
+  // Also not a failure, and not even a fallback: the cross lane AUTHORED this range, so the
+  // review was never its to give (point 667). It ends in the same place for the same reason.
   SELF_REVIEW: 'self-review',
 })
 
 /** One human sentence per kind — what the reader is told went wrong. */
 const CAUSE_TEXT = Object.freeze({
   [OUTCOME.NOT_INSTALLED]: `\`${CODEX_BIN}\` is not on PATH in this container`,
-  [OUTCOME.UNREACHABLE]: 'the OpenAI host could not be reached (network or firewall)',
+  [OUTCOME.UNREACHABLE]: "the cross lane's host could not be reached (network or firewall)",
   [OUTCOME.LOGIN_EXPIRED]: `the ChatGPT login is gone or expired (see \`cross-review.mjs --restore-login\`)`,
   [OUTCOME.ALLOWANCE_EXHAUSTED]: 'the ChatGPT allowance for this account is exhausted',
-  [OUTCOME.MODEL_REFUSED]: `the server refused the model id "${ASTRA_MODEL_ID}"`,
+  [OUTCOME.MODEL_REFUSED]: `the server refused the model id "${lane('cross').modelId}"`,
   [OUTCOME.TIMEOUT]: 'the review did not finish inside its time budget',
   [OUTCOME.ERROR_EXIT]: 'codex exited with an error',
   [OUTCOME.NO_VERDICT]: 'the run produced no parseable verdict',
-  [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/lane-routing.mjs --status)',
-  [OUTCOME.SELF_REVIEW]: `${ASTRA_MODEL_NAME} AUTHORED part of this range — no model reviews its own work`,
+  [OUTCOME.SWITCHED_OFF]: 'the routing setting is at `main-only` (node scripts/lane-routing.mjs --status)',
+  [OUTCOME.SELF_REVIEW]: `${laneLabel('cross')} AUTHORED part of this range — no model reviews its own work`,
 })
 
 /** The outcomes that are a VENDOR outage rather than a failed run — the signature set
@@ -188,7 +228,7 @@ const FAILURE_PATTERNS = [
   // text that ONLY shows a broken connection is unreachable, whatever stray word it
   // carries.
   //
-  // Second half (GPT-5.6 Sol, reviewing the first): the naive fix overshoots. Codex
+  // Second half (cross-vendor review of the first): the naive fix overshoots. Codex
   // RETRIES, so one transcript can hold a real `429` from attempt 1 and a
   // `Reconnecting…` storm after it — and a server that answered 429 DID speak about
   // the account, however the stream ended. Hence the order below: a definitive quota
@@ -249,7 +289,7 @@ export function classifyOutcome({ spawnError = null, exitCode = 0, stdout = '', 
  * The probe that proves the `-m` flag is honoured at all: an unknown id must be
  * rejected rather than silently substituted, because a green review against a
  * substituted model would be worthless — it would be a review by whatever the
- * account defaults to, recorded under Astra's name.
+ * account defaults to, recorded under the cross lane's name.
  */
 export function isUnknownModelRefusal(text) {
   return FAILURE_PATTERNS[0][1].test(String(text ?? ''))
@@ -257,8 +297,8 @@ export function isUnknownModelRefusal(text) {
 
 /** The `codex exec` command line for one review. Read-only sandbox, no writes. */
 export function codexArgs({
-  modelId = ASTRA_MODEL_ID,
-  effort = ASTRA_REASONING_EFFORT,
+  modelId = lane('cross').modelId,
+  effort = lane('cross').reasoningEffort,
   cwd = '',
   outputFile = '',
   prompt = '',
@@ -282,7 +322,7 @@ export function codexArgs({
 }
 
 /**
- * The prompt Astra is given.
+ * The prompt the reviewer is given.
  *
  * It states the ARTEFACT first and the author's rationale never: CLAUDE.md §6
  * requires a convergent reviewer to read the diff before any justification, so
@@ -430,8 +470,8 @@ export function rawFieldValue(rawLine) {
  * Tolerant on the way in — markdown emphasis, a code fence, a leading bullet —
  * and strict on the way out: a verdict word the recorder does not accept, or an
  * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
- * been reviewed, and the caller records nothing — an Astra run is handed on, a
- * selected Claude run ends without a record — rather than record a guess.
+ * been reviewed, and the caller records nothing — a cross-lane run is handed on, a
+ * selected handover run ends without a record — rather than record a guess.
  */
 export function parseVerdict(text, { receipt = '' } = {}) {
   const raw = String(text ?? '')
@@ -523,25 +563,29 @@ export function parseVerdict(text, { receipt = '' } = {}) {
 }
 
 /**
- * WHO REVIEWED, AND WHAT MAY BE RECORDED.
+ * WHO REVIEWED, AND WHAT MAY BE RECORDED — for a run of the cross lane.
  *
  * The one rule this function exists for: the recorded model NAMES THE RUN THAT
- * ACTUALLY HAPPENED, never the preference. Astra is preferred, so a successful Astra
- * run records Astra — but every failure names the selected Claude reviewer, with an
- * EMPTY verdict, because at that moment no second pair of eyes has seen the
- * change yet (formatReviewReport decides whether any template is printed). `ready` says whether a record may be written at all.
+ * ACTUALLY HAPPENED, never the preference. The cross lane is preferred, so a
+ * successful cross-lane run records the cross lane — but every failure names the
+ * selected handover reviewer, with an EMPTY verdict, because at that moment no second
+ * pair of eyes has seen the change yet (formatReviewReport decides whether any
+ * template is printed). `ready` says whether a record may be written at all.
+ * `model` is the display name a record stores; `role` the lane it belongs to.
  */
-export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall, fableState } = {}) {
-  // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Astra now
-  // AUTHORS as well as reviews, and a model may not review its own work — so a
-  // Astra run over a Astra-authored range is not a review whatever it answered, and
-  // recording it would put a self-review in front of a gate that then reads
+export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall, scarceState } = {}) {
+  // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). The cross
+  // lane AUTHORS as well as reviews, and a model may not review its own work — so a
+  // cross-lane run over a cross-authored range is not a review whatever it answered,
+  // and recording it would put a self-review in front of a gate that then reads
   // green. The runner asks the same question before it spends a codex call; this
   // is the backstop for every caller that does not.
-  if (authoredByLane(authorModel)) {
-    const chain = availableReviewChain(CLAUDE_REVIEW_CHAIN, fableState)
+  if (authoredByLane('cross', authorModel)) {
+    const chain = reviewChain('crossAuthored', scarceState)
+    const model = firstNonAuthor(chain, authorModel)
     return {
-      model: firstNonAuthor(chain, authorModel),
+      model,
+      role: model ? reviewerDescriptor(model).key : '',
       chain,
       ranBy: '',
       verdict: '',
@@ -554,8 +598,9 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
   }
   if (outcome.ok && parsed.ok) {
     return {
-      model: ASTRA_MODEL_NAME,
-      ranBy: ASTRA_MODEL_NAME,
+      model: CROSS.displayName,
+      role: 'cross',
+      ranBy: CROSS.displayName,
       verdict: parsed.verdict,
       evidence: parsed.evidence,
       fellBack: false,
@@ -575,9 +620,11 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
   const cause = outcome.ok
     ? `${CAUSE_TEXT[OUTCOME.NO_VERDICT]}${parsed.error ? ` (${parsed.error})` : ''}`
     : outcome.cause || CAUSE_TEXT[kind] || 'codex did not deliver a review'
-  const chain = availableReviewChain(FALLBACK_CHAIN, fableState)
+  const chain = reviewChain('crossUnavailable', scarceState)
+  const model = firstNonAuthor(chain, authorModel)
   return {
-    model: firstNonAuthor(chain, authorModel),
+    model,
+    role: model ? reviewerDescriptor(model).key : '',
     chain,
     ranBy: '',
     verdict: '',
@@ -590,26 +637,26 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shor
 }
 
 /**
- * The fallback reviewer, given who AUTHORED the change.
+ * The fallback reviewer when the cross lane did not deliver, given who AUTHORED the change.
  *
- * The chain follows the shared Fable switch. Fable also AUTHORS here (CLAUDE.md §6), and a Fable
- * review of Fable's own commit is the self-review both gates refuse. That would
- * leave a Fable-authored change with no reachable reviewer at all whenever Astra
- * is down, so the second Anthropic model in the chain takes over instead (found
- * by the cross-vendor review of this very branch, 10.08.2026).
+ * The chain follows the scarce-lane switch. The scarce lane also AUTHORS here (CLAUDE.md
+ * §6), and its review of its own commit is the self-review both gates refuse. That would
+ * leave a scarce-authored change with no reachable reviewer at all whenever the cross lane
+ * is down, so the next role in the chain takes over instead (found by the cross-vendor
+ * review of this very branch, 10.08.2026).
  *
  * It takes EVERY author in the reviewed range, not just the head commit's: one
- * record covers every commit it contains, so a range with one Fable commit under
- * an Opus head must be handed to a model that authored NEITHER (second and third
- * rounds of the same review — the first fix picked Opus 5 for exactly that
+ * record covers every commit it contains, so a range with one scarce-lane commit under
+ * a main-chain head must be handed to a model that authored NEITHER (second and third
+ * rounds of the same review — the first fix picked the main chain for exactly that
  * range, which is a self-review of half of it).
  *
  * With every model in the chain among the authors it returns '' : there is then
- * no valid Anthropic reviewer at all, and saying so is the only honest answer —
- * the review waits for Astra rather than being recorded by an author of the work.
+ * no valid handover reviewer at all, and saying so is the only honest answer —
+ * the review waits for the cross lane rather than being recorded by an author of the work.
  */
-export function fallbackReviewerFor(authorModels = '', fableState) {
-  return firstNonAuthor(availableReviewChain(FALLBACK_CHAIN, fableState), authorModels)
+export function fallbackReviewerFor(authorModels = '', scarceState) {
+  return firstNonAuthor(reviewChain('crossUnavailable', scarceState), authorModels)
 }
 
 /** Every model designation of an author list, however it was handed over. */
@@ -617,22 +664,22 @@ function authorList(authorModels) {
   return (Array.isArray(authorModels) ? authorModels : [authorModels]).filter(Boolean)
 }
 
-/** The first candidate of a chain that authored no part of the range, or ''. */
+/** The first candidate of a chain that shares no identity with an author, or ''. */
 function firstNonAuthor(chain, authorModels) {
   const authors = authorList(authorModels)
-  return chain.find((candidate) => !authors.some((a) => sameModel(candidate, a))) ?? ''
+  return chain.find((candidate) => !authors.some((a) => sharesIdentity(candidate, a))) ?? ''
 }
 
 /**
- * Did the OpenAI lane author any part of this range (point 667)?
+ * Did the lane of `role` author any part of this range (point 667)?
  *
- * Judged by `isOpenAiLane`, so every spelling of the lane answers alike — the
- * trailer's "GPT-6 Astra", a bare "Astra", the raw id, and the RETIRED
- * "GPT-5.6 Sol" (point 1061). A renamed lane is still the same model: work the
- * lane wrote under its old name is work it may not review under its new one.
+ * Judged by lane identity (model-lanes.mjs `mentionedIdentities`), so every spelling of
+ * the lane answers alike — its trailer name, a bare family word, the raw id, and every
+ * RETIRED name (point 1061). A renamed lane is still the same lane: work it wrote under
+ * its old name is work it may not review under its new one.
  */
-export function authoredByLane(authorModels = '') {
-  return authorList(authorModels).some((a) => isOpenAiLane(a))
+export function authoredByLane(role, authorModels = '', registry = LANES) {
+  return authorList(authorModels).some((a) => mentionedIdentities(a, registry).includes(role))
 }
 
 /**
@@ -753,7 +800,7 @@ export const PROBE_MAX_AGE_MS = 30 * 86_400_000
 export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS, fingerprint = '') {
   const at = Number(receipt?.at ?? 0)
   if (!receipt || receipt.refused !== true || !at) {
-    return { fresh: false, warning: `the model id ${ASTRA_MODEL_ID} has never been proven honoured on this machine — proving it (node scripts/cross-review.mjs --probe)` }
+    return { fresh: false, warning: `the model id ${lane('cross').modelId} has never been proven honoured on this machine — proving it (node scripts/cross-review.mjs --probe)` }
   }
   // THE PROOF IS BOUND TO WHAT PRODUCED IT (fifth cross-vendor round). The
   // receipt outlives container rebuilds, so a proof taken with another codex
@@ -795,9 +842,9 @@ export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
 /** Shell-quote one value for the record command line we print. */
 const q = (s) => `"${String(s ?? '').replace(/(["\\$`])/g, '\\$1')}"`
 
-/** A ready-to-run invocation of this same reviewer command for any roster
- *  member. The caller supplies the already-bounded request; no prose handoff
- *  has to be translated back into flags by a human. */
+/** A ready-to-run invocation of this same reviewer command for any role. The
+ *  caller supplies the already-bounded request; no prose handoff has to be
+ *  translated back into flags by a human. `model` is a role or a model name. */
 export function formatReviewerCommand({
   model = '',
   sha = '',
@@ -832,7 +879,7 @@ const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slic
 /**
  * The record command, in the shape `mechanism-review.mjs --record` expects.
  *
- * After a completed run (Astra, or a selected Claude reviewer) it is complete and
+ * After a completed run (the cross lane, or a selected handover reviewer) it is complete and
  * can be run as printed. In the hand-over template the verdict and the evidence
  * stand as ANGLE-BRACKET PLACEHOLDERS the recorder refuses — so a hand that
  * pastes it without the named reviewer's review first gets a refusal, not a
@@ -925,8 +972,8 @@ export function formatReviewReport({
   // is still reported; the ready-to-run command is not.
   if (partial) {
     const said = decision.fellBack
-      ? `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}`
-      : `${decision.ranBy || ASTRA_MODEL_NAME} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
+      ? `${laneLabel('cross')} did not review it: ${decision.cause}`
+      : `${decision.ranBy || CROSS.displayName} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
     return [
       `cross-review: ${said}`,
       '',
@@ -953,7 +1000,7 @@ export function formatReviewReport({
   // the ready-to-run command is not.
   if (gap) {
     // THE HAND-OVER STILL HAS TO NAME ITS READER. A short-fall on a path that
-    // never ran Astra at all — the share switch, or a range Astra authored — is
+    // never ran the cross lane at all — the routing setting, or a range it authored — is
     // still a review somebody must do, and a refusal that dropped the reviewer's
     // name left the caller with no idea whose review it was waiting for.
     const who = decision.model
@@ -961,10 +1008,10 @@ export function formatReviewReport({
       ? `  The review is ${who}'s, and it is NOT done.`
       : '  No model of the chain may review this range — every one of them authored part of it.'
     const said = !decision.fellBack
-      ? `${decision.ranBy || ASTRA_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+      ? `${decision.ranBy || CROSS.displayName} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
       : decision.kind === OUTCOME.SELF_REVIEW
-        ? `ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
-        : `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
+        ? `ROLE SWAP — ${laneLabel('cross')} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
+        : `${laneLabel('cross')} did not review it: ${decision.cause}.\n${handOver}`
     return [`cross-review: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
   }
   const cmd = formatRecordCommand({
@@ -989,8 +1036,9 @@ export function formatReviewReport({
       ]
     : []
   if (!decision.fellBack) {
-    const ranBy = decision.ranBy || ASTRA_MODEL_NAME
-    const detail = sameModel(ranBy, ASTRA_MODEL_NAME) ? ` (effort ${ASTRA_REASONING_EFFORT})` : ''
+    const ranBy = decision.ranBy || CROSS.displayName
+    const ran = reviewerDescriptor(ranBy)
+    const detail = ran ? ` (${ran.key} lane, effort ${ran.effort})` : ''
     const scope = pass
       ? Number(pass.total) === 1
         ? ` (SCOPED PASS — ${(pass.files ?? []).length} end-state file(s))`
@@ -1012,18 +1060,18 @@ export function formatReviewReport({
   // recorded (four-eyes finding, second round, 10.08.2026).
   const who = decision.model
   // THE ROLE SWAP IS NOT A FALLBACK (point 667), and calling it one would read as
-  // something having gone wrong. Astra authored this range; the review was always
-  // Claude's, together with the suites, the picture and the landing.
+  // something having gone wrong. The cross lane authored this range; the review was
+  // always the main chain's, together with the suites, the picture and the landing.
   if (decision.kind === OUTCOME.SELF_REVIEW) {
     if (!who) {
       return [
-        `cross-review: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
-        `  And every model of ${(decision.chain ?? CLAUDE_REVIEW_CHAIN).join(', ')} authored part of it too, so none of them`,
+        `cross-review: ROLE SWAP — ${laneLabel('cross')} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+        `  And every model of ${(decision.chain ?? reviewChain('crossAuthored')).join(', ')} authored part of it too, so none of them`,
         '  may either. The review is NOT done and cannot be recorded: review a narrower range.',
       ].join('\n')
     }
     return [
-      `cross-review: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+      `cross-review: ROLE SWAP — ${laneLabel('cross')} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
       `  The review is ${who}'s, which also runs the suites, judges the picture and lands the point.`,
       reviewerCommand ? '  Start that reader with the same bounded request:' : '  Record what IT says — never a verdict this command invented:',
       '',
@@ -1033,10 +1081,10 @@ export function formatReviewReport({
   }
   if (!who) {
     return [
-      `cross-review: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
-      `  And EVERY model in the fallback chain (${(decision.chain ?? FALLBACK_CHAIN).join(', ')}) authored part of this`,
+      `cross-review: FALLBACK — ${laneLabel('cross')} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `  And EVERY model in the fallback chain (${(decision.chain ?? reviewChain('crossUnavailable')).join(', ')}) authored part of this`,
       '  range, so none of them may review it. The review is NOT done and cannot be recorded:',
-      `  fix the ${ASTRA_MODEL_NAME} run, or review a narrower range one of them did not write.`,
+      `  fix the cross-lane (${CROSS.displayName}) run, or review a narrower range one of them did not write.`,
     ].join('\n')
   }
   // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round). A record
@@ -1052,7 +1100,7 @@ export function formatReviewReport({
   // stays. Every other kind — the unknown ones included — refuses.
   if (decision.kind !== OUTCOME.NO_VERDICT && decision.kind !== OUTCOME.SWITCHED_OFF) {
     return [
-      `cross-review: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `cross-review: FALLBACK — ${laneLabel('cross')} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
       '  NO RECORD COMMAND IS PRINTED: no completed hand-off proves any of this range was read,',
       '  so nothing of it may be recorded.',
       `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
@@ -1061,7 +1109,7 @@ export function formatReviewReport({
     ].join('\n')
   }
   return [
-    `cross-review: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+    `cross-review: FALLBACK — ${laneLabel('cross')} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
     `  The review is NOT done. Hand it to ${who} and record what IT says:`,
     '',
     reviewerCommand ? `  Start it: ${reviewerCommand}` : `  1. give ${who} the commit and the brief above,`,

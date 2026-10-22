@@ -1,40 +1,47 @@
 #!/usr/bin/env node
-// ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). `--model` also
-// addresses the Claude-family lanes (fable, opus, opus48), run through runClaudeAsk.
+// ASK A LANE FOR PURE TEXT WORK (work-order point 654, A1). `--lane <role>` picks the lane
+// (default `cross`); the claude-runtime lanes (main, scarce, main-fallback) run through
+// runClaudeAsk.
 //
 //   node scripts/ask-lane.mjs --kind diagnose  --brief "why did the place suite go red?" \
 //        --log /tmp/place.log --diff main..HEAD
 //   node scripts/ask-lane.mjs --kind audit     --brief "…" --file src/world/river.ts
-//   node scripts/ask-lane.mjs --kind enumerate --brief "…"      # a blind-parallel half
+//   node scripts/ask-lane.mjs --lane cross --kind enumerate --brief "…"   # a blind-parallel half
 //   node scripts/ask-lane.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
 //   … and anything piped on stdin is material too.
 //
-// It is `scripts/cross-review.mjs`'s proven path — `codex exec` at ASTRA_REASONING_EFFORT in a
+// It is `scripts/cross-review.mjs`'s proven path — `codex exec` at the cross lane's recorded
+// reasoning effort in a
 // READ-ONLY sandbox, the artefact on stdin — generalised past reviews to the four kinds
 // of work that need no write access: DIAGNOSE, AUDIT, ENUMERATE, EXPLAIN. The login
 // handling, the unavailability classification and the model-id freshness probe are
 // IMPORTED from that path, not rebuilt.
 //
-// ASTRA AUTHORS NOTHING ON THIS PATH. The answer is text a Claude session acts on, and no
-// commit carries Astra's trailer from here. Astra's AUTHORING lane is a different command
+// NO LANE AUTHORS ON THIS PATH. The answer is text another session acts on, and no commit
+// carries the asked lane's trailer from here. Authoring is a different command
 // (scripts/author-delegate.mjs, point 667), where the trailer and the allowlist do apply.
 //
-// WHEN THE SHARE SWITCH has moved the load away from Astra, or the model did not answer,
-// this says so, names the cause, hands the work back and exits 3, so a script can tell
-// "answered" from "did not" without reading prose. A measured Astra outage (point 1194)
-// serves the ask on Opus 5.5 instead.
+// WHEN THE SHARE SWITCH has moved the load away from the cross lane, or the model did not
+// answer, this says so, names the cause, hands the work back and exits 3, so a script can
+// tell "answered" from "did not" without reading prose. A measured cross-lane outage
+// (point 1194) serves the ask on the main lane instead.
 import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './cross-review-core.mjs'
+import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS } from './cross-review-core.mjs'
 import { ensureModelProven, runCodex } from './cross-review.mjs'
 import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
 import { effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
 import { currentLaneState } from './lane-switch.mjs'
 import { laneIsOn } from './lane-switch-core.mjs'
 import { authoringClaudeArgs } from './author-fable-core.mjs'
-import { ASK_MODELS, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-lane-core.mjs'
+import { ASK_LANES, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskLane } from './ask-lane-core.mjs'
+import { EXECUTION_ROLES } from './model-lanes.mjs'
+
+/** The lanes by role, read once: the cross lane is the default, the main lane the outage fallback. */
+const CROSS_LANE = ASK_LANES.cross
+const MAIN_LANE = ASK_LANES.main
 
 /** One git read that never throws — a missing range is reported, not fatal. */
 function git(args) {
@@ -86,14 +93,14 @@ function gatherSections({ stdin = '', logs = [], diff = '', files = [] } = {}) {
 
 export const usage = () =>
   [
-    'usage: node scripts/ask-lane.mjs [--model astra|fable|opus|opus48] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
+    `usage: node scripts/ask-lane.mjs [--lane ${EXECUTION_ROLES.join('|')}] --kind <` + KINDS.join('|') + '> --brief "<the question>" \\',
     '           [--file <path>]… [--log <path>]… [--diff <range>] [--timeout <ms>] [--anyway] [--json]',
     '',
     'Material also comes from stdin. Nothing is fetched by the model: this container cannot',
     'create user namespaces, so everything it may look at must travel with the request.',
-    `Defaults to ${ASTRA_MODEL_NAME} at reasoning effort ${ASTRA_REASONING_EFFORT}; every target AUTHORS NOTHING —`,
-    'the answer is text another session acts on. Astra obeys the share switch; Fable obeys the',
-    'Fable switch. A routed refusal exits 3 unless --anyway is allowed for that route.',
+    `Defaults to the cross lane (${CROSS_LANE.name}) at reasoning effort ${CROSS_LANE.effort}; every lane AUTHORS NOTHING —`,
+    'the answer is text another session acts on. The cross lane obeys the share switch; the scarce',
+    'lane obeys its lane switch. A routed refusal exits 3 unless --anyway is allowed for that route.',
     '  node scripts/lane-routing.mjs --status   # what goes where right now',
   ].join('\n')
 
@@ -148,14 +155,14 @@ if (isMainModule(import.meta.url)) {
     }
     const kind = normaliseKind(flag('--kind'))
     const brief = flag('--brief')
-    let model = resolveAskModel(flag('--model') || 'astra')
+    let model = resolveAskLane(flag('--lane') || 'cross')
     if (!kind || !brief) {
       console.error(`ask-lane: --kind (one of ${KINDS.join(', ')}) and --brief are both required.\n`)
       console.error(usage())
       process.exit(2)
     }
     if (!model) {
-      console.error('ask-lane: --model must be one of astra, fable, opus, opus48.\n')
+      console.error(`ask-lane: --lane must be one of ${EXECUTION_ROLES.join(', ')}.\n`)
       console.error(usage())
       process.exit(2)
     }
@@ -164,27 +171,27 @@ if (isMainModule(import.meta.url)) {
     // override — deliberate, because the whole purpose of the switch is that nobody
     // spends the scarce allowance by habit.
     const share = currentSetting()
-    if (model.key === 'astra') {
+    if (model.key === 'cross') {
       // A fallback nobody is told about is a setting nobody chose (second cross-vendor round).
       if (share.problem) console.error(settingProblemLine(share, 'ask-lane'))
       const routed = effectiveRoute(kind, share)
-      // A MEASURED OUTAGE serves the kind on Opus 5.5 instead of refusing (point 1194).
+      // A MEASURED OUTAGE serves the kind on the main lane instead of refusing (point 1194).
       if (routed.fallback && !argv.includes('--anyway')) {
-        console.error(`ask-lane: ${fallbackLine(share)} — asking ${ASK_MODELS.opus.name} instead.`)
-        model = ASK_MODELS.opus
-      } else if (routed.to !== 'astra' && !argv.includes('--anyway')) {
+        console.error(`ask-lane: ${fallbackLine(share)} — asking ${MAIN_LANE.name} instead.`)
+        model = MAIN_LANE
+      } else if (routed.to !== 'cross' && !argv.includes('--anyway')) {
         console.error(
-          `ask-lane: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${ASTRA_MODEL_NAME}.\n` +
-            `  Do it in the Claude chain, or: node scripts/lane-routing.mjs --more until --status routes ${kind} to Astra   (override once with --anyway)`,
+          `ask-lane: the share switch is at \`${share.setting}\`, which routes ${kind} to the main chain — not asking ${CROSS_LANE.name}.\n` +
+            `  Do it in the main chain, or: node scripts/lane-routing.mjs --more until --status routes ${kind} to the cross lane   (override once with --anyway)`,
         )
         process.exit(3)
       }
     }
-    if (model.key === 'fable') {
-      const fable = currentLaneState()
-      if (!fable.ok) throw new Error(fable.problem)
-      if (!laneIsOn(fable)) {
-        console.error(`ask-lane: ${model.name} is switched off — node scripts/lane-switch.mjs --status`)
+    if (model.key === 'scarce') {
+      const scarce = currentLaneState('scarce')
+      if (!scarce.ok) throw new Error(scarce.problem)
+      if (!laneIsOn(scarce)) {
+        console.error(`ask-lane: ${model.name} is switched off — node scripts/lane-switch.mjs --lane scarce --status`)
         process.exit(3)
       }
     }
@@ -217,11 +224,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
-    // The identity is PROVEN before a word is attributed to Astra: nothing in a run's
+    // The identity is PROVEN before a word is attributed to the cross lane: nothing in a run's
     // output names the model that answered, so the whole attribution rests on the server
     // refusing an unknown id (see cross-review.mjs --probe).
     if (model.runtime === 'codex' && !ensureModelProven({ who: 'ask-lane' })) {
-      console.error(`ask-lane: the model id is not proven honoured — refusing to attribute an answer to ${ASTRA_MODEL_NAME}.`)
+      console.error(`ask-lane: the model id is not proven honoured — refusing to attribute an answer to ${model.name}.`)
       process.exit(2)
     }
     console.error(`ask-lane: asking ${model.name} (effort ${model.effort}) for a ${kind} — ${material.length} characters of material …`)
@@ -232,13 +239,13 @@ if (isMainModule(import.meta.url)) {
       input: material,
       timeoutMs: Number(flag('--timeout')) || REVIEW_TIMEOUT_MS,
     }
-    let run = model.runtime === 'codex' ? runCodex(request) : runClaudeAsk({ ...request, model })
+    let run = model.runtime === 'codex' ? runCodex({ ...request, modelId: model.id }) : runClaudeAsk({ ...request, model })
     let outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
     if (model.runtime === 'codex') {
-      // An outage signature records the fallback and serves this ask on Opus 5.5.
-      const recorded = recordLaneRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
+      // An outage signature records the fallback and serves this ask on the main lane.
+      const recorded = recordLaneRun({ role: model.key, outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
       if (recorded.fellBack) {
-        model = ASK_MODELS.opus
+        model = MAIN_LANE
         console.error(`ask-lane: serving the ${kind} on ${model.name} instead …`)
         run = runClaudeAsk({ ...request, prompt: buildAskPrompt({ kind, brief, modelName: model.name }), model })
         outcome = run

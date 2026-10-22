@@ -114,8 +114,8 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
           },
         }),
     }],
-    ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-delegate.mjs 701' }],
-    ['delegating to Fable', { toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' }],
+    ['delegating to the cross lane', { toolName: 'Bash', command: 'node scripts/author-delegate.mjs 701' }],
+    ['delegating to the scarce lane', { toolName: 'Bash', command: 'node scripts/author-delegate.mjs --lane scarce 834' }],
     ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/cross-review.mjs --commit abc' }],
     ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-lane.mjs --kind audit --brief "x"' }],
   ]

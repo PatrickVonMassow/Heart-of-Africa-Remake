@@ -1,6 +1,6 @@
 // LAND A FINISHED POINT — the whole chain, one command (point 594).
 //
-//   node scripts/land-point.mjs 594 --model "Claude Opus 5.5"   land it
+//   node scripts/land-point.mjs 594 --model "<trailer name>"   land it
 //   node scripts/land-point.mjs 594 --dry      print the plan, touch nothing
 //   node scripts/land-point.mjs 594 --model "…" --serial   force the gate serial (--parallel: parallel)
 //   node scripts/land-point.mjs 594 --model "…" --branch feat/594-x   name the branch yourself

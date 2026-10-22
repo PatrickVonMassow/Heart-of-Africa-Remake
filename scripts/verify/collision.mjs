@@ -327,7 +327,7 @@ async function reachableBuildings(sceneLabel) {
         await page.evaluate(() => window.__chiefHome())
         // …and the reset itself is CHECKED, or a half-reset that leaves the flag
         // standing would let the press below pass without anybody coming out
-        // (GPT-6 Astra, pass 3/9). Indoors means: the flag is down and the
+        // (cross-vendor review, pass 3/9). Indoors means: the flag is down and the
         // figure is off the scene.
         const home = await page
           .waitForFunction(
@@ -1034,14 +1034,14 @@ if (section('play-rocks')) {
     // line between the two rocks and aimed at the near one, which puts the far
     // one exactly behind it — and the shutter gated the near rock alone, so the
     // claimed two-rock photograph would have passed with the second stone
-    // occluded or missing outright (GPT-5.6 Sol, first cross-vendor round, D3).
+    // occluded or missing outright (first cross-vendor round, D3).
     // The stand comes from the scene itself (`bankPlayRocksView`), so the suite
     // and `bankStage.test.ts` judge one description of it and not two.
     const view = await page.evaluate(() => window.__bankStageView?.() ?? null)
     // AND THE STAND IS REALLY OFF THE AXIS. A stand ON it would satisfy every
     // other claim here — both rocks project inside the frame, because they are
     // on one line through its middle — while showing a single stone with another
-    // hidden behind it (GPT-5.6 Sol, confirming round). The angle the pair
+    // hidden behind it (cross-vendor review, confirming round). The angle the pair
     // subtends from the camera is what says otherwise, measured from the rocks
     // and the stand rather than assumed.
     const spread = view

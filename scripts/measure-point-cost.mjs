@@ -30,6 +30,9 @@ import {
   parseClaudeTranscript,
   parseCodexTranscript,
   selectLandedPoints,
+  CLAUDE_PROVIDER,
+  CODEX_PROVIDER,
+  PROVIDERS,
 } from './measure-point-cost-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 
@@ -146,14 +149,16 @@ export function buildSnapshot({ landed, turns, boundaryText = '', source = {}, g
   const result = aggregatePointLedger({ landed, turns: assigned, boundaryEvents })
   const assignedTurns = assigned.filter((turn) => points.includes(turn.point) && turn.tokens > 0)
   const residualTurns = assigned.filter((turn) => !points.includes(turn.point) && turn.tokens > 0)
-  const providerTokens = {
-    anthropic: assignedTurns.filter((turn) => turn.provider === 'anthropic').reduce((sum, turn) => sum + turn.tokens, 0),
-    openai: assignedTurns.filter((turn) => turn.provider === 'openai').reduce((sum, turn) => sum + turn.tokens, 0),
-  }
-  const reviewProviderTokens = {
-    anthropic: assignedTurns.filter((turn) => turn.role === 'review' && turn.provider === 'anthropic').reduce((sum, turn) => sum + turn.tokens, 0),
-    openai: assignedTurns.filter((turn) => turn.role === 'review' && turn.provider === 'openai').reduce((sum, turn) => sum + turn.tokens, 0),
-  }
+  const tokensOf = (rows) => rows.reduce((sum, turn) => sum + turn.tokens, 0)
+  const providerTokens = Object.fromEntries(
+    PROVIDERS.map((provider) => [provider, tokensOf(assignedTurns.filter((turn) => turn.provider === provider))]),
+  )
+  const reviewProviderTokens = Object.fromEntries(
+    PROVIDERS.map((provider) => [
+      provider,
+      tokensOf(assignedTurns.filter((turn) => turn.role === 'review' && turn.provider === provider)),
+    ]),
+  )
   const assignedBy = assignedTurns.reduce(
     (totals, turn) => {
       totals[turn.pointSource] = (totals[turn.pointSource] ?? 0) + turn.tokens
@@ -194,10 +199,7 @@ export function buildSnapshot({ landed, turns, boundaryText = '', source = {}, g
     },
     providerTokens,
     reviewProviderTokens,
-    residualTokens: {
-      anthropic: residualFor('anthropic'),
-      openai: residualFor('openai'),
-    },
+    residualTokens: Object.fromEntries(PROVIDERS.map((provider) => [provider, residualFor(provider)])),
     wholeDocumentReads: {
       attributed: result.ledger.reduce((sum, row) => sum + row.wholeDocumentReads, 0),
       sourceWindow: assigned.filter((turn) => turn.signals?.wholeDocumentRead).length,
@@ -234,9 +236,10 @@ export function formatConsole(snapshot) {
   const codexDiscovered = snapshot.source.codexCandidates ?? snapshot.source.codexFiles ?? 0
   const codexMatched = snapshot.source.codexFiles ?? 0
   lines.push(`sources: Claude ${snapshot.source.claudeFiles ?? 0} transcript(s), Codex ${codexDiscovered} rollout(s) discovered; ${codexMatched} matched the point pre-filter, ${Math.max(0, codexDiscovered - codexMatched)} did not`)
-  lines.push(`assigned: Anthropic ${k(snapshot.providerTokens.anthropic)} · OpenAI ${k(snapshot.providerTokens.openai)} · total ${k(snapshot.totalTokens)}`)
-  lines.push(`cross-vendor review reconciliation: Anthropic ${k(snapshot.reviewProviderTokens.anthropic)} · OpenAI ${k(snapshot.reviewProviderTokens.openai)}`)
-  const codexResidual = snapshot.residualTokens.openai
+  const split = (tokens) => PROVIDERS.map((provider) => `${provider} ${k(tokens[provider] ?? 0)}`).join(' · ')
+  lines.push(`assigned: ${split(snapshot.providerTokens)} · total ${k(snapshot.totalTokens)}`)
+  lines.push(`cross-vendor review reconciliation: ${split(snapshot.reviewProviderTokens)}`)
+  const codexResidual = snapshot.residualTokens[CODEX_PROVIDER]
   lines.push(`named Codex residual: ${k(codexResidual.tokens)} across ${codexResidual.turns} turn(s) / ${codexResidual.files} file(s): unattributed ${k(codexResidual.unattributedTokens)}, declared outside the landed-point window ${k(codexResidual.outsideWindowTokens)}`)
   lines.push('')
   lines.push('POINT  LANDED               TOTAL     MAIN   REVIEWS   AGENTS (each delegated session)')
@@ -277,7 +280,7 @@ export function formatConsole(snapshot) {
 export function formatMarkdown(snapshot) {
   const codexDiscovered = snapshot.source.codexCandidates ?? snapshot.source.codexFiles ?? 0
   const codexMatched = snapshot.source.codexFiles ?? 0
-  const codexResidual = snapshot.residualTokens.openai
+  const codexResidual = snapshot.residualTokens[CODEX_PROVIDER]
   const refArg = snapshot.source.ref && snapshot.source.ref !== 'main' ? ` --ref ${snapshot.source.ref}` : ''
   const untilArg = snapshot.source.until ? ` --until ${snapshot.source.until}` : ''
   const lines = [
@@ -289,7 +292,7 @@ export function formatMarkdown(snapshot) {
     '',
     `Counting basis: ${snapshot.accounting.basis}. ${snapshot.accounting.comparison}`,
     '',
-    `Cross-vendor review reconciliation: ${snapshot.reviewProviderTokens.openai} OpenAI tokens and ${snapshot.reviewProviderTokens.anthropic} Anthropic tokens; the ledger's review origin is the OpenAI total only.`,
+    `Cross-vendor review reconciliation: ${snapshot.reviewProviderTokens[CODEX_PROVIDER]} ${CODEX_PROVIDER} tokens and ${snapshot.reviewProviderTokens[CLAUDE_PROVIDER]} ${CLAUDE_PROVIDER} tokens; the ledger's review origin is the ${CODEX_PROVIDER} total only.`,
     '',
     `Attribution basis: ${pct(snapshot.assignedBy.evidence / snapshot.totalTokens)} explicit point evidence, ${pct(snapshot.assignedBy.session / snapshot.totalTokens)} delegated-session carry and ${pct(snapshot.assignedBy.neighbour / snapshot.totalTokens)} same-session neighbour carry within the active-episode bound.`,
     '',
@@ -395,8 +398,11 @@ if (isMainModule(import.meta.url)) {
     if (originTotal(row) !== row.tokens) throw new Error(`origin split does not reconcile for point ${row.point}`)
   }
   const reviewTotal = snapshot.ledger.reduce((sum, row) => sum + row.origins.crossVendorReviews, 0)
-  if (snapshot.reviewProviderTokens.anthropic !== 0 || reviewTotal !== snapshot.reviewProviderTokens.openai) {
-    throw new Error('cross-vendor review split does not reconcile to OpenAI review traffic')
+  const nonCodexReview = PROVIDERS.filter((provider) => provider !== CODEX_PROVIDER).some(
+    (provider) => (snapshot.reviewProviderTokens[provider] ?? 0) !== 0,
+  )
+  if (nonCodexReview || reviewTotal !== snapshot.reviewProviderTokens[CODEX_PROVIDER]) {
+    throw new Error('cross-vendor review split does not reconcile to the codex-runtime review traffic')
   }
   const writePath = flag('--write')
   const reportPath = flag('--report')

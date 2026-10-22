@@ -146,7 +146,7 @@ export function gatherDashboardInputs({ sessionId = '' } = {}) {
       // The board's own clock, for the expected-end rule. Gathered HERE and not
       // only at --synced: the Stop chain is where the rule has to bite, because
       // a card whose status text is refreshed and whose HEAD has not moved
-      // satisfies every other invariant while its header ages (Fable 5, four-eyes).
+      // satisfies every other invariant while its header ages (four-eyes review).
       nowMinutes: berlinMinutes(),
       // Calibratable without a code change: minutes in dashboard-state.json.
       freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,

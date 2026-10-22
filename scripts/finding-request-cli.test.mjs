@@ -50,7 +50,7 @@ const run = (args, expectFail = false, env = {}, input = undefined) => {
  * A preload that makes a SECOND window deposit inside the gap between the
  * carrier read and the carrier write of the process under test.
  *
- * The gap is the whole subject of four-eyes finding 1 (Fable 5), and it cannot
+ * The gap is the whole subject of four-eyes finding 1, and it cannot
  * be reached from outside the process: it is microseconds wide and no polling
  * loop would land in it deterministically. Hooking `readFileSync` puts the
  * concurrent deposit exactly where it hurts — after the running CLI has read the

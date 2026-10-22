@@ -469,7 +469,7 @@ function readRunLogSegment(from) {
 // is the whole point of `firewall-allow.mjs`), and it needs no network of its own
 // beyond DNS.
 //
-// IT IS DETACHED, NOT AWAITED (GPT-5.6 Sol, 11.08.2026). Run synchronously it sat
+// IT IS DETACHED, NOT AWAITED (cross-vendor review, 11.08.2026). Run synchronously it sat
 // in front of every later duty of the tick — the spawn decision, the chat inbox,
 // the leaked-worker sweep — and `timeout` on a sync call is no ceiling at all:
 // node signals the child and then waits for it to actually exit, so a wedged

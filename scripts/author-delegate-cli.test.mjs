@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, SCARCE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { uncommittedSummary } from './author-delegate-core.mjs'
+import { AUTHOR_ROLES, uncommittedSummary } from './author-delegate-core.mjs'
 import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-delegate.mjs'
-import { writeState as writeFableState } from './lane-switch-core.mjs'
+import { writeState as writeSwitchState } from './lane-switch-core.mjs'
+import { CROSS, SCARCE, trailerFor } from './model-lanes.mjs'
 
 const root = resolve(process.cwd())
 const script = resolve(root, 'scripts', 'author-delegate.mjs')
@@ -21,11 +22,11 @@ function ledger(rows) {
   return path
 }
 
-function fableFile() {
-  const dir = mkdtempSync(join(tmpdir(), 'hoa-author-fable-'))
+function switchFile() {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-author-switch-'))
   dirs.push(dir)
-  const path = join(dir, 'fable-switch.json')
-  writeFileSync(path, JSON.stringify(writeFableState('off', { why: 'test decision', by: 'test', now: 1 })))
+  const path = join(dir, 'lane-switch.json')
+  writeFileSync(path, JSON.stringify({ lanes: { scarce: writeSwitchState('off', { why: 'test decision', by: 'test', now: 1 }) } }))
   return path
 }
 
@@ -34,7 +35,7 @@ function route(records, extra = []) {
     cwd: root,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: fableFile() },
+    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: switchFile() },
   })
 }
 
@@ -48,7 +49,7 @@ function examine(records) {
     // Examination intentionally runs before an authoring worktree exists, so
     // it gives the management checkout explicitly instead of asking the live
     // script's source path to override its cwd.
-    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: fableFile() },
+    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: switchFile() },
   })
 }
 
@@ -88,7 +89,7 @@ describe('commitsSince', () => {
       '-m',
       'Rescue: the author is still testing',
       '-m',
-      'Co-Authored-By: GPT-6 Astra <noreply@openai.com>',
+      `Co-Authored-By: ${trailerFor('cross')}`,
     )
 
     expect(commitsSince(base, { cwd: repo })).toEqual([
@@ -96,7 +97,7 @@ describe('commitsSince', () => {
         sha: git(repo, 'rev-parse', 'HEAD'),
         subject: 'Checkpoint the parser [skip ci]',
         rescue: 'the author is still testing',
-        trailers: 'GPT-6 Astra <noreply@openai.com>',
+        trailers: trailerFor('cross'),
       },
     ])
   })
@@ -163,7 +164,7 @@ describe('author-delegate records a commission before dispatch', () => {
       round: 3,
       authorFraming: AUTHORING_FRAMINGS[0],
       sha: 'b'.repeat(40),
-      model: 'GPT-6 Astra',
+      model: CROSS.displayName,
     })
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
 
@@ -172,23 +173,23 @@ describe('author-delegate records a commission before dispatch', () => {
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
   })
 
-  it('records the commissioned lane model while keeping Astra as the default', () => {
+  it('records the commissioned lane model while keeping the cross lane as the default', () => {
     const events = []
-    const fable = recordAuthoringCommission({
+    const scarce = recordAuthoringCommission({
       records: [],
       point,
       round: 5,
       framing: AUTHORING_FRAMINGS[0],
       sha: 'f'.repeat(40),
-      model: 'Fable 5',
+      model: SCARCE.retired[0],
       now: 1_787_130_000_000,
       append: (record) => events.push(record),
       commit: () => {},
     })
-    expect(fable.record.model).toBe('Fable 5')
-    expect(events[0]).toMatchObject({ model: 'Fable 5' })
+    expect(scarce.record.model).toBe(SCARCE.retired[0])
+    expect(events[0]).toMatchObject({ model: SCARCE.retired[0] })
 
-    const astra = recordAuthoringCommission({
+    const cross = recordAuthoringCommission({
       records: [],
       point,
       round: 0,
@@ -197,13 +198,13 @@ describe('author-delegate records a commission before dispatch', () => {
       append: () => {},
       commit: () => {},
     })
-    expect(astra.record.model).toBe('GPT-6 Astra')
+    expect(cross.record.model).toBe(CROSS.displayName)
   })
 
   it('refuses to reuse one round under a different lane model', () => {
     expect(() =>
       recordAuthoringCommission({
-        records: [{ kind: AUTHORING_COMMISSION_KIND, point: Number(point), round: 5, authorFraming: '', model: 'Fable 5' }],
+        records: [{ kind: AUTHORING_COMMISSION_KIND, point: Number(point), round: 5, authorFraming: '', model: SCARCE.retired[0] }],
         point,
         round: 5,
         sha: 'a'.repeat(40),
@@ -396,11 +397,11 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
   it('reports zero and uses the ordinary lane when the point has no review record', () => {
     const result = route(ledger([]))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → astra`)
+    expect(result.stdout).toContain(`point ${point} → cross`)
     expect(result.stdout).toContain('review record: 0 unsuccessful round(s)')
   })
 
-  it('derives N non-passing reviews and holds the lane while the switch refuses Fable', () => {
+  it('derives N non-passing reviews and holds the lane while the switch refuses the scarce lane', () => {
     const rows = Array.from({ length: SCARCE_ESCALATION_ROUNDS }, (_, round) => ({
       point: Number(point),
       mode: 'review',
@@ -417,7 +418,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
     rows.unshift({ point: Number(point), mode: 'review', verdict: 'merge' })
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → astra`)
+    expect(result.stdout).toContain(`point ${point} → cross`)
     expect(result.stdout).toContain('node scripts/lane-switch.mjs --status')
     expect(result.stdout).toContain(
       `review record: ${SCARCE_ESCALATION_ROUNDS} unsuccessful round(s); ${SCARCE_ESCALATION_ROUNDS} fresh attempt(s)`,
@@ -436,7 +437,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
     }
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → astra`)
+    expect(result.stdout).toContain(`point ${point} → cross`)
     expect(result.stdout).toContain(`${SCARCE_ESCALATION_ROUNDS} unsuccessful round(s); 2 fresh attempt(s)`)
     expect(result.stdout).toContain('REPEAT — no author framing was recorded')
   })
@@ -449,7 +450,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
     }))
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → astra`)
+    expect(result.stdout).toContain(`point ${point} → cross`)
     expect(result.stdout).toContain('11 unsuccessful round(s); 11 fresh attempt(s)')
   })
 
@@ -457,7 +458,7 @@ describe('author-delegate routing reads unsuccessful rounds from the review ledg
     const result = route(ledger([]), ['--rounds', String(SCARCE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
     // The override still carries the count; only the lane change is withheld.
-    expect(result.stdout).toContain(`point ${point} → astra`)
+    expect(result.stdout).toContain(`point ${point} → cross`)
     expect(result.stdout).toContain('node scripts/lane-switch.mjs --status')
   })
 
@@ -523,5 +524,103 @@ describe('pushBranch and the fast gate', () => {
 
     expect(pushBranch('main', { cwd: repo }).ok).toBe(false)
     expect(readFileSync(ran, 'utf8')).toContain('ran')
+  })
+})
+
+describe('author-delegate --lane: one command for every authoring lane', () => {
+  function laneFixture(state = 'on') {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-author-lane-cli-'))
+    dirs.push(dir)
+    const records = join(dir, 'reviews.jsonl')
+    const laneSwitch = join(dir, 'lane-switch.json')
+    const findings = join(dir, 'findings.md')
+    writeFileSync(records, '')
+    writeFileSync(laneSwitch, JSON.stringify({ lanes: { scarce: writeSwitchState(state, { why: 'test decision', by: 'test', now: 1 }) } }))
+    writeFileSync(findings, 'F1 | scripts/a.mjs | retain the invariant\n')
+    return { records, laneSwitch, findings }
+  }
+
+  function runLane(args, state = 'on') {
+    const files = laneFixture(state)
+    return spawnSync(process.execPath, [script, ...args.map((arg) => (arg === '<findings>' ? files.findings : arg))], {
+      cwd: root,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: files.records, LANE_SWITCH_FILE: files.laneSwitch },
+    })
+  }
+
+  it('prints the lane-aware usage in runtime help', () => {
+    const result = runLane(['--lane', 'scarce', '--help'])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('usage: node scripts/author-delegate.mjs [--lane <cross|scarce>] --point <N>')
+    // The literal usage (harvested into the command index) names exactly the authoring lanes.
+    expect(result.stdout).toContain(`[--lane <${AUTHOR_ROLES.join('|')}>]`)
+    expect(result.stdout).toContain(`${SCARCE.displayName} AUTHORS the point`)
+    expect(result.stdout).toContain('local/<point>-scarce-author.log')
+  })
+
+  it('refuses a lane with no authoring path', () => {
+    const result = runLane(['--lane', 'main', '--point', '1', '--dry-run'])
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('the main lane has no authoring path here')
+  })
+
+  it('names the serving command in the shared routing report', () => {
+    const result = runLane(['--routing', '--point', '834', '--rounds', String(SCARCE_ESCALATION_ROUNDS)])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(`point 834 → scarce (${SCARCE.displayName})`)
+    expect(result.stdout).toContain('commission: node scripts/author-delegate.mjs --lane scarce --point 834')
+  })
+
+  it('redirects a cross-lane dry-run to the scarce lane instead of refusing it', () => {
+    const result = runLane(['--lane', 'cross', '--point', '834', '--rounds', String(SCARCE_ESCALATION_ROUNDS), '--dry-run'])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stderr).toContain('node scripts/author-delegate.mjs --lane scarce --point 834')
+    expect(result.stderr).not.toContain(`not to ${CROSS.displayName}`)
+  })
+
+  it('takes the lane the routing decides when none is named', () => {
+    const result = runLane(['--point', '999991', '--rounds', String(SCARCE_ESCALATION_ROUNDS), '--findings', '<findings>', '--dry-run'])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stderr).toContain(`lane verdict for point 999991: scarce (${SCARCE.displayName})`)
+    expect(result.stdout).toContain(`claude -p <the prompt> --model ${SCARCE.modelId} --output-format json`)
+  })
+
+  it('prints a no-fallback scarce-lane commission with the correct prompt and reviewer', () => {
+    const result = runLane([
+      '--lane',
+      'scarce',
+      '--point',
+      '999991',
+      '--rounds',
+      String(SCARCE_ESCALATION_ROUNDS),
+      '--findings',
+      '<findings>',
+      '--dry-run',
+    ])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(`claude -p <the prompt> --model ${SCARCE.modelId} --output-format json`)
+    expect(result.stdout).not.toContain('--fallback-model')
+    expect(result.stdout).toContain(`as ${SCARCE.displayName}`)
+    expect(result.stdout).toContain(`Co-Authored-By: ${trailerFor('scarce')}`)
+    expect(result.stdout).toContain(`A session on ${CROSS.displayName} then REVIEWS`)
+    expect(result.stdout).toContain('Do NOT push, do NOT merge')
+  })
+
+  it('prints the cross-lane codex commission with the record\'s reasoning effort', () => {
+    const result = runLane(['--lane', 'cross', '--point', '999991', '--findings', '<findings>', '--dry-run', '--anyway'])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(`codex exec --color never --dangerously-bypass-approvals-and-sandbox -m ${CROSS.modelId} -c model_reasoning_effort=${CROSS.reasoningEffort}`)
+    expect(result.stdout).toContain(`Co-Authored-By: ${trailerFor('cross')}`)
+  })
+
+  it('does not let --anyway bypass the shared lane switch', () => {
+    const result = runLane(
+      ['--lane', 'scarce', '--point', '999991', '--rounds', String(SCARCE_ESCALATION_ROUNDS), '--findings', '<findings>', '--anyway', '--dry-run'],
+      'off',
+    )
+    expect(result.status).toBe(3)
+    expect(result.stderr).toContain(`${SCARCE.displayName} is switched off`)
   })
 })

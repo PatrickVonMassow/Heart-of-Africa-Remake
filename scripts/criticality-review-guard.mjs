@@ -318,7 +318,7 @@ function pointAuthorship(commissionSha, reviewSha) {
     return { ...commit, authorModels: modelsFromTrailers(trailers), parentAuthorModels }
   })
   const plan = planAuthorshipGroups({ commits: attributed })
-  // BOTH SETS GO THROUGH THE PLANNER'S BOUNDARY (cross-vendor review, GPT-5.6 Sol,
+  // BOTH SETS GO THROUGH THE PLANNER'S BOUNDARY (cross-vendor review,
   // 28.08.2026). The ordinary measurement was routed through it and this one was
   // not, so an unavailable receipt could still claim the work order or the
   // retrospective as an unreviewable file — a clearance for paths no round was
@@ -472,7 +472,7 @@ export function buildFindingsFiledReceipt({
     }
   }
   // THE BINDING MUST BE UNIQUE, OR IT BINDS TWO THINGS (cross-vendor review,
-  // GPT-5.6 Sol at effort high). The emitted row identifies its review by
+  // ). The emitted row identifies its review by
   // {sha, point, model, reviewAt} — and two refusals by one model on one sha can
   // share a millisecond, at which point ONE findings list would clear BOTH. The
   // ledger has no finer identifier, so the honest answer is to refuse rather
