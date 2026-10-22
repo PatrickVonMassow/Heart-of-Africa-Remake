@@ -2892,6 +2892,8 @@ function ErrandVillagers({
   if (yaws.current.length !== count) {
     yaws.current = Array.from({ length: count }, (_, i) => yaws.current[i] ?? 0)
   }
+  // The heading a speaker still turns toward on the spot, or null.
+  const faceTo = useRef<Array<number | null>>([])
 
   // May a body stand here? The settlement boundary and the collider set
   // together — the same question this component's own step asks. The work
@@ -3089,6 +3091,7 @@ function ErrandVillagers({
           // and the step goes along the turned heading, like the household walkers.
           const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
           yaws.current[i] = turn.yaw
+          faceTo.current[i] = null
           const sx = me.x + Math.sin(turn.yaw) * step * turn.pace
           const sz = me.z + Math.cos(turn.yaw) * step * turn.pace
           const [nx, nz] = insidePlace({ radius, bank, observed }, sx, sz, NPC_RADIUS * 2)
@@ -3257,7 +3260,12 @@ function ErrandVillagers({
         // On the ground: the body's own stride carries the rise and fall.
         g.position.set(me.x, groundHeight(me.x, me.z), me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
+        const aim = faceTo.current[i]
         if (facing !== null) yaws.current[i] = facing
+        else if (aim !== null && aim !== undefined) {
+          yaws.current[i] = turnToward(yaws.current[i], aim, VILLAGER_MOTION.spotTurnRate * dt)
+          if (yaws.current[i] === aim) faceTo.current[i] = null
+        }
         g.rotation.y = yaws.current[i]
         // THE SINK, which is half of what makes a fill read as fetching rather
         // than as falling: a y-squash on the figure's own group (work-order 1085).
@@ -3293,12 +3301,13 @@ function ErrandVillagers({
     for (const said of work.emitted) {
       // The speaker turns to what he is talking about as he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all. The word and
-      // its gesture take the new yaw now; the body is drawn turned from the
-      // next frame.
+      // its gesture take the new yaw now; the body turns to it on the spot from
+      // the next frame, never swung round in one.
       const speaker = people[said.speaker]
       if (speaker) {
-        yaws.current[said.speaker] = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
-        speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+        const aim = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
+        faceTo.current[said.speaker] = aim
+        speakWork(camera, said, speaker, aim, refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
   }

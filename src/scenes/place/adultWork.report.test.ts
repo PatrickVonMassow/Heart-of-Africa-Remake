@@ -34,7 +34,7 @@ function sceneMovement() {
   }
   const move = new Function(...Object.keys(deps), 'env', `
     const {people, spawnAnchors, work, idle, rand, namedPlaces, rim, colliders, radius, bank, observed,
-      nav, bodies, bodySet, separationWorld, yaws, dt, cfg} = env;
+      nav, bodies, bodySet, separationWorld, yaws, faceTo, dt, cfg} = env;
     ${movement}
   `)
   return (env: object) => move(...Object.values(deps), env)
@@ -101,6 +101,7 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
       },
     },
     yaws: { current: people.map(() => 0) },
+    faceTo: { current: [] },
   }
   const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
   resetDevAsserts()

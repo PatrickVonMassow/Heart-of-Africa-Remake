@@ -1976,6 +1976,41 @@ if (section('adult-errands')) {
       !!geography.waterHead && !!geography.waterFoot,
       JSON.stringify({ head: geography.waterHead, foot: geography.waterFoot }),
     )
+    // A NEW HEADING IS TURNED TO, NEVER SNAPPED (point 1404): over five seconds
+    // of errands, words and digging, no adult's body swings further in one
+    // rendered frame than its fastest turn (walking or on the spot) allows for
+    // that frame's own time. Measured before the fix: 1.2-2.9 rad in one frame.
+    const swings = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const m = window.__villagerMotion
+          const rate = Math.max(window.__balance.villageLife.adultErrands.pace / m.turnRadius, m.spotTurnRate)
+          let prev = window.__placeErrands().villagers.map((v) => v.yaw)
+          let t = performance.now()
+          let frames = 0
+          let worst = { over: 0, swing: 0, dt: 0, who: null }
+          const tick = () => {
+            const now = performance.now()
+            const dt = (now - t) / 1000
+            t = now
+            const yaws = window.__placeErrands().villagers.map((v) => v.yaw)
+            yaws.forEach((y, i) => {
+              const swing = Math.abs(Math.atan2(Math.sin(y - prev[i]), Math.cos(y - prev[i])))
+              const over = swing - (rate * Math.min(dt, 0.1) * 1.5 + 0.01)
+              if (over > worst.over) worst = { over, swing, dt, who: i }
+            })
+            prev = yaws
+            if (++frames < 300) requestAnimationFrame(tick)
+            else resolve({ frames, worst })
+          }
+          requestAnimationFrame(tick)
+        }),
+    )
+    check(
+      'no village adult swings round to a new heading in one frame — it turns (point 1404)',
+      swings.worst.over <= 0,
+      JSON.stringify(swings),
+    )
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared
