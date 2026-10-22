@@ -269,3 +269,9 @@ describe('parseClaudeResultOutput', () => {
     expect(parsed.ok).toBe(false)
   })
 })
+
+describe('readState refuses a root that is no object', () => {
+  it.each(['null', '[]', '42', '"on"'])('reads %s as unusable for every lane', (raw) => {
+    for (const role of ['main', 'cross', 'scarce']) expect(readState(raw, role).ok, `${raw} ${role}`).toBe(false)
+  })
+})

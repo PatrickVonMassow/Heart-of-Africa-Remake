@@ -133,7 +133,9 @@ export function readState(raw, role = DEFAULT_SWITCH_ROLE) {
   } catch (error) {
     return unusable('not valid JSON', error.message, wanted)
   }
-  if (value && typeof value === 'object' && !Array.isArray(value) && 'lanes' in value) {
+  // Any root other than a plain object is a broken form, whichever lane is asked.
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return unusable('garbled', 'the root must be an object', wanted)
+  if ('lanes' in value) {
     const lanes = value.lanes
     if (!lanes || typeof lanes !== 'object' || Array.isArray(lanes)) return unusable('garbled', 'lanes must be an object', wanted)
     return lanes[wanted] == null ? defaultState(wanted) : decodeEntry(lanes[wanted], wanted)
