@@ -29,7 +29,7 @@ import {
   declaredRunAlive,
   parsePorcelainZ,
   needsRepair,
-  NEEDS_PROTECTED_SECURED,
+  repairActionAllowed,
   GATE_COMMANDS,
   judgeGateRun,
   gateKey,
@@ -159,11 +159,14 @@ try {
 }
 const verificationWriterLive = liveVerifyRun || declaredVerifyRun
 let dirtyFiles = []
+let statusReadable = true
 try {
   // Raw -z output: untrimmed status columns, unquoted paths, renames as two fields.
   dirtyFiles = parsePorcelainZ(git(['status', '--porcelain=v1', '-z'], { raw: true })).filter((f) => f !== WAIT_LEASE_PATH)
-} catch {
-  /* unreadable status */
+} catch (e) {
+  // FAIL CLOSED: an unreadable status is an UNKNOWN dirty set, never an empty one.
+  statusReadable = false
+  log(`ALERT: git status could not be read (${(e && e.message) || e}) — no destructive repair runs this time`)
 }
 
 let conflictMarkers = false
@@ -297,7 +300,7 @@ const plan = planRemediation({
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')
 for (const a of plan) log(`planned [${a.level}] ${a.action}: ${a.reason}`)
 
-let alertsRemain = false
+let alertsRemain = !statusReadable
 // FAIL CLOSED (21.10.2026): until the protected work-order files are secured on
 // a pushed rescue branch, no action that could overwrite them runs.
 let protectedSecured = !plan.some((a) => a.action === 'rescue-protected-commit')
@@ -309,8 +312,9 @@ for (const a of plan) {
     continue
   }
   if (a.level === 'repair' && !repair) continue
-  if (!protectedSecured && NEEDS_PROTECTED_SECURED.includes(a.action)) {
-    log(`REFUSED ${a.action}: the protected work-order files are not secured on a pushed rescue branch — they stay as they are; fix by hand`)
+  const gateVerdict = repairActionAllowed({ action: a.action, statusReadable, protectedSecured })
+  if (!gateVerdict.allowed) {
+    log(`REFUSED ${a.action}: ${gateVerdict.reason} — the tree stays as it is; fix by hand`)
     alertsRemain = true
     continue
   }
@@ -477,7 +481,7 @@ if (gate) recordGateMeasurement(measurementClean)
 // user orders also marked the triggering alert handled, so the run two seconds
 // later read CONSISTENT. Until the protected files are committed by a person,
 // every run sees the incident again.
-if (!pendingRepair && !gateFailed && !protectedRescued && !plan.some((a) => a.action === 'alert-protected-paths')) {
+if (!pendingRepair && !gateFailed && statusReadable && !protectedRescued && !plan.some((a) => a.action === 'alert-protected-paths')) {
   markAlertHandled()
   log('parallel alert marked handled')
 } else if (protectedRescued || plan.some((a) => a.action === 'alert-protected-paths')) {
@@ -489,7 +493,7 @@ if (!pendingRepair && !gateFailed && !protectedRescued && !plan.some((a) => a.ac
 // THESE sessions; recording the pair holds the demand until one of them moves.
 // Only a run that actually ran the gate to a judgeable green may record it —
 // `shouldRecordSatisfaction` decides, so an inconclusive red cannot buy a pass.
-if (shouldRecordSatisfaction({ gateRan: gate, broken: gateFailed, inconclusive: gateInconclusive, pendingRepair })) {
+if (shouldRecordSatisfaction({ gateRan: gate, broken: gateFailed, inconclusive: gateInconclusive, pendingRepair, alertsRemain, reconcileRed })) {
   recordGateSatisfied()
 }
 if (pendingRepair) {

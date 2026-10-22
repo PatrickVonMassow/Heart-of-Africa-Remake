@@ -586,8 +586,12 @@ export function shouldRecordSatisfaction({
   broken = false,
   inconclusive = false,
   pendingRepair = false,
+  alertsRemain = false,
+  reconcileRed = false,
 } = {}) {
-  return !!gateRan && !broken && !inconclusive && !pendingRepair
+  // Only the CLEAN verdict may clear the demand: a run that is RED on the carrier
+  // reconciliation or still carries a rescue alert proves nothing consistent.
+  return !!gateRan && !broken && !inconclusive && !pendingRepair && !alertsRemain && !reconcileRed
 }
 
 // ---------------------------------------------------------------------------
@@ -674,6 +678,25 @@ export function quarantineStashArgs(name, { excludeVerification = false } = {}) 
 
 /** Plan actions that would overwrite protected files and so wait for their rescue. */
 export const NEEDS_PROTECTED_SECURED = Object.freeze(['abort-merge', 'rescue-and-reset', 'restore-tasks-from-head'])
+
+/** Every action that moves, stashes or overwrites working-tree content. */
+const DESTRUCTIVE = Object.freeze([...NEEDS_PROTECTED_SECURED, 'quarantine-stash'])
+
+/**
+ * May this planned action run? PURE. FAIL CLOSED (review 22.10.2026): when the
+ * status could not be read, the dirty set is UNKNOWN — an empty list there is not
+ * "nothing to protect" — so no destructive action runs at all; otherwise the
+ * protected files must be secured before anything that could overwrite them.
+ */
+export function repairActionAllowed({ action, statusReadable = true, protectedSecured = true } = {}) {
+  if (!statusReadable && DESTRUCTIVE.includes(action)) {
+    return { allowed: false, reason: 'the working-tree status could not be read, so what it would destroy is unknown' }
+  }
+  if (!protectedSecured && NEEDS_PROTECTED_SECURED.includes(action)) {
+    return { allowed: false, reason: 'the protected work-order files are not secured on a pushed rescue branch' }
+  }
+  return { allowed: true, reason: '' }
+}
 
 /**
  * Does the `batch-in-flight` declaration name a run whose process is still

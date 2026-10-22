@@ -17,6 +17,8 @@ import {
   planRemediation,
   quarantineScope,
   quarantineStashArgs,
+  repairActionAllowed,
+  shouldRecordSatisfaction,
 } from './batch-doctor-core.mjs'
 import { INDEX_RESCUE_DIR, rescueProtectedCommit } from './batch-doctor-states.mjs'
 import { appendPoint, makeRepoFixture } from './carrier-reconcile-fixture.mjs'
@@ -79,6 +81,31 @@ describe('the plan rescues before anything can overwrite the protected files', (
     const plan = planRemediation({ ...CLEAN, dirtyFiles: ['TASKS.md'], mergeInProgress: true })
     expect(actions(plan).indexOf('rescue-protected-commit')).toBeLessThan(actions(plan).indexOf('abort-merge'))
     expect([...NEEDS_PROTECTED_SECURED].sort()).toEqual(['abort-merge', 'rescue-and-reset', 'restore-tasks-from-head'])
+  })
+})
+
+describe('fail closed: an unknown dirty set and a red verdict', () => {
+  it('an unreadable status refuses every destructive action, protected files secured or not', () => {
+    for (const action of ['quarantine-stash', 'rescue-and-reset', 'abort-merge', 'restore-tasks-from-head']) {
+      expect(repairActionAllowed({ action, statusReadable: false, protectedSecured: true }).allowed).toBe(false)
+    }
+    expect(repairActionAllowed({ action: 'clear-stale-git-locks', statusReadable: false }).allowed).toBe(true)
+    expect(repairActionAllowed({ action: 'rescue-and-reset', protectedSecured: false }).allowed).toBe(false)
+    expect(repairActionAllowed({ action: 'quarantine-stash', protectedSecured: false }).allowed).toBe(true)
+  })
+
+  it('only a clean verdict records the gate satisfaction', () => {
+    const green = { gateRan: true, broken: false, inconclusive: false, pendingRepair: false }
+    expect(shouldRecordSatisfaction(green)).toBe(true)
+    expect(shouldRecordSatisfaction({ ...green, alertsRemain: true })).toBe(false)
+    expect(shouldRecordSatisfaction({ ...green, reconcileRed: true })).toBe(false)
+  })
+
+  it('the doctor wires both: status failure feeds the gate, satisfaction sees alerts and the reconciliation', () => {
+    const src = readFileSync(repoPath('scripts', 'batch-doctor.mjs'), 'utf8')
+    expect(src).toMatch(/statusReadable = false/)
+    expect(src).toMatch(/repairActionAllowed\(\{ action: a\.action, statusReadable, protectedSecured \}\)/)
+    expect(src).toMatch(/shouldRecordSatisfaction\(\{[^}]*alertsRemain, reconcileRed \}\)/)
   })
 })
 
