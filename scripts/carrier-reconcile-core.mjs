@@ -61,16 +61,22 @@ export function queuedState(point, { sha, anchor } = {}) {
  * is the open state between the TASKS.md append and the push. Returns null for
  * any other state (pending, blocked).
  */
+export const MAX_RANGE = 200
+
 export function parseRequestState(state = '') {
   const m = /^(queued|appending)\s+(\d+)(?:\s*(?:\.\.|–|-)\s*(\d+))?((?:\s+[@~][0-9a-f]+)*)\s*$/.exec(String(state ?? '').trim())
   if (!m) return null
   const from = Number(m[2])
   const to = m[3] ? Number(m[3]) : from
-  const points = []
-  for (let n = Math.min(from, to); n <= Math.max(from, to) && points.length < 1000; n++) points.push(n)
   const sha = /@([0-9a-f]{7,40})/.exec(m[4] ?? '')?.[1] ?? null
-  const anchor = /~([0-9a-f]{8})/.exec(m[4] ?? '')?.[1] ?? null
-  return { kind: m[1], points, sha, anchor, range: points.length > 1 }
+  // One anchor per member, in member order (a range carries one per point).
+  const anchors = [...(m[4] ?? '').matchAll(/~([0-9a-f]{8})\b/g)].map((a) => a[1])
+  const span = Math.abs(to - from) + 1
+  // An oversized range is REJECTED, never silently cut short (review 22.10.2026).
+  if (span > MAX_RANGE) return { kind: m[1], points: [], sha, anchor: anchors[0] ?? null, anchors, range: true, tooLarge: { from, to } }
+  const points = []
+  for (let n = Math.min(from, to); n <= Math.max(from, to); n++) points.push(n)
+  return { kind: m[1], points, sha, anchor: anchors[0] ?? null, anchors, range: points.length > 1 }
 }
 
 /**
@@ -114,7 +120,7 @@ export function carrierClaims(text = '', source = '') {
     }
     const d = DRAIN_PROOF.exec(line)
     if (d && lastHead) {
-      claims.push({ source, at: lastHead.at, title: lastHead.title, kind: 'drained', points: [Number(d[1])], sha: d[2], anchor: d[3] ?? null, range: false, raw: line.trim() })
+      claims.push({ source, at: lastHead.at, title: lastHead.title, kind: 'drained', points: [Number(d[1])], sha: d[2], anchor: d[3] ?? null, anchors: d[3] ? [d[3]] : [], range: false, raw: line.trim() })
     }
   }
   return claims
@@ -156,37 +162,35 @@ export function reconcileCarrier({ carriers = [], remote, head, working, mainSha
         open.push({ ...claim, reason: 'appended, not yet proven on origin/main' })
         continue
       }
-      for (const original of claim.points) {
+      if (claim.tooLarge) {
+        checked++
+        red.push({ point: claim.tooLarge.from, title: claim.title, source: claim.source, state: claim.raw, reason: 'range-too-large' })
+        continue
+      }
+      claim.points.forEach((original, i) => {
         checked++
         const alias = aliases?.[String(original)]
         let n = original
-        let anchor = claim.range ? null : claim.anchor
+        // IDENTITY PER RESOLVED POINT (review 22.10.2026): each member keeps its own
+        // anchor, and a renumbered point is checked against the SAME title at its
+        // new number (or the anchor the alias names). No anchor is no identity.
+        let anchor = claim.range ? (claim.anchors?.[i] ?? null) : claim.anchor
         if (alias && (alias.status === 'deleted' || alias.status === 'absorbed')) {
           aliased.push({ point: original, title: claim.title, status: alias.status, why: alias.why ?? '' })
-          continue
+          return
         }
         if (alias && Number.isInteger(alias.renumberedTo)) {
           n = alias.renumberedTo
-          anchor = null
+          if (/^[0-9a-f]{8}$/.test(String(alias.anchor ?? ''))) anchor = alias.anchor
         }
         const where = pointLocation(n, planes)
         const base = { point: original, title: claim.title, source: claim.source, state: claim.raw }
-        if (where !== 'origin-main') {
-          red.push({ ...base, reason: where })
-          continue
-        }
-        if (!claim.sha) {
-          red.push({ ...base, reason: 'no-proof' })
-          continue
-        }
-        if (!onMain(claim.sha, mainShas)) {
-          red.push({ ...base, reason: 'proof-not-on-main' })
-          continue
-        }
-        if (anchor && titleAnchor(planes.remote.heads.get(n)) !== anchor) {
-          red.push({ ...base, reason: 'anchor-mismatch' })
-        }
-      }
+        if (where !== 'origin-main') return red.push({ ...base, reason: where })
+        if (!claim.sha) return red.push({ ...base, reason: 'no-proof' })
+        if (!anchor) return red.push({ ...base, reason: 'no-anchor' })
+        if (!onMain(claim.sha, mainShas)) return red.push({ ...base, reason: 'proof-not-on-main' })
+        if (titleAnchor(planes.remote.heads.get(n)) !== anchor) red.push({ ...base, reason: 'anchor-mismatch' })
+      })
     }
   }
   return { ok: red.length === 0, red, open, aliased, checked, duplicates: planes.remote.duplicates ?? [] }
@@ -196,6 +200,8 @@ const RED_WORDS = Object.freeze({
   ...LOCATION_WORDS,
   'no-proof': 'is ticked without an origin/main proof (legacy tick — run node scripts/carrier-reconcile.mjs --backfill)',
   'proof-not-on-main': 'names a proof commit that origin/main does not contain',
+  'no-anchor': 'carries no content anchor for this point, so its identity is unproven',
+  'range-too-large': `is a range of more than ${MAX_RANGE} points — rejected, not cut short`,
   'anchor-mismatch': 'now names a DIFFERENT point at that number (title anchor differs) — renumbered? record it in docs/carrier-aliases.json',
 })
 

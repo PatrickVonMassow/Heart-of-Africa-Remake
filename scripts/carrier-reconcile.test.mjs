@@ -63,10 +63,29 @@ describe('reconcileCarrier — a queued point without its work-order point is RE
   })
 
   it('expands a range to every member and fails on the single missing one', () => {
-    const text = '- [x] 2026-10-21T10:31:00.000Z · s · [request] · queued 1402..1406 @abcdef123456 · Fünf Aufträge\n'
+    const anchors = [1402, 1403, 1404, 1405, 1406].map((n) => `~${titleAnchor(T(n))}`).join(' ')
+    const text = `- [x] 2026-10-21T10:31:00.000Z · s · [request] · queued 1402..1406 @abcdef123456 ${anchors} · Fünf Aufträge\n`
     const r = check(text, planes({ remote: [1402, 1403, 1405], archive: [1406] }))
     expect(r.checked).toBe(5)
     expect(r.red.map((x) => x.point)).toEqual([1404])
+  })
+
+  it('a range member without its own anchor, or an unrelated point at its number, is red', () => {
+    const text = '- [x] 2026-10-21T10:31:00.000Z · s · [request] · queued 1402..1403 @abcdef123456 · Zwei Aufträge\n'
+    expect(check(text, planes({ remote: [1402, 1403] })).red.map((x) => x.reason)).toEqual(['no-anchor', 'no-anchor'])
+    const anchored = `- [x] 2026-10-21T10:31:00.000Z · s · [request] · queued 1402..1403 @abcdef123456 ~${titleAnchor(T(1402))} ~${titleAnchor(T(1403))} · Zwei\n`
+    const p = planes({ remote: [1402, 1403] })
+    p.remote.heads.set(1403, 'An unrelated point now at 1403')
+    expect(check(anchored, p).red).toMatchObject([{ point: 1403, reason: 'anchor-mismatch' }])
+  })
+
+  it('a single tick WITH its sha but WITHOUT an anchor is red', () => {
+    expect(check(tick(1402, { anchor: null }), planes({ remote: [1402] })).red[0].reason).toBe('no-anchor')
+  })
+
+  it('rejects an oversized range explicitly instead of cutting it short', () => {
+    const text = '- [x] 2026-10-21T10:31:00.000Z · s · [request] · queued 1..5000 @abcdef123456 · Zu viel\n'
+    expect(check(text, planes({ remote: [1] })).red).toMatchObject([{ reason: 'range-too-large' }])
   })
 
   it('the 5ba920079 restore (1402–1405 back in TASKS.md, 1406 closed in the archive) is green', () => {
@@ -101,7 +120,14 @@ describe('renumbering and deletion go through an explicit alias, never through t
   })
 
   it('a renumbered point is followed to its new number; a deleted one is accepted only when named', () => {
-    expect(check(tick(1402), planes({ remote: [1499] }), { 1402: { renumberedTo: 1499 } }).ok).toBe(true)
+    // Renumbering keeps the title: the claim's anchor is checked at the new number.
+    const moved = planes({ remote: [1499] })
+    moved.remote.heads.set(1499, T(1402))
+    expect(check(tick(1402), moved, { 1402: { renumberedTo: 1499 } }).ok).toBe(true)
+    // An unrelated point at the alias target does not satisfy it.
+    expect(check(tick(1402), planes({ remote: [1499] }), { 1402: { renumberedTo: 1499 } }).red[0].reason).toBe('anchor-mismatch')
+    // Unless the alias itself names the target's anchor.
+    expect(check(tick(1402), planes({ remote: [1499] }), { 1402: { renumberedTo: 1499, anchor: titleAnchor(T(1499)) } }).ok).toBe(true)
     expect(check(tick(1107), planes({ remote: [] })).ok).toBe(false)
     const r = check(tick(1107), planes({ remote: [] }), { 1107: { status: 'deleted', why: 'user' } })
     expect(r.ok).toBe(true)

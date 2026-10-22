@@ -182,7 +182,8 @@ export function backfillCarriers({ root = mainCheckoutRoot(), fetch = false, car
         if (missing.length) unproven.push({ path, title: claim.title, points: missing })
         continue
       }
-      const proof = claim.range ? `@${sha}` : `@${sha} ~${titleAnchor(gathered.remote.heads.get(claim.points[0]))}`
+      // One anchor per member, so every point of a range keeps its identity.
+      const proof = `@${sha} ${claim.points.map((n) => `~${titleAnchor(gathered.remote.heads.get(n))}`).join(' ')}`
       replace.set(line, line.replace(` · ${claim.raw} · `, ` · ${claim.raw} ${proof} · `))
     }
     if (replace.size === 0) continue
