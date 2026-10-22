@@ -674,10 +674,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Gemergt heißt nicht laufend.** Ein Dauerprozess läuft nach dem Merge mit altem Code weiter.
   → *Prompt:* „Vor einer **Live**-Messung: Startete der Prozess **nach** dem Merge? Sonst neu
   starten — und die Aufsicht tut das künftig selbst.“
-- **Dein Auftrag gilt als eingereiht, liegt aber nur ungespeichert da.** Er wurde abgehakt,
-  bevor er committet und gepusht war; ein Aufräumlauf hat ihn dann beiseitegeschoben — weg.
-  → *Prompt:* „Ein Auftrag gilt erst als **eingereiht**, wenn er **committet und gepusht** ist.
-  Aufräumen **sichert und meldet** fremde ungespeicherte Arbeit, statt sie wegzuschieben.“
+- **Dein Auftrag gilt als eingereiht, lag aber nur ungespeichert da** — Aufräumen schob ihn weg.
+  → *Prompt:* „**Eingereiht** heißt **committet und gepusht**. Aufräumen **sichert und meldet**
+  fremde ungespeicherte Arbeit, statt sie wegzuschieben.“
 
 ---
 
