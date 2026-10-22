@@ -548,6 +548,43 @@ describe('the clip gait on the ground', () => {
     }
   })
 
+  it('two villagers drawn in turn pose their legs and toes as each drawn alone, through every toe release', () => {
+    // review 22.10.2026: the toes letting go after the tip's hold ended were
+    // flattened onto a heading shared between figures, so a walker drawn in
+    // between with another heading turned the releasing toes
+    const n = asset.bones.length
+    const f = adult.frame
+    const legs = ['thigh', 'shin', 'foot', 'toe'].flatMap((b) => ['L', 'R'].map((s) => asset.bones.indexOf(`${b}.${s}`)))
+    const walkers = [
+      { yaw: 0.3, speed: 1.0 * f.legScale * f.scale },
+      { yaw: -2.1, speed: 1.3 * f.legScale * f.scale },
+    ]
+    const dt = 1 / 60
+    const run = (who: number[]) => {
+      const gaits = who.map(() => newClipGait())
+      const poses = who.map(() => newPose(n))
+      const out: number[][][] = who.map(() => [])
+      for (let k = 0; k * dt < 4; k++) {
+        who.forEach((w, j) => {
+          const { yaw, speed } = walkers[w]
+          const d = speed * dt * (k + 1)
+          stepClipGait(gaits[j], asset, f, speed * dt, speed)
+          clipGaitPose(gaits[j], asset, f, speed, { x: Math.sin(yaw) * d, z: Math.cos(yaw) * d, yaw, unit: 1 }, poses[j])
+          out[j].push(legs.flatMap((b) => Array.from(poses[j].rot.slice(b * 4, b * 4 + 4))))
+        })
+      }
+      return out
+    }
+    const both = run([0, 1])
+    const alone = [run([0])[0], run([1])[0]]
+    // component by component (an angle between float32 quaternions reads
+    // their rounding as a turn)
+    let worst = 0
+    for (const w of [0, 1]) both[w].forEach((frame, k) => frame.forEach((x, c) => (worst = Math.max(worst, Math.abs(x - alone[w][k][c])))))
+    // the same arithmetic on the same state: exactly the same pose
+    expect(worst).toBe(0)
+  })
+
   it('a pivot carried across the reach of leg and foot in one line moves the ankle and foot without a jump', () => {
     // review 21.10.2026: the lift to the reach ended at the horizontal limit,
     // so a low pivot just past it dropped back down and the pose jumped

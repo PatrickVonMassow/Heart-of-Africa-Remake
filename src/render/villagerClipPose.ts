@@ -557,7 +557,9 @@ export function clipGaitPose(
   // a flat foot keeps the world heading it lay down with (a turn of the body
   // or of the clip's foot slides no planted toe round its heel)
   SIDES.forEach((s, i) => {
-    if (!body || (_flat[i] <= 0 && !g.held[i].tip)) {
+    // (kept while the toes are still letting go after the tip's hold: their
+    // flat turn is this figure's own, rebuilt every call)
+    if (!body || (_flat[i] <= 0 && !g.held[i].tip && g.lift[i].toes <= 0)) {
       g.flatYaw[i] = null
       return
     }
