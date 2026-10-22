@@ -68,7 +68,7 @@ import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
 import { workStop, type WorkStopMode } from './taskWalkerStop'
-import { steerHeading } from '../../render/figureWalk'
+import { steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
@@ -2684,14 +2684,6 @@ function Walkers({
       ))}
     </>
   )
-}
-
-/** The heading a walker turns toward: where a full step toward its waypoint
- *  really goes (slid along a wall, round another body) — unless that is
- *  hardly a step, or a shove back, which never turns it about. */
-function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
-  const ahead = (tx - x) * dx + (tz - z) * dz > 0
-  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
 }
 
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
