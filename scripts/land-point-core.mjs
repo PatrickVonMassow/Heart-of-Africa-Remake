@@ -37,7 +37,7 @@
 //     INTRODUCE a finding that guard would block on (pre-existing ones are
 //     tolerated — see transitionAccepted).
 
-import { MAIN, VENDORS } from './model-lanes.mjs'
+import { MAIN, trailerAddressFor } from './model-lanes.mjs'
 
 /** A landing failure that is the CHAIN's own verdict, not a crash. */
 export class LandingError extends Error {
@@ -142,7 +142,7 @@ export function tickCommitMessage({ number, model } = {}) {
     `Point ${number} is verified and merged; its block moves verbatim into`,
     'docs/tasks-archive.md so TASKS.md keeps only the open work.',
     '',
-    `Co-Authored-By: ${name} <${VENDORS[MAIN.vendor].trailerAddress}>`,
+    `Co-Authored-By: ${name} <${trailerAddressFor(name)}>`,
     '',
   ].join('\n')
 }

@@ -258,6 +258,12 @@ export function vendorKeyOf(value, registry = LANES) {
   return found.size === 1 ? [...found][0] : 'unknown'
 }
 
+/** The trailer address of the vendor a model designation names; the main lane's when unresolved. */
+export function trailerAddressFor(value, registry = LANES) {
+  const key = vendorKeyOf(value, registry)
+  return VENDORS[key === 'unknown' ? lane('main', registry).vendor : key].trailerAddress
+}
+
 /** Do two designations belong to different vendors? Unknown on either side is never "different". */
 export function differentVendor(a, b, registry = LANES) {
   const x = vendorKeyOf(a, registry)

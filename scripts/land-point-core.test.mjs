@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers, POLICY_NEUTRAL } from './model-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
-import { MAIN, SCARCE, trailerFor } from './model-lanes.mjs'
+import { CROSS, MAIN, SCARCE, trailerFor } from './model-lanes.mjs'
 import {
   closingRunRecords,
   AUDIT_TRIGGER_FILES,
@@ -85,6 +85,11 @@ describe('the tick commit message', () => {
     const msg = tickCommitMessage({ number: 594, model: MAIN.trailerName })
     expect(msg.split('\n')).toContain(`Co-Authored-By: ${trailerFor('main')}`)
     expect(evaluateCommitTrailers(msg).block).toBe(false)
+  })
+
+  it('takes the trailer address from the vendor of the model it was given', () => {
+    const msg = tickCommitMessage({ number: 594, model: CROSS.trailerName })
+    expect(msg.split('\n')).toContain(`Co-Authored-By: ${trailerFor('cross')}`)
   })
 
   it('REFUSES to invent a model when none is given', () => {

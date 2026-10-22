@@ -27,7 +27,7 @@
 // wrong here goes wrong QUIETLY, so every judgment is a function with no I/O,
 // pinned in scripts/fold-point-core.test.mjs, and scripts/fold-point.mjs only
 // performs what these decide.
-import { MAIN, VENDORS } from './model-lanes.mjs'
+import { MAIN, trailerAddressFor } from './model-lanes.mjs'
 import { LandingError, VERDICT, tickAndArchive } from './land-point-core.mjs'
 import { closeCard, nowCard, queueCard, toNow } from './board-core.mjs'
 
@@ -297,7 +297,7 @@ export function foldCommitMessage({ number, into = null, delivered = '', model }
     'Its block moves verbatim into docs/tasks-archive.md so TASKS.md keeps only',
     'the open work.',
     '',
-    `Co-Authored-By: ${name} <${VENDORS[MAIN.vendor].trailerAddress}>`,
+    `Co-Authored-By: ${name} <${trailerAddressFor(name)}>`,
     '',
   ].join('\n')
 }

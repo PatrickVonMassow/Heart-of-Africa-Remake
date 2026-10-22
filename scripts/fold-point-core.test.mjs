@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { MAIN, trailerFor } from './model-lanes.mjs'
+import { CROSS, MAIN, trailerFor } from './model-lanes.mjs'
 import { knownPoints, topicViolations } from './dashboard-card-topic-guard-core.mjs'
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { doneCard, doneEntries, hasCurrentWork, nowCard, queueCard } from './board-core.mjs'
@@ -271,6 +271,11 @@ describe('the commit message', () => {
     expect(msg).toContain(`Co-Authored-By: ${trailerFor('main')}`)
     // The trailer must satisfy the very gate that reads it.
     expect(evaluateCommitTrailers(msg).block).toBe(false)
+  })
+
+  it('takes the trailer address from the vendor of the model it was given', () => {
+    const msg = foldCommitMessage({ number: 613, into: 720, model: CROSS.trailerName })
+    expect(msg).toContain(`Co-Authored-By: ${trailerFor('cross')}`)
   })
 
   it('states in its body where the content went', () => {
