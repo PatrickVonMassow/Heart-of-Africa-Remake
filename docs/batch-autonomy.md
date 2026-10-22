@@ -2372,8 +2372,8 @@ breach freezes the provenance baseline exactly as an unranked append does — a
 gate that could be answered by forgetting the question would have a one-turn
 life.
 
-WHAT IS GRANDFATHERED IS FROZEN, NOT REMEMBERED (cross-vendor review by the cross lane
-Sol, 21.08.2026). The order that stood in front of the release before the rule
+WHAT IS GRANDFATHERED IS FROZEN, NOT REMEMBERED (cross-vendor review by the cross lane,
+21.08.2026). The order that stood in front of the release before the rule
 landed is not re-litigated — that would be a block loop rather than a decision —
 but reading the exemption off the moving provenance baseline made it a two-turn
 bypass: settle anywhere in the order, then move the point in front of the
