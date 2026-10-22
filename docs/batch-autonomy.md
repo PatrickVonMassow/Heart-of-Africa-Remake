@@ -124,7 +124,7 @@ named owner. Only S-12 is allowed to stop the whole batch.
 | S-23 | Individual mechanism inventory misses pair-only wedges, including 944+945. | **Closed here:** this composition table is mandatory input for future hard guards; S-02/S-03 and S-05/S-06/S-25 preserve the measured pairs separately. |
 | S-24 | Dead-owner in-flight records leave every point busy. | **Direct fix:** exclude/reclaim expired records before candidate selection. Emergency independently computes logical workable points with dead in-flight records omitted. |
 | S-25 | Board-first guard forbids the failed landing's remaining cleanup. | **Direct fix:** narrowly permit the authenticated landing-recovery mutation; owned with S-05 by point 937. |
-| S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-lane.mjs --model` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
+| S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-lane.mjs --lane` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
 | S-27 | Owner and its only watcher are both absent or wedged. | **Closed by double safety:** `HoA-Batch-Emergency` is an hourly SYSTEM timer outside those sessions; the watchdog checks/re-registers it, while it starts the authenticated primary task. |
 
 One further stop path was measured while cross-reading the range rather than by

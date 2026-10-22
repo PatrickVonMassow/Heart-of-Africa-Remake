@@ -92,8 +92,8 @@ must pass clean before any tag.
   rebuilt code for test gaps AND real bugs, reading it against the design.
 <!-- rule:model-policy@2f245cec -->
 - Mix in a **different model than the recent author** for a blind pass — the
-  cross-vendor default, so Astra reads main-chain-authored code and Claude reads
-  Astra's (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,
+  cross-vendor default, so the cross lane reads main-chain-authored code and the
+  main chain reads cross-lane code (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,
   harvested and every finding re-verified inline before it is filed.
 - **Leak & accumulation code-review class (point 285, prong A):** the same
   fresh-model pass explicitly sweeps for the dispose/prune/re-seed/effect-cleanup

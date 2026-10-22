@@ -304,9 +304,11 @@ constraint.
 ## What no setting routes
 
 - A point whose verification is the work, unless its spec marks it hard — since
-  18.08.2026 a hard or critical point is the cross lane's whatever else it says, short of
-  the one exception above: a reached §6 scarce-lane escalation threshold. No SETTING
-  routes it; the routing function decides, and a point's own `Author lane:` tag
+  18.08.2026 the routing function gives a hard or critical point to the cross lane,
+  short of the one exception above: a reached §6 scarce-lane escalation threshold.
+  The cross lane then authors it only at `prefer-cross` (at `default` and
+  `main-only` the author command keeps it in the main chain unless `--anyway`);
+  the routing function decides the lane, and a point's own `Author lane:` tag
   or `--anyway` is the deliberate override subject to the model switches.
 - REVIEWING what the cross lane itself authored — no model reviews its own work, so
   `cross-review.mjs` refuses such a range before it spends a call on it.
