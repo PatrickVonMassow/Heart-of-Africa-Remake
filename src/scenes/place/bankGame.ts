@@ -318,6 +318,10 @@ interface BankRoundConfig {
   dodgeReach: number
   /** How fast a roaming child's heading drifts (rad/s) — the wander itself. */
   roamTurn: number
+  /** How near a playmate ahead bends a roaming child's walk away from it (m):
+   *  playmates are no steering obstacle, so without it two walks met head-on
+   *  and the separation shoved one of them backwards. */
+  roamGap: number
   /** How long a climber may make no progress toward the boulder before giving
    *  the obstructed approach up. A reachable stone keeps resetting this watch. */
   roamGoalSeconds: number
@@ -1605,16 +1609,34 @@ function stepRoam(
     // village, minimum gap 0.42-0.57 m for a whole roaming phase). A reflection
     // keeps the sideways half of the motion and only turns the outward half
     // back, so they walk ALONG their quarter and stay a group of individuals.
+    // A playmate close AHEAD bends the walk away the same way: playmates are no
+    // steering obstacle, so two walks met head-on and the separation shoved one
+    // child backwards at walking pace (measured, 0.78 m).
+    // The walk turns INTO either bend at the body's own `turnRate`: set in one
+    // frame it flipped the travel up to 176° while the body eased after it, a
+    // child walking backwards.
     c.roamHeading += (rand() * 2 - 1) * cfg.roamTurn * dt
-    const out = Math.hypot(c.x - stage.roam.x, c.z - stage.roam.z)
-    if (out > stage.roam.radius * 0.8) {
-      const nx = (c.x - stage.roam.x) / out
-      const nz = (c.z - stage.roam.z) / out
-      const dx = Math.sin(c.roamHeading)
-      const dz = Math.cos(c.roamHeading)
-      const radial = dx * nx + dz * nz
-      if (radial > 0) c.roamHeading = Math.atan2(dx - 2 * radial * nx, dz - 2 * radial * nz)
+    let aim = c.roamHeading
+    const bend = (nx: number, nz: number) => {
+      const dx = Math.sin(aim)
+      const dz = Math.cos(aim)
+      const toward = dx * nx + dz * nz
+      if (toward > 0) aim = Math.atan2(dx - 2 * toward * nx, dz - 2 * toward * nz)
     }
+    const out = Math.hypot(c.x - stage.roam.x, c.z - stage.roam.z)
+    if (out > stage.roam.radius * 0.8) bend((c.x - stage.roam.x) / out, (c.z - stage.roam.z) / out)
+    let near = cfg.roamGap
+    let mate: BankChild | null = null
+    for (let j = 0; j < s.children.length; j++) {
+      const o = s.children[j]
+      const d = j === i || onStone(o) ? Infinity : dist(c, o)
+      if (d < near && d > 1e-6) {
+        near = d
+        mate = o
+      }
+    }
+    if (mate) bend((mate.x - c.x) / near, (mate.z - c.z) / near)
+    c.roamHeading = turnToward(c.roamHeading, aim, cfg.turnRate * dt)
     const look = cfg.reachDistance
     const facingBefore = c.facing
     drive(

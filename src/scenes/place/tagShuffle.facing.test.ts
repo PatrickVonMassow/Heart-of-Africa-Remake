@@ -36,4 +36,30 @@ describe('the children run facing where they run', () => {
     expect(running).toBeGreaterThan(500)
     expect(worst).toBeLessThan(0.3)
   }, 60_000)
+
+  it('never walks a child far backwards', () => {
+    // A walk (over 1 m/s) with the body past three-eighths of a turn off its
+    // travel. The roam's rim reflection flipped the walk in one frame and
+    // left a child walking backwards for metres.
+    const v = village('bambara-village', 2694999956)
+    const prev = v.children.map((c) => ({ x: c.x, z: c.z }))
+    const backwards = v.children.map(() => 0)
+    let worst = 0
+    for (let t = 0; t < 160; t += 1 / 60) {
+      frame(v, 1 / 60)
+      v.children.forEach((c, i) => {
+        const dx = c.x - prev[i].x
+        const dz = c.z - prev[i].z
+        prev[i] = { x: c.x, z: c.z }
+        const d = Math.hypot(dx, dz)
+        const travel = Math.atan2(dx, dz)
+        const off = Math.abs(Math.atan2(Math.sin(c.facing - travel), Math.cos(c.facing - travel)))
+        if (d * 60 > 1 && off > (Math.PI * 3) / 4) {
+          backwards[i] += d
+          worst = Math.max(worst, backwards[i])
+        } else backwards[i] = 0
+      })
+    }
+    expect(worst).toBeLessThan(0.3)
+  }, 60_000)
 })

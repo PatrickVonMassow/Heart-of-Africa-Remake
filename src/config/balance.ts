@@ -941,6 +941,8 @@ interface BalanceConfig {
       dodgeReach: number
       /** How fast a roaming child's heading drifts (rad/s). */
       roamTurn: number
+      /** How near a playmate ahead bends a roaming child's walk away (m). */
+      roamGap: number
       /** How long the climber may make no progress toward the boulder before giving up. */
       roamGoalSeconds: number
       /** How far outside the boulder's own collider the climber stops before it
@@ -1903,6 +1905,9 @@ export const balance: BalanceConfig = {
       // A quarter turn a second at the most: a wander that reads as wandering
       // rather than as a figure being blown about.
       roamTurn: 1.4,
+      // Calibratable estimate: about two body lengths, so the bend — turned at
+      // `turnRate` — is done before the two bodies meet.
+      roamGap: 1.6,
       // A reachable stone keeps resetting this watch as the climber gets
       // closer. Thirty seconds without gaining any ground toward it means a
       // hut, pocket or other collider has made the approach impossible.
