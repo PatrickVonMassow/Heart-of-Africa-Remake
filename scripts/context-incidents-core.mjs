@@ -17,6 +17,7 @@
 // deduplicate: a series file handed in twice counts twice.
 // Closing that would mean deriving the reading at session start from the
 // predecessor's transcript — a separate point, not claimed here.
+import { LEGACY } from './model-lanes.mjs'
 import { expandSegments, headAndArgs, segmentInvokesPathWhere, segmentInvokesScript } from './command-classify-core.mjs'
 
 /** Record format version. Readers keep older versions readable; a writer only
@@ -99,7 +100,8 @@ const READ_TOOLS = new Set(['Read'])
  *  here (the fence's run-wait.mjs exemption and npm subcommand parsing are not
  *  mirrored). */
 const SUITE_SCRIPTS = ['run-all.mjs', 'run-logged.mjs']
-const ASK_SCRIPTS = ['ask-lane.mjs', 'author-delegate.mjs', 'author-fable.mjs', 'cross-review.mjs']
+// Retired names stay: incidents are read from transcripts written before the rename.
+const ASK_SCRIPTS = ['ask-lane.mjs', 'author-delegate.mjs', 'author-fable.mjs', 'cross-review.mjs', ...LEGACY.askScripts]
 const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
 /** npm script names that ARE a browser run, and the fast gates beside them. */
 const NPM_SUITE_ARGS = new Set(['test', 'test:small', 'test:large'])

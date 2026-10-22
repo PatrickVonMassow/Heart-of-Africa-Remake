@@ -14,6 +14,7 @@
 //   - the growth is attributed per KIND of call with its input size, since point
 //     745 needs a cost per kind and a per-turn average cannot yield one.
 import { describe, it, expect } from 'vitest'
+import { LEGACY } from './model-lanes.mjs'
 import {
   CALL_KINDS,
   INCIDENT_KINDS,
@@ -82,6 +83,8 @@ describe('callKind / shellKind — the growth is charged to a KIND, read off the
     expect(shellKind('npm run test:unit')).toBe(CALL_KINDS.FAST_GATE)
     expect(shellKind('npm run build && npm run lint')).toBe(CALL_KINDS.FAST_GATE)
     expect(shellKind('cat material | node scripts/ask-lane.mjs --kind diagnose')).toBe(CALL_KINDS.DELEGATED_ASK)
+    // Transcripts from before the lane rename still name the vendor scripts.
+    for (const script of LEGACY.askScripts) expect(shellKind(`node scripts/${script} --x`)).toBe(CALL_KINDS.DELEGATED_ASK)
     expect(shellKind('node scripts/author-fable.mjs --point 834')).toBe(CALL_KINDS.DELEGATED_ASK)
     expect(shellKind('git status --short')).toBe(CALL_KINDS.BASH)
     expect(shellKind('')).toBe(CALL_KINDS.BASH)

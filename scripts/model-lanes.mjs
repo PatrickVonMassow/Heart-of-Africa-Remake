@@ -120,6 +120,8 @@ export const LEGACY = Object.freeze({
     'Fable 5.1 is switched off by the recorded Fable switch (node scripts/fable-switch.mjs --status): ',
     'Fable 5 is switched off by the recorded Fable switch (node scripts/fable-switch.mjs --status): ',
   ]),
+  /** The vendor-named delegating scripts the role-named ones replaced, for reading old transcripts. */
+  askScripts: Object.freeze(['ask-astra.mjs', 'author-astra.mjs', 'review-astra.mjs']),
   /** The `--model` keys the old ask/review commands accepted, for reading recorded commands. */
   cliKeys: Object.freeze({ astra: 'cross', fable: 'scarce', opus: 'main', opus48: 'main-fallback' }),
 })
