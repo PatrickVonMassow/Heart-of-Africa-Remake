@@ -10,6 +10,7 @@ import {
   LANES,
   LEGACY,
   MAIN,
+  TEST_FOREIGN_MODELS,
   SCARCE,
   VENDORS,
   differentVendor,
@@ -160,7 +161,7 @@ describe('the cross-vendor rule compares vendor fields only', () => {
   it('selects reviewers from the vendors no author has, with a synthetic third vendor', () => {
     const synthetic = [
       ...LANES,
-      Object.freeze({ ...CROSS, role: 'third', vendor: 'anthropic', familyWords: ['zeta'], retired: [], displayName: 'Zeta 1', trailerName: 'Zeta 1', modelId: 'zeta-1' }),
+      Object.freeze({ ...CROSS, role: 'third', vendor: MAIN.vendor, familyWords: ['zeta'], retired: [], displayName: 'Zeta 1', trailerName: 'Zeta 1', modelId: 'zeta-1' }),
     ]
     expect(eligibleReviewers([MAIN.trailerName], synthetic).map((l) => l.role)).toEqual(['cross'])
     expect(eligibleReviewers([CROSS.displayName]).map((l) => l.role).sort()).toEqual(['main', 'scarce'])
@@ -210,7 +211,7 @@ describe('identities a designation mentions', () => {
   it('keeps the main fallback distinct and names foreign models by their word', () => {
     expect(mentionedIdentities(MAIN.fallback.trailerName)).toEqual(['main-fallback'])
     expect(sharesIdentity(MAIN.fallback.displayName, MAIN.displayName)).toBe(false)
-    expect(mentionedIdentities('Claude Haiku 4.5')).toEqual(['other:haiku'])
+    expect(mentionedIdentities(TEST_FOREIGN_MODELS.haikuTrailer)).toEqual(['other:haiku'])
     expect(mentionedIdentities('Alice')).toEqual([])
     expect(sharesIdentity('Alice', 'Alice')).toBe(false)
   })
