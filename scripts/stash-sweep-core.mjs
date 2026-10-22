@@ -19,6 +19,14 @@ export function isMachinePath(path = '') {
   )
 }
 
+/** Binary files: nothing in them can be read as an order. */
+export function isBinaryPath(path = '') {
+  return /\.(png|jpe?g|webp|gif|bin|glb|gltf|wav|mp3|ogg|zip|ico|woff2?|ttf|pdf|webm|mp4|mov|avi|zst|gz)$/i.test(String(path))
+}
+
+/** Bytes that are binary whatever their name says: git's own test, a NUL byte. */
+export const isBinaryText = (text = '') => String(text).includes('\0')
+
 /** Text paths whose added lines may carry user orders (checked by content). */
 export function isContentPath(path = '') {
   const p = String(path).replace(/\\/g, '/')
@@ -66,11 +74,17 @@ export function judgeStash({ files = [], main } = {}) {
   const titlesOnMain = new Map([...heads].map(([n, t]) => [titleAnchor(t), n]))
   const out = { missingPoints: [], missingQuotes: [], renumbered: [], otherLines: 0, machine: 0, code: 0, contentPaths: [] }
   for (const file of files) {
+    // A MACHINE PATH IS STILL READ (review 22.10.2026): `local/orders.md` with a
+    // point line is user content, whatever directory it sits in. Only a machine
+    // file whose added text holds no point head and no user line is discardable.
     if (isMachinePath(file.path)) {
-      out.machine++
-      continue
+      const carriesOrders = (file.added ?? []).some((l) => /^- \[[ xX]\] \d+\./.test(norm(l)) || isUserLine(l))
+      if (!carriesOrders) {
+        out.machine++
+        continue
+      }
     }
-    if (!isContentPath(file.path)) {
+    if (!isContentPath(file.path) && !isMachinePath(file.path)) {
       // The IO half already dropped lines that main's copy of the SAME file holds.
       if ((file.added ?? []).some((l) => norm(l))) out.code++
       continue

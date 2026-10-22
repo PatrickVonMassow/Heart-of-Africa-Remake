@@ -15,7 +15,7 @@ import { writeFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
 import { withoutGitLocalEnvironment } from './repo-paths.mjs'
 import { mainCheckoutRoot } from './carrier-reconcile.mjs'
-import { addedLines, corpusOf, isContentPath, isMachinePath, judgeStash, unionHeads } from './stash-sweep-core.mjs'
+import { addedLines, corpusOf, isBinaryPath, isBinaryText, isContentPath, isMachinePath, judgeStash, unionHeads } from './stash-sweep-core.mjs'
 
 function gitIn(root) {
   const env = withoutGitLocalEnvironment()
@@ -60,35 +60,38 @@ export function sweepStashes({ root = mainCheckoutRoot() } = {}) {
   const results = []
   for (const stash of listStashes(git)) {
     const files = []
-    const tracked = git(['diff', '--name-only', '--no-renames', `${stash.sha}^1`, stash.sha]).split(/\r?\n/).filter(Boolean)
-    let untracked = []
+    // -z: NUL-separated raw names, so a quoted name (übernahme.md) is read as itself (review 22.10.2026).
+    const zList = (out) => out.split('\0').filter(Boolean)
+    const tracked = zList(git(['diff', '-z', '--name-only', '--no-renames', `${stash.sha}^1`, stash.sha]))
+    let hasUntracked = true
     try {
       git(['rev-parse', '-q', '--verify', `${stash.sha}^3`])
-      untracked = git(['ls-tree', '-r', '--name-only', `${stash.sha}^3`]).split(/\r?\n/).filter(Boolean)
     } catch {
-      untracked = []
+      hasUntracked = false
     }
+    const untracked = hasUntracked ? zList(git(['ls-tree', '-r', '-z', '--name-only', `${stash.sha}^3`])) : []
     for (const path of tracked) {
-      if (isMachinePath(path)) {
+      if (isBinaryPath(path)) {
         files.push({ path, added: [] })
         continue
       }
       const added = addedLines(git(['diff', '--no-color', '-U0', `${stash.sha}^1`, stash.sha, '--', path]))
-      files.push({ path, added: isContentPath(path) ? added : notInMain(added, mainText(path)) })
+      files.push({ path, added: isContentPath(path) || isMachinePath(path) ? added : notInMain(added, mainText(path)) })
     }
     for (const path of untracked) {
-      if (isMachinePath(path)) {
+      if (isBinaryPath(path)) {
         files.push({ path, added: [], untracked: true })
         continue
       }
-      let text = ''
+      // An unreadable blob is an ERROR, never empty content.
+      let text
       try {
         text = git(['show', `${stash.sha}^3:${path}`])
-      } catch {
-        text = ''
+      } catch (e) {
+        throw new Error(`stash ${stash.sha.slice(0, 12)}: untracked ${JSON.stringify(path)} could not be read (${String(e.stderr || e.message).trim().split('\n')[0]})`)
       }
-      const lines = text.split(/\r?\n/)
-      files.push({ path, added: isContentPath(path) ? lines : notInMain(lines, mainText(path)), untracked: true })
+      const lines = isBinaryText(text) ? [] : text.split(/\r?\n/)
+      files.push({ path, added: isContentPath(path) || isMachinePath(path) ? lines : notInMain(lines, mainText(path)), untracked: true })
     }
     const contentPaths = files.filter((f) => isContentPath(f.path)).map((f) => f.path)
     const corpus = corpusOf([...baseCorpus, ...contentPaths.map(mainText)])
