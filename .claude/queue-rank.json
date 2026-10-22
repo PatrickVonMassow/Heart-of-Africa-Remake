@@ -1680,6 +1680,18 @@
       "why": "WebGL-2-only village-walk red; worked with 1396 on the same walk",
       "origin": "machine",
       "place": "last"
+    },
+    "1422": {
+      "at": "2026-10-22T11:43:58.228Z",
+      "why": "Villager gait finding from the 1402 capture; belongs at the end with the other Dorfleben rig points, after 1397",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1423": {
+      "at": "2026-10-22T11:43:58.345Z",
+      "why": "Villager gait finding from the 1402 capture; belongs at the end with the other Dorfleben rig points, after 1397",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1709,7 +1721,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-22T10:22:18.647Z",
+    "at": "2026-10-22T11:43:58.355Z",
     "points": [
       184,
       200,
@@ -2176,7 +2188,9 @@
       1417,
       1418,
       1419,
-      1420
+      1420,
+      1422,
+      1423
     ]
   }
 }
