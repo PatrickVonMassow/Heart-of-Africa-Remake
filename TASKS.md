@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
-  Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
-  Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.
-  Source: finding 21.10.2026 18:26 by the 1409 author: with the lock free, the empty transcript after /clear counted as unattended and acquired; batch-progress-guard is fifth in the Stop order, so every later batch-duty guard bound that chat window. Acquisition is frozen by 1409's spec, hence its own point.
-  Queue position: directly after 1409 (it follows its ownership change).
-  Criticality: medium - a real blockade of an attended chat window (infrastructure freeze exemption, CLAUDE.md section 2).
-  Bundle: Chat & Tafel.
 - [ ] 1412. Village bank routing test fails under machine load
   Queue position: after point 1411 (front-of-queue gate stability: it reddens unrelated branches and CI).
   Source: finding 21.10.2026 18:14: `src/scenes/place/routing.test.ts` "a villager sent to the BANK gets there" failed in two independent full unit runs (1402 worktree seed 1337; 1410 worktree seeds 7 and 1337) at load average 13-16; the file alone passes 19/19, also on main. Caused red CI run 39625616367 on feat/1402-rear-leg-tremble.

@@ -34512,3 +34512,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Tests: scripts/author-astra-core.test.mjs:83 expects model_reasoning_effort=medium; review-astra-core.test.mjs (uses the constant) stays green; no other hard-coded 'high' for the OpenAI lane remains in scripts/ (comments recording past reviews "GPT-5.6 Sol at effort high" are history and stay).
   Criticality: low - cost/latency setting, one constant.
   Bundle: Chat & Tafel.
+
+- [x] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
+  Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
+  Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.
+  Source: finding 21.10.2026 18:26 by the 1409 author: with the lock free, the empty transcript after /clear counted as unattended and acquired; batch-progress-guard is fifth in the Stop order, so every later batch-duty guard bound that chat window. Acquisition is frozen by 1409's spec, hence its own point.
+  Queue position: directly after 1409 (it follows its ownership change).
+  Criticality: medium - a real blockade of an attended chat window (infrastructure freeze exemption, CLAUDE.md section 2).
+  Bundle: Chat & Tafel.
