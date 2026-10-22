@@ -42,12 +42,12 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
+import { OPUS_MODEL_ID, servingFallbackModelId } from './lane-switch-core.mjs'
 import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
 /** Model policy (CLAUDE.md §6). rule:model-policy@2f245cec
- *  The session starts on OPUS_MODEL_ID (scripts/fable-switch-core.mjs). Its one CLI fallback is the next member of the
- *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
+ *  The session starts on OPUS_MODEL_ID (scripts/lane-switch-core.mjs). Its one CLI fallback is the next member of the
+ *  chain reported by scripts/lane-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
 export const SPAWN_MODEL = OPUS_MODEL_ID
 

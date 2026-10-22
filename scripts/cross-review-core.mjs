@@ -7,7 +7,7 @@
 // vendor is the strongest decorrelation available, so REVIEWS go to OpenAI's
 // GPT-6 Astra at reasoning effort MEDIUM first and to the first eligible Claude
 // reviewer when Astra cannot be reached. Since point 667 Astra also AUTHORS under
-// the role swap (scripts/author-astra.mjs, admitted in the model-guard allowlist);
+// the role swap (scripts/author-delegate.mjs, admitted in the model-guard allowlist);
 // what this file protects is the other half of that swap — no model reviews its
 // own work (`astraAuthored`, the self-review refusal), whoever wrote the commit.
 //
@@ -21,7 +21,7 @@
 // never the one that was preferred.
 //
 // Side-effect free: the process spawn, the temp files and the printing belong to
-// scripts/review-astra.mjs. Pinned by review-astra-core.test.mjs.
+// scripts/cross-review.mjs. Pinned by cross-review-core.test.mjs.
 
 import {
   BLIND_REVIEWER,
@@ -41,7 +41,7 @@ import {
   OPUS_MODEL,
   OPUS_MODEL_ID,
   fableIsOn,
-} from './fable-switch-core.mjs'
+} from './lane-switch-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import {
   assembleMaterial,
@@ -63,7 +63,7 @@ export { BLIND_REVIEWER, blindReviewerAdmission }
 export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 
 /** The model id `codex exec -m` is given, and the name a record calls it by.
- *  Both are stated ONCE, in fable-switch-core.mjs beside the other model
+ *  Both are stated ONCE, in lane-switch-core.mjs beside the other model
  *  identities, and re-exported here because this is where every caller of the
  *  review command already looks for them (point 1061). */
 export { ASTRA_MODEL_ID }
@@ -145,18 +145,18 @@ export const OUTCOME = Object.freeze({
 const CAUSE_TEXT = Object.freeze({
   [OUTCOME.NOT_INSTALLED]: `\`${CODEX_BIN}\` is not on PATH in this container`,
   [OUTCOME.UNREACHABLE]: 'the OpenAI host could not be reached (network or firewall)',
-  [OUTCOME.LOGIN_EXPIRED]: `the ChatGPT login is gone or expired (see \`review-astra.mjs --restore-login\`)`,
+  [OUTCOME.LOGIN_EXPIRED]: `the ChatGPT login is gone or expired (see \`cross-review.mjs --restore-login\`)`,
   [OUTCOME.ALLOWANCE_EXHAUSTED]: 'the ChatGPT allowance for this account is exhausted',
   [OUTCOME.MODEL_REFUSED]: `the server refused the model id "${ASTRA_MODEL_ID}"`,
   [OUTCOME.TIMEOUT]: 'the review did not finish inside its time budget',
   [OUTCOME.ERROR_EXIT]: 'codex exited with an error',
   [OUTCOME.NO_VERDICT]: 'the run produced no parseable verdict',
-  [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/astra-share.mjs --status)',
+  [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/lane-routing.mjs --status)',
   [OUTCOME.SELF_REVIEW]: `${ASTRA_MODEL_NAME} AUTHORED part of this range — no model reviews its own work`,
 })
 
 /** The outcomes that are a VENDOR outage rather than a failed run — the signature set
- *  the share switch's measured fallback keys on (scripts/astra-share-core.mjs). */
+ *  the share switch's measured fallback keys on (scripts/lane-routing-core.mjs). */
 export const OUTAGE_OUTCOMES = Object.freeze([OUTCOME.ALLOWANCE_EXHAUSTED, OUTCOME.UNREACHABLE])
 
 /** The cause sentence of one outcome kind — for the callers that skip classifyOutcome. */
@@ -413,7 +413,7 @@ export const charStripped = (text) => String(text ?? '').replace(/[*`_#>~]/g, ''
  *  label's colon, around an entry's pipes, at line end — because that padding
  *  belongs to the `LABEL: value` / `id | file | text` format the prompts
  *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
- *  (ask-astra's explain) is not a labelled field and trims NOTHING. */
+ *  (ask-lane's explain) is not a labelled field and trims NOTHING. */
 export function rawFieldValue(rawLine) {
   const at = String(rawLine ?? '').indexOf(':')
   if (at < 0) return ''
@@ -746,13 +746,13 @@ export const PROBE_MAX_AGE_MS = 30 * 86_400_000
  * token usage, no model field). So the identity rests on the server REFUSING an
  * unknown id — which `--probe` demonstrates — and the honest thing is to say
  * when that demonstration is missing or old rather than to imply it every time.
- * The answer is a warning, not a verdict: ensureModelProven (review-astra.mjs)
+ * The answer is a warning, not a verdict: ensureModelProven (cross-review.mjs)
  * re-runs the probe on it, and only a probe that then fails blocks the review.
  */
 export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS, fingerprint = '') {
   const at = Number(receipt?.at ?? 0)
   if (!receipt || receipt.refused !== true || !at) {
-    return { fresh: false, warning: `the model id ${ASTRA_MODEL_ID} has never been proven honoured on this machine — proving it (node scripts/review-astra.mjs --probe)` }
+    return { fresh: false, warning: `the model id ${ASTRA_MODEL_ID} has never been proven honoured on this machine — proving it (node scripts/cross-review.mjs --probe)` }
   }
   // THE PROOF IS BOUND TO WHAT PRODUCED IT (fifth cross-vendor round). The
   // receipt outlives container rebuilds, so a proof taken with another codex
@@ -771,7 +771,7 @@ export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_A
   }
   const ageDays = Math.floor((now - at) / 86_400_000)
   if (now - at > maxAgeMs) {
-    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — re-proving it (node scripts/review-astra.mjs --probe)` }
+    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — re-proving it (node scripts/cross-review.mjs --probe)` }
   }
   return { fresh: true, warning: '', ageDays }
 }
@@ -811,7 +811,7 @@ export function formatReviewerCommand({
   const reviewer = reviewerDescriptor(model)
   if (!reviewer || !sha || !String(brief).trim()) return ''
   const parts = [
-    'node scripts/review-astra.mjs',
+    'node scripts/cross-review.mjs',
     `--reviewer ${reviewer.key}`,
     `--sha ${String(sha)}`,
     `--brief ${q(brief)}`,
@@ -927,7 +927,7 @@ export function formatReviewReport({
       ? `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}`
       : `${decision.ranBy || ASTRA_MODEL_NAME} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
     return [
-      `review-astra: ${said}`,
+      `cross-review: ${said}`,
       '',
       `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
       // A hand-over never SAW anything, but the refusal is the same: only the
@@ -964,7 +964,7 @@ export function formatReviewReport({
       : decision.kind === OUTCOME.SELF_REVIEW
         ? `ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
         : `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
-    return [`review-astra: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
+    return [`cross-review: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
   }
   const cmd = formatRecordCommand({
     sha,
@@ -996,7 +996,7 @@ export function formatReviewReport({
         : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
       : ''
     return [
-      `review-astra: ${ranBy}${detail} reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
+      `cross-review: ${ranBy}${detail} reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
       `  ${decision.evidence}`,
       ...(plan ? ['', formatReviewCoverage(plan, pass)] : []),
       '',
@@ -1016,13 +1016,13 @@ export function formatReviewReport({
   if (decision.kind === OUTCOME.SELF_REVIEW) {
     if (!who) {
       return [
-        `review-astra: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+        `cross-review: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
         `  And every model of ${(decision.chain ?? CLAUDE_REVIEW_CHAIN).join(', ')} authored part of it too, so none of them`,
         '  may either. The review is NOT done and cannot be recorded: review a narrower range.',
       ].join('\n')
     }
     return [
-      `review-astra: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+      `cross-review: ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
       `  The review is ${who}'s, which also runs the suites, judges the picture and lands the point.`,
       reviewerCommand ? '  Start that reader with the same bounded request:' : '  Record what IT says — never a verdict this command invented:',
       '',
@@ -1032,7 +1032,7 @@ export function formatReviewReport({
   }
   if (!who) {
     return [
-      `review-astra: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `cross-review: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
       `  And EVERY model in the fallback chain (${(decision.chain ?? FALLBACK_CHAIN).join(', ')}) authored part of this`,
       '  range, so none of them may review it. The review is NOT done and cannot be recorded:',
       `  fix the ${ASTRA_MODEL_NAME} run, or review a narrower range one of them did not write.`,
@@ -1051,7 +1051,7 @@ export function formatReviewReport({
   // stays. Every other kind — the unknown ones included — refuses.
   if (decision.kind !== OUTCOME.NO_VERDICT && decision.kind !== OUTCOME.SWITCHED_OFF) {
     return [
-      `review-astra: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `cross-review: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
       '  NO RECORD COMMAND IS PRINTED: no completed hand-off proves any of this range was read,',
       '  so nothing of it may be recorded.',
       `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
@@ -1060,7 +1060,7 @@ export function formatReviewReport({
     ].join('\n')
   }
   return [
-    `review-astra: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+    `cross-review: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
     `  The review is NOT done. Hand it to ${who} and record what IT says:`,
     '',
     reviewerCommand ? `  Start it: ${reviewerCommand}` : `  1. give ${who} the commit and the brief above,`,

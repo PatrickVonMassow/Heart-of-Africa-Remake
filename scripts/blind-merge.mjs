@@ -26,8 +26,8 @@
 // prints and sets the exit code. It fails LOUD — it is a command, not a hook.
 import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
-import { currentFableState } from './fable-switch.mjs'
-import { mergeFallbackReason, mergePromptFraming, mergerModel } from './fable-switch-core.mjs'
+import { currentFableState } from './lane-switch.mjs'
+import { mergeFallbackReason, mergePromptFraming, mergerModel } from './lane-switch-core.mjs'
 import { canonicalTreePath, isTrackedInGit } from './git-tracked.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
@@ -103,7 +103,7 @@ export const usage = () =>
   '           [--author-at-b <ISO> --author-transcript-b <session.jsonl>] \\\n' +
   '           [--fallback "<switch-generated reason>"]                     (the count)\n' +
   '\nThe merge of a blind-parallel stage goes to the model that wrote NEITHER list\n' +
-  '(CLAUDE.md §6), selected by node scripts/fable-switch.mjs --status. A balanced run prints the mechanism-review.mjs command to record,\n' +
+  '(CLAUDE.md §6), selected by node scripts/lane-switch.mjs --status. A balanced run prints the mechanism-review.mjs command to record,\n' +
   'including the --accounting line, which is the receipt that nothing was dropped.'
 
 if (isMainModule(import.meta.url)) {
@@ -279,7 +279,7 @@ if (isMainModule(import.meta.url)) {
             `      ${p.b}: ${y?.file ?? ''} — ${y?.defect ?? ''}`,
         )
       }
-      console.log(`\nMERGING MODEL — ${expectedMerger} (${mergerBecause}; node scripts/fable-switch.mjs --status)`)
+      console.log(`\nMERGING MODEL — ${expectedMerger} (${mergerBecause}; node scripts/lane-switch.mjs --status)`)
       const framing = mergePromptFraming(fableState, slots)
       if (framing) console.log(`\n${framing}`)
       console.log(
@@ -375,7 +375,7 @@ if (isMainModule(import.meta.url)) {
       merger.ok = false
       merger.errors.push(
         `merger "${declared}" is not the one this stage owes: ${expectedMerger} owns this merge, ` +
-          `${mergerBecause} (node scripts/fable-switch.mjs --status)`,
+          `${mergerBecause} (node scripts/lane-switch.mjs --status)`,
       )
     }
     if (fallback && fallback !== switchFallback) {

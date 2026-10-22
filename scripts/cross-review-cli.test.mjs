@@ -41,14 +41,14 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, ASTRA_MODEL_NAME } from './review-astra-core.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL, OPUS_MODEL_ID, writeState as writeFableState } from './fable-switch-core.mjs'
-import { formatContributionPassPlan } from './review-astra.mjs'
+import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, ASTRA_MODEL_NAME } from './cross-review-core.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL, OPUS_MODEL_ID, writeState as writeFableState } from './lane-switch-core.mjs'
+import { formatContributionPassPlan } from './cross-review.mjs'
 
 /** The command and everything it imports — copied so REPO_ROOT is the fixture. */
 const SCRIPT_FILES = [
-  'review-astra.mjs',
-  'review-astra-core.mjs',
+  'cross-review.mjs',
+  'cross-review-core.mjs',
   // The material budget, its accounting and the pass plan (point 714): the
   // command refuses a record whose round did not carry the range, and the suite
   // exercises that refusal against the real command.
@@ -75,11 +75,11 @@ const SCRIPT_FILES = [
   // The share switch the command asks BEFORE it spends an allowance (point 654), and
   // the atomic write it persists a setting with. The fixture leaves the setting unset,
   // so every case below runs at `default` — reviews to Sol, as before.
-  'astra-share.mjs',
-  'astra-share-core.mjs',
-  'fable-switch.mjs',
-  'fable-switch-core.mjs',
-  'ask-astra-core.mjs',
+  'lane-routing.mjs',
+  'lane-routing-core.mjs',
+  'lane-switch.mjs',
+  'lane-switch-core.mjs',
+  'ask-lane-core.mjs',
   'author-fable-core.mjs',
   'atomic-write.mjs',
 ]
@@ -301,7 +301,7 @@ const provenId = () => {
 }
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'review-astra-cli-'))
+  dir = mkdtempSync(join(tmpdir(), 'cross-review-cli-'))
   emptyTemplate = join(dir, 'empty-git-template')
   mkdirSync(emptyTemplate, { recursive: true })
   repo = join(dir, 'repo')
@@ -340,7 +340,7 @@ beforeAll(() => {
     windowsHide: true,
     env: hermeticEnv(),
   })
-  script = join(repo, 'scripts', 'review-astra.mjs')
+  script = join(repo, 'scripts', 'cross-review.mjs')
   for (const file of SCRIPT_FILES) copyFileSync(resolve('scripts', file), join(repo, 'scripts', file))
   // `local/` is ignored here as it is in the real repository — the saved-login
   // path is refused unless git PROVES it ignored, and that proof is a property
@@ -834,7 +834,7 @@ describe('the guards around the run', () => {
   it('prints a runnable Fable handover when both vendors but not every model authored', () => {
     const r = run(['--sha', unreviewableSha, '--brief', 'judge it', '--point', '870'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
     expect(r.stdout).toContain('--point 870')
     expect(r.stderr).not.toMatch(/UNREVIEWABLE/)
   })
@@ -897,14 +897,14 @@ describe('the guards around the run', () => {
   })
 
   it('PROVES the model id before attributing a review to it, and remembers the proof', () => {
-    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', headSha, '--brief', 'judge it'])
     expect(r.status, r.stderr).toBe(0)
     // The unknown id was tried first, then the real review ran.
     expect(calls()[0]).not.toBe('gpt-6-astra')
     expect(calls()).toContain('gpt-6-astra')
-    expect(JSON.parse(readFileSync(join(stateDir, 'review-astra-probe.json'), 'utf8'))).toMatchObject({ refused: true })
+    expect(JSON.parse(readFileSync(join(stateDir, 'cross-review-probe.json'), 'utf8'))).toMatchObject({ refused: true })
     // …and the next review does not pay for the probe again.
     writeFileSync(join(dir, 'calls.log'), '')
     expect(run(['--sha', headSha, '--brief', 'judge it']).status).toBe(0)
@@ -1010,7 +1010,7 @@ describe('a range SOL authored', () => {
     expect(r.status, r.stderr).toBe(3)
     expect(r.stdout).toMatch(/ROLE SWAP/)
     expect(r.stdout).toMatch(/AUTHORED part of/)
-    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer opus')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer opus')
     // Not one call — not even the model-id probe: the question is answered from
     // the trailers, and paying for a review Sol may not give is the waste this
     // ordering exists to prevent.
@@ -1125,7 +1125,7 @@ describe('a narrowed --since on the early routes', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { ASTRA_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
     expect(r.stdout).toContain(`--since ${headSha}~1`)
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
@@ -1135,7 +1135,7 @@ describe('a narrowed --since on the early routes', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', astraHeadSha, '--since', `${astraHeadSha}~1`, '--brief', 'judge it'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer opus')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer opus')
     expect(r.stdout).toContain(`--since ${astraHeadSha}~1`)
     expect(calls()).toEqual([])
   })
@@ -1145,7 +1145,7 @@ describe('a narrowed --since on the early routes', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', astraHeadSha, '--brief', 'judge it'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer opus')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer opus')
     expect(r.stdout).not.toContain('--since')
   })
 })
@@ -1319,7 +1319,7 @@ describe('a range too large for one round', () => {
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { ASTRA_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toContain('node scripts/review-astra.mjs --reviewer fable')
+    expect(r.stdout).toContain('node scripts/cross-review.mjs --reviewer fable')
     rmSync(shareFile, { force: true })
   })
 
@@ -1368,7 +1368,7 @@ describe('a range too large for one round', () => {
         unreviewable: [],
       }],
     })
-    const command = planText.split('\n').find((line) => line.trim().startsWith('node scripts/review-astra.mjs'))?.trim()
+    const command = planText.split('\n').find((line) => line.trim().startsWith('node scripts/cross-review.mjs'))?.trim()
     expect(command).toBeTruthy()
     expect(command).not.toContain('--pass')
 

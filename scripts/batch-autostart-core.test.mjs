@@ -76,7 +76,7 @@ import {
   ownerKeepsBatch,
   takeoverHandsOver,
 } from './batch-autostart-core.mjs'
-import { readState, writeState } from './fable-switch-core.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
 import { PAUSE_RETRY_LADDER_MS } from './batch-pause-core.mjs'
 import { checkAgentOutput, registeredFeatureWriters, worktreeActiveAt } from './batch-in-flight.mjs'
 

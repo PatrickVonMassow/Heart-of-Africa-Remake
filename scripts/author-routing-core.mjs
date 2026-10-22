@@ -10,7 +10,7 @@
 // quota reading, which then outlived it). An UNREACHABLE lane is different from
 // a full one: where the OpenAI volume is spent, authoring goes to Opus 5.5 rather
 // than waiting for the vendor (user 23.09.2026; point 1194 measures and lifts it).
-// That fallback is decided in astra-share-core.mjs (`effectiveRoute`), not here.
+// That fallback is decided in lane-routing-core.mjs (`effectiveRoute`), not here.
 //
 //   astra  GPT-6 Astra authors the points, and Claude then reviews, runs the
 //          suites, judges the picture and lands. Since 18.08.2026 that includes
@@ -32,11 +32,11 @@
 // where it answers wrongly, the fix is a case in its test file, not a habit.
 //
 // The reasons travel with the verdict so a dispatcher can see WHY and override
-// with a tag in the point itself; author-astra.mjs refuses a run whose point
+// with a tag in the point itself; author-delegate.mjs refuses a run whose point
 // routes to another lane unless `--anyway` is given. Side-effect free; the work-order reading belongs to
-// scripts/author-astra.mjs. Pinned by author-routing-core.test.mjs.
+// scripts/author-delegate.mjs. Pinned by author-routing-core.test.mjs.
 
-import { ASTRA_MODEL, FABLE_MODEL, OPUS_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, OPUS_MODEL, fableIsOn, fableRefusalReason, requireState } from './lane-switch-core.mjs'
 
 /** The authoring lanes, in report order. */
 export const LANES = Object.freeze(['astra', 'fable', 'opus'])
@@ -81,7 +81,7 @@ export const AUTHORING_FRAMINGS = Object.freeze([
 /** The two outcomes a completed examination may record. */
 export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
 
-/** A pre-dispatch receipt written by author-astra for a round governed by this mechanism. */
+/** A pre-dispatch receipt written by author-delegate for a round governed by this mechanism. */
 export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
 
 const isUnsuccessfulReview = (record, wanted) => {
@@ -109,7 +109,7 @@ export function specExaminerFor(history = {}, fallbackAuthor = '') {
   if (/\b(?:astra|sol)\b/i.test(author)) {
     return { vendor: 'claude', model: OPUS_MODEL, route: 'claude-read', author }
   }
-  return { vendor: 'astra', model: ASTRA_MODEL, route: 'ask-astra', author }
+  return { vendor: 'astra', model: ASTRA_MODEL, route: 'ask-lane', author }
 }
 
 /**
@@ -338,7 +338,7 @@ export const HARD_MARKERS = Object.freeze([
  * Author lane: — and 97 of those 99 still name a marker in the point's OWN
  * prose. The obvious narrowing would move TWO points, so it was decided against
  * rather than forgotten, and the tag handles those two. Numbers, the rest of the
- * reasoning and the reopening condition: docs/astra-routing.md, "Routed and not
+ * reasoning and the reopening condition: docs/lane-routing.md, "Routed and not
  * commissioned".
  */
 export const VERIFICATION_MARKERS = Object.freeze([

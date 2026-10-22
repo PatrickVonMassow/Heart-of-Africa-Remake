@@ -2,10 +2,10 @@
 // the result-JSON parsing and the merger roster that decision is read against.
 //
 // This module is deliberately pure. The state file belongs to the main checkout and
-// scripts/fable-switch.mjs owns its I/O; every policy consumer receives the decoded
+// scripts/lane-switch.mjs owns its I/O; every policy consumer receives the decoded
 // state and derives its answer here instead of carrying a second switch.
 
-const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
+const SWITCH_COMMAND = 'node scripts/lane-switch.mjs'
 const STATE_FILE_NAME = 'fable-switch.json'
 export const FABLE_MODEL = 'Fable 5.1'
 // The OpenAI lane, stated ONCE here beside the other model identities and imported
@@ -123,11 +123,11 @@ export function writeState(state, { why = '', by = '', now = Date.now() } = {}) 
   const reason = String(why ?? '').trim()
   const setBy = String(by ?? '').trim()
   const changedAt = Number(now)
-  if (direction !== 'on' && direction !== 'off') throw new Error(`fable-switch: state must be on or off`)
-  if (!reason || /[\r\n]/.test(reason)) throw new Error('fable-switch: --why needs one non-empty line')
-  if (!setBy || /[\r\n]/.test(setBy)) throw new Error('fable-switch: the setter identity is unavailable')
+  if (direction !== 'on' && direction !== 'off') throw new Error(`lane-switch: state must be on or off`)
+  if (!reason || /[\r\n]/.test(reason)) throw new Error('lane-switch: --why needs one non-empty line')
+  if (!setBy || /[\r\n]/.test(setBy)) throw new Error('lane-switch: the setter identity is unavailable')
   if (!Number.isFinite(changedAt) || changedAt <= 0 || changedAt > MAX_TIMESTAMP) {
-    throw new Error('fable-switch: the change timestamp is invalid')
+    throw new Error('lane-switch: the change timestamp is invalid')
   }
   return { state: direction, reason, setBy, changedAt }
 }
@@ -318,7 +318,7 @@ export function isSwitchFallbackReason(reason) {
 export function statusReport(value) {
   const state = requireState(value)
   return (
-    `fable-switch: ${state.state.toUpperCase()} — reason: ${state.reason} — ` +
+    `lane-switch: ${state.state.toUpperCase()} — reason: ${state.reason} — ` +
     `set by ${state.setBy} at ${new Date(state.changedAt).toISOString()}`
   )
 }

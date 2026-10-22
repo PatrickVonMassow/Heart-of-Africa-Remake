@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const CLI = join(dirname(fileURLToPath(import.meta.url)), 'astra-share.mjs')
+const CLI = join(dirname(fileURLToPath(import.meta.url)), 'lane-routing.mjs')
 let dir = ''
 let file = ''
 
@@ -24,16 +24,16 @@ const run = (...args) => {
 const state = () => JSON.parse(readFileSync(file, 'utf8'))
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'hoa-astra-share-'))
+  dir = mkdtempSync(join(tmpdir(), 'hoa-lane-routing-'))
   file = join(dir, 'nested', 'astra-share.json')
 })
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-describe('astra-share.mjs', () => {
+describe('lane-routing.mjs', () => {
   it('reports the default before anything has ever been set, and writes no file to do it', () => {
     const r = run('--status')
     expect(r.status).toBe(0)
-    expect(r.stdout.split('\n')[0]).toBe('astra-share: default — to GPT-6 Astra: review, enumerate · to Claude: diagnose, audit, explain, author')
+    expect(r.stdout.split('\n')[0]).toBe('lane-routing: default — to GPT-6 Astra: review, enumerate · to Claude: diagnose, audit, explain, author')
     const json = run('--status', '--json')
     expect(json.status).toBe(0)
     expect(JSON.parse(json.stdout).routing.map(({ kind, to }) => ({ kind, to }))).toEqual([
@@ -53,9 +53,9 @@ describe('astra-share.mjs', () => {
   it('steps towards Astra, persists it, and says so in the SAME invocation', () => {
     const r = run('--more')
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/^astra-share: prefer-astra —/)
+    expect(r.stdout).toMatch(/^lane-routing: prefer-astra —/)
     expect(state().setting).toBe('prefer-astra')
-    expect(run('--status').stdout).toMatch(/^astra-share: prefer-astra — to GPT-6 Astra: review, diagnose/)
+    expect(run('--status').stdout).toMatch(/^lane-routing: prefer-astra — to GPT-6 Astra: review, diagnose/)
   })
 
   it('refuses to wrap past the end, leaving the setting where it was', () => {
@@ -66,15 +66,15 @@ describe('astra-share.mjs', () => {
   })
 
   it('steps back down again, two steps to the escape hatch, printing what it saved', () => {
-    expect(run('--less').stdout).toMatch(/^astra-share: default —/)
+    expect(run('--less').stdout).toMatch(/^lane-routing: default —/)
     expect(state().setting).toBe('default')
-    expect(run('--less').stdout).toMatch(/^astra-share: claude-only —/)
+    expect(run('--less').stdout).toMatch(/^lane-routing: claude-only —/)
     expect(state().setting).toBe('claude-only')
     expect(run('--status').out).toMatch(/to GPT-6 Astra: nothing/)
   })
 
   it('sets a named setting and answers --json machine-readably', () => {
-    expect(run('--set', 'prefer-astra').stdout).toMatch(/^astra-share: prefer-astra —/)
+    expect(run('--set', 'prefer-astra').stdout).toMatch(/^lane-routing: prefer-astra —/)
     const json = JSON.parse(run('--status', '--json').stdout)
     expect(json.setting).toBe('prefer-astra')
     expect(json.routing.find((r) => r.kind === 'diagnose').to).toBe('astra')
@@ -95,7 +95,7 @@ describe('astra-share.mjs', () => {
     writeFileSync(file, '{ this is not json')
     const r = run('--status')
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/^astra-share: claude-only —/)
+    expect(r.stdout).toMatch(/^lane-routing: claude-only —/)
     expect(r.stdout).toMatch(/to GPT-6 Astra: nothing/)
     expect(r.out).toMatch(/NOTE: .*not JSON/)
   })
@@ -108,7 +108,7 @@ describe('astra-share.mjs', () => {
     mkdirSync(file, { recursive: true })
     const r = run('--status')
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/^astra-share: claude-only —/)
+    expect(r.stdout).toMatch(/^lane-routing: claude-only —/)
     expect(r.stdout).toMatch(/NOTE: .*could not be read/)
     rmSync(file, { recursive: true, force: true })
   })
@@ -141,10 +141,10 @@ describe('the delegation brief carries the switch', () => {
 // could have stopped saying that a routed setting was not the operator's choice.
 describe('settingProblemLine', () => {
   it('names the problem and the repair, and says nothing when there is none', async () => {
-    const { settingProblemLine } = await import('./astra-share.mjs')
-    const line = settingProblemLine({ setting: 'claude-only', problem: 'the state file is not JSON', corrupt: true }, 'review-astra')
-    expect(line).toMatch(/^review-astra: the share setting is UNUSABLE — the state file is not JSON/)
-    expect(line).toMatch(/astra-share\.mjs --set/)
+    const { settingProblemLine } = await import('./lane-routing.mjs')
+    const line = settingProblemLine({ setting: 'claude-only', problem: 'the state file is not JSON', corrupt: true }, 'cross-review')
+    expect(line).toMatch(/^cross-review: the share setting is UNUSABLE — the state file is not JSON/)
+    expect(line).toMatch(/lane-routing\.mjs --set/)
     expect(settingProblemLine({ setting: 'default', problem: '' })).toBe('')
     expect(settingProblemLine(null)).toBe('')
   })
@@ -156,7 +156,7 @@ describe('settingProblemLine', () => {
     writeFileSync(file, JSON.stringify({ setting: 'prefer-astra', changedAt: now, changedBy: 'test', fallback }))
     const r = run('--status')
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/^astra-share: prefer-astra \(outage FALLBACK until .+\) — to GPT-6 Astra: nothing/)
+    expect(r.stdout).toMatch(/^lane-routing: prefer-astra \(outage FALLBACK until .+\) — to GPT-6 Astra: nothing/)
     expect(r.stdout).toMatch(/FALLBACK ACTIVE — GPT-6 Astra unreachable/)
     expect(r.stdout).toMatch(/author {5}→ Claude/)
     expect(run('--set', 'default').status).toBe(0)

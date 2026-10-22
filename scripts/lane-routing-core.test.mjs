@@ -9,7 +9,7 @@
 //     the switch does another;
 //   - a consumer keeping its own copy of the table instead of asking this core.
 import { describe, it, expect } from 'vitest'
-import { KINDS as ASK_KINDS } from './ask-astra-core.mjs'
+import { KINDS as ASK_KINDS } from './ask-lane-core.mjs'
 import {
   DEFAULT_SETTING,
   KINDS,
@@ -35,7 +35,7 @@ import {
   statusLine,
   step,
   writeState,
-} from './astra-share-core.mjs'
+} from './lane-routing-core.mjs'
 
 describe('the settings themselves', () => {
   it('are ordered from the least Astra to the most, with the default in the middle', () => {
@@ -46,7 +46,7 @@ describe('the settings themselves', () => {
   })
 
   it('carry every kind that can actually be routed, and no kind nothing can', () => {
-    // `author` joined the table when scripts/author-astra.mjs made it routable
+    // `author` joined the table when scripts/author-delegate.mjs made it routable
     // (point 667) — the switch's biggest lever, and the reason it exists.
     expect(KINDS).toEqual(['review', ...ASK_KINDS, 'author'])
     for (const kind of KINDS) expect(KIND_NOTES[kind]).toBeTruthy()
@@ -186,7 +186,7 @@ describe('what it says', () => {
   it('states in ONE line what goes where', () => {
     const line = statusLine('default')
     expect(line.split('\n')).toHaveLength(1)
-    expect(line).toBe('astra-share: default — to GPT-6 Astra: review, enumerate · to Claude: diagnose, audit, explain, author')
+    expect(line).toBe('lane-routing: default — to GPT-6 Astra: review, enumerate · to Claude: diagnose, audit, explain, author')
     expect(SETTING_NOTES.default).toContain('reviews and enumerate to Astra; diagnose, audit, explain and author to Claude')
     expect(statusLine('claude-only')).toMatch(/to GPT-6 Astra: nothing/)
     expect(statusLine('prefer-astra')).toMatch(/to Claude: nothing/)
@@ -205,11 +205,11 @@ describe('what it says', () => {
   })
 
   it('tells a delegated agent what to hand over, at every setting', () => {
-    expect(briefLine('prefer-astra')).toMatch(/ask-astra\.mjs/)
+    expect(briefLine('prefer-astra')).toMatch(/ask-lane\.mjs/)
     expect(briefLine('prefer-astra')).toMatch(/diagnose/)
     expect(briefLine('claude-only')).toMatch(/do NOT call/)
     expect(briefLine('default')).toMatch(/reviews and enumerate go to GPT-6 Astra/)
-    expect(briefLine('default')).toContain('ask-astra.mjs --kind enumerate')
+    expect(briefLine('default')).toContain('ask-lane.mjs --kind enumerate')
     expect(briefLine('default')).toContain('Diagnose, audit, explain and author stay with Claude')
     expect(briefLine('default')).toContain('a blind audit half uses `--anyway`')
     for (const s of SETTINGS) expect(briefLine(s)).toBeTruthy()
@@ -290,7 +290,7 @@ describe('the measured outage fallback (point 1194)', () => {
   })
 
   it('--status, the brief and the board name the active fallback, and keep the operator setting', () => {
-    expect(statusLine(state, now + 1)).toMatch(/^astra-share: prefer-astra \(outage FALLBACK until .+\) — to GPT-6 Astra: nothing/)
+    expect(statusLine(state, now + 1)).toMatch(/^lane-routing: prefer-astra \(outage FALLBACK until .+\) — to GPT-6 Astra: nothing/)
     const line = fallbackLine(state, now + 1)
     expect(line).toMatch(/FALLBACK ACTIVE/)
     expect(line).toMatch(/usage limit/)

@@ -3,9 +3,9 @@ import {
   formatAuthorshipPlan,
   formatContributionPassPlan,
   formatUnavailableReceiptRoute,
-} from './review-astra.mjs'
+} from './cross-review.mjs'
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
-import { OPUS_MODEL } from './fable-switch-core.mjs'
+import { OPUS_MODEL } from './lane-switch-core.mjs'
 
 const sha = 'a'.repeat(40)
 const base = 'b'.repeat(40)
@@ -34,7 +34,7 @@ describe('printed review pass commands', () => {
     }, { sha })
 
     expect(text).toContain(
-      `node scripts/review-astra.mjs --sha ${sha} --since ${base} ` +
+      `node scripts/cross-review.mjs --sha ${sha} --since ${base} ` +
         '--reviewer opus --brief "<what to judge>" --pass 1',
     )
   })
@@ -53,7 +53,7 @@ describe('printed review pass commands', () => {
     })
 
     expect(text).toContain(
-      `node scripts/review-astra.mjs --sha ${sha} --since ${base} ` +
+      `node scripts/cross-review.mjs --sha ${sha} --since ${base} ` +
         '--reviewer opus --brief "<what to judge>"',
     )
   })
@@ -134,7 +134,7 @@ describe('printed review pass commands', () => {
 
     expect(text).toContain('UNREVIEWABLE: scripts/no-independent-reviewer.mjs')
     expect(text).not.toMatch(/pass \d+\/\d+/)
-    expect(text).not.toContain('node scripts/review-astra.mjs --sha')
+    expect(text).not.toContain('node scripts/cross-review.mjs --sha')
     expect(text).toContain(`--record-unavailable ${sha} --point 1008`)
     expect(text).toContain('--files "scripts/no-independent-reviewer.mjs"')
   })

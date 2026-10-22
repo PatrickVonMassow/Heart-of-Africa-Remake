@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { OPUS_MODEL, writeState } from './fable-switch-core.mjs'
+import { OPUS_MODEL, writeState } from './lane-switch-core.mjs'
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), 'blind-merge.mjs')
 
@@ -292,7 +292,7 @@ describe('the command', () => {
     )
     expect(countedOff.status).toBe(0)
     expect(countedOff.out).toContain('WEAKER TWO-MODEL fallback')
-    expect(countedOff.out).toContain('node scripts/fable-switch.mjs --status')
+    expect(countedOff.out).toContain('node scripts/lane-switch.mjs --status')
     expect(countedOff.out).toContain('--merged-by "GPT-6 Astra"')
   })
 

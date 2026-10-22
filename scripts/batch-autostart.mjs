@@ -100,7 +100,7 @@ import {
   RUNAWAY_FAIL_LIMIT,
   runawayRecoveryDecision,
 } from './batch-autostart-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentFableState } from './lane-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'

@@ -33,7 +33,7 @@ import {
   isSwitchFallbackReason,
   mergeFallbackReason,
   mergerModel,
-} from './fable-switch-core.mjs'
+} from './lane-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
@@ -473,7 +473,7 @@ const commitAuthors = (commit = {}) => {
  * Files on a refusing contribution which a later contribution by the refusing
  * vendor demonstrably fixed and had read by the other vendor.
  *
- * This belongs at refusal evaluation, not in `review-astra`'s authorship cut.
+ * This belongs at refusal evaluation, not in `cross-review`'s authorship cut.
  * Changing the planner per contribution could OFFER an Astra pass for the old
  * Claude contribution, but it could not make the gate accept the Claude review
  * of Astra's answering commit; the command and the decision would still disagree.
@@ -850,7 +850,7 @@ export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', au
   if (declared && !sameModel(declared, expected)) {
     errors.push(
       `--merged-by "${declared}" is not the one this stage owes: ${expected} owns this merge ` +
-        '(node scripts/fable-switch.mjs --status)',
+        '(node scripts/lane-switch.mjs --status)',
     )
   }
   const conflict = (authors ?? []).filter(Boolean).some((author) => sameModel(expected, author))
@@ -1343,7 +1343,7 @@ export function validateMode({ mode, framing } = {}) {
  * limit, and the recorder does not know the range. A record's range is fixed by
  * the GATE's baseline, not by anything the record carries, so "does this range
  * fit one round" is not a question this function can even ask — while the
- * offering side, which does know, already refuses (review-astra.mjs). What IS
+ * offering side, which does know, already refuses (cross-review.mjs). What IS
  * checkable travels with the pass: the files it read, which the gate holds
  * against the commit it would clear. The check the recorder cannot make lives
  * where the range IS known (escalation round of the same review): the GATE
@@ -2450,7 +2450,7 @@ export function formatMechanismReviewVerdict(
     )
   }
   if (String(contributionPlanText ?? '').trim()) {
-    lines.push('', 'RUNNABLE CONTRIBUTION PLAN (the same planner review-astra executes):', contributionPlanText.trim())
+    lines.push('', 'RUNNABLE CONTRIBUTION PLAN (the same planner cross-review executes):', contributionPlanText.trim())
   }
   return lines.join('\n')
 }

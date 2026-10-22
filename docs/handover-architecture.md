@@ -157,7 +157,7 @@ A bounded ready queue and completed-review backlog limit preserve parallelism wi
 The implementation lives in:
 
 - `CLAUDE.md`: lifecycle rules, role split, boundary prohibition, rejected alternatives and fallback.
-- `scripts/author-astra.mjs`: first conforming worker adapter.
+- `scripts/author-delegate.mjs`: first conforming worker adapter.
 - `scripts/detached-agent.mjs`: common worker contract and adapter interface.
 - `scripts/batch-daemon.mjs`: new daemon entry point, global cap, leases, fencing and process ownership.
 - `scripts/batch-dispatch.mjs`: authorized queue, dependencies and backlog control.
@@ -228,9 +228,9 @@ survives a crash.
 
    Implement append-only journal writes, checksum validation, atomic snapshot replacement, replay and corruption quarantine. Require write–flush–rename durability for a committed snapshot or receipt. Verify normal replay, truncated final record, checksum mismatch and interrupted snapshot replacement with `npx vitest run scripts/batch-state-core.test.mjs scripts/batch-state.test.mjs scripts/batch-state-durability.test.mjs` (the union's `scripts/__tests__/batch-state.test.mjs`, translated).
 
-3. Implement the daemon and the authoring adapter (`author-astra.mjs`; the union's `author-sol.mjs` under its earlier name).
+3. Implement the daemon and the authoring adapter (`author-delegate.mjs`; the union's `author-sol.mjs` under its earlier name).
 
-   Add `scripts/batch-daemon.mjs`; move transferable process parentage, leases, stable identities, logs and heartbeats under it. Adapt `scripts/author-astra.mjs` without changing its proven authoring behavior. Commands must include `node scripts/batch-daemon.mjs start`, `status`, `stop` and `drill`. Verify worker survival after launcher-client exit, global-cap enforcement, daemon restart and the readiness rule of mechanism 1 — `start` reports ready only on a record whose launch nonce equals the one it generated, whose pid and pid start time probe live and whose state reads `running`, and a record left at `starting` must time the start out rather than satisfy it — with `npx vitest run scripts/detached-agent.test.mjs scripts/batch-daemon-core.test.mjs scripts/batch-daemon.test.mjs` (the union's `scripts/__tests__/…`, translated).
+   Add `scripts/batch-daemon.mjs`; move transferable process parentage, leases, stable identities, logs and heartbeats under it. Adapt `scripts/author-delegate.mjs` without changing its proven authoring behavior. Commands must include `node scripts/batch-daemon.mjs start`, `status`, `stop` and `drill`. Verify worker survival after launcher-client exit, global-cap enforcement, daemon restart and the readiness rule of mechanism 1 — `start` reports ready only on a record whose launch nonce equals the one it generated, whose pid and pid start time probe live and whose state reads `running`, and a record left at `starting` must time the start out rather than satisfy it — with `npx vitest run scripts/detached-agent.test.mjs scripts/batch-daemon-core.test.mjs scripts/batch-daemon.test.mjs` (the union's `scripts/__tests__/…`, translated).
 
 4. Implement transferable declarations and fencing.
 
@@ -266,7 +266,7 @@ survives a crash.
 
 12. Run staged failure trials.
 
-    First enable only `author-astra.mjs`. Run normal handover plus worker crash, stall, push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse, duplicate coordinator, remote outage and checkpoint-timeout drills through `node scripts/batch-daemon.mjs drill --scenario <name>`. Run the complete regression layers with `npm run test:unit` and the LARGE browser gate `npm test` (CLAUDE.md §5); there is no Playwright test runner here. Enable another adapter only after all drills pass.
+    First enable only `author-delegate.mjs`. Run normal handover plus worker crash, stall, push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse, duplicate coordinator, remote outage and checkpoint-timeout drills through `node scripts/batch-daemon.mjs drill --scenario <name>`. Run the complete regression layers with `npm run test:unit` and the LARGE browser gate `npm test` (CLAUDE.md §5); there is no Playwright test runner here. Enable another adapter only after all drills pass.
 
 13. Measure a representative trial before changing the default.
 
@@ -295,7 +295,7 @@ measurement is named.
 #### 1. How the daemon escapes the session that starts it
 
 This is the defect that killed the run of 21.08.2026, so it is stated against the code that failed
-and against a drill that reproduces it. `scripts/author-astra.mjs` spawns `codex` like this:
+and against a drill that reproduces it. `scripts/author-delegate.mjs` spawns `codex` like this:
 
 ```js
 const child = spawn('codex', args, {
@@ -729,7 +729,7 @@ actually holds is narrow:
   than a residual: two writers of the same local state, one of them uninstrumented.
 
   **A previous draft said a legacy operation "runs inside a session process, so it cannot outlive
-  one", and mechanism 1 of this very document refutes that.** `scripts/author-astra.mjs` spawns a
+  one", and mechanism 1 of this very document refutes that.** `scripts/author-delegate.mjs` spawns a
   DETACHED child; whether it survives its parent depends on its stdio, which is the entire subject
   above. Probing former session pids therefore proves nothing about their detached children. So
   the precondition probes the work, not only the workers:

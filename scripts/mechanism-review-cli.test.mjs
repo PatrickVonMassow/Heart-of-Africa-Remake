@@ -37,10 +37,10 @@ import {
   OPUS_MODEL,
   readState as readFableState,
   writeState as writeFableState,
-} from './fable-switch-core.mjs'
+} from './lane-switch-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
-const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs', 'git-tracked.mjs']
+const FABLE_FILES = ['lane-switch.mjs', 'lane-switch-core.mjs', 'atomic-write.mjs', 'git-tracked.mjs']
 const installFableSwitch = (repo, state = 'on') => {
   for (const file of FABLE_FILES) copyFileSync(resolve(process.cwd(), 'scripts', file), join(repo, 'scripts', file))
   mkdirSync(join(repo, '.claude'), { recursive: true })
@@ -917,7 +917,7 @@ describe('the mode round-trips into the ledger', () => {
       // The whole switch-generated sentence, not merely the status command: the
       // false "two models existed" wording would still have contained it
       // (re-review round 3).
-      expect(row.mergeFallback).toMatch(/^Fable 5.1 is switched off by the recorded Fable switch \(node scripts\/fable-switch\.mjs --status\): /)
+      expect(row.mergeFallback).toMatch(/^Fable 5.1 is switched off by the recorded Fable switch \(node scripts\/lane-switch\.mjs --status\): /)
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
       // The row says which blobs it read, so a later reader re-derives the proof.
       expect(row.halfAuthors).toEqual([OPUS_MODEL, 'GPT-6 Astra'])

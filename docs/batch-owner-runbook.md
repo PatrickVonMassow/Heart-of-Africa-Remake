@@ -130,7 +130,7 @@ The first historical run and the reproducible 21 August/four-day fixtures are in
 hard, complex, error-prone, and high-criticality points; Opus 5.5 authors work
 whose verification is itself the task. Fable 5.1 authors tagged points and automatic
 review-round escalations through `scripts/author-fable.mjs`, as `CLAUDE.md` §6 states. Review is cross-vendor through
-`scripts/review-astra.mjs` for Claude-authored work and Claude for Astra-authored
+`scripts/cross-review.mjs` for Claude-authored work and Claude for Astra-authored
 work. Serving fallback order is Opus 5.5, Fable 5.1, then Opus 4.8; a different
 serving model pauses the batch.
 

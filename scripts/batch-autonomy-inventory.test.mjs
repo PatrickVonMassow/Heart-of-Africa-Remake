@@ -84,10 +84,10 @@ const HUMAN_WAIT_FILES = [
   'scripts/board-queue-core.mjs',
   'scripts/board-queue.mjs',
   'scripts/child-retry.mjs',
+  'scripts/cross-review-core.mjs',
   'scripts/dashboard-guard-core.mjs',
   'scripts/defer-for-user.mjs',
   'scripts/permission-autogrant-core.mjs',
-  'scripts/review-astra-core.mjs',
   'scripts/user-gate-core.mjs',
   'scripts/vdzk-admissibility-core.mjs',
 ]

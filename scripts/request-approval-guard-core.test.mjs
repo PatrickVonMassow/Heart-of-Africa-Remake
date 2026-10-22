@@ -835,7 +835,7 @@ describe('pure read pipelines pass the pre-gate (21.10.2026 Stop-loop blockade)'
     STAMP,
     // measured 21.10.2026: a quoted ?, ;, | or * in a canonical command is literal
     'node scripts/board.mjs vdzk-keep "Kartenschrift für die Anweisungstexte?"',
-    'node scripts/ask-astra.mjs --kind enumerate --brief "read problem.md; answer | why?"',
+    'node scripts/ask-lane.mjs --kind enumerate --brief "read problem.md; answer | why?"',
     'git diff --stat main | tail -1',
     'sort -u f | uniq -c',
   ])('allowed: %s', (command) => allowed(command))

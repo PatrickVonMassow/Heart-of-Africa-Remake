@@ -23,7 +23,7 @@ import {
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL, readState, writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL, readState, writeState } from './lane-switch-core.mjs'
 
 const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
 const OFF = fable('off')
@@ -126,7 +126,7 @@ describe('authorLaneFor — which lane authors a point', () => {
     for (const reworkRounds of [FABLE_ESCALATION_ROUNDS, FABLE_ESCALATION_ROUNDS + 7]) {
       const why = decision({ body: 'x', reworkRounds }).why
       expect(why[0]).toBe('mechanical or mid-difficulty, and nothing marks it otherwise')
-      expect(why[1]).toContain('node scripts/fable-switch.mjs --status')
+      expect(why[1]).toContain('node scripts/lane-switch.mjs --status')
       expect(why[1]).toContain('test decision')
     }
     // Below the threshold nothing is said about it at all.
@@ -459,7 +459,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     expect(specExaminerFor({ rounds: [{ authoredBy: `${CLAUDE_MODEL} <noreply@anthropic.com>` }] })).toMatchObject({
       vendor: 'astra',
       model: 'GPT-6 Astra',
-      route: 'ask-astra',
+      route: 'ask-lane',
     })
   })
 

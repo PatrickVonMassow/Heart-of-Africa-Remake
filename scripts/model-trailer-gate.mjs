@@ -20,7 +20,7 @@
 // and refuses the commit.
 import { readFileSync } from 'node:fs'
 import { evaluateCommitTrailers, formatCommitTrailerVerdict } from './model-guard-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentFableState } from './lane-switch.mjs'
 import { isMainModule } from './is-main.mjs'
 
 if (isMainModule(import.meta.url)) {

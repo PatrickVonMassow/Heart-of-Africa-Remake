@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { CLAUDE_MODEL, writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, writeState } from './lane-switch-core.mjs'
 
 const GATE = resolve(process.cwd(), 'scripts/model-trailer-gate.mjs')
 const HOOK = resolve(process.cwd(), 'scripts/git-hooks/commit-msg')
@@ -124,8 +124,8 @@ describe('a real commit through the commit-msg hook', () => {
     'commit-scope-guard-core.mjs',
     'model-trailer-gate.mjs',
     'model-guard-core.mjs',
-    'fable-switch.mjs',
-    'fable-switch-core.mjs',
+    'lane-switch.mjs',
+    'lane-switch-core.mjs',
     'atomic-write.mjs',
     'repo-paths.mjs',
     'is-main.mjs',

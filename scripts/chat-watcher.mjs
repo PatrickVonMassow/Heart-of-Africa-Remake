@@ -57,7 +57,7 @@ import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 import { openPointStatus, ARCHIVE_PATH, TASKS_PATH } from './tasks-source.mjs'
 import { buildSpawnArgs, buildSpawnOptions, resolveClaudeCli, cliSearchSummary } from './batch-autostart-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentFableState } from './lane-switch.mjs'
 import {
   CLAIM_SESSION_PREFIX,
   DEFERRAL_MS,

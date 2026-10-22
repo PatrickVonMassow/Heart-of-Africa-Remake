@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { writeState } from './fable-switch-core.mjs'
+import { writeState } from './lane-switch-core.mjs'
 
 const root = resolve(process.cwd())
-const astraScript = resolve(root, 'scripts', 'author-astra.mjs')
+const astraScript = resolve(root, 'scripts', 'author-delegate.mjs')
 const fableScript = resolve(root, 'scripts', 'author-fable.mjs')
 const dirs = []
 
@@ -46,7 +46,7 @@ describe('Fable authoring CLI', () => {
     const result = run(fableScript, ['--help'])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain('usage: node scripts/author-fable.mjs --point <N>')
-    expect(result.stdout).not.toContain('scripts/author-astra.mjs')
+    expect(result.stdout).not.toContain('scripts/author-delegate.mjs')
   })
 
   it('names the serving command in the shared routing report', () => {

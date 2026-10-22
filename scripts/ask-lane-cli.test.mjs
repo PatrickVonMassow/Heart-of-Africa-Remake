@@ -9,10 +9,10 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { OPUS_MODEL_ID } from './fable-switch-core.mjs'
+import { OPUS_MODEL_ID } from './lane-switch-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const CLI = join(HERE, 'ask-astra.mjs')
+const CLI = join(HERE, 'ask-lane.mjs')
 
 /** A `codex` that answers however the case's env asks it to. */
 const STUB = `#!/usr/bin/env node
@@ -104,7 +104,7 @@ const calls = () => readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\
 const clearCalls = () => writeFileSync(join(dir, 'calls.log'), '')
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'hoa-ask-astra-'))
+  dir = mkdtempSync(join(tmpdir(), 'hoa-ask-lane-'))
   stubDir = join(dir, 'bin')
   stateDir = join(dir, 'state')
   mkdirSync(stubDir, { recursive: true })
@@ -118,7 +118,7 @@ beforeAll(() => {
   fableFile = join(dir, 'fable-switch.json')
   writeFileSync(fableFile, JSON.stringify({
     state: 'on', reason: 'fixture: the Fable lane is open for this suite',
-    setBy: 'ask-astra-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
+    setBy: 'ask-lane-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
   }))
   materialFile = join(dir, 'suite.log')
   writeFileSync(materialFile, 'FAIL place: the frame shows the port, not the village\n')
@@ -141,7 +141,7 @@ describe('what it refuses before spending anything', () => {
     const r = run(['--kind', kind, '--brief', 'inspect this material', '--file', materialFile])
     expect(r.status).toBe(3)
     expect(r.stderr).toMatch(/share switch is at `default`/)
-    expect(r.stderr).toMatch(/astra-share\.mjs --more/)
+    expect(r.stderr).toMatch(/lane-routing\.mjs --more/)
     expect(calls()).toEqual([])
   })
 
@@ -183,7 +183,7 @@ describe('what it refuses before spending anything', () => {
     clearCalls()
     // Even with NO probe receipt: a request with nothing to send must cost no codex call
     // at all, and the probe is a codex call (cross-vendor review, 12.08.2026).
-    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     const r = run(['--kind', 'explain', '--brief', 'what does it do?'])
     expect(r.status).toBe(2)
     expect(r.stderr).toMatch(/no material at all/)
@@ -195,7 +195,7 @@ describe('what it refuses before spending anything', () => {
   it('refuses a request whose material is ENTIRELY placeholders, naming what failed', () => {
     setting('prefer-astra')
     clearCalls()
-    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', join(dir, 'does-not-exist.log')])
     expect(r.status).toBe(2)
     expect(r.stderr).toMatch(/material MISSING/)
@@ -209,7 +209,7 @@ describe('what it refuses before spending anything', () => {
   it('refuses a request whose only material is a readable but EMPTY file', () => {
     setting('prefer-astra')
     clearCalls()
-    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     const empty = join(dir, 'empty.log')
     writeFileSync(empty, '   \n')
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', empty])
@@ -265,7 +265,7 @@ describe('an ask that runs', () => {
     setting('prefer-astra')
     clearCalls()
     // With no receipt the id must be PROVEN before a word is attributed to Astra.
-    rmSync(join(stateDir, 'review-astra-probe.json'), { force: true })
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
     const r = run(['--kind', 'diagnose', '--brief', 'why did the place suite go red?', '--file', materialFile], { INPUT: 'piped material too\n' })
     expect(r.status, r.stderr).toBe(0)
     // The unknown id is asked FIRST (the probe), then the real one: that refusal is the

@@ -28,7 +28,7 @@ import {
   splitTrailerField,
 } from './model-guard-core.mjs'
 import { RECENT_LOG_FORMAT } from './model-guard.mjs'
-import { CLAUDE_MODEL, readState, writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, readState, writeState } from './lane-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 const SWITCH_AT = Date.parse('2026-08-20T17:34:12.107Z')
@@ -185,7 +185,7 @@ describe('the serving allowlist follows the Fable switch', () => {
     const verdict = evaluateCommitTrailers(message, FABLE_OFF)
     expect(verdict.block).toBe(true)
     const text = formatCommitTrailerVerdict(verdict)
-    expect(text).toContain('node scripts/fable-switch.mjs --status')
+    expect(text).toContain('node scripts/lane-switch.mjs --status')
     expect(text).toContain('test capacity exhausted')
     expect(text).not.toContain('Co-Authored-By: Claude Fable 5.1')
   })
@@ -196,7 +196,7 @@ describe('the serving allowlist follows the Fable switch', () => {
     expect(hits).toHaveLength(1)
     const text = formatForbiddenReason(hits, { fableState: FABLE_OFF })
     expect(text).toContain('Fable 5.1 may author only while its recorded policy is ON')
-    expect(text).toContain('node scripts/fable-switch.mjs --status')
+    expect(text).toContain('node scripts/lane-switch.mjs --status')
   })
 })
 

@@ -573,7 +573,7 @@ export function unquoteGitPath(value) {
   // pipeline (git → files → Map keys → git show), which this string-based
   // pipeline cannot do. So every consumer REFUSES a path that decodes with
   // U+FFFD in it (undecodablePaths below; parsePassFiles here and gatherRange in
-  // review-astra.mjs ask) —
+  // cross-review.mjs ask) —
   // erring to refusing a record, never to granting one. The cost knowingly
   // paid: a file genuinely NAMED with U+FFFD is refused alongside, because the
   // two are indistinguishable after the decode.
@@ -711,7 +711,7 @@ export function parseDiffHeader(line, lookahead = []) {
  *
  * Pure, and the reason no extra git call is needed to cost a file: a per-file
  * patch size is already in the patch. The `b/` side is taken as the path, as
- * review-astra-core.mjs's `newFilePathsIn` does; a rename's section is also
+ * cross-review-core.mjs's `newFilePathsIn` does; a rename's section is also
  * emitted under its source, flagged as an alias (see below).
  */
 export function splitPatchByFile(patch) {

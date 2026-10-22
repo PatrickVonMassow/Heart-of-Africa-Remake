@@ -28,7 +28,7 @@ import {
   validateList,
   validateMerger,
 } from './blind-merge-core.mjs'
-import { mergeFallbackReason, readState, writeState } from './fable-switch-core.mjs'
+import { mergeFallbackReason, readState, writeState } from './lane-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 

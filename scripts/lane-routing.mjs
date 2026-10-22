@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667).
 //
-//   node scripts/astra-share.mjs --status     # what goes where right now
-//   node scripts/astra-share.mjs --more       # one step towards Astra
-//   node scripts/astra-share.mjs --less       # one step back towards Claude
-//   node scripts/astra-share.mjs --set prefer-astra|default|claude-only
-//   node scripts/astra-share.mjs --json       # the same, machine-readable
+//   node scripts/lane-routing.mjs --status     # what goes where right now
+//   node scripts/lane-routing.mjs --more       # one step towards Astra
+//   node scripts/lane-routing.mjs --less       # one step back towards Claude
+//   node scripts/lane-routing.mjs --set prefer-astra|default|claude-only
+//   node scripts/lane-routing.mjs --json       # the same, machine-readable
 //
 // WHY IT EXISTS (user 11.08.2026): two vendors, two allowances that run out at different
 // times. Rather than wait until the Anthropic volume is nearly spent, the user wants to
@@ -19,9 +19,9 @@
 // picture and lands. What no setting routes is in NEVER_ROUTED below.
 //
 // The setting lives in the MAIN checkout's `.claude/astra-share.json` (git-ignored, this
-// machine's state), and every consumer — `scripts/ask-astra.mjs`, `scripts/review-astra.mjs`,
+// machine's state), and every consumer — `scripts/ask-lane.mjs`, `scripts/cross-review.mjs`,
 // the delegation brief and the board footer — READS it rather than keeping its own copy.
-// The decisions are pure and Vitest-covered in scripts/astra-share-core.mjs.
+// The decisions are pure and Vitest-covered in scripts/lane-routing-core.mjs.
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, sep as sep_ } from 'node:path'
@@ -44,7 +44,7 @@ import {
   statusLine,
   step,
   writeState,
-} from './astra-share-core.mjs'
+} from './lane-routing-core.mjs'
 
 /**
  * The state file, resolved to the MAIN checkout even from a delegated agent's worktree.
@@ -86,12 +86,12 @@ export function currentSetting(file = SETTING_FILE) {
  * The line a consumer prints when the state file is broken, or ''.
  *
  * It exists because a fallback nobody is told about is a setting nobody chose (cross-
- * vendor review, 12.08.2026): every consumer that reads the setting (review-astra,
- * ask-astra, author-astra, board-publish, point-brief) must also say when it is not the
+ * vendor review, 12.08.2026): every consumer that reads the setting (cross-review,
+ * ask-lane, author-delegate, board-publish, point-brief) must also say when it is not the
  * operator's.
  */
-export function settingProblemLine(state, who = 'astra-share') {
-  return state?.problem ? `${who}: the share setting is UNUSABLE — ${state.problem}. Repair it: node scripts/astra-share.mjs --set <setting>` : ''
+export function settingProblemLine(state, who = 'lane-routing') {
+  return state?.problem ? `${who}: the share setting is UNUSABLE — ${state.problem}. Repair it: node scripts/lane-routing.mjs --set <setting>` : ''
 }
 
 // An operator change keeps a recorded outage: the fallback is measured, not chosen.
@@ -106,7 +106,7 @@ function save(setting, { by = '', file = SETTING_FILE } = {}) {
  * signature writes or renews the fallback, a success lifts it. Returns afterAstraRun's
  * answer. Never throws — a failed write is printed, and the run's own verdict stands.
  */
-export function recordAstraRun({ outcome, text = '', kind = '', who = 'astra-share', file = SETTING_FILE } = {}) {
+export function recordAstraRun({ outcome, text = '', kind = '', who = 'lane-routing', file = SETTING_FILE } = {}) {
   const state = currentSetting(file)
   const next = afterAstraRun({ outcome, text, kind, previous: state.fallback })
   if (state.corrupt || JSON.stringify(next.fallback) === JSON.stringify(state.fallback ?? null)) return next
@@ -141,7 +141,7 @@ export function statusReport(state) {
 
 export const usage = () =>
   [
-    'usage: node scripts/astra-share.mjs --status | --more | --less | --set <setting> [--json]',
+    'usage: node scripts/lane-routing.mjs --status | --more | --less | --set <setting> [--json]',
     '',
     `settings, from the least Astra to the most: ${SETTINGS.join(' → ')}`,
     ...SETTINGS.map((s) => `  ${s.padEnd(12)} ${SETTING_NOTES[s]}`),
@@ -172,11 +172,11 @@ if (isMainModule(import.meta.url)) {
     if (setIndex >= 0) {
       const wanted = normaliseSetting(argv[setIndex + 1])
       if (!wanted) {
-        console.error(`astra-share: not a setting: ${argv[setIndex + 1] ?? '(none)'}\n`)
+        console.error(`lane-routing: not a setting: ${argv[setIndex + 1] ?? '(none)'}\n`)
         console.error(usage())
         process.exit(2)
       }
-      save(wanted, { by: 'astra-share --set' })
+      save(wanted, { by: 'lane-routing --set' })
       emit(currentSetting(), { changed: true })
       process.exit(0)
     }
@@ -186,18 +186,18 @@ if (isMainModule(import.meta.url)) {
       if (!moved.changed) {
         // AT AN END IT SAYS SO rather than wrapping: a `--more` that quietly became
         // `claude-only` would move the load to the very vendor the user was sparing.
-        console.error(`astra-share: already at \`${moved.from}\` — no setting further ${direction === 'more' ? 'towards Astra' : 'towards Claude'}.`)
+        console.error(`lane-routing: already at \`${moved.from}\` — no setting further ${direction === 'more' ? 'towards Astra' : 'towards Claude'}.`)
         emit(currentSetting(), { changed: false })
         process.exit(0)
       }
-      save(moved.to, { by: `astra-share --${direction}` })
+      save(moved.to, { by: `lane-routing --${direction}` })
       emit(currentSetting(), { changed: true, from: moved.from })
       process.exit(0)
     }
     emit(currentSetting(), { changed: false })
     process.exit(0)
   } catch (e) {
-    console.error(`astra-share failed: ${(e && e.message) || e}`)
+    console.error(`lane-routing failed: ${(e && e.message) || e}`)
     process.exit(1)
   }
 }

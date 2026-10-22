@@ -3,12 +3,12 @@
 // Astra (OpenAI, codex) is the default; `author-fable.mjs` drives the same core
 // with its own trailer, runtime, author model and command name.
 //
-// `scripts/review-astra.mjs` and `scripts/ask-astra.mjs` send Astra work it may only
+// `scripts/cross-review.mjs` and `scripts/ask-lane.mjs` send Astra work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
 // own worktree, committed step by step. Claude then reviews it, runs the suites,
 // judges the picture and lands it — the role swap of CLAUDE.md §6, which keeps
 // two vendors on a point wherever both are reachable and lets neither review
-// itself (the outage fallback in astra-share-core is the named exception).
+// itself (the outage fallback in lane-routing-core is the named exception).
 //
 // TWO THINGS ARE DIFFERENT FROM THE READ-ONLY PATHS, and both are load-bearing:
 //
@@ -33,12 +33,12 @@
 //    run unclean, never make it clean (`judgeAuthoring`).
 //
 // Side-effect free: the spawn, the git work and the push belong to
-// scripts/author-astra.mjs. Pinned by author-astra-core.test.mjs.
+// scripts/author-delegate.mjs. Pinned by author-delegate-core.test.mjs.
 
-import { OPUS_MODEL } from './fable-switch-core.mjs'
+import { OPUS_MODEL } from './lane-switch-core.mjs'
 import { allowedTrailers, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { charStripped, rawFieldValue, stripDecoration, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './review-astra-core.mjs'
+import { charStripped, rawFieldValue, stripDecoration, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './cross-review-core.mjs'
 
 export { ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
 
@@ -629,7 +629,7 @@ export function formatAuthoringReport({
   reviewer = OPUS_MODEL,
   pushed = null,
   framing = '',
-  commandName = 'author-astra',
+  commandName = 'author-delegate',
   authorModel = ASTRA_MODEL_NAME,
   authorDetail = `(effort ${ASTRA_REASONING_EFFORT})`,
   authorTrailer = ASTRA_TRAILER,

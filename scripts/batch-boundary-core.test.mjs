@@ -1013,11 +1013,11 @@ function stopGuardRemedies(root, guard) {
     if (!ts.isImportDeclaration(statement)) continue
     const importedFile = statement.moduleSpecifier.text
     // Most refusal text lives in a `-core`, but the mechanism guard now prints
-    // its repair commands through review-astra's contribution formatter so the
+    // its repair commands through cross-review's contribution formatter so the
     // guard and executable planner cannot drift. Follow that named formatter
-    // too; otherwise this inventory reports that review-astra vanished precisely
+    // too; otherwise this inventory reports that cross-review vanished precisely
     // because the command acquired a single authoritative source.
-    const carriesRemedyText = importedFile.endsWith('-core.mjs') || importedFile === './review-astra.mjs'
+    const carriesRemedyText = importedFile.endsWith('-core.mjs') || importedFile === './cross-review.mjs'
     if (!importedFile.startsWith('./') || !carriesRemedyText) continue
     const bindings = statement.importClause?.namedBindings
     if (!bindings || !ts.isNamedImports(bindings)) continue
@@ -1058,7 +1058,7 @@ describe('every Stop-guard remedy is closing work or explicitly deferred at the 
     for (const [script, reason] of closingAdditions) {
       expect(isClosingSetCommand(`node scripts/${script}.mjs`), reason).toBe(true)
     }
-    for (const script of ['review-astra', 'throttle-probe', 'verify/run-all']) {
+    for (const script of ['cross-review', 'throttle-probe', 'verify/run-all']) {
       expect(isClosingSetCommand(`node scripts/${script}.mjs`), `${script} starts real work`).toBe(false)
     }
   })
@@ -1126,7 +1126,7 @@ describe('every Stop-guard remedy is closing work or explicitly deferred at the 
       deferredRemedies.push(command)
     }
     expect(new Set(deferredRemedies.map((command) => /scripts[\\/]([\w/-]+)\.mjs/.exec(command)?.[1]))).toEqual(
-      new Set(['review-astra', 'throttle-probe', 'verify/run-all']),
+      new Set(['cross-review', 'throttle-probe', 'verify/run-all']),
     )
   })
 

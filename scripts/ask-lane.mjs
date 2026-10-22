@@ -2,14 +2,14 @@
 // ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). `--model` also
 // addresses the Claude-family lanes (fable, opus, opus48), run through runClaudeAsk.
 //
-//   node scripts/ask-astra.mjs --kind diagnose  --brief "why did the place suite go red?" \
+//   node scripts/ask-lane.mjs --kind diagnose  --brief "why did the place suite go red?" \
 //        --log /tmp/place.log --diff main..HEAD
-//   node scripts/ask-astra.mjs --kind audit     --brief "…" --file src/world/river.ts
-//   node scripts/ask-astra.mjs --kind enumerate --brief "…"      # a blind-parallel half
-//   node scripts/ask-astra.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
+//   node scripts/ask-lane.mjs --kind audit     --brief "…" --file src/world/river.ts
+//   node scripts/ask-lane.mjs --kind enumerate --brief "…"      # a blind-parallel half
+//   node scripts/ask-lane.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
 //   … and anything piped on stdin is material too.
 //
-// It is `scripts/review-astra.mjs`'s proven path — `codex exec` at ASTRA_REASONING_EFFORT in a
+// It is `scripts/cross-review.mjs`'s proven path — `codex exec` at ASTRA_REASONING_EFFORT in a
 // READ-ONLY sandbox, the artefact on stdin — generalised past reviews to the four kinds
 // of work that need no write access: DIAGNOSE, AUDIT, ENUMERATE, EXPLAIN. The login
 // handling, the unavailability classification and the model-id freshness probe are
@@ -17,7 +17,7 @@
 //
 // ASTRA AUTHORS NOTHING ON THIS PATH. The answer is text a Claude session acts on, and no
 // commit carries Astra's trailer from here. Astra's AUTHORING lane is a different command
-// (scripts/author-astra.mjs, point 667), where the trailer and the allowlist do apply.
+// (scripts/author-delegate.mjs, point 667), where the trailer and the allowlist do apply.
 //
 // WHEN THE SHARE SWITCH has moved the load away from Astra, or the model did not answer,
 // this says so, names the cause, hands the work back and exits 3, so a script can tell
@@ -27,14 +27,14 @@ import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './review-astra-core.mjs'
-import { ensureModelProven, runCodex } from './review-astra.mjs'
-import { currentSetting, recordAstraRun, settingProblemLine } from './astra-share.mjs'
-import { effectiveRoute, fallbackLine } from './astra-share-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
-import { fableIsOn } from './fable-switch-core.mjs'
+import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './cross-review-core.mjs'
+import { ensureModelProven, runCodex } from './cross-review.mjs'
+import { currentSetting, recordAstraRun, settingProblemLine } from './lane-routing.mjs'
+import { effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
+import { currentFableState } from './lane-switch.mjs'
+import { fableIsOn } from './lane-switch-core.mjs'
 import { authoringClaudeArgs } from './author-fable-core.mjs'
-import { ASK_MODELS, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-astra-core.mjs'
+import { ASK_MODELS, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-lane-core.mjs'
 
 /** One git read that never throws — a missing range is reported, not fatal. */
 function git(args) {
@@ -86,7 +86,7 @@ function gatherSections({ stdin = '', logs = [], diff = '', files = [] } = {}) {
 
 export const usage = () =>
   [
-    'usage: node scripts/ask-astra.mjs [--model astra|fable|opus|opus48] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
+    'usage: node scripts/ask-lane.mjs [--model astra|fable|opus|opus48] --kind <' + KINDS.join('|') + '> --brief "<the question>" \\',
     '           [--file <path>]… [--log <path>]… [--diff <range>] [--timeout <ms>] [--anyway] [--json]',
     '',
     'Material also comes from stdin. Nothing is fetched by the model: this container cannot',
@@ -94,7 +94,7 @@ export const usage = () =>
     `Defaults to ${ASTRA_MODEL_NAME} at reasoning effort ${ASTRA_REASONING_EFFORT}; every target AUTHORS NOTHING —`,
     'the answer is text another session acts on. Astra obeys the share switch; Fable obeys the',
     'Fable switch. A routed refusal exits 3 unless --anyway is allowed for that route.',
-    '  node scripts/astra-share.mjs --status   # what goes where right now',
+    '  node scripts/lane-routing.mjs --status   # what goes where right now',
   ].join('\n')
 
 /** Run a Claude-family ask with no tools and prove the serving model from the
@@ -150,12 +150,12 @@ if (isMainModule(import.meta.url)) {
     const brief = flag('--brief')
     let model = resolveAskModel(flag('--model') || 'astra')
     if (!kind || !brief) {
-      console.error(`ask-astra: --kind (one of ${KINDS.join(', ')}) and --brief are both required.\n`)
+      console.error(`ask-lane: --kind (one of ${KINDS.join(', ')}) and --brief are both required.\n`)
       console.error(usage())
       process.exit(2)
     }
     if (!model) {
-      console.error('ask-astra: --model must be one of astra, fable, opus, opus48.\n')
+      console.error('ask-lane: --model must be one of astra, fable, opus, opus48.\n')
       console.error(usage())
       process.exit(2)
     }
@@ -166,16 +166,16 @@ if (isMainModule(import.meta.url)) {
     const share = currentSetting()
     if (model.key === 'astra') {
       // A fallback nobody is told about is a setting nobody chose (second cross-vendor round).
-      if (share.problem) console.error(settingProblemLine(share, 'ask-astra'))
+      if (share.problem) console.error(settingProblemLine(share, 'ask-lane'))
       const routed = effectiveRoute(kind, share)
       // A MEASURED OUTAGE serves the kind on Opus 5.5 instead of refusing (point 1194).
       if (routed.fallback && !argv.includes('--anyway')) {
-        console.error(`ask-astra: ${fallbackLine(share)} — asking ${ASK_MODELS.opus.name} instead.`)
+        console.error(`ask-lane: ${fallbackLine(share)} — asking ${ASK_MODELS.opus.name} instead.`)
         model = ASK_MODELS.opus
       } else if (routed.to !== 'astra' && !argv.includes('--anyway')) {
         console.error(
-          `ask-astra: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${ASTRA_MODEL_NAME}.\n` +
-            `  Do it in the Claude chain, or: node scripts/astra-share.mjs --more until --status routes ${kind} to Astra   (override once with --anyway)`,
+          `ask-lane: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${ASTRA_MODEL_NAME}.\n` +
+            `  Do it in the Claude chain, or: node scripts/lane-routing.mjs --more until --status routes ${kind} to Astra   (override once with --anyway)`,
         )
         process.exit(3)
       }
@@ -184,7 +184,7 @@ if (isMainModule(import.meta.url)) {
       const fable = currentFableState()
       if (!fable.ok) throw new Error(fable.problem)
       if (!fableIsOn(fable)) {
-        console.error(`ask-astra: ${model.name} is switched off — node scripts/fable-switch.mjs --status`)
+        console.error(`ask-lane: ${model.name} is switched off — node scripts/lane-switch.mjs --status`)
         process.exit(3)
       }
     }
@@ -195,7 +195,7 @@ if (isMainModule(import.meta.url)) {
     const sections = gatherSections({ stdin: readStdin(), logs: flags('--log'), diff: flag('--diff'), files: flags('--file') })
     const { text: material, carried, omitted } = formatAskMaterial({ sections, budget: MATERIAL_BUDGET_CHARS })
     if (!material.trim()) {
-      console.error('ask-astra: no material at all — give it a --file, a --log, a --diff or something on stdin.')
+      console.error('ask-lane: no material at all — give it a --file, a --log, a --diff or something on stdin.')
       process.exit(2)
     }
     // A REQUEST WHOSE MATERIAL IS ALL PLACEHOLDERS IS NOT A REQUEST. An unreadable file
@@ -207,24 +207,24 @@ if (isMainModule(import.meta.url)) {
     // "ok" and carry nothing, so the question is which sections were written with
     // content, not which reads succeeded.
     const failed = sections.filter((s) => !s.ok)
-    for (const s of failed) console.error(`ask-astra: material MISSING — ${s.problem ?? s.title}`)
+    for (const s of failed) console.error(`ask-lane: material MISSING — ${s.problem ?? s.title}`)
     for (const title of omitted) {
-      if (!failed.some((s) => s.title === title)) console.error(`ask-astra: material EMPTY or DROPPED for the budget — ${title}`)
+      if (!failed.some((s) => s.title === title)) console.error(`ask-lane: material EMPTY or DROPPED for the budget — ${title}`)
     }
     const real = carried.filter((title) => sections.find((s) => s.title === title)?.ok)
     if (!real.length) {
-      console.error('ask-astra: NOTHING of the material actually travelled — refusing to send a request that carries only placeholders.')
+      console.error('ask-lane: NOTHING of the material actually travelled — refusing to send a request that carries only placeholders.')
       process.exit(2)
     }
 
     // The identity is PROVEN before a word is attributed to Astra: nothing in a run's
     // output names the model that answered, so the whole attribution rests on the server
-    // refusing an unknown id (see review-astra.mjs --probe).
-    if (model.runtime === 'codex' && !ensureModelProven({ who: 'ask-astra' })) {
-      console.error(`ask-astra: the model id is not proven honoured — refusing to attribute an answer to ${ASTRA_MODEL_NAME}.`)
+    // refusing an unknown id (see cross-review.mjs --probe).
+    if (model.runtime === 'codex' && !ensureModelProven({ who: 'ask-lane' })) {
+      console.error(`ask-lane: the model id is not proven honoured — refusing to attribute an answer to ${ASTRA_MODEL_NAME}.`)
       process.exit(2)
     }
-    console.error(`ask-astra: asking ${model.name} (effort ${model.effort}) for a ${kind} — ${material.length} characters of material …`)
+    console.error(`ask-lane: asking ${model.name} (effort ${model.effort}) for a ${kind} — ${material.length} characters of material …`)
 
     const startedAt = Date.now()
     const request = {
@@ -236,10 +236,10 @@ if (isMainModule(import.meta.url)) {
     let outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
     if (model.runtime === 'codex') {
       // An outage signature records the fallback and serves this ask on Opus 5.5.
-      const recorded = recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-astra' })
+      const recorded = recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
       if (recorded.fellBack) {
         model = ASK_MODELS.opus
-        console.error(`ask-astra: serving the ${kind} on ${model.name} instead …`)
+        console.error(`ask-lane: serving the ${kind} on ${model.name} instead …`)
         run = runClaudeAsk({ ...request, prompt: buildAskPrompt({ kind, brief, modelName: model.name }), model })
         outcome = run
       }
@@ -267,7 +267,7 @@ if (isMainModule(import.meta.url)) {
     }
     process.exit(0)
   } catch (e) {
-    console.error(`ask-astra failed: ${(e && e.message) || e}`)
+    console.error(`ask-lane failed: ${(e && e.message) || e}`)
     process.exit(1)
   }
 }

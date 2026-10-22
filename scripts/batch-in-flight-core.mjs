@@ -1793,7 +1793,7 @@ function segmentTarget(seg) {
   // An authoring run IS the commissioning of a point, whichever vendor runs it —
   // unless it is one of the read-only legs, which produce no work at all.
   if (!/--routing\b|--dry-run\b/.test(seg)) {
-    const authored = uniq([...seg.matchAll(/author-(?:astra|sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    const authored = uniq([...seg.matchAll(/author-(?:delegate|astra|sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
     if (authored.length) return { points: authored, refs: [], how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {
@@ -1851,7 +1851,7 @@ function segmentTarget(seg) {
  * Switching to an existing branch, pushing one, landing one — none of them
  * CREATES anything, and none is recognised here.
  *
- * A READ-ONLY RUN OPENS NOTHING either: `author-astra.mjs --routing` answers which
+ * A READ-ONLY RUN OPENS NOTHING either: `author-delegate.mjs --routing` answers which
  * lane owns a point and every author command's `--dry-run` prints the prompt it
  * would send. Refusing those would deny the very question a session asks BEFORE
  * it commissions.

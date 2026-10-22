@@ -4,10 +4,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { currentFableState } from './fable-switch.mjs'
-import { mergerModel } from './fable-switch-core.mjs'
+import { currentFableState } from './lane-switch.mjs'
+import { mergerModel } from './lane-switch-core.mjs'
 
-const CLI = join(dirname(fileURLToPath(import.meta.url)), 'fable-switch.mjs')
+const CLI = join(dirname(fileURLToPath(import.meta.url)), 'lane-switch.mjs')
 let dir
 let file
 
@@ -21,17 +21,17 @@ const run = (...args) => {
 }
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'hoa-fable-switch-'))
+  dir = mkdtempSync(join(tmpdir(), 'hoa-lane-switch-'))
   file = join(dir, 'nested', 'fable-switch.json')
 })
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-describe('fable-switch.mjs', () => {
+describe('lane-switch.mjs', () => {
   it('fails loud when no decision has been recorded', () => {
     const result = run('--status')
     expect(result.status).toBe(1)
     expect(result.out).toContain('state is absent')
-    expect(result.out).toContain('fable-switch.mjs --status')
+    expect(result.out).toContain('lane-switch.mjs --status')
     expect(existsSync(file)).toBe(false)
   })
 
@@ -44,7 +44,7 @@ describe('fable-switch.mjs', () => {
   it('flips off and reports the state, reason, and setter from the same write', () => {
     const result = run('--off', '--why', 'not enough volume left')
     expect(result.status).toBe(0)
-    expect(result.out).toMatch(/^fable-switch: OFF/)
+    expect(result.out).toMatch(/^lane-switch: OFF/)
     expect(result.out).toContain('reason: not enough volume left')
     expect(result.out).toContain('set by test operator')
     expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
@@ -56,7 +56,7 @@ describe('fable-switch.mjs', () => {
   })
 
   it('makes the opposite flip visible to a fresh reader in the same run', () => {
-    expect(run('--on', '--why', 'the user restored capacity').out).toMatch(/^fable-switch: ON/)
+    expect(run('--on', '--why', 'the user restored capacity').out).toMatch(/^lane-switch: ON/)
     expect(mergerModel(currentFableState(file))).toBe('Fable 5.1')
     expect(run('--status').out).toContain('the user restored capacity')
   })

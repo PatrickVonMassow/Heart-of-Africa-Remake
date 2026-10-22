@@ -79,8 +79,8 @@ screenshots, and end-to-end. Strategy and suite map: `scripts/verify/README.md`.
   points; Opus 5.5 authors points whose verification is the work; Fable 5.1
   authors tagged points and router escalations; an unreachable Astra lane
   authors on Opus 5.5. Review is cross-vendor, never by an author of the range
-  (`scripts/review-astra.mjs` for Claude work, Claude for Astra work).
-  `node scripts/fable-switch.mjs --status` alone decides Fable authoring,
+  (`scripts/cross-review.mjs` for Claude work, Claude for Astra work).
+  `node scripts/lane-switch.mjs --status` alone decides Fable authoring,
   serving, commit trailers, and blind merging; a serving model outside its
   chain pauses the batch. Every commit names its author model in a
   `Co-Authored-By` trailer; a cross-vendor reviewer goes only in a distinct

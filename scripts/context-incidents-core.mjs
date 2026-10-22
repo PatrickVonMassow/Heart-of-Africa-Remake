@@ -99,7 +99,7 @@ const READ_TOOLS = new Set(['Read'])
  *  here (the fence's run-wait.mjs exemption and npm subcommand parsing are not
  *  mirrored). */
 const SUITE_SCRIPTS = ['run-all.mjs', 'run-logged.mjs']
-const ASK_SCRIPTS = ['ask-astra.mjs', 'author-astra.mjs', 'author-fable.mjs', 'review-astra.mjs']
+const ASK_SCRIPTS = ['ask-lane.mjs', 'author-delegate.mjs', 'author-fable.mjs', 'cross-review.mjs']
 const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
 /** npm script names that ARE a browser run, and the fast gates beside them. */
 const NPM_SUITE_ARGS = new Set(['test', 'test:small', 'test:large'])

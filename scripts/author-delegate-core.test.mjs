@@ -28,7 +28,7 @@ import {
   ASTRA_TRAILER,
   uncommittedSummary,
   withheldEnvNames,
-} from './author-astra-core.mjs'
+} from './author-delegate-core.mjs'
 import { evaluateCommitMessage } from './commit-scope-guard-core.mjs'
 
 const astraCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-6 Astra <noreply@openai.com>' })
@@ -167,7 +167,7 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
     // The cross-vendor review's P0: with the sandbox off, the run can still read
     // a token FILE and push. The regex must not be described as preventing that,
     // and the wrapper is what pushes, so the claim to check is the narrow one.
-    const source = readFileSync(resolve('scripts', 'author-astra-core.mjs'), 'utf8')
+    const source = readFileSync(resolve('scripts', 'author-delegate-core.mjs'), 'utf8')
     expect(source).toMatch(/HYGIENE, NOT CONTAINMENT/)
     expect(source).toMatch(/can read `\.secrets\/`/)
   })

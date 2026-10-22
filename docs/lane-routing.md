@@ -21,10 +21,10 @@ and neither model ever reviews its own work. See
 ## The switch
 
 ```
-node scripts/astra-share.mjs --status          # what goes where right now, in one line
-node scripts/astra-share.mjs --more            # one step towards Astra
-node scripts/astra-share.mjs --less            # one step back towards Claude
-node scripts/astra-share.mjs --set prefer-astra  # or default, or claude-only
+node scripts/lane-routing.mjs --status          # what goes where right now, in one line
+node scripts/lane-routing.mjs --more            # one step towards Astra
+node scripts/lane-routing.mjs --less            # one step back towards Claude
+node scripts/lane-routing.mjs --set prefer-astra  # or default, or claude-only
 ```
 
 | setting | review · enumerate | diagnose · audit · explain |
@@ -40,7 +40,7 @@ sweeps are costly; a blind audit half at `default` uses the existing `--anyway`.
 `prefer-astra` hands every
 read-only kind to Astra. `claude-only` is the escape hatch for the other
 direction — when the ChatGPT side is the scarce one — and it stops the review
-path too: `review-astra.mjs` then sends nothing at all and hands the review to a
+path too: `cross-review.mjs` then sends nothing at all and hands the review to a
 Claude reviewer that authored none of the range, with **no verdict**, which is
 the honest state (Astra has not seen the change).
 
@@ -70,10 +70,10 @@ unreachable, authoring falls back to Opus 5.5 rather than waiting for the vendor
 (user 23.09.2026, after the volume ran out mid-batch and the switch had to be
 moved by hand). CLAUDE.md §6 states the rule; point 1194 makes it automatic. A
 routed codex run whose outcome is `allowance-exhausted` or `unreachable`
-(`OUTAGE_KINDS` in `scripts/astra-share-core.mjs`) writes a `fallback` record —
+(`OUTAGE_KINDS` in `scripts/lane-routing-core.mjs`) writes a `fallback` record —
 signature, kind and a probe clock (`OUTAGE_PROBE_MS`, 30 min, calibratable) —
 beside the operator setting, which stays as it was. While the clock runs every
-kind routes to Claude: an ask is served on Opus 5.5, `author-astra.mjs` exits 5
+kind routes to Claude: an ask is served on Opus 5.5, `author-delegate.mjs` exits 5
 ("author it on Opus 5.5", not the point's red), and a review hands over to
 Fable 5.1 with a cause that names the fallback. When the clock runs out the next
 routed run is the probe: a success lifts the record, the same signature renews
@@ -83,11 +83,11 @@ the board footer name an active fallback.
 ## Asking Astra
 
 ```
-node scripts/ask-astra.mjs --kind diagnose  --brief "why did the place suite go red?" \
+node scripts/ask-lane.mjs --kind diagnose  --brief "why did the place suite go red?" \
      --log /tmp/place.log --diff main..HEAD
-node scripts/ask-astra.mjs --kind audit     --brief "…" --file src/world/river.ts
-node scripts/ask-astra.mjs --kind enumerate --brief "…"        # a blind-parallel half
-node scripts/ask-astra.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
+node scripts/ask-lane.mjs --kind audit     --brief "…" --file src/world/river.ts
+node scripts/ask-lane.mjs --kind enumerate --brief "…"        # a blind-parallel half
+node scripts/ask-lane.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
 ```
 
 Anything piped on stdin is material too. Nothing is fetched by the model: this
@@ -125,11 +125,11 @@ through.
 ## Authoring (point 667)
 
 ```
-node scripts/author-astra.mjs --routing --all        # which lane owns each open point, and why
-node scripts/author-astra.mjs --routing --point 651  # one point
-node scripts/author-astra.mjs --point 651            # author it here, on this branch
-node scripts/author-astra.mjs --point 651 --dry-run  # the prompt and the argv, nothing spent
-node scripts/author-astra.mjs --point 651 --findings f.md   # the second leg: answer the review
+node scripts/author-delegate.mjs --routing --all        # which lane owns each open point, and why
+node scripts/author-delegate.mjs --routing --point 651  # one point
+node scripts/author-delegate.mjs --point 651            # author it here, on this branch
+node scripts/author-delegate.mjs --point 651 --dry-run  # the prompt and the argv, nothing spent
+node scripts/author-delegate.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
 Run the command alone, without `setsid` or `tee`, and never redirected onto its
@@ -149,7 +149,7 @@ does not detect that mistake. Help, routing, examination and dry runs create no 
 for the authoring and escalation policy. `scripts/author-routing-core.mjs`
 applies it from the point text and recorded review history. A point may request
 a lane with `Author lane: astra|fable|opus` **as a standalone line** in its
-spec; the Fable lane remains subject to `node scripts/fable-switch.mjs --status`.
+spec; the Fable lane remains subject to `node scripts/lane-switch.mjs --status`.
 A point still tagged with the retired `sol` spelling is read as `astra`, so the
 rename costs no queued point its lane.
 A `fable` tag is immediate, while `astra`/`opus` tags yield to ONE thing: the
@@ -227,7 +227,7 @@ works and the dispatch does not.
 | `Co-Authored-By` on `main` since 06.09. — Claude family | 182 |
 | `Co-Authored-By` on `main` since 06.09. — GPT-6 Astra | 6, all six from point 1069 |
 | `Reviewed-By: GPT-6 Astra` over the same range | 14 |
-| `author-astra.mjs` receipts (then `.claude/author-<N>.log`, now `local/<point>-<lane>-author.log`) ever | 3 — points 1008, 1031 (31.08.), 1069 (07.09.) |
+| `author-delegate.mjs` receipts (then `.claude/author-<N>.log`, now `local/<point>-<lane>-author.log`) ever | 3 — points 1008, 1031 (31.08.), 1069 (07.09.) |
 | — of those, in the last three days | 1 — point 1069 |
 
 Those rows say one thing together: **the REVIEW half of the lane runs and the
@@ -245,7 +245,7 @@ written here anyway. The two readings around it are 271/103 over 374 open points
 on 08.09. and 280/99 over 379 today — five points entered the queue in between,
 so the nine-point difference is NOT the tagging's effect and neither reading is
 the other's before/after. What is left is not a lever but a command:
-`node scripts/author-astra.mjs --point <N>` in the point's own worktree, which
+`node scripts/author-delegate.mjs --point <N>` in the point's own worktree, which
 the session-start policy line now says in those words. **The proof owed is one
 point authored by Astra end to end, and it is owed by point 1072** — the next
 Astra-lane point in work-order order, and a communication point, which is the
@@ -305,7 +305,7 @@ constraint.
   routes it; the routing function decides, and a point's own `Author lane:` tag
   or `--anyway` is the deliberate override subject to the model switches.
 - REVIEWING what Astra itself authored — no model reviews its own work, so
-  `review-astra.mjs` refuses such a range before it spends a call on it.
+  `cross-review.mjs` refuses such a range before it spends a call on it.
 - Driving the browser suites and **judging the picture**.
 - The landing (`scripts/land-point.mjs`) and the main session's bookkeeping.
 
@@ -352,8 +352,8 @@ residue is visible rather than distributed.
 
 Recorded verbatim from 13.08.2026, so it names the commands and files as they were
 spelled then — `ask-sol.mjs`, `sol-share.mjs`, `review-sol.mjs` and
-`review-sol-cli.test.mjs` are today's `ask-astra.mjs`, `astra-share.mjs`,
-`review-astra.mjs` and `review-astra-cli.test.mjs`.
+`review-sol-cli.test.mjs` are today's `ask-lane.mjs`, `lane-routing.mjs`,
+`cross-review.mjs` and `cross-review-cli.test.mjs`.
 
 Not a stub: `scripts/review-sol-cli.test.mjs` was reproduced red on this branch —
 18 of 19 cases failing — and the run went

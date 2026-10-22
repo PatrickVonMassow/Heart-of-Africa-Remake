@@ -61,8 +61,8 @@ import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
-import { currentFableState } from './fable-switch.mjs'
-import { servingPolicyLine } from './fable-switch-core.mjs'
+import { currentFableState } from './lane-switch.mjs'
+import { servingPolicyLine } from './lane-switch-core.mjs'
 import { currentVenue } from './cloud-switch.mjs'
 import { venueInstruction } from './cloud-switch-core.mjs'
 
@@ -317,12 +317,12 @@ try {
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
       'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +
-      'reached Fable escalation threshold in scripts/author-routing-core.mjs). scripts/astra-share.mjs --status says what routes now; ' +
+      'reached Fable escalation threshold in scripts/author-routing-core.mjs). scripts/lane-routing.mjs --status says what routes now; ' +
       'an UNREACHABLE Astra lane (exhausted OpenAI volume included) authors on Opus 5.5 instead of ' +
-      'waiting. REVIEW is CROSS-VENDOR (scripts/review-astra.mjs for Anthropic-authored work, Claude ' +
+      'waiting. REVIEW is CROSS-VENDOR (scripts/cross-review.mjs for Anthropic-authored work, Claude ' +
       'for Astra-authored work); no model reviews its own. AN ASTRA-LANE POINT IS COMMISSIONED, NOT ' +
-      'WRITTEN HERE: node scripts/author-astra.mjs --point <N> in its worktree, then review, suites, ' +
-      'picture, landing (docs/astra-routing.md, "Routed and not commissioned"). ' +
+      'WRITTEN HERE: node scripts/author-delegate.mjs --point <N> in its worktree, then review, suites, ' +
+      'picture, landing (docs/lane-routing.md, "Routed and not commissioned"). ' +
       (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`) +
       // Where authoring delegations start (point 1230): the cloud switch's routing read.
       ` ${cloudVenueLine()}`

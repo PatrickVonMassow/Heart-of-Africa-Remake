@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // The only writer for the shared Fable decision.
 //
-//   node scripts/fable-switch.mjs --status
-//   node scripts/fable-switch.mjs --on  --why "<user instruction>"
-//   node scripts/fable-switch.mjs --off --why "<user instruction>"
+//   node scripts/lane-switch.mjs --status
+//   node scripts/lane-switch.mjs --on  --why "<user instruction>"
+//   node scripts/lane-switch.mjs --off --why "<user instruction>"
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
@@ -17,9 +17,9 @@ import {
   statusReport,
   unreadableState,
   writeState,
-} from './fable-switch-core.mjs'
+} from './lane-switch-core.mjs'
 
-export { servingRoute } from './fable-switch-core.mjs'
+export { servingRoute } from './lane-switch-core.mjs'
 
 export const STATE_FILE =
   process.env.FABLE_SWITCH_FILE ||
@@ -55,7 +55,7 @@ function save(state, why, file = STATE_FILE) {
 }
 
 export const usage = () =>
-  'usage: node scripts/fable-switch.mjs --status | --on --why "<user instruction>" | --off --why "<user instruction>"'
+  'usage: node scripts/lane-switch.mjs --status | --on --why "<user instruction>" | --off --why "<user instruction>"'
 
 if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
@@ -77,7 +77,7 @@ if (isMainModule(import.meta.url)) {
     console.log(statusReport(currentFableState()))
     process.exit(0)
   } catch (error) {
-    console.error(`fable-switch: ${(error && error.message) || error}`)
+    console.error(`lane-switch: ${(error && error.message) || error}`)
     process.exit(1)
   }
 }

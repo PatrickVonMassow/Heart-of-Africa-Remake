@@ -27,7 +27,7 @@
 // wrong here goes wrong QUIETLY, so every judgment is a function with no I/O,
 // pinned in scripts/fold-point-core.test.mjs, and scripts/fold-point.mjs only
 // performs what these decide.
-import { CLAUDE_MODEL } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL } from './lane-switch-core.mjs'
 import { LandingError, VERDICT, tickAndArchive } from './land-point-core.mjs'
 import { closeCard, nowCard, queueCard, toNow } from './board-core.mjs'
 

@@ -60,7 +60,7 @@ import {
   VERDICTS,
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentFableState } from './lane-switch.mjs'
 import {
   FABLE_MODEL,
   FABLE_MODEL_ID,
@@ -69,7 +69,7 @@ import {
   OPUS_MODEL,
   OPUS_MODEL_ID,
   parseClaudeResultOutput,
-} from './fable-switch-core.mjs'
+} from './lane-switch-core.mjs'
 import { authorshipRefusesPermission } from './authorship-check-core.mjs'
 import { commitObjectParents } from './mechanism-review-range-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
@@ -1467,7 +1467,7 @@ export const usage = () =>
   `--spec-examination records the one cross-vendor reading before Fable escalation:\n` +
   `       sound when the text survived the findings, amended when the work order changed.\n` +
   `--merged-by names the model that folded the two lists into the union — selected by\n` +
-  `       node scripts/fable-switch.mjs --status, and checked when explicitly supplied — the one that\n` +
+  `       node scripts/lane-switch.mjs --status, and checked when explicitly supplied — the one that\n` +
   `       wrote NEITHER of them, because a merge can lose a finding silently — and the\n` +
   `       COUNT says none did. Hand over the FILES and it is counted here:\n` +
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
@@ -1476,7 +1476,7 @@ export const usage = () =>
   `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded end-state file scope, or one\n` +
   `       pass of a range whose material no single review round can hold. The passes cut\n` +
   `       through the FILE SET. Once every pass of the split is recorded, each clears the\n` +
-  `       files it names at the reviewed end state; the rest of the range stays owed. review-astra.mjs prints the plan.\n` +
+  `       files it names at the reviewed end state; the rest of the range stays owed. cross-review.mjs prints the plan.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
   `       The record stores the reviewed head as the files' end-state sha. A later commit to\n` +
@@ -1494,7 +1494,7 @@ export const usage = () =>
   `       ASTRA authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
   `       of it, which also runs the suites, judges the picture and lands the point.\n` +
   `       Run it — never a hand-typed codex line — with:\n` +
-  `       node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>"\n` +
+  `       node scripts/cross-review.mjs --sha <sha> --brief "<what to judge>"\n` +
   `\nThe GATES are separate commands and answer --status themselves:\n` +
   `       node scripts/mechanism-review-guard.mjs --status\n` +
   `       node scripts/criticality-review-guard.mjs --status`

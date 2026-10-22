@@ -33,7 +33,7 @@
 // This module is pure: text in, text out, no I/O. scripts/point-brief.mjs is the
 // I/O wrapper (same split as doc-budget-core.mjs / doc-budget-guard.mjs).
 import { createHash } from 'node:crypto'
-import { DEFAULT_SETTING as DEFAULT_ASTRA_SHARE, briefLine as astraBriefLine } from './astra-share-core.mjs'
+import { DEFAULT_SETTING as DEFAULT_ASTRA_SHARE, briefLine as astraBriefLine } from './lane-routing-core.mjs'
 
 /** Thrown for a failure the reader must see: unknown point, dangling section,
  *  adopted point that exists nowhere. */

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624).
 //
-//   node scripts/review-astra.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \
+//   node scripts/cross-review.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \
 //        [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \
 //        [--pass <k>] [--file <end-state path>]…
-//   node scripts/review-astra.mjs --probe          # is the -m flag honoured at all?
-//   node scripts/review-astra.mjs --save-login     # keep the login across a rebuild
-//   node scripts/review-astra.mjs --restore-login
+//   node scripts/cross-review.mjs --probe          # is the -m flag honoured at all?
+//   node scripts/cross-review.mjs --save-login     # keep the login across a rebuild
+//   node scripts/cross-review.mjs --restore-login
 //
 // It runs the review non-interactively — through `codex exec` in a READ-ONLY
 // sandbox for Astra, or a tool-free `claude` run for a --reviewer Claude model —
@@ -24,7 +24,7 @@
 // WHEN ASTRA IS NOT AVAILABLE the command says so in ONE line, names the cause,
 // and hands the review to the first eligible Claude reviewer — printing the command
 // that starts that reviewer, never a verdict, so nothing can be recorded as reviewed
-// that nobody reviewed. The decision logic is pure (review-astra-core.mjs); this
+// that nobody reviewed. The decision logic is pure (cross-review-core.mjs); this
 // half does the process work and fails LOUD. It is a command, not a hook.
 //
 // THE LOGIN (the point's open question, answered here): `codex login` stores its
@@ -51,13 +51,13 @@ import { dirname, join, sep as sep_ } from 'node:path'
 import { createHash } from 'node:crypto'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { currentSetting, recordAstraRun, settingProblemLine } from './astra-share.mjs'
-import { effectiveRoute, fallbackReviewCause } from './astra-share-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentSetting, recordAstraRun, settingProblemLine } from './lane-routing.mjs'
+import { effectiveRoute, fallbackReviewCause } from './lane-routing-core.mjs'
+import { currentFableState } from './lane-switch.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import { mergeProblem, reviewRecordWellFormed, sameModel } from './mechanism-review-core.mjs'
 import { authoringClaudeArgs } from './author-fable-core.mjs'
-import { parseClaudeAskOutput } from './ask-astra-core.mjs'
+import { parseClaudeAskOutput } from './ask-lane-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -83,7 +83,7 @@ import {
   ASTRA_MODEL_ID,
   ASTRA_MODEL_NAME,
   ASTRA_REASONING_EFFORT,
-} from './review-astra-core.mjs'
+} from './cross-review-core.mjs'
 import {
   assembleMaterial,
   formatCoveragePlan,
@@ -552,7 +552,7 @@ export function formatContributionPassPlan(plan = {}) {
         const fileFlags = (entry.files ?? []).map((file) => ` --file ${shellQuote(file)}`).join('')
         const reviewer = reviewerDescriptor(pass.reviewer)
         lines.push(
-          `    node scripts/review-astra.mjs --sha ${entry.sha} --since ${entry.base} ` +
+          `    node scripts/cross-review.mjs --sha ${entry.sha} --since ${entry.base} ` +
             `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>"${passFlag}${fileFlags}`,
         )
       }
@@ -575,7 +575,7 @@ export function formatContributionPassPlan(plan = {}) {
 
 export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   const lines = [
-    `review-astra: the material budget is ${plan.budget} characters per round; ` +
+    `cross-review: the material budget is ${plan.budget} characters per round; ` +
       `this range has ${plan.rawSize} characters of outstanding material.`,
   ]
   if (!plan.passes.length && plan.dropped?.length) {
@@ -597,7 +597,7 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
       `  pass ${pass.index}/${pass.total} → ${pass.reviewerVendor} reviewer ${pass.reviewer}; ` +
         `${pass.size} characters; end state ${String(pass.endState).slice(0, 7)}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
-      `    node scripts/review-astra.mjs --sha ${sha} --since ${pass.rangeBase} ` +
+      `    node scripts/cross-review.mjs --sha ${sha} --since ${pass.rangeBase} ` +
         `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>"${plan.fits ? '' : ` --pass ${pass.index}`}`,
     )
   }
@@ -631,10 +631,10 @@ export function formatUnavailableReceiptRoute(plan, { sha = '', point = '' } = {
   const files = [...new Set((plan?.unreviewable ?? []).flatMap((group) => group?.files ?? []))]
   if (!files.length) return ''
   if (!/^\d+$/.test(String(point).trim())) {
-    return 'review-astra: unavailable files need a point-bound receipt; rerun this plan with --point <N> to print its verified record command.'
+    return 'cross-review: unavailable files need a point-bound receipt; rerun this plan with --point <N> to print its verified record command.'
   }
   return [
-    'review-astra: after every runnable pass is recorded, record only the measured unavailable remainder:',
+    'cross-review: after every runnable pass is recorded, record only the measured unavailable remainder:',
     '  node scripts/criticality-review-guard.mjs ' +
       `--record-unavailable ${sha} --point ${String(point).trim()} ` +
       `--files ${shellQuote(formatPassFiles(files))} ` +
@@ -721,13 +721,13 @@ function mergeBase(ref, sha, { explicit = false } = {}) {
 /**
  * Run codex once and hand back everything the classifier needs.
  *
- * EXPORTED so `scripts/ask-astra.mjs` runs the SAME path rather than a second one of its
+ * EXPORTED so `scripts/ask-lane.mjs` runs the SAME path rather than a second one of its
  * own (point 654): the sandbox flags, the stdin hand-off, the temp output file and the
  * timeout are decisions this file already got right the hard way, and two copies of them
  * would drift the day one is fixed.
  */
 export function runCodex({ prompt, input = '', modelId = ASTRA_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
-  const outFile = join(tmpdir(), `review-astra-${process.pid}-${Date.now()}.txt`)
+  const outFile = join(tmpdir(), `cross-review-${process.pid}-${Date.now()}.txt`)
   const args = codexArgs({ modelId, effort: ASTRA_REASONING_EFFORT, cwd: REPO_ROOT, outputFile: outFile, prompt })
   const res = spawnSync(CODEX_BIN, args, {
     encoding: 'utf8',
@@ -848,7 +848,7 @@ function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = REVIEW_TI
 }
 
 /** The receipt of the last passed model-id probe (see probeFreshness). */
-const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-astra-probe.json')
+const PROBE_RECEIPT_FILE = join(STATE_DIR, 'cross-review-probe.json')
 
 /**
  * What the model-id proof is TIED TO: the codex binary, its version and the
@@ -890,13 +890,13 @@ export function probe() {
       `${JSON.stringify({ at: Date.now(), refused: true, id: bogus, fingerprint: codexFingerprint() })}\n`,
     )
     console.log(
-      `review-astra --probe: PASS — the server REFUSED the unknown id "${bogus}", so \`-m\` is honoured\n` +
+      `cross-review --probe: PASS — the server REFUSED the unknown id "${bogus}", so \`-m\` is honoured\n` +
         `  and a review run with -m ${ASTRA_MODEL_ID} really is ${ASTRA_MODEL_NAME}.`,
     )
     return 0
   }
   console.error(
-    `review-astra --probe: FAIL — the unknown id "${bogus}" was NOT refused (exit ${res.exitCode}).\n` +
+    `cross-review --probe: FAIL — the unknown id "${bogus}" was NOT refused (exit ${res.exitCode}).\n` +
       '  A model id that is silently substituted makes every recorded Astra review worthless:\n' +
       '  the ledger would name Astra for work some other model did. Do not record Astra reviews\n' +
       `  until this passes again.\n  codex said: ${text.trim().split('\n').slice(-3).join(' | ') || '(nothing)'}`,
@@ -908,11 +908,11 @@ export function probe() {
  * Is `-m` PROVEN honoured on this machine, proving it now where the receipt is missing
  * or stale? Returns false when the proof could not be obtained.
  *
- * EXPORTED for `scripts/ask-astra.mjs` (point 654): every kind of work attributed to Astra
+ * EXPORTED for `scripts/ask-lane.mjs` (point 654): every kind of work attributed to Astra
  * rests on the same proof, since nothing in a run's output names the model that answered.
  * A second implementation of this check would be a second place for it to be skipped.
  */
-export function ensureModelProven({ log = console.error, who = 'review-astra' } = {}) {
+export function ensureModelProven({ log = console.error, who = 'cross-review' } = {}) {
   const freshness = probeFreshness(readProbeReceipt(), Date.now(), PROBE_MAX_AGE_MS, codexFingerprint())
   if (freshness.fresh) return true
   log(`${who}: ${freshness.warning}\n  proving the model id first …`)
@@ -951,7 +951,7 @@ function pathEscapes(target) {
 /** `--save-login` / `--restore-login`: the container-rebuild answer. */
 function saveLogin() {
   if (!existsSync(AUTH_FILE)) {
-    console.error(`review-astra --save-login: no login found at ${AUTH_FILE} — run \`codex login\` first.`)
+    console.error(`cross-review --save-login: no login found at ${AUTH_FILE} — run \`codex login\` first.`)
     return 1
   }
   mkdirSync(dirname(SAVED_AUTH_FILE), { recursive: true })
@@ -968,7 +968,7 @@ function saveLogin() {
   })
   if (ignored.status !== 0) {
     console.error(
-      `review-astra --save-login: REFUSING — git does not ignore ${SAVED_AUTH_FILE}.\n` +
+      `cross-review --save-login: REFUSING — git does not ignore ${SAVED_AUTH_FILE}.\n` +
         '  A login token written where git can see it is one `git add -A` away from the repository.',
     )
     return 1
@@ -981,15 +981,15 @@ function saveLogin() {
   for (const end of [SAVED_AUTH_FILE, AUTH_FILE]) {
     const escape = pathEscapes(end)
     if (escape) {
-      console.error(`review-astra --save-login: REFUSING — ${escape}`)
+      console.error(`cross-review --save-login: REFUSING — ${escape}`)
       return 1
     }
   }
   copyFileSync(AUTH_FILE, SAVED_AUTH_FILE)
   chmodSync(SAVED_AUTH_FILE, 0o600)
   console.log(
-    `review-astra: login saved to ${SAVED_AUTH_FILE} (git-ignored, 0600).\n` +
-      '  After a container rebuild: node scripts/review-astra.mjs --restore-login',
+    `cross-review: login saved to ${SAVED_AUTH_FILE} (git-ignored, 0600).\n` +
+      '  After a container rebuild: node scripts/cross-review.mjs --restore-login',
   )
   return 0
 }
@@ -997,8 +997,8 @@ function saveLogin() {
 function restoreLogin() {
   if (!existsSync(SAVED_AUTH_FILE)) {
     console.error(
-      `review-astra --restore-login: nothing saved at ${SAVED_AUTH_FILE}.\n` +
-        '  Log in once (`codex login`), then `node scripts/review-astra.mjs --save-login`.',
+      `cross-review --restore-login: nothing saved at ${SAVED_AUTH_FILE}.\n` +
+        '  Log in once (`codex login`), then `node scripts/cross-review.mjs --save-login`.',
     )
     return 1
   }
@@ -1007,7 +1007,7 @@ function restoreLogin() {
   for (const end of [SAVED_AUTH_FILE, AUTH_FILE]) {
     const escape = pathEscapes(end)
     if (escape) {
-      console.error(`review-astra --restore-login: REFUSING — ${escape}`)
+      console.error(`cross-review --restore-login: REFUSING — ${escape}`)
       return 1
     }
   }
@@ -1016,7 +1016,7 @@ function restoreLogin() {
   chmodSync(AUTH_FILE, 0o600)
   const age = Math.round((Date.now() - statSync(SAVED_AUTH_FILE).mtimeMs) / 86_400_000)
   console.log(
-    `review-astra: login restored to ${AUTH_FILE} (saved ${age} day(s) ago).\n` +
+    `cross-review: login restored to ${AUTH_FILE} (saved ${age} day(s) ago).\n` +
       '  Check it with: codex login status',
   )
   return 0
@@ -1024,11 +1024,11 @@ function restoreLogin() {
 
 export const usage = () =>
   [
-    'usage: node scripts/review-astra.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
+    'usage: node scripts/cross-review.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \\',
     '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
     '           [--pass <k>] [--file <current end-state path>]…',
-    '       node scripts/review-astra.mjs --probe            (is -m honoured?)',
-    '       node scripts/review-astra.mjs --save-login | --restore-login',
+    '       node scripts/cross-review.mjs --probe            (is -m honoured?)',
+    '       node scripts/cross-review.mjs --save-login | --restore-login',
     '',
     'The material is the whole range <since>..<sha> (--since defaults to main), because',
     'one record covers every commit it contains.',
@@ -1050,7 +1050,7 @@ export const usage = () =>
     `Without --reviewer, reviews run on ${ASTRA_MODEL_NAME} at reasoning effort ${ASTRA_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     'cannot be reached, or the share switch routes reviews away from it, the review is',
     'HANDED OVER to the first eligible Claude model allowed by the shared Fable switch',
-    '(`node scripts/fable-switch.mjs --status`) that authored no part of the reviewed',
+    '(`node scripts/lane-switch.mjs --status`) that authored no part of the reviewed',
     `range; a range ${ASTRA_MODEL_NAME} authored goes by role swap to the Opus-first Claude chain.`,
     '--reviewer runs exactly that handover reader. The recorded review always names the',
     'model that ACTUALLY ran, and none of them may review its own work.',
@@ -1078,12 +1078,12 @@ if (isMainModule(import.meta.url)) {
     const selectedFiles = [...new Set(flags('--file'))]
     const requestedReviewer = reviewerFlag ? reviewerDescriptor(reviewerFlag) : null
     if (!sha || !brief) {
-      console.error('review-astra: --sha and --brief are both required.\n')
+      console.error('cross-review: --sha and --brief are both required.\n')
       console.error(usage())
       process.exit(2)
     }
     if (reviewerFlag && !requestedReviewer) {
-      console.error('review-astra: --reviewer must be one of astra, fable, opus, opus48.\n')
+      console.error('cross-review: --reviewer must be one of astra, fable, opus, opus48.\n')
       console.error(usage())
       process.exit(2)
     }
@@ -1096,7 +1096,7 @@ if (isMainModule(import.meta.url)) {
       windowsHide: true,
     })
     if (resolved.status !== 0) {
-      console.error(`review-astra: "${sha}" is not a commit in this repository.`)
+      console.error(`cross-review: "${sha}" is not a commit in this repository.`)
       process.exit(2)
     }
     const full = (resolved.stdout ?? '').trim()
@@ -1111,7 +1111,7 @@ if (isMainModule(import.meta.url)) {
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
-    if (share.problem) console.error(settingProblemLine(share, 'review-astra'))
+    if (share.problem) console.error(settingProblemLine(share, 'cross-review'))
     // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
     // (escalation round): the early routes hard-coded `partial: null`, so an
     // explicit narrowed `--since` on a fitting range printed a whole-SHA record
@@ -1132,7 +1132,7 @@ if (isMainModule(import.meta.url)) {
     const passFlag = flag('--pass')
     if (argv.includes('--carry-from')) {
       console.error(
-        'review-astra: --carry-from is obsolete — recorded pass coverage follows end-state files, so the next ' +
+        'cross-review: --carry-from is obsolete — recorded pass coverage follows end-state files, so the next ' +
           'plan automatically omits unchanged files and owes only files changed since their recorded state.',
       )
       process.exit(2)
@@ -1163,25 +1163,25 @@ if (isMainModule(import.meta.url)) {
     if (unavailableRoute) console.error(unavailableRoute)
     if (plan.passes.length > MAX_PASS_TOTAL) {
       console.error(
-        `review-astra: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
+        `cross-review: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
       )
       process.exit(2)
     }
     if (!plan.passes.length && plan.dropped.length && !plan.uncoverable.length) {
-      console.error('review-astra: every touched file returned to its base state; no review record is needed.')
+      console.error('cross-review: every touched file returned to its base state; no review record is needed.')
       process.exit(0)
     }
     if (!plan.passes.length || plan.uncoverable.length) {
       console.error(
         plan.unreviewable.length && !plan.uncoverable.length
-          ? 'review-astra: no runnable review pass remains; use the verified unavailable receipt route above.'
-          : 'review-astra: the authorship plan cannot cover every changed file; no record is offered.',
+          ? 'cross-review: no runnable review pass remains; use the verified unavailable receipt route above.'
+          : 'cross-review: the authorship plan cannot cover every changed file; no record is offered.',
       )
       process.exit(4)
     }
     const selection = passFor(plan)
     if (selection.error) {
-      console.error(`review-astra: ${selection.error}`)
+      console.error(`cross-review: ${selection.error}`)
       process.exit(2)
     }
     const selected = plan.fits ? plan.passes[0] : selection.pass
@@ -1190,7 +1190,7 @@ if (isMainModule(import.meta.url)) {
     // A full branch-range review stays pass-less for ledger compatibility.
     const pass = plan.fits ? (selectedFiles.length || partialFor(base) ? selected : null) : selected
     if (!selected) {
-      console.error('review-astra: REFUSING to spend a round on the whole range — run one of the authored passes above.')
+      console.error('cross-review: REFUSING to spend a round on the whole range — run one of the authored passes above.')
       process.exit(4)
     }
     const rangeAuthors = selected.authors
@@ -1222,13 +1222,13 @@ if (isMainModule(import.meta.url)) {
       })
       if (!routed.model || !sameModel(routed.model, requestedReviewer.name)) {
         console.error(
-          `review-astra: --reviewer ${requestedReviewer.key} is not this range's first eligible handover; ` +
+          `cross-review: --reviewer ${requestedReviewer.key} is not this range's first eligible handover; ` +
             `the route names ${routed.model || 'nobody'}.`,
         )
         process.exit(2)
       }
     } else if (requestedReviewer && astraAuthored(rangeAuthors)) {
-      console.error(`review-astra: ${ASTRA_MODEL_NAME} authored part of this range and may not review it.`)
+      console.error(`cross-review: ${ASTRA_MODEL_NAME} authored part of this range and may not review it.`)
       process.exit(2)
     }
 
@@ -1299,7 +1299,7 @@ if (isMainModule(import.meta.url)) {
     }
 
     console.error(
-      `review-astra: asking ${targetReviewer.name} (effort ${targetReviewer.effort}) to review ${full.slice(0, 7)} …`,
+      `cross-review: asking ${targetReviewer.name} (effort ${targetReviewer.effort}) to review ${full.slice(0, 7)} …`,
     )
     // THE IDENTITY IS PROVEN BEFORE THE REVIEW, NOT MENTIONED AFTER IT (second
     // cross-vendor round). Nothing in a run's output names the model that
@@ -1309,7 +1309,7 @@ if (isMainModule(import.meta.url)) {
     // missing or stale, and a failed probe stops the review before a word of it
     // can be attributed to a model that may not have written it.
     if (targetReviewer.runtime === 'codex' && !ensureModelProven()) {
-      console.error('review-astra: the model id is not proven honoured — refusing to attribute a review to it.')
+      console.error('cross-review: the model id is not proven honoured — refusing to attribute a review to it.')
       process.exit(2)
     }
 
@@ -1343,7 +1343,7 @@ if (isMainModule(import.meta.url)) {
     const outcome = targetReviewer.runtime === 'codex' ? classifyOutcome(run) : run
     // An outage signature records the fallback; the hand-over below says it is one.
     const outage = targetReviewer.runtime === 'codex'
-      ? recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'review', who: 'review-astra' })
+      ? recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'review', who: 'cross-review' })
       : { fellBack: false }
     if (outage.fellBack) outcome.cause = fallbackReviewCause(outage.fallback)
     // The RECEIPT is demanded back (finding 8): the token stands only on the
@@ -1394,7 +1394,7 @@ if (isMainModule(import.meta.url)) {
     }
     if (targetReviewer.runtime === 'claude' && decision.fellBack) {
       console.log(
-        `review-astra: ${targetReviewer.name} did not deliver a recordable review of ${full.slice(0, 7)}: ` +
+        `cross-review: ${targetReviewer.name} did not deliver a recordable review of ${full.slice(0, 7)}: ` +
           `${decision.cause || 'no usable verdict'}.\n  The review is NOT done; no record command is printed.`,
       )
       process.exit(3)
@@ -1427,7 +1427,7 @@ if (isMainModule(import.meta.url)) {
     // is the same shape of answer: a verdict was given, no record may rest on it.
     process.exit(decision.fellBack || shortfall ? 3 : 0)
   } catch (e) {
-    console.error(`review-astra failed: ${(e && e.message) || e}`)
+    console.error(`cross-review failed: ${(e && e.message) || e}`)
     process.exit(1)
   }
 }

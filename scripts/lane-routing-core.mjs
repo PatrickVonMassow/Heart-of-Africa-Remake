@@ -14,11 +14,11 @@
 // of waiting (user 23.09.2026); point 1194 makes that automatic, with a probe clock.
 //
 // Side-effect free: reading and writing the file, and the printing, belong to
-// scripts/astra-share.mjs. Pinned by astra-share-core.test.mjs.
+// scripts/lane-routing.mjs. Pinned by lane-routing-core.test.mjs.
 
-import { KINDS as ASK_KINDS } from './ask-astra-core.mjs'
-import { FABLE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
-import { OUTAGE_OUTCOMES } from './review-astra-core.mjs'
+import { KINDS as ASK_KINDS } from './ask-lane-core.mjs'
+import { FABLE_MODEL, OPUS_MODEL } from './lane-switch-core.mjs'
+import { OUTAGE_OUTCOMES } from './cross-review-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 
 /**
@@ -107,24 +107,24 @@ export function settingPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
  * Every kind of work this switch has an opinion about.
  *
  * `review` is the four-eyes review that already goes to Astra (point 624), the middle ones
- * are the read-only kinds `scripts/ask-astra.mjs` can carry, and `author` is the writing
+ * are the read-only kinds `scripts/ask-lane.mjs` can carry, and `author` is the writing
  * lane of point 667 — deliberately absent while nothing could route it, and added the
- * moment `scripts/author-astra.mjs` existed to. It matters most: authoring is the largest
+ * moment `scripts/author-delegate.mjs` existed to. It matters most: authoring is the largest
  * single item of the spend, so the switch that exists to move load between two vendors
  * would be missing its biggest lever without it.
  */
 export const KINDS = Object.freeze(['review', ...ASK_KINDS, 'author'])
 
-/** The kinds `scripts/ask-astra.mjs` carries (review has its own command). */
+/** The kinds `scripts/ask-lane.mjs` carries (review has its own command). */
 const READ_ONLY_KINDS = Object.freeze([...ASK_KINDS])
 
 export const KIND_NOTES = Object.freeze({
-  review: 'the four-eyes review of a diff (scripts/review-astra.mjs)',
+  review: 'the four-eyes review of a diff (scripts/cross-review.mjs)',
   diagnose: 'name the cause of a red from log plus diff',
   audit: 'the enumerating plausibility and bug-finding sweeps',
   enumerate: 'risk, test-case and option lists (a blind-parallel half)',
   explain: 'what a subsystem does, where something is handled',
-  author: 'authoring a point, the hard and critical ones included (scripts/author-astra.mjs)',
+  author: 'authoring a point, the hard and critical ones included (scripts/author-delegate.mjs)',
 })
 
 /**
@@ -212,7 +212,7 @@ export function readSetting(raw) {
 /** The state object to write for a setting. PURE. */
 export function writeState(setting, { now = Date.now(), by = '', fallback = null } = {}) {
   const value = normaliseSetting(setting)
-  if (!value) throw new Error(`astra-share: not a setting: ${setting}`)
+  if (!value) throw new Error(`lane-routing: not a setting: ${setting}`)
   const kept = readFallback(fallback)
   return { setting: value, changedAt: now, changedBy: String(by ?? ''), ...(kept ? { fallback: kept } : {}) }
 }
@@ -267,7 +267,7 @@ function signatureLine(text) {
 /**
  * The fallback record after one routed Astra run. PURE.
  *
- * `outcome` is review-astra-core's classifyOutcome; `text` the run's stderr and stdout.
+ * `outcome` is cross-review-core's classifyOutcome; `text` the run's stderr and stdout.
  * Returns { fallback, fellBack }: a success lifts any record, an outage records or
  * renews one with a fresh probe clock, and every other failure leaves the record as it
  * was and is NOT a fallback.
@@ -328,7 +328,7 @@ export function fallbackReviewCause(fb) {
 export function step(setting, direction) {
   const from = settingOrSafe(setting)
   const delta = direction === 'more' ? 1 : direction === 'less' ? -1 : 0
-  if (!delta) throw new Error(`astra-share: not a direction: ${direction}`)
+  if (!delta) throw new Error(`lane-routing: not a direction: ${direction}`)
   const i = SETTINGS.indexOf(from)
   const j = i + delta
   if (j < 0 || j >= SETTINGS.length) return { from, to: from, changed: false, atEnd: true }
@@ -358,7 +358,7 @@ export function statusLine(state, now = Date.now()) {
   const claude = KINDS.filter((kind) => !astra.includes(kind))
   const half = (label, list) => `${label}: ${list.length ? list.join(', ') : 'nothing'}`
   const mark = fallback ? ` (outage FALLBACK until ${new Date(fallback.probeAt).toISOString()})` : ''
-  return `astra-share: ${value}${mark} — ${half('to GPT-6 Astra', astra)} · ${half('to Claude', claude)}`
+  return `lane-routing: ${value}${mark} — ${half('to GPT-6 Astra', astra)} · ${half('to Claude', claude)}`
 }
 
 /**
@@ -372,24 +372,24 @@ export function statusLine(state, now = Date.now()) {
 export function briefLine(state) {
   const { setting: value, corrupt, fallback } = asState(state)
   if (fallback) {
-    return `- ASTRA ROUTING: ${fallbackLine(state)} — do NOT call \`scripts/ask-astra.mjs\`.`
+    return `- ASTRA ROUTING: ${fallbackLine(state)} — do NOT call \`scripts/ask-lane.mjs\`.`
   }
   // A FALLBACK SAYS IT IS ONE (audit, 12.08.2026). Presented bare, a safe setting reads
   // as the operator's choice, and nobody repairs the file it actually came from.
-  const mark = corrupt ? ' (FALLBACK — the share state file is unusable; repair it with `node scripts/astra-share.mjs --set <setting>`)' : ''
+  const mark = corrupt ? ' (FALLBACK — the share state file is unusable; repair it with `node scripts/lane-routing.mjs --set <setting>`)' : ''
   if (value === 'prefer-astra') {
     // The brief speaks to a DELEGATED agent, which is authoring already — so it is told
     // about the reading kinds it can hand over, not about the authoring lane it is in.
     return (
       `- ASTRA ROUTING is at \`prefer-astra\`: hand ${kindsToAstra(value).filter((k) => READ_ONLY_KINDS.includes(k)).join('/')} to ` +
-      '`node scripts/ask-astra.mjs --kind <kind> --brief "…"` (material on stdin) instead of doing it in your own\n' +
+      '`node scripts/ask-lane.mjs --kind <kind> --brief "…"` (material on stdin) instead of doing it in your own\n' +
       `  context. You keep the gates, the suites and the pictures; a read-only ask writes no commit.${mark}`
     )
   }
   if (value === 'claude-only') {
-    return `- ASTRA ROUTING is at \`claude-only\`: the ChatGPT side is the scarce one — do NOT call \`scripts/ask-astra.mjs\`.${mark}`
+    return `- ASTRA ROUTING is at \`claude-only\`: the ChatGPT side is the scarce one — do NOT call \`scripts/ask-lane.mjs\`.${mark}`
   }
-  return `- ASTRA ROUTING is at \`default\`: reviews and enumerate go to GPT-6 Astra; hand blind-parallel enumerate halves to \`node scripts/ask-astra.mjs --kind enumerate --brief "…"\` (material on stdin). Diagnose, audit, explain and author stay with Claude; a blind audit half uses \`--anyway\`.${mark}`
+  return `- ASTRA ROUTING is at \`default\`: reviews and enumerate go to GPT-6 Astra; hand blind-parallel enumerate halves to \`node scripts/ask-lane.mjs --kind enumerate --brief "…"\` (material on stdin). Diagnose, audit, explain and author stay with Claude; a blind audit half uses \`--anyway\`.${mark}`
 }
 
 /**

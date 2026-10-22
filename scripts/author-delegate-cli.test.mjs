@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { uncommittedSummary } from './author-astra-core.mjs'
-import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-astra.mjs'
-import { writeState as writeFableState } from './fable-switch-core.mjs'
+import { uncommittedSummary } from './author-delegate-core.mjs'
+import { commitsSince, ledgerSnapshot, pushBranch, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-delegate.mjs'
+import { writeState as writeFableState } from './lane-switch-core.mjs'
 
 const root = resolve(process.cwd())
-const script = resolve(root, 'scripts', 'author-astra.mjs')
+const script = resolve(root, 'scripts', 'author-delegate.mjs')
 const point = '999991'
 const dirs = []
 
@@ -142,7 +142,7 @@ afterEach(() => {
   while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true })
 })
 
-describe('author-astra records a commission before dispatch', () => {
+describe('author-delegate records a commission before dispatch', () => {
   it('appends and durably commits the exact point, round and framing once', () => {
     const events = []
     const input = {
@@ -392,7 +392,7 @@ describe('author-astra records a commission before dispatch', () => {
   })
 })
 
-describe('author-astra routing reads unsuccessful rounds from the review ledger', () => {
+describe('author-delegate routing reads unsuccessful rounds from the review ledger', () => {
   it('reports zero and uses the ordinary lane when the point has no review record', () => {
     const result = route(ledger([]))
     expect(result.status, result.stderr).toBe(0)
@@ -418,7 +418,7 @@ describe('author-astra routing reads unsuccessful rounds from the review ledger'
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain(`point ${point} → astra`)
-    expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
+    expect(result.stdout).toContain('node scripts/lane-switch.mjs --status')
     expect(result.stdout).toContain(
       `review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); ${FABLE_ESCALATION_ROUNDS} fresh attempt(s)`,
     )
@@ -458,7 +458,7 @@ describe('author-astra routing reads unsuccessful rounds from the review ledger'
     expect(result.status, result.stderr).toBe(0)
     // The override still carries the count; only the lane change is withheld.
     expect(result.stdout).toContain(`point ${point} → astra`)
-    expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
+    expect(result.stdout).toContain('node scripts/lane-switch.mjs --status')
   })
 
   it('turns the override immediately before the threshold into the examination step', () => {
@@ -475,7 +475,7 @@ describe('author-astra routing reads unsuccessful rounds from the review ledger'
   })
 })
 
-describe('author-astra examination does not require an authoring worktree', () => {
+describe('author-delegate examination does not require an authoring worktree', () => {
   it('prints the read-only examination packet before branch and worktree readiness', () => {
     const records = ledger(
       Array.from({ length: FABLE_ESCALATION_ROUNDS - 1 }, () => ({

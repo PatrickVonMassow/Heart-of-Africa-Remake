@@ -27,7 +27,7 @@ import {
 import { notify } from './notify.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
-import { currentFableState, servingRoute } from './fable-switch.mjs'
+import { currentFableState, servingRoute } from './lane-switch.mjs'
 import { readTranscriptMessages } from './authorship-check-core.mjs'
 import { modelHandoffDecision } from './model-handoff-core.mjs'
 import { writeJsonAtomic, writeTextAtomic } from './atomic-write.mjs'

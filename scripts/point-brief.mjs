@@ -17,7 +17,7 @@ import { join, relative, resolve } from 'node:path'
 import { ARCHIVE_PATH, readTasksAll, TASKS_PATH } from './tasks-source.mjs'
 import { BriefError, buildBrief, BRIEF_TOKEN_CEILING, ORIENTATION_LIMITS } from './point-brief-core.mjs'
 import { CLAUDE_PATH, DESIGN_PATH, REPO_ROOT, readDocCorpus } from './doc-corpus.mjs'
-import { currentSetting, settingProblemLine } from './astra-share.mjs'
+import { currentSetting, settingProblemLine } from './lane-routing.mjs'
 
 /**
  * The suites' own section parser, loaded ONLY if scripts/verify/ is there.

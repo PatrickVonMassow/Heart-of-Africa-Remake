@@ -37,7 +37,7 @@ import { lostPoints } from './carrier-reconcile-core.mjs'
 import { ALIASES_PATH, runReconcile, showAtRevision } from './carrier-reconcile.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentFableState } from './lane-switch.mjs'
 import {
   branchDeletionBlocker,
   formatCleanupNotes,
@@ -913,7 +913,7 @@ async function main(argv) {
     if (trailers.block) {
       console.error(
         `land-point: --model "${model}" is not an allowed authoring model (CLAUDE.md §6).\n` +
-          `  The serving chain is derived by node scripts/fable-switch.mjs --status; name the model actually running this landing.`,
+          `  The serving chain is derived by node scripts/lane-switch.mjs --status; name the model actually running this landing.`,
       )
       return 2
     }

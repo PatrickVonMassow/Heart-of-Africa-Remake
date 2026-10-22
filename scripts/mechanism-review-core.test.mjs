@@ -43,7 +43,7 @@ import {
   verifiedPlannerPasses,
   VERDICTS,
 } from './mechanism-review-core.mjs'
-import { CLAUDE_MODEL, readState, writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, readState, writeState } from './lane-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
@@ -1588,7 +1588,7 @@ describe('evaluateMechanismReview', () => {
       const text = formatMechanismReviewVerdict(v)
       expect(text).toContain('split into 3 passes')
       expect(text).toContain('missing pass 2')
-      expect(text).not.toContain('review-astra.mjs --sha')
+      expect(text).not.toContain('cross-review.mjs --sha')
       expect(text).toContain('immutable commit boundary')
     })
 
@@ -1604,7 +1604,7 @@ describe('evaluateMechanismReview', () => {
         ['Fable 5', ['scripts/render-verify-core.test.mjs', 'scripts/section-tag-core.mjs', 'scripts/verify/sections.mjs']],
         ['Opus 5', ['scripts/criticality-review-guard.mjs', 'scripts/mechanism-review-core.test.mjs']],
         ['Opus 5', ['scripts/render-verify-guard.mjs', 'scripts/render-verify-guard.test.mjs', 'scripts/render-verify-recorder.mjs']],
-        ['Opus 5', ['scripts/review-astra.mjs', 'scripts/tasks-spec-guard.mjs', 'scripts/verify/sections.test.mjs', 'scripts/review-astra-plan.test.mjs']],
+        ['Opus 5', ['scripts/cross-review.mjs', 'scripts/tasks-spec-guard.mjs', 'scripts/verify/sections.test.mjs', 'scripts/cross-review-plan.test.mjs']],
         ['Fable 5', ['scripts/mechanism-review-core.mjs']],
         ['Fable 5', ['scripts/render-verify-recorder.test.mjs']],
         ['Fable 5', ['scripts/verify/README.md']],
@@ -2523,7 +2523,7 @@ describe('validateRecord carries the mode', () => {
     expect(validateRecord(input).ok, validateRecord(input).errors).toBe(true)
     expect(resolveMergePolicy({ ...input, authors: [input.model, input.authoredBy] })).toMatchObject({
       mergedBy: 'GPT-6 Astra',
-      mergeFallback: expect.stringContaining('node scripts/fable-switch.mjs --status'),
+      mergeFallback: expect.stringContaining('node scripts/lane-switch.mjs --status'),
       errors: [],
     })
     expect(validateRecord({ ...input, mergedBy: 'Fable 5' }).ok).toBe(false)

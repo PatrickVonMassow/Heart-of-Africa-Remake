@@ -163,7 +163,7 @@ export const pointLaneCommitsCommand = (ref, exclude = TICK_BRANCH) => [
 ]
 
 // THE SAME BOUNDARY THE PLANNER USES (`reviewEndStateFiles`). The gate demanded
-// coverage of paths `review-astra` structurally refuses to put in a pass — the work
+// coverage of paths `cross-review` structurally refuses to put in a pass — the work
 // order, its archive, the retrospective — so a HIGH point whose file set had
 // picked one of them up could never reach a complete composition, whatever was
 // reviewed. The exclusion list already says why those documents have their own

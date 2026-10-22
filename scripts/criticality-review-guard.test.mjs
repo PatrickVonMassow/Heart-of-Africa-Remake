@@ -34,7 +34,7 @@ import {
   readWorkOrder,
   showAt,
 } from './criticality-review-guard.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL } from './lane-switch-core.mjs'
 
 describe('baselineFor', () => {
   it('prefers the branch’s own confirmed baseline, then main’s, then nothing', () => {
@@ -143,7 +143,7 @@ describe('point file-set measurement', () => {
     expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
   })
 
-  // ONE BOUNDARY (28.08.2026): `review-astra` structurally refuses to put the work
+  // ONE BOUNDARY (28.08.2026): `cross-review` structurally refuses to put the work
   // order, its archive or the retrospective in a pass, so a point whose measured
   // file set picked one of them up could never reach a complete composition,
   // whatever was reviewed. The gate reads the planner's exclusion list.
@@ -351,11 +351,11 @@ describe('point file-set measurement', () => {
     const calls = []
     const rows = attachPointFileSets([commission, review], (base, sha) => {
       calls.push([base, sha])
-      return ['scripts/author-fable.mjs', 'scripts/author-astra.mjs']
+      return ['scripts/author-fable.mjs', 'scripts/author-delegate.mjs']
     })
 
     expect(calls).toEqual([[commission.sha, review.sha]])
-    expect(rows[1].pointFiles).toEqual(['scripts/author-fable.mjs', 'scripts/author-astra.mjs'])
+    expect(rows[1].pointFiles).toEqual(['scripts/author-fable.mjs', 'scripts/author-delegate.mjs'])
   })
 
   it('verifies unavailable receipts only for Git’s exact unreviewable file set', () => {

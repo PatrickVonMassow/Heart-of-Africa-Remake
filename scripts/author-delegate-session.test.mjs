@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { writeState as writeFableState } from './fable-switch-core.mjs'
+import { writeState as writeFableState } from './lane-switch-core.mjs'
 
-const moduleUrl = pathToFileURL(resolve('scripts/author-astra.mjs')).href
+const moduleUrl = pathToFileURL(resolve('scripts/author-delegate.mjs')).href
 const dirs = []
 const processes = new Set()
 const waitFor = (check) => vi.waitFor(check, { timeout: 10_000, interval: 20 })
@@ -106,7 +106,7 @@ describe('authoring session and log ownership', () => {
   it.each(['absolute', 'relative'])('keeps an explicit %s log path in the caller worktree', async (override) => {
     const run = fixture({ worktree: true, override })
     await running(run)
-    expect(run.stdout().split('\n')[0]).toBe(`author-astra: log ${run.log} (append)`)
+    expect(run.stdout().split('\n')[0]).toBe(`author-delegate: log ${run.log} (append)`)
     expect(existsSync(join(run.main, 'local'))).toBe(false)
     writeFileSync(run.release, '')
     expect((await run.closed).code).toBe(0)
@@ -118,7 +118,7 @@ describe('authoring session and log ownership', () => {
     const identity = await running(run)
     expect(identity.pid).not.toBe(run.child.pid)
     expect(run.child.exitCode).toBe(null)
-    expect(run.stdout().split('\n')[0]).toBe(`author-astra: log ${run.log} (append)`)
+    expect(run.stdout().split('\n')[0]).toBe(`author-delegate: log ${run.log} (append)`)
     writeFileSync(run.release, '')
     expect(await run.closed).toEqual({ code: exitCode, signal: null })
     expect(run.stderr()).toBe('')
@@ -179,7 +179,7 @@ describe('authoring session and log ownership', () => {
   it('validates --log and documents the unsupported same-path tee without creating logs for help', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'hoa-author-help-'))
     dirs.push(cwd)
-    const script = resolve('scripts/author-astra.mjs')
+    const script = resolve('scripts/author-delegate.mjs')
     const help = spawnSync(process.execPath, [script, '--help'], { cwd, encoding: 'utf8', windowsHide: true })
     expect(help.status).toBe(0)
     expect(help.stdout).toContain('[--log <path>]')

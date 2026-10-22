@@ -1,7 +1,7 @@
 // THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1).
 // It also addresses the Claude-family lanes (fable, opus, opus48; see ASK_MODELS).
 //
-// `scripts/review-astra.mjs` proved one shape of this: `codex exec` in a READ-ONLY sandbox
+// `scripts/cross-review.mjs` proved one shape of this: `codex exec` in a READ-ONLY sandbox
 // with the artefact on stdin, because this container cannot create user namespaces and a
 // shell command of the reviewer's would die before it ran. When point 654 was written, the
 // last twelve recorded mechanism reviews all carried "GPT-6 Astra", so the path worked.
@@ -9,7 +9,7 @@
 // What it did NOT do is carry any other kind of pure text work — and text work is where
 // the volume is: measured 12.08.2026, verification is 41.5 % of the whole spend and
 // 48.0 % of that is reading logs, scripts and reports, i.e. 19.9 % of everything, with
-// no browser and no picture involved (docs/astra-routing.md carries the whole table).
+// no browser and no picture involved (docs/lane-routing.md carries the whole table).
 //
 // THE RULE THIS FILE IS SHAPED AROUND is the review path's, unchanged: an answer nobody
 // gave must never be reported as an answer. Every path out of a failed run says so
@@ -17,7 +17,7 @@
 // Astra, to another eligible lane otherwise — never silently, never recorded as the model's.
 //
 // Side-effect free: the process spawn, the material gathering and the printing belong to
-// scripts/ask-astra.mjs. Pinned by ask-astra-core.test.mjs.
+// scripts/ask-lane.mjs. Pinned by ask-lane-core.test.mjs.
 
 import {
   FABLE_MODEL,
@@ -27,8 +27,8 @@ import {
   OPUS_MODEL,
   OPUS_MODEL_ID,
   parseClaudeResultOutput,
-} from './fable-switch-core.mjs'
-import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, stripDecoration, ASTRA_REASONING_EFFORT } from './review-astra-core.mjs'
+} from './lane-switch-core.mjs'
+import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, stripDecoration, ASTRA_REASONING_EFFORT } from './cross-review-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
 
@@ -104,7 +104,7 @@ export function entryPrefix(kind) {
  */
 export function buildAskPrompt({ kind = '', brief = '', modelName = ASTRA_MODEL_NAME } = {}) {
   const k = normaliseKind(kind)
-  if (!k) throw new Error(`ask-astra: not a kind: ${kind}`)
+  if (!k) throw new Error(`ask-lane: not a kind: ${kind}`)
   const shape = ANSWER_SHAPES[k]
   const lines = [
     `You are doing READ-ONLY work for this repository as ${modelName}. You were chosen`,
@@ -329,7 +329,7 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
  */
 export function parseAnswer({ kind = '', text = '' } = {}) {
   const k = normaliseKind(kind)
-  if (!k) throw new Error(`ask-astra: not a kind: ${kind}`)
+  if (!k) throw new Error(`ask-lane: not a kind: ${kind}`)
   // Markdown DECORATION by its SHAPE, never by bare character (round-7
   // pass 1, sharpening round 6): deleting every `*_#>` globally corrupted
   // structured answers (`src/foo_bar.mjs` → `src/foobar.mjs`) and could
@@ -408,9 +408,9 @@ export function formatUnavailable({ kind = '', cause = '', setting = '', modelNa
   const k = normaliseKind(kind) ?? String(kind ?? '')
   const handoff = modelName === ASTRA_MODEL_NAME ? 'Do it in the Claude chain' : 'Hand it to another eligible lane'
   return [
-    `ask-astra: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
+    `ask-lane: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
     `  The ${k} is NOT done. ${handoff} — nothing here may be recorded as ${modelName}'s work.`,
-    ...(setting === 'claude-only' && modelName === ASTRA_MODEL_NAME ? ['  (The share switch is at `claude-only`; `node scripts/astra-share.mjs --more` steps toward Astra; at `default` only review and enumerate go there.)'] : []),
+    ...(setting === 'claude-only' && modelName === ASTRA_MODEL_NAME ? ['  (The share switch is at `claude-only`; `node scripts/lane-routing.mjs --more` steps toward Astra; at `default` only review and enumerate go there.)'] : []),
   ].join('\n')
 }
 
@@ -419,7 +419,7 @@ export function formatUnavailable({ kind = '', cause = '', setting = '', modelNa
 export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = ASTRA_MODEL_NAME, effort = ASTRA_REASONING_EFFORT } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
   const seconds = Number.isFinite(Number(elapsedMs)) ? Math.round(Number(elapsedMs) / 1000) : 0
-  const head = `ask-astra: ${modelName} (effort ${effort}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
+  const head = `ask-lane: ${modelName} (effort ${effort}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
   if (k === 'diagnose') return [head, `  CAUSE:    ${parsed.answer?.cause ?? ''}`, `  EVIDENCE: ${parsed.answer?.evidence ?? ''}`].join('\n')
   if (k === 'audit' || k === 'enumerate') {
     return [head, ...(parsed.answer?.entries ?? []).map((e) => `  ${e.id} | ${e.file} | ${e.text}`)].join('\n')

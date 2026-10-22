@@ -901,7 +901,7 @@ describe('the astra-routing line', () => {
     const brief = briefAt('default')
     expect(brief).toMatch(/ASTRA ROUTING is at `default`/)
     expect(brief).toContain('reviews and enumerate go to GPT-6 Astra')
-    expect(brief).toContain('ask-astra.mjs --kind enumerate')
+    expect(brief).toContain('ask-lane.mjs --kind enumerate')
     expect(brief).toContain('Diagnose, audit, explain and author stay with Claude')
     expect(brief).toContain('a blind audit half uses `--anyway`')
   })
@@ -909,7 +909,7 @@ describe('the astra-routing line', () => {
   it('tells the agent WHAT to hand over while the switch prefers Astra', () => {
     const brief = briefAt('prefer-astra')
     expect(brief).toMatch(/hand diagnose\/audit\/enumerate\/explain/)
-    expect(brief).toMatch(/ask-astra\.mjs --kind/)
+    expect(brief).toMatch(/ask-lane\.mjs --kind/)
     expect(brief).toMatch(/You keep the gates, the suites and the pictures/)
     // The reader of a brief is ALREADY the author, whichever lane it is in
     // (point 667), so the line offers it the READING kinds and no other.
@@ -918,7 +918,7 @@ describe('the astra-routing line', () => {
   })
 
   it('tells it to stay off Astra entirely at claude-only', () => {
-    expect(briefAt('claude-only')).toMatch(/do NOT call `scripts\/ask-astra\.mjs`/)
+    expect(briefAt('claude-only')).toMatch(/do NOT call `scripts\/ask-lane\.mjs`/)
   })
 
   it('defaults to the default when the caller passes nothing at all', () => {

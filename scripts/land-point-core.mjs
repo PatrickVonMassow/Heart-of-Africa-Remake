@@ -37,7 +37,7 @@
 //     INTRODUCE a finding that guard would block on (pre-existing ones are
 //     tolerated — see transitionAccepted).
 
-import { CLAUDE_MODEL } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL } from './lane-switch-core.mjs'
 
 /** A landing failure that is the CHAIN's own verdict, not a crash. */
 export class LandingError extends Error {

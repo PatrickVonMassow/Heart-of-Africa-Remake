@@ -13,7 +13,7 @@ import {
   vendorOf,
 } from './mechanism-review-range-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
-import { CLAUDE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL } from './lane-switch-core.mjs'
 
 const sha = (letter) => letter.repeat(40)
 const commit = (id, authorModel, files) => ({ sha: sha(id), authorModel, files })

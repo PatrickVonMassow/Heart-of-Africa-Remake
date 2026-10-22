@@ -58,7 +58,7 @@ import {
   OPUS_MODEL,
   fableIsOn,
   fableRefusalReason,
-} from './fable-switch-core.mjs'
+} from './lane-switch-core.mjs'
 
 /** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
  *  matched against the name PARSED out of a trailer (`modelNamesIn`) — anchored,

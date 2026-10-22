@@ -1,6 +1,6 @@
 // Pure decisions for the Fable authoring command. The process and git work stay
-// in author-astra.mjs, whose commissioner is parameterised by lane.
-import { FABLE_MODEL, FABLE_MODEL_ID } from './fable-switch-core.mjs'
+// in author-delegate.mjs, whose commissioner is parameterised by lane.
+import { FABLE_MODEL, FABLE_MODEL_ID } from './lane-switch-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 
 export { FABLE_MODEL, FABLE_MODEL_ID }

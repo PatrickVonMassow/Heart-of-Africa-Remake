@@ -37,8 +37,8 @@ import {
   ASTRA_MODEL_ID,
   ASTRA_MODEL_NAME,
   ASTRA_REASONING_EFFORT,
-} from './review-astra-core.mjs'
-import { CLAUDE_MODEL, OPUS_FALLBACK_MODEL, OPUS_MODEL, readState, writeState } from './fable-switch-core.mjs'
+} from './cross-review-core.mjs'
+import { CLAUDE_MODEL, OPUS_FALLBACK_MODEL, OPUS_MODEL, readState, writeState } from './lane-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test', by: 'test', now: 1 })))
 
@@ -334,7 +334,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
       sha: '16793dd'.padEnd(40, '0'),
       brief: 'read the guide and brevity core at their end state',
       point: 977,
-    })).toMatch(/^node scripts\/review-astra\.mjs --reviewer fable /)
+    })).toMatch(/^node scripts\/cross-review\.mjs --reviewer fable /)
   })
 
   it('a reachable Sol reviews, and is recorded as the reviewer', () => {

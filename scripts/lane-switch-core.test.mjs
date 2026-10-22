@@ -24,7 +24,7 @@ import {
   statusReport,
   unreadableState,
   writeState,
-} from './fable-switch-core.mjs'
+} from './lane-switch-core.mjs'
 
 const on = () => readState(JSON.stringify(writeState('on', { why: 'capacity restored', by: 'the user', now: 1_700_000_000_000 })))
 const off = () => readState(JSON.stringify(writeState('off', { why: 'not enough volume left', by: 'the user', now: 1_700_000_000_000 })))
@@ -34,7 +34,7 @@ describe('the Fable state record', () => {
     const state = off()
     expect(state).toMatchObject({ ok: true, state: 'off', reason: 'not enough volume left', setBy: 'the user' })
     expect(statusReport(state)).toBe(
-      'fable-switch: OFF — reason: not enough volume left — set by the user at 2023-11-14T22:13:20.000Z',
+      'lane-switch: OFF — reason: not enough volume left — set by the user at 2023-11-14T22:13:20.000Z',
     )
   })
 
@@ -46,16 +46,16 @@ describe('the Fable state record', () => {
   ])('%s state fails loud instead of choosing a direction', (_name, state) => {
     expect(state.ok).toBe(false)
     expect(state.state).toBeNull()
-    expect(state.problem).toContain('node scripts/fable-switch.mjs --status')
-    expect(() => fableIsOn(state)).toThrow(/fable-switch\.mjs --status/)
-    expect(() => mergerModel(state)).toThrow(/fable-switch\.mjs --status/)
+    expect(state.problem).toContain('node scripts/lane-switch.mjs --status')
+    expect(() => fableIsOn(state)).toThrow(/lane-switch\.mjs --status/)
+    expect(() => mergerModel(state)).toThrow(/lane-switch\.mjs --status/)
   })
 
   it('refuses incomplete writes', () => {
     expect(() => writeState('sideways', { why: 'x', by: 'y' })).toThrow(/on or off/)
     expect(() => writeState('off', { why: '', by: 'y' })).toThrow(/--why/)
     expect(() => writeState('off', { why: 'x', by: '' })).toThrow(/setter/)
-    expect(() => requireState({ state: 'off' })).toThrow(/fable-switch\.mjs/)
+    expect(() => requireState({ state: 'off' })).toThrow(/lane-switch\.mjs/)
   })
 
   it('lives in the main checkout shared by delegated worktrees', () => {
@@ -83,7 +83,7 @@ describe('decisions derived from the state', () => {
     expect(servingPolicyLine(on())).not.toContain('Fable 5.1, Sonnet, Haiku')
     expect(servingPolicyLine(off())).toContain(`${OPUS_MODEL}, then ${OPUS_FALLBACK_MODEL}`)
     expect(servingPolicyLine(off())).toContain('Fable 5.1, Sonnet, Haiku')
-    expect(servingPolicyLine(off())).toContain('node scripts/fable-switch.mjs --status')
+    expect(servingPolicyLine(off())).toContain('node scripts/lane-switch.mjs --status')
     expect(servingPolicyLine(off())).toContain('trusted handoff to the next allowed lane')
     expect(servingPolicyLine(off())).toContain('Only that fresh lane')
     expect(servingPolicyLine(off())).not.toContain('.claude/batch-paused')
@@ -202,7 +202,7 @@ describe('decisions derived from the state', () => {
 
   it('generates the route refusal from the same record', () => {
     expect(fableRefusalReason(off())).toBe(
-      'Fable 5.1 is refused because the recorded Fable switch is OFF (node scripts/fable-switch.mjs --status): not enough volume left',
+      'Fable 5.1 is refused because the recorded Fable switch is OFF (node scripts/lane-switch.mjs --status): not enough volume left',
     )
     expect(fableRefusalReason(on())).toBe('')
   })
