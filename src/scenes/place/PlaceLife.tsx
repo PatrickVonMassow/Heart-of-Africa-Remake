@@ -62,7 +62,7 @@ import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
+import { START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
@@ -74,8 +74,9 @@ import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
 import {
   SPARE_JAR_LOCAL, aimFromShoulder, standJarLocal, toFigureFrame, standToWorld, standYaw, takeJarTravel, takePose,
 } from './waterStand'
-import { workStop, type WorkStopMode } from './taskWalkerStop'
-import { steerHeading, wayHeading } from '../../render/figureWalk'
+import { workSpan, workStop, type StopMode } from './taskWalkerStop'
+import { correctAim, gripPoints, handlingPose, loadHandling, loadPlacement, type LoadHandling, type V3 } from './taskWalkerLoad'
+import { approach, steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
@@ -2222,13 +2223,68 @@ function TaskWalker({
   const kneels = useRef(false)
   const load = useRef<THREE.Group>(null)
   const state = useRef({
-    mode: 'inside' as 'inside' | 'go' | WorkStopMode,
+    mode: 'inside' as 'inside' | 'go' | 'back' | StopMode,
     seg: 0,
     x: home.x,
     z: home.z,
     yaw: 0,
     timer: startDelay,
+    /** This stop's kneeling time (`workSpan`). */
+    span: 0,
   })
+  // The load in its hands (taskWalkerLoad.ts): its own pose, the kneel as the
+  // body draws it, and each hand's aim correction toward the drawn arm.
+  const pose = useRef<FigurePose>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 })
+  const kneelK = useRef(0)
+  const aimFix = useRef<[V3, V3]>([{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }])
+  const handle = useMemo(() => {
+    const inv = new THREE.Matrix4()
+    const m = new THREE.Matrix4()
+    const hp = new THREE.Vector3()
+    const hq = new THREE.Quaternion()
+    const hs = new THREE.Vector3()
+    const v = new THREE.Vector3()
+    const upright = new THREE.Quaternion()
+    const toV3 = (o: THREE.Vector3): V3 => ({ x: o.x, y: o.y, z: o.z })
+    // Places the load and writes the arms for this frame. On the walk it rides
+    // the crown untouched; in the stop it goes where the hands take it.
+    return (stand: THREE.Group, h: LoadHandling, dt: number) => {
+      const g = load.current
+      const p = pose.current
+      if (!g) return
+      if (h.down === 0 && h.hold === 0 && h.reach === 0) {
+        g.position.set(0, 0, 0)
+        g.quaternion.identity()
+        g.scale.set(1, 1, 1)
+        handlingPose(p, h, [hp, hp], kneelK.current)
+        for (const f of aimFix.current) f.x = f.y = f.z = 0
+        return
+      }
+      stand.updateMatrixWorld(true)
+      const crown = stand.getObjectByName('figure-crown')
+      if (!crown) return
+      inv.copy(stand.matrixWorld).invert()
+      // the crown as last drawn, in the walker's own frame
+      m.multiplyMatrices(inv, crown.matrixWorld).decompose(hp, hq, hs)
+      const drawn = (['hand-left', 'hand-right'] as const).map((n) => {
+        const o = stand.getObjectByName(n)
+        return o ? toV3(stand.worldToLocal(o.getWorldPosition(v))) : null
+      })
+      const hands = drawn[0] && drawn[1] ? ([drawn[0], drawn[1]] as [V3, V3]) : null
+      const placed = loadPlacement(h, toV3(hp), hands, carry)
+      const aims = gripPoints(placed.planned, carry).map((t, i) => {
+        const fix = (aimFix.current[i] = correctAim(aimFix.current[i], t, drawn[i], h.reach, dt))
+        return { x: t.x + fix.x, y: t.y + fix.y, z: t.z + fix.z }
+      }) as [V3, V3]
+      handlingPose(p, h, aims, kneelK.current)
+      // its transform in the walker's frame, brought into the crown's
+      hq.slerp(upright, placed.tilt)
+      hs.lerp(v.set(1, 1, 1), placed.tilt)
+      m.compose(hp.set(placed.base.x, placed.base.y, placed.base.z), hq, hs)
+      inv.copy(crown.matrixWorld).invert().multiply(stand.matrixWorld).multiply(m)
+      inv.decompose(g.position, g.quaternion, g.scale)
+    }
+  }, [carry])
   // The body it presents to the other inhabitants (point 578) — only while it is
   // out of its dwelling.
   const bodySet = useContext(InhabitantBodiesContext)
@@ -2272,29 +2328,34 @@ function TaskWalker({
       }
       return
     }
-    if (s.mode === 'work' || s.mode === 'rise') {
-      // Kneels where it stopped, the load set down; the figure folds down and
-      // stands up again on its own short transition — held on the spot until
-      // it is up, then it takes the load and walks.
-      const next = workStop(s.mode, s.timer, dt)
+    if (s.mode === 'take' || s.mode === 'work' || s.mode === 'rise' || s.mode === 'settle') {
+      // Stops where it is: takes the load off its head with both hands, kneels
+      // and sets it down beside it, works, grips it again and rises with it
+      // onto its head — the figure folding down and standing up on its own
+      // short transition, held on the spot until the hands let go on the head.
+      // The load is never hidden: it is always where the hands have it.
+      const next = workStop(s.mode, s.timer, dt, s.span)
       kneels.current = next.kneels
-      if (load.current) load.current.visible = next.mode !== 'work'
       s.mode = next.mode
       s.timer = next.timer
       if (next.mode === 'back') s.seg = 0
+      kneelK.current = approach(kneelK.current, next.kneels ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
       stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
       stand.rotation.y = s.yaw
+      handle(stand, loadHandling(s.mode, s.timer, s.span), dt)
       return
     }
 
     stand.visible = true
     kneels.current = false
-    if (load.current) load.current.visible = true
+    kneelK.current = 0
+    handle(stand, loadHandling(s.mode, s.timer, s.span), dt)
     const tgt = route[s.seg + 1]
     if (!tgt) {
       if (s.mode === 'go') {
-        s.mode = 'work'
-        s.timer = 5 + Math.random() * 5
+        s.mode = 'take'
+        s.span = workSpan(5 + Math.random() * 5)
+        s.timer = TASK_LOAD_HANDLING.takeSeconds
       } else {
         s.mode = 'inside'
         s.timer = 10 + Math.random() * 16
@@ -2348,6 +2409,7 @@ function TaskWalker({
       <Figure
         cloth={cloth}
         kneeling={kneels}
+        pose={pose}
         headSteady={steadiedLoad(carry, taskLoadShape(carry))}
         headProp={
           <group ref={load}>
