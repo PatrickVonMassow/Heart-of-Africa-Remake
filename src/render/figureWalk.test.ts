@@ -367,15 +367,15 @@ describe('the task walker gets up before it walks off', () => {
     ]
     for (const dt of [1 / 60, 1 / 24, 0.1]) {
       const m = restingMotion()
-      let mode: WorkStopMode | 'go' = 'work'
+      let mode: WorkStopMode = 'take'
       let timer = 2
       let x = 0
       let kneels = true
       let kneltFully = false
       let walkedOff = false
       for (let f = 0; f < 400; f++) {
-        if (mode === 'work' || mode === 'rise') {
-          const next = workStop(mode, timer, dt)
+        if (mode !== 'back') {
+          const next = workStop(mode, timer, dt, 2)
           mode = next.mode
           timer = next.timer
           kneels = next.kneels

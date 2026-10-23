@@ -30,7 +30,7 @@ interface Frame {
 function simulate(carry: TaskLoad, lag = 0): Frame[] {
   const span = workSpan(6)
   let mode: WorkStopMode = 'take'
-  let timer = H.takeSeconds
+  let timer: number = H.takeSeconds
   let kneel = 0
   const rest: [V3, V3] = [
     { x: 0.25, y: 0.8, z: 0 },
