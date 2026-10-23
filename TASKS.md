@@ -77,18 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1430. Cloud authoring sessions deliver build, lint and Vitest green
-  QUEUE POSITION: front of the work order, directly after the branch clean-up point deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen").
-  GOAL: shorten local acceptance per point by moving the machine-independent gates into the cloud authoring session.
-  FINAL STATE:
-  1. The cloud authoring delegation (cloud switch ON, Agent isolation "remote") instructs the delegate to run build, lint and the unit layer (Vitest) on its branch before handing over, and to hand over: pushed commit sha, the three gate results, and open issues.
-  2. The local acceptance on the pushed branch then runs only what needs the quiet local machine: the covering browser tier suites (scripts/verify/tiers.mjs) and the picture check (both backends when isBackendSensitivePath applies), plus review and landing. The local tier run stays mandatory; cloud green is never accepted as local evidence for browser suites.
-  3. Change is limited to the delegation prompt/brief text and the place that documents the local acceptance steps (docs/batch-owner-runbook.md or docs/lane-routing.md); no new guard, ledger field, router or workflow abstraction (infrastructure freeze, CLAUDE.md §2). If a cloud unit result disagrees with a later local run, that is recorded as a finding, not handled by new machinery.
-  4. Evidence: one cloud-authored point landed under the new flow, with the handover message naming sha and gate results, and the local acceptance log showing no repeated build/lint/unit layer. SPLIT 23.10.2026 into point 1436 (no cloud-authored point exists yet to carry it); 1430 lands with items 1–3.
-  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entry U5 (A3 + B12).
-  Observed problem: Local acceptance is the measured bottleneck: review, suites, picture check and landing run serially in one session on one machine that must be quiet (memory verify-suites-need-a-quiet-machine). Build, lint and Vitest do not need that machine; running them in the cloud session removes them from the serial step for every point. It is a simplification of the local step without new infrastructure, which satisfies the finding-intake rule of CLAUDE.md §2.
-  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1431. Hand the throughput working instruction to the batch-owning session
   QUEUE POSITION: front of the work order together with the two points deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen"). This is a standing working instruction for the batch owner plus one backlog entry, not code; carry it in as one short point whose final state is the recorded instruction, or apply it directly and record it as closed.
   FINAL STATE:
