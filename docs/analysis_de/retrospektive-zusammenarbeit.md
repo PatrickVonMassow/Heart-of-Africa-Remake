@@ -1749,7 +1749,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 23.10.2026, 06:23 · Quellen-Fingerprint: `5132e3b53347…`
+Zuletzt aktualisiert: Freitag, 23.10.2026, 07:32 · Quellen-Fingerprint: `b61862ede4e3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1795,7 +1795,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Pure read/search delegations (locate or summarize only) use subagent_type Explore, not general-purpose; writing, committing, verifying, authoring, review and suites keep their agent types | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 7 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 144 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 145 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1866,8 +1866,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 107 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 172 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
 
-<!-- RETRO-FINGERPRINT: 5132e3b53347f503ba397fb6d931270c270d3e4fcade12d732b1c82f4f44411b -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-23T04:23:00.996Z -->
+<!-- RETRO-FINGERPRINT: b61862ede4e33642c8d4b07cf59e59a35cbef0d046d4a0e855d1912bcb4763a8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-23T05:32:20.751Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8256,3 +8256,18 @@ hatte. Die Regel steht seit dem 23.09. im Memory (`only-one-head-session`): Wenn
 eine Schreiboperation braucht und der Guard sie verweigert, hole ich den Batch über den
 vorgesehenen Anspruchsweg selbst — und schicke den Nutzer nie in eine Sitzung, die ihn nicht
 hören kann.
+
+### 3.306 Die Wächter kannten nur eine Maschine
+
+Punkt 1426 sollte den Cloud-Klon arbeitsfähig machen, und er scheiterte zunächst an unseren
+eigenen Wächtern: Mehrere lasen lokalen, nicht versionierten Zustand — Schalterdateien,
+Lane-Einträge, Home-Pfade —, und wo dieser Zustand auf der frischen Maschine schlicht fehlte,
+werteten sie das als „aus" und sperrten. Fehlender Zustand und ein Zustand, der „nein" sagt,
+sahen im Code gleich aus.
+
+Die Lockerung selbst war dann teurer als erwartet: fünf Cross-Review-Runden mit sieben Lücken —
+fremde Homes, Home-Aliase, Groß-/Kleinschreibung, `~/..`, Deduplizierung, ein `null`-Eintrag.
+Jede war für sich klein, und jede hätte als neue Freigabe falsch gegriffen. Die Lehre hat zwei
+Hälften: Ein Wächter trennt „Zustand fehlt" ausdrücklich von „Zustand verbietet", und eine
+Lockerung wird reviewt wie neuer Code, weil sie dieselbe Angriffsfläche hat. Der Befund liegt
+nicht blockierend in `docs/backlog.md` (Befund vom 23.10.2026).
