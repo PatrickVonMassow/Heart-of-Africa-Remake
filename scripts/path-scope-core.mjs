@@ -431,7 +431,9 @@ export function pathsInCommand(command, ctx, parseSegments) {
       // one of them: a same-canonical path is a duplicate only when its physical
       // spelling matches too (or one of them is unknown, e.g. a bare `~` form).
       const physical = physicalPath(cand, c)
-      const same = (e) => !e.physical || !physical || e.physical.toLowerCase() === physical.toLowerCase()
+      // POSIX spellings compare case-sensitively; only drive paths fold case.
+      const fold = (s) => (s.startsWith('/') ? s : s.toLowerCase())
+      const same = (e) => !e.physical || !physical || fold(e.physical) === fold(physical)
       const entries = seen.get(canonical) || []
       if (entries.some(same)) continue
       seen.set(canonical, [...entries, { raw: cand, canonical, physical }])

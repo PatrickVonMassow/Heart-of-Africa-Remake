@@ -416,6 +416,13 @@ describe('the checkout root of the running repository is in scope wherever it li
     expect(v.offenders.map((o) => o.raw)).toEqual(['/root/Repo/secret'])
   })
 
+  it('a case-variant POSIX sibling in the same command is judged on its own', () => {
+    const repo = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    const v = evaluate({ command: 'cat /home/user/Repo/secret /home/User/Repo/secret', ctx: repo, parseSegments })
+    expect(v.block).toBe(true)
+    expect(v.offenders.map((o) => o.raw)).toEqual(['/home/User/Repo/secret'])
+  })
+
   it('~ is expanded before .. is collapsed', () => {
     const repo = { ...cloud, projectRoots: ['/home/user/Repo'] }
     expect(evaluate({ command: 'cat ~/../Repo/secret', ctx: repo, parseSegments }).block).toBe(true)
