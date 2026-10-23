@@ -34763,3 +34763,19 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Observed problem: Local acceptance is the measured bottleneck: review, suites, picture check and landing run serially in one session on one machine that must be quiet (memory verify-suites-need-a-quiet-machine). Build, lint and Vitest do not need that machine; running them in the cloud session removes them from the serial step for every point. It is a simplification of the local step without new infrastructure, which satisfies the finding-intake rule of CLAUDE.md §2.
   Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1431. Hand the throughput working instruction to the batch-owning session
+  QUEUE POSITION: front of the work order together with the two points deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen"). This is a standing working instruction for the batch owner plus one backlog entry, not code; carry it in as one short point whose final state is the recorded instruction, or apply it directly and record it as closed.
+  FINAL STATE:
+  1. Working instruction for the batch-owning session, recorded where the owner reads its routine (docs/batch-owner-runbook.md, a short section "Throughput with cloud authoring"), effective immediately:
+     a. Quiet acceptance windows: while a local browser suite, unit gate or picture check runs, no other local agent, browser or Vitest run starts; cloud authoring continues (U4).
+     b. Gate a branch only after its author declares it final; rerun only the checks a later commit invalidates (U7).
+     c. Use suite wait time for lightweight work only: review other pushed commits early, prepare their acceptance steps; never start a second heavy check (U8).
+     d. When refilling the pool, prefer bounded ready points with clear acceptance and disjoint files/prerequisites; check overlap before delegating (U9).
+     e. Pace cloud authoring up to the credit expiry on 05.11.2026 to what local acceptance can land, not to what the cloud can produce (U12).
+  2. docs/backlog.md entry (non-blocking): "Separate cloud-author cap" — raise the authoring cap above 3 and stop counting pushed-but-unverified branches only if, after the branch clean-up and the cloud pre-check points, the pool sits at 3 with the owner idle; then change POOL_CAP (scripts/batch-in-flight-core.mjs) and DAEMON_POOL_CAP (scripts/batch-daemon-core.mjs) together, since a test asserts they agree (U11; disagreement A1 vs B6/B16, Fable's verdict: measure first).
+  3. Not repeated because already rules: tier selection (CLAUDE.md §5, U6) and reproducing loaded reds on a quiet machine (CLAUDE.md §7.2, memory verify-suites-need-a-quiet-machine, U10).
+  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entries U4, U7, U8, U9, U11, U12.
+  Observed problem: These union entries are working practices of the batch owner, not code; a point per entry would open branches with nothing to change, and enforcing them by guards is forbidden by the infrastructure freeze. The user approved recording them as an instruction to the batch-owning session and parking the cap question in the backlog with its measurement condition, so they are not lost.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
