@@ -1749,7 +1749,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 23.10.2026, 06:23 · Quellen-Fingerprint: `5132e3b53347…`
+Zuletzt aktualisiert: Freitag, 23.10.2026, 07:11 · Quellen-Fingerprint: `9c1fb9bef499…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1866,8 +1866,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 107 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 172 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
 
-<!-- RETRO-FINGERPRINT: 5132e3b53347f503ba397fb6d931270c270d3e4fcade12d732b1c82f4f44411b -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-23T04:23:00.996Z -->
+<!-- RETRO-FINGERPRINT: 9c1fb9bef4994749d1a408d1ec097d4ed71e39207a1b5aa0c07e9295a469cd7a -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-23T05:11:00.230Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8256,3 +8256,18 @@ hatte. Die Regel steht seit dem 23.09. im Memory (`only-one-head-session`): Wenn
 eine Schreiboperation braucht und der Guard sie verweigert, hole ich den Batch über den
 vorgesehenen Anspruchsweg selbst — und schicke den Nutzer nie in eine Sitzung, die ihn nicht
 hören kann.
+
+### 3.306 Die Wächter kannten nur eine Maschine
+
+Punkt 1426 sollte den Cloud-Klon arbeitsfähig machen, und er scheiterte zunächst an unseren
+eigenen Wächtern: Mehrere lasen lokalen, nicht versionierten Zustand — Schalterdateien,
+Lane-Einträge, Home-Pfade —, und wo dieser Zustand auf der frischen Maschine schlicht fehlte,
+werteten sie das als „aus" und sperrten. Fehlender Zustand und ein Zustand, der „nein" sagt,
+sahen im Code gleich aus.
+
+Die Lockerung selbst war dann teurer als erwartet: fünf Cross-Review-Runden mit sieben Lücken —
+fremde Homes, Home-Aliase, Groß-/Kleinschreibung, `~/..`, Deduplizierung, ein `null`-Eintrag.
+Jede war für sich klein, und jede hätte als neue Freigabe falsch gegriffen. Die Lehre hat zwei
+Hälften: Ein Wächter trennt „Zustand fehlt" ausdrücklich von „Zustand verbietet", und eine
+Lockerung wird reviewt wie neuer Code, weil sie dieselbe Angriffsfläche hat. Der Befund liegt
+nicht blockierend in `docs/backlog.md` (Befund vom 23.10.2026).
