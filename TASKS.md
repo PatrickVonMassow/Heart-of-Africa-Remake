@@ -77,6 +77,51 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1429. Reconcile the nine open branches and eight worktrees with the work order
+  QUEUE POSITION: front of the work order (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen"), ahead of the cloud pre-check point deposited with it.
+  GOAL: free the three-slot pool so cloud authoring can run at all. Measured 23.10.2026 14:30: POOL_CAP = 3 counts open feat/* branches (point 712), and nine are open remotely (1049-queue-order-rule, 1255-loom-plaza-distance, 1297-calf-shield-river, 1333-jar-mouth-under-water, 1347-garment-rebuild, 1405-water-carrier-table, 834-durable-authoring-lane, 847-brevity-guard-gaps, 901-superseded-ci-run), eight with local worktrees. The pool is oversubscribed threefold, so no new delegation starts and the user sees one task in progress.
+  FINAL STATE:
+  1. Reconcile: every open feat/* branch and worktree is checked against TASKS.md, docs/tasks-archive.md and docs/backlog.md and classified as merged, superseded, abandoned, or live (with its distance to acceptance). Read each branch log before deciding.
+  2. Close: merged, superseded and abandoned branches are removed (local branch, remote branch, worktree) after any still-needed diff is preserved (commit sha named in the point's closing record or backlog).
+  3. Infrastructure branches 834, 847, 901: triaged against the infrastructure freeze (CLAUDE.md §2). Only one that fixes a reproducible current-game blockade or a possible false approval continues; the rest are parked as entries in docs/backlog.md (branch name, last sha, what is done/missing) and their branches and worktrees removed; their TASKS.md points closed with that reason.
+  4. Land: after the running verify finishes, the remaining live feature branches are landed in order of distance to acceptance, each time-boxed; a branch that does not converge in its box is split or demoted instead of holding a slot (memory split-a-point-that-will-not-converge).
+  5. Evidence: closing record lists, per branch, its classification and outcome, and the open feat/* count after the point (target: at most 3, slots free for refill).
+  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entries U1, U2, U3.
+  Observed problem: The user asked why only one task is usually in progress although authoring now runs in the cloud. Measurement shows the pool cap of 3 is held by nine open branches, most waiting for review, verification or landing, or parked. Freeing those slots is the only change that lets parallel cloud authoring start today; raising the cap would only add branches waiting at the serial local acceptance step (Fable's verdict in the merged union, U11). It is a real blockade and mostly deletion, which satisfies the finding-intake rule of CLAUDE.md §2.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1430. Cloud authoring sessions deliver build, lint and Vitest green
+  QUEUE POSITION: front of the work order, directly after the branch clean-up point deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen").
+  GOAL: shorten local acceptance per point by moving the machine-independent gates into the cloud authoring session.
+  FINAL STATE:
+  1. The cloud authoring delegation (cloud switch ON, Agent isolation "remote") instructs the delegate to run build, lint and the unit layer (Vitest) on its branch before handing over, and to hand over: pushed commit sha, the three gate results, and open issues.
+  2. The local acceptance on the pushed branch then runs only what needs the quiet local machine: the covering browser tier suites (scripts/verify/tiers.mjs) and the picture check (both backends when isBackendSensitivePath applies), plus review and landing. The local tier run stays mandatory; cloud green is never accepted as local evidence for browser suites.
+  3. Change is limited to the delegation prompt/brief text and the place that documents the local acceptance steps (docs/batch-owner-runbook.md or docs/lane-routing.md); no new guard, ledger field, router or workflow abstraction (infrastructure freeze, CLAUDE.md §2). If a cloud unit result disagrees with a later local run, that is recorded as a finding, not handled by new machinery.
+  4. Evidence: one cloud-authored point landed under the new flow, with the handover message naming sha and gate results, and the local acceptance log showing no repeated build/lint/unit layer.
+  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entry U5 (A3 + B12).
+  Observed problem: Local acceptance is the measured bottleneck: review, suites, picture check and landing run serially in one session on one machine that must be quiet (memory verify-suites-need-a-quiet-machine). Build, lint and Vitest do not need that machine; running them in the cloud session removes them from the serial step for every point. It is a simplification of the local step without new infrastructure, which satisfies the finding-intake rule of CLAUDE.md §2.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1431. Hand the throughput working instruction to the batch-owning session
+  QUEUE POSITION: front of the work order together with the two points deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen"). This is a standing working instruction for the batch owner plus one backlog entry, not code; carry it in as one short point whose final state is the recorded instruction, or apply it directly and record it as closed.
+  FINAL STATE:
+  1. Working instruction for the batch-owning session, recorded where the owner reads its routine (docs/batch-owner-runbook.md, a short section "Throughput with cloud authoring"), effective immediately:
+     a. Quiet acceptance windows: while a local browser suite, unit gate or picture check runs, no other local agent, browser or Vitest run starts; cloud authoring continues (U4).
+     b. Gate a branch only after its author declares it final; rerun only the checks a later commit invalidates (U7).
+     c. Use suite wait time for lightweight work only: review other pushed commits early, prepare their acceptance steps; never start a second heavy check (U8).
+     d. When refilling the pool, prefer bounded ready points with clear acceptance and disjoint files/prerequisites; check overlap before delegating (U9).
+     e. Pace cloud authoring up to the credit expiry on 05.11.2026 to what local acceptance can land, not to what the cloud can produce (U12).
+  2. docs/backlog.md entry (non-blocking): "Separate cloud-author cap" — raise the authoring cap above 3 and stop counting pushed-but-unverified branches only if, after the branch clean-up and the cloud pre-check points, the pool sits at 3 with the owner idle; then change POOL_CAP (scripts/batch-in-flight-core.mjs) and DAEMON_POOL_CAP (scripts/batch-daemon-core.mjs) together, since a test asserts they agree (U11; disagreement A1 vs B6/B16, Fable's verdict: measure first).
+  3. Not repeated because already rules: tier selection (CLAUDE.md §5, U6) and reproducing loaded reds on a quiet machine (CLAUDE.md §7.2, memory verify-suites-need-a-quiet-machine, U10).
+  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entries U4, U7, U8, U9, U11, U12.
+  Observed problem: These union entries are working practices of the batch owner, not code; a point per entry would open branches with nothing to change, and enforcing them by guards is forbidden by the infrastructure freeze. The user approved recording them as an instruction to the batch-owning session and parking the cap question in the backlog with its measurement condition, so they are not lost.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1433. A chat session's /clear converts the successor's pending spawn and takes the batch lock
+  Final state: a session the user opens for something else never converts a pending-spawn reservation meant for the launcher's successor; only the process whose pid the reservation names converts it, with or without the authorized marker, and the real successor takes over. A Vitest drives the measured sequence (handover, launcher spawn reserved, a foreign session's SessionStart) and asserts the foreign session stays out and the reservation survives for the successor.
+  Observed problem: 23.10.2026 13:54 handover, the launcher spawned the successor, ~13:55 a /clear in a chat window converted the reservation; the real successor did not find it (log 13:58: previous spawn did NOT take over). No headless batch ran, four requests stayed in the carrier, and the Stop guards forced batch work in the chat in a loop; worked around by a manual release(). Cause: scripts/batch-resume-hook.mjs:417 calls convertPendingSpawn with authorized:!!auth, and scripts/batch-singleton.mjs:2364 then lets any session without a pid match convert. Closed point 1053 only closed the bare acquire.
+  Source: two findings of 23.10.2026 13:58 and 14:00 in the findings carrier (chat session), merged into one point. Real blockade of the batch (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1405. Water carrier sets the jar down too far from the table, his hand misses the water, and the new jar appears from nowhere
   The Bambara water carrier at the jar table: (a) he sets the jar down while standing much too far from the table, (b) afterwards his hand does not point exactly at the water, (c) the new jar appears in his hand out of nothing. Related closed point 1376 (the water carrier shows his jar for the whole errand): check first whether this is a regression of it. Done when he steps up to the table before setting down, his pointing hand aims at the water, and the jar he carries next is visibly taken up.
   Source: user bug report hoa-state-2026-10-21-2694999956 (4).zip (10:24:13Z), user words: "Der Wasserholer ist noch viel zu weit weg vom Tisch, wenn er das Wasser abstellt, seine Hand zeigt danach auch nicht genau aufs Wasser und der neue Krug erscheint aus dem Nichts in seiner Hand."
@@ -96,6 +141,19 @@ put it is the mistake this line exists to stop.
   Source: user bug report KopfInKorb (/backup/hoa/local/KopfInKorb.zip), filed 21.10.2026 19:12Z.
   Repro for all: seed 3318564123, Bambara village (place mode), position x/z -59.45/-130.99, build production 0562828, WebGPU.
   Queue position: after the user-report points 1402-1405 (append-and-defer of a user-reported defect).
+  Bundle: Dorfleben.
+- [ ] 1432. The task walker takes its head load off with its hands and puts it back on instead of letting it vanish
+  QUEUE POSITION: directly after point 1414 (user order 23.10.2026 15:51, "Ja, das so nach 1414 einreihen.").
+  GOAL: the village task walker (TaskWalker in src/scenes/place/PlaceLife.tsx, carry 'bundle' to the fire or 'jar' to the well) takes its head load off with its hands and puts it back on, instead of the load vanishing while it kneels. Today `load.current.visible = next.mode !== 'work'` (PlaceLife.tsx ~2273) only hides the load during the kneel; nothing sets it down.
+  FINAL STATE:
+  1. Set down: at the target the walker grips the load on its head with both hands; while kneeling down it brings the load down with its hands and sets it on the ground beside it, letting go only then. The load moves with the hands throughout and never jumps on its own.
+  2. Work: while it kneels and works, the load stands visibly on the ground beside it.
+  3. Pick up: before standing up it grips the load on the ground, lifts it with its hands while rising and puts it on its head; afterwards the hands hold it as they do now while walking.
+  4. Never invisible: in no phase is the load invisible or does it appear from nowhere — for the bundle and the jar.
+  5. Tests: a Vitest asserts the load is visible in every phase (walk, kneel down, work, rise) and stays close to the hands during set-down and pick-up; a picture check shows three frames: the set-down moment, the kneeling walker with the load on the ground, and the pick-up moment.
+  SOURCE: user bug report hoa-state-2026-10-23-1989448783.zip (13:45:37Z, seed 1989448783, bambara-village, build 6183b2b, webgpu), user words: "Eben hat er sich vor dem Feuer hingekniet und die Kiste auf seinem Kopf ist verschwunden. Als er dann wieder aufgestanden ist, ist sie wieder erschienen." Refinement 23.10.2026 15:49: "Wandern soll aber bedeuten, dass er sie aktiv mit seiner Hand vom Kopf nimmt und auf den Boden legt bzw. danach wieder in die Hand nimmt und auf seinen Kopf legt."
+  Observed problem: Reproducible player impact reported by the user: a villager kneeling at the fire makes the crate on its head vanish and reappear on standing up. The code comment promises the load is set down, but the code only hides it. No open point or backlog entry covers it (grep of TASKS.md and docs/backlog.md, 23.10.2026).
+  Source: user request 23.10.2026 via the findings carrier, spec cut from 6183b2bfa; approved: "Ja, das so nach 1414 einreihen.".
   Bundle: Dorfleben.
 - [ ] 1416. Villagers at the fish-drying rack jitter in place
   Queue position: directly after point 1414 (user decision 21.10.2026).
