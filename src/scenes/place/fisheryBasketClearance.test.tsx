@@ -63,6 +63,11 @@ beforeAll(async () => {
   asset = await parseVillager(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
 })
 
+// A bone-transformed vertex is the bones' world position under the mesh's bind
+// inverse; undoing that inverse (whatever frame it was last refreshed in) gives
+// the world position the bones put it at.
+const toWorld = new THREE.Matrix4()
+
 /** How deep a point is inside the basket standing at `at` (> 0 inside, m). */
 function inside(p: THREE.Vector3, at: { x: number; y: number; z: number }): number {
   const { radius, height } = FISH_BASKET
@@ -163,7 +168,7 @@ describe('the basket the net man holds at the landing', () => {
       for (const i of headVerts) {
         v.fromBufferAttribute(pos, i)
         mesh.applyBoneTransform(i, v)
-        v.applyMatrix4(mesh.matrixWorld)
+        v.applyMatrix4(toWorld.copy(mesh.bindMatrixInverse).invert())
         worstDrawn = Math.max(worstDrawn, inside(v, at))
       }
       // The primitive: a round head on the trunk leaning about the ground
@@ -238,7 +243,7 @@ describe('the basket the carrier swaps at the bank', () => {
         if (w < 0.5) continue
         v.fromBufferAttribute(pos, i)
         mesh.applyBoneTransform(i, v)
-        v.applyMatrix4(mesh.matrixWorld)
+        v.applyMatrix4(toWorld.copy(mesh.bindMatrixInverse).invert())
         worst = Math.max(worst, inside(v, at))
       }
     }
