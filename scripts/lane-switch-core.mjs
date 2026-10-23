@@ -140,8 +140,8 @@ export function readState(raw, role = DEFAULT_SWITCH_ROLE) {
     const lanes = value.lanes
     if (!lanes || typeof lanes !== 'object' || Array.isArray(lanes)) return unusable('garbled', 'lanes must be an object', wanted)
     if (!(wanted in lanes)) return defaultState(wanted)
-    // An explicit null is a recorded but broken entry for the switch-gated lane: it fails closed.
-    if (lanes[wanted] === null) return lane(wanted).scarce ? unusable('garbled', 'the lane entry is null', wanted) : defaultState(wanted)
+    // An explicit null is a recorded but broken entry, for every lane: it fails closed.
+    if (lanes[wanted] === null) return unusable('garbled', 'the lane entry is null', wanted)
     return decodeEntry(lanes[wanted], wanted)
   }
   // A flat record is the scarce lane's legacy entry; it says nothing about another lane.
