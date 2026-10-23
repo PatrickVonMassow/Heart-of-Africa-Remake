@@ -83,6 +83,44 @@ put it is the mistake this line exists to stop.
   Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
   Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
   Bundle: Dorfleben.
+  Handover 23.10.2026 00:10: the full `polish-villagers` pass at branch 983fe682f was KILLED by the 45-min suite wall on BOTH backends (WebGPU: last frames villager-dress 23:07, then 17 min inside village-walk); full passes before took 31-39 min. Next: run `--section=village-walk` alone on the branch and on main, compare durations, and fix the stall if the bounded turn causes it before landing.
+  Handover 23.10.2026 01:20 (983fe682f): the stall is NOT the turn — `--section=village-walk` alone 3:34 GREEN (38/38, WebGPU); `--section=adult-errands` swing check GREEN on WebGPU and WebGL 2, its only reds the two water-rim checks charged to 568. The full pass needs no merge (verify README "What finishes a feat/ point") and walls on a 7.9 GB renderer (finding filed). Left: the MOVING capture the point demands (no tool exists; a short frame sequence of one errand villager turning at a waypoint, both backends), cross review of the turning diff, then land.
+  Picture verdict 23.10.2026 01:40 on feat/1404 (frames 1404-errand-turn-1..4, WebGPU, commit after e04187e6f): INCONCLUSIVE — from the fixed spot the filmed turner is not identifiable (the camera must follow the chosen index or the frames must mark it), so the capture proves nothing yet. ODDITY in frame 1: the woman in the pink wrapper is drawn nearly HORIZONTAL in mid-air with legs splayed while moving (also a hard lean on the right-hand woman in frame 3) — check whether the bounded turn's slow-down/pace interplay or the walk cycle produces it before landing; if it reproduces on main it is its own point. WebGL 2 frames still owed.
+Handover 23.10.2026 02:15 (932882cd4): the capture now FOLLOWS the turner (label carries yaw, way heading, gait); review GPT-6.1 Sol merge-with-fixes on 0cf1d8f (digger + word double turn, index-0 capture, vacuous census) all fixed in the next commit, and the swing check now reads the turn bound INSIDE the game frame (`turnWorst`; the rAF sampler read a hitch as a snap, 0.038 rad over). The FLIGHT ODDITY is ours: new census "no village adult on an errand is drawn in a sprint" RED twice on the branch (sprint 1, 7.4-8.3 m/s, body moving 5.75 m/s against pace 1.25, player 16 m away), GREEN on main with the same census — the turned step bypassed `stepRoundBodies`, walked into the body it routed round and the separation (cap 8 m/s) shoved it. Fix 932882cd4 steps the resolved way scaled by the turn pace; unit 2635 green; NOT yet browser-verified. Next: `npm test -- polish-villagers --section=adult-errands` on WebGPU and WebGL 2 (census and swing green; reds charged to 568 allowed), look at the four following frames on both backends, confirming cross review of 0cf1d8f..932882cd4, then land.
+Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is REFUTED by measurement — in-frame telemetry read the separation shove at 0 and the worst frame jump at exactly 6.0 m/s with no escape: the section itself sets the errand pace to 6 m/s, at which every errand adult is rightly drawn in a sprint. The capture and the gait census now run at the SHIPPED pace (restored to 6 after); census and in-frame swing check GREEN on WebGPU and WebGL 2, the only reds the rim checks charged to 568 (plus once the stand-order moment-catcher charged to 642). Confirming cross review GPT-6.1 Sol 0cf1d8f..932882cd4: merge, both passes recorded. The two fixed waits the branch had added (fixedWaits unit red) are now a 300-frame count and a wait for the turner to walk on 0.35 m; build red on two untyped gait fields fixed; tsc, lint, build, 18280 unit GREEN. Left before landing: WebGPU frame 1404-errand-turn-1 shows NO turner (only water — the camera at 4 m off its flank, p.yaw = side, may be looking away; frames 2-4 show the carrier), and frame 3 shows the carrier in a deep lunge-like stride at the shipped pace — judge whether that is the loaded walk clip or ours; then look at the four WebGL 2 frames of this commit and land.
+- [ ] 1426. Make the cloud clone able to work: path-scope, request-approval-guard and model-guard stop blocking it
+  QUEUE POSITION: front of the work order (user 22.10.2026: "Reihe das ganz vorne in der Queue ein.").
+  PROBLEM: a claude.ai/code cloud session on PatrickVonMassow/Heart-of-Africa-Remake (probe 22.10.2026,
+  host `vm`, machine-id a3942038ad9d43cba151ebad027d1061, kernel 6.18.44-fc-v140) could not write a
+  single file. Three repo hooks run in the clone and block it:
+  1. path-scope (scripts/path-scope-core.mjs): the clone lives at /home/user/Heart-of-Africa-Remake,
+     not in ALLOW_ROOTS, classed as "another user's home directory"; every Write/Edit and every Bash
+     call with the repo path is refused, so the clone cannot even fix itself.
+  2. request-approval-guard: refuses any Bash command holding a quote, redirect or operator
+     (`mkdir -p docs/probes && printf '...' > file`), although it neither mentions finding.mjs nor --request.
+  3. model-guard serving-model tripwire: the scarce-lane switch state is local/untracked, absent in
+     the clone, so every turn end is blocked and the session loops (observed: 6+ repeated stop refusals,
+     burning cloud credit).
+  FINAL STATE:
+  1. path-scope treats the checkout root of the running repository (git toplevel / project dir) as in
+     scope wherever it lives, so a cloud clone under /home/user/<repo> is in scope; foreign home dirs stay out.
+  2. request-approval-guard only fires on commands that actually mention finding.mjs or --request;
+     a plain write/redirect command without those words passes.
+  3. model-guard: an ABSENT lane-switch state in a clone without the local state files does not block
+     the turn end (notice, not refusal); a recorded OFF or an out-of-chain serving model still blocks.
+  4. Re-run the cloud probe: a claude.ai/code session writes docs/probes/1230-cloud-marker.txt
+     (hostname/machine-id/kernel lines) on branch probe/1230-cloud-marker and pushes it without any
+     workaround; then `node scripts/cloud-switch.mjs --record-probe probe/1230-cloud-marker` passes.
+     Switch ON additionally needs the user's confirmation that the cloud credit balance dropped.
+  Test: unit tests for each of the three guard cores (cloud-clone path in scope, plain redirect passes,
+  absent switch state in clone does not block); the probe branch as end-to-end proof.
+  Infrastructure freeze (CLAUDE.md §2): allowed — reproducible real blockade (cloud authoring
+  impossible), no new mechanism, only loosening three existing rules.
+  Criticality: medium. Deadline: cloud credits expire 05.11.2026 08:59 MEZ.
+  After landing (finding 22.10.2026 22:05): a "Von dir zu klären" card asks the user to start a cloud
+  session with the probe order and then confirm the credit drop under claude.ai/settings/usage; deadline 05.11.2026.
+  Bundle: Modell & Wächter.
+
 - [ ] 1424. A walking child snaps backwards when its way round an obstacle expires
   Split off 1403 (22.10.2026, after nine non-converging tries): a roaming child walking round an obstacle at 1.4 m/s (bank `drive`, `wants=false`) has its edge commitment end on the CLOCK (`ageEdge`, tagGame.ts) while its goal lies >135° behind; the walk snaps ~185° in one frame and the child walks backwards while its body eases after it. Done when `tagShuffle.facing.test.ts` "never walks a child far backwards" is un-skipped and green at its 0.3 m bound (measured 0.303 m, child 3, the boulder climber, t 80.05 s), with every other place case green, and a moving capture shows no backwards walk.
   Tried and reverted on 1403 (do not repeat): turning in place on a >135° snap (0.47 m, two more cases red); `releaseEdge` holding the commitment (0.35 m); holding the commitment one frame while the goal is behind (green replay, but `tagShuffle.test.ts` "holds when the adults walk through the children's own ground" 60 < 100); that hold bounded by `anchorFor` (5.0 m backwards) or by a 1.5 s cap per commitment (three cases red). The hold is load-bearing, so the fix likely belongs in how the way round ends (ease the course out of the commitment) rather than how long it lasts.
