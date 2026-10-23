@@ -135,6 +135,13 @@ export const DEFAULT_CONTEXT = {
   drives: ['c', 'd', 'e'],
   /** Does this top-level directory exist? Injected so the core stays pure. */
   dirExists: () => false,
+  /**
+   * The checkout root(s) of the RUNNING repository (git toplevel, the project
+   * dir), wherever they live. A clone outside ALLOW_ROOTS — a claude.ai/code
+   * cloud session checks out under /home/user/<repo> — is still the work
+   * itself, so it is in scope; its neighbours in that home stay out.
+   */
+  projectRoots: [],
 }
 
 const withContext = (ctx) => ({ ...DEFAULT_CONTEXT, ...(ctx || {}) })
@@ -229,9 +236,29 @@ export function denyNote(canonical) {
   return ''
 }
 
+/**
+ * A checkout root too broad to stand for one repository: the filesystem root, a
+ * home itself, a drive root, or a directory that holds homes. Such a "project
+ * root" would put foreign home dirs in scope, so it is ignored.
+ */
+const TOO_BROAD_ROOT = /^(\/|~|[a-z]:\/?|\/home|\/users|[a-z]:\/users)$/i
+
+/** The project roots of this context as allow entries (canonical, deduped). */
+export function projectRootEntries(ctx) {
+  const c = withContext(ctx)
+  const out = []
+  for (const raw of c.projectRoots || []) {
+    const canonical = canonicalisePath(raw, c)
+    if (!canonical || TOO_BROAD_ROOT.test(canonical)) continue
+    if (out.some((r) => r.path.toLowerCase() === canonical.toLowerCase())) continue
+    out.push({ path: canonical, why: 'the checkout root of the running repository' })
+  }
+  return out
+}
+
 /** Is this canonical path inside the allow-list? `{ allowed, root?, note? }` */
-export function pathVerdict(canonical) {
-  const root = allowingRoot(canonical)
+export function pathVerdict(canonical, ctx) {
+  const root = allowingRoot(canonical) || allowingRoot(canonical, projectRootEntries(ctx))
   if (root) return { allowed: true, root }
   return { allowed: false, note: denyNote(canonical) }
 }
@@ -404,7 +431,7 @@ export function evaluate({ command = '', filePath = '', cwd = '', ctx, parseSegm
     const c = withContext(ctx)
     const offenders = []
     const push = (raw, canonical) => {
-      const verdict = pathVerdict(canonical)
+      const verdict = pathVerdict(canonical, c)
       if (!verdict.allowed && !offenders.some((o) => o.canonical === canonical)) {
         offenders.push({ raw, canonical, note: verdict.note })
       }

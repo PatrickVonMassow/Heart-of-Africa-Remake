@@ -24,7 +24,7 @@ import { evaluate, DEFAULT_CONTEXT } from './path-scope-core.mjs'
 import { expandSegments, headAndArgs, parseSegments } from './command-classify-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
-import { repoPath } from './repo-paths.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { interceptToolOutput, interceptionEnvelope } from './tool-output-intercept-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
@@ -55,7 +55,10 @@ function machineContext() {
     cache.set(p, ok)
     return ok
   }
-  return { ...DEFAULT_CONTEXT, homes, dirExists }
+  // The running checkout is in scope wherever it lives (a cloud clone sits
+  // under /home/user/<repo>, outside ALLOW_ROOTS).
+  const projectRoots = [REPO_ROOT, process.env.CLAUDE_PROJECT_DIR].filter((p) => typeof p === 'string' && p)
+  return { ...DEFAULT_CONTEXT, homes, dirExists, projectRoots }
 }
 
 /** The judgeable part of a PreToolUse payload, or null when there is nothing to judge. */

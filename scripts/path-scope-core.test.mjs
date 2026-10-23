@@ -340,3 +340,45 @@ describe('the guard reads a path from every write tool it is wired for', () => {
     })
   })
 })
+
+describe('the checkout root of the running repository is in scope wherever it lives', () => {
+  // A claude.ai/code cloud session clones under /home/user/<repo> and runs as
+  // that home's user — outside ALLOW_ROOTS, so without this every write refused.
+  const cloud = {
+    ...ctx,
+    homes: [...ctx.homes, '/home/user'],
+    projectRoots: ['/home/user/Heart-of-Africa-Remake'],
+  }
+  const cloudJudge = (command) => evaluate({ command, ctx: cloud, parseSegments })
+  const cloudPath = (filePath, cwd = '') => evaluate({ filePath, cwd, ctx: cloud, parseSegments })
+
+  it('allows a write and a shell call inside the cloud clone', () => {
+    expect(cloudPath('/home/user/Heart-of-Africa-Remake/docs/probes/1230-cloud-marker.txt').block).toBe(false)
+    expect(cloudPath('docs/probes/x.txt', '/home/user/Heart-of-Africa-Remake').block).toBe(false)
+    expect(
+      cloudJudge("mkdir -p /home/user/Heart-of-Africa-Remake/docs/probes && ls /home/user/Heart-of-Africa-Remake").block,
+    ).toBe(false)
+    expect(cloudJudge('ls ~/Heart-of-Africa-Remake/scripts').block).toBe(false)
+  })
+
+  it('keeps the rest of that home and foreign homes out', () => {
+    expect(cloudPath('/home/user/other-repo/x').block).toBe(true)
+    expect(cloudPath('/home/user/Heart-of-Africa-Remake-evil/x').block).toBe(true)
+    expect(cloudJudge('ls /home/other').block).toBe(true)
+  })
+
+  it('ignores a "project root" too broad to stand for one repository', () => {
+    for (const broad of ['/', '/home', '/home/user', '/Users', 'C:\\Users', 'C:\\']) {
+      const v = evaluate({
+        filePath: '/home/other/secret.txt',
+        ctx: { ...cloud, projectRoots: [broad] },
+        parseSegments,
+      })
+      expect(v.block, broad).toBe(true)
+    }
+  })
+
+  it('without a project root the clone is still out of scope (the old blockade)', () => {
+    expect(judgePath('/home/user/Heart-of-Africa-Remake/x').block).toBe(true)
+  })
+})
