@@ -2255,7 +2255,7 @@ function TaskWalker({
       if (h.down === 0 && h.hold === 0 && h.reach === 0) {
         g.position.set(0, 0, 0)
         g.quaternion.identity()
-        g.scale.set(1, 1, 1)
+        g.scale.setScalar(1)
         handlingPose(p, h, [hp, hp], kneelK.current)
         for (const f of aimFix.current) f.x = f.y = f.z = 0
         return
