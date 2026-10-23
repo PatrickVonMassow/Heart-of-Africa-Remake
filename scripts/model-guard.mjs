@@ -14,6 +14,8 @@
 // the session. While any pause record sits in .claude/batch-paused (a clocked
 // handoff probe among them) the guard stands down; the launcher removes a
 // probe's record when it is due.
+// An ABSENT lane-switch state (a clone without the untracked state file) is a
+// notice, not a refusal: the scarce lane is judged OFF (turnEndScarceState).
 // Manual drive: node scripts/model-guard.mjs --status
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { execSync } from 'node:child_process'
@@ -23,6 +25,7 @@ import {
   findUnidentifiedCommits,
   formatForbiddenReason,
   formatUnidentifiedReason,
+  turnEndScarceState,
 } from './model-guard-core.mjs'
 import { notify } from './notify.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -134,19 +137,21 @@ if (isMainModule(import.meta.url)) {
     // the log and the baseline here would let the two drift apart with nothing
     // to notice it (the identity test can only see a shared function).
     const gathered = gatherModelGuardInputs()
-    const { log, baselineMs: baseline, backupRefs, scarceState } = gathered.inputs
-    if (!scarceState.ok && !gathered.applicable) {
+    const { log, baselineMs: baseline, backupRefs } = gathered.inputs
+    const { scarceState, refuse, notice } = turnEndScarceState(gathered.inputs.scarceState)
+    if (refuse && !gathered.applicable) {
       if (process.argv[2] === '--status') console.log(JSON.stringify({ applicable: false, scarceProblem: scarceState.problem }, null, 2))
       process.exit(0)
     }
-    if (!scarceState.ok && gathered.applicable) {
+    if (refuse && gathered.applicable) {
       if (process.argv[2] === '--status') {
         console.error(`model-guard: ${scarceState.problem}`)
         process.exit(1)
       }
-      process.stdout.write(JSON.stringify({ decision: 'block', reason: `SERVING-MODEL TRIPWIRE: ${scarceState.problem}` }))
+      process.stdout.write(JSON.stringify({ decision: 'block', reason: refuse }))
       process.exit(0)
     }
+    if (notice) console.error(notice)
     const hits = findForbiddenCommits(log, baseline, scarceState)
     const unidentified = findUnidentifiedCommits(log, baseline, scarceState)
     if (process.argv[2] === '--status') {

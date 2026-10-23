@@ -99,7 +99,7 @@ export function unreadableState(error, role = DEFAULT_SWITCH_ROLE) {
 /** The state of a lane nobody recorded a decision for: only the switch-gated lane fails
  *  closed; every other lane is usable until switched off. */
 function defaultState(role) {
-  if (lane(role).scarce) return unusable('absent', '', role)
+  if (lane(role).scarce) return { ...unusable('absent', '', role), absent: true }
   return { ok: true, role, state: 'on', reason: 'no recorded decision; this lane is on by default', setBy: 'default', changedAt: 0, problem: '' }
 }
 

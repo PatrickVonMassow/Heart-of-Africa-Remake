@@ -36,6 +36,7 @@ import {
   findUnidentifiedCommits,
   formatForbiddenReason,
   formatUnidentifiedReason,
+  turnEndScarceState,
 } from './model-guard-core.mjs'
 import { evaluate as renderVerifyEvaluate } from './render-verify-core.mjs'
 import {
@@ -172,8 +173,9 @@ export const GUARDS = [
     gather: ({ sessionId } = {}) => gatherModelGuardInputs({ sessionId, arm: false }),
     // Both halves of the split (point 397), so the preflight predicts which of
     // the two blocks the session would meet — they have different remedies.
-    decide: ({ log, baselineMs, backupRefs, scarceState }) => {
-      if (!scarceState?.ok) return { block: true, reason: `SERVING-MODEL TRIPWIRE: ${scarceState?.problem}` }
+    decide: ({ log, baselineMs, backupRefs, scarceState: recorded }) => {
+      const { scarceState, refuse } = turnEndScarceState(recorded)
+      if (refuse) return { block: true, reason: refuse }
       const forbidden = findForbiddenCommits(log, baselineMs, scarceState)
       const unidentified = findUnidentifiedCommits(log, baselineMs, scarceState)
       if (forbidden.length) {
