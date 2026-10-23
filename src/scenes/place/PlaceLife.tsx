@@ -2898,6 +2898,10 @@ function ErrandVillagers({
   // rate one game frame drew (point 1404) — measured in the frame, with its dt.
   const drawnYaw = useRef<Array<number | null>>([])
   const turnWorst = useRef({ over: 0, swing: 0, dt: 0, who: -1 })
+  // Dev: the hardest shove the separation gave an errand adult, with the pace
+  // its turn left it and the body it overlapped (point 1404 flight oddity).
+  const turnPace = useRef<number[]>([])
+  const shoveWorst = useRef({ speed: 0, dt: 0, who: -1, pace: 1, other: -1, otherScale: 0, otherFixed: false })
 
   // May a body stand here? The settlement boundary and the collider set
   // together — the same question this component's own step asks. The work
@@ -3099,6 +3103,7 @@ function ErrandVillagers({
           const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
           yaws.current[i] = turn.yaw
           faceTo.current[i] = null
+          if (import.meta.env.DEV) turnPace.current[i] = turn.pace
           const sx = me.x + (tx - me.x) * turn.pace
           const sz = me.z + (tz - me.z) * turn.pace
           const [nx, nz] = turn.pace < 1 ? resolveMove(colliders, sx, sz, NPC_RADIUS, [me.x, me.z]) : [tx, tz]
@@ -3138,6 +3143,22 @@ function ErrandVillagers({
         body.x = me.x
         body.z = me.z
         separateBody(bodySet, body, dt, sep, separationWorld)
+        if (import.meta.env.DEV && dt > 0) {
+          const speed = Math.hypot(body.x - me.x, body.z - me.z) / dt
+          if (speed > shoveWorst.current.speed) {
+            let other = -1
+            let near = Infinity
+            bodySet.bodies.forEach((o, k) => {
+              const d = o === body || !o.active ? Infinity : Math.hypot(o.x - me.x, o.z - me.z)
+              if (d < near) {
+                near = d
+                other = k
+              }
+            })
+            const o = bodySet.bodies[other]
+            shoveWorst.current = { speed, dt, who: i, pace: turnPace.current[i] ?? 1, other, otherScale: o?.scale ?? 0, otherFixed: !!o?.fixed }
+          }
+        }
         me.x = body.x
         me.z = body.z
       }
@@ -3357,6 +3378,11 @@ function ErrandVillagers({
       turnWorst: { ...turnWorst.current },
       resetTurnWorst: () => {
         turnWorst.current = { over: 0, swing: 0, dt: 0, who: -1 }
+      },
+      /** The hardest separation shove of an errand adult (point 1404). */
+      shoveWorst: { ...shoveWorst.current },
+      resetShoveWorst: () => {
+        shoveWorst.current = { speed: 0, dt: 0, who: -1, pace: 1, other: -1, otherScale: 0, otherFixed: false }
       },
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)

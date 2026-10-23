@@ -2035,6 +2035,7 @@ if (section('adult-errands')) {
     const flight = await page.evaluate(
       () =>
         new Promise((resolve) => {
+          window.__placeErrands().resetShoveWorst()
           let worst = { sprint: 0, jog: 0, speed: 0, who: null }
           let frames = 0
           const seen = new Set()
@@ -2062,7 +2063,7 @@ if (section('adult-errands')) {
             })
             last = vs.map((v) => ({ x: v.x, z: v.z, yaw: v.yaw }))
             if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
-            else resolve({ ...worst, frames, adults, gaitSeen: seen.size })
+            else resolve({ ...worst, frames, adults, gaitSeen: seen.size, shove: window.__placeErrands().shoveWorst })
           }
           requestAnimationFrame(tick)
         }),
