@@ -2056,13 +2056,18 @@ if (section('adult-errands')) {
         } finally {
           await freezeLife(false)
         }
-        // the next frame once the turner has walked on about 0.35 m (≈0.3 s)
-        await page
+        if (k === 4) break
+        // the next frame once the turner has walked on about 0.35 m (≈0.3 s);
+        // a turner standing still makes four frames of one instant, not a moving capture
+        const walked = await page
           .waitForFunction(({ i, x, z }) => {
             const v = window.__placeErrands().villagers[i]
             return Math.hypot(v.x - x, v.z - z) > 0.35
           }, { i: turner, x: at.x, z: at.z }, { timeout: 5000, polling: 'raf' })
-          .catch(() => {})
+          .then(() => true)
+          .catch(() => false)
+        check(`the filmed errand adult walks on between moving-capture frames ${k} and ${k + 1} (point 1404)`, walked)
+        if (!walked) break
       }
     }
     // NO VILLAGE ADULT FLIES (point 1404 oddity, frame 1 of 23.10.2026: a woman
