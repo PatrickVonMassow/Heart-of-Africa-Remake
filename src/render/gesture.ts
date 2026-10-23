@@ -210,6 +210,9 @@ export interface GestureState {
   /** Per-figure phase offset, read by the refusal's shake so a crowd never
    *  shakes in lockstep. */
   phase: number
+  /** The arm that gestures, when the caller solved the aim from that arm's own
+   *  shoulder (absent: the arm on the bearing's side, `gestureArm`). */
+  side?: ArmSide
 }
 
 /** The rest state — no gesture running. */
@@ -233,6 +236,8 @@ export interface GestureAim {
   /** Per-figure phase offset (rad); the refusal's shake reads it so
    *  simultaneous refusals do not beat together. */
   phase?: number
+  /** The arm the aim was solved for (see `GestureState.side`). */
+  side?: ArmSide
 }
 
 /**
@@ -258,6 +263,7 @@ export function startGesture(kind: GestureKind, aim: GestureAim = {}): GestureSt
     bearing: aim.bearing ?? 0,
     elevation: aim.elevation ?? 0,
     phase: aim.phase ?? 0,
+    ...(aim.side ? { side: aim.side } : {}),
   }
 }
 
@@ -423,7 +429,7 @@ function blendArm(rest: ArmPose, target: ArmPose, e: number): ArmPose {
 export function gesturePose(s: GestureState): FigurePose {
   const e = gestureEnvelope(s)
   if (s.kind === null || e <= 0) return { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }
-  const side = gestureArm(s.bearing)
+  const side = s.side ?? gestureArm(s.bearing)
   const otherSide: ArmSide = side === 'left' ? 'right' : 'left'
   const restArm = REST_POSE[side]
   const restOther = REST_POSE[otherSide]

@@ -134,7 +134,7 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
     expect(worstTurn).toBeGreaterThan(0)
     expect(worstTurn).toBeLessThanOrEqual(turnBound)
     expect(words, 'the first pair must order, fetch, and report before its 300-second expiry').toEqual(['water-out', 'water-back'])
-    expect(phases).toEqual(new Set(['wait:none', 'fetch:emptyJar', 'fill:emptyJar', 'walk:fullJar', 'walk:none']))
+    expect(phases).toEqual(new Set(['wait:none', 'take:none', 'take:emptyJar', 'fetch:emptyJar', 'fill:emptyJar', 'walk:fullJar', 'walk:none']))
     expect(work.standJars).toBe(1)
     // THE REPORT ENDS THE ERRAND WHEN IT HAS BEEN HEARD OUT (work-order 1184):
     // the pair stands at the stand through the hold between the word and its

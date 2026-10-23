@@ -29,6 +29,7 @@ import { instructionDelay } from '../../communication/speaking'
 import type { ConceptId } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
 import { devAssert } from '../../systems/devAssert'
+import { newestJarWater, TAKE_GRAB, tableSpot } from './waterStand'
 
 export type AdultSituationId = 'water-out' | 'water-back' | 'dig-first' | 'dig-second'
 
@@ -40,7 +41,7 @@ export const ADULT_SITUATIONS: readonly AdultSituationId[] = [
 ] as const
 
 export type AdultCarry = 'none' | 'emptyJar' | 'fullJar' | 'digTool'
-type AdultPhase = 'walk' | 'fetch' | 'fill' | 'send' | 'wait' | 'invite' | 'site' | 'dig'
+type AdultPhase = 'walk' | 'take' | 'fetch' | 'fill' | 'send' | 'wait' | 'invite' | 'site' | 'dig'
 type DigUtterance = 'invitation' | 'site'
 
 export interface ErrandPoint { x: number; z: number }
@@ -135,6 +136,10 @@ export interface AdultTask extends ErrandPoint {
    *  solid body, so a man sent there stalls a walker's width off it and is never
    *  counted as arrived. He stands next to it, as one does at a table. */
   standSpot: ErrandPoint | null
+  /** The water carrier's place AT the stand's table (work-order 1405): he waits
+   *  for the order on his `standSpot`, then steps up here to take the empty jar
+   *  and comes back here to set the full one down. */
+  tableSpot?: ErrandPoint
   arrived: boolean
   /** Seconds this worker has dug in the current bout. */
   dug: number
@@ -205,7 +210,7 @@ export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
 export function workArrivalRadius(task: AdultTask): number {
   // Both men must reach their own spot before waiting at the stand. Stopping
   // a metre early can block the other man's route around its solid body.
-  if (task.standSpot && (task.phase === 'send' || task.phase === 'wait' || task.situation === 'water-back')) {
+  if (task.standSpot && (task.phase === 'send' || task.phase === 'wait' || task.phase === 'take' || task.situation === 'water-back')) {
     return balance.waterStandArrivalRadius
   }
   // The fill is dipped where the water stands ankle-deep, not a metre short.
@@ -495,7 +500,11 @@ function readyWord(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: 
       state.standJars = Math.min(balance.waterStandCapacity, state.standJars + 1)
     }
     const sender = t.orderedBy === null ? null : view.villagers[t.orderedBy]
-    return sender ? { id: t.situation, concept: 'RIVER', speaker: i, aim: { x: sender.x, y: 1, z: sender.z } } : null
+    // Said TO the sender, POINTED AT the water just set down (work-order 1405):
+    // the hand names what was fetched, and the sender stands across the table.
+    const g = view.geography
+    const aim = g.waterStand ? newestJarWater(g.waterStand, g.waterFoot, state.standJars) : null
+    return sender && aim ? { id: t.situation, concept: 'RIVER', speaker: i, aim } : null
   }
   if (t.role === 'initiator' && t.phase === 'invite' && t.arrived && mate) {
     return { id: t.situation, concept: 'DIG', speaker: i, purpose: 'invitation', aim: { x: mate.x, y: 1, z: mate.z } }
@@ -536,11 +545,15 @@ function wordConsequence(state: AdultWorkState, view: AdultWorkView, t: AdultTas
     const carrier = state.tasks[t.partner]
     const fill = view.geography.waterFill
     if (carrier && fill) {
-      carrier.phase = 'fetch'
-      carrier.carry = 'emptyJar'
-      carrier.x = fill.x
-      carrier.z = fill.z
+      // HE TAKES THE EMPTY JAR UP FROM THE STAND (work-order 1405): it used to
+      // appear in his hand with the order. He steps up to the table first; the
+      // step below hands him the jar partway through the take.
+      const at = carrier.tableSpot ?? carrier.standSpot ?? { x: carrier.x, z: carrier.z }
+      carrier.phase = 'take'
+      carrier.x = at.x
+      carrier.z = at.z
       carrier.arrived = false
+      carrier.dug = 0
     }
   }
 }
@@ -709,6 +722,19 @@ export function stepAdultWork(
         if (mate && mate.phase === 'dig' && t.partner !== null) state.digEnded[t.partner] = mate.dug
         clearPair(state, i)
       }
+    } else if (t.arrived && t.phase === 'take') {
+      t.dug += dt
+      const seconds = balance.waterJarTakeSeconds
+      if (t.carry === 'none' && t.dug >= seconds * TAKE_GRAB) t.carry = 'emptyJar'
+      const fill = view.geography.waterFill
+      if (t.dug >= seconds && fill) {
+        t.carry = 'emptyJar'
+        t.phase = 'fetch'
+        t.x = fill.x
+        t.z = fill.z
+        t.arrived = false
+        t.dug = 0
+      }
     } else if (t.arrived && t.phase === 'fetch' && !t.via) {
       // ARRIVING AT THE WATER OPENS THE FILL, IT DOES NOT END THE ERRAND. The
       // jar used to flip to 'fullJar' at the next casting, with nothing shown in
@@ -729,12 +755,14 @@ export function stepAdultWork(
         t.carry = 'fullJar'
         t.situation = 'water-back'
         t.phase = 'walk'
-        t.x = t.standSpot.x
-        t.z = t.standSpot.z
-        // Only `say.at` is read for the report; its aim is always the SENDER's
-        // own position when the word falls (readyWord): the report is addressed
-        // to the man, not to the ground he stands on.
-        t.say = { at: { ...t.standSpot }, aim: { ...t.standSpot } }
+        // Back to the TABLE, not to the waiting ring 2.4 m off it (work-order
+        // 1405): the jar is set down where a man can reach the plank.
+        const back = t.tableSpot ?? t.standSpot
+        t.x = back.x
+        t.z = back.z
+        // Only `say.at` is read for the report; its aim is the water just set
+        // down, read when the word falls (readyWord).
+        t.say = { at: { ...back }, aim: { ...back } }
         t.owes = true
         const sender = t.orderedBy === null ? null : view.villagers[t.orderedBy]
         if (sender) t.pendingWord = { id: 'water-back', concept: 'RIVER', speaker: i, aim: { x: sender.x, y: 1, z: sender.z } }
@@ -808,6 +836,7 @@ export function stepAdultWork(
       state.tasks[carrier] = {
         situation: id, phase: 'wait', carry: 'none', role: 'partner', partner: sender,
         siteIndex: null, orderedBy: sender, standSpot: carrierSpot,
+        tableSpot: tableSpot(stand, carrierSpot, view.standable),
         x: carrierSpot.x, z: carrierSpot.z, arrived: false, dug: 0, owes: false,
         say: null, via: null, age: 0,
       }
