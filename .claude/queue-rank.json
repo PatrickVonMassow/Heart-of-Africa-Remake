@@ -1698,6 +1698,18 @@
       "why": "finding from the 1404 capture, not a user order; it belongs behind the other villager-rig findings 1422/1423 that already stand last",
       "origin": "machine",
       "place": "last"
+    },
+    "1427": {
+      "at": "2026-10-23T06:52:56.453Z",
+      "why": "low criticality, rare crowd case; behind the user-reported Dorfleben points",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1428": {
+      "at": "2026-10-23T08:18:42.030Z",
+      "why": "finding present on main, not a user order; behind the user-reported Dorfleben points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1727,7 +1739,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-23T04:11:14.271Z",
+    "at": "2026-10-23T08:18:42.038Z",
     "points": [
       184,
       200,
@@ -2196,7 +2208,9 @@
       1422,
       1423,
       1424,
-      1425
+      1425,
+      1427,
+      1428
     ]
   }
 }

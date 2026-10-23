@@ -19,6 +19,7 @@ import {
   grabDue,
   grabHandWorld,
   handGapToBody,
+  ageEdge,
   lineClear,
   moveChild,
   turnBeforeRun,
@@ -38,7 +39,7 @@ import {
 } from './tagGame'
 import { boxCollider, standingClear, tryNudgeToFree, type Collider } from './collision'
 import { balance } from '../../config/balance'
-import { floorPace, recoverPace, trotPace } from '../../systems/pursuit'
+import { floorPace, recoverPace, trotPace, turnToward } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
 import { resetDevAsserts } from '../../systems/devAssert'
 import {
@@ -2144,5 +2145,42 @@ describe('the set-off turn judges the course the child will really take', () => 
     const walled: TagWorld = { ...OPEN, blocked: (x, z) => z < -0.5 || OPEN.blocked(x, z) }
     expect(turnBeforeRun(c, Math.PI, CFG, walled)).toBe(false)
     expect(c.edgeFor).toBe(1)
+  })
+})
+
+describe('a walk eases out of a way round that ran out (point 1424)', () => {
+  // The commitment ran out on the clock with the wanted heading right behind
+  // the course: taken at once, the walk flipped in one frame and the child
+  // walked backwards while its body eased after it.
+  it('turns the course round at the body rate instead of flipping it', () => {
+    const s = game([[0, 0], [10, 10]])
+    const c = s.children[0]
+    Object.assign(c, { heading: 0, facing: 0, edgeFor: 0.01, edgeSide: 1, pinned: 0, held: false })
+    const dt = 1 / 60
+    let worst = 0
+    for (let k = 0; k < 90; k++) {
+      ageEdge(c, dt)
+      const x = c.x
+      const z = c.z
+      moveChild(c, Math.PI, 1.4 * dt, dt, CFG, OPEN)
+      c.facing = turnToward(c.facing, c.heading, CFG.turnRate * dt)
+      const travel = Math.atan2(c.x - x, c.z - z)
+      worst = Math.max(worst, Math.abs(Math.atan2(Math.sin(c.facing - travel), Math.cos(c.facing - travel))))
+      if (k === 0) expect(Math.abs(c.heading)).toBeLessThanOrEqual(CFG.turnRate * dt + 1e-9)
+    }
+    expect(c.edgeFor).toBe(0)
+    expect(worst).toBeLessThan(Math.PI / 4)
+    // …and it does come round to where it wants to go.
+    expect(Math.abs(Math.atan2(Math.sin(c.heading - Math.PI), Math.cos(c.heading - Math.PI)))).toBeLessThan(1e-6)
+  })
+
+  it('sets a child that stood through the expiry off on what it is given', () => {
+    const s = game([[0, 0], [10, 10]])
+    const c = s.children[0]
+    Object.assign(c, { heading: 0, facing: 0, edgeFor: 0.01, edgeSide: 1, pinned: 0, held: true })
+    ageEdge(c, 1 / 60)
+    c.held = false
+    moveChild(c, Math.PI, 1.4 / 60, 1 / 60, CFG, OPEN)
+    expect(c.heading).toBe(Math.PI)
   })
 })

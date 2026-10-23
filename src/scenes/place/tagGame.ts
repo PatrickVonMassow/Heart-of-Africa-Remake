@@ -233,6 +233,10 @@ export interface TagChild {
   edgeSide: number
   /** Seconds left on that commitment. */
   edgeFor: number
+  /** The commitment ran out on the CLOCK (point 1424): the course turns back
+   *  to the wanted heading at `turnRate` instead of flipping onto it, until it
+   *  is on course again. */
+  edgeEase: boolean
   /** The start, walked distance and furthest reach of the current progress
    *  window — a child that walks without covering ground is as stuck as one
    *  that cannot move at all (point 648). See `trackProgress`. */
@@ -398,6 +402,7 @@ export function createTagGame(
       carried: 0,
       edgeSide: 0,
       edgeFor: 0,
+      edgeEase: false,
       anchorX: p.x,
       anchorZ: p.z,
       anchorWalked: 0,
@@ -553,8 +558,17 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
 export function ageEdge(c: TagChild, dt: number): void {
   if (c.edgeFor > 0) {
     c.edgeFor = Math.max(0, c.edgeFor - dt)
-    if (c.edgeFor === 0) c.edgeSide = 0
+    if (c.edgeFor === 0) {
+      c.edgeSide = 0
+      // Ended by the clock, not by an opened way: the wanted heading may lie
+      // right behind the course (measured 185°), and taken at once the walk
+      // flipped in one frame while the body eased after it — a child walking
+      // backwards. `moveChild` eases the course round instead — for a child
+      // that is walking: one told to stand sets off on what it is given.
+      c.edgeEase = !c.held
+    }
   }
+  if (c.held) c.edgeEase = false
 }
 
 /** The signed angle from `from` to `to`, in (−π, π]. */
@@ -814,6 +828,10 @@ export function turnBeforeRun(
   occupied?: (x: number, z: number) => boolean,
   stopAt?: { x: number; z: number },
 ): boolean {
+  // A runner turns on the spot rather than easing its course round: the eased
+  // exit from a commitment is the walk's (point 1424), and an eased course
+  // fighting a runner's fresh heading ran it sideways.
+  c.edgeEase = false
   // A pinned child is left to `moveChild`, whose quarter turns and rescue
   // free it; it is not running anywhere meanwhile.
   if (c.pinned > 0) return false
@@ -876,8 +894,12 @@ export function moveChild(
   const look = Math.max(len, world.childRadius * 2)
   releaseEdge(c, desired, world, blockedAt, stopAt)
   // What it steers on this frame: where it wants to go, or — while it is going
-  // round something — the course it is already on along that obstacle's edge.
-  let heading = c.edgeFor > 0 ? c.heading : desired
+  // round something — the course it is already on along that obstacle's edge,
+  // or — just out of such a commitment — its course turning toward the way it
+  // wants at the body's own `turnRate`.
+  if (c.edgeFor > 0 || Math.abs(angleTo(c.heading, desired)) <= ON_COURSE) c.edgeEase = false
+  const steer = c.edgeFor > 0 ? c.heading : c.edgeEase ? turnToward(c.heading, desired, cfg.turnRate * dt) : desired
+  let heading = steer
   let course = c.heading
   let moved = false
   for (let k = 0; k < steps; k++) {
@@ -905,7 +927,8 @@ export function moveChild(
     // Something stood in the way of where it wanted to go and it had to turn
     // aside for it: from here it goes round that obstacle the way this step
     // turned, and keeps to that side until the way it wants is open again.
-    const off = angleTo(desired, heading)
+    // Judged against what it STEERED, so an eased course is no deflection.
+    const off = angleTo(steer, heading)
     if (c.edgeFor <= 0 && Math.abs(off) > ON_COURSE) {
       c.edgeSide = off > 0 ? 1 : -1
       c.edgeFor = Math.max(0, cfg.edgeSeconds)
