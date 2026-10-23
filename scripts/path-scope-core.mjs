@@ -184,6 +184,10 @@ export function canonicalisePath(raw, ctx) {
   }
   s = s.replace(/\\/g, '/')
   if (!s) return ''
+  // Expand `~` to the running user's home BEFORE `..` is collapsed: the shell
+  // reads `~/../Repo` as <home>/../Repo, never as ~/Repo.
+  const home = String(c.home ?? '').replace(/\\/g, '/').replace(/\/+$/, '')
+  if (home && (s === '~' || s.startsWith('~/'))) s = `${home}${s.slice(1)}`
 
   let out = ''
   const drive = s.match(/^([A-Za-z]):(\/.*)?$/)
@@ -422,14 +426,22 @@ export function pathsInCommand(command, ctx, parseSegments) {
     for (const cand of candidatesOf(raw)) {
       if (cand.startsWith('/') && !looksLikePosixPath(cand, c)) continue
       const canonical = canonicalisePath(cand, c)
-      if (canonical && !seen.has(canonical)) seen.set(canonical, { raw: cand, canonical })
+      if (!canonical) continue
+      // Two HOMES fold onto the same `~` form, and a checkout root admits only
+      // one of them: a same-canonical path is a duplicate only when its physical
+      // spelling matches too (or one of them is unknown, e.g. a bare `~` form).
+      const physical = physicalPath(cand, c)
+      const same = (e) => !e.physical || !physical || e.physical.toLowerCase() === physical.toLowerCase()
+      const entries = seen.get(canonical) || []
+      if (entries.some(same)) continue
+      seen.set(canonical, [...entries, { raw: cand, canonical, physical }])
     }
   }
   for (const seg of parseSegments(command)) {
     for (const w of seg.words || []) if (!w.quoted) add(w.text)
     for (const r of seg.redirects || []) if (r.target) add(r.target)
   }
-  return [...seen.values()]
+  return [...seen.values()].flat().map(({ raw, canonical }) => ({ raw, canonical }))
 }
 
 const excerpt = (s) => (s.length > EXCERPT_CHARS ? `${s.slice(0, EXCERPT_CHARS)}…` : s)

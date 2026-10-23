@@ -408,4 +408,18 @@ describe('the checkout root of the running repository is in scope wherever it li
     expect(evaluate({ filePath: 'd:\\work\\repo\\x', ctx: win, parseSegments }).block).toBe(false)
     expect(evaluate({ filePath: 'D:\\Work\\Repository\\x', ctx: win, parseSegments }).block).toBe(true)
   })
+
+  it('two homes folding onto one ~ form are each judged on their own physical path', () => {
+    const repo = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    const v = evaluate({ command: 'cat /home/user/Repo/secret /root/Repo/secret', ctx: repo, parseSegments })
+    expect(v.block).toBe(true)
+    expect(v.offenders.map((o) => o.raw)).toEqual(['/root/Repo/secret'])
+  })
+
+  it('~ is expanded before .. is collapsed', () => {
+    const repo = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    expect(evaluate({ command: 'cat ~/../Repo/secret', ctx: repo, parseSegments }).block).toBe(true)
+    expect(canonicalisePath('~/../Repo/secret', repo)).toBe('/home/Repo/secret')
+    expect(evaluate({ command: 'cat ~/Repo/x', ctx: repo, parseSegments }).block).toBe(false)
+  })
 })
