@@ -636,7 +636,7 @@ export function SkinnedFigure({
           if (releasing.current[i] !== null && reachOfPose(i) === undefined) return i !== steadyArm
           return !contactArm[i] && i !== steadyArm && (!v || armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, REST_POSE_ARMS[i]))
         }) as [boolean, boolean]
-        for (const i of [0, 1] as const) if (clips.arms[i] >= 1 || i === steadyArm) releasing.current[i] = null
+        for (const i of [0, 1] as const) if (i === steadyArm) releasing.current[i] = null
         applyClipLayers(gltf.asset, gltf.person, gb, clips, m, free)
         takeTrunkBase(gb, trunkBase)
         digShare = clips.dig
