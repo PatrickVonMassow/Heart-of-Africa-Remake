@@ -3091,16 +3091,17 @@ function ErrandVillagers({
           // Facing where it WALKS (on a route the waypoint, not the destination
           // behind the huts) — TURNED toward it, never snapped: a new waypoint or
           // a fresh stroll used to swing the body round between two frames. A
-          // way far off its heading slows it nearly to a stand while it turns,
-          // and the step goes along the turned heading, like the household walkers.
+          // way far off its heading slows it nearly to a stand while it turns.
+          // The step stays the way round bodies and walls, only shortened by
+          // that pace: stepped along the turned heading instead, it walked into
+          // the body it was routing round and the separation shoved it off at
+          // up to 8 m/s, drawn as a sprint in mid-air (point 1404 oddity).
           const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
           yaws.current[i] = turn.yaw
           faceTo.current[i] = null
-          const sx = me.x + Math.sin(turn.yaw) * step * turn.pace
-          const sz = me.z + Math.cos(turn.yaw) * step * turn.pace
-          const [nx, nz] = insidePlace({ radius, bank, observed }, sx, sz, NPC_RADIUS * 2)
-            ? resolveMove(colliders, sx, sz, NPC_RADIUS, [me.x, me.z])
-            : [me.x, me.z]
+          const sx = me.x + (tx - me.x) * turn.pace
+          const sz = me.z + (tz - me.z) * turn.pace
+          const [nx, nz] = turn.pace < 1 ? resolveMove(colliders, sx, sz, NPC_RADIUS, [me.x, me.z]) : [tx, tz]
           const moved = Math.hypot(nx - me.x, nz - me.z)
           me.x = nx
           me.z = nz

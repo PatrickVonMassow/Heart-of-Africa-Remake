@@ -2040,16 +2040,27 @@ if (section('adult-errands')) {
           const seen = new Set()
           let adults = 0
           const t0 = performance.now()
+          let last = null
+          let lastT = t0
           const tick = () => {
             frames++
+            const now = performance.now()
+            const dt = Math.max(1e-3, (now - lastT) / 1000)
+            lastT = now
             const vs = window.__placeErrands().villagers
             adults = vs.length
+            const p = window.__placePlayer
             vs.forEach((v, i) => {
               const g = v.drawn.gait
               if (g) seen.add(i)
+              // what the body really did since the last sample, for the cause
+              const was = last?.[i]
+              const move = was ? Math.hypot(v.x - was.x, v.z - was.z) / dt : null
+              const spin = was ? Math.abs(Math.atan2(Math.sin(v.yaw - was.yaw), Math.cos(v.yaw - was.yaw))) / dt : null
               if (g && (g.sprint > worst.sprint || (g.sprint === worst.sprint && g.jog > worst.jog)))
-                worst = { sprint: g.sprint, jog: g.jog, speed: v.drawn.speed, who: i, x: v.x, z: v.z, work: v.work?.phase ?? null, arrived: v.work?.arrived ?? null }
+                worst = { sprint: g.sprint, jog: g.jog, speed: v.drawn.speed, move, spin, dt, who: i, x: v.x, z: v.z, player: Math.hypot(p.x - v.x, p.z - v.z), work: v.work?.phase ?? null, arrived: v.work?.arrived ?? null }
             })
+            last = vs.map((v) => ({ x: v.x, z: v.z, yaw: v.yaw }))
             if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
             else resolve({ ...worst, frames, adults, gaitSeen: seen.size })
           }
