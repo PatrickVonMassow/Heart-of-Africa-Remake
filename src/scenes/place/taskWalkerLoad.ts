@@ -32,7 +32,8 @@ const smooth = (v: number) => {
   const t = clamp01(v)
   return t * t * (3 - 2 * t)
 }
-const mix = (a: number, b: number, t: number) => a + (b - a) * t
+// exact at both ends, so a load set down stands exactly on its spot
+const mix = (a: number, b: number, t: number) => (t >= 1 ? b : t <= 0 ? a : a + (b - a) * t)
 /** A release: the hands keep the load the first 40 % of it (it comes to rest
  *  in them), then come away. */
 const RELEASE_HOLD = 0.4

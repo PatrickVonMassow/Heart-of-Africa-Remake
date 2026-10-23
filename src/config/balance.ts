@@ -2641,13 +2641,13 @@ export const TASK_LOAD_HANDLING = {
   /** Standing at the target, both hands go up and grip the load on the head. */
   takeSeconds: 0.45,
   /** The load brought down to the ground while the walker kneels down. */
-  lowerSeconds: 1.0,
+  lowerSeconds: 1.4,
   /** The hands let go of the set-down load (and of the load back on the head). */
   releaseSeconds: 0.35,
   /** Before rising, the hands go down to the load on the ground and grip it. */
   gripSeconds: 0.45,
   /** The load lifted onto the head while the walker rises (never shorter than the kneel). */
-  liftSeconds: 1.0,
+  liftSeconds: 1.4,
   /** Where the load stands while the walker works, in its own frame (m):
    *  `side` to its left (+x), `forward` in front of its knees. */
   ground: { side: 0.32, forward: 0.34 },
