@@ -58,7 +58,7 @@ import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, VILLAGER_POSE, balance } from '../../config/balance'
+import { START_YEAR, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
@@ -68,7 +68,7 @@ import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
 import { workStop, type WorkStopMode } from './taskWalkerStop'
-import { steerHeading } from '../../render/figureWalk'
+import { steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
@@ -1827,7 +1827,7 @@ function Porters({
   // crate's front corners. Constant — a porter holds the load, it does not wave.
   const carry = useRef<FigurePose | null>({ left: armAim(0.3, 0.45), right: armAim(-0.3, 0.45), lean: 0.05, turn: 0 })
   // Where each porter actually stands, so its move can be swept from there.
-  const pos = useRef<Array<{ x: number; z: number } | null>>([])
+  const pos = useRef<Array<{ x: number; z: number; yaw?: number } | null>>([])
   // The body each porter presents to the other inhabitants (point 578).
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(routes.length)
@@ -1867,7 +1867,10 @@ function Porters({
       const px = p.x
       const pz = p.z
       g.position.set(px, groundHeight(px, pz), pz)
-      g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
+      // Turned about at the route's end on the spot, never flipped in a frame.
+      const heading = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
+      p.yaw = turnToward(p.yaw ?? heading, heading, VILLAGER_MOTION.spotTurnRate * dt)
+      g.rotation.y = p.yaw
     })
   })
   return (
@@ -2683,14 +2686,6 @@ function Walkers({
   )
 }
 
-/** The heading a walker turns toward: where a full step toward its waypoint
- *  really goes (slid along a wall, round another body) — unless that is
- *  hardly a step, or a shove back, which never turns it about. */
-function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
-  const ahead = (tx - x) * dx + (tz - z) * dz > 0
-  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
-}
-
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
  *  figure sliding along a wall beside the waypoint still ticks it off instead of
  *  circling it. */
@@ -2897,6 +2892,12 @@ function ErrandVillagers({
   if (yaws.current.length !== count) {
     yaws.current = Array.from({ length: count }, (_, i) => yaws.current[i] ?? 0)
   }
+  // The heading a speaker still turns toward on the spot, or null.
+  const faceTo = useRef<Array<number | null>>([])
+  // Dev: each body's yaw as last drawn, and the worst turn beyond the bounded
+  // rate one game frame drew (point 1404) — measured in the frame, with its dt.
+  const drawnYaw = useRef<Array<number | null>>([])
+  const turnWorst = useRef({ over: 0, swing: 0, dt: 0, who: -1 })
 
   // May a body stand here? The settlement boundary and the collider set
   // together — the same question this component's own step asks. The work
@@ -3084,18 +3085,28 @@ function ErrandVillagers({
           // errands send a villager out onto the bank lobe, and a circular rim
           // would have frozen it at the plain radius short of the water.
           const inside = insidePlace({ radius, bank, observed }, wantX, wantZ, NPC_RADIUS * 2)
-          const [nx, nz] = inside
+          const [tx, tz] = inside
             ? resolveMove(colliders, wantX, wantZ, NPC_RADIUS, [me.x, me.z])
             : [me.x, me.z]
+          // Facing where it WALKS (on a route the waypoint, not the destination
+          // behind the huts) — TURNED toward it, never snapped: a new waypoint or
+          // a fresh stroll used to swing the body round between two frames. A
+          // way far off its heading slows it nearly to a stand while it turns.
+          // The step stays the way round bodies and walls, only shortened by
+          // that pace, so the turn never walks it into a body it routes round.
+          const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
+          yaws.current[i] = turn.yaw
+          faceTo.current[i] = null
+          const sx = me.x + (tx - me.x) * turn.pace
+          const sz = me.z + (tz - me.z) * turn.pace
+          const [nx, nz] = turn.pace < 1 ? resolveMove(colliders, sx, sz, NPC_RADIUS, [me.x, me.z]) : [tx, tz]
           const moved = Math.hypot(nx - me.x, nz - me.z)
           me.x = nx
           me.z = nz
           state.walked += moved
-          // Facing where it WALKS, which on a route is the waypoint rather than
-          // the destination behind the huts.
-          yaws.current[i] = Math.atan2(ax, az)
-          // Use the same escape ladder as the household walkers.
-          if (moved < step * 0.25) {
+          // Use the same escape ladder as the household walkers. A body turning
+          // nearly on the spot is not stuck.
+          if (moved < step * 0.25 && turn.pace >= 0.3) {
             state.stuck += dt
             if (state.stuck > balance.walkerUnstuckSeconds) {
               const anchor = spawnAnchors[i]
@@ -3111,7 +3122,7 @@ function ErrandVillagers({
               }
               state.stuck = 0
             }
-          } else {
+          } else if (moved >= step * 0.25) {
             state.stuck = 0
           }
         }
@@ -3230,7 +3241,9 @@ function ErrandVillagers({
           figureWork.dig = true
           const siteIndex = task?.siteIndex
           const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
-          if (site) yaws.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
+          // turned to the pit on the spot, not swung round in one frame: the
+          // pit is its one aim, so a word's aim never adds a second turn
+          if (site) faceTo.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
         }
         // the shaft along the digging arm: the stroke drives the blade into the pit
         if (digTool) digTool.rotation.x = primitiveToolTilt(state.digK)
@@ -3251,7 +3264,22 @@ function ErrandVillagers({
         // On the ground: the body's own stride carries the rise and fall.
         g.position.set(me.x, groundHeight(me.x, me.z), me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
+        const aim = faceTo.current[i]
         if (facing !== null) yaws.current[i] = facing
+        else if (aim !== null && aim !== undefined) {
+          yaws.current[i] = turnToward(yaws.current[i], aim, VILLAGER_MOTION.spotTurnRate * dt)
+          if (yaws.current[i] === aim) faceTo.current[i] = null
+        }
+        if (import.meta.env.DEV) {
+          const was = drawnYaw.current[i]
+          const now = yaws.current[i]
+          if (was !== null && was !== undefined && facing === null) {
+            const swing = Math.abs(Math.atan2(Math.sin(now - was), Math.cos(now - was)))
+            const over = swing - Math.max(cfg.pace / VILLAGER_MOTION.turnRadius, VILLAGER_MOTION.spotTurnRate) * dt
+            if (over > turnWorst.current.over) turnWorst.current = { over, swing, dt, who: i }
+          }
+          drawnYaw.current[i] = now
+        }
         g.rotation.y = yaws.current[i]
         // THE SINK, which is half of what makes a fill read as fetching rather
         // than as falling: a y-squash on the figure's own group (work-order 1085).
@@ -3287,12 +3315,13 @@ function ErrandVillagers({
     for (const said of work.emitted) {
       // The speaker turns to what he is talking about as he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all. The word and
-      // its gesture take the new yaw now; the body is drawn turned from the
-      // next frame.
+      // its gesture take the new yaw now; the body turns to it on the spot from
+      // the next frame, never swung round in one.
       const speaker = people[said.speaker]
       if (speaker) {
-        yaws.current[said.speaker] = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
-        speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+        const aim = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
+        faceTo.current[said.speaker] = aim
+        speakWork(camera, said, speaker, aim, refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
   }
@@ -3322,6 +3351,11 @@ function ErrandVillagers({
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
+      /** The worst turn past the bounded rate any frame drew (point 1404). */
+      turnWorst: { ...turnWorst.current },
+      resetTurnWorst: () => {
+        turnWorst.current = { over: 0, swing: 0, dt: 0, who: -1 }
+      },
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
         // WHAT IS ACTUALLY DRAWN, not what the pose intended (work-order 1085):
@@ -3333,11 +3367,16 @@ function ErrandVillagers({
         let handY = null
         let headAspect = null
         let mouthY = null
+        let gait: { walk: number; jog: number; sprint: number } | null = null
+        let speed: number | null = null
         if (g) {
           g.updateWorldMatrix(true, true)
           g.traverse((o) => {
             if (o.name === 'hand-left') handY = o.getWorldPosition(new THREE.Vector3()).y
             if (o.name === 'jar-mouth') mouthY = o.getWorldPosition(new THREE.Vector3()).y
+            // the gait the body is drawn in, at its own measured ground speed
+            if (o.userData.gait && !gait) gait = o.userData.gait
+            if (o.userData.walk && speed === null) speed = (o.userData.walk as { speed: number }).speed
             // THE HEAD AS DRAWN, in world extents: a squat shortens a man, it does
             // not deflate his skull, so the ratio of the head's world height to its
             // world width must stay 1 through the sink (work-order 1085).
@@ -3368,7 +3407,7 @@ function ErrandVillagers({
               ? Math.min(1, task.dug / balance.bankFillSeconds)
               : null,
           yaw: yaws.current[i] ?? 0,
-          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z) },
+          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z), gait, speed },
           carry: carryOf(work, i),
           work: task
             ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,

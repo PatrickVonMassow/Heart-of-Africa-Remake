@@ -237,6 +237,14 @@ export function steerHeading(yaw: number, desired: number, speed: number, dt: nu
   return { yaw: yaw + turn, pace }
 }
 
+/** The heading a walker turns toward: where a full step toward its waypoint
+ *  really goes (slid along a wall, round another body) — unless that is
+ *  hardly a step, or a shove back, which never turns it about. */
+export function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
+  const ahead = (tx - x) * dx + (tz - z) * dz > 0
+  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
+}
+
 export interface FootPhase {
   z: number
   lift: number

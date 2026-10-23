@@ -1944,6 +1944,8 @@ if (section('adult-errands')) {
     e.intervalSeconds = 0.8
     e.dwellSeconds = 1
     e.digSeconds = 3
+    // the shipped pace, for the moving capture and the gait census (point 1404)
+    window.__errandShippedPace = e.pace
     e.pace = 6
     // Keep the measured ten-adult standalone setup. How many errands this
     // window then sees is no longer left to luck: it casts them itself and
@@ -1976,6 +1978,139 @@ if (section('adult-errands')) {
       !!geography.waterHead && !!geography.waterFoot,
       JSON.stringify({ head: geography.waterHead, foot: geography.waterFoot }),
     )
+    // A NEW HEADING IS TURNED TO, NEVER SNAPPED (point 1404): over five seconds
+    // of errands, words and digging, no adult's body swings further in one
+    // drawn frame than its fastest turn (walking or on the spot) allows for
+    // that frame's own dt. Measured INSIDE the game frame (`turnWorst`): a
+    // requestAnimationFrame sampler beside it can see two game frames in one
+    // of its own after a hitch and read a bounded turn as a snap.
+    // Measured before the fix: 1.2-2.9 rad in one frame.
+    await page.evaluate(() => window.__placeErrands().resetTurnWorst())
+    // 300 drawn frames (about five seconds at 60 fps), counted, not timed
+    await page.evaluate(() => new Promise((done) => {
+      let n = 0
+      const tick = () => (++n >= 300 ? done() : requestAnimationFrame(tick))
+      requestAnimationFrame(tick)
+    }))
+    const swings = await page.evaluate(() => ({ worst: window.__placeErrands().turnWorst }))
+    check(
+      'no village adult swings round to a new heading in one frame — it turns (point 1404)',
+      swings.worst.over <= 1e-6,
+      JSON.stringify(swings),
+    )
+    // The capture and the census below run at the SHIPPED errand pace: at this
+    // window's calibrated 6 m/s every errand adult is rightly drawn in a sprint,
+    // and that sprint was the mid-air flight of the first capture (frame-jump
+    // telemetry, 23.10.2026: worst jump exactly 6.0 m/s, no shove, no escape).
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = window.__errandShippedPace })
+    // THE MOVING CAPTURE the point is judged by (point 1404): one walking adult
+    // whose heading is far off its next way, four frames about 0.3 s apart, the
+    // camera FOLLOWING that one body (4 m off its first flank, re-placed per
+    // frame) so the turner is the figure in the middle of every frame — its yaw,
+    // way heading and drawn gait ride in each frame's label.
+    const turner = await page
+      .waitForFunction(() => {
+        const vs = window.__placeErrands().villagers
+        const i = vs.findIndex((v) => v.work && !v.work.arrived && Math.abs(Math.atan2(Math.sin(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw), Math.cos(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw))) > 0.8)
+        return i >= 0 ? { i } : false
+      }, null, { timeout: 60000, polling: 50 })
+      .then((h) => h.jsonValue())
+      .then((r) => r.i)
+      .catch(() => null)
+    check('an errand adult is caught facing away from its next way, to film its turn (point 1404)', turner !== null)
+    if (turner !== null) {
+      const side0 = await page.evaluate((i) => window.__placeErrands().villagers[i].yaw + Math.PI / 2, turner)
+      const follow = ({ i, side }) => {
+        const v = window.__placeErrands().villagers[i]
+        const p = window.__placePlayer
+        p.x = v.x + Math.sin(side) * 4
+        p.z = v.z + Math.cos(side) * 4
+        p.yaw = side
+        p.pitch = -0.15
+      }
+      // Frame 1 once showed only water (23.10.2026, both backends): the first
+      // view of this spot stalls the shutter while the turner walks on out of
+      // it. Village life is held still from the camera placement to the
+      // exposure, as for the fill shot (point 1108).
+      await page.evaluate(follow, { i: turner, side: side0 })
+      await nextFrames(8)
+      for (const k of [1, 2, 3, 4]) {
+        await page.evaluate(follow, { i: turner, side: side0 })
+        await nextFrames(2)
+        await freezeLife(true)
+        await page.evaluate(follow, { i: turner, side: side0 })
+        const at = await page.evaluate((i) => {
+          const v = window.__placeErrands().villagers[i]
+          const way = v.work ? Math.atan2(v.work.x - v.x, v.work.z - v.z) : null
+          return { x: v.x, z: v.z, yaw: v.yaw, way, gait: v.drawn.gait, speed: v.drawn.speed }
+        }, turner)
+        const deg = (a) => (a === null ? 'n/a' : Math.round((a * 180) / Math.PI))
+        const g = at.gait ? `walk ${at.gait.walk.toFixed(2)} jog ${at.gait.jog.toFixed(2)} sprint ${at.gait.sprint.toFixed(2)}` : 'no gait'
+        const label = `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`
+        console.log(label)
+        try {
+          await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
+            local: { x: at.x, y: 0.9, z: at.z },
+            label,
+          })
+        } finally {
+          await freezeLife(false)
+        }
+        if (k === 4) break
+        // the next frame once the turner has walked on about 0.35 m (≈0.3 s);
+        // a turner standing still makes four frames of one instant, not a moving capture
+        const walked = await page
+          .waitForFunction(({ i, x, z }) => {
+            const v = window.__placeErrands().villagers[i]
+            return Math.hypot(v.x - x, v.z - z) > 0.35
+          }, { i: turner, x: at.x, z: at.z }, { timeout: 5000, polling: 'raf' })
+          .then(() => true)
+          .catch(() => false)
+        check(`the filmed errand adult walks on between moving-capture frames ${k} and ${k + 1} (point 1404)`, walked)
+        if (!walked) break
+      }
+    }
+    // NO VILLAGE ADULT FLIES (point 1404 oddity, frame 1 of 23.10.2026: a woman
+    // drawn near horizontal in mid-air, legs splayed). The drawn gait of every
+    // errand adult over ~10 s: an errand walks; a sprint share means the body's
+    // measured ground speed jumped (a snap, an escape) and the clip flies.
+    const flight = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let worst = { sprint: 0, jog: 0, speed: 0, who: null }
+          let frames = 0
+          const seen = new Set()
+          let adults = 0
+          const t0 = performance.now()
+          let last = null
+          let lastT = t0
+          const tick = () => {
+            frames++
+            const now = performance.now()
+            const dt = Math.max(1e-3, (now - lastT) / 1000)
+            lastT = now
+            const vs = window.__placeErrands().villagers
+            adults = vs.length
+            const p = window.__placePlayer
+            vs.forEach((v, i) => {
+              const g = v.drawn.gait
+              if (g) seen.add(i)
+              // what the body really did since the last sample, for the cause
+              const was = last?.[i]
+              const move = was ? Math.hypot(v.x - was.x, v.z - was.z) / dt : null
+              const spin = was ? Math.abs(Math.atan2(Math.sin(v.yaw - was.yaw), Math.cos(v.yaw - was.yaw))) / dt : null
+              if (g && (g.sprint > worst.sprint || (g.sprint === worst.sprint && g.jog > worst.jog)))
+                worst = { sprint: g.sprint, jog: g.jog, speed: v.drawn.speed, move, spin, dt, who: i, x: v.x, z: v.z, player: Math.hypot(p.x - v.x, p.z - v.z), work: v.work?.phase ?? null, arrived: v.work?.arrived ?? null }
+            })
+            last = vs.map((v) => ({ x: v.x, z: v.z, yaw: v.yaw }))
+            if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
+            else resolve({ ...worst, frames, adults, gaitSeen: seen.size })
+          }
+          requestAnimationFrame(tick)
+        }),
+    )
+    check('no village adult on an errand is drawn in a sprint (point 1404 flight oddity)', flight.adults > 0 && flight.gaitSeen === flight.adults && flight.sprint < 0.5, JSON.stringify(flight))
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared

@@ -37,7 +37,7 @@ it('keeps each resolved spawn anchor after the villager walks away', () => {
 function escapeStep(actor: 'walker' | 'errand') {
   const begin = actor === 'walker'
     ? '      if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {'
-    : '          if (moved < step * 0.25) {'
+    : '          if (moved < step * 0.25 && turn.pace >= 0.3) {'
   const after = actor === 'walker'
     ? '\n      settleBody(i, s, !throughDoor)'
     : '\n        }\n      }\n\n      // THE BODY'
@@ -48,7 +48,7 @@ function escapeStep(actor: 'walker' | 'errand') {
   const deps = { escapeToFree, balance, NPC_RADIUS: WALKER_RADIUS }
   const tick = new Function(...Object.keys(deps), 'env', `
     const {s, def, colliders, nav, oldX, oldZ, step, dt,
-      me, state, moved, spawnAnchors, i, task, work, clearTask} = env;
+      me, state, moved, turn, spawnAnchors, i, task, work, clearTask} = env;
     ${ts.transpile(source.slice(start, end), { target: ts.ScriptTarget.ES2022 })}
   `)
   return (env: object) => tick(...Object.values(deps), env)
@@ -91,7 +91,7 @@ it.each(rungs)('both steppers place the body via $rung after the configured wind
       const env = {
         s, me, state, def: { home: { door: home } }, colliders, nav,
         spawnAnchors, i: 0, task: actor === 'errand-task' ? {} : null,
-        work: {}, clearTask, oldX: 0, oldZ: 0, step: 0.1, moved: 0, dt: 0.05,
+        work: {}, clearTask, oldX: 0, oldZ: 0, step: 0.1, moved: 0, turn: { pace: 1 }, dt: 0.05,
       }
       tick(env)
       expect([s.x, s.z, me.x, me.z]).toEqual([0, 0, 0, 0])

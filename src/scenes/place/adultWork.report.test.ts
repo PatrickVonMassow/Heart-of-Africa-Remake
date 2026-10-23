@@ -4,7 +4,7 @@ import ts from 'typescript'
 import { beforeAll, expect, it, vi } from 'vitest'
 import { setupGeodata } from '../../test/geodata'
 import { resetDevAsserts } from '../../systems/devAssert'
-import { balance } from '../../config/balance'
+import { balance, VILLAGER_MOTION } from '../../config/balance'
 import { instructionDelay } from '../../communication/speaking'
 import { mulberry32 } from '../../world/noise'
 import { buildLayout } from './layout'
@@ -13,6 +13,7 @@ import * as collision from './collision'
 import * as routing from './routing'
 import * as inhabitants from './inhabitantBodies'
 import { insidePlace } from './boundary'
+import { steerHeading, wayHeading } from '../../render/figureWalk'
 
 beforeAll(setupGeodata)
 
@@ -28,12 +29,12 @@ function sceneMovement() {
   expect(end).toBeGreaterThan(start)
   const movement = ts.transpile(source.slice(start, end) + '\n}', { target: ts.ScriptTarget.ES2022 })
   const deps = {
-    ...workApi, ...collision, ...routing, ...inhabitants, insidePlace, balance,
+    ...workApi, ...collision, ...routing, ...inhabitants, insidePlace, balance, steerHeading, wayHeading,
     NPC_RADIUS: collision.WALKER_RADIUS, WAYPOINT_RADIUS: 1.2,
   }
   const move = new Function(...Object.keys(deps), 'env', `
     const {people, spawnAnchors, work, idle, rand, namedPlaces, rim, colliders, radius, bank, observed,
-      nav, bodies, bodySet, separationWorld, yaws, dt, cfg} = env;
+      nav, bodies, bodySet, separationWorld, yaws, faceTo, dt, cfg} = env;
     ${movement}
   `)
   return (env: object) => move(...Object.values(deps), env)
@@ -100,6 +101,7 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
       },
     },
     yaws: { current: people.map(() => 0) },
+    faceTo: { current: [] },
   }
   const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
   resetDevAsserts()
@@ -108,8 +110,17 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
     let firstCarrier: workApi.AdultTask | null = null
     const phases = new Set<string>()
     const words: string[] = []
+    // The walking body TURNS (work-order: villagers turned abruptly): no frame
+    // swings a walker round by more than its bounded turn allows.
+    const turnBound = (cfg.pace / VILLAGER_MOTION.turnRadius + VILLAGER_MOTION.spotTurnRate) * dt + 1e-9
+    let worstTurn = 0
     for (let tick = 0; tick * dt < cfg.errandSeconds; tick++) {
+      const before = [...env.yaws.current]
       move(env)
+      for (let k = 0; k < before.length; k++) {
+        const d = env.yaws.current[k] - before[k]
+        worstTurn = Math.max(worstTurn, Math.abs(Math.atan2(Math.sin(d), Math.cos(d))))
+      }
       workApi.stepAdultWork(work, view, dt, cfg, rand)
       if (!firstSender) {
         firstSender = work.tasks.find((t) => t?.phase === 'send') ?? null
@@ -120,6 +131,8 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
       if (words.includes('water-back')) break
     }
     expect(firstSender, 'the water dispatcher must cast a sender').not.toBeNull()
+    expect(worstTurn).toBeGreaterThan(0)
+    expect(worstTurn).toBeLessThanOrEqual(turnBound)
     expect(words, 'the first pair must order, fetch, and report before its 300-second expiry').toEqual(['water-out', 'water-back'])
     expect(phases).toEqual(new Set(['wait:none', 'fetch:emptyJar', 'fill:emptyJar', 'walk:fullJar', 'walk:none']))
     expect(work.standJars).toBe(1)
