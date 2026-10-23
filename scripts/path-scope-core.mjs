@@ -429,11 +429,11 @@ export function pathsInCommand(command, ctx, parseSegments) {
       if (!canonical) continue
       // Two HOMES fold onto the same `~` form, and a checkout root admits only
       // one of them: a same-canonical path is a duplicate only when its physical
-      // spelling matches too (or one of them is unknown, e.g. a bare `~` form).
+      // spelling matches too; an unknown spelling only matches another unknown.
       const physical = physicalPath(cand, c)
       // POSIX spellings compare case-sensitively; only drive paths fold case.
-      const fold = (s) => (s.startsWith('/') ? s : s.toLowerCase())
-      const same = (e) => !e.physical || !physical || fold(e.physical) === fold(physical)
+      const fold = (s) => (!s || s.startsWith('/') ? s : s.toLowerCase())
+      const same = (e) => fold(e.physical) === fold(physical)
       const entries = seen.get(canonical) || []
       if (entries.some(same)) continue
       seen.set(canonical, [...entries, { raw: cand, canonical, physical }])

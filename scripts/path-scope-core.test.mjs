@@ -324,7 +324,7 @@ describe('a first-class file path (Read/Edit/Write)', () => {
 
 describe('pathsInCommand', () => {
   it('returns the raw spelling beside the canonical one, deduped', () => {
-    const found = pathsInCommand('cat /mnt/c/Users/Patri/Documents/x ~/Documents/x', ctx, parseSegments)
+    const found = pathsInCommand('cat /mnt/c/Users/Patri/Documents/x ~/Documents/x', { ...ctx, home: '/mnt/c/Users/Patri' }, parseSegments)
     expect(found.map((f) => f.canonical.toLowerCase())).toEqual(['~/documents/x'])
     expect(found[0].raw).toBe('/mnt/c/Users/Patri/Documents/x')
   })
@@ -421,6 +421,12 @@ describe('the checkout root of the running repository is in scope wherever it li
     const v = evaluate({ command: 'cat /home/user/Repo/secret /home/User/Repo/secret', ctx: repo, parseSegments })
     expect(v.block).toBe(true)
     expect(v.offenders.map((o) => o.raw)).toEqual(['/home/User/Repo/secret'])
+  })
+
+  it('a ~ form with an unknown home is judged even beside an allowed physical twin', () => {
+    const repo = { ...ctx, home: '', projectRoots: ['/home/node/Repo'] }
+    expect(evaluate({ command: 'cat ~/Repo/x', ctx: repo, parseSegments }).block).toBe(true)
+    expect(evaluate({ command: 'cat /home/node/Repo/x ~/Repo/x', ctx: repo, parseSegments }).block).toBe(true)
   })
 
   it('~ is expanded before .. is collapsed', () => {
