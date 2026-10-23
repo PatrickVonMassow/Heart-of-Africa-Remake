@@ -27,11 +27,15 @@ beforeAll(async () => {
 
 const take: FigurePose = { left: { ...REST_POSE.left }, right: armAim(-0.6, -0.4), lean: 0, turn: 0, reach: { right: 0.9 } }
 const held: FigurePose = { ...take, reach: undefined }
+// the last frame of a take: the arm all but back at rest, the reach still named
+const takeEnd: FigurePose = { left: { ...REST_POSE.left }, right: { ...REST_POSE.right, pitch: REST_POSE.right.pitch - 0.05 }, lean: 0, turn: 0, reach: { right: 1 } }
+const rest: FigurePose = { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }
 const gesture: FigurePose = { left: { ...REST_POSE.left }, right: armAim(-1.3, 0.3), lean: 0, turn: 0 }
 
 /** The drawn right hand, in the figure's frame, after the poses shown in turn
- *  for 120 frames each. */
-async function handAfter(poses: FigurePose[]) {
+ *  for 120 frames each, and the fastest frame-to-frame move of a jar hung
+ *  0.3 m below its hand anchor. */
+async function run(poses: FigurePose[]) {
   const look: FigureLook = {
     peopleId: 'swahili',
     drivers: { coldness: 0, harmattan: 0, karif: 0 },
@@ -59,13 +63,23 @@ async function handAfter(poses: FigurePose[]) {
   const gl = { render() {}, setSize() {}, setPixelRatio() {}, domElement: {} }
   await root.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
   await act(async () => root.render(<Stage />))
-  for (frame = 0; frame < poses.length * 120; frame++) act(() => advance((frame + 1) / 60))
-  group.updateMatrixWorld(true)
+  let jarStep = 0
+  let lastJar: THREE.Vector3 | null = null
+  for (frame = 0; frame < poses.length * 120; frame++) {
+    act(() => advance((frame + 1) / 60))
+    group.updateMatrixWorld(true)
+    const anchor = group.getObjectByName('hand-right')
+    if (!anchor) continue
+    const jar = group.worldToLocal(anchor.localToWorld(new THREE.Vector3(0, -0.3, 0)))
+    if (lastJar) jarStep = Math.max(jarStep, jar.distanceTo(lastJar))
+    lastJar = jar
+  }
   const mesh = group.getObjectByName('figure-body') as THREE.SkinnedMesh
   const hand = group.worldToLocal(mesh.skeleton.bones[asset.bones.indexOf('hand.R')].getWorldPosition(new THREE.Vector3()))
   await act(async () => root.unmount())
-  return hand
+  return { hand, jarStep }
 }
+const handAfter = async (poses: FigurePose[]) => (await run(poses)).hand
 
 describe('a released pose reach', () => {
   it('gives the arm back to a later contact gesture once the clips hold it', async () => {
@@ -78,5 +92,11 @@ describe('a released pose reach', () => {
     const direct = await handAfter([take, gesture, gesture])
     const fresh = await handAfter([gesture, gesture, gesture])
     expect(direct.distanceTo(fresh)).toBeLessThan(0.01)
+  }, 60_000)
+
+  it('lets a jar hung from the hand ride through the end of the release without a swing', async () => {
+    const { jarStep } = await run([takeEnd, rest, rest])
+    // 0.05 m in a 60 fps frame is 3 m/s, a walking arm's swing at most
+    expect(jarStep).toBeLessThan(0.05)
   }, 60_000)
 })

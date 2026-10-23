@@ -816,6 +816,9 @@ export function SkinnedFigure({
         if (contactArm[i] && vh && anchor.parent) {
           const parentQ = anchor.parent.getWorldQuaternion(new THREE.Quaternion()).invert()
           anchor.quaternion.copy(parentQ.multiply(vh.getWorldQuaternion(new THREE.Quaternion())))
+          // a released reach hands the prop to the bone as the clips take the
+          // arm back, so the release's end never swings what hangs there
+          if (clips && releasing.current[i] !== null && reachOfPose(i) === undefined) anchor.quaternion.slerp(_q.identity(), clips.arms[i])
         } else anchor.quaternion.identity()
         anchor.updateWorldMatrix(false, true)
       })
