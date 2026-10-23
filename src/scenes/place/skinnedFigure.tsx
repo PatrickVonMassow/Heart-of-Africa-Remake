@@ -285,8 +285,9 @@ const _rv = new THREE.Vector3()
 const _rn = new THREE.Vector3()
 const _rf = new THREE.Vector3()
 
-/** What the figure measured of its own walk, and its transitions in progress. */
+type ArmAngles = { pitch: number; yaw: number; roll: number }
 
+/** What the figure measured of its own walk, and its transitions in progress. */
 export function SkinnedFigure({
   look,
   cloth,
@@ -380,6 +381,8 @@ export function SkinnedFigure({
   // last reach while the clips take it back, so the release never snaps.
   const releasing = useRef<[number | null, number | null]>([null, null])
   const lastReach = useRef<[number | null, number | null]>([null, null])
+  // the pose's arm angles when its reach was given up: a later change is a new gesture
+  const releasedAt = useRef<[ArmAngles | null, ArmAngles | null]>([null, null])
   const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
@@ -469,7 +472,11 @@ export function SkinnedFigure({
       for (const i of [0, 1] as const) {
         const k = reachOfPose(i)
         if (k !== undefined) releasing.current[i] = null
-        else if (lastReach.current[i] !== null && gltf && clips) releasing.current[i] = lastReach.current[i]
+        else if (lastReach.current[i] !== null && gltf && clips) {
+          releasing.current[i] = lastReach.current[i]
+          const v = arms.current[i]
+          releasedAt.current[i] = v ? { pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z } : null
+        }
         lastReach.current[i] = k ?? null
       }
       const reachFor = (i: number) => reachOfPose(i) ?? releasing.current[i] ?? undefined
@@ -636,7 +643,14 @@ export function SkinnedFigure({
           if (releasing.current[i] !== null && reachOfPose(i) === undefined) return i !== steadyArm
           return !contactArm[i] && i !== steadyArm && (!v || armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, REST_POSE_ARMS[i]))
         }) as [boolean, boolean]
-        for (const i of [0, 1] as const) if (i === steadyArm) releasing.current[i] = null
+        // The release ends at the steadying hand, or once the clips hold the
+        // arm whole and the pose has moved it since (a new gesture, or rest).
+        for (const i of [0, 1] as const) {
+          const v = arms.current[i]
+          const at = releasedAt.current[i]
+          const moved = !v || !at || Math.max(Math.abs(v.rotation.x - at.pitch), Math.abs(v.rotation.y - at.yaw), Math.abs(v.rotation.z - at.roll)) > 1e-3
+          if (i === steadyArm || (clips.arms[i] >= 1 && moved)) releasing.current[i] = null
+        }
         applyClipLayers(gltf.asset, gltf.person, gb, clips, m, free)
         takeTrunkBase(gb, trunkBase)
         digShare = clips.dig
