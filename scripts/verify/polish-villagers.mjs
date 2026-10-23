@@ -2020,22 +2020,34 @@ if (section('adult-errands')) {
     check('an errand adult is caught facing away from its next way, to film its turn (point 1404)', turner !== null)
     if (turner !== null) {
       const side0 = await page.evaluate((i) => window.__placeErrands().villagers[i].yaw + Math.PI / 2, turner)
+      const follow = ({ i, side }) => {
+        const v = window.__placeErrands().villagers[i]
+        const p = window.__placePlayer
+        p.x = v.x + Math.sin(side) * 4
+        p.z = v.z + Math.cos(side) * 4
+        p.yaw = side
+        p.pitch = -0.15
+      }
+      // The first placement jumps the camera across the village; the drawn
+      // view needs a few frames to arrive there (frame 1 of 23.10.2026 03:34
+      // showed only water, the turner at the edge or outside it).
+      await page.evaluate(follow, { i: turner, side: side0 })
+      await nextFrames(8)
       for (const k of [1, 2, 3, 4]) {
-        const at = await page.evaluate(({ i, side }) => {
+        await page.evaluate(follow, { i: turner, side: side0 })
+        await nextFrames(2)
+        const at = await page.evaluate((i) => {
           const v = window.__placeErrands().villagers[i]
-          const p = window.__placePlayer
-          p.x = v.x + Math.sin(side) * 4
-          p.z = v.z + Math.cos(side) * 4
-          p.yaw = side
-          p.pitch = -0.15
           const way = v.work ? Math.atan2(v.work.x - v.x, v.work.z - v.z) : null
           return { x: v.x, z: v.z, yaw: v.yaw, way, gait: v.drawn.gait, speed: v.drawn.speed }
-        }, { i: turner, side: side0 })
+        }, turner)
         const deg = (a) => (a === null ? 'n/a' : Math.round((a * 180) / Math.PI))
         const g = at.gait ? `walk ${at.gait.walk.toFixed(2)} jog ${at.gait.jog.toFixed(2)} sprint ${at.gait.sprint.toFixed(2)}` : 'no gait'
+        const label = `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`
+        console.log(label)
         await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
           local: { x: at.x, y: 0.9, z: at.z },
-          label: `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`,
+          label,
         })
         // the next frame once the turner has walked on about 0.35 m (≈0.3 s)
         await page
