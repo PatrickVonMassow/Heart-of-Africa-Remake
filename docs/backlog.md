@@ -2209,3 +2209,4 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
   - `feat/1255-loom-plaza-distance` @ 79fcb509f — lowers the loom plaza height bar to 60 px;
     point 1255 was parked by 1258 ("land nothing"), its red lives on in open point 1266, which
     forbids weakening the check, so the commit is reference only.
+- Water carrier's report gesture reads as pointing at a villager (finding 23.10.2026 16:40): in `verification/1405-water-carrier-report.png` (WebGPU, feat/1405 98049d22b) a Bambara woman stands between him and the jars, so his aim at the water (0.032 m off) reads on screen as pointing at her. Staging only, the measured aim is right; a table-side keep-clear for idle villagers would end it.
