@@ -4,10 +4,11 @@
 
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
-import { armAim, armDirection, FILL_CARRY_SIDE, gesturePose, REST_POSE, startGesture } from '../../render/gesture'
+import { armAim, armDirection, FILL_CARRY_SIDE, REST_POSE } from '../../render/gesture'
 import {
   newestJarWater,
-  shoulderAim,
+  aimFromShoulder,
+  toFigureFrame,
   SPARE_JAR_LOCAL,
   standJarLocal,
   standToWorld,
@@ -93,39 +94,34 @@ describe('the take', () => {
 })
 
 describe('the report points at the water', () => {
-  const shoulder = { y: 1.05, x: 0.2 }
-  // Where the arm's line from its own shoulder passes a target: the closest
-  // distance, in world metres.
-  const miss = (figure: { x: number; z: number; yaw: number }, target: { x: number; y: number; z: number }) => {
-    const a = shoulderAim(figure, target, shoulder)
-    const g = gesturePose({ ...startGesture('point', a), t: 1 })
-    const arm = g[a.side]
-    const local = armDirection(arm)
-    // Into the world: the figure's local +X is (cos yaw, -sin yaw), +Z (sin yaw, cos yaw).
-    const c = Math.cos(figure.yaw), s = Math.sin(figure.yaw)
-    const dir = [local[0] * c + local[2] * s, local[1], -local[0] * s + local[2] * c]
-    const lx = a.side === 'left' ? shoulder.x : -shoulder.x
-    const from = [figure.x + lx * c, shoulder.y, figure.z - lx * s]
-    const v = [target.x - from[0], target.y - from[1], target.z - from[2]]
+  // The arm's line from its own shoulder, under a trunk leaning by `lean`,
+  // against the target: the closest distance (m).
+  const miss = (shoulder: [number, number, number], target: [number, number, number], lean: number) => {
+    const a = aimFromShoulder(shoulder, target, lean)
+    const d = armDirection(armAim(a.bearing, a.elevation))
+    // Rx(lean): the trunk's frame into the figure's.
+    const c = Math.cos(lean), s = Math.sin(lean)
+    const dir = [d[0], d[1] * c - d[2] * s, d[1] * s + d[2] * c]
+    const v = [target[0] - shoulder[0], target[1] - shoulder[1], target[2] - shoulder[2]]
     const along = v[0] * dir[0] + v[1] * dir[1] + v[2] * dir[2]
-    return { off: Math.hypot(v[0] - along * dir[0], v[1] - along * dir[1], v[2] - along * dir[2]), along, side: a.side }
+    return { off: Math.hypot(v[0] - along * dir[0], v[1] - along * dir[1], v[2] - along * dir[2]), along }
   }
 
-  it('aims the arm’s own line through a jar a metre ahead, which the centre line misses', () => {
-    const jar = { x: 0, y: 0.7, z: 1 }
-    const figure = { x: 0, z: 0, yaw: 0 }
-    const got = miss(figure, jar)
+  it('aims the arm’s own line through a jar a metre ahead and below', () => {
+    const got = miss([0.17, 1.15, 0.03], [0, 0.7, 1], 0)
     expect(got.along).toBeGreaterThan(0)
-    expect(got.off).toBeLessThan(1e-6)
-    // The pointing arm keeps the side it was solved for.
-    expect(gesturePose({ ...startGesture('indicate', shoulderAim(figure, jar, shoulder)), t: 2 }).pointHand?.[got.side]).toBeGreaterThan(0)
+    expect(got.off).toBeLessThan(1e-9)
   })
 
-  it('stays on the jar from any facing', () => {
-    for (const yaw of [0.3, -1.2, 2.8]) {
-      const figure = { x: 2, z: -1, yaw }
-      const jar = { x: 2 + Math.sin(yaw) * 1.1, y: 0.7, z: -1 + Math.cos(yaw) * 1.1 }
-      expect(miss(figure, jar).off).toBeLessThan(1e-6)
-    }
+  it('takes the trunk’s lean out of the aim', () => {
+    for (const lean of [0.03, 0.34]) expect(miss([-0.17, 1.1, 0.05], [0.2, 0.55, 0.9], lean).off).toBeLessThan(1e-9)
+  })
+
+  it('reads a world point in the figure’s own frame', () => {
+    const yaw = 0.8
+    const ahead = toFigureFrame({ x: 1, z: 2, yaw }, { x: 1 + Math.sin(yaw), y: 0.5, z: 2 + Math.cos(yaw) })
+    expect(ahead[0]).toBeCloseTo(0, 12)
+    expect(ahead[1]).toBe(0.5)
+    expect(ahead[2]).toBeCloseTo(1, 12)
   })
 })

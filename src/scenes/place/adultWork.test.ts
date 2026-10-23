@@ -523,7 +523,7 @@ describe('the water carrier works AT the table (work-order 1405)', () => {
     return { frames, words, state }
   }
   const fromStand = (p: { x: number; z: number }) => Math.hypot(p.x - STAND.x, p.z - STAND.z)
-  const atTable = balance.waterStandReach + balance.waterStandArrivalRadius + 1e-6
+  const atTable = balance.waterStandReach + balance.waterStandTableArrivalRadius + 1e-6
 
   it('sets the full jar down standing at the table, not on the 2.4 m ring', () => {
     const { frames } = errandFrames()

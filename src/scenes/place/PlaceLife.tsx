@@ -39,6 +39,9 @@ import {
   fillSquat,
   copyPoseExtras,
   FILL_CARRY_SIDE,
+  gestureArm,
+  INDICATE_LEAN,
+  WORK_LEAN_MAX,
   gestureEnvelope,
   gesturePose,
   isGesturing,
@@ -69,7 +72,7 @@ import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
 import {
-  SPARE_JAR_LOCAL, aimFromShoulder, shoulderAim, standJarLocal, standToWorld, standYaw, takeJarTravel, takePose,
+  SPARE_JAR_LOCAL, aimFromShoulder, standJarLocal, toFigureFrame, standToWorld, standYaw, takeJarTravel, takePose,
 } from './waterStand'
 import { workStop, type WorkStopMode } from './taskWalkerStop'
 import { steerHeading, wayHeading } from '../../render/figureWalk'
@@ -3250,13 +3253,13 @@ function ErrandVillagers({
         state.digK = 0
         if (digTool) digTool.visible = false
         figureWork.tool = false
-        // The carrying arm reaches for the jar's rim from its own shoulder.
+        // The carrying arm reaches for the jar's rim from its own drawn
+        // shoulder, through the trunk's lean at full reach.
         const ground = groundHeight(me.x, me.z)
-        const reach = takePose(taking, shoulderAim(
-          { x: me.x, z: me.z, yaw: yaws.current[i] },
-          { x: spareAt.x, y: spareAt.y + JAR_HEIGHT / 2 - ground, z: spareAt.z },
+        const reach = takePose(taking, aimFromShoulder(
           drawnShoulder(refs.current[i], limbs.current[i]?.current, FILL_CARRY_SIDE),
-          FILL_CARRY_SIDE,
+          toFigureFrame({ x: me.x, z: me.z, yaw: yaws.current[i] }, { x: spareAt.x, y: spareAt.y + JAR_HEIGHT / 2 - ground, z: spareAt.z }),
+          WORK_LEAN_MAX,
         ))
         if (pose) {
           pose.left = reach.left
@@ -3727,24 +3730,23 @@ function Jar({ full }: { full: boolean }) {
 
 /**
  * Where a villager's shoulder on `side` is DRAWN, in metres in his own group's
- * frame — off the centre line and above his feet (work-order 1405): the glTF
- * body's `upperArm` bone, else the primitive figure's arm pivot. Every body
- * has its own build, so an aim solved from an assumed shoulder misses a jar a
- * metre off by the difference.
+ * frame (work-order 1405): the glTF body's `upperArm` bone, else the
+ * primitive figure's arm pivot. Every body has its own build, so an aim solved
+ * from an assumed shoulder misses a jar a metre off by the difference.
  */
 function drawnShoulder(
   figure: THREE.Object3D | null,
   limbs: FigureLimbs | null | undefined,
   side: ArmSide,
-): { x: number; y: number } {
-  const fallback = { x: FIGURE_LIMBS.shoulderX, y: FIGURE_LIMBS.shoulderY }
+): [number, number, number] {
+  const fallback: [number, number, number] = [(side === 'left' ? 1 : -1) * FIGURE_LIMBS.shoulderX, FIGURE_LIMBS.shoulderY, 0]
   if (!figure) return fallback
   const joint = figure.getObjectByName(side === 'left' ? 'bone-upperArm.L' : 'bone-upperArm.R') ?? limbs?.arms[side === 'left' ? 0 : 1]
   if (!joint) return fallback
   figure.updateWorldMatrix(true, false)
   joint.updateWorldMatrix(true, false)
   const at = figure.worldToLocal(joint.getWorldPosition(new THREE.Vector3()))
-  return { x: Math.abs(at.x), y: at.y }
+  return [at.x, at.y, at.z]
 }
 
 /**
@@ -3836,7 +3838,7 @@ function speakWork(
   yaw: number,
   anchor: THREE.Group | null,
   gesture: RefObject<GestureState>,
-  shoulderOf: (side: ArmSide) => { x: number; y: number },
+  shoulderOf: (side: ArmSide) => [number, number, number],
   /** The ground under the speaker, so the aim is taken from his own shoulder. */
   lift: number,
 ): void {
@@ -3859,8 +3861,11 @@ function speakWork(
   }
   // FROM THE ARM'S OWN SHOULDER (work-order 1405): measured from the body's
   // centre, a point at a jar a metre off ran parallel past it.
+  const target = toFigureFrame({ x: speaker.x, z: speaker.z, yaw }, { ...said.aim, y: said.aim.y - lift })
+  const side = gestureArm(Math.atan2(target[0], target[2]))
   gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
-    ...aimFromShoulder({ x: speaker.x, z: speaker.z, yaw }, { ...said.aim, y: said.aim.y - lift }, shoulderOf),
+    ...aimFromShoulder(shoulderOf(side), target, INDICATE_LEAN),
+    side,
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
 }

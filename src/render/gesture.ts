@@ -396,6 +396,10 @@ export function aimAt(
   }
 }
 
+/** How far an indication leans the trunk in (rad); an aim solved for it takes
+ *  this lean back out. */
+export const INDICATE_LEAN = 0.03
+
 /** Blend an angle from rest toward a target by the envelope. */
 function toward(rest: number, target: number, e: number): number {
   return rest + (target - rest) * e
@@ -486,7 +490,7 @@ export function gesturePose(s: GestureState): FigurePose {
       // that same pace and then simply holds the aim for the rest.
       const sweep = smoothstep(s.t / (GESTURE_DURATIONS.indicate * 0.6))
       arm = armAim(s.bearing * sweep, s.elevation * sweep)
-      lean = 0.03
+      lean = INDICATE_LEAN
       break
     }
     case 'touch': {
@@ -511,6 +515,9 @@ export function gesturePose(s: GestureState): FigurePose {
   }
   // the aiming hand of a point or an indication takes the pointing shape
   if (s.kind === 'point' || s.kind === 'indicate') posed.pointHand = { left: side === 'left' ? e : 0, right: side === 'right' ? e : 0 }
+  // An aim solved from the drawn shoulder (`side` given) is held along that
+  // line by the glTF body's drawn arm, not reached to the primitive's hand.
+  if (s.side && (s.kind === 'point' || s.kind === 'indicate')) posed.reach = side === 'left' ? { left: 1 } : { right: 1 }
   return posed
 }
 

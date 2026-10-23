@@ -9,10 +9,7 @@ import {
   FILL_CARRY_SIDE,
   REST_POSE,
   WORK_LEAN_MAX,
-  aimAt,
-  gestureArm,
   type ArmPose,
-  type ArmSide,
   type FigurePose,
 } from '../../render/gesture'
 import { JAR_HEIGHT } from './fillJar'
@@ -131,43 +128,44 @@ export function takePose(progress: number, aim: { bearing: number; elevation: nu
     right: FILL_CARRY_SIDE === 'left' ? free : carrying,
     lean: WORK_LEAN_MAX * e,
     turn: 0,
+    // The glTF body holds the reaching arm along the aim from its own drawn
+    // shoulder, rather than reaching it to the primitive's hand.
+    reach: FILL_CARRY_SIDE === 'left' ? { left: 1 } : { right: 1 },
   }
+}
+
+/** A world point in a figure's own frame (local +Z ahead, +X to its left,
+ *  y kept as given), under the codebase's yaw convention. */
+export function toFigureFrame(
+  figure: { x: number; z: number; yaw: number },
+  p: { x: number; y: number; z: number },
+): [number, number, number] {
+  const dx = p.x - figure.x
+  const dz = p.z - figure.z
+  const c = Math.cos(figure.yaw)
+  const s = Math.sin(figure.yaw)
+  return [dx * c - dz * s, p.y, dx * s + dz * c]
 }
 
 /**
- * The aim of a pointing arm taken from ITS OWN SHOULDER, not from the body's
- * centre line (work-order 1405). `aimAt` measures from the centre, so an arm
- * half a shoulder-width off it pointed PARALLEL to the line at the target and
- * missed a jar a metre away by that half-width. The side is the one the
- * centre's bearing picks; the bearing and elevation are solved from that
- * shoulder, and the side is returned so the gesture keeps it even where the
- * corrected bearing crosses the centre line. `arm` names the side instead.
+ * The arm aim from the DRAWN SHOULDER to a target, both in the figure's own
+ * frame (work-order 1405), as the trunk that carries the arm takes it: the
+ * trunk leans by `lean` (about its X, top toward +Z), so the aim is turned back
+ * through that lean. Measured from the body's centre line and an assumed
+ * shoulder, a point at a jar a metre off ran parallel past it and well below.
  */
-export function shoulderAim(
-  figure: { x: number; z: number; yaw: number },
-  target: { x: number; y: number; z: number },
-  shoulder: { y: number; x: number },
-  arm?: ArmSide,
-): { bearing: number; elevation: number; side: ArmSide } {
-  const side = arm ?? gestureArm(aimAt(figure, target, shoulder.y).bearing)
-  const lx = side === 'left' ? shoulder.x : -shoulder.x
-  // The figure's local +X in the world, under the codebase's yaw convention
-  // (local +Z onto (sin yaw, cos yaw)).
-  const at = {
-    x: figure.x + lx * Math.cos(figure.yaw),
-    z: figure.z - lx * Math.sin(figure.yaw),
-    yaw: figure.yaw,
-  }
-  return { ...aimAt(at, target, shoulder.y), side }
-}
-
-/** `shoulderAim` with the side the centre's bearing picks and that side's own
- *  drawn shoulder (`shoulderOf`), for a body whose two shoulders are measured. */
 export function aimFromShoulder(
-  figure: { x: number; z: number; yaw: number },
-  target: { x: number; y: number; z: number },
-  shoulderOf: (side: ArmSide) => { x: number; y: number },
-): { bearing: number; elevation: number; side: ArmSide } {
-  const side = gestureArm(aimAt(figure, target, shoulderOf('left').y).bearing)
-  return shoulderAim(figure, target, shoulderOf(side), side)
+  shoulder: readonly [number, number, number],
+  target: readonly [number, number, number],
+  lean = 0,
+): { bearing: number; elevation: number } {
+  const x = target[0] - shoulder[0]
+  const y0 = target[1] - shoulder[1]
+  const z0 = target[2] - shoulder[2]
+  // Rx(-lean): y' = y cos + z sin, z' = -y sin + z cos.
+  const c = Math.cos(lean)
+  const s = Math.sin(lean)
+  const y = y0 * c + z0 * s
+  const z = -y0 * s + z0 * c
+  return { bearing: Math.atan2(x, z), elevation: Math.atan2(y, Math.hypot(x, z)) }
 }

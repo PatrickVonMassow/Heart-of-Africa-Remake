@@ -210,6 +210,8 @@ export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
 export function workArrivalRadius(task: AdultTask): number {
   // Both men must reach their own spot before waiting at the stand. Stopping
   // a metre early can block the other man's route around its solid body.
+  // At the table itself, where the jars are taken up and set down (1405).
+  if (task.tableSpot && (task.phase === 'take' || task.situation === 'water-back')) return balance.waterStandTableArrivalRadius
   if (task.standSpot && (task.phase === 'send' || task.phase === 'wait' || task.phase === 'take' || task.situation === 'water-back')) {
     return balance.waterStandArrivalRadius
   }

@@ -98,6 +98,8 @@ interface BalanceConfig {
   /** How far from the water stand's centre the carrier stands while he takes
    *  the empty jar up and sets the full one down: at the table's edge. */
   waterStandReach: number
+  /** Arrival tolerance at that table spot: tight, so he stands at the plank. */
+  waterStandTableArrivalRadius: number
   /** Seconds the carrier takes to reach for the empty jar on the stand, lift
    *  it into his hand and straighten up again. */
   waterJarTakeSeconds: number
@@ -1384,6 +1386,9 @@ export const balance: BalanceConfig = {
   // Calibratable: the stand's solid body (0.6 m) plus a walker's radius (0.3 m)
   // plus a little, so the carrier stands at the table's edge, not 2.4 m off it.
   waterStandReach: 0.95,
+  // Calibratable: the generic 0.3 m stopped him 1.2 m off the stand's centre,
+  // three quarters of a metre short of the plank.
+  waterStandTableArrivalRadius: 0.1,
   // Calibratable: long enough to read as reaching, lifting and straightening.
   waterJarTakeSeconds: 1.6,
   // Calibratable (work-order 1117): the fill spot lies only ~0.5 m past the
