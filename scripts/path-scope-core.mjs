@@ -142,6 +142,8 @@ export const DEFAULT_CONTEXT = {
    * itself, so it is in scope; its neighbours in that home stay out.
    */
   projectRoots: [],
+  /** The running user's home, physically (expands a `~` when matching projectRoots). */
+  home: '',
 }
 
 const withContext = (ctx) => ({ ...DEFAULT_CONTEXT, ...(ctx || {}) })
@@ -237,28 +239,63 @@ export function denyNote(canonical) {
 }
 
 /**
- * A checkout root too broad to stand for one repository: the filesystem root, a
- * home itself, a drive root, or a directory that holds homes. Such a "project
- * root" would put foreign home dirs in scope, so it is ignored.
+ * The PHYSICAL spelling of an absolute path: the canonical form without folding
+ * any home onto `~` (a leading `~` is expanded to `ctx.home`, the running user's
+ * home, or left as '' when that is unknown). Dynamic checkout roots are matched
+ * on this form, so a clone at /home/user/<repo> never stands for /root/<repo>.
  */
-const TOO_BROAD_ROOT = /^(\/|~|[a-z]:\/?|\/home|\/users|[a-z]:\/users)$/i
+export function physicalPath(raw, ctx) {
+  const c = withContext(ctx)
+  const p = canonicalisePath(raw, { ...c, homes: [] })
+  if (!p.startsWith('~')) return p
+  const home = String(c.home ?? '').replace(/\\/g, '/').replace(/\/+$/, '')
+  return home.startsWith('/') || /^[a-z]:\//i.test(home) ? collapse(`${home}${p.slice(1)}`) : ''
+}
 
-/** The project roots of this context as allow entries (canonical, deduped). */
+/** A Windows-style (drive-letter) path is matched case-insensitively, a POSIX one exactly. */
+const isWindowsPath = (p) => /^[a-z]:\//i.test(p)
+
+/**
+ * A checkout root too broad to stand for one repository: the filesystem or a
+ * drive root, a directory that holds homes, or ANY home directory itself
+ * (a direct child of /home, /Users or C:/Users, and /root). Such a "project
+ * root" would put a whole home in scope, so it is ignored.
+ */
+const TOO_BROAD_ROOT = /^(\/|[a-z]:\/?|\/home(\/[^/]+)?|\/users(\/[^/]+)?|[a-z]:\/users(\/[^/]+)?|\/root)$/i
+
+/** The project roots of this context as physical allow entries (deduped). */
 export function projectRootEntries(ctx) {
   const c = withContext(ctx)
   const out = []
   for (const raw of c.projectRoots || []) {
-    const canonical = canonicalisePath(raw, c)
-    if (!canonical || TOO_BROAD_ROOT.test(canonical)) continue
-    if (out.some((r) => r.path.toLowerCase() === canonical.toLowerCase())) continue
-    out.push({ path: canonical, why: 'the checkout root of the running repository' })
+    const path = physicalPath(raw, c)
+    if (!path || TOO_BROAD_ROOT.test(path)) continue
+    if (out.some((r) => r.path === path)) continue
+    out.push({ path, why: 'the checkout root of the running repository' })
   }
   return out
 }
 
-/** Is this canonical path inside the allow-list? `{ allowed, root?, note? }` */
-export function pathVerdict(canonical, ctx) {
-  const root = allowingRoot(canonical) || allowingRoot(canonical, projectRootEntries(ctx))
+/** The dynamic checkout root covering this physical path, or null. */
+export function projectRootFor(physical, ctx) {
+  const p = String(physical ?? '')
+  if (!p) return null
+  const win = isWindowsPath(p)
+  const key = win ? p.toLowerCase() : p
+  for (const root of projectRootEntries(ctx)) {
+    if (isWindowsPath(root.path) !== win) continue
+    const r = win ? root.path.toLowerCase() : root.path
+    if (key === r || key.startsWith(`${r}/`)) return root
+  }
+  return null
+}
+
+/**
+ * Is this path inside the allow-list? `{ allowed, root?, note? }`. `physical`
+ * (see physicalPath) is what the dynamic checkout roots are matched against.
+ */
+export function pathVerdict(canonical, ctx, physical = '') {
+  const root = allowingRoot(canonical) || projectRootFor(physical, ctx)
   if (root) return { allowed: true, root }
   return { allowed: false, note: denyNote(canonical) }
 }
@@ -430,8 +467,8 @@ export function evaluate({ command = '', filePath = '', cwd = '', ctx, parseSegm
   try {
     const c = withContext(ctx)
     const offenders = []
-    const push = (raw, canonical) => {
-      const verdict = pathVerdict(canonical, c)
+    const push = (raw, canonical, resolved = raw) => {
+      const verdict = pathVerdict(canonical, c, physicalPath(resolved, c))
       if (!verdict.allowed && !offenders.some((o) => o.canonical === canonical)) {
         offenders.push({ raw, canonical, note: verdict.note })
       }
@@ -444,7 +481,7 @@ export function evaluate({ command = '', filePath = '', cwd = '', ctx, parseSegm
         raw = `${String(cwd).replace(/[\\/]+$/, '')}/${raw}`
       }
       const canonical = canonicalisePath(raw, c)
-      if (canonical) push(String(filePath), canonical)
+      if (canonical) push(String(filePath), canonical, raw)
     }
 
     if (command) {

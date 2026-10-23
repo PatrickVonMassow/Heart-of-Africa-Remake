@@ -348,6 +348,7 @@ describe('the checkout root of the running repository is in scope wherever it li
     ...ctx,
     homes: [...ctx.homes, '/home/user'],
     projectRoots: ['/home/user/Heart-of-Africa-Remake'],
+    home: '/home/user',
   }
   const cloudJudge = (command) => evaluate({ command, ctx: cloud, parseSegments })
   const cloudPath = (filePath, cwd = '') => evaluate({ filePath, cwd, ctx: cloud, parseSegments })
@@ -368,7 +369,7 @@ describe('the checkout root of the running repository is in scope wherever it li
   })
 
   it('ignores a "project root" too broad to stand for one repository', () => {
-    for (const broad of ['/', '/home', '/home/user', '/Users', 'C:\\Users', 'C:\\']) {
+    for (const broad of ['/', '/home', '/home/user', '/Users', 'C:\\Users', 'C:\\', '/home/other', '/Users/Other', 'C:\\Users\\Other', '/root']) {
       const v = evaluate({
         filePath: '/home/other/secret.txt',
         ctx: { ...cloud, projectRoots: [broad] },
@@ -380,5 +381,31 @@ describe('the checkout root of the running repository is in scope wherever it li
 
   it('without a project root the clone is still out of scope (the old blockade)', () => {
     expect(judgePath('/home/user/Heart-of-Africa-Remake/x').block).toBe(true)
+  })
+
+  it('a foreign home set as the project root admits nothing inside it', () => {
+    for (const [root, inside] of [
+      ['/home/other', '/home/other/secret.txt'],
+      ['/Users/Other', '/Users/Other/secret.txt'],
+      ['C:\\Users\\Other', 'C:\\Users\\Other\\secret.txt'],
+      ['/root', '/root/secret.txt'],
+    ]) {
+      const v = evaluate({ filePath: inside, ctx: { ...cloud, projectRoots: [root] }, parseSegments })
+      expect(v.block, root).toBe(true)
+    }
+  })
+
+  it('a checkout root keeps its physical home: /root/<same repo name> stays out', () => {
+    expect(cloudPath('/root/Heart-of-Africa-Remake/secret').block).toBe(true)
+    expect(cloudPath('/home/node/Heart-of-Africa-Remake/secret').block).toBe(true)
+  })
+
+  it('a POSIX checkout root matches case-sensitively; a Windows one does not', () => {
+    const posix = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    expect(evaluate({ filePath: '/home/user/Repo/x', ctx: posix, parseSegments }).block).toBe(false)
+    expect(evaluate({ filePath: '/home/user/repo/private', ctx: posix, parseSegments }).block).toBe(true)
+    const win = { ...ctx, projectRoots: ['D:\\Work\\Repo'] }
+    expect(evaluate({ filePath: 'd:\\work\\repo\\x', ctx: win, parseSegments }).block).toBe(false)
+    expect(evaluate({ filePath: 'D:\\Work\\Repository\\x', ctx: win, parseSegments }).block).toBe(true)
   })
 })

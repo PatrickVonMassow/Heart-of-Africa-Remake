@@ -58,7 +58,7 @@ function machineContext() {
   // The running checkout is in scope wherever it lives (a cloud clone sits
   // under /home/user/<repo>, outside ALLOW_ROOTS).
   const projectRoots = [REPO_ROOT, process.env.CLAUDE_PROJECT_DIR].filter((p) => typeof p === 'string' && p)
-  return { ...DEFAULT_CONTEXT, homes, dirExists, projectRoots }
+  return { ...DEFAULT_CONTEXT, homes, dirExists, projectRoots, home }
 }
 
 /** The judgeable part of a PreToolUse payload, or null when there is nothing to judge. */
