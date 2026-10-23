@@ -80,6 +80,7 @@ put it is the mistake this line exists to stop.
 - [ ] 1424. A walking child snaps backwards when its way round an obstacle expires
   Split off 1403 (22.10.2026, after nine non-converging tries): a roaming child walking round an obstacle at 1.4 m/s (bank `drive`, `wants=false`) has its edge commitment end on the CLOCK (`ageEdge`, tagGame.ts) while its goal lies >135° behind; the walk snaps ~185° in one frame and the child walks backwards while its body eases after it. Done when `tagShuffle.facing.test.ts` "never walks a child far backwards" is un-skipped and green at its 0.3 m bound (measured 0.303 m, child 3, the boulder climber, t 80.05 s), with every other place case green, and a moving capture shows no backwards walk.
   Tried and reverted on 1403 (do not repeat): turning in place on a >135° snap (0.47 m, two more cases red); `releaseEdge` holding the commitment (0.35 m); holding the commitment one frame while the goal is behind (green replay, but `tagShuffle.test.ts` "holds when the adults walk through the children's own ground" 60 < 100); that hold bounded by `anchorFor` (5.0 m backwards) or by a 1.5 s cap per commitment (three cases red). The hold is load-bearing, so the fix likely belongs in how the way round ends (ease the course out of the commitment) rather than how long it lasts.
+  Landing gate (findings 23.10.2026 05:21Z/05:30Z): frame 187-child-on-the-boulder came out washed white on feat/1424 with green checks (likely a child standing in the camera point); compare that frame on main and on the branch, both backends, before landing.
   Bundle: Dorfleben.
 - [ ] 1405. Water carrier sets the jar down too far from the table, his hand misses the water, and the new jar appears from nowhere
   The Bambara water carrier at the jar table: (a) he sets the jar down while standing much too far from the table, (b) afterwards his hand does not point exactly at the water, (c) the new jar appears in his hand out of nothing. Related closed point 1376 (the water carrier shows his jar for the whole errand): check first whether this is a regression of it. Done when he steps up to the table before setting down, his pointing hand aims at the water, and the jar he carries next is visibly taken up.
@@ -16024,4 +16025,10 @@ to land than a mechanism that needs a review.
   Final state: the jar moves from hip to shoulder as a visible lift over a natural duration, never as a pop between two carry poses.
   Verifiable: a Vitest on the carry-pose transition bounds the jar's per-frame displacement; a moving capture on both backends shows the lift.
   Criticality: medium - visible pop on every water carrier.
+  Bundle: Dorfleben.
+- [ ] 1427. A running child pushed back by separation walks backwards
+  Source: finding 23.10.2026 05:21Z during point 1424 (present on main): a runner pressing against another body at 2.4 m/s is pushed back by the separation step and walks backwards (0.49 m at t 104 s), seen only in chaotic replays of tagShuffle.facing.
+  Final state: separation slows or sidesteps a pressing runner but never moves it against its facing faster than a walk.
+  Verifiable: a Vitest replay in tagShuffle.facing bounds the backwards walk under separation; a moving capture shows no backwards push.
+  Criticality: low - rare, only in crowded moments.
   Bundle: Dorfleben.
