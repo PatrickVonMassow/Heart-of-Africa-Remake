@@ -18,6 +18,14 @@ not need it and must not act on it.
   Y, collect status or log facts) uses `subagent_type: "Explore"`; authoring,
   review, suites, and anything that writes, commits, or verifies keep their
   current agent types, and the model policy is unchanged.
+- A cloud authoring delegate (cloud switch ON) runs build, lint, and Vitest
+  on its branch and hands over the pushed sha, the three gate results, and
+  open issues. Local acceptance of that branch then runs only what needs the
+  quiet machine: the covering browser tier suites (`scripts/verify/tiers.mjs`),
+  the picture check (both backends when `isBackendSensitivePath` applies),
+  review, and landing; the local tier run stays mandatory and cloud green is
+  never browser-suite evidence. A cloud unit result that a later local run
+  contradicts is filed as a finding.
 - Land with `node scripts/land-point.mjs <N> --model <m>`. It drives the no-ff
   merge, fast gate, work-order tick/archive commit, push, board publish, and
   worktree cleanup, stopping on the first failed step. The post-merge gate is

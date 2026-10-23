@@ -123,6 +123,9 @@ describe('the routing read', () => {
 
   it('the cloud instruction names remote isolation and the pool slot', () => {
     expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(/isolation: "remote".*pool slot/s)
+    expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(
+      /build, lint and Vitest.*pushed sha.*both backends when isBackendSensitivePath.*later local unit result contradicting it is filed as a finding/s,
+    )
     expect(venueInstruction({ venue: 'local', notice: '' })).toMatch(/local worktrees/)
   })
 })
