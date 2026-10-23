@@ -4050,7 +4050,7 @@ if (section('water-stand-table')) {
       if (prev) {
         const j = Math.hypot(at.x - prev.x, at.y - prev.y, at.z - prev.z)
         const speed = j / Math.max(1e-3, (s.t - prev.t) / 1000)
-        if (speed > worst.speed) worst = { speed, k, from: s.hand ? 'hand' : 'plank' }
+        if (speed > worst.speed) worst = { speed, k, from: s.hand ? 'hand' : 'plank', jump: j, dt: s.t - prev.t, turn: Math.abs(s.yaw - S[k - 1].yaw), walk: Math.hypot(s.x - S[k - 1].x, s.z - S[k - 1].z) }
         if (s.hand && !prev.hand) swap = j
       }
       prev = { ...at, t: s.t, hand: !!s.hand }
@@ -4060,7 +4060,7 @@ if (section('water-stand-table')) {
     check('water stand table: the empty jar is taken up from the plank, never appearing from nothing',
       order >= 0 && off > order && taking.length > 5 && both === 0 && none === 0 && swap !== null && swap <= 0.05 && worst.speed <= 4 && lifted > 0.1 && !!S[order].spare,
       `order at frame ${order}, off the stand at ${off}, walking checked to ${walkEnd}; ${taking.length} take frames; jar lifted ${lifted.toFixed(2)} m off the plank before it is in his hand; ` +
-        `plank-to-hand gap ${swap == null ? 'never' : `${swap.toFixed(3)} m`}; fastest move ${worst.speed.toFixed(2)} m/s (frame ${worst.k}, ${worst.from ?? '-'}); ${both} frames with two jars, ${none} with none`)
+        `plank-to-hand gap ${swap == null ? 'never' : `${swap.toFixed(3)} m`}; fastest move ${worst.speed.toFixed(2)} m/s (frame ${worst.k}, ${worst.from ?? '-'}, ${worst.jump?.toFixed(3) ?? '-'} m in ${worst.dt?.toFixed(0) ?? '-'} ms, body turned ${worst.turn?.toFixed(3) ?? '-'} rad and moved ${worst.walk?.toFixed(3) ?? '-'} m); ${both} frames with two jars, ${none} with none`)
     // (b) The report's pointing arm, held: its drawn line from the shoulder
     // through the hand against the water in the jar he set down.
     const held = S.filter((s) => (s.situation === 'water-back' || s.situation === 'ended') && s.gesture?.kind === 'indicate' && s.gesture.t > 1.75 &&
