@@ -210,6 +210,9 @@ export interface GestureState {
   /** Per-figure phase offset, read by the refusal's shake so a crowd never
    *  shakes in lockstep. */
   phase: number
+  /** The arm that gestures, when the caller solved the aim from that arm's own
+   *  shoulder (absent: the arm on the bearing's side, `gestureArm`). */
+  side?: ArmSide
 }
 
 /** The rest state — no gesture running. */
@@ -233,6 +236,8 @@ export interface GestureAim {
   /** Per-figure phase offset (rad); the refusal's shake reads it so
    *  simultaneous refusals do not beat together. */
   phase?: number
+  /** The arm the aim was solved for (see `GestureState.side`). */
+  side?: ArmSide
 }
 
 /**
@@ -258,6 +263,7 @@ export function startGesture(kind: GestureKind, aim: GestureAim = {}): GestureSt
     bearing: aim.bearing ?? 0,
     elevation: aim.elevation ?? 0,
     phase: aim.phase ?? 0,
+    ...(aim.side ? { side: aim.side } : {}),
   }
 }
 
@@ -390,6 +396,10 @@ export function aimAt(
   }
 }
 
+/** How far an indication leans the trunk in (rad); an aim solved for it takes
+ *  this lean back out. */
+export const INDICATE_LEAN = 0.03
+
 /** Blend an angle from rest toward a target by the envelope. */
 function toward(rest: number, target: number, e: number): number {
   return rest + (target - rest) * e
@@ -423,7 +433,7 @@ function blendArm(rest: ArmPose, target: ArmPose, e: number): ArmPose {
 export function gesturePose(s: GestureState): FigurePose {
   const e = gestureEnvelope(s)
   if (s.kind === null || e <= 0) return { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }
-  const side = gestureArm(s.bearing)
+  const side = s.side ?? gestureArm(s.bearing)
   const otherSide: ArmSide = side === 'left' ? 'right' : 'left'
   const restArm = REST_POSE[side]
   const restOther = REST_POSE[otherSide]
@@ -480,7 +490,7 @@ export function gesturePose(s: GestureState): FigurePose {
       // that same pace and then simply holds the aim for the rest.
       const sweep = smoothstep(s.t / (GESTURE_DURATIONS.indicate * 0.6))
       arm = armAim(s.bearing * sweep, s.elevation * sweep)
-      lean = 0.03
+      lean = INDICATE_LEAN
       break
     }
     case 'touch': {
@@ -505,6 +515,9 @@ export function gesturePose(s: GestureState): FigurePose {
   }
   // the aiming hand of a point or an indication takes the pointing shape
   if (s.kind === 'point' || s.kind === 'indicate') posed.pointHand = { left: side === 'left' ? e : 0, right: side === 'right' ? e : 0 }
+  // An aim solved from the drawn shoulder (`side` given) is held along that
+  // line by the glTF body's drawn arm, not reached to the primitive's hand.
+  if (s.side && (s.kind === 'point' || s.kind === 'indicate')) posed.reach = side === 'left' ? { left: 1 } : { right: 1 }
   return posed
 }
 

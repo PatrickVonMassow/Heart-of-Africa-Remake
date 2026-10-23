@@ -38,6 +38,10 @@ import {
   fillPose,
   fillSquat,
   copyPoseExtras,
+  FILL_CARRY_SIDE,
+  gestureArm,
+  INDICATE_LEAN,
+  WORK_LEAN_MAX,
   gestureEnvelope,
   gesturePose,
   isGesturing,
@@ -67,6 +71,9 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
+import {
+  SPARE_JAR_LOCAL, aimFromShoulder, standJarLocal, toFigureFrame, standToWorld, standYaw, takeJarTravel, takePose,
+} from './waterStand'
 import { workStop, type WorkStopMode } from './taskWalkerStop'
 import { steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
@@ -133,6 +140,7 @@ import {
   goalOf,
   stepAdultWork,
   taskOf,
+  waterErrandSpots,
   type AdultSituationId,
   type AdultWorkGeography,
   type AdultWorkView,
@@ -2743,6 +2751,8 @@ function ErrandVillagers({
   const refs = useRef<Array<THREE.Group | null>>([])
   /** The jars STANDING at the village water stand (work-order 1087). */
   const standJars = useRef<Array<THREE.Object3D | null>>([])
+  /** The EMPTY jar waiting on the stand for the next carrier (work-order 1405). */
+  const spareJar = useRef<THREE.Object3D | null>(null)
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
   // is empty. Both are mounted once and shown by the frame loop, like every other
   // per-frame visibility in this scene.
@@ -2945,6 +2955,13 @@ function ErrandVillagers({
   )
   const speechFloor = useContext(SpeechFloorContext)
   const vocabulary = useGame((s) => s.vocabulary)
+  // The stand's plank turns its front, where the empty jar waits, to the
+  // water carrier's own working spot (work-order 1405).
+  const standFacing = useMemo(() => {
+    if (!geography.waterStand) return 0
+    const spots = waterErrandSpots({ standable }, geography)
+    return standYaw(geography.waterStand, spots?.carrierSpot ?? geography.waterFoot)
+  }, [geography, standable])
   const view = useMemo<AdultWorkView>(
     () => ({ vocabulary, villagers: people, geography, standable, invitationClear, childrenHear, floor: speechFloor ?? undefined }),
     [vocabulary, people, geography, standable, invitationClear, childrenHear, speechFloor],
@@ -2982,6 +2999,16 @@ function ErrandVillagers({
     for (let k = 0; k < standJars.current.length; k++) {
       const jar = standJars.current[k]
       if (jar) jar.visible = k < work.standJars
+    }
+    // The empty jar stands on the plank's front edge until a carrier takes it
+    // up (work-order 1405); it is back there once he has set his full one down.
+    const stand = geography.waterStand
+    const yawOfStand = standFacing
+    const spareAt = stand ? standToWorld(stand, yawOfStand, SPARE_JAR_LOCAL) : null
+    const spare = spareJar.current
+    if (spare) {
+      spare.visible = true
+      spare.position.set(...SPARE_JAR_LOCAL)
     }
 
     // The first filling carrier's ring: its fill progress and the mouth's spot.
@@ -3172,6 +3199,10 @@ function ErrandVillagers({
       const dipping = task && task.arrived && task.phase === 'fill'
         ? Math.min(1, task.dug / balance.bankFillSeconds)
         : null
+      // THE TAKE (work-order 1405): at the table, reaching for the empty jar.
+      const taking = task && task.arrived && task.phase === 'take'
+        ? Math.min(1, task.dug / balance.waterJarTakeSeconds)
+        : null
 
       // WHAT HE IS CARRYING, and what that does to his body: jars keep their
       // established positions; the digging tool lives in the hand pivot so the
@@ -3195,13 +3226,49 @@ function ErrandVillagers({
         handJar.position.set(...placed.position)
         handJar.rotation.set(...placed.rotation)
       }
+      // The empty jar is out with this carrier from the moment it is in his
+      // hand until his full one stands on the plank; during the take it travels
+      // from the plank into the hand that reaches for it.
+      if (spare && task?.role === 'partner' && task.situation === 'water-out') {
+        if (carry !== 'none') spare.visible = false
+        else if (taking !== null && handJar && spare.parent) {
+          const travel = takeJarTravel(taking)
+          if (travel > 0) {
+            handJar.updateWorldMatrix(true, false)
+            const inHand = handJar.getWorldPosition(new THREE.Vector3())
+            const from = spare.parent.localToWorld(new THREE.Vector3(...SPARE_JAR_LOCAL))
+            spare.position.copy(spare.parent.worldToLocal(from.lerp(inHand, travel)))
+          }
+        }
+      }
+      if (taking !== null && spareAt) faceTo.current[i] = Math.atan2(spareAt.x - me.x, spareAt.z - me.z)
 
       // The pose: a fill wins over everything, then digging, then the gesture,
       // then the load on the head, then rest.
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      if (filling !== null) {
+      if (taking !== null && spareAt) {
+        state.dug = 0
+        state.digK = 0
+        if (digTool) digTool.visible = false
+        figureWork.tool = false
+        // The carrying arm reaches for the jar's rim from its own drawn
+        // shoulder, through the trunk's lean at full reach.
+        const ground = groundHeight(me.x, me.z)
+        const reach = takePose(taking, aimFromShoulder(
+          drawnShoulder(refs.current[i], limbs.current[i]?.current, FILL_CARRY_SIDE),
+          toFigureFrame({ x: me.x, z: me.z, yaw: yaws.current[i] }, { x: spareAt.x, y: spareAt.y + JAR_HEIGHT / 2 - ground, z: spareAt.z }),
+          WORK_LEAN_MAX,
+        ))
+        if (pose) {
+          pose.left = reach.left
+          pose.right = reach.right
+          pose.lean = reach.lean
+          pose.turn = reach.turn
+          copyPoseExtras(pose, reach)
+        }
+      } else if (filling !== null) {
         state.dug = 0
         state.digK = 0
         // The jar rides the dipping hand of its own accord — it hangs inside the
@@ -3321,7 +3388,10 @@ function ErrandVillagers({
       if (speaker) {
         const aim = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
         faceTo.current[said.speaker] = aim
-        speakWork(camera, said, speaker, aim, refs.current[said.speaker], gestures.current[said.speaker])
+        const lift = groundHeight(speaker.x, speaker.z)
+        const figure = refs.current[said.speaker]
+        const arms = limbs.current[said.speaker]?.current
+        speakWork(camera, said, speaker, aim, figure, gestures.current[said.speaker], (side) => drawnShoulder(figure, arms, side), lift)
       }
     }
   }
@@ -3412,8 +3482,12 @@ function ErrandVillagers({
           work: task
             ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,
                 partner: task.partner, owes: !!task.owes, hushed: !!task.hushed, withheld: !!task.withheld,
-                pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z) }
+                pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z),
+                // The take at the stand and where he stands for it (work-order 1405).
+                taking: task.arrived && task.phase === 'take' ? Math.min(1, task.dug / balance.waterJarTakeSeconds) : null,
+                tableSpot: task.tableSpot ?? null }
             : null,
+          gesture: gestures.current[i] ? { ...gestures.current[i].current } : null,
         }
       }),
     })
@@ -3448,9 +3522,10 @@ function ErrandVillagers({
           : { who, progress, facing, anchors: people.map((p) => ({ x: p.x, z: p.z })) }
     }
     // Empties the water stand, so a browser check can watch one set-down add
-    // exactly one jar instead of meeting a stand already at its cap (work-order 1376).
-    w.__placeClearStand = () => {
-      work.standJars = 0
+    // exactly one jar instead of meeting a stand already at its cap (work-order 1376);
+    // `keep` leaves older jars standing, so the newest is not the first slot.
+    w.__placeClearStand = (keep = 0) => {
+      work.standJars = keep
     }
     return () => {
       delete w.__placeErrands
@@ -3536,7 +3611,13 @@ function ErrandVillagers({
         </group>
       ))}
       {geography.waterStand && (
-        <WaterStand x={geography.waterStand.x} z={geography.waterStand.z} jarRefs={standJars} />
+        <WaterStand
+          x={geography.waterStand.x}
+          z={geography.waterStand.z}
+          yaw={standFacing}
+          jarRefs={standJars}
+          spareRef={spareJar}
+        />
       )}
       {Array.from({ length: balance.bankFillRing.count }, (_, k) => (
         <mesh
@@ -3649,6 +3730,27 @@ function Jar({ full }: { full: boolean }) {
 }
 
 /**
+ * Where a villager's shoulder on `side` is DRAWN, in metres in his own group's
+ * frame (work-order 1405): the glTF body's `upperArm` bone, else the
+ * primitive figure's arm pivot. Every body has its own build, so an aim solved
+ * from an assumed shoulder misses a jar a metre off by the difference.
+ */
+function drawnShoulder(
+  figure: THREE.Object3D | null,
+  limbs: FigureLimbs | null | undefined,
+  side: ArmSide,
+): [number, number, number] {
+  const fallback: [number, number, number] = [(side === 'left' ? 1 : -1) * FIGURE_LIMBS.shoulderX, FIGURE_LIMBS.shoulderY, 0]
+  if (!figure) return fallback
+  const joint = figure.getObjectByName(side === 'left' ? 'bone-upperArm.L' : 'bone-upperArm.R') ?? limbs?.arms[side === 'left' ? 0 : 1]
+  if (!joint) return fallback
+  figure.updateWorldMatrix(true, false)
+  joint.updateWorldMatrix(true, false)
+  const at = figure.worldToLocal(joint.getWorldPosition(new THREE.Vector3()))
+  return [at.x, at.y, at.z]
+}
+
+/**
  * THE VILLAGE WATER STAND (work-order 1087): a low platform beside the fire
  * where the filled jars are set down. It is what gives the errand's return leg a
  * destination — the carrier used to walk to a radius, where his task was nulled
@@ -3659,9 +3761,22 @@ function Jar({ full }: { full: boolean }) {
  * capacity, so a delivery past the cap replaces the oldest standing jar rather
  * than piling one more on.
  */
-function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObject<Array<THREE.Object3D | null>> }) {
+function WaterStand({
+  x,
+  z,
+  yaw,
+  jarRefs,
+  spareRef,
+}: {
+  x: number
+  z: number
+  /** Its front, where the empty jar waits, toward the water path (waterStand.ts). */
+  yaw: number
+  jarRefs: RefObject<Array<THREE.Object3D | null>>
+  spareRef: RefObject<THREE.Object3D | null>
+}) {
   return (
-    <group position={[x, 0, z]}>
+    <group position={[x, 0, z]} rotation={[0, yaw, 0]}>
       {/* Four short posts and a plank top — the same worn timber the village's
           other frames are built from. */}
       {[
@@ -3679,25 +3794,27 @@ function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObjec
         <boxGeometry args={[0.92, 0.07, 0.92]} />
         <meshStandardMaterial color="#6b5433" roughness={0.92} />
       </mesh>
-      {Array.from({ length: balance.waterStandCapacity }, (_, i) => {
-        // Set down in a row across the plank, so three read as three. All of
-        // them are mounted once and the frame loop shows as many as stand there.
-        const spread = 0.28
-        const offset = (i - (balance.waterStandCapacity - 1) / 2) * spread
-        return (
-          <group
-            key={i}
-            ref={(el) => {
-              if (jarRefs.current) jarRefs.current[i] = el
-            }}
-            name="stand-jar"
-            visible={false}
-            position={[offset, 0.385 + JAR_HEIGHT / 2, i % 2 === 0 ? 0.04 : -0.06]}
-          >
-            <Jar full />
-          </group>
-        )
-      })}
+      {Array.from({ length: balance.waterStandCapacity }, (_, i) => (
+        // Set down in a row across the plank's back half, so three read as
+        // three. All of them are mounted once and the frame loop shows as many
+        // as stand there.
+        <group
+          key={i}
+          ref={(el) => {
+            if (jarRefs.current) jarRefs.current[i] = el
+          }}
+          name="stand-jar"
+          visible={false}
+          position={standJarLocal(i)}
+        >
+          <Jar full />
+        </group>
+      ))}
+      {/* The empty jar the next carrier takes up, at the front edge (work-order
+          1405). The frame loop moves it into his hand and hides it there. */}
+      <group ref={spareRef} name="stand-jar-empty" position={SPARE_JAR_LOCAL}>
+        <Jar full={false} />
+      </group>
     </group>
   )
 }
@@ -3722,6 +3839,9 @@ function speakWork(
   yaw: number,
   anchor: THREE.Group | null,
   gesture: RefObject<GestureState>,
+  shoulderOf: (side: ArmSide) => [number, number, number],
+  /** The ground under the speaker, so the aim is taken from his own shoulder. */
+  lift: number,
 ): void {
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
@@ -3740,8 +3860,13 @@ function speakWork(
       speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
+  // FROM THE ARM'S OWN SHOULDER (work-order 1405): measured from the body's
+  // centre, a point at a jar a metre off ran parallel past it.
+  const target = toFigureFrame({ x: speaker.x, z: speaker.z, yaw }, { ...said.aim, y: said.aim.y - lift })
+  const side = gestureArm(Math.atan2(target[0], target[2]))
   gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
-    ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
+    ...aimFromShoulder(shoulderOf(side), target, INDICATE_LEAN),
+    side,
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
 }

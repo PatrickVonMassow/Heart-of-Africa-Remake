@@ -46,11 +46,12 @@ function fixture(config = cfg) {
   return { state, view, sender, carrier, step }
 }
 
-/** Runs the station for `seconds` and answers whether the carrier has set off. */
+/** Runs the station for `seconds` and answers whether the carrier has set off —
+ *  first up to the table, for the empty jar (work-order 1405). */
 function fetchedWithin(f: ReturnType<typeof fixture>, seconds: number, dt = 1 / 60): boolean {
   for (let t = 0; t < seconds; t += dt) {
     f.step(dt)
-    if (f.state.tasks[f.carrier]?.phase === 'fetch') return true
+    if (f.state.tasks[f.carrier]?.phase === 'take') return true
   }
   return false
 }
@@ -124,7 +125,8 @@ describe('the instructed body waits for the word to end', () => {
     const hold = instructionDelay('RIVER', SHIPPED_VOCABULARY)
     expect(fetchedWithin(f, hold - 2 * dt, dt)).toBe(false)
     expect(fetchedWithin(f, 4 * dt, dt)).toBe(true)
-    expect(f.state.tasks[f.carrier]!.carry).toBe('emptyJar')
+    // Empty-handed still: the jar is taken up at the table (work-order 1405).
+    expect(f.state.tasks[f.carrier]!.carry).toBe('none')
   })
 
   it('takes the pause from balance instead of a constant in the code', () => {
@@ -155,7 +157,7 @@ describe('the instructed body waits for the word to end', () => {
       expect(ticks).toBeLessThan(instructionDelay('RIVER', SHIPPED_VOCABULARY) / dt + 2)
     }
     // The hold ran out and the carrier set off on that very tick.
-    expect(f.state.tasks[f.carrier]!.phase).toBe('fetch')
+    expect(f.state.tasks[f.carrier]!.phase).toBe('take')
     expect(errors).not.toHaveBeenCalled()
   })
 
