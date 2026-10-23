@@ -9,6 +9,8 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-10-23 polish-children WebGL 2 — the 1239 check "a caught child was photographed standing slumped clear of the run" missed its window once in a full branch run of feat/1424 (86a68f5c1, log 2026-10-23T09-47-34-993; caught moments mostly "crowded"), green in the branch's section run (10-39-36-506) and on main (10-30-21-518, 10-51-21-476). Same chaotic class as the meeting count in 1424's commit; watch at the next LARGE.
+- 2026-10-23 polish-children WebGL 2 on main ac714e5cf — "the children are photographed from a standpoint in the open" red (2 of 5 in the clear, maasai-village), owned by no point (log 2026-10-23T10-51-21-476); WebGL-2-only, waits for the next LARGE.
 - 2026-10-23 cloud probe — `parseMarker` in `scripts/cloud-switch.mjs` reads only `hostname: <h>`; the probe of 23.10. wrote `hostname vm` and read NOT PASSED until recorded by hand. Accept both forms when the switch is next touched.
 - 2026-10-23 model guard — `model-handoff-core.mjs` sets `verifiedThrough` to the commit's own second while `findForbiddenCommits` skips only `c.when < sinceMs`, so a verified commit stays a hit and the handoff answers 'no advanceable timestamp' (199be6e; baseline advanced by hand in 657b243bd). Fix: compare `<=` or add 1000 ms; adjust model-handoff-core.test.mjs:41.
 - 2026-10-06 pre-push gate — the unit gate for 124d7b9 (TASKS split only) went red while a Blender fit loaded the host, without naming the failing file or test; the superset run on f8cb1ab was green (588 files / 17299 tests) and the next gated push passed. Suspected load-sensitive unit test; the gate should print the failing test names.
