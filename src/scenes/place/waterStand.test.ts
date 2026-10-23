@@ -26,14 +26,14 @@ const STAND = { x: 4, z: -3 }
 describe('the carrier stands at the table', () => {
   it('steps in from his waiting spot to the table edge, on the same bearing', () => {
     const from = { x: STAND.x + 2.4 * Math.cos(0.7), z: STAND.z + 2.4 * Math.sin(0.7) }
-    const at = tableSpot(STAND, from)
+    const at = tableSpot(STAND, from)!
     expect(Math.hypot(at.x - STAND.x, at.z - STAND.z)).toBeCloseTo(balance.waterStandReach, 9)
     expect(Math.atan2(at.z - STAND.z, at.x - STAND.x)).toBeCloseTo(0.7, 9)
   })
 
-  it('keeps his own spot where the table edge is not standable', () => {
+  it('names no spot where the table edge is not standable', () => {
     const from = { x: STAND.x + 2.4, z: STAND.z }
-    expect(tableSpot(STAND, from, () => false)).toEqual(from)
+    expect(tableSpot(STAND, from, () => false)).toBeNull()
   })
 })
 

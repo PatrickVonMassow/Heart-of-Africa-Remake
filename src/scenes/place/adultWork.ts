@@ -846,6 +846,10 @@ export function stepAdultWork(
       const spots = waterErrandSpots(view, g)
       if (!spots) continue
       const { senderSpot, carrierSpot } = spots
+      // No standable table edge: the errand does not cast this round rather
+      // than run from the waiting ring.
+      const atTable = tableSpot(stand, carrierSpot, view.standable)
+      if (!atTable) continue
       state.tasks[sender] = {
         situation: id, phase: 'send', carry: 'none', role: 'initiator', partner: carrier,
         siteIndex: null, orderedBy: null, standSpot: senderSpot,
@@ -855,7 +859,7 @@ export function stepAdultWork(
       state.tasks[carrier] = {
         situation: id, phase: 'wait', carry: 'none', role: 'partner', partner: sender,
         siteIndex: null, orderedBy: sender, standSpot: carrierSpot,
-        tableSpot: tableSpot(stand, carrierSpot, view.standable),
+        tableSpot: atTable,
         x: carrierSpot.x, z: carrierSpot.z, arrived: false, dug: 0, owes: false,
         say: null, via: null, age: 0,
       }

@@ -62,20 +62,21 @@ export function newestJarWater(stand: StandPoint, front: StandPoint | null, coun
  * Where the carrier stands AT the table: on the line from the stand's centre
  * out to his own working spot, `reach` from the centre (work-order 1405). His
  * working spot on the 2.4 m ring is where he waits for the order; the jar is
- * taken up and set down from here. Off standable ground, his own spot.
+ * taken up and set down from here. Off standable ground, null: an errand
+ * worked from the waiting ring is the defect this point removes.
  */
 export function tableSpot(
   stand: StandPoint,
   from: StandPoint,
   standable: (x: number, z: number) => boolean = () => true,
   reach = balance.waterStandReach,
-): StandPoint {
+): StandPoint | null {
   const dx = from.x - stand.x
   const dz = from.z - stand.z
   const d = Math.hypot(dx, dz)
   if (d <= reach) return { x: from.x, z: from.z }
   const spot = { x: stand.x + (dx / d) * reach, z: stand.z + (dz / d) * reach }
-  return standable(spot.x, spot.z) ? spot : { x: from.x, z: from.z }
+  return standable(spot.x, spot.z) ? spot : null
 }
 
 /** Where in the take the arm is out at the jar (0..1 of the take). */

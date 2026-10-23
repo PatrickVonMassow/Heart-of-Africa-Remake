@@ -508,12 +508,14 @@ describe('the water carrier works AT the table (work-order 1405)', () => {
     const v = view(6)
     const state = createAdultWork(6, CFG)
     const frames: Array<{ i: number; phase: string; carry: string; x: number; z: number; jars: number; arrived: boolean; dug: number; spot: { x: number; z: number } | null }> = []
-    const words: SpokenWord[] = []
+    // Each word with the stand count and the speaker's spot of its own frame.
+    const words: Array<{ word: SpokenWord; jars: number; spot: { x: number; z: number } | null }> = []
     const dt = 1 / 60
     for (let f = 0; f < 240 * 60; f++) {
       walkFrame(state, v, dt)
+      const spots = state.tasks.map((t) => t?.standSpot ?? null)
       const word = stepAdultWork(state, v, dt, CFG, () => 0.5)
-      if (word) words.push(word)
+      if (word) words.push({ word, jars: state.standJars, spot: spots[word.speaker] ?? null })
       state.tasks.forEach((t, i) => {
         if (t?.role === 'partner' && t.situation.startsWith('water')) {
           frames.push({ i, phase: t.phase, carry: t.carry, x: v.villagers[i].x, z: v.villagers[i].z, jars: state.standJars, arrived: t.arrived, dug: t.dug, spot: t.standSpot })
@@ -544,19 +546,29 @@ describe('the water carrier works AT the table (work-order 1405)', () => {
     }
     // The jar is never in his hand before he has reached the table for it.
     for (const f of frames.filter((f) => f.phase === 'wait' || (f.phase === 'take' && !f.arrived))) expect(f.carry).toBe('none')
-    // And the take runs its configured length before he sets off.
-    const holds = taking.filter((f) => f.carry === 'none').length + taking.filter((f) => f.carry === 'emptyJar').length
-    expect(holds).toBeGreaterThanOrEqual(Math.floor(balance.waterJarTakeSeconds * 60) - 1)
+    // And EACH take runs its configured length before he sets off.
+    const runs: number[] = []
+    const open = new Map<number, number>()
+    for (const f of frames) {
+      if (f.phase === 'take' && f.arrived) open.set(f.i, (open.get(f.i) ?? 0) + 1)
+      else if (open.has(f.i)) {
+        runs.push(open.get(f.i)!)
+        open.delete(f.i)
+      }
+    }
+    expect(runs.length).toBeGreaterThan(0)
+    for (const n of runs) expect(n).toBeGreaterThanOrEqual(Math.floor(balance.waterJarTakeSeconds * 60) - 1)
   })
 
   it('points the report at the water in the jar just set down', () => {
     const { words, frames } = errandFrames()
-    const reports = words.filter((w) => w.id === 'water-back')
+    const reports = words.filter((w) => w.word.id === 'water-back')
     expect(reports.length).toBeGreaterThan(0)
-    for (const w of reports) {
-      const mine = frames.filter((f) => f.i === w.speaker).pop()!
+    expect(frames.length).toBeGreaterThan(0)
+    for (const { word, jars, spot } of reports) {
       // The stand's front faces the carrier's own spot, where the jars are drawn.
-      expect(w.aim).toEqual(newestJarWater(STAND, mine.spot, mine.jars))
+      expect(spot).not.toBeNull()
+      expect(word.aim).toEqual(newestJarWater(STAND, spot, jars))
     }
   })
 })
