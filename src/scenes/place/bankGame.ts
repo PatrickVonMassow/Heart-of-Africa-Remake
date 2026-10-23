@@ -734,6 +734,7 @@ export function createBankGame(
       carried: 0,
       edgeSide: 0,
       edgeFor: 0,
+      edgeEase: false,
       anchorX: p.x,
       anchorZ: p.z,
       anchorWalked: 0,
