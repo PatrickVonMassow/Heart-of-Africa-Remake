@@ -77,19 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1429. Reconcile the nine open branches and eight worktrees with the work order
-  QUEUE POSITION: front of the work order (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen"), ahead of the cloud pre-check point deposited with it.
-  GOAL: free the three-slot pool so cloud authoring can run at all. Measured 23.10.2026 14:30: POOL_CAP = 3 counts open feat/* branches (point 712), and nine are open remotely (1049-queue-order-rule, 1255-loom-plaza-distance, 1297-calf-shield-river, 1333-jar-mouth-under-water, 1347-garment-rebuild, 1405-water-carrier-table, 834-durable-authoring-lane, 847-brevity-guard-gaps, 901-superseded-ci-run), eight with local worktrees. The pool is oversubscribed threefold, so no new delegation starts and the user sees one task in progress.
-  FINAL STATE:
-  1. Reconcile: every open feat/* branch and worktree is checked against TASKS.md, docs/tasks-archive.md and docs/backlog.md and classified as merged, superseded, abandoned, or live (with its distance to acceptance). Read each branch log before deciding.
-  2. Close: merged, superseded and abandoned branches are removed (local branch, remote branch, worktree) after any still-needed diff is preserved (commit sha named in the point's closing record or backlog).
-  3. Infrastructure branches 834, 847, 901: triaged against the infrastructure freeze (CLAUDE.md §2). Only one that fixes a reproducible current-game blockade or a possible false approval continues; the rest are parked as entries in docs/backlog.md (branch name, last sha, what is done/missing) and their branches and worktrees removed; their TASKS.md points closed with that reason.
-  4. Land: after the running verify finishes, the remaining live feature branches are landed in order of distance to acceptance, each time-boxed; a branch that does not converge in its box is split or demoted instead of holding a slot (memory split-a-point-that-will-not-converge).
-  5. Evidence: closing record lists, per branch, its classification and outcome, and the open feat/* count after the point (target: at most 3, slots free for refill).
-  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entries U1, U2, U3.
-  Observed problem: The user asked why only one task is usually in progress although authoring now runs in the cloud. Measurement shows the pool cap of 3 is held by nine open branches, most waiting for review, verification or landing, or parked. Freeing those slots is the only change that lets parallel cloud authoring start today; raising the cap would only add branches waiting at the serial local acceptance step (Fable's verdict in the merged union, U11). It is a real blockade and mostly deletion, which satisfies the finding-intake rule of CLAUDE.md §2.
-  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1430. Cloud authoring sessions deliver build, lint and Vitest green
   QUEUE POSITION: front of the work order, directly after the branch clean-up point deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen").
   GOAL: shorten local acceptance per point by moving the machine-independent gates into the cloud authoring session.
