@@ -2187,3 +2187,4 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 - The 1402 interleave test (src/render/villagerClipPose.test.ts:583) passes trivially without a toe-release frame; assert a release-frame count > 0 (Fable 5.1 review, 22.10.2026).
 
 - polish-villagers full pass walls at 45 min with a 7.9 GB Chrome renderer (23.10.2026, feat/1404 983fe682f; village-walk alone 3:34) — the bundle LARGE cannot cover the suite until per-page memory growth across sections is fixed or the suite split.
+- Retro lesson from 1426: guards read missing local (unversioned) state as "off" and locked out the cloud clone; the loosening needed five cross-review rounds for seven gaps. Separate "state missing" from "state says no"; review loosenings like new code (finding 23.10.2026 04:23).
