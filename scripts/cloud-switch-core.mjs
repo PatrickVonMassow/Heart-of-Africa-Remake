@@ -198,8 +198,9 @@ export function venueInstruction(route) {
       'commit, the brief in the prompt or a tracked file (local/ is not in the clone). Before handing ' +
       'over, the delegate runs build, lint and Vitest on its branch and hands over the pushed sha, the ' +
       'three gate results and open issues. Locally the owner then runs only the covering browser tier ' +
-      'suites, the picture check, review and landing on the pushed branch (cloud green never stands in ' +
-      'for a browser suite); its remote branch holds a pool slot.'
+      'suites, the picture check (both backends when isBackendSensitivePath applies), review and ' +
+      'landing on the pushed branch; cloud green never stands in for a browser suite, and a later ' +
+      'local unit result contradicting it is filed as a finding. Its remote branch holds a pool slot.'
     )
   }
   return `CLOUD SWITCH OFF: authoring delegations run in local worktrees.${route.notice ? ` ${route.notice}.` : ''}`
