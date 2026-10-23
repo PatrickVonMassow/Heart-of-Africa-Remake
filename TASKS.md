@@ -84,7 +84,7 @@ put it is the mistake this line exists to stop.
   1. The cloud authoring delegation (cloud switch ON, Agent isolation "remote") instructs the delegate to run build, lint and the unit layer (Vitest) on its branch before handing over, and to hand over: pushed commit sha, the three gate results, and open issues.
   2. The local acceptance on the pushed branch then runs only what needs the quiet local machine: the covering browser tier suites (scripts/verify/tiers.mjs) and the picture check (both backends when isBackendSensitivePath applies), plus review and landing. The local tier run stays mandatory; cloud green is never accepted as local evidence for browser suites.
   3. Change is limited to the delegation prompt/brief text and the place that documents the local acceptance steps (docs/batch-owner-runbook.md or docs/lane-routing.md); no new guard, ledger field, router or workflow abstraction (infrastructure freeze, CLAUDE.md §2). If a cloud unit result disagrees with a later local run, that is recorded as a finding, not handled by new machinery.
-  4. Evidence: one cloud-authored point landed under the new flow, with the handover message naming sha and gate results, and the local acceptance log showing no repeated build/lint/unit layer.
+  4. Evidence: one cloud-authored point landed under the new flow, with the handover message naming sha and gate results, and the local acceptance log showing no repeated build/lint/unit layer. SPLIT 23.10.2026 into point 1436 (no cloud-authored point exists yet to carry it); 1430 lands with items 1–3.
   SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entry U5 (A3 + B12).
   Observed problem: Local acceptance is the measured bottleneck: review, suites, picture check and landing run serially in one session on one machine that must be quiet (memory verify-suites-need-a-quiet-machine). Build, lint and Vitest do not need that machine; running them in the cloud session removes them from the serial step for every point. It is a simplification of the local step without new infrastructure, which satisfies the finding-intake rule of CLAUDE.md §2.
   Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
@@ -103,6 +103,14 @@ put it is the mistake this line exists to stop.
   SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entries U4, U7, U8, U9, U11, U12.
   Observed problem: These union entries are working practices of the batch owner, not code; a point per entry would open branches with nothing to change, and enforcing them by guards is forbidden by the infrastructure freeze. The user approved recording them as an instruction to the batch-owning session and parking the cap question in the backlog with its measurement condition, so they are not lost.
   Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
+  QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
+  FINAL STATE:
+  1. One cloud-authored point (cloud switch ON, Agent isolation "remote") lands whose handover message names the pushed sha and the build, lint and Vitest results.
+  2. Its local acceptance log shows the covering browser tier suites, picture check, review and landing, and no repeated build/lint/unit layer before the merge (the post-merge fast gate of land-point stays).
+  3. The sha, handover text excerpt and acceptance log path are recorded in this point's closing note. No new machinery (CLAUDE.md §2 infrastructure freeze).
+  Source: split of point 1430 item 4, which no point in the repository could yet evidence.
   Bundle: Session- & Repo-Hygiene.
 - [ ] 1433. A chat session's /clear converts the successor's pending spawn and takes the batch lock
   Final state: a session the user opens for something else never converts a pending-spawn reservation meant for the launcher's successor; only the process whose pid the reservation names converts it, with or without the authorized marker, and the real successor takes over. A Vitest drives the measured sequence (handover, launcher spawn reserved, a foreign session's SessionStart) and asserts the foreign session stays out and the reservation survives for the successor.
