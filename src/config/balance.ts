@@ -1055,6 +1055,12 @@ interface BalanceConfig {
       stepSeconds: number
       liftSeconds: number
       fillSecondsPerFish: number
+      /** The net man's hands ashore: their height over the ground (m) while he
+       *  holds the basket at the bow, its rim in his hands; and his trunk's lean
+       *  added at the bottom of a bend (rad). At the bottom his hands are at the
+       *  rim of the basket standing on the ground. */
+      basketHoldHeight: number
+      netManBendLean: number
       /** The longest a word waits for the settlement's floor before the boat
        *  goes on unspoken (the floor then forgets it). */
       wordWaitSeconds: number
@@ -2155,6 +2161,10 @@ export const balance: BalanceConfig = {
       stepSeconds: 1.5,
       liftSeconds: 0.8,
       fillSecondsPerFish: 0.9,
+      // Estimates, calibratable: the basket held about knee to thigh high, and
+      // a moderate forward lean, so his head stays above the rim.
+      basketHoldHeight: 0.55,
+      netManBendLean: 0.15,
       // Well inside the floor's own 240 s hold, so a held word is let go by
       // the boat rather than forced out by the floor.
       wordWaitSeconds: 12,
