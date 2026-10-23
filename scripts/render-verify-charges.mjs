@@ -72,6 +72,22 @@ export const RED_CHARGES = [
     why: 'Covering WebGPU run on main after point 1343 landed, 19.10.2026: hand 3.2 cm off the trunk at a 3.2 cm hand radius. Point 1340 keeps the catch-frame hand on the caught child (amended 19.10.2026); the charge dies with it.',
   },
   {
+    point: 1434,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /the children are photographed from a standpoint in the open/i,
+    why: 'Full WebGL 2 run on main ac714e5cf, 23.10.2026 (log 10-51-21-476), owned by no point until filed as 1434. The charge dies with it.',
+  },
+  {
+    point: 1434,
+    suite: 'polish-children',
+    kind: 'check',
+    backend: 'webgl',
+    match: /no child walks without getting anywhere/i,
+    detailMatch: /worst child 0 at 1\.47 % of its own judged time/i,
+    why: 'Full WebGL 2 run on main ac714e5cf, 23.10.2026 (log 10-51-21-476), owned by no point until filed as 1434; only this measured composition, every other one stays uncovered. The charge dies with it.',
+  },
+  {
     point: 1344,
     suite: 'polish-children',
     kind: 'check',

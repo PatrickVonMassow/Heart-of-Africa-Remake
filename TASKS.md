@@ -16092,3 +16092,8 @@ to land than a mechanism that needs a review.
   Verifiable: polish-children --section=children-bank-game green on both backends; a Vitest on the touch-pose timing where the cause is browserless.
   Criticality: medium - visible hands off the stone in every bank round.
   Bundle: Dorfleben.
+- [ ] 1434. Two unowned WebGL 2 reds in the children suite: a standpoint in the open, and a child walking without getting anywhere
+  Final state: the full WebGL 2 polish-children run on main is free of both reds, or each is traced to a named cause and fixed: (a) "the children are photographed from a standpoint in the open" (2 of 5 in the clear, maasai-village); (b) "no child walks without getting anywhere" (worst child 0 at 1.47 % of its own judged time, group 0.29 %, 18 of 5875 1 s windows). Read the log first and decide per red whether it is product or picture fixture; a fixture cause is fixed in scripts/verify, a product cause in the children's paths. Its charges in scripts/render-verify-charges.mjs die with this point.
+  Observed problem: both reds came up on the full WebGL 2 run on main ac714e5cf after point 1424 landed (log local/verify-logs/2026-10-23T10-51-21-476-polish-children.log), owned by no point; the predecessor session deferred them with the order to file them as a point (render-verify-guard deferral at fcbf6a1).
+  Source: render-verify-guard of 23.10.2026, deferral of the 1424 landing session.
+  Bundle: Dorfleben.
