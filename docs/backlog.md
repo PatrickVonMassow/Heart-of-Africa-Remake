@@ -2192,3 +2192,20 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 
 - polish-villagers full pass walls at 45 min with a 7.9 GB Chrome renderer (23.10.2026, feat/1404 983fe682f; village-walk alone 3:34) — the bundle LARGE cannot cover the suite until per-page memory growth across sections is fixed or the suite split.
 - Retro lesson from 1426: guards read missing local (unversioned) state as "off" and locked out the cloud clone; the loosening needed five cross-review rounds for seven gaps. Separate "state missing" from "state says no"; review loosenings like new code (finding 23.10.2026 04:23).
+
+- 23.10.2026 branch reconciliation (point 1429) — parked or removed branches, shas kept here
+  because the branches are gone (local, remote and worktree):
+  - `feat/847-brevity-guard-gaps` @ 42411828e — 17 commits closing the four ways past
+    `scripts/guide-brevity-core.mjs` plus later review rounds (last verdict: round sixteen);
+    missing: a clean cross-vendor pass and the merge. Parked under the infrastructure freeze
+    (a doc-length guard; no game blockade, no false approval of game work); point 847 closed.
+  - `feat/901-superseded-ci-run` @ d9b9ec985 — only a "Record hostile-test authoring
+    commission" commit; the fix (cancelled CI runs counted as failed) was never written.
+    Parked under the freeze (a false red, not a false approval); point 901 closed.
+  - `feat/834-durable-authoring-lane` @ 091f66b55 — 122 commits kept as material for the cut
+    points 889–895, all of which have landed; superseded.
+  - `feat/1049-queue-order-rule` @ 9815ce1b1 — only the commission record; abandoned, point
+    1049 stays open.
+  - `feat/1255-loom-plaza-distance` @ 79fcb509f — lowers the loom plaza height bar to 60 px;
+    point 1255 was parked by 1258 ("land nothing"), its red lives on in open point 1266, which
+    forbids weakening the check, so the commit is reference only.
