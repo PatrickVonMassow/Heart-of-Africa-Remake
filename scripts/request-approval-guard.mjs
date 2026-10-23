@@ -25,15 +25,13 @@
 // needing its own approval, one without a readable title denied. The guard keeps
 // a cooperative session from forgetting the rule; it is no shell parser and
 // does not try to win against an adversary.
-// NOT JUDGED (21.10.2026): a pure read pipeline (rg, grep, cat, head, git log
-// … joined only by `|`, see isPureRead) reads its quoted words literally, so
-// a quoted `?`, `*`, `;` or `|` there no longer makes it a possible deposit;
-// a direct `node scripts/board.mjs` or `ask-lane.mjs` call passes with prose
-// arguments (`?`, `;`, `|` but no `*`, quote or substitution).
+// NOT JUDGED (22.10.2026): any command that does not mention either word —
+// a plain write, redirect, pipe or chain passes untouched (a cloud clone could
+// not write a file before). A deposit assembled purely by expansion
+// (`fin*.mjs`, `$F`) is therefore not seen: an accepted gap.
 // ACCEPTED FALSE POSITIVES: a command that merely MENTIONS `finding.mjs` or
-// `--request` (echo, grep, a test name) is judged as well; so is any other
-// command holding a quote, pipe or glob outside that allowlist (`git commit
-// -m "Fix?"`, `find -name '*.ts'`). The way out is to rephrase the command.
+// `--request` (echo, grep, a test name) is judged as well. The way out is to
+// rephrase the command.
 //
 // KNOWN GAP: a batch-owner session appending a point directly to TASKS.md from
 // a chat discussion is not covered; there the memory rule alone applies.

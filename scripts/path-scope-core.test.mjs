@@ -324,7 +324,7 @@ describe('a first-class file path (Read/Edit/Write)', () => {
 
 describe('pathsInCommand', () => {
   it('returns the raw spelling beside the canonical one, deduped', () => {
-    const found = pathsInCommand('cat /mnt/c/Users/Patri/Documents/x ~/Documents/x', ctx, parseSegments)
+    const found = pathsInCommand('cat /mnt/c/Users/Patri/Documents/x ~/Documents/x', { ...ctx, home: '/mnt/c/Users/Patri' }, parseSegments)
     expect(found.map((f) => f.canonical.toLowerCase())).toEqual(['~/documents/x'])
     expect(found[0].raw).toBe('/mnt/c/Users/Patri/Documents/x')
   })
@@ -338,5 +338,101 @@ describe('the guard reads a path from every write tool it is wired for', () => {
       filePath: '~/Documents/x',
       cwd: '',
     })
+  })
+})
+
+describe('the checkout root of the running repository is in scope wherever it lives', () => {
+  // A claude.ai/code cloud session clones under /home/user/<repo> and runs as
+  // that home's user — outside ALLOW_ROOTS, so without this every write refused.
+  const cloud = {
+    ...ctx,
+    homes: [...ctx.homes, '/home/user'],
+    projectRoots: ['/home/user/Heart-of-Africa-Remake'],
+    home: '/home/user',
+  }
+  const cloudJudge = (command) => evaluate({ command, ctx: cloud, parseSegments })
+  const cloudPath = (filePath, cwd = '') => evaluate({ filePath, cwd, ctx: cloud, parseSegments })
+
+  it('allows a write and a shell call inside the cloud clone', () => {
+    expect(cloudPath('/home/user/Heart-of-Africa-Remake/docs/probes/1230-cloud-marker.txt').block).toBe(false)
+    expect(cloudPath('docs/probes/x.txt', '/home/user/Heart-of-Africa-Remake').block).toBe(false)
+    expect(
+      cloudJudge("mkdir -p /home/user/Heart-of-Africa-Remake/docs/probes && ls /home/user/Heart-of-Africa-Remake").block,
+    ).toBe(false)
+    expect(cloudJudge('ls ~/Heart-of-Africa-Remake/scripts').block).toBe(false)
+  })
+
+  it('keeps the rest of that home and foreign homes out', () => {
+    expect(cloudPath('/home/user/other-repo/x').block).toBe(true)
+    expect(cloudPath('/home/user/Heart-of-Africa-Remake-evil/x').block).toBe(true)
+    expect(cloudJudge('ls /home/other').block).toBe(true)
+  })
+
+  it('ignores a "project root" too broad to stand for one repository', () => {
+    for (const broad of ['/', '/home', '/home/user', '/Users', 'C:\\Users', 'C:\\', '/home/other', '/Users/Other', 'C:\\Users\\Other', '/root']) {
+      const v = evaluate({
+        filePath: '/home/other/secret.txt',
+        ctx: { ...cloud, projectRoots: [broad] },
+        parseSegments,
+      })
+      expect(v.block, broad).toBe(true)
+    }
+  })
+
+  it('without a project root the clone is still out of scope (the old blockade)', () => {
+    expect(judgePath('/home/user/Heart-of-Africa-Remake/x').block).toBe(true)
+  })
+
+  it('a foreign home set as the project root admits nothing inside it', () => {
+    for (const [root, inside] of [
+      ['/home/other', '/home/other/secret.txt'],
+      ['/Users/Other', '/Users/Other/secret.txt'],
+      ['C:\\Users\\Other', 'C:\\Users\\Other\\secret.txt'],
+      ['/root', '/root/secret.txt'],
+    ]) {
+      const v = evaluate({ filePath: inside, ctx: { ...cloud, projectRoots: [root] }, parseSegments })
+      expect(v.block, root).toBe(true)
+    }
+  })
+
+  it('a checkout root keeps its physical home: /root/<same repo name> stays out', () => {
+    expect(cloudPath('/root/Heart-of-Africa-Remake/secret').block).toBe(true)
+    expect(cloudPath('/home/node/Heart-of-Africa-Remake/secret').block).toBe(true)
+  })
+
+  it('a POSIX checkout root matches case-sensitively; a Windows one does not', () => {
+    const posix = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    expect(evaluate({ filePath: '/home/user/Repo/x', ctx: posix, parseSegments }).block).toBe(false)
+    expect(evaluate({ filePath: '/home/user/repo/private', ctx: posix, parseSegments }).block).toBe(true)
+    const win = { ...ctx, projectRoots: ['D:\\Work\\Repo'] }
+    expect(evaluate({ filePath: 'd:\\work\\repo\\x', ctx: win, parseSegments }).block).toBe(false)
+    expect(evaluate({ filePath: 'D:\\Work\\Repository\\x', ctx: win, parseSegments }).block).toBe(true)
+  })
+
+  it('two homes folding onto one ~ form are each judged on their own physical path', () => {
+    const repo = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    const v = evaluate({ command: 'cat /home/user/Repo/secret /root/Repo/secret', ctx: repo, parseSegments })
+    expect(v.block).toBe(true)
+    expect(v.offenders.map((o) => o.raw)).toEqual(['/root/Repo/secret'])
+  })
+
+  it('a case-variant POSIX sibling in the same command is judged on its own', () => {
+    const repo = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    const v = evaluate({ command: 'cat /home/user/Repo/secret /home/User/Repo/secret', ctx: repo, parseSegments })
+    expect(v.block).toBe(true)
+    expect(v.offenders.map((o) => o.raw)).toEqual(['/home/User/Repo/secret'])
+  })
+
+  it('a ~ form with an unknown home is judged even beside an allowed physical twin', () => {
+    const repo = { ...ctx, home: '', projectRoots: ['/home/node/Repo'] }
+    expect(evaluate({ command: 'cat ~/Repo/x', ctx: repo, parseSegments }).block).toBe(true)
+    expect(evaluate({ command: 'cat /home/node/Repo/x ~/Repo/x', ctx: repo, parseSegments }).block).toBe(true)
+  })
+
+  it('~ is expanded before .. is collapsed', () => {
+    const repo = { ...cloud, projectRoots: ['/home/user/Repo'] }
+    expect(evaluate({ command: 'cat ~/../Repo/secret', ctx: repo, parseSegments }).block).toBe(true)
+    expect(canonicalisePath('~/../Repo/secret', repo)).toBe('/home/Repo/secret')
+    expect(evaluate({ command: 'cat ~/Repo/x', ctx: repo, parseSegments }).block).toBe(false)
   })
 })

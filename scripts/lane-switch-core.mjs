@@ -99,7 +99,8 @@ export function unreadableState(error, role = DEFAULT_SWITCH_ROLE) {
 /** The state of a lane nobody recorded a decision for: only the switch-gated lane fails
  *  closed; every other lane is usable until switched off. */
 function defaultState(role) {
-  if (lane(role).scarce) return unusable('absent', '', role)
+  // `absent: true` only here, where nothing was recorded at all (no file, no lane key).
+  if (lane(role).scarce) return { ...unusable('absent', '', role), absent: true }
   return { ok: true, role, state: 'on', reason: 'no recorded decision; this lane is on by default', setBy: 'default', changedAt: 0, problem: '' }
 }
 
@@ -138,7 +139,10 @@ export function readState(raw, role = DEFAULT_SWITCH_ROLE) {
   if ('lanes' in value) {
     const lanes = value.lanes
     if (!lanes || typeof lanes !== 'object' || Array.isArray(lanes)) return unusable('garbled', 'lanes must be an object', wanted)
-    return lanes[wanted] == null ? defaultState(wanted) : decodeEntry(lanes[wanted], wanted)
+    if (!(wanted in lanes)) return defaultState(wanted)
+    // An explicit null is a recorded but broken entry, for every lane: it fails closed.
+    if (lanes[wanted] === null) return unusable('garbled', 'the lane entry is null', wanted)
+    return decodeEntry(lanes[wanted], wanted)
   }
   // A flat record is the scarce lane's legacy entry; it says nothing about another lane.
   if (!lane(wanted).scarce) return defaultState(wanted)

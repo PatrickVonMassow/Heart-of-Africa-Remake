@@ -109,6 +109,35 @@ export function laneStateAtCommit(commitWhen, scarceState) {
   return { ...scarceState, state: currentIsOn ? 'off' : 'on' }
 }
 
+/**
+ * The scarce-lane state the turn-end tripwire judges with (22.10.2026). A switch
+ * state that was never RECORDED — the untracked state file is missing, as in a
+ * fresh cloud clone — no longer refuses the turn end: that looped a cloud
+ * session through repeated stop refusals. It is judged as OFF instead (so a
+ * scarce-lane commit still trips) and reported as a notice. Any other unusable
+ * state (garbled, unreadable) still refuses; a recorded state passes unchanged.
+ * Returns `{ scarceState, refuse, notice }` with '' for the unused texts.
+ */
+export function turnEndScarceState(scarceState) {
+  if (scarceState?.ok) return { scarceState, refuse: '', notice: '' }
+  if (scarceState?.absent === true) {
+    return {
+      scarceState: {
+        ok: true,
+        role: scarceState.role,
+        state: 'off',
+        reason: 'no recorded switch state in this checkout; judged as off',
+        setBy: 'model-guard',
+        changedAt: 1, // earlier than every commit, so no history flips to on
+        problem: '',
+      },
+      refuse: '',
+      notice: `model-guard notice: ${scarceState.problem} Until it is recorded the scarce lane is judged OFF.`,
+    }
+  }
+  return { scarceState, refuse: `SERVING-MODEL TRIPWIRE: ${scarceState?.problem || 'the lane switch state is unusable.'}`, notice: '' }
+}
+
 /** Missing switch policy fails closed; policy-neutral parsing must say so at the call site. */
 const admitsScarce = (scarceState) =>
   scarceState === POLICY_NEUTRAL || (scarceState !== undefined && laneIsOn(scarceState))

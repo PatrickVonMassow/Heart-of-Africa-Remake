@@ -26,6 +26,7 @@ import {
   POLICY_NEUTRAL,
   reviewerTrailers,
   splitTrailerField,
+  turnEndScarceState,
 } from './model-guard-core.mjs'
 import { RECENT_LOG_FORMAT } from './model-guard.mjs'
 import { readState, writeState } from './lane-switch-core.mjs'
@@ -840,5 +841,53 @@ describe('the cross authoring lane', () => {
     expect(findForbiddenCommits(log, T0).map((h) => h.sha)).toEqual(['bbbbbbb'])
     expect(findUnidentifiedCommits(log, T0)).toEqual([])
     expect(formatForbiddenReason(findForbiddenCommits(log, T0))).toContain(CROSS.displayName)
+  })
+})
+
+describe('turn end with an absent switch state (cloud clone, 22.10.2026)', () => {
+  // A fresh clone has no untracked .claude lane-switch file: that looped a cloud
+  // session through repeated stop refusals.
+  const absent = readState(null, 'scarce')
+  const log = [
+    line('aaaaaaa', '2026-07-24T22:30:00Z', `Claude ${SCARCE.displayName} <${MAIN_AT}>`),
+    line('bbbbbbb', '2026-07-24T22:40:00Z', `Claude Sonnet 5 <${MAIN_AT}>`),
+  ].join('\n')
+
+  it('does not refuse; it gives a notice and judges the scarce lane as off', () => {
+    expect(absent.ok).toBe(false)
+    const v = turnEndScarceState(absent)
+    expect(v.refuse).toBe('')
+    expect(v.notice).toMatch(/judged OFF/)
+    expect(v.scarceState).toMatchObject({ ok: true, state: 'off' })
+    expect(findForbiddenCommits('', T0, v.scarceState)).toEqual([])
+  })
+
+  it('a scarce-lane or out-of-chain commit still trips under the absent state', () => {
+    const { scarceState } = turnEndScarceState(absent)
+    expect(findForbiddenCommits(log, T0, scarceState).map((h) => h.sha)).toEqual(['aaaaaaa', 'bbbbbbb'])
+  })
+
+  it('a recorded OFF still trips a scarce-lane commit, exactly as before', () => {
+    const v = turnEndScarceState(SCARCE_OFF)
+    expect(v).toEqual({ scarceState: SCARCE_OFF, refuse: '', notice: '' })
+    expect(findForbiddenCommits(log, T0, v.scarceState).map((h) => h.sha)).toEqual(['aaaaaaa', 'bbbbbbb'])
+  })
+
+  it('a garbled or unreadable state still refuses', () => {
+    for (const broken of [readState('{not json', 'scarce'), readState('{"state":"off"}', 'scarce')]) {
+      const v = turnEndScarceState(broken)
+      expect(v.refuse).toMatch(/^SERVING-MODEL TRIPWIRE: /)
+      expect(v.notice).toBe('')
+    }
+  })
+
+  it('only a genuinely missing file or lane key counts as absent; a null or malformed entry still refuses', () => {
+    expect(turnEndScarceState(readState(null, 'scarce')).refuse).toBe('')
+    expect(turnEndScarceState(readState('{"lanes":{}}', 'scarce')).refuse).toBe('')
+    for (const raw of ['{"lanes":{"scarce":null}}', '{"lanes":{"scarce":{"state":"off"}}}', '{"lanes":{"scarce":"on"}}']) {
+      const state = readState(raw, 'scarce')
+      expect(state.absent, raw).toBeUndefined()
+      expect(turnEndScarceState(state).refuse, raw).toMatch(/^SERVING-MODEL TRIPWIRE: /)
+    }
   })
 })

@@ -275,3 +275,18 @@ describe('readState refuses a root that is no object', () => {
     for (const role of ['main', 'cross', 'scarce']) expect(readState(raw, role).ok, `${raw} ${role}`).toBe(false)
   })
 })
+
+describe('an explicit null or malformed lane entry is unusable for every lane', () => {
+  for (const role of [MAIN.role, CROSS.role, SCARCE.role]) {
+    it(`${role}: null and malformed fail closed, a missing key keeps its default`, () => {
+      for (const entry of ['null', '{"state":"off"}', '"on"']) {
+        const state = readState(`{"lanes":{"${role}":${entry}}}`, role)
+        expect(state.ok, `${role} ${entry}`).toBe(false)
+        expect(state.absent, `${role} ${entry}`).toBeUndefined()
+      }
+      const missing = readState('{"lanes":{}}', role)
+      if (role === SCARCE.role) expect(missing).toMatchObject({ ok: false, absent: true })
+      else expect(missing).toMatchObject({ ok: true, state: 'on' })
+    })
+  }
+})
