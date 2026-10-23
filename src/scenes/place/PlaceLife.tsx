@@ -2412,7 +2412,7 @@ function TaskWalker({
         pose={pose}
         headSteady={steadiedLoad(carry, taskLoadShape(carry))}
         headProp={
-          <group ref={load}>
+          <group ref={load} name="task-walker-load">
             {carry === 'bundle' ? (
               <mesh position={[0, TASK_BUNDLE.height / 2, 0]} castShadow>
                 <boxGeometry args={[TASK_BUNDLE.width, TASK_BUNDLE.height, TASK_BUNDLE.depth]} />
