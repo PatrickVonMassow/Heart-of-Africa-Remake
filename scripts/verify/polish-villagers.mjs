@@ -4037,7 +4037,12 @@ if (section('water-stand-table')) {
     // sets off is the same defect.
     let walkEnd = off
     while (off > 0 && walkEnd < S.length && walkEnd < off + 30 && S[walkEnd].phase === 'fetch') walkEnd++
+    // The take is judged at a hand's pace; his first steps at a carry walk's,
+    // whose arm swing alone reaches about 4.5 m/s at these frames with no
+    // turn (measured 23.10.2026, frame 255) — a pop from the plank is a
+    // jump of a jar's distance, well past either bound.
     let worst = { speed: 0, k: -1 }
+    let walkWorst = { speed: 0, k: -1 }
     let swap = null
     let both = 0
     let none = 0
@@ -4050,7 +4055,8 @@ if (section('water-stand-table')) {
       if (prev) {
         const j = Math.hypot(at.x - prev.x, at.y - prev.y, at.z - prev.z)
         const speed = j / Math.max(1e-3, (s.t - prev.t) / 1000)
-        if (speed > worst.speed) worst = { speed, k, from: s.hand ? 'hand' : 'plank', jump: j, dt: s.t - prev.t, turn: Math.abs(s.yaw - S[k - 1].yaw), walk: Math.hypot(s.x - S[k - 1].x, s.z - S[k - 1].z), phase: s.phase, gesture: s.gesture?.kind ?? null }
+        const into = s.phase === 'fetch' ? walkWorst : worst
+        if (speed > into.speed) Object.assign(into, { speed, k, from: s.hand ? 'hand' : 'plank', jump: j, dt: s.t - prev.t, turn: Math.abs(s.yaw - S[k - 1].yaw), walk: Math.hypot(s.x - S[k - 1].x, s.z - S[k - 1].z), phase: s.phase, gesture: s.gesture?.kind ?? null })
         if (s.hand && !prev.hand) swap = j
       }
       prev = { ...at, t: s.t, hand: !!s.hand }
@@ -4058,9 +4064,9 @@ if (section('water-stand-table')) {
     const taking = S.filter((s) => s.taking != null)
     const lifted = taking.reduce((m, s) => (s.spare && S[order].spare ? Math.max(m, Math.hypot(s.spare.x - S[order].spare.x, s.spare.y - S[order].spare.y, s.spare.z - S[order].spare.z)) : m), 0)
     check('water stand table: the empty jar is taken up from the plank, never appearing from nothing',
-      order >= 0 && off > order && taking.length > 5 && both === 0 && none === 0 && swap !== null && swap <= 0.05 && worst.speed <= 4 && lifted > 0.1 && !!S[order].spare,
+      order >= 0 && off > order && taking.length > 5 && both === 0 && none === 0 && swap !== null && swap <= 0.05 && worst.speed <= 4 && walkWorst.speed <= 6 && lifted > 0.1 && !!S[order].spare,
       `order at frame ${order}, off the stand at ${off}, walking checked to ${walkEnd}; ${taking.length} take frames; jar lifted ${lifted.toFixed(2)} m off the plank before it is in his hand; ` +
-        `plank-to-hand gap ${swap == null ? 'never' : `${swap.toFixed(3)} m`}; fastest move ${worst.speed.toFixed(2)} m/s (frame ${worst.k}, ${worst.from ?? '-'}, ${worst.jump?.toFixed(3) ?? '-'} m in ${worst.dt?.toFixed(0) ?? '-'} ms, body turned ${worst.turn?.toFixed(3) ?? '-'} rad and moved ${worst.walk?.toFixed(3) ?? '-'} m, phase ${worst.phase ?? '-'}, gesture ${worst.gesture ?? 'none'}); ${both} frames with two jars, ${none} with none`)
+        `plank-to-hand gap ${swap == null ? 'never' : `${swap.toFixed(3)} m`}; fastest take move ${worst.speed.toFixed(2)} m/s (frame ${worst.k}, ${worst.from ?? '-'}, ${worst.jump?.toFixed(3) ?? '-'} m in ${worst.dt?.toFixed(0) ?? '-'} ms, body turned ${worst.turn?.toFixed(3) ?? '-'} rad and moved ${worst.walk?.toFixed(3) ?? '-'} m, phase ${worst.phase ?? '-'}, gesture ${worst.gesture ?? 'none'}); fastest in his first steps ${walkWorst.speed.toFixed(2)} m/s (frame ${walkWorst.k}, ${walkWorst.jump?.toFixed(3) ?? '-'} m in ${walkWorst.dt?.toFixed(0) ?? '-'} ms, body turned ${walkWorst.turn?.toFixed(3) ?? '-'} rad); ${both} frames with two jars, ${none} with none`)
     // (b) The report's pointing arm, held: its drawn line from the shoulder
     // through the hand against the water in the jar he set down.
     const held = S.filter((s) => (s.situation === 'water-back' || s.situation === 'ended') && s.gesture?.kind === 'indicate' && s.gesture.t > 1.75 &&
