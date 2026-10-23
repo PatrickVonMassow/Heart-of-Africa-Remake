@@ -1986,7 +1986,12 @@ if (section('adult-errands')) {
     // of its own after a hitch and read a bounded turn as a snap.
     // Measured before the fix: 1.2-2.9 rad in one frame.
     await page.evaluate(() => window.__placeErrands().resetTurnWorst())
-    await page.waitForTimeout(5000)
+    // 300 drawn frames (about five seconds at 60 fps), counted, not timed
+    await page.evaluate(() => new Promise((done) => {
+      let n = 0
+      const tick = () => (++n >= 300 ? done() : requestAnimationFrame(tick))
+      requestAnimationFrame(tick)
+    }))
     const swings = await page.evaluate(() => ({ worst: window.__placeErrands().turnWorst }))
     check(
       'no village adult swings round to a new heading in one frame — it turns (point 1404)',
@@ -2032,7 +2037,13 @@ if (section('adult-errands')) {
           local: { x: at.x, y: 0.9, z: at.z },
           label: `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`,
         })
-        await page.waitForTimeout(300)
+        // the next frame once the turner has walked on about 0.35 m (≈0.3 s)
+        await page
+          .waitForFunction(({ i, x, z }) => {
+            const v = window.__placeErrands().villagers[i]
+            return Math.hypot(v.x - x, v.z - z) > 0.35
+          }, { i: turner, x: at.x, z: at.z }, { timeout: 5000, polling: 'raf' })
+          .catch(() => {})
       }
     }
     // NO VILLAGE ADULT FLIES (point 1404 oddity, frame 1 of 23.10.2026: a woman
@@ -2042,7 +2053,6 @@ if (section('adult-errands')) {
     const flight = await page.evaluate(
       () =>
         new Promise((resolve) => {
-          window.__placeErrands().resetShoveWorst()
           let worst = { sprint: 0, jog: 0, speed: 0, who: null }
           let frames = 0
           const seen = new Set()
@@ -2070,7 +2080,7 @@ if (section('adult-errands')) {
             })
             last = vs.map((v) => ({ x: v.x, z: v.z, yaw: v.yaw }))
             if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
-            else resolve({ ...worst, frames, adults, gaitSeen: seen.size, shove: window.__placeErrands().shoveWorst, jump: window.__placeErrands().jumpWorst })
+            else resolve({ ...worst, frames, adults, gaitSeen: seen.size })
           }
           requestAnimationFrame(tick)
         }),
