@@ -44,6 +44,22 @@ not need it and must not act on it.
   aesthetically good enough. Use a branch preview only when the user's eyes are
   required to establish that the change is safe to land.
 
+## Throughput with cloud authoring
+
+Working instruction (user order 23.10.2026), practice only — no guard enforces it:
+
+- Quiet acceptance windows: while a local browser suite, unit gate, or picture
+  check runs, start no other local agent, browser, or Vitest run; cloud
+  authoring continues.
+- Gate a branch only after its author declares it final; rerun only the checks
+  a later commit invalidates.
+- Spend suite wait time on lightweight work only: review other pushed commits
+  early and prepare their acceptance steps; never start a second heavy check.
+- When refilling the pool, prefer bounded ready points with clear acceptance and
+  disjoint files and prerequisites; check overlap before delegating.
+- Until the cloud credit expires on 05.11.2026, pace cloud authoring to what
+  local acceptance can land, not to what the cloud can produce.
+
 ## Boundary, lease, claims, and wake-up
 
 Take every point boundary in two phases. After the point being landed is merged
