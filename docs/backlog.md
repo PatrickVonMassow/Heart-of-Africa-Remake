@@ -9,6 +9,8 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-10-23 cloud probe — `parseMarker` in `scripts/cloud-switch.mjs` reads only `hostname: <h>`; the probe of 23.10. wrote `hostname vm` and read NOT PASSED until recorded by hand. Accept both forms when the switch is next touched.
+- 2026-10-23 model guard — `model-handoff-core.mjs` sets `verifiedThrough` to the commit's own second while `findForbiddenCommits` skips only `c.when < sinceMs`, so a verified commit stays a hit and the handoff answers 'no advanceable timestamp' (199be6e; baseline advanced by hand in 657b243bd). Fix: compare `<=` or add 1000 ms; adjust model-handoff-core.test.mjs:41.
 - 2026-10-06 pre-push gate — the unit gate for 124d7b9 (TASKS split only) went red while a Blender fit loaded the host, without naming the failing file or test; the superset run on f8cb1ab was green (588 files / 17299 tests) and the next gated push passed. Suspected load-sensitive unit test; the gate should print the failing test names.
 - 2026-10-01 parked work-order point 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits — parked by point 1258 while the loom is
   switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
