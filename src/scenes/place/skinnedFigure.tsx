@@ -721,6 +721,8 @@ export function SkinnedFigure({
       }
       // THE HANDS ON THE FINAL BODY: each contact and the steadying hand.
       let steadyShown = 0
+      // how much of each solved hand the clips drew over (the prop anchor follows it)
+      const clipShown = [0, 0]
       ;(['L', 'R'] as const).forEach((s, i) => {
         const up = b[`upperArm.${s}`]
         const fore = b[`forearm.${s}`]
@@ -779,6 +781,7 @@ export function SkinnedFigure({
         // while the clips still own part of the arm (taken or given back), the
         // solve blends with what they left, never a snap
         const share = gltf && clips ? Math.max(clips.dig, clips.arms[i]) : 0
+        if (done) clipShown[i] = share
         if (done && share > 0) {
           up.quaternion.slerp(armBase[i][0], share)
           fore.quaternion.slerp(armBase[i][1], share)
@@ -816,9 +819,9 @@ export function SkinnedFigure({
         if (contactArm[i] && vh && anchor.parent) {
           const parentQ = anchor.parent.getWorldQuaternion(new THREE.Quaternion()).invert()
           anchor.quaternion.copy(parentQ.multiply(vh.getWorldQuaternion(new THREE.Quaternion())))
-          // a released reach hands the prop to the bone as the clips take the
-          // arm back, so the release's end never swings what hangs there
-          if (clips && releasing.current[i] !== null && reachOfPose(i) === undefined) anchor.quaternion.slerp(_q.identity(), clips.arms[i])
+          // as much the bone's as the clips drew the hand (a reach given back or
+          // taken anew), so neither end of the hand-over swings what hangs there
+          if (clipShown[i] > 0) anchor.quaternion.slerp(_q.identity(), clipShown[i])
         } else anchor.quaternion.identity()
         anchor.updateWorldMatrix(false, true)
       })

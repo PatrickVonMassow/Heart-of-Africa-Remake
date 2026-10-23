@@ -33,9 +33,9 @@ const rest: FigurePose = { left: { ...REST_POSE.left }, right: { ...REST_POSE.ri
 const gesture: FigurePose = { left: { ...REST_POSE.left }, right: armAim(-1.3, 0.3), lean: 0, turn: 0 }
 
 /** The drawn right hand, in the figure's frame, after the poses shown in turn
- *  for 120 frames each, and the fastest frame-to-frame move of a jar hung
+ *  for `per` frames each, and the fastest frame-to-frame move of a jar hung
  *  0.3 m below its hand anchor. */
-async function run(poses: FigurePose[]) {
+async function run(poses: FigurePose[], per = 120) {
   const look: FigureLook = {
     peopleId: 'swahili',
     drivers: { coldness: 0, harmattan: 0, karif: 0 },
@@ -50,7 +50,7 @@ async function run(poses: FigurePose[]) {
     const pose = useRef<FigurePose | null>({ ...poses[0] })
     const limbs = useRef<FigureLimbs | null>(null)
     useFrame(() => {
-      pose.current = { ...poses[Math.min(poses.length - 1, Math.floor(frame / 120))] }
+      pose.current = { ...poses[Math.min(poses.length - 1, Math.floor(frame / per))] }
       applyFigurePose(limbs.current, pose.current)
     })
     return (
@@ -65,7 +65,7 @@ async function run(poses: FigurePose[]) {
   await act(async () => root.render(<Stage />))
   let jarStep = 0
   let lastJar: THREE.Vector3 | null = null
-  for (frame = 0; frame < poses.length * 120; frame++) {
+  for (frame = 0; frame < poses.length * per; frame++) {
     act(() => advance((frame + 1) / 60))
     group.updateMatrixWorld(true)
     const anchor = group.getObjectByName('hand-right')
@@ -97,6 +97,12 @@ describe('a released pose reach', () => {
   it('lets a jar hung from the hand ride through the end of the release without a swing', async () => {
     const { jarStep } = await run([takeEnd, rest, rest])
     // 0.05 m in a 60 fps frame is 3 m/s, a walking arm's swing at most
+    expect(jarStep).toBeLessThan(0.05)
+  }, 60_000)
+
+  it('and through a new reach that takes the arm while the clips are half way back', async () => {
+    const hold = (p: FigurePose) => Array.from({ length: 12 }, () => p)
+    const { jarStep } = await run([...hold(takeEnd), rest, ...hold(takeEnd)], 10)
     expect(jarStep).toBeLessThan(0.05)
   }, 60_000)
 })
