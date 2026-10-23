@@ -2063,7 +2063,7 @@ if (section('adult-errands')) {
             })
             last = vs.map((v) => ({ x: v.x, z: v.z, yaw: v.yaw }))
             if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
-            else resolve({ ...worst, frames, adults, gaitSeen: seen.size, shove: window.__placeErrands().shoveWorst })
+            else resolve({ ...worst, frames, adults, gaitSeen: seen.size, shove: window.__placeErrands().shoveWorst, jump: window.__placeErrands().jumpWorst })
           }
           requestAnimationFrame(tick)
         }),

@@ -2902,6 +2902,11 @@ function ErrandVillagers({
   // its turn left it and the body it overlapped (point 1404 flight oddity).
   const turnPace = useRef<number[]>([])
   const shoveWorst = useRef({ speed: 0, dt: 0, who: -1, pace: 1, other: -1, otherScale: 0, otherFixed: false })
+  // Dev: the hardest jump an errand adult was drawn making between two frames,
+  // with what moved it that frame (point 1404 flight oddity).
+  const jumpFrom = useRef<Array<{ x: number; z: number; yaw: number } | null>>([])
+  const jumpWhy = useRef<string[]>([])
+  const jumpWorst = useRef<Record<string, unknown>>({ speed: 0 })
 
   // May a body stand here? The settlement boundary and the collider set
   // together — the same question this component's own step asks. The work
@@ -3118,6 +3123,7 @@ function ErrandVillagers({
             if (state.stuck > balance.walkerUnstuckSeconds) {
               const anchor = spawnAnchors[i]
               const escape = escapeToFree(colliders, me.x, me.z, NPC_RADIUS, nav, [anchor.x, anchor.z])
+              if (import.meta.env.DEV) jumpWhy.current[i] = (jumpWhy.current[i] ?? '') + ` escape:${escape.rung}`
               me.x = escape.pos[0]
               me.z = escape.pos[1]
               // A route planned from where it no longer stands is worthless.
@@ -3302,6 +3308,16 @@ function ErrandVillagers({
             if (over > turnWorst.current.over) turnWorst.current = { over, swing, dt, who: i }
           }
           drawnYaw.current[i] = now
+          const from = jumpFrom.current[i]
+          if (from && dt > 0) {
+            const speed = Math.hypot(me.x - from.x, me.z - from.z) / dt
+            if (speed > (jumpWorst.current.speed as number)) {
+              const spin = Math.abs(Math.atan2(Math.sin(now - from.yaw), Math.cos(now - from.yaw))) / dt
+              jumpWorst.current = { speed, spin, dt, who: i, why: jumpWhy.current[i] ?? '', pace: turnPace.current[i] ?? 1, facing, x: me.x, z: me.z, phase: taskOf(work, i)?.phase ?? null }
+            }
+          }
+          jumpFrom.current[i] = { x: me.x, z: me.z, yaw: now }
+          jumpWhy.current[i] = ''
         }
         g.rotation.y = yaws.current[i]
         // THE SINK, which is half of what makes a fill read as fetching rather
@@ -3381,8 +3397,11 @@ function ErrandVillagers({
       },
       /** The hardest separation shove of an errand adult (point 1404). */
       shoveWorst: { ...shoveWorst.current },
+      /** The hardest frame-to-frame jump of an errand adult (point 1404). */
+      jumpWorst: { ...jumpWorst.current },
       resetShoveWorst: () => {
         shoveWorst.current = { speed: 0, dt: 0, who: -1, pace: 1, other: -1, otherScale: 0, otherFixed: false }
+        jumpWorst.current = { speed: 0 }
       },
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
