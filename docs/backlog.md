@@ -2211,3 +2211,12 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
     forbids weakening the check, so the commit is reference only.
 - Water carrier's report gesture reads as pointing at a villager (finding 23.10.2026 16:40): in `verification/1405-water-carrier-report.png` (WebGPU, feat/1405 98049d22b) a Bambara woman stands between him and the jars, so his aim at the water (0.032 m off) reads on screen as pointing at her. Staging only, the measured aim is right; a table-side keep-clear for idle villagers would end it.
 - Separate cloud-author cap (23.10.2026, union U11; A1 vs B6/B16, Fable 5.1: measure first): raise the authoring cap above 3 and stop counting pushed-but-unverified branches only if, after the branch clean-up and the cloud pre-check points, the pool sits at 3 with the owner idle; then change `POOL_CAP` (scripts/batch-in-flight-core.mjs) and `DAEMON_POOL_CAP` (scripts/batch-daemon-core.mjs) together — a test asserts they agree.
+- Rule-set review 23.10.2026 (memory fixes done directly; these repo-text findings are parked under the freeze):
+  - `scripts/batch-resume-hook.mjs:335` pause text names `scripts/batch-lock.mjs clearPaused`, which has no CLI entry; only deleting the marker works.
+  - `scripts/batch-resume-hook.mjs:272-276` "a delegated author still building does NOT hold the boundary" contradicts CLAUDE.md §6 and `scripts/batch-adoption-core.mjs:143` (a session-bound lane blocks it).
+  - `scripts/batch-resume-hook.mjs:267-268` "every user-reported defect becomes a ready TASKS point" overrides the CLAUDE.md §2 finding-intake filter.
+  - CLAUDE.md §7.2 "required render/mechanism PROOF supplied" has no enforcement left: `mechanism-review-guard.mjs:91` and `criticality-review-guard.mjs:71` are switched off, yet both (~2,000 lines) still run at every Stop — deletion candidate.
+  - `scripts/criticality-review-guard.mjs:983` says "end the turn again" while line 973 says only `--status` reaches it.
+  - `scripts/rule-echo-guard.mjs:140`, `scripts/queue-rank-core.mjs:493,539` and `scripts/board-currency-core.mjs:325` attribute a fail-open rule to CLAUDE.md §7.2, which has none.
+  - The rule-echo stamp on memory `fable-sparingly` read "ok" while that memory was stale; a stamp proves the hash, not the content.
+  - The reply timestamp is enforced twice at turn end (project `timestamp-guard` and the user-global `check-reply-timestamp.cjs`).
