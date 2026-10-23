@@ -77,39 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1426. Make the cloud clone able to work: path-scope, request-approval-guard and model-guard stop blocking it
-  QUEUE POSITION: front of the work order (user 22.10.2026: "Reihe das ganz vorne in der Queue ein.").
-  PROBLEM: a claude.ai/code cloud session on PatrickVonMassow/Heart-of-Africa-Remake (probe 22.10.2026,
-  host `vm`, machine-id a3942038ad9d43cba151ebad027d1061, kernel 6.18.44-fc-v140) could not write a
-  single file. Three repo hooks run in the clone and block it:
-  1. path-scope (scripts/path-scope-core.mjs): the clone lives at /home/user/Heart-of-Africa-Remake,
-     not in ALLOW_ROOTS, classed as "another user's home directory"; every Write/Edit and every Bash
-     call with the repo path is refused, so the clone cannot even fix itself.
-  2. request-approval-guard: refuses any Bash command holding a quote, redirect or operator
-     (`mkdir -p docs/probes && printf '...' > file`), although it neither mentions finding.mjs nor --request.
-  3. model-guard serving-model tripwire: the scarce-lane switch state is local/untracked, absent in
-     the clone, so every turn end is blocked and the session loops (observed: 6+ repeated stop refusals,
-     burning cloud credit).
-  FINAL STATE:
-  1. path-scope treats the checkout root of the running repository (git toplevel / project dir) as in
-     scope wherever it lives, so a cloud clone under /home/user/<repo> is in scope; foreign home dirs stay out.
-  2. request-approval-guard only fires on commands that actually mention finding.mjs or --request;
-     a plain write/redirect command without those words passes.
-  3. model-guard: an ABSENT lane-switch state in a clone without the local state files does not block
-     the turn end (notice, not refusal); a recorded OFF or an out-of-chain serving model still blocks.
-  4. Re-run the cloud probe: a claude.ai/code session writes docs/probes/1230-cloud-marker.txt
-     (hostname/machine-id/kernel lines) on branch probe/1230-cloud-marker and pushes it without any
-     workaround; then `node scripts/cloud-switch.mjs --record-probe probe/1230-cloud-marker` passes.
-     Switch ON additionally needs the user's confirmation that the cloud credit balance dropped.
-  Test: unit tests for each of the three guard cores (cloud-clone path in scope, plain redirect passes,
-  absent switch state in clone does not block); the probe branch as end-to-end proof.
-  Infrastructure freeze (CLAUDE.md §2): allowed — reproducible real blockade (cloud authoring
-  impossible), no new mechanism, only loosening three existing rules.
-  Criticality: medium. Deadline: cloud credits expire 05.11.2026 08:59 MEZ.
-  After landing (finding 22.10.2026 22:05): a "Von dir zu klären" card asks the user to start a cloud
-  session with the probe order and then confirm the credit drop under claude.ai/settings/usage; deadline 05.11.2026.
-  Bundle: Modell & Wächter.
-
 - [ ] 1424. A walking child snaps backwards when its way round an obstacle expires
   Split off 1403 (22.10.2026, after nine non-converging tries): a roaming child walking round an obstacle at 1.4 m/s (bank `drive`, `wants=false`) has its edge commitment end on the CLOCK (`ageEdge`, tagGame.ts) while its goal lies >135° behind; the walk snaps ~185° in one frame and the child walks backwards while its body eases after it. Done when `tagShuffle.facing.test.ts` "never walks a child far backwards" is un-skipped and green at its 0.3 m bound (measured 0.303 m, child 3, the boulder climber, t 80.05 s), with every other place case green, and a moving capture shows no backwards walk.
   Tried and reverted on 1403 (do not repeat): turning in place on a >135° snap (0.47 m, two more cases red); `releaseEdge` holding the commitment (0.35 m); holding the commitment one frame while the goal is behind (green replay, but `tagShuffle.test.ts` "holds when the adults walk through the children's own ground" 60 < 100); that hold bounded by `anchorFor` (5.0 m backwards) or by a 1.5 s cap per commitment (three cases red). The hold is load-bearing, so the fix likely belongs in how the way round ends (ease the course out of the commitment) rather than how long it lasts.
