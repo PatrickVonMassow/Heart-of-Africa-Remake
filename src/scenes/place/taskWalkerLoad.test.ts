@@ -65,9 +65,8 @@ function simulate(carry: TaskLoad, lag = 0): Frame[] {
       return { x: at.x, y: at.y + lag * h.reach, z: at.z }
     }) as [V3, V3]
   }
-  // and the first step of the walk home: the load back on the crown
-  const head = { x: 0, y: 1.5, z: 0.02 }
-  frames.push({ mode: 'back', phase: 'walk', base: loadPlacement(loadHandling('back', 0, span), head, hands, carry).base, hands, hold: 0, down: 0 })
+  // the last frame is the first step of the walk home, as the stop produced it
+  if (mode !== 'back') throw new Error(`the stop never completed: stuck in ${mode}`)
   return frames
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { VILLAGER_MOTION as M } from '../config/balance'
+import { TASK_LOAD_HANDLING, VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type AgeGroup, type DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { bodyProportions, buildBodyGeometry, createSkeleton, jointPositions } from './figureBody'
@@ -35,7 +35,7 @@ import {
   type WalkMotion,
 } from './figureWalk'
 import { TASK_BUNDLE, TASK_JAR, steadiedLoad, taskLoadShape } from '../scenes/place/headLoads'
-import { workStop, type WorkStopMode } from '../scenes/place/taskWalkerStop'
+import { RISE_SECONDS, workSpan, workStop, type WorkStopMode } from '../scenes/place/taskWalkerStop'
 
 const bodies = AGE_GROUPS.flatMap((age) => SEXES.map((sex) => ({ age, sex, p: bodyProportions(sex, age, 0) })))
 const SPEEDS = [0.3, 0.8, 1.2, 1.8]
@@ -367,15 +367,18 @@ describe('the task walker gets up before it walks off', () => {
     ]
     for (const dt of [1 / 60, 1 / 24, 0.1]) {
       const m = restingMotion()
+      const span = workSpan(2)
       let mode: WorkStopMode = 'take'
-      let timer = 2
+      let timer = TASK_LOAD_HANDLING.takeSeconds
       let x = 0
       let kneels = true
       let kneltFully = false
       let walkedOff = false
-      for (let f = 0; f < 400; f++) {
+      // the whole stop, then a second of walking off
+      const frames = Math.ceil((TASK_LOAD_HANDLING.takeSeconds + span + RISE_SECONDS + TASK_LOAD_HANDLING.releaseSeconds + 1) / dt)
+      for (let f = 0; f < frames; f++) {
         if (mode !== 'back') {
-          const next = workStop(mode, timer, dt, 2)
+          const next = workStop(mode, timer, dt, span)
           mode = next.mode
           timer = next.timer
           kneels = next.kneels
