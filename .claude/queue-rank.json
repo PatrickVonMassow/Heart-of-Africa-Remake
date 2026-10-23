@@ -1716,6 +1716,12 @@
       "why": "follows 1427/1428 on the same children files; unowned WebGL-2 reds, not user-ranked",
       "origin": "machine",
       "place": "last"
+    },
+    "1435": {
+      "at": "2026-10-23T17:26:42.446Z",
+      "why": "WebGL-2-only follow-up split from the landed 1405; may wait until the next LARGE (CLAUDE.md 7.2), so it stays behind the user-report points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1745,7 +1751,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-23T16:20:39.428Z",
+    "at": "2026-10-23T17:26:42.454Z",
     "points": [
       184,
       200,
@@ -2203,7 +2209,6 @@
       1398,
       1399,
       1400,
-      1405,
       1414,
       1415,
       1416,
@@ -2221,7 +2226,8 @@
       1431,
       1432,
       1433,
-      1434
+      1434,
+      1435
     ]
   }
 }
