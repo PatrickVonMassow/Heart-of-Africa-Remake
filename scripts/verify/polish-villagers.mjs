@@ -3984,7 +3984,8 @@ if (section('water-stand-table')) {
           const k = vs.findIndex((v) => v.work?.situation === 'water-out' && v.work.phase === 'wait')
           if (k >= 0) {
             rec.who = k
-            window.__placeClearStand()
+            // One older jar stays, so the report must find the NEW jar, not slot 0.
+            window.__placeClearStand(1)
             scene.traverse((o) => { if (o.name === 'carried-jar-empty' && o.userData.villager === k) hand = o })
             for (let p = hand; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
           } else if (!vs.some((v) => v.work?.situation?.startsWith('water')) && now - rec.castAt > 2000) {
@@ -4024,20 +4025,24 @@ if (section('water-stand-table')) {
     // (a) The set-down: the frame the stand gains his jar.
     const down = S.findIndex((s, k) => k > 0 && s.jars > S[k - 1].jars)
     check('water stand table: he sets the full jar down standing at the table',
-      down > 0 && gap(S[down]) <= reach + 0.05,
-      down > 0 ? `${gap(S[down]).toFixed(2)} m from the stand's centre at the set-down (table reach ${reach.toFixed(2)} m; the old waiting ring is 2.4 m)` : 'no set-down seen')
+      down > 0 && gap(S[down]) <= reach + 0.05 && S[down].jars === 2,
+      down > 0 ? `${gap(S[down]).toFixed(2)} m from the stand's centre at the set-down (table reach ${reach.toFixed(2)} m; the old waiting ring is 2.4 m); stand ${S[down - 1].jars} -> ${S[down].jars} jars (one older jar kept)` : 'no set-down seen')
     // (c) The empty jar: drawn exactly once on every frame from the order until
     // he walks off with it, and never jumping — a pop is a move faster than any
     // hand moves it (the headless frames are slow, so it is judged as a speed),
     // and above all no gap where it leaves the plank for his hand.
     const order = S.findIndex((s) => s.phase === 'take')
     const off = S.findIndex((s, k) => k > order && s.phase === 'fetch')
+    // On through his first walking frames: a jar that jumps or vanishes as he
+    // sets off is the same defect.
+    let walkEnd = off
+    while (off > 0 && walkEnd < S.length && walkEnd < off + 30 && S[walkEnd].phase === 'fetch') walkEnd++
     let worst = { speed: 0, k: -1 }
     let swap = null
     let both = 0
     let none = 0
     let prev = null
-    for (let k = Math.max(0, order); k >= 0 && k < (off > 0 ? off : S.length); k++) {
+    for (let k = Math.max(0, order); k >= 0 && k < (off > 0 ? walkEnd : S.length); k++) {
       const s = S[k]
       if (s.spare && s.hand) both++
       const at = s.hand ?? s.spare
@@ -4054,7 +4059,7 @@ if (section('water-stand-table')) {
     const lifted = taking.reduce((m, s) => (s.spare && S[order].spare ? Math.max(m, Math.hypot(s.spare.x - S[order].spare.x, s.spare.y - S[order].spare.y, s.spare.z - S[order].spare.z)) : m), 0)
     check('water stand table: the empty jar is taken up from the plank, never appearing from nothing',
       order >= 0 && off > order && taking.length > 5 && both === 0 && none === 0 && swap !== null && swap <= 0.05 && worst.speed <= 4 && lifted > 0.1 && !!S[order].spare,
-      `order at frame ${order}, off the stand at ${off}; ${taking.length} take frames; jar lifted ${lifted.toFixed(2)} m off the plank before it is in his hand; ` +
+      `order at frame ${order}, off the stand at ${off}, walking checked to ${walkEnd}; ${taking.length} take frames; jar lifted ${lifted.toFixed(2)} m off the plank before it is in his hand; ` +
         `plank-to-hand gap ${swap == null ? 'never' : `${swap.toFixed(3)} m`}; fastest move ${worst.speed.toFixed(2)} m/s (frame ${worst.k}, ${worst.from ?? '-'}); ${both} frames with two jars, ${none} with none`)
     // (b) The report's pointing arm, held: its drawn line from the shoulder
     // through the hand against the water in the jar he set down.

@@ -3522,9 +3522,10 @@ function ErrandVillagers({
           : { who, progress, facing, anchors: people.map((p) => ({ x: p.x, z: p.z })) }
     }
     // Empties the water stand, so a browser check can watch one set-down add
-    // exactly one jar instead of meeting a stand already at its cap (work-order 1376).
-    w.__placeClearStand = () => {
-      work.standJars = 0
+    // exactly one jar instead of meeting a stand already at its cap (work-order 1376);
+    // `keep` leaves older jars standing, so the newest is not the first slot.
+    w.__placeClearStand = (keep = 0) => {
+      work.standJars = keep
     }
     return () => {
       delete w.__placeErrands
