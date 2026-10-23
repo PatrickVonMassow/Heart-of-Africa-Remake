@@ -880,4 +880,14 @@ describe('turn end with an absent switch state (cloud clone, 22.10.2026)', () =>
       expect(v.notice).toBe('')
     }
   })
+
+  it('only a genuinely missing file or lane key counts as absent; a null or malformed entry still refuses', () => {
+    expect(turnEndScarceState(readState(null, 'scarce')).refuse).toBe('')
+    expect(turnEndScarceState(readState('{"lanes":{}}', 'scarce')).refuse).toBe('')
+    for (const raw of ['{"lanes":{"scarce":null}}', '{"lanes":{"scarce":{"state":"off"}}}', '{"lanes":{"scarce":"on"}}']) {
+      const state = readState(raw, 'scarce')
+      expect(state.absent, raw).toBeUndefined()
+      expect(turnEndScarceState(state).refuse, raw).toMatch(/^SERVING-MODEL TRIPWIRE: /)
+    }
+  })
 })
