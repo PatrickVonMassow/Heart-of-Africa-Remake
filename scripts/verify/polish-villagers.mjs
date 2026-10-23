@@ -3907,9 +3907,10 @@ if (section('water-jar-carried')) {
         }, who, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null)
         await nextFrames(2)
         const after = await standReading()
-        // His stand spot is JOIN_STAND_OFF (2.4 m) from the stand's centre; half a
-        // metre over that plus his arrival reach still means "at the stand".
-        const atStand = !!flip && !flip.early && flip.carry === 'none' && flip.count === 1 && flip.gap <= 2.4 + flip.reach + 0.5
+        // He sets it down AT THE TABLE (work-order 1405): his table spot is
+        // `waterStandReach` from the stand's centre, plus his arrival reach.
+        const tableReach = await page.evaluate(() => window.__balance.waterStandReach)
+        const atStand = !!flip && !flip.early && flip.carry === 'none' && flip.count === 1 && flip.gap <= tableReach + flip.reach + 0.05
         check(`water jar (${body} body): the stand gains his jar only when he sets it down`,
           before === 0 && atStand && after.shown === after.count && after.count === 1,
           `${before} → ${after.count} set down, ${after.shown} shown; ` +
@@ -3922,6 +3923,159 @@ if (section('water-jar-carried')) {
   if (live) {
     await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
     await freezeLife(false)
+  }
+}
+
+// THE CARRIER AT THE TABLE (work-order 1405). The user saw the water carrier
+// set his jar down standing far off the stand, his report's hand not on the
+// water, and the next empty jar appear in his hand from nothing. One whole
+// errand is RECORDED frame by frame in the page (live, nothing frozen): where
+// he stands at the set-down, where the empty jar is drawn on every frame from
+// the order to his leaving the stand, and the drawn pointing arm's line against
+// the water in the jar he set down. Then a second errand is held at the take
+// and at the report for the picture.
+if (section('water-stand-table')) {
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.villagerCount = 10
+  })
+  await goToPlace('bambara-village')
+  const live = await page.evaluate(() => !!window.__placeErrands?.().geography.waterStand)
+  check('water stand table: the Bambara village has its water stand', live)
+  if (live) {
+    // The player a few metres off the stand on its landward side, inside the
+    // hearing radius, so the report's gesture is made at all.
+    const standView = () => page.evaluate(() => {
+      const g = window.__placeErrands().geography
+      const s = g.waterStand
+      const f = g.waterFoot ?? { x: s.x + 1, z: s.z }
+      const d = Math.hypot(f.x - s.x, f.z - s.z) || 1
+      const p = window.__placePlayer
+      p.x = s.x - ((f.x - s.x) / d) * 4.5
+      p.z = s.z - ((f.z - s.z) / d) * 4.5
+      p.yaw = Math.atan2(-(s.x - p.x), -(s.z - p.z))
+      p.pitch = -0.28
+      return { x: s.x, z: s.z }
+    })
+    const stand = await standView()
+    const recorded = await page.evaluate(() => new Promise((resolve) => {
+      const scene = window.__placeScene
+      const spare = scene.getObjectByName('stand-jar-empty')
+      const rows = []
+      scene.traverse((o) => { if (o.name === 'stand-jar') rows.push(o) })
+      const wp = (o) => { o.updateWorldMatrix(true, false); const e = o.matrixWorld.elements; return { x: e[12], y: e[13], z: e[14] } }
+      const shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true }
+      const rec = { who: null, samples: [], started: performance.now(), castAt: 0, cleared: false }
+      let hand = null
+      let inh = null
+      const tick = () => {
+        const now = performance.now()
+        if (now - rec.started > 240000) return resolve({ ...rec, timeout: true })
+        const e = window.__placeErrands()
+        const vs = e.villagers
+        if (rec.who == null) {
+          const k = vs.findIndex((v) => v.work?.situation === 'water-out' && v.work.phase === 'wait')
+          if (k >= 0) {
+            rec.who = k
+            window.__placeClearStand()
+            scene.traverse((o) => { if (o.name === 'carried-jar-empty' && o.userData.villager === k) hand = o })
+            for (let p = hand; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+          } else if (!vs.some((v) => v.work?.situation?.startsWith('water')) && now - rec.castAt > 2000) {
+            rec.castAt = now
+            window.__placeCastErrand('water-out')
+          }
+          return requestAnimationFrame(tick)
+        }
+        const v = vs[rec.who]
+        const arm = (s) => {
+          const up = inh?.getObjectByName(`bone-upperArm.${s === 'left' ? 'L' : 'R'}`)
+          const tip = inh?.getObjectByName(s === 'left' ? 'hand-left' : 'hand-right')
+          return up && tip ? { shoulder: wp(up), hand: wp(tip) } : null
+        }
+        const newest = e.standJars > 0 ? rows[Math.min(rows.length, e.standJars) - 1] : null
+        rec.samples.push({
+          t: now, x: v.x, z: v.z, yaw: v.yaw, phase: v.work?.phase ?? null, situation: v.work?.situation ?? (rec.endAt ? 'ended' : null),
+          arrived: v.work?.arrived ?? null, taking: v.work?.taking ?? null, carry: v.carry, jars: e.standJars,
+          spare: spare && shown(spare) ? wp(spare) : null,
+          hand: hand && shown(hand) ? wp(hand) : null,
+          gesture: v.gesture, arms: v.gesture?.kind ? { left: arm('left'), right: arm('right') } : null,
+          water: newest ? (() => { const p = wp(newest); return { x: p.x, y: p.y + 0.16, z: p.z } })() : null,
+        })
+        // On past the errand's end while his report's gesture still runs.
+        if (!v.work && rec.samples.some((s) => s.situation === 'water-back')) {
+          rec.endAt ??= now
+          if (now - rec.endAt > 3000) return resolve(rec)
+        }
+        if (!v.work && rec.samples.length > 30 && !rec.samples.some((s) => s.situation)) return resolve({ ...rec, lost: true })
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    }))
+    const S = recorded.samples
+    check('water stand table: one whole water errand was recorded', !!recorded.who || recorded.who === 0 ? !recorded.timeout && !recorded.lost : false,
+      `villager ${recorded.who}, ${S.length} frames${recorded.timeout ? ', timed out' : ''}${recorded.lost ? ', errand lost before the return' : ''}`)
+    const reach = await page.evaluate(() => window.__balance.waterStandReach + window.__balance.waterStandArrivalRadius)
+    const gap = (s) => Math.hypot(s.x - stand.x, s.z - stand.z)
+    // (a) The set-down: the frame the stand gains his jar.
+    const down = S.findIndex((s, k) => k > 0 && s.jars > S[k - 1].jars)
+    check('water stand table: he sets the full jar down standing at the table',
+      down > 0 && gap(S[down]) <= reach + 0.05,
+      down > 0 ? `${gap(S[down]).toFixed(2)} m from the stand's centre at the set-down (table reach ${reach.toFixed(2)} m; the old waiting ring is 2.4 m)` : 'no set-down seen')
+    // (c) The empty jar: drawn exactly once on every frame from the order until
+    // he walks off with it, and never jumping between two frames — measured
+    // against his own body, which carries a jar in the hand along with it.
+    const order = S.findIndex((s) => s.phase === 'take')
+    const off = S.findIndex((s, k) => k > order && s.phase === 'fetch')
+    let worst = { jump: 0, k: -1 }
+    let both = 0
+    let none = 0
+    let prev = null
+    for (let k = Math.max(0, order); k >= 0 && k < (off > 0 ? off : S.length); k++) {
+      const s = S[k]
+      if (s.spare && s.hand) both++
+      const at = s.hand ?? s.spare
+      if (!at) { none++; continue }
+      if (prev) {
+        const bx = s.hand && prev.hand ? s.x - S[k - 1].x : 0
+        const bz = s.hand && prev.hand ? s.z - S[k - 1].z : 0
+        const j = Math.hypot(at.x - prev.x - bx, at.y - prev.y, at.z - prev.z - bz)
+        if (j > worst.jump) worst = { jump: j, k, from: s.hand ? 'hand' : 'plank' }
+      }
+      prev = { ...at, hand: !!s.hand }
+    }
+    const taking = S.filter((s) => s.taking != null)
+    const lifted = taking.reduce((m, s) => (s.spare && S[order].spare ? Math.max(m, Math.hypot(s.spare.x - S[order].spare.x, s.spare.y - S[order].spare.y, s.spare.z - S[order].spare.z)) : m), 0)
+    check('water stand table: the empty jar is taken up from the plank, never appearing from nothing',
+      order >= 0 && off > order && taking.length > 10 && both === 0 && none === 0 && worst.jump < 0.15 && lifted > 0.1 && !!S[order].spare,
+      `order at frame ${order}, off the stand at ${off}; ${taking.length} take frames; jar lifted ${lifted.toFixed(2)} m off the plank before it is in his hand; ` +
+        `largest frame-to-frame move of the empty jar ${worst.jump.toFixed(3)} m (frame ${worst.k}, ${worst.from ?? '-'}); ${both} frames with two jars, ${none} with none`)
+    // (b) The report's pointing arm, held: its drawn line from the shoulder
+    // through the hand against the water in the jar he set down.
+    const held = S.filter((s) => (s.situation === 'water-back' || s.situation === 'ended') && s.gesture?.kind === 'indicate' && s.gesture.t > 1.75 &&
+      s.gesture.t < s.gesture.duration - 0.4 && s.arms && s.water && down > 0 && Math.hypot(s.x - S[down].x, s.z - S[down].z) < 0.1)
+    const misses = held.map((s) => {
+      const a = s.arms[s.gesture.side ?? 'left']
+      if (!a) return null
+      const d = [a.hand.x - a.shoulder.x, a.hand.y - a.shoulder.y, a.hand.z - a.shoulder.z]
+      const n = Math.hypot(...d)
+      const u = d.map((c) => c / n)
+      const w = [s.water.x - a.shoulder.x, s.water.y - a.shoulder.y, s.water.z - a.shoulder.z]
+      const along = w[0] * u[0] + w[1] * u[1] + w[2] * u[2]
+      return { off: Math.hypot(w[0] - along * u[0], w[1] - along * u[1], w[2] - along * u[2]), along, reach: Math.hypot(...w) }
+    }).filter(Boolean)
+    const worstMiss = misses.reduce((m, x) => (x.off > m.off ? x : m), { off: 0 })
+    check('water stand table: his report points at the water he set down',
+      misses.length > 5 && worstMiss.off <= 0.1 && misses.every((m) => m.along > 0),
+      `${misses.length} held frames; the arm's line passes the jar's water at most ${worstMiss.off.toFixed(3)} m off (${worstMiss.reach?.toFixed(2) ?? '?'} m out)`)
+    // A diagnostic dump only when asked for (no tracked file is written).
+    if (process.env.WATER_STAND_DUMP) appendFileSync(process.env.WATER_STAND_DUMP, JSON.stringify({ stand, reach, down: S[down], misses, worst, take: S.slice(Math.max(0, order - 2), order + 120) }) + '\n')
   }
 }
 

@@ -507,7 +507,7 @@ describe('the water carrier works AT the table (work-order 1405)', () => {
   function errandFrames() {
     const v = view(6)
     const state = createAdultWork(6, CFG)
-    const frames: Array<{ i: number; phase: string; carry: string; x: number; z: number; jars: number; arrived: boolean; dug: number }> = []
+    const frames: Array<{ i: number; phase: string; carry: string; x: number; z: number; jars: number; arrived: boolean; dug: number; spot: { x: number; z: number } | null }> = []
     const words: SpokenWord[] = []
     const dt = 1 / 60
     for (let f = 0; f < 240 * 60; f++) {
@@ -516,7 +516,7 @@ describe('the water carrier works AT the table (work-order 1405)', () => {
       if (word) words.push(word)
       state.tasks.forEach((t, i) => {
         if (t?.role === 'partner' && t.situation.startsWith('water')) {
-          frames.push({ i, phase: t.phase, carry: t.carry, x: v.villagers[i].x, z: v.villagers[i].z, jars: state.standJars, arrived: t.arrived, dug: t.dug })
+          frames.push({ i, phase: t.phase, carry: t.carry, x: v.villagers[i].x, z: v.villagers[i].z, jars: state.standJars, arrived: t.arrived, dug: t.dug, spot: t.standSpot })
         }
       })
     }
@@ -554,8 +554,9 @@ describe('the water carrier works AT the table (work-order 1405)', () => {
     const reports = words.filter((w) => w.id === 'water-back')
     expect(reports.length).toBeGreaterThan(0)
     for (const w of reports) {
-      const jars = frames.filter((f) => f.i === w.speaker).map((f) => f.jars).pop()!
-      expect(w.aim).toEqual(newestJarWater(STAND, FOOT, jars))
+      const mine = frames.filter((f) => f.i === w.speaker).pop()!
+      // The stand's front faces the carrier's own spot, where the jars are drawn.
+      expect(w.aim).toEqual(newestJarWater(STAND, mine.spot, mine.jars))
     }
   })
 })

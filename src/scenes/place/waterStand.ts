@@ -31,13 +31,13 @@ const ROW_SPREAD = 0.28
  *  front edge, the side the carrier works from (local +Z, toward the water). */
 const ROW_Z = [-0.17, -0.25] as const
 /** The empty jar waiting at the plank's front edge. */
-export const SPARE_JAR_LOCAL: Vec3 = [0, STAND_PLANK_TOP + JAR_HEIGHT / 2, 0.27]
+export const SPARE_JAR_LOCAL: Vec3 = [0, STAND_PLANK_TOP + JAR_HEIGHT / 2, 0.3]
 
-/** The stand's yaw (three.js `rotation.y`): its front, local +Z, toward the
- *  water path's foot — the side the carrier comes back from. */
-export function standYaw(stand: StandPoint, foot: StandPoint | null): number {
-  if (!foot) return 0
-  return Math.atan2(foot.x - stand.x, foot.z - stand.z)
+/** The stand's yaw (three.js `rotation.y`): its front, local +Z, toward
+ *  `front` — the water carrier's working spot (`waterErrandSpots`). */
+export function standYaw(stand: StandPoint, front: StandPoint | null): number {
+  if (!front) return 0
+  return Math.atan2(front.x - stand.x, front.z - stand.z)
 }
 
 /** A point in the stand's own frame, in world metres (the stand's group stands
@@ -55,10 +55,10 @@ export function standJarLocal(i: number, capacity = balance.waterStandCapacity):
 
 /** The water in the newest jar standing on the stand: the mouth of the last
  *  shown slot. `count` is the state's `standJars`; with none, the row's middle. */
-export function newestJarWater(stand: StandPoint, foot: StandPoint | null, count: number): { x: number; y: number; z: number } {
+export function newestJarWater(stand: StandPoint, front: StandPoint | null, count: number): { x: number; y: number; z: number } {
   const slot = Math.max(0, Math.min(balance.waterStandCapacity, count) - 1)
   const [x, y, z] = standJarLocal(slot)
-  return standToWorld(stand, standYaw(stand, foot), [x, y + JAR_HEIGHT / 2, z])
+  return standToWorld(stand, standYaw(stand, front), [x, y + JAR_HEIGHT / 2, z])
 }
 
 /**
@@ -141,14 +141,15 @@ export function takePose(progress: number, aim: { bearing: number; elevation: nu
  * missed a jar a metre away by that half-width. The side is the one the
  * centre's bearing picks; the bearing and elevation are solved from that
  * shoulder, and the side is returned so the gesture keeps it even where the
- * corrected bearing crosses the centre line.
+ * corrected bearing crosses the centre line. `arm` names the side instead.
  */
 export function shoulderAim(
   figure: { x: number; z: number; yaw: number },
   target: { x: number; y: number; z: number },
   shoulder: { y: number; x: number },
+  arm?: ArmSide,
 ): { bearing: number; elevation: number; side: ArmSide } {
-  const side = gestureArm(aimAt(figure, target, shoulder.y).bearing)
+  const side = arm ?? gestureArm(aimAt(figure, target, shoulder.y).bearing)
   const lx = side === 'left' ? shoulder.x : -shoulder.x
   // The figure's local +X in the world, under the codebase's yaw convention
   // (local +Z onto (sin yaw, cos yaw)).
@@ -158,4 +159,15 @@ export function shoulderAim(
     yaw: figure.yaw,
   }
   return { ...aimAt(at, target, shoulder.y), side }
+}
+
+/** `shoulderAim` with the side the centre's bearing picks and that side's own
+ *  drawn shoulder (`shoulderOf`), for a body whose two shoulders are measured. */
+export function aimFromShoulder(
+  figure: { x: number; z: number; yaw: number },
+  target: { x: number; y: number; z: number },
+  shoulderOf: (side: ArmSide) => { x: number; y: number },
+): { bearing: number; elevation: number; side: ArmSide } {
+  const side = gestureArm(aimAt(figure, target, shoulderOf('left').y).bearing)
+  return shoulderAim(figure, target, shoulderOf(side), side)
 }

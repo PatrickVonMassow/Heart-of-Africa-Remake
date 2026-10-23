@@ -377,7 +377,7 @@ function anotherFree(view: AdultWorkView, first: number): number {
  * (work-order 1087). Two men at one place block each other, and neither is then
  * counted as arrived.
  */
-function facingSpot(view: AdultWorkView, site: ErrandPoint, taken: ErrandPoint): ErrandPoint | null {
+function facingSpot(view: Pick<AdultWorkView, 'standable'>, site: ErrandPoint, taken: ErrandPoint): ErrandPoint | null {
   const away = Math.atan2(site.z - taken.z, site.x - taken.x)
   for (let k = 0; k < JOIN_BEARINGS; k++) {
     const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / JOIN_BEARINGS)
@@ -388,6 +388,26 @@ function facingSpot(view: AdultWorkView, site: ErrandPoint, taken: ErrandPoint):
     if (view.standable(x, z)) return { x, z }
   }
   return null
+}
+
+/**
+ * The two water errand spots beside the stand (work-order 1087/1245): the
+ * sender's on the side away from the water, the carrier's swept from straight
+ * opposite it. Fixed by the ground alone, so the stand can turn the front of
+ * its plank — where the empty jar waits — to the carrier's side (1405).
+ */
+export function waterErrandSpots(
+  view: Pick<AdultWorkView, 'standable'>,
+  g: AdultWorkGeography,
+): { senderSpot: ErrandPoint; carrierSpot: ErrandPoint } | null {
+  if (!g.waterStand || !g.waterFoot) return null
+  const senderSpot = facingSpot(view, g.waterStand, g.waterFoot)
+  if (!senderSpot) return null
+  // The carrier takes the FAR side, swept from straight opposite the sender:
+  // drawing a second spot at random gave the same one wherever the caller's
+  // rand is steady, and two men on one spot block each other.
+  const carrierSpot = facingSpot(view, g.waterStand, senderSpot)
+  return carrierSpot ? { senderSpot, carrierSpot } : null
 }
 
 /** Another free adult to carry the water, with none of DIG's invitation
@@ -503,7 +523,8 @@ function readyWord(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: 
     // Said TO the sender, POINTED AT the water just set down (work-order 1405):
     // the hand names what was fetched, and the sender stands across the table.
     const g = view.geography
-    const aim = g.waterStand ? newestJarWater(g.waterStand, g.waterFoot, state.standJars) : null
+    // The stand's front faces the carrier's own spot (waterErrandSpots).
+    const aim = g.waterStand ? newestJarWater(g.waterStand, t.standSpot, state.standJars) : null
     return sender && aim ? { id: t.situation, concept: 'RIVER', speaker: i, aim } : null
   }
   if (t.role === 'initiator' && t.phase === 'invite' && t.arrived && mate) {
@@ -820,13 +841,9 @@ export function stepAdultWork(
       // the side away from the water and points past the stand at the river.
       // One draw is still taken, so every later draw of the stream is unchanged.
       rand()
-      const senderSpot = facingSpot(view, stand, g.waterFoot)
-      if (!senderSpot) continue
-      // The carrier takes the FAR side, swept from straight opposite the sender:
-      // drawing a second spot at random gave the same one wherever the caller's
-      // rand is steady, and two men on one spot block each other.
-      const carrierSpot = facingSpot(view, stand, senderSpot)
-      if (!carrierSpot) continue
+      const spots = waterErrandSpots(view, g)
+      if (!spots) continue
+      const { senderSpot, carrierSpot } = spots
       state.tasks[sender] = {
         situation: id, phase: 'send', carry: 'none', role: 'initiator', partner: carrier,
         siteIndex: null, orderedBy: null, standSpot: senderSpot,
