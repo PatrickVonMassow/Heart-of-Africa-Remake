@@ -65,6 +65,42 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: one whole water errand was recorded/i,
+    detailMatch: /timed out/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: he sets the full jar down standing at the table/i,
+    detailMatch: /no set-down seen/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: his report points at the water he set down/i,
+    detailMatch: /^0 held frames/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: the empty jar is taken up from the plank/i,
+    detailMatch: /fastest in his first steps 6\.66 m\/s/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
     point: 1340,
     suite: 'polish-children',
     kind: 'check',
