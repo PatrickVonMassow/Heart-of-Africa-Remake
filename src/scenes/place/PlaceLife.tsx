@@ -3102,9 +3102,7 @@ function ErrandVillagers({
           // a fresh stroll used to swing the body round between two frames. A
           // way far off its heading slows it nearly to a stand while it turns.
           // The step stays the way round bodies and walls, only shortened by
-          // that pace: stepped along the turned heading instead, it walked into
-          // the body it was routing round and the separation shoved it off at
-          // up to 8 m/s, drawn as a sprint in mid-air (point 1404 oddity).
+          // that pace, so the turn never walks it into a body it routes round.
           const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
           yaws.current[i] = turn.yaw
           faceTo.current[i] = null

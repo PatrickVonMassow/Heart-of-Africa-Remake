@@ -1944,6 +1944,8 @@ if (section('adult-errands')) {
     e.intervalSeconds = 0.8
     e.dwellSeconds = 1
     e.digSeconds = 3
+    // the shipped pace, for the moving capture and the gait census (point 1404)
+    window.__errandShippedPace = e.pace
     e.pace = 6
     // Keep the measured ten-adult standalone setup. How many errands this
     // window then sees is no longer left to luck: it casts them itself and
@@ -1991,6 +1993,11 @@ if (section('adult-errands')) {
       swings.worst.over <= 1e-6,
       JSON.stringify(swings),
     )
+    // The capture and the census below run at the SHIPPED errand pace: at this
+    // window's calibrated 6 m/s every errand adult is rightly drawn in a sprint,
+    // and that sprint was the mid-air flight of the first capture (frame-jump
+    // telemetry, 23.10.2026: worst jump exactly 6.0 m/s, no shove, no escape).
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = window.__errandShippedPace })
     // THE MOVING CAPTURE the point is judged by (point 1404): one walking adult
     // whose heading is far off its next way, four frames about 0.3 s apart, the
     // camera FOLLOWING that one body (4 m off its first flank, re-placed per
@@ -2069,6 +2076,7 @@ if (section('adult-errands')) {
         }),
     )
     check('no village adult on an errand is drawn in a sprint (point 1404 flight oddity)', flight.adults > 0 && flight.gaitSeen === flight.adults && flight.sprint < 0.5, JSON.stringify(flight))
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared
