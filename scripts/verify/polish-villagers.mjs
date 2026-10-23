@@ -2028,14 +2028,17 @@ if (section('adult-errands')) {
         p.yaw = side
         p.pitch = -0.15
       }
-      // The first placement jumps the camera across the village; the drawn
-      // view needs a few frames to arrive there (frame 1 of 23.10.2026 03:34
-      // showed only water, the turner at the edge or outside it).
+      // Frame 1 once showed only water (23.10.2026, both backends): the first
+      // view of this spot stalls the shutter while the turner walks on out of
+      // it. Village life is held still from the camera placement to the
+      // exposure, as for the fill shot (point 1108).
       await page.evaluate(follow, { i: turner, side: side0 })
       await nextFrames(8)
       for (const k of [1, 2, 3, 4]) {
         await page.evaluate(follow, { i: turner, side: side0 })
         await nextFrames(2)
+        await freezeLife(true)
+        await page.evaluate(follow, { i: turner, side: side0 })
         const at = await page.evaluate((i) => {
           const v = window.__placeErrands().villagers[i]
           const way = v.work ? Math.atan2(v.work.x - v.x, v.work.z - v.z) : null
@@ -2045,10 +2048,14 @@ if (section('adult-errands')) {
         const g = at.gait ? `walk ${at.gait.walk.toFixed(2)} jog ${at.gait.jog.toFixed(2)} sprint ${at.gait.sprint.toFixed(2)}` : 'no gait'
         const label = `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`
         console.log(label)
-        await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
-          local: { x: at.x, y: 0.9, z: at.z },
-          label,
-        })
+        try {
+          await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
+            local: { x: at.x, y: 0.9, z: at.z },
+            label,
+          })
+        } finally {
+          await freezeLife(false)
+        }
         // the next frame once the turner has walked on about 0.35 m (≈0.3 s)
         await page
           .waitForFunction(({ i, x, z }) => {
