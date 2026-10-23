@@ -381,7 +381,7 @@ export function SkinnedFigure({
   // last reach while the clips take it back, so the release never snaps.
   const releasing = useRef<[number | null, number | null]>([null, null])
   const lastReach = useRef<[number | null, number | null]>([null, null])
-  // the pose's arm angles when its reach was given up: a later change is a new gesture
+  // the pose's arm angles on the reach's last frame: a later change is a new gesture
   const releasedAt = useRef<[ArmAngles | null, ArmAngles | null]>([null, null])
   const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
   const owned = !!(pose && limbs)
@@ -471,12 +471,11 @@ export function SkinnedFigure({
       const reachOfPose = (i: number) => (i === 0 ? extras?.reach?.left : extras?.reach?.right)
       for (const i of [0, 1] as const) {
         const k = reachOfPose(i)
-        if (k !== undefined) releasing.current[i] = null
-        else if (lastReach.current[i] !== null && gltf && clips) {
-          releasing.current[i] = lastReach.current[i]
-          const v = arms.current[i]
+        const v = arms.current[i]
+        if (k !== undefined) {
+          releasing.current[i] = null
           releasedAt.current[i] = v ? { pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z } : null
-        }
+        } else if (lastReach.current[i] !== null && gltf && clips) releasing.current[i] = lastReach.current[i]
         lastReach.current[i] = k ?? null
       }
       const reachFor = (i: number) => reachOfPose(i) ?? releasing.current[i] ?? undefined

@@ -73,4 +73,10 @@ describe('a released pose reach', () => {
     const fresh = await handAfter([gesture, gesture, gesture])
     expect(afterRelease.distanceTo(fresh)).toBeLessThan(0.01)
   }, 60_000)
+
+  it('gives it back as well when the gesture comes on the very frame the reach ends', async () => {
+    const direct = await handAfter([take, gesture, gesture])
+    const fresh = await handAfter([gesture, gesture, gesture])
+    expect(direct.distanceTo(fresh)).toBeLessThan(0.01)
+  }, 60_000)
 })
