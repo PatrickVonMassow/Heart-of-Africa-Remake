@@ -241,7 +241,7 @@ describe('derived distribution paragraphs', () => {
     expect(concisenessOffenders(html)[0].reason).toMatch(/^one long unbroken paragraph \(70 words\)/)
   })
   it('does not count the line against a card body near its budget', () => {
-    const html = boardHtml({ queue: [{ n: 12, body: `<p>${lorem(40)}</p><p>${lorem(40)}</p>${dist}` }] })
+    const html = boardHtml({ queue: [{ n: 12, body: `<p>${lorem(45)}</p><p>${lorem(45)}</p>${dist}` }] })
     expect(concisenessOffenders(html)).toEqual([])
   })
 })
