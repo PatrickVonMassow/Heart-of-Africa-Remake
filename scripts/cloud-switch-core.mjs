@@ -193,8 +193,11 @@ export function venueInstruction(route) {
   if (route.venue === 'cloud') {
     return (
       'CLOUD SWITCH ON (node scripts/cloud-switch.mjs --status): start every Claude-lane authoring ' +
-      'delegation — Agent-tool children and cleanup/union chunks — as a cloud session (Agent ' +
-      '`isolation: "remote"`): its own clone, its own feat/<point>-<slug> branch, push after every ' +
+      'delegation, cleanup/union chunks included, as a cloud session — `script -qfc "claude --cloud ' +
+      '\'<brief>\'" <log>` creates it and returns at once with its session id; read its progress with ' +
+      'RemoteTrigger get_run_log <session id> and message it with `claude -p "<message>" --cloud ' +
+      '<session id>`. Never Agent `isolation: "remote"`: measured 24.10.2026 to run in a local ' +
+      'worktree. The session has its own clone, its own feat/<point>-<slug> branch, push after every ' +
       'commit, the brief in the prompt or a tracked file (local/ is not in the clone). Before handing ' +
       'over, the delegate runs build, lint and Vitest on its branch and hands over the pushed sha, the ' +
       'three gate results and open issues. Locally the owner then runs only the covering browser tier ' +

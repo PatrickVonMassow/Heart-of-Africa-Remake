@@ -136,6 +136,13 @@ recorded marker whose host differs from this container (`--record-probe <ref>`)
 plus the user's confirmation that the cloud credit balance dropped. Until both
 stand, `--venue` routes every authoring delegation locally.
 
+Re-probe, 24.10.2026 (point 1439): `isolation: "remote"` again ran in
+`.claude/worktrees/agent-…` on host `66a0eaaacb4b`. The CLI path works instead:
+`claude --cloud '<brief>'` under a pseudo-terminal created session
+`session_019CayQyCc3CUhUEMqHA7kKG`, which reported host `vm` and cwd
+`/home/user/Heart-of-Africa-Remake`. The start procedure lives in
+`docs/lane-routing.md` ("Cloud start of Claude-lane authoring").
+
 ## 7. The volume of a verify run's output — BUILT (no primitive)
 
 Our gap, and the one both models named in the 30.07.2026 four-eyes review: a

@@ -121,8 +121,8 @@ describe('the routing read', () => {
     expect(authoringVenue(readState('{'))).toMatchObject({ venue: 'local' })
   })
 
-  it('the cloud instruction names remote isolation and the pool slot', () => {
-    expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(/isolation: "remote".*pool slot/s)
+  it('the cloud instruction names the claude --cloud start, warns off remote isolation, and names the pool slot', () => {
+    expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(/claude --cloud.*get_run_log.*Never Agent `isolation: "remote"`.*pool slot/s)
     expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(
       /build, lint and Vitest.*pushed sha.*both backends when isBackendSensitivePath.*later local unit result contradicting it is filed as a finding/s,
     )
