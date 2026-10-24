@@ -34793,3 +34793,9 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Queue position: front (user 24.10.2026 00:03: "ja, so einreihen und direkt erledigen").
   Source: user request 24.10.2026 via the findings carrier, spec cut from fee8a65c2; approved: "ja, so einreihen und direkt erledigen".
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1440. Board work cards show who built and reviewed a point, and where
+  Final state: every work card's details carry a section "Verteilung" with one fixed-form line, e.g. "Bau: Opus 5.5 · Cloud | Prüfung: GPT-6.1 Sol" ("offen" for a part still pending). The line is derived from the recorded delegation venue, the cross-review records and the commit trailers, never hand-typed. A Vitest covers a local build, a cloud build and a pending review.
+  Queue position: directly after 1438 (user order: first the cloud start, then 1438, then this card change).
+  Source: user request 24.10.2026 via the findings carrier; approved verbatim: "Ja, den Kartenumbau so einreihen. Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio." Title shown to the user: "Karten-Details: Abschnitt Verteilung mit Bau- und Prüfmodell und Ort (lokal/Cloud) aus den Protokollen".
+  Bundle: Session- & Repo-Hygiene.

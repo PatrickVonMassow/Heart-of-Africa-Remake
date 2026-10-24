@@ -77,11 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1440. Board work cards show who built and reviewed a point, and where
-  Final state: every work card's details carry a section "Verteilung" with one fixed-form line, e.g. "Bau: Opus 5.5 · Cloud | Prüfung: GPT-6.1 Sol" ("offen" for a part still pending). The line is derived from the recorded delegation venue, the cross-review records and the commit trailers, never hand-typed. A Vitest covers a local build, a cloud build and a pending review.
-  Queue position: directly after 1438 (user order: first the cloud start, then 1438, then this card change).
-  Source: user request 24.10.2026 via the findings carrier; approved verbatim: "Ja, den Kartenumbau so einreihen. Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio." Title shown to the user: "Karten-Details: Abschnitt Verteilung mit Bau- und Prüfmodell und Ort (lokal/Cloud) aus den Protokollen".
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1441. Launcher-daemon HANGING-send test reddens fast gates under load
   Final state: `scripts/batch-launcher-daemon.test.mjs` "a HANGING send loses to its budget" no longer depends on wall-clock time under machine load: it drives the alert budget with fake timers or an injected clock, so the full `test:unit` and the land-point fast gate never time it out. The test still proves the loop keeps ticking and sends no recovery notice after a hanging send.
   Observed problem: passes alone in 1.2 s, but timed out in the full unit run on 20.10.2026 (point 1345), 22.10.2026 06:57 and 24.10.2026 02:3x (land-point fast gate of point 1439, run in parallel with build and lint). The backlog entry said: a point once it reddens a second gate.
