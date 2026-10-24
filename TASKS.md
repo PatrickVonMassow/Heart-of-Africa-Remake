@@ -77,12 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1441. Launcher-daemon HANGING-send test reddens fast gates under load
-  Final state: `scripts/batch-launcher-daemon.test.mjs` "a HANGING send loses to its budget" no longer depends on wall-clock time under machine load: it drives the alert budget with fake timers or an injected clock, so the full `test:unit` and the land-point fast gate never time it out. The test still proves the loop keeps ticking and sends no recovery notice after a hanging send.
-  Observed problem: passes alone in 1.2 s, but timed out in the full unit run on 20.10.2026 (point 1345), 22.10.2026 06:57 and 24.10.2026 02:3x (land-point fast gate of point 1439, run in parallel with build and lint). The backlog entry said: a point once it reddens a second gate.
-  Queue position: directly after 1440 (it reddens landings).
-  Source: docs/backlog.md entries of 20.10. and 22.10.2026 plus the 24.10.2026 gate; real blockade of landings (CLAUDE.md §2 finding intake).
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1442. polish-villagers villager-dress hangs on WebGPU in its cost probe
   Final state: `npm test -- polish-villagers --section=villager-dress` with VERIFY_GL=webgpu ends on its own (pass or a named red) within its measured runtime; the cost probe loop (`scripts/verify/polish-villagers.mjs`, `DRESS_COST` villages) records a `cost` row per village on WebGPU in `local/verify-measure/villager-dress.jsonl`, and every wait inside it (awaitPlaceDrawn, awaitGltfBody, the 61-frame rAF sampler) has a timeout that reports which village and level it stuck on instead of hanging. Then the full polish-villagers suite runs to its end on both backends, which is the covering run render-verify-guard owes for the village render commits since 460b010.
   Observed problem: on 24.10.2026 the full WebGPU run was killed at the 45-min and then the 90-min wall timeout; the section alone is killed at 8 min. All dress frames and every `row-hidden` record are written (last frame 1294-dress-<people>), but no WebGPU `cost` record exists at all (the only ones are WebGL, 18.10.2026); `--section=village-walk` passes in 3 min 34 s.
