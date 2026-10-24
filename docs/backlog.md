@@ -2220,3 +2220,4 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
   - `scripts/rule-echo-guard.mjs:140`, `scripts/queue-rank-core.mjs:493,539` and `scripts/board-currency-core.mjs:325` attribute a fail-open rule to CLAUDE.md §7.2, which has none.
   - The rule-echo stamp on memory `fable-sparingly` read "ok" while that memory was stale; a stamp proves the hash, not the content.
   - The reply timestamp is enforced twice at turn end (project `timestamp-guard` and the user-global `check-reply-timestamp.cjs`).
+- Cloud clone reds 10 Vitest cases that pass locally (finding 24.10.2026 03:37): the 1440 cloud author saw `scripts/container-entrypoint.test.mjs` (6) and `scripts/land-point-runner.test.mjs` (4) red in its clone, also on main 1ce3814; locally 615/615 files green. Environment-sensitive under the cloud clone; the local gate stays the decider, so no blockade — fix when a cloud delegate's handover is misread because of it.
