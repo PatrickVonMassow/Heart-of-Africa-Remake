@@ -1,5 +1,10 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  CLOUD_START_COMMAND,
   authoringVenue,
   probeVerdict,
   readState,
@@ -121,12 +126,25 @@ describe('the routing read', () => {
     expect(authoringVenue(readState('{'))).toMatchObject({ venue: 'local' })
   })
 
-  it('the cloud instruction names remote isolation and the pool slot', () => {
-    expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(/isolation: "remote".*pool slot/s)
+  it('the cloud instruction names the claude --cloud start, warns off remote isolation, and names the pool slot', () => {
+    expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(/claude --cloud.*get_run_log.*Never Agent `isolation: "remote"`.*pool slot/s)
     expect(venueInstruction({ venue: 'cloud', notice: '' })).toMatch(
       /build, lint and Vitest.*pushed sha.*both backends when isBackendSensitivePath.*later local unit result contradicting it is filed as a finding/s,
     )
     expect(venueInstruction({ venue: 'local', notice: '' })).toMatch(/local worktrees/)
+  })
+
+  it('the cloud start command hands a brief with quotes and substitutions over verbatim', () => {
+    expect(venueInstruction({ venue: 'cloud', notice: '' })).toContain(CLOUD_START_COMMAND)
+    const dir = mkdtempSync(join(tmpdir(), 'cloud-start-'))
+    const brief = `Fix the player's map "now" $(touch ${join(dir, 'expanded')}) \`id\``
+    writeFileSync(join(dir, 'brief.txt'), brief)
+    // The pseudo-terminal wrapper and the CLI are swapped for sh and printf; the quoting is what is tested.
+    const command = CLOUD_START_COMMAND.replace('<brief file>', join(dir, 'brief.txt'))
+      .replace("script -qfc '", "sh -c '")
+      .replace(' <log>', '')
+      .replace('claude --cloud', 'printf %s')
+    expect(execFileSync('sh', ['-c', command], { encoding: 'utf8' })).toBe(brief)
   })
 })
 
