@@ -103,6 +103,28 @@ describe('the commit-msg model-trailer gate', () => {
     expect(judge(withTrailer('Co-Authored-By: Patrick von Massow <patrick@example.com>')).status).toBe(0)
   })
 
+  it('judges a never-recorded lane switch state OFF, and refuses a garbled one', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'hoa-model-trailer-'))
+    try {
+      const message = resolve(dir, 'COMMIT_EDITMSG')
+      writeFileSync(message, withTrailer(`Co-Authored-By: ${trailerFor('main')}`), 'utf8')
+      const run = (file) =>
+        spawnSync(process.execPath, [GATE, '--message', message], {
+          windowsHide: true,
+          encoding: 'utf8',
+          env: { ...process.env, LANE_SWITCH_FILE: file },
+        })
+      const absent = run(resolve(dir, 'no-lane-switch.json'))
+      expect(absent.status, absent.stderr).toBe(0)
+      expect(absent.stderr).toContain('judged OFF')
+      const garbled = resolve(dir, 'lane-switch.json')
+      writeFileSync(garbled, '{not json')
+      expect(run(garbled).status).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('never blocks on a missing or unnamed message file', () => {
     const missing = spawnSync(process.execPath, [GATE, '--message', resolve(tmpdir(), 'no-such-msg')], {
       windowsHide: true,

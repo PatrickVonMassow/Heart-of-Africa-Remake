@@ -233,3 +233,15 @@ describe('description/status split', () => {
     expect(concisenessOffenders(status)[0].reason).toMatch(/^one long unbroken paragraph \(70 words\)/)
   })
 })
+
+describe('derived distribution paragraphs', () => {
+  const dist = '<p class="dist-head">Verteilung</p><p class="dist">Bau: Opus 5.5 · Cloud | Prüfung: offen</p>'
+  it('still flags a long single paragraph on a card without the divider', () => {
+    const html = boardHtml({ queue: [{ n: 11, body: `<p>${lorem(70)}</p>${dist}` }] })
+    expect(concisenessOffenders(html)[0].reason).toMatch(/^one long unbroken paragraph \(70 words\)/)
+  })
+  it('does not count the line against a card body near its budget', () => {
+    const html = boardHtml({ queue: [{ n: 12, body: `<p>${lorem(45)}</p><p>${lorem(45)}</p>${dist}` }] })
+    expect(concisenessOffenders(html)).toEqual([])
+  })
+})
