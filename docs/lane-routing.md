@@ -388,9 +388,11 @@ With the cloud switch ON, a Claude-lane authoring delegation starts as a cloud
 session from the CLI, never through Agent `isolation: "remote"`, which ran in a
 local worktree on every probe (07.08., 29.09. and 24.10.2026):
 
-- Start: `script -qfc "claude --cloud '<brief>'" <log>`. `--cloud` refuses
-  `--print`, so the pseudo-terminal carries the interactive start; the call
-  returns within seconds and the log names the session id and its claude.ai link.
+- Start: `BRIEF="$(cat <brief file>)" script -qfc 'claude --cloud "$BRIEF"' <log>`.
+  `--cloud` refuses `--print`, so the pseudo-terminal carries the interactive
+  start; the brief passes through the environment, so quotes and `$(…)` in it
+  stay text. The call returns within seconds and the log names the session id
+  and its claude.ai link.
 - Follow: RemoteTrigger `get_run_log` with that session id (provisioning, clone,
   tool calls, results). Message: `claude -p "<message>" --cloud <session id>`.
 - The cloud clone runs this repository's hooks, so its replies carry the chat

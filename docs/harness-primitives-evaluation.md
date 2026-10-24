@@ -110,7 +110,7 @@ Verdict: **narrowed, not retired.**
 
 So: the *wait* is the primitive's, the *survivorship judgement* stays ours.
 
-## 6. Remote execution — CHECKED, and NOT available here
+## 6. Remote execution — Agent isolation local; `claude --cloud` works (24.10.2026)
 
 What it would buy: the one layer that survives a dead machine or a dead line —
 the residual the user knowingly accepted when he declined a paid API key for the
@@ -122,7 +122,7 @@ It reported `Linux …-microsoft-standard-WSL2, x86_64, not remote` on a branch
 not grant remote execution, and — the part worth remembering — **it did not fail
 loudly either**; the call succeeded and silently degraded.
 
-Verdict: **not available; the residual stands.** Two consequences: do not plan a
+Verdict (07.08.2026, for Agent `isolation: "remote"`): **not available; the residual stands.** Two consequences: do not plan a
 resilience layer on remote execution without re-probing first, and never infer
 from a successful `isolation: "remote"` call that the work is off this machine —
 ask the agent where it is (`uname -a`), which is what this probe did.
@@ -141,7 +141,8 @@ Re-probe, 24.10.2026 (point 1439): `isolation: "remote"` again ran in
 `claude --cloud '<brief>'` under a pseudo-terminal created session
 `session_019CayQyCc3CUhUEMqHA7kKG`, which reported host `vm` and cwd
 `/home/user/Heart-of-Africa-Remake`. The start procedure lives in
-`docs/lane-routing.md` ("Cloud start of Claude-lane authoring").
+`docs/lane-routing.md` ("Cloud start of Claude-lane authoring"). Remote execution
+is therefore available through the CLI path only; Agent isolation stays local.
 
 ## 7. The volume of a verify run's output — BUILT (no primitive)
 

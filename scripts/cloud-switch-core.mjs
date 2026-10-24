@@ -188,13 +188,17 @@ export function authoringVenue(value, { cloudReachable = !value?.unreachable } =
   return { venue: 'cloud', notice: '' }
 }
 
+// The brief travels in an environment variable: `--cloud` refuses `--print`, so `script`
+// supplies the terminal, and nesting the brief in its quoted command broke on an apostrophe.
+export const CLOUD_START_COMMAND = `BRIEF="$(cat <brief file>)" script -qfc 'claude --cloud "$BRIEF"' <log>`
+
 /** The delegation instruction for one venue, as the resume hook and `--venue` print it. */
 export function venueInstruction(route) {
   if (route.venue === 'cloud') {
     return (
       'CLOUD SWITCH ON (node scripts/cloud-switch.mjs --status): start every Claude-lane authoring ' +
-      'delegation, cleanup/union chunks included, as a cloud session — `script -qfc "claude --cloud ' +
-      '\'<brief>\'" <log>` creates it and returns at once with its session id; read its progress with ' +
+      `delegation, cleanup/union chunks included, as a cloud session — \`${CLOUD_START_COMMAND}\` ` +
+      'creates it and returns at once with its session id; read its progress with ' +
       'RemoteTrigger get_run_log <session id> and message it with `claude -p "<message>" --cloud ' +
       '<session id>`. Never Agent `isolation: "remote"`: measured 24.10.2026 to run in a local ' +
       'worktree. The session has its own clone, its own feat/<point>-<slug> branch, push after every ' +
