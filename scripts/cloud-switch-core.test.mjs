@@ -144,7 +144,7 @@ describe('the routing read', () => {
       .replace("script -qfc '", "sh -c '")
       .replace(' <log>', '')
       .replace('claude --cloud', 'printf %s')
-    expect(execFileSync('sh', ['-c', command], { encoding: 'utf8' })).toBe(brief)
+    expect(execFileSync('sh', ['-c', command], { encoding: 'utf8', windowsHide: true })).toBe(brief)
   })
 })
 
