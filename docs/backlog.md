@@ -2175,7 +2175,6 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 - Tag chaser chest gaze jumps at the bearing wrap (19.10.2026, point 1384 author): `chestYaw * bearing` in `src/scenes/place/tagGame.ts` still jumps by chestYaw·2π when the quarry crosses straight behind the chaser; 1384 unwrapped only the readied arm (`holdBearing`). Unmeasured on screen.
 - Board cards fall back to the English work-order final-state sentence (board-core.mjs pointDescription fallback) although a German body stands in .claude/board-queue.json, and the closing status repeats the card subject (findings carrier 19.10.2026 22:50; proposal a-c awaits the user approval in the chat session).
 - Hint toast sits inside the status bar on the victory frame (20.10.2026, flow on WebGPU): `verification/07-victory.png` shows the swim hint toast at y≈16 over the location text "Norden · …", while `04-chief-hut-meeting.png` places its toast below the bar (y≈70). Seen only under the victory veil; becomes a point once an in-play frame shows the overlap.
-- Launcher-daemon HANGING-send test times out under full unit load (20.10.2026, point 1345 unit run): `scripts/batch-launcher-daemon.test.mjs` "a HANGING send loses to its budget" hit its 30 s timeout once in the full `test:unit` (1 of 17872) and passes alone in 1.2 s. Load-sensitive wall-clock wait; a point once it reddens a second gate (fake timers or a load-independent budget).
 - WebGL 2 walker frame passed with an orange slab across the walker (20.10.2026, point 1330): `verification/1295-village-walker-mid-stride-webgl2.png` (11:21) shows a near-lens orange slab over the walker's torso and arms, yet the side-on free-spot check accepted it; the feet stay visible. Possible false approval of that frame's occlusion probe — a point once a second frame shows it.
 - Blocked villager walker jitters ~2 cm per frame (20.10.2026, point 1330 author, sample dump): a walker blocked by another body oscillates back and forth while nearly standing (collision/separation). Not seen in play yet.
 - `village-walk` arm-swing check reddened once on WebGL 2 (20.10.2026, point 1330 diagnostic run, pre-fix code): armVsLeg −0.61 together with the camera free-spot side-on check; not reproduced in later green runs.
@@ -2186,7 +2185,6 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
   no player impact, collected here.
 
 - mechanism-review-guard `--status` passes on a git ENOBUFS crash (finding 22.10.2026 06:57) — should fail loud.
-- batch-launcher-daemon test "a HANGING send loses to its budget" timed out under load (finding 22.10.2026 06:57) — load-sensitive timeout.
 - From the 1393 review: unlocked lane-switch read-modify-write; criticality fixture same-vendor review; cross-review `--brief` plan spends a round (finding 22.10.2026 06:57).
 - The 1402 interleave test (src/render/villagerClipPose.test.ts:583) passes trivially without a toe-release frame; assert a release-frame count > 0 (Fable 5.1 review, 22.10.2026).
 
