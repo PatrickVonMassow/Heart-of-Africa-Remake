@@ -16,10 +16,10 @@
 // switch state and prints the refusal. FAIL-OPEN on an internal error, like
 // every gate here — a broken gate must never make the tree uncommittable — while
 // a real finding fails CLOSED, which is the whole point. An unreadable or
-// invalid lane switch state is not an internal error: it is a missing policy
-// and refuses the commit.
+// invalid lane switch state is not an internal error: it is a broken policy
+// and refuses the commit. A state never recorded is judged OFF instead.
 import { readFileSync } from 'node:fs'
-import { evaluateCommitTrailers, formatCommitTrailerVerdict } from './model-guard-core.mjs'
+import { evaluateCommitTrailers, formatCommitTrailerVerdict, turnEndScarceState } from './model-guard-core.mjs'
 import { currentLaneState } from './lane-switch.mjs'
 import { isMainModule } from './is-main.mjs'
 
@@ -35,11 +35,14 @@ if (isMainModule(import.meta.url)) {
     } catch {
       message = ''
     }
-    const scarceState = currentLaneState()
-    if (!scarceState.ok) {
+    // A switch state never recorded in this checkout (a fresh cloud clone) is
+    // judged OFF, as at the turn end; a garbled or unreadable one still refuses.
+    const { scarceState, refuse, notice } = turnEndScarceState(currentLaneState())
+    if (refuse) {
       process.stderr.write(`model-trailer-gate: refusing because ${scarceState.problem}\n`)
       process.exit(1)
     }
+    if (notice) process.stderr.write(`${notice}\n`)
     const verdict = evaluateCommitTrailers(message, scarceState)
     if (verdict.block) {
       process.stderr.write(`${formatCommitTrailerVerdict(verdict)}\n`)

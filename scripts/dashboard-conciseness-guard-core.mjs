@@ -107,7 +107,7 @@ export function cardSections(bodyHtml) {
   const body = String(bodyHtml ?? '')
   const at = body.indexOf('<hr class="split">')
   if (at < 0) return [{ label: '', html: body }]
-  const drop = (html) => html.replace(/<p class="(?:status-head|desc-missing)">[\s\S]*?<\/p>/g, ' ')
+  const drop = (html) => html.replace(/<p class="(?:status-head|desc-missing|dist-head|dist)">[\s\S]*?<\/p>/g, ' ')
   return [
     { label: 'description: ', html: drop(body.slice(0, at)) },
     { label: '', html: drop(body.slice(at)) },
