@@ -3,7 +3,7 @@
 //
 // A point's authored commits come from three places, in this order:
 //   1. its live `feat/<N>-*` branch (local or origin), the commits not on main;
-//   2. the merge of that branch into main, once the branch is gone;
+//   2. every merge of that branch into main;
 //   3. the shas the review ledger recorded for the point.
 // Commits that touch nothing outside `.claude/` are bookkeeping (review and
 // commission records, queue ranks), not the build, and are left out.
@@ -73,7 +73,8 @@ export function gatherDistributionLines(
     const [parents, subject] = line.split('\x1f')
     const n = pointOfBranch(subject)
     const [first, second] = parents.split(' ')
-    if (wanted.has(n) && second && !commits.get(n).size) keep(n, logOf([`${first}..${second}`]))
+    // Every merge counts: a branch merged twice carries its later increment only in the newer merge.
+    if (wanted.has(n) && second) keep(n, logOf([`${first}..${second}`]))
   }
 
   const shaPoint = new Map()
