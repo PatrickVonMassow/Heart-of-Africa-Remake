@@ -235,7 +235,7 @@ describe('description/status split', () => {
 })
 
 describe('derived distribution paragraphs', () => {
-  const dist = '<p class="dist-head">Verteilung</p><p class="dist">Bau: Opus 5.5 · Cloud | Prüfung: offen</p>'
+  const dist = '<p class="dist-head">Verteilung</p><p class="dist">Bau: Modell A · Cloud | Prüfung: offen</p>'
   it('still flags a long single paragraph on a card without the divider', () => {
     const html = boardHtml({ queue: [{ n: 11, body: `<p>${lorem(70)}</p>${dist}` }] })
     expect(concisenessOffenders(html)[0].reason).toMatch(/^one long unbroken paragraph \(70 words\)/)
