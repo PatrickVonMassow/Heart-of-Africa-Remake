@@ -405,3 +405,6 @@ host `vm`, cwd `/home/user/Heart-of-Africa-Remake`, branch
 `claude/probe-1439-diagnostics-x7fma3`; this container is `66a0eaaacb4b` under
 `microsoft-standard-WSL2`. Sandbox allocation to first tool call took 47 s,
 most of it the clone.
+At 02:20 the same session created `feat/1439-cloud-push-probe` from
+`origin/main` and pushed it (`1a8544653`, removed after the check), so a cloud
+author can push its own `feat/` branch with the session's credentials.
