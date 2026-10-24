@@ -77,12 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1438. Route mid-difficulty points to the Claude lane while the cloud credit lasts
-  Final state: while the cloud switch routes Claude-lane authoring to the cloud (authoringVenue → 'cloud') and before the credit expiry (CREDIT_EXPIRY in scripts/cloud-switch-core.mjs, 05.11.2026 08:59 MEZ), authorLaneFor in scripts/author-routing-core.mjs routes a point that is "mechanical or mid-difficulty, and nothing marks it otherwise" to the main lane instead of the cross lane, with a reason naming the cloud credit. Tags, HIGH criticality, hard cases and the scarce escalation keep their current routing. After the expiry or with the switch off/unusable, routing is unchanged. author-delegate.mjs passes the venue to the decision; a node test covers on, off and expired.
-  Observed problem: the cloud switch has been ON since 23.10.2026 09:34, yet the 250 USD cloud credit is unused (248 left, expires 05.11.2026). Measured 24.10.2026: of the open points author routing sends 265 to the cross lane (local GPT) and only 100 to the main lane; 156 of the cross ones only because they are mid-difficulty with nothing marking them. Only main-lane (Claude) authoring can run in the cloud, so the credit had almost nothing to author.
-  Queue position: front (user 24.10.2026 00:03: "ja, so einreihen und direkt erledigen").
-  Source: user request 24.10.2026 via the findings carrier, spec cut from fee8a65c2; approved: "ja, so einreihen und direkt erledigen".
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1440. Board work cards show who built and reviewed a point, and where
   Final state: every work card's details carry a section "Verteilung" with one fixed-form line, e.g. "Bau: Opus 5.5 · Cloud | Prüfung: GPT-6.1 Sol" ("offen" for a part still pending). The line is derived from the recorded delegation venue, the cross-review records and the commit trailers, never hand-typed. A Vitest covers a local build, a cloud build and a pending review.
   Queue position: directly after 1438 (user order: first the cloud start, then 1438, then this card change).

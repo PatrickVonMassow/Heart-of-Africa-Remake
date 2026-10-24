@@ -34786,3 +34786,10 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Queue position: front, before 1438 (user 24.10.2026 00:18: "Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio.").
   Source: finding "Agent isolation remote falls back to a local worktree in this session" (24.10.2026 00:15) plus the probe above; real blockade of the user's top priority (CLAUDE.md §2 finding intake).
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1438. Route mid-difficulty points to the Claude lane while the cloud credit lasts
+  Final state: while the cloud switch routes Claude-lane authoring to the cloud (authoringVenue → 'cloud') and before the credit expiry (CREDIT_EXPIRY in scripts/cloud-switch-core.mjs, 05.11.2026 08:59 MEZ), authorLaneFor in scripts/author-routing-core.mjs routes a point that is "mechanical or mid-difficulty, and nothing marks it otherwise" to the main lane instead of the cross lane, with a reason naming the cloud credit. Tags, HIGH criticality, hard cases and the scarce escalation keep their current routing. After the expiry or with the switch off/unusable, routing is unchanged. author-delegate.mjs passes the venue to the decision; a node test covers on, off and expired.
+  Observed problem: the cloud switch has been ON since 23.10.2026 09:34, yet the 250 USD cloud credit is unused (248 left, expires 05.11.2026). Measured 24.10.2026: of the open points author routing sends 265 to the cross lane (local GPT) and only 100 to the main lane; 156 of the cross ones only because they are mid-difficulty with nothing marking them. Only main-lane (Claude) authoring can run in the cloud, so the credit had almost nothing to author.
+  Queue position: front (user 24.10.2026 00:03: "ja, so einreihen und direkt erledigen").
+  Source: user request 24.10.2026 via the findings carrier, spec cut from fee8a65c2; approved: "ja, so einreihen und direkt erledigen".
+  Bundle: Session- & Repo-Hygiene.
