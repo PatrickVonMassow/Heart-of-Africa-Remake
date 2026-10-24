@@ -94,6 +94,12 @@ put it is the mistake this line exists to stop.
   Queue position: directly after 1438 (user order: first the cloud start, then 1438, then this card change).
   Source: user request 24.10.2026 via the findings carrier; approved verbatim: "Ja, den Kartenumbau so einreihen. Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio." Title shown to the user: "Karten-Details: Abschnitt Verteilung mit Bau- und Prüfmodell und Ort (lokal/Cloud) aus den Protokollen".
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1441. Launcher-daemon HANGING-send test reddens fast gates under load
+  Final state: `scripts/batch-launcher-daemon.test.mjs` "a HANGING send loses to its budget" no longer depends on wall-clock time under machine load: it drives the alert budget with fake timers or an injected clock, so the full `test:unit` and the land-point fast gate never time it out. The test still proves the loop keeps ticking and sends no recovery notice after a hanging send.
+  Observed problem: passes alone in 1.2 s, but timed out in the full unit run on 20.10.2026 (point 1345), 22.10.2026 06:57 and 24.10.2026 02:3x (land-point fast gate of point 1439, run in parallel with build and lint). The backlog entry said: a point once it reddens a second gate.
+  Queue position: directly after 1440 (it reddens landings).
+  Source: docs/backlog.md entries of 20.10. and 22.10.2026 plus the 24.10.2026 gate; real blockade of landings (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1437. Remove the settled queueing-feedback card from the board
   Final state: Remove the board card "Rückmeldung beim Einreihen: welcher der drei Vorschläge?" from the dashboard and republish it. No point and no other change: the user leaves the queueing feedback as it is for now. Background: GPT-6.1 Sol judged Proposal 1 (chat session appends an approved order to TASKS.md itself) CRITICAL on 23.10.2026 16:03 (A1 concurrent main writers / number collisions, A2 guard compatibility unproven, A3 queue positions other than end, A4 not a simplification under the infrastructure freeze); the user then decided to leave it as it is.
   Observed problem: User order 23.10.2026 21:25 in a chat session without the batch lock: the decision card is settled (leave as is), so it must leave the board. The chat session cannot edit the board under the stand-down.
