@@ -83,6 +83,12 @@ put it is the mistake this line exists to stop.
   Queue position: directly after 1440 (it reddens landings).
   Source: docs/backlog.md entries of 20.10. and 22.10.2026 plus the 24.10.2026 gate; real blockade of landings (CLAUDE.md §2 finding intake).
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1442. polish-villagers villager-dress hangs on WebGPU in its cost probe
+  Final state: `npm test -- polish-villagers --section=villager-dress` with VERIFY_GL=webgpu ends on its own (pass or a named red) within its measured runtime; the cost probe loop (`scripts/verify/polish-villagers.mjs`, `DRESS_COST` villages) records a `cost` row per village on WebGPU in `local/verify-measure/villager-dress.jsonl`, and every wait inside it (awaitPlaceDrawn, awaitGltfBody, the 61-frame rAF sampler) has a timeout that reports which village and level it stuck on instead of hanging. Then the full polish-villagers suite runs to its end on both backends, which is the covering run render-verify-guard owes for the village render commits since 460b010.
+  Observed problem: on 24.10.2026 the full WebGPU run was killed at the 45-min and then the 90-min wall timeout; the section alone is killed at 8 min. All dress frames and every `row-hidden` record are written (last frame 1294-dress-<people>), but no WebGPU `cost` record exists at all (the only ones are WebGL, 18.10.2026); `--section=village-walk` passes in 3 min 34 s.
+  Queue position: directly after 1441 (it holds the render coverage of every village landing).
+  Source: covering-run attempts of the 1440 session, 24.10.2026; real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1437. Remove the settled queueing-feedback card from the board
   Final state: Remove the board card "Rückmeldung beim Einreihen: welcher der drei Vorschläge?" from the dashboard and republish it. No point and no other change: the user leaves the queueing feedback as it is for now. Background: GPT-6.1 Sol judged Proposal 1 (chat session appends an approved order to TASKS.md itself) CRITICAL on 23.10.2026 16:03 (A1 concurrent main writers / number collisions, A2 guard compatibility unproven, A3 queue positions other than end, A4 not a simplification under the infrastructure freeze); the user then decided to leave it as it is.
   Observed problem: User order 23.10.2026 21:25 in a chat session without the batch lock: the decision card is settled (leave as is), so it must leave the board. The chat session cannot edit the board under the stand-down.
