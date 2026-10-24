@@ -30,12 +30,19 @@ function switchFile() {
   return path
 }
 
+// The live cloud switch would reroute mid-difficulty work (point 1438); an absent state file keeps it local.
+function noCloudFile() {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-author-cloud-'))
+  dirs.push(dir)
+  return join(dir, 'cloud-switch.json')
+}
+
 function route(records, extra = []) {
   return spawnSync(process.execPath, [script, '--routing', '--point', point, ...extra], {
     cwd: root,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: switchFile() },
+    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: switchFile(), CLOUD_SWITCH_FILE: noCloudFile() },
   })
 }
 
@@ -49,7 +56,7 @@ function examine(records) {
     // Examination intentionally runs before an authoring worktree exists, so
     // it gives the management checkout explicitly instead of asking the live
     // script's source path to override its cwd.
-    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: switchFile() },
+    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, LANE_SWITCH_FILE: switchFile(), CLOUD_SWITCH_FILE: noCloudFile() },
   })
 }
 
@@ -546,7 +553,7 @@ describe('author-delegate --lane: one command for every authoring lane', () => {
       cwd: root,
       encoding: 'utf8',
       windowsHide: true,
-      env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: files.records, LANE_SWITCH_FILE: files.laneSwitch },
+      env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: files.records, LANE_SWITCH_FILE: files.laneSwitch, CLOUD_SWITCH_FILE: noCloudFile() },
     })
   }
 

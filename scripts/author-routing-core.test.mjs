@@ -23,6 +23,7 @@ import {
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
+import { CREDIT_EXPIRY } from './cloud-switch-core.mjs'
 import { readState, writeState } from './lane-switch-core.mjs'
 import { CROSS, MAIN, VENDORS, trailerFor } from './model-lanes.mjs'
 
@@ -501,5 +502,31 @@ describe('formatLaneReport', () => {
     expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — cross 2 · scarce 0 · main 1 · blocked 0')
     expect(text).toMatch(/ {4}1 {2}cross {3}mechanical/)
     expect(formatLaneReport()).toContain('0 open point(s)')
+  })
+})
+
+describe('authorLaneFor — the cloud credit (user 24.10.2026)', () => {
+  const MID = 'The board card says "stand" for a point nobody is working on. Say what it is.'
+  const before = Date.parse(CREDIT_EXPIRY) - 1
+  const after = Date.parse(CREDIT_EXPIRY)
+
+  it('routes unmarked mid-difficulty work to the main lane while the cloud venue is on and the credit lasts', () => {
+    const d = decision({ body: MID, venue: 'cloud', now: before })
+    expect(d).toMatchObject({ lane: 'main', model: MAIN.displayName })
+    expect(d.why[0]).toMatch(/cloud credit/)
+  })
+
+  it('leaves the routing unchanged with the switch off or unusable, and after the expiry', () => {
+    expect(lane(MID, { venue: 'local', now: before })).toBe('cross')
+    expect(lane(MID, { now: before })).toBe('cross')
+    expect(lane(MID, { venue: 'cloud', now: after })).toBe('cross')
+  })
+
+  it('keeps tags, HIGH criticality, hard cases and the scarce escalation where they were', () => {
+    const cloud = { venue: 'cloud', now: before }
+    expect(lane('Fix it.\nAuthor lane: cross', cloud)).toBe('cross')
+    expect(lane(MID, { ...cloud, criticality: 'high' })).toBe('cross')
+    expect(lane('A complex rebuild of the launcher.', cloud)).toBe('cross')
+    expect(decision({ body: MID, ...cloud, scarceState: ON, reworkRounds: SCARCE_ESCALATION_ROUNDS }).lane).toBe('scarce')
   })
 })
