@@ -5059,60 +5059,94 @@ if (section('villager-dress')) {
   // Draw calls and triangles from the renderer's per-frame counters; the frame
   // time is the median of 60 rendered frames (a shared, software-rendered
   // machine: compare the levels, not the absolute milliseconds).
-  for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
-    await goToPlace(villageOf(people))
+  // Every wait below is frame-driven; a page whose frames stop never answers.
+  // A wall-clock cap per step turns that into a red naming village and level
+  // (calibratable: DRESS_STEP_MS).
+  const STEP_MS = Number(process.env.DRESS_STEP_MS ?? 120_000)
+  const within = async (what, run) => {
+    let timer
+    const started = Date.now()
+    try {
+      return await Promise.race([
+        run(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`cost probe stuck: ${what} (no answer within ${STEP_MS / 1000} s)`)), STEP_MS)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+      const ms = Date.now() - started
+      if (ms > 10_000) console.log(`  villager-dress cost step ${what}: ${Math.round(ms / 100) / 10} s`)
+    }
+  }
+  costProbe: for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
     const row = {}
-    // `code`: the glTF body switched off (`figureGltfBody` false) — point
-    // 1293's code-built body, the "before" of the glTF body.
-    const runs = [['low', null], ['medium', 0], ['medium', null, 'code'], ['medium', null], ['high', 0], ['high', null, 'code'], ['high', null]]
-    for (const [level, force, body] of runs) {
-      await page.evaluate(
-        async ({ l, force, code }) => {
-          const q = await import('/src/config/quality.ts')
-          window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
-          for (const k of ['medium', 'high']) {
-            q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
-            q.QUALITY_PRESETS[k].figureGltfBody = !code
-          }
-          // through another level, so every figure re-reads the table
-          window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
-          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
-          window.__ui.getState().setDetailLevel(l)
-        },
-        { l: level, force, code: body === 'code' },
-      )
-      const name = force === 0 ? `${level}-primitive` : body === 'code' ? `${level}-code` : level
-      await nextFrames(10)
-      await awaitPlaceDrawn(`${people} ${name}`)
-      if (level !== 'low' && force == null && body !== 'code') await awaitGltfBody(`${people} ${name}`)
-      row[name] = await page.evaluate(
-        () =>
-          new Promise((resolve) => {
-            const times = []
-            const calls = []
-            const tris = []
-            let last = performance.now()
-            const tick = (t) => {
-              times.push(t - last)
-              last = t
-              const r = window.__renderer?.info?.render
-              calls.push(r?.drawCalls ?? 0)
-              tris.push(r?.triangles ?? 0)
-              if (times.length < 61) return requestAnimationFrame(tick)
-              const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
-              let figures = 0
-              let skinned = 0
-              let gltf = 0
-              window.__placeScene.traverse((o) => {
-                if (o.name === 'inhabitant') figures++
-                if (o.isSkinnedMesh) skinned++
-                if (o.isSkinnedMesh && o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
-              })
-              resolve({ figures, skinned, gltf, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+    let step = `${people} enter`
+    try {
+      await within(step, () => goToPlace(villageOf(people)))
+      // `code`: the glTF body switched off (`figureGltfBody` false) — point
+      // 1293's code-built body, the "before" of the glTF body.
+      const runs = [['low', null], ['medium', 0], ['medium', null, 'code'], ['medium', null], ['high', 0], ['high', null, 'code'], ['high', null]]
+      for (const [level, force, body] of runs) {
+        const name = force === 0 ? `${level}-primitive` : body === 'code' ? `${level}-code` : level
+        step = `${people} ${name} switch`
+        await within(step, () => page.evaluate(
+          async ({ l, force, code }) => {
+            const q = await import('/src/config/quality.ts')
+            window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
+            for (const k of ['medium', 'high']) {
+              q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
+              q.QUALITY_PRESETS[k].figureGltfBody = !code
             }
-            requestAnimationFrame(tick)
-          }),
-      )
+            // through another level, so every figure re-reads the table
+            window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+            window.__ui.getState().setDetailLevel(l)
+          },
+          { l: level, force, code: body === 'code' },
+        ))
+        step = `${people} ${name} settle`
+        await within(step, async () => {
+          await nextFrames(10)
+          await awaitPlaceDrawn(`${people} ${name}`)
+        })
+        step = `${people} ${name} glTF body`
+        if (level !== 'low' && force == null && body !== 'code') await within(step, () => awaitGltfBody(`${people} ${name}`))
+        step = `${people} ${name} 61-frame sample`
+        row[name] = await within(step, () => page.evaluate(
+          () =>
+            new Promise((resolve) => {
+              const times = []
+              const calls = []
+              const tris = []
+              let last = performance.now()
+              const tick = (t) => {
+                times.push(t - last)
+                last = t
+                const r = window.__renderer?.info?.render
+                calls.push(r?.drawCalls ?? 0)
+                tris.push(r?.triangles ?? 0)
+                if (times.length < 61) return requestAnimationFrame(tick)
+                const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
+                let figures = 0
+                let skinned = 0
+                let gltf = 0
+                window.__placeScene.traverse((o) => {
+                  if (o.name === 'inhabitant') figures++
+                  if (o.isSkinnedMesh) skinned++
+                  if (o.isSkinnedMesh && o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
+                })
+                resolve({ figures, skinned, gltf, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+              }
+              requestAnimationFrame(tick)
+            }),
+        ))
+      }
+    } catch (e) {
+        // the page may be wedged: record what was read, name the step, stop the probe
+        record('cost', { village: `${people}-village`, row, stuck: step })
+        check(`${people}: the cost probe answers at every step`, false, String(e?.message ?? e))
+        break costProbe
     }
     record('cost', { village: `${people}-village`, row })
     check(
