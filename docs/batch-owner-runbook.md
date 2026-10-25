@@ -54,18 +54,27 @@ enforces it; it replaces the user order of 23.10.2026 it refines.
 and the 1297 merge (25.10.2026 22:05Z): 99.0 h, **3.96 h per landed point**, 3.42 h
 without the 13.6 h host-down stretch of 24./25.10. Losses parallelism does not cure:
 host down 13.6 h, suite repeats about 8 h, hung WebGPU runs about 4 h. Only one cloud
-author ever ran (1440: submission to merge 1.3 h); there was no post-1443 cycle when
-this was written.
+author ever ran (1440: submission to merge 1.3 h).
+
+**After 1443 alone.** 1443 drained the pool (1414, 1432, 1333, 1297 merged 25.10.2026
+11:53Z–22:05Z; closed 22:27Z). From the first free slot (1333 merge, 21:10Z) to
+26.10.2026 00:30 local, no cloud author was commissioned and no batch-daemon ran: the
+old mode has no step that commissions while a point is accepted, so a free pool does
+not by itself overlap anything. The goal is therefore not met by 1443 alone, and a
+further old-mode cycle is not run first — it would spend at least 48 h of the credit
+that expires 05.11.2026 to measure a mode with no overlap step. The measured cycle
+below compares the new mode against the pre-1443 3.42 h.
 
 **Bounds** (provisional; changed only by the measured cycle below):
 
 - Cloud authors submitted or running: at most **1**, counted from submission — a
   cloud session has no branch until it pushes, so `commission-guard` cannot see it;
-  `batch-in-flight --status` (its declaration) is what is checked. Reason: one
-  author already produced faster than acceptance landed (1.3 h against about 3 h of
-  local acceptance per game point), and every branch that waited over a day needed
-  post-sync rework. Raise to 2 only when the cycle measures acceptance standing idle
-  for want of a ready successor.
+  `batch-in-flight --status` (its declaration) is what is checked. Reason: 1 is the
+  smallest bound that overlaps authoring with acceptance at all; it carries no
+  capacity claim, and every branch that waited over a day needed post-sync rework.
+  A higher bound needs a measured cycle showing both acceptance standing idle for
+  want of a ready successor and no finished branch waiting over a day; it then
+  changes this number and the switch-over condition together.
 - Finished branches waiting for acceptance: at most **1**. `POOL_CAP` 3 stays the
   branch ceiling, never a target; a free slot is explained with
   `--slots-free "1444 bound: one cloud author"`.
@@ -75,10 +84,13 @@ this was written.
   runs of 23.10 went red, and load moves a suite by about a fifth.
 - Credit (expires 05.11.2026): commission only what local acceptance can land
   before then.
+- `batch-daemon` stays off while these bounds hold: its refill fills to
+  `DAEMON_POOL_CAP` 3 and has no lower setting on its command line (measured
+  26.10.2026). Starting it first needs that cap set to the bound.
 
 **Switch-over.** From the first point after 1444: when a local acceptance window
-opens, `batch-in-flight --status` shows no submitted or running cloud author and no
-finished branch waits, commission the next ready, file-disjoint queue point through
+opens, `batch-in-flight --status` shows fewer submitted or running cloud authors than
+the bound and no finished branch waits, commission the next ready, file-disjoint queue point through
 `author-delegate`/cloud-switch, declare it, and continue the acceptance. The
 existing `independentOpenPoints` decides disjointness; the successor is adopted at
 the boundary as today. Picture-fix loops stay local (`author-routing-core`).
@@ -91,8 +103,14 @@ diagnose before running it again; a relevant commit or a recorded changed condit
 (an environment repair) reopens it. A red already charged to an open point with
 `main` unchanged in that section reuses the recorded `main` run.
 
+**Manageable.** Every cloud author, local agent and long suite is declared with
+`batch-in-flight --waiting-on "<what and why>"`, so `node scripts/batch-in-flight.mjs
+--status` is the one output naming what runs where and why; an undeclared job is
+the owner's defect, not a gap in the command.
+
 **Simplified.** Routine retrospective, guide-attest and queue-rank refreshes go into
-one bookkeeping commit per boundary. A wait declaration uses the suite's measured
+one bookkeeping commit per boundary; a user-order publication receipt keeps its own
+required timing and is never deferred into that commit. A wait declaration uses the suite's measured
 duration (`run-wait --plan`), not the 45-minute default.
 
 **Kept unchanged.** Pool cap and `commission-guard`, cloud-switch ON, lane routing
