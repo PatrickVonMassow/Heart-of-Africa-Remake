@@ -338,20 +338,6 @@ put it is the mistake this line exists to stop.
   Final state: each cause is measured (game or check) and fixed; both sections run green on both backends.
   Verifiable: both sections green on WebGPU and WebGL 2; a right-layer test per corrected cause.
   Bundle: Tierverhalten.
-- [ ] 1297. Investigate, and fix if confirmed, a calf-predation outcome reported by the user on 05.10.2026 (bug report /backup/hoa/local/hoa-state-2026-10-05-1928572142.zip, seed 1928572142, position 43.77/-100.17, build 69221cd, WebGPU): a lion hunted an antelope calf, the parent ran as a living shield between lion and calf, the lion visibly reached the PARENT, yet the CALF died although the lion was well away from it. The user adds: the calf was on the OTHER side of the river when it died.
-  Queue position: directly before point 1294 (user order 05.10.2026: "Reihe eine Untersuchung und eventuelle Behebung davon direkt vor 1294 ein.").
-  Evidence (snapshot taken after the event, hunt already in 'leave'): two antelope carcasses 1.89 apart at about (100, -122) — almost exactly PARENT_BLOCK_OFFSET = 1.8 — both with landed vultures (a land kill, not a drowning); no mourning calf and no vigil parent nearby, i.e. most likely BOTH died. The screenshot shows the kill stain right at the waterline of the FAR (east) bank, the traveller on the west bank.
-  Suspected mechanisms (unproven):
-  (a) The shield take (Wildlife.tsx ~2633-2701, Herds frame, PARENT_TAKE_DIST 1.0) reconstructs the lion's move segment with the full HUNT_LION_SPEED, while in a river the lion moves at the swim-braked pace (swimBrakedPace, ~5848) — the tested segment is not the lion's real one.
-  (b) The take and the calf catch (~5858, LionHunt frame, CALF_CATCH_DIST 0.9) are separate tests: a shielding parent slightly off the lion→calf line (> 1.0) is visibly overlapped but not taken; the lion catches the calf behind it, and the too-late rule (PARENT_TOO_LATE_DIST 3.2, caught countdown ~2487) kills both.
-  (c) The chaseSwim far-bank resolution (chaseSwimEscaped) and the orphan mourning (mournOrphan / mournAt pulling the calf back toward the parent's body at the water) interact with the shield across the river.
-  The feed pose snaps the lion to s.px + 0.7 beside its victim (~6014).
-  Final state:
-  1. A reproducing test stages the shield hunt at a river (calf swims across, the parent shields in or at the water, the lion follows) plus the variant with a laterally offset parent on land, and records which animal the lion contacts first and which dies where. If it does not reproduce, the point closes with that test as evidence and a note of what was ruled out.
-  2. If confirmed: the first body the lion actually reaches decides — also in water and at the braked swim pace. A hunter that visibly reaches the shielding parent meets the parent's defence roll (design.md §19 / §19.8) first; the calf is never caught through, past, or across the river from a shielding parent. No change to the defence roll, the too-late rule itself, or balance values.
-  3. The lion is never drawn snapping across to a victim it did not reach.
-  4. Right-layer tests: Vitest for the pure contact predicate; the existing wildlife Playwright suite for the staged river scene; picture check per §7.2.
-  Bundle: Tierverhalten.
 - [ ] 1301. Low-preset primitive villager kneels with constant limb lengths and stays above ground
   Queue position: directly behind point 1294.
   Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
