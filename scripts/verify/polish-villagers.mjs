@@ -4925,7 +4925,7 @@ if (section('villager-dress')) {
       .evaluate(() => {
         const r = window.__renderer
         const m = r?.info?.memory ?? {}
-        const mb = (b) => Math.round((b ?? 0) / 1e5) / 10
+        const mb = (b) => (b == null ? null : Math.round(b / 1e5) / 10)
         return {
           pipelines: r?._pipelines?.caches?.size ?? null,
           programs: m.programs ?? null,
@@ -4939,6 +4939,8 @@ if (section('villager-dress')) {
         }
       })
       .then((load) => record('gpu-load', { where, ...load }))
+      // Diagnostics only: an unreadable load never stops the checks.
+      .catch((e) => record('gpu-load', { where, unavailable: String(e?.message ?? e).slice(0, 200) }))
   await gpuLoad('section start')
   // A FRESH PAGE, AND AGAIN EVERY FEW VILLAGES (point 1446). Every village
   // visit leaves its pipelines and heap behind (measured: ~40 pipelines and
