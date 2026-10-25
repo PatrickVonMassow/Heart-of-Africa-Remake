@@ -230,10 +230,10 @@ lane (when switched on), then the main fallback; a different serving model
 pauses the batch.
 
 **After a lane rename lands** (scripts or state files renamed, as on the
-generic-lane change): the owner restarts the batch daemon before the next
-point starts, because a running daemon keeps invoking the script names its
-loaded code holds, and the memory entries naming old commands are updated in
-the same handoff.
+generic-lane change): a running batch daemon is restarted before the next
+point starts, because it keeps invoking the script names its loaded code holds
+(a stopped daemon stays stopped while "Throughput with cloud authoring" keeps it
+off), and the memory entries naming old commands are updated in the same handoff.
 
 For blind-parallel work, each input entry carries an id. The third model merges
 by meaning through `scripts/blind-merge.mjs`, and every input is counted exactly
