@@ -5900,10 +5900,14 @@ if (section('village-walk')) {
     let shown = true
     for (let o = load; o; o = o.parent) if (!o.visible) shown = false
     if (!shown) return false
+    // caught by the load's own travel: the kneel (0.6 s) ends long before the
+    // lowering (1.4 s) has brought the load clear of the head
+    const prevH = window.__loadPhaseH ?? h
+    window.__loadPhaseH = h
     const between = h > 0.2 && h < head - 0.3
-    if (phase === 'down') return k > prev && k > 0.2 && k < 0.9 && between
+    if (phase === 'down') return k > 0.2 && h < prevH - 1e-4 && between
     if (phase === 'ground') return k > 0.97 && h < 0.08
-    return k < prev && k > 0.1 && k < 0.8 && between
+    return k < prev && h > prevH + 1e-4 && between
   }, phase, phase === 'down' ? 9000 : 2400)
   for (const [phase, name, label] of [
     ['down', '1432-village-load-set-down', 'the task walker kneeling down, its head load held in both hands on the way from its head to the ground'],
