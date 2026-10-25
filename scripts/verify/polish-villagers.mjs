@@ -4917,6 +4917,29 @@ if (section('villager-dress')) {
       return { figures: row.children.length, skinned, heads, gltf, meshes: [...meshes].sort() }
     })
 
+  // THE GPU LOAD the run has built up (point 1446): the renderer's tracked
+  // memory and its cached pipelines, read on entering the section and in every
+  // village, so a run that loses Chrome's GPU process shows what grew before it.
+  const gpuLoad = (where) =>
+    page
+      .evaluate(() => {
+        const r = window.__renderer
+        const m = r?.info?.memory ?? {}
+        const mb = (b) => Math.round((b ?? 0) / 1e5) / 10
+        return {
+          pipelines: r?._pipelines?.caches?.size ?? null,
+          programs: m.programs ?? null,
+          geometries: m.geometries ?? null,
+          textures: m.textures ?? null,
+          texturesMB: mb(m.texturesSize),
+          attributesMB: mb(m.attributesSize),
+          totalMB: mb(m.total),
+          renderTargets: m.renderTargets ?? null,
+          heapMB: performance.memory ? mb(performance.memory.usedJSHeapSize) : null,
+        }
+      })
+      .then((load) => record('gpu-load', { where, ...load }))
+  await gpuLoad('section start')
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
   // bytes, its parse, each distinct person's build, and every main-thread
@@ -4935,6 +4958,7 @@ if (section('villager-dress')) {
   for (const people of PEOPLES) {
     await goToPlace(villageOf(people))
     await awaitGltfBody(people)
+    await gpuLoad(villageOf(people))
     if (!loadRecorded) {
       loadRecorded = true
       await nextFrames(10)
