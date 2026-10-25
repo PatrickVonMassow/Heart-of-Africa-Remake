@@ -135,15 +135,16 @@ export function searchDeepBend(o: { lean: number; wants: boolean; posedReach: bo
 }
 
 /** The least of `leans` whose `shortfall` (m, ≤ 0 when every contact is in
- *  reach) is met; failing that, the one that comes closest, so a contact the
- *  bend cannot fully make up is still brought as near as it goes. */
-export function leastLean(leans: readonly number[], shortfall: (l: number) => number): number {
+ *  reach) is met; failing that, with `nearest` the one that comes closest, so
+ *  a contact the bend cannot fully make up is still brought as near as it
+ *  goes, and without it none (0). */
+export function leastLean(leans: readonly number[], shortfall: (l: number) => number, nearest = true): number {
   let best = 0
   let bestShort = shortfall(0)
   for (const l of leans) {
     const s = shortfall(l)
     if (s <= 0) return l
-    if (s < bestShort) {
+    if (nearest && s < bestShort) {
       best = l
       bestShort = s
     }

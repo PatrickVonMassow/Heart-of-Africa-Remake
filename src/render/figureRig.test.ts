@@ -114,6 +114,9 @@ describe('the contact lean', () => {
     expect(leastLean(leans, (l) => 0.5 - l)).toBe(0.2)
     // a bend that only moves the hand away keeps the trunk upright
     expect(leastLean(leans, (l) => 0.1 + l)).toBe(0)
+    // without `nearest` a bend that never reaches keeps the trunk upright
+    expect(leastLean(leans, (l) => 0.5 - l, false)).toBe(0)
+    expect(leastLean(leans, (l) => 0.12 - l, false)).toBe(0.15)
   })
 })
 

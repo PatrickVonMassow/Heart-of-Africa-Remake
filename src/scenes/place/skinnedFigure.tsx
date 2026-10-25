@@ -590,11 +590,14 @@ export function SkinnedFigure({
         const grab = lunge > 0
         if (extras?.reach && !grab) lean = 0
         const steadying = !!headSteady && rig.crown.children.some((c) => c.visible)
-        if (searchDeepBend({ lean, wants, posedReach: !!extras?.reach, grab, steadying }) && gltf) {
+        // a released reach easing back into the clips is still the pose's
+        // reach: a bend that only comes nearer would swing what the hand carries
+        const posedReach = !!extras?.reach || releasing.current.some((r) => r !== null)
+        if (searchDeepBend({ lean, wants, posedReach, grab, steadying }) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
           // least (in the same steps) that brings every contact within reach,
-          // else the one that brings them nearest
+          // else (without a pose's reach) the one that brings them nearest
           const leans: number[] = []
           for (let l = 0.05; l <= VILLAGER_POSE.contactLeanMax + 1e-9; l += 0.05) leans.push(l)
           lean = leastLean(leans, (l) => {
@@ -607,7 +610,7 @@ export function SkinnedFigure({
               short = Math.max(short, loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) - reachOf(s) * 0.995)
             })
             return short
-          })
+          }, !posedReach)
           if (extras?.reach) lean *= lunge
           writeTrunk(lean, hipYaw, chestYaw)
           b.hips.updateWorldMatrix(false, true)
