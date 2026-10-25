@@ -101,6 +101,16 @@ export const RED_CHARGES = [
     why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
   },
   {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /water stand table: the empty jar is taken up from the plank/i,
+    detailMatch: /fastest in his first steps [6-9]\.\d+ m\/s/i,
+    why: 'Full WebGPU polish-villagers run on feat/1446-dress-gpu-process-loss 957968566, 25.10.2026 (log 07-06-50-791): his first steps 7.67 m/s against the 6 m/s bound, the same red (b) point 1435 owns on WebGL 2; also red in the full WebGPU runs of 23.10. and 25.10.2026 03:40. The charge dies with it.',
+  },
+  {
     point: 1340,
     suite: 'polish-children',
     kind: 'check',
@@ -283,6 +293,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1292,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /both women strike the mortar and every strike is heard/i,
@@ -298,6 +309,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1292,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /back at the mortar both strike again, half a stroke apart/i,
@@ -308,6 +320,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1381,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /at least three unhidden fish are in the frame/i,
@@ -1737,32 +1750,6 @@ export const RED_CHARGES = [
       + 'with 565.',
   },
   {
-    point: 1172,
-    suite: 'polish-villagers',
-    backend: 'webgpu',
-    // Measured on this host, whose WebGPU lane launches with --force-webgpu-compat
-    // and an opengles adapter, so the reading belongs to the compatibility level
-    // and says nothing about a core adapter.
-    featureLevel: 'compatibility',
-    // SHAPE-SCOPED: count 0 means the dig bout had ENDED before the shutter, so
-    // which villager left and by how much is the accident and the staging race
-    // is the defect. Scoped to WebGPU, the only lane it has been measured on;
-    // the same branch tip ran this check green on WebGL 2 thirty minutes
-    // earlier, so it must stay a real red there.
-    match: /^and both are still at the stroke, on opposite sides of the hole\b/i,
-    why:
-      'THE RED POINT 1172 WAS FILED FOR, measured 21.09.2026 on the WebGPU polish pass of '
-      + 'point 1158 (local/verify-logs/2026-09-21T09-35-28-998-polish.log, 303 pass 1 fail, '
-      + 'count 0 striking 0). It is not 1158\'s: that point changes pointer-lock input handling '
-      + 'and its only edit outside pointerLock.ts and its test is a comment in PlaceScene.tsx, '
-      + 'and the SAME tip ran the whole polish suite green on WebGL 2 thirty minutes earlier '
-      + '(304 pass 0 fail). It is not 1121\'s either: that race is the river-bank aim block at '
-      + '~6047, this is the dig-pair block at ~6660. The rung re-run ALONE on a quiet machine '
-      + 'went 39/0, and the red run printed "UNDER LOAD — NOT AUTHORITATIVE" itself — consistent '
-      + 'with load AND with a rare race, which is why the later green closes nothing (point 640). '
-      + 'The charge dies with 1172.',
-  },
-  {
     point: 642,
     suite: 'polish-settlement',
     backend: 'webgl',
@@ -1791,6 +1778,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1187,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /BOTH her hands are elsewhere half a pass later/i,
@@ -1812,6 +1800,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1202,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /the spoil crossing starts on flat ground/i,
@@ -1955,6 +1944,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1333,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /the jar's mouth is tipped under the water surface/i,
@@ -1967,7 +1957,8 @@ export const RED_CHARGES = [
     point: 642,
     suite: 'polish-villagers',
     kind: 'check',
-    match: /^the order at the stand can be photographed: a sender still there and a carrier already going — no order in 180 s/i,
+    match: /^the order at the stand can be photographed: a sender still there and a carrier already going\b/i,
+    detailMatch: /^no order in 180 s/i,
     why:
       'MEASURED 18.10.2026 on main f698cd920, webgpu full polish-villagers: the moment-catcher point 642 '
       + 'names as its fourth case found no order inside its 180 s window (charged before on 24.09.2026, '
