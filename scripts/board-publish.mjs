@@ -72,6 +72,8 @@ import {
 import { readTasksAll } from './tasks-source.mjs'
 import { applyLivenessBlock } from './board-liveness-core.mjs'
 import { measureLiveness } from './board-liveness.mjs'
+import { renderCardDistributions } from './board-distribution-core.mjs'
+import { cardPoints, gatherDistributionLines } from './board-distribution.mjs'
 import {
   ARCHIVE_CONTENT_URL,
   ARCHIVE_FILE,
@@ -90,6 +92,17 @@ import {
   stampFileHash,
   stampFingerprint,
 } from './board-currency-core.mjs'
+
+/** `html` with every card's derived distribution line; unchanged (and said why) when it cannot be gathered. */
+function withDistributions(html) {
+  try {
+    const lines = gatherDistributionLines(cardPoints(html))
+    return renderCardDistributions(html, (point) => lines.get(point) ?? null)
+  } catch (e) {
+    console.error(`board-publish: distribution lines not refreshed (${e.message})`)
+    return html
+  }
+}
 
 /** SHA-256 of the repo board bytes a publish attests — the same digest dashboard-state uses. */
 const sha256 = (text) => createHash('sha256').update(Buffer.from(text)).digest('hex')
@@ -358,6 +371,9 @@ try {
   // stale one, and saying why beats failing silently.
   console.error(`board-publish: footer not refreshed (${e.message})`)
 }
+// THE "VERTEILUNG" LINE (user request 24.10.2026): who built and reviewed each
+// card's point, and where, derived from trailers and the review ledger.
+repoBytes = withDistributions(repoBytes)
 
 if (repoBytes !== original) {
   // Atomic (point 443, four-eyes F3) — and this one writes the very file the
@@ -469,7 +485,7 @@ try {
   console.error(`board-publish: liveness line not measured (${e.message})`)
 }
 const archive = existsSync(archiveFile)
-  ? renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll())
+  ? withDistributions(renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll()))
   : null
 
 // A tree built with plumbing: no checkout, no index, no branch switch. This

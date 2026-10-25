@@ -49,6 +49,7 @@ import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routin
 import { FALLBACK_AUTHOR, effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
 import { CROSS } from './model-lanes.mjs'
 import { currentLaneState } from './lane-switch.mjs'
+import { currentVenue } from './cloud-switch.mjs'
 import { laneIsOn, laneRefusalReason } from './lane-switch-core.mjs'
 import {
   AUTHOR_ROLES,
@@ -225,7 +226,10 @@ export function recordAuthoringCommission({
 }
 
 /** The lane a point belongs to, with the reasons that decided it. */
-export function laneFor(number, { override = '', reworkRounds, records, scarceState = currentLaneState('scarce') } = {}) {
+export function laneFor(
+  number,
+  { override = '', reworkRounds, records, scarceState = currentLaneState('scarce'), venue = currentVenue().venue } = {},
+) {
   const body = pointBody(number)
   const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
   const roundHistory = authorRoundHistory(rows, number)
@@ -233,7 +237,7 @@ export function laneFor(number, { override = '', reworkRounds, records, scarceSt
   return {
     body,
     roundHistory,
-    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds, scarceState }),
+    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds, scarceState, venue }),
   }
 }
 
@@ -633,12 +637,19 @@ export async function runAuthoringCli({ argv = process.argv.slice(2) } = {}) {
           process.exit(2)
         }
         const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+        const { venue } = currentVenue()
         const rows = parsePointBlocks(readTasksOpen())
           .filter((b) => !b.done)
           .map((b) => {
             const roundHistory = authorRoundHistory(records, b.n)
             const reworkRounds = roundHistory.freshRounds
-            const decided = authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level, reworkRounds, scarceState })
+            const decided = authorLaneFor({
+              body: b.body,
+              criticality: criticalityOf(b.body).level,
+              reworkRounds,
+              scarceState,
+              venue,
+            })
             return {
               number: b.n,
               ...decided,

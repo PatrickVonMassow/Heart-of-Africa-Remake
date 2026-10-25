@@ -34779,3 +34779,44 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Observed problem: These union entries are working practices of the batch owner, not code; a point per entry would open branches with nothing to change, and enforcing them by guards is forbidden by the infrastructure freeze. The user approved recording them as an instruction to the batch-owning session and parking the cap question in the backlog with its measurement condition, so they are not lost.
   Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1439. Claude-lane authoring delegations really start as cloud sessions
+  Final state: with the cloud switch ON, a Claude-lane authoring delegation starts on a measured cloud path (candidates: `claude --cloud "<brief>"` from the CLI, or a claude.ai remote-trigger routine), not Agent `isolation: "remote"`, which this session measured to fall back to a local worktree. The working path is named in the cloud-switch instruction text the SessionStart hook prints and in docs/lane-routing.md, with its measured evidence: the session id or link, a hostname that is not the local container, and a pushed feat/<point>-<slug> branch from that session. If no path works without the user present, the cloud switch is turned off with that reason recorded, so the instruction stops promising a cloud start that falls back. No new machinery (CLAUDE.md §2 infrastructure freeze).
+  Observed problem: measured 24.10.2026 01:58: an Agent-tool probe with isolation "remote" ran in /workspace/hoa/.claude/worktrees/agent-af536fca721b0e288 on the local WSL host (hostname 66a0eaaacb4b, REMOTE_CONTAINERS set). The two authoring delegations of 24.10.2026 00:00 (1414, 1432) fell back the same way. The 250 USD cloud credit (expires 05.11.2026) therefore stays unused, and routing change 1438 alone cannot spend it.
+  Queue position: front, before 1438 (user 24.10.2026 00:18: "Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio.").
+  Source: finding "Agent isolation remote falls back to a local worktree in this session" (24.10.2026 00:15) plus the probe above; real blockade of the user's top priority (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1438. Route mid-difficulty points to the Claude lane while the cloud credit lasts
+  Final state: while the cloud switch routes Claude-lane authoring to the cloud (authoringVenue → 'cloud') and before the credit expiry (CREDIT_EXPIRY in scripts/cloud-switch-core.mjs, 05.11.2026 08:59 MEZ), authorLaneFor in scripts/author-routing-core.mjs routes a point that is "mechanical or mid-difficulty, and nothing marks it otherwise" to the main lane instead of the cross lane, with a reason naming the cloud credit. Tags, HIGH criticality, hard cases and the scarce escalation keep their current routing. After the expiry or with the switch off/unusable, routing is unchanged. author-delegate.mjs passes the venue to the decision; a node test covers on, off and expired.
+  Observed problem: the cloud switch has been ON since 23.10.2026 09:34, yet the 250 USD cloud credit is unused (248 left, expires 05.11.2026). Measured 24.10.2026: of the open points author routing sends 265 to the cross lane (local GPT) and only 100 to the main lane; 156 of the cross ones only because they are mid-difficulty with nothing marking them. Only main-lane (Claude) authoring can run in the cloud, so the credit had almost nothing to author.
+  Queue position: front (user 24.10.2026 00:03: "ja, so einreihen und direkt erledigen").
+  Source: user request 24.10.2026 via the findings carrier, spec cut from fee8a65c2; approved: "ja, so einreihen und direkt erledigen".
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1440. Board work cards show who built and reviewed a point, and where
+  Final state: every work card's details carry a section "Verteilung" with one fixed-form line, e.g. "Bau: Opus 5.5 · Cloud | Prüfung: GPT-6.1 Sol" ("offen" for a part still pending). The line is derived from the recorded delegation venue, the cross-review records and the commit trailers, never hand-typed. A Vitest covers a local build, a cloud build and a pending review.
+  Queue position: directly after 1438 (user order: first the cloud start, then 1438, then this card change).
+  Source: user request 24.10.2026 via the findings carrier; approved verbatim: "Ja, den Kartenumbau so einreihen. Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio." Title shown to the user: "Karten-Details: Abschnitt Verteilung mit Bau- und Prüfmodell und Ort (lokal/Cloud) aus den Protokollen".
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1441. Launcher-daemon HANGING-send test reddens fast gates under load
+  Final state: `scripts/batch-launcher-daemon.test.mjs` "a HANGING send loses to its budget" no longer depends on wall-clock time under machine load: it drives the alert budget with fake timers or an injected clock, so the full `test:unit` and the land-point fast gate never time it out. The test still proves the loop keeps ticking and sends no recovery notice after a hanging send.
+  Observed problem: passes alone in 1.2 s, but timed out in the full unit run on 20.10.2026 (point 1345), 22.10.2026 06:57 and 24.10.2026 02:3x (land-point fast gate of point 1439, run in parallel with build and lint). The backlog entry said: a point once it reddens a second gate.
+  Queue position: directly after 1440 (it reddens landings).
+  Source: docs/backlog.md entries of 20.10. and 22.10.2026 plus the 24.10.2026 gate; real blockade of landings (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1442. polish-villagers villager-dress hangs on WebGPU in its cost probe
+  Final state: `npm test -- polish-villagers --section=villager-dress` with VERIFY_GL=webgpu ends on its own (pass or a named red) within its measured runtime; the cost probe loop (`scripts/verify/polish-villagers.mjs`, `DRESS_COST` villages) records a `cost` row per village on WebGPU in `local/verify-measure/villager-dress.jsonl`, and every wait inside it (awaitPlaceDrawn, awaitGltfBody, the 61-frame rAF sampler) has a timeout that reports which village and level it stuck on instead of hanging. The full-suite run on both backends moved to 1446 (split 25.10.2026: section green, full run blocked by a GPU-process loss).
+  Observed problem: on 24.10.2026 the full WebGPU run was killed at the 45-min and then the 90-min wall timeout; the section alone is killed at 8 min. All dress frames and every `row-hidden` record are written (last frame 1294-dress-<people>), but no WebGPU `cost` record exists at all (the only ones are WebGL, 18.10.2026); `--section=village-walk` passes in 3 min 34 s.
+  Queue position: directly after 1441 (it holds the render coverage of every village landing).
+  Source: covering-run attempts of the 1440 session, 24.10.2026; real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1446. The full polish-villagers WebGPU run loses Chrome's GPU process inside villager-dress
+  Final state: the GPU-process loss in the full `VERIFY_GL=webgpu` polish-villagers run is located (which section/act accumulates GPU load before it, measured) and removed, or staged away without weakening a check; then the full polish-villagers suite runs to its end on both backends, which is the covering run render-verify-guard owes for the village render commits since 460b010.
+  Observed problem: run of 25.10.2026 03:40 UTC on feat/1442 3b70d4a87 (`VERIFY_SUITE_TIMEOUT_MS=5400000`): villager-dress `row-hidden` rows arrive every 15-30 s from 04:04 to hausa at 04:10:24, then nothing until bambara at 04:22:13; Chrome's `--type=gpu-process` was 11 s old at 04:22:22 (restarted), and afterwards rows took ~2 min each (fang 04:26, mongo 04:28, mbuti 04:30). run-wait declared it HUNG at 51 min; ended by hand. The earlier run of 02:57 UTC stalled at the same spot (last row nubians, then silence). `--section=villager-dress` alone passes with `cost` rows (01:36-01:39 UTC). WebGL 2 full run of 02:32 UTC ended exit 1 after 17 min (reds 1381, 1265, 1266 plus an uncaught exception, `local/verify-logs/2026-10-25T02-32-06-170-polish-villagers.log.suites.jsonl`).
+  Queue position: directly after 1442.
+  Source: covering run of the 1442 session, 25.10.2026; real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.

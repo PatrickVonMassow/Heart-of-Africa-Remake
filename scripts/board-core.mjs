@@ -346,6 +346,8 @@ details:not(.sect)[open]>summary::after{content:"▾"}
 .body hr.split{border:0;border-top:1px solid var(--rule,#cdbf9c);margin:10px 0 6px}
 .body .status-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin-bottom:2px}
 .body .desc-missing{font-style:italic;color:var(--warn,#a85f28)}
+.body .dist-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin:8px 0 2px}
+.body .dist{font-size:.85em;color:var(--soft,#7c6c4d)}
 </style>`
 
 const criticalityBadge = (level) =>
