@@ -126,6 +126,31 @@ export function contactWantsLean(s: THREE.Vector3, t: THREE.Vector3, reach: numb
   return t.clone().sub(pivot).dot(forward) > 0
 }
 
+/** Whether the glTF trunk's distributed bend is searched for a contact lean:
+ *  when the one-pivot lean found one, for a lunging grab, or when a contact
+ *  wants a lean the one pivot cannot make up — but not for a pose's own reach
+ *  and not under a steadied head load, which a deep bend would tip off. */
+export function searchDeepBend(o: { lean: number; wants: boolean; posedReach: boolean; grab: boolean; steadying: boolean }): boolean {
+  return o.lean > 0 || o.grab || (o.wants && !o.posedReach && !o.steadying)
+}
+
+/** The least of `leans` whose `shortfall` (m, ≤ 0 when every contact is in
+ *  reach) is met; failing that, the one that comes closest, so a contact the
+ *  bend cannot fully make up is still brought as near as it goes. */
+export function leastLean(leans: readonly number[], shortfall: (l: number) => number): number {
+  let best = 0
+  let bestShort = shortfall(0)
+  for (const l of leans) {
+    const s = shortfall(l)
+    if (s <= 0) return l
+    if (s < bestShort) {
+      best = l
+      bestShort = s
+    }
+  }
+  return best
+}
+
 /** The extra forward chest lean (rad) that brings `t` within `reach` of a
  *  shoulder at `s` when the chest pivots about `pivot`; 0 when it already is
  *  or when the target is not a reachable contact in front (see the limits). */

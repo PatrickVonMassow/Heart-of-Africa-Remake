@@ -9,6 +9,8 @@ import {
   CONTACT_LEAN_MAX,
   contactLean,
   contactWantsLean,
+  leastLean,
+  searchDeepBend,
   gestureArmEuler,
   hangToward,
   HANGING_ROLL_KEEP,
@@ -95,6 +97,23 @@ describe('the contact lean', () => {
     expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(false)
     expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(false)
     expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, 0.45), 0.5, pivot, fwd)).toBe(true)
+  })
+  it('searches the deep bend for a wanted contact, but never under a steadied head load', () => {
+    const base = { lean: 0, wants: true, posedReach: false, grab: false, steadying: false }
+    expect(searchDeepBend(base)).toBe(true)
+    expect(searchDeepBend({ ...base, steadying: true })).toBe(false)
+    expect(searchDeepBend({ ...base, posedReach: true })).toBe(false)
+    expect(searchDeepBend({ ...base, wants: false })).toBe(false)
+    // what the one-pivot lean or a lunge asked for is searched as before
+    expect(searchDeepBend({ ...base, wants: false, lean: 0.2, steadying: true })).toBe(true)
+    expect(searchDeepBend({ ...base, wants: false, grab: true, posedReach: true })).toBe(true)
+  })
+  it('takes the least lean that reaches, else the one that comes nearest', () => {
+    const leans = [0.05, 0.1, 0.15, 0.2]
+    expect(leastLean(leans, (l) => 0.12 - l)).toBe(0.15)
+    expect(leastLean(leans, (l) => 0.5 - l)).toBe(0.2)
+    // a bend that only moves the hand away keeps the trunk upright
+    expect(leastLean(leans, (l) => 0.1 + l)).toBe(0)
   })
 })
 

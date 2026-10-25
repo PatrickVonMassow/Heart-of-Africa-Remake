@@ -28,7 +28,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, newGaze, palmNormal, palmRollAngle, palmRollCenter, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, newGaze, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -590,23 +590,24 @@ export function SkinnedFigure({
         const grab = lunge > 0
         if (extras?.reach && !grab) lean = 0
         const steadying = !!headSteady && rig.crown.children.some((c) => c.visible)
-        if ((lean > 0 || (wants && !extras?.reach && !steadying) || grab) && gltf) {
+        if (searchDeepBend({ lean, wants, posedReach: !!extras?.reach, grab, steadying }) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
-          // least (in the same steps) that brings every contact within reach
-          lean = 0
-          for (let l = 0.05; l <= VILLAGER_POSE.contactLeanMax + 1e-9; l += 0.05) {
+          // least (in the same steps) that brings every contact within reach,
+          // else the one that brings them nearest
+          const leans: number[] = []
+          for (let l = 0.05; l <= VILLAGER_POSE.contactLeanMax + 1e-9; l += 0.05) leans.push(l)
+          lean = leastLean(leans, (l) => {
             writeTrunk(l, hipYaw, chestYaw)
             b.hips.updateWorldMatrix(false, true)
-            const short = (['L', 'R'] as const).some((s, i) => {
+            let short = -Infinity
+            ;(['L', 'R'] as const).forEach((s, i) => {
               const vh = virtualHands.current[i]
-              return !!vh && contactArm[i] && loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) > reachOf(s) * 0.995
+              if (!vh || !contactArm[i]) return
+              short = Math.max(short, loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) - reachOf(s) * 0.995)
             })
-            if (!short) {
-              lean = l
-              break
-            }
-          }
+            return short
+          })
           if (extras?.reach) lean *= lunge
           writeTrunk(lean, hipYaw, chestYaw)
           b.hips.updateWorldMatrix(false, true)
