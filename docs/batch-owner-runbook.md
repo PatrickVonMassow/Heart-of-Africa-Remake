@@ -46,8 +46,8 @@ not need it and must not act on it.
 
 ## Throughput with cloud authoring
 
-Plan of point 1444 (six eyes: blind halves Opus 5.5 / GPT-6.1 Sol, merge Fable 5.1,
-break check GPT-6.1 Sol; record `docs/four-eyes/1444-*`). Practice only — no guard
+Plan of point 1444 (six eyes: blind halves main chain / cross lane, merge scarce
+lane, break check cross lane; record `docs/four-eyes/1444-*`). Practice only — no guard
 enforces it; it replaces the user order of 23.10.2026 it refines.
 
 **Baseline.** 25 distinct points landed between the 1409 merge (21.10.2026 19:02Z)
