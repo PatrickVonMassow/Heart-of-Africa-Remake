@@ -34828,3 +34828,17 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Repro for all: seed 3318564123, Bambara village (place mode), position x/z -59.45/-130.99, build production 0562828, WebGPU.
   Queue position: after the user-report points 1402-1405 (append-and-defer of a user-reported defect).
   Bundle: Dorfleben.
+
+- [x] 1432. The task walker takes its head load off with its hands and puts it back on instead of letting it vanish
+  QUEUE POSITION: directly after point 1414 (user order 23.10.2026 15:51, "Ja, das so nach 1414 einreihen.").
+  GOAL: the village task walker (TaskWalker in src/scenes/place/PlaceLife.tsx, carry 'bundle' to the fire or 'jar' to the well) takes its head load off with its hands and puts it back on, instead of the load vanishing while it kneels. Today `load.current.visible = next.mode !== 'work'` (PlaceLife.tsx ~2273) only hides the load during the kneel; nothing sets it down.
+  FINAL STATE:
+  1. Set down: at the target the walker grips the load on its head with both hands; while kneeling down it brings the load down with its hands and sets it on the ground beside it, letting go only then. The load moves with the hands throughout and never jumps on its own.
+  2. Work: while it kneels and works, the load stands visibly on the ground beside it.
+  3. Pick up: before standing up it grips the load on the ground, lifts it with its hands while rising and puts it on its head; afterwards the hands hold it as they do now while walking.
+  4. Never invisible: in no phase is the load invisible or does it appear from nowhere — for the bundle and the jar.
+  5. Tests: a Vitest asserts the load is visible in every phase (walk, kneel down, work, rise) and stays close to the hands during set-down and pick-up; a picture check shows three frames: the set-down moment, the kneeling walker with the load on the ground, and the pick-up moment.
+  SOURCE: user bug report hoa-state-2026-10-23-1989448783.zip (13:45:37Z, seed 1989448783, bambara-village, build 6183b2b, webgpu), user words: "Eben hat er sich vor dem Feuer hingekniet und die Kiste auf seinem Kopf ist verschwunden. Als er dann wieder aufgestanden ist, ist sie wieder erschienen." Refinement 23.10.2026 15:49: "Wandern soll aber bedeuten, dass er sie aktiv mit seiner Hand vom Kopf nimmt und auf den Boden legt bzw. danach wieder in die Hand nimmt und auf seinen Kopf legt."
+  Observed problem: Reproducible player impact reported by the user: a villager kneeling at the fire makes the crate on its head vanish and reappear on standing up. The code comment promises the load is set down, but the code only hides it. No open point or backlog entry covers it (grep of TASKS.md and docs/backlog.md, 23.10.2026).
+  Source: user request 23.10.2026 via the findings carrier, spec cut from 6183b2bfa; approved: "Ja, das so nach 1414 einreihen.".
+  Bundle: Dorfleben.
