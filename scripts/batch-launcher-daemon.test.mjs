@@ -12,7 +12,7 @@
 // so this one RACES: real processes, spawned in one synchronous burst on a
 // throwaway record, each running the real `runDaemon`. Only the tick is injected —
 // the race is over the record, and the batch is never touched.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -475,11 +475,17 @@ describe('runDaemon — dead ticks alert through the daemon itself', () => {
     }
   })
 
+  // On a FAKE clock (point 1441): on the wall clock a starved event loop let the
+  // 100 ms budget plus the scripted 300/600 ms lock changes land before one poll,
+  // the two hand-overs collapsed into one unchanged signal, and the daemon slept
+  // its 10-minute interval out — a timeout in loaded full runs, never alone.
   it('a HANGING send loses to its budget: the loop keeps ticking and no recovery notice follows', { timeout: 30_000 }, async () => {
     const place = arena()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
     try {
       let hangs = 0
-      const { outcome, ticks, sent } = await runScripted(
+      let settled = false
+      const run = runScripted(
         place,
         [null, null, 0],
         () => {
@@ -487,7 +493,15 @@ describe('runDaemon — dead ticks alert through the daemon itself', () => {
           return new Promise(() => {}) // never settles — the incident's dead network
         },
         { alertTimeoutMs: 100 },
-      )
+      ).finally(() => {
+        settled = true
+      })
+      // Fake time only moves when stepped; 60 s is far past the three ticks'
+      // ~2 s of scripted time and far short of the 10-minute interval a lost
+      // wake would sleep, so a regression still fails instead of passing late.
+      for (let t = 0; t < 60_000 && !settled; t += 20) await vi.advanceTimersByTimeAsync(20)
+      expect(settled).toBe(true)
+      const { outcome, ticks, sent } = await run
       expect(outcome).toBe('yielded')
       expect(ticks).toBe(3) // the loop survived its own voice hanging
       expect(hangs).toBeGreaterThanOrEqual(1)
@@ -495,6 +509,7 @@ describe('runDaemon — dead ticks alert through the daemon itself', () => {
       // the only sends ever attempted were the stall alerts themselves.
       for (const s of sent) expect(s.title).toMatch(/STALLED/)
     } finally {
+      vi.useRealTimers()
       place.cleanup()
     }
   })
