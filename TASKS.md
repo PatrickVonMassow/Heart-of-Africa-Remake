@@ -88,6 +88,49 @@ put it is the mistake this line exists to stop.
   Observed problem (measured 24.10.2026 08:53): five open feat branches against POOL_CAP 3, none parked (1297 3 weeks old, 1496 behind main; 1333 412 behind; 1347 66 commits/368 files; 1414 and 1432 2-6 commits, 36 behind). commission-guard therefore refuses every new cloud authoring lane although cloud credit is available, so nothing ran in parallel to the ~2.5 h polish-villagers WebGPU run after 1440 landed. The in-flight declaration was also stale for ~2.5 h ("Landung 1440: Fast-Gate läuft", slotsFree empty).
   Source: user request 24.10.2026 via the findings carrier; approved: "ja".
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1444. Raise the batch's working pace through measured cloud use and parallelisation (local included), without overloading the machine or the owner (after 1443)
+  THIS DEPOSIT REPLACES the earlier carrier request titled "Raise the batch's working pace through measured cloud use and parallelisation (local included), without overloading the machine or the owner" (deposited 25.10.2026 ~02:29). Append THIS one; mark BOTH entries queued to the same point number.
+
+  RANK: User 25.10.2026: this point goes to the very FRONT of the queue, directly BEHIND point 1443 (close the open branches) and ahead of every other open point. User 25.10.2026: things may already improve once 1443 is done.
+
+  DEPENDENCY ON 1443: 1443 drains the open-branch pool (five open feat branches against POOL_CAP 3 made commission-guard refuse every new cloud authoring lane, measured 24.10.2026). This point starts only after 1443 has landed. Its analysis first measures what 1443 alone changed (cloud lanes commissioned in parallel to local acceptance once slots are free) and then addresses only what still slows the batch; it neither duplicates nor undoes 1443's work.
+
+  PROCEDURE: Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle (memory six-eyes-with-final-check), BEFORE anything is changed:
+    1. Model A (Claude lane) and model B (cross lane) run the analysis below BLIND and in parallel. B receives only the GOAL, the CONSTRAINTS, the DEPENDENCY ON 1443 and access to the raw material (git history, .claude/batch-activity.jsonl, .claude/batch-launcher.log, local/*.log, local/verify-logs/, docs/batch-owner-runbook.md, docs/lane-routing.md, scripts/). B never sees the MEASUREMENT section of this point nor A's list.
+    2. A third, distinct model merges both proposals through scripts/blind-merge.mjs; disagreements are resolved with reasons, not by union.
+    3. The merged plan goes to a model of the OTHER vendor than the merger for a final "does this break anything" check. Only an approved plan is implemented; objections are fixed and re-checked first.
+    4. Implementation gets the usual cross-vendor code review.
+
+  GOAL: Points land faster per wall-clock day. Cloud authoring and local work run in parallel where that shortens the cycle; the batch switches to that way of working as the result of this point.
+
+  CONSTRAINTS (binding):
+    - Manageable: at any time the owner can name in one short command output what runs where (cloud sessions, local agents, suites) and why. No new orchestration layer when an existing mechanism (pool cap / commission-guard, batch-daemon, author-delegate, cloud-switch, run-wait) can carry it; CLAUDE.md infrastructure freeze applies — prefer switching off or simplifying an obstructing rule over building a new one.
+    - Not overloaded: a bounded number of concurrent cloud authors and local heavy jobs, derived from the measurement, not guessed; quiet acceptance windows for browser suites and picture checks stay intact (memory verify-suites-need-a-quiet-machine); cloud credit (expires 05.11.2026) is not spent on work that cannot be landed.
+    - Unchanged quality gates: local browser tier suites, picture check (both backends when isBackendSensitivePath applies), cross-vendor review and land-point.mjs remain mandatory; cloud green never stands in for a browser suite.
+    - Single owner, serial landing on main.
+
+  ANALYSIS (both blind halves):
+    0) Baseline after 1443: with the pool drained, how many cloud authors ran in parallel to local acceptance, and how long per landed point.
+    a) Where the wall-clock time of the last ~25 landed points went: authoring, waiting for review, local suites, re-runs after red, picture checks, handover/boundary, and time with no live owner. Every hour assigned once.
+    b) Which of those stretches could overlap with another point's stretches, and what the actual limit is (local acceptance throughput, machine load, owner context, file overlap between points).
+    c) Which existing rules or mechanisms prevent the overlap today, and whether each should be loosened, switched off or kept.
+
+  FINAL STATE:
+    - A merged, approved and recorded plan (in docs/batch-owner-runbook.md, replacing what it supersedes) that states the concurrency bounds and the switch-over.
+    - The batch actually runs that way after this point lands: the next points after it are worked under the new mode, and one measured cycle after landing confirms a shorter time per landed point or names why not.
+    - If the baseline after 1443 already shows the goal met, the point closes with that measurement as a recorded finding instead of a change.
+    - Tests at the right layer (Vitest) for any changed decision logic.
+
+  MEASUREMENT (owner-side context — NOT for the blind half B):
+    Measured 25.10.2026, 02:23 by a non-owner chat session.
+    - Cloud switch ON since 23.10.2026; only ONE cloud authoring session was ever started (local/1440-cloud-author.log, 24.10.2026 04:41). 1441 and 1442 left only local worktree and log traces, no cloud start log.
+    - Point 1443 (open, at the front) already names one cause: five open branches against POOL_CAP 3, so commission-guard refuses every new cloud lane. This session's earlier reading that the pool is inactive because no batch-daemon process runs was incomplete: the cap binds through commission-guard.
+    - The batch works one point at a time: delegate, wait blocking, land, end at the boundary. docs/batch-owner-runbook.md:60 paces cloud authoring to what local acceptance can land.
+    - No landing between 24.10.2026 09:40 (1441) and 25.10.2026 02:17; 1442's last commit 24.10. 13:39; the launcher took over only at 02:17 with "heartbeat-predates-boot" (host restart), so roughly 12 h had no live owner.
+    - Game points ran long rounds on their branches: 1393 53 commits / 38 h, 1402 7 / 18 h, 1405 17 / 12 h, 1404 24 / 8 h (author and fix-up commits not separable from git alone).
+    - 1442's last suite run polish-villagers ended "9/23 frames, 14 missing" (local/1442-dress-cost-short-webgpu.log).
+    - Open stale branches: 1297 (idle since 06.10.), 1347 (66 commits, idle since 21.10.), 1333, 1414, 1432.
+    - Of the last 25 merges roughly 9 are game points.
 - [ ] 1437. Remove the settled queueing-feedback card from the board
   Final state: Remove the board card "Rückmeldung beim Einreihen: welcher der drei Vorschläge?" from the dashboard and republish it. No point and no other change: the user leaves the queueing feedback as it is for now. Background: GPT-6.1 Sol judged Proposal 1 (chat session appends an approved order to TASKS.md itself) CRITICAL on 23.10.2026 16:03 (A1 concurrent main writers / number collisions, A2 guard compatibility unproven, A3 queue positions other than end, A4 not a simplification under the infrastructure freeze); the user then decided to leave it as it is.
   Observed problem: User order 23.10.2026 21:25 in a chat session without the batch lock: the decision card is settled (leave as is), so it must leave the board. The chat session cannot edit the board under the stand-down.
@@ -16014,3 +16057,10 @@ to land than a mechanism that needs a review.
   Observed problem: the WebGL 2 section run on feat/1405-water-carrier-table 98049d22b (log local/verify-logs/2026-10-23T16-40-45-147-polish-villagers.log) after the WebGPU run at the same head was green; both WebGL 2 frames (take, report) show the user's three goals met. Split from 1405 so the user's report could land.
   Source: picture check of the 1405 landing session, 23.10.2026.
   Bundle: Dorfleben.
+- [ ] 1445. The launcher's absolute deadline counts dead time before a fresh owner and tries to take the batch from a working session
+  Final state: ownerKeepsBatch (scripts/batch-autostart-core.mjs ~1603) measures the stall of the CURRENT owner, never time that passed before that owner took the batch: the stall clock starts no earlier than the owner's lock acquisition (batch-lock.json acquiredAt/claimedAt). A fresh owner with a fresh heartbeat and declared advancing work is not taken over by past-absolute-deadline for dead time inherited from its dead predecessor. The hard deadline still bites an owner that itself has not moved for hardDeadlineMs. A Vitest drives the measured sequence (progressAt 13 h before now, owner acquired 16 min ago, fresh heartbeat, declared wait advancing) and asserts keeps: true; a second case asserts the deadline still fires once the owner's own tenure exceeds it without progress. Check whether scripts/batch-emergency-core.mjs ~167 (same reason code) shares the defect and fix it there too if so.
+
+  Observed problem (measured 25.10.2026 02:33 Europe/Berlin by a non-owner chat session): after a host restart no landing happened between 24.10.2026 13:39 and 25.10.2026 02:17; the launcher then spawned owner 39bfd4f3 (pid 38492, lock acquired ~02:17). At 02:26 that owner started verify polish-villagers --section=villager-dress for 1442 and declared the wait (batch-in-flight.json). At 02:33 the launcher logged "TAKING THE BATCH despite a live owner — past-absolute-deadline: the batch has not moved for 833 min. Owner … had a heartbeat 1 min old and declared work advancing", wrote a process-exit event for the still-living pid 38492 into .claude/batch-activity.jsonl, made a spawn-attempt (pid 104199), and was stopped only by "atomic acquire returned held … NOT spawning". The same takeover line appears repeatedly in .claude/batch-launcher.log. A different race outcome would have started a second batch writer beside a working owner, or killed its running suite. The same tick also listed this chat window as a PARALLEL SESSION.
+
+  Real blockade / data risk (CLAUDE.md §2 finding intake): concurrent main writers.
+  Bundle: Session- & Repo-Hygiene.
