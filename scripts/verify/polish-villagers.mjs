@@ -4917,24 +4917,75 @@ if (section('villager-dress')) {
       return { figures: row.children.length, skinned, heads, gltf, meshes: [...meshes].sort() }
     })
 
-  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
-  // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
-  // bytes, its parse, each distinct person's build, and every main-thread
-  // block (long task) from entering the first village until it is drawn.
-  await page.evaluate(() => {
-    window.__dressLongTasks = []
-    try {
-      new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
-        type: 'longtask',
+  // THE GPU LOAD the run has built up (point 1446): the renderer's tracked
+  // memory and its cached pipelines, read on entering the section and in every
+  // village, so a run that loses Chrome's GPU process shows what grew before it.
+  const gpuLoad = (where) =>
+    page
+      .evaluate(() => {
+        const r = window.__renderer
+        const m = r?.info?.memory ?? {}
+        const mb = (b) => (b == null ? null : Math.round(b / 1e5) / 10)
+        return {
+          pipelines: r?._pipelines?.caches?.size ?? null,
+          programs: m.programs ?? null,
+          geometries: m.geometries ?? null,
+          textures: m.textures ?? null,
+          texturesMB: mb(m.texturesSize),
+          attributesMB: mb(m.attributesSize),
+          totalMB: mb(m.total),
+          renderTargets: m.renderTargets ?? null,
+          heapMB: performance.memory ? mb(performance.memory.usedJSHeapSize) : null,
+        }
       })
-    } catch {
-      window.__dressLongTasks = null
-    }
-  })
+      .then((load) => record('gpu-load', { where, ...load }))
+      // Diagnostics only: an unreadable load never stops the checks.
+      .catch((e) => record('gpu-load', { where, unavailable: String(e?.message ?? e).slice(0, 200) }))
+  await gpuLoad('section start')
+  // A FRESH PAGE, AND AGAIN EVERY FEW VILLAGES (point 1446). Every village
+  // visit leaves its pipelines and heap behind (measured: ~40 pipelines and
+  // ~0.6 GB of Chrome's GPU process per village), so after the sections before
+  // this one the full run lost the GPU process around the 16th village. A
+  // reload frees that load; every check below runs as before. Calibratable:
+  // DRESS_REBOOT_EVERY villages per page.
+  const REBOOT_EVERY = Number(process.env.DRESS_REBOOT_EVERY ?? 8)
+  const freshPage = async () => {
+    await page.goto(BASE)
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    await page.waitForFunction(() => window.__game && window.__balance && window.__renderer, null, { timeout: 90000 })
+    await assertBackend(page)
+    await nextFrames(30)
+    await page.evaluate(() => {
+      window.__balance.randomEventsEnabled = false
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
+    // bytes, its parse, each distinct person's build, and every main-thread
+    // block (long task) from entering the first village until it is drawn.
+    await page.evaluate(() => {
+      window.__dressLongTasks = []
+      try {
+        new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
+          type: 'longtask',
+        })
+      } catch {
+        window.__dressLongTasks = null
+      }
+    })
+  }
+  await freshPage()
+  await gpuLoad('fresh page')
   let loadRecorded = false
-  for (const people of PEOPLES) {
+  for (const [n, people] of PEOPLES.entries()) {
+    if (n > 0 && n % REBOOT_EVERY === 0) {
+      await freshPage()
+      await gpuLoad('fresh page')
+    }
     await goToPlace(villageOf(people))
     await awaitGltfBody(people)
+    await gpuLoad(villageOf(people))
     if (!loadRecorded) {
       loadRecorded = true
       await nextFrames(10)
