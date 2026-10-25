@@ -1,0 +1,175 @@
+{
+  "model": "Opus 5.5",
+  "entries": [
+    {
+      "id": "A1",
+      "file": "docs/batch-owner-runbook.md:60",
+      "defect": "Replace the pacing prose with: at most 2 concurrent cloud authors. Derivation: acceptance-only game points average 3.05 h against one measured 1.3 h cloud cycle (1440), so one author keeps acceptance fed and a second absorbs red rework. Every branch that waited more than a day (1297, 1333, 1414, 1432) needed post-sync rework."
+    },
+    {
+      "id": "A2",
+      "file": "POOL_CAP / commission-guard",
+      "defect": "KEEP 3 = one branch in local acceptance plus 2 cloud branches. While 1347 stays open (idle since 21.10), the effective cloud bound is 1; landing or parking it through the existing park record lifts it to 2."
+    },
+    {
+      "id": "A3",
+      "file": "procedure (switch-over)",
+      "defect": "From the first point after this one, start cloud authoring of the next 1–2 ready, file-disjoint points at the start of each local acceptance window. Enforcement is commission-guard's existing free-slot reason (point 427); no new guard."
+    },
+    {
+      "id": "A4",
+      "file": "cloud-switch / lane-routing / author-delegate",
+      "defect": "Make both status outputs agree on where authoring runs. If author-delegate authors locally while the switch is ON, fix that decision and cover it with Vitest. Measured: 7 locally authored points vs 1 cloud start since 23.10 09:34Z."
+    },
+    {
+      "id": "A5",
+      "file": "runbook \"Quiet acceptance windows\"",
+      "defect": "KEEP: at most 1 local heavy job (browser suite, unit gate, picture check, or local author running Vitest). Reasons: 12 GB available RAM, swap already in use, the recorded suite memory wall."
+    },
+    {
+      "id": "A6",
+      "file": "procedure (section re-runs)",
+      "defect": "After 2 reds of the same section and backend with no new commit in between, stop re-running and diagnose. Repeats cost 8.2 h, about 40 of them on 1404 and 1405."
+    },
+    {
+      "id": "A7",
+      "file": "red-charging procedure",
+      "defect": "Skip the main re-run when the red is already charged to an open point and main is unchanged for that section; reuse the recorded main run (cover with Vitest). Measured 1.4 h."
+    },
+    {
+      "id": "A8",
+      "file": "retrospective-fingerprint / guide-attest requirement",
+      "defect": "Switch off the per-landing refresh and refresh once per day instead. About 45 of 191 main commits; main pushes about 10 min apart. Locate the demanding rule first."
+    },
+    {
+      "id": "A9",
+      "file": "procedure (host)",
+      "defect": "Ask the user to keep the WSL2 host awake. 13.6 h (13.9 %) was lost with the launcher silent, more than all suite repeats together."
+    },
+    {
+      "id": "A10",
+      "file": "batch-boundary.mjs",
+      "defect": "KEEP and follow it. 1440 landed without a point boundary and 1.7 h of stall-only journal followed."
+    },
+    {
+      "id": "A11",
+      "file": "run-wait.mjs / 1446 fix",
+      "defect": "KEEP. Confirm in the measured cycle that `running/-` WebGPU hangs (4.0 h) no longer occur; treat any hang as STALLED and do not re-await it."
+    },
+    {
+      "id": "A12",
+      "file": "land-point.mjs, tier suites, picture check (both backends), cross-review.mjs",
+      "defect": "KEEP unchanged. Cloud green never replaces them; local Vitest stays because cloud-clone-only Vitest reds exist (parked 24.10 06:25)."
+    },
+    {
+      "id": "A13",
+      "file": "author-routing-core (\"verification is the work\")",
+      "defect": "KEEP. Picture fix loops stay local; the cloud authors only first implementations."
+    },
+    {
+      "id": "A14",
+      "file": "commission-guard --status",
+      "defect": "KEEP as the single \"what runs where\" command. Check that it lists cloud sessions and wiring state (its output is absent from the material); if it does not, add one line there, with a Vitest test."
+    },
+    {
+      "id": "A15",
+      "file": "procedure (measured cycle)",
+      "defect": "After landing, run `batch-standstill-report.mjs` over the next 5 landed points or 48 h, whichever is later. Success means a mean below 3.37 h per point (excluding host-down), with game points below 5.0 h and others below 1.8 h. Otherwise name the class that absorbed the gain."
+    },
+    {
+      "id": "A16",
+      "file": "launcher stalled-no-progress",
+      "defect": "KEEP as telemetry, but do not count `process-exit` events as session loss in measurements."
+    },
+    {
+      "id": "A17",
+      "file": "owner-side measurement",
+      "defect": "FINDING on the measurement/material: \"No landing between 24.10 09:40 and 25.10 02:17\" — the next landing is the 1442 merge at 25.10 06:04:44+01:00; 02:17 is the launcher takeover, so the landing gap is 21.4 h."
+    },
+    {
+      "id": "A18",
+      "file": "owner-side measurement",
+      "defect": "FINDING on the measurement/material: \"roughly 12 h no live owner\" — the journal and launcher are silent 24.10 12Z–25.10 00Z and the launcher reports 833/848 min unmoved (≈13.6–14 h); the earlier `heartbeat-predates-boot` restarts at 24.10 10Z and 11Z are omitted."
+    },
+    {
+      "id": "A19",
+      "file": "owner-side measurement",
+      "defect": "FINDING on the measurement/material: 1393 is listed among \"game points\" but feat/1393-generic-model-lanes is infrastructure (journal: \"1393: Autor baut Modell-Lanes\")."
+    },
+    {
+      "id": "A20",
+      "file": "owner-side measurement",
+      "defect": "FINDING on the measurement/material: \"1442's last suite run … 9/23 frames\" cites local/1442-dress-cost-short-webgpu.log (mtime 24.10 10:52Z), but later 1442 runs exist (25.10 01:26, 01:46, 02:32, 03:40Z, the last 51.6 min exit 1); the log content is not attached."
+    },
+    {
+      "id": "A21",
+      "file": "1443 premise / commission-guard.mjs",
+      "defect": "FINDING on the measurement/material: Cloud lane 1440 started 24.10 04:41 CEST with 5 feat branches open, and 1442 (24.10 10:00 CEST) and 1446 (25.10 06:51 CET) were cut with ≥5 open, so \"commission-guard refused every new cloud lane\" contradicts the material; the park/override record and `--status` are absent."
+    },
+    {
+      "id": "A22",
+      "file": "MERGES list",
+      "defect": "FINDING on the measurement/material: feat/1413-empty-transcript-no-lock is merged twice (22.10 01:56 and 02:21 CEST): \"last 25 merges\" are 24 distinct points."
+    },
+    {
+      "id": "A23",
+      "file": ".claude/batch-activity.jsonl",
+      "defect": "FINDING on the measurement/material: `process-exit … stalled-no-progress` repeats up to 8× for one session that keeps working (6ad6d4 23.10 09:52–11:52Z during suites; 0893e1 emits delegated-start 6 min after its \"exit\"), so the event does not mean the process exited."
+    },
+    {
+      "id": "A24",
+      "file": ".claude/batch-launcher.log",
+      "defect": "FINDING on the measurement/material: \"owner process measured inactive (fresh-heartbeat)\" gives a fresh heartbeat as an inactivity cause, and many \"taking over\" lines have no following RESUMING spawn."
+    },
+    {
+      "id": "A25",
+      "file": ".claude/batch-activity.jsonl",
+      "defect": "FINDING on the measurement/material: 1440 merged 24.10 03:59Z with no `point-boundary` handover (only context-boundary 73017b before and 3899a2 at 07:20Z after); 04:35–06:14Z shows only stall flags."
+    },
+    {
+      "id": "A26",
+      "file": "local/verify-logs",
+      "defect": "FINDING on the measurement/material: Game point feat/1402 has no verify-run record at all, and feat/1403's only runs are two non-zero children-bank-game WebGPU runs (exit 1 and 2, no WebGL, no green), yet both merged; the browser-suite gate evidence is not in the material."
+    },
+    {
+      "id": "A27",
+      "file": "local/verify-logs",
+      "defect": "FINDING on the measurement/material: Six runs remain `running/-` with 0.0 duration (23.10 05:08, 24.10 08:14/09:18/10:52/11:39, 25.10 02:57Z) with no terminal receipt, hiding ≈4 h from duration sums."
+    },
+    {
+      "id": "A28",
+      "file": "local/*-author.log",
+      "defect": "FINDING on the measurement/material: 1409/1412/1407-astra-author.log are all exactly 483 B and 1424-cross-author.log is 499 B; 1412's delegated-start and finish share startedAt 1792630205801, and 1409/1424 switched to main-chain authors within 1–11 min, so non-main authoring starts appear to have failed 4/4 (content not attached)."
+    },
+    {
+      "id": "A29",
+      "file": "main non-merge commits",
+      "defect": "FINDING on the measurement/material: Code/test changes landed directly on main outside land-point (24.10 01:56 undici bump, 02:31 cloud-start test child shell, 06:07 distribution test fixture; 25.10 18:04 moment-catcher charge); no review evidence is visible."
+    },
+    {
+      "id": "A30",
+      "file": "cloud-switch / lane-routing --status",
+      "defect": "FINDING on the measurement/material: lane-routing says \"author → the main chain\" while cloud-switch says \"authoring delegations run in the CLOUD\"; nothing in the material resolves which applies (7 local vs 1 cloud authoring since switch-on)."
+    },
+    {
+      "id": "A31",
+      "file": "docs/batch-owner-runbook.md:60",
+      "defect": "FINDING on the measurement/material: \"pace cloud authoring to what local acceptance can land\" states no number, so neither the owner nor a measurement can check it."
+    },
+    {
+      "id": "A32",
+      "file": "main non-merge commits",
+      "defect": "FINDING on the measurement/material: 191 non-merge commits against 25 merges in 98 h, about 45 of them retrospective-fingerprint/guide-attest refreshes, at ≈10 min per main push (8 pushes 23.10 20:23–21:45Z)."
+    },
+    {
+      "id": "A33",
+      "file": "material section \"batch-in-flight --status (now)\"",
+      "defect": "FINDING on the measurement/material: The header promises batch-in-flight --status output but none is included, and commission-guard --status (ARMED/DORMANT) is absent, so one-command visibility is unverifiable."
+    },
+    {
+      "id": "A34",
+      "file": "scripts/commission-guard.mjs, batch-in-flight-core.mjs, docs/lane-routing.md, launcher log",
+      "defect": "FINDING on the measurement/material: TRUNCATED: commission-guard \"(full)\" ends mid-comment \"this point is being FINISHED\", the core region ends \"on a HE\", lane-routing.md ends at a stray backtick, and launcher lines are cut at ≈100 chars (\"failCoun\")."
+    }
+  ]
+}
