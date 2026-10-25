@@ -131,6 +131,7 @@ put it is the mistake this line exists to stop.
     - 1442's last suite run polish-villagers ended "9/23 frames, 14 missing" (local/1442-dress-cost-short-webgpu.log).
     - Open stale branches: 1297 (idle since 06.10.), 1347 (66 commits, idle since 21.10.), 1333, 1414, 1432.
     - Of the last 25 merges roughly 9 are game points.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1437. Remove the settled queueing-feedback card from the board
   Final state: Remove the board card "Rückmeldung beim Einreihen: welcher der drei Vorschläge?" from the dashboard and republish it. No point and no other change: the user leaves the queueing feedback as it is for now. Background: GPT-6.1 Sol judged Proposal 1 (chat session appends an approved order to TASKS.md itself) CRITICAL on 23.10.2026 16:03 (A1 concurrent main writers / number collisions, A2 guard compatibility unproven, A3 queue positions other than end, A4 not a simplification under the infrastructure freeze); the user then decided to leave it as it is.
   Observed problem: User order 23.10.2026 21:25 in a chat session without the batch lock: the decision card is settled (leave as is), so it must leave the board. The chat session cannot edit the board under the stand-down.
