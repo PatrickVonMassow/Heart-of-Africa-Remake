@@ -4940,22 +4940,47 @@ if (section('villager-dress')) {
       })
       .then((load) => record('gpu-load', { where, ...load }))
   await gpuLoad('section start')
-  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
-  // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
-  // bytes, its parse, each distinct person's build, and every main-thread
-  // block (long task) from entering the first village until it is drawn.
-  await page.evaluate(() => {
-    window.__dressLongTasks = []
-    try {
-      new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
-        type: 'longtask',
-      })
-    } catch {
-      window.__dressLongTasks = null
-    }
-  })
+  // A FRESH PAGE, AND AGAIN EVERY FEW VILLAGES (point 1446). Every village
+  // visit leaves its pipelines and heap behind (measured: ~40 pipelines and
+  // ~0.6 GB of Chrome's GPU process per village), so after the sections before
+  // this one the full run lost the GPU process around the 16th village. A
+  // reload frees that load; every check below runs as before. Calibratable:
+  // DRESS_REBOOT_EVERY villages per page.
+  const REBOOT_EVERY = Number(process.env.DRESS_REBOOT_EVERY ?? 8)
+  const freshPage = async () => {
+    await page.goto(BASE)
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    await page.waitForFunction(() => window.__game && window.__balance && window.__renderer, null, { timeout: 90000 })
+    await assertBackend(page)
+    await nextFrames(30)
+    await page.evaluate(() => {
+      window.__balance.randomEventsEnabled = false
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
+    // bytes, its parse, each distinct person's build, and every main-thread
+    // block (long task) from entering the first village until it is drawn.
+    await page.evaluate(() => {
+      window.__dressLongTasks = []
+      try {
+        new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
+          type: 'longtask',
+        })
+      } catch {
+        window.__dressLongTasks = null
+      }
+    })
+  }
+  await freshPage()
+  await gpuLoad('fresh page')
   let loadRecorded = false
-  for (const people of PEOPLES) {
+  for (const [n, people] of PEOPLES.entries()) {
+    if (n > 0 && n % REBOOT_EVERY === 0) {
+      await freshPage()
+      await gpuLoad('fresh page')
+    }
     await goToPlace(villageOf(people))
     await awaitGltfBody(people)
     await gpuLoad(villageOf(people))
