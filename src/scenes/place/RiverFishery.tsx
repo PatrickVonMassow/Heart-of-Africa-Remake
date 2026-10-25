@@ -550,10 +550,10 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     if (carrierWalk.current) {
       carrierWalk.current.position.set(c.x, groundHeight(c.x, c.z), c.z)
       carrierWalk.current.rotation.y = c.yaw
-      // A basket on his head rests on his crown and rides its bob.
+      // A basket on his head rests on his crown, rides its bob and tilts with it.
       for (const b of ring.baskets) {
         const g = b.at === 'carrier' ? basketGroups.current[b.id] : null
-        if (g && !kneeling && crownIn(carrierWalk.current, g.parent, g.position)) g.rotation.set(0, c.yaw, 0)
+        if (g && !kneeling) crownIn(carrierWalk.current, g.parent, g.position, g.quaternion)
       }
     }
     const cw = carrierWalkPoseRef.current

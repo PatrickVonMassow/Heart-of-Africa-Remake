@@ -3,7 +3,7 @@
 // the Figure component itself so the component module exports components only.
 
 import { createContext, useContext, useEffect, useMemo } from 'react'
-import type * as THREE from 'three/webgpu'
+import * as THREE from 'three/webgpu'
 import { REST_POSE, type FigurePose } from '../../render/gesture'
 import type { SpeechFloor } from '../../communication/speechFloor'
 import type { ColdDress } from './useColdCloaks'
@@ -140,13 +140,21 @@ export const HEAD_CARRY_POSE: { current: FigurePose } = {
  * Where the crown of the figure under `group` is, in the coordinates of
  * `frame` (a load's parent), with this frame's pose and transform — for a
  * head load that cannot be mounted on the figure itself (the fishers' basket,
- * which moves between people). False when the figure has no crown yet.
+ * which moves between people). With `turn`, also the head's orientation in
+ * that frame, so the load tilts with the head instead of the bowed head
+ * rising into it. False when the figure has no crown yet.
  */
-export function crownIn(group: THREE.Object3D, frame: THREE.Object3D | null, out: THREE.Vector3): boolean {
+export function crownIn(group: THREE.Object3D, frame: THREE.Object3D | null, out: THREE.Vector3, turn?: THREE.Quaternion): boolean {
   group.updateMatrixWorld(true)
   const crown = group.getObjectByName('figure-crown')
   if (!crown) return false
   crown.getWorldPosition(out)
   if (frame) frame.worldToLocal(out)
+  if (turn) {
+    crown.getWorldQuaternion(turn)
+    if (frame) turn.premultiply(frame.getWorldQuaternion(FRAME_TURN).invert())
+  }
   return true
 }
+
+const FRAME_TURN = new THREE.Quaternion()

@@ -22,9 +22,9 @@ import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
 import { createBasketRing, FISH_BASKET, type BasketRing } from './fishBaskets'
-import { CARRIER_BASKET_Y, carrierWalkPose, copyPose, netManAshore, netManBasketAt, placeNetMan } from './fisheryPoses'
+import { carrierWalkPose, copyPose, netManAshore, netManBasketAt, placeNetMan } from './fisheryPoses'
 import { PLACE_RADIUS } from './layout'
-import type { FigureLook } from './placeFigureContext'
+import { crownIn, type FigureLook } from './placeFigureContext'
 import { buildRiverBank } from './riverBank'
 import { SkinnedFigure } from './skinnedFigure'
 import { canoeLane, createCanoe, stepCanoe, type CanoeState } from './villagerCanoe'
@@ -227,7 +227,11 @@ describe('the basket the carrier swaps at the bank', () => {
     const si = mesh.geometry.attributes.skinIndex
     const sw = mesh.geometry.attributes.skinWeight
     const v = new THREE.Vector3()
-    const at = { x: 0, y: CARRIER_BASKET_Y, z: 0 }
+    // The basket rides and tilts with his crown as RiverFishery places it (crownIn);
+    // the head is measured in the basket's own frame.
+    const crown = new THREE.Vector3()
+    const turn = new THREE.Quaternion()
+    const origin = { x: 0, y: 0, z: 0 }
     let worst = -Infinity
     let t = 0
     // a second carrying at the bank, then the whole swap, then carrying on
@@ -237,6 +241,8 @@ describe('the basket the carrier swaps at the bank', () => {
       now.clock = Math.max(0, Math.min(lift, k * DT))
       act(() => advance((t += DT)))
       outer.updateWorldMatrix(true, true)
+      expect(crownIn(outer, null, crown, turn)).toBe(true)
+      turn.invert()
       for (let i = 0; i < pos.count; i++) {
         let w = 0
         for (let c = 0; c < 4; c++) if (si.getComponent(i, c) === headIndex) w += sw.getComponent(i, c)
@@ -244,10 +250,11 @@ describe('the basket the carrier swaps at the bank', () => {
         v.fromBufferAttribute(pos, i)
         mesh.applyBoneTransform(i, v)
         v.applyMatrix4(toWorld.copy(mesh.bindMatrixInverse).invert())
-        worst = Math.max(worst, inside(v, at))
+        worst = Math.max(worst, inside(v.sub(crown).applyQuaternion(turn), origin))
       }
     }
     await act(async () => root.unmount())
-    expect(worst).toBeLessThan(0)
+    // The basket rests on the crown: contact, never more than 2 mm into the head.
+    expect(worst).toBeLessThan(0.002)
   })
 })
