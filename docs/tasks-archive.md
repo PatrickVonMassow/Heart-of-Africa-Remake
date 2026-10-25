@@ -34806,3 +34806,10 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Queue position: directly after 1440 (it reddens landings).
   Source: docs/backlog.md entries of 20.10. and 22.10.2026 plus the 24.10.2026 gate; real blockade of landings (CLAUDE.md §2 finding intake).
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1442. polish-villagers villager-dress hangs on WebGPU in its cost probe
+  Final state: `npm test -- polish-villagers --section=villager-dress` with VERIFY_GL=webgpu ends on its own (pass or a named red) within its measured runtime; the cost probe loop (`scripts/verify/polish-villagers.mjs`, `DRESS_COST` villages) records a `cost` row per village on WebGPU in `local/verify-measure/villager-dress.jsonl`, and every wait inside it (awaitPlaceDrawn, awaitGltfBody, the 61-frame rAF sampler) has a timeout that reports which village and level it stuck on instead of hanging. The full-suite run on both backends moved to 1446 (split 25.10.2026: section green, full run blocked by a GPU-process loss).
+  Observed problem: on 24.10.2026 the full WebGPU run was killed at the 45-min and then the 90-min wall timeout; the section alone is killed at 8 min. All dress frames and every `row-hidden` record are written (last frame 1294-dress-<people>), but no WebGPU `cost` record exists at all (the only ones are WebGL, 18.10.2026); `--section=village-walk` passes in 3 min 34 s.
+  Queue position: directly after 1441 (it holds the render coverage of every village landing).
+  Source: covering-run attempts of the 1440 session, 24.10.2026; real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
