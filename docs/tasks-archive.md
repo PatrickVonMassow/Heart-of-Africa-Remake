@@ -34813,3 +34813,10 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Queue position: directly after 1441 (it holds the render coverage of every village landing).
   Source: covering-run attempts of the 1440 session, 24.10.2026; real blockade (CLAUDE.md §2 finding intake).
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1446. The full polish-villagers WebGPU run loses Chrome's GPU process inside villager-dress
+  Final state: the GPU-process loss in the full `VERIFY_GL=webgpu` polish-villagers run is located (which section/act accumulates GPU load before it, measured) and removed, or staged away without weakening a check; then the full polish-villagers suite runs to its end on both backends, which is the covering run render-verify-guard owes for the village render commits since 460b010.
+  Observed problem: run of 25.10.2026 03:40 UTC on feat/1442 3b70d4a87 (`VERIFY_SUITE_TIMEOUT_MS=5400000`): villager-dress `row-hidden` rows arrive every 15-30 s from 04:04 to hausa at 04:10:24, then nothing until bambara at 04:22:13; Chrome's `--type=gpu-process` was 11 s old at 04:22:22 (restarted), and afterwards rows took ~2 min each (fang 04:26, mongo 04:28, mbuti 04:30). run-wait declared it HUNG at 51 min; ended by hand. The earlier run of 02:57 UTC stalled at the same spot (last row nubians, then silence). `--section=villager-dress` alone passes with `cost` rows (01:36-01:39 UTC). WebGL 2 full run of 02:32 UTC ended exit 1 after 17 min (reds 1381, 1265, 1266 plus an uncaught exception, `local/verify-logs/2026-10-25T02-32-06-170-polish-villagers.log.suites.jsonl`).
+  Queue position: directly after 1442.
+  Source: covering run of the 1442 session, 25.10.2026; real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
