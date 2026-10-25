@@ -156,13 +156,6 @@ put it is the mistake this line exists to stop.
   Placement (user order 21.10.2026): queue as a new point directly after point 1405 in the work order.
   Source: user request 21.10.2026 (chat session 7ee60c4b), spec cut from 3063698ad; approved: "ja".
   Bundle: Dorfleben.
-- [ ] 1414. Fishery figure at the canoe squats with his head inside the fish basket
-  The man in dark blue squatting at the beached canoe has his head buried in the woven fish basket: the basket stays near standing head height while he crouches and leans to the hull. Done when the basket clears the head in every squat and lean phase, with a Vitest asserting basket-head clearance over the whole swap cycle, judged in a capture.
-  Suspects: RiverFishery.tsx placeBasket case netman (fixed height ground+0.55-0.45*reach, 0.45 m ahead) against the placeNetMan squash and reachPose lean, or the carrier swap bend in carrierWalkPose while the basket is still at the carrier.
-  Source: user bug report KopfInKorb (/backup/hoa/local/KopfInKorb.zip), filed 21.10.2026 19:12Z.
-  Repro for all: seed 3318564123, Bambara village (place mode), position x/z -59.45/-130.99, build production 0562828, WebGPU.
-  Queue position: after the user-report points 1402-1405 (append-and-defer of a user-reported defect).
-  Bundle: Dorfleben.
 - [ ] 1432. The task walker takes its head load off with its hands and puts it back on instead of letting it vanish
   QUEUE POSITION: directly after point 1414 (user order 23.10.2026 15:51, "Ja, das so nach 1414 einreihen.").
   GOAL: the village task walker (TaskWalker in src/scenes/place/PlaceLife.tsx, carry 'bundle' to the fire or 'jar' to the well) takes its head load off with its hands and puts it back on, instead of the load vanishing while it kneels. Today `load.current.visible = next.mode !== 'work'` (PlaceLife.tsx ~2273) only hides the load during the kneel; nothing sets it down.

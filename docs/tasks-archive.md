@@ -34820,3 +34820,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Queue position: directly after 1442.
   Source: covering run of the 1442 session, 25.10.2026; real blockade (CLAUDE.md §2 finding intake).
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1414. Fishery figure at the canoe squats with his head inside the fish basket
+  The man in dark blue squatting at the beached canoe has his head buried in the woven fish basket: the basket stays near standing head height while he crouches and leans to the hull. Done when the basket clears the head in every squat and lean phase, with a Vitest asserting basket-head clearance over the whole swap cycle, judged in a capture.
+  Suspects: RiverFishery.tsx placeBasket case netman (fixed height ground+0.55-0.45*reach, 0.45 m ahead) against the placeNetMan squash and reachPose lean, or the carrier swap bend in carrierWalkPose while the basket is still at the carrier.
+  Source: user bug report KopfInKorb (/backup/hoa/local/KopfInKorb.zip), filed 21.10.2026 19:12Z.
+  Repro for all: seed 3318564123, Bambara village (place mode), position x/z -59.45/-130.99, build production 0562828, WebGPU.
+  Queue position: after the user-report points 1402-1405 (append-and-defer of a user-reported defect).
+  Bundle: Dorfleben.
