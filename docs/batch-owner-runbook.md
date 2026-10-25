@@ -103,10 +103,12 @@ diagnose before running it again; a relevant commit or a recorded changed condit
 (an environment repair) reopens it. A red already charged to an open point with
 `main` unchanged in that section reuses the recorded `main` run.
 
-**Manageable.** Every cloud author, local agent and long suite is declared with
-`batch-in-flight --waiting-on "<what and why>"`, so `node scripts/batch-in-flight.mjs
---status` is the one output naming what runs where and why; an undeclared job is
-the owner's defect, not a gap in the command.
+**Manageable.** The in-flight declaration is one record that a new `--waiting-on`
+replaces, so each declaration names every concurrent job: its text says what runs
+where and why (`"cloud author 1450 (session <id>); local suite polish-villagers for
+1449"`), and each job adds its evidence (`--branch`, `--worktree`, `--log`, `--pid`).
+`node scripts/batch-in-flight.mjs --status` then prints that text and all items in
+one output; a job missing from it is the owner's defect, not a gap in the command.
 
 **Simplified.** Routine retrospective, guide-attest and queue-rank refreshes go into
 one bookkeeping commit per boundary; a user-order publication receipt keeps its own
