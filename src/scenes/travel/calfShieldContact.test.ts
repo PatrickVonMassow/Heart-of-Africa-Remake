@@ -163,7 +163,7 @@ function aftermath(
   seconds: number,
   book: Bookkeeping = PRODUCTION,
 ): After {
-  const calf: Calf & { escape?: number; mourn?: number; mournAt?: P; caught?: boolean } = { ...st.calf }
+  const calf: Calf & { escape?: number; mourn?: number; mournAt?: P; caught?: number } = { ...st.calf }
   const par = { ...st.par, dead: false }
   let bonded = true
   const lion = { ...st.lion }
@@ -188,7 +188,7 @@ function aftermath(
   let mournReached = false
   for (let f = 0; f < seconds / dt; f++) {
     // Herds pre-pass: a caught calf dies in its countdown.
-    if (calf.caught) break
+    if (calf.caught !== undefined) break
     const chaseOnCalf = hunt.mode === 'chase' && hunt.victim === 'calf'
     if (!par.dead && bonded && chaseOnCalf) {
       const h = blockHeading(par.x, par.z, calf.x, calf.z, lion.x, lion.z, PARENT_BLOCK_OFFSET)
@@ -266,7 +266,7 @@ function aftermath(
           const pace = swimBrakedPace(HUNT_LION_SPEED, river(lion.x, lion.z), SWIM_PACE)
           lion.x += Math.sin(lion.h) * pace * dt
           lion.z += Math.cos(lion.h) * pace * dt
-          if (segPointDist(x0, z0, lion.x, lion.z, calf.x, calf.z) < CALF_CATCH_DIST) calf.caught = true
+          if (segPointDist(x0, z0, lion.x, lion.z, calf.x, calf.z) < CALF_CATCH_DIST) calf.caught = 0
         }
       }
     } else if (hunt.mode === 'feed') {
@@ -293,7 +293,7 @@ function aftermath(
     }
     if (landedAcross) minAfter = Math.min(minAfter, Math.hypot(lion.x - calf.x, lion.z - calf.z))
   }
-  return { calfCaught: calf.caught === true, parentTaken, familyBroken, landedAcross, minLionCalfAfterLanding: minAfter, mournReached }
+  return { calfCaught: calf.caught !== undefined, parentTaken, familyBroken, landedAcross, minLionCalfAfterLanding: minAfter, mournReached }
 }
 
 describe('the shield at the river (user report 05.10.2026)', () => {
