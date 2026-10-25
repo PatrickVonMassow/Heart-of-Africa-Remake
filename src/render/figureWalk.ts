@@ -16,6 +16,7 @@
 
 import { VILLAGER_MOTION as M } from '../config/balance'
 import type { AgeGroup } from '../systems/appearance'
+import type { BufferGeometry } from 'three/webgpu'
 import type { BodyProportions } from './figureBody'
 import { kneelLegs } from './figureRig'
 
@@ -236,6 +237,14 @@ export function steerHeading(yaw: number, desired: number, speed: number, dt: nu
   return { yaw: yaw + turn, pace }
 }
 
+/** The heading a walker turns toward: where a full step toward its waypoint
+ *  really goes (slid along a wall, round another body) — unless that is
+ *  hardly a step, or a shove back, which never turns it about. */
+export function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
+  const ahead = (tx - x) * dx + (tz - z) * dz > 0
+  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
+}
+
 export interface FootPhase {
   z: number
   lift: number
@@ -355,12 +364,56 @@ export function crouchTarget(speed: number, contactCrouch: number): number {
   return Math.abs(speed) > M.moveSpeed ? 0 : contactCrouch
 }
 
-/** The crown above the head bone (which sits at the chin): where a head load
- *  rests, riding every bob and stoop of the head. `drawnTop` is the top of the
- *  drawn figure in its bind pose (hair, a head cloth) — the load sits on what
- *  is drawn, not on the skull's nominal height. */
-export function crownOffset(p: BodyProportions, drawnTop = p.crownY): number {
-  return Math.max(p.crownY, drawnTop) - p.chinY
+/** The crown above the head bone: where a head load rests, riding every bob
+ *  and stoop of the head. `drawnTop` is the top of the drawn figure in its
+ *  bind pose (hair, a head cloth) — the load sits on what is drawn, not on the
+ *  skull's nominal height. `headY` is the head bone's bind height: at the chin
+ *  on the code-built body, but some centimetres above it on the glTF body, so
+ *  it is read off the bone rather than assumed to be the chin. */
+export function crownOffset(p: BodyProportions, drawnTop = p.crownY, headY = p.chinY): number {
+  return Math.max(p.crownY, drawnTop) - headY
+}
+
+/** How far from the head bone's vertical the drawn head top is read (figure
+ *  units): the scalp under a load, not a hair bag or a brim beside it. */
+export const HEAD_TOP_AXIS = 0.06
+
+/**
+ * The top of the drawn head over the head bone's vertical in the bind pose:
+ * the highest vertex skinned wholly to `head` (scalp or headwear) within
+ * HEAD_TOP_AXIS of (`x`, `z`). Only vertices of drawn triangles count: the
+ * garment mask drops triangles from the index but keeps their vertices
+ * (non-indexed geometry draws every vertex). Null when no such vertex is
+ * drawn. The global top would put the load on whatever pokes highest
+ * anywhere on the figure.
+ */
+export function drawnHeadTop(g: BufferGeometry, head: number, x: number, z: number): number | null {
+  const pos = g.getAttribute('position')
+  const si = g.getAttribute('skinIndex')
+  const sw = g.getAttribute('skinWeight')
+  if (!pos || !si || !sw) return null
+  const index = g.getIndex()
+  let drawn: Uint8Array | null = null
+  if (index) {
+    drawn = new Uint8Array(pos.count)
+    for (let i = 0; i < index.count; i++) drawn[index.getX(i)] = 1
+  }
+  let top: number | null = null
+  for (let v = 0; v < pos.count; v++) {
+    if (drawn && !drawn[v]) continue
+    let whole = false
+    for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === head && sw.getComponent(v, k) > 0.99) whole = true
+    if (whole && Math.hypot(pos.getX(v) - x, pos.getZ(v) - z) <= HEAD_TOP_AXIS && (top === null || pos.getY(v) > top)) top = pos.getY(v)
+  }
+  return top
+}
+
+/** The crown anchor of a bound figure: its offset above the head bone (at
+ *  `headAt` in the bind pose, unrotated) to the drawn head top over the
+ *  bone's vertical — or the figure's top where nothing is drawn wholly on the
+ *  head there. */
+export function figureCrownOffset(p: BodyProportions, g: BufferGeometry, head: number, headAt: { x: number; y: number; z: number }): number {
+  return crownOffset(p, drawnHeadTop(g, head, headAt.x, headAt.z) ?? g.boundingBox?.max.y, headAt.y)
 }
 
 /** A figure's own walk between frames: what it measures of its ground
@@ -547,6 +600,13 @@ export function primitiveLayout(k: number, legs: boolean, L: { hipY: number; arm
     labelHeight: mix(1.45, (0.55 + 0.45) * 0.75),
     groupScale: [1, 1, 1],
   }
+}
+
+/** The primitive's hip pivot under a trunk lean: the cone's base rim tips by
+ *  `radius·|sin lean|` below the hip, so a kneeling (low) hip rises by what the
+ *  rim would cut into the ground; a standing hip is already clear. */
+export function leanedHipY(hipY: number, radius: number, lean: number): number {
+  return Math.max(hipY, radius * Math.abs(Math.sin(lean)))
 }
 
 /** True when a pose leaves this arm hanging at rest — no contact to reach, so

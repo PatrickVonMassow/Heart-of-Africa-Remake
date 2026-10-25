@@ -127,6 +127,48 @@ export interface FigurePose {
    *  pixel at all. Point 351's chase reads its posture through `lean` in the
    *  same way. */
   turn: number
+  /** How far each hand takes the pointing shape (0 … 1; absent: none) — the
+   *  glTF body's `point.L/R` hand morphs (natural-villager-motion step 3). */
+  pointHand?: { left: number; right: number }
+  /** Each clavicle's protraction and elevation (rad; absent: none) — the glTF
+   *  body's posable shoulders, added after its clips (natural-villager-motion
+   *  step 11). */
+  shoulders?: { left: ShoulderPose; right: ShoulderPose }
+  /** Where the head looks (glTF body; absent: along the pose's own turn):
+   *  `yaw`/`pitch` relative to the heading (rad), and `turn`, the part of
+   *  this pose's `turn` that is the gaze's rather than the trunk's own — the
+   *  glTF body takes that part off the trunk and gives the chest only its
+   *  share (VILLAGER_POSE.gaze.chestYaw), the head and neck the rest
+   *  (natural-villager-motion steps 15/16). */
+  gaze?: { yaw: number; pitch: number; turn: number }
+  /** How far out each posed hand is solved (glTF body), as a share of the
+   *  line from its shoulder to where the pose's arm points the hand (a side
+   *  left out: the primitive's own hand): below 1 the elbow bends, above 1
+   *  the hand reaches for a target beyond the primitive's straight arm. `lunge`: the trunk may lean in, as far as
+   *  it takes, to bring such a hand onto its target (the catch's last stride);
+   *  without it a pose with a reach leans by its own lean alone. A number is
+   *  that lean-in's share (true = 1), so a blend between poses eases it. */
+  reach?: { left?: number; right?: number; lunge?: boolean | number }
+  /** The glTF body's own pose where it differs from this one, which the
+   *  primitive figure keeps (the low preset untouched, natural-villager-motion
+   *  constraint 7): applyFigurePose writes it onto a skinned figure's pivots. */
+  body?: FigurePose
+}
+
+/** A clavicle's turn off the clip: forward (protraction) and up (elevation, rad). */
+export interface ShoulderPose {
+  protraction: number
+  elevation: number
+}
+
+/** Carry the pose's optional parts (the hand shapes) from `from` onto
+ *  `into`, for a caller that copies the arms, lean and turn field by field. */
+export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
+  into.pointHand = from.pointHand
+  into.shoulders = from.shoulders
+  into.gaze = from.gaze
+  into.reach = from.reach
+  into.body = from.body
 }
 
 /** Which side an arm belongs to. */
@@ -168,6 +210,9 @@ export interface GestureState {
   /** Per-figure phase offset, read by the refusal's shake so a crowd never
    *  shakes in lockstep. */
   phase: number
+  /** The arm that gestures, when the caller solved the aim from that arm's own
+   *  shoulder (absent: the arm on the bearing's side, `gestureArm`). */
+  side?: ArmSide
 }
 
 /** The rest state — no gesture running. */
@@ -191,6 +236,8 @@ export interface GestureAim {
   /** Per-figure phase offset (rad); the refusal's shake reads it so
    *  simultaneous refusals do not beat together. */
   phase?: number
+  /** The arm the aim was solved for (see `GestureState.side`). */
+  side?: ArmSide
 }
 
 /**
@@ -216,6 +263,7 @@ export function startGesture(kind: GestureKind, aim: GestureAim = {}): GestureSt
     bearing: aim.bearing ?? 0,
     elevation: aim.elevation ?? 0,
     phase: aim.phase ?? 0,
+    ...(aim.side ? { side: aim.side } : {}),
   }
 }
 
@@ -348,6 +396,10 @@ export function aimAt(
   }
 }
 
+/** How far an indication leans the trunk in (rad); an aim solved for it takes
+ *  this lean back out. */
+export const INDICATE_LEAN = 0.03
+
 /** Blend an angle from rest toward a target by the envelope. */
 function toward(rest: number, target: number, e: number): number {
   return rest + (target - rest) * e
@@ -381,7 +433,7 @@ function blendArm(rest: ArmPose, target: ArmPose, e: number): ArmPose {
 export function gesturePose(s: GestureState): FigurePose {
   const e = gestureEnvelope(s)
   if (s.kind === null || e <= 0) return { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }
-  const side = gestureArm(s.bearing)
+  const side = s.side ?? gestureArm(s.bearing)
   const otherSide: ArmSide = side === 'left' ? 'right' : 'left'
   const restArm = REST_POSE[side]
   const restOther = REST_POSE[otherSide]
@@ -438,7 +490,7 @@ export function gesturePose(s: GestureState): FigurePose {
       // that same pace and then simply holds the aim for the rest.
       const sweep = smoothstep(s.t / (GESTURE_DURATIONS.indicate * 0.6))
       arm = armAim(s.bearing * sweep, s.elevation * sweep)
-      lean = 0.03
+      lean = INDICATE_LEAN
       break
     }
     case 'touch': {
@@ -461,6 +513,11 @@ export function gesturePose(s: GestureState): FigurePose {
     lean: lean * e,
     turn: turn * e,
   }
+  // the aiming hand of a point or an indication takes the pointing shape
+  if (s.kind === 'point' || s.kind === 'indicate') posed.pointHand = { left: side === 'left' ? e : 0, right: side === 'right' ? e : 0 }
+  // An aim solved from the drawn shoulder (`side` given) is held along that
+  // line by the glTF body's drawn arm, not reached to the primitive's hand.
+  if (s.side && (s.kind === 'point' || s.kind === 'indicate')) posed.reach = side === 'left' ? { left: 1 } : { right: 1 }
   return posed
 }
 

@@ -12,15 +12,17 @@
 // Pure: plain geometry and arrays, no scene graph; the tests read it directly.
 
 import * as THREE from 'three/webgpu'
-import { VILLAGER_GLTF } from '../config/balance'
+import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
-import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, tidy, type BodyProportions, type BoneName } from './figureBody'
-import { buildLayerGeometry } from './figureDress'
+import { bodyProportions, mixHex, paint as paintSurface, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE, tidy, type BodyProportions } from './figureBody'
+import { fibreOf, INFANT_SKIN, surfaceOf } from './figureDress'
+import { FIGURE_FIBRE } from './materials'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
-import { bakeMorphs, legScale, morphInfluences, restHeads } from './villagerBody'
+import { bakeMorphs, legScale, morphInfluences, restBounds, restHeads, stylisePeaks } from './villagerBody'
 import { topoOrder } from './villagerAsset'
+import { applyGarmentMask, COVER_ATTRIBUTE } from './villagerGarmentMask'
 
 const DOWN = new THREE.Vector3(0, -1, 0)
 
@@ -108,11 +110,47 @@ export function bakePose(geo: THREE.BufferGeometry, rest: Float32Array, heads: F
   }
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4))
   g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wts, 4))
-  g.morphAttributes = {}
-  g.morphTargetsRelative = false
+  // The live morphs (the hands' shapes, villagerBody.ts LIVE_MORPHS) ride the
+  // same linear skin map: a relative delta turns with the bones it hangs on
+  // (Σ w·R_b·d), so a closed hand closes on the hung body as on the file's.
+  const live = (geo.morphAttributes.position ?? []).map((m) => {
+    const d = new Float32Array(pos.count * 3)
+    for (let k = 0; k < pos.count; k++) {
+      t.set(m.getX(k), m.getY(k), m.getZ(k))
+      if (t.lengthSq() === 0) continue
+      acc.set(0, 0, 0)
+      let total = 0
+      for (let c = 0; c < 4; c++) {
+        const w = sw.getComponent(k, c)
+        if (w <= 0) continue
+        v.copy(t).applyQuaternion(world[si.getComponent(k, c)])
+        acc.addScaledVector(v, w)
+        total += w
+      }
+      if (total > 0) acc.multiplyScalar(1 / total)
+      else acc.copy(t)
+      d[k * 3] = acc.x
+      d[k * 3 + 1] = acc.y
+      d[k * 3 + 2] = acc.z
+    }
+    const a = new THREE.BufferAttribute(d, 3)
+    a.name = m.name
+    return a
+  })
+  g.morphAttributes = live.length ? { position: live } : {}
+  g.morphTargetsRelative = true
   g.deleteAttribute('normal')
   g.computeVertexNormals()
   return g
+}
+
+/** Scale a geometry's relative morph deltas (the body's grounding and sizing
+ *  scale positions about the soles; a delta only scales). */
+function scaleMorphs(g: THREE.BufferGeometry, s: number): void {
+  for (const m of g.morphAttributes.position ?? []) {
+    const a = m.array as Float32Array
+    for (let i = 0; i < a.length; i++) a[i] *= s
+  }
 }
 
 /** The bone each vertex hangs on most (its largest skin weight). */
@@ -154,6 +192,8 @@ export interface GltfPerson {
   hair: Uint8Array
   /** How the asset's clips reach this hung, scaled body (render/villagerClipPose.ts). */
   frame: PersonFrame
+  /** The body's garment cover mask (vertices × 4, render/villagerGarmentMask.ts), or null. */
+  cover: Uint16Array | null
 }
 
 /** A person's skeleton before the hang and the transform onto the drawn one:
@@ -167,6 +207,8 @@ export interface PersonFrame {
   scale: number
   /** Hip height over the basis body's (villagerBody.ts legScale). */
   legScale: number
+  /** The morph influences baked into this person (villagerBody.ts morphInfluences). */
+  influences: Record<string, number>
 }
 
 /**
@@ -201,16 +243,25 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     arr[k * 3 + 2] *= s
   }
   pos.needsUpdate = true
+  scaleMorphs(g, s)
+  stylisePeaks(g, age === 'child')
   const rest = new Float32Array(heads.length)
   for (let i = 0; i < heads.length / 3; i++) {
     rest[i * 3] = heads[i * 3] * s
     rest[i * 3 + 1] = (heads[i * 3 + 1] - sole) * s
     rest[i * 3 + 2] = heads[i * 3 + 2] * s
   }
-  g.computeBoundingBox()
-  g.computeBoundingSphere()
+  restBounds(g)
   const p = measureProportions(asset, g, dom, rest, p0)
-  return { geometry: g, rest, p, hair: hairMask(asset, g, dom, p), frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0) } }
+  const cov = asset.geometries.body.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
+  return {
+    geometry: g,
+    rest,
+    p,
+    hair: hairMask(asset, g, dom, p),
+    frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0), influences: w },
+    cover: cov ? Uint16Array.from(cov.array as ArrayLike<number>) : null,
+  }
 }
 
 /** Per-bone vertex samples of a hung body. */
@@ -400,110 +451,6 @@ function hairMask(asset: VillagerAsset, g: THREE.BufferGeometry, dom: Uint16Arra
 }
 
 /**
- * The trunk's cloth takes its skin weights from the body beneath it (the
- * nearest trunk vertex's), so a bent trunk — the elder's stoop — carries skin
- * and cloth alike; the code-built weights, measured to the code-built bones,
- * moved the cloth at the belly otherwise than the skin under it and the skin
- * came through. Only the band from the hips to below the shoulders is
- * transferred, faded in and out over its edges, and without the arm bones
- * (a raised arm must not drag the cloth's waist up); the hem and the
- * shoulders keep the weights that fold a robe with the legs and the arms.
- * In place on a layer already re-indexed onto the asset's bones.
- */
-export function transferTrunkWeights(asset: VillagerAsset, person: GltfPerson, g: THREE.BufferGeometry): THREE.BufferGeometry {
-  const { p, geometry: body } = person
-  const H = p.stature
-  const lo = p.hipY + 0.02 * H
-  const hi = p.shoulderY - 0.06 * H
-  const fade = 0.03 * H
-  const bp = body.getAttribute('position') as THREE.BufferAttribute
-  const bi = body.getAttribute('skinIndex') as THREE.BufferAttribute
-  const bw = body.getAttribute('skinWeight') as THREE.BufferAttribute
-  const dom = dominantBones(body)
-  const trunk = new Set(['hips', 'spine', 'chest'].map((n) => asset.bones.indexOf(n)))
-  const arms = new Set(['L', 'R'].flatMap((s) => [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`].map((n) => asset.bones.indexOf(n))))
-  const near: number[] = []
-  for (let k = 0; k < bp.count; k++) {
-    const y = bp.getY(k)
-    if (trunk.has(dom[k]) && y > lo - fade && y < hi + fade) near.push(k)
-  }
-  const pos = g.getAttribute('position') as THREE.BufferAttribute
-  const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
-  const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute
-  if (!near.length || !si || !sw) return g
-  for (let k = 0; k < pos.count; k++) {
-    const x = pos.getX(k)
-    const y = pos.getY(k)
-    const z = pos.getZ(k)
-    // a sleeve's share on the arm bones stays: only the rest moves to the trunk
-    let armShare = 0
-    for (let j = 0; j < 4; j++) if (arms.has(si.getComponent(k, j))) armShare += sw.getComponent(k, j)
-    const band = Math.min(1, (y - lo + fade) / fade, (hi + fade - y) / fade)
-    const rest = 1 - Math.min(1, armShare)
-    if (band <= 0 || rest <= 0) continue
-    let best = -1
-    let d = Infinity
-    for (const n of near) {
-      const e = (bp.getX(n) - x) ** 2 + (bp.getY(n) - y) ** 2 + (bp.getZ(n) - z) ** 2
-      if (e < d) {
-        d = e
-        best = n
-      }
-    }
-    const w = new Map<number, number>()
-    let own = 0
-    for (let j = 0; j < 4; j++) {
-      const b = bi.getComponent(best, j)
-      const v = bw.getComponent(best, j)
-      if (v > 0 && !arms.has(b)) {
-        w.set(b, (w.get(b) ?? 0) + v)
-        own += v
-      }
-    }
-    if (own <= 0) continue
-    for (const [b, v] of w) w.set(b, (v / own) * band * rest)
-    for (let j = 0; j < 4; j++) {
-      const b = si.getComponent(k, j)
-      const v = sw.getComponent(k, j)
-      if (v > 0) w.set(b, (w.get(b) ?? 0) + (arms.has(b) ? v : v * (1 - band)))
-    }
-    // four slots: the arm influences keep theirs, the largest others share the rest
-    const byWeight = [...w].sort((a, b) => b[1] - a[1])
-    const armSlots = byWeight.filter(([b]) => arms.has(b))
-    const others = byWeight.filter(([b]) => !arms.has(b)).slice(0, 4 - armSlots.length)
-    const armSum = armSlots.reduce((t, [, v]) => t + v, 0)
-    const otherSum = others.reduce((t, [, v]) => t + v, 0)
-    const top = [...armSlots, ...others.map(([b, v]): [number, number] => [b, (v / otherSum) * (1 - armSum)])]
-    for (let j = 0; j < 4; j++) {
-      si.setComponent(k, j, top[j]?.[0] ?? 0)
-      sw.setComponent(k, j, top[j]?.[1] ?? 0)
-    }
-  }
-  si.needsUpdate = true
-  sw.needsUpdate = true
-  return g
-}
-
-/** The 17 code-built bone names onto the asset's bone indices (the dress
- *  layers are skinned by BONE_NAMES order). */
-export function codeBoneMap(asset: VillagerAsset): Uint16Array {
-  return Uint16Array.from(BONE_NAMES, (n: BoneName) => {
-    const i = asset.bones.indexOf(n)
-    if (i < 0) throw new Error(`villager.glb: no bone ${n}`)
-    return i
-  })
-}
-
-/** Re-index a geometry skinned by BONE_NAMES onto the asset's bones (in place). */
-export function remapSkin(g: THREE.BufferGeometry, map: Uint16Array): THREE.BufferGeometry {
-  const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
-  const out = new Uint16Array(si.count * 4)
-  for (let k = 0; k < si.count; k++) for (let c = 0; c < 4; c++) out[k * 4 + c] = map[si.getComponent(k, c)]
-  g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(out, 4))
-  return g
-}
-
-/**
  * The hanging skeleton of a person, root (hips) unparented and at rest, its
  * inverses taken here. Bones in the asset's order (the skin indices); named
  * `bone-<name>` like the code-built ones.
@@ -529,13 +476,101 @@ export function createGltfSkeleton(asset: VillagerAsset, rest: Float32Array): { 
   return { skeleton: new THREE.Skeleton(list), bones }
 }
 
+/** A baby sling's infant-head flag per vertex (scripts/villager/export.py
+ *  _INFANT; GLTFLoader lower-cases a custom attribute's name). */
+export const INFANT_ATTRIBUTE = '_infant'
+
+/** The pipeline's mesh name for a dress layer (scripts/villager/garments.py `mesh_name`). */
+export const garmentMeshName = (l: Pick<DressLayer, 'form' | 'wear'>): string => `g-${l.form}-${l.wear}`
+
+/** The layer a dress slot is worn in, innermost first (scripts/villager/mask.py
+ *  LAYER): only a garment of an outer layer hides or pushes an inner one. */
+const SLOT_LAYER: Record<DressLayer['slot'], number> = { ornament: 0, hip: 1, head: 1, torso: 2, shoulder: 3 }
+export const garmentLayer = (l: Pick<DressLayer, 'slot'>): number => SLOT_LAYER[l.slot]
+
+/** Dress layers that are no garment (paint on the skin): never a mesh. */
+const isPaint = (l: Pick<DressLayer, 'form'>) => l.form === 'bodyPaint'
+
+/**
+ * A pipeline garment on a person: the mesh scripts/villager/ built round this
+ * body, fitted to every clip (fit.py) and measured frame by frame in
+ * verification/villager-body/penetration-report.md — carried through exactly
+ * the body's morphs, hang, grounding and scale (gltfPerson), so it sits on the
+ * drawn body as it sat on the measured one, and painted as the layer (a baby
+ * sling's infant head in the infant's skin). Vertex order is the file's, so
+ * the garment's own cover mask still indexes it. Null when the file holds no
+ * garment for the layer's form and wear.
+ */
+export function gltfGarment(asset: VillagerAsset, person: GltfPerson, l: DressLayer): THREE.BufferGeometry | null {
+  const name = garmentMeshName(l)
+  const src = asset.geometries[name]
+  if (!src || asset.parts[name] !== 'garment') return null
+  const { rest0, hang, sole, scale, influences } = person.frame
+  const g = bakePose(bakeMorphs(src, influences), rest0, hungHeads(asset, rest0, hang), hang)
+  // The hands' shapes move the body's hands only: a garment carries zero
+  // deltas for them (merged with the body, every part needs the same targets).
+  g.morphAttributes.position = (g.morphAttributes.position ?? []).map((m) => {
+    const z = new THREE.BufferAttribute(new Float32Array(m.count * 3), 3)
+    z.name = m.name
+    return z
+  })
+  const pos = g.getAttribute('position') as THREE.BufferAttribute
+  const arr = pos.array as Float32Array
+  let bottom = Infinity
+  for (let k = 0; k < pos.count; k++) {
+    arr[k * 3] *= scale
+    arr[k * 3 + 1] = (arr[k * 3 + 1] - sole) * scale
+    arr[k * 3 + 2] *= scale
+    bottom = Math.min(bottom, arr[k * 3 + 1])
+  }
+  pos.needsUpdate = true
+  const second = l.colour2 ?? mixHex(l.colour, '#000000', 0.35)
+  const out = paintSurface(g, l.colour, surfaceOf(l, person.p, bottom), second, fibreOf(l))
+  const infant = src.getAttribute(INFANT_ATTRIBUTE) as THREE.BufferAttribute | undefined
+  if (infant) {
+    // the infant is skin, not cloth: no garment pattern, second colour or sheen
+    const col = out.getAttribute('color') as THREE.BufferAttribute
+    const col2 = out.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
+    const surf = out.getAttribute(SURFACE_ATTRIBUTE) as THREE.BufferAttribute
+    const c = new THREE.Color(INFANT_SKIN)
+    for (let k = 0; k < infant.count; k++) {
+      if (infant.getX(k) <= 0.5) continue
+      col.setXYZ(k, c.r, c.g, c.b)
+      col2.setXYZ(k, c.r, c.g, c.b)
+      surf.setXYZW(k, ...PLAIN_SURFACE)
+      col2.setW(k, FIGURE_FIBRE.skin)
+    }
+  }
+  return tidy(out)
+}
+
+const missingGarments = new Set<string>()
+
+/**
+ * One dress layer of a person, skinned to the asset's bones: the pipeline's
+ * measured garment. No code-built layer reaches the glTF body; a layer the
+ * file holds no garment for is left off (a product defect, reported once in
+ * development — villagerFigureBody.test.ts holds every generated pair to a
+ * mesh), body paint is no mesh at all.
+ */
+export function gltfLayerGeometry(asset: VillagerAsset, person: GltfPerson, l: DressLayer): THREE.BufferGeometry | null {
+  if (isPaint(l)) return null
+  const g = gltfGarment(asset, person, l)
+  if (!g && import.meta.env.DEV && !missingGarments.has(garmentMeshName(l))) {
+    missingGarments.add(garmentMeshName(l))
+    console.error(`[villager] villager.glb holds no garment ${garmentMeshName(l)}: the layer is left off`)
+  }
+  return g
+}
+
 /**
  * A person's whole figure as ONE geometry skinned to the asset's bones: the
  * glTF body painted (skin, or skin under body paint; the scalp in the hair
- * colour) and every dress layer. The layers are point 1293's code-built ones,
- * fitted to this body's measured proportions.
- * OPEN: point 1311 replaces them with the pipeline's skinned garments.
- * `layerOf` lets the caller cache the layer builds.
+ * colour) and every dress layer as the pipeline's garment
+ * (gltfLayerGeometry). The cover mask of the worn garments hides and pushes
+ * the body, and each worn garment under the worn garments of an outer layer
+ * (render/villagerGarmentMask.ts; scripts/villager/sheets.py `masked`).
+ * `layerOf` lets the caller cache the garment builds (it must not mutate them).
  */
 export function gltfFigureGeometry(
   asset: VillagerAsset,
@@ -543,23 +578,39 @@ export function gltfFigureGeometry(
   layers: readonly DressLayer[],
   skin: string,
   paint: string | null,
-  radial: number,
-  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => buildLayerGeometry(l, person.p, radial),
+  _radial: number,
+  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => gltfLayerGeometry(asset, person, l),
 ): THREE.BufferGeometry {
   const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
   const col = body.getAttribute('color') as THREE.BufferAttribute
+  const fib = body.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
   const hair = new THREE.Color(person.p.hair)
   person.hair.forEach((h, i) => {
-    if (h) col.setXYZ(i, hair.r, hair.g, hair.b)
+    if (!h) return
+    col.setXYZ(i, hair.r, hair.g, hair.b)
+    fib.setW(i, FIGURE_FIBRE.none) // the scalp's hair: no skin pores
   })
-  const parts = [tidy(body)]
-  const map = codeBoneMap(asset)
-  for (const l of layers) {
-    const lg = layerOf(l)
-    if (lg) parts.push(transferTrunkWeights(asset, person, remapSkin(lg.clone(), map)))
+  const depth = VILLAGER_ASSET.garmentMaskPush * person.frame.scale
+  const drawn = layers.flatMap((l) => {
+    const g = layerOf(l)
+    return g ? [{ l, g }] : []
+  })
+  const worn = drawn.map(({ l }) => garmentMeshName(l))
+  const parts = [applyGarmentMask(tidy(body), person.cover, asset.garmentMask, worn, depth)]
+  for (const { l, g } of drawn) {
+    const over = drawn.filter((o) => garmentLayer(o.l) > garmentLayer(l)).map((o) => garmentMeshName(o.l))
+    const cov = asset.geometries[garmentMeshName(l)]?.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
+    parts.push(applyGarmentMask(g.clone(), cov ? (cov.array as ArrayLike<number>) : null, asset.garmentMask, over, depth))
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
-  if (!g) throw new Error('glTF villager: body and dress layers do not merge')
-  g.computeBoundingSphere()
+  if (!g) throw new Error('glTF villager: body and garments do not merge')
+  // three's merge checks the parts agree on relative targets but leaves the
+  // result at the default (absolute): the GPU would scale the base by 1 − Σ
+  // weights and turn the body inside out below the ground
+  g.morphTargetsRelative = parts[0].morphTargetsRelative
+  // the merge drops the targets' names: the mesh's morph dictionary reads them
+  const named = parts[0].morphAttributes.position ?? []
+  ;(g.morphAttributes.position ?? []).forEach((m, k) => (m.name = named[k]?.name ?? m.name))
+  restBounds(g)
   return g
 }

@@ -12,8 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { separateResultSection } from './render-verify-recorder.mjs'
 import { sectionTag } from './section-tag-core.mjs'
-import {
-  ARCHIVE_DESCRIPTION_SUFFIX,
+import { ARCHIVE_DESCRIPTION_SUFFIX,
   ARCHIVE_MEMBER_SEPARATOR,
   ARCHIVE_MEMBER_SUFFIXES,
   ARCHIVE_OVERLAY_SUFFIX,
@@ -21,10 +20,8 @@ import {
   ARCHIVE_STATE_SUFFIX,
   archiveMemberDetail,
   archiveMemberNames,
-  memberPresentCheckName,
-} from './verify/report-archive-names.mjs'
-import {
-  BACKENDS,
+  memberPresentCheckName } from './verify/report-archive-names.mjs'
+import { BACKENDS,
   NON_RENDER_VERIFY,
   featureLevelOf,
   DELETED_NON_RENDER_VERIFY,
@@ -54,8 +51,7 @@ import {
   runIdentity,
   derivedRedKey,
   SUSPECT_UNNAMED,
-  TRUNCATED_KIND,
-} from './render-verify-core.mjs'
+  TRUNCATED_KIND } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { checkKey, failedChecks } from './verify/baseline-classify-core.mjs'
 import { DEV_SUITES, POLISH_THEME_SUITES } from './verify/tiers.mjs'
@@ -1434,7 +1430,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
   })
 
   // THE SAME ROUTE FOR A MEASUREMENT THE RECORD CUT OFF (cross-vendor review,
-  // GPT-5.6 Sol, do-not-merge on 3e6ffd2). The record keeps the first 200
+  // do-not-merge on 3e6ffd2). The record keeps the first 200
   // characters, and a detailMatch anchored at both ends is claiming "and this is
   // where the measurement ends" — which a cut record cannot say. The same kept
   // prefix belongs both to the red the signature was written for and to a longer
@@ -1478,7 +1474,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     // Three readings of the pattern were tried and each was defeated by a shape
     // built to defeat it — the last by `/^(?=A{200}$)|^A{200}.$/`, which asserts
     // the end in one alternative and swallows the probe character in the other
-    // (cross-vendor review, GPT-5.6 Sol). So the table below is not a list of
+    // (cross-vendor review). So the table below is not a list of
     // dangerous shapes the reader recognises; it is the evidence that NONE of
     // them gets through, however it anchors — by a trailing `$`, an alternation,
     // a greedy quantifier, a lookahead consuming nothing, or a probe-eating
@@ -1491,14 +1487,14 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       ['a lookahead asserting the end after the match', /one\.json, two\.json, z{180}(?=$)/],
       ['a zero-length match at the end', /z*$/],
       // THE SHAPE THAT SLIPPED THROUGH THE FIRST READING (cross-vendor review,
-      // GPT-5.6 Sol, do-not-merge on 8f3f23d): a lookaround CONSUMES nothing, so
+      // do-not-merge on 8f3f23d): a lookaround CONSUMES nothing, so
       // this succeeds with a zero-length hit at index 0 while demanding that the
       // text end exactly at 200 — an end-claim no arithmetic over the match can
       // see, and exactly the claim a cut record cannot support.
       ['a lookahead that asserts the end without consuming anything', /^(?=one\.json, two\.json, z{180}$)/],
       ['a lookahead over the whole kept text at a later index', /(?=json, z{180}$)/],
       // THE SHAPE THAT DEFEATED THE LAST READING OF THE PATTERN (cross-vendor
-      // review, GPT-5.6 Sol, do-not-merge on 48a100e): one alternative asserts
+      // review, do-not-merge on 48a100e): one alternative asserts
       // the end with a zero-width match, the other consumes exactly one more
       // character — so a probe that appended one character found the pattern
       // still matching and called it safe, while the real 201-character detail
@@ -1516,7 +1512,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
 
     // A STATEFUL SIGNATURE ANSWERS THE SAME EVERY TIME IT IS ASKED, and the
     // REFUSAL is not allowed to be the reason it looks stable (cross-vendor
-    // review, GPT-5.6 Sol, 8f3f23d: repeating `toBeNull()` passes just as well
+    // review, 8f3f23d: repeating `toBeNull()` passes just as well
     // when a surviving `lastIndex` made the pattern miss). So the entry's own
     // regex is asserted untouched after every call — `usableRegex` rebuilds a
     // flagless copy and never advances the one the ledger holds — and the
@@ -1556,7 +1552,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       expect(chargeFor(cutRed, scoped(/^one\.json, two\.json,/))).toBeNull()
     })
 
-    // THE REAL ENTRY, NOT AN ANALOGUE (cross-vendor review, GPT-5.6 Sol, 8f3f23d,
+    // THE REAL ENTRY, NOT AN ANALOGUE (cross-vendor review, 8f3f23d,
     // which asked for it): the point-698 crossing red is 223 characters long, so
     // every record of it IS cut — and it charges through the shipped ledger,
     // because its signature stops far short of the bound. This is the case that
@@ -1610,7 +1606,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(chargeFor(shorter, scopedFor(new RegExp(`^${'y'.repeat(199)}$`)))?.point).toBe(927)
 
     // AND THE WRITER SETTLES THE ONE AMBIGUOUS LENGTH ITSELF (cross-vendor
-    // review, GPT-5.6 Sol, do-not-merge on b3e5200e): a measurement that merely
+    // review, do-not-merge on b3e5200e): a measurement that merely
     // happened to be exactly 200 characters long was read as cut, and its narrow
     // charge withdrawn, although nothing was ever removed from it. Records
     // written since carry the answer, so the length inference reaches only the
@@ -1643,7 +1639,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(wasDetailCut(parse)).toBe(false)
     expect(chargeFor(parse, scopedFor(new RegExp(`^${'y'.repeat(400)}$`)))?.point).toBe(927)
 
-    // A FIELD NOBODY CAN READ IS NOT EVIDENCE (cross-vendor review, GPT-5.6 Sol,
+    // A FIELD NOBODY CAN READ IS NOT EVIDENCE (cross-vendor review,
     // do-not-merge on ae9a500c). Treating any present value as "not cut" let a
     // malformed durable record — a hand-edited or half-written state file —
     // walk past the inference and answer a signature belonging to a different
@@ -1655,7 +1651,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     }
 
     // NOR IS AN INHERITED BOOLEAN EVIDENCE WRITTEN ON THE RECORD (cross-vendor
-    // review, GPT-5.6 Sol, do-not-merge on 8249b20). This record's own detail
+    // review, do-not-merge on 8249b20). This record's own detail
     // ends at the ambiguous bound, while only its prototype denies a cut. The
     // reader must take the safe legacy route and refuse the end-anchored charge;
     // changing the own-property guard back to optional chaining makes both
@@ -2933,7 +2929,7 @@ describe('the shipped charge ledger', () => {
   })
 
   // THE DECLARATION IS AN AUTHORISATION, SO THE LIST OF WHO HOLDS IT IS PINNED
-  // (cross-vendor review, GPT-5.6 Sol, 30.08.2026). A shape check alone would
+  // (cross-vendor review, 30.08.2026). A shape check alone would
   // let any narrow entry take `detailReadsPrefix` and read a cut measurement
   // with this file still green — which is the one thing the declaration exists
   // to make deliberate. The two point-698 crossing entries are the whole list
@@ -2976,6 +2972,13 @@ describe('the shipped charge ledger', () => {
         '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
         'child-seconds, least judgeable child 4 at 99.1 %. Bad = over 1 m walked inside 0.35 m',
+      // The real text, from local/verify-logs/2026-10-25T16-55-07-991-polish-villagers.log.
+      '642/polish-villagers/undefined':
+        'no order in 180 s — phases seen: water-out:send×3997, water-out:fill×816, dig-second:site×3462, ' +
+        'dig-first:invite×2054, dig-second:dig×1200, water-back:walk×1506, dig-first:site×4124, ' +
+        'dig-first:dig×1334, dig-second:invite×1622, water-out:wait×350, water-out:take×217, ' +
+        'water-out:fetch×1108; returning carrier got to 0.95 m of the stand, arrived-samples 372, ' +
+        'his goal sits 0.95 m from it',
     }
     expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`).sort()).toEqual(
       Object.keys(measuredFor).sort(),
@@ -2987,7 +2990,7 @@ describe('the shipped charge ledger', () => {
       const at = (text_) =>
         new RegExp(c.detailMatch.source, c.detailMatch.flags.replace(/[gy]/g, '')).exec(text_)
       // ASKED OF THE WHOLE MEASUREMENT, NOT ONLY OF ITS STORED PREFIX
-      // (cross-vendor review, GPT-5.6 Sol, ae9a500c). Running it on the cut text
+      // (cross-vendor review, ae9a500c). Running it on the cut text
       // alone cannot tell a genuine prefix reader from one whose match depends
       // on the ARTIFICIAL end the cut created — which is the very mistake these
       // cases are about. A prefix reader answers the same on both, and answers
@@ -3084,8 +3087,8 @@ describe('the shipped charge ledger', () => {
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
-    // THE LANE MUST BE THE ONLY THING THAT DIFFERS (cross-vendor review, GPT-5.6
-    // Sol, 30.08.2026): without the level this observation was null for TWO
+    // THE LANE MUST BE THE ONLY THING THAT DIFFERS (cross-vendor review,
+    // 30.08.2026): without the level this observation was null for TWO
     // reasons at once — the next case already proves a missing level alone does
     // it — so 642 could have been widened across lanes with this pin still green.
     expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgl', featureLevel: 'compatibility' })).toBeNull()
@@ -3313,7 +3316,7 @@ describe('the shipped charge ledger', () => {
       'THREE.WebGPURenderer: Async render pipeline creation failed (renderPipeline_BasicMaterial_1005): [Invalid TextureView] is invalid due to a previous error.',
     ]
     // THE RED MUST EXIST BEFORE ITS CHARGE MAY BE NULL (cross-vendor review,
-    // GPT-5.6 Sol, 30.08.2026): `?.point ?? null` would have passed just as well
+    // 30.08.2026): `?.point ?? null` would have passed just as well
     // if parsing or recording stopped producing a red at all, which is a
     // regression this pin is supposed to catch, not hide.
     for (const t of stillRed) {
@@ -3451,7 +3454,7 @@ describe('the shipped charge ledger', () => {
   })
 
   // THE FOUR NARROWINGS THE CROSS-VENDOR REVIEW OF 30.08.2026 REQUIRED
-  // (GPT-5.6 Sol, do-not-merge on ffc9c23). Each entry had been written against
+  // (cross-vendor review, do-not-merge on ffc9c23). Each entry had been written against
   // the red it was measured on and matched a WIDER family than that red — which
   // is the one failure mode a charge must never have. These pin the narrow half
   // AND the measured half together: an entry that stops matching its own
@@ -3493,7 +3496,7 @@ describe('the shipped charge ledger', () => {
 
   it('charges the four measured reds with measurement and section stored separately', () => {
     // THE HALVES COME FROM THE RECORDER, not from a hand-built object
-    // (cross-vendor finding, GPT-5.6 Sol, 01.09.2026: the case bypassed recorder
+    // (cross-vendor finding, 01.09.2026: the case bypassed recorder
     // provenance). Writing `detail` and `section` as separate fields proves the
     // CHARGE and merely assumes the split it rests on. Here the suite's own
     // printed tail — measurement, the two-space join, the trimmed tag — is cut
@@ -3548,7 +3551,7 @@ describe('the shipped charge ledger', () => {
   })
 
   // THE THREE ENTRIES WHOSE ONLY PIN WAS A TAGGED READ (cross-vendor review,
-  // Opus 4.8, 30.08.2026, soft flag). Points 938 (both lanes) and 603 were
+  // the main fallback, 30.08.2026, soft flag). Points 938 (both lanes) and 603 were
   // exercised solely inside the deleted section-tag block, and that deletion was
   // right — a tagged detail charges nothing now — but it left these entries with
   // the ledger-wide structural cases and no evidence of their own. Here they
@@ -3583,8 +3586,8 @@ describe('the shipped charge ledger', () => {
     expect(settings({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
     expect(at(ground, { suite: 'polish-children', backend: 'webgl' })).toBeNull()
     expect(at(ground, { suite: 'settings', backend: 'webgl' }, 'console')).toBeNull()
-    // AND THE DETAIL IS READ VERBATIM, TAG AND ALL (cross-vendor review, GPT-5.6
-    // Sol, 8f3f23d): these two entries are name-only, so a tagged detail must
+    // AND THE DETAIL IS READ VERBATIM, TAG AND ALL (cross-vendor review,
+    // 8f3f23d): these two entries are name-only, so a tagged detail must
     // change nothing for them — while the composite entry that DOES read a
     // detail must stay refused with the tag on it, which is the loud state the
     // withdrawn stripper was refused for. Both halves are asserted here so this
@@ -3602,8 +3605,8 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor({ ...composite, detail: members }, gpuReport).point).toBe(927)
     expect(chargeFor({ ...composite, detail: tagged(members) }, gpuReport)).toBeNull()
 
-    // POINT 603 IS ASKED WITH A TAGGED DETAIL TOO (cross-vendor review, GPT-5.6
-    // Sol, 8f3f23d): exercising it only with an empty detail would leave this
+    // POINT 603 IS ASKED WITH A TAGGED DETAIL TOO (cross-vendor review,
+    // 8f3f23d): exercising it only with an empty detail would leave this
     // block green even if the entry grew a `detailMatch` of its own, which would
     // contradict the name-only behaviour it is here to pin.
     expect(chargeFor({ name: ground, kind: 'check', detail: tagged('laplacian mean 1.07') }, { suite: 'settings', backend: 'webgl' }).point).toBe(603)
@@ -3619,8 +3622,8 @@ describe('the shipped charge ledger', () => {
     expect(at(`after F8, ${ground}`, { suite: 'settings', backend: 'webgl' }).point).toBe(603)
   })
 
-  // RESTORED AFTER A REVIEW FINDING, TWICE INDEPENDENTLY (GPT-5.6 Sol on
-  // f2f40dd, then Opus 4.8 on b258a3e): withdrawing the section-tag stripper
+  // RESTORED AFTER A REVIEW FINDING, TWICE INDEPENDENTLY (the cross lane on
+  // f2f40dd, then the main fallback on b258a3e): withdrawing the section-tag stripper
   // took these two blocks with it, and neither depends on the stripper — their
   // details carry no tag. Both ledger entries stand, so the deletion was a
   // silent loss of the backend and feature-level isolation they pin.
@@ -3630,7 +3633,7 @@ describe('the shipped charge ledger', () => {
     // (30.08.2026). One entry without a backend used to cover them, resting on
     // the argument that the restore path is plain JavaScript — reasoning, not a
     // measurement, and it also reached the CORE adapter the player runs and a run
-    // that recorded no level at all (cross-vendor review, GPT-5.6 Sol).
+    // that recorded no level at all (cross-vendor review).
     const restored = { name: 'restored: ssaoEnabled', detail: 'false -> true', kind: 'check' }
     const on = (scope) => chargeFor(restored, { suite: 'benchmark', ...scope })
     expect(on({ backend: 'webgl' }).point).toBe(1009)
@@ -3638,8 +3641,8 @@ describe('the shipped charge ledger', () => {
     // Neither the core adapter nor a run whose level went unrecorded was measured.
     expect(on({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
     expect(on({ backend: 'webgpu' })).toBeNull()
-    // EACH HALF IS ISOLATED, not only the WebGL one (cross-vendor review, GPT-5.6
-    // Sol): dropping the WebGPU entry's suite, kind or backend must not leave
+    // EACH HALF IS ISOLATED, not only the WebGL one (cross-vendor review):
+    // dropping the WebGPU entry's suite, kind or backend must not leave
     // this file green, so the negatives are asserted on BOTH scopes.
     const gpu = { backend: 'webgpu', featureLevel: 'compatibility' }
     expect(chargeFor(restored, { suite: 'settings', backend: 'webgl' })).toBeNull()
@@ -3648,7 +3651,7 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor({ ...restored, kind: 'console' }, { suite: 'benchmark', ...gpu })).toBeNull()
     // A WebGL scope carrying a level must be answered by the WebGL entry and not
     // by the other one. Both entries are point 1009, so the POINT cannot tell
-    // them apart (cross-vendor review, GPT-5.6 Sol) — the matched entry's own
+    // them apart (cross-vendor review) — the matched entry's own
     // backend can.
     expect(chargeFor(restored, { suite: 'benchmark', backend: 'webgl', featureLevel: 'compatibility' }).backend).toBe('webgl')
     expect(on({ backend: 'webgl' }).backend).toBe('webgl')
@@ -3706,7 +3709,7 @@ describe('the shipped charge ledger', () => {
     expect(at('the archive carries a screenshot', 'no PNG member')).toBeNull()
     // The EXACT red the withdrawn entry charged, duplicate and all — a WebGL
     // entry could otherwise come back for the duplicated form without failing
-    // here (cross-vendor review, GPT-5.6 Sol).
+    // here (cross-vendor review).
     const vite504 = 'Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)'
     expect(at('no console errors', vite504)).toBeNull()
     expect(at('no console errors', `${vite504} | ${vite504}`)).toBeNull()
@@ -3750,7 +3753,7 @@ describe('the shipped charge ledger', () => {
     const withDetail = (name, detail) => ({ ...red(name), detail })
     const composite = 'the archive holds picture, state, overlay and description'
     // THE FIXTURES ARE BUILT BY THE CODE THAT PRINTS THEM (cross-vendor review,
-    // GPT-5.6 Sol, 30.08.2026). Written out by hand, every boundary assertion
+    // 30.08.2026). Written out by hand, every boundary assertion
     // below could stay green while report.mjs emitted a different separator,
     // member order or name shape — the charges would quietly stop matching the
     // suite and nothing would say so. `detailOf` and `memberOf` go through
@@ -3763,7 +3766,7 @@ describe('the shipped charge ledger', () => {
     // renaming a member in production reds this line instead of quietly leaving
     // the charge matching a detail the suite no longer prints.
     // The production list is pinned by ROLE and by SHAPE first (cross-vendor
-    // review, GPT-5.6 Sol, round 2): taking "everything but the picture" out of an
+    // review, round 2): taking "everything but the picture" out of an
     // unnamed list cannot tell a RENAMED member from an ADDED one, so a suffix
     // change could mutate the positive fixture below and leave the negative cases
     // unreachable while every line stayed green.
@@ -3782,7 +3785,7 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(withDetail(composite, detailOf(ARCHIVE_PICTURE_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX)), scoped)).toBeNull()
     expect(chargeFor(withDetail(composite, detailOf(ARCHIVE_STATE_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX)), scoped)).toBeNull()
     // THE LOST-STATE CASE HAD TO BE WRITTEN WITHOUT A SECOND REASON TO FAIL
-    // (cross-vendor review, GPT-5.6 Sol, 30.08.2026): the two lines above also
+    // (cross-vendor review, 30.08.2026): the two lines above also
     // lose the overlay or carry a picture, so each stayed null through a
     // CONSTRAINT OTHER than the state lookahead — and the entry's state
     // lookahead was in fact satisfied by the overlay's own `.json`. This detail
@@ -3792,7 +3795,7 @@ describe('the shipped charge ledger', () => {
       chargeFor(withDetail(composite, detailOf(ARCHIVE_OVERLAY_SUFFIX, ARCHIVE_DESCRIPTION_SUFFIX)), scoped),
     ).toBeNull()
     // AND THE STATE MEMBER IS THE ONE THE SUITE NAMES, not merely some other JSON
-    // (cross-vendor review, GPT-5.6 Sol, round 2): an archive that shipped a
+    // (cross-vendor review, round 2): an archive that shipped a
     // `metadata.json` in place of its state satisfied `a .json that is not the
     // overlay` and was charged as the measured picture loss.
     expect(
@@ -3864,7 +3867,7 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(red(memberPresentCheckName('hoa-state-2026-08-29-42', ARCHIVE_PICTURE_SUFFIX)), scoped).point).toBe(927)
     // ANY OTHER PNG MEMBER IS A RED NOBODY HAS MEASURED: the wildcard that used
     // to stand here accepted every `member <anything>.png is present` the report
-    // suite might grow (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    // suite might grow (cross-vendor review, 30.08.2026).
     expect(chargeFor(red('member thumbnail.png is present'), scoped)).toBeNull()
   })
 
@@ -3894,7 +3897,7 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(low, { ...scoped, featureLevel: 'core' })).toBeNull()
     // AND THE REASON MAY NOT RIDE ALONG WITH A SECOND FAILURE: unanchored, the
     // detail below carried the known capability gap AND a genuinely different
-    // fault and was still excused (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    // fault and was still excused (cross-vendor review, 30.08.2026).
     expect(
       chargeFor(
         withDetail(
@@ -3904,7 +3907,7 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
-    // NOR MAY THE SAMPLE BE EMPTY (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    // NOR MAY THE SAMPLE BE EMPTY (cross-vendor review, 30.08.2026).
     // `0/0 rows` says the benchmark produced no rows at all — the earlier
     // `rows.every(...)` check passes vacuously on an empty report, so this line is
     // reachable, and it is a different defect from the measured 0/33 and 0/3.
@@ -3931,7 +3934,7 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(withDetail('no console errors', 'TypeError: x is not a function'), scoped)).toBeNull()
     // BOTH ends: the two lines above only witness the TRAILING anchor, so the
     // leading one could have been dropped with every assertion still green
-    // (cross-vendor review, GPT-5.6 Sol, 30.08.2026).
+    // (cross-vendor review, 30.08.2026).
     expect(chargeFor(withDetail('no console errors', `TypeError: x is not a function ${sentence}`), scoped)).toBeNull()
   })
 
@@ -3979,7 +3982,7 @@ describe('the shipped charge ledger', () => {
       chargeFor(withDetail(name, 'the crowd did not hold: as few as 1 label(s) in a sampled frame (peak 6) — under the 2-label floor, nothing proven'), scoped),
     ).toBeNull()
     // THE WHOLE PRINTED LINE IS SPELLED OUT, NOT LEFT TO A WILDCARD (cross-vendor
-    // review, GPT-5.6 Sol, round 2). `deepest N px.*unreadable bar` accepted any
+    // review, round 2). `deepest N px.*unreadable bar` accepted any
     // text at all between the depth and the bar — including a detail that has lost
     // the label-floor reading the verdict always prints, which is a changed
     // measurement rather than the one 1010 owns.
@@ -3993,7 +3996,7 @@ describe('the shipped charge ledger', () => {
         scoped,
       ),
     ).toBeNull()
-    // THE PAIR IS EVIDENCE, NOT DECORATION (cross-vendor review, GPT-5.6 Sol,
+    // THE PAIR IS EVIDENCE, NOT DECORATION (cross-vendor review,
     // 30.08.2026): the bracket used to be optional, so a detail that reports a
     // depth but has LOST the pair that produced it was charged as the measured
     // red. `worstDepth` and `worstPair` travel together out of one reading in
@@ -4032,7 +4035,7 @@ describe('the shipped charge ledger', () => {
         webglPolish,
       ),
     ).toBeNull()
-    // NOR IS AN EMPTY BRACKET A PAIR (cross-vendor review, GPT-5.6 Sol, round 2):
+    // NOR IS AN EMPTY BRACKET A PAIR (cross-vendor review, round 2):
     // requiring `[...]` left `[]` chargeable, so the identity was still optional.
     // polish.mjs writes `"<a>"×"<b>" <across>×<down> px` and nothing else.
     expect(chargeFor(withDetail(name, measured.replace('["Ada"×"Njoro" 14×12 px]', '[]')), scoped)).toBeNull()

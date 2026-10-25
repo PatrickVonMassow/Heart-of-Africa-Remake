@@ -50,7 +50,7 @@ const ANY_STATEMENT = /(?:^|[\n;])\s*import\b(?!\s*[.(])/g
  * Returns `{ imports: [{ specifier, names, hasDefault }], unparsed }`. A DEFAULT
  * binding is tracked because it can be missing exactly like a named one — node
  * refuses `import x from './y.mjs'` against a module with no default export with
- * the same link error (cross-vendor review, GPT-5.6 Sol, 22.08.2026). A
+ * the same link error (cross-vendor review, 22.08.2026). A
  * namespace binding cannot fail and is not tracked. `unparsed` counts the import
  * statements no recognised form claimed: a non-zero count means this scanner has
  * gone blind, not that the file is clean.
@@ -87,7 +87,7 @@ export function scanStaticImports(source) {
  * ASK EVERY TARGET FOR THE NAMES THE SUBJECT WANTS.
  *
  * EVERY target that binds a name — a namespace-only or side-effect import binds
- * none and is skipped — not only the relative ones (cross-vendor review, GPT-5.6 Sol,
+ * none and is skipped — not only the relative ones (cross-vendor review,
  * 22.08.2026). Node refuses `import { readFileSyc } from 'node:fs'` exactly as
  * it refuses a mis-sourced local name, and the launcher imports from `node:fs`,
  * `node:child_process` and `node:path` — skipping those would have left the

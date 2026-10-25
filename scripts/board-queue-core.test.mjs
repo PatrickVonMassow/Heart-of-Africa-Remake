@@ -16,10 +16,12 @@ import { queueCard, toNow } from './board-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { evaluate as evaluateTopic } from './dashboard-card-topic-guard-core.mjs'
 import {
+  BOARD_CARD_TITLE_MAX,
   FINDER_POINTS,
   RELEASE_TAG_POINT,
   QUEUE_STUB_BODY,
   assertNotFlagValue,
+  boardCardBlockers,
   boardTitleReport,
   buildQueueSection,
   importQueueFromHtml,
@@ -335,19 +337,38 @@ describe('renderQueueCard — the markup the guard parsers read, and no injectio
   // The hand-kept board carried two or three paragraphs per card; the projection
   // that replaced it could emit only one, which turns a restored body into the
   // long unbroken paragraph the conciseness guard rejects.
-  it('renders one <p> per paragraph, and still accepts a bare string', () => {
+  it('renders one description <p> per paragraph, and still accepts a bare string', () => {
     const many = renderQueueCard({ point: 9, title: 'Neun', body: ['Erster.', 'Zweiter.'], meta: '~1 h' })
-    expect(many.match(/<p>/g)).toHaveLength(2)
-    expect(many).toContain('<p>Erster.</p>')
-    expect(many).toContain('<p>Zweiter.</p>')
+    expect(many.match(/<p class="desc">/g)).toHaveLength(2)
+    expect(many).toContain('<p class="desc">Erster.</p>')
+    expect(many).toContain('<p class="desc">Zweiter.</p>')
 
     const one = renderQueueCard({ point: 9, title: 'Neun', body: 'Nur einer.', meta: '~1 h' })
-    expect(one.match(/<p>/g)).toHaveLength(1)
+    expect(one.match(/<p class="desc">/g)).toHaveLength(1)
   })
 
   it('drops empty paragraphs rather than rendering a blank one', () => {
     const html = renderQueueCard({ point: 9, title: 'Neun', body: ['Da.', '   ', ''], meta: '~1 h' })
-    expect(html.match(/<p>/g)).toHaveLength(1)
+    expect(html.match(/<p class="desc">/g)).toHaveLength(1)
+  })
+
+  it('imports no description from a split card that only shows the placeholder (review finding 4)', () => {
+    const card =
+      '<details>\n  <summary><span class="num">9</span><span class="t">Neun</span><span class="right"><span class="meta">~1 h</span></span></summary>\n' +
+      '  <div class="body">\n    <p class="desc-missing">Beschreibung fehlt</p>\n    <hr class="split">\n' +
+      '    <p class="status-head">Stand der Umsetzung</p>\n    <p>Noch nicht begonnen.</p>\n  </div>\n</details>\n'
+    const board = `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n${card}</details>\n<details class="sect">`
+    const imported = importQueueFromHtml(board).points[9]
+    expect(imported.body).toBeNull()
+    // Round trip: rendering the import back shows the stub, not the status as prose.
+    expect(renderQueueCard({ point: 9, title: imported.title, body: imported.body, meta: '~1 h' })).not.toMatch(/<p class="desc">[^<]*Stand der Umsetzung/)
+  })
+
+  it('shows the description, the divider and a not-started status, and imports the description alone', () => {
+    const html = renderQueueCard({ point: 9, title: 'Neun', body: ['Was der Punkt liefert.'], meta: '~1 h' })
+    expect(html).toMatch(/<p class="desc">Was der Punkt liefert\.<\/p>\n\s*<hr class="split">\n\s*<p class="status-head">Stand der Umsetzung<\/p>\n\s*<p>Noch nicht begonnen\.<\/p>/)
+    const board = `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n${html}</details>\n<details class="sect">`
+    expect(importQueueFromHtml(board).points[9].body).toEqual(['Was der Punkt liefert.'])
   })
 })
 
@@ -691,6 +712,64 @@ describe('the generator SAYS which cards are still unnamed and unestimated', () 
   })
 })
 
+describe('a board card has a short title and a body', () => {
+  const long = 'T'.repeat(BOARD_CARD_TITLE_MAX + 1)
+  it('refuses an over-long title at the store, naming the limit and the body as the remedy', () => {
+    expect(() => setQueueEntry(null, 7, { title: long })).toThrow(
+      new RegExp(`limit ${BOARD_CARD_TITLE_MAX}\\).*move the rest into the body`),
+    )
+    // Counted in characters, not UTF-16 units or bytes: exactly the limit passes.
+    const atLimit = 'Ü'.repeat(BOARD_CARD_TITLE_MAX)
+    expect(setQueueEntry(null, 7, { title: atLimit }).points[7].title).toBe(atLimit)
+    // A body-only write does not re-judge a title it does not touch.
+    expect(setQueueEntry({ points: { 7: { title: long } } }, 7, { body: 'Text.' }).points[7].body).toBe('Text.')
+  })
+  it('blocks a body-less or over-long card for an open point, and passes a short title with a body', () => {
+    const html = board(
+      renderQueueCard({ point: 1, title: 'Kurz', body: 'Text.', meta: '~1 h' }) +
+        renderQueueCard({ point: 2, title: 'Ohne Text', body: QUEUE_STUB_BODY, meta: QUEUE_STUB_META }) +
+        renderQueueCard({ point: 3, title: long, body: 'Text.', meta: '~1 h' }),
+    )
+    expect(boardCardBlockers(html, [1, 2, 3])).toEqual({ bodyless: [2], overlong: [3] })
+    expect(boardCardBlockers(html, [1])).toEqual({ bodyless: [], overlong: [] })
+  })
+  it('measures the title as the reader sees it, every entity decoded once', () => {
+    const shown = `${'A'.repeat(BOARD_CARD_TITLE_MAX - 5)}&quot;`
+    const html = board(
+      renderQueueCard({ point: 4, title: 'x', body: 'Text.', meta: '~1 h' }).replace(
+        '<span class="t">x</span>',
+        `<span class="t">${shown}</span>`,
+      ) +
+        renderQueueCard({ point: 5, title: 'x', body: 'Text.', meta: '~1 h' }).replace(
+          '<span class="t">x</span>',
+          `<span class="t">${'&#228;&#xFC;&hellip;'.repeat(BOARD_CARD_TITLE_MAX / 2)}</span>`,
+        ),
+    )
+    expect(importQueueFromHtml(html).points[4].title).toBe(`${'A'.repeat(BOARD_CARD_TITLE_MAX - 5)}"`)
+    expect(boardCardBlockers(html, [4, 5])).toEqual({ bodyless: [], overlong: [5] })
+  })
+  it('reads a hand-written description paragraph with further attributes and class tokens', () => {
+    // Written by hand, NOT by renderQueueCard: the importer must not depend on its exact tag.
+    const card = (point, p) =>
+      `<details>\n  <summary><span class="num">${point}</span><span class="t">Kurz</span>` +
+      `<span class="right"><span class="meta">~1 h</span></span></summary>\n` +
+      `  <div class="body">\n    ${p}\n    <hr class="split">\n    <p class="status">Status.</p>\n  </div>\n</details>\n`
+    const html = board(
+      card(11, '<p class="desc" lang="de">Text.</p>') +
+        card(12, '<p lang="de" class="lead desc">Text.</p>') +
+        card(13, '<p data-class="desc">Kein Text.</p>'),
+    )
+    expect(importQueueFromHtml(html).points[11].body).toEqual(['Text.'])
+    expect(importQueueFromHtml(html).points[12].body).toEqual(['Text.'])
+    expect(boardCardBlockers(html, [11, 12, 13])).toEqual({ bodyless: [13], overlong: [] })
+  })
+  it('ignores the cards of points that are no longer open', () => {
+    const html = board(renderQueueCard({ point: 9, title: long, body: QUEUE_STUB_BODY, meta: QUEUE_STUB_META }))
+    expect(boardCardBlockers(html, [])).toEqual({ bodyless: [], overlong: [] })
+    expect(boardCardBlockers('<main></main>', [9])).toEqual({ bodyless: [], overlong: [] })
+  })
+})
+
 describe('a command-line flag is never a card text', () => {
   // `board-queue.mjs set` had no `--text-stdin`, so a session that tried to pipe
   // German prose in stored the literal string as the card body — six cards, three
@@ -953,7 +1032,7 @@ describe('the pending-request card', () => {
   })
 
   it('repairs the transliteration a shell-mangled title arrives with', () => {
-    // Four-eyes finding 2 (Fable 5): the title is the one field that travels as
+    // Four-eyes finding 2: the title is the one field that travels as
     // an argument, so a depositor writes "fuer"/"pruefen" — and the board audit
     // then blocks the OWNER for text it never wrote.
     // Only the flagged words are repaired: "loesen" is not on the audit's stem
@@ -969,7 +1048,7 @@ describe('the pending-request card', () => {
   })
 
   it('neutralises the blocked card’s title the same way the queue card’s is', () => {
-    // Four-eyes finding 4 (Fable 5, 31.07.2026): `--blocked` handed the raw
+    // Four-eyes finding 4 (31.07.2026): `--blocked` handed the raw
     // deposit title to vdzk-add while the queue card already routed through
     // boardSafeTitle — and the audit reads the whole published board, titles
     // included, on the OWNER's turn.

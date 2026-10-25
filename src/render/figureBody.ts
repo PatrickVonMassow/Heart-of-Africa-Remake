@@ -12,6 +12,7 @@
 import * as THREE from 'three/webgpu'
 import type { AgeGroup, Sex } from '../systems/appearance'
 import { merge, sweepTube, type SweepStation } from './faunaGeometry'
+import { FIGURE_FIBRE } from './materials'
 
 /** Crown height of an adult man, in figure units (= primitive cone 1 + head). */
 export const FIGURE_STATURE = 1.34
@@ -320,29 +321,37 @@ export function skinGeometry(
 
 /** Name of the per-vertex surface attribute: [pattern kind, a, b, roughness]. */
 export const SURFACE_ATTRIBUTE = 'figureSurface'
-/** Name of the per-vertex second colour a pattern mixes towards. */
+/** Name of the per-vertex second colour a pattern mixes towards (rgb), with
+ *  the part's micro-structure kind (materials.ts FIGURE_FIBRE) in w — packed,
+ *  because a masked glTF figure already binds WebGPU's limit of 8 vertex
+ *  buffers and a ninth attribute fails the pipeline. */
 export const SECOND_COLOUR_ATTRIBUTE = 'figureColour2'
 
-/** Colour a part and give it a surface: one pattern kind + params + roughness. */
+/** The surface paint() gives skin and any part without a garment pattern. */
+export const PLAIN_SURFACE: [number, number, number, number] = [0, 0, 0, 0.85]
+
+/** Colour a part and give it a surface: one pattern kind + params + roughness,
+ *  and its micro-structure kind (skin unless said otherwise). */
 export function paint(
   geo: THREE.BufferGeometry,
   hex: string,
-  surface: [number, number, number, number] = [0, 0, 0, 0.85],
+  surface: [number, number, number, number] = PLAIN_SURFACE,
   hex2: string = hex,
+  fibre: number = FIGURE_FIBRE.skin,
 ): THREE.BufferGeometry {
   const n = geo.getAttribute('position').count
   const a = new THREE.Color(hex)
   const b = new THREE.Color(hex2)
   const col = new Float32Array(n * 3)
-  const col2 = new Float32Array(n * 3)
+  const col2 = new Float32Array(n * 4)
   const surf = new Float32Array(n * 4)
   for (let i = 0; i < n; i++) {
     col.set([a.r, a.g, a.b], i * 3)
-    col2.set([b.r, b.g, b.b], i * 3)
+    col2.set([b.r, b.g, b.b, fibre], i * 4)
     surf.set(surface, i * 4)
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
-  geo.setAttribute(SECOND_COLOUR_ATTRIBUTE, new THREE.BufferAttribute(col2, 3))
+  geo.setAttribute(SECOND_COLOUR_ATTRIBUTE, new THREE.BufferAttribute(col2, 4))
   geo.setAttribute(SURFACE_ATTRIBUTE, new THREE.BufferAttribute(surf, 4))
   return geo
 }
@@ -381,8 +390,14 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
   const skin = look.paint ? mixHex(look.skin, look.paint, 0.55) : look.skin
   const limbRadial = Math.max(6, Math.round((radial * 2) / 3))
   const parts: THREE.BufferGeometry[] = []
-  const add = (geo: THREE.BufferGeometry, weigh: (v: THREE.Vector3) => Array<[number, number]>, hex: string, surface?: [number, number, number, number]) => {
-    parts.push(tidy(skinGeometry(paint(geo, hex, surface), weigh)))
+  const add = (
+    geo: THREE.BufferGeometry,
+    weigh: (v: THREE.Vector3) => Array<[number, number]>,
+    hex: string,
+    surface?: [number, number, number, number],
+    fibre: number = FIGURE_FIBRE.skin,
+  ) => {
+    parts.push(tidy(skinGeometry(paint(geo, hex, surface, hex, fibre), weigh)))
   }
 
   // TORSO: crotch → pelvis → waist → chest → shoulders → neck base. The
@@ -441,7 +456,7 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
     { radial, rings: 6, capEnd: true },
   )
   cutTriangles(hair, (c) => c.z > p.headHalfW * 0.35 && c.y < hc + p.headHalfH * 0.5)
-  add(hair, () => [[boneIndex('head'), 1]], p.hair, [4, 90, 0.25, 0.95])
+  add(hair, () => [[boneIndex('head'), 1]], p.hair, [4, 90, 0.25, 0.95], FIGURE_FIBRE.none)
   // BEARD: the front half of a short sleeve round the jaw, ending under the chin.
   if (p.beard) {
     const beard = sweepTube(
@@ -453,7 +468,7 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
       { radial, rings: 5, capEnd: true },
     )
     cutTriangles(beard, (c) => c.z < p.headHalfW * 0.15)
-    add(beard, () => [[boneIndex('head'), 1]], p.hair, [4, 90, 0.25, 0.95])
+    add(beard, () => [[boneIndex('head'), 1]], p.hair, [4, 90, 0.25, 0.95], FIGURE_FIBRE.none)
   }
 
   // ARMS hang down their bones; the hand is a flattened end.

@@ -20,6 +20,7 @@ import {
   shellSegments,
   evaluate,
 } from './board-first-core.mjs'
+import { evaluateCardReviews } from './decision-card-guard-core.mjs'
 import { CLOSING_WORK_TITLE } from './board-core.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -298,6 +299,43 @@ describe('ownership mutation stand-down', () => {
     expect(moved({ worktree: true })).toEqual({ block: false, reason: '', standDown: true })
   })
 
+  it('admits the decision-card keep and still refuses other board mutations', () => {
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "Kartenschrift" --why "x"' }).block).toBe(false)
+    expect(moved({ command: 'node scripts/board.mjs now "x"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-remove "Kartenschrift"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && node scripts/board.mjs now "x"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" > out.txt' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && git status --short' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && node scripts/board.mjs vdzk-keep "L"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" > /dev/null 2>&1' }).block).toBe(true)
+  })
+
+  it('admits the keep with --session, the form a non-owner needs no environment for', () => {
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "x" --why y --session abc-123' }).block).toBe(false)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-remove "x" --session abc-123' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs now "x" --session abc-123' }).block).toBe(true)
+  })
+
+  // Every command the decision-card Stop review prints to a non-owner must pass
+  // that non-owner's stand-down, or the two guards hold the session in a loop.
+  it('refuses no remediation command the decision-card review prints to a non-owner', () => {
+    const cards = ['Kartenschrift auf der Tafel', 'Freigabe für den Launcher']
+    const verdict = evaluateCardReviews({
+      userMessage: { id: 'm1', text: 'Die Kartenschrift bleibt, die Freigabe auch.' },
+      cardsAtMessage: cards,
+      currentTitles: cards,
+      nonOwner: true,
+      sessionId: 'abc-123',
+    })
+    expect(verdict.block).toBe(true)
+    const commands = verdict.reason.match(/node scripts\/\S+\.mjs .*$/gm)
+    expect(commands.length).toBe(4)
+    for (const command of commands) {
+      expect(command).toContain('--session abc-123')
+      expect(moved({ command }).block, command).toBe(false)
+    }
+  })
+
   it('does not constrain a session while no other live owner holds the lock', () => {
     expect(moved({ heldByOtherLiveOwner: false })).toEqual({ block: false, reason: '', standDown: false })
   })
@@ -431,8 +469,8 @@ describe('the stand-down leaves the session scratchpad and the carrier open', ()
     const { reason } = write(`${root}/TASKS.md`)
     expect(reason).toContain('reads remain available')
     expect(reason).toContain(`ONE WRITE PATH STAYS OPEN: your session scratchpad \`${pad}\``)
-    expect(reason).toContain('node scripts/finding.mjs --request "<title>" --stdin')
-    expect(reason).toContain('`--- spec ---`')
+    expect(reason).toContain('node scripts/finding.mjs --request "<title>" --spec-file <spec path> --why-file <why path>')
+    expect(reason).toContain('with the Write tool')
     expect(reason).toContain('batch-claim.mjs')
     // Without a known scratchpad the path is still named, as the harness pattern.
     expect(at({ toolName: 'Bash', command: 'npm run build', scratchpad: '' }).reason)

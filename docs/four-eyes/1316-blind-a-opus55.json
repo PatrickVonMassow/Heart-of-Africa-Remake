@@ -1,0 +1,125 @@
+{
+ "model": "Claude Opus 5.5",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "scripts/villager/sheets.py",
+   "defect": "`build.mjs sheets` fails: OUTFITS (sheets.py:176) names removed garment g-cloak-chest so mask.decode raises after an 883 s mask build; use a current garment id (or derive outfits from the garment list)."
+  },
+  {
+   "id": "A2",
+   "file": "scripts/villager/sheets.py + gamepath.py (runtime pose export)",
+   "defect": "Frame sheets show only the raw clips while the game re-solves legs and code-writes trunk/neck/head, so no sheet shows what is drawn; add a sheet fed by pose sequences exported from the game pose code for walk, turn, run, dig, pick-up, point, chaser and caught child (the before/after strip)."
+  },
+  {
+   "id": "A3",
+   "file": "scripts/villager/skeleton.py",
+   "defect": "hips and spine share the same head/tail (skeleton.py:13-14), spine_01+02 are merged and DEF-spine.002 dropped, so the spine channel is zero in every clip and every lean pivots at the pelvis; re-head to a three-segment spine (spine/spine1/chest) mapped 1:1 from MakeHuman and UAL, keeping the penetration gate green."
+  },
+  {
+   "id": "A4",
+   "file": "scripts/villager/skeleton.py, body.py",
+   "defect": "No twist bones, so forearm pronation is carried by the hand alone and wrings the wrist (dig grip, pointing palm); add one forearm twist bone per arm weighted from the distal forearm."
+  },
+  {
+   "id": "A5",
+   "file": "scripts/villager/body.py",
+   "defect": "No finger bones and a splayed rest hand (every walk/sprint frame), no pointing hand shape; add point.L/R and relax hand morphs beside grip.L/R instead of finger bones."
+  },
+  {
+   "id": "A6",
+   "file": "scripts/villager/sources.json, clips.py",
+   "defect": "CC0 Quaternius UAL2 (Walk_Carry_Loop, Farm_Harvest, ...) lies on disk but was unpinned in point 1294; re-pin it with licence and sha256 and add a UAL2 bone map."
+  },
+  {
+   "id": "A7",
+   "file": "scripts/villager/clips.py, src/render/villagerRig.ts (gaitAt)",
+   "defect": "Walk cross-fades straight into a flight-phase sprint (balance.ts:2677-2679), giving a hybrid mid-band; add the unused UAL1 Jog_Fwd_Loop and blend walk-jog-sprint by speed."
+  },
+  {
+   "id": "A8",
+   "file": "scripts/villager/clips.py",
+   "defect": "The Quaternius walk is hunched (chest +18 deg), arms held forward with splayed hands and feet crossing the midline; apply per-clip style offsets (chest pitch, arm hang, hip abduction for ~10 cm step width) in the pipeline from VILLAGER_ASSET.clipStyle."
+  },
+  {
+   "id": "A9",
+   "file": "scripts/villager/clips.py",
+   "defect": "The sprint carries a constant 22.5 deg hips pitch plus ~30 deg chest pitch and +-29 deg chest yaw (a cartoon dive); remove the hips pitch and scale chest pitch/yaw to a child run."
+  },
+  {
+   "id": "A10",
+   "file": "scripts/villager/clips.py",
+   "defect": "The idle stands staggered with a constant 13 deg hip yaw and 11 deg head yaw (reads frozen mid-step); choose/blend an idle with a square stance and no constant yaw."
+  },
+  {
+   "id": "A11",
+   "file": "scripts/villager/clips.py",
+   "defect": "No pick-up clip exists although UAL1 PickUp_Table and UAL2 Farm_Harvest are available; retarget one and cut it into down/hold/up like the kneel."
+  },
+  {
+   "id": "A12",
+   "file": "scripts/villager/toolclips.py (DIG_KEYS, dig_clip)",
+   "defect": "Authored dig holds the shaft 25-35 deg from horizontal like pushing a pole, upper hand at the chin, head fixed at 0.12, knees in valgus, no foot on the blade; re-key with a near-vertical set and foot press, hands apart, trunk yaw for the throw, gaze on the blade, knee poles outward."
+  },
+  {
+   "id": "A13",
+   "file": "src/render/villagerClipPose.ts (clipGaitPose)",
+   "defect": "Both legs are re-solved every frame with a fixed forward pole and hips height unchanged by the stride warp (lines 179, 242-243), so clip knee swivel is lost and legs stilt-lock or crouch; take the pole from the clip knee, solve only on a real miss, adjust pelvis height to the warped stride, and roll the toe at push-off, keeping the 1295 contact holds."
+  },
+  {
+   "id": "A14",
+   "file": "src/scenes/place/skinnedFigure.tsx, src/render/figureWalk.ts",
+   "defect": "Shoulder/hip counter-yaw come from the code walk phase while the legs come from the clip phase (two clocks), and spine gets a stray -walk.hipYaw for a hip yaw the clip overwrote; drive both from the clip gait phase and remove the stray compensation."
+  },
+  {
+   "id": "A15",
+   "file": "src/scenes/place/gltfClipLayers.ts, skinnedFigure.tsx",
+   "defect": "The gait layer blends only hips and legs (LEGS, gltfClipLayers.ts:102), so the clip trunk counter-rotation, neck and head never show; blend the upper chain from the clip and apply the code lean/stoop/turn afterwards as additive deltas, then solve contact arms."
+  },
+  {
+   "id": "A16",
+   "file": "src/render/figureRig.ts, skinnedFigure.tsx",
+   "defect": "Every lean writes spine.rotation.x only (pelvis pivot), so trunk, head and arms tip as one block; add a distributeLean over hips/spine/spine1/chest with weights in balance.ts and re-search contactLean through it."
+  },
+  {
+   "id": "A17",
+   "file": "src/render/figureRig.ts, skinnedFigure.tsx",
+   "defect": "The head is identity unless squashed (unsquashHead), so it inherits every lean and never looks at anything; add a neck/head look-at chain with limits, defaulting to the horizon (stabilisation) and fed with context targets (speaker, pointed spot, blade, hand, quarry, ground)."
+  },
+  {
+   "id": "A18",
+   "file": "src/render/figureWalk.ts, villagerClipPose.ts",
+   "defect": "A turn is converted into forward walking (walked += turned*turnStep, figureWalk.ts:446), so a spot turn plays a walk in place and the body yaws as one block; add head lead via the gaze, a lean into curves, and procedural step turns pivoting held feet on the ball."
+  },
+  {
+   "id": "A19",
+   "file": "src/render/villagerClipPose.ts",
+   "defect": "Pelvic lateral shift/bob may be missing at runtime; add a small stance-side pelvis shift only if the runtime sheet shows a static pelvis after A8."
+  },
+  {
+   "id": "A20",
+   "file": "src/render/gesture.ts, skinnedFigure.tsx",
+   "defect": "Point is an FK arm aim with a fixed bent forearm (-0.2) and a splayed hand, no gaze first; sequence gaze then arm, straighten the forearm, use the point morph, protract the clavicle and turn the chest a quarter toward the target."
+  },
+  {
+   "id": "A21",
+   "file": "src/scenes/place/tagGame.ts (tagFigurePose, chaserGaze, CHASER_ARMS)",
+   "defect": "The chaser leans max(runLean, TOUCH_LEAN 0.5) from the pelvis on top of the sprint hips pitch (~50 deg), turns the trunk not the head, and holds both arms forward; limit the lean to <=0.12 rad distributed, aim the head/neck at the quarry, reach one arm horizontally with the other counter-swinging."
+  },
+  {
+   "id": "A22",
+   "file": "src/scenes/place/gltfClipLayers.ts (UNWRITTEN), gesture.ts FigurePose",
+   "defect": "The clavicles are reset to identity every frame, so no pose can round or protract the shoulders; make them posable via a shoulders field added after the clip, covered by the penetration gate."
+  },
+  {
+   "id": "A23",
+   "file": "src/scenes/place/tagGame.ts (caughtSlumpPose), balance.ts",
+   "defect": "The caught slump is a 0.48 rad forward fold at the pelvis with arms pitched plumb; replace it with a near-upright trunk sunk over spine/chest, protracted and lowered clavicles, a bowed head via the gaze and loosely hanging arms (closing the OPEN on caughtSlumpLean)."
+  },
+  {
+   "id": "A24",
+   "file": "src/scenes/place/gltfClipLayers.ts, PlaceLife.tsx",
+   "defect": "Pick-up and low reaches fold the back (contactLean) or dive from the waist (kneelWork cut) and carry inherits the crossover walk; add a pickUp work layer with gaze on the object, re-derive carry from the normalised walk/UAL2 Walk_Carry_Loop, and bend knees before back in contacts."
+  }
+ ]
+}

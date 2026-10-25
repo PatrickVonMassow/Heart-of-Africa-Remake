@@ -34,6 +34,7 @@
 // scripts/batch-lock.mjs, the tick's decision in scripts/batch-autostart.mjs.
 
 import { createHash } from 'node:crypto'
+import { humanText } from './request-approval-guard-core.mjs'
 
 /** The metadata keys the record understands. Anything else is part of the reason,
  *  so a legacy line like `autostart watchdog: …` is never eaten as metadata. */
@@ -70,6 +71,70 @@ export function namesUserUtterance(reason) {
 }
 
 /**
+ * ONLY AN EXPLICIT ORDER STOPS THE BATCH (point 1351). Twice a session paused the
+ * batch on a question or a discussion remark (24.09.2026 »Erstmal nur darüber
+ * reden«, 12.10.2026 »Hast du die Batch bekommen?«). Only a CLOSED COMMAND
+ * counts: "stop the batch", "Batch anhalten", the bare stop word, at most with a
+ * time phrase. Conservative on purpose: a refused real order costs one
+ * rephrasing, a false stop idles the machine.
+ */
+// Any length: a one-word quote (»No«) can be the retraction that voids the order.
+const QUOTED = /"([^"\n]+)"|„([^“”\n]+)[“”]|“([^”\n]+)”|»([^«\n]+)«/g
+const L = '(?![\\p{L}])'
+const LEAD = '^(?:(?:bitte|please|claude)[,!]?\\s+)*'
+const TARGET = '(?:die\\s+|der\\s+|deine\\s+|deiner\\s+|the\\s+|your\\s+)?(?:batch|stapel|arbeit|work|alles|everything)' + L
+const NOW = '(?:\\s+(?:sofort|jetzt|now))?'
+// The only words a command may carry after its verb: when, and for how long.
+const TAIL =
+  '(?:\\s+(?:sofort|jetzt|now|bitte|please|bis\\s+morgen|bis\\s+auf\\s+weiteres|bis\\s+ich\\s+zurück\\s+bin|für\\s+heute|for\\s+now|for\\s+today|until\\s+i\\s+return|until\\s+tomorrow))*[\\s!.]*$'
+const COMMAND = new RegExp(
+  LEAD +
+    '(?:(?:stopp|stoppe|stop|pausiere|pause|unterbrich|beende|suspend)' + L + NOW + '\\s+' + TARGET +
+    '|halte?' + L + '\\s+' + TARGET + NOW + '\\s+an' + L +
+    '|hör(?:e)?' + L + '\\s+mit\\s+' + TARGET + '\\s+auf' + L +
+    '|' + TARGET + NOW + '\\s+(?:anhalten|stoppen|pausieren|unterbrechen|beenden)' + L +
+    '|(?:stopp|stop|halt|anhalten|pause)' + L + ')' +
+    TAIL,
+  'iu',
+)
+// Any of these ANYWHERE in the text voids it: a question, a negation, a hedge, or
+// a word that keeps or restarts the batch (a retraction inside the same message).
+const VOIDING =
+  /\?|(?<![\p{L}'])(nicht|nie|niemals|kein\p{L}*|nein|doch|not|never|no|don't|dont|vielleicht|eventuell|erstmal|könnte\p{L}*|würde\p{L}*|sollte\p{L}*|soll|sollen|willst|überleg\p{L}*|falls|wenn|ob|reden|besprechen|weiter\p{L}*|fortsetzen|starte\p{L}*|maybe|perhaps|could|would|should|might|if|whether|discuss|talk|continue|resume|restart|keep|go\s+on)(?![\p{L}'])/iu
+
+/** Sentences of one flattened text; a wrapped line stays in its sentence. */
+function sentencesOf(flat) {
+  return flat.match(/[^.!?…;]+[.!?…;]*/g) ?? []
+}
+
+/**
+ * Is this user text an explicit order to stop or pause the batch? Every sentence
+ * must be EXACTLY a closed command (verb, the batch, at most a time phrase), and
+ * nothing in the whole text may ask, negate, hedge or retract.
+ */
+export function isExplicitStopOrder(text) {
+  const flat = String(text ?? '')
+    .replace(/[’‘ʼ`´]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+  // »bis auf weiteres« is a duration the TAIL allows, not the continue word »weiter«.
+  if (!flat || VOIDING.test(flat.replace(/bis auf weiteres/giu, ' '))) return false
+  const sentences = sentencesOf(flat)
+    .map((x) => x.trim())
+    .filter(Boolean)
+  return sentences.length > 0 && sentences.every((x) => COMMAND.test(x))
+}
+
+/**
+ * Does a pause reason QUOTE an explicit stop order (not just any user words)? All
+ * quotes are judged as ONE utterance, so a separately quoted retraction voids it.
+ */
+export function quotesExplicitStopOrder(reason) {
+  const quotes = [...String(reason ?? '').matchAll(QUOTED)].map((m) => m.slice(1).find(Boolean))
+  return quotes.length > 0 && isExplicitStopOrder(quotes.join('. '))
+}
+
+/**
  * The retry ladder: a first park is short, each further one longer, and past the
  * last rung the park keeps probing at the capped interval. Twenty minutes is the
  * point's own measure of a self-clearing cause; three hours is long enough that a
@@ -99,7 +164,7 @@ const isoOrNull = (v) => {
  * A full ISO stamp — date AND time. `Date.parse` alone would read the TRUNCATED
  * stamp of a torn write ("retry-after: 2026") as 1 January of that year, which is
  * in the past, which resumes the batch: the one corruption mode that can flip this
- * mechanism toward the unsafe direction (four-eyes review, Fable 5, finding 4).
+ * mechanism toward the unsafe direction (four-eyes review, finding 4).
  */
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
 
@@ -188,11 +253,14 @@ export function classifyPause({ text, now = Date.now() } = {}) {
   const base = { reason: rec.reason, type: rec.type, cause: rec.cause, retryAfter: rec.retryAfter, attempt: rec.attempt, pausedAt: rec.pausedAt, waitMs: 0 }
   if (rec.retryAfter == null) {
     const typedUserStop = rec.type === PAUSE_TYPES.USER_STOP && rec.cause === 'user-stop' && rec.clocklessOnPurpose
-    if (typedUserStop && namesUserUtterance(rec.reason)) {
+    if (typedUserStop && quotesExplicitStopOrder(rec.reason)) {
       return { ...base, state: 'hold', why: 'typed user-stop: the user deliberately stopped the batch' }
     }
     if (typedUserStop) {
-      return { ...base, state: 'recover', misfiledUserStop: true, why: 'typed user-stop quotes no user utterance (a misfiled stop)' }
+      const why = namesUserUtterance(rec.reason)
+        ? 'typed user-stop quotes no explicit stop order (a misfiled stop)'
+        : 'typed user-stop quotes no user utterance (a misfiled stop)'
+      return { ...base, state: 'recover', misfiledUserStop: true, why }
     }
     const why = rec.clocklessOnPurpose
       ? `retry-after is never, but only a typed user-stop may be clockless${rec.type ? ` (type ${rec.type})` : ''}`
@@ -276,4 +344,35 @@ export function describePause(verdict) {
     default:
       return 'not paused'
   }
+}
+
+/**
+ * Does the latest REAL human message in this transcript order the batch stopped? The Stop
+ * guard offers the user-stop end only then (point 1351): naming it to every
+ * session invited reading a question as one. `text` is the JSONL transcript.
+ */
+export function transcriptOrdersStop(text) {
+  if (typeof text !== 'string' || !text.includes('"human"')) return false
+  // Only the LATEST human message counts: an order the user has since followed
+  // with anything else (a resume, a new task) no longer authorises a stop.
+  let latest = null
+  for (const line of text.split('\n')) {
+    if (!line.includes('"human"')) continue
+    try {
+      const said = humanText(JSON.parse(line))
+      if (said !== null) latest = said
+    } catch {
+      /* a torn line proves nothing */
+    }
+  }
+  return latest !== null && isExplicitStopOrder(latest)
+}
+
+/** The Stop guard's user-stop clause: offered only to a session whose user ordered a stop. */
+export function userStopEnd(userOrderedStop) {
+  return userOrderedStop
+    ? '(b) the user explicitly ORDERED the batch stopped or paused: ' +
+        '`node scripts/batch-pause.mjs --user-stop "<the user\'s order, quoted>"`, then stop; '
+    : '(b) no user stop: the user\'s latest message orders no stop, and a question, ' +
+        'complaint or discussion remark is never one; '
 }

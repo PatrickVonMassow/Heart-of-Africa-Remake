@@ -7,6 +7,12 @@ import { describe, it, expect } from 'vitest'
 import { waitThresholds } from '../wait-lease-core.mjs'
 import {
   BLOCKING_LIMIT_MS,
+  LOG_WAIT_STALL_MS,
+  LOG_WAIT_TIMEOUT_MS,
+  awaitLog,
+  exitCodeOfDoneLine,
+  formatLogWaitReport,
+  logWaitStep,
   COUNTED_SUITE_FRAMES,
   FIRST_WAIT_FRACTION,
   hungMarkMs,
@@ -528,5 +534,87 @@ describe('the completion receipt', () => {
   it('reports a polled run as polled', () => {
     const text = formatReceipt(buildReceipt({ exitCode: 0, polls: 3 })).join('\n')
     expect(text).toMatch(new RegExp(`polls: {3}3 of ${MAX_POLLS}`))
+  })
+})
+
+// A bounded wait on an arbitrary build log (point 1356): it ends DONE, STALLED or
+// TIMEOUT within its bound, on a fake clock — never an unbounded `until grep`.
+describe('awaitLog — bounded wait on a build log', () => {
+
+  /** A fake clock whose sleep advances it, and a log driven by `script(t)`. */
+  function harness(script) {
+    let t = 1_000_000
+    const sleeps = []
+    return {
+      now: () => t,
+      sleep: async (ms) => {
+        sleeps.push(ms)
+        t += ms
+      },
+      readLog: () => script(t),
+      sleeps,
+      start: t,
+    }
+  }
+
+  it('the defaults are a bounded wait: a stall threshold below the timeout', () => {
+    expect(LOG_WAIT_STALL_MS).toBeGreaterThan(0)
+    expect(LOG_WAIT_TIMEOUT_MS).toBeGreaterThan(LOG_WAIT_STALL_MS)
+  })
+
+  it('a never-finishing, silent log ends with a STALL report within the configured bound', async () => {
+    const h = harness(() => ({ size: 120, text: 'building garments\nstep 3/9\n' }))
+    const r = await awaitLog({ ...h, timeoutMs: 600_000, stallMs: 60_000, tickMs: 5000 })
+    expect(r.state).toBe('stalled')
+    expect(r.silentMs).toBeGreaterThanOrEqual(60_000)
+    expect(r.waitedMs).toBeLessThanOrEqual(60_000)
+    const report = formatLogWaitReport(r, { logPath: 'build.log' }).join('\n')
+    expect(report).toMatch(/^STALLED {2}build\.log — no log growth for 1m 00s/)
+    expect(report).toMatch(/last write 1m 00s ago, log 120 bytes/)
+    expect(report).toContain('step 3/9')
+    expect(report).toMatch(/DIAGNOSE, do not re-run this wait blindly/)
+  })
+
+  it('silence before the wait counts: an old mtime stalls at once', async () => {
+    const h = harness((t) => ({ size: 5, mtimeMs: t - 90_000, text: 'x\n' }))
+    const r = await awaitLog({ ...h, timeoutMs: 600_000, stallMs: 60_000 })
+    expect(r.state).toBe('stalled')
+    expect(h.sleeps).toEqual([])
+  })
+
+  it('a log that keeps growing without a marker ends on TIMEOUT, not on a stall', async () => {
+    const h = harness((t) => ({ size: t, text: `tick ${t}\n` }))
+    const r = await awaitLog({ ...h, timeoutMs: 120_000, stallMs: 60_000, tickMs: 5000 })
+    expect(r.state).toBe('timeout')
+    expect(r.waitedMs).toBe(120_000)
+    expect(formatLogWaitReport(r, { logPath: 'b.log' })[0]).toMatch(/^TIMEOUT {2}b\.log — no done marker after 2m 00s/)
+  })
+
+  it('the done marker ends the wait with the parsed exit code', async () => {
+    let start = null
+    const h = harness((t) => {
+      start ??= t
+      return t - start >= 20_000 ? { size: 30, text: 'working\nexit 1\n' } : { size: t, text: 'working\n' }
+    })
+    const r = await awaitLog({ ...h, timeoutMs: 600_000, stallMs: 60_000, tickMs: 5000 })
+    expect(r).toMatchObject({ state: 'done', exitCode: 1, waitedMs: 20_000 })
+    expect(formatLogWaitReport(r, { logPath: 'b.log' })).toEqual(['DONE     b.log after 20s — exit 1'])
+  })
+
+  it('a custom done pattern without an exit code is done with exitCode null', async () => {
+    const h = harness(() => ({ size: 9, text: 'ALL DONE\n' }))
+    const r = await awaitLog({ ...h, doneRe: /^ALL DONE$/ })
+    expect(r).toMatchObject({ state: 'done', exitCode: null })
+  })
+
+  it('a missing log counts as silent since the wait began', () => {
+    expect(logWaitStep({ startedAt: 0, now: 60_000, timeoutMs: 600_000, stallMs: 60_000 }).state).toBe('stalled')
+    expect(logWaitStep({ startedAt: 0, now: 59_000, timeoutMs: 600_000, stallMs: 60_000 }).state).toBe('waiting')
+  })
+
+  it('reads the exit code off the usual done-line shapes', () => {
+    expect(exitCodeOfDoneLine('exit 0')).toBe(0)
+    expect(exitCodeOfDoneLine('exit=137')).toBe(137)
+    expect(exitCodeOfDoneLine('exit')).toBeNull()
   })
 })

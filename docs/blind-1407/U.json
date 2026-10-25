@@ -1,0 +1,309 @@
+{
+ "mergedBy": "Fable 5.1",
+ "entries": [
+  {
+   "id": "U1",
+   "from": [
+    "A1",
+    "A2",
+    "B1"
+   ],
+   "defect": "The `--queued` transition in finding.mjs ticks the carrier with no check that point N exists in a commit reachable from pushed origin/main; it must verify origin/main holds `- [ ] N.`/`- [x] N.` and refuse otherwise, since the 21.10 ticks happened with appends only in the working tree."
+  },
+  {
+   "id": "U2",
+   "from": [
+    "A3"
+   ],
+   "defect": "`markQueued` must take and record a proof sha (`queued N @<sha>`) so later reconciliation can re-verify the tick instead of trusting it."
+  },
+  {
+   "id": "U3",
+   "from": [
+    "A4"
+   ],
+   "defect": "The carrier needs an intermediate `appending N` state between pending and the push-gated `queued N`, with reconciliation treating `appending` as open, otherwise the gate becomes never-tick."
+  },
+  {
+   "id": "U4",
+   "from": [
+    "A5",
+    "A47"
+   ],
+   "defect": "The boundary drain line, `--commit` refusal and runbook/autonomy docs order the tick before the commit (append, `--queued`); they must become append, commit, push, then `--queued` or the old order will be repeated."
+  },
+  {
+   "id": "U5",
+   "from": [
+    "A6"
+   ],
+   "defect": "The `request-not-queued` duty in auditFindings demands the tick within the turn and must count a staged/committed `appending N` as worked, not a violation, or the Stop guard pushes premature ticks."
+  },
+  {
+   "id": "U6",
+   "from": [
+    "A7"
+   ],
+   "defect": "The `--drained` path ticks absorbed findings `[x]` with no proof they reached a pushed TASKS.md point; it needs the same `--point N` and origin/main check."
+  },
+  {
+   "id": "U7",
+   "from": [
+    "A8",
+    "A46"
+   ],
+   "defect": "`projectSlug` does not normalize trailing separators, producing two real carrier files (-workspace-hoa and -workspace-hoa-); normalize and have reconciliation read every carrier resolving to this repo, with a test that both paths map to one memory dir."
+  },
+  {
+   "id": "U8",
+   "from": [
+    "A9"
+   ],
+   "defect": "`--queued` run from a linked worktree must resolve REPO_ROOT to the main checkout and check origin/main, not the feature branch's TASKS.md which may hold N while main does not."
+  },
+  {
+   "id": "U9",
+   "from": [
+    "A10",
+    "A11",
+    "A13",
+    "B3"
+   ],
+   "defect": "`planRemediation`/`quarantineScope` stash every dirty path except verification/, so TASKS.md, docs/tasks-archive.md, .claude/queue-rank.json and docs/work-packages.md went into an unaudited stash; add a protected list, split dirty paths into protected/quarantinable, exclude protected paths (tracked and untracked) from `quarantineStashArgs`, and emit rescue-protected-commit plus an alert action."
+  },
+  {
+   "id": "U10",
+   "from": [
+    "A12"
+   ],
+   "defect": "Add `rescueProtectedCommit` that commits protected paths to a `refs/heads/rescue/doctor-<ts>` branch via a temporary index without touching HEAD or the working tree, pushes it, and runs before any quarantine stash."
+  },
+  {
+   "id": "U11",
+   "from": [
+    "A14",
+    "A15",
+    "B5"
+   ],
+   "defect": "After a quarantine the doctor still logs VERDICT: consistent and `markAlertHandled()` silences the triggering parallel alert in the same run, so the run two seconds later saw CONSISTENT; a rescue or reconciliation mismatch must set alertsRemain, exit 1, and persist an alert the next session sees."
+  },
+  {
+   "id": "U12",
+   "from": [
+    "A16",
+    "A17"
+   ],
+   "defect": "`rescue-and-reset` runs `git reset --hard origin/main` with no preceding quarantine when parallelDetected is false, and `rescueAndReset` saves only committed local main, so uncommitted TASKS.md appends are destroyed; the plan must always rescue protected dirty content before the reset."
+  },
+  {
+   "id": "U13",
+   "from": [
+    "A18"
+   ],
+   "defect": "`restore-tasks-from-head` overwrites an unparseable TASKS.md with HEAD keeping only a local backup; the damaged bytes must go into the rescue commit and raise an alert rather than a silent repair."
+  },
+  {
+   "id": "U14",
+   "from": [
+    "A19",
+    "A20",
+    "B6"
+   ],
+   "defect": "The doctor needs a pure `reconcileCarrierAgainstTasks` run on every invocation (including read-only and clean-tree runs) comparing all carriers against TASKS.md and the archive on the working tree and origin/main; any queued point missing, working-tree-only or only in an unpushed commit is red and blocks a consistent verdict."
+  },
+  {
+   "id": "U15",
+   "from": [
+    "A21",
+    "A22"
+   ],
+   "defect": "Amendment/rank requests reuse existing numbers and carrier titles may be German while TASKS.md is English, so reconciliation must match on number plus a stamped content anchor, never on number alone or on title."
+  },
+  {
+   "id": "U16",
+   "from": [
+    "A23",
+    "B10"
+   ],
+   "defect": "Renumbered or absorbed points keep the old N in the carrier; reconciliation needs an explicit alias/identity mapping and a renumbering regression so an unrelated point at the old number cannot satisfy it and real renumbering does not false-red."
+  },
+  {
+   "id": "U17",
+   "from": [
+    "A24",
+    "B8"
+   ],
+   "defect": "Reconciliation must accept a point in either TASKS.md or docs/tasks-archive.md (readTasksAll), reporting duplicates without treating them as lost; restore commit 5ba920079 (1402–1405 restored, 1406 closed in archive) is the regression case."
+  },
+  {
+   "id": "U18",
+   "from": [
+    "A25",
+    "B7"
+   ],
+   "defect": "Existing legacy `queued` entries have no proof and survived removal of their points; a one-time backfill must verify each against TASKS.md, the archive and origin/main history, stamping a sha or filing a red finding instead of grandfathering them green."
+  },
+  {
+   "id": "U19",
+   "from": [
+    "A26"
+   ],
+   "defect": "`readRepoVerdict` reuses a clean/mandate marker or ignores doctor stdout, so reconciliation must run at every session start regardless of the marker and a red result must be printed in hook output, not only an exit code."
+  },
+  {
+   "id": "U20",
+   "from": [
+    "A27"
+   ],
+   "defect": "A doctor timeout or crash returns `{ ran: false }` and the session proceeds; for reconciliation this must count as red (fail closed)."
+  },
+  {
+   "id": "U21",
+   "from": [
+    "A28"
+   ],
+   "defect": "land-point must run reconciliation after the merge and again after tick/archive move before commit and push, raising a LandingError (step 'gate') when a stale branch TASKS.md or conflict resolution drops points."
+  },
+  {
+   "id": "U22",
+   "from": [
+    "A29"
+   ],
+   "defect": "`transitionAccepted` compares only archive-guard rules; extend it to refuse a landing that removes any point other than N from the union of TASKS.md and the archive."
+  },
+  {
+   "id": "U23",
+   "from": [
+    "A30"
+   ],
+   "defect": "On the land-point push-failure path the tick is committed only locally; the carrier must not advance to queued and reconciliation must report such entries as unpushed until origin/main holds them."
+  },
+  {
+   "id": "U24",
+   "from": [
+    "A31"
+   ],
+   "defect": "The doctor quarantines inside linked worktrees (stashes on feat/1184, feat/1137); protected-file rescue must apply there too, and reconciliation must always read the main checkout plus origin/main, never only CHECKOUT_ROOT."
+  },
+  {
+   "id": "U25",
+   "from": [
+    "A32"
+   ],
+   "defect": "Rescue branch names must be unique (timestamp plus pid), never pruned by cleanup scripts, and named with their files in the alert; test that two runs in the same second do not overwrite each other."
+  },
+  {
+   "id": "U26",
+   "from": [
+    "A33",
+    "B4"
+   ],
+   "defect": "If the rescue commit/push fails (index.lock, no network), the plan must not fall back to stashing protected files; leave them in the working tree, alert and exit 1 (fail closed)."
+  },
+  {
+   "id": "U27",
+   "from": [
+    "A34",
+    "B12"
+   ],
+   "defect": "A one-time stash sweep must diff every stash (including the untracked parent) for TASKS.md, the archive, work-packages, queue-rank, CLAUDE.md and other docs, classifying by content (point lines, user quotes, order lines) rather than filename, and check each against origin/main."
+  },
+  {
+   "id": "U28",
+   "from": [
+    "A35",
+    "B14"
+   ],
+   "defect": "The sweep must produce a per-stash disposition: machine state discardable, content on main redundant, user content absent from main restored to TASKS.md/archive or filed as a finding/card, recorded in a committed audit report, distinguishing archived/renumbered from genuinely missing."
+  },
+  {
+   "id": "U29",
+   "from": [
+    "A36"
+   ],
+   "defect": "Sweep edge cases: feature-branch stashes diff against their own base, restored/renumbered points (1402–1406) count by content match, and the sweep must be strictly read-only with no pop/apply on the shared tree."
+  },
+  {
+   "id": "U30",
+   "from": [
+    "A37",
+    "B13"
+   ],
+   "defect": "The sweep must enumerate all existing stashes keyed by commit sha, not index (indices shift on push/drop), and distinguish doctor-quarantine from other stashes rather than trusting the 218 or 222 counts."
+  },
+  {
+   "id": "U31",
+   "from": [
+    "A38",
+    "B15"
+   ],
+   "defect": "Incident replay test: uncommitted point N appended, carrier ticked, unhandled parallel alert, ownerAlive=false, `--repair`; N must remain in TASKS.md on a rescue branch with an alert, nonzero exit and no consistent verdict."
+  },
+  {
+   "id": "U32",
+   "from": [
+    "A39"
+   ],
+   "defect": "Test the doctor run twice in a row: the second run must still report the red reconciliation or rescue alert, not CONSISTENT."
+  },
+  {
+   "id": "U33",
+   "from": [
+    "A40",
+    "B16"
+   ],
+   "defect": "Unit test: carrier `queued 1402` with a parseable TASKS.md and archive lacking 1402 returns not ok and never yields isConsistent, with variants archive-only (ok), working-tree-only (red), unpushed-commit-only (red), missing anchor (red)."
+  },
+  {
+   "id": "U34",
+   "from": [
+    "A41",
+    "B2"
+   ],
+   "defect": "Test that `--queued --point N` is refused for dirty-only, unpushed-local and worktree-branch-only points leaving the entry pending, succeeds with `@<sha>` once pushed, and legacy sha-less entries parse but are flagged."
+  },
+  {
+   "id": "U35",
+   "from": [
+    "A42"
+   ],
+   "defect": "Test `quarantineScope`/`quarantineStashArgs`: of TASKS.md, archive, queue-rank, work-packages and src/x.ts only src/x.ts is stashed, protected paths produce rescue plus alert, and the verification exclusion composes with it."
+  },
+  {
+   "id": "U36",
+   "from": [
+    "A43"
+   ],
+   "defect": "Test diverged main (ahead 1, behind 1), parallelDetected false, dirty TASKS.md: the plan orders rescue-protected-commit before rescue-and-reset."
+  },
+  {
+   "id": "U37",
+   "from": [
+    "A44"
+   ],
+   "defect": "land-point test: a branch whose TASKS.md lacks a point main gained later is stopped by post-merge reconciliation before commit/push, and main keeps the point."
+  },
+  {
+   "id": "U38",
+   "from": [
+    "A45",
+    "B11"
+   ],
+   "defect": "Test a queued-but-missing point through both the session-start hook (with a valid clean marker and with ran:false) and the post-merge gate, including invocation from a worktree whose task content differs from main; both must show red."
+  },
+  {
+   "id": "U39",
+   "from": [
+    "B9"
+   ],
+   "defect": "Reconciliation tests must expand carrier range notation like `queued 1402..1406` to every member and fail on a single missing one rather than matching the range as a whole."
+  },
+  {
+   "id": "U40",
+   "from": [
+    "B17"
+   ],
+   "defect": "Only the point, log excerpt, restore commit stat and stash count are attached, so concrete implementation-line defects, hook wiring and the claimed verbatim restoration cannot be verified from this material."
+  }
+ ]
+}

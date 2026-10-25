@@ -24,6 +24,8 @@ const KNOWN_GAPS = new Set([
   1255, // parked verbatim in docs/backlog.md by point 1258 while the loom is off
   1257, // parked verbatim in docs/backlog.md by point 1258 while the loom is off
   575, // folded into 1284 (detailed animal models) on 04.10.2026 — user order 03.10.2026
+  // 1319-1327 deleted unimplemented on 07.10.2026 — replaced by 1329, the covered-body mask (user order)
+  ...[1319, 1320, 1321, 1322, 1323, 1324, 1325, 1326, 1327],
 ])
 
 /** Point numbers with their tick state: [{ n, done }]. */

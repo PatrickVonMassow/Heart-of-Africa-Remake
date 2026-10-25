@@ -9,6 +9,9 @@ an arm the source holds level comes out level here too. Local rotations follow
 as W_parent⁻¹ · W_b; the villager's rest rotations are the identity. The hips
 take the source's hip travel scaled by the hip heights.
 
+The walk, sprint and idle are then restyled (`restyle`, VILLAGER_ASSET.clipStyle):
+the source's hunched walk and diving sprint straightened, the idle squared.
+
 Each clip is then put on the ground with the villager's own feet (heel, ball and
 toe-tip contact points, scripts/villager/rig.py FK), its natural ground speed is
 measured off the planted foot, and a loop is rotated to start at the left
@@ -26,14 +29,15 @@ FPS = 30
 SOURCES = {
     'idle': ('UAL1', 'Idle_Loop', 'loop'),
     'walk': ('UAL1', 'Walk_Loop', 'gait'),
+    'jog': ('UAL1', 'Jog_Fwd_Loop', 'gait'),
     'sprint': ('UAL1', 'Sprint_Loop', 'gait'),
     'kneelWork': ('UAL1', 'Fixing_Kneeling', 'once'),
 }
 # The kneel transitions cut from Fixing_Kneeling (seconds): going down, the
 # held kneel (one frame), getting up.
 KNEEL_CUTS = {'kneelDown': (0.0, 0.75), 'kneel': (1.2, 1.2), 'kneelUp': (4.1, 4.85)}
-FILES = {'UAL1': 'quaternius/AnimationLibrary_Godot_Standard.gltf'}
-MAPS = {'UAL1': SK.UAL1}
+FILES = {'UAL1': 'quaternius/AnimationLibrary_Godot_Standard.gltf', 'UAL2': 'quaternius/UAL2_Standard.glb'}
+MAPS = {'UAL1': SK.UAL1, 'UAL2': SK.UAL2}
 
 
 class Source:
@@ -235,6 +239,52 @@ def analyse_gait(clip, joints, cp):
     return {'heights': H, 'speed': speed}
 
 
+def contact_intervals(an, nf, touch=0.02):
+    """Per foot and contact (heel, ball, tip) the phase intervals [a, b) of
+    the cycle (0 … 1 from the left landing) in which it carries — within
+    `touch` of the ground; b > 1 where an interval wraps past the seam."""
+    n = nf - 1  # the last frame repeats the first
+    out = {}
+    for s in ('L', 'R'):
+        out[s] = {}
+        for k in ('heel', 'ball', 'tip'):
+            down = an['heights'][s][k][:n] < touch
+            if down.all():
+                out[s][k] = [[0.0, 1.0]]
+                continue
+            spans = []
+            for i in range(n):
+                if down[i] and not down[i - 1]:
+                    j = 1
+                    while down[(i + j) % n]:
+                        j += 1
+                    spans.append([i / n, (i + j) / n])
+            out[s][k] = sorted(spans)
+    return out
+
+
+def best_loop_end(c, search=0.25):
+    """Cut a loop at the frame of its last quarter that best meets its first
+    (the worst bone's angle): a source loop whose ends do not meet (the
+    Quaternius sprint) is closed where it nearly does instead of having a
+    wide gap smeared over the whole cycle. Returns the seam left at that cut."""
+    Q = c['q']
+    n = len(Q)
+
+    def gap(k):
+        d = np.abs((Q[0] * Q[k]).sum(1)).clip(0, 1)
+        return float(2 * np.arccos(d).max())
+    first = max(2, int(n * (1 - search)))
+    best = min(range(first, n), key=gap)
+    if best < n - 1 and gap(best) < gap(n - 1):
+        dt = c['times'][1] - c['times'][0]
+        c['q'] = Q[:best + 1].copy()
+        c['hips'] = c['hips'][:best + 1].copy()
+        c['times'] = c['times'][:best + 1].copy()
+        c['duration'] = float(best * dt)
+    return gap(len(c['q']) - 1)
+
+
 def lowest(an, side):
     H = an['heights'][side]
     return np.minimum(np.minimum(H['heel'], H['ball']), H['tip'])
@@ -305,6 +355,170 @@ def soften(c, passes=1):
         c['hips'] = np.concatenate([out_p, out_p[:1]])
 
 
+# ---- clip style (natural-villager-motion step 6) ----------------------------------
+
+X, Y, Z = np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0])
+
+
+def tilt(wr, b):
+    """A bone's forward tilt (rad, + leaning forward): its up axis off the vertical, seen from the side."""
+    y = qrot(wr[SK.INDEX[b]], Y)
+    return float(np.arctan2(y[2], y[1]))
+
+
+def tilt_after(turn, wr, b):
+    """`b`'s forward tilt once the whole figure is turned by the world `turn`."""
+    y = qrot(qmul(turn, wr[SK.INDEX[b]]), Y)
+    return float(np.arctan2(y[2], y[1]))
+
+
+def heading(wr, b):
+    """A bone's facing about the vertical (rad, + to the figure's left)."""
+    z = qrot(wr[SK.INDEX[b]], Z)
+    return float(np.arctan2(z[0], z[2]))
+
+
+def _set_world(joints, q, hips, bone, W):
+    wr, _wp = rig.fk(joints, q, hips)
+    p = SK.PARENT[bone]
+    q[SK.INDEX[bone]] = qnorm(W) if p is None else qnorm(qmul(qinv(wr[SK.INDEX[p]]), W))
+
+
+def _turn(joints, q, hips, bone, axis, ang):
+    """Turn `bone` (its children with it) by `ang` about the world `axis`."""
+    from gltfio import qaxis
+    wr, _wp = rig.fk(joints, q, hips)
+    _set_world(joints, q, hips, bone, qmul(qaxis(axis, ang), wr[SK.INDEX[bone]]))
+
+
+def _hold(joints, q, hips, bones, world):
+    """Give `bones` their world rotations `world` back (a parent moved)."""
+    for b in bones:
+        _set_world(joints, q, hips, b, world[SK.INDEX[b]])
+
+
+def restyle(c, name, joints, style):
+    """The clip-style offsets (VILLAGER_ASSET.clipStyle) on a retargeted clip,
+    per frame: the hips' and the chest's MEAN forward tilt brought to
+    `hipsTilt` and `chestTilt` by one offset each (each keeps its swing; the legs keeping their world turn so the feet stay
+    put; the rest on the chest), the chest's twist against the hips scaled by
+    `chestTwist`; the head keeping its world turn through it all (the twist
+    moves the chest's tilt, so a second pass brings its mean back to
+    `chestTilt`). `elbowMean` shifts each elbow's bend by one offset to that
+    mean, kept in [`elbowMin`, `elbowMax`]; `armIn` brings the upper arm toward the body;
+    `square` takes a standing clip's constant turns out (hips and head) and
+    puts the feet side by side."""
+    s = style.get(name)
+    if not s:
+        return {}
+    from toolclips import two_bone
+    Q, P = c['q'], c['hips']
+    n = len(Q)
+    fk = lambda f: rig.fk(joints, Q[f], P[f])  # noqa: E731
+    hips_yaw = float(np.mean([heading(fk(f)[0], 'hips') for f in range(n)])) if s.get('square') else 0.0
+    # the tilts the offsets correct, read as the frame loop below meets them:
+    # after the square's yaw is out (a turn about the vertical changes what a
+    # tilt seen from the side measures)
+    from gltfio import qaxis
+    unyaw = qaxis(Y, -hips_yaw)
+    before = {}
+    for b in ('hips', 'chest', 'head'):
+        before[b] = float(np.degrees(np.mean([tilt_after(unyaw, fk(f)[0], b) for f in range(n)])))
+    # constant offsets to the means, so each bone keeps its own swing through the cycle
+    hips_off = np.radians(0.0) + (s['hipsTilt'] - np.radians(before['hips']) if 'hipsTilt' in s else 0.0)
+    chest_off = s['chestTilt'] - np.radians(before['chest']) - hips_off if 'chestTilt' in s else 0.0
+
+    def bend_of(wp, side):
+        iu, il, ih = SK.INDEX['upperArm.' + side], SK.INDEX['forearm.' + side], SK.INDEX['hand.' + side]
+        u, fa = wp[il] - wp[iu], wp[ih] - wp[il]
+        return u, fa, float(np.arccos(np.clip(np.dot(u, fa) / np.linalg.norm(u) / np.linalg.norm(fa), -1, 1)))
+
+    # the elbow's bend is the arm's own: the trunk offsets below leave it as it is
+    bend_mean = {side: float(np.mean([bend_of(fk(f)[1], side)[2] for f in range(n)])) for side in ('L', 'R')}
+    for f in range(n):
+        q, h = Q[f], P[f]
+        wr0, wp0 = rig.fk(joints, q, h)
+        head0 = wr0[SK.INDEX['head']].copy()
+        if hips_yaw:
+            _turn(joints, q, h, 'hips', Y, -hips_yaw)
+            wr0, wp0 = rig.fk(joints, q, h)
+            head0 = wr0[SK.INDEX['head']].copy()
+        if 'hipsTilt' in s:
+            _turn(joints, q, h, 'hips', X, hips_off)
+            _hold(joints, q, h, ['thigh.L', 'thigh.R'], wr0)
+            # the turned hips carry the thigh heads along, and the legs kept
+            # their world turn moved the feet with them, by a little more or
+            # less every frame: a planted sprint foot slid under the runtime
+            # hold (0.0041 per 120 Hz frame for the no-slide test's 0.004).
+            # Each leg is bent back onto its foot's own place and turn, its
+            # knee toward where it was.
+            for side in ('L', 'R'):
+                fi, si = SK.INDEX['foot.' + side], SK.INDEX['shin.' + side]
+                hip = rig.fk(joints, q, h)[1][SK.INDEX['thigh.' + side]]
+                two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, wp0[fi], wp0[si] - hip, wr0[fi], 'foot.' + side)
+        if 'chestTilt' in s:
+            _turn(joints, q, h, 'chest', X, chest_off)
+        if 'chestTwist' in s:
+            wr, _wp = rig.fk(joints, q, h)
+            tw = heading(wr, 'chest') - heading(wr, 'hips')
+            _turn(joints, q, h, 'spine1', Y, -tw * (1 - s['chestTwist']))
+        if s.get('square'):
+            # the head facing the hips' way: its constant turn removed
+            wr, _wp = rig.fk(joints, q, h)
+            from gltfio import qaxis
+            head0 = qmul(qaxis(Y, heading(wr, 'hips') - heading(wr0, 'head')), head0)
+        _set_world(joints, q, h, 'head', head0)
+    if 'chestTilt' in s:
+        # the twist turned the tilted chest about the vertical, which moves its
+        # tilt (the jog came out 13.4° for 10.9°): the mean brought back
+        res = s['chestTilt'] - float(np.mean([tilt(fk(f)[0], 'chest') for f in range(n)]))
+        for f in range(n):
+            q, h = Q[f], P[f]
+            head0 = rig.fk(joints, q, h)[0][SK.INDEX['head']].copy()
+            _turn(joints, q, h, 'chest', X, res)
+            _set_world(joints, q, h, 'head', head0)
+    for f in range(n):
+        q, h = Q[f], P[f]
+        if 'elbowMin' in s:
+            for side, sg in (('L', 1.0), ('R', -1.0)):
+                wr, wp = rig.fk(joints, q, h)
+                fwd = qrot(wr[SK.INDEX['chest']], Z)
+                if s.get('armIn'):
+                    _turn(joints, q, h, 'upperArm.' + side, fwd, -sg * s['armIn'])
+                    wr, wp = rig.fk(joints, q, h)
+                u, fa, bend = bend_of(wp, side)
+                want = bend + (s['elbowMean'] - bend_mean[side]) if 'elbowMean' in s else bend
+                want = min(max(want, s['elbowMin']), s.get('elbowMax', np.pi))
+                # in the elbow's own plane (a near-straight arm has none: bent forward)
+                axis = np.cross(u, fa) if bend > 0.05 else np.cross(u, fwd)
+                if abs(want - bend) > 1e-6 and np.linalg.norm(axis) > 1e-6:
+                    _turn(joints, q, h, 'forearm.' + side, axis / np.linalg.norm(axis), want - bend)
+        if s.get('square'):
+            wr, wp = rig.fk(joints, q, h)
+            mid = 0.5 * (wp[SK.INDEX['foot.L']][2] + wp[SK.INDEX['foot.R']][2])
+            half = 0.5 * (wp[SK.INDEX['foot.L']][0] - wp[SK.INDEX['foot.R']][0])
+            for side, sg in (('L', 1.0), ('R', -1.0)):
+                fi = SK.INDEX['foot.' + side]
+                t = wp[fi].copy()
+                t[2] = mid
+                # side by side, the same span, centred under the hips
+                t[0] = wp[SK.INDEX['hips']][0] + sg * half
+                frot = wr[fi].copy()
+                # each foot pointing the hips' way
+                from gltfio import qaxis
+                frot = qmul(qaxis(Y, heading(wr, 'hips') - heading(wr, 'foot.' + side)), frot)
+                two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, Z, frot, 'foot.' + side)
+    for f in range(1, n):
+        flip = (Q[f] * Q[f - 1]).sum(1) < 0
+        Q[f, flip] *= -1
+    after = {b: float(np.degrees(np.mean([tilt(fk(f)[0], b) for f in range(n)]))) for b in ('hips', 'chest', 'head')}
+    elbows = [np.degrees(bend_of(fk(f)[1], side)[2]) for f in range(n) for side in ('L', 'R')]
+    print(f'clip {name}: style — tilt (deg) before {before}, after {after}; elbow (deg) '
+          f'{np.degrees(min(bend_mean.values())):.1f}-{np.degrees(max(bend_mean.values())):.1f} mean before, '
+          f'{min(elbows):.1f}-{max(elbows):.1f} after')
+    return after
+
+
 def slice_clip(c, t0, t1, name):
     """A part of a clip, from t0 to t1, resampled at FPS (a hold when t0 = t1)."""
     from sheets import sample
@@ -320,7 +534,10 @@ def slice_clip(c, t0, t1, name):
             'source': c['source'] + f' {t0:.2f}–{t1:.2f}s'}
 
 
-def build_clips(src_dir, body, cfg, only=None):
+def build_clips(src_dir, body, cfg, only=None, style=True):
+    """The retargeted clips; `style=False` leaves the clip style out, a dict
+    puts that style on instead of VILLAGER_ASSET.clipStyle (the motion the
+    garments are tailored to, fit.tailor)."""
     import os
     joints = body['joints']
     cp = contact_points(body)
@@ -337,11 +554,22 @@ def build_clips(src_dir, body, cfg, only=None):
         c['source'] = f'{lib}:{clip_name}'
         c['kind'] = kind
         if kind in ('gait', 'loop'):
-            seam = close_loop(c)
+            seam = best_loop_end(c)
+            close_loop(c)
+            c['seam'] = seam
+            limit = cfg['VILLAGER_ASSET']['loopSeamMax']
+            if seam > limit:
+                # a seam this wide is a different pose at the loop's two ends:
+                # spread over the cycle it smears the whole clip — refused
+                raise RuntimeError(f'clip {name}: loop seam {seam:.2f} rad over VILLAGER_ASSET.loopSeamMax = {limit}')
             if seam > 0.05:
                 print(f'clip {name}: loop seam closed ({seam:.2f} rad at the worst bone)')
-        if name == 'sprint':
+        if name in ('sprint', 'jog'):
+            # the jog snaps its knee straight at the strike as the sprint does (~28 rad/s)
             soften(c, 2)
+        # the style offsets (natural-villager-motion step 6), before the grounding
+        if style:
+            restyle(c, name, joints, cfg['VILLAGER_ASSET']['clipStyle'] if style is True else style)
         if kind == 'gait':
             ground(c, joints, cp, per_frame=(name != 'sprint' and name != 'jog'))
             an = analyse_gait(c, joints, cp)
@@ -349,6 +577,7 @@ def build_clips(src_dir, body, cfg, only=None):
             an = analyse_gait(c, joints, cp)
             c['speed'] = an['speed']
             c['heights'] = an['heights']
+            c['contacts'] = {'seam': float(c['seam']), 'support': contact_intervals(an, len(c['times']))}
         else:
             ground(c, joints, cp, per_frame=False)
         out['clips'][name] = c
@@ -359,3 +588,24 @@ def build_clips(src_dir, body, cfg, only=None):
     import toolclips
     toolclips.build_tool_clips(body, out, cfg)
     return out
+
+
+def selftest():
+    """The square's yaw comes out before the hips' tilt is read (no Blender
+    needed): a bone turned 60° about the vertical and tilted 30° forward in its
+    own frame reads ≈ 13.9° seen from the side, 30° once the turn is out, and
+    the offset from that brings it exactly to its target."""
+    from gltfio import qaxis
+    w = {SK.INDEX['hips']: qmul(qaxis(Y, np.radians(60)), qaxis(X, np.radians(30)))}
+    wr = [w.get(i, np.array([0, 0, 0, 1.0])) for i in range(len(SK.BONES))]
+    unyaw = qaxis(Y, -np.radians(60))
+    assert abs(np.degrees(tilt(wr, 'hips')) - 30) > 10
+    assert abs(np.degrees(tilt_after(unyaw, wr, 'hips')) - 30) < 1e-6
+    target = np.radians(5)
+    off = target - tilt_after(unyaw, wr, 'hips')
+    turned = qmul(qaxis(X, off), qmul(unyaw, wr[SK.INDEX['hips']]))
+    wr2 = list(wr)
+    wr2[SK.INDEX['hips']] = turned
+    assert abs(tilt(wr2, 'hips') - target) < 1e-6
+    print('clips selftest: ok')
+

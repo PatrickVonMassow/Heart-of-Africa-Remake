@@ -1,18 +1,31 @@
 // The task walker's stop at its work (work-order "walking villagers", from
-// point 350): it kneels where it stopped, works, and gets up ON THE SPOT —
-// the standing transition runs to its end before the first step, so it never
-// rises while it moves off.
+// point 350): it takes the load off its head with both hands while standing,
+// kneels and sets it down beside it, works, grips it again, rises with it onto
+// its head and lets go — and gets up ON THE SPOT: every step runs to its end
+// before the first step home, so it never rises while it moves off.
 
-import { VILLAGER_MOTION } from '../../config/balance'
+import { TASK_LOAD_HANDLING as H, VILLAGER_MOTION } from '../../config/balance'
 
-export type WorkStopMode = 'work' | 'rise' | 'back'
+export type WorkStopMode = 'take' | 'work' | 'rise' | 'settle' | 'back'
+export type StopMode = Exclude<WorkStopMode, 'back'>
 
-/** One frame of the stop: `work` counts the work down while kneeling, `rise`
- *  holds the walker in place for the getting-up, then `back` lets it walk. */
-export function workStop(mode: 'work' | 'rise', timer: number, dt: number): { mode: WorkStopMode; timer: number; kneels: boolean } {
+/** The kneeling time of one stop: long enough for setting the load down,
+ *  letting go and gripping it again. */
+export function workSpan(seconds: number): number {
+  return Math.max(seconds, H.lowerSeconds + H.releaseSeconds + H.gripSeconds + 0.5)
+}
+
+/** How long the getting-up with the load takes. */
+export const RISE_SECONDS = Math.max(VILLAGER_MOTION.kneelSeconds, H.liftSeconds)
+
+/** One frame of the stop: `take` grips the load standing, `work` kneels
+ *  (`span` long), `rise` gets up with it, `settle` lets go of it on the head,
+ *  then `back` lets the walker walk. */
+export function workStop(mode: StopMode, timer: number, dt: number, span: number): { mode: WorkStopMode; timer: number; kneels: boolean } {
   const left = timer - dt
-  if (mode === 'work') {
-    return left > 0 ? { mode, timer: left, kneels: true } : { mode: 'rise', timer: VILLAGER_MOTION.kneelSeconds, kneels: false }
-  }
-  return left > 0 ? { mode, timer: left, kneels: false } : { mode: 'back', timer: 0, kneels: false }
+  if (left > 0) return { mode, timer: left, kneels: mode === 'work' }
+  if (mode === 'take') return { mode: 'work', timer: span, kneels: true }
+  if (mode === 'work') return { mode: 'rise', timer: RISE_SECONDS, kneels: false }
+  if (mode === 'rise') return { mode: 'settle', timer: H.releaseSeconds, kneels: false }
+  return { mode: 'back', timer: 0, kneels: false }
 }

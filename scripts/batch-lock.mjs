@@ -80,7 +80,7 @@ export function pauseState(now = Date.now(), opts = {}) {
  * file because that is what clears it (with `failCount`) the moment a spawn commits
  * something, and a park written from anywhere else must climb the SAME ladder: an
  * unanswered alert or a standing outage that re-parked at rung 1 every twenty
- * minutes would never reach a human (four-eyes review, Fable 5, findings 1 + 3).
+ * minutes would never reach a human (four-eyes review, findings 1 + 3).
  */
 export function retryAttempts({ statePath = STATE_PATH, path = PAUSE_PATH } = {}) {
   let fromState = 0

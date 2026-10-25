@@ -36,7 +36,7 @@ const consumedDir = () => resolve(spoolDir(), 'consumed')
 const memoryDir = () => resolve(repo, 'memory')
 const carrierPath = () => resolve(memoryDir(), 'findings-carrier.md')
 
-const runHook = (sessionId = OWNER, transcriptPath = resolve(claudeDir(), 'projects', 'owner.jsonl')) =>
+const runHook = (sessionId = OWNER, transcriptPath = resolve(claudeDir(), 'projects', 'owner.jsonl'), extra = {}) =>
   spawnSync(process.execPath, [resolve(repo, 'scripts', 'lock-heartbeat-hook.mjs')], {
     windowsHide: true,
     encoding: 'utf8',
@@ -48,6 +48,7 @@ const runHook = (sessionId = OWNER, transcriptPath = resolve(claudeDir(), 'proje
       hook_event_name: 'PostToolUse',
       tool_name: 'Read',
       tool_input: { file_path: 'x.ts' },
+      ...extra,
     }),
   })
 
@@ -118,6 +119,14 @@ describe('the user message at the next tool call', () => {
   it('stands down for a subagent carrying the owner session id, consuming nothing', () => {
     const transcript = resolve(claudeDir(), 'projects', 'owner', 'subagents', 'agent-a.jsonl')
     const r = runHook(OWNER, transcript)
+    expect(r.status).toBe(0)
+    expect(r.stdout).toBe('')
+    expect(pendingFiles()).toEqual(['n1.json'])
+  })
+
+  it('stands down for a subagent whose payload carries the PARENT transcript but an agent_id', () => {
+    // Measured 12.10.2026: this shape consumed a user message into a subagent.
+    const r = runHook(OWNER, resolve(claudeDir(), 'projects', 'owner.jsonl'), { agent_id: 'a27e192a39170f873' })
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')
     expect(pendingFiles()).toEqual(['n1.json'])

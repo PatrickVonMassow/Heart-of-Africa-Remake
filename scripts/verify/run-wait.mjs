@@ -21,19 +21,34 @@
 //       The one COUNTED poll. Use it only where awaiting is genuinely
 //       impossible; it prints how many are left and what to do instead.
 //
+//   node scripts/verify/run-wait.mjs --await-log <log> [--done '<regex>'] [--timeout <s>] [--stall <s>]
+//       A BOUNDED wait on ANY log (point 1356) — a background build with no
+//       verify record, e.g. a Blender build ending in `exit <code>`. Replaces
+//       `until grep -q "^exit " $LOG; do sleep 20; done`. Ends DONE (default
+//       marker `^exit `; exit 0 when the build's code is 0 or absent, else 1),
+//       STALLED (no log growth for --stall, default 30 min; exit 5) or TIMEOUT
+//       (--timeout, default 6 h; exit 3). A stall or timeout is DIAGNOSED, not
+//       re-awaited blindly. Longer than ~10 min: start it as a background call.
+//
 // With no <log>, --await, --receipt and --status resolve the newest LIVE run in
 // the log directory, else the newest run at all — the ordinary case: the session
 // has just started one run. With several live runs --await refuses and asks for
 // the log; --plan reads no record.
+import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import { isAbsolute, join, relative } from 'node:path'
 import {
   BLOCKING_LIMIT_MS,
+  LOG_WAIT_DONE_PATTERN,
+  LOG_WAIT_STALL_MS,
+  LOG_WAIT_TIMEOUT_MS,
   MAX_POLLS,
+  awaitLog,
   backendsFrom,
   buildReceipt,
   formatDuration,
   formatObservedBand,
+  formatLogWaitReport,
   formatReceipt,
   hungMarkMs,
   nextWaitMs,
@@ -67,6 +82,8 @@ const USAGE = [
   '  node scripts/verify/run-wait.mjs --await [<log>] [--timeout <s>] block until it is over, then the receipt',
   '  node scripts/verify/run-wait.mjs --receipt [<log>]               the receipt of a finished run',
   '  node scripts/verify/run-wait.mjs --status [<log>]                ONE counted poll (last resort)',
+  "  node scripts/verify/run-wait.mjs --await-log <log> [--done '<regex>'] [--timeout <s>] [--stall <s>]",
+  '                                                    bounded wait on any build log: DONE / STALLED / TIMEOUT',
 ].join('\n')
 
 /** How often the blocking wait looks at the record. Not a poll in the sense
@@ -342,9 +359,83 @@ function doReceipt(logArg) {
   return exitOf(record)
 }
 
+/** The value after `--flag`, or null when the flag is absent; a flag without
+ *  its operand is refused rather than read as absent. */
+function flagValue(args, flag) {
+  const i = args.indexOf(flag)
+  if (i < 0) return null
+  if (i + 1 >= args.length || args[i + 1].startsWith('--')) throw new Error(`${flag} needs a value`)
+  return args[i + 1]
+}
+
+/** Seconds from a flag as ms, or the default; a bad value is refused, not guessed. */
+function secondsFlag(args, flag, fallbackMs) {
+  const raw = flagValue(args, flag)
+  if (raw === null) return fallbackMs
+  const s = Number(raw)
+  if (!Number.isFinite(s) || s <= 0) throw new Error(`${flag} needs a positive number of seconds, got "${raw}"`)
+  return Math.round(s * 1000)
+}
+
+/** How much of a log's END each look reads: the done marker and the report's
+ *  last lines live there, and a multi-GB build log is not re-read every tick. */
+const LOG_TAIL_BYTES = 256 * 1024
+
+function readTail(path, size) {
+  // One byte before the window says whether the window starts on a line boundary.
+  const cut = size > LOG_TAIL_BYTES
+  const start = cut ? size - LOG_TAIL_BYTES - 1 : 0
+  const buf = Buffer.alloc(size - start)
+  const fd = openSync(path, 'r')
+  try {
+    readSync(fd, buf, 0, buf.length, start)
+  } finally {
+    closeSync(fd)
+  }
+  if (!cut) return buf.toString('utf8')
+  // A window starting mid-line drops that fragment, so it never passes for a
+  // whole done line; with no newline at all the whole window is one fragment.
+  if (buf[0] === 0x0a) return buf.subarray(1).toString('utf8')
+  const nl = buf.indexOf(0x0a)
+  return nl < 0 ? '' : buf.subarray(nl + 1).toString('utf8')
+}
+
+/** `--await-log`: a bounded wait on an arbitrary log (point 1356). */
+async function doAwaitLog(args) {
+  const logArg = args.find((a, i) => !a.startsWith('--') && !['--done', '--timeout', '--stall', '--tick'].includes(args[i - 1]))
+  if (!logArg) {
+    console.log(USAGE)
+    return 2
+  }
+  const logPath = isAbsolute(logArg) ? logArg : join(process.cwd(), logArg)
+  const doneRe = new RegExp(flagValue(args, '--done') ?? LOG_WAIT_DONE_PATTERN)
+  const timeoutMs = secondsFlag(args, '--timeout', LOG_WAIT_TIMEOUT_MS)
+  const stallMs = secondsFlag(args, '--stall', LOG_WAIT_STALL_MS)
+  // `--tick` is for tests; the default looks every 5 s inside the one call.
+  const tickMs = secondsFlag(args, '--tick', undefined)
+  const result = await awaitLog({
+    readLog: () => {
+      if (!existsSync(logPath)) return null
+      const st = statSync(logPath)
+      return { size: st.size, mtimeMs: st.mtimeMs, text: readTail(logPath, st.size) }
+    },
+    now: () => Date.now(),
+    sleep: (ms) => delay(ms),
+    doneRe,
+    timeoutMs,
+    stallMs,
+    ...(tickMs === undefined ? {} : { tickMs }),
+  })
+  for (const line of formatLogWaitReport(result, { logPath: forDisplay(logPath) })) console.log(line)
+  if (result.state === 'stalled') return 5
+  if (result.state === 'timeout') return 3
+  return result.exitCode === null || result.exitCode === 0 ? 0 : 1
+}
+
 async function main(argv) {
   const mode = argv[0]
   const rest = argv.slice(1)
+  if (mode === '--await-log') return doAwaitLog(rest)
   const timeoutIndex = rest.indexOf('--timeout')
   const timeoutS = timeoutIndex >= 0 ? Number(rest[timeoutIndex + 1]) : null
   const positional = rest.filter((a, i) => !a.startsWith('--') && !(timeoutIndex >= 0 && i === timeoutIndex + 1))

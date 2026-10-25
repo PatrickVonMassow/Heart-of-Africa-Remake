@@ -13,7 +13,8 @@
 // no alert), so it does not own the supervisor's turn end. The exemption ends with that declaration. A ref that
 // no longer exists is dropped, and terminal answers are cached per sha so the
 // common turn costs no API call. The decision logic lives in
-// ci-status-guard-core.mjs (pure, Vitest-covered).
+// ci-status-guard-core.mjs (pure, Vitest-covered). A feature ref's red that its
+// open TASKS.md point charges by run id is reported on stderr, not blocked.
 //
 // Fail-OPEN above all: CI pending past the wait budget, no run yet, offline,
 // non-200, any internal error → allow, so the guard can never freeze a session
@@ -35,10 +36,19 @@ import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import {
   acknowledgeCiWaitState,
   blockReason,
+  blockingRunIds,
+  chargedReportsDue,
+  chargedRunIds,
+  observedShaEntry,
+  observerClassification,
+  refBranch,
   ciWaitBackoffMs,
   ciWaitIdentity,
-  classifyRuns,
   failedRuns,
+  withGateStatuses,
+  readAllStatusPages,
+  targetBranch,
+  waitTarget,
   ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
@@ -65,7 +75,7 @@ import {
   blockingDeployments,
   candidateDeployments,
 } from './pages-deploy-unblock-core.mjs'
-import { heldByOtherLiveOwner, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { ownsLock, probePid, readOwnerLock } from './batch-singleton.mjs'
 import { boundaryIsSealed } from './batch-boundary-core.mjs'
 import { assessCiWait } from './batch-in-flight-core.mjs'
 import { gatherInFlight, worktreeBranch } from './batch-in-flight.mjs'
@@ -190,6 +200,15 @@ function git(args) {
   }).trim()
 }
 
+/** The checked-out branch name, '' when detached or unreadable. */
+function currentBranch() {
+  try {
+    return git(['symbolic-ref', '--quiet', '--short', 'HEAD'])
+  } catch {
+    return ''
+  }
+}
+
 /** HEAD counts as pushed once ANY remote-tracking ref contains it (local refs, no
  *  network). Feature branches push to origin/feat/<point>-<slug>, so the old
  *  origin/main-only ancestor check silenced the guard for ALL branch work —
@@ -250,7 +269,10 @@ function httpsRequest(url, { method = 'GET', headers = {}, body = null, timeoutM
   })
 }
 
-/** Actions runs for the sha; null on any failure (the caller fails open). */
+/** Actions runs for the sha with its `ci/gate (branch)` commit statuses attached
+ * (a soft `feat/**` run concludes success even when its gate is red; the
+ * classifier folds the gate in for the target's own branch); null on any
+ * failure or incomplete read of either (the caller fails open and says so). */
 async function fetchRuns(repo, headSha) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -264,12 +286,29 @@ async function fetchRuns(repo, headSha) {
     { headers },
   )
   if (!res || res.status !== 200) return null
+  let runs
   try {
     const data = JSON.parse(res.body)
-    return Array.isArray(data?.workflow_runs) ? data.workflow_runs : null
+    runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : null
   } catch {
     return null
   }
+  if (!runs) return null
+  // Every page, or none: a red gate on an unread page must not pass as green.
+  const statuses = await readAllStatusPages(async (page) => {
+    const statusRes = await httpsRequest(
+      `https://api.github.com/repos/${repo}/commits/${headSha}/statuses?per_page=100&page=${page}`,
+      { headers },
+    )
+    if (!statusRes || statusRes.status !== 200) return null
+    try {
+      const list = JSON.parse(statusRes.body)
+      return Array.isArray(list) ? list : null
+    } catch {
+      return null
+    }
+  })
+  return statuses ? withGateStatuses(runs, statuses) : null
 }
 
 /** Dispatch the one failed-jobs re-run selected by the pure classifier. A 201
@@ -526,10 +565,11 @@ function pushReflog() {
 /** Judge ONE red sha: every failed run on it, each classified for WHERE its
  *  fault lies, so an outage cannot be mistaken for our own breakage (points
  *  526/528). Returns the chosen classification, whether every red is
- *  unactionable, the famine clocks to keep, the judged workflows and the
- *  re-run wait a failed-jobs dispatch started (`rerunWait`). */
-async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
-  const reds = failedRuns(runs, sha)
+ *  unactionable, the famine clocks to keep, the judged workflows, the
+ *  re-run wait a failed-jobs dispatch started (`rerunWait`) and the actionable
+ *  reds' run ids (`blockingRunIds`). */
+async function judgeRed(repo, { sha, branch = '', runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
+  const reds = failedRuns(runs, sha, { branch })
   const judged = []
   const stillFamished = {}
   let dispatchedWait = null
@@ -579,6 +619,9 @@ async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWai
     // Every workflow this call actually judged, so the sweep can CLEAR the
     // waiver clock of one that is no longer dying the famine way.
     judgedWorkflows: judged.map((c) => c.workflowName),
+    // The reds something can be done about; a charge must cover all of them.
+    // An id-less one stays as null, so it can never be charged away.
+    blockingRunIds: judged.filter((c) => c.actionable !== false).map((c) => (c.runId == null ? null : String(c.runId))),
   }
 }
 
@@ -610,10 +653,11 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
         'handoff instead of trapping a session that may only end.',
     }
   }
-  if (heldByOtherLiveOwner(sessionId)) {
+  // Batch duty: only the lock holder owes it — before any git, network or CI work.
+  if (!ownsLock(sessionId).mine) {
     return {
       applicable: false,
-      why: 'another live session owns the batch lock',
+      why: 'this session does not hold the batch lock',
       cause: 'not-lock-owner',
     }
   }
@@ -670,6 +714,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
       existingRefs,
       headSha: head,
       headPushed: isPushed(head),
+      headBranch: currentBranch(),
     }),
     liveAuthorBranches,
   })
@@ -686,7 +731,15 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     return { applicable: true, inputs: { decision: null, failedOpen: [] } }
   }
 
+  // Unreadable TASKS.md → nothing charged, so every red still blocks.
+  let tasksText = ''
+  try {
+    tasksText = readFileSync(repoPath('TASKS.md'), 'utf8')
+  } catch {
+    /* fail-safe */
+  }
   const swept = await sweepTargets({
+    chargedRuns: (branch) => chargedRunIds(tasksText, branch),
     targets,
     cache,
     notified,
@@ -700,8 +753,12 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
           notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
 
+  // Charged reds are reported once per session (`chargedReport` in the state).
+  let chargedDue = swept.charged ?? []
   if (!readOnly) {
     const persisted = mutateState((current) => {
+      const report = chargedReportsDue(current.chargedReport, sessionId, swept.charged)
+      chargedDue = report.due
       const observations = (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')
       const prior = current.ciWait ?? null
       const nextWait = reconcileCiWait(prior, observations, { now, makeWakeToken: randomUUID })
@@ -714,6 +771,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
         notifiedRefs: swept.notified,
         notifiedAt: now,
         ciWait: nextWait,
+        chargedReport: report.next,
       }
     })
     const durableWait = persisted?.ciWait ?? null
@@ -753,6 +811,14 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     startWaitObserver(durableWait)
   }
 
+  if (!readOnly && chargedDue.length > 0) {
+    console.error(
+      `ci-status-guard reported, charged to point ${chargedDue
+        .map((c) => `${/^feat\/(\d+)-/.exec(refBranch(c.ref))?.[1] ?? '?'}: ${c.ref} ${String(c.sha).slice(0, 7)} run ${c.runId}`)
+        .join('; ')}`,
+    )
+  }
+
   // A fail-open SAYS why (point 387): a silently swallowed API error is
   // indistinguishable from a green, which is the confusion this point ends.
   if (swept.failedOpen.length > 0) {
@@ -770,6 +836,15 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     }
   }
   return { applicable: true, inputs: { decision: swept.decision, failedOpen: swept.failedOpen } }
+}
+
+/** The run ids charged to `branch`'s open point; unreadable TASKS.md → none. */
+function readChargedRuns(branch) {
+  try {
+    return chargedRunIds(readFileSync(repoPath('TASKS.md'), 'utf8'), branch)
+  } catch {
+    return new Set()
+  }
 }
 
 /** Claim and run the renewable observer. Its ownership is stored on the wait,
@@ -803,11 +878,11 @@ async function observeDurableWait(wakeToken) {
       await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
       continue
     }
-    let classification = classifyRuns(runs, wait.sha)
+    let classification = observerClassification(runs, wait.sha, { branch: targetBranch(wait), chargedRuns: readChargedRuns })
     const observedAt = Date.now()
     if (classification.state === 'pending') {
       const observation = {
-        target: { ref: wait.ref, sha: wait.sha },
+        target: waitTarget(wait),
         classification,
         firstSeenAt: wait.firstObservationAt,
         observedAt,
@@ -862,16 +937,19 @@ async function observeDurableWait(wakeToken) {
 
     let standDown = false
     let famine = snapshot.famine ?? {}
+    let judgedRed = null
     if (classification.state === 'failed') {
       try {
         const judged = await judgeRed(repo, {
           sha: wait.sha,
+          branch: targetBranch(wait),
           runs,
           classification,
           famine,
           now: observedAt,
           rerunWait: wait,
         })
+        judgedRed = judged
         classification = judged.classification ?? classification
         standDown = judged.standDown === true
         famine = { ...famine, ...(judged.stillFamished ?? {}) }
@@ -883,7 +961,7 @@ async function observeDurableWait(wakeToken) {
         await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
         continue
       }
-      await notifyCiRed(ciRedAlertMessage({ target: { ref: wait.ref, sha: wait.sha }, classification, standDown }))
+      await notifyCiRed(ciRedAlertMessage({ target: waitTarget(wait), classification, standDown }))
     }
 
     let finished = null
@@ -898,12 +976,16 @@ async function observeDurableWait(wakeToken) {
         famine,
         shas: {
           ...(current.shas ?? {}),
-          [wait.sha]: {
-            state: classification.state,
-            firstSeenAt: wait.firstObservationAt,
-            checkedAt: observedAt,
-            ...(reason ? { reason } : {}),
-          },
+          [wait.sha]: observedShaEntry({
+            wait,
+            classification,
+            reason,
+            runIds: classification.state === 'failed'
+              ? blockingRunIds({ judged: judgedRed, runs, sha: wait.sha, branch: targetBranch(wait), chosen: classification })
+              : [],
+            runs,
+            observedAt,
+          }),
         },
         notifiedRefs: classification.state === 'failed'
           ? { ...(current.notifiedRefs ?? {}), [wait.ref]: wait.sha }

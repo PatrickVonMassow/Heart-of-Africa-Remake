@@ -84,7 +84,7 @@ describe('findRepeatDemands', () => {
   it('reads ACROSS a concatenation seam — the shape the real offender had', () => {
     // Verbatim from timestamp-guard-core.mjs before this change: no single
     // physical line contains "reply again", and a per-line scan reported the
-    // file clean (four-eyes review, Fable 5). A formatter wrapping a long
+    // file clean (four-eyes review). A formatter wrapping a long
     // message re-creates this for free, so it must be caught by construction.
     const source =
       '      reason:\n' +

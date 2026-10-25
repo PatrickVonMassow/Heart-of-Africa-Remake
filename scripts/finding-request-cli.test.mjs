@@ -18,6 +18,15 @@ import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { requestEntries } from './findings-request-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { makeRepoFixture } from './carrier-reconcile-fixture.mjs'
+import { beforeAll } from 'vitest'
+
+// The queue tick is PROVEN on origin/main (no user order is ever lost): every
+// CLI run here reads a throwaway checkout whose pushed TASKS.md holds 481 and 1200.
+let fixture
+beforeAll(() => {
+  fixture = makeRepoFixture({ points: [481, 1200] })
+})
 
 const SPEC = ['FINAL STATE: der Träger bekommt eine zweite Art.', '', '  - [ ] eine Zeile, die wie ein Kopf aussieht', 'Ende.'].join('\n')
 
@@ -28,7 +37,7 @@ const run = (args, expectFail = false, env = {}, input = undefined) => {
       cwd: REPO_ROOT,
       encoding: 'utf8',
       windowsHide: true,
-      env: { ...process.env, FINDINGS_MEMORY_DIR: dir, ...env },
+      env: { ...process.env, FINDINGS_MEMORY_DIR: dir, HOA_REPO_ROOT: fixture.root, ...env },
       ...(input === undefined ? {} : { input }),
     })
   } catch (e) {
@@ -41,7 +50,7 @@ const run = (args, expectFail = false, env = {}, input = undefined) => {
  * A preload that makes a SECOND window deposit inside the gap between the
  * carrier read and the carrier write of the process under test.
  *
- * The gap is the whole subject of four-eyes finding 1 (Fable 5), and it cannot
+ * The gap is the whole subject of four-eyes finding 1, and it cannot
  * be reached from outside the process: it is microseconds wide and no polling
  * loop would land in it deterministically. Hooking `readFileSync` puts the
  * concurrent deposit exactly where it hurts — after the running CLI has read the

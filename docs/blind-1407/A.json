@@ -1,0 +1,240 @@
+{
+ "model": "Opus 5.5",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "scripts/finding.mjs",
+   "defect": "Root cause: the `--queued` branch calls `markQueued` and `writeBack` with no check that point N exists in TASKS.md at all, let alone committed or pushed, so on 21.10 the carrier said \"queued 1402..1406\" at 10:31Z while the appends existed only in the working tree."
+  },
+  {
+   "id": "A2",
+   "file": "scripts/finding.mjs",
+   "defect": "Required change: before the `--queued` transition, verify that `git show origin/main:TASKS.md` (or `origin/main:docs/tasks-archive.md`) holds `- [ ] N.`/`- [x] N.` and that `git merge-base --is-ancestor <commit adding N> origin/main` holds (after a `git fetch`); otherwise refuse with \"commit and push first\", and the entry stays pending."
+  },
+  {
+   "id": "A3",
+   "file": "scripts/findings-request-core.mjs",
+   "defect": "Required change: `markQueued` must take a proof argument (the commit sha that holds point N plus a check that it is reachable from origin/main), stay pure, and record that sha in the entry (for example `queued N @<sha>`), so a reconciler can later re-verify the tick instead of trusting it."
+  },
+  {
+   "id": "A4",
+   "file": "scripts/findings-request-core.mjs",
+   "defect": "Failure mode: the carrier has only `pending`, `queued` and `blocked`; with the tick gated on push, the owner needs an intermediate state (for example `appending N`) or the gate turns into \"never tick\". Define the transition pending → appending N (working tree) → queued N (pushed), and have the reconciliation treat `appending` as open."
+  },
+  {
+   "id": "A5",
+   "file": "scripts/batch-boundary-core.mjs",
+   "defect": "Root cause and conflict: `boundaryRequestDrainLine` tells the owner to \"append VERBATIM to TASKS.md, `finding.mjs --queued`\", and `--commit` refuses while a request waits (`boundaryRequestRefusal` in scripts/findings-core.mjs). That order forces the tick before the commit, so the boundary text and the refusal must be changed to append, commit, push, then `--queued` (or accept `appending` entries whose point is in the commit about to be made)."
+  },
+  {
+   "id": "A6",
+   "file": "scripts/findings-core.mjs",
+   "defect": "Same pressure: `auditFindings`, through the `request-not-queued` duty, demands the tick within the turn. The duty must count an `appending N` entry whose point is staged or committed as being worked on, not as a violation, otherwise the Stop guard pushes toward premature ticks again."
+  },
+  {
+   "id": "A7",
+   "file": "scripts/finding.mjs",
+   "defect": "The `--drained` path (findings, not requests) has the same flaw: an absorbed finding is ticked `[x]` with no proof it reached a pushed TASKS.md point. Item 1 must also cover `--drained` (require `--point N` and the same origin/main check), since the two findings 1407 absorbs are exactly this kind."
+  },
+  {
+   "id": "A8",
+   "file": "scripts/findings-paths.mjs",
+   "defect": "Edge case: `memoryDir` builds the path from `projectSlug(REPO_ROOT)`, and there are two real carriers today: ~/.claude/projects/-workspace-hoa/memory/findings-carrier.md (162 queued) and ~/.claude/projects/-workspace-hoa-/memory/findings-carrier.md (3885 lines, 31 queued). Normalize trailing separators in `projectSlug`, and have the reconciliation read every carrier whose slug resolves to this repo."
+  },
+  {
+   "id": "A9",
+   "file": "scripts/findings-paths.mjs",
+   "defect": "Worktree edge case: test that `--queued` run from a linked worktree (.claude/worktrees/point-N) resolves `REPO_ROOT` to the main checkout (`commonCheckoutRoot`), so it writes the main carrier and checks origin/main rather than the feature branch's TASKS.md, which may hold N while main does not."
+  },
+  {
+   "id": "A10",
+   "file": "scripts/batch-doctor-core.mjs",
+   "defect": "Root cause: `planRemediation` plans `quarantine-stash` over every path in `dirtyFiles` (`quarantineScope` only exempts `verification/`). TASKS.md, docs/tasks-archive.md and .claude/queue-rank.json go into a stash that nobody audits; the 11:15:21 stash held exactly .claude/queue-rank.json, TASKS.md and docs/work-packages.md."
+  },
+  {
+   "id": "A11",
+   "file": "scripts/batch-doctor-core.mjs",
+   "defect": "Required change: add `PROTECTED_USER_CONTENT` = TASKS.md, docs/tasks-archive.md, .claude/queue-rank.json and docs/work-packages.md (the restore 5ba920079 touched it and the stash held it), and consider CLAUDE.md and docs/bundle names. `quarantineScope` must split dirty paths into `protected` and `quarantinable`, and the plan must emit a separate `rescue-protected-commit` action (level repair) plus an `alert-protected-content-rescued` action (level alert)."
+  },
+  {
+   "id": "A12",
+   "file": "scripts/batch-doctor-states.mjs",
+   "defect": "Required change: a new `rescueProtectedCommit({ git, name, paths })` that commits the protected paths to `refs/heads/rescue/doctor-<ts>` without touching HEAD, the index or the working tree (temporary `GIT_INDEX_FILE`, `read-tree HEAD`, `add`, `write-tree`, `commit-tree -p HEAD`, `update-ref`), then pushes the rescue branch to origin. The commit must come before any `quarantineStash`, and the protected files must stay in place in the working tree (exclude them with `:(exclude)` pathspecs in `quarantineStashArgs`)."
+  },
+  {
+   "id": "A13",
+   "file": "scripts/batch-doctor-core.mjs",
+   "defect": "`quarantineStashArgs` currently takes only `excludeVerification`; extend it to exclude the protected paths. Test the untracked case too: a new docs/tasks-archive.md, or a queue-rank.json that is untracked inside a worktree, must not go in through `-u`."
+  },
+  {
+   "id": "A14",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "Root cause of the false approval: after `EXECUTED quarantine-stash` the wrapper still logs \"VERDICT: consistent\" and exits 0, because the verdict reads only `pendingRepair`, `gateFailed` and `alertsRemain`, never \"a destructive repair touched user content\". A rescued protected file must set `alertsRemain`, which gives exit 1 and a loud log line naming the rescue branch."
+  },
+  {
+   "id": "A15",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "Failure mode: `markAlertHandled()` runs whenever there is no pending repair, so the parallel alert that triggered the quarantine was silenced in the same run, and the run 2 seconds later saw `unhandledAlert=no` and logged CONSISTENT. Do not mark the alert handled when protected content was rescued or the reconciliation is red, and write a separate persistent alert (board card or alert-escalation) that the next session's verdict sees."
+  },
+  {
+   "id": "A16",
+   "file": "scripts/batch-doctor-core.mjs",
+   "defect": "Hidden loss path: `rescue-and-reset` (divergence ahead>0 and behind>0) runs `git reset --hard origin/main`, and if `parallelDetected` is false there is no quarantine before it, so dirty TASKS.md appends are destroyed outright. `planRemediation` must always precede the reset with `rescue-protected-commit` (and the quarantine) when there are dirty files."
+  },
+  {
+   "id": "A17",
+   "file": "scripts/batch-doctor-states.mjs",
+   "defect": "`rescueAndReset` saves only committed local main on the rescue branch; uncommitted protected content is not in it. Same fix as A16, plus a test that dirty TASKS.md with diverged main ends up on a rescue ref."
+  },
+  {
+   "id": "A18",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "`restore-tasks-from-head` (when TASKS.md does not parse) overwrites the working-tree TASKS.md with HEAD and keeps only a local backup file. The damaged bytes, which can hold appended points, must also go into the rescue commit and raise an alert, not be logged as a silent repair."
+  },
+  {
+   "id": "A19",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "Required change for item 3: add a `reconcileCarrier` step on every run (auto level, before the verdict) that reads all carriers (A8) and `readTasksAll` from scripts/tasks-source.mjs on the working tree AND on origin/main. Any `queued N` with no `- [ ] N.`/`- [x] N.` in TASKS.md or the archive becomes an alert-level finding that forces exit 1 and can never end in \"consistent\"."
+  },
+  {
+   "id": "A20",
+   "file": "scripts/batch-doctor-core.mjs",
+   "defect": "Required change: a pure `reconcileCarrierAgainstTasks({ carrierTexts, tasksText, archiveText, originTasksText, originArchiveText })` that returns `{ missing, workingTreeOnly, unpushed, ok }`. A point found only in the working tree or only in an unpushed commit (divergence ahead>0, as at 11:15: `+1/-0`) is red as well, because that is exactly the state the stash and a reset destroy."
+  },
+  {
+   "id": "A21",
+   "file": "scripts/findings-request-core.mjs",
+   "defect": "Edge case: amendment and rank requests reuse an existing number (\"queued 1393\" twice for \"Move point 1393 directly after point 1407\" and \"Amend 1393: OpenAI lane reasoning effort back to high\"; 1406 was a ranking order closed in the archive). Matching by number would pass while the amendment text is lost, so each queued entry needs a content anchor (carrier `at`/identity stamped into the point's Source line, or a required spec substring) that the reconciliation checks."
+  },
+  {
+   "id": "A22",
+   "file": "scripts/findings-request-core.mjs",
+   "defect": "Edge case: carrier titles can be German while TASKS.md titles are English (1407: \"Keine Nutzer-Anweisung geht je verloren...\" vs \"No user instruction is ever lost...\"). The reconciliation must not match on title; it must match on number plus the stamped identity or anchor from A21."
+  },
+  {
+   "id": "A23",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "Edge case, renumbered points: when a point is renumbered or merged into a bundle (the \"Absorbs ...\" pattern), the carrier keeps the old N. The reconciliation needs an explicit alias record (for example `queued N -> M` written by a `finding.mjs --renumbered` transition, or an \"Absorbs/Renumbered from N\" line in the point body), otherwise renumbering produces a permanent false red, or the rule gets relaxed until it misses a real loss."
+  },
+  {
+   "id": "A24",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "Edge case, archive moves: land-point writes the archive first and TASKS.md second, so a crash between the two leaves a duplicate, but a manual archive move can leave N in neither file. The reconciliation must use both files (`readTasksAll`), and a point present in both must be reported but not treated as lost."
+  },
+  {
+   "id": "A25",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "Edge case, carrier entries queued before this change: 162+31 legacy `queued` entries have no commit-sha proof. A one-time backfill must check each against TASKS.md, the archive and `git log -S` on origin/main, write `@<sha>` where it is found, and file a red finding where it is not, instead of grandfathering them as green."
+  },
+  {
+   "id": "A26",
+   "file": "scripts/batch-resume-hook.mjs",
+   "defect": "`readRepoVerdict` either reuses the mandate marker (when the verdict is `mandate` or `clean`) or runs the doctor without `--repair`, with stdout ignored and a 30 s timeout. The reconciliation must run at every session start even when the launcher marker reports clean (or the marker must carry the reconciliation result and fail when it is absent), and a red reconciliation must be printed in the hook output, not only shown as an exit code."
+  },
+  {
+   "id": "A27",
+   "file": "scripts/batch-resume-hook.mjs",
+   "defect": "Failure mode: a doctor timeout or crash returns `{ ran: false }` and the session goes on. For the reconciliation this must count as red (fail closed), because an unread carrier cannot be shown to be consistent."
+  },
+  {
+   "id": "A28",
+   "file": "scripts/land-point.mjs",
+   "defect": "Required change for item 3: after the merge (step 1) and again after the tick and archive move (steps 3+4), before the commit and push, run `reconcileCarrierAgainstTasks` on `moved.tasks`/`moved.archive`. A merge whose conflict resolution drops other points' lines, or a stale branch TASKS.md, must stop the landing with a `LandingError` (step 'gate'), not be pushed."
+  },
+  {
+   "id": "A29",
+   "file": "scripts/land-point.mjs",
+   "defect": "`transitionAccepted` compares only tasks-archive-guard rules before and after. Extend it, or add a sibling check, so a landing that removes any point other than N from the union of TASKS.md and the archive is refused, catching a silent loss through the merge."
+  },
+  {
+   "id": "A30",
+   "file": "scripts/land-point.mjs",
+   "defect": "Edge case: the push-failure path (\"main could not be pushed\") leaves the tick committed only locally. The carrier must not be advanced from appending to queued here, and the reconciliation must report such entries as unpushed until origin/main holds them."
+  },
+  {
+   "id": "A31",
+   "file": "scripts/batch-doctor.mjs",
+   "defect": "Edge case, worktree vs main tree: stashes on feat/1184 and feat/1137 show the doctor quarantines inside linked worktrees. A worktree's TASKS.md is a branch copy, not the work order, so the protected-file rescue must apply there too, and the reconciliation must always read the main checkout plus origin/main, never only `CHECKOUT_ROOT`."
+  },
+  {
+   "id": "A32",
+   "file": "scripts/batch-doctor-states.mjs",
+   "defect": "The rescue branch name must be unique and collision-safe (ISO timestamp plus pid), it must never be deleted by worktree-cleanup or branch-pruning scripts, and the alert must name the branch and the files. Add a test that a second doctor run in the same second does not overwrite the first rescue."
+  },
+  {
+   "id": "A33",
+   "file": "scripts/batch-doctor-core.mjs",
+   "defect": "Failure mode: the rescue commit or push can fail (for example a stale index.lock or no network). Then the plan must not fall back to stashing the protected files; it must leave them in the working tree, raise an alert and exit 1. In short: fail closed, never fall back to a silent stash."
+  },
+  {
+   "id": "A34",
+   "file": "scripts/stash-sweep.mjs (new)",
+   "defect": "Required change for item 4: a one-time sweep over all 222 stash entries (`git stash list`, 204+ named doctor-quarantine). For each, diff stash^1..stash and the untracked parent stash^3 for TASKS.md, docs/tasks-archive.md, docs/work-packages.md, .claude/queue-rank.json, CLAUDE.md, memory-like docs and docs/*.md. Extract added point lines (`- [ ] N.`), user quotes (\"Source: user\", German quote markers) and order lines, then check whether each still exists on origin/main (`git grep` or `readTasksAll` at origin/main)."
+  },
+  {
+   "id": "A35",
+   "file": "scripts/stash-sweep.mjs (new)",
+   "defect": "Classification rules: machine state (verification/ frames, wait leases, build outputs, run records, queue-rank snapshots identical to a later main commit) counts as discardable. Content that is on main counts as redundant. User content not on main is restored by committing it to TASKS.md or the archive, or filed as a carrier finding or board card. The verdict per stash goes into a committed audit report, and stashes are never dropped automatically."
+  },
+  {
+   "id": "A36",
+   "file": "scripts/stash-sweep.mjs (new)",
+   "defect": "Edge cases: stashes recorded on feature branches (feat/659 with a queue-rank snapshot, feat/1184, feat/1137) must be diffed against their own base parent, not main. Points renumbered or restored since (1402-1406 in 5ba920079) must count as present by content match, not by number alone. The sweep must be strictly read-only (`git stash show -p --include-untracked`, `git show stash@{n}^3`), with no `stash pop`/`apply` on the shared tree."
+  },
+  {
+   "id": "A37",
+   "file": "scripts/stash-sweep.mjs (new)",
+   "defect": "Failure mode: stash indices shift whenever any stash is pushed or dropped during a sweep. The sweep must key stashes by commit sha (`git rev-parse stash@{n}`), not by index, and record the sha in the report."
+  },
+  {
+   "id": "A38",
+   "file": "scripts/batch-doctor-core.test.mjs",
+   "defect": "Test case (VERIFIABLE 1): in a temporary git repo with origin, append point N to TASKS.md (uncommitted), tick the carrier through the CLI, write an unhandled parallel alert, set `ownerAlive` to false, run batch-doctor `--repair`. The run must end with N still in the TASKS.md working tree, a `rescue/` branch holding it, an alert-level log line, exit code ≠ 0, and no \"VERDICT: consistent\"."
+  },
+  {
+   "id": "A39",
+   "file": "scripts/batch-doctor-cli.test.mjs",
+   "defect": "Test case: the same replay with the doctor run twice in a row (as at 11:15:21 and 11:15:23). The second run must still report the red reconciliation or rescue alert, not \"repo state CONSISTENT\"."
+  },
+  {
+   "id": "A40",
+   "file": "scripts/batch-doctor-core.test.mjs",
+   "defect": "Test case (VERIFIABLE 2): `reconcileCarrierAgainstTasks` with a carrier `queued 1402` and TASKS.md plus archive lacking 1402 returns not ok, and `planRemediation` (or the verdict) given that result is never `isConsistent`. Also cover these variants: point only in the archive (ok), point only in the working tree (red), point only in an unpushed local commit (red), amendment anchor missing (red)."
+  },
+  {
+   "id": "A41",
+   "file": "scripts/finding.test.mjs",
+   "defect": "Test case: `--queued \"<title>\" --point N` refuses when N is not on origin/main and leaves the entry pending. It succeeds and records `@<sha>` once N has been pushed. A legacy `queued N` entry without a sha is accepted by the parser but flagged by the reconciliation."
+  },
+  {
+   "id": "A42",
+   "file": "scripts/batch-doctor-core.test.mjs",
+   "defect": "Test case: `quarantineScope` and `quarantineStashArgs` with dirty paths TASKS.md, docs/tasks-archive.md, .claude/queue-rank.json, docs/work-packages.md and src/x.ts. Only src/x.ts is stashed, the four protected paths produce `rescue-protected-commit` plus an alert, and with `verificationWriterLive` both exclusions apply together."
+  },
+  {
+   "id": "A43",
+   "file": "scripts/batch-doctor-core.test.mjs",
+   "defect": "Test case: diverged main (ahead 1, behind 1), `parallelDetected` false, dirty TASKS.md. The plan must order `rescue-protected-commit` before `rescue-and-reset`, so the hard reset can never discard uncommitted TASKS.md."
+  },
+  {
+   "id": "A44",
+   "file": "scripts/land-point.test.mjs",
+   "defect": "Test case: a feature branch whose TASKS.md lacks a point that main gained after the branch was cut (the stale-copy merge case). The post-merge reconciliation stops the landing before commit and push, and main keeps the point."
+  },
+  {
+   "id": "A45",
+   "file": "scripts/batch-resume-hook.test.mjs",
+   "defect": "Test case: a session start with a valid \"clean\" mandate marker but a carrier containing `queued N` with N missing. The hook output must show the red reconciliation, and an unrunnable doctor (`ran: false`) must not be taken as clean."
+  },
+  {
+   "id": "A46",
+   "file": "scripts/findings-paths.test.mjs",
+   "defect": "Test case: `projectSlug('/workspace/hoa/')` and `projectSlug('/workspace/hoa')` resolve to the same memory dir, and the reconciliation reads both existing carrier files."
+  },
+  {
+   "id": "A47",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "Docs: the drain recipe (`--show`, verbatim append, `--queued`) must become append, commit, push, then `--queued` (with `appending` in between), and the doctor section must name protected files, rescue branches and the red reconciliation. Update docs/batch-autonomy.md lines ~1913-1931 accordingly, or the old order will be followed again."
+  }
+ ]
+}

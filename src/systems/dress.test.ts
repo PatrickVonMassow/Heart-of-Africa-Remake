@@ -1,4 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { QUALITY_PRESETS } from '../config/quality'
+import { primitiveLayout } from '../render/figureWalk'
+import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from './appearance'
 import { cloakForCloth, seasonalDressFor, wearsByRank } from './dress'
 import { COLD_DRESS_THRESHOLD, coldnessAt, harmattanAt, karifAt } from './season'
 
@@ -252,5 +257,59 @@ describe('wearsByRank (point 137d — the cold is a class experience)', () => {
   it('is stable per figure and never dresses an off-palette stranger', () => {
     expect(wearsByRank(SOUTH_CLOTH[0], SOUTH_CLOTH)).toBe(wearsByRank(SOUTH_CLOTH[0], SOUTH_CLOTH))
     expect(wearsByRank('#123456', SOUTH_CLOTH)).toBe(false)
+  })
+})
+
+// The rule of design.md §19.15 / docs/peoples-1890.md §8.6: women never show
+// an uncovered upper body, children always wear a hip layer.
+const HIP_COVERING = new Set<DressLayer['form']>(['shirt', 'robe', 'toga'])
+const CHEST_COVERING = new Set<DressLayer['form']>(['breastCloth', 'shirt', 'robe', 'toga'])
+const CHEST_WHEN_TIED = new Set<DressLayer['form']>(['wrapLong', 'skirtKnee', 'skirtShort', 'cape', 'cloak', 'neckBeads'])
+const coversHip = (l: DressLayer) => l.slot === 'hip' || HIP_COVERING.has(l.form)
+const coversChest = (l: DressLayer) => CHEST_COVERING.has(l.form) || (CHEST_WHEN_TIED.has(l.form) && l.wear === 'chest')
+
+describe('the covered upper body and the hip layer (design.md §19.15)', () => {
+  const PALETTE = ['#3a5a8a', '#8a4a2a', '#c2b090']
+  const DRIVERS = [
+    { coldness: 0, harmattan: 0, karif: 0 },
+    { coldness: 1, harmattan: 0, karif: 0 },
+    { coldness: 0, harmattan: 1, karif: 0 },
+    { coldness: 0, harmattan: 0, karif: 1 },
+    { coldness: 1, harmattan: 1, karif: 1 },
+  ]
+
+  it('for every people, season and year: every child and woman has a hip layer, every grown woman a chest cover', () => {
+    const fails: string[] = []
+    let checked = 0
+    for (const peopleId of [...Object.keys(PEOPLE_DRESS), null])
+      for (const sex of SEXES)
+        for (const age of AGE_GROUPS)
+          for (const drivers of DRIVERS)
+            for (let year = 1890; year <= 1895; year++)
+              for (const cloth of PALETTE)
+                for (const pick of [0.05, 0.35, 0.65, 0.95]) {
+                  const ls = appearanceFor({ peopleId, sex, age, drivers, year, cloth, palette: PALETTE, pick })
+                  const who = `${peopleId} ${sex} ${age} ${JSON.stringify(drivers)} ${year} ${cloth} ${pick}`
+                  checked++
+                  if ((age === 'child' || sex === 'female') && !ls.some(coversHip)) fails.push(`${who}: no hip layer`)
+                  if (sex === 'female' && age !== 'child' && !ls.some(coversChest)) fails.push(`${who}: chest uncovered`)
+                }
+    expect(checked).toBeGreaterThan(20_000)
+    expect([...new Set(fails.map((f) => f.split(' {')[0] + f.slice(f.lastIndexOf(':'))))]).toEqual([])
+  })
+
+  it('the low preset keeps the primitive figure, whose trunk is drawn whole in the figure’s cloth', () => {
+    // The low preset draws no skinned body at all (no glTF, no code-built body)…
+    expect(QUALITY_PRESETS.low.figureBodySegments).toBe(0)
+    expect(QUALITY_PRESETS.low.figureGltfBody).toBe(false)
+    // …and the primitive's trunk cone runs from the hip to the shoulders,
+    // standing and kneeling, in the cloth colour: no bare chest or pelvis.
+    for (const k of [0, 1]) {
+      const lay = primitiveLayout(k, true, { hipY: 0.45, armLength: 0.5 })
+      expect(lay.height).toBeGreaterThan(lay.hipY)
+    }
+    const src = readFileSync(resolve(process.cwd(), 'src/scenes/place/placeFigure.tsx'), 'utf8')
+    const cone = src.slice(src.indexOf('<mesh ref={cone}'))
+    expect(cone.slice(0, cone.indexOf('</mesh>'))).toContain('color={cloth}')
   })
 })

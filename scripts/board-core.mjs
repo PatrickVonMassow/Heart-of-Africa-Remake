@@ -92,6 +92,97 @@ export function renderCardBody(text, { stamp = null, indent = '    ', escape = n
   return paras.map((p, i) => `${indent}<p>${i === 0 ? lead : ''}${p}</p>`).join('\n')
 }
 
+// TWO SECTIONS PER POINT CARD (user 05.10.2026): the description says what the
+// point delivers and only `board.mjs describe` changes it; the status below the
+// divider is what every progress update replaces. Description and heading are
+// `<p class=…>`, so every reader of plain `<p>` (statusOf, cardBodyText, the
+// stub carry-over) keeps reading the status alone.
+export const DESCRIPTION_MISSING_TEXT = 'Beschreibung fehlt'
+export const STATUS_SECTION_TITLE = 'Stand der Umsetzung'
+/** The status a queue card shows: no work has started on it. */
+export const QUEUE_STATUS_TEXT = 'Noch nicht begonnen.'
+/** A description longer than this is a status or a spec, not 1-3 sentences. */
+export const DESCRIPTION_WORD_LIMIT = 60
+
+const DESC_PARA_RE = /<p class="desc">([\s\S]*?)<\/p>/g
+
+/** Whether a card already carries the description/status split. */
+export function hasCardSections(card) {
+  return /<hr class="split">/.test(String(card ?? ''))
+}
+
+/** The card's description text (paragraphs joined by a blank line), '' when none or placeholder. */
+export function descriptionOf(card) {
+  return [...String(card ?? '').matchAll(DESC_PARA_RE)]
+    .map((m) => m[1].trim())
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+/**
+ * A card body with both sections: the description (or the visible
+ * placeholder), the divider, the status heading, the stamped status.
+ */
+export function renderCardSections({ description = '', status = '', stamp = null, indent = '    ', escape = null } = {}) {
+  const desc = cardParagraphs(description).map((p) => (escape ? escape(p) : p))
+  const head = desc.length
+    ? desc.map((p) => `${indent}<p class="desc">${p}</p>`)
+    : [`${indent}<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`]
+  return [...head, renderStatusSection({ status, stamp, indent, escape })].join('\n')
+}
+
+/** The divider, the status heading and the stamped status — the part a progress update replaces. */
+export function renderStatusSection({ status = '', stamp = null, indent = '    ', escape = null } = {}) {
+  const statusLines = renderCardBody(status, { stamp, indent, escape })
+  return [
+    `${indent}<hr class="split">`,
+    `${indent}<p class="status-head">${STATUS_SECTION_TITLE}</p>`,
+    ...(statusLines ? [statusLines] : []),
+  ].join('\n')
+}
+
+const escapeHtmlText = (text) => String(text ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/**
+ * The German description `.claude/board-queue.json` keeps for `point` (its
+ * `body` paragraphs, HTML-escaped and joined by a blank line); '' when none.
+ * The second source of a card's description after the card itself — the
+ * English work-order text is never one (user 19.10.2026: the board is German).
+ */
+export function queuedDescription(queueData, point) {
+  const entry = queueData?.points?.[String(Number(point))]
+  if (!entry || typeof entry !== 'object') return ''
+  return (Array.isArray(entry.body) ? entry.body : [entry.body])
+    .filter((p) => typeof p === 'string' && p.trim())
+    .map((p) => escapeHtmlText(p.trim()))
+    .join('\n\n')
+}
+
+const unescapeHtmlText = (text) =>
+  String(text ?? '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+
+/**
+ * A status text without a leading repetition of the card title ("<Titel> — …",
+ * "<Titel>: …"). The title stands in the card head already; repeating it at the
+ * start of the status pushed the actual state out of the first line (user
+ * 19.10.2026). Strips, never refuses: a status that is nothing but the title
+ * is kept as it is.
+ */
+export function stripLeadingTitle(status, title) {
+  const text = String(status ?? '')
+  const subject = unescapeHtmlText(title).trim()
+  if (!subject) return text
+  const body = text.trimStart()
+  for (const form of new Set([subject, escapeHtmlText(subject)])) {
+    if (body.slice(0, form.length).toLowerCase() !== form.toLowerCase()) continue
+    const sep = body.slice(form.length).match(/^\s*[—–\-:;,.|]+\s*/)
+    if (!sep) continue
+    const rest = body.slice(form.length + sep[0].length)
+    if (rest.trim()) return rest.replace(/^\p{Ll}/u, (c) => c.toUpperCase())
+  }
+  return text
+}
+
 /**
  * A card's text — from the argv words, or, when `--text-stdin` stands among
  * them, from what the wrapper read on stdin as UTF-8.
@@ -252,6 +343,11 @@ details:not(.sect)>summary::after{content:"▸";flex:0 0 auto;align-self:baselin
 details:not(.sect)[open]>summary::after{content:"▾"}
 .criticality{flex:0 1 auto;min-width:auto;max-width:100%;white-space:nowrap;overflow-wrap:normal;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
+.body hr.split{border:0;border-top:1px solid var(--rule,#cdbf9c);margin:10px 0 6px}
+.body .status-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin-bottom:2px}
+.body .desc-missing{font-style:italic;color:var(--warn,#a85f28)}
+.body .dist-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin:8px 0 2px}
+.body .dist{font-size:.85em;color:var(--soft,#7c6c4d)}
 </style>`
 
 const criticalityBadge = (level) =>
@@ -477,14 +573,27 @@ export function queueCard(html, point) {
 }
 
 /**
+ * The description a queue card hands on: its description section, or — on a
+ * card written before the split — its prose. The generated stub is no prose.
+ */
+function queueDescription(card) {
+  const text = hasCardSections(card) ? descriptionOf(card) : statusOf(card)
+  return [QUEUE_STUB_BODY, escapePlain(QUEUE_STUB_BODY)].includes(text.trim()) ? '' : text
+}
+
+/**
  * Move a point's card out of the queue and into the current-work section as a
  * `now` card with the given title, times and stamped status.
+ *
+ * With a `span` (the card-times record, see `recordPromotion`) the header is
+ * rendered from the RECORDED start, never from the caller's `times`: a
+ * successor session must not overwrite when the work began (user 05.10.2026).
  *
  * This exists because hand-rolling the regex per move kept failing on shell
  * escaping — three times in one day — and a board edit that silently matches
  * nothing is exactly the class of failure the guards were built for.
  */
-export function promoteToNow(html, point, { title, times, status, stamp = berlinStamp() }) {
+export function promoteToNow(html, point, { title, times, status, stamp = berlinStamp(), description = '', queueData = null, span = null }) {
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   if (!title || !status) throw new Error('board: promote needs a title and a status')
@@ -501,8 +610,12 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
   }
   const now =
     `<details class="now">\n  <summary>${numberChip(point)}<span class="t">${escapeCardTitle(stripPointPrefix(title, point))}</span>` +
-    `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody(status, { stamp })}\n  </div>\n</details>\n`
+    `<span class="right"><span class="meta">${span ? cardTimeLine(span) : times ?? stamp}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardSections({
+      description: String(description ?? '').trim() || queueDescription(card) || queuedDescription(queueData, point),
+      status: stripLeadingTitle(status, subject),
+      stamp,
+    })}\n  </div>\n</details>\n`
   // Both state cards go with it (points 470/544): the moment a point is current
   // work, "nothing is running" is false and "only closing duties are left" is
   // false, and leaving one standing is how the board came to say two things at
@@ -858,17 +971,14 @@ const NOW_STUB_TITLE = 'Text für diesen Punkt fehlt noch'
 function renderNowStub(point, { stamp = berlinStamp(), carried = '', title = '', queued = '' } = {}) {
   const note = String(carried ?? '').trim()
   const fromQueue = String(queued ?? '').trim()
-  const text = [
-    NOW_STUB_TEXT,
-    fromQueue ? `Aus der Warteschlange übernommen: ${fromQueue}` : '',
-    note ? `Aus der Übergabekarte übernommen: ${note}` : '',
-  ].filter(Boolean).join('\n\n')
+  // The queue prose is the point's description; the stub text is its status.
+  const text = [NOW_STUB_TEXT, note ? `Aus der Übergabekarte übernommen: ${note}` : ''].filter(Boolean).join('\n\n')
   const heading = stripPointPrefix(String(title ?? '').trim(), point) || NOW_STUB_TITLE
   return (
     `<details class="now" data-state="stub">\n  <summary>${numberChip(point)}` +
     `<span class="t">${escapeCardTitle(heading)}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody(text, { stamp })}\n` +
+    `  <div class="body">\n${renderCardSections({ description: fromQueue, status: text, stamp })}\n` +
     '  </div>\n</details>\n'
   )
 }
@@ -908,7 +1018,7 @@ function stubTitleSources(source, points, { queueData = null, titles = {} } = {}
     const point = Number((card.match(/class="num">\s*(\d+)/) ?? [])[1])
     if (!wanted.has(point) || out.has(point)) continue
     const title = ((card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
-    const queued = cardBodyText(card)
+    const queued = (hasCardSections(card) ? descriptionOf(card) : cardBodyText(card))
       .split('\n\n')
       .filter((p) => !stubBodies.has(p))
       .join('\n\n')
@@ -1225,11 +1335,54 @@ export function addHours(stamp, hours) {
 }
 
 /** The difference between the two stamps of a now-card header, in hours. */
-function spanHours(times) {
-  const m = String(times ?? '').match(/(\d{1,2}):(\d{2})\s*·\s*~?\s*(\d{1,2}):(\d{2})/)
+export function spanHours(times, { now = new Date(), recorded = null } = {}) {
+  // THE RECORD FIRST (second cross-vendor round): its timestamps are exact,
+  // where a header without a year can only be placed by context.
+  if (recorded?.start && (recorded.end || recorded.eta)) {
+    return (new Date(recorded.end ?? recorded.eta) - new Date(recorded.start)) / 3600000
+  }
+  const stamp = '(?:(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2})?\\s+)?~?\\s*(\\d{1,2}):(\\d{2})'
+  const m = String(times ?? '').match(new RegExp(`${stamp}\\s*[·–]\\s*~?\\s*${stamp}`))
   if (!m) return null
-  const from = Number(m[1]) * 60 + Number(m[2])
-  const to = Number(m[3]) * 60 + Number(m[4])
+  const [, d1, mo1, y1, h1, mi1, d2, mo2, y2, h2, mi2] = m
+  // DATED on both sides (a span over 24 h): the full duration, not the clock
+  // difference modulo a day (cross-vendor review). "DD.MM.YY" names its years;
+  // a "DD.MM." span is placed by context — its start is the latest such date
+  // not after `now` — and spans more than 24 h up to exactly one year, so an
+  // end that does not lie after the start lies a year later.
+  if (d1 && d2) {
+    const at = (year, d, mo, h, mi) => Date.UTC(year, Number(mo) - 1, Number(d), Number(h), Number(mi))
+    // Compared in Berlin wall time on both sides, so no slack is needed
+    // (third cross-vendor round: a day of slack put a start a day ahead in the
+    // current year).
+    const nowParts = berlinParts(new Date(now))
+    const nowWall = at(Number(nowParts.year) + 2000, nowParts.day, nowParts.month, ...nowParts.clock.split(':'))
+    // A 29.02. exists only in a leap year; Date.UTC would roll it to 01.03.
+    const exists = (year, d, mo) => {
+      const date = new Date(Date.UTC(year, Number(mo) - 1, Number(d)))
+      return date.getUTCDate() === Number(d) && date.getUTCMonth() === Number(mo) - 1
+    }
+    let startYear = y1 ? 2000 + Number(y1) : Number(nowParts.year) + 2000
+    if (!y1) {
+      // Bounded: a date no year has (31.02.) is no span, not an endless search.
+      for (let tries = 0; !exists(startYear, d1, mo1) || at(startYear, d1, mo1, h1, mi1) > nowWall; tries += 1) {
+        if (tries > 8) return null
+        startYear -= 1
+      }
+    } else if (!exists(startYear, d1, mo1)) return null
+    const from = at(startYear, d1, mo1, h1, mi1)
+    let endYear = y2 ? 2000 + Number(y2) : startYear
+    if (!y2) {
+      for (let tries = 0; !exists(endYear, d2, mo2) || at(endYear, d2, mo2, h2, mi2) <= from; tries += 1) {
+        if (tries > 8) return null
+        endYear += 1
+      }
+    } else if (!exists(endYear, d2, mo2)) return null
+    const to = at(endYear, d2, mo2, h2, mi2)
+    return (to - from) / 3600000
+  }
+  const from = Number(h1) * 60 + Number(mi1)
+  const to = Number(h2) * 60 + Number(mi2)
   return ((to - from + 1440) % 1440) / 60
 }
 
@@ -1254,7 +1407,7 @@ const statusOf = (card) => {
  * caller types a point number and a status, and the header the guard reads
  * cannot drift from the queue entry it came from.
  */
-export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
+export function toNow(html, point, status, { stamp = berlinStamp(), description = '', queueData = null, span = null } = {}) {
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   const hours = estimateHours(metaOf(card))
@@ -1263,6 +1416,9 @@ export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
     times: hours == null ? stamp : `${stamp} · ~${addHours(stamp, hours)}`,
     status,
     stamp,
+    description,
+    queueData,
+    span,
   })
 }
 
@@ -1279,12 +1435,14 @@ export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
  * card has a start time and no end, so `spanHours` is null on the way back —
  * and it turned the whole unit layer red over a board move that looked routine.
  */
-export function toQueue(html, point, { text, estimate } = {}) {
+export function toQueue(html, point, { text, estimate, recorded = null, now = new Date() } = {}) {
   const card = nowCard(html, point)
-  const renderEntry = (title, meta, body) =>
+  // Both sections travel: the description stays, the status is the text given
+  // or the card's own.
+  const renderEntry = (title, meta, body, description) =>
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${meta}</span></span>` +
-    `</summary>\n  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
+    `</summary>\n  <div class="body">\n${renderCardSections({ description, status: body })}\n  </div>\n</details>\n`
   // IDEMPOTENT AGAINST BOARD DRIFT (point 700, measured 17.08.2026): a board
   // that already lists the point in the Warteschlange — however it came to —
   // must not receive a SECOND card for it, because the resulting
@@ -1304,11 +1462,17 @@ export function toQueue(html, point, { text, estimate } = {}) {
   // meta, and what was not given keeps the standing card's own value. The
   // bare handover call (`queue <n>`) leaves it untouched.
   const updateStanding = (doc) => {
-    if (!text?.trim() && estimate == null) return doc
+    // A standing card without a description takes the now-card's along.
+    const carried = card && !queueDescription(standing) ? descriptionOf(card) : ''
+    if (!text?.trim() && estimate == null) {
+      // Description-only carry-over: the status markup stays byte for byte.
+      return carried ? doc.replace(standing, () => withCardDescription(standing, carried)) : doc
+    }
     const body = text?.trim() || statusOf(standing)
     if (!body) throw new Error('board: refusing to queue a card with an empty body')
     const meta = estimate ?? (metaOf(standing).trim() || QUEUE_STUB_META)
-    return doc.replace(standing, renderEntry(stripPointPrefix(titleOf(standing), point), meta, body))
+    const description = queueDescription(standing) || (card ? descriptionOf(card) : '')
+    return doc.replace(standing, renderEntry(stripPointPrefix(titleOf(standing), point), meta, body, description))
   }
   if (!card) {
     // A REPEATED move is a SUCCESS, not a typo (point 700; Sol review of
@@ -1327,9 +1491,9 @@ export function toQueue(html, point, { text, estimate } = {}) {
   if (standing) return updateStanding(html.replace(card, ''))
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
-  const hours = spanHours(metaOf(card))
+  const hours = spanHours(metaOf(card), { now, recorded })
   const meta = estimate ?? (hours == null ? QUEUE_STUB_META : hoursLabel(hours))
-  const entry = renderEntry(stripPointPrefix(titleOf(card), point), meta, body)
+  const entry = renderEntry(stripPointPrefix(titleOf(card), point), meta, body, descriptionOf(card))
   const out = html.replace(card, '')
   const { from } = sectionBounds(out, 'queue')
   return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
@@ -1341,13 +1505,15 @@ export function toQueue(html, point, { text, estimate } = {}) {
  * shape the Erledigt section fixes. The body carries the card's status text,
  * every paragraph, over unless the caller writes a closing one.
  */
-export function toDone(html, point, { text, end = berlinStamp() } = {}) {
+export function toDone(html, point, { text, end = berlinStamp(), span = null, queueData = null } = {}) {
   const card = nowCard(html, point)
   if (!card) throw new Error(`board: no current-work card for point ${point}`)
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to archive a card with an empty body')
-  const start = (metaOf(card).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? end
-  const title = stripPointPrefix(titleOf(card), point)
+  const start = (metaOf(card).match(START_FIELD_RE) ?? [])[1] ?? end
+  // The Erledigt title is the subject alone (user 19.10.2026): archiving the
+  // closing card must not carry its stage label into the archive.
+  const title = stripClosingStage(stripPointPrefix(titleOf(card), point))
   const out = html.replace(card, '')
   // ONE POINT, ONE ERLEDIGT CARD (user 18.08.2026, measured on point 700, which
   // stood there FOUR times). A point comes back into current work whenever a
@@ -1361,18 +1527,23 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   // arithmetic says the opposite (measured on point 700's four cards).
   const existing = doneCards(out, point)
   const earliest = earliestStart(existing) || start
-  const entry = renderDoneEntry({ point, title, start: earliest, end, body })
+  // The German queue text is the last source (point 1363): a landing whose
+  // projection discarded the now card leaves nothing else to carry over.
+  const description =
+    descriptionOf(card) || existing.map(descriptionOf).find(Boolean) || queuedDescription(queueData, point)
+  const meta = span ? cardTimeLine(span) : `${earliest} · ${end}`
+  const entry = renderDoneEntry({ point, title, meta, body, description })
   const cleaned = dropDoneCards(out, point)
   const { from } = sectionBounds(cleaned, 'done')
   return `${cleaned.slice(0, from)}\n${entry}${cleaned.slice(from).replace(/^\n/, '')}`
 }
 
 /** One Erledigt entry, the single writer of that markup. */
-function renderDoneEntry({ point, title, start, end, body }) {
+function renderDoneEntry({ point, title, meta, body, description = '' }) {
   return (
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
-    `<span class="right"><span class="meta">${start} · ${end}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
+    `<span class="right"><span class="meta">${meta}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardSections({ description, status: body })}\n  </div>\n</details>\n`
   )
 }
 
@@ -1385,7 +1556,7 @@ function renderDoneEntry({ point, title, start, end, body }) {
  */
 export function withStart(card, start) {
   return String(card ?? '').replace(/(class="meta">)([^<]*)/, (whole, lead, content) => {
-    const at = content.indexOf('·')
+    const at = content.search(/[·–]/)
     return at < 0 ? `${lead}${start}` : `${lead}${start} ${content.slice(at)}`
   })
 }
@@ -1454,11 +1625,16 @@ export function doneStart(card) {
   // a bare digit boundary still read `12:34:56` and `12:34x` as `12:34`, so a
   // damaged card could decide the merged start. What may follow is the range
   // separator or the closing tag, nothing else.
-  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|<\/span>))/)
+  // A long span's start carries its date ("03.10. 09:12", "03.10.25 09:12"),
+  // and the merge must keep it whole (cross-vendor review).
+  const m = String(card ?? '').match(
+    /class="meta">\s*((\d{1,2})\.(\d{1,2})\.(?:\d{2})?\s+)?(\d{1,2}):(\d{2})(?=\s*(?:·|–|<\/span>))/,
+  )
   if (!m) return ''
-  const [, h, min] = m
+  const [, date = '', day, month, h, min] = m
   if (Number(h) > 23 || Number(min) > 59) return ''
-  return `${h}:${min}`
+  if (date && (Number(day) < 1 || Number(day) > 31 || Number(month) < 1 || Number(month) > 12)) return ''
+  return `${date.trim() ? `${date.trim()} ` : ''}${h}:${min}`
 }
 
 /**
@@ -1562,11 +1738,15 @@ export const CLOSING_STAGE = 'Abschlussarbeiten'
 /** The pre-655 closing title, still recognised so an older board stays readable. */
 export const CLOSING_WORK_TITLE = 'Abschlussarbeiten zum gerade beendeten Punkt'
 
-/** A subject with a `: Abschlussarbeiten` tail removed — composing twice must not stack. */
-const stripClosingStage = (text) =>
-  String(text ?? '')
-    .replace(new RegExp(`\\s*:\\s*${CLOSING_STAGE}\\s*$`), '')
-    .trim()
+/**
+ * The closing-stage tail ("<Betreff>: Abschlussarbeiten", "— abschlussarbeiten"):
+ * ONE grammar for detecting and removing it, so nothing the publish gate reads
+ * as a closing title survives the strip.
+ */
+const closingSuffixRe = () => new RegExp(`\\s*[:—–]\\s*${CLOSING_STAGE}\\s*$`, 'i')
+
+/** A subject with its closing-stage tail removed — composing twice must not stack. */
+const stripClosingStage = (text) => String(text ?? '').trim().replace(closingSuffixRe(), '').trim()
 
 /**
  * Is this title the shape the CLOSING card composes — "<Betreff>: <Stage>"?
@@ -1577,7 +1757,7 @@ const stripClosingStage = (text) =>
  * Vorbereitung" is an ordinary title with a real subject.
  */
 export function looksLikeClosingTitle(title) {
-  return new RegExp(`[:—–]\\s*${CLOSING_STAGE}\\s*$`, 'i').test(String(title ?? '').trim())
+  return closingSuffixRe().test(String(title ?? '').trim())
 }
 
 /** "<Betreff>: Abschlussarbeiten" — what `board.mjs closing <N>` composes. */
@@ -1632,7 +1812,7 @@ const FILLER_WORDS = new Set([
  * Does this title say only what STAGE the work is in (point 655)?
  *
  * THE RULE, and why it is not simply "begins with a stage word" (four-eyes
- * review, GPT-5.6 Sol, 12.08.2026): the title is stripped of its number prefix,
+ * review, 12.08.2026): the title is stripped of its number prefix,
  * of every stage word and of the FILLER above — and if NOTHING is left, it named
  * no subject. "Abschlussarbeiten zum gerade beendeten Punkt" leaves nothing and
  * is refused; "Vorbereitung der Karten", "Cleanup parser for Windows" and
@@ -2093,7 +2273,7 @@ export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
  * IT IS NOT A CLAIM TO STOP. That is the whole point of it — `board-first-guard`
  * denies under the idle card and lets the work through under this one.
  */
-export function toClosingWork(html, point, { subject, reason, stamp = berlinStamp() } = {}) {
+export function toClosingWork(html, point, { subject, reason, stamp = berlinStamp(), queueData = null } = {}) {
   if (!/^\d+$/.test(String(point ?? ''))) {
     throw new Error(
       `board: closing takes the POINT it closes, got "${point}" — node scripts/board.mjs closing <N> "<Grund>"`,
@@ -2125,13 +2305,57 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
     kind: 'closing',
     point,
     title: closingCardTitle(subject_),
-    // THE BODY SAYS WHAT THE POINT IS ABOUT BEFORE IT SAYS WHAT STAGE IT IS IN
-    // (user 11.08.2026). The subject leads, the owed duties follow as their own
-    // paragraph — composed here, so no caller can leave the subject out.
-    text: `${subject_} — dieser Punkt ist zusammengeführt und abgehakt; die ${CLOSING_STAGE} stehen noch aus.\n\n${duties}`,
+    // THE CARD SAYS WHAT THE POINT IS ABOUT BEFORE WHAT STAGE IT IS IN (user
+    // 11.08.2026, 19.10.2026): the point's description on top, the status below
+    // the divider. The subject stands in the title; the status does not repeat it.
+    description: closingDescription(html, point, queueData),
+    text: `Zusammengeführt und abgehakt; die ${CLOSING_STAGE} stehen noch aus.\n\n${stripLeadingTitle(duties, subject_)}`,
     stamp,
     claim: 'that only closing duties are left',
   })
+}
+
+/**
+ * The description the closing card shows: the point's own card (Erledigt,
+ * current work, queue or a standing closing card), else its German text in
+ * `.claude/board-queue.json`; '' leaves the visible placeholder.
+ */
+function closingDescription(html, point, queueData) {
+  let now = null
+  try {
+    now = nowCard(html, point)
+  } catch {
+    /* no current-work section — nothing to carry from it */
+  }
+  // Scoped to the Warteschlange: the whole-document match would also find an
+  // Erledigt card and hand its status on as a description.
+  let queued = null
+  try {
+    const { from, end } = sectionBounds(html, 'queue')
+    queued = queueCard(html.slice(from, end), point)
+  } catch {
+    /* no queue section — nothing to carry from it */
+  }
+  return (
+    [...doneCards(html, point), now].map(descriptionOf).find(Boolean) ||
+    (queued ? queueDescription(queued) : '') ||
+    queuedDescription(queueData, point)
+  )
+}
+
+/**
+ * Every Erledigt title without the closing stage label (user 19.10.2026): an
+ * archived card titled "<Betreff>: Abschlussarbeiten" read as the closing card
+ * listed twice. Runs on every board edit, so a board written before the fix
+ * heals on the next command.
+ */
+export function cleanDoneTitles(html) {
+  return editSectionCards(String(html ?? ''), 'done', (card) =>
+    card.html.replace(
+      new RegExp(`(<span class="t">)${TITLE_TEXT}(</span>)`),
+      (whole, open, title, close) => (looksLikeClosingTitle(title) ? `${open}${stripClosingStage(title)}${close}` : whole),
+    ),
+  )
 }
 
 /**
@@ -2148,7 +2372,7 @@ export function pointSubject(html, point) {
 }
 
 /** Write one state card, replacing whichever one stands. */
-function writeStateCard(html, { kind, point = null, title, text: reason, stamp, emptyReason, claim, precondition }) {
+function writeStateCard(html, { kind, point = null, title, text: reason, description = null, stamp, emptyReason, claim, precondition }) {
   const text = String(reason ?? '').trim()
   if (!text) throw new Error(emptyReason)
   const standing = standingPointCards(html)
@@ -2167,7 +2391,9 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
     `<details class="now"${STATE_ATTR(kind)}>\n  <summary>${point == null ? '' : numberChip(point)}` +
     `<span class="t">${escapeCardTitle(title)}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody(text, { stamp })}\n  </div>\n</details>\n`
+    `  <div class="body">\n${
+      description == null ? renderCardBody(text, { stamp }) : renderCardSections({ description, status: text, stamp })
+    }\n  </div>\n</details>\n`
   return insertAsFirstNowCard(stripStateCards(html), card)
 }
 
@@ -2178,14 +2404,14 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
  * another card on its own. Anything else is REFUSED: leaving the section empty
  * is the defect, and forgetting must not be able to reach it.
  */
-export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp } = {}) {
+export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, queueData = null, span = null, nextSpan = null } = {}) {
   if (next != null && none) throw new Error('board: done takes EITHER --next or --none, never both')
   const at = stamp ?? end
-  const archived = toDone(html, point, { text, end })
+  const archived = toDone(html, point, { text, end, span, queueData })
   if (next != null) {
     const status = String(nextStatus ?? '').trim()
     if (!status) throw new Error(`board: --next ${next} needs the new card's status text`)
-    return toNow(archived, next, status, { stamp: at })
+    return toNow(archived, next, status, { stamp: at, queueData, span: nextSpan })
   }
   if (none) return toNoCurrentWork(archived, none, { stamp: at })
   if (!hasCurrentWork(archived)) {
@@ -2596,9 +2822,153 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   const re = new RegExp(`(${NOW_HEAD(point)}${WITHIN_CARD}<div class="body">)${WITHIN_CARD}(</div>\\s*</details>)`)
   const { from, end, text: section } = nowSectionSlice(html)
   if (!re.test(section)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
-  const body = renderCardBody(text, { stamp })
-  const rewritten = section.replace(re, (_m, head, tail) => `${head}\n${body}\n  ${tail}`)
+  const card = nowCard(html, point)
+  const status = card ? stripLeadingTitle(text, stripClosingStage(stripPointPrefix(titleOf(card), point))) : text
+  // ONLY THE STATUS IS REPLACED: the description is read back from the card and
+  // written unchanged (byte-identical; only `describe` changes it).
+  const rewritten = section.replace(re, (whole, head, tail) => {
+    // Cut at the divider ELEMENT, whatever the line breaks around it.
+    const inner = whole.slice(head.length, whole.length - tail.length)
+    const at = inner.indexOf('<hr class="split">')
+    const kept = at < 0 ? '' : inner.slice(0, at).trimEnd()
+    return kept
+      ? `${head}${kept}\n${renderStatusSection({ status, stamp })}\n  ${tail}`
+      : `${head}\n${renderCardSections({ status, stamp })}\n  ${tail}`
+  })
   return html.slice(0, from) + rewritten + html.slice(end)
+}
+
+/** The description lines alone (the placeholder when there is none). */
+function renderDescriptionSection(description, { indent = '    ' } = {}) {
+  const all = renderCardSections({ description, indent })
+  return all.slice(0, all.indexOf(`${indent}<hr class="split">`)).replace(/\n$/, '')
+}
+
+const CARD_BODY_RE = /(<div class="body">)([\s\S]*?)(\s*<\/div>\s*<\/details>)/
+
+/**
+ * `card` with its description set to `description`. A card already split keeps
+ * its status bytes; a card from before the split keeps its whole body, byte
+ * for byte, as the status (`status` replaces it — the queue's case).
+ */
+function withCardDescription(card, description, { status = null } = {}) {
+  return String(card).replace(CARD_BODY_RE, (_m, open, inner, close) => {
+    const desc = renderDescriptionSection(description)
+    const at = inner.indexOf('<hr class="split">')
+    if (at >= 0) return `${open}\n${desc}\n    ${inner.slice(at)}${close}`
+    const rest = status == null
+      ? [`    <hr class="split">`, `    <p class="status-head">${STATUS_SECTION_TITLE}</p>`, ...(inner.trim() ? [`    ${inner.trim()}`] : [])].join('\n')
+      : renderStatusSection({ status })
+    return `${open}\n${desc}\n${rest}${close}`
+  })
+}
+
+/** Every point card of one section as `{ point, html, state }`, in order. */
+function sectionPointCards(html, key) {
+  let bounds
+  try {
+    bounds = sectionBounds(html, key)
+  } catch {
+    return []
+  }
+  const section = String(html).slice(bounds.from, bounds.end)
+  return [...section.matchAll(/<details(?: class="now"[^>]*)?>\s*<summary>[\s\S]*?<\/details>/g)]
+    .map((m) => {
+      const summary = (m[0].match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+      const { chip, legacy } = summaryPoint(summary)
+      const state = (m[0].match(/^<details[^>]*data-state="([^"]*)"/) ?? [])[1] ?? null
+      return { point: chip ?? legacy, html: m[0], state }
+    })
+    .filter((c) => c.point != null)
+}
+
+/** Replace the cards `edit` returns a new text for, inside the section alone. */
+function editSectionCards(html, key, edit) {
+  let bounds
+  try {
+    bounds = sectionBounds(html, key)
+  } catch {
+    return html
+  }
+  let section = html.slice(bounds.from, bounds.end)
+  for (const card of sectionPointCards(html, key)) {
+    const next = edit(card)
+    if (next != null && next !== card.html) section = section.replace(card.html, () => next)
+  }
+  return html.slice(0, bounds.from) + section + html.slice(bounds.end)
+}
+
+/** The section ('now' | 'queue' | 'done') whose card `describe` edits for `point`, or null. */
+export function describedSection(html, point) {
+  return ['now', 'queue', 'done'].find((key) => sectionPointCards(html, key).some((c) => c.point === String(point))) ?? null
+}
+
+/**
+ * `board.mjs describe`: set the DESCRIPTION of a point's card — its current-work
+ * card, else its queue card, else its Erledigt card. The only writer of the
+ * description after the card exists; the status stays as it is.
+ */
+export function setCardDescription(html, point, text) {
+  if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
+  const description = String(text ?? '').trim()
+  if (!description) throw new Error('board: refusing to write an empty description')
+  const words = description.split(/\s+/).length
+  if (words > DESCRIPTION_WORD_LIMIT) {
+    throw new Error(
+      `board: a description is 1-3 sentences on what the point delivers — ${words} words is over ` +
+        `${DESCRIPTION_WORD_LIMIT}; progress belongs in the status (board.mjs status)`,
+    )
+  }
+  const key = describedSection(html, point)
+  if (!key) throw new Error(`board: point ${point} has no card on the board to describe`)
+  let done = false
+  return editSectionCards(html, key, (card) => {
+    if (done || card.point !== String(point)) return null
+    done = true
+    const status = key === 'queue' && !hasCardSections(card.html) ? QUEUE_STATUS_TEXT : null
+    return withCardDescription(card.html, description, { status })
+  })
+}
+
+/**
+ * ONE-TIME MIGRATION to the description/status split. A current-work or
+ * Erledigt card keeps its whole body as its status and gets the description
+ * taken from the point's German text in `.claude/board-queue.json` (`queueData`);
+ * a queue card's prose IS its description (the queue rebuild renders it so)
+ * and its status says no work has started. Cards already split are left alone;
+ * state cards are not point cards. Returns the board and what it did,
+ * including the points whose description stays the visible placeholder.
+ */
+export function migrateCardDescriptions(html, queueData = null) {
+  const counts = { now: 0, queue: 0, done: 0 }
+  const missing = { now: [], queue: [], done: [] }
+  const skipped = []
+  let out = String(html ?? '')
+  for (const key of ['now', 'queue', 'done']) {
+    out = editSectionCards(out, key, (card) => {
+      if (hasCardSections(card.html)) return null
+      if (key === 'now' && card.state && card.state !== 'stub') return null
+      counts[key]++
+      if (key === 'queue') {
+        // Only a body of plain paragraphs is prose this can carry; anything
+        // else (a list, a table) stays untouched and is reported.
+        const inner = (card.html.match(CARD_BODY_RE) ?? [])[2] ?? ''
+        if (inner.replace(/<p>[\s\S]*?<\/p>/g, '').trim()) {
+          counts.queue--
+          skipped.push(card.point)
+          return null
+        }
+        const prose = queueDescription(card.html)
+        if (!prose) missing.queue.push(card.point)
+        // The generated stub stays what the queue rebuild renders for "no prose yet".
+        return withCardDescription(card.html, prose || escapePlain(QUEUE_STUB_BODY), { status: QUEUE_STATUS_TEXT })
+      }
+      const description = queuedDescription(queueData, card.point)
+      if (!description) missing[key].push(card.point)
+      return withCardDescription(card.html, description)
+    })
+  }
+  return { html: out, counts, missing, skipped }
 }
 
 /**
@@ -2616,7 +2986,7 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
  * 09.09.2026 the user hit the visible half of this: the board promised 11:46
  * for work still running at 13:40.
  */
-export function setCardTimes(html, point, end) {
+export function setCardTimes(html, point, end, { span = null, now = new Date() } = {}) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
   html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
@@ -2633,9 +3003,12 @@ export function setCardTimes(html, point, end) {
   if (!m) throw new Error(`board: no current-work card for point ${point} — add the card first`)
   // The START is never rewritten: it is when the work actually began, and a
   // re-estimate that moved it would erase how long the point has been running.
-  const start = (String(m[2]).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1]
+  const start = (String(m[2]).match(START_FIELD_RE) ?? [])[1]
   if (!start) throw new Error(`board: the card for point ${point} carries no start time: "${m[2]}"`)
-  const rewritten = section.replace(re, (_all, head, _old, tail) => `${head}${start} · ~${wanted}${tail}`)
+  // With the card-times record the start comes from the record (and is the same
+  // moment); the line is rendered whole, session count included.
+  const line = span ? cardTimeLine(span) : legacyTimeLine(m[2], start, wanted, now)
+  const rewritten = section.replace(re, (_all, head, _old, tail) => `${head}${line}${tail}`)
   return html.slice(0, from) + rewritten + html.slice(to)
 }
 
@@ -2746,4 +3119,311 @@ export function promotionEstimateWarning(html, point) {
         `expected end. Give it one: node scripts/board.mjs eta ${point} "<HH:MM>" (a queue --estimate no ` +
         'longer reaches the promoted card)'
     : null
+}
+
+// ═══ Card times: the original start, the session count, dated spans ═══
+// User 05.10.2026: a successor session wrote its takeover time as the card's
+// start ("14:00 – 14:30" for many hours of work), and a span over 24 h was
+// indistinguishable from a short one. The start is now RECORDED once, at the
+// first promotion (`.claude/board-card-times.json`, written by board.mjs), and
+// every header is rendered from that record.
+
+/** An optional "DD.MM." / "DD.MM.YY" date in front of a clock, as source text. */
+const DATE_PREFIX = '\\d{1,2}\\.\\d{1,2}\\.(?:\\d{2})?\\s+'
+/** A header's start field: the clock, with the date a long span puts in front. */
+const START_FIELD_RE = new RegExp(`^\\s*((?:${DATE_PREFIX})?\\d{1,2}:\\d{2})`)
+
+/** The separator between start and end, and the session suffix's noun. */
+export const CARD_SPAN_SEPARATOR = ' – '
+export const SESSIONS_WORD = 'Sitzungen'
+
+const BERLIN_PARTS = new Intl.DateTimeFormat('de-DE', {
+  timeZone: 'Europe/Berlin',
+  year: '2-digit',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+function berlinParts(date) {
+  const p = Object.fromEntries(BERLIN_PARTS.formatToParts(date).map((x) => [x.type, x.value]))
+  return { day: p.day, month: p.month, year: p.year, clock: `${p.hour}:${p.minute}` }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Which notation a span needs: 'time' (≤ 24 h), 'date' (> 24 h), 'year' (> 1 calendar year). */
+export function cardSpanBand(start, end) {
+  const from = new Date(start)
+  const to = new Date(end)
+  const [a, b] = from <= to ? [from, to] : [to, from]
+  const yearOn = new Date(a)
+  yearOn.setUTCFullYear(yearOn.getUTCFullYear() + 1)
+  if (b > yearOn) return 'year'
+  if (b - a > DAY_MS) return 'date'
+  return 'time'
+}
+
+function bandStamp(date, band, { projected = false } = {}) {
+  const p = berlinParts(date)
+  const clock = `${projected ? '~' : ''}${p.clock}`
+  if (band === 'year') return `${p.day}.${p.month}.${p.year} ${clock}`
+  if (band === 'date') return `${p.day}.${p.month}. ${clock}`
+  return clock
+}
+
+/**
+ * "09:12 – 14:30", "03.10. 09:12 – 05.10. 14:30" or
+ * "03.10.25 09:12 – 05.10.26 14:30" (Europe/Berlin), by the distance between the
+ * two. A projected end carries "~" before its clock, after any date, so the
+ * estimate audit's `~HH:MM` still finds it.
+ */
+export function formatCardSpan(start, end, { projected = false } = {}) {
+  const band = cardSpanBand(start, end)
+  return `${bandStamp(new Date(start), band)}${CARD_SPAN_SEPARATOR}${bandStamp(new Date(end), band, { projected })}`
+}
+
+/**
+ * A card's whole time line: the span (or the start alone, dated by its distance
+ * to `now`, while a running card has no expected end) plus "· <n> Sitzungen"
+ * when more than one session worked it.
+ */
+export function cardTimeLine({ start, end = null, projected = false, sessions = 1, now = new Date() } = {}) {
+  const line = end
+    ? formatCardSpan(start, end, { projected })
+    : bandStamp(new Date(start), cardSpanBand(start, now))
+  return Number(sessions) > 1 ? `${line} · ${sessions} ${SESSIONS_WORD}` : line
+}
+
+/**
+ * The record after `point` is promoted. The START is set once — the first
+ * promotion, or the point's first branch commit when that is earlier (the
+ * fallback for work begun before a card was promoted) — and never moved again.
+ * A promotion by a session other than the last one counts one more session; an
+ * unknown session counts as a new one.
+ */
+export function recordPromotion(entry, { now = new Date(), session = '', fallbackStart = null, eta = null } = {}) {
+  const at = new Date(now)
+  const fallback = fallbackStart ? new Date(fallbackStart) : null
+  const start = entry?.start ?? (fallback && fallback < at ? fallback : at).toISOString()
+  // DISTINCT sessions (cross-vendor review): A → B → A is two sessions, so the
+  // ids already counted are kept; an unknown session always counts.
+  const sessionIds = Array.isArray(entry?.sessionIds) ? [...entry.sessionIds] : entry?.session ? [entry.session] : []
+  const known = Boolean(session && sessionIds.includes(session))
+  if (session && !known) sessionIds.push(session)
+  const sessions = entry ? (Number(entry.sessions) || 1) + (known ? 0 : 1) : 1
+  return { start, sessions, session: session || '', sessionIds, eta: eta ? new Date(eta).toISOString() : null, end: null }
+}
+
+/** The span a recorded card renders: running (projected end) or finished. */
+export function spanOf(entry, { now = new Date() } = {}) {
+  if (!entry?.start) return null
+  const finished = Boolean(entry.end)
+  return {
+    start: entry.start,
+    end: finished ? entry.end : entry.eta ?? null,
+    projected: !finished,
+    sessions: entry.sessions ?? 1,
+    now,
+  }
+}
+
+/**
+ * The moment whose Berlin clock reads `clock` ("HH:MM"), next to `reference`:
+ * the nearest one, or with `future` the first at or after the reference (an
+ * hour of slack, so an estimate typed at 14:31 for 14:30 stays today).
+ */
+export function resolveBerlinClock(clock, reference = new Date(), { future = false } = {}) {
+  const m = String(clock ?? '').match(/^\s*(\d{1,2}):(\d{2})\s*$/)
+  if (!m) return null
+  const ref = new Date(reference)
+  const [h, min] = berlinParts(ref).clock.split(':').map(Number)
+  const base = ref.getTime() - ref.getUTCSeconds() * 1000 - ref.getUTCMilliseconds() +
+    ((Number(m[1]) * 60 + Number(m[2])) - (h * 60 + min)) * 60000
+  const candidates = [base - DAY_MS, base, base + DAY_MS].map((t) => new Date(t))
+  if (future) return candidates.find((c) => c.getTime() >= ref.getTime() - 3600000) ?? candidates[2]
+  return candidates.reduce((best, c) => (Math.abs(c - ref) < Math.abs(best - ref) ? c : best))
+}
+
+/** The end clock a free "<times>" string names ("09:12 · ~14:30" → "14:30"), or null. */
+export function timesEndClock(times) {
+  const m = String(times ?? '').match(new RegExp(`[·–-]\\s*~?\\s*(?:${DATE_PREFIX})?~?\\s*(\\d{1,2}:\\d{2})`))
+  return m ? m[1] : null
+}
+
+/** The first card-head regex match's meta, rewritten — one card's text. */
+function withMeta(card, line) {
+  return card.replace(/(<span class="meta">)[^<]*(<\/span>)/, (_all, open, close) => `${open}${line}${close}`)
+}
+
+const NOW_CARD_RE = new RegExp(`<details class="now"[^>]*>\\s*<summary>\\s*${CARD_NUMBER_SOURCE('(\\d+)')}[\\s\\S]*?</details>`, 'g')
+
+/**
+ * Render every recorded card's header from the record: running cards in the
+ * current-work section, finished ones in Erledigt — or, with `archive`, every
+ * Erledigt-shaped card of an archive page. Cards without a record keep their
+ * value. Returns `{ html, rendered }`.
+ */
+export function applyCardTimes(html, store, { now = new Date(), archive = false } = {}) {
+  const source = String(html ?? '')
+  const points = store?.points ?? {}
+  let rendered = 0
+  const render = (text, re, finished) =>
+    text.replace(re, (card, point) => {
+      const entry = points[point]
+      if (!entry?.start || Boolean(entry.end) !== finished) return card
+      rendered++
+      return withMeta(card, cardTimeLine(spanOf(entry, { now })))
+    })
+  const doneRe = () => new RegExp(DONE_CARD_RE.source, 'g')
+  if (archive) return { html: render(source, doneRe(), true), rendered }
+  let out = source
+  for (const [key, re, finished] of [['now', NOW_CARD_RE, false], ['done', doneRe(), true]]) {
+    let b
+    try {
+      b = sectionBounds(out, key)
+    } catch {
+      continue
+    }
+    out = `${out.slice(0, b.from)}${render(out.slice(b.from, b.end), new RegExp(re.source, 'g'), finished)}${out.slice(b.end)}`
+  }
+  return { html: out, rendered }
+}
+
+/**
+ * The records the retroactive pass derives for cards that carry none: start =
+ * the point's first branch commit; end = the card's own end clock, placed next
+ * to the merge (or last branch commit), never before the start; sessions = the
+ * distinct sessions the traces name (at least one), kept as `sessionIds` so a
+ * later promotion by one of them is not counted again. A card without a trace is
+ * counted in `untraceable` and keeps its value.
+ */
+export function backfillCardTimes({ store = {}, cards = [], traces = {}, now = new Date() } = {}) {
+  const points = { ...(store.points ?? {}) }
+  const added = []
+  const untraceable = []
+  for (const { point, meta, finished } of cards) {
+    if (points[point]?.start) continue
+    const trace = traces[point]
+    if (!trace?.firstCommit) {
+      untraceable.push(point)
+      continue
+    }
+    const start = new Date(trace.firstCommit)
+    const bare = String(meta ?? '').replace(new RegExp(`\\s*·\\s*\\d+\\s+${SESSIONS_WORD}\\s*$`), '')
+    const endClock = finished ? (bare.match(/(\d{1,2}:\d{2})\s*$/) ?? [])[1] : null
+    let end = null
+    if (finished) {
+      const near = new Date(trace.lastCommit ?? trace.firstCommit)
+      end = (endClock && resolveBerlinClock(endClock, near)) || near
+      if (end < start) end = near < start ? start : near
+    }
+    const etaClock = finished ? null : timesEndClock(meta)
+    points[point] = {
+      start: start.toISOString(),
+      sessions: Math.max(1, Number(trace.sessions) || 1, trace.sessionIds?.length ?? 0),
+      session: '',
+      sessionIds: Array.isArray(trace.sessionIds) ? [...trace.sessionIds] : [],
+      eta: etaClock ? resolveBerlinClock(etaClock, now, { future: true }).toISOString() : null,
+      end: end ? end.toISOString() : null,
+    }
+    added.push(point)
+  }
+  return { store: { ...store, v: 1, points }, added, untraceable }
+}
+
+/** `{ point, meta, finished }` for every numbered now- and Erledigt card (or every archive card). */
+export function timedCards(html, { archive = false } = {}) {
+  const source = String(html ?? '')
+  const collect = (text, re, finished) =>
+    [...text.matchAll(re)].map((m) => ({ point: m[1], meta: metaOf(m[0]), finished }))
+  if (archive) return collect(source, new RegExp(DONE_CARD_RE.source, 'g'), true)
+  const out = []
+  for (const [key, re, finished] of [['now', NOW_CARD_RE, false], ['done', DONE_CARD_RE, true]]) {
+    try {
+      const b = sectionBounds(source, key)
+      out.push(...collect(source.slice(b.from, b.end), new RegExp(re.source, 'g'), finished))
+    } catch {
+      /* no such section */
+    }
+  }
+  return out
+}
+
+/**
+ * The whole retroactive pass as ONE transaction over the board, the archive
+ * page and the LATEST record (cross-vendor review): the caller runs it inside
+ * the board edit lock, so a promotion recorded meanwhile is merged, never
+ * overwritten, and both pages are written before anything is published.
+ * `traceOf(points)` supplies the branch/session traces.
+ */
+export function backfillTransaction({ html, archiveHtml = null, store = {}, traceOf = () => ({}), now = new Date() } = {}) {
+  const cards = [...timedCards(html), ...(archiveHtml == null ? [] : timedCards(archiveHtml, { archive: true }))]
+  const points = [...new Set(cards.map((c) => c.point))]
+  const result = backfillCardTimes({ store, cards, traces: traceOf(points), now })
+  const board = applyCardTimes(html, result.store, { now })
+  const archive = archiveHtml == null ? null : applyCardTimes(archiveHtml, result.store, { now, archive: true })
+  return {
+    html: board.html,
+    archiveHtml: archive?.html ?? null,
+    store: result.store,
+    cards: cards.length,
+    points: points.length,
+    added: result.added,
+    untraceable: [...new Set(result.untraceable)],
+    rendered: board.rendered + (archive?.rendered ?? 0),
+  }
+}
+
+/**
+ * A re-estimated header WITHOUT a record: the start field, its separator and
+ * the session suffix stay; a dated start gets a dated end in the same notation
+ * (cross-vendor review), an undated one the bare "~HH:MM" it always had.
+ */
+function legacyTimeLine(meta, start, wanted, now = new Date()) {
+  const sep = String(meta).includes('–') ? CARD_SPAN_SEPARATOR : ' · '
+  const suffix = (String(meta).match(new RegExp(`\\s*·\\s*\\d+\\s+${SESSIONS_WORD}\\s*$`)) ?? [''])[0]
+  const dated = start.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2})?\s/)
+  const end = dated
+    ? bandStamp(resolveBerlinClock(wanted, now, { future: true }), dated[3] ? 'year' : 'date', { projected: true })
+    : `~${wanted}`
+  return `${start}${sep}${end}${suffix}`
+}
+
+/**
+ * The `backfill-times` command as one orchestration with its I/O injected, so
+ * the lost-update race is testable (second cross-vendor round). Outside the
+ * lock only the dry run reads anything; the real pass reads board, archive and
+ * the record INSIDE `editBoard`, whose transform returns `{ html, store }` and
+ * whose `afterWrite` writes the archive before the publish.
+ */
+export function runCardTimesBackfill({
+  dryRun = false,
+  now = new Date(),
+  readBoard,
+  readArchive = () => null,
+  readStore,
+  traceOf,
+  editBoard,
+  writeArchive = () => {},
+} = {}) {
+  let tx = null
+  const pass = (html) =>
+    (tx = backfillTransaction({ html, archiveHtml: readArchive(), store: readStore(), traceOf, now }))
+  if (dryRun) {
+    pass(readBoard())
+    return tx
+  }
+  editBoard(
+    (html) => {
+      pass(html)
+      return { html: tx.html, store: tx.store }
+    },
+    () => {
+      if (tx?.archiveHtml != null) writeArchive(tx.archiveHtml)
+    },
+  )
+  return tx
 }

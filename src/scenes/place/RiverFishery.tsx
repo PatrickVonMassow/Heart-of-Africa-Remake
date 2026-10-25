@@ -41,12 +41,12 @@ import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryM
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
 import { rainAmount } from '../../systems/season'
-import { blendPose, carrierWalkPose, copyPose, netFishRotation, ownPose, reachPose } from './fisheryPoses'
+import { blendPose, CARRIER_BASKET_Y, carrierWalkPose, copyPose, netFishRotation, netManAshore, netManBasketAt, ownPose, placeNetMan, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
 import { BANK_WATER_DROP, type PlaceRiverBank } from './riverBank'
-import { basketRingViolation, type BasketRing, type FishBasket } from './fishBaskets'
+import { basketRingViolation, FISH_BASKET, type BasketRing, type FishBasket } from './fishBaskets'
 import {
   createFishFire,
   createFisheryRing,
@@ -75,6 +75,7 @@ import {
 import { devAssert } from '../../systems/devAssert'
 import { isLifeFrozen } from './lifeFreeze'
 import { Pounder } from './Pounder'
+import { FisheryNetMan } from './FisheryNetMan'
 
 /** The speech-label id of the net man's words (the dugout's, as before). */
 export const CANOE_SPEAKER_ID = 'village-canoe'
@@ -86,8 +87,8 @@ const CANOE_DEPTH = 0.28
 /** The hull fish lie this high over the hull's water line. */
 const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
-const BASKET_R = 0.26
-const BASKET_H = 0.34
+const BASKET_R = FISH_BASKET.radius
+const BASKET_H = FISH_BASKET.height
 /** The rope's own axis and a scratch direction for orienting it. */
 const ROPE_UP = new THREE.Vector3(0, 1, 0)
 const ROPE_DIR = new THREE.Vector3()
@@ -304,13 +305,12 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
   const paddle = useRef<THREE.Group>(null)
   const paddlerPose = useRef<FigurePose | null>(paddlePose(0))
   const paddlerLimbs = useRef<FigureLimbs | null>(null)
-  const netSeat = useRef<THREE.Group>(null)
-  const netSeatPose = useRef<FigurePose | null>({ ...REST_POSE })
-  const netSeatLimbs = useRef<FigureLimbs | null>(null)
-  const netShore = useRef<THREE.Group>(null)
-  const netShorePose = useRef<FigurePose | null>({ ...REST_POSE })
-  const netShoreLimbs = useRef<FigureLimbs | null>(null)
-  const netShoreSquat = useRef(1)
+  // ONE net man in the hull and ashore (point 1387), never two Figures swapped.
+  const netMan = useRef<THREE.Group>(null)
+  const netPose = useRef<FigurePose | null>({ ...REST_POSE })
+  const netLimbs = useRef<FigureLimbs | null>(null)
+  const netKneels = useRef(true)
+  const netSquat = useRef(1)
   const gesture = useRef<GestureState>(restGesture())
   const foldedNet = useRef<THREE.Mesh>(null)
   const floats = useRef<Array<THREE.Mesh | null>>([])
@@ -408,19 +408,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
       paddlerG.current.position.set(p.x, -BANK_WATER_DROP + CANOE_SEAT_Y, p.z)
       paddlerG.current.rotation.y = p.yaw
     }
-    if (netSeat.current) {
-      netSeat.current.visible = nm.inBoat
-      netSeat.current.position.set(nm.x, -BANK_WATER_DROP + CANOE_SEAT_Y, nm.z)
-      netSeat.current.rotation.y = nm.yaw
-    }
-    if (netShore.current) {
-      netShore.current.visible = !nm.inBoat
-      netShore.current.position.set(nm.x, groundHeight(nm.x, nm.z), nm.z)
-      netShore.current.rotation.y = nm.yaw
-      const squash = 1 - 0.28 * nm.reach
-      netShore.current.scale.set(1, squash, 1)
-      netShoreSquat.current = squash
-    }
+    if (netMan.current) placeNetMan(netMan.current, nm, -BANK_WATER_DROP + CANOE_SEAT_Y, groundHeight, netKneels, netSquat)
 
     if (said) {
       const at = { x: nm.x, z: nm.z }
@@ -430,7 +418,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
       playSpeech(plan)
       if (speechReach(distance, options.radius).audible) {
         useGame.getState().hearUtterance(utterance)
-        if (netSeat.current) speakOverhead(CANOE_SPEAKER_ID, [utterance], netSeat.current, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
+        if (netMan.current) speakOverhead(CANOE_SPEAKER_ID, [utterance], netMan.current, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
       }
       // He points the way he tells the paddler to go, far along the lane.
       const way = said === 'UPSTREAM' ? -1 : 1
@@ -449,8 +437,8 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     // The net man's.
     // The net is set on the hull's shore side.
     const netSide = bearingIn(nm, { x: nm.x - lane.nx, z: nm.z - lane.nz })
-    const sp = netSeatPose.current
-    if (sp) {
+    const np = netPose.current
+    if (np && nm.inBoat) {
       const next = isGesturing(gesture.current)
         ? gesturePose(gesture.current)
         : nm.action === 'haul'
@@ -458,14 +446,12 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
           : nm.action === 'payOut' || nm.action === 'holdNet'
             ? { left: armAim(netSide + 0.15, -0.35 + (nm.action === 'payOut' ? 0.15 * Math.sin(t * 5) : 0)), right: armAim(netSide - 0.2, -0.55), lean: 0.2, turn: Math.max(-0.7, Math.min(0.7, netSide * 0.5)) }
             : { left: armAim(0.25, -1.0), right: armAim(-0.25, -1.0), lean: 0.12, turn: 0 }
-      copyPose(sp, next)
-      applyFigurePose(netSeatLimbs.current, sp)
-    }
-    const shore = netShorePose.current
-    if (shore) {
+      copyPose(np, next)
+      applyFigurePose(netLimbs.current, np)
+    } else if (np) {
       const holding = ring.baskets.some((b) => b.at === 'netman')
-      copyPose(shore, holding && nm.reach < 0.05 ? { left: armAim(0.25, -0.55), right: armAim(-0.25, -0.55), lean: 0.12, turn: 0 } : reachPose(0, nm.reach))
-      applyFigurePose(netShoreLimbs.current, shore)
+      copyPose(np, netManAshore(nm.reach, holding).pose)
+      applyFigurePose(netLimbs.current, np)
     }
 
     // The net: folded in the hull, or a headline of floats on the water — and
@@ -564,10 +550,10 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     if (carrierWalk.current) {
       carrierWalk.current.position.set(c.x, groundHeight(c.x, c.z), c.z)
       carrierWalk.current.rotation.y = c.yaw
-      // A basket on his head rests on his crown and rides its bob.
+      // A basket on his head rests on his crown, rides its bob and tilts with it.
       for (const b of ring.baskets) {
         const g = b.at === 'carrier' ? basketGroups.current[b.id] : null
-        if (g && !kneeling && crownIn(carrierWalk.current, g.parent, g.position)) g.rotation.set(0, c.yaw, 0)
+        if (g && !kneeling) crownIn(carrierWalk.current, g.parent, g.position, g.quaternion)
       }
     }
     const cw = carrierWalkPoseRef.current
@@ -793,12 +779,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
           }
         />
       </group>
-      <group ref={netSeat} name="village-canoe-netman" position={born.net}>
-        <Figure cloth={clothOf(1)} kneel pose={netSeatPose} limbs={netSeatLimbs} />
-      </group>
-      <group ref={netShore} name="village-canoe-netman-ashore" position={born.net} visible={false}>
-        <Figure cloth={clothOf(1)} pose={netShorePose} limbs={netShoreLimbs} squat={netShoreSquat} />
-      </group>
+      <FisheryNetMan group={netMan} born={born.net} cloth={clothOf(1)} pose={netPose} limbs={netLimbs} kneels={netKneels} squat={netSquat} />
       {[0, 1].map((id) => (
         <group
           key={id}
@@ -1031,15 +1012,14 @@ function placeBasket(
       break
     }
     case 'netman': {
-      const nm = canoe.netMan
-      const x = nm.x + Math.sin(nm.yaw) * 0.45
-      const z = nm.z + Math.cos(nm.yaw) * 0.45
-      g.position.set(x, groundHeight(nm.x, nm.z) + 0.55 - 0.45 * nm.reach, z)
+      // Hanging from his hands by its rim, never at a height of its own.
+      const at = netManBasketAt(canoe.netMan, groundHeight)
+      g.position.set(at.x, at.y, at.z)
       break
     }
     case 'carrier': {
       const c = fire.carrier
-      g.position.set(c.x, groundHeight(c.x, c.z) + 1.36, c.z)
+      g.position.set(c.x, groundHeight(c.x, c.z) + CARRIER_BASKET_Y, c.z)
       g.rotation.set(0, c.yaw, 0)
       break
     }

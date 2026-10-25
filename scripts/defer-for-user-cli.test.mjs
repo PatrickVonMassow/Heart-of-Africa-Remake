@@ -1,7 +1,7 @@
 // The CLI half of the typed user gate, exercised as a PROCESS. The pure rules
 // live in scripts/user-gate-core.test.mjs; what only a real argv can show is
 // how the flags are read — and one of those readings fabricated a field
-// (fifth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+// (fifth cross-vendor round, 23.08.2026).
 //
 // HOA_REPO_ROOT points every run at a throwaway work order. A directory with no
 // `.git` is not a linked worktree, so the main-only refusal correctly stands

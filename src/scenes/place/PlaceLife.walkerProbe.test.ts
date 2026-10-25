@@ -17,11 +17,13 @@ it('reports the real body transform separately from live ground and holds only t
   const held = { current: null as number | null }
   const w = {} as { __placeWalkers: {
     states: unknown
+    speeds: number[]
     sample: (who: number) => unknown
     hold: (who: number | null) => void
   } }
-  install(w, states, [{ home: { x: 0, z: 0 } }], { current: [body] }, height, held)
+  install(w, states, [{ home: { x: 0, z: 0 }, speed: 1.3 }], { current: [body] }, height, held)
   expect(w.__placeWalkers.states).toBe(states.current)
+  expect(w.__placeWalkers.speeds).toEqual([1.3])
   expect(w.__placeWalkers.sample(0)).toEqual({ x: 4, z: 6, mode: 'walk', pause: 0,
     groundHeight: 0.4, drawn: { x: 4, y: 0.43, z: 6, visible: true }, held: false })
   expect(height).toHaveBeenCalledWith(4, 6)
@@ -45,4 +47,20 @@ it('stops the held actor before movement or a transform write, only in dev', () 
   expect(tick(...args, 0, true)).toBeUndefined()
   expect(tick(...args, 1, true)).toBe('advance')
   expect(tick(...args, 0, false)).toBe('advance')
+})
+
+it('names one walker by one index: carries[k] and group(k) are the same walker', () => {
+  const bodies = [new Group(), new Group(), new Group()]
+  const defs = [false, true, false].map((carries, k) => ({ home: { x: k, z: 0 }, speed: 1 + k, carries }))
+  const w = {} as { __placeWalkers: { carries: boolean[]; homes: unknown[]; group: (k: number) => Group | null } }
+  install(w, { current: [] }, defs, { current: bodies }, () => 0, { current: null })
+  defs.forEach((d, k) => {
+    expect(w.__placeWalkers.carries[k]).toBe(d.carries)
+    expect(w.__placeWalkers.homes[k]).toBe(d.home)
+    expect(w.__placeWalkers.group(k)).toBe(bodies[k])
+  })
+  // and the drawn group k is the one that renders def k's head load
+  const draw = source.slice(source.indexOf('{defs.map((def, i) => (', end), source.indexOf('\n      ))}', end))
+  expect(draw).toMatch(/refs\.current\[i\] = el/)
+  expect(draw).toMatch(/def\.carries \? \(/)
 })

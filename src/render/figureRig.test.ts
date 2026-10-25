@@ -3,10 +3,15 @@ import { describe, expect, it } from 'vitest'
 import { armAim, REST_POSE } from './gesture'
 import {
   contactCrouch,
+  CROUCH_GAIN_MIN,
   CROUCH_MAX,
   unsquashHead,
   CONTACT_LEAN_MAX,
   contactLean,
+  contactWantsLean,
+  holdsPosedReach,
+  leastLean,
+  searchDeepBend,
   gestureArmEuler,
   hangToward,
   HANGING_ROLL_KEEP,
@@ -79,6 +84,53 @@ describe('the contact lean', () => {
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(0)
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(0)
   })
+  it('still asks for a lean where the one-pivot lean falls short, so a deeper bend may try', () => {
+    // low in front of the feet: further than CONTACT_LEAN_MAX about one pivot
+    // brings the shoulder, but within CONTACT_LEAN_REACH of the arm's reach
+    const s = v(0.12, 0.65, 0.1)
+    const t = v(0.2, 0.15, 0.18)
+    const p0 = v(0, 0.35, 0)
+    expect(contactLean(s, t, 0.42, p0, fwd)).toBe(0)
+    expect(contactWantsLean(s, t, 0.42, p0, fwd)).toBe(true)
+  })
+  it('asks for no lean where contactLean refuses one by its limits', () => {
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, -0.45), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, 0.45), 0.5, pivot, fwd)).toBe(true)
+  })
+  it('searches the deep bend for a wanted contact, but never under a steadied head load', () => {
+    const base = { lean: 0, wants: true, posedReach: false, grab: false, steadying: false }
+    expect(searchDeepBend(base)).toBe(true)
+    expect(searchDeepBend({ ...base, steadying: true })).toBe(false)
+    expect(searchDeepBend({ ...base, posedReach: true })).toBe(false)
+    expect(searchDeepBend({ ...base, wants: false })).toBe(false)
+    // what the one-pivot lean or a lunge asked for is searched as before
+    expect(searchDeepBend({ ...base, wants: false, lean: 0.2, steadying: true })).toBe(true)
+    expect(searchDeepBend({ ...base, wants: false, grab: true, posedReach: true })).toBe(true)
+  })
+  it('takes the least lean that reaches, else the one that comes nearest', () => {
+    const leans = [0.05, 0.1, 0.15, 0.2]
+    expect(leastLean(leans, (l) => 0.12 - l)).toBe(0.15)
+    expect(leastLean(leans, (l) => 0.5 - l)).toBe(0.2)
+    // a bend that only moves the hand away keeps the trunk upright
+    expect(leastLean(leans, (l) => 0.1 + l)).toBe(0)
+    // without `nearest` a bend that never reaches keeps the trunk upright
+    expect(leastLean(leans, (l) => 0.5 - l, false)).toBe(0)
+    expect(leastLean(leans, (l) => 0.12 - l, false)).toBe(0.15)
+  })
+  it('holds a pose’s reach while it reaches and while its release eases back', () => {
+    const leans = [0.05, 0.1, 0.15, 0.2]
+    const unreachable = (l: number) => 0.5 - l
+    const bend = (reach: boolean, releasing: [number | null, number | null]) =>
+      leastLean(leans, unreachable, !holdsPosedReach(reach, releasing))
+    // an active reach and a reach releasing on either arm keep the trunk upright
+    expect(bend(true, [null, null])).toBe(0)
+    expect(bend(false, [0, null])).toBe(0)
+    expect(bend(false, [null, 1])).toBe(0)
+    // once the release has faded out an ordinary contact bends nearest again
+    expect(bend(false, [null, null])).toBe(0.2)
+  })
 })
 
 describe('gestures keep their aim; the resting arm hangs like a person’s', () => {
@@ -134,13 +186,33 @@ describe('the head stays round through a squat', () => {
     expect(ax[1].dot(ax[2])).toBeCloseTo(0, 6)
     // no snap at the threshold: a barely squashed head is oriented like an
     // unsquashed one
+    head.quaternion.identity()
     unsquashHead(head, chain, 0.999)
     const nearly = head.quaternion.clone()
+    head.quaternion.identity()
     unsquashHead(head, chain, 1)
     expect(nearly.angleTo(head.quaternion)).toBeLessThan(0.02)
     // and no squat leaves it untouched
     expect(head.scale.y).toBe(1)
     expect(head.quaternion.equals(new THREE.Quaternion())).toBe(true)
+  })
+
+  it('composes with the head\'s own turn: none at no squash, its world twist kept under one', () => {
+    const chain = [new THREE.Bone(), new THREE.Bone()]
+    chain[1].rotation.set(0.3, 0, 0)
+    chain[0].add(chain[1])
+    const head = new THREE.Bone()
+    chain[1].add(head)
+    const own = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0.5, 0))
+    head.quaternion.copy(own)
+    unsquashHead(head, chain, 1)
+    expect(head.quaternion.angleTo(own)).toBeLessThan(1e-6)
+    unsquashHead(head, chain, 0.7)
+    chain[0].updateMatrixWorld(true)
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion()))
+    // the world turn about y survives (the gaze's yaw), the pitch is undone
+    expect(Math.atan2(fwd.x, fwd.z)).toBeGreaterThan(0.3)
+    expect(Math.abs(fwd.y)).toBeLessThan(1e-6)
   })
 })
 
@@ -173,6 +245,13 @@ describe('the contact crouch', () => {
     expect(first).toBeCloseTo(0.4, 9)
     for (let i = 0; i < 5; i++) expect(contactCrouch(short)).toBe(first)
     expect(contactCrouch(() => -1)).toBe(0)
-    expect(contactCrouch(() => 1)).toBe(CROUCH_MAX)
+    // out of reach at every flex: no squat for a hand no crouch helps
+    expect(contactCrouch(() => 1)).toBe(0)
+    expect(contactCrouch((c) => 0.5 + c)).toBe(0)
+    // a low contact just beyond reach: the flex that comes closest
+    expect(contactCrouch((c) => 0.5 - 0.4 * Math.min(c, 0.6))).toBeCloseTo(0.6, 9)
+    // a gain below CROUCH_GAIN_MIN keeps the shallower flex
+    expect(contactCrouch((c) => 0.5 - CROUCH_GAIN_MIN * 0.5 * c)).toBe(0)
+    expect(contactCrouch((c) => (c >= CROUCH_MAX - 1e-9 ? 0.1 : 0.5))).toBe(CROUCH_MAX)
   })
 })

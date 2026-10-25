@@ -8,9 +8,12 @@
 // HUD are DOM, so they travel as the overlay snapshot beside it.
 //
 // Stacks above panels and dialogs (§17.4); the start/victory/defeat overlays
-// share its z-index and, mounted later, sit above it. Esc closes it, from the description field too, and
-// leaves focus on no control (§17.5) — the field itself is autofocused on
-// purpose, so the user can start typing the moment the modal appears.
+// share its z-index and, mounted later, sit above it. Opening it gives the
+// pointer back, as the place dialogs do. Esc closes it and leaves focus on no
+// control (§17.5); inside a description field that holds text, Esc only leaves
+// the field, so a typed report is never lost to one keypress — the next Esc
+// closes. The field itself is autofocused on purpose, so the user can start
+// typing the moment the modal appears.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../state/store'
@@ -28,6 +31,7 @@ import { describeBackend } from '../render/backendInfo'
 import { getRenderContext } from '../render/renderContext'
 import { snapshotOverlay, type OverlayItem } from '../report/overlaySnapshot'
 import { buildBugReport, dataUrlToBytes } from '../report/bugReport'
+import { releasePointerLock } from '../scenes/place/pointerLock'
 
 /** Environment header for the dump and the description file (§21.1). */
 function reportEnvironment(): DumpEnvironment {
@@ -80,6 +84,8 @@ export function StateDump() {
 
   useEffect(() => {
     if (!open) return
+    // A held lock swallows Esc and hides the cursor the report needs.
+    releasePointerLock()
     setDescription('')
     capture.current = null
     env.current = reportEnvironment()
@@ -159,7 +165,11 @@ export function StateDump() {
           onKeyDown={(e) => {
             // Game keys ignore a typing target (systems/input.ts), so Esc and
             // F6 are served here while the field has focus.
-            if (e.key === 'Escape' || e.key === 'F6') {
+            if (e.key === 'Escape' && description !== '') {
+              e.preventDefault()
+              e.stopPropagation()
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape' || e.key === 'F6') {
               e.preventDefault()
               e.stopPropagation()
               close()

@@ -55,6 +55,9 @@ scripts/.tile-cache
 # The derived queue's prose and order (point 400, delta C) — session state that
 # belongs beside the board it renders, not in the source history.
 .claude/board-queue.json
+# The board cards' recorded start, session count and end (scripts/board.mjs).
+.claude/board-card-times.json
+.claude/board-card-times.json.tmp-*
 # The measured queue calibration (point 730) — the reading `queue-calibration.mjs`
 # takes off the merge history, serving the estimates on the file above. Derived
 # state: it is re-measured on demand, never carried in the source history.
@@ -204,7 +207,7 @@ scripts/.tile-cache
 # Runtime state of the batch-resilience layers (child-retry, alert-escalation).
 .claude/resilience/
 
-# Which vendor the read-only work goes to (scripts/astra-share.mjs, point 654). THIS
+# Which vendor the read-only work goes to (scripts/lane-routing.mjs, point 654). THIS
 # MACHINE's operator setting, flipped when one of the two allowances runs short — a
 # committed one would hand a clone somebody else's routing, and it would conflict on
 # every branch that touched it. It lives in the MAIN checkout, so every worktree agent

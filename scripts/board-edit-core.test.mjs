@@ -71,6 +71,20 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
     expect(said).not.toContain('The LIVE page was NOT updated — fix the above')
   })
 
+  // User 19.10.2026: an Erledigt title that carries the closing stage label is
+  // cleaned by whatever edit comes next, not only by the archiving one.
+  it('cleans a leaked closing stage from an Erledigt title on an unrelated edit', () => {
+    const leaked = boardHtml().replace('<span class="t">Done 209</span>', '<span class="t">Done 209 — Abschlussarbeiten</span>')
+    expect(leaked).toContain('Done 209 — Abschlussarbeiten')
+    const { state, edit } = harness(leaked, tasks(210, 211, 204))
+
+    edit((html) => addVdzk(html, 'Kartenschrift wählen', designQuestion('Soll die enge oder die weite Variante gelten?')))
+
+    expect(state.writes).toBe(1)
+    expect(state.html).toContain('<span class="t">Done 209</span>')
+    expect(state.html).not.toContain('Abschlussarbeiten')
+  })
+
   it('refuses a knowably incomplete board before writing or publishing', () => {
     const { state, edit } = harness(boardHtml(), tasks(210, 211, 204, 703))
 

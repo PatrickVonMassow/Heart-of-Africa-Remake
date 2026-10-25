@@ -6,12 +6,17 @@ import { PLACES } from '../world/geo'
 import {
   AGE_GROUPS,
   appearanceFor,
+  isOpenOuter,
+  isRevealableTop,
   LAYER_SLOTS,
   PEOPLE_DRESS,
   SEXES,
+  withOpenOuterRule,
   zuluBlanketShare,
   type AppearanceQuery,
+  type DressLayer,
 } from './appearance'
+import { seasonalDressFor } from './dress'
 
 const DOC = readFileSync(resolve(process.cwd(), 'docs/peoples-1890.md'), 'utf8')
 const SOUTH = ['#3a5a8a', '#8a4a2a', '#c2b090']
@@ -195,5 +200,113 @@ describe('the year switches the layers (VILLAGER_DRESS, calibratable)', () => {
     expect(
       appearanceFor(query({ peopleId: 'baganda', year: 1895, cloth: SOUTH[1] })).find((l) => l.slot === 'torso')!.material,
     ).toBe('barkCloth')
+  })
+})
+
+describe('the covered upper body (docs/peoples-1890.md §8.6)', () => {
+  it('the San woman’s mantle stays tied over the breast in the cold, re-worn rather than doubled', () => {
+    const q = { peopleId: 'san', sex: 'female', age: 'adult' } as const
+    for (const drivers of [WARM, COLD]) {
+      const mantles = appearanceFor(query({ ...q, drivers })).filter((l) => l.form === 'cloak')
+      expect(mantles.map((l) => l.wear)).toEqual(['chest'])
+    }
+  })
+
+  it('a share of San mothers carries an infant in the mantle; nobody else does', () => {
+    const picks = Array.from({ length: 200 }, (_, i) => (i + 0.5) / 200)
+    const share = (over: Partial<AppearanceQuery>) =>
+      picks.filter((pick) => appearanceFor(query({ ...over, pick })).some((l) => l.form === 'babySling')).length / picks.length
+    const san = share({ peopleId: 'san', sex: 'female', age: 'adult' })
+    expect(san).toBeGreaterThan(VILLAGER_DRESS.babySlingShare - 0.05)
+    expect(san).toBeLessThan(VILLAGER_DRESS.babySlingShare + 0.05)
+    expect(share({ peopleId: 'san', sex: 'female', age: 'youth' })).toBe(0)
+    expect(share({ peopleId: 'san', sex: 'male', age: 'adult' })).toBe(0)
+    expect(share({ peopleId: 'zulu', sex: 'female', age: 'adult' })).toBe(0)
+  })
+
+  it('the covers differ by people — no village gets the same garment as every other', () => {
+    const cover = (p: string) =>
+      PEOPLE_DRESS[p].female.adult
+        .filter((l) => l.slot !== 'hip' || l.wear === 'chest')
+        .map((l) => `${l.form}/${l.material}`)
+        .join('+')
+    const kinds = new Set(['zulu', 'pedi', 'san', 'wayeyi', 'bemba', 'fang', 'mongo', 'mbuti', 'lunda', 'banda'].map(cover))
+    expect(kinds.size).toBeGreaterThanOrEqual(8)
+  })
+})
+
+describe('the open outer garment rule (design.md §19.15)', () => {
+  const PALETTE = ['#3a5a8a', '#8a4a2a', '#c2b090']
+  const DRIVERS = [0, 1].flatMap((coldness) => [0, 1].flatMap((harmattan) => [0, 1].map((karif) => ({ coldness, harmattan, karif }))))
+
+  it('no everyday outfit puts a revealable inner top under an open outer garment; every such pairing is the seasonal wrap', () => {
+    const fails: string[] = []
+    const pairs = new Set<string>()
+    let checked = 0
+    for (const peopleId of [...Object.keys(PEOPLE_DRESS), null])
+      for (const sex of SEXES)
+        for (const age of AGE_GROUPS)
+          for (const drivers of DRIVERS)
+            for (let year = 1890; year <= 1895; year++)
+              for (const cloth of PALETTE)
+                for (const pick of [0.05, 0.35, 0.65, 0.95]) {
+                  const ls = appearanceFor({ peopleId, sex, age, drivers, year, cloth, palette: PALETTE, pick })
+                  checked++
+                  const outer = ls.filter(isOpenOuter)
+                  if (!outer.length || !ls.some(isRevealableTop)) continue
+                  const who = `${peopleId} ${sex} ${age}`
+                  pairs.add(who)
+                  // Only the seasonal wrap may sit over a top: a two-shoulder cloak, and only in its season.
+                  const seasonal = peopleId ? seasonalDressFor(peopleId, drivers) : null
+                  if (!seasonal || outer.some((l) => l.form !== 'cloak' || l.wear !== 'bothShoulders')) fails.push(`${who} ${JSON.stringify(drivers)}`)
+                }
+    expect(checked).toBeGreaterThan(30_000)
+    expect(fails).toEqual([])
+    // The recorded exemption, exactly: the seasonal two-shoulder wrap over its period inner garment.
+    expect([...pairs].sort()).toEqual(
+      [
+        'hausa female youth', 'hausa female adult', 'hausa female elder',
+        'hausa male youth', 'hausa male adult', 'hausa male elder',
+        'tuareg female youth', 'tuareg female adult', 'tuareg female elder',
+        'tuareg male youth', 'tuareg male adult', 'tuareg male elder',
+        'zulu female adult', 'zulu female elder',
+      ].sort(),
+    )
+  })
+
+  it('leaves a revealable top off under an everyday open cape, and keeps it under a cape tied over the breast', () => {
+    const l = (slot: DressLayer['slot'], form: DressLayer['form'], wear: DressLayer['wear']): DressLayer =>
+      ({ slot, form, material: 'hide', colour: '#000000', colour2: null, pattern: 'plain', wear, source: { guess: 'test' } })
+    const hip = l('hip', 'skirtKnee', 'waist')
+    const top = l('torso', 'breastCloth', 'chest')
+    const wrap = l('hip', 'wrapLong', 'chest')
+    expect(withOpenOuterRule([hip, top, wrap, l('shoulder', 'cape', 'leftShoulder')]).map((x) => x.form)).toEqual(['skirtKnee', 'cape'])
+    expect(withOpenOuterRule([hip, top, l('shoulder', 'cloak', 'bothShoulders')]).map((x) => x.form)).toEqual(['skirtKnee', 'cloak'])
+    expect(withOpenOuterRule([hip, top, l('shoulder', 'cape', 'chest')]).map((x) => x.form)).toEqual(['skirtKnee', 'breastCloth', 'cape'])
+    expect(withOpenOuterRule([hip, top]).map((x) => x.form)).toEqual(['skirtKnee', 'breastCloth'])
+  })
+})
+
+describe("the chief's dress of office", () => {
+  const chief = (peopleId: string) => appearanceFor(query({ peopleId, age: 'elder', cloth: SOUTH[0], office: 'chief' }))
+
+  it('dresses the Bambara chief in a white boubou over the everyday trousers and cap', () => {
+    const layers = chief('bambara')
+    const torso = layers.filter((l) => l.slot === 'torso')
+    expect(torso).toHaveLength(1)
+    expect(torso[0]).toMatchObject({ form: 'robe', material: 'cotton', colour: '#f3f0e8' })
+    expect(layers.map((l) => l.form)).toEqual(expect.arrayContaining(['trousers', 'cap']))
+    // An ordinary Bambara man keeps his indigo shirt.
+    const everyday = appearanceFor(query({ peopleId: 'bambara', age: 'elder', cloth: SOUTH[0] }))
+    expect(everyday.find((l) => l.slot === 'torso')?.form).toBe('shirt')
+  })
+
+  it('leaves a people without a recorded dress of office in its own dress', () => {
+    const zulu = query({ peopleId: 'zulu', age: 'elder', cloth: SOUTH[0] })
+    expect(appearanceFor({ ...zulu, office: 'chief' })).toEqual(appearanceFor(zulu))
+  })
+
+  it('wears no turban or metal decoration', () => {
+    expect(chief('bambara').some((l) => l.form === 'turban' || l.material === 'metal')).toBe(false)
   })
 })

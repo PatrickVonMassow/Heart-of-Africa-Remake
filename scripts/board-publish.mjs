@@ -55,14 +55,16 @@ import {
 } from './board-core.mjs'
 import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
 import { BOARD_EDIT_LOCK_PATH, withBoardEditLock } from './board-edit-lock.mjs'
-import { currentSetting, settingProblemLine } from './astra-share.mjs'
-import { applyFooterNote } from './astra-share-core.mjs'
+import { currentSetting, settingProblemLine } from './lane-routing.mjs'
+import { applyFooterNote } from './lane-routing-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
 import {
   ESTIMATE_CMD,
   QUEUE_DATA_PATH,
+  BOARD_CARD_TITLE_MAX,
   TITLE_CMD,
+  boardCardBlockers,
   boardTitleReport,
   parseQueueDataFile,
   parseTaskTitles,
@@ -70,6 +72,8 @@ import {
 import { readTasksAll } from './tasks-source.mjs'
 import { applyLivenessBlock } from './board-liveness-core.mjs'
 import { measureLiveness } from './board-liveness.mjs'
+import { renderCardDistributions } from './board-distribution-core.mjs'
+import { cardPoints, gatherDistributionLines } from './board-distribution.mjs'
 import {
   ARCHIVE_CONTENT_URL,
   ARCHIVE_FILE,
@@ -88,6 +92,17 @@ import {
   stampFileHash,
   stampFingerprint,
 } from './board-currency-core.mjs'
+
+/** `html` with every card's derived distribution line; unchanged (and said why) when it cannot be gathered. */
+function withDistributions(html) {
+  try {
+    const lines = gatherDistributionLines(cardPoints(html))
+    return renderCardDistributions(html, (point) => lines.get(point) ?? null)
+  } catch (e) {
+    console.error(`board-publish: distribution lines not refreshed (${e.message})`)
+    return html
+  }
+}
 
 /** SHA-256 of the repo board bytes a publish attests — the same digest dashboard-state uses. */
 const sha256 = (text) => createHash('sha256').update(Buffer.from(text)).digest('hex')
@@ -356,6 +371,9 @@ try {
   // stale one, and saying why beats failing silently.
   console.error(`board-publish: footer not refreshed (${e.message})`)
 }
+// THE "VERTEILUNG" LINE (user request 24.10.2026): who built and reviewed each
+// card's point, and where, derived from trailers and the review ledger.
+repoBytes = withDistributions(repoBytes)
 
 if (repoBytes !== original) {
   // Atomic (point 443, four-eyes F3) — and this one writes the very file the
@@ -405,8 +423,27 @@ if (uncovered.length) {
   // case that lands here is exactly a freshly appended point with no card
   // anywhere. The generator is what serves it.
   console.error('Give each of them a card: node scripts/board-queue.mjs   (rebuilds the queue')
-  console.error('from the work order; a point with no prose yet gets a stub, which is enough to')
-  console.error('publish). Write the prose with: node scripts/board-queue.mjs set <N> "<text>".')
+  console.error('from the work order; a point with no prose yet gets a stub, which the check')
+  console.error('below still refuses). Write the prose with: node scripts/board-queue.mjs set <N> "<text>".')
+  process.exit(1)
+}
+
+// A QUEUE CARD NEEDS A SHORT TITLE AND A BODY (user 19.10.2026): a card whose
+// description landed in its title shows a run-on headline over the generator's
+// stub. Only cards rendered for open points count.
+const blockers = boardCardBlockers(repoBytes, open)
+if (blockers.bodyless.length || blockers.overlong.length) {
+  console.error('board-publish REFUSED — queue card(s) for open points lack a short title or a body:')
+  if (blockers.bodyless.length) {
+    console.error(`  no body (only the stub): ${blockers.bodyless.join(', ')} — node scripts/board-queue.mjs set <N> --text-stdin`)
+  }
+  if (blockers.overlong.length) {
+    console.error(
+      `  title over ${BOARD_CARD_TITLE_MAX} characters: ${blockers.overlong.join(', ')} — ` +
+        `shorten it (${TITLE_CMD}) and move the rest into the body`,
+    )
+  }
+  console.error('Then rebuild the queue (node scripts/board-queue.mjs) and publish again.')
   process.exit(1)
 }
 
@@ -448,7 +485,7 @@ try {
   console.error(`board-publish: liveness line not measured (${e.message})`)
 }
 const archive = existsSync(archiveFile)
-  ? renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll())
+  ? withDistributions(renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll()))
   : null
 
 // A tree built with plumbing: no checkout, no index, no branch switch. This

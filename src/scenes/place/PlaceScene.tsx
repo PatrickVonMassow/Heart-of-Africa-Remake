@@ -31,11 +31,11 @@ import {
   effectiveFaunaBodySegments,
   effectivePlaceRiverSegments,
   effectiveWaterDetailOctaves,
+  effectiveFigureLimbSegments,
 } from '../../state/ui'
-import { balance, START_YEAR } from '../../config/balance'
+import { balance, GIZA_CAST, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
-import { cloakForCloth } from '../../systems/dress'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
 import { withFisheryMovers } from './fisheryColliders'
 import { CookShelter } from './CookShelter'
@@ -75,9 +75,14 @@ import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
+import { FIGURE_STATURE } from '../../render/figureBody'
+import { Figure } from './placeFigure'
+import { ColdCloaksContext, FigureLookContext, LimbDetailContext } from './placeFigureContext'
+import { useFigureLook } from './useFigureLook'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildPlayRock, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments } from '../../render/landmarks'
-import { GIZA_AMBIENT, GIZA_PYRAMIDS, type GizaAmbientRole } from './gizaSite'
+import { GIZA_AMBIENT, GIZA_PYRAMIDS, gizaFigure, isGizaPerson, type GizaAmbientRole } from './gizaSite'
+import { LadyHat, SunHelmet } from './castHats'
 import {
   buildAntelopeParts,
   buildElephantParts,
@@ -637,12 +642,11 @@ function Chief({
   // faces the open ground rather than his wall.
   const standingFacing = drummerFacing()
   const [x, z] = door
+  // The rank cloth: the first of the palette is the notable's (`wearsByRank`),
+  // which also gives him the season's wrap where only rank wears one.
   const robe = style.cloth[0]
-  // The season's wrap over the shoulders, always — he is the notable
-  // (design.md §19.13, the reasoning that dressed the elder before him).
-  const shoulder = dress
-    ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
-    : style.cloth[1 % style.cloth.length]
+  const look = useFigureLook(useGame((s) => s.placeId), style.cloth)
+  const limbSegments = useUi(effectiveFigureLimbSegments)
   useEffect(() => {
     setChiefAnchor(group.current)
     setChiefStanding(x, z)
@@ -709,36 +713,17 @@ function Chief({
     // Named, so a check can read where the picture really puts him — and so the
     // §13.4 speech dev hook finds his anchor by the speaker id he speaks under.
     <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, groundHeight(x, z), z]} rotation={[0, standingFacing, 0]}>
-      {/* Robe */}
-      <mesh position={[0, 0.62, 0]} castShadow>
-        <coneGeometry args={[CHIEF_BODY_RADIUS, 1.25, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={robe} roughness={0.95} />
-      </mesh>
-      {/* Torso and shoulder cloth */}
-      <mesh position={[0, 1.28, 0]} castShadow>
-        <cylinderGeometry args={[0.22, 0.28, 0.5, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={shoulder} roughness={0.95} />
-      </mesh>
-      {/* Head */}
-      <mesh position={[0, 1.68, 0]} castShadow>
-        <sphereGeometry args={[0.2, ...TESSELLATION.figureHead]} />
-        <meshStandardMaterial color="#5c3317" roughness={0.85} />
-      </mesh>
-      {/* Cap of office */}
-      <mesh position={[0, 1.8, 0]}>
-        <sphereGeometry args={[0.19, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 2.6]} />
-        <meshStandardMaterial color="#cfc8bd" roughness={1} />
-      </mesh>
-      {/* Staff of office */}
-      <mesh position={[0.38, 0.95, 0.05]} rotation={[0, 0, -0.08]} castShadow>
-        <cylinderGeometry args={[0.03, 0.04, 1.9, 6]} />
-        <meshStandardMaterial color="#5f4526" roughness={0.9} />
-      </mesh>
-      <mesh position={[0.4, 1.92, 0.05]}>
-        <sphereGeometry args={[0.06, ...TESSELLATION.figureHand]} />
-        <meshStandardMaterial color="#4a3018" roughness={0.9} />
-      </mesh>
-      <Html center position={[0, 2.3, 0]} distanceFactor={14}>
+      {/* The same body every villager is drawn with, at their game scale
+          (skinned on medium/high, primitive on low): an elder, set apart by
+          his dress of office, not by size. */}
+      <LimbDetailContext.Provider value={limbSegments}>
+        <ColdCloaksContext.Provider value={dress}>
+          <FigureLookContext.Provider value={look}>
+            <Figure cloth={robe} sex="male" age="elder" office="chief" permanentLabel />
+          </FigureLookContext.Provider>
+        </ColdCloaksContext.Provider>
+      </LimbDetailContext.Provider>
+      <Html center position={[0, FIGURE_STATURE + 0.5, 0]} distanceFactor={14}>
         <div className="map-label">{t.labels.chief}</div>
       </Html>
     </group>
@@ -2291,47 +2276,6 @@ function GizaMonuments() {
   return <mesh geometry={geometry} material={material} castShadow receiveShadow />
 }
 
-/** A robed human figure for the plateau's ambient life — a guide/dragoman,
- *  a Bedouin cameleer, a donkey-boy, or a pith-helmeted 1890s tourist. */
-function RobedFigure({
-  robe,
-  head = '#7a5232',
-  helmet = false,
-  scarf = false,
-  scale = 1,
-}: {
-  robe: string
-  head?: string
-  helmet?: boolean
-  scarf?: boolean
-  scale?: number
-}) {
-  return (
-    <group scale={[scale, scale, scale]}>
-      <mesh position={[0, 0.62, 0]} castShadow>
-        <coneGeometry args={[0.32, 1.25, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={robe} roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 1.32, 0]} castShadow>
-        <sphereGeometry args={[0.15, ...TESSELLATION.figureHead]} />
-        <meshStandardMaterial color={head} roughness={0.85} />
-      </mesh>
-      {scarf && (
-        <mesh position={[0, 1.4, 0]} castShadow>
-          <sphereGeometry args={[0.18, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 1.7]} />
-          <meshStandardMaterial color="#efe6d0" roughness={0.9} />
-        </mesh>
-      )}
-      {helmet && (
-        <mesh position={[0, 1.42, 0]} castShadow>
-          <sphereGeometry args={[0.18, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color="#e9e1c6" roughness={0.9} />
-        </mesh>
-      )}
-    </group>
-  )
-}
-
 /** A standing camel (Bedouin mount): humped body, long neck, four legs. */
 function Camel() {
   const tan = '#b89468'
@@ -2418,38 +2362,50 @@ function Donkey() {
  * monuments), paired with GIZA_AMBIENT's roles; each figure idles and looks
  * slowly around (no mechanics).
  */
-function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role: GizaAmbientRole }> }) {
+function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role: GizaAmbientRole; sex?: 'female' | 'male' }> }) {
   const groundHeight = usePlaceGround()
   const refs = useRef<Array<THREE.Group | null>>([])
   const phases = useMemo(() => anchors.map((_, i) => i * 1.7 + 0.3), [anchors])
+  // The plateau's people wear their cast's dress on the villagers' body
+  // (docs/giza-1890.md §4.1); null on the low preset, which keeps the
+  // primitive figure. One look per cast, read once per visit.
+  const placeId = useGame((s) => s.placeId)
+  const looks = {
+    egyptian: useFigureLook(placeId, GIZA_PALETTE, 'egyptian'),
+    bedouin: useFigureLook(placeId, GIZA_PALETTE, 'bedouin'),
+    european: useFigureLook(placeId, GIZA_PALETTE, 'european'),
+  }
+  const limbSegments = useUi(effectiveFigureLimbSegments)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     anchors.forEach((a, i) => {
       const g = refs.current[i]
       if (!g) return
+      // Each stands and looks slowly around; a person steps with the turn.
       g.rotation.y = phases[i] + Math.sin(t * 0.3 + phases[i]) * 0.5
-      const person = a.role === 'guide' || a.role === 'tourist' || a.role === 'cameleer' || a.role === 'donkeyboy'
-      g.position.y = groundHeight(a.x, a.z) + (person ? Math.max(0, Math.sin(t * 1.6 + phases[i])) * 0.03 : 0)
+      g.position.y = groundHeight(a.x, a.z)
     })
   })
-  const figureFor = (role: GizaAmbientRole) => {
-    switch (role) {
-      case 'camel':
-        return <Camel />
-      case 'donkey':
-        return <Donkey />
-      case 'tourist':
-        return <RobedFigure robe="#c9bfa2" head="#c99f78" helmet />
-      case 'guide':
-        return <RobedFigure robe="#d8cba8" scarf />
-      case 'cameleer':
-        return <RobedFigure robe="#b89a63" scarf />
-      default: // donkeyboy: a smaller robed youth
-        return <RobedFigure robe="#9a7b4e" scale={0.82} />
-    }
+  const figureFor = (a: { role: GizaAmbientRole; sex?: 'female' | 'male' }) => {
+    if (a.role === 'camel') return <Camel />
+    if (a.role === 'donkey') return <Donkey />
+    if (!isGizaPerson(a.role)) return null
+    const spec = gizaFigure(a.role, a.sex)
+    const hat =
+      spec.hat === 'sunHelmet' ? (
+        <SunHelmet colour={GIZA_CAST.sunHelmet} />
+      ) : spec.hat === 'ladyHat' ? (
+        <LadyHat colour={GIZA_CAST.ladyHat} band={GIZA_CAST.ladyHatBand} />
+      ) : undefined
+    // The villagers' own Figure at their stature: named under Ctrl by its role.
+    return (
+      <FigureLookContext.Provider value={looks[spec.cast]}>
+        <Figure cloth={spec.cloth} skin={spec.skin} sex={spec.sex} age={spec.age} role={a.role} headProp={hat} />
+      </FigureLookContext.Provider>
+    )
   }
   return (
-    <>
+    <LimbDetailContext.Provider value={limbSegments}>
       {anchors.map((a, i) => (
         <group
           key={i}
@@ -2457,16 +2413,19 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
           ref={(el) => {
             refs.current[i] = el
           }}
-          // The Giza crowd names itself under Ctrl like any other inhabitant
-          // (design.md §17.8): its roles ARE the kinds, mounts included.
-          userData={markActor({ kind: a.role, height: a.role === 'camel' ? 2.4 : 2.0 })}
+          // The mounts name themselves under Ctrl like any other inhabitant
+          // (design.md §17.8); a person's Figure carries its own mark.
+          userData={isGizaPerson(a.role) ? undefined : markActor({ kind: a.role, height: a.role === 'camel' ? 2.4 : 2.0 })}
         >
-          {figureFor(a.role)}
+          {figureFor(a)}
         </group>
       ))}
-    </>
+    </LimbDetailContext.Provider>
   )
 }
+
+/** The plateau's cloth palette: the cast's own colours (no rank among them). */
+const GIZA_PALETTE: readonly string[] = [GIZA_CAST.guideGown, GIZA_CAST.cameleerGown, GIZA_CAST.donkeyboyGown, GIZA_CAST.touristSuit, GIZA_CAST.touristGown]
 
 // --- Scene --------------------------------------------------------------------
 
@@ -3430,7 +3389,7 @@ export function PlaceScene() {
       {isMonument && <GizaMonuments />}
       {isMonument && (
         <GizaAmbient
-          anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist' }))}
+          anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex }))}
         />
       )}
 

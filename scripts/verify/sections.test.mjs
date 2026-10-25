@@ -347,7 +347,7 @@ describe('a check that says how many subjects it actually saw (point 1136)', () 
   it('never CONVERTS a malformed count into a valid one', () => {
     // `Number(true)` is 1 and `Number(null)` is 0, so coercing before validating
     // manufactured a covering claim out of a broken declaration — one subject
-    // against a minimum of one (GPT-6 Astra, cross-vendor round).
+    // against a minimum of one (cross-vendor round).
     expect(() => coverageVerdict({ subjects: true, minimum: true, what: 'errands' })).toThrow(/whole subject count/)
     expect(() => coverageVerdict({ subjects: null, minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
     expect(() => coverageVerdict({ subjects: [3], minimum: 2, what: 'errands' })).toThrow(/whole subject count/)

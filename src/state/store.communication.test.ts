@@ -257,7 +257,7 @@ describe('the hand-over asks for the current drums without changing the give rul
     expect(g().carriedForms).toContain('rock-relief')
     expect(useUi.getState().drumPerformance).toBeNull()
     expect(chiefWalkState()).toMatchObject({ phase: 'walking-out', progress: 0.5, drumOnArrival: true })
-    const step = chiefTick(chiefWalkState(), chiefWalkState().at + 5, { speed: 1, pathLength: 10, staySeconds: 60 })
+    const step = chiefTick(chiefWalkState(), chiefWalkState().at + 6, { speed: 1, pathLength: 10, staySeconds: 60 })
     setChiefWalkState(step.walk)
     expect(step.beatDrums).toBe(true)
     if (step.beatDrums) g().sendDrumMessage()

@@ -1,14 +1,18 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { VILLAGER_MOTION as M } from '../config/balance'
-import { AGE_GROUPS, SEXES, type AgeGroup } from '../systems/appearance'
-import { bodyProportions, buildBodyGeometry, jointPositions } from './figureBody'
+import { TASK_LOAD_HANDLING, VILLAGER_MOTION as M } from '../config/balance'
+import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type AgeGroup, type DressLayer } from '../systems/appearance'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { bodyProportions, buildBodyGeometry, createSkeleton, jointPositions } from './figureBody'
+import { buildLayerGeometry } from './figureDress'
 import { FIGURE_LIMBS } from './figures'
 import {
   ankleAt,
   armAtRest,
   crouchTarget,
   crownOffset,
+  drawnHeadTop,
+  figureCrownOffset,
   headLoadGrip,
   hipJointAt,
   kneelBlend,
@@ -17,6 +21,7 @@ import {
   lowestFoot,
   loadRadiusAt,
   phasePerDistance,
+  leanedHipY,
   primitiveLayout,
   restingMotion,
   solveLeg,
@@ -31,10 +36,24 @@ import {
   type WalkMotion,
 } from './figureWalk'
 import { TASK_BUNDLE, TASK_JAR, steadiedLoad, taskLoadShape } from '../scenes/place/headLoads'
-import { workStop, type WorkStopMode } from '../scenes/place/taskWalkerStop'
+import { RISE_SECONDS, workSpan, workStop, type WorkStopMode } from '../scenes/place/taskWalkerStop'
 
 const bodies = AGE_GROUPS.flatMap((age) => SEXES.map((sex) => ({ age, sex, p: bodyProportions(sex, age, 0) })))
 const SPEEDS = [0.3, 0.8, 1.2, 1.8]
+const dressOf = (l: DressLayer): DressLayer => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 })
+
+/** The highest point of a drawn triangle within 6 cm of the vertical (`x`, `z`), whatever it is skinned to. */
+function drawnTopOver(g: THREE.BufferGeometry, x: number, z: number): number {
+  const pos = g.getAttribute('position')
+  const index = g.getIndex()
+  let top = -Infinity
+  const n = index ? index.count : pos.count
+  for (let i = 0; i < n; i++) {
+    const v = index ? index.getX(i) : i
+    if (Math.hypot(pos.getX(v) - x, pos.getZ(v) - z) <= 0.06) top = Math.max(top, pos.getY(v))
+  }
+  return top
+}
 
 describe('the walk keeps the feet on the ground', () => {
   it('the leg IK puts the ankle where it was asked', () => {
@@ -289,6 +308,54 @@ describe('a walker turning a corner keeps its planted foot', () => {
     const b = steerHeading(0, 0.05, 1.1, 1 / 60)
     expect(b.pace).toBeGreaterThan(0.99)
   })
+
+  it('turns the short way across ±π with a bounded per-frame change and converges', () => {
+    const dt = 1 / 60
+    const speed = 1.2
+    const bound = (speed / M.turnRadius + M.spotTurnRate) * dt + 1e-9
+    // From just below +π to just above -π is a small turn through π, not a
+    // turn back through 0.
+    const across = steerHeading(Math.PI - 0.05, -Math.PI + 0.05, speed, dt)
+    expect(across.yaw).toBeGreaterThan(Math.PI - 0.05)
+    // A reversal (the errand villager's new stroll behind it) and a right angle.
+    for (const [from, to] of [[0, Math.PI], [0.3, 0.3 + Math.PI / 2], [-2.9, 2.9]]) {
+      let yaw = from
+      let frames = 0
+      const err = () => Math.abs(Math.atan2(Math.sin(to - yaw), Math.cos(to - yaw)))
+      while (err() > 1e-6 && frames < 600) {
+        const next = steerHeading(yaw, to, speed, dt).yaw
+        expect(Math.abs(next - yaw)).toBeLessThanOrEqual(bound)
+        yaw = next
+        frames++
+      }
+      expect(err()).toBeLessThanOrEqual(1e-6)
+      // never instant: even the right angle takes a visible fraction of a second
+      expect(frames).toBeGreaterThan(10)
+    }
+  })
+
+  it('a walker stepping along its steered heading rounds a corner instead of snapping', () => {
+    const dt = 1 / 60
+    const speed = 1.2
+    const route: Array<[number, number]> = [[0, 4], [4, 4], [0, 0]]
+    let x = 0
+    let z = 0
+    let yaw = 0
+    let seg = 0
+    let worst = 0
+    for (let f = 0; f < 60 * 30 && seg < route.length; f++) {
+      const [tx, tz] = route[seg]
+      const step = Math.min(speed * dt, Math.hypot(tx - x, tz - z))
+      const turn = steerHeading(yaw, Math.atan2(tx - x, tz - z), speed, dt)
+      worst = Math.max(worst, Math.abs(Math.atan2(Math.sin(turn.yaw - yaw), Math.cos(turn.yaw - yaw))))
+      yaw = turn.yaw
+      x += Math.sin(yaw) * step * turn.pace
+      z += Math.cos(yaw) * step * turn.pace
+      if (Math.hypot(tx - x, tz - z) < 0.3) seg++
+    }
+    expect(seg).toBe(route.length)
+    expect(worst).toBeLessThanOrEqual((speed / M.turnRadius + M.spotTurnRate) * dt)
+  })
 })
 
 describe('the task walker gets up before it walks off', () => {
@@ -301,15 +368,18 @@ describe('the task walker gets up before it walks off', () => {
     ]
     for (const dt of [1 / 60, 1 / 24, 0.1]) {
       const m = restingMotion()
-      let mode: WorkStopMode | 'go' = 'work'
-      let timer = 2
+      const span = workSpan(2)
+      let mode: WorkStopMode = 'take'
+      let timer: number = TASK_LOAD_HANDLING.takeSeconds
       let x = 0
       let kneels = true
       let kneltFully = false
       let walkedOff = false
-      for (let f = 0; f < 400; f++) {
-        if (mode === 'work' || mode === 'rise') {
-          const next = workStop(mode, timer, dt)
+      // the whole stop, then a second of walking off
+      const frames = Math.ceil((TASK_LOAD_HANDLING.takeSeconds + span + RISE_SECONDS + TASK_LOAD_HANDLING.releaseSeconds + 1) / dt)
+      for (let f = 0; f < frames; f++) {
+        if (mode !== 'back') {
+          const next = workStop(mode, timer, dt, span)
           mode = next.mode
           timer = next.timer
           kneels = next.kneels
@@ -381,6 +451,42 @@ describe('head loads sit on the crown', () => {
     }
   })
 
+  it('the code-built rig (the stand-in for the glTF body) anchors the load on its drawn head within 2 cm for every build, age and dress', () => {
+    for (const age of AGE_GROUPS)
+      for (const sex of SEXES)
+        for (const build of [-1, 0, 1]) {
+          const p = bodyProportions(sex, age, build)
+          const { skeleton, bones } = createSkeleton(p)
+          const headAt = bones.head.getWorldPosition(new THREE.Vector3())
+          const hi = skeleton.bones.indexOf(bones.head)
+          const dresses = [['bare', []] as const, ...Object.entries(PEOPLE_DRESS).map(([id, t]) => [id, t[sex][age].map(dressOf)] as const)]
+          for (const [id, layers] of dresses) {
+            const parts = [buildBodyGeometry(p, { skin: '#5c3317', paint: null }, 12)]
+            for (const l of layers) {
+              const lg = buildLayerGeometry(l, p, 12)
+              if (lg) parts.push(lg)
+            }
+            const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
+            g.computeBoundingBox()
+            const crown = headAt.y + figureCrownOffset(p, g, hi, headAt)
+            // independent of the skinning: the highest drawn point over the head bone's vertical
+            const top = drawnTopOver(g, headAt.x, headAt.z)
+            expect(Math.abs(crown - top), `${id} ${sex} ${age} build ${build}: crown ${crown.toFixed(3)} over drawn head ${top.toFixed(3)}`).toBeLessThanOrEqual(0.02)
+          }
+        }
+  })
+
+  it('the drawn head top counts only vertices of drawn triangles', () => {
+    // a scalp triangle at 1.60 and a masked-off vertex at 1.70 over the same axis
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 1.6, 0, 0.01, 1.58, 0, 0, 1.58, 0.01, 0, 1.7, 0], 3))
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Array(16).fill(5), 4))
+    g.setAttribute('skinWeight', new THREE.Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4))
+    expect(drawnHeadTop(g, 5, 0, 0)).toBeCloseTo(1.7, 6)
+    g.setIndex([0, 1, 2])
+    expect(drawnHeadTop(g, 5, 0, 0)).toBeCloseTo(1.6, 6)
+  })
+
   it('a steadying hand grips within reach, its elbow bent, against the drawn side of either task load', () => {
     const p = bodyProportions('female', 'adult')
     const shoulder = { x: p.shoulderX, y: p.shoulderY - p.crownY, z: 0 }
@@ -426,6 +532,20 @@ describe('kneeling folds the body, it never squashes it', () => {
       }
       expect(kneelBlend(d, stand, 0).hipHeight).toBeCloseTo(walkPose(d, 0, 0, 0, 'adult').hipHeight, 5)
     }
+  })
+
+  it('lifts a kneeling primitive hip just enough that a leaning trunk cone keeps its rim on the ground', () => {
+    const kneel = primitiveLayout(1, true, FIGURE_LIMBS)
+    const r = 0.25
+    for (const lean of [0, 0.2, 0.4, -0.3]) {
+      const hip = leanedHipY(kneel.hipY, r, lean)
+      // the lowest point of the tipped base rim, over the ground
+      expect(hip - r * Math.abs(Math.sin(lean))).toBeGreaterThanOrEqual(-1e-9)
+      expect(hip - r * Math.abs(Math.sin(lean))).toBeLessThanOrEqual(Math.max(kneel.hipY, 1e-9))
+    }
+    // a standing hip is already clear and stays where it is
+    const stand = primitiveLayout(0, true, FIGURE_LIMBS)
+    expect(leanedHipY(stand.hipY, r, 0.4)).toBe(stand.hipY)
   })
 
   it('the primitive keeps a uniform scale and its head radius through the whole transition', () => {

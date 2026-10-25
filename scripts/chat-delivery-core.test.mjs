@@ -185,6 +185,20 @@ describe('the stand-downs every guard in this repo shares', () => {
     expect(isSubagentHook({ transcript_path: '/projects/owner/session.jsonl' })).toBe(false)
   })
 
+  it('recognises a delegated hook by agent_id even when it carries the parent transcript path', () => {
+    // The measured 12.10.2026 payload shape: parent session id AND parent transcript.
+    const parent = { session_id: 'owner', transcript_path: '/projects/owner/owner.jsonl' }
+    expect(isSubagentHook({ ...parent, agent_id: 'a27e192a39170f873' })).toBe(true)
+    expect(isSubagentHook({ ...parent, agentId: 'a1' })).toBe(true)
+    expect(isSubagentHook({ ...parent, agent_id: '  ' })).toBe(false)
+    expect(isSubagentHook({ ...parent, agent_type: 'general-purpose' })).toBe(false)
+    expect(isSubagentHook(parent)).toBe(false)
+    expect(deliveryDecision({ ownsBatch: true, pending: [msg()], hookInput: { ...parent, agent_id: 'a1' } })).toEqual({
+      deliver: [],
+      reason: 'subagent-hook',
+    })
+  })
+
   it('delivers nothing to a subagent hook even when it carries the owner session id', () => {
     expect(
       deliveryDecision({

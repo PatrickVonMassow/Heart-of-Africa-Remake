@@ -95,6 +95,14 @@ interface BalanceConfig {
   waterStandCapacity: number
   /** Arrival tolerance at the separate working spots beside the water stand. */
   waterStandArrivalRadius: number
+  /** How far from the water stand's centre the carrier stands while he takes
+   *  the empty jar up and sets the full one down: at the table's edge. */
+  waterStandReach: number
+  /** Arrival tolerance at that table spot: tight, so he stands at the plank. */
+  waterStandTableArrivalRadius: number
+  /** Seconds the carrier takes to reach for the empty jar on the stand, lift
+   *  it into his hand and straighten up again. */
+  waterJarTakeSeconds: number
   /** Arrival tolerance at the fill spot in the river (work-order 1117), so the
    *  carrier dips ankle-deep rather than from the dry edge. */
   bankFillArrivalRadius: number
@@ -867,10 +875,14 @@ interface BalanceConfig {
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
       turnRate: number
+      /** Largest angle (rad) between a running child's body and its way
+       *  before it sets off: past it, it turns on the spot first. */
+      setOffTurn: number
       /** Seconds the freshly caught child stands before it chases (work-order
        *  1176); never longer than `immunitySeconds`. */
       caughtPauseSeconds: number
-      /** A caught child's slump (work-order 1239): trunk lean and arm roll (rad). */
+      /** A caught child's slump on the primitive figure (work-order 1239):
+       *  trunk lean and arm roll (rad). */
       caughtSlumpLean: number
       caughtSlumpArmRoll: number
       /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
@@ -937,6 +949,8 @@ interface BalanceConfig {
       dodgeReach: number
       /** How fast a roaming child's heading drifts (rad/s). */
       roamTurn: number
+      /** How near a playmate ahead bends a roaming child's walk away (m). */
+      roamGap: number
       /** How long the climber may make no progress toward the boulder before giving up. */
       roamGoalSeconds: number
       /** How far outside the boulder's own collider the climber stops before it
@@ -1041,6 +1055,12 @@ interface BalanceConfig {
       stepSeconds: number
       liftSeconds: number
       fillSecondsPerFish: number
+      /** The net man's hands ashore: their height over the ground (m) while he
+       *  holds the basket at the bow, its rim in his hands; and his trunk's lean
+       *  added at the bottom of a bend (rad). At the bottom his hands are at the
+       *  rim of the basket standing on the ground. */
+      basketHoldHeight: number
+      netManBendLean: number
       /** The longest a word waits for the settlement's floor before the boat
        *  goes on unspoken (the floor then forgets it). */
       wordWaitSeconds: number
@@ -1369,6 +1389,14 @@ export const balance: BalanceConfig = {
   // Calibratable: stop within 0.3 m of the assigned spot. The generic 1.1 m
   // tolerance let a waiting carrier occupy the sender's approach lane.
   waterStandArrivalRadius: 0.3,
+  // Calibratable: the stand's solid body (0.6 m) plus a walker's radius (0.3 m)
+  // plus a little, so the carrier stands at the table's edge, not 2.4 m off it.
+  waterStandReach: 0.95,
+  // Calibratable: the generic 0.3 m stopped him 1.2 m off the stand's centre,
+  // three quarters of a metre short of the plank.
+  waterStandTableArrivalRadius: 0.1,
+  // Calibratable: long enough to read as reaching, lifting and straightening.
+  waterJarTakeSeconds: 1.6,
   // Calibratable (work-order 1117): the fill spot lies only ~0.5 m past the
   // waterline, so the generic 1.1 m let the carrier dip from dry ground.
   bankFillArrivalRadius: 0.2,
@@ -1805,6 +1833,11 @@ export const balance: BalanceConfig = {
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
       turnRate: 3.6,
+      // Calibratable estimate: a running child turns on the spot until its body
+      // is within a quarter turn of its way, so it never sprints off sideways or
+      // backwards. 45° made children near a waypoint stop for single frames
+      // over and over, which slowed the bank round's gather to its backstop.
+      setOffTurn: Math.PI / 2,
       // Work-order 1176, calibratable estimates. The caught child's beat of
       // frustration; the tag-back window (1.4 s) covers it plus a first step.
       caughtPauseSeconds: 0.7,
@@ -1815,7 +1848,11 @@ export const balance: BalanceConfig = {
       // the body than at rest (0.46). The roll was specified at 0.20, but below
       // about 0.34 the upper arm sinks into the trunk cone at this lean
       // (src/render/figures.test.ts pins the clearance).
-      // OPEN: confirm 0.34 against the specified 0.20 in the picture.
+      // These two are the PRIMITIVE figure's (low preset, unchanged by user
+      // decision 04.10.2026); the specified 0.20 roll is infeasible there, so
+      // 0.34 stands. The glTF body's slump is `caughtSlump` below, whose arms
+      // hang by the clip (VILLAGER_POSE.caughtSlump, natural-villager-motion
+      // step 16).
       caughtSlumpLean: 0.48,
       caughtSlumpArmRoll: 0.34,
       // The chaser looks at its quarry within a modest trunk turn.
@@ -1890,6 +1927,9 @@ export const balance: BalanceConfig = {
       // A quarter turn a second at the most: a wander that reads as wandering
       // rather than as a figure being blown about.
       roamTurn: 1.4,
+      // Calibratable estimate: about two body lengths, so the bend — turned at
+      // `turnRate` — is done before the two bodies meet.
+      roamGap: 1.6,
       // A reachable stone keeps resetting this watch as the climber gets
       // closer. Thirty seconds without gaining any ground toward it means a
       // hut, pocket or other collider has made the approach impossible.
@@ -2121,6 +2161,10 @@ export const balance: BalanceConfig = {
       stepSeconds: 1.5,
       liftSeconds: 0.8,
       fillSecondsPerFish: 0.9,
+      // Estimates, calibratable: the basket held about knee to thigh high, and
+      // a moderate forward lean, so his head stays above the rim.
+      basketHoldHeight: 0.55,
+      netManBendLean: 0.15,
       // Well inside the floor's own 240 s hold, so a held word is let go by
       // the boat rather than forced out by the floor.
       wordWaitSeconds: 12,
@@ -2460,6 +2504,64 @@ export const VILLAGER_DRESS = {
    *  the bark cloth: the protectorate (1894) favoured cotton (§2.5, MODERN). The
    *  record gives no population-wide date (Astra B44), so it is rank-gated. */
   bagandaCottonFrom: 1894,
+  /** Share of San adult women drawn with an infant carried in the mantle
+   *  (Passarge: "infants are carried in it", §7.3 San). The share is a
+   *  calibratable GUESS: no source gives a number. */
+  babySlingShare: 0.3,
+} as const
+
+/**
+ * Micro-structure of the figures' surfaces (villagers and the traveller, design
+ * line 64): the baked cloth / leather / skin maps (scripts/textureFields.mjs)
+ * projected triplanar in the body's BIND-POSE space (render/materials.ts
+ * `figureMicroColor`/`figureMicroNormal`), so the structure rides the skinned,
+ * animated body. Lengths are in FIGURE units (an adult man is
+ * VILLAGER_ASSET.stature = 1.34 ≈ 1.75 m, so 1 unit ≈ 1.3 m). Every value is a
+ * CALIBRATABLE educated guess read off the eye-height pictures.
+ */
+export const FIGURE_MICRO = {
+  /** Tile edge per kind (512 px per tile): cloth ≈ 0.21 m (a thread ≈ 1.6 mm),
+   *  leather ≈ 0.26 m, skin ≈ 0.16 m. */
+  tile: { cloth: 0.16, leather: 0.2, skin: 0.12 },
+  /** Normal-map tangent deflection per kind (1 = as baked). */
+  bump: { cloth: 1.0, leather: 1.0, skin: 1.0 },
+  /** How much of the baked albedo structure reaches the tint (0 = flat tint,
+   *  1 = as baked); skin is kept faint so a face never reads dirty. */
+  albedo: { cloth: 1.0, leather: 0.9, skin: 0.8 },
+  /** Frequency (per figure unit) of the low noise that switches between the
+   *  two texture scales against visible tiling. */
+  breakFreq: 2.2,
+  /** Ratio of the second (coarser) texture scale to the first. */
+  secondScale: 0.353,
+} as const
+
+/**
+ * The colours of the Giza plateau's people and of the expedition leader, drawn
+ * on the villagers' body (docs/giza-1890.md §4.1). Every value is a
+ * CALIBRATABLE guess: the record names the garments, not their colours. The
+ * gowns and the old robed figures' tones are kept; the hats are props.
+ */
+export const GIZA_CAST = {
+  guideGown: '#d8cba8',
+  cameleerGown: '#b89a63',
+  donkeyboyGown: '#9a7b4e',
+  touristSuit: '#c9bfa2',
+  touristGown: '#3e3a4a', // the dark colours of the Victorian dress
+  localSkin: '#7a5232',
+  bedouinSkin: '#6e4a2c',
+  touristSkin: '#d9b48e',
+  sunHelmet: '#e9e1c6',
+  ladyHat: '#5a4a3a',
+  ladyHatBand: '#8a2a2a',
+} as const
+
+/** The expedition leader of the bird's-eye view: khaki drill, sun helmet and
+ *  pack, on the same body (calibratable colours). */
+export const TRAVELLER_LOOK = {
+  khaki: '#c4ac72',
+  skin: '#e8c39a',
+  sunHelmet: '#ddd0a8',
+  pack: '#7c5a34',
 } as const
 
 /**
@@ -2485,8 +2587,12 @@ export const VILLAGER_MOTION = {
   moveSpeed: 0.08,
   /** Time constant (s) of the measured ground speed's smoothing. */
   speedSmoothing: 0.12,
-  /** A ground speed above this is a placement, not a walk (no stride). */
-  teleportSpeed: 6,
+  /** A ground speed above this is a placement, not a walk (no stride), in
+   *  person units per second: a tag child's sprint (3.4 m/s, a runner's
+   *  boosted 3.8, at child scale 0.55) is 6.2–6.9 and must stride — at 6 its
+   *  legs froze at full run. A placement is a jump of a body width or more in
+   *  one frame (18+ at 60 Hz). Calibratable. */
+  teleportSpeed: 10,
   /** How fast the walk fades in and out (weight per second, 0 ↔ 1). */
   walkFadeRate: 5,
   /** Swing foot's lift at mid-swing, as a fraction of the leg length. */
@@ -2536,6 +2642,43 @@ export const VILLAGER_MOTION = {
 } as const
 
 /**
+ * The village task walker's head load taken down and put back BY HAND
+ * (src/scenes/place/taskWalkerLoad.ts): seconds of each step of its stop and
+ * where the load stands while it works. Every value is a CALIBRATABLE educated
+ * guess, read off no picture yet.
+ */
+export const TASK_LOAD_HANDLING = {
+  /** Standing at the target, both hands go up and grip the load on the head. */
+  takeSeconds: 0.45,
+  /** The load brought down to the ground while the walker kneels down. */
+  lowerSeconds: 1.4,
+  /** The hands let go of the set-down load (and of the load back on the head). */
+  releaseSeconds: 0.35,
+  /** Before rising, the hands go down to the load on the ground and grip it. */
+  gripSeconds: 0.45,
+  /** The load lifted onto the head while the walker rises (never shorter than the kneel). */
+  liftSeconds: 1.4,
+  /** Where the load stands while the walker works, in its own frame (m):
+   *  `side` to its left (+x), `forward` in front of its knees. */
+  ground: { side: 0.32, forward: 0.34 },
+  /** The palms' gap off the load's side (m). */
+  gripClearance: 0.03,
+  /** How much faster the load moves out from the body than down, so the
+   *  path clears the shoulder instead of cutting through it. */
+  outFirst: 1.6,
+  /** The share of the way down (and up) over which the load passes from where
+   *  it rests into the moving hands, so a grip or release never pulls it
+   *  toward hands that stand still. */
+  handOver: 0.15,
+  /** The trunk's lean (rad) toward a load at the ground. */
+  groundLean: 0.4,
+  /** How fast each hand's aim corrects the gap between where it was aimed and
+   *  where it was drawn (1/s), and the largest correction (m). */
+  aimCorrectRate: 6,
+  aimCorrectMax: 0.35,
+} as const
+
+/**
  * The villager's glTF body as the asset pipeline builds it (work-order "glTF
  * villager body"; scripts/villager/build.mjs reads this block). BUILD-time values:
  * a change takes effect when the pipeline is re-run and the .glb committed.
@@ -2567,6 +2710,9 @@ export const VILLAGER_ASSET = {
    *  woman from a man at village distance (as render/figureBody.ts `bust`).
    *  Calibratable, read off the frame sheets and the village frames. */
   breastCup: { child: 0, youth: 0.55, adult: 0.8, elder: 0.75 },
+  /** The cap on breastCup the pipeline builds with (scripts/villager/body.py
+   *  clamps to it): a stylised bust, never MakeHuman's full cup. Calibratable. */
+  breastCupMax: 0.8,
   /** How far a build of ±1 moves MakeHuman's weight slider off its average. */
   buildWeight: 0.3,
   /** Triangles of the decimated body (hands, feet and face kept finer). */
@@ -2583,12 +2729,132 @@ export const VILLAGER_ASSET = {
    *  steps, so a vertex caught between two body parts does not swing from
    *  one to the other. Calibratable. */
   garmentFitStep: 0.01,
+  /** How near a garment's opening (neck, sleeve, hem, a cape's outline) a
+   *  covered body or inner-garment vertex stays drawn, only pushed inward,
+   *  instead of hidden under the worn garment (scripts/villager/mask.py; figure
+   *  units, ≈ 9 cm): skin at an opening stays visible. Calibratable. */
+  garmentMaskOpening: 0.07,
+  /** How far the game pushes a covered vertex it still draws inward along its
+   *  normal while the covering garment is worn (render/villagerGarmentMask.ts;
+   *  figure units, ≈ 5 mm). Calibratable. */
+  garmentMaskPush: 0.004,
+  /** How far a body or inner-garment vertex's skin weights may differ from
+   *  the covering cloth's (L1: 0 alike, 2 disjoint) and it still counts as
+   *  covered: a hand hanging inside a skirt's outline swings out of it and is
+   *  never hidden (scripts/villager/mask.py). Calibratable. */
+  garmentMaskWeightGap: 1.2,
+  /** How far a hidden body vertex may pass through the cloth that hides it
+   *  (the penetration report's "cut"): the cloth is drawn where the body
+   *  bulges past it, which is what hiding is for, until a limb looks cut off
+   *  (figure units, ≈ 2.6 cm). Calibratable. */
+  garmentMaskCutTolerance: 0.02,
+  /** Every how many poses of the exported clips (and the build pose) the
+   *  body's cover mask is checked in, at every body corner, instead of the
+   *  build pose alone (scripts/villager/mask.py `motion`; 0: build pose only).
+   *  Calibratable. */
+  garmentMaskPoseStride: 1,
+  /** How near a garment's cloth in the build pose a body vertex not covered
+   *  there is still checked over every pose, so skin a garment covers only in
+   *  motion is found (figure units, ≈ 10 cm). Calibratable. */
+  garmentMaskMotionReach: 0.08,
+  /** How deep under a covered body vertex (straight inward) the cover mask
+   *  looks for cloth sunk into the body in any pose: such a vertex stays
+   *  hidden rather than drawn over that cloth (figure units, ≈ 16 cm: a
+   *  kneeling thigh can swallow the cloth 10 cm deep; cloth past a thin limb
+   *  found too only keeps a point hidden as in the build pose). Calibratable. */
+  garmentMaskSinkReach: 0.12,
+  /** How far apart the penetration report samples the cloth between a
+   *  garment's vertices (figure units, ≈ 5 cm). Calibratable. */
+  garmentFaceSpacing: 0.04,
+  /** The longest cloth edge the pipeline leaves in a garment (figure units,
+   *  ≈ 4 cm): a longer one is split, so the cloth between two vertices follows
+   *  a curved body part instead of cutting it by a chord. Calibratable. */
+  garmentEdgeMax: 0.03,
+  /** How far outside the drawn body the pipeline settles a garment's
+   *  vertices in the build pose at every body corner, innermost layer
+   *  (figure units, ≈ 6 mm). Calibratable. */
+  garmentSettleClearance: 0.005,
+  /** How much farther each layer outward is settled (ornament, hip and head,
+   *  torso, shoulder), so an inner garment never settles where an outer one
+   *  lies (figure units, ≈ 5 mm). Calibratable. */
+  garmentLayerGap: 0.004,
+  /** How far an inner garment the build-pose mask leaves uncovered may lie
+   *  outside an outer one through its cloth and still be settled under it
+   *  (figure units, ≈ 2.6 cm): it is the inner garment drawn over the outer
+   *  one; farther off it is another part of the figure. Calibratable. */
+  garmentLayerReach: 0.02,
+  /** How a settle push spreads over the cloth round the vertex that asked
+   *  for it: over this many rings of neighbours, each taking this share of
+   *  the ring before (a narrower spread left the cloth lumpy, and its folds
+   *  confused the cover mask's inside test). Calibratable. */
+  garmentSettleSpreadRings: 5,
+  garmentSettleSpreadKeep: 0.7,
+  /** Taubin smoothing rounds over the settled cloth between settle passes
+   *  (the pushes leave it dented). Calibratable. */
+  garmentSettleSmooth: 4,
+  /** The clip style (natural-villager-motion step 6; scripts/villager/clips.py
+   *  `restyle`), per retargeted clip, rad: the hips' and the chest's MEAN
+   *  forward tilt (each keeps its swing; the source walk leans its chest 18°,
+   *  the jog 43° with a ±54° twist, the sprint dives 23° at the hips and 52° at
+   *  the chest), the chest's twist
+   *  against the hips as a share of the source's, the elbow's mean bend (one
+   *  offset, so the forearm keeps its swing) held in [elbowMin, elbowMax] —
+   *  the source walk bends it 32–41°, the concept asks 15–25° — and the upper
+   *  arm brought toward the body; `square` takes a standing clip's
+   *  constant turns out and puts its feet side by side. The head keeps its
+   *  world turn. Calibratable, read off the clip sheets. */
+  clipStyle: {
+    walk: { chestTilt: 0.105, elbowMean: 0.35, elbowMin: 0.26, elbowMax: 0.44, armIn: 0.05 },
+    jog: { chestTilt: 0.19, chestTwist: 0.25 },
+    sprint: { hipsTilt: 0.0, chestTilt: 0.19, chestTwist: 0.37 },
+    idle: { square: true, chestTilt: 0.105 },
+  },
+  /** The widest loop seam the clip pipeline closes (rad, the worst bone's
+   *  turn between a loop's last frame and its first once cut where they meet
+   *  best): beyond it the loop is refused, never smeared over its cycle
+   *  (natural-villager-motion step 5). Calibratable. */
+  loopSeamMax: 0.35,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive
    *  figure's hand). Shared by the game's tool (PlaceLife.tsx) and the clips
    *  the pipeline solves the hands onto. */
   shovel: { top: 0.16, shaftBottom: -0.5, tip: -0.76, shaftRadius: 0.022, bladeWidth: 0.2, bladeThickness: 0.02 },
+  /** The authored dig (natural-villager-motion step 7; scripts/villager/
+   *  toolclips.py dig_clip). The extra trunk lean the hands may ask for to
+   *  reach the shaft is capped at `leanExtraMax` (rad; unbounded it folded
+   *  the trunk 0.46–0.74 rad past its keyed lean onto the hands); what they
+   *  need beyond it the hips give by sinking `dropPerExtra` figure units per
+   *  rad, the knees bending out — their poles `kneeOut` (rad) off straight
+   *  ahead. `grip`: where each hand holds the shaft (tool frame, figure
+   *  units; the right hand lower, the tool's carry hand) — measured: with the
+   *  keyed upper-hand path a lower right hand (−0.06 … −0.12) leaves it short
+   *  of the shaft and flips the left elbow, so the hands stay 0.16 apart until
+   *  the keys are re-authored. `headOnBlade`: the
+   *  share of the head's turn toward the blade. Calibratable, read off the
+   *  dig sheets. */
+  dig: { leanExtraMax: 0.4, dropPerExtra: 0.5, kneeOut: 0.35, grip: { R: -0.03, L: 0.13 }, headOnBlade: 0.6 },
+  /** The hands' shapes (natural-villager-motion step 3; scripts/villager/body.py
+   *  hand_shape): per finger the curl (rad) at each of its three joints,
+   *  knuckle first, and the thumb's fold across the palm. `grip` closes round
+   *  a shaft (the values the closed hand was built with, not a guess);
+   *  `point` keeps the index straight and closes the rest; `relax` is the soft
+   *  curl of a hand at rest, deeper toward the little finger. Calibratable, read
+   *  off verification/villager-body/hands-*.png. */
+  handShapes: {
+    grip: {
+      fingers: { index: [1.15, 1.35, 0.95], middle: [1.15, 1.35, 0.95], ring: [1.15, 1.35, 0.95], pinky: [1.15, 1.35, 0.95] },
+      thumb: [0.55, 0.6, 0.5],
+    },
+    point: {
+      fingers: { index: [0.05, 0.05, 0.0], middle: [1.2, 1.4, 0.95], ring: [1.25, 1.4, 0.95], pinky: [1.3, 1.4, 0.95] },
+      thumb: [0.5, 0.55, 0.45],
+    },
+    relax: {
+      fingers: { index: [0.18, 0.25, 0.15], middle: [0.26, 0.32, 0.2], ring: [0.32, 0.38, 0.24], pinky: [0.38, 0.44, 0.28] },
+      thumb: [0.15, 0.15, 0.1],
+    },
+  },
 } as const
 
 /**
@@ -2599,14 +2865,38 @@ export const VILLAGER_ASSET = {
 export const VILLAGER_GLTF = {
   /** How much of the adult man's build morph a build of ±1 gets, by age. */
   buildByAge: { child: 0.5, youth: 0.8, adult: 1, elder: 0.9 },
-  /** The walk turns into the sprint around this ground speed, per unit of leg
+  /** The walk turns into the jog around this ground speed, per unit of leg
    *  (figure units per second at the basis body's leg length; a child's
    *  shorter leg reaches it at a lower speed). Set where the walk's stride
    *  reaches strideMax (its natural speed ≈ 0.83 × strideMax²): above it a walk
    *  could only over-reach. Calibratable. */
-  sprintThreshold: 1.8,
-  /** Half-width of the band the two gaits cross-fade over, same units. */
-  sprintBand: 0.35,
+  jogThreshold: 1.8,
+  /** Half-width of the band walk and jog cross-fade over, same units. */
+  jogBand: 0.35,
+  /** The jog turns into the sprint here, same units: the band's lower edge
+   *  (threshold − band) sits above the tag game's top pace — a fresh runner at
+   *  `sprintSpeed × runnerBoost` on a child figure (`CHILD_FIGURE_SCALE`) runs
+   *  ≈ 7.2–7.5 per unit of leg — so every running villager jogs and the sprint
+   *  is the clip of a real dash only (natural-villager-motion step 5).
+   *  Calibratable. */
+  sprintThreshold: 7.9,
+  /** Half-width of the band jog and sprint cross-fade over, same units.
+   *  Narrow so the band's top stays below ≈ 8.2 per unit of leg, past which
+   *  the pure sprint's held toe slides beyond the no-slide limit at 120 Hz
+   *  (male youth, measured 15.10.2026; OPEN: the hold's contact onboarding). */
+  sprintBand: 0.25,
+  /** How the jog's stride follows its pace (as strideExponent/Min/Max for the
+   *  walk and sprint): the jog clip covers a long stride at its natural speed
+   *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their
+   *  cadence. Calibratable. */
+  jogStride: { exponent: 0.8, min: 0.4, max: 1.08 },
+  /** Body safety net (design.md clothing rule): no vertex of the chest front
+   *  or of a child's pelvis midline may peak sharper than this — its offset above
+   *  its neighbours' mean along the normal, over their mean edge length. The
+   *  asset's breast apex measures ≈ 0.40 (a nipple-like point) against ≈ 0.21
+   *  on the men's chest; the clamp only pulls such a point inward, so no dress
+   *  layer can newly intersect. Calibratable. */
+  trunkPeakSharpnessMax: 0.22,
   /** A gait's stride grows with pace as speed^exponent over its natural
    *  speed (the rest is cadence), bounded so the leg never over-reaches. */
   strideExponent: 0.5,
@@ -2620,6 +2910,86 @@ export const VILLAGER_GLTF = {
    *  fades back onto the clip's own foot (a shoved or turned foot eases home
    *  in its swing, never jumps). Calibratable. */
   plantFadeCycle: 0.15,
+  /** Share of the gait cycle over which a rolling foot's leg blends from
+   *  the pose drawn on one pivot into the next pivot's, or off its toes into
+   *  the clip's swing (villagerClipPose.ts `LiftOff`). Calibratable. */
+  liftOffBlendCycle: 0.15,
+  /** How high (multiples of the touch height) a held sole contact rises
+   *  before it lets go; its share of the foot's hold fades from 0.6 touch up
+   *  to here. A heel rolling off over a planted ball carries its own miss,
+   *  and dropped within one frame it shifted the held ball by a third of the
+   *  difference (0.0044 per 60 Hz frame mid walk↔jog band, measured
+   *  15.10.2026). Calibratable. */
+  plantLetGo: 2,
+  /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
+   *  the blended gait's stance is read over `groundSamples` phases, at
+   *  `groundLevels` steps across each cross-fade band (interpolated between).
+   *  Calibratable. */
+  groundSamples: 24,
+  groundLevels: 8,
+  /** The walk's planted foot (villagerClipPose.ts `clipGaitPose`): it lies
+   *  flat on the ground (ankle at its rest height, no pitch or roll) over
+   *  this share of its blended stance, from loading response to heel-off,
+   *  easing in and out over `footFlatBlend` of the stance on either side.
+   *  The retargeted walk clip carries its heel 1.5 cm up through mid-stance,
+   *  which never read as a planted foot. Weighted by the walk's share (a run
+   *  lands on its forefoot). Calibratable. */
+  footFlatFrom: 0.12,
+  footFlatTo: 0.62,
+  footFlatBlend: 0.1,
+  /** Where the flat foot hands its pivot from its held heel to its held
+   *  ball (share of the stance; the foot lies flat there, so the hand-over
+   *  moves nothing). Calibratable. */
+  footPivotSwitch: 0.4,
+  /** Share of a rolling foot's pitch its toes lift their tip by while the
+   *  foot rolls over its ball (villagerClipPose.ts `heelOff`). Calibratable. */
+  toeLift: 0.3,
+  /** Share of the gait cycle over which the toes, lying flat at toe-off,
+   *  let go of the ground at the fastest (villagerClipPose.ts). Calibratable. */
+  toeReleaseCycle: 0.1,
+  /** How far (rad) short of leg and foot in one line a rolling foot's
+   *  pitch levels off, eased in over twice that, so the roll tends to that
+   *  line without its pitch snapping onto it (villagerClipPose.ts `heelOff`).
+   *  Calibratable. */
+  rollSoftPitch: 0.3,
+  /** Share of the cycle over which the walk eases a sole contact onto the
+   *  ground after its authored touch and off it before its authored lift
+   *  (the retargeted clip lifts its trailing ball and toe early).
+   *  Calibratable. */
+  supportEase: 0.06,
+  /** The walk's share (gaitWeights) from which a walk with no planted foot
+   *  standing settles onto its lower sole (a run's flight stays). Calibratable. */
+  soleSettleWalk: 0.9,
+  /** How far (person units per unit of leg) the lower heel or ball of a walk
+   *  may stay above the ground after the leg solve before the walk lowers its
+   *  hips onto it (villagerClipPose.ts, a jog's stride coming back to the
+   *  walk). Calibratable. */
+  walkSoleReach: 0.012,
+  /** How far below the ground a flat foot's sole contact model may lie
+   *  before the flat ankle is raised (person units per unit of leg): the
+   *  contacts scale with the leg, the drawn foot does not quite. Calibratable. */
+  flatContactSink: 0.004,
+  /** The pelvis under a warped stride (natural-villager-motion steps 5 and 10):
+   *  it drops just as far as both legs need to reach their feet, each leg
+   *  reaching at most `legReach` of its full length, and at most
+   *  `pelvisDropMax` per unit of leg. Calibratable. */
+  legReach: 0.995,
+  pelvisDropMax: 0.08,
+  /** The walk's own pelvis drop (same units): as far as a foot in its
+   *  stance needs to reach its planted spot, at most `walkDropMax` — the
+   *  double support's low point of a real walk, a few cm, never the runs'
+   *  toe-off reach — fading out over the last `walkDropFade` of the stance
+   *  (a share of it). Calibratable. */
+  walkDropMax: 0.05,
+  walkDropFade: 0.3,
+  /** Starting or stopping, each foot steps between the stand and the gait
+   *  (gltfClipLayers.ts `settleFeet`), lifted at mid-step by this share of
+   *  the ground it covers. Calibratable. */
+  settleStepLift: 0.35,
+  /** Stopping, a foot landed on the stand holds its spot while the body
+   *  drifts and steps the miss over (lifted as above) over this last share
+   *  of the walk weight. Calibratable. */
+  settleRestep: 0.45,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */
@@ -2628,6 +2998,100 @@ export const VILLAGER_GLTF = {
    *  (brow, and the nape behind the ears) and of the head's depth back → front
    *  (what counts as behind). The body carries no hair mesh. Calibratable. */
   hair: { brow: 0.62, nape: 0.3, back: 0.38 },
+} as const
+
+/** The caught child's slump on the glTF body (natural-villager-motion step 16):
+ *  trunk lean over the three spine segments, clavicle protraction and drop,
+ *  head bow (rad) and the settle in and out (s). */
+export interface CaughtSlumpConfig {
+  trunk: number
+  shoulderForward: number
+  shoulderDrop: number
+  headBow: number
+  settleSeconds: number
+}
+
+/** The tag chaser on the glTF body (natural-villager-motion step 15); see
+ *  `VILLAGER_POSE.tagChaser` for the units. */
+export interface ChaserBodyConfig {
+  leanMax: number
+  prepareDistance: number
+  prepareElevation: number
+  prepareReach: number
+  prepareProtraction: number
+  prepareSeconds: number
+  reachElevation: number
+  reachProtraction: number
+  reachMax: number
+}
+
+/**
+ * The glTF villager's runtime pose on top of its clips (natural-villager-motion
+ * steps 9–11). Calibratable, read off the runtime sheets.
+ */
+export const VILLAGER_POSE = {
+  /** How a trunk lean or turn (rad) is shared over the three spine segments,
+   *  pelvis up; the hips take none (no leg is re-solved under them). Sum 1, no
+   *  bone above 0.35 (step 9). */
+  leanShares: { spine: 0.35, spine1: 0.33, chest: 0.32 },
+  // Natural-villager-motion step 16, calibratable estimates: a brake and
+  // settle into a planted hold — trunk 0.12 rad over spine/spine1/chest only
+  // (hips 0), clavicles forward 0.25 and dropped 0.1, the head bowed 0.35 by
+  // the gaze on the ground about a metre ahead; eased in and out over
+  // `settleSeconds`.
+  caughtSlump: { trunk: 0.12, shoulderForward: 0.25, shoulderDrop: 0.1, headBow: 0.35, settleSeconds: 0.25 },
+  // Natural-villager-motion step 15, calibratable estimates. The run's own
+  // lean, capped (rad); inside `prepareDistance` (m, beyond the commit
+  // distance, so the pre-aim never delays a grab) one arm blends into a
+  // bent-elbow preparation — aimed `prepareElevation` (rad, below the
+  // horizontal), its hand at `prepareReach` of the straight arm, the
+  // clavicle forward `prepareProtraction` — over `prepareSeconds` (never
+  // faster than `VILLAGER_GLTF.transitionSeconds`, the clip's arm hand-over:
+  // `readySeconds` in tagGame.ts); the grab
+  // then reaches `reachElevation` off the horizontal at shoulder height
+  // with the clavicle forward `reachProtraction` (rad), the hand solved onto
+  // the quarry's surface up to `reachMax` of the straight arm.
+  tagChaser: {
+    leanMax: 0.12,
+    prepareDistance: 3.2,
+    prepareElevation: -0.55,
+    prepareReach: 0.7,
+    prepareProtraction: 0.1,
+    prepareSeconds: 0.25,
+    reachElevation: 0,
+    reachProtraction: 0.22,
+    reachMax: 1.6,
+  },
+  /** The gaze (step 9): the head held on a target (by default the horizon
+   *  along the heading). `chestYaw`: the chest's share of a turn toward the
+   *  target; of the rest the neck takes `neck`, the head the remainder.
+   *  Limits relative to the heading (rad): yaw ±`yawMax`, pitch `pitchDown`
+   *  below … `pitchUp` above. `seconds`: the damping's time constant.
+   *  `headLoad`: the limits' share kept under a head load. */
+  gaze: { chestYaw: 0.25, neck: 0.4, yawMax: 1.22, pitchUp: 0.52, pitchDown: 0.7, seconds: 0.18, headLoad: 0.5 },
+  /** The corrective leg solve (step 10): it runs only where the leg's target
+   *  misses the clip's own ankle by more than this (person units per unit of
+   *  leg). The concept's ~2 mm would leave a held foot up to 2 mm off its hold
+   *  against the 1 mm the held-foot test allows; the solve keeps the clip's
+   *  own hinge and twist, so it needs no dead zone to keep the clip's leg and
+   *  this is 0.5 mm. The knee bends toward the clip's own knee until the leg
+   *  is this straight (the knee's offset off the hip–ankle line, person units
+   *  per unit of leg), toward straight ahead below it. */
+  legCorrectMin: 0.0005,
+  /** The posable clavicles (step 11): a pose's protraction (rad, the
+   *  shoulder forward) and elevation (rad, up; negative drops it) per side,
+   *  added after the clip, clamped to these ranges — the ones the garment
+   *  penetration gate measures (scripts/villager/penetration.py, clip
+   *  `shoulders`). Calibratable. */
+  shoulders: { protractionMax: 0.3, elevationMax: 0.2, dropMax: 0.12 },
+  /** The most the distributed trunk may lean (rad, the whole over its three
+   *  segments, each its share) to bring a contact into reach. A bend shared
+   *  over three pivots carries the shoulder less far than the same angle at
+   *  the lowest one: the runtime point subject's hand needed 0.55–0.6 rad
+   *  distributed where one joint needed 0.5 (measured 18.10.2026), so the
+   *  one-joint CONTACT_LEAN_MAX (0.5) is too short here. Calibratable. */
+  contactLeanMax: 1.2,
+  kneePoleMin: 0.01,
 } as const
 
 // Dev hook for the headless verification (the village-walk tolerances).

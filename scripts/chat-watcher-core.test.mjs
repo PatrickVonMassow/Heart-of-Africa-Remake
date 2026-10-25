@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import {
   CLAIM_BY,
   CLAIM_SESSION_PREFIX,
@@ -8,21 +8,34 @@ import {
   WAKE_REASONS,
   WATCHER_PID_TOLERANCE_MS,
   ackPlan,
+  stillPendingCount,
   adoptDecision,
   buildResponderPrompt,
   claimIsOurs,
   pendingAgeMs,
   reconnectDelayMs,
   responderClaim,
+  responderSpawn,
   stampOf,
   sweepPlan,
   wakeDecision,
+  selfRestartDecision,
+  startFingerprint,
+  watcherCodeFingerprint,
   watcherSupervision,
+  isWatcherCommand,
 } from './chat-watcher-core.mjs'
+import { holdExclusiveAddress, watcherAddress } from './batch-singleton.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
-import { claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
+import { buildSpawnArgs, buildSpawnOptions, claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
+import { LOADED_FINGERPRINT, readWatcherFingerprint } from './chat-watcher-fingerprint.mjs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { boardHtml } from './dashboard-guard-fixtures.mjs'
 
 const ok = { accepted: true, paused: false, formatAlarm: false, ownerAlive: false, responderLive: false, claimHonoured: false }
 
@@ -120,7 +133,7 @@ describe('the deferral has a deadline — a live owner may not sit on a message 
   const NOW = 1_700_000_000_000
 
   it('still skips for a live owner while the message is YOUNG — unchanged behaviour', () => {
-    const plan = sweepPlan({ pending: [aged(0)], now: NOW + 60_000, windowMs: DEFERRAL_MS })
+    const plan = sweepPlan({ pending: [aged(0)], now: NOW + DEFERRAL_MS - 1, windowMs: DEFERRAL_MS })
     expect(plan.overdue).toEqual([])
     expect(wakeDecision({ ...ok, ownerAlive: true, deferralExpired: false })).toEqual({
       decision: 'skip',
@@ -382,6 +395,15 @@ describe('watcherSupervision — the launcher tick is the whole lifecycle', () =
     })
     expect(r.action).toBe('start')
     expect(r.pid).toBe(null)
+  })
+
+  it('trusts the command line over a start time that drifted past the tolerance', () => {
+    const drifted = { exists: true, startedAt: record.pidStartedAt - 5000 }
+    const cmd = '/usr/local/bin/node /workspace/hoa/scripts/chat-watcher.mjs'
+    expect(watcherSupervision({ record, probe: probeOf({ 900: { ...drifted, command: cmd } }) }).action).toBe('none')
+    expect(
+      watcherSupervision({ record, probe: probeOf({ 900: { ...drifted, command: '/usr/bin/vim notes' } }) }).action,
+    ).toBe('start')
   })
 
   it('keeps a live inbox listener through a pause, so the user can end it', () => {
@@ -646,5 +668,231 @@ describe('openPointStatus — the format alarm both spawners read', () => {
 
   it('is total', () => {
     expect(openPointStatus()).toEqual({ open: 0, alarm: false })
+  })
+})
+
+describe('the watcher singleton', () => {
+  const cmd = 'node /workspace/hoa/scripts/chat-watcher.mjs'
+
+  it('recognises the watcher command and nothing else', () => {
+    expect(isWatcherCommand(cmd)).toBe(true)
+    expect(isWatcherCommand('C:\\node\\node.exe C:\\hoa\\scripts\\chat-watcher.mjs')).toBe(true)
+    expect(isWatcherCommand('/usr/bin/tail -f /repo/scripts/chat-watcher.mjs')).toBe(false)
+    expect(isWatcherCommand('/usr/bin/vim /repo/scripts/chat-watcher.mjs')).toBe(false)
+    expect(isWatcherCommand('node scripts/chat-watcher.mjs --dry-run')).toBe(true)
+    expect(isWatcherCommand('node scripts/chat-watcher-core.test.mjs')).toBe(false)
+    expect(isWatcherCommand(['node', '--no-warnings', '/repo/scripts/chat-watcher.mjs'])).toBe(true)
+    expect(isWatcherCommand(['C:\\Program Files\\nodejs\\node.exe', 'C:\\hoa\\scripts\\chat-watcher.mjs'])).toBe(true)
+    expect(isWatcherCommand(['/usr/bin/vim', '/repo/scripts/chat-watcher.mjs'])).toBe(false)
+    expect(isWatcherCommand(['node', '/repo/scripts/other.mjs', 'chat-watcher.mjs'])).toBe(false)
+    expect(isWatcherCommand(null)).toBe(false)
+  })
+})
+
+describe.runIf(process.platform === 'linux')('holdExclusiveAddress — the OS admits one watcher per checkout', () => {
+  it('holds the address once and refuses a second holder until the first lets go', async () => {
+    const address = watcherAddress(`/test/${process.pid}/${Date.now()}`)
+    const first = await holdExclusiveAddress(address)
+    expect(first).toMatchObject({ held: true, reason: 'held' })
+    expect(await holdExclusiveAddress(address)).toEqual({ held: false, reason: 'in-use' })
+    await new Promise((r) => first.server.close(r))
+    const again = await holdExclusiveAddress(address)
+    expect(again.held).toBe(true)
+    again.server.close()
+  })
+
+  it('fails CLOSED on a listen error other than in-use', async () => {
+    // A filesystem path in a directory that does not exist cannot be bound.
+    const r = await holdExclusiveAddress(`/nonexistent-${process.pid}/watcher.sock`)
+    expect(r.held).toBe(false)
+    expect(r.reason).toMatch(/^listen-error: /)
+  })
+
+  it('names one address per checkout and none where the platform has no exclusive one', () => {
+    expect(watcherAddress('/a', 'linux')).not.toBe(watcherAddress('/b', 'linux'))
+    expect(watcherAddress('/a', 'linux').startsWith('\0')).toBe(true)
+    expect(watcherAddress('/a', 'win32')).toMatch(/^\\\\\.\\pipe\\/)
+    expect(watcherAddress('/a', 'darwin')).toBe(null)
+  })
+})
+
+describe('stillPendingCount — measured on the spool, not handed minus acked', () => {
+  it('counts an answered message the responder consumed itself as no longer pending', () => {
+    expect(stillPendingCount([{ id: 'a' }], [])).toBe(0)
+  })
+  it('counts only handed messages that are still spooled', () => {
+    expect(stillPendingCount([{ id: 'a' }, { id: 'b' }], [{ id: 'b' }, { id: 'c' }])).toBe(1)
+  })
+})
+
+describe('watcherCodeFingerprint — the watcher and the modules it imports', () => {
+  const files = {
+    'chat-watcher.mjs': "import { a } from './a.mjs'\nimport x from 'node:fs'\nawait import('./b.mjs')",
+    'a.mjs': "import './c.mjs'\nimport { y } from '../src/y.ts'",
+    'b.mjs': 'export const b = 1',
+    'c.mjs': 'export const c = 1',
+    'unrelated.mjs': 'export const u = 1',
+  }
+  const fp = (over = {}) => {
+    const all = { ...files, ...over }
+    return watcherCodeFingerprint({ readText: (n) => all[n] ?? null })
+  }
+
+  it('skips an import whose file does not exist, commented out or not', () => {
+    const base = fp()
+    const gone = (n) => (n === 'gone.mjs' || n === 'gone2.mjs' ? undefined : null)
+    const commented = watcherCodeFingerprint({
+      readText: (n) => ({ ...files, 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\n// import './gone.mjs'\n/* import './gone2.mjs' */" })[n] ?? gone(n),
+    })
+    expect(commented).not.toBeNull()
+    const missing = watcherCodeFingerprint({
+      readText: (n) => (n === 'gone.mjs' ? undefined : { ...files, 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\nimport './gone.mjs'" }[n] ?? null),
+    })
+    expect(missing).not.toBeNull()
+    expect(base).not.toBeNull()
+  })
+
+  it('does not let an unterminated quote in a comment swallow the next import', () => {
+    const src = "// import './unfinished\nimport './a.mjs'"
+    const withA = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': src, 'a.mjs': a })[n] })
+    expect(withA('export const a = 1')).not.toBe(withA('export const a = 2'))
+    const sameLine = "/* import './unfinished */ import './a.mjs'"
+    const withB = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': sameLine, 'a.mjs': a })[n] })
+    expect(withB('export const a = 1')).not.toBe(withB('export const a = 2'))
+  })
+
+  it('keeps an import that sits between comment-like markers in strings', () => {
+    const src = "const open = '/*'\nimport './a.mjs'\nconst close = '*/'"
+    const withA = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': src, 'a.mjs': a })[n] ?? null })
+    expect(withA('export const a = 1')).not.toBe(withA('export const a = 2'))
+  })
+
+  it('still yields null for an unreadable entry or an unreadable existing import', () => {
+    expect(watcherCodeFingerprint({ readText: (n) => (n === 'chat-watcher.mjs' ? undefined : files[n]) })).toBeNull()
+    expect(fp({ 'b.mjs': null })).toBeNull()
+  })
+
+  it('is stable for unchanged files', () => {
+    expect(fp()).toBe(fp())
+  })
+
+  it('changes with the entry and with a transitive import', () => {
+    expect(fp({ 'chat-watcher.mjs': files['chat-watcher.mjs'] + '\n' })).not.toBe(fp())
+    expect(fp({ 'c.mjs': 'export const c = 2' })).not.toBe(fp())
+    expect(fp({ 'b.mjs': 'export const b = 2' })).not.toBe(fp())
+  })
+
+  it('ignores files the watcher does not import', () => {
+    expect(fp({ 'unrelated.mjs': 'export const u = 2' })).toBe(fp())
+  })
+
+  it('is null when an imported file is unreadable', () => {
+    expect(fp({ 'c.mjs': null })).toBe(null)
+    expect(fp({ 'chat-watcher.mjs': null })).toBe(null)
+  })
+
+  it('is read at the watcher module\'s first import, and complete on this tree', () => {
+    const src = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
+    const firstImport = src.split('\n').find((l) => l.startsWith('import '))
+    expect(firstImport).toContain("from './chat-watcher-fingerprint.mjs'")
+    expect(LOADED_FINGERPRINT).toMatch(/^[0-9a-f]{16}$/)
+    expect(readWatcherFingerprint()).toBe(LOADED_FINGERPRINT)
+  })
+})
+
+describe('selfRestartDecision — an idle watcher whose code a merge changed exits', () => {
+  const idle = { startFingerprint: 'aaaa', currentFingerprint: 'bbbb', childAlive: false, adoptedResponderAlive: false, pending: 0 }
+
+  it('stays on a matching fingerprint', () => {
+    expect(selfRestartDecision({ ...idle, currentFingerprint: 'aaaa' })).toEqual({ exit: false, reason: 'code-unchanged' })
+  })
+
+  it('exits on a mismatch while idle', () => {
+    expect(selfRestartDecision(idle)).toEqual({ exit: true, reason: 'code-changed' })
+  })
+
+  it('never exits on an unreadable current fingerprint', () => {
+    expect(selfRestartDecision({ ...idle, currentFingerprint: null })).toEqual({ exit: false, reason: 'fingerprint-unreadable' })
+    expect(selfRestartDecision({ ...idle, currentFingerprint: '' }).exit).toBe(false)
+  })
+
+  it('waits for a live spawned responder', () => {
+    expect(selfRestartDecision({ ...idle, childAlive: true })).toEqual({ exit: false, reason: 'responder-live' })
+  })
+
+  it('waits for a live adopted responder', () => {
+    expect(selfRestartDecision({ ...idle, adoptedResponderAlive: true })).toEqual({ exit: false, reason: 'responder-live' })
+  })
+
+  it('waits while a message is in its hands', () => {
+    expect(selfRestartDecision({ ...idle, pending: 1 })).toEqual({ exit: false, reason: 'message-in-hand' })
+  })
+
+  it('a watcher started without a fingerprint exits on the first readable one', () => {
+    expect(selfRestartDecision({ ...idle, startFingerprint: null }).exit).toBe(true)
+  })
+
+  it('is wired: the watcher checks it on its own timer and logs the exit', () => {
+    const src = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
+    expect(src).toContain('setInterval(checkSelfRestart, SELF_RESTART_CHECK_MS)')
+    expect(src).toContain("'chat watcher: exiting (code-changed)'")
+    expect(src).toContain("shutdown('code-changed')")
+  })
+})
+
+describe('startFingerprint — a fingerprint read after the code changed is not vouched for', () => {
+  const base = { fingerprint: 'abcd', processStartMs: 1000, nowMs: 2000, untrusted: 'U' }
+  it('trusts files older than the process', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 999] })).toBe('abcd')
+  })
+  it('distrusts a file modified while the process started', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 1500] })).toBe('U')
+  })
+  it('ignores a future mtime, so a clock set back cannot distrust every start', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 9000] })).toBe('abcd')
+  })
+  it('keeps an unreadable fingerprint null', () => {
+    expect(startFingerprint({ ...base, fingerprint: null, mtimesMs: [1500] })).toBeNull()
+  })
+})
+
+// 12.10.2026 19:44 UTC: the responder replied in seven seconds, then looped on
+// the answered-card Stop review until the RESPONDER_MAX_MS kill — its remedy
+// (`board.mjs vdzk-keep`) could not tell which of the guard state's sessions
+// was its own, because the spawned CLI exports no CLAUDE_SESSION_ID.
+describe('the responder spawn carries its own session id', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'responder-session-'))
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  const boardPath = join(dir, 'board.html')
+  const statePath = join(dir, 'guard-state.json')
+  const title = 'Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten'
+  const responderId = '11111111-2222-4333-8444-555555555555'
+  writeFileSync(boardPath, boardHtml({ klaerungExtra: [title] }))
+  const entry = (id) => ({ titles: [title], userMessage: { id, text: 'Messprobe vom Batch.' }, review: { messageId: id, kept: {} } })
+  // More than one session, as on the live host (19 on 13.10.2026).
+  writeFileSync(statePath, JSON.stringify({ version: 2, sessions: { 'owner-session': entry('m-owner'), [responderId]: entry('m-responder') } }))
+
+  const { CLAUDE_SESSION_ID: _drop, ...hostEnv } = process.env
+  const base = { ...hostEnv, DECISION_CARD_DASHBOARD: boardPath, DECISION_CARD_GUARD_STATE: statePath }
+  const keep = (env) => spawnSync(process.execPath, [join(process.cwd(), 'scripts', 'board.mjs'), 'vdzk-keep', title, '--why', 'Messprobe'], {
+    cwd: process.cwd(), env, encoding: 'utf8', windowsHide: true,
+  })
+
+  it('reproduces the loop: without the id the keep cannot pick its session', () => {
+    const r = keep(buildSpawnOptions({ cwd: process.cwd(), stdio: 'ignore', env: base }).env)
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain('cannot identify this session')
+  })
+
+  it('fixes the id before the spawn and exports the same one', () => {
+    const plan = responderSpawn({ args: buildSpawnArgs({ prompt: 'x', fallbackModel: null }), env: base, sessionId: responderId })
+    expect(plan.args.slice(-2)).toEqual(['--session-id', responderId])
+    const { env } = buildSpawnOptions({ cwd: process.cwd(), stdio: 'ignore', env: plan.env })
+    expect(env.CLAUDE_SESSION_ID).toBe(responderId)
+    const r = keep(env)
+    expect(r.stderr).toBe('')
+    expect(r.status).toBe(0)
+    const kept = JSON.parse(readFileSync(statePath, 'utf8')).sessions[responderId].review.kept
+    expect(Object.keys(kept)).toEqual([title])
   })
 })

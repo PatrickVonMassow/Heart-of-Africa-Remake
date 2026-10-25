@@ -338,7 +338,7 @@ describe('end-to-end guard process', () => {
     const recent = berlinStamp(new Date(now.getTime() - 4 * 60000))
     // The NEW turn has to be in the transcript, or this measures nothing but
     // "the latest valid reply passes" and would stay green under an extraction
-    // that correctly resets at a user prompt (GPT-5.6 Sol, 23.08.2026).
+    // that correctly resets at a user prompt (cross-vendor review, 23.08.2026).
     const raced = [
       line('assistant', [{ type: 'tool_use' }], { id: 'prev-a' }),
       line('user', [{ type: 'tool_result' }], { id: 'prev-r' }),

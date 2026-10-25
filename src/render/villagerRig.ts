@@ -180,36 +180,77 @@ const smooth = (e0: number, e1: number, x: number) => {
   return t * t * (3 - 2 * t)
 }
 
-/** How much of the sprint a figure moving at `speed` (figure units/s) with
- *  legs `legScale` × the basis body's runs: 0 walking … 1 sprinting, crossing
- *  over `sprintBand` either side of `sprintThreshold` per unit of leg. */
-export function sprintWeight(speed: number, legScale: number): number {
+/** How much of the faster gait a figure moving at `speed` (figure units/s)
+ *  with legs `legScale` × the basis body's runs: 0 below … 1 above, crossing
+ *  over `band` either side of `threshold` per unit of leg. */
+function gaitShare(speed: number, legScale: number, threshold: number, band: number): number {
   const v = Math.abs(speed) / Math.max(1e-6, legScale)
-  return smooth(G.sprintThreshold - G.sprintBand, G.sprintThreshold + G.sprintBand, v)
+  return smooth(threshold - band, threshold + band, v)
 }
+
+/** How much of the sprint a figure moving at `speed` runs (0 … 1, per unit of leg). */
+export function sprintWeight(speed: number, legScale: number): number {
+  return gaitShare(speed, legScale, G.sprintThreshold, G.sprintBand)
+}
+
+/** The three gaits' weights at a ground speed (natural-villager-motion step 5):
+ *  walk → jog → sprint by `jogThreshold`/`sprintThreshold` per unit of leg,
+ *  each crossing over its band; they always sum to 1. */
+export function gaitWeights(speed: number, legScale: number): { walk: number; jog: number; sprint: number } {
+  const a = gaitShare(speed, legScale, G.jogThreshold, G.jogBand)
+  const b = sprintWeight(speed, legScale)
+  return { walk: 1 - a, jog: a * (1 - b), sprint: a * b }
+}
+
+/** How a gait's stride grows with pace: speed^exponent over its natural
+ *  speed, bounded (the cadence makes up the rest). */
+export interface StrideRule {
+  exponent: number
+  min: number
+  max: number
+}
+const WALK_STRIDE: StrideRule = { exponent: G.strideExponent, min: G.strideMin, max: G.strideMax }
 
 /** The stride factor of a gait at `speed` over its natural speed `natural`
  *  (both for this body): speed^exponent, bounded. The cadence makes up the rest. */
-export function strideFactor(speed: number, natural: number): number {
+export function strideFactor(speed: number, natural: number, rule: StrideRule = WALK_STRIDE): number {
   if (natural <= 1e-6) return 1
   const r = Math.abs(speed) / natural
-  return Math.min(G.strideMax, Math.max(G.strideMin, Math.pow(Math.max(r, 1e-6), G.strideExponent)))
+  return Math.min(rule.max, Math.max(rule.min, Math.pow(Math.max(r, 1e-6), rule.exponent)))
+}
+
+/** The gait clips a figure blends (walk, jog, sprint). */
+export interface GaitClips {
+  walk: VillagerClip
+  jog: VillagerClip
+  sprint: VillagerClip
 }
 
 /**
- * The gait at a ground speed: the sprint's share, each gait's stride factor,
- * the distance one cycle covers (blended) and so the phase advance per unit
+ * The gait at a ground speed: each gait's share and stride factor, the
+ * distance one cycle covers (blended) and so the phase advance per unit
  * walked — the planted foot sweeps exactly the distance walked, so it holds
- * its spot (point 1295's no-slide) at every speed and body size.
+ * its spot (point 1295's no-slide) at every speed and body size. All three
+ * clips start at the left heel strike (phase 0), so they blend in step.
  */
-export function gaitAt(walk: VillagerClip, sprint: VillagerClip, speed: number, legScale: number) {
-  const s = sprintWeight(speed, legScale)
-  const vw = walk.speed * legScale
-  const vs = sprint.speed * legScale
+export function gaitAt(clips: GaitClips, speed: number, legScale: number) {
+  const w = gaitWeights(speed, legScale)
+  const vw = clips.walk.speed * legScale
+  const vj = clips.jog.speed * legScale
+  const vs = clips.sprint.speed * legScale
   const kw = strideFactor(speed, vw)
+  const kj = strideFactor(speed, vj, G.jogStride)
   const ks = strideFactor(speed, vs)
-  const cycle = (1 - s) * vw * walk.duration * kw + s * vs * sprint.duration * ks
-  return { sprint: s, strideWalk: kw, strideSprint: ks, stride: (1 - s) * kw + s * ks, cycle, phasePerUnit: cycle > 1e-6 ? 1 / cycle : 0 }
+  const cycle = w.walk * vw * clips.walk.duration * kw + w.jog * vj * clips.jog.duration * kj + w.sprint * vs * clips.sprint.duration * ks
+  return {
+    ...w,
+    strideWalk: kw,
+    strideJog: kj,
+    strideSprint: ks,
+    stride: w.walk * kw + w.jog * kj + w.sprint * ks,
+    cycle,
+    phasePerUnit: cycle > 1e-6 ? 1 / cycle : 0,
+  }
 }
 
 // ---- two-bone IK on the villager skeleton -------------------------------------------

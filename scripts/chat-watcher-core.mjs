@@ -50,6 +50,8 @@
 // by process), and would then acquire the owner lock — precisely the outcome
 // this module exists to prevent.
 
+import { createHash } from 'node:crypto'
+
 /**
  * Every reason a decision can carry, in one place so the live path, the dry run
  * and the tests all speak the same words. The verification drops (`malformed`,
@@ -178,10 +180,13 @@ export function wakeDecision({
 
 /** How long a message may sit pending under "the live owner will get it" before
  *  the watcher takes it anyway. Calibratable — `HOA_CHAT_DEFER_MS` in the
- *  wrapper. Three minutes is short enough that a phone reader still reads it as
- *  an answer, and long enough that an ordinarily busy owner always wins the race
- *  (its heartbeat delivers within seconds). */
-export const DEFERRAL_MS = 3 * 60 * 1000
+ *  wrapper. 45 seconds (three minutes until 13.10.2026): a working owner's
+ *  heartbeat delivers within seconds, so it still always wins the race, while
+ *  an owner that is waiting cannot answer at all — every further minute of
+ *  deferral was pure wait for the phone reader, on top of a responder run of
+ *  up to RESPONDER_MAX_MS. With the sweep every 15 s a message is taken
+ *  within about a minute. */
+export const DEFERRAL_MS = 45 * 1000
 
 /**
  * HOW LONG HAS THIS MESSAGE BEEN WAITING? PURE. NaN when it cannot be told.
@@ -323,6 +328,97 @@ export const WATCHER_PID_TOLERANCE_MS = 2000
  *  name from this pure module rather than importing the watcher wrapper. */
 export const WATCHER_PID_FILE = 'chat-watcher.json'
 
+/** Does a process command line belong to a chat watcher? Only node EXECUTING
+ *  the watcher script counts — an editor or `tail` naming the file does not.
+ *  `command` is the argument vector, or a string split on whitespace. A miss
+ *  (say, a node option with an operand) costs one extra start, which exits at
+ *  once on the held address (`holdExclusiveAddress`); it cannot double a watcher. */
+export function isWatcherCommand(command) {
+  const argv = Array.isArray(command) ? command : typeof command === 'string' ? command.split(/\s+/) : null
+  if (!argv || argv.length < 2) return false
+  const base = (a) => String(a).replace(/^"|"$/g, '').split(/[\\/]/).pop()
+  if (!/^node(\.exe)?$/i.test(base(argv[0]))) return false
+  const script = argv.slice(1).find((a) => !String(a).startsWith('-'))
+  return script !== undefined && base(script) === 'chat-watcher.mjs'
+}
+
+/** Relative imports of one module source: static, side-effect and dynamic.
+ *  Not syntax-aware: an import inside a comment or string is followed too, which
+ *  only widens the hash; a nonexistent one is skipped by the caller. */
+function relativeImports(source) {
+  const out = []
+  // The path sits in a lookahead: a match consumes only its keyword, so a false
+  // match (say, in a comment) can never swallow the quote of a real import.
+  const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(?=['"](\.\/[^'"\r\n]+)['"])/g
+  for (let m; (m = re.exec(source)); ) out.push(m[1].slice(2))
+  return out
+}
+
+/**
+ * THE WATCHER'S CODE FINGERPRINT. PURE — `readText(name)` returns a `scripts/`
+ * file's content or null. Hashes the entry and every module it imports from
+ * `scripts/`, transitively (`./x.mjs` only; `../` and packages are outside), so
+ * any merge into code the watcher runs changes it. Null when any file is
+ * unreadable; an import whose file does not exist (`readText` gives undefined)
+ * is skipped — such a module could not load, so it is not code the watcher runs. Read at watcher start and at its idle self-restart check
+ * (`chat-watcher-fingerprint.mjs`, `selfRestartDecision`).
+ */
+export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } = {}) {
+  const seen = new Map()
+  const queue = [entry]
+  while (queue.length) {
+    const name = queue.shift()
+    if (seen.has(name)) continue
+    const text = typeof readText === 'function' ? readText(name) : null
+    if (text === undefined && name !== entry) continue
+    // An unreadable file makes the fingerprint incomplete: null, never a hash.
+    if (typeof text !== 'string') return null
+    seen.set(name, text)
+    queue.push(...relativeImports(text))
+  }
+  const hash = createHash('sha256')
+  for (const name of [...seen.keys()].sort()) hash.update(`${name}\0${seen.get(name)}\0`)
+  return hash.digest('hex').slice(0, 16)
+}
+
+/** The start fingerprint a watcher may vouch for. The ESM loader read its
+ *  sources before this fingerprint was taken, so a file modified in between
+ *  (mtime from `processStartMs` to `nowMs`) makes it `untrusted`, and the
+ *  first idle check restarts once. A future mtime (clock set back) is ignored. */
+export function startFingerprint({ fingerprint, mtimesMs = [], processStartMs, nowMs, untrusted }) {
+  if (fingerprint === null) return null
+  return mtimesMs.some((m) => m >= processStartMs && m <= nowMs) ? untrusted : fingerprint
+}
+
+/** How often an idle watcher recomputes its code fingerprint (calibratable). */
+export const SELF_RESTART_CHECK_MS = 30_000
+
+/**
+ * SHOULD AN IDLE WATCHER EXIT BECAUSE A MERGE CHANGED ITS CODE? PURE.
+ *
+ * Exit only on a readable current fingerprint that differs from the one taken
+ * at start, while no responder it spawned or adopted is alive and no message is
+ * in its hands. An unreadable fingerprint (null) never exits. After the exit the
+ * launcher's dead-watcher branch (`watcherSupervision`) starts the new code.
+ *
+ * Returns { exit, reason }.
+ */
+export function selfRestartDecision({
+  startFingerprint = null,
+  currentFingerprint = null,
+  childAlive = false,
+  adoptedResponderAlive = false,
+  pending = 0,
+} = {}) {
+  if (typeof currentFingerprint !== 'string' || currentFingerprint === '') {
+    return { exit: false, reason: 'fingerprint-unreadable' }
+  }
+  if (currentFingerprint === startFingerprint) return { exit: false, reason: 'code-unchanged' }
+  if (childAlive || adoptedResponderAlive) return { exit: false, reason: 'responder-live' }
+  if (pending > 0) return { exit: false, reason: 'message-in-hand' }
+  return { exit: true, reason: 'code-changed' }
+}
+
 /**
  * IS THE WATCHER ALIVE, AND WHAT SHOULD THE TICK DO? PURE — `probe` is injected.
  *
@@ -339,7 +435,12 @@ export function watcherSupervision({ paused = false, record = null, probe = null
   let alive = false
   if (Number.isInteger(pid) && pid > 0 && typeof probe === 'function') {
     const p = probe(pid)
-    if (p && p.exists === true) {
+    if (p && p.exists === true && (typeof p.command === 'string' || Array.isArray(p.command))) {
+      // The command line, where the OS gives one, is the identity: the probed
+      // start time drifts against the wall clock (WSL measured -1.2 s in 5 h),
+      // crossed the tolerance, and every tick then started one more watcher.
+      alive = isWatcherCommand(p.command)
+    } else if (p && p.exists === true) {
       // `stampOf`, not `Number` — see its note. A pidfile with no start time is
       // meant to fall through to the LENIENT branch (unknown identity, treat the
       // live pid as ours); `Number(null)` is 0, which is finite, so the old form
@@ -436,6 +537,21 @@ export function buildResponderPrompt(messages) {
 }
 
 /**
+ * THE RESPONDER KNOWS ITS OWN SESSION ID. PURE.
+ *
+ * The answered-card Stop review can owe a non-owner responder a
+ * `board.mjs vdzk-keep` or `vdzk-answer.mjs` call, and both pick the session
+ * from `CLAUDE_SESSION_ID` once the guard state holds more than one. The CLI
+ * does not export it, so the responder of 12.10.2026 19:44 UTC answered in
+ * seven seconds and then looped on Stop until the RESPONDER_MAX_MS kill. The id
+ * is therefore fixed BEFORE the spawn (`--session-id`) and exported with it.
+ * It is a fresh uuid, never the claim's synthetic `chat-responder-…` id.
+ */
+export function responderSpawn({ args = [], env = {}, sessionId } = {}) {
+  return { args: [...args, '--session-id', sessionId], env: { ...env, CLAUDE_SESSION_ID: sessionId } }
+}
+
+/**
  * WHICH SPOOLED MESSAGES MAY BE MARKED CONSUMED AFTER THE RESPONDER EXITED? PURE.
  *
  * Delivery into the prompt is AT-LEAST-ONCE by the same reasoning the launcher
@@ -473,4 +589,14 @@ export function ackPlan({ handed = [], pending = [], spawnedAt = null, actedAt =
   if (!Number.isFinite(spawned) || !Number.isFinite(acted) || acted < spawned) return []
   const ids = new Set((Array.isArray(handed) ? handed : []).map((m) => m?.id).filter(Boolean))
   return (Array.isArray(pending) ? pending : []).filter((m) => m && ids.has(m.id) && typeof m.file === 'string')
+}
+
+/**
+ * HOW MANY HANDED MESSAGES ARE STILL ON THE SPOOL? PURE. Measured, not derived
+ * as handed - acked: a responder's own delivery hook consumes its message
+ * before the watcher acks, which logged an answered message as still pending.
+ */
+export function stillPendingCount(handed = [], pending = []) {
+  const ids = new Set((Array.isArray(pending) ? pending : []).map((m) => m?.id).filter(Boolean))
+  return (Array.isArray(handed) ? handed : []).filter((m) => m?.id && ids.has(m.id)).length
 }

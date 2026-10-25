@@ -18,7 +18,7 @@ import { dirname, sep as sep_ } from 'node:path'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { statePathFrom } from './fable-switch-core.mjs'
+import { statePathFrom } from './lane-switch-core.mjs'
 import {
   STATE_FILE_NAME,
   authoringVenue,
@@ -46,7 +46,7 @@ export const STATE_FILE =
   process.env.CLOUD_SWITCH_FILE ||
   statePathFrom(git(['rev-parse', '--path-format=absolute', '--git-common-dir']).stdout ?? '', REPO_ROOT, {
     sep: sep_,
-  }).replace(/fable-switch\.json$/, STATE_FILE_NAME)
+  }).replace(/lane-switch\.json$/, STATE_FILE_NAME)
 
 /** Read afresh on every call, so a flip is visible to every reader at once. */
 export function currentCloudState(file = STATE_FILE) {

@@ -92,6 +92,7 @@ export const NON_RENDER_VERIFY = new Set([
   'backend-lane-core.mjs', // WHICH lanes exist and whether a renderer is software; the check drives the browser
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
+  'carriedJar.mjs', // the carried-jar projection and pixel verdict; polish-villagers.mjs hands it its page
   'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; the polish-* suites and the replay test record it
   'colliderProbe.mjs', // the collider geometry the suites read with; collision.mjs and the polish-* suites hand it their page
   'communicationAudio.mjs', // PCM analysis and WAV encoding; no browser
@@ -317,7 +318,7 @@ export function wasDetailCut(red) {
   const hasOwnMark = red != null && Object.hasOwn(red, 'detailCut')
   if (hasOwnMark && red.detailCut === true) return true
   // ONLY A LITERAL `false` PROVES THE OTHER DIRECTION (cross-vendor review,
-  // GPT-5.6 Sol, do-not-merge on ae9a500c). Treating any present value as
+  // do-not-merge on ae9a500c). Treating any present value as
   // "not cut" let a malformed durable record — `detailCut: null` in a
   // hand-edited or half-written state file — walk past the length inference and
   // answer a signature belonging to a different red. A field nobody can read is
@@ -340,7 +341,7 @@ export function wasDetailCut(red) {
  * still match if the text went on — and every one of them was refused with a
  * counterexample, the last being `/^(?=A{200}$)|^A{200}.$/`, which asserts the
  * end in one alternative and swallows the probe character in the other
- * (cross-vendor review, GPT-5.6 Sol). The lesson is the one the section-tag
+ * (cross-vendor review). The lesson is the one the section-tag
  * reader (section-tag-core.mjs) learned: recovering intent from TEXT
  * proves SYNTAX, not PROVENANCE. A regex cannot be interrogated about what its
  * author meant, and no finite probe closes a pattern written to defeat it.
@@ -415,7 +416,7 @@ export function chargeFor(red, options) {
       // instead of being guessed into an owner.
       //
       // AND A SIGNATURE MAY NOT READ THE END OF A MEASUREMENT THE RECORD CUT
-      // OFF (cross-vendor review, GPT-5.6 Sol, do-not-merge on 3e6ffd2). The
+      // OFF (cross-vendor review, do-not-merge on 3e6ffd2). The
       // record keeps the first MAX_RED_DETAIL_LEN characters, and a `detailMatch`
       // anchored at both ends therefore matches `<cut>` out of `<cut><more>` —
       // satisfying a signature written for a DIFFERENT, genuinely shorter red,
@@ -424,7 +425,7 @@ export function chargeFor(red, options) {
       // nothing ended. Same shape as the section tag and the same answer: the
       // reader does not guess, it refuses, and the red stays loudly uncharged.
       //
-      // AND THE ENTRY DECIDES, NOT THE READER (cross-vendor review, GPT-5.6 Sol,
+      // AND THE ENTRY DECIDES, NOT THE READER (cross-vendor review,
       // three refusals). An entry whose signature reads only the FRONT of the
       // measurement declares `detailReadsPrefix` and keeps charging; every other
       // one is refused here. Refusing ALL of them instead would withdraw the
@@ -513,7 +514,7 @@ export function chargeReds(reds, options) {
     // bound took something or the text simply ended there. So the field is
     // written whenever it settles that question — `true` when the bound cut, and
     // `false` for the one uncut length that would otherwise be misread (see
-    // `wasDetailCut`; cross-vendor review, GPT-5.6 Sol, do-not-merge on
+    // `wasDetailCut`; cross-vendor review, do-not-merge on
     // b3e5200e, which named the false positive). Everywhere else it stays
     // absent, so an ordinary record keeps the shape it always had.
     if (printed.length > MAX_RED_DETAIL_LEN) stored.detailCut = true

@@ -53,7 +53,7 @@ import { resolveOwnership, PID_START_TOLERANCE_MS, LAUNCHER_TICK_MS } from './ba
  *  falling immediately after the release, and a slower launcher lengthens the
  *  window with itself rather than losing it.
  *
- *  IT COUPLES IN BOTH DIRECTIONS (four-eyes review, Fable 5, finding 2). The same
+ *  IT COUPLES IN BOTH DIRECTIONS (four-eyes review, finding 2). The same
  *  product is `CLAIM_MAX_AGE_MS`, which also bounds a claim NOBODY has released to
  *  yet once no live owner holds the batch (a machine errand always) and feeds the resume hook's stand-down text and the claim CLI — doors that
  *  have nothing to do with the tick. So a future SPEED-UP of `LAUNCHER_TICK_MS`
@@ -112,7 +112,7 @@ export function claimIsBounded(claim) {
  * IS THERE A LIVE SESSION OWNER? PURE. A human claim's pending clock pauses while
  * this is true; once the owner is gone, the take-up window is the bound.
  *
- * IT IS NOT LOCK EXISTENCE (four-eyes review, Fable 5, 30.07.2026, finding 1).
+ * IT IS NOT LOCK EXISTENCE (four-eyes review, 30.07.2026, finding 1).
  * Derived as `!!lock?.sessionId` it also matched the LAUNCHER's `pending-spawn`
  * placeholder, whose session id is a `launcher-<uuid>` and whose process is a
  * `claude -p` still booting. That produced a loop out of the crash path: the
@@ -334,7 +334,7 @@ export function assessClaim({
     // clock nobody here can reason about — there is no window to measure, and the
     // reading that cannot strand the batch is the one that reserves nothing.
     // Checked BEFORE the probe: a long-expired record then costs no OS call
-    // (four-eyes review, Fable 5, 30.07.2026, finding 4).
+    // (four-eyes review, 30.07.2026, finding 4).
     const releasedRenewedAt = activityAt !== null && base.releasedAt !== null && activityAt >= base.releasedAt
       ? activityAt
       : base.releasedAt
@@ -523,7 +523,7 @@ export function takeoverDecision({
 
   // FLOOR, never round: an age rounded UP reads at the log as though the window
   // had already run out while the lock was in fact still being held, and the line
-  // exists to be trusted at 03:00 (four-eyes review, Fable 5, finding 4).
+  // exists to be trusted at 03:00 (four-eyes review, finding 4).
   const minutes = (ms) => (Number.isFinite(ms) ? `${Math.max(0, Math.floor(ms / 60000))} min` : null)
   const claimedAgo = minutes(ageMs)
   // The tick equivalence is only true for the DEFAULT window. Calibrated down via

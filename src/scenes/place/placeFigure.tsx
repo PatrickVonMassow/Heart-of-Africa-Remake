@@ -11,7 +11,7 @@ import { gaitBodyLift, legSwingAngle } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
-import { approach, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
+import { approach, leanedHipY, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
 import { VILLAGER_MOTION } from '../../config/balance'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
@@ -29,6 +29,8 @@ type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
   age?: AgeGroup
   /** The hands' work for the glTF body's clips (ignored by the primitive). */
   work?: RefObject<FigureWork>
+  /** An office whose dress the skinned body wears (the primitive keeps its cloth). */
+  office?: 'chief'
 }
 
 /**
@@ -38,13 +40,13 @@ type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
  * below, unchanged (user decision 04.10.2026). Both take the same props and
  * publish the same pivots, so a vignette never knows which one it drew.
  */
-export function Figure({ sex, age, work, ...props }: FigureProps) {
+export function Figure({ sex, age, work, office, ...props }: FigureProps) {
   const look = useContext(FigureLookContext)
   // Who this villager is, keyed HERE: this component stays mounted when the
   // detail level swaps the drawn body, so medium → low → medium keeps the person.
   const identityKey = useId()
   return look ? (
-    <SkinnedFigure look={look} sex={sex} age={age} identityKey={identityKey} work={work} {...props} />
+    <SkinnedFigure look={look} sex={sex} age={age} identityKey={identityKey} work={work} office={office} {...props} />
   ) : (
     <PrimitiveFigure {...props} />
   )
@@ -81,6 +83,8 @@ function PrimitiveFigure({
   handProp,
   headProp,
   kneeling,
+  permanentLabel,
+  ownedByPlayer,
 }: {
   cloth: string
   skin?: string
@@ -125,6 +129,10 @@ function PrimitiveFigure({
   headSteady?: HeadLoadShape | null
   /** Kneels while true: down and up again as a short transition. */
   kneeling?: RefObject<boolean>
+  /** Carries a standing label of its own: the Ctrl layer does not name it twice. */
+  permanentLabel?: boolean
+  /** The player's own figure (the bird's-eye traveller): never named by the Ctrl layer. */
+  ownedByPlayer?: boolean
 }) {
   const cold = useContext(ColdCloaksContext)
   const segments = useContext(LimbDetailContext)
@@ -249,6 +257,11 @@ function PrimitiveFigure({
     // and a stretch. The head is a smooth sphere, so its counter-rotation is
     // invisible; only its roundness survives. `turn` needs no answer — a rotation
     // about y commutes with a scale along y.
+    // A forward lean while kneeling (setting a load down) would tip the cone's
+    // rim into the ground; the hip rises by just that much.
+    if (trunk.current && shape.current) {
+      trunk.current.position.y = leanedHipY(shape.current.hipY, trunkRadius(shape.current), trunk.current.rotation.x)
+    }
     if (head.current) {
       const squash = squat?.current ?? 1
       const flattened = squash > 0.01 && Math.abs(squash - 1) > 1e-4
@@ -281,7 +294,7 @@ function PrimitiveFigure({
   return (
     // Named so a speaking figure can be found in the scene graph — the overhead
     // speech label rides on this object (design.md §13.4).
-    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: lay.labelHeight })}>
+    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: lay.labelHeight, permanentLabel, ownedByPlayer })}>
       <group ref={lifted}>
         {/* The trunk pivots at the hip so a lean or a shake carries the arms and
             the head with it, and the legs (below) stay planted. The cone is a

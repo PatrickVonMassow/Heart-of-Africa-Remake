@@ -141,7 +141,7 @@ describe('fail-open: what cannot be read is never a violation', () => {
   })
 })
 
-// The four-eyes review (Fable 5, 30.07.2026) found these by probing, and they are
+// The four-eyes review (30.07.2026) found these by probing, and they are
 // the costly direction: each one PASSED a decision the user would never have seen.
 describe('the false passes the four-eyes review found', () => {
   it('does not accept a card connected only by a project-generic word', () => {
@@ -572,6 +572,18 @@ describe('a non-owner carries an answer and the owner applies it', () => {
     expect(owner.reason).toContain(`node scripts/board.mjs vdzk-remove ${JSON.stringify(title)}`)
     expect(owner.reason).toContain(`node scripts/vdzk-answer.mjs --applied ${JSON.stringify(title)}`)
     expect(evaluateCarriedAnswers({ entries: [entry], currentTitles: [title], owner: false }).block).toBe(false)
+  })
+
+  it('a non-owner passes cards its message does not touch and still carries a suspected answer', () => {
+    const unrelated = ['Startskript des Launchers', 'Kartenschrift für die Tafel']
+    const chat = { id: 'chat-unrelated', text: 'Wie weit ist der Batch gerade?' }
+    expect(evaluateCardReviews({ userMessage: chat, cardsAtMessage: unrelated, currentTitles: unrelated, nonOwner: true }))
+      .toEqual({ block: false, reason: null })
+    expect(evaluateCardReviews({ userMessage: chat, cardsAtMessage: unrelated, currentTitles: unrelated }).block).toBe(true)
+    const v = evaluateCardReviews({ userMessage, cardsAtMessage: [title, ...unrelated], currentTitles: [title, ...unrelated], nonOwner: true })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('node scripts/vdzk-answer.mjs')
+    expect(v.reason).toContain('1 open card(s)')
   })
 
   it('an entry naming a vanished card self-clears', () => {

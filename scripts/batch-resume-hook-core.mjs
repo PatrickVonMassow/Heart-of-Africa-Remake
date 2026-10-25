@@ -26,6 +26,7 @@
 // pure and tested here; the hook only gathers the state and prints the result.
 import { CLAIM_BY } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
+import { humanText } from './request-approval-guard-core.mjs'
 
 const OWNER_OWNERSHIP = new Set(['acquired-spawn', 'acquired', 'mine'])
 
@@ -264,4 +265,162 @@ export function standDownMessage({
           'word, never to claim over it on your own.'
         : ''),
   }
+}
+
+/**
+ * DOES A SPAWNED SUCCESSOR PROVE ITS LAUNCH WITHOUT ITS RESERVATION? PURE.
+ *
+ * The launcher writes one spawn token to the one-shot authorization marker
+ * (`autostart-authorized.json`) and to its start record (`autostart-last.json`),
+ * both naming the child pid. A successor whose `pending-spawn` lock was lost
+ * (reaped, or overtaken) proves itself only when both carry the same token AND
+ * name the claude process this session runs under (user 03.09.2026: a session
+ * nobody invited must not take the batch).
+ */
+export function spawnTokenProof({ auth = null, lastSpawn = null, ancestorPid = null } = {}) {
+  if (!auth) return { proven: false, reason: 'no launcher authorization marker' }
+  const token = typeof auth.spawnToken === 'string' ? auth.spawnToken : ''
+  if (!token) return { proven: false, reason: 'the authorization marker carries no spawn token' }
+  if (!lastSpawn || lastSpawn.spawnToken !== token) {
+    return { proven: false, reason: "the spawn token does not match the launcher's start record" }
+  }
+  const pid = Number(ancestorPid)
+  if (!Number.isInteger(pid) || pid <= 0 || auth.pid !== pid || lastSpawn.pid !== pid) {
+    return { proven: false, reason: 'the spawned pid is not the claude process this session runs under' }
+  }
+  return { proven: true, reason: 'the launcher spawn token and pid match this session' }
+}
+
+/**
+ * MAY THIS SESSION START TAKE THE BATCH? PURE.
+ *
+ * Ownership on SessionStart needs an INVITATION: the launcher's reservation
+ * converted for this session, a lock this session/process already holds (a
+ * compaction), or — the reservation lost — a proven spawn token. A bare start
+ * gets none and never calls `acquire`. `unproven` is set when a launcher marker
+ * was present but could not be proved: the hook says so, and the lock stays
+ * unconverted for the launcher's `lockConverted` reading to judge.
+ */
+export function sessionStartOwnership({ converted = false, heldHere = false, spawnProof = null, auth = null } = {}) {
+  if (converted) return { invitation: 'pending-spawn', mayAcquire: false, unproven: false }
+  if (heldHere) return { invitation: 'held', mayAcquire: true, unproven: false }
+  if (spawnProof?.proven) return { invitation: 'spawn-token', mayAcquire: true, unproven: false }
+  return { invitation: null, mayAcquire: false, unproven: !!auth }
+}
+
+/**
+ * MAY THIS SESSION START CONSUME THE LAUNCHER'S ONE-SHOT MARKER? PURE.
+ *
+ * Only the successor the marker invited consumes it: a converted reservation, or
+ * a proven spawn token that then owns. Any other window leaves it in place for
+ * that successor (four-eyes review: an uninvited window deleted it first); the
+ * marker expires on its own after ten minutes.
+ */
+export function consumesLaunchAuthorization({ ownership = 'none', invitation = null } = {}) {
+  if (ownership === 'acquired-spawn') return true
+  return invitation === 'spawn-token' && (ownership === 'acquired' || ownership === 'mine')
+}
+
+/** The word the user starts the batch with in a window the hook did not invite. */
+export const BATCH_START_WORD = 'continue'
+
+/**
+ * The opening of an OWNER's SessionStart text. PURE. Only a session that already
+ * held the lock (`mine`) is reminded of the standing instruction; a launcher
+ * spawn names its launcher instead. No other ownership value exists here.
+ */
+export function ownerStartText({ ownership, startEvidence = '' } = {}) {
+  if (ownership === 'mine') {
+    return (
+      'Standing user instruction: continue the batch autonomously, point by point, then the Closing steps — ' +
+      'without waiting for the user to say "continue".'
+    )
+  }
+  const measured = startEvidence || 'the launcher recorded no start evidence'
+  return `Resumed by the OS autostart launcher. Launcher start evidence: ${measured}.`
+}
+
+/**
+ * What an UNINVITED session is told when no live owner holds the batch. PURE.
+ * It orients and names the way in; it asserts no user order.
+ */
+export function uninvitedSessionMessage({ sessionId = '' } = {}) {
+  return (
+    'The batch is AVAILABLE (no live owner), but this session was NOT invited to own it: no launcher ' +
+    'reservation was converted for it and it held no batch lock before. It does NOT own the batch. ' +
+    `Orientation only: the open points above, \`node scripts/point-brief.mjs <N>\` for a spec, ${OWNER_RUNBOOK_DOC} ` +
+    `for how the batch runs. Answer the user normally. The user starts the batch with the word "${BATCH_START_WORD}"; ` +
+    `only then take it with \`node scripts/batch-claim.mjs --take --session ${sessionId}\`.`
+  )
+}
+
+/**
+ * DOES THIS TRANSCRIPT PROVE A PERSON IS SITTING AT THE WINDOW? PURE.
+ *
+ * Measured over this repo's transcripts (13.10.2026): a launcher spawn carries
+ * one prompt entry (`promptSource`/`turnOrigin` "sdk", no `origin`), while a
+ * window the user types into carries entries with `origin.kind` "human" — the
+ * same reading `request-approval-guard` uses for "headless". Returns true on the
+ * first human entry, false when the text was read and holds none, and null when
+ * there is nothing to read (unproven, never "interactive").
+ */
+export function transcriptShowsPerson(text) {
+  if (typeof text !== 'string' || text.length === 0) return null
+  if (!text.includes('"human"')) return false
+  for (const line of text.split('\n')) {
+    if (!line.includes('"human"')) continue
+    try {
+      if (humanText(JSON.parse(line)) !== null) return true
+    } catch {
+      /* a torn line proves nothing */
+    }
+  }
+  return false
+}
+
+/**
+ * MAY THIS TURN END TAKE A FREED BATCH LOCK? PURE.
+ *
+ * The Stop guard's acquire keeps the batch from ever being ownerless, but it
+ * must not hand the batch to the window a person is talking to unasked (user
+ * 31.08.2026). The invitations of `sessionStartOwnership` apply here too: a lock
+ * this session already holds, or a claim it made itself. Without one, only a
+ * session demonstrably unattended acquires — a read transcript holding no person,
+ * as the launcher's worker carries. `interactive` null (empty or unreadable, as a
+ * chat window right after /clear) is unproven and takes nothing: the launcher's
+ * worker, not that window, is the successor (finding 21.10.2026).
+ */
+export function turnEndOwnership({ heldHere = false, claimMine = false, interactive = null } = {}) {
+  if (heldHere) return { mayAcquire: true, invitation: 'held' }
+  if (claimMine) return { mayAcquire: true, invitation: 'claim' }
+  if (interactive !== false) return { mayAcquire: false, invitation: null }
+  return { mayAcquire: true, invitation: 'unattended' }
+}
+
+/**
+ * The OWN line a session gets when a turn end made it the batch owner. PURE.
+ * Never a clause inside another guard's text: it is printed first, alone.
+ */
+export function ownershipChangeLine({ sessionId = '', invitation = null } = {}) {
+  const how =
+    invitation === 'claim'
+      ? 'on the claim this window recorded'
+      : 'because the lock had no live owner and this session is unattended'
+  return (
+    `BATCH OWNERSHIP CHANGED: this session (${sessionId || 'unknown'}) took the batch lock at this turn end, ${how}. ` +
+    'It now OWNS the batch; any earlier STAND DOWN notice is void.'
+  )
+}
+
+/**
+ * What an interactive, uninvited window is told when it left a freed lock
+ * alone. PURE. It asks; it takes nothing.
+ */
+export function freeLockDeclinedLine({ sessionId = '' } = {}) {
+  return (
+    'BATCH FREE, NOT TAKEN: the batch lock has no live owner, but this window is interactive and never asked for ' +
+    "the batch, so it did NOT take it — the launcher's fresh worker is the normal successor. This session does NOT " +
+    `own the batch; answer the user normally. If the user wants the batch here, they say "${BATCH_START_WORD}"; ` +
+    `only then take it with \`node scripts/batch-claim.mjs --take --session ${sessionId}\`.`
+  )
 }

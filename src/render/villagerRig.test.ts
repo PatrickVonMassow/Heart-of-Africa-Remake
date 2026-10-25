@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { VILLAGER_GLTF } from '../config/balance'
+import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { legScale, morphInfluences, restHeads } from './villagerBody'
@@ -15,15 +15,18 @@ import {
   contactPoints,
   forwardKinematics,
   gaitAt,
+  gaitWeights,
   newPose,
   newWorld,
   sampleClip,
   sprintWeight,
   strideFactor,
   toolInHand,
+  type GaitClips,
 } from './villagerRig'
 
 let asset: VillagerAsset
+const clips = () => asset.clips as unknown as GaitClips
 
 beforeAll(async () => {
   const buf = readFileSync(resolve(__dirname, '../../public/models/villager.glb'))
@@ -39,8 +42,24 @@ describe('the glTF villager asset', () => {
     expect(asset.parents[asset.bones.indexOf('foot.L')]).toBe(asset.bones.indexOf('shin.L'))
   })
 
+  it('has a three-segment spine over a short pelvis: 22 bones, hips → spine → spine1 → chest → neck', () => {
+    expect(asset.bones).toHaveLength(22)
+    const parent = (b: string) => asset.bones[asset.parents[asset.bones.indexOf(b)]]
+    expect(asset.parents[asset.bones.indexOf('hips')]).toBe(-1)
+    expect(parent('spine')).toBe('hips')
+    expect(parent('spine1')).toBe('spine')
+    expect(parent('chest')).toBe('spine1')
+    expect(parent('neck')).toBe('chest')
+    // the trunk in chain order, root first (the pose code walks topoOrder)
+    expect(['hips', 'spine', 'spine1', 'chest'].map((b) => asset.bones.indexOf(b))).toEqual([0, 1, 2, 3])
+    // four distinct pivots up the trunk, each above the one below
+    const y = (b: string) => asset.rest[asset.bones.indexOf(b) * 3 + 1]
+    const trunk = ['hips', 'spine', 'spine1', 'chest', 'neck'].map(y)
+    for (let k = 1; k < trunk.length; k++) expect(trunk[k] - trunk[k - 1]).toBeGreaterThan(0.02)
+  })
+
   it('has the clips the figure plays', () => {
-    for (const c of ['idle', 'walk', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle']) expect(asset.clips[c]).toBeDefined()
+    for (const c of ['idle', 'walk', 'jog', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle']) expect(asset.clips[c]).toBeDefined()
     expect(asset.clips.walk.speed).toBeGreaterThan(0)
     expect(asset.clips.sprint.speed).toBeGreaterThan(asset.clips.walk.speed)
   })
@@ -100,13 +119,33 @@ describe('speed → clip, stride and cadence', () => {
   })
 
   it('advances the phase by exactly the distance one cycle covers', () => {
-    const g = gaitAt(asset.clips.walk, asset.clips.sprint, 1.2, 1)
+    const g = gaitAt(clips(), 1.2, 1)
     expect(g.sprint).toBe(0)
+    expect(g.jog).toBe(0)
     expect(g.cycle).toBeCloseTo(asset.clips.walk.speed * asset.clips.walk.duration * g.strideWalk)
     expect(g.phasePerUnit * g.cycle).toBeCloseTo(1)
     // a child (shorter leg) needs more cycles for the same ground
-    const child = gaitAt(asset.clips.walk, asset.clips.sprint, 1.2, 0.85)
+    const child = gaitAt(clips(), 1.2, 0.85)
     expect(child.phasePerUnit).toBeGreaterThan(g.phasePerUnit)
+  })
+
+  it('walk → jog → sprint by speed: the weights sum to 1, each gait wins its own band, the phase rate is continuous', () => {
+    expect(VILLAGER_GLTF.jogThreshold + VILLAGER_GLTF.jogBand).toBeLessThan(VILLAGER_GLTF.sprintThreshold - VILLAGER_GLTF.sprintBand)
+    let last = gaitAt(clips(), 0.05, 1)
+    for (let v = 0.06; v < 10; v += 0.01) {
+      for (const legs of [1, 0.85]) {
+        const w = gaitWeights(v, legs)
+        expect(w.walk + w.jog + w.sprint).toBeCloseTo(1, 12)
+        for (const x of [w.walk, w.jog, w.sprint]) expect(x).toBeGreaterThanOrEqual(0)
+      }
+      const g = gaitAt(clips(), v, 1)
+      // continuous: no jump of the phase rate at a band's edge or inside it
+      expect(Math.abs(g.phasePerUnit - last.phasePerUnit) / last.phasePerUnit).toBeLessThan(0.02)
+      last = g
+    }
+    expect(gaitWeights(1.0, 1).walk).toBe(1)
+    expect(gaitWeights((VILLAGER_GLTF.jogThreshold + VILLAGER_GLTF.sprintThreshold) / 2, 1).jog).toBe(1)
+    expect(gaitWeights(VILLAGER_GLTF.sprintThreshold + VILLAGER_GLTF.sprintBand + 0.1, 1).sprint).toBe(1)
   })
 })
 
@@ -188,5 +227,81 @@ describe('the tool is held in the hand bone', () => {
       const leftFist = asset.toolHold.L.offset.clone().applyQuaternion(world.q[hL]).add(world.p[hL])
       expect(leftFist.distanceTo(otherGrip)).toBeLessThan(0.01)
     }
+  })
+
+  it('in the dig clip the head follows the blade tip frame by frame, not a fixed point', () => {
+    const dig = asset.clips.dig
+    const pose = newPose(asset.bones.length)
+    const world = newWorld(asset.bones.length)
+    const hR = asset.bones.indexOf('hand.R')
+    const ih = asset.bones.indexOf('head')
+    const frames = Array.from({ length: 24 }, (_, f) => {
+      sampleClip(dig, (dig.duration * f) / 24, pose)
+      forwardKinematics(asset, asset.rest, pose, world)
+      const tool = toolInHand(asset, 'R', dig.tool!.grip)
+      const q = world.q[hR].clone().multiply(tool.quaternion)
+      const origin = tool.position.clone().applyQuaternion(world.q[hR]).add(world.p[hR])
+      const tip = origin.add(new THREE.Vector3(0, VILLAGER_ASSET.shovel.tip, 0).applyQuaternion(q))
+      const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(world.q[ih])
+      return { tip, head: world.p[ih].clone(), fwd }
+    })
+    const off = (k: number, target: THREE.Vector3) => frames[k].fwd.angleTo(target.clone().sub(frames[k].head))
+    // where the blade has moved away from its first-frame place, the head
+    // looks nearer the moving tip than that fixed place (the bug aimed at it)
+    let judged = 0
+    for (let k = 1; k < frames.length; k++) {
+      if (frames[k].tip.distanceTo(frames[0].tip) < 0.15) continue
+      judged++
+      expect(off(k, frames[k].tip)).toBeLessThan(off(k, frames[0].tip))
+    }
+    expect(judged).toBeGreaterThan(4)
+  })
+})
+
+describe('the clip style (natural-villager-motion step 6)', () => {
+  /** A bone's forward tilt (deg) per sampled frame of a clip: its up axis off
+   *  the vertical, seen from the side (or, with `yaw`, its facing off ahead). */
+  const tilts = (clip: string, bone: string, yaw = false) => {
+    const c = asset.clips[clip]
+    const n = asset.bones.length
+    const pose = newPose(n)
+    const world = newWorld(n)
+    const i = asset.bones.indexOf(bone)
+    const k = 24
+    return Array.from({ length: k }, (_, f) => {
+      sampleClip(c, (f / k) * c.duration, pose)
+      forwardKinematics(asset, asset.rest, pose, world)
+      const v = new THREE.Vector3(0, yaw ? 0 : 1, yaw ? 1 : 0).applyQuaternion(world.q[i])
+      return ((yaw ? Math.atan2(v.x, v.z) : Math.atan2(v.z, v.y)) * 180) / Math.PI
+    })
+  }
+  /** The tilt's size: its mean over the clip of each frame's absolute tilt
+   *  (a clip swinging ±30° or leaning back has no small mean), and the worst
+   *  single frame. */
+  const size = (clip: string, bone: string, yaw = false) => {
+    const t = tilts(clip, bone, yaw).map(Math.abs)
+    return { mean: t.reduce((s, x) => s + x, 0) / t.length, worst: Math.max(...t) }
+  }
+  // a single frame may swing past the mean's bound with the stride, never
+  // dive (the jog's chest peaks at 19.9°, measured 15.10.2026)
+  const DIVE = 25
+  it('the sprint no longer dives: hips upright, chest under 15°; the jog likewise', () => {
+    expect(size('sprint', 'hips').worst).toBeLessThan(2)
+    for (const clip of ['sprint', 'jog']) {
+      const chest = size(clip, 'chest')
+      expect(chest.mean, clip).toBeLessThan(15)
+      expect(chest.worst, clip).toBeLessThan(DIVE)
+    }
+    // leaning forward, not back
+    expect(Math.min(...tilts('sprint', 'chest'), ...tilts('jog', 'chest'))).toBeGreaterThan(0)
+  })
+  it('the walk and the idle stand up: chest under 10°; the idle faces ahead', () => {
+    for (const clip of ['walk', 'idle']) {
+      const chest = size(clip, 'chest')
+      expect(chest.mean, clip).toBeLessThan(10)
+      expect(chest.worst, clip).toBeLessThan(DIVE)
+    }
+    expect(size('idle', 'hips', true).worst).toBeLessThan(1)
+    expect(size('idle', 'head', true).worst).toBeLessThan(2)
   })
 })

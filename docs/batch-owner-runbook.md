@@ -18,6 +18,14 @@ not need it and must not act on it.
   Y, collect status or log facts) uses `subagent_type: "Explore"`; authoring,
   review, suites, and anything that writes, commits, or verifies keep their
   current agent types, and the model policy is unchanged.
+- A cloud authoring delegate (cloud switch ON) runs build, lint, and Vitest
+  on its branch and hands over the pushed sha, the three gate results, and
+  open issues. Local acceptance of that branch then runs only what needs the
+  quiet machine: the covering browser tier suites (`scripts/verify/tiers.mjs`),
+  the picture check (both backends when `isBackendSensitivePath` applies),
+  review, and landing; the local tier run stays mandatory and cloud green is
+  never browser-suite evidence. A cloud unit result that a later local run
+  contradicts is filed as a finding.
 - Land with `node scripts/land-point.mjs <N> --model <m>`. It drives the no-ff
   merge, fast gate, work-order tick/archive commit, push, board publish, and
   worktree cleanup, stopping on the first failed step. The post-merge gate is
@@ -28,10 +36,29 @@ not need it and must not act on it.
   second author is building buys a slower run and a redder one. This is
   scheduling, not construction: no guard enforces it, and `--plan` printing the
   observed band is the whole of its machinery.
+- Await a background build log with `node scripts/verify/run-wait.mjs
+  --await-log <log>` (as a background call), never an `until grep` loop. A
+  STALLED or TIMEOUT result is diagnosed and reported, not re-awaited blindly.
 - User-facing aesthetic judgment is against deployed `main`. A test-green,
   independently picture-checked improvement lands before asking whether it is
   aesthetically good enough. Use a branch preview only when the user's eyes are
   required to establish that the change is safe to land.
+
+## Throughput with cloud authoring
+
+Working instruction (user order 23.10.2026), practice only — no guard enforces it:
+
+- Quiet acceptance windows: while a local browser suite, unit gate, or picture
+  check runs, start no other local agent, browser, or Vitest run; cloud
+  authoring continues.
+- Gate a branch only after its author declares it final; rerun only the checks
+  a later commit invalidates.
+- Spend suite wait time on lightweight work only: review other pushed commits
+  early and prepare their acceptance steps; never start a second heavy check.
+- When refilling the pool, prefer bounded ready points with clear acceptance and
+  disjoint files and prerequisites; check overlap before delegating.
+- Until the cloud credit expires on 05.11.2026, pace cloud authoring to what
+  local acceptance can land, not to what the cloud can produce.
 
 ## Boundary, lease, claims, and wake-up
 
@@ -123,13 +150,21 @@ The first historical run and the reproducible 21 August/four-day fixtures are in
 
 ## Authoring and four eyes
 
-`scripts/author-routing-core.mjs` owns the routing cut. GPT-6 Astra authors the
-hard, complex, error-prone, and high-criticality points; Opus 5.5 authors work
-whose verification is itself the task. Fable 5 authors tagged points and automatic
-review-round escalations through `scripts/author-fable.mjs`, as `CLAUDE.md` §6 states. Review is cross-vendor through
-`scripts/review-astra.mjs` for Claude-authored work and Claude for Astra-authored
-work. Serving fallback order is Opus 5.5, Fable 5, then Opus 4.8; a different
-serving model pauses the batch.
+`scripts/author-routing-core.mjs` owns the routing cut; the lanes are role
+records in `scripts/model-lanes.mjs`, the only place naming models. At the
+`default` routing the main chain authors; the scarce lane authors tagged points
+and automatic review-round escalations through
+`scripts/author-delegate.mjs --lane scarce`, as `CLAUDE.md` §6 states. Review is
+cross-vendor through `scripts/cross-review.mjs`: a lane of another vendor than
+every author of the range. Serving fallback order is the main chain, the scarce
+lane (when switched on), then the main fallback; a different serving model
+pauses the batch.
+
+**After a lane rename lands** (scripts or state files renamed, as on the
+generic-lane change): the owner restarts the batch daemon before the next
+point starts, because a running daemon keeps invoking the script names its
+loaded code holds, and the memory entries naming old commands are updated in
+the same handoff.
 
 For blind-parallel work, each input entry carries an id. The third model merges
 by meaning through `scripts/blind-merge.mjs`, and every input is counted exactly
@@ -158,9 +193,14 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
 ## Board and owner-only operating hooks
 
 - Drain waiting findings (`node scripts/finding.mjs --drain` lists them from the
-  memory carrier) into the work order, then run
-  `node scripts/finding.mjs --drained "<title>"`. Queue waiting user requests
-  (`--requests`) with `--show`, a verbatim append and `--queued`; `--blocked`
+  memory carrier) into the work order, commit and push main, then run
+  `node scripts/finding.mjs --drained "<title>" --point <N>` (or `--why` for a
+  backlog/duplicate drain). Queue waiting user requests (`--requests`) in this
+  order: `--show`, a verbatim append, `--appending "<title>" --point <N>`,
+  commit, push main, and only then `--queued` — it proves point N on
+  origin/main and refuses otherwise. `node scripts/carrier-reconcile.mjs`
+  re-checks every tick against TASKS.md + archive (doctor, session start and
+  land-point run it); a RED there is a possibly lost user order. `--blocked`
   is only for one that cannot be carried out. A deferral leaves it pending:
   past the watermark, no `--blocked` and no decision card — `--commit
   --context` hands it on in the carrier and the successor queues it.

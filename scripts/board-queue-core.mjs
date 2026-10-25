@@ -50,7 +50,7 @@ import {
   QUEUE_STUB_META,
   TRANSLITERATION_STEMS,
 } from './dashboard-guard-core.mjs'
-import { normaliseLineEndings } from './board-core.mjs'
+import { normaliseLineEndings, QUEUE_STATUS_TEXT, renderStatusSection } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
@@ -190,12 +190,25 @@ export function gatedEntryPoints(entries) {
   return (Array.isArray(entries) ? entries : []).filter((e) => e?.gated).map((e) => e.point)
 }
 
-/** Undo the escaping `renderQueueCard` applied, so a title read back compares. */
+/** The named entities a board title can carry, beyond the three `esc` writes. */
+const NAMED_ENTITIES = Object.freeze({
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', shy: '\u00ad',
+  hellip: '…', ndash: '–', mdash: '—', middot: '·', times: '×',
+  laquo: '«', raquo: '»', bdquo: '„', ldquo: '“', rdquo: '”', sbquo: '‚', lsquo: '‘', rsquo: '’',
+  auml: 'ä', ouml: 'ö', uuml: 'ü', Auml: 'Ä', Ouml: 'Ö', Uuml: 'Ü', szlig: 'ß', eacute: 'é',
+})
+
+/**
+ * Undo the escaping a board title carries, so a title read back compares and is
+ * measured as the reader sees it. ONE pass, so `&amp;quot;` stays `&quot;`; an
+ * entity outside the table stays literal.
+ */
 const unesc = (text) =>
-  String(text ?? '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
+  String(text ?? '').replace(/&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z][a-zA-Z0-9]*));/g, (whole, hex, dec, name) => {
+    const code = hex ? parseInt(hex, 16) : dec ? Number(dec) : null
+    if (code !== null) return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole
+    return Object.hasOwn(NAMED_ENTITIES, name) ? NAMED_ENTITIES[name] : whole
+  })
 
 /**
  * The same two reports, taken from a BOARD rather than from the data — what the
@@ -218,6 +231,46 @@ export function boardTitleReport(html, titles = {}) {
   }
   const asc = (a, b) => a - b
   return { untranslated: untranslated.sort(asc), unestimated: unestimated.sort(asc) }
+}
+
+/**
+ * The longest board card title, in characters (calibratable). A headline that
+ * runs on — the whole translated work-order title plus its queue position — is
+ * how cards came to carry their description in the title and none in the body.
+ */
+export const BOARD_CARD_TITLE_MAX = 80
+
+/** A title over the limit is refused at the store boundary, naming the remedy. */
+export function assertCardTitleLength(title) {
+  const t = typeof title === 'string' ? title.trim() : ''
+  const length = [...t].length
+  if (length > BOARD_CARD_TITLE_MAX) {
+    throw new Error(
+      `board-queue: refusing a card title of ${length} characters (limit ${BOARD_CARD_TITLE_MAX}) — ` +
+        'keep the title short and move the rest into the body: node scripts/board-queue.mjs set <N> --text-stdin',
+    )
+  }
+  return title
+}
+
+/**
+ * What BLOCKS a publish among the queue cards the board renders for OPEN points:
+ * a card with no body (only the generator's stub) and a card whose title is over
+ * `BOARD_CARD_TITLE_MAX`. A card for a point outside `open` is not counted.
+ */
+export function boardCardBlockers(html, open = []) {
+  const openSet = new Set([...open].map(Number))
+  const { points } = importQueueFromHtml(html)
+  const bodyless = []
+  const overlong = []
+  for (const [key, entry] of Object.entries(points)) {
+    const n = Number(key)
+    if (!openSet.has(n)) continue
+    if (!entry.body) bodyless.push(n)
+    if ([...String(entry.title ?? '')].length > BOARD_CARD_TITLE_MAX) overlong.push(n)
+  }
+  const asc = (a, b) => a - b
+  return { bodyless: bodyless.sort(asc), overlong: overlong.sort(asc) }
 }
 
 /**
@@ -431,7 +484,7 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   let t = String(title ?? '').replace(/\s+/g, ' ').trim()
   const stem = (path) => (path.split('/').pop() ?? path).replace(/\.[a-z]+$/i, '')
   // A TITLE IS THE ONE FIELD THAT TRAVELS AS AN ARGUMENT (four-eyes finding 2,
-  // Fable 5): the depositing window is told its umlauts do not survive a Windows
+  // scarce-lane review): the depositing window is told its umlauts do not survive a Windows
   // shell, so it writes "fuer"/"pruefen" — and the board audit rejects exactly
   // that, on the OWNER's turn, for text it never wrote. The repair is applied
   // only to the words the audit's own stem list flags, so ordinary German
@@ -457,7 +510,7 @@ const BLOCKED_CARD_PREFIX = 'Anfrage nicht übernehmbar: '
  * The title of the decision card a request that cannot be carried in becomes.
  *
  * The deposit's own title goes through the SAME neutralisation as the queue card
- * (four-eyes finding 4, Fable 5, 31.07.2026): it was written in another window
+ * (four-eyes finding 4, 31.07.2026): it was written in another window
  * and lands on a card the OWNER publishes, so a path, a `§`, a point reference
  * or a shell-mangled umlaut would be judged on the owner's turn, for text it
  * never wrote. The `--blocked` path passed it through raw while the queue card
@@ -541,14 +594,18 @@ export function renderRequestsCard(requests, { max = REQUEST_CARD_MAX } = {}) {
   )
 }
 
-/** One card, in exactly the markup the board guard's parsers read. */
+/**
+ * One card, in exactly the markup the board guard's parsers read. The stored
+ * prose is the point's DESCRIPTION (written before the card is taken up); the
+ * status below the divider says no work has started yet.
+ */
 export function renderQueueCard({ point, title, body, meta }) {
   return (
     `<details>\n  <summary><span class="num">${Number(point)}</span><span class="t">${esc(title)}</span>` +
     `<span class="right"><span class="meta">${esc(meta)}</span></span></summary>\n` +
     `  <div class="body">\n${(paragraphs(body) ?? [QUEUE_STUB_BODY])
-      .map((p) => `    <p>${esc(p)}</p>\n`)
-      .join('')}  </div>\n</details>\n`
+      .map((p) => `    <p class="desc">${esc(p)}</p>\n`)
+      .join('')}${renderStatusSection({ status: QUEUE_STATUS_TEXT })}\n  </div>\n</details>\n`
   )
 }
 
@@ -636,9 +693,17 @@ export function importQueueFromHtml(html) {
     const title = (summary.match(/class="t">([\s\S]*?)<\/span>/) ?? [])[1] ?? ''
     const metaRaw = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? ''
     const bodyHtml = (chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? ''
-    const paras = [...bodyHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => cardText(m[1])).filter(Boolean)
-    // A card with no <p> at all (a hand-written board) still yields its text.
-    const body = paras.length ? paras : [cardText(bodyHtml)].filter(Boolean)
+    // A split card stores its DESCRIPTION alone; the status and the
+    // placeholder are not queue prose, so no description paragraph means none.
+    const split = bodyHtml.includes('<hr class="split">')
+    // Any attribute order and further class tokens count (`<p class="desc" lang="de">`);
+    // `\s` before `class` keeps `data-class` out.
+    const paraRe = split
+      ? /<p\b[^>]*?\sclass\s*=\s*["'](?:[^"']*\s)?desc(?:\s[^"']*)?["'][^>]*>([\s\S]*?)<\/p>/gi
+      : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
+    const paras = [...bodyHtml.matchAll(paraRe)].map((m) => cardText(m[1])).filter(Boolean)
+    // A legacy card with no <p> at all (a hand-written board) still yields its text.
+    const body = paras.length || split ? paras : [cardText(bodyHtml)].filter(Boolean)
     // THE CARD SEQUENCE IS NOT IMPORTED (point 608): the board's order is a
     // rendering of the work order, so reading it back would only re-create the
     // second home this point removed.
@@ -771,6 +836,7 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
   const n = Number(point)
   if (!Number.isInteger(n) || n <= 0) throw new Error(`board: not a point number: ${point}`)
   assertNotFlagValue(title, 'title')
+  assertCardTitleLength(title)
   assertNotFlagValue(Array.isArray(body) ? body[0] : body, 'body')
   assertNotFlagValue(estimate, 'estimate')
   const { points } = normaliseQueueData(data)

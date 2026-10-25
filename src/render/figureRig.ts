@@ -33,16 +33,30 @@ export const CROUCH_MAX = 1.1
 /**
  * The contact crouch: the smallest knee flex (0.1 rad steps up to CROUCH_MAX)
  * at which `shortAt(c)` — the hand's shortfall with the hips dropped for that
- * flex — is no longer positive; CROUCH_MAX when none is. Always searched from
- * standing (c = 0), so the same contact gives the same crouch every frame.
+ * flex — is no longer positive. When no flex brings the hand into reach, the
+ * flex that comes closest, and standing unless a deeper one gains more than
+ * CROUCH_GAIN_MIN: a hand no crouch can reach is no reason to squat. Always
+ * searched from standing (c = 0), so the same contact gives the same crouch
+ * every frame.
  */
 export function contactCrouch(shortAt: (c: number) => number): number {
+  let best = 0
+  let bestShort = Infinity
   for (let k = 0; k <= Math.round(CROUCH_MAX * 10); k++) {
     const c = k / 10
-    if (shortAt(c) <= 0) return c
+    const short = shortAt(c)
+    if (short <= 0) return c
+    if (short < bestShort - CROUCH_GAIN_MIN) {
+      best = c
+      bestShort = short
+    }
   }
-  return CROUCH_MAX
+  return best
 }
+
+/** The least shortfall (figure units) a deeper crouch must make up, short of
+ *  reach, to be taken over a shallower one. Calibratable. */
+export const CROUCH_GAIN_MIN = 0.02
 
 /** The largest shortfall (figure units) the lean may make up; a hand further
  *  out than this was a gesture, not a contact, and keeps its direction. */
@@ -101,14 +115,55 @@ export function solveTwoBone(
   return { upper, fore, reached: true }
 }
 
+/** Whether `t` is a contact a forward lean should make up: out of `reach` of
+ *  the shoulder at `s`, but by no more than `CONTACT_LEAN_REACH`, and in front
+ *  of `pivot`. Asked apart from `contactLean` because a body that bends over
+ *  several segments may reach what the one-pivot lean cannot. */
+export function contactWantsLean(s: THREE.Vector3, t: THREE.Vector3, reach: number, pivot: THREE.Vector3, forward: THREE.Vector3): boolean {
+  const d = s.distanceTo(t)
+  if (d <= reach) return false
+  if (d - reach > CONTACT_LEAN_REACH) return false
+  return t.clone().sub(pivot).dot(forward) > 0
+}
+
+/** Whether the glTF trunk's distributed bend is searched for a contact lean:
+ *  when the one-pivot lean found one, for a lunging grab, or when a contact
+ *  wants a lean the one pivot cannot make up — but not for a pose's own reach
+ *  and not under a steadied head load, which a deep bend would tip off. */
+export function searchDeepBend(o: { lean: number; wants: boolean; posedReach: boolean; grab: boolean; steadying: boolean }): boolean {
+  return o.lean > 0 || o.grab || (o.wants && !o.posedReach && !o.steadying)
+}
+
+/** Whether a figure's contacts are held by its pose's reach: an arm reaching
+ *  now, or a released reach still easing back into the clips (`releasing`
+ *  holds that arm's reach until its solve has faded out). */
+export function holdsPosedReach(reach: boolean, releasing: readonly (number | null)[]): boolean {
+  return reach || releasing.some((r) => r !== null)
+}
+
+/** The least of `leans` whose `shortfall` (m, ≤ 0 when every contact is in
+ *  reach) is met; failing that, with `nearest` the one that comes closest, so
+ *  a contact the bend cannot fully make up is still brought as near as it
+ *  goes, and without it none (0). */
+export function leastLean(leans: readonly number[], shortfall: (l: number) => number, nearest = true): number {
+  let best = 0
+  let bestShort = shortfall(0)
+  for (const l of leans) {
+    const s = shortfall(l)
+    if (s <= 0) return l
+    if (nearest && s < bestShort) {
+      best = l
+      bestShort = s
+    }
+  }
+  return best
+}
+
 /** The extra forward chest lean (rad) that brings `t` within `reach` of a
  *  shoulder at `s` when the chest pivots about `pivot`; 0 when it already is
  *  or when the target is not a reachable contact in front (see the limits). */
 export function contactLean(s: THREE.Vector3, t: THREE.Vector3, reach: number, pivot: THREE.Vector3, forward: THREE.Vector3): number {
-  const d = s.distanceTo(t)
-  if (d <= reach) return 0
-  if (d - reach > CONTACT_LEAN_REACH) return 0
-  if (t.clone().sub(pivot).dot(forward) <= 0) return 0
+  if (!contactWantsLean(s, t, reach, pivot, forward)) return 0
   const axis = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize()
   const q = new THREE.Quaternion()
   const p = new THREE.Vector3()
@@ -135,7 +190,8 @@ export function kneelLegs(thighLen: number, calfR: number): { thigh: number; shi
  * on the head alone shears it. The head's world linear part is
  * `diag(1,s,1) · Q · R · S` (Q the chain's rotation); with `R = Q⁻¹` and
  * `S = diag(1,1/s,1)` it is the identity — a counter-rotation and a stretch.
- * Writes `head`'s quaternion and scale; `chain` is hips → neck, in order.
+ * Reads and writes `head`'s quaternion (its own turn composed in: left as it
+ * is at no squash) and writes its scale; `chain` is hips → neck, in order.
  */
 export function unsquashHead(head: THREE.Object3D, chain: readonly THREE.Object3D[], s: number): void {
   const k = s > 0.01 ? s : 1
@@ -148,10 +204,13 @@ export function unsquashHead(head: THREE.Object3D, chain: readonly THREE.Object3
   // Keep the chain's TURN (its twist about y): a rotation about y commutes
   // with the y-squash, so only the rest — lean and stoop — must be undone.
   // With R = Q⁻¹·T the head's world part is diag(1,s,1)·T·diag(1,1/s,1) = T.
-  const twist = new THREE.Quaternion(0, q.y, 0, q.w)
+  // The head's own turn (the clip's, the gaze's) is composed in: its world
+  // twist is kept, and at no squash its local turn is left exactly as it is.
+  const world = q.clone().multiply(head.quaternion)
+  const twist = new THREE.Quaternion(0, world.y, 0, world.w)
   if (twist.lengthSq() < 1e-12) twist.identity()
   else twist.normalize()
-  head.quaternion.identity().slerp(q.invert().multiply(twist), f)
+  head.quaternion.slerp(q.invert().multiply(twist), f)
   head.scale.set(1, 1 / k, 1)
 }
 /** The squash over which the head's counter-rotation fades in. */
@@ -164,4 +223,176 @@ const DOWN = new THREE.Vector3(0, -1, 0)
 export function hangToward(dir: THREE.Vector3, parentWorld: THREE.Quaternion, out = new THREE.Quaternion()): THREE.Quaternion {
   const local = dir.clone().applyQuaternion(parentWorld.clone().invert()).normalize()
   return out.setFromUnitVectors(DOWN, local)
+}
+
+/**
+ * The palm's normal in the LEFT hand bone's own frame on the hanging rest
+ * (+x the hand's outside, +z forward); the right hand mirrors x. The glTF
+ * hand's is measured off public/models/villager.glb — its flattest axis,
+ * signed by the way its `grip` morph curls the fingers (pinned by
+ * scenes/place/steadyingPalm.test.tsx) — and faces the thigh and a little
+ * back; the code-built hand is a paddle flat across z, taken as facing back
+ * to match.
+ */
+export const PALM_NORMAL = {
+  gltf: [-0.85, 0.19, -0.49],
+  code: [0, 0, -1],
+} as const satisfies Record<string, readonly [number, number, number]>
+
+/** The palm normal of one hand (`side` +1 left, −1 right) in its bone's frame. */
+export function palmNormal(body: keyof typeof PALM_NORMAL, side: 1 | -1, out = new THREE.Vector3()): THREE.Vector3 {
+  const [x, y, z] = PALM_NORMAL[body]
+  return out.set(side * x, y, z).normalize()
+}
+
+const _palmD = new THREE.Vector3()
+const _palmQ = new THREE.Quaternion()
+
+/**
+ * The roll (rad, in (−π, π]) that turns a hand's palm toward `toward`: a turn
+ * about the hand bone's own axis (local +y; the bone hangs along −y), so the
+ * hand stays where the arm solve put it and only rolls. `parentWorld` is the
+ * orientation of the hand's parent (the forearm) and `toward` a direction,
+ * both in one common frame; `palm` is the palm normal in the hand's frame
+ * (`palmNormal`). 0 when `toward` runs along the hand's axis.
+ *
+ * The roll is taken within half a turn of `center`, so its one unavoidable
+ * cut (a full turn is the same roll) sits opposite it: a caller that splits
+ * the roll over two joints passes the roll its pose needs (`palmRollCenter`),
+ * and the split is continuous over every roll that pose reaches.
+ */
+export function palmRollAngle(parentWorld: THREE.Quaternion, palm: THREE.Vector3, toward: THREE.Vector3, center = 0): number {
+  const d = _palmD.copy(toward).applyQuaternion(_palmQ.copy(parentWorld).invert())
+  if (Math.hypot(d.x, d.z) < 1e-9 || Math.hypot(palm.x, palm.z) < 1e-9) return 0
+  // a turn about +y by θ carries the azimuth atan2(x, z) to atan2(x, z) + θ
+  const a = Math.atan2(d.x, d.z) - Math.atan2(palm.x, palm.z) - center
+  const turn = 2 * Math.PI
+  return center + a - turn * Math.ceil((a - Math.PI) / turn)
+}
+
+/** `palmRollAngle` as the hand's local quaternion. */
+export function palmRoll(parentWorld: THREE.Quaternion, palm: THREE.Vector3, toward: THREE.Vector3, out = new THREE.Quaternion()): THREE.Quaternion {
+  return out.setFromAxisAngle(UP, palmRollAngle(parentWorld, palm, toward))
+}
+
+/** The roll (rad) a steadying hand on a head load needs, measured on the
+ *  mounted figure (scenes/place/steadyingPalm.test.tsx): about 1.9 on the
+ *  code-built body and 2.3–3.5 on the glTF one, the left hand's negative and
+ *  the right's mirrored. The split roll's cut lies half a turn from it. A
+ *  pose constant, calibratable. */
+export const PALM_ROLL_CENTER = 2.5
+
+/** The steadying roll's centre for one hand (`side` +1 left, −1 right). */
+export const palmRollCenter = (side: 1 | -1): number => -side * PALM_ROLL_CENTER
+const UP = new THREE.Vector3(0, 1, 0)
+
+/** The share of a palm roll the forearm takes about its own axis, the wrist
+ *  the rest: the turn spread along the forearm as a real one pronates, so
+ *  neither the elbow's nor the wrist's skin wrings (the bodies have no twist
+ *  bones). A pose constant, calibratable. */
+export const FOREARM_ROLL_SHARE = 0.5
+
+// ---- the distributed lean and the gaze (natural-villager-motion step 9) ------
+
+/** The three spine segments a trunk lean is shared over, pelvis up. */
+export const LEAN_BONES = ['spine', 'spine1', 'chest'] as const
+export type LeanBone = (typeof LEAN_BONES)[number]
+
+/**
+ * A trunk lean `pitch` (rad, + leaning in) and turn `yaw` (rad) shared over
+ * the spine segments by `shares` (VILLAGER_POSE.leanShares): per bone the
+ * local delta (pitch about its x, then yaw about its y) that sums to the whole.
+ */
+export function distributeLean(
+  pitch: number,
+  yaw: number,
+  shares: Readonly<Record<LeanBone, number>>,
+): Record<LeanBone, { pitch: number; yaw: number }> {
+  const out = {} as Record<LeanBone, { pitch: number; yaw: number }>
+  for (const b of LEAN_BONES) out[b] = { pitch: pitch * shares[b], yaw: yaw * shares[b] }
+  return out
+}
+
+/** A gaze held on a direction: its yaw and pitch (rad) relative to the
+ *  heading (+z, +y up), damped toward what it wants. */
+export interface Gaze {
+  yaw: number
+  pitch: number
+  wantYaw: number
+  wantPitch: number
+}
+export const newGaze = (): Gaze => ({ yaw: 0, pitch: 0, wantYaw: 0, wantPitch: 0 })
+
+export interface GazeLimits {
+  yawMax: number
+  pitchUp: number
+  pitchDown: number
+  seconds: number
+}
+
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
+
+/**
+ * One step of the gaze toward what it wants, frame-rate independent
+ * (1 − e^(−dt/τ)), within its limits scaled by `tight` (1, or less under a
+ * head load). The wanted yaw is taken the short way round from where the gaze
+ * is, then clamped, so a target behind never flips the head from one side to
+ * the other.
+ */
+export function stepGaze(g: Gaze, dt: number, lim: GazeLimits, tight = 1): void {
+  const yawMax = lim.yawMax * tight
+  const want = Math.min(yawMax, Math.max(-yawMax, g.yaw + wrap(g.wantYaw - g.yaw)))
+  const pitch = Math.min(lim.pitchUp * tight, Math.max(-lim.pitchDown * tight, g.wantPitch))
+  const k = 1 - Math.exp(-Math.max(0, dt) / Math.max(1e-6, lim.seconds))
+  g.yaw += (want - g.yaw) * k
+  g.pitch += (pitch - g.pitch) * k
+  g.yaw = Math.min(yawMax, Math.max(-yawMax, g.yaw))
+  g.pitch = Math.min(lim.pitchUp * tight, Math.max(-lim.pitchDown * tight, g.pitch))
+}
+
+/** The unit direction of a gaze's yaw and pitch (+z ahead, +y up). */
+export function gazeDirection(yaw: number, pitch: number, out = new THREE.Vector3()): THREE.Vector3 {
+  return out.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))
+}
+
+/** A direction's gaze angles (yaw about +y from +z, pitch up). */
+export function gazeAngles(d: THREE.Vector3): { yaw: number; pitch: number } {
+  const len = d.length() || 1
+  return { yaw: Math.atan2(d.x, d.z), pitch: Math.asin(Math.min(1, Math.max(-1, d.y / len))) }
+}
+
+const _aw = new THREE.Quaternion()
+const _ad = new THREE.Quaternion()
+const _af = new THREE.Vector3()
+const _ap = new THREE.Quaternion()
+const _id = new THREE.Quaternion()
+
+/**
+ * Aim the head (+z its face) along `dir` (unit, body frame) over neck and
+ * head: the neck takes `neckShare` of the turn, the head the rest, so the face
+ * points along `dir` whatever the trunk below does (a lean, a gait's bob), by
+ * `weight` (0 leaves both as they are). `chestWorld` is the chest's turn in
+ * the body frame; `neck` and `head` are their local turns, written in place.
+ */
+export function aimHead(chestWorld: THREE.Quaternion, neck: THREE.Quaternion, head: THREE.Quaternion, dir: THREE.Vector3, neckShare: number, weight = 1): void {
+  if (weight <= 0) return
+  // the head's world turn and face, the shortest turn onto the wanted one
+  _aw.copy(chestWorld).multiply(neck).multiply(head)
+  _af.set(0, 0, 1).applyQuaternion(_aw)
+  _ad.setFromUnitVectors(_af, dir)
+  // the neck's share, as a world turn of the neck: local' = P⁻¹ · r · P · local
+  const r = _id.identity().slerp(_ad, Math.min(1, neckShare * weight))
+  _ap.copy(chestWorld)
+  neck.premultiply(_ap).premultiply(r).premultiply(_ap.invert())
+  // the head takes the rest
+  _aw.copy(chestWorld).multiply(neck).multiply(head)
+  _af.set(0, 0, 1).applyQuaternion(_aw)
+  const rest = _ad.setFromUnitVectors(_af, dir)
+  const total = Math.min(1, weight)
+  const neckW = Math.min(1, neckShare * weight)
+  // of what is left, the share that brings the whole turn to `weight`
+  const k = neckW >= 1 ? 1 : Math.max(0, (total - neckW) / (1 - neckW))
+  const r2 = new THREE.Quaternion().slerp(rest, k)
+  _ap.copy(chestWorld).multiply(neck)
+  head.premultiply(_ap).premultiply(r2).premultiply(_ap.invert())
 }

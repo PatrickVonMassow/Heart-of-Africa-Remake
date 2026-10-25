@@ -712,3 +712,137 @@ export function formatReceipt(receipt) {
   }
   return out
 }
+
+/*
+ * A BOUNDED WAIT ON AN ARBITRARY LOG (point 1356) — for a background build that
+ * writes no verify record, e.g. a Blender build whose log ends with `exit <code>`.
+ *
+ * WHY: the owner awaited such builds with `until grep -q "^exit " $LOG; do sleep
+ * 20; done`. On 14.10.2026 a build log stayed silent for 3 h 36 min while ten
+ * Blender processes ran; nobody could tell slow from hung, and a real hang would
+ * have held the batch forever. The wait now ends one of three ways: DONE (the
+ * marker line appeared), STALLED (the log has not grown for the stall threshold)
+ * or TIMEOUT (the whole budget is spent). A stall or timeout is a report for the
+ * owner to DIAGNOSE (is the process alive, busy, waiting on input?) — never a
+ * reason to start the same wait again blindly.
+ */
+
+/** Default budget of a whole log wait. Calibratable: the longest measured build
+ *  (14.10.2026) ran ~4 h. */
+export const LOG_WAIT_TIMEOUT_MS = 6 * 60 * 60_000
+
+/** Default stall threshold: no log growth for this long is reported. Calibratable
+ *  guess — short enough that a hang surfaces in under an hour, long enough that
+ *  a slow build step that writes nothing for minutes is not called stalled. */
+export const LOG_WAIT_STALL_MS = 30 * 60_000
+
+/** How often the log is looked at inside the one blocking call (no model turn). */
+export const LOG_WAIT_TICK_MS = 5000
+
+/** The default done marker: the line the build wrappers append last. */
+export const LOG_WAIT_DONE_PATTERN = '^exit '
+
+/** The exit code on a done line (`exit 1`, `exit=0`), or null when it carries none. */
+export function exitCodeOfDoneLine(line) {
+  const m = /\bexit\b\s*[=:]?\s*(-?\d+)/.exec(line ?? '')
+  return m ? Number(m[1]) : null
+}
+
+/** The last line of `text` the done pattern matches, or null. */
+export function findDoneLine(text, doneRe) {
+  const lines = String(text ?? '').split(/\r?\n/)
+  for (let i = lines.length - 1; i >= 0; i--) {
+    doneRe.lastIndex = 0
+    if (doneRe.test(lines[i])) return lines[i]
+  }
+  return null
+}
+
+/**
+ * ONE DECISION of the log wait, pure. `lastWriteAt` is when the log last grew
+ * (or its mtime); a log that never appeared counts as silent since `startedAt`.
+ * DONE wins over STALLED wins over TIMEOUT, so a marker that arrived on the last
+ * tick is still a success and a silent log is named stalled, not merely slow.
+ */
+export function logWaitStep({ startedAt, now, lastWriteAt = null, doneLine = null, timeoutMs, stallMs }) {
+  const waitedMs = Math.max(0, now - startedAt)
+  const silentMs = Math.max(0, now - (Number.isFinite(lastWriteAt) ? lastWriteAt : startedAt))
+  if (doneLine !== null) return { state: 'done', exitCode: exitCodeOfDoneLine(doneLine), waitedMs, silentMs }
+  if (silentMs >= stallMs) return { state: 'stalled', waitedMs, silentMs }
+  if (waitedMs >= timeoutMs) return { state: 'timeout', waitedMs, silentMs }
+  return { state: 'waiting', waitedMs, silentMs }
+}
+
+/**
+ * The whole bounded wait, with every effect injected so the Vitest layer can run
+ * it on a fake clock. `readLog()` returns `{ size, mtimeMs?, text }` or null (no
+ * log yet); `sleep(ms)` waits. Returns the final step plus what the report needs.
+ */
+export async function awaitLog({
+  readLog,
+  now,
+  sleep,
+  doneRe = new RegExp(LOG_WAIT_DONE_PATTERN, 'm'),
+  timeoutMs = LOG_WAIT_TIMEOUT_MS,
+  stallMs = LOG_WAIT_STALL_MS,
+  tickMs = LOG_WAIT_TICK_MS,
+}) {
+  const startedAt = now()
+  let lastSize = null
+  let lastWriteAt = null
+  for (;;) {
+    const log = readLog()
+    const t = now()
+    if (log) {
+      if (lastSize === null || log.size !== lastSize) {
+        // First sight: trust the file's own mtime (silence before the wait counts);
+        // later growth is dated by when it was seen.
+        lastWriteAt = lastSize === null && Number.isFinite(log.mtimeMs) ? log.mtimeMs : t
+        lastSize = log.size
+      } else if (Number.isFinite(log.mtimeMs) && log.mtimeMs > lastWriteAt) {
+        lastWriteAt = log.mtimeMs
+      }
+    }
+    const step = logWaitStep({
+      startedAt,
+      now: t,
+      lastWriteAt,
+      doneLine: log ? findDoneLine(log.text, doneRe) : null,
+      timeoutMs,
+      stallMs,
+    })
+    if (step.state !== 'waiting') {
+      return { ...step, size: log ? log.size : null, text: log ? log.text : '', timeoutMs, stallMs }
+    }
+    const left = Math.min(timeoutMs - step.waitedMs, stallMs - step.silentMs)
+    await sleep(Math.max(1, Math.min(tickMs, left)))
+  }
+}
+
+/** The report of a finished log wait: what happened, and for a stall or timeout
+ *  what the owner diagnoses next instead of waiting again. */
+export function formatLogWaitReport(result, { logPath = '?', tailLines = 10 } = {}) {
+  const tail = String(result.text ?? '').replace(/\s+$/, '').split(/\r?\n/).slice(-tailLines)
+  const size = result.size === null ? 'missing' : `${result.size} bytes`
+  const out = []
+  if (result.state === 'done') {
+    out.push(
+      `DONE     ${logPath} after ${formatDuration(result.waitedMs)} — ` +
+        (result.exitCode === null ? 'done marker found (no exit code on it)' : `exit ${result.exitCode}`),
+    )
+    return out
+  }
+  const head =
+    result.state === 'stalled'
+      ? `STALLED  ${logPath} — no log growth for ${formatDuration(result.silentMs)} (stall threshold ${formatDuration(result.stallMs)})`
+      : `TIMEOUT  ${logPath} — no done marker after ${formatDuration(result.waitedMs)} (budget ${formatDuration(result.timeoutMs)})`
+  out.push(head)
+  out.push(`   waited ${formatDuration(result.waitedMs)}, last write ${formatDuration(result.silentMs)} ago, log ${size}`)
+  out.push(`   last ${tail.length} line(s):`)
+  for (const l of tail) out.push(`     ${l}`)
+  out.push(
+    '   DIAGNOSE, do not re-run this wait blindly: is the build process alive and busy (ps / CPU), blocked on input, ' +
+      'or gone? Report the finding on the board, then either end the build by hand or await again with a reason.',
+  )
+  return out
+}

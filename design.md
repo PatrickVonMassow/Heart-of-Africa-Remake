@@ -782,6 +782,10 @@ the steppe burning and the rinderpest years — lives in `docs/design-reference.
 §19.15, moved there verbatim under the same number (27.07.2026). The STANDING RULE
 of §19.14 applies to it too.
 
+**Covered upper body and hip layer (user 06.10.2026).** Youth, adult and elder women never show an uncovered upper body; children always wear a hip layer. Where the source says otherwise or is silent, the nearest attested layer of the same people is chosen — never foreign dress, never one uniform garment, and never a censorship device (no blur, toggle or camera trick). This deliberately departs from parts of the record; the deviation is recorded per people in `docs/peoples-1890.md` §8.6.
+
+**Open outer garments (user 11.10.2026).** Under an open outer garment — a cape, or a cloak not tied over the breast — a villager wears no inner top the opening could reveal against the outer cloth; the outfit generator enforces this for the everyday dress. The seasonal two-shoulder wrap (the Zulu and Tuareg cold cloaks, the Hausa harmattan cloak) keeps its period garment underneath, masked where the wrap covers it (the garment cover mask); whether that reads at the game's normal camera distance is judged by eye in the village picture check, never by a numeric threshold.
+
 ## 20. Core Gameplay Loop
 
 1. Port city (first-person): buy equipment, gifts, weapons, canteen, rope, canoe, provisions; possibly take a ferry. Entering the port city saves automatically (checkpoint).

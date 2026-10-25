@@ -671,6 +671,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Lösung wird erst eingereiht, wenn du sie mir **gezeigt** und ich **danach**
   zugestimmt habe. Mein **Wortlaut** reist mit dem Auftrag. Ein Wächter dafür bleibt **einfach**
   und sperrt im Zweifel — er schützt gegen Vergessen, nicht gegen einen Angreifer."
+- **Gemergt heißt nicht laufend.** Ein Dauerprozess läuft nach dem Merge mit altem Code weiter.
+  → *Prompt:* „Vor einer **Live**-Messung: Startete der Prozess **nach** dem Merge? Sonst neu
+  starten — und die Aufsicht tut das künftig selbst.“
+- **Dein Auftrag gilt als eingereiht, lag aber nur ungespeichert da** — Aufräumen schob ihn weg.
+  → *Prompt:* „**Eingereiht** heißt **committet und gepusht**. Aufräumen **sichert und meldet**
+  fremde ungespeicherte Arbeit, statt sie wegzuschieben.“
 
 ---
 
@@ -710,4 +716,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: ef6c147277a8d0a3e8b75a81550d17d8fe9a9a5b0039f38f8cb6a05fa28b50c3 -->
+<!-- GUIDE-FINGERPRINT: 9bbd55193331eb946d863c67fa98a0501a285360260b1f704276834fd822556b -->

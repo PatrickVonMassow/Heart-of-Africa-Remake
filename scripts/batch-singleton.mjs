@@ -53,6 +53,8 @@ import {
   statSync,
 } from 'node:fs'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { createServer } from 'node:net'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { commonRepoPath } from './repo-paths.mjs'
@@ -841,6 +843,48 @@ export function cheapProbePid(pid) {
     return { exists: true, startedAt: null }
   } catch (e) {
     return { exists: !!(e && e.code === 'EPERM'), startedAt: null }
+  }
+}
+
+/**
+ * HOLD AN OS-EXCLUSIVE ADDRESS for this process's lifetime: a Linux abstract
+ * socket or a Windows named pipe. The kernel admits one listener and frees the
+ * address when the process dies, so there is no stale file and no takeover
+ * race. Resolves { held, reason }. Any listen error fails CLOSED: a watcher
+ * that cannot prove it is alone does not run (the owner's hook still delivers).
+ * Only a null address — a platform with no such primitive, none in use here —
+ * runs unguarded.
+ */
+export function holdExclusiveAddress(address) {
+  if (!address) return Promise.resolve({ held: true, reason: 'no-address' })
+  return new Promise((resolve) => {
+    const server = createServer((socket) => socket.destroy())
+    server.once('error', (e) =>
+      resolve({ held: false, reason: e && e.code === 'EADDRINUSE' ? 'in-use' : `listen-error: ${e?.code ?? e}` }),
+    )
+    server.listen(address, () => {
+      server.unref()
+      resolve({ held: true, reason: 'held', server })
+    })
+  })
+}
+
+/** The watcher's exclusive address for one checkout, or null off Linux/Windows. */
+export function watcherAddress(repoRoot, platform = process.platform) {
+  const tag = createHash('sha256').update(String(repoRoot)).digest('hex').slice(0, 16)
+  if (platform === 'win32') return `\\\\.\\pipe\\hoa-chat-watcher-${tag}`
+  if (platform === 'linux') return `\0hoa-chat-watcher-${tag}`
+  return null
+}
+
+/** The process argument vector, or null where the OS gives none cheaply
+ *  (no /proc). */
+export function processCommand(pid) {
+  if (process.platform === 'win32') return null
+  try {
+    return readFileSync(`/proc/${Number(pid)}/cmdline`, 'utf8').split('\0').filter(Boolean)
+  } catch {
+    return null
   }
 }
 
@@ -1962,6 +2006,23 @@ export function release(sessionId, lockPath = LOCK_PATH) {
   return false
 }
 
+/**
+ * The CLI's manual release: retire the holder's batch writer, then drop the lock.
+ * Deleting only the lock left an active writer whose idle process vetoed every
+ * launcher start until it exited (standstill of 16.10.2026).
+ */
+export function manualRelease(lockPath = LOCK_PATH) {
+  const lock = readOwnerLock(lockPath)
+  if (!lock) return null
+  retireBatchWriter(lock.sessionId, {
+    lockPath,
+    generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+    reason: 'manual-release',
+  })
+  rmSync(lockPath, { force: true })
+  return lock.sessionId
+}
+
 /** The head the boundary was committed from. Best effort: a seal without a ref
  *  is still a seal, and no bookkeeping read may fail a handover. */
 function currentHeadForSeal(lockPath) {
@@ -2511,10 +2572,9 @@ if (isMain) {
     const parallel = detectParallel(readOwnerLock()?.sessionId ?? '')
     console.log(`live parallel sessions: ${parallel.length ? JSON.stringify(parallel) : 'none'}`)
   } else if (cmd === 'release') {
-    const lock = readOwnerLock()
-    if (lock) {
-      rmSync(LOCK_PATH, { force: true })
-      console.log(`released lock held by ${lock.sessionId} (manual override)`)
+    const released = manualRelease()
+    if (released) {
+      console.log(`released lock held by ${released} (manual override, batch writer retired)`)
     } else {
       console.log('no lock to release')
     }

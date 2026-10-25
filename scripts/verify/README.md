@@ -139,6 +139,15 @@ node scripts/verify/run-wait.mjs --receipt [<log>]                 # a finished 
 `--await` returns when the run is over and prints its receipt; neither counts as
 a poll, because nobody looked. With no `<log>` both resolve the newest run.
 
+**A build log with no verify record** (a Blender build ending in `exit <code>`)
+is awaited with `run-wait.mjs --await-log <log> [--done '<regex>'] [--timeout <s>]
+[--stall <s>]`, never `until grep … ; do sleep; done` (point 1356). It ends DONE
+(default marker `^exit `; exit 0, or 1 for a non-zero build code), STALLED (no
+log growth for 30 min; exit 5) or TIMEOUT (6 h; exit 3), both calibratable in
+`run-wait-core.mjs`. A stall or timeout prints the last write age, log size and
+last lines for a diagnosis; it is never retried blindly. Run it in the
+background when it may outlast the 10-minute shell cap.
+
 **3. Where a look is genuinely unavoidable, it is COUNTED.**
 
 ```
@@ -1192,7 +1201,7 @@ the session. Only the run is skipped — and the NEXT commit on that branch, the
 one that finishes the work, carries neither marker nor trailer and runs CI
 normally.
 
-The timed Sol authoring lane applies that distinction mechanically. Every
+The timed cross-lane authoring applies that distinction mechanically. Every
 author-written checkpoint and the pre-run commission receipt use the rescue
 pair, so its two-minute pushes start no disposable CI chain. Only after the
 author process exits cleanly, leaves a clean tree and reports `test:unit`, build
@@ -2008,7 +2017,7 @@ Node's definitive uncaught-exception marker stays a crash whatever else it
 recorded.
 
 STATED RESIDUAL, because this document states it rather than assuming it away
-(cross-vendor finding, Fable 5, 31.08.2026): the legacy reading has only two
+(cross-vendor finding, the scarce lane, 31.08.2026): the legacy reading has only two
 of the three legs the new definition uses — it cannot ask whether stdout
 reached the suite's own terminal report line, because old records did not store
 it. A legacy run that asserted its backend, printed its first red and THEN

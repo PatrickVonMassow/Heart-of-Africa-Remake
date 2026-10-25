@@ -10,8 +10,9 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
+import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -243,13 +244,16 @@ if (section('villager-canoe')) {
     const b = window.__balance.villageLife.bankGame
     const c = window.__balance.communication
     const k = window.__balance.villageLife.canoe
-    const kept = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds, labelSeconds: c.labelSeconds, haulSeconds: k.haulSeconds }
+    const kept = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds, labelSeconds: c.labelSeconds, haulSeconds: k.haulSeconds, liftSeconds: k.liftSeconds }
     b.roamSeconds = 8
     b.roamGuardSeconds = 8
     c.labelSeconds = 12
     // A slow haul, so the headless shutter finds the net still half out on
     // the water: the same code path at a longer configured value.
     k.haulSeconds = 60
+    // A slow lift at the landing, so the shutter finds the net man still
+    // squatting ashore over the basket (point 1387).
+    k.liftSeconds = 8
     return kept
   })
   try {
@@ -423,6 +427,44 @@ if (section('villager-canoe')) {
           local: { x: c.x, y: 0.3, z: c.z },
           label: 'the two fishermen hauling the drift net into their dugout at the downstream end, silvery fish in the hull, seen from the boat’s standing place on the waterline; no child and no play rock in the picture',
         })
+      }
+      // The net man ashore at the landing, squatting to the basket (point
+      // 1387): the SAME man who knelt in the hull — one drawn body, no double.
+      const ashore = await page
+        .waitForFunction(() => {
+          const c = window.__placeCanoe?.()
+          return !!c && c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3
+        }, null, { timeout: 120000, polling: 100 })
+        .then(() => true)
+        .catch(() => false)
+      check('at the landing the net man steps ashore to unload', ashore)
+      if (ashore && atBoat) {
+        const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
+        await standAt(boat.stand, nm)
+        const squatting = () => page.evaluate(() => {
+          const c = window.__placeCanoe()
+          return c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3
+        })
+        const before = await squatting()
+        const one = await page.evaluate(() => {
+          const c = window.__placeCanoe()
+          let named = 0
+          let visible = 0
+          window.__placeScene.traverse((o) => {
+            if (!o.name.startsWith('village-canoe-netman')) return
+            named++
+            if (o.visible) visible++
+          })
+          return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
+        })
+        check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
+        await frame('1387-netman-ashore-unloading', {
+          local: { x: nm.x, y: 0.5, z: nm.z },
+          label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
+        })
+        // The squat held from the positioning through the shutter (cross-vendor review).
+        const after = await squatting()
+        check('he was still squatting ashore, unloading, before and after the shutter', before && after, JSON.stringify({ before, after }))
       }
       // The net man's word to the paddler once the basket is set down, and the
       // paddler's hard strokes that answer it.
@@ -738,6 +780,7 @@ if (section('villager-canoe')) {
       b.roamGuardSeconds = kept.roamGuardSeconds
       window.__balance.communication.labelSeconds = kept.labelSeconds
       window.__balance.villageLife.canoe.haulSeconds = kept.haulSeconds
+      window.__balance.villageLife.canoe.liftSeconds = kept.liftSeconds
       delete window.__canoeFrameAt
       delete window.__canoeSeen
       const g = window.__game.getState()
@@ -1576,7 +1619,7 @@ if (section('village-loom')) {
       // The shuttle AND both her hands, in world space: the pixel difference
       // below says that something in the crop changed, and a growing cloth or
       // a thrown shuttle would change it over arms that never moved — which is
-      // the reported defect (GPT-6 Astra review, pass 4).
+      // the reported defect (cross-vendor review, pass 4).
       const shuttleAndHands = () => {
         const m = window.__placeScene.getObjectByName('village-loom-shuttle')
         m.updateWorldMatrix(true, false)
@@ -1654,7 +1697,7 @@ if (section('village-loom')) {
         const s = window.__placeLayout.loom
         return Math.hypot(s.tend.downstream.x - s.seat.x, s.tend.downstream.z - s.seat.z)
       })
-      // PART-WAY, AND WALKING OUT (GPT-6 Astra review, two rounds): a helper
+      // PART-WAY, AND WALKING OUT (cross-vendor review, two rounds): a helper
       // parked at his stand, standing beyond it, or on his way BACK is not a
       // body carrying the word she said. He faces the way he walks (0 toward
       // downstream, π toward upstream) and turns to the warp when he stands
@@ -1670,93 +1713,104 @@ if (section('village-loom')) {
         const reading = (window.__speech?.labels() ?? []).some(l => l.speakerId === 'village-weaver')
         return { along, partWay: Math.abs(along) > 0.4 && Math.abs(along) < limit, outward, reading }
       }
-      const called = await page.waitForFunction(({ src, limit }) => {
-        const s = new Function('limit', 'return (' + src + ')(limit)')(limit)
-        return !!s && s.partWay && s.outward && s.reading
-      }, { src: helperState.toString(), limit: tendStand - 0.4 }, { timeout: 60000 }).then(() => true).catch(() => false)
-      check('the weaver’s call sends her helper part-way along the warp, and he is walking it OUT under her reading', called)
-      if (called) {
-        const view = page.viewportSize()
-        const teaching = await page.evaluate(({ width, height, limit, src }) => {
-          const layout = window.__placeLayout
-          const station = layout.loom
-          const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
-          const along = state.along
-          const screen = window.__speech?.anchorScreen('village-weaver') ?? null
-          // Nine points ON THE WATER: three depths beyond the waterline (below)
-          // straight out from her seat, each also a stride either way along
-          // the warp. Each is projected through the live camera; the frame is
-          // then read at the ones inside it.
-          const cam = window.__placeCamera
-          const V = Object.getPrototypeOf(cam.position).constructor
-          // AT THREE DEPTHS, NOT ONE (work-order 1191): from a seat ~29 m back
-          // the point 3 m past the modelled waterline projected onto the drawn
-          // beach a few pixels under the water band, with the river plainly in
-          // the frame. 8 and 15 m out lie on the water from any seat the
-          // placement allows; one blue point still answers the question.
-          const toLine = layout.bank
-            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz)
-            : 0
-          const water = layout.bank
-            ? [3, 8, 15].flatMap((beyond) => [-2.5, 0, 2.5].map((d) => {
-                const out = toLine + beyond
-                const x = station.seat.x + layout.bank.nx * out + station.fx * d
-                const z = station.seat.z + layout.bank.nz * out + station.fz * d
-                const v = new V(x, 0, z).project(cam)
-                const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
-                return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
-              }))
-            : []
-          return {
-            ...state,
-            toward: along > 0 ? 'DOWNSTREAM' : 'UPSTREAM',
-            screen,
-            labelOnScreen: !!screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height,
-            water,
+      // His walk out lasts barely a second at the errand pace, shorter than a
+      // shutter (point 1375: he arrived and turned between the two reads), so
+      // the life freeze is set IN the predicate, the same frame the state
+      // holds, and lifted only after the bracket read below.
+      try {
+        const called = await page.waitForFunction(({ src, limit }) => {
+          const s = new Function('limit', 'return (' + src + ')(limit)')(limit)
+          const held = !!s && s.partWay && s.outward && s.reading
+          if (held) window.__placeFreezeLife?.(true)
+          return held
+        }, { src: helperState.toString(), limit: tendStand - 0.4 }, { timeout: 60000 }).then(() => true).catch(() => false)
+        check('the weaver’s call sends her helper part-way along the warp, and he is walking it OUT under her reading', called)
+        if (called) {
+          const view = page.viewportSize()
+          const teaching = await page.evaluate(({ width, height, limit, src }) => {
+            const layout = window.__placeLayout
+            const station = layout.loom
+            const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
+            const along = state.along
+            const screen = window.__speech?.anchorScreen('village-weaver') ?? null
+            // Nine points ON THE WATER: three depths beyond the waterline (below)
+            // straight out from her seat, each also a stride either way along
+            // the warp. Each is projected through the live camera; the frame is
+            // then read at the ones inside it.
+            const cam = window.__placeCamera
+            const V = Object.getPrototypeOf(cam.position).constructor
+            // AT THREE DEPTHS, NOT ONE (work-order 1191): from a seat ~29 m back
+            // the point 3 m past the modelled waterline projected onto the drawn
+            // beach a few pixels under the water band, with the river plainly in
+            // the frame. 8 and 15 m out lie on the water from any seat the
+            // placement allows; one blue point still answers the question.
+            const toLine = layout.bank
+              ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz)
+              : 0
+            const water = layout.bank
+              ? [3, 8, 15].flatMap((beyond) => [-2.5, 0, 2.5].map((d) => {
+                  const out = toLine + beyond
+                  const x = station.seat.x + layout.bank.nx * out + station.fx * d
+                  const z = station.seat.z + layout.bank.nz * out + station.fz * d
+                  const v = new V(x, 0, z).project(cam)
+                  const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
+                  return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
+                }))
+              : []
+            return {
+              ...state,
+              toward: along > 0 ? 'DOWNSTREAM' : 'UPSTREAM',
+              screen,
+              labelOnScreen: !!screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height,
+              water,
+            }
+          }, { width: view.width, height: view.height, limit: tendStand, src: helperState.toString() })
+          check('her reading stands over her own head while he walks — and ON the screen',
+            teaching.reading && teaching.labelOnScreen, JSON.stringify(teaching))
+          check('he is part-way along the warp and still walking out before the picture is taken',
+            teaching.partWay && teaching.outward, JSON.stringify({ along: teaching.along, outward: teaching.outward }))
+          // The frame declares the HELPER as its subject: he is what the word
+          // means, and a picture that lost him would prove nothing.
+          const helperWorld = await page.evaluate(() => {
+            const helper = window.__placeScene.getObjectByName('village-loom-helper')
+            helper.updateWorldMatrix(true, false)
+            const e = helper.matrixWorld.elements
+            return { x: e[12], y: e[13], z: e[14] }
+          })
+          const third = await frame('1157-village-loom-named-tending', {
+            local: { x: helperWorld.x, y: helperWorld.y + 0.6, z: helperWorld.z },
+            label: `the helper ${teaching.toward.toLowerCase()} along the warp after the weaver named it, her reading over her head and the river beyond`,
+          })
+          // THE SHUTTER IS BRACKETED: the same state read again AFTER the frame.
+          // His walk out is monotone and her reading only ever ends, so a state
+          // that held before the shutter and still holds after it held at the
+          // shutter too — a helper who arrived, or a reading that faded, while
+          // the photograph was being taken is caught here.
+          const after = await page.evaluate(({ src, limit }) => new Function('limit', 'return (' + src + ')(limit)')(limit),
+            { src: helperState.toString(), limit: tendStand })
+          check('he was still walking out under her reading when the shutter closed',
+            !!after && after.partWay && after.outward && after.reading, JSON.stringify(after))
+          // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
+          // the projected water points, not assumed from the stand. Water is the
+          // one blue-dominant ground in this village; sand, cloth and a body in
+          // the way are not.
+          // A refused frame is its own red and leaves nothing to read (point 1145).
+          if (third) {
+            const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
+            const blueAt = (px, py) => {
+              if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
+              const i = (py * info.width + px) * info.channels
+              const r = data[i], g = data[i + 1], b = data[i + 2]
+              return b > r + 15 && b >= g - 10
+            }
+            const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
+            check('the river is in the captured frame, read at the projected water points',
+              waterSeen.length > 0, JSON.stringify(teaching.water))
           }
-        }, { width: view.width, height: view.height, limit: tendStand, src: helperState.toString() })
-        check('her reading stands over her own head while he walks — and ON the screen',
-          teaching.reading && teaching.labelOnScreen, JSON.stringify(teaching))
-        check('he is part-way along the warp and still walking out before the picture is taken',
-          teaching.partWay && teaching.outward, JSON.stringify({ along: teaching.along, outward: teaching.outward }))
-        // The frame declares the HELPER as its subject: he is what the word
-        // means, and a picture that lost him would prove nothing.
-        const helperWorld = await page.evaluate(() => {
-          const helper = window.__placeScene.getObjectByName('village-loom-helper')
-          helper.updateWorldMatrix(true, false)
-          const e = helper.matrixWorld.elements
-          return { x: e[12], y: e[13], z: e[14] }
-        })
-        const third = await frame('1157-village-loom-named-tending', {
-          local: { x: helperWorld.x, y: helperWorld.y + 0.6, z: helperWorld.z },
-          label: `the helper ${teaching.toward.toLowerCase()} along the warp after the weaver named it, her reading over her head and the river beyond`,
-        })
-        // THE SHUTTER IS BRACKETED: the same state read again AFTER the frame.
-        // His walk out is monotone and her reading only ever ends, so a state
-        // that held before the shutter and still holds after it held at the
-        // shutter too — a helper who arrived, or a reading that faded, while
-        // the photograph was being taken is caught here.
-        const after = await page.evaluate(({ src, limit }) => new Function('limit', 'return (' + src + ')(limit)')(limit),
-          { src: helperState.toString(), limit: tendStand })
-        check('he was still walking out under her reading when the shutter closed',
-          !!after && after.partWay && after.outward && after.reading, JSON.stringify(after))
-        // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
-        // the projected water points, not assumed from the stand. Water is the
-        // one blue-dominant ground in this village; sand, cloth and a body in
-        // the way are not.
-        // A refused frame is its own red and leaves nothing to read (point 1145).
-        if (third) {
-          const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
-          const blueAt = (px, py) => {
-            if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
-            const i = (py * info.width + px) * info.channels
-            const r = data[i], g = data[i + 1], b = data[i + 2]
-            return b > r + 15 && b >= g - 10
-          }
-          const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
-          check('the river is in the captured frame, read at the projected water points',
-            waterSeen.length > 0, JSON.stringify(teaching.water))
         }
+      } finally {
+        // Lifted on every path, so no later block inherits a frozen village.
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
       }
 
       // FROM THE PLAZA (point 1183): the user's criterion is that the station
@@ -1890,6 +1944,8 @@ if (section('adult-errands')) {
     e.intervalSeconds = 0.8
     e.dwellSeconds = 1
     e.digSeconds = 3
+    // the shipped pace, for the moving capture and the gait census (point 1404)
+    window.__errandShippedPace = e.pace
     e.pace = 6
     // Keep the measured ten-adult standalone setup. How many errands this
     // window then sees is no longer left to luck: it casts them itself and
@@ -1922,6 +1978,139 @@ if (section('adult-errands')) {
       !!geography.waterHead && !!geography.waterFoot,
       JSON.stringify({ head: geography.waterHead, foot: geography.waterFoot }),
     )
+    // A NEW HEADING IS TURNED TO, NEVER SNAPPED (point 1404): over five seconds
+    // of errands, words and digging, no adult's body swings further in one
+    // drawn frame than its fastest turn (walking or on the spot) allows for
+    // that frame's own dt. Measured INSIDE the game frame (`turnWorst`): a
+    // requestAnimationFrame sampler beside it can see two game frames in one
+    // of its own after a hitch and read a bounded turn as a snap.
+    // Measured before the fix: 1.2-2.9 rad in one frame.
+    await page.evaluate(() => window.__placeErrands().resetTurnWorst())
+    // 300 drawn frames (about five seconds at 60 fps), counted, not timed
+    await page.evaluate(() => new Promise((done) => {
+      let n = 0
+      const tick = () => (++n >= 300 ? done() : requestAnimationFrame(tick))
+      requestAnimationFrame(tick)
+    }))
+    const swings = await page.evaluate(() => ({ worst: window.__placeErrands().turnWorst }))
+    check(
+      'no village adult swings round to a new heading in one frame — it turns (point 1404)',
+      swings.worst.over <= 1e-6,
+      JSON.stringify(swings),
+    )
+    // The capture and the census below run at the SHIPPED errand pace: at this
+    // window's calibrated 6 m/s every errand adult is rightly drawn in a sprint,
+    // and that sprint was the mid-air flight of the first capture (frame-jump
+    // telemetry, 23.10.2026: worst jump exactly 6.0 m/s, no shove, no escape).
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = window.__errandShippedPace })
+    // THE MOVING CAPTURE the point is judged by (point 1404): one walking adult
+    // whose heading is far off its next way, four frames about 0.3 s apart, the
+    // camera FOLLOWING that one body (4 m off its first flank, re-placed per
+    // frame) so the turner is the figure in the middle of every frame — its yaw,
+    // way heading and drawn gait ride in each frame's label.
+    const turner = await page
+      .waitForFunction(() => {
+        const vs = window.__placeErrands().villagers
+        const i = vs.findIndex((v) => v.work && !v.work.arrived && Math.abs(Math.atan2(Math.sin(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw), Math.cos(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw))) > 0.8)
+        return i >= 0 ? { i } : false
+      }, null, { timeout: 60000, polling: 50 })
+      .then((h) => h.jsonValue())
+      .then((r) => r.i)
+      .catch(() => null)
+    check('an errand adult is caught facing away from its next way, to film its turn (point 1404)', turner !== null)
+    if (turner !== null) {
+      const side0 = await page.evaluate((i) => window.__placeErrands().villagers[i].yaw + Math.PI / 2, turner)
+      const follow = ({ i, side }) => {
+        const v = window.__placeErrands().villagers[i]
+        const p = window.__placePlayer
+        p.x = v.x + Math.sin(side) * 4
+        p.z = v.z + Math.cos(side) * 4
+        p.yaw = side
+        p.pitch = -0.15
+      }
+      // Frame 1 once showed only water (23.10.2026, both backends): the first
+      // view of this spot stalls the shutter while the turner walks on out of
+      // it. Village life is held still from the camera placement to the
+      // exposure, as for the fill shot (point 1108).
+      await page.evaluate(follow, { i: turner, side: side0 })
+      await nextFrames(8)
+      for (const k of [1, 2, 3, 4]) {
+        await page.evaluate(follow, { i: turner, side: side0 })
+        await nextFrames(2)
+        await freezeLife(true)
+        await page.evaluate(follow, { i: turner, side: side0 })
+        const at = await page.evaluate((i) => {
+          const v = window.__placeErrands().villagers[i]
+          const way = v.work ? Math.atan2(v.work.x - v.x, v.work.z - v.z) : null
+          return { x: v.x, z: v.z, yaw: v.yaw, way, gait: v.drawn.gait, speed: v.drawn.speed }
+        }, turner)
+        const deg = (a) => (a === null ? 'n/a' : Math.round((a * 180) / Math.PI))
+        const g = at.gait ? `walk ${at.gait.walk.toFixed(2)} jog ${at.gait.jog.toFixed(2)} sprint ${at.gait.sprint.toFixed(2)}` : 'no gait'
+        const label = `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`
+        console.log(label)
+        try {
+          await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
+            local: { x: at.x, y: 0.9, z: at.z },
+            label,
+          })
+        } finally {
+          await freezeLife(false)
+        }
+        if (k === 4) break
+        // the next frame once the turner has walked on about 0.35 m (≈0.3 s);
+        // a turner standing still makes four frames of one instant, not a moving capture
+        const walked = await page
+          .waitForFunction(({ i, x, z }) => {
+            const v = window.__placeErrands().villagers[i]
+            return Math.hypot(v.x - x, v.z - z) > 0.35
+          }, { i: turner, x: at.x, z: at.z }, { timeout: 5000, polling: 'raf' })
+          .then(() => true)
+          .catch(() => false)
+        check(`the filmed errand adult walks on between moving-capture frames ${k} and ${k + 1} (point 1404)`, walked)
+        if (!walked) break
+      }
+    }
+    // NO VILLAGE ADULT FLIES (point 1404 oddity, frame 1 of 23.10.2026: a woman
+    // drawn near horizontal in mid-air, legs splayed). The drawn gait of every
+    // errand adult over ~10 s: an errand walks; a sprint share means the body's
+    // measured ground speed jumped (a snap, an escape) and the clip flies.
+    const flight = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let worst = { sprint: 0, jog: 0, speed: 0, who: null }
+          let frames = 0
+          const seen = new Set()
+          let adults = 0
+          const t0 = performance.now()
+          let last = null
+          let lastT = t0
+          const tick = () => {
+            frames++
+            const now = performance.now()
+            const dt = Math.max(1e-3, (now - lastT) / 1000)
+            lastT = now
+            const vs = window.__placeErrands().villagers
+            adults = vs.length
+            const p = window.__placePlayer
+            vs.forEach((v, i) => {
+              const g = v.drawn.gait
+              if (g) seen.add(i)
+              // what the body really did since the last sample, for the cause
+              const was = last?.[i]
+              const move = was ? Math.hypot(v.x - was.x, v.z - was.z) / dt : null
+              const spin = was ? Math.abs(Math.atan2(Math.sin(v.yaw - was.yaw), Math.cos(v.yaw - was.yaw))) / dt : null
+              if (g && (g.sprint > worst.sprint || (g.sprint === worst.sprint && g.jog > worst.jog)))
+                worst = { sprint: g.sprint, jog: g.jog, speed: v.drawn.speed, move, spin, dt, who: i, x: v.x, z: v.z, player: Math.hypot(p.x - v.x, p.z - v.z), work: v.work?.phase ?? null, arrived: v.work?.arrived ?? null }
+            })
+            last = vs.map((v) => ({ x: v.x, z: v.z, yaw: v.yaw }))
+            if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
+            else resolve({ ...worst, frames, adults, gaitSeen: seen.size })
+          }
+          requestAnimationFrame(tick)
+        }),
+    )
+    check('no village adult on an errand is drawn in a sprint (point 1404 flight oddity)', flight.adults > 0 && flight.gaitSeen === flight.adults && flight.sprint < 0.5, JSON.stringify(flight))
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared
@@ -1970,7 +2159,7 @@ if (section('adult-errands')) {
     // THE UTTERANCE ALREADY STANDING WHEN THE WINDOW OPENS IS NOT ONE OF OURS.
     // `last` survives its own moment, so the first sample would otherwise be
     // counted as a fresh word and measured at a speaker who has since walked on
-    // (GPT-5.6 Sol, confirming round). It is read once, before the loop, and
+    // (cross-vendor review, confirming round). It is read once, before the loop, and
     // becomes the thing every later sample is compared against.
     const first = await page.evaluate(() => window.__placeErrands())
     let seen = first.last
@@ -1999,7 +2188,7 @@ if (section('adult-errands')) {
       // THE POPULATION IS THE GAME'S OWN STATEMENT THAT THE BOUT HAS BEGUN —
       // phase and arrival — NOT `digging`. `digging` already carries the rim
       // test, so a reading taken over it could never fail: the very body that
-      // would prove the defect is the one it drops (GPT-6 Astra, cross-vendor
+      // would prove the defect is the one it drops (cross-vendor
       // round). Read over the bout instead, both halves are real: the village
       // brings BOTH men to the rim, and the stroke therefore plays.
       const atPit = new Map()
@@ -2023,7 +2212,7 @@ if (section('adult-errands')) {
         if (pair.length !== 2) continue
         pairsSeen++
         const site = now.geography.digSites[siteIndex]
-        // ACROSS THE HOLE, MEASURED AS SUCH (GPT-6 Astra, cross-vendor round).
+        // ACROSS THE HOLE, MEASURED AS SUCH (cross-vendor round).
         // A midpoint reading proves nothing: both bodies are already inside
         // `rimLimit`, so their middle always is too — two men side by side on
         // one arc pass it. What must hold is that the site lies BETWEEN them:
@@ -2052,7 +2241,7 @@ if (section('adult-errands')) {
       // measured a man who had walked on: a correct carrier says RIVER at the
       // head of the path and then goes down to the water, which failed the check
       // though nothing was wrong, while a word really spoken at the bank slipped
-      // through as soon as its speaker walked away (GPT-5.6 Sol, first
+      // through as soon as its speaker walked away (cross-vendor review, first
       // cross-vendor round, D1).
       const last = now.last
       const key = last ? `${last.id}/${last.concept}/${last.speaker}` : null
@@ -2063,7 +2252,7 @@ if (section('adult-errands')) {
         if (who) {
           // AGAINST THE CHILDREN THEMSELVES, first. The stage says where they
           // belong; a child on the speaker's side of a rock is nearer him than
-          // the rock is, and it is the child who hears (GPT-5.6 Sol, confirming
+          // the rock is, and it is the child who hears (cross-vendor review, confirming
           // round). The stage points stay as a floor for the moment when the
           // children are elsewhere entirely.
           const kids = await page.evaluate(() => window.__placeTag?.()?.children ?? [])
@@ -2114,7 +2303,7 @@ if (section('adult-errands')) {
     // 09.09.2026.
     const errandsCast = staged['water-out'] ?? 0
     // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
-    // (GPT-6 Astra, cross-vendor round): the game stages 'water-back' at the
+    // (cross-vendor round): the game stages 'water-back' at the
     // moment the fill ends and the carrier turns for home, so it counts the
     // trips that had an empty leg and filled — the full leg home has begun,
     // not necessarily ended. ONE is the honest
@@ -2130,7 +2319,7 @@ if (section('adult-errands')) {
       errandsCast > 0,
       `${errandsCast} water errand(s) cast over 240 samples, ${roundTrips} of them turned for home`,
     )
-    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (GPT-6 Astra,
+    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (cross-vendor review,
     // cross-vendor round). Bundled into the jar assertion it inherited the water
     // errand's sample count, so a broken digging animation in a window with few
     // errands would have read NOT-COVERING instead of red — and the DIG
@@ -2150,7 +2339,7 @@ if (section('adult-errands')) {
     // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
     // the staging, digging and carrying checks are satisfied by animation alone,
     // and the earshot check passed EXPLICITLY when nobody spoke at all — so a
-    // broken speech path would have gone green (GPT-5.6 Sol, first cross-vendor
+    // broken speech path would have gone green (first cross-vendor
     // round, D2).
     check(
       'and both adult words are really spoken — RIVER and DIG',
@@ -3405,7 +3594,7 @@ if (section('adult-errands')) {
   // ONLY THE BASELINE LANE MAY STAND THE BLOCK DOWN. The exemption exists for
   // the PRE-change app, which has no durable dig record; on the candidate the
   // same missing capability IS the regression this block is here to catch, and
-  // a silent SKIP would report it as green (GPT-6 Astra, cross-vendor review of
+  // a silent SKIP would report it as green (cross-vendor review of
   // 23495d5, 14.09.2026). `baseline-classify.mjs` sets the marker when it spawns
   // the suite inside the baseline checkout, and nothing else sets it.
   const baselineLane = onBaselineLane(process.env)
@@ -3490,6 +3679,736 @@ if (section('adult-errands')) {
   }
   }
 
+}
+
+// THE WATER CARRIER'S JAR, AS DRAWN, FOR THE WHOLE ERRAND. The user watched a
+// Bambara carrier walk to the river with empty hands, bend into the water,
+// walk back with nothing on his head, and a full jar appear on the stand. Every
+// check above read the errand's `carry` field or probed an assumed point over
+// his head. This block asks the picture: in each phase — walking out, filling,
+// walking back — the jar group of THAT carrier is projected through the live
+// camera, and the pixels inside that projection must change when only its own
+// meshes are hidden (scripts/verify/carriedJar.mjs). Both figure bodies: the
+// skinned body (as mounted, and after its rig is rebuilt in place) and the low
+// preset's primitive one.
+if (section('water-jar-carried')) {
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.dwellSeconds = 1
+    e.digSeconds = 3
+    e.pace = 6
+    e.villagerCount = 10
+  })
+  await goToPlace('bambara-village')
+  const live = await page.evaluate(() => !!window.__placeErrands)
+  check('water jar: the Bambara village publishes its errands', live)
+
+  // Rawness of a clip: decoded once per exposure, RGBA.
+  const rawOf = async (buf) => {
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+    return { data, channels: info.channels }
+  }
+  // The jar's own pixels: the projected rectangle exposed with and without its
+  // meshes, life frozen so nothing else moves between the two.
+  const jarPixels = async (who, name, rect) => {
+    const clip = { x: rect.x, y: rect.y, width: Math.max(1, rect.width), height: Math.max(1, rect.height) }
+    await page.evaluate(castCarriedJarShadow, { who, name, on: false })
+    await nextFrames(8)
+    const shown = await rawOf(await capturePixels(page, `${name} shown`, { clip }))
+    await page.evaluate(showCarriedJarMeshes, { who, name, on: false })
+    await nextFrames(8)
+    const hidden = await rawOf(await capturePixels(page, `${name} hidden`, { clip }))
+    await page.evaluate(showCarriedJarMeshes, { who, name, on: true })
+    await page.evaluate(castCarriedJarShadow, { who, name, on: true })
+    await nextFrames(4)
+    return countChangedPixels(shown.data, hidden.data, shown.channels)
+  }
+  // Every stand jar shown against the errand's own count: none appears unless
+  // one was set down.
+  const standReading = () => page.evaluate(() => {
+    let shown = 0
+    window.__placeScene.traverse((o) => { if (o.name === 'stand-jar' && o.visible) shown++ })
+    const e = window.__placeErrands()
+    return { shown, count: e.standJars, capacity: e.standCapacity }
+  })
+  // A lens beside the jar, on the first bearing the ground accepts and from
+  // which the jar's pixels are really there.
+  const photographJar = async (who, name, phase, body, label) => {
+    const first = await page.evaluate(probeCarriedJar, { who, name })
+    if (!first.found) return { verdict: judgeCarriedJar(first, 0), probe: first, tried: 0 }
+    let best = { verdict: judgeCarriedJar(first, 0), probe: first, tried: 0 }
+    let tried = 0
+    for (const dist of [3, 4.5]) for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      const placed = await page.evaluate(([c, a, dist, margin]) => {
+        const cx = c.x + Math.sin(a) * dist
+        const cz = c.z + Math.cos(a) * dist
+        const inward = Math.hypot(cx, cz) <= Math.hypot(c.x, c.z)
+        const edge = window.__placeBoundaryRadius(Math.atan2(cz, cx))
+        if (!inward && (edge == null || Math.hypot(cx, cz) > edge - margin)) return null
+        const p = window.__placePlayer
+        p.x = cx
+        p.z = cz
+        p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
+        p.pitch = Math.atan2(c.y - 1.6, dist)
+        return { x: cx, z: cz }
+      }, [first.center, a, dist, 8])
+      if (!placed) continue
+      tried++
+      await nextFrames(3)
+      const drift = await page.evaluate((w) => Math.hypot(window.__placePlayer.x - w.x, window.__placePlayer.z - w.z), placed)
+      if (drift > 0.4) continue
+      await awaitPlaceDrawn(`water jar ${phase}`)
+      const probe = await page.evaluate(probeCarriedJar, { who, name })
+      if (!probe.rect) continue
+      const changed = await jarPixels(who, name, probe.rect)
+      const verdict = judgeCarriedJar(probe, changed)
+      best = { verdict, probe, tried, changed }
+      if (verdict.ok) {
+        await frame(shotName(`1376-water-carrier-${phase}-${body}`), {
+          local: probe.center,
+          label: label,
+        })
+        return best
+      }
+    }
+    return best
+  }
+  const PHASES = [
+    { phase: 'walk-out', name: 'carried-jar-empty', label: 'the water carrier walking to the river with the EMPTY jar in his hand' },
+    { phase: 'fill', name: 'carried-jar-empty', label: 'the water carrier at the bank dipping the same jar into the river' },
+    { phase: 'walk-back', name: 'carried-jar-full', label: 'the water carrier walking back with the FULL jar on his head' },
+  ]
+  // Waits for the named phase of one carrier (or, for the walk-out, of any),
+  // casting the water errand while none runs, and FREEZES life in the same
+  // frame the phase is seen, so the exposure shows that instant.
+  const awaitPhase = (phase, who) => page.waitForFunction(([phase, who]) => {
+    const e = window.__placeErrands()
+    const stand = e.geography.waterStand
+    const vs = e.villagers
+    const hit = (i) => {
+      const v = vs[i]
+      if (!v?.work) return false
+      if (phase === 'walk-out') {
+        return v.work.situation === 'water-out' && v.carry === 'emptyJar' && v.filling == null &&
+          !v.work.arrived && stand && Math.hypot(v.x - stand.x, v.z - stand.z) > 2.5
+      }
+      if (phase === 'fill') return v.carry === 'emptyJar' && v.filling != null && v.filling > 0.3
+      return v.work.situation === 'water-back' && v.carry === 'fullJar' && !v.work.arrived &&
+        stand && Math.hypot(v.x - stand.x, v.z - stand.z) > 4
+    }
+    const found = who == null ? vs.findIndex((_, i) => hit(i)) : hit(who) ? who : -1
+    if (found >= 0) {
+      window.__placeFreezeLife(true)
+      return { who: found }
+    }
+    if (phase === 'walk-out' && !vs.some((v) => v.work?.situation?.startsWith('water'))) {
+      const now = performance.now()
+      if (!(window.__jarCastAt > now - 2000)) {
+        window.__jarCastAt = now
+        window.__placeCastErrand('water-out')
+      }
+    }
+    return null
+  }, [phase, who], { timeout: 240000 }).then((h) => h.jsonValue()).catch(() => null)
+
+  // Three bodies: the skinned one as the village mounted it; the same figures
+  // after a preset switch REBUILDS their rig in place (medium → high changes the
+  // body's radial segments) — the path on which the jars stayed on the old,
+  // undrawn skeleton; and the low preset's primitive figure.
+  const BODIES = [
+    { body: 'skinned', level: null },
+    { body: 'skinned-rebuilt', level: 'high' },
+    { body: 'primitive', level: 'low' },
+  ]
+  for (const { body, level } of live ? BODIES : []) {
+    // The rebuilt pass must really rebuild: medium first, its skeletons noted,
+    // then the switch, and every skinned inhabitant must stand on a new one.
+    const skeletonIds = () => page.evaluate(() => {
+      const ids = []
+      window.__placeScene.traverse((o) => {
+        if (o.name !== 'inhabitant') return
+        o.traverse((q) => { if (q.isSkinnedMesh && q.skeleton) ids.push(q.skeleton.uuid) })
+      })
+      return ids
+    })
+    let rigsBefore = null
+    if (body === 'skinned-rebuilt') {
+      await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+      await nextFrames(8)
+      await awaitPlaceDrawn('water jar: medium preset')
+      rigsBefore = new Set(await skeletonIds())
+    }
+    if (level) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+      await nextFrames(8)
+      await awaitPlaceDrawn(`water jar: ${level} preset`)
+    }
+    if (rigsBefore) {
+      const after = await skeletonIds()
+      check('water jar (skinned-rebuilt body): the preset switch rebuilt every figure rig',
+        rigsBefore.size > 0 && after.length > 0 && after.every((id) => !rigsBefore.has(id)),
+        `${rigsBefore.size} skeletons before, ${after.length} after, ${after.filter((id) => rigsBefore.has(id)).length} kept`)
+    }
+    let who = null
+    for (const { phase, name, label } of PHASES) {
+      const at = await awaitPhase(phase, who)
+      check(`water jar (${body} body): the ${phase} phase is reached`, !!at, at ? `villager ${at.who}` : 'not within 240 s')
+      if (!at) break
+      who = at.who
+      const skinned = await page.evaluate((w) => {
+        let s = false
+        window.__placeScene.traverse((o) => { if (o.name === 'carried-jar-empty' && o.userData.villager === w) {
+          for (let p = o; p; p = p.parent) if (p.name === 'inhabitant') p.traverse((q) => { if (q.isSkinnedMesh) s = true })
+        } })
+        return s
+      }, who)
+      const wantSkinned = body !== 'primitive'
+      check(`water jar (${body} body, ${phase}): the carrier wears the ${wantSkinned ? 'skinned' : 'primitive'} body`,
+        skinned === wantSkinned, `villager ${who}: ${skinned ? 'skinned' : 'primitive'} body`)
+      const stand = await standReading()
+      check(`water jar (${body} body, ${phase}): the stand shows exactly the jars set down on it`,
+        stand.shown === stand.count, `${stand.shown} shown, ${stand.count} set down`)
+      const got = await photographJar(who, name, phase, body, label)
+      const p = got.probe
+      check(
+        `water jar (${body} body): in the ${phase} phase his jar is drawn where the lens sees it`,
+        got.verdict.ok,
+        `${skinned ? 'skinned' : 'primitive'} body, villager ${who}: ${got.verdict.why}` +
+          (p?.found ? ` — jar centre (${p.center.x.toFixed(2)}, ${p.center.y.toFixed(2)}, ${p.center.z.toFixed(2)}),` +
+            ` size ${p.size.x.toFixed(2)}×${p.size.y.toFixed(2)}×${p.size.z.toFixed(2)}, world scale ${p.worldScale.toFixed(3)},` +
+            ` feet ${p.feet ? `(${p.feet.x.toFixed(2)}, ${p.feet.y.toFixed(2)}, ${p.feet.z.toFixed(2)})` : '?'}, ${got.tried} placements` : ''),
+      )
+      if (phase === 'walk-back') {
+        // The set-down: the stand, emptied first so the cap cannot hide it,
+        // gains exactly his jar, and only once he has reached it.
+        await page.evaluate(() => window.__placeClearStand())
+        await nextFrames(2)
+        const before = (await standReading()).count
+        await freezeLife(false)
+        const flip = await page.waitForFunction((w) => {
+          const e = window.__placeErrands()
+          const v = e.villagers[w]
+          const st = e.geography.waterStand
+          // A jar on the stand while his is still on his head was credited early.
+          if (v.carry === 'fullJar') {
+            if (e.standJars > 0) return { carry: v.carry, early: e.standJars, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
+            return null
+          }
+          return { carry: v.carry, count: e.standJars, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
+        }, who, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null)
+        await nextFrames(2)
+        const after = await standReading()
+        // He sets it down AT THE TABLE (work-order 1405): his table spot is
+        // `waterStandReach` from the stand's centre, plus his arrival reach.
+        const tableReach = await page.evaluate(() => window.__balance.waterStandReach + window.__balance.waterStandTableArrivalRadius)
+        const atStand = !!flip && !flip.early && flip.carry === 'none' && flip.count === 1 && flip.gap <= tableReach + 0.05
+        check(`water jar (${body} body): the stand gains his jar only when he sets it down`,
+          before === 0 && atStand && after.shown === after.count && after.count === 1,
+          `${before} → ${after.count} set down, ${after.shown} shown; ` +
+            (flip ? (flip.early ? `${flip.early} on the stand while his jar was still on his head, ${flip.gap.toFixed(2)} m out` :
+              `jar ${flip.carry} at ${flip.gap.toFixed(2)} m from the stand (reach ${flip.reach}), ${flip.count} on the stand at that instant`) : 'jar never left his head'))
+      }
+      await freezeLife(false)
+    }
+  }
+  if (live) {
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    await freezeLife(false)
+  }
+}
+
+// THE CARRIER AT THE TABLE (work-order 1405). The user saw the water carrier
+// set his jar down standing far off the stand, his report's hand not on the
+// water, and the next empty jar appear in his hand from nothing. One whole
+// errand is RECORDED frame by frame in the page (live, nothing frozen): where
+// he stands at the set-down, where the empty jar is drawn on every frame from
+// the order to his leaving the stand, and the drawn pointing arm's line against
+// the water in the jar he set down. Then a second errand is held at the take
+// and at the report for the picture.
+if (section('water-stand-table')) {
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.villagerCount = 10
+  })
+  await goToPlace('bambara-village')
+  const live = await page.evaluate(() => !!window.__placeErrands?.().geography.waterStand)
+  check('water stand table: the Bambara village has its water stand', live)
+  if (live) {
+    // The player a few metres off the stand on its landward side, inside the
+    // hearing radius, so the report's gesture is made at all.
+    const standView = () => page.evaluate(() => {
+      const g = window.__placeErrands().geography
+      const s = g.waterStand
+      const f = g.waterFoot ?? { x: s.x + 1, z: s.z }
+      const d = Math.hypot(f.x - s.x, f.z - s.z) || 1
+      const p = window.__placePlayer
+      p.x = s.x - ((f.x - s.x) / d) * 4.5
+      p.z = s.z - ((f.z - s.z) / d) * 4.5
+      p.yaw = Math.atan2(-(s.x - p.x), -(s.z - p.z))
+      p.pitch = -0.28
+      return { x: s.x, z: s.z }
+    })
+    const stand = await standView()
+    const recorded = await page.evaluate(() => new Promise((resolve) => {
+      const scene = window.__placeScene
+      const spare = scene.getObjectByName('stand-jar-empty')
+      const rows = []
+      scene.traverse((o) => { if (o.name === 'stand-jar') rows.push(o) })
+      const wp = (o) => { o.updateWorldMatrix(true, false); const e = o.matrixWorld.elements; return { x: e[12], y: e[13], z: e[14] } }
+      const shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true }
+      const rec = { who: null, samples: [], started: performance.now(), castAt: 0, cleared: false }
+      let hand = null
+      let inh = null
+      const tick = () => {
+        const now = performance.now()
+        if (now - rec.started > 240000) return resolve({ ...rec, timeout: true })
+        const e = window.__placeErrands()
+        const vs = e.villagers
+        if (rec.who == null) {
+          const k = vs.findIndex((v) => v.work?.situation === 'water-out' && v.work.phase === 'wait')
+          if (k >= 0) {
+            rec.who = k
+            // One older jar stays, so the report must find the NEW jar, not slot 0.
+            window.__placeClearStand(1)
+            scene.traverse((o) => { if (o.name === 'carried-jar-empty' && o.userData.villager === k) hand = o })
+            for (let p = hand; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+          } else if (!vs.some((v) => v.work?.situation?.startsWith('water')) && now - rec.castAt > 2000) {
+            rec.castAt = now
+            window.__placeCastErrand('water-out')
+          }
+          return requestAnimationFrame(tick)
+        }
+        const v = vs[rec.who]
+        const arm = (s) => {
+          const up = inh?.getObjectByName(`bone-upperArm.${s === 'left' ? 'L' : 'R'}`)
+          const tip = inh?.getObjectByName(s === 'left' ? 'hand-left' : 'hand-right')
+          return up && tip ? { shoulder: wp(up), hand: wp(tip) } : null
+        }
+        const newest = e.standJars > 0 ? rows[Math.min(rows.length, e.standJars) - 1] : null
+        rec.samples.push({
+          t: now, x: v.x, z: v.z, yaw: v.yaw, phase: v.work?.phase ?? null, situation: rec.endAt ? 'ended' : v.work?.situation ?? null,
+          arrived: v.work?.arrived ?? null, taking: v.work?.taking ?? null, carry: v.carry, jars: e.standJars,
+          spare: spare && shown(spare) ? wp(spare) : null,
+          hand: hand && shown(hand) ? wp(hand) : null,
+          gesture: v.gesture, arms: v.gesture?.kind || v.work?.taking != null ? { left: arm('left'), right: arm('right') } : null,
+          water: newest ? (() => { const p = wp(newest); return { x: p.x, y: p.y + 0.16, z: p.z } })() : null,
+        })
+        // On past the errand's end while his report's gesture still runs.
+        if (v.work?.situation !== 'water-back' && rec.samples.some((s) => s.situation === 'water-back')) rec.endAt ??= now
+        if (rec.endAt && now - rec.endAt > 3000) return resolve(rec)
+        if (!v.work && rec.samples.length > 30 && !rec.samples.some((s) => s.situation)) return resolve({ ...rec, lost: true })
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    }))
+    const S = recorded.samples
+    check('water stand table: one whole water errand was recorded', !!recorded.who || recorded.who === 0 ? !recorded.timeout && !recorded.lost : false,
+      `villager ${recorded.who}, ${S.length} frames${recorded.timeout ? ', timed out' : ''}${recorded.lost ? ', errand lost before the return' : ''}`)
+    const reach = await page.evaluate(() => window.__balance.waterStandReach + window.__balance.waterStandTableArrivalRadius)
+    const gap = (s) => Math.hypot(s.x - stand.x, s.z - stand.z)
+    // (a) The set-down: the frame the stand gains his jar.
+    const down = S.findIndex((s, k) => k > 0 && s.jars > S[k - 1].jars)
+    check('water stand table: he sets the full jar down standing at the table',
+      down > 0 && gap(S[down]) <= reach + 0.05 && S[down].jars === 2,
+      down > 0 ? `${gap(S[down]).toFixed(2)} m from the stand's centre at the set-down (table reach ${reach.toFixed(2)} m; the old waiting ring is 2.4 m); stand ${S[down - 1].jars} -> ${S[down].jars} jars (one older jar kept)` : 'no set-down seen')
+    // (c) The empty jar: drawn exactly once on every frame from the order until
+    // he walks off with it, and never jumping — a pop is a move faster than any
+    // hand moves it (the headless frames are slow, so it is judged as a speed),
+    // and above all no gap where it leaves the plank for his hand.
+    const order = S.findIndex((s) => s.phase === 'take')
+    const off = S.findIndex((s, k) => k > order && s.phase === 'fetch')
+    // On through his first walking frames: a jar that jumps or vanishes as he
+    // sets off is the same defect.
+    let walkEnd = off
+    while (off > 0 && walkEnd < S.length && walkEnd < off + 30 && S[walkEnd].phase === 'fetch') walkEnd++
+    // The take is judged at a hand's pace; his first steps at a carry walk's,
+    // whose arm swing alone reaches about 4.5 m/s at these frames with no
+    // turn (measured 23.10.2026, frame 255) — a pop from the plank is a
+    // jump of a jar's distance, well past either bound.
+    let worst = { speed: 0, k: -1 }
+    let walkWorst = { speed: 0, k: -1 }
+    let swap = null
+    let both = 0
+    let none = 0
+    let prev = null
+    for (let k = Math.max(0, order); k >= 0 && k < (off > 0 ? walkEnd : S.length); k++) {
+      const s = S[k]
+      if (s.spare && s.hand) both++
+      const at = s.hand ?? s.spare
+      if (!at) { none++; continue }
+      if (prev) {
+        const j = Math.hypot(at.x - prev.x, at.y - prev.y, at.z - prev.z)
+        const speed = j / Math.max(1e-3, (s.t - prev.t) / 1000)
+        const into = s.phase === 'fetch' ? walkWorst : worst
+        if (speed > into.speed) Object.assign(into, { speed, k, from: s.hand ? 'hand' : 'plank', jump: j, dt: s.t - prev.t, turn: Math.abs(s.yaw - S[k - 1].yaw), walk: Math.hypot(s.x - S[k - 1].x, s.z - S[k - 1].z), phase: s.phase, gesture: s.gesture?.kind ?? null })
+        if (s.hand && !prev.hand) swap = j
+      }
+      prev = { ...at, t: s.t, hand: !!s.hand }
+    }
+    const taking = S.filter((s) => s.taking != null)
+    const lifted = taking.reduce((m, s) => (s.spare && S[order].spare ? Math.max(m, Math.hypot(s.spare.x - S[order].spare.x, s.spare.y - S[order].spare.y, s.spare.z - S[order].spare.z)) : m), 0)
+    check('water stand table: the empty jar is taken up from the plank, never appearing from nothing',
+      order >= 0 && off > order && taking.length > 5 && both === 0 && none === 0 && swap !== null && swap <= 0.05 && worst.speed <= 4 && walkWorst.speed <= 6 && lifted > 0.1 && !!S[order].spare,
+      `order at frame ${order}, off the stand at ${off}, walking checked to ${walkEnd}; ${taking.length} take frames; jar lifted ${lifted.toFixed(2)} m off the plank before it is in his hand; ` +
+        `plank-to-hand gap ${swap == null ? 'never' : `${swap.toFixed(3)} m`}; fastest take move ${worst.speed.toFixed(2)} m/s (frame ${worst.k}, ${worst.from ?? '-'}, ${worst.jump?.toFixed(3) ?? '-'} m in ${worst.dt?.toFixed(0) ?? '-'} ms, body turned ${worst.turn?.toFixed(3) ?? '-'} rad and moved ${worst.walk?.toFixed(3) ?? '-'} m, phase ${worst.phase ?? '-'}, gesture ${worst.gesture ?? 'none'}); fastest in his first steps ${walkWorst.speed.toFixed(2)} m/s (frame ${walkWorst.k}, ${walkWorst.jump?.toFixed(3) ?? '-'} m in ${walkWorst.dt?.toFixed(0) ?? '-'} ms, body turned ${walkWorst.turn?.toFixed(3) ?? '-'} rad); ${both} frames with two jars, ${none} with none`)
+    // (b) The report's pointing arm, held: its drawn line from the shoulder
+    // through the hand against the water in the jar he set down.
+    const held = S.filter((s) => (s.situation === 'water-back' || s.situation === 'ended') && s.gesture?.kind === 'indicate' && s.gesture.t > 1.75 &&
+      s.gesture.t < s.gesture.duration - 0.4 && s.arms && s.water && down > 0 && Math.hypot(s.x - S[down].x, s.z - S[down].z) < 0.1)
+    const misses = held.map((s) => {
+      const a = s.arms[s.gesture.side ?? 'left']
+      if (!a) return null
+      const d = [a.hand.x - a.shoulder.x, a.hand.y - a.shoulder.y, a.hand.z - a.shoulder.z]
+      const n = Math.hypot(...d)
+      const u = d.map((c) => c / n)
+      const w = [s.water.x - a.shoulder.x, s.water.y - a.shoulder.y, s.water.z - a.shoulder.z]
+      const along = w[0] * u[0] + w[1] * u[1] + w[2] * u[2]
+      return { off: Math.hypot(w[0] - along * u[0], w[1] - along * u[1], w[2] - along * u[2]), along, reach: Math.hypot(...w) }
+    }).filter(Boolean)
+    const worstMiss = misses.reduce((m, x) => (x.off > m.off ? x : m), { off: 0 })
+    check('water stand table: his report points at the water he set down',
+      misses.length > 5 && worstMiss.off <= 0.1 && misses.every((m) => m.along > 0),
+      `${misses.length} held frames; the arm's line passes the jar's water at most ${worstMiss.off.toFixed(3)} m off (${worstMiss.reach?.toFixed(2) ?? '?'} m out)`)
+    // THE PICTURES: a second errand held at the take, with the empty jar between
+    // plank and hand, and at the report, with his arm out at the jar set down.
+    // Life is frozen in the frame the moment is seen, so the shot is that moment.
+    const holdAt = (moment) => page.waitForFunction((moment) => {
+      const e = window.__placeErrands()
+      const vs = e.villagers
+      const k = vs.findIndex((v) => moment === 'take'
+        ? v.work?.taking != null && v.work.taking > 0.42 && v.work.taking < 0.58
+        : v.work?.situation === 'water-back' && v.carry === 'none' && v.gesture?.kind === 'indicate' && v.gesture.t > 1.7 && v.gesture.t < 2.1)
+      if (k >= 0) {
+        window.__placeFreezeLife(true)
+        return { who: k, x: vs[k].x, z: vs[k].z }
+      }
+      if (!vs.some((v) => v.work?.situation?.startsWith('water'))) {
+        const now = performance.now()
+        if (!(window.__standCastAt > now - 2000)) {
+          window.__standCastAt = now
+          window.__placeCastErrand('water-out')
+        }
+      }
+      return null
+    }, moment, { timeout: 240000, polling: 'raf' }).then((h) => h.jsonValue()).catch(() => null)
+    for (const [moment, label] of [
+      ['take', 'the water carrier at the stand taking the empty jar up from the plank into his hand'],
+      ['report', 'the water carrier at the stand pointing at the water in the jar he has just set down'],
+    ]) {
+      await standView()
+      const at = await holdAt(moment)
+      check(`water stand table: the ${moment} is reached for its picture`, !!at, at ? `villager ${at.who}` : 'not within 240 s')
+      if (!at) continue
+      // The lens off to the side of the line from him to the stand, so his arm
+      // and the plank are both seen in profile — on the first side and distance
+      // from which he (and at the take, the jar in flight) is really what the
+      // lens sees: their pixels change when only they are hidden. Another
+      // villager walking between lens and table would otherwise fill the frame.
+      const target = (kind) => page.evaluate(([kind, who]) => {
+        const scene = window.__placeScene
+        let o = null
+        if (kind === 'jar') o = scene.getObjectByName('stand-jar-empty')
+        else scene.traverse((q) => { if (!o && q.name === 'carried-jar-empty' && q.userData.villager === who) o = q })
+        if (kind === 'man') while (o && o.name !== 'inhabitant') o = o.parent
+        return !!o
+      }, [kind, at.who])
+      const rectOf = (kind) => page.evaluate(([kind, who]) => {
+        const scene = window.__placeScene
+        const cam = window.__placeCamera
+        let o = null
+        if (kind === 'jar') o = scene.getObjectByName('stand-jar-empty')
+        else scene.traverse((q) => { if (!o && q.name === 'carried-jar-empty' && q.userData.villager === who) o = q })
+        if (kind === 'man') while (o && o.name !== 'inhabitant') o = o.parent
+        if (!o || !cam) return null
+        scene.updateMatrixWorld(true)
+        const r = document.querySelector('canvas').getBoundingClientRect()
+        const ap = (e, v) => [0, 1, 2, 3].map((k) => e[k] * v[0] + e[k + 4] * v[1] + e[k + 8] * v[2] + e[k + 12] * v[3])
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+        o.traverse((m) => {
+          if (!m.isMesh || !m.geometry) return
+          if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
+          const b = m.geometry.boundingBox
+          for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+            const c = ap(cam.projectionMatrix.elements, ap(cam.matrixWorldInverse.elements, ap(m.matrixWorld.elements, [x, y, z, 1])))
+            if (!(c[3] > 0)) continue
+            const px = r.left + ((c[0] / c[3] + 1) / 2) * r.width
+            const py = r.top + ((1 - c[1] / c[3]) / 2) * r.height
+            x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px); y1 = Math.max(y1, py)
+          }
+        })
+        x0 = Math.max(r.left, Math.floor(x0)); y0 = Math.max(r.top, Math.floor(y0))
+        x1 = Math.min(r.right, Math.ceil(x1)); y1 = Math.min(r.bottom, Math.ceil(y1))
+        return x1 > x0 + 2 && y1 > y0 + 2 ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : null
+      }, [kind, at.who])
+      const showOf = (kind, on) => page.evaluate(([kind, who, on]) => {
+        const scene = window.__placeScene
+        let o = null
+        if (kind === 'jar') o = scene.getObjectByName('stand-jar-empty')
+        else scene.traverse((q) => { if (!o && q.name === 'carried-jar-empty' && q.userData.villager === who) o = q })
+        if (kind === 'man') while (o && o.name !== 'inhabitant') o = o.parent
+        if (o) o.visible = on
+      }, [kind, at.who, on])
+      const share = async (kind) => {
+        const rect = await rectOf(kind)
+        if (!rect) return 0
+        const raw = async () => {
+          const { data, info } = await sharp(await capturePixels(page, `${kind} ${moment}`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
+          return { data, channels: info.channels }
+        }
+        await nextFrames(3)
+        const shown = await raw()
+        await showOf(kind, false)
+        await nextFrames(3)
+        const hidden = await raw()
+        await showOf(kind, true)
+        await nextFrames(2)
+        return countChangedPixels(shown.data, hidden.data, shown.channels) / (rect.width * rect.height)
+      }
+      let subject = null
+      let seen = null
+      const tries = []
+      for (const dist of [2.8, 3.6]) for (const side of [1, -1]) {
+        if (seen) break
+        subject = await page.evaluate(([at, stand, dist, side]) => {
+          const dx = stand.x - at.x
+          const dz = stand.z - at.z
+          const d = Math.hypot(dx, dz) || 1
+          const mid = { x: (at.x + stand.x) / 2, z: (at.z + stand.z) / 2 }
+          const p = window.__placePlayer
+          p.x = mid.x - side * (dz / d) * dist
+          p.z = mid.z + side * (dx / d) * dist
+          p.yaw = Math.atan2(-(mid.x - p.x), -(mid.z - p.z))
+          p.pitch = Math.atan2(0.75 - 1.6, dist)
+          return { x: mid.x, y: 0.75, z: mid.z }
+        }, [at, stand, dist, side])
+        await nextFrames(4)
+        await awaitPlaceDrawn(`water stand ${moment}`)
+        const man = await share('man')
+        const jar = moment === 'take' && await target('jar') ? await share('jar') : 1
+        tries.push(`${dist}/${side}: man ${(man * 100).toFixed(0)} %, jar ${(jar * 100).toFixed(0)} %`)
+        // His box is loose about a leaning, reaching body (12 % measured unobstructed
+        // from every side at the take); a body in front of him leaves next to none.
+        if (man >= 0.08 && jar >= 0.3) seen = { dist, side, man, jar }
+      }
+      check(`water stand table: the ${moment} is photographed with him${moment === 'take' ? ' and the jar' : ''} in plain view`,
+        !!seen, seen ? `lens ${seen.dist} m off, side ${seen.side}: ${(seen.man * 100).toFixed(0)} % of his box and ${(seen.jar * 100).toFixed(0)} % of the jar's are his own pixels` : `no lens sees him unobstructed (${tries.join('; ')})`)
+      if (seen) await frame(shotName(`1405-water-carrier-${moment}`), { local: subject, label })
+      await page.evaluate(() => window.__placeFreezeLife(false))
+    }
+    // A diagnostic dump only when asked for (no tracked file is written).
+    if (process.env.WATER_STAND_DUMP) appendFileSync(process.env.WATER_STAND_DUMP, JSON.stringify({ stand, reach, down: S[down], misses, held, worst, take: S.slice(Math.max(0, order - 2), order + 120) }) + '\n')
+  }
+}
+
+// THE STEADYING HAND ON THE JAR, CLOSE (work-order "steadying hand holds a
+// head load with the palm"). The water carrier walking back under the full jar
+// lays one hand on it (skinnedFigure.tsx, the steadying arm); the user saw the
+// back of that hand on the jar. The 1376 frames above are aimed at the jar and
+// show no hand on it, so this block waits for a carrier whose steadying hand
+// is REALLY drawn — the figure's dev probe `userData.steady` (its arm, and how
+// much of the solve shows past the clips) — freezes life in that frame, and
+// photographs the hand from close by, side-on and from the front: the palm on
+// the jar, the back of the hand outward. At the shutter the probe must still
+// read the arm engaged, and the hand itself must be what the lens sees there
+// (its pixels there change when only it is hidden).
+// The right hand steadies only while the left one is busy (a gesture the
+// carrier makes on a work word aimed to its left): reachable, but not
+// stageable here, so the right side is pinned by
+// src/scenes/place/steadyingPalm.test.tsx alone.
+if (section('steadying-palm')) {
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.dwellSeconds = 1
+    e.digSeconds = 3
+    e.pace = 6
+    e.villagerCount = 10
+  })
+  await goToPlace('bambara-village')
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  await nextFrames(8)
+  await awaitPlaceDrawn('steadying palm: medium preset')
+  const live = await page.evaluate(() => !!window.__placeErrands)
+  check('steadying palm: the Bambara village publishes its errands', live)
+  // Each carrier's figure, its full jar and its steadying-hand probe.
+  const carriers = () => {
+    const out = {}
+    window.__placeScene.traverse((o) => {
+      if (o.name !== 'carried-jar-full') return
+      for (let p = o; p; p = p.parent) {
+        if (p.name === 'inhabitant') {
+          out[o.userData.villager] = { jar: o.visible, steady: p.userData.steady ?? null }
+          return
+        }
+      }
+    })
+    return out
+  }
+  // A carrier on the way back with the full jar on the head and the
+  // steadying hand engaged; life frozen in the frame it is seen.
+  const engaged = live ? await page.waitForFunction((src) => {
+    const carriers = new Function(`return (${src})`)()
+    const e = window.__placeErrands()
+    const seen = carriers()
+    const found = e.villagers.findIndex((v, i) =>
+      v?.work?.situation === 'water-back' && v.carry === 'fullJar' && !v.work.arrived &&
+      seen[i]?.jar && seen[i]?.steady?.arm && seen[i].steady.weight > 0.9)
+    if (found >= 0) {
+      window.__placeFreezeLife(true)
+      return { who: found, steady: seen[found].steady }
+    }
+    if (!e.villagers.some((v) => v.work?.situation?.startsWith('water'))) {
+      const now = performance.now()
+      if (!(window.__jarCastAt > now - 2000)) {
+        window.__jarCastAt = now
+        window.__placeCastErrand('water-out')
+      }
+    }
+    return null
+  }, carriers.toString(), { timeout: 240000 }).then((h) => h.jsonValue()).catch(() => null) : null
+  if (!engaged && live) {
+    // why not: every carrier walking back, with what its probe reads
+    const why = await page.evaluate((src) => {
+      const seen = new Function(`return (${src})`)()()
+      return window.__placeErrands().villagers.map((v, i) => ({ i, situation: v?.work?.situation, carry: v?.carry, ...seen[i] }))
+        .filter((r) => r.carry === 'fullJar')
+    }, carriers.toString())
+    check('steadying palm: a carrier walks back with the full jar and its steadying hand on it', false, JSON.stringify(why))
+  }
+  if (engaged) {
+    const { who } = engaged
+    const arm = engaged.steady.arm
+    const bone = arm === 'left' ? 'L' : 'R'
+    check('steadying palm: a carrier walks back with the full jar and its steadying hand on it', true,
+      `villager ${who}, ${arm} hand, weight ${engaged.steady.weight.toFixed(2)}`)
+    // The hand, the figure's side and heading, in world coordinates.
+    const pose = await page.evaluate(([who, bone]) => {
+      let inh = null
+      window.__placeScene.traverse((o) => {
+        if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+      })
+      const hand = inh.getObjectByName(`bone-hand.${bone}`)
+      const V = hand.position.constructor
+      inh.updateWorldMatrix(true, true)
+      const h = hand.getWorldPosition(new V())
+      const m = inh.matrixWorld.elements
+      const len = (x, z) => Math.hypot(x, z) || 1
+      const sx = { x: m[0] / len(m[0], m[2]), z: m[2] / len(m[0], m[2]) }
+      const fz = { x: m[8] / len(m[8], m[10]), z: m[10] / len(m[8], m[10]) }
+      return { hand: { x: h.x, y: h.y, z: h.z }, side: sx, fwd: fz }
+    }, [who, bone])
+    const sign = arm === 'left' ? 1 : -1
+    // calibratable: the hand's own pixels a frame needs to show it at all
+    const HAND_PIXELS = 250
+    // The hand's own pixels in a box around its projection: drawn, then with
+    // only the hand bone collapsed, so the jar, head and every other occluder
+    // keep their depth and cannot supply the difference themselves.
+    const handPixels = async (name) => {
+      const rect = await page.evaluate(([who, bone]) => {
+        let inh = null
+        window.__placeScene.traverse((o) => {
+          if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+        })
+        const hand = inh.getObjectByName(`bone-hand.${bone}`)
+        const v = hand.getWorldPosition(new hand.position.constructor()).project(window.__placeCamera)
+        if (Math.abs(v.x) > 0.9 || Math.abs(v.y) > 0.9 || v.z > 1) return null
+        const w = window.innerWidth
+        const h = window.innerHeight
+        return { x: Math.round((v.x + 1) / 2 * w) - 40, y: Math.round((1 - v.y) / 2 * h) - 40, width: 80, height: 80 }
+      }, [who, bone])
+      if (!rect) return { changed: 0, rect: null }
+      const shown = await sharp(await capturePixels(page, `${name} shown`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
+      const setShown = (on) => page.evaluate(([who, bone, on]) => {
+        let inh = null
+        window.__placeScene.traverse((o) => {
+          if (o.name === 'carried-jar-full' && o.userData.villager === who) for (let p = o; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+        })
+        inh.getObjectByName(`bone-hand.${bone}`).scale.setScalar(on ? 1 : 1e-3)
+      }, [who, bone, on])
+      await setShown(false)
+      await nextFrames(6)
+      const hidden = await sharp(await capturePixels(page, `${name} hidden`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
+      await setShown(true)
+      await nextFrames(6)
+      return { changed: countChangedPixels(shown.data, hidden.data, shown.info.channels), rect }
+    }
+    const VIEWS = [
+      { view: 'side', label: `close on the water carrier walking back under the full jar, side-on: his steadying ${arm.toUpperCase()} hand on the jar, palm to it`, out: 1, ahead: 0.5 },
+      { view: 'front', label: `close on the water carrier walking back under the full jar, from the front: his steadying ${arm.toUpperCase()} hand on the jar, palm to it`, out: 0.45, ahead: 1 },
+    ]
+    for (const { view, label, out, ahead } of VIEWS) {
+      const name = shotName(`1392-steadying-palm-${arm}-${view}`)
+      let shot = null
+      let best = null
+      for (const dist of [1.4, 1.8, 2.3]) {
+        for (const turn of [0, 0.35, -0.35, 0.7, -0.7]) {
+          // a bearing out from the hand's side and ahead of the carrier, turned a little
+          const bx = sign * pose.side.x * out + pose.fwd.x * ahead
+          const bz = sign * pose.side.z * out + pose.fwd.z * ahead
+          const c = Math.cos(turn)
+          const s = Math.sin(turn)
+          const n = Math.hypot(bx, bz)
+          const dx = (bx * c + bz * s) / n
+          const dz = (-bx * s + bz * c) / n
+          const placed = await page.evaluate(([h, dx, dz, dist]) => {
+            const p = window.__placePlayer
+            p.x = h.x + dx * dist
+            p.z = h.z + dz * dist
+            p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
+            p.pitch = Math.atan2(h.y - window.__placeCamera.position.y, dist)
+            return { x: p.x, z: p.z }
+          }, [pose.hand, dx, dz, dist])
+          await nextFrames(3)
+          // the eye height of where the player now stands, then the aim again
+          await page.evaluate(([h, dist]) => {
+            const p = window.__placePlayer
+            p.pitch = Math.atan2(h.y - window.__placeCamera.position.y, dist)
+          }, [pose.hand, dist])
+          await nextFrames(3)
+          const drift = await page.evaluate((w) => Math.hypot(window.__placePlayer.x - w.x, window.__placePlayer.z - w.z), placed)
+          if (drift > 0.3) continue
+          await awaitPlaceDrawn(`steadying palm ${view}`)
+          const px = await handPixels(name)
+          best = { dist, turn, ...px }
+          if (px.changed < HAND_PIXELS) continue
+          const before = await page.evaluate(carriers)
+          shot = await frame(name, { local: pose.hand, label })
+          const after = await page.evaluate(carriers)
+          check(`steadying palm (${view}): at the shutter the ${arm} hand is engaged on the jar`,
+            [before, after].every((r) => r[who]?.jar && r[who]?.steady?.arm === arm && r[who].steady.weight > 0),
+            `before ${JSON.stringify(before[who])}, after ${JSON.stringify(after[who])}`)
+          break
+        }
+        if (shot) break
+      }
+      check(`steadying palm (${view}): the hand on the jar is photographed close by`, !!shot,
+        best ? `last try ${best.dist} m, turn ${best.turn}: ${best.changed} of 6400 pixels at the hand are the hand's own` : 'no placement accepted')
+    }
+  }
+  if (live) await freezeLife(false)
 }
 
 // GRAIN POUNDING READS AS GRAIN POUNDING (work-order 1274). The stroke itself —
@@ -3998,24 +4917,75 @@ if (section('villager-dress')) {
       return { figures: row.children.length, skinned, heads, gltf, meshes: [...meshes].sort() }
     })
 
-  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
-  // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
-  // bytes, its parse, each distinct person's build, and every main-thread
-  // block (long task) from entering the first village until it is drawn.
-  await page.evaluate(() => {
-    window.__dressLongTasks = []
-    try {
-      new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
-        type: 'longtask',
+  // THE GPU LOAD the run has built up (point 1446): the renderer's tracked
+  // memory and its cached pipelines, read on entering the section and in every
+  // village, so a run that loses Chrome's GPU process shows what grew before it.
+  const gpuLoad = (where) =>
+    page
+      .evaluate(() => {
+        const r = window.__renderer
+        const m = r?.info?.memory ?? {}
+        const mb = (b) => (b == null ? null : Math.round(b / 1e5) / 10)
+        return {
+          pipelines: r?._pipelines?.caches?.size ?? null,
+          programs: m.programs ?? null,
+          geometries: m.geometries ?? null,
+          textures: m.textures ?? null,
+          texturesMB: mb(m.texturesSize),
+          attributesMB: mb(m.attributesSize),
+          totalMB: mb(m.total),
+          renderTargets: m.renderTargets ?? null,
+          heapMB: performance.memory ? mb(performance.memory.usedJSHeapSize) : null,
+        }
       })
-    } catch {
-      window.__dressLongTasks = null
-    }
-  })
+      .then((load) => record('gpu-load', { where, ...load }))
+      // Diagnostics only: an unreadable load never stops the checks.
+      .catch((e) => record('gpu-load', { where, unavailable: String(e?.message ?? e).slice(0, 200) }))
+  await gpuLoad('section start')
+  // A FRESH PAGE, AND AGAIN EVERY FEW VILLAGES (point 1446). Every village
+  // visit leaves its pipelines and heap behind (measured: ~40 pipelines and
+  // ~0.6 GB of Chrome's GPU process per village), so after the sections before
+  // this one the full run lost the GPU process around the 16th village. A
+  // reload frees that load; every check below runs as before. Calibratable:
+  // DRESS_REBOOT_EVERY villages per page.
+  const REBOOT_EVERY = Number(process.env.DRESS_REBOOT_EVERY ?? 8)
+  const freshPage = async () => {
+    await page.goto(BASE)
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    await page.waitForFunction(() => window.__game && window.__balance && window.__renderer, null, { timeout: 90000 })
+    await assertBackend(page)
+    await nextFrames(30)
+    await page.evaluate(() => {
+      window.__balance.randomEventsEnabled = false
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
+    // bytes, its parse, each distinct person's build, and every main-thread
+    // block (long task) from entering the first village until it is drawn.
+    await page.evaluate(() => {
+      window.__dressLongTasks = []
+      try {
+        new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
+          type: 'longtask',
+        })
+      } catch {
+        window.__dressLongTasks = null
+      }
+    })
+  }
+  await freshPage()
+  await gpuLoad('fresh page')
   let loadRecorded = false
-  for (const people of PEOPLES) {
+  for (const [n, people] of PEOPLES.entries()) {
+    if (n > 0 && n % REBOOT_EVERY === 0) {
+      await freshPage()
+      await gpuLoad('fresh page')
+    }
     await goToPlace(villageOf(people))
     await awaitGltfBody(people)
+    await gpuLoad(villageOf(people))
     if (!loadRecorded) {
       loadRecorded = true
       await nextFrames(10)
@@ -4140,60 +5110,94 @@ if (section('villager-dress')) {
   // Draw calls and triangles from the renderer's per-frame counters; the frame
   // time is the median of 60 rendered frames (a shared, software-rendered
   // machine: compare the levels, not the absolute milliseconds).
-  for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
-    await goToPlace(villageOf(people))
+  // Every wait below is frame-driven; a page whose frames stop never answers.
+  // A wall-clock cap per step turns that into a red naming village and level
+  // (calibratable: DRESS_STEP_MS).
+  const STEP_MS = Number(process.env.DRESS_STEP_MS ?? 120_000)
+  const within = async (what, run) => {
+    let timer
+    const started = Date.now()
+    try {
+      return await Promise.race([
+        run(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`cost probe stuck: ${what} (no answer within ${STEP_MS / 1000} s)`)), STEP_MS)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+      const ms = Date.now() - started
+      if (ms > 10_000) console.log(`  villager-dress cost step ${what}: ${Math.round(ms / 100) / 10} s`)
+    }
+  }
+  costProbe: for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
     const row = {}
-    // `code`: the glTF body switched off (`figureGltfBody` false) — point
-    // 1293's code-built body, the "before" of the glTF body.
-    const runs = [['low', null], ['medium', 0], ['medium', null, 'code'], ['medium', null], ['high', 0], ['high', null, 'code'], ['high', null]]
-    for (const [level, force, body] of runs) {
-      await page.evaluate(
-        async ({ l, force, code }) => {
-          const q = await import('/src/config/quality.ts')
-          window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
-          for (const k of ['medium', 'high']) {
-            q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
-            q.QUALITY_PRESETS[k].figureGltfBody = !code
-          }
-          // through another level, so every figure re-reads the table
-          window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
-          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
-          window.__ui.getState().setDetailLevel(l)
-        },
-        { l: level, force, code: body === 'code' },
-      )
-      const name = force === 0 ? `${level}-primitive` : body === 'code' ? `${level}-code` : level
-      await nextFrames(10)
-      await awaitPlaceDrawn(`${people} ${name}`)
-      if (level !== 'low' && force == null && body !== 'code') await awaitGltfBody(`${people} ${name}`)
-      row[name] = await page.evaluate(
-        () =>
-          new Promise((resolve) => {
-            const times = []
-            const calls = []
-            const tris = []
-            let last = performance.now()
-            const tick = (t) => {
-              times.push(t - last)
-              last = t
-              const r = window.__renderer?.info?.render
-              calls.push(r?.drawCalls ?? 0)
-              tris.push(r?.triangles ?? 0)
-              if (times.length < 61) return requestAnimationFrame(tick)
-              const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
-              let figures = 0
-              let skinned = 0
-              let gltf = 0
-              window.__placeScene.traverse((o) => {
-                if (o.name === 'inhabitant') figures++
-                if (o.isSkinnedMesh) skinned++
-                if (o.isSkinnedMesh && o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
-              })
-              resolve({ figures, skinned, gltf, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+    let step = `${people} enter`
+    try {
+      await within(step, () => goToPlace(villageOf(people)))
+      // `code`: the glTF body switched off (`figureGltfBody` false) — point
+      // 1293's code-built body, the "before" of the glTF body.
+      const runs = [['low', null], ['medium', 0], ['medium', null, 'code'], ['medium', null], ['high', 0], ['high', null, 'code'], ['high', null]]
+      for (const [level, force, body] of runs) {
+        const name = force === 0 ? `${level}-primitive` : body === 'code' ? `${level}-code` : level
+        step = `${people} ${name} switch`
+        await within(step, () => page.evaluate(
+          async ({ l, force, code }) => {
+            const q = await import('/src/config/quality.ts')
+            window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
+            for (const k of ['medium', 'high']) {
+              q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
+              q.QUALITY_PRESETS[k].figureGltfBody = !code
             }
-            requestAnimationFrame(tick)
-          }),
-      )
+            // through another level, so every figure re-reads the table
+            window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+            window.__ui.getState().setDetailLevel(l)
+          },
+          { l: level, force, code: body === 'code' },
+        ))
+        step = `${people} ${name} settle`
+        await within(step, async () => {
+          await nextFrames(10)
+          await awaitPlaceDrawn(`${people} ${name}`)
+        })
+        step = `${people} ${name} glTF body`
+        if (level !== 'low' && force == null && body !== 'code') await within(step, () => awaitGltfBody(`${people} ${name}`))
+        step = `${people} ${name} 61-frame sample`
+        row[name] = await within(step, () => page.evaluate(
+          () =>
+            new Promise((resolve) => {
+              const times = []
+              const calls = []
+              const tris = []
+              let last = performance.now()
+              const tick = (t) => {
+                times.push(t - last)
+                last = t
+                const r = window.__renderer?.info?.render
+                calls.push(r?.drawCalls ?? 0)
+                tris.push(r?.triangles ?? 0)
+                if (times.length < 61) return requestAnimationFrame(tick)
+                const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
+                let figures = 0
+                let skinned = 0
+                let gltf = 0
+                window.__placeScene.traverse((o) => {
+                  if (o.name === 'inhabitant') figures++
+                  if (o.isSkinnedMesh) skinned++
+                  if (o.isSkinnedMesh && o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
+                })
+                resolve({ figures, skinned, gltf, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+              }
+              requestAnimationFrame(tick)
+            }),
+        ))
+      }
+    } catch (e) {
+        // the page may be wedged: record what was read, name the step, stop the probe
+        record('cost', { village: `${people}-village`, row, stuck: step })
+        check(`${people}: the cost probe answers at every step`, false, String(e?.message ?? e))
+        break costProbe
     }
     record('cost', { village: `${people}-village`, row })
     check(
@@ -4237,53 +5241,149 @@ if (section('village-walk')) {
   // The camera side-on to a walker (index; null: the task walker), about
   // `near` off its flank: the left flank first, then the right, nearer or
   // farther where the player cannot stand (a hut wall pushes it off, and the
-  // figure leaves the picture).
+  // figure leaves the picture), a little fore or aft of square where neither
+  // sees it. A spot counts only when the subject is in the picture and the
+  // first surface on the sight line to its hips and its head is its own body:
+  // a hut wall or another villager in front is the next spot, and no spot at
+  // all is no frame.
+  let sideOnMisses = []
   const sideOn = async (walker, near, pitch) => {
-    for (const [flank, dist] of [1, -1].flatMap((f) => [near, near * 0.7, near * 1.35].map((d) => [f, d]))) {
-      const want = await page.evaluate(({ walker, dist, pitch, flank }) => {
+    sideOnMisses = []
+    // Square first, then ever more oblique (at most 26 degrees off square): a
+    // post in one sight line (measured: an unnamed cylinder blocked every one
+    // of the former 18 spots at the kneeling task walker) leaves the next a
+    // few degrees on clear. Each refused spot's reason is kept for the red.
+    const spots = [0, 0.15, -0.15, 0.3, -0.3, 0.45, -0.45].flatMap((turn) => [1, -1].flatMap((f) => [near, near * 0.85, near * 1.2, near * 0.7, near * 1.35].map((d) => [f, d, turn])))
+    for (const [flank, dist, turn] of spots) {
+      const want = await page.evaluate(({ walker, dist, pitch, flank, turn }) => {
         const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
-        const side = g.rotation.y + (flank * Math.PI) / 2
+        const side = g.rotation.y + (flank * Math.PI) / 2 + turn
         const p = window.__placePlayer
         p.x = g.position.x + Math.sin(side) * dist
         p.z = g.position.z + Math.cos(side) * dist
         p.yaw = side
         p.pitch = pitch
         return { x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }
-      }, { walker, dist, pitch, flank })
+      }, { walker, dist, pitch, flank, turn })
       await nextFrames(4)
       const at = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-      if (Math.hypot(at.x - want.x, at.z - want.z) < 0.05) return { x: want.gx, z: want.gz }
+      if (Math.hypot(at.x - want.x, at.z - want.z) >= 0.05) {
+        sideOnMisses.push({ flank, dist, turn, why: 'moved', by: +Math.hypot(at.x - want.x, at.z - want.z).toFixed(2) })
+        continue
+      }
+      const seen = await page.evaluate((walker) => {
+        const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
+        const cam = window.__placeCamera
+        if (!g?.visible || !cam || !window.__placeRayHit) return 'no subject'
+        const V = g.position.constructor
+        const own = new Set()
+        g.traverse((o) => own.add(o.uuid))
+        let mesh = null
+        g.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+        const hips = mesh?.skeleton.bones.find((b) => b.name === 'bone-hips')
+        const head = g.getObjectByName('figure-head')
+        if (!hips || !head) return 'no hips or head'
+        g.updateWorldMatrix(true, true)
+        cam.updateMatrixWorld()
+        // Inside the body the sight line meets the subject's own surface
+        // first; a see-through surface (the rain's streaks) is looked past.
+        const clearTo = (p) => {
+          let from = cam.position.clone()
+          for (let k = 0; k < 6; k++) {
+            const hit = window.__placeRayHit(p.x, p.y, p.z, [from.x, from.y, from.z])
+            if (hit.hitDistance === null || own.has(hit.hitUuid) || hit.hitDistance >= hit.targetDistance - 0.25) return true
+            const by = window.__placeScene.getObjectByProperty('uuid', hit.hitUuid)
+            if (![by?.material].flat().some((m) => m?.transparent)) {
+              const chain = []
+              for (let o = by; o && chain.length < 5; o = o.parent) if (o.name) chain.push(o.name)
+              const at = from.clone().add(p.clone().sub(from).normalize().multiplyScalar(hit.hitDistance))
+              const mat = [by?.material].flat()[0]
+              const gp = by?.geometry?.parameters
+              const wp = by ? by.getWorldPosition(p.clone()) : null
+              const what = `${by?.isInstancedMesh ? 'instanced ' : ''}${gp ? JSON.stringify(gp).slice(0, 90) : ''} at ${wp ? `${wp.x.toFixed(2)} ${wp.y.toFixed(2)} ${wp.z.toFixed(2)}` : '?'} parent ${by?.parent?.type ?? ''} ${by?.parent?.parent?.type ?? ''}`
+              return `blocked by ${by?.type ?? hit.hitUuid} ${by?.geometry?.type ?? ''} ${mat?.type ?? ''} ${mat?.name ?? ''} [${chain.join(' < ')}] at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)}, point ${at.x.toFixed(2)} ${at.y.toFixed(2)} ${at.z.toFixed(2)}, target y ${p.y.toFixed(2)}, eye y ${cam.position.y.toFixed(2)}; ${what}`
+            }
+            from = from.clone().add(p.clone().sub(from).normalize().multiplyScalar(hit.hitDistance + 0.01))
+          }
+          return 'too many see-through surfaces'
+        }
+        for (const [name, p] of [['hips', hips.getWorldPosition(new V())], ['head', head.getWorldPosition(new V())]]) {
+          const n = p.clone().project(cam)
+          if (!(Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.9 && n.z < 1)) return `${name} out of the picture`
+          const clear = clearTo(p)
+          if (clear !== true) return `${name}: ${clear}`
+        }
+        return true
+      }, walker)
+      if (seen === true) return { x: want.gx, z: want.gz }
+      sideOnMisses.push({ flank, dist, turn, why: seen })
     }
     return null
   }
+  // The walk gait proper: the glTF body's walk share at its own ground speed
+  // (`userData.gait`, skinnedFigure.tsx), so a walker brisk enough to blend
+  // into the jog — no planted stance through its flight — is never the subject.
+  const WALK_ONLY = 0.98
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   await goToPlace('zulu-village')
   const tol = await page.evaluate(() => ({ ...(window.__villagerMotion ?? {}) }))
   const FOOT_TOL = (tol.footGroundTolerance ?? 0.02) + 0.02 // + the slope under a stride
   const SLIP_TOL = (tol.stanceSlipTolerance ?? 0.03) + 0.01 // + one frame's sampling
-  // A walker that is out, walking, not lingering, skinned and drawn.
-  const pick = () =>
-    page.evaluate(() => {
-      const w = window.__placeWalkers
-      if (!w) return null
-      for (let i = 0; i < w.states.length; i++) {
-        const s = w.states[i]
-        const g = w.group(i)
-        if (!g || !g.visible || s.mode !== 'walk' || s.pause > 0) continue
-        if (s.seg === 0 || s.seg >= s.route.length - 2) continue // not on a door leg
-        let skinned = false
-        g.traverse((o) => { if (o.isSkinnedMesh) skinned = true })
-        if (skinned) return i
-      }
-      return null
-    })
-  const found = await stepUntil(async () => {
+  // A walker that is out, walking (on the walk gait), not lingering, skinned
+  // and drawn — AT ITS CRUISE PACE (the walk's smoothed speed within 10 % of
+  // its route pace: one just through its door is still easing up, reads as a
+  // walk for a frame and jogs the next), heading straight at its waypoint
+  // with at least WALK_LEFT metres of that straight leg to go (a turn adds
+  // its step to the walk's speed and tips a brisk walker into the jog band),
+  // and of those the slowest cruiser. The census names every walker out
+  // when none qualifies.
+  const WALK_LEFT = 3
+  const walkers = (arg) => {
     const w = window.__placeWalkers
-    if (!w) return false
-    return w.states.some((s, i) => s.mode === 'walk' && s.pause <= 0 && s.seg > 0 && s.seg < s.route.length - 2 && w.group(i)?.visible)
-  }, null, 3600)
-  check('village walk: a villager is out walking on the skinned body', found, found ? '' : 'no walker left its dwelling')
-  const who = found ? await pick() : null
+    if (!w) return { pick: null, census: [] }
+    const census = []
+    for (let i = 0; i < w.states.length; i++) {
+      const s = w.states[i]
+      const g = w.group(i)
+      if (!g || !g.visible || s.mode !== 'walk' || s.pause > 0) continue
+      if (s.seg === 0 || s.seg >= s.route.length - 2) continue // not on a door leg
+      let skinned = false
+      let gait = null
+      let walk = null
+      g.traverse((o) => {
+        if (o.isSkinnedMesh) skinned = true
+        if (o.userData.gait && !gait) gait = o.userData.gait
+        if (o.userData.walk && !walk) walk = o.userData.walk
+      })
+      const unit = g.getWorldScale(g.position.clone()).x || 1
+      const pace = walk ? walk.speed * unit : 0
+      // Ground left before the next stop: the errand (seg 3 lingers) or the door leg.
+      const len = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
+      const r = s.route
+      const left = len([s.x, s.z], r[s.seg + 1])
+      const bearing = Math.atan2(r[s.seg + 1][0] - s.x, r[s.seg + 1][1] - s.z)
+      const off = Math.abs(Math.atan2(Math.sin(bearing - s.yaw), Math.cos(bearing - s.yaw)))
+      const row = { i, skinned, walk: gait ? +gait.walk.toFixed(3) : null, pace: +pace.toFixed(2), cruise: w.speeds[i], left: +left.toFixed(1), off: +off.toFixed(2) }
+      census.push(row)
+      row.ok = skinned && !!gait && gait.walk >= arg.walkOnly && Math.abs(pace - w.speeds[i]) <= 0.1 * w.speeds[i] && left >= arg.walkLeft && off <= 0.15
+    }
+    // The slowest qualifying walker: furthest from the jog band.
+    const ok = census.filter((c) => c.ok).sort((a, b) => a.cruise - b.cruise)
+    return { pick: ok.length ? ok[0].i : null, census }
+  }
+  // The pick is kept from the very frame that found it: life runs on between
+  // two evaluates, and a walker re-asked a frame later can have drifted out of
+  // the cruise band (measured 16.10.2026, full WebGPU run: found, then no pick).
+  const found = await stepUntil((arg) => {
+    const r = new Function('arg', `return (${arg.fn})(arg)`)(arg)
+    if (r.pick !== null) window.__verifyWalkPick = r
+    return r.pick !== null
+  }, { fn: walkers.toString(), walkOnly: WALK_ONLY, walkLeft: WALK_LEFT }, 3600)
+  const chosen = found
+    ? await page.evaluate(() => window.__verifyWalkPick)
+    : await page.evaluate(walkers, { walkOnly: WALK_ONLY, walkLeft: WALK_LEFT })
+  check('village walk: a villager is out walking on the skinned body', found, found ? '' : `no walker out at cruise on the walk gait with ${WALK_LEFT} m to go: ${JSON.stringify(chosen.census)}`)
+  const who = found ? chosen.pick : null
   // A walker out but none on the skinned body would skip every gait check
   // below: that is a red, never a quiet pass.
   check('village walk: the walker measured is drawn on the skinned body', who !== null, found ? 'walkers out, none skinned' : 'no walker out')
@@ -4341,6 +5441,11 @@ if (section('village-walk')) {
             g.traverse((o) => { if (o.userData.walk && !w) w = o.userData.walk })
             return w && { phase: w.phase, weight: w.weight, speed: w.speed, reach: w.reach, held: w.plants.map((p) => !!p.contact), off: w.plants.map((p) => [p.offset.x, p.offset.z]) }
           })(),
+          gaitWalk: (() => {
+            let q = null
+            g.traverse((o) => { if (o.userData.gait && !q) q = o.userData.gait })
+            return q ? q.walk : null
+          })(),
           handZ: [ahead('hand.L'), ahead('hand.R')],
           footZ: [ahead('foot.L'), ahead('foot.R')],
           mode: s.mode,
@@ -4350,13 +5455,31 @@ if (section('village-walk')) {
           body: { x: g.position.x, z: g.position.z },
         }
       }, i)
+    // Sampled in RUNS of consecutive walk-gait frames: a turn adds its step
+    // to the walk's speed and can tip a brisk walker into the jog band for a
+    // few frames, and a walker reaching its errand or door stops — either
+    // ends the run, the probe waits out the dip (or takes the next walker that
+    // qualifies) and samples on. Stances and slips are measured within a run
+    // only; a gap never joins two runs.
     const samples = []
-    for (let f = 0; f < 120; f++) {
-      const r = await readFeet(who)
-      if (!r || r.mode !== 'walk' || r.pause > 0) break
-      samples.push(r)
+    const gaps = []
+    let walker = who
+    let runId = 0
+    for (let f = 0; f < 600 && samples.length < 120; f++) {
+      const r = walker === null ? null : await readFeet(walker)
+      if (r && r.mode === 'walk' && r.pause === 0 && r.gaitWalk >= WALK_ONLY) {
+        samples.push({ ...r, who: walker, run: runId })
+      } else {
+        if (samples.length && samples[samples.length - 1].run === runId) {
+          gaps.push({ at: samples.length, who: walker, mode: r?.mode, gaitWalk: r?.gaitWalk == null ? null : +r.gaitWalk.toFixed(3), speed: r?.walk ? +r.walk.speed.toFixed(2) : null, seg: r?.seg })
+          runId++
+        }
+        // Out of the walk altogether (lingering, at a door, indoors): the next walker.
+        if (!r || r.mode !== 'walk' || r.pause > 0 || r.seg === 0 || r.seg >= 5) walker = (await page.evaluate(walkers, { walkOnly: WALK_ONLY, walkLeft: WALK_LEFT })).pick
+      }
       await nextFrames(1)
     }
+    const runs = new Set(samples.map((r) => r.run)).size
     if (process.env.VILLAGE_WALK_DUMP) (await import('node:fs')).writeFileSync(process.env.VILLAGE_WALK_DUMP, JSON.stringify(samples))
     // The lowest DRAWN sole point each frame (the transformed foot geometry).
     const footVerts = samples.length ? Math.min(...samples.flatMap((r) => r.feet.map((f) => f.verts))) : 0
@@ -4375,7 +5498,7 @@ if (section('village-walk')) {
     let worstSlip = 0
     let worstStance = null
     const stances = []
-    const walking = (j) => j > 0 && Math.hypot(samples[j].body.x - samples[j - 1].body.x, samples[j].body.z - samples[j - 1].body.z) > 0.01
+    const walking = (j) => j > 0 && samples[j].run === samples[j - 1].run && Math.hypot(samples[j].body.x - samples[j - 1].body.x, samples[j].body.z - samples[j - 1].body.z) > 0.01
     for (const k of [0, 1]) {
       let start = null
       let run = 0
@@ -4427,7 +5550,8 @@ if (section('village-walk')) {
     const col = (key, i) => samples.map((r) => r[key][i])
     const armVsLeg = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', i)).toFixed(3)) : [0, 0]
     const armVsOther = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', 1 - i)).toFixed(3)) : [0, 0]
-    const detail = JSON.stringify({ frames: samples.length, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
+    const gaitWalk = samples.length ? +Math.min(...samples.map((r) => r.gaitWalk)).toFixed(3) : null
+    const detail = JSON.stringify({ frames: samples.length, runs, walkers: [...new Set(samples.map((r) => r.who))], gaps: gaps.slice(0, 4), gaitWalk, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
     report(`  village-walk ${detail}`)
     check('village walk: measured over at least 30 walking frames', samples.length >= 30, detail)
     check(`village walk: the lowest drawn sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m, transformed foot geometry)`, samples.length > 0 && footVerts > 0 && worstGround <= FOOT_TOL, detail)
@@ -4438,13 +5562,17 @@ if (section('village-walk')) {
     check('village walk: each arm swings against its own side’s leg (hand forward while that foot is back)', armVsLeg.every((r) => r < -0.5) && armVsOther.every((r) => r > 0.5), detail)
 
     // MID-STRIDE, side-on: the camera stands three metres off his flank.
-    const stride = await stepUntil((i) => {
+    const stride = await stepUntil(({ i, walkOnly }) => {
       const g = window.__placeWalkers.group(i)
       let mesh = null
-      g?.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+      let gait = null
+      g?.traverse((o) => {
+        if (o.isSkinnedMesh && !mesh) mesh = o
+        if (o.userData.gait && !gait) gait = o.userData.gait
+      })
       const t = mesh?.skeleton.bones.find((b) => b.name === 'bone-thigh.L')
-      return !!t && Math.abs(t.rotation.x) > 0.22 && window.__placeWalkers.states[i].mode === 'walk'
-    }, who, 240)
+      return !!t && Math.abs(t.rotation.x) > 0.22 && window.__placeWalkers.states[i].mode === 'walk' && !!gait && gait.walk >= walkOnly
+    }, { i: who, walkOnly: WALK_ONLY }, 240)
     if (stride) {
       await freezeLife(true)
       try {
@@ -4461,18 +5589,28 @@ if (section('village-walk')) {
     check('village walk: a mid-stride moment was caught for the picture', stride, '')
   }
 
-  // A HEAD CARRIER: the load sits on the crown, no hand above the load.
-  const carrierFound = await stepUntil(() => {
+  // A HEAD CARRIER: the load sits on the crown, no hand above the load. The
+  // carrier is one out on the walk gait (as the walker above), and the one
+  // found is the one measured and photographed.
+  const carrierOut = (walkOnly) => {
     const w = window.__placeWalkers
-    return !!w && w.states.some((s, i) => w.carries[i] && s.mode === 'walk' && s.seg > 0 && s.seg < s.route.length - 2 && w.group(i)?.visible)
-  }, null, 3600)
+    if (!w) return null
+    const i = w.states.findIndex((s, k) => {
+      if (!w.carries[k] || s.mode !== 'walk' || s.pause > 0 || s.seg === 0 || s.seg >= s.route.length - 2 || !w.group(k)?.visible) return false
+      let gait = null
+      w.group(k).traverse((o) => { if (o.userData.gait && !gait) gait = o.userData.gait })
+      return !!gait && gait.walk >= walkOnly
+    })
+    return i < 0 ? null : { i }
+  }
+  const carrierFound = await stepUntil(carrierOut, WALK_ONLY, 3600)
   check('village walk: a villager carries a load on the head', carrierFound, '')
   if (carrierFound) {
     await freezeLife(true)
     try {
-      const c = await page.evaluate(() => {
+      const out = await page.evaluate(carrierOut, WALK_ONLY)
+      const c = !out ? null : await page.evaluate((i) => {
         const w = window.__placeWalkers
-        const i = w.states.findIndex((s, k) => w.carries[k] && s.mode === 'walk' && w.group(k)?.visible)
         const g = w.group(i)
         const V = g.position.constructor
         const crown = g.getObjectByName('figure-crown')
@@ -4491,26 +5629,65 @@ if (section('village-walk')) {
           const b = o.geometry.boundingBox
           base = crown.worldToLocal(o.localToWorld(new V((b.min.x + b.max.x) / 2, b.min.y, (b.min.z + b.max.z) / 2)))
         })
+        // The DRAWN head under the crown: the vertices skinned wholly to the
+        // head bone (scalp and headwear), carried through the bones as the GPU
+        // does, in the crown's frame; the highest of them within 6 cm of its
+        // axis is where the load must rest. Above it the load floats.
+        let headTop = null
+        g.traverse((m) => {
+          if (!m.isSkinnedMesh || !crown) return
+          const b = m.skeleton.bones.findIndex((q) => q.name === 'bone-head')
+          const si = m.geometry.attributes.skinIndex
+          const sw = m.geometry.attributes.skinWeight
+          for (let v = 0; si && sw && v < si.count; v++) {
+            let whole = false
+            for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === b && sw.getComponent(v, k) > 0.99) whole = true
+            if (!whole) continue
+            const q = crown.worldToLocal(m.localToWorld(m.getVertexPosition(v, new V())))
+            if (Math.hypot(q.x, q.z) <= 0.06 && (headTop === null || q.y > headTop)) headTop = q.y
+          }
+        })
         return {
           i,
           x: g.position.x,
           z: g.position.z,
           onHeadBone: chain.includes('bone-head'),
           chain,
+          // What hangs under the crown, for a base that is not found.
+          underCrown: crown ? crown.children.map((o) => `${o.type}${o.visible ? '' : ' hidden'}`) : null,
           base: base ? { x: +base.x.toFixed(4), y: +base.y.toFixed(4), z: +base.z.toFixed(4) } : null,
           crownAboveHead: top && head ? top.y - head.getWorldPosition(new V()).y : null,
+          // The crown over the drawn head top under it (figure units): 0 is a
+          // load resting on the head.
+          crownOverDrawnHead: headTop === null ? null : +(-headTop).toFixed(4),
           handsBelowCrown: top ? hands.every((h) => h < top.y + 0.05) : false,
         }
+      }, out.i)
+      check('head carrier: the carrier found is still out on the walk once life is held', !!c, '')
+      // Every walker flagged as a carrier draws its basket under ITS crown, and
+      // no other does: carries[k] and group(k) name the same walker.
+      const crowns = await page.evaluate(() => {
+        const w = window.__placeWalkers
+        return w.carries.map((carries, k) => {
+          const crown = w.group(k)?.getObjectByName('figure-crown')
+          return { k, carries, load: !!crown?.children.some((o) => o.visible) }
+        })
       })
-      check('head carrier: the load’s crown hangs from the head bone (it rides the head, never a fixed height)', c.onHeadBone && c.crownAboveHead > 0, JSON.stringify(c))
-      check('head carrier: the load’s base sits on the crown (within 1 cm)', !!c.base && Math.hypot(c.base.x, c.base.y, c.base.z) <= 0.01, JSON.stringify(c))
-      check('head carrier: no hand is raised above the head — the balanced carrier keeps both arms free', c.handsBelowCrown, JSON.stringify(c))
-      const seen = await sideOn(c.i, 3.2, -0.04)
-      check('head carrier: the camera found a free spot side-on to the carrier', !!seen, '')
-      if (seen) await frame(shot('1295-village-head-carrier'), {
-        local: { x: c.x, y: 1.2, z: c.z },
-        label: 'a Zulu villager walking with a basket on the head: the basket sits on the crown, both arms swing free',
-      })
+      check('head carrier: each walker carries a basket exactly when it is flagged a carrier',
+        crowns.every((o) => o.carries === o.load), JSON.stringify(crowns))
+      if (c) {
+        const d = JSON.stringify(c)
+        check('head carrier: the load’s crown hangs from the head bone (it rides the head, never a fixed height)', c.onHeadBone && c.crownAboveHead > 0, d)
+        check('head carrier: the load’s base sits on the crown (within 1 cm)', !!c.base && Math.hypot(c.base.x, c.base.y, c.base.z) <= 0.01, d)
+        check('head carrier: the crown rests on the drawn head under it (within 2 cm) — the load neither floats nor sinks', c.crownOverDrawnHead !== null && Math.abs(c.crownOverDrawnHead) <= 0.02, d)
+        check('head carrier: no hand is raised above the head — the balanced carrier keeps both arms free', c.handsBelowCrown, d)
+        const seen = await sideOn(c.i, 3.2, -0.04)
+        check('head carrier: the camera found a free spot side-on to the carrier', !!seen, '')
+        if (seen) await frame(shot('1295-village-head-carrier'), {
+          local: { x: c.x, y: 1.2, z: c.z },
+          label: 'a Zulu villager walking with a basket on the head: the basket sits on the crown, both arms swing free',
+        })
+      }
     } finally {
       await freezeLife(false)
     }
@@ -4665,7 +5842,11 @@ if (section('village-walk')) {
     if (!hips) return false
     const bind = new hips.position.constructor().setFromMatrixPosition(mesh.skeleton.boneInverses[0].clone().invert()).y
     const f = hips.position.y / bind
-    return f > 0.55 && f < 0.9
+    // Half-way by the KNEEL itself, not by a low hip alone: a hip that low
+    // also comes from ducking through the hut doorway on the way out (measured
+    // 16.10.2026, WebGL 2: caught 0.5 m inside the own hut, no side-on spot).
+    const k = g.getObjectByName('inhabitant')?.userData.walk?.kneel
+    return typeof k === 'number' && k > 0.05 && k < 0.95 && f > 0.55 && f < 0.9
   }, null, 7200)
   check('kneel: the task walker was caught on its way down or up', halfway, '')
   if (halfway) {
@@ -4690,11 +5871,130 @@ if (section('village-walk')) {
       })
       check('kneel: one figure folds down — no second body swapped in, no squash, the head keeps its shape', k.figures === 1 && k.uniform && k.headRound, JSON.stringify(k))
       const seen = await sideOn(null, 2.6, -0.16)
-      check('kneel: the camera found a free spot side-on to the task walker', !!seen, '')
+      check('kneel: the camera found a free spot side-on to the task walker', !!seen, seen ? '' : JSON.stringify(sideOnMisses))
       if (seen) await frame(shot('1295-village-kneel-transition'), {
         local: { x: k.x, y: 0.5, z: k.z },
         label: 'the Zulu task walker half-way through kneeling down at its work, side-on: legs folding, head round, one figure',
       })
+    } finally {
+      await freezeLife(false)
+    }
+  }
+
+  // The head load in the hands (work-order "the task walker takes its head
+  // load off with its hands"): caught going down with the load between head
+  // and ground, kneeling with it standing on the ground, and rising with it
+  // between ground and head again — visible in every caught frame. The
+  // timeline and the grip are pinned in src/scenes/place/taskWalkerLoad.test.ts.
+  const loadPhase = (phase) => stepUntil((phase) => {
+    const g = window.__placeScene.getObjectByName('village-task-walker')
+    const load = g?.getObjectByName('task-walker-load')
+    const k = g?.getObjectByName('inhabitant')?.userData.walk?.kneel
+    if (!g?.visible || !load || typeof k !== 'number') return false
+    const prev = window.__loadPhaseKneel ?? k
+    window.__loadPhaseKneel = k
+    const V = g.position.constructor
+    g.updateWorldMatrix(true, true)
+    const h = load.getWorldPosition(new V()).y - g.position.y
+    const head = g.getObjectByName('figure-head').getWorldPosition(new V()).y - g.position.y
+    let shown = true
+    for (let o = load; o; o = o.parent) if (!o.visible) shown = false
+    if (!shown) return false
+    // caught by the load's own travel: the kneel (0.6 s) ends long before the
+    // lowering (1.4 s) has brought the load clear of the head
+    const prevH = window.__loadPhaseH ?? h
+    window.__loadPhaseH = h
+    const between = h > 0.2 && h < head - 0.3
+    if (phase === 'down') return k > 0.2 && h < prevH - 1e-4 && between
+    if (phase === 'ground') return k > 0.97 && h < 0.08
+    return k < prev && h > prevH + 1e-4 && between
+  }, phase, phase === 'down' ? 9000 : 2400)
+  // Gripping from either side, in the load's own horizontal frame: each palm
+  // reaches out to a face (at least 0.6 of the half-extent from the centre on
+  // that axis, and that axis is its nearest face within 0.15), and the two faces
+  // are opposite. The box clamp alone reads zero gaps for palms collapsed into
+  // the middle or both on one face.
+  const opposingGrip = (palms, half) => {
+    const reach = palms.map(([x, z]) => [x / half[0], z / half[1]])
+    const k = [0, 1].find((a) => {
+      const [p, q] = reach.map((r) => r[a])
+      return Math.sign(p) !== Math.sign(q) && reach.every((r) => Math.abs(r[a]) >= 0.6 && Math.abs(r[a]) >= Math.abs(r[1 - a]) - 0.15)
+    })
+    return { reach: reach.map((r) => r.map((v) => +v.toFixed(2))), ok: k !== undefined }
+  }
+  for (const [what, palms, half, want] of [
+    ['two palms on one face', [[0.5, -0.4], [0.5, 0.4]], [0.5, 0.5], false],
+    ['two palms on one long face of a narrow load', [[0.2, -0.4], [0.2, 0.4]], [0.2, 0.5], false],
+    ["two palms collapsed into the load's middle", [[0.05, 0], [-0.05, 0]], [0.5, 0.5], false],
+    ['two palms on one side of the centre', [[0.05, 0.05], [0.5, 0.5]], [0.5, 0.5], false],
+    ['two palms on opposite faces', [[-0.5, 0.05], [0.5, -0.05]], [0.5, 0.5], true],
+    ['two palms on opposite short faces of a narrow load', [[0.02, -0.5], [-0.02, 0.5]], [0.2, 0.5], true],
+  ]) check(`head load: the grip check ${want ? 'accepts' : 'rejects'} ${what}`, opposingGrip(palms, half).ok === want, '')
+  for (const [phase, name, label] of [
+    ['down', '1432-village-load-set-down', 'the task walker kneeling down, its head load held in both hands on the way from its head to the ground'],
+    ['ground', '1432-village-load-on-ground', 'the task walker kneeling at its work, its head load standing on the ground beside it'],
+    ['up', '1432-village-load-pick-up', 'the task walker rising, its head load lifted in both hands on the way from the ground to its head'],
+  ]) {
+    const caught = await loadPhase(phase)
+    check(`head load: the task walker was caught ${phase === 'down' ? 'setting its load down' : phase === 'ground' ? 'kneeling with its load on the ground' : 'picking its load up'}, the load visible`, caught, '')
+    if (!caught) continue
+    await freezeLife(true)
+    try {
+      if (phase !== 'ground') {
+        // the drawn palms on the load, measured on the rig rather than the plan
+        const gaps = await page.evaluate(() => {
+          const g = window.__placeScene.getObjectByName('village-task-walker')
+          const load = g.getObjectByName('task-walker-load')
+          const V = g.position.constructor
+          g.updateWorldMatrix(true, true)
+          const lo = new V(Infinity, Infinity, Infinity)
+          const hi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(o.matrixWorld)
+              lo.min(c)
+              hi.max(c)
+            }
+          })
+          const palms = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n).getWorldPosition(new V()))
+          // the load's box in its own frame, the palms relative to its centre
+          const toLoad = load.matrixWorld.clone().invert()
+          const llo = new V(Infinity, Infinity, Infinity)
+          const lhi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            const m = toLoad.clone().multiply(o.matrixWorld)
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(m)
+              llo.min(c)
+              lhi.max(c)
+            }
+          })
+          const mid = new V().addVectors(llo, lhi).multiplyScalar(0.5)
+          return {
+            gaps: palms.map((p) => +new V().copy(p).clamp(lo, hi).distanceTo(p).toFixed(3)),
+            local: palms.map((p) => {
+              const q = p.clone().applyMatrix4(toLoad).sub(mid)
+              return [q.x, q.z]
+            }),
+            half: [(lhi.x - llo.x) / 2, (lhi.z - llo.z) / 2],
+          }
+        })
+        const grip = opposingGrip(gaps.local, gaps.half)
+        check(`head load (${phase}): both drawn hands are on the load (gaps ${gaps.gaps.join(', ')} m ≤ 0.1)`, gaps.gaps.every((d) => d <= 0.1), '')
+        check(`head load (${phase}): the hands hold it on opposite faces (reach per half-extent ${JSON.stringify(grip.reach)})`, grip.ok, '')
+      }
+      const at = await page.evaluate(() => {
+        const g = window.__placeScene.getObjectByName('village-task-walker')
+        return { x: g.position.x, z: g.position.z }
+      })
+      const seen = await sideOn(null, 2.6, -0.16)
+      check(`head load (${phase}): the camera found a free spot side-on to the task walker`, !!seen, seen ? '' : JSON.stringify(sideOnMisses))
+      if (seen) await frame(shot(name), { local: { x: at.x, y: 0.5, z: at.z }, label })
     } finally {
       await freezeLife(false)
     }
@@ -4730,9 +6030,12 @@ if (section('village-walk')) {
   check('low preset: every villager drawn is the primitive figure (no skinned body)', census.figures > 0 && census.skinnedFigures === 0, JSON.stringify(census))
   check('low preset: every kneeling primitive figure keeps a uniform scale', census.kneeling > 0 && census.bad.length === 0, JSON.stringify(census))
   // Grounding of the walking primitives, every frame for a while: the lowest
-  // drawn point of each walker's body over the ground under it.
+  // drawn point of each walker's body over the ground under it. Sampling runs
+  // on past 60 frames until 30 walking samples exist (a single walker can
+  // stop to idle mid-window), capped so an empty village still ends.
   const lowGround = []
-  for (let f = 0; f < 60; f++) {
+  let lowFrames = 0
+  for (let f = 0; f < 600 && (f < 60 || lowGround.length < 30); f++) {
     lowGround.push(...(await page.evaluate(() => {
       const w = window.__placeWalkers
       const V = window.__placeScene.position.constructor
@@ -4760,9 +6063,10 @@ if (section('village-walk')) {
       return rows
     })))
     await nextFrames(1)
+    lowFrames = f + 1
   }
   const lowWorst = lowGround.reduce((m, r) => Math.max(m, Math.abs(r.off)), 0)
-  const lowDetail = JSON.stringify({ samples: lowGround.length, walkers: new Set(lowGround.map((r) => r.i)).size, skinned: lowGround.filter((r) => r.skinned).length, worstGround: +lowWorst.toFixed(4) })
+  const lowDetail = JSON.stringify({ samples: lowGround.length, frames: lowFrames, walkers: new Set(lowGround.map((r) => r.i)).size, skinned: lowGround.filter((r) => r.skinned).length, worstGround: +lowWorst.toFixed(4) })
   report(`  low-preset walkers ${lowDetail}`)
   check(`low preset: every walking primitive stands on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m)`, lowGround.length >= 30 && lowGround.every((r) => !r.skinned) && lowWorst <= FOOT_TOL, lowDetail)
   // The task walker's whole kneel, on the primitive.
@@ -4772,6 +6076,498 @@ if (section('village-walk')) {
   kneelChecks('low preset kneel', lowKneel)
   check(`low preset kneel: the primitive stays on the ground through the kneel (≤ ${FOOT_TOL.toFixed(3)} m)`, lowKneel.worstLowest !== null && lowKneel.worstLowest <= FOOT_TOL, JSON.stringify(lowKneel))
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+}
+
+// --- Figure micro-structure (design.md line 64) -------------------------------
+// The villagers and the traveller carry baked cloth / leather / skin structure,
+// projected in the body's BIND-POSE space (render/materials.ts figureMicro*).
+// Three pictures, judged by looking: a close first-person view of a villager
+// (cloth weave, hide grain, skin), the same walker at two phases of its stride
+// (the structure must stay on the limb, not swim across it), and the bird's-eye
+// traveller — plus the traveller's temporal stability measured under TRAA.
+if (section('figure-micro')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  // One villager `d` ahead of the player with a clear sight line to its hips
+  // and chest, on the first of 16 bearings that has one.
+  const stageOne = (village, who, d) =>
+    page.evaluate(
+      ({ who, d }) => {
+        const p = window.__placePlayer
+        window.__dressLineup(null)
+        for (let k = 0; k < 16; k++) {
+          const yaw = p.yaw + (k * Math.PI) / 8
+          const cx = p.x - Math.sin(yaw) * d
+          const cz = p.z - Math.cos(yaw) * d
+          const clear = [0.5, 0.9, 1.2].every((y) => {
+            const hit = window.__placeRayHit?.(cx, y, cz)
+            return !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.15
+          })
+          if (!clear) continue
+          p.yaw = yaw
+          p.pitch = -0.12
+          window.__dressLineup({ x: cx, z: cz, yaw, only: [who] })
+          return { cx, cz, yaw }
+        }
+        return null
+      },
+      { who, d },
+    )
+  for (const [village, who, label] of [
+    ['zulu-village', 'female-adult', 'a Zulu married woman: bare skin, hide skirt, beadwork'],
+    ['hausa-village', 'male-adult', 'a Hausa married man in his cotton robe'],
+  ]) {
+    await goToPlace(village)
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    const at = await stageOne(village, who, 1.25)
+    check(`figure micro-structure: ${village} ${who} staged close with a clear view`, !!at, 'no clear bearing at 1.25 m')
+    if (!at) continue
+    await nextFrames(4)
+    const drawn = await page.evaluate(() => {
+      const row = window.__placeScene.getObjectByName('dress-lineup')
+      let skinned = null
+      row?.traverse((o) => {
+        if (o.isSkinnedMesh && !skinned) skinned = o
+      })
+      // the micro-structure kind rides in w of the second colour (figureBody.ts)
+      const fib = skinned?.geometry.getAttribute('figureColour2')
+      const kinds = fib?.itemSize === 4 ? [...new Set(Array.from({ length: fib.count }, (_, k) => fib.getW(k)))].sort() : []
+      return { skinned: !!skinned, material: skinned?.material.name ?? null, normalNode: !!skinned?.material.normalNode, kinds }
+    })
+    check(
+      `figure micro-structure: the ${village} ${who} is the skinned body with the micro-relief material and its skin plus garment kinds`,
+      drawn.skinned && drawn.normalNode && drawn.kinds.includes(1) && drawn.kinds.some((k) => k === 2 || k === 3),
+      JSON.stringify(drawn),
+    )
+    await frame(shot(`1380-figure-micro-${village.replace('-village', '')}-close`), {
+      local: { x: at.cx, y: 0.8, z: at.cz },
+      label: `${label}, 1.25 m from the eye: the cloth/leather/skin micro-structure at first-person height`,
+    })
+    await page.evaluate(() => window.__dressLineup(null))
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+  }
+
+  // THE WALK-CYCLE PAIR: one walker, frozen at two phases of its stride with
+  // the camera at the same offset from it, so the weave can be compared on the
+  // limb from frame to frame.
+  await goToPlace('hausa-village')
+  // Every walker out on the walk, on the glTF body.
+  const walkerAt = () =>
+    page.evaluate(() => {
+      const w = window.__placeWalkers
+      const out = []
+      if (!w) return out
+      for (let i = 0; i < w.states.length; i++) {
+        const s = w.states[i]
+        const g = w.group(i)
+        if (!g?.visible || s.mode !== 'walk' || s.pause > 0) continue
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        if (!mesh || !mesh.skeleton.bones.some((b) => b.name === 'bone-toe.L')) continue
+        out.push(i)
+      }
+      return out
+    })
+  let who = null
+  for (let f = 0; f < 600 && who === null; f += 10) {
+    who = (await walkerAt())[0] ?? null
+    if (who === null) await nextFrames(10)
+  }
+  check('figure micro-structure: a villager is out walking on the glTF body', who !== null, 'no skinned walker out in 600 frames')
+  if (who !== null) {
+    // The camera at the walker's flank, `dist` off, looking at it; returns the
+    // thigh swing and whether the hips and head project into the picture.
+    const flankView = (i, flank, dist) =>
+      page.evaluate(
+        ({ i, flank, dist }) => {
+          const g = window.__placeWalkers.group(i)
+          const side = g.rotation.y + (flank * Math.PI) / 2
+          const p = window.__placePlayer
+          p.x = g.position.x + Math.sin(side) * dist
+          p.z = g.position.z + Math.cos(side) * dist
+          p.yaw = side
+          p.pitch = -0.3
+          return { x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }
+        },
+        { i, flank, dist },
+      )
+    // The pose, and whether the hips, both shins and the head project into the
+    // picture with the first surface on each sight line the walker's own body
+    // (a hut wall or a fence in front is no frame).
+    const pose = (i) =>
+      page.evaluate((i) => {
+        const g = window.__placeWalkers.group(i)
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        const own = new Set()
+        g.traverse((o) => own.add(o.uuid))
+        const bone = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`)
+        const cam = window.__placeCamera
+        g.updateWorldMatrix(true, true)
+        cam.updateMatrixWorld()
+        const V = g.position.constructor
+        let why = null
+        for (const n of ['hips', 'shin.L', 'shin.R', 'head']) {
+          const p = bone(n).getWorldPosition(new V())
+          const v = p.clone().project(cam)
+          if (!(Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9 && v.z < 1)) {
+            why = `${n} out of the picture`
+            break
+          }
+          const hit = window.__placeRayHit?.(p.x, p.y, p.z)
+          if (hit && hit.hitDistance !== null && !own.has(hit.hitUuid) && hit.hitDistance < hit.targetDistance - 0.25) {
+            why = `${n} hidden at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)}`
+            break
+          }
+        }
+        return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView: why === null, why, at: { x: g.position.x, z: g.position.z } }
+      }, i)
+    // Stand at a flank that holds the legs in the picture and is not pushed off.
+    // The walker's screen box (CSS px) from its projected joints, padded.
+    const walkerBox = (i) =>
+      page.evaluate((i) => {
+        const g = window.__placeWalkers.group(i)
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        const cam = window.__placeCamera
+        const V = g.position.constructor
+        const W = window.innerWidth
+        const H = window.innerHeight
+        const pts = ['head', 'foot.L', 'foot.R', 'hand.L', 'hand.R', 'hips']
+          .map((n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).getWorldPosition(new V()).project(cam))
+          .map((v) => [((v.x + 1) / 2) * W, ((1 - v.y) / 2) * H])
+        const xs = pts.map((q) => q[0])
+        const ys = pts.map((q) => q[1])
+        const pad = 60
+        const x = Math.max(0, Math.floor(Math.min(...xs) - pad))
+        const y = Math.max(0, Math.floor(Math.min(...ys) - pad))
+        return { x, y, width: Math.min(W - x, Math.ceil(Math.max(...xs) + pad) - x), height: Math.min(H - y, Math.ceil(Math.max(...ys) + pad) - y) }
+      }, i)
+    const pair = []
+    const misses = []
+    const standAt = async (flanks = [1, -1]) => {
+      for (const flank of flanks) {
+        for (const dist of [1.6, 1.9, 1.3, 2.3, 2.8]) {
+          const want = await flankView(who, flank, dist)
+          await nextFrames(3)
+          const got = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+          if (Math.hypot(got.x - want.x, got.z - want.z) > 0.05) {
+            misses.push({ flank, dist, why: 'moved' })
+            continue
+          }
+          const p = await pose(who)
+          if (p.inView) return { flank, dist, ...p }
+          misses.push({ flank, dist, why: p.why })
+        }
+      }
+      return null
+    }
+    // Frame A: the first walker out that a clear flank spot holds; life runs
+    // on a little between tries, so a walker behind a hut comes out again.
+    let a = null
+    for (let tries = 0; tries < 8 && !a; tries++) {
+      for (const i of await walkerAt()) {
+        who = i
+        await page.evaluate(() => window.__placeFreezeLife?.(true))
+        a = await standAt()
+        if (a) break
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+      }
+      if (!a) await nextFrames(60)
+    }
+    check('figure micro-structure: walk frame A has the walker’s legs in clear view', !!a, `no flank spot at 1.3–2.8 m held any walker: ${JSON.stringify(misses.slice(-12))}`)
+    if (a) {
+      await frame(shot('1380-figure-micro-walk-a'), {
+        local: { x: a.at.x, y: 0.6, z: a.at.z },
+        label: `walk-cycle frame A: the Hausa walker side-on (thighs ${a.thighL.toFixed(2)} / ${a.thighR.toFixed(2)} rad); the cloth weave on the moving leg`,
+      })
+      pair.push(await capturePixels(page, 'walk-cycle pair, frame A', { clip: await walkerBox(who) }))
+      // On to a clearly different phase of the stride: the leading thigh
+      // swapped. Half a stride on, the walker may stand where the same flank
+      // spot is blocked (every distance "moved": a wall at his side), so up to
+      // four opposite-phase moments are tried before the frame is refused.
+      const swappedNow = (aa) =>
+        stepUntil(
+          ({ i, a }) => {
+            const g = window.__placeWalkers.group(i)
+            let mesh = null
+            g.traverse((o) => {
+              if (o.isSkinnedMesh && !mesh) mesh = o
+            })
+            const t = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).rotation.x
+            const d = t('thigh.L') - t('thigh.R')
+            return Math.sign(d) !== Math.sign(a.thighL - a.thighR) && Math.abs(d) > 0.6 * Math.abs(a.thighL - a.thighR)
+          },
+          { i: who, a: aa },
+          240,
+        )
+      let swapped = false
+      let b = null
+      const bMisses = []
+      for (let attempt = 0; attempt < 4 && !b; attempt++) {
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+        if (attempt > 0) await nextFrames(20) // off this moment, on to the next stride
+        swapped = await swappedNow(a)
+        await page.evaluate(() => window.__placeFreezeLife?.(true))
+        misses.length = 0
+        if (swapped) b = await standAt([a.flank])
+        bMisses.push(...misses)
+      }
+      misses.length = 0
+      misses.push(...bMisses.slice(-10))
+      check(
+        'figure micro-structure: walk frame B shows the same walker at the opposite stride phase, legs in view',
+        swapped && !!b && b.flank === a.flank,
+        JSON.stringify({ swapped, a: a && { thighL: a.thighL, thighR: a.thighR, flank: a.flank }, b: b && { thighL: b.thighL, thighR: b.thighR, flank: b.flank }, misses }),
+      )
+      if (b) {
+        await frame(shot('1380-figure-micro-walk-b'), {
+          local: { x: b.at.x, y: 0.6, z: b.at.z },
+          label: `walk-cycle frame B: the same walker half a stride on (thighs ${b.thighL.toFixed(2)} / ${b.thighR.toFixed(2)} rad); the weave must sit on the leg as in frame A`,
+        })
+        pair.push(await capturePixels(page, 'walk-cycle pair, frame B', { clip: await walkerBox(who) }))
+        // Both crops side by side at one height, brightened ×2 for the eye (the
+        // walker is often in a hut's shade): the comparison picture.
+        const h = 640
+        const crops = await Promise.all(pair.map((c) => sharp(c).resize({ height: h }).modulate({ brightness: 2 }).toBuffer({ resolveWithObject: true })))
+        const w = crops.reduce((n, c) => n + c.info.width, 0) + 10
+        let left = 0
+        const layers = crops.map((c) => {
+          const l = { input: c.data, left, top: 0 }
+          left += c.info.width + 10
+          return l
+        })
+        await sharp({ create: { width: w, height: h, channels: 3, background: '#ffffff' } }).composite(layers).png().toFile(`${OUT}${shot('1380-figure-micro-walk-pair')}.png`)
+      }
+    }
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+  }
+
+  // THE BIRD'S-EYE TRAVELLER: out of the place into the travel view; the
+  // skinned traveller (medium) must stay still under TRAA — the baked maps'
+  // mip chain, not a distance fade, is what keeps the far structure calm.
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  const out = await page
+    .waitForFunction(() => !window.__game.getState().placeId && !!window.__travellerRoot && window.__camera?.settled?.(), null, { timeout: 60000 })
+    .then(() => true)
+    .catch(() => false)
+  check('figure micro-structure: the travel view holds the traveller', out, 'no settled travel camera with the traveller in 60 s')
+  if (out) {
+    const skinned = await page.evaluate(() => {
+      let m = null
+      window.__travellerRoot.traverse((o) => {
+        if (o.isSkinnedMesh && o.visible && !m) m = o
+      })
+      return m ? { material: m.material.name, normalNode: !!m.material.normalNode } : null
+    })
+    check('figure micro-structure: the traveller is the skinned body with the micro-relief material', !!skinned?.normalNode, JSON.stringify(skinned))
+    const pos = await page.evaluate(() => window.__game.getState().pos)
+    await frame(shot('1380-figure-micro-traveller'), {
+      world: { x: pos.x, z: pos.z },
+      label: 'the traveller from the bird’s-eye travel camera, standing still under TRAA',
+    })
+    // The traveller's screen box from the projection of his feet and crown.
+    const box = await page.evaluate(() => {
+      const r = window.__travellerRoot
+      r.updateWorldMatrix(true, true)
+      const V = r.position.constructor
+      const pts = []
+      r.traverse((o) => {
+        if (o.name === 'figure-crown' || o.name === 'bone-foot.L' || o.name === 'bone-foot.R' || o.name === 'bone-hand.L' || o.name === 'bone-hand.R') {
+          const v = o.getWorldPosition(new V())
+          pts.push(window.__camera.ndc(v.x, v.z, v.y))
+        }
+      })
+      const W = window.innerWidth
+      const H = window.innerHeight
+      const xs = pts.map((p) => ((p.x + 1) / 2) * W)
+      const ys = pts.map((p) => ((1 - p.y) / 2) * H)
+      const pad = 12
+      const left = Math.max(0, Math.floor(Math.min(...xs) - pad))
+      const top = Math.max(0, Math.floor(Math.min(...ys) - pad))
+      return { left, top, width: Math.min(W - left, Math.ceil(Math.max(...xs) - Math.min(...xs) + 2 * pad)), height: Math.min(H - top, Math.ceil(Math.max(...ys) - Math.min(...ys) + 2 * pad)), points: pts.length }
+    })
+    const clip = { x: box.left, y: box.top, width: box.width, height: box.height }
+    const grey = async (png) => sharp(png).greyscale().raw().toBuffer()
+    // VISIBILITY FIRST (review finding): the joints' projection proves only
+    // where he would be, not that he is drawn — an occluded or absent
+    // traveller changes nothing and passed. So the same crop is rendered once
+    // with the traveller hidden; the pixels that differ are HIS visible
+    // pixels, and the shimmer is measured on them. His cast shadow is
+    // switched off while the mask is taken (review finding): shadow pixels
+    // are ground, carry no micro-structure and diluted the interior.
+    await page.evaluate(() => {
+      window.__travellerRoot.visible = false
+    })
+    await nextFrames(30) // let the TRAA history settle on the empty ground
+    const without = await grey(await capturePixels(page, 'traveller mask (hidden)', { clip }))
+    await page.evaluate(() => {
+      window.__travellerRoot.visible = true
+      window.__travellerShadow = []
+      window.__travellerRoot.traverse((o) => {
+        if (o.isMesh && o.castShadow) {
+          o.castShadow = false
+          window.__travellerShadow.push(o)
+        }
+      })
+    })
+    await nextFrames(30)
+    const shownNoShadow = await grey(await capturePixels(page, 'traveller mask (shown, no cast shadow)', { clip }))
+    await page.evaluate(() => {
+      for (const o of window.__travellerShadow) o.castShadow = true
+      delete window.__travellerShadow
+      // THE POSE IS FROZEN for the shimmer frames: standing, he still plays
+      // his idle clip, which moved his joints ~1 px between captures
+      // (measured 0.89-1.15 px) — motion, not shimmer, and on a textured
+      // surface it read as a rising 3-10 % "shimmer". A frozen page clock
+      // makes every frame's dt 0, so nothing animates, while the TRAA jitter
+      // still runs per rendered frame (the ground keeps changing 0.2-0.3 %).
+      const realNow = performance.now.bind(performance)
+      const t0 = realNow()
+      window.__realNow1380 = realNow
+      performance.now = () => t0
+    })
+    const frames = []
+    let boneMovePx = []
+    try {
+      await nextFrames(30) // TRAA history converges on the frozen pose, shadow back on
+      const joints = () =>
+        page.evaluate(() => {
+          const r = window.__travellerRoot
+          r.updateWorldMatrix(true, true)
+          const V = r.position.constructor
+          const pts = []
+          r.traverse((o) => {
+            if (!o.isBone) return
+            const v = o.getWorldPosition(new V())
+            const n = window.__camera.ndc(v.x, v.z, v.y)
+            pts.push([((n.x + 1) / 2) * window.innerWidth, ((1 - n.y) / 2) * window.innerHeight])
+          })
+          return pts
+        })
+      const at = []
+      for (let i = 0; i < 4; i++) {
+        at.push(await joints())
+        frames.push(await capturePixels(page, 'traveller shimmer frame diff', { clip }))
+        await nextFrames(6)
+      }
+      boneMovePx = at.slice(1).map((p, k) => +Math.max(0, ...p.map((q, j) => Math.hypot(q[0] - at[k][j][0], q[1] - at[k][j][1]))).toFixed(3))
+    } finally {
+      await page.evaluate(() => {
+        performance.now = window.__realNow1380
+        delete window.__realNow1380
+      })
+    }
+    const raws = await Promise.all(frames.map(grey))
+    const mask = new Uint8Array(without.length)
+    let visible = 0
+    if (shownNoShadow.length === without.length) {
+      for (let i = 0; i < without.length; i++) {
+        if (Math.abs(shownNoShadow[i] - without[i]) > 16) {
+          mask[i] = 1
+          visible++
+        }
+      }
+    }
+    // A man-sized figure in the bird's-eye crop covers far more than this.
+    const minVisible = Math.max(40, Math.round(0.05 * without.length))
+    // The shimmer is judged on his INTERIOR (mask pixels whose 8 neighbours
+    // are his too): the silhouette ring flickers under the TRAA sub-pixel
+    // jitter whatever the surface carries — measured 7.4-8.8 % of all his
+    // pixels with the micro-structure switched OFF — while the micro-structure
+    // lives on the interior, where a mip-chain failure would show.
+    const W = box.width
+    const H = mask.length === W * box.height ? box.height : 0 // capture ≠ clip: no interior, the check fails
+    const interior = new Uint8Array(mask.length)
+    let inner = 0
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x
+        if (!mask[i]) continue
+        let all = true
+        for (let dy = -1; dy <= 1 && all; dy++) for (let dx = -1; dx <= 1; dx++) if (!mask[i + dy * W + dx]) all = false
+        if (all) {
+          interior[i] = 1
+          inner++
+        }
+      }
+    }
+    let maxFrac = 0
+    let maxAll = 0
+    const pairs = []
+    const groundPairs = []
+    const driftPairs = []
+    for (let k = 1; k < raws.length; k++) {
+      const [a, b] = [raws[k - 1], raws[k]]
+      if (a.length !== b.length || a.length !== mask.length || inner === 0) continue
+      let changed = 0
+      let changedAll = 0
+      let ground = 0
+      let groundChanged = 0
+      let drift = 0
+      for (let i = 0; i < a.length; i++) {
+        if (interior[i]) drift += b[i] - a[i]
+        if (!mask[i]) {
+          ground++
+          if (Math.abs(a[i] - b[i]) > 6) groundChanged++
+          continue
+        }
+        if (Math.abs(a[i] - b[i]) <= 6) continue
+        changedAll++
+        if (interior[i]) changed++
+      }
+      maxFrac = Math.max(maxFrac, changed / inner)
+      maxAll = Math.max(maxAll, changedAll / visible)
+      pairs.push(+((changed / inner) * 100).toFixed(2))
+      // Diagnostics: a moving light or camera changes the ground too and
+      // shifts the interior's mean; shimmer does neither.
+      groundPairs.push(+((groundChanged / Math.max(1, ground)) * 100).toFixed(2))
+      driftPairs.push(+(drift / inner).toFixed(2))
+    }
+    // The crop, enlarged 4× for the eye (nearest neighbour: no smoothing).
+    await sharp(frames[0]).resize({ width: box.width * 4, kernel: 'nearest' }).toFile(`${OUT}${shot('1380-figure-micro-traveller-crop')}.png`)
+    check(
+      'figure micro-structure: the traveller is visibly drawn in his crop (hidden-vs-shown mask)',
+      box.points >= 5 && box.width > 8 && box.height > 8 && visible >= minVisible,
+      JSON.stringify({ box, visiblePixels: visible, minVisible, cropPixels: without.length }),
+    )
+    check(
+      'figure micro-structure: the standing traveller is temporally stable under TRAA (no shimmer on his visible pixels)',
+      // Measured with the pose frozen (19.10.2026, ~200 interior pixels, so
+      // one pixel ≈ 0.5 %): WebGPU micro ON [0, 0.51, 0.51] / [1.01, 1.01,
+      // 0.51] %, the micro-OFF control (FIGURE_MICRO bump and albedo 0)
+      // [0.5, 1.51, 1.01] % — the baked maps add no shimmer; WebGL 2 micro ON
+      // [1.97, 2.46, 1.48] % (no WebGL 2 control). The 5 % bar stays. A joint
+      // that still moves means the frames measure motion: the check fails.
+      // A capture that does not match the mask is skipped above, so every
+      // pair must have been compared or nothing was measured.
+      visible >= minVisible &&
+        inner >= 20 &&
+        boneMovePx.length === 3 &&
+        boneMovePx.every((d) => d < 0.05) &&
+        pairs.length === 3 &&
+        pairs.length === raws.length - 1 &&
+        maxFrac < 0.05,
+      JSON.stringify({
+        boneMovePx,
+        comparedPairs: pairs.length,
+        captures: raws.map((r) => r.length),
+        visiblePixels: visible,
+        interiorPixels: inner,
+        maxChangedInterior: +(maxFrac * 100).toFixed(2) + ' %',
+        pairsPercent: pairs,
+        withSilhouette: +(maxAll * 100).toFixed(2) + ' %',
+        groundPairsPercent: groundPairs,
+        interiorMeanDrift: driftPairs,
+      }),
+    )
+  }
 }
 
 await finishPolishSuite()

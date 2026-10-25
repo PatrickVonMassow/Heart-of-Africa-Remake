@@ -539,3 +539,15 @@ describe('the board audits are untouched by the chat', () => {
     expect(structureViolations(leaked).map((v) => v.code)).toContain('sections-wrong')
   })
 })
+
+describe('the chat hint states the reply bound', () => {
+  // The watcher answers after its ~45 s deferral (DEFERRAL_MS) plus the
+  // responder's cold start; the measured live bound is 3 min. It is typical,
+  // not guaranteed (a watcher restart gap delays it), so the hint promises no
+  // maximum; the launcher tick is no longer the transport.
+  it('names the 3-minute bound as typical and not the launcher tick', () => {
+    const hint = /hint:\s*'([^']*)'/.exec(viewerHtml)?.[1] ?? ''
+    expect(hint).toMatch(/in der Regel .*3 Minuten/)
+    expect(hint).not.toMatch(/spätestens|Launcher-Tick|15 Minuten/)
+  })
+})

@@ -201,6 +201,27 @@ def world_pose(parents, local_t, local_r):
 # ---- writing ------------------------------------------------------------------
 
 
+def sparse_bounds(stored, moved, count):
+    """min/max of a sparse accessor as glTF requires: over the substituted
+    values (as stored, i.e. quantized when normalized) and, when any vertex is
+    left out, the implicit zeros."""
+    vals = np.asarray(stored)[moved].reshape(len(moved), -1)
+    if len(moved) < count:
+        vals = np.vstack([vals, np.zeros((1, vals.shape[1]))])
+    return [float(x) for x in vals.min(0)], [float(x) for x in vals.max(0)]
+
+
+def selftest():
+    # deltas under eps are dropped: their values must not widen the bounds,
+    # and the implicit zeros must be inside them (point 1315 review)
+    d = np.array([[0.0001, 0, 0], [0.001, 0.5, -0.25], [0, 0, 0]]) * 32767
+    moved = np.nonzero(np.abs(d).max(1) > 0.0005 * 32767)[0]
+    lo, hi = sparse_bounds(np.round(d), moved, 3)
+    assert lo == [0.0, 0.0, round(-0.25 * 32767)] and hi == [round(0.001 * 32767), round(0.5 * 32767), 0.0], (lo, hi)
+    lo, hi = sparse_bounds(np.array([[1.0, 2, 3], [4, 5, 6]]), np.array([0, 1]), 2)
+    assert lo == [1.0, 2.0, 3.0] and hi == [4.0, 5.0, 6.0], (lo, hi)
+
+
 class GlbWriter:
     def __init__(self):
         self.j = {'asset': {'version': '2.0', 'generator': 'hoa scripts/villager'}, 'scene': 0, 'scenes': [{'nodes': []}],
@@ -233,19 +254,32 @@ class GlbWriter:
         self.j['accessors'].append(acc)
         return len(self.j['accessors']) - 1
 
-    def sparse_accessor(self, delta, atype='VEC3'):
-        """A morph delta as a sparse accessor over zeros: only moved vertices."""
-        moved = np.nonzero(np.abs(delta).max(1) > 1e-6)[0]
+    def sparse_accessor(self, delta, atype='VEC3', eps=1e-6, quantize=False):
+        """A morph delta as a sparse accessor over zeros: only the vertices it
+        moves by more than `eps` (figure units). `quantize`: the values as
+        normalized shorts (KHR_mesh_quantization; |delta| < 1 figure unit,
+        steps of 1/32767 ≈ 0.04 mm)."""
+        moved = np.nonzero(np.abs(delta).max(1) > eps)[0]
         count = int(delta.shape[0])
-        acc = {'componentType': 5126, 'count': count, 'type': atype}
+        acc = {'componentType': 5122 if quantize else 5126, 'count': count, 'type': atype}
         if len(moved) == 0:
             moved = np.array([0])
         idx = self._view(moved.astype(np.uint32 if count > 65535 else np.uint16).tobytes())
-        val = self._view(np.ascontiguousarray(delta[moved]).astype(np.float32).tobytes())
+        if quantize:
+            if np.abs(delta).max() >= 1:
+                raise ValueError('a quantized morph delta must stay under 1 figure unit')
+            delta = np.round(np.asarray(delta) * 32767)
+            acc['normalized'] = True
+            for e in ('KHR_mesh_quantization',):
+                for k in ('extensionsUsed', 'extensionsRequired'):
+                    if e not in self.j.setdefault(k, []):
+                        self.j[k].append(e)
+            val = self._view(np.ascontiguousarray(delta[moved]).astype(np.int16).tobytes())
+        else:
+            val = self._view(np.ascontiguousarray(delta[moved]).astype(np.float32).tobytes())
         acc['sparse'] = {'count': int(len(moved)), 'indices': {'bufferView': idx, 'componentType': 5125 if count > 65535 else 5123},
                          'values': {'bufferView': val}}
-        acc['min'] = [float(x) for x in delta.min(0)]
-        acc['max'] = [float(x) for x in delta.max(0)]
+        acc['min'], acc['max'] = sparse_bounds(np.asarray(delta), moved, count)
         self.j['accessors'].append(acc)
         return len(self.j['accessors']) - 1
 

@@ -1,7 +1,9 @@
 """Step 1: the villager's base body from MakeHuman — one decimated mesh in the
 game's figure units with morph targets for sex, age and build, the skeleton's
-joints per morph, skin weights mapped onto the villager bones, and a closed-hand
-(grip) morph per hand.
+joints per morph, skin weights mapped onto the villager bones, and three hand
+shapes per hand — closed round a shaft (grip), pointing (point) and relaxed
+(relax) — from the MakeHuman finger weights (natural-villager-motion step 3; no
+finger bones).
 
 Morphs are BILINEAR over the appearance table's corners, exact at every
 (sex, age) corner: basis = adult man; `female`; `child`/`youth`/`elder` (male);
@@ -21,7 +23,9 @@ from mhbody import MakeHuman
 
 AGES = ['child', 'youth', 'adult', 'elder']
 SEXES = ['female', 'male']
-MORPHS = ['female', 'child', 'youth', 'elder', 'child_f', 'youth_f', 'elder_f', 'slight', 'stout', 'grip.L', 'grip.R']
+HAND_SHAPES = ('grip', 'point', 'relax')
+HAND_MORPHS = [f'{h}.{s}' for h in HAND_SHAPES for s in 'LR']
+MORPHS = ['female', 'child', 'youth', 'elder', 'child_f', 'youth_f', 'elder_f', 'slight', 'stout', *HAND_MORPHS]
 
 
 def corner_shapes(mh, cfg):
@@ -33,7 +37,7 @@ def corner_shapes(mh, cfg):
 
     def make(sex, age, build):
         w = 0.5 + build * A['buildWeight']
-        cup = A['breastCup'][age] if sex == 'female' else 0.0
+        cup = min(A['breastCup'][age], A['breastCupMax']) if sex == 'female' else 0.0
         v = mh.shape(1.0 if sex == 'male' else 0.0, A['makeHumanAge'][age], w, A['makeHumanRace'], cup)
         lo = v[body, 1].min()
         hi = v[body, 1].max()
@@ -79,10 +83,13 @@ def morph_deltas(C):
 FINGERS = ['index', 'middle', 'ring', 'pinky']
 
 
-def grip_shape(mh, v, weights_full, side):
-    """The basis shape with one hand closed round a shaft (fingers curled at
-    each phalanx, the thumb wrapped across): linear blend skinning of the
-    MakeHuman game_engine finger bones on the full-resolution mesh."""
+def hand_shape(mh, v, weights_full, side, shape):
+    """The basis shape with one hand posed: each finger curled at each
+    phalanx by `shape['fingers'][finger]` (rad), the thumb folded across the
+    palm by `shape['thumb']` — linear blend skinning of the MakeHuman
+    game_engine finger bones on the full-resolution mesh. The shapes
+    (VILLAGER_ASSET.handShapes): grip closes round a shaft, point keeps the
+    index straight, relax is the soft curl of a hand at rest."""
     rig = json.load(open(mh.dir + '/rig.game_engine.json'))
     s = '_l' if side == 'L' else '_r'
 
@@ -101,18 +108,18 @@ def grip_shape(mh, v, weights_full, side):
     palm /= np.linalg.norm(palm)
     # Each finger bone: its world rotation (about the curl axis) composed down the chain.
     world = {}
-    curl = {1: 1.15, 2: 1.35, 3: 0.95}
     for f in FINGERS:
+        curl = shape['fingers'][f]
         q = np.array([0, 0, 0, 1.0])
         for k in (1, 2, 3):
             b = f'{f}_0{k}{s}'
             d = tail(b) - head(b)
             axis = np.cross(d, palm)
-            q = qnorm(qmul(qaxis(axis, curl[k]), q))
+            q = qnorm(qmul(qaxis(axis, curl[k - 1]), q))
             world[b] = q
     # The thumb folds across the palm toward the fingers.
     q = np.array([0, 0, 0, 1.0])
-    for k, ang in ((1, 0.55), (2, 0.6), (3, 0.5)):
+    for k, ang in zip((1, 2, 3), shape['thumb']):
         b = f'thumb_0{k}{s}'
         d = tail(b) - head(b)
         axis = np.cross(d, palm)
@@ -295,17 +302,19 @@ def top4(W):
 
 
 def build_body(mh, cfg):
+    shapes = cfg['VILLAGER_ASSET']['handShapes']
     C = corner_shapes(mh, cfg)
     basis, deltas = morph_deltas(C)
     Wfull, raw = full_weights(mh)
-    deltas['grip.L'] = grip_shape(mh, basis, raw, 'L') - basis
-    deltas['grip.R'] = grip_shape(mh, basis, raw, 'R') - basis
+    for m in HAND_MORPHS:
+        h, side = m.split('.')
+        deltas[m] = hand_shape(mh, basis, raw, side, shapes[h]) - basis
     # Joints per corner → per morph.
     J = {k: joints_of(mh, v) for k, v in C.items()}
     jarr = {k: np.array([[*J[k][n][0], *J[k][n][1]] for n in SK.NAMES]) for k in C}
     jbasis, jdel = morph_deltas(jarr)
-    jdel['grip.L'] = np.zeros_like(jbasis)
-    jdel['grip.R'] = np.zeros_like(jbasis)
+    for m in HAND_MORPHS:
+        jdel[m] = np.zeros_like(jbasis)
 
     # Each palm's normal at rest (the retarget aligns the hands' twist by it).
     palm = {}

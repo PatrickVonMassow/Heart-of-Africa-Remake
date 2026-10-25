@@ -216,3 +216,32 @@ describe('evaluate', () => {
     expect(concisenessOffenders(section(derived + authored))).toMatchObject([{ where: 'now', point: 713 }])
   })
 })
+
+// A card split into description and status (user 05.10.2026) is judged per
+// section: each is read on its own, so their words do not add up.
+describe('description/status split', () => {
+  const split = (desc, status) =>
+    `<p class="desc">${desc}</p><hr class="split"><p class="status-head">Stand der Umsetzung</p>${status}`
+  it('judges description and status separately', () => {
+    const html = boardHtml({ now: [{ n: 7, body: split(`${lorem(30)}.`, `<p>${lorem(30)}</p><p>${lorem(30)}</p>`) }] })
+    expect(concisenessOffenders(html)).toEqual([])
+  })
+  it('names the section that is over budget', () => {
+    const long = boardHtml({ queue: [{ n: 8, body: split(lorem(95), '<p>Noch nicht begonnen.</p>') }] })
+    expect(concisenessOffenders(long)[0].reason).toMatch(/^description: 95 words/)
+    const status = boardHtml({ now: [{ n: 9, body: split('Kurz.', `<p>${lorem(70)}</p>`) }] })
+    expect(concisenessOffenders(status)[0].reason).toMatch(/^one long unbroken paragraph \(70 words\)/)
+  })
+})
+
+describe('derived distribution paragraphs', () => {
+  const dist = '<p class="dist-head">Verteilung</p><p class="dist">Bau: Modell A · Cloud | Prüfung: offen</p>'
+  it('still flags a long single paragraph on a card without the divider', () => {
+    const html = boardHtml({ queue: [{ n: 11, body: `<p>${lorem(70)}</p>${dist}` }] })
+    expect(concisenessOffenders(html)[0].reason).toMatch(/^one long unbroken paragraph \(70 words\)/)
+  })
+  it('does not count the line against a card body near its budget', () => {
+    const html = boardHtml({ queue: [{ n: 12, body: `<p>${lorem(45)}</p><p>${lorem(45)}</p>${dist}` }] })
+    expect(concisenessOffenders(html)).toEqual([])
+  })
+})

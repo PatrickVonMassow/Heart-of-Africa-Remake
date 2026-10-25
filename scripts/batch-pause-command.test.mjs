@@ -87,6 +87,21 @@ describe('batch-pause command', () => {
     expect(verdict.retryAfter).toBeGreaterThan(NOW)
   })
 
+  it('refuses a quoted question or discussion remark as a stop reason and accepts an explicit order', () => {
+    for (const reason of [
+      'user 12.10.2026: »Hast du die Batch bekommen? Dazu habe ich dich nicht aufgefordert.«',
+      'user 24.09.2026: »Erstmal nur darüber reden«',
+    ]) {
+      const result = recordUserStop(reason, { ...paths(), owner: HOLDER, now: NOW })
+      expect(result).toMatchObject({ refused: true, why: expect.stringMatching(/^not-an-explicit-stop-order/) })
+    }
+    for (const reason of ['user: »Halte die Batch an«', 'user: »Stopp die Batch«']) {
+      const target = paths()
+      expect(recordUserStop(reason, { ...target, owner: HOLDER, now: NOW })).toMatchObject({ clockless: true })
+      expect(existsSync(target.path)).toBe(true)
+    }
+  })
+
   it.each([
     [],
     ['--user-stop'],
@@ -98,8 +113,10 @@ describe('batch-pause command', () => {
   })
 
   it('points every stop instruction at the typed writer and distinguishes the clocked case', () => {
-    const guard = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-progress-guard.mjs'), 'utf8')
-    expect(guard).toContain('batch-pause.mjs --user-stop')
+    const here = dirname(fileURLToPath(import.meta.url))
+    const guard = readFileSync(join(here, 'batch-progress-guard.mjs'), 'utf8')
+    expect(guard).toContain('userStopEnd(transcriptOrdersStop(')
+    expect(readFileSync(join(here, 'batch-pause-core.mjs'), 'utf8')).toContain('batch-pause.mjs --user-stop')
     expect(guard).toContain('batch-pause.mjs --awaiting-user')
     expect(guard).toMatch(/--awaiting-user[\s\S]*restart clock/)
     expect(guard).not.toContain('then create .claude/batch-paused and stop')

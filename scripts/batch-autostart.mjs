@@ -39,6 +39,7 @@ import {
   readOwnerLock,
   assessOwner,
   probePid,
+  processCommand,
   bootTimeMs,
   detectParallel,
   raiseParallelAlert,
@@ -92,13 +93,14 @@ import {
   staleEtaLogLine,
   launcherStartRecord,
   successorStartDecision,
+  startReservation,
   supervisorRestartDecision,
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
   RUNAWAY_FAIL_LIMIT,
   runawayRecoveryDecision,
 } from './batch-autostart-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
@@ -467,7 +469,7 @@ function readRunLogSegment(from) {
 // is the whole point of `firewall-allow.mjs`), and it needs no network of its own
 // beyond DNS.
 //
-// IT IS DETACHED, NOT AWAITED (GPT-5.6 Sol, 11.08.2026). Run synchronously it sat
+// IT IS DETACHED, NOT AWAITED (cross-vendor review, 11.08.2026). Run synchronously it sat
 // in front of every later duty of the tick — the spawn decision, the chat inbox,
 // the leaked-worker sweep — and `timeout` on a sync call is no ceiling at all:
 // node signals the child and then waits for it to actually exit, so a wedged
@@ -711,6 +713,12 @@ if (!batchParked && pause.state !== 'retry' && state.pauseJournalKey) {
   delete state.pauseJournalKey
 }
 
+/** A pid probe that also names the command, the watcher's drift-free identity. */
+const watcherProbe = (pid) => {
+  const p = probePid(pid)
+  return p.exists ? { ...p, command: processCommand(pid) } : p
+}
+
 // --- THE MESSAGE WATCHER: this tick is its supervisor (point 407) --------------
 // Stage 3 of the chat channel is a long-lived process subscribed to the inbox
 // topic, so a message arriving into an IDLE machine wakes a light responder
@@ -728,7 +736,7 @@ if (!batchParked && pause.state !== 'retry' && state.pauseJournalKey) {
 // work; its decision gate admits only verified mail to a bounded responder.
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
-  const sup = watcherSupervision({ paused: batchParked, record: rec, probe: probePid })
+  const sup = watcherSupervision({ paused: batchParked, record: rec, probe: watcherProbe })
   // A WATCHER CANNOT RUN WITHOUT A READABLE SECRET, and one started anyway exits
   // before it writes its pidfile — so the supervision would read "not running"
   // and start another doomed process at every tick, for ever, with nothing
@@ -1479,6 +1487,15 @@ if (!startDecision.start) {
         'shape that stood the batch still for 107 minutes on 03.09.2026. A successor is being started.',
       'high',
     )
+    // The refused decision carries no reservation; the takeover needs one for
+    // the atomic acquire below.
+    const reservation = startReservation({ trigger, spawnToken, lock, fenceState, now })
+    if (reservation.requestedFence === null) {
+      log('skip: takeover refused — the ownership fence has no safe successor generation; NOT spawning')
+      writeJsonAtomic(C('autostart-state.json'), state)
+      process.exit(0)
+    }
+    startDecision = { ...startDecision, reservation }
     delete state.wedgeVerdictKey
     delete state.wedgeVerdictRepeats
     delete state.writerVetoSince
@@ -1892,7 +1909,7 @@ try {
   const fresh = pendingSinceHandover(pendingChat, state.chatHandedAt)
   const suffix = chatPromptSuffix(fresh)
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
-  const fableState = currentFableState()
+  const fableState = currentLaneState()
   if (!fableState.ok) throw new Error(fableState.problem)
   const emergency = emergencyHandoffPrompt(readJson(join(REPO, 'local', 'batch-emergency-state.json')))
   const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix + emergency)

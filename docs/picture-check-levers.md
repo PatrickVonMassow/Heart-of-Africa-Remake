@@ -12,7 +12,7 @@ author's rationale.
 
 ---
 
-## 1. Lever list A — Opus 5, written blind
+## 1. Lever list A — the main chain, written blind
 
 Written after reading `picture-check-cost.md` and `render-verify-core.mjs`, and
 **before** any second list existed. Committed on its own so the order is
@@ -127,7 +127,7 @@ as considered-and-rejected so the next reader does not re-derive them.
 
 ---
 
-## 2. Lever list B — Fable 5, written blind
+## 2. Lever list B — the scarce lane, written blind
 
 Asked the same question from the same measurement, forbidden to read §1 or any
 `feat/361-*` branch, and confirmed it did not. Summarised here; the wording is

@@ -4,6 +4,12 @@
 //   node scripts/villager/build.mjs fetch      only fetch the pinned sources
 //   node scripts/villager/build.mjs fetch --pin   (re)write the sha256 of every source
 //   node scripts/villager/build.mjs sheets     render the Blender frame sheets
+//   node scripts/villager/build.mjs runtime    the round trip of the runtime-pose export
+//
+// The steps sheets, penetration and runtime first export the game's own
+// composed poses (src/render/villagerRuntimePose.test.tsx, run by Vitest) and
+// hand them to the pipeline (--runtime), which checks the round trip before it
+// draws or measures them.
 //
 // Inputs are the PINNED CC0 sources in scripts/villager/sources.json (MakeHuman /
 // MPFB2 base mesh, macro targets and game_engine rig; Quaternius Universal
@@ -16,6 +22,7 @@
 //
 // Blender is never a build or runtime dependency: the game loads the committed
 // .glb files with three's GLTFLoader.
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -85,8 +92,23 @@ export async function pipelineConfig() {
   })
   const code = out.outputFiles[0].text
   const mod = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
-  return { VILLAGER_ASSET: mod.VILLAGER_ASSET, FIGURE_STATURE: mod.VILLAGER_ASSET.stature }
+  // VILLAGER_POSE: only the clavicle range the penetration step measures — the
+  // runtime's other pose values must not key (and refit) the pipeline's caches
+  return { VILLAGER_ASSET: mod.VILLAGER_ASSET, VILLAGER_GLTF: mod.VILLAGER_GLTF, VILLAGER_POSE: { shoulders: mod.VILLAGER_POSE.shoulders }, FIGURE_STATURE: mod.VILLAGER_ASSET.stature }
 }
+
+/** The game's composed poses for the eight subjects, as JSON at `path` (Vitest). */
+export function exportRuntimePoses(path) {
+  const r = spawnSync('npx', ['vitest', 'run', 'src/render/villagerRuntimePose.test.tsx'], {
+    cwd: repo,
+    env: { ...process.env, VILLAGER_RUNTIME_POSES: path },
+    stdio: 'inherit',
+    windowsHide: true,
+  })
+  if (r.status !== 0 || !existsSync(path)) throw new Error(`runtime-pose export failed (vitest exit ${r.status})`)
+}
+
+const RUNTIME_STEPS = ['sheets', 'penetration', 'runtime']
 
 async function main() {
   const [cmd = 'all', ...rest] = process.argv.slice(2)
@@ -99,12 +121,20 @@ async function main() {
   const cfgPath = join(work, `config-${process.pid}.json`)
   writeFileSync(cfgPath, JSON.stringify(cfg, null, 1))
   const args = ['--src', src, '--config', cfgPath, '--out', join(repo, 'public', 'models'), '--work', work, '--verification', join(repo, 'verification', 'villager-body')]
-  const step = cmd === 'all' ? 'all' : cmd
-  let status
+  // 'all' builds and exports the asset first: the runtime poses are read from the exported glb
+  const passes = cmd === 'all' ? ['body,clips,garments,export', 'sheets,penetration'] : [cmd]
+  const runtimePath = join(work, `runtime-poses-${process.pid}.json`)
+  let status = 0
   try {
-    status = runBlender([join(here, 'pipeline.py'), '--step', step, ...args, ...rest])
+    for (const step of passes) {
+      const runtime = step.split(',').some((s) => RUNTIME_STEPS.includes(s))
+      if (runtime) exportRuntimePoses(runtimePath)
+      status = runBlender([join(here, 'pipeline.py'), '--step', step, ...args, ...(runtime ? ['--runtime', runtimePath] : []), ...rest])
+      if (status !== 0) break
+    }
   } finally {
     rmSync(cfgPath, { force: true })
+    rmSync(runtimePath, { force: true })
   }
   if (status !== 0) return status
   for (const f of ['villager.glb']) {

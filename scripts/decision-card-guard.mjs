@@ -26,7 +26,7 @@ import {
 } from './decision-card-guard-core.mjs'
 import { SECTION_TITLES, parseCards, sliceSections } from './dashboard-guard-core.mjs'
 import { extractLastAssistantText } from './timestamp-guard-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { readVdzkAnswers, writeVdzkAnswers } from './vdzk-answer.mjs'
@@ -61,15 +61,15 @@ export function vdzkTitles(html) {
 export function gatherDecisionCardCondition({
   sessionId = '',
   paused,
-  otherOwner,
+  owner,
   dashboardExists,
   dashboardHtml,
 } = {}) {
   if ((paused ?? existsSync(PAUSE)) === true) return { applicable: false, why: 'the batch is paused' }
-  if ((otherOwner ?? heldByOtherLiveOwner(sessionId)) === true) {
+  if ((owner ?? ownsLock(sessionId).mine) !== true) {
     return {
       applicable: false,
-      why: 'another live session owns the batch lock',
+      why: 'this session does not hold the batch lock',
       cause: 'not-lock-owner',
     }
   }
@@ -169,7 +169,8 @@ function typedUserText(content) {
 /** The last positively identified user message in Claude's JSONL transcript.
  *
  * There are exactly two accepted channels: a CLI entry marked
- * `promptSource: "typed"`, and the chat watcher's own responder envelope. All
+ * `promptSource: "typed"` or `origin.kind: "human"`, and the chat watcher's own
+ * responder envelope. All
  * other `type: "user"` entries are machine traffic and cannot arm a review.
  * Older CLI versions that omit `promptSource` therefore cannot arm the typed
  * channel; that conservative miss is preferable to assigning a duty from
@@ -189,7 +190,9 @@ export function extractLastUserMessage(jsonl) {
     const content = entry.message?.content
     const id = entry.uuid || entry.message?.id
     if (typeof id !== 'string' || !id.trim()) continue
-    if (entry.promptSource === 'typed') {
+    // This CLI writes a human prompt as promptSource "sdk" with origin.kind
+    // "human" (measured 03.10.2026); peers and notifications carry other kinds.
+    if (entry.promptSource === 'typed' || entry.origin?.kind === 'human') {
       const text = typedUserText(content)
       if (text) last = { id, text }
     }
@@ -319,7 +322,9 @@ if (isMainModule(import.meta.url)) {
     const transcriptPath = payload && payload.transcript_path
 
     if (existsSync(PAUSE)) process.exit(0) // user-paused: no batch duty in flight
-    const nonOwner = heldByOtherLiveOwner(sessionId)
+    // Card duties belong to the batch-lock holder alone — no review is demanded
+    // from any other session, before any state is read or written.
+    if (!ownsLock(sessionId).mine) process.exit(0)
     if (!existsSync(DASHBOARD)) process.exit(0) // no board — dashboard-guard owns that case
     if (!transcriptPath || !existsSync(transcriptPath)) process.exit(0) // nothing to judge
 
@@ -354,7 +359,7 @@ if (isMainModule(import.meta.url)) {
     const carriedVerdict = evaluateCarriedAnswers({
       entries: reconciled.active,
       currentTitles: titles,
-      owner: !nonOwner,
+      owner: true,
       stateReadable: answerStateReadable,
     })
     if (carriedVerdict.block) {
@@ -369,17 +374,13 @@ if (isMainModule(import.meta.url)) {
       currentTitles: titles,
       review: activeSnapshot?.review,
       carriedAnswers: reconciled.active,
-      nonOwner,
+      sessionId,
       stateReadable: Boolean(activeSnapshot),
     })
     if (reviewVerdict.block) {
       process.stdout.write(JSON.stringify({ decision: 'block', reason: reviewVerdict.reason }))
       process.exit(0)
     }
-
-    // The original direction is a batch-owner duty: a non-owner is explicitly
-    // barred from creating the board card that could satisfy it.
-    if (nonOwner) process.exit(0)
 
     const verdict = evaluate({
       replyText: extractLastAssistantText(transcript),

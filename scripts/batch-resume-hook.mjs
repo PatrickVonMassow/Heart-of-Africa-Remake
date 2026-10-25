@@ -15,6 +15,9 @@
 //     'pending-spawn' lock to itself (pid-bound + one-shot authorization) —
 //     it never overrides a live lock (the old unconditional claim was the
 //     e9407cae incident's second hole).
+//   - ownership needs an INVITATION (user 03.09.2026): that conversion, a lock
+//     this session already held (compaction), or a successor proving the
+//     launcher's spawn token. A bare start orients and takes nothing.
 // It also records this TOP-LEVEL session id for the parallel-session detector
 // (subagents never fire SessionStart, so they can never be flagged).
 //
@@ -35,6 +38,7 @@ import {
   noteTopLevelSession,
   noteSessionStandDown,
   findClaudeAncestor,
+  ownsLock,
   probePid,
   transitionOwnerSession,
 } from './batch-singleton.mjs'
@@ -44,16 +48,21 @@ import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
 import {
   allGatedMessage,
+  consumesLaunchAuthorization,
   openPointsHeadline,
   ownerRunbookContext,
+  ownerStartText,
+  sessionStartOwnership,
+  spawnTokenProof,
   standDownMessage,
+  uninvitedSessionMessage,
 } from './batch-resume-hook-core.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
-import { currentFableState } from './fable-switch.mjs'
-import { servingPolicyLine } from './fable-switch-core.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { servingPolicyLine } from './lane-switch-core.mjs'
 import { currentVenue } from './cloud-switch.mjs'
 import { venueInstruction } from './cloud-switch-core.mjs'
 
@@ -67,6 +76,7 @@ function cloudVenueLine() {
 }
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { noteHandoverAttributionSuccessorStart } from './handover-attribution.mjs'
+import { reconcileHookLine } from './carrier-reconcile-core.mjs'
 
 const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
 
@@ -171,6 +181,15 @@ function autostartAuthorization(nowMs) {
   }
   return null
 }
+// The launcher's start record: the spawn token a successor proves itself against
+// when its pending-spawn reservation is gone.
+function readLastSpawn() {
+  try {
+    return JSON.parse(readFileSync(repoPath('.claude', 'autostart-last.json'), 'utf8'))
+  } catch {
+    return null
+  }
+}
 function clearAuthorized() {
   try {
     rmSync(AUTH_PATH)
@@ -222,6 +241,18 @@ try {
   /* an unreadable or unstartable launcher must never block session orientation */
 }
 
+// NO USER ORDER IS EVER LOST (21.10.2026). The carrier reconciliation runs at
+// EVERY session start — owner or not, whatever the doctor's mandate marker says
+// — and a red result, or one that could not run, is PRINTED here: an exit code
+// nobody reads is how five queued orders went missing for five hours.
+try {
+  const { runReconcile } = await import('./carrier-reconcile.mjs')
+  const line = reconcileHookLine(runReconcile({ fetch: false }))
+  if (line) console.log(`[batch-resume] ${line}`)
+} catch (e) {
+  console.log(`[batch-resume] ${reconcileHookLine({ ran: false, error: (e && e.message) || String(e) })}`)
+}
+
 // Condensed per docs/context-cut-list-1209.md (U158/U159): the workflow rules
 // CLAUDE.md §6/§9 and docs/batch-owner-runbook.md already carry are named, not
 // restated; what only this text carried stays in it.
@@ -231,8 +262,8 @@ const RESUME_BODY =
   'owner runbook. MAXIMAL DELEGATION: delegate implementation and infra/guard/doc/dashboard work to ' +
   'at most 3 concurrent WORKTREE-ISOLATED agents on NON-OVERLAPPING files under the model policy ' +
   '(throttle DOWN if report volume threatens context, never up; tightly-coupled same-file points go ' +
-  'TOGETHER on ONE branch sequentially); the main session keeps picture verification on both ' +
-  'backends, the serial merge -> fast-gate -> tick -> deploy -> cleanup, and the board publish. ' +
+  'TOGETHER on ONE branch sequentially); the main session keeps picture verification (backends per ' +
+  'CLAUDE.md §6), the serial merge -> fast-gate -> tick -> deploy -> cleanup, and the board publish. ' +
   'Every defect the user reports on the deployed build is APPENDED as its own ready TASKS point on ' +
   'main and delegated (append-and-defer), never fixed ad hoc or dropped. ' +
   'POINT BOUNDARY: once the point you were landing is LANDED (merged and ticked), run ' +
@@ -268,31 +299,31 @@ try {
     if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
-    const fableState = currentFableState()
+    const scarceState = currentLaneState()
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
     // degraded to Haiku and wrecked three points — name the authoring policy at
     // every session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
     // The policy wording also NAMES THE COMMISSION COMMAND (point 1077,
     // 09.09.2026): the cut ran and the command did not — 280 of 379 open points
-    // were routed to Astra and one was commissioned in three days, while
-    // fourteen Astra reviews landed. Announcing the routing without its command
+    // were routed to the cross lane and one was commissioned in three days, while
+    // fourteen cross-lane reviews landed. Announcing the routing without its command
     // is what the measurement found. Kept out of the stamped block below, where
     // nothing but the stamp may stand.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@2f245cec
-      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
+      // rule:model-policy@740d83c2
+      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES (role records in scripts/model-lanes.mjs). ' +
       'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
       'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +
-      'reached §6 Fable escalation threshold). scripts/astra-share.mjs --status says what routes now; ' +
-      'an UNREACHABLE Astra lane (exhausted OpenAI volume included) authors on Opus 5.5 instead of ' +
-      'waiting. REVIEW is CROSS-VENDOR (scripts/review-astra.mjs for Anthropic-authored work, Claude ' +
-      'for Astra-authored work); no model reviews its own. AN ASTRA-LANE POINT IS COMMISSIONED, NOT ' +
-      'WRITTEN HERE: node scripts/author-astra.mjs --point <N> in its worktree, then review, suites, ' +
-      'picture, landing (docs/astra-routing.md, "Routed and not commissioned"). ' +
-      (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`) +
+      'reached scarce-lane escalation threshold in scripts/author-routing-core.mjs). scripts/lane-routing.mjs --status says what routes now; ' +
+      'an UNREACHABLE cross lane (exhausted volume included) authors on the main chain instead of ' +
+      'waiting. REVIEW is CROSS-VENDOR (scripts/cross-review.mjs for main-chain work, the main chain ' +
+      'for cross-lane work); no model reviews its own. A CROSS-LANE POINT IS COMMISSIONED, NOT ' +
+      'WRITTEN HERE: node scripts/author-delegate.mjs --lane cross --point <N> in its worktree, then review, suites, ' +
+      'picture, landing (docs/lane-routing.md, "Routed and not commissioned"). ' +
+      (scarceState.ok ? servingPolicyLine(scarceState) : `SCARCE-LANE SWITCH UNKNOWN: ${scarceState.problem}`) +
       // Where authoring delegations start (point 1230): the cloud switch's routing read.
       ` ${cloudVenueLine()}`
     const now = Date.now()
@@ -342,6 +373,15 @@ try {
       // converting the spawn, and loop with the next tick (four-eyes review,
       // finding 1).
       const lock = readOwnerLock()
+      const ownerAlive = (l) =>
+        l
+          ? assessOwner(l, {
+              now,
+              bootTime: bootTimeMs(),
+              probe: l.pid ? probePid(l.pid) : null,
+              work: gatherOwnerWork(l, { now }),
+            }).alive === true
+          : false
       const reservation = claim
         ? assessClaim({
             claim,
@@ -355,14 +395,7 @@ try {
               // an expired lease that advancing work outvotes must read alive at
               // THIS door too, or a window opening during that state takes the
               // batch off a session that is mid-verification.
-              alive: lock
-                ? assessOwner(lock, {
-                    now,
-                    bootTime: bootTimeMs(),
-                    probe: lock.pid ? probePid(lock.pid) : null,
-                    work: gatherOwnerWork(lock, { now }),
-                  }).alive === true
-                : false,
+              alive: ownerAlive(lock),
             }),
             now,
             maxAgeMs: maxAgeMs(),
@@ -370,22 +403,39 @@ try {
           })
         : { honour: false, mine: false, claimantSid: null }
 
-      // Ownership: pending-spawn conversion first (launcher-spawned session),
-      // then the ordinary atomic acquire. NO path overrides a live lock.
+      // Ownership needs an INVITATION (user 03.09.2026): the pending-spawn
+      // conversion first, then the atomic acquire — but only for a lock this
+      // session already holds (compaction) or a successor proving the launcher's
+      // spawn token. A bare start never acquires. NO path overrides a live lock.
       const auth = autostartAuthorization(now)
       let ownership = 'none'
+      let invitation = null
       // The same predicate the owner's Stop guard applies before ITS acquire, so
       // the rule lives in one place and cannot drift between the two doors.
       if (reservationDecision({ assessment: reservation }).acquire) {
-        if (lock && lock.kind === 'pending-spawn') {
-          if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
-        }
-        if (ownership === 'none') {
+        const converted =
+          !!(lock && lock.kind === 'pending-spawn') && convertPendingSpawn(sessionId, { authorized: !!auth })
+        if (converted) ownership = 'acquired-spawn'
+        const plan = sessionStartOwnership({
+          converted,
+          heldHere: !converted && ownsLock(sessionId, { lock: readOwnerLock() }).mine,
+          spawnProof: spawnTokenProof({ auth, lastSpawn: readLastSpawn(), ancestorPid: sessionProcess?.pid }),
+          auth,
+        })
+        invitation = plan.invitation
+        if (plan.mayAcquire) {
           const r = acquire(sessionId, { work: gatherOwnerWork(readOwnerLock(), { now: Date.now() }) })
           if (r === 'acquired' || r === 'mine') ownership = r
         }
+        if (plan.unproven) {
+          console.error(
+            '[batch-resume] LAUNCHER SPAWN NOT PROVEN: an autostart marker is present but this session neither ' +
+              'converted its reservation nor matched its spawn token — it does NOT take the batch; the ' +
+              "launcher's lockConverted check judges that spawn at its next tick.",
+          )
+        }
       }
-      if (auth) clearAuthorized()
+      if (auth && consumesLaunchAuthorization({ ownership, invitation })) clearAuthorized()
       // The claim has done its job the moment its own window owns the batch.
       if (reservation.mine && (ownership === 'acquired' || ownership === 'mine')) clearClaim()
 
@@ -428,19 +478,16 @@ try {
         }
       }
       const agentLine = agentOrientation ? ` ${agentOrientation}` : ''
-      if (ownership === 'acquired-spawn') {
-        const measured = auth?.startReason || 'the launcher recorded no start evidence'
+      if (ownsBatch(ownership)) {
+        const opening = ownerStartText({ ownership, startEvidence: auth?.startReason })
+        const noIdle = ownership === 'mine' ? '' : ' Do NOT idle-stop (the batch-progress-guard enforces this).'
         console.log(
-          `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher. ` +
-            `Launcher start evidence: ${measured}. ${RESUME_BODY} ` +
-            `Do NOT idle-stop (the batch-progress-guard enforces this).${agentLine}${ownerContext}`,
+          `${header} ${gitStanding()}${repoLine} ${opening} ${RESUME_BODY}${noIdle}${agentLine}${ownerContext}`,
         )
-      } else if (ownership === 'acquired' || ownership === 'mine') {
-        console.log(
-          `${header} ${gitStanding()}${repoLine} Standing user instruction: continue the batch autonomously, ` +
-            `point by point, then the Closing steps — without waiting for the user to say ` +
-            `"continue". ${RESUME_BODY}${agentLine}${ownerContext}`,
-        )
+      } else if (!invitation && reservationDecision({ assessment: reservation }).acquire && !ownerAlive(readOwnerLock())) {
+        // Uninvited and nobody holds the batch: orient, name the way in, take nothing.
+        noteSessionStandDown(sessionId, { processIdentity: sessionProcess, lock: readOwnerLock(), claim, now })
+        console.log(`${header} ${gitStanding()} ${uninvitedSessionMessage({ sessionId })}`)
       } else {
         // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
         // Five situations reach this branch and they need different words — most

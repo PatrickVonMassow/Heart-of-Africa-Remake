@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { auditGuide, formatViolations } from './guide-brevity-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
 
 const GUIDE = repoPath('docs/analysis_de/vibe-coding-anleitung.md')
@@ -24,15 +24,15 @@ const PAUSE = repoPath('.claude/batch-paused')
 export function gatherGuideBrevityInputs({
   sessionId = '',
   paused,
-  otherOwner,
+  owner,
   guideExists,
   guideText,
 } = {}) {
   if ((paused ?? existsSync(PAUSE)) === true) return { applicable: false, why: 'the batch is paused' }
-  if ((otherOwner ?? heldByOtherLiveOwner(sessionId)) === true) {
+  if ((owner ?? ownsLock(sessionId).mine) !== true) {
     return {
       applicable: false,
-      why: 'another live session owns the batch lock',
+      why: 'this session does not hold the batch lock',
       cause: CAUSE.notLockOwner,
     }
   }
@@ -55,7 +55,7 @@ if (isMainModule(import.meta.url)) {
     }
     // --status answers whatever the pause and the lock say, through the same gathering.
     const gathered = status
-      ? gatherGuideBrevityInputs({ paused: false, otherOwner: false })
+      ? gatherGuideBrevityInputs({ paused: false, owner: true })
       : gatherGuideBrevityInputs({ sessionId: payload.session_id || '' })
     if (!gathered.applicable) {
       if (status) console.log(`guide-brevity stands down: ${gathered.why}`)

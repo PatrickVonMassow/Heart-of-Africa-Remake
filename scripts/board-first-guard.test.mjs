@@ -281,7 +281,7 @@ describe('board-first-guard (spawned)', () => {
       const reason = refused.decision?.hookSpecificOutput?.permissionDecisionReason ?? ''
       expect(reason).toContain('BATCH OWNERSHIP STAND-DOWN')
       expect(reason).toContain(`your session scratchpad \`${pad}\``)
-      expect(reason).toContain('node scripts/finding.mjs --request "<title>" --stdin')
+      expect(reason).toContain('node scripts/finding.mjs --request "<title>" --spec-file <spec path> --why-file <why path>')
 
       // The board stays the owner's: a real board Write and a real publish command are refused.
       expect(allowed('Write', { file_path: resolve(repo, '.batch-dashboard.html') })).toBe(false)
@@ -639,6 +639,94 @@ describe('board-first-guard (spawned)', () => {
       expect(JSON.parse(readFileSync(lockPath, 'utf8')).leaseUntil).toBe(strangerLock.leaseUntil)
     } finally {
       rmSync(lockPath, { force: true })
+    }
+  })
+
+  // --- THE BOARD DUTY BELONGS TO THE LOCK HOLDER ALONE ----------------------
+  // A non-owner used to receive the board-first deny AND stamp
+  // `boardFirstFiredAt` into the shared state, consuming the real owner's
+  // once-per-turn stand-down. Every refusal before the board decision stays.
+  const lockPath = () => resolve(repo, '.claude', 'batch-lock.json')
+
+  it('a non-owner of an ownerless batch gets no board deny and writes no fired stamp', () => {
+    rmSync(lockPath(), { force: true })
+    const scratch = mkdtempSync(resolve(tmpdir(), 'hoa-board-first-nonowner-'))
+    try {
+      const r = callGuard('Write', { file_path: resolve(scratch, 'note.md') })
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout.trim()).toBe('')
+      expect(readState().boardFirstFiredAt).toBeUndefined()
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('a non-owner beside a dead foreign lock gets no board deny either', () => {
+    // A lock naming another session whose lease has run out: no live foreign
+    // owner, so no ownership stand-down — and still no board duty for us.
+    writeJson(lockPath(), { v: 2, sessionId: 'gone-session', claimedAt: Date.now() - 60 * 60_000, leaseUntil: Date.now() - 60_000, pid: 2 ** 22 + 1 })
+    const scratch = mkdtempSync(resolve(tmpdir(), 'hoa-board-first-nonowner-'))
+    try {
+      const r = callGuard('Write', { file_path: resolve(scratch, 'note.md') })
+      expect(r.stdout.trim()).toBe('')
+      expect(readState().boardFirstFiredAt).toBeUndefined()
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it('an ownerless main write is still refused, and a stale-fence holder still fenced out', () => {
+    rmSync(lockPath(), { force: true })
+    const main = denial(callGuard('Write', { file_path: 'src/x.ts' }))
+    expect(main).toContain('MAIN WRITE REFUSED')
+    expect(main).not.toContain('BOARD FIRST')
+    seedFence(7, 8)
+    try {
+      expect(denial(callGuard('Bash', { command: 'git push origin main' }))).toContain('FENCED OUT')
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+    expect(readState().boardFirstFiredAt).toBeUndefined()
+  })
+
+  it('the lock holder keeps the board deny, and a sealed boundary still refuses it', () => {
+    const owner = callGuard('Write', { file_path: 'src/x.ts' })
+    expect(denial(owner)).toContain('BOARD FIRST')
+    expect(readState().boardFirstFiredAt).toBeGreaterThan(0)
+
+    const boundary = resolve(repo, '.claude', 'batch-boundary.json')
+    writeJson(boundary, { phase: 'committed', sessionId: SID, at: Date.now(), point: 1 })
+    try {
+      expect(denial(callGuard('Bash', { command: 'npm run build' }))).toContain('THE BOUNDARY IS COMMITTED')
+    } finally {
+      rmSync(boundary, { force: true })
+    }
+  })
+
+  it('an isolated worktree keeps its exemption, lock or no lock', () => {
+    const base = mkdtempSync(resolve(tmpdir(), 'hoa-board-first-wt-'))
+    const wt = resolve(base, '.claude', 'worktrees', 'point-x')
+    try {
+      cpSync(resolve(repo, 'scripts'), resolve(wt, 'scripts'), { recursive: true })
+      mkdirSync(resolve(wt, '.claude'), { recursive: true })
+      const now = Date.now()
+      writeJson(resolve(wt, '.claude', 'dashboard-state.json'), { turnStartedAt: now })
+      writeJson(resolve(wt, '.claude', 'current-focus.json'), { point: 1, note: 'stale', setAt: now - 60_000, confirmedAt: now - 60_000 })
+      for (const withLock of [true, false]) {
+        const lock = resolve(wt, '.claude', 'batch-lock.json')
+        if (withLock) writeJson(lock, { v: 2, sessionId: SID, claimedAt: now, leaseUntil: now + 60 * 60_000, pid: process.pid })
+        else rmSync(lock, { force: true })
+        const r = spawnSync(process.execPath, [resolve(wt, 'scripts', 'board-first-guard.mjs')], {
+          windowsHide: true,
+          cwd: wt,
+          encoding: 'utf8',
+          input: JSON.stringify({ session_id: SID, hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: 'src/x.ts' } }),
+        })
+        expect(r.status, r.stderr).toBe(0)
+        expect(r.stdout.trim(), `worktree, lock=${withLock}`).toBe('')
+      }
+    } finally {
+      rmSync(base, { recursive: true, force: true })
     }
   })
 

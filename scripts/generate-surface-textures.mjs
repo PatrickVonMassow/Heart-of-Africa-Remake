@@ -1,9 +1,11 @@
 // Generates the tileable settlement-surface textures (albedo + normal map)
 // for the first-person materials (design.md §2.6): plaster, mud daub, thatch,
-// wood and trodden settlement ground. Procedural and deterministic, so the
+// wood and trodden settlement ground, plus the figure kinds cloth, leather and
+// skin (villagers and the traveller). Procedural and deterministic, so the
 // assets are reproducible from the repository without downloads:
 //   node scripts/generate-surface-textures.mjs
-// Writes public/tex/{plaster,mud,thatch,wood,ground}_{a,n}.png (512², RGB).
+// Writes public/tex/{plaster,mud,thatch,wood,ground,cloth,leather,skin}_{a,n}.png
+// (512², RGB).
 // 512 px over the ~1-2.5 m runtime tiles keeps millimetre grain in the top
 // mip; the GPU mip chain band-limits it with distance (materials.ts).
 

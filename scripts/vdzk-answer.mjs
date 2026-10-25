@@ -5,12 +5,15 @@
 // named VDZK card, so a long owner wait cannot leave the answered card standing.
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { answerDeadline, dueCarriedAnswers, reconcileCarriedAnswers } from './decision-card-guard-core.mjs'
 import { SECTION_TITLES, parseCards, sliceSections } from './dashboard-guard-core.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { extractLastUserMessage } from './decision-card-guard.mjs'
+import { projectSlug } from './context-watermark.mjs'
 
 const REPO = REPO_ROOT
 const DASHBOARD = process.env.DECISION_CARD_DASHBOARD || repoPath('.batch-dashboard.html')
@@ -64,24 +67,40 @@ export function resolveTitle(fragment, titles) {
   return hits[0]
 }
 
-function activeSource(sessionId = process.env.CLAUDE_SESSION_ID || '') {
-  let state
+/** The harness exports CLAUDE_CODE_SESSION_ID; CLAUDE_SESSION_ID stays an override. */
+const envSessionId = () => process.env.CLAUDE_SESSION_ID || process.env.CLAUDE_CODE_SESSION_ID || ''
+
+/** The session's own transcript, by exact id only — never a "newest" guess. */
+function transcriptMessage(sessionId) {
+  if (!sessionId) return null
+  try {
+    const path = join(homedir(), '.claude', 'projects', projectSlug(REPO_ROOT), `${sessionId}.jsonl`)
+    return existsSync(path) ? extractLastUserMessage(readFileSync(path, 'utf8')) : null
+  } catch {
+    return null
+  }
+}
+
+/** The guard's turn-start seed is a cache: concurrent sessions can drop a
+ * standing-down session's entry, so the transcript is the fallback source. */
+function activeSource(sessionId = envSessionId()) {
+  let state = null
   try {
     state = JSON.parse(readFileSync(GUARD_STATE_PATH, 'utf8'))
   } catch {
-    throw new Error('decision-card guard state is unreadable; wait for the guard to record this message')
+    /* fall through to the transcript */
   }
   const sessions = state?.sessions && typeof state.sessions === 'object' ? state.sessions : {}
   let selected = sessionId ? sessions[sessionId] : null
   let selectedId = sessionId
-  if (!selected) {
+  if (!selected && !sessionId) {
     const entries = Object.entries(sessions).filter(([, value]) => value && typeof value === 'object')
     if (entries.length === 1) [selectedId, selected] = entries[0]
   }
-  if (!selected?.userMessage?.id) {
-    throw new Error('cannot identify this session\'s active user message; wait for the guard to run')
-  }
-  return { sessionId: selectedId, messageId: selected.userMessage.id }
+  if (selected?.userMessage?.id) return { sessionId: selectedId, messageId: selected.userMessage.id }
+  const message = transcriptMessage(sessionId)
+  if (message?.id) return { sessionId, messageId: message.id }
+  throw new Error('cannot identify this session\'s active user message; wait for the guard to run')
 }
 
 export function recordVdzkAnswer(fragment, answer, { now = Date.now(), sessionId } = {}) {
@@ -176,10 +195,11 @@ if (isMainModule(import.meta.url)) {
     } else {
       const answer = flagValue(args, '--answer')
       const fragment = args[0]
-      if (!fragment || answer == null) {
-        throw new Error('usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided>"')
+      const sessionId = flagValue(args, '--session')
+      if (!fragment || answer == null || sessionId === undefined || sessionId === '') {
+        throw new Error('usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided>" [--session <id>]')
       }
-      const entry = recordVdzkAnswer(fragment, answer)
+      const entry = recordVdzkAnswer(fragment, answer, sessionId ? { sessionId } : {})
       console.log(`answer carried for ${entry.cardTitle}; deadline ${new Date(entry.deadlineAt).toISOString()}`)
     }
   } catch (error) {

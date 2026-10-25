@@ -29,6 +29,7 @@ import { instructionDelay } from '../../communication/speaking'
 import type { ConceptId } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
 import { devAssert } from '../../systems/devAssert'
+import { newestJarWater, TAKE_GRAB, tableSpot } from './waterStand'
 
 export type AdultSituationId = 'water-out' | 'water-back' | 'dig-first' | 'dig-second'
 
@@ -40,7 +41,7 @@ export const ADULT_SITUATIONS: readonly AdultSituationId[] = [
 ] as const
 
 export type AdultCarry = 'none' | 'emptyJar' | 'fullJar' | 'digTool'
-type AdultPhase = 'walk' | 'fetch' | 'fill' | 'send' | 'wait' | 'invite' | 'site' | 'dig'
+type AdultPhase = 'walk' | 'take' | 'fetch' | 'fill' | 'send' | 'wait' | 'invite' | 'site' | 'dig'
 type DigUtterance = 'invitation' | 'site'
 
 export interface ErrandPoint { x: number; z: number }
@@ -92,6 +93,9 @@ export interface AdultWorkConfig {
   intervalSpread: number
   dwellSeconds: number
   digSeconds: number
+  /** The stroke a strike is counted on: the drawn body's (the glTF dig clip's
+   *  period and blade-contact instant) — the primitive figure's when absent. */
+  digStroke?: DigStroke
   errandSeconds: number
   stallSeconds: number
   pace: number
@@ -132,6 +136,10 @@ export interface AdultTask extends ErrandPoint {
    *  solid body, so a man sent there stalls a walker's width off it and is never
    *  counted as arrived. He stands next to it, as one does at a table. */
   standSpot: ErrandPoint | null
+  /** The water carrier's place AT the stand's table (work-order 1405): he waits
+   *  for the order on his `standSpot`, then steps up here to take the empty jar
+   *  and comes back here to set the full one down. */
+  tableSpot?: ErrandPoint
   arrived: boolean
   /** Seconds this worker has dug in the current bout. */
   dug: number
@@ -169,6 +177,10 @@ export interface AdultWorkState {
    *  It is capped at `balance.waterStandCapacity`: a delivery past the cap
    *  replaces the oldest jar, which is what lets the stand need no consumer. */
   standJars: number
+  /** Per body whose dig bout completed in the latest step: the work clock
+   *  (`dug`) it completed at, so the drawn stroke ends on the step's last
+   *  advance although the task is gone. */
+  digEnded: Record<number, number>
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
@@ -187,6 +199,7 @@ export function createAdultWork(count: number, cfg: AdultWorkConfig, progress: r
     cursor: 0,
     siteProgress: Object.fromEntries(progress.map((p, i) => [i, { ...p }])),
     standJars: 0,
+    digEnded: {},
   }
 }
 
@@ -197,7 +210,9 @@ export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
 export function workArrivalRadius(task: AdultTask): number {
   // Both men must reach their own spot before waiting at the stand. Stopping
   // a metre early can block the other man's route around its solid body.
-  if (task.standSpot && (task.phase === 'send' || task.phase === 'wait' || task.situation === 'water-back')) {
+  // At the table itself, where the jars are taken up and set down (1405).
+  if (task.tableSpot && (task.phase === 'take' || task.situation === 'water-back')) return balance.waterStandTableArrivalRadius
+  if (task.standSpot && (task.phase === 'send' || task.phase === 'wait' || task.phase === 'take' || task.situation === 'water-back')) {
     return balance.waterStandArrivalRadius
   }
   // The fill is dipped where the water stands ankle-deep, not a metre short.
@@ -241,6 +256,22 @@ export function digBout(hold: { digHold: number }, onRim: boolean, inBout: boole
   }
   hold.digHold = Math.max(0, hold.digHold - dt)
   return hold.digHold > 0
+}
+
+/**
+ * The clock a body's drawn stroke runs on (both the glTF clip and the
+ * primitive's digPose, each with `digPhaseOf`): its errand's work clock
+ * (`dug`, advanced by stepAdultWork only under a stroke really played) while
+ * it digs, so each counted strike is the one drawn in that frame; on the
+ * step that completes the bout, the clock it completed at (`ended`, the
+ * state's `digEnded`), the task being gone; held where it stopped while the
+ * bout's pose is still `shown` (a hold or a fade); from the top once the pose
+ * is gone.
+ */
+export function drawnDigClock(prev: number, task: { phase: string; dug: number } | null | undefined, shown: boolean, ended?: number): number {
+  if (task && task.phase === 'dig') return task.dug
+  if (ended !== undefined) return ended
+  return shown ? prev : 0
 }
 
 export function carryOf(state: AdultWorkState, index: number): AdultCarry {
@@ -304,9 +335,28 @@ export function clearTask(state: AdultWorkState, index: number): void {
   if (index >= 0 && index < state.tasks.length) clearPair(state, index)
 }
 
-export function digStrikeCrossed(before: number, after: number, phase = 0): boolean {
-  return Math.floor((after + phase) / DIG_CYCLE_SECONDS) > Math.floor((before + phase) / DIG_CYCLE_SECONDS)
+/** One dig stroke: its period (s) and the instant in it the blade meets the
+ *  ground (s from the stroke's start) — where a strike is counted. */
+export interface DigStroke {
+  seconds: number
+  strikeAt: number
 }
+
+/** The primitive figure's stroke (render/gesture.ts digPose): it strikes at the
+ *  turn of its cycle. */
+export const PRIMITIVE_DIG_STROKE: DigStroke = { seconds: DIG_CYCLE_SECONDS, strikeAt: 0 }
+
+/** Whether the work clock passed a strike between `before` and `after`
+ *  (seconds of digging, `phase` the body's offset into its stroke): one per
+ *  stroke, at its blade contact, whatever the frame steps. */
+export function digStrikeCrossed(before: number, after: number, phase = 0, stroke: DigStroke = PRIMITIVE_DIG_STROKE): boolean {
+  const at = (t: number) => Math.floor((t + phase - stroke.strikeAt) / stroke.seconds)
+  return at(after) > at(before)
+}
+
+/** A body's offset into its dig stroke (s), so a pair does not dig in lockstep:
+ *  the work clock and the drawn stroke both add it. */
+export const digPhaseOf = (index: number): number => index * 0.37
 
 
 function anyFree(view: AdultWorkView, avoid: number): number {
@@ -329,7 +379,7 @@ function anotherFree(view: AdultWorkView, first: number): number {
  * (work-order 1087). Two men at one place block each other, and neither is then
  * counted as arrived.
  */
-function facingSpot(view: AdultWorkView, site: ErrandPoint, taken: ErrandPoint): ErrandPoint | null {
+function facingSpot(view: Pick<AdultWorkView, 'standable'>, site: ErrandPoint, taken: ErrandPoint): ErrandPoint | null {
   const away = Math.atan2(site.z - taken.z, site.x - taken.x)
   for (let k = 0; k < JOIN_BEARINGS; k++) {
     const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / JOIN_BEARINGS)
@@ -340,6 +390,26 @@ function facingSpot(view: AdultWorkView, site: ErrandPoint, taken: ErrandPoint):
     if (view.standable(x, z)) return { x, z }
   }
   return null
+}
+
+/**
+ * The two water errand spots beside the stand (work-order 1087/1245): the
+ * sender's on the side away from the water, the carrier's swept from straight
+ * opposite it. Fixed by the ground alone, so the stand can turn the front of
+ * its plank — where the empty jar waits — to the carrier's side (1405).
+ */
+export function waterErrandSpots(
+  view: Pick<AdultWorkView, 'standable'>,
+  g: AdultWorkGeography,
+): { senderSpot: ErrandPoint; carrierSpot: ErrandPoint } | null {
+  if (!g.waterStand || !g.waterFoot) return null
+  const senderSpot = facingSpot(view, g.waterStand, g.waterFoot)
+  if (!senderSpot) return null
+  // The carrier takes the FAR side, swept from straight opposite the sender:
+  // drawing a second spot at random gave the same one wherever the caller's
+  // rand is steady, and two men on one spot block each other.
+  const carrierSpot = facingSpot(view, g.waterStand, senderSpot)
+  return carrierSpot ? { senderSpot, carrierSpot } : null
 }
 
 /** Another free adult to carry the water, with none of DIG's invitation
@@ -452,7 +522,12 @@ function readyWord(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: 
       state.standJars = Math.min(balance.waterStandCapacity, state.standJars + 1)
     }
     const sender = t.orderedBy === null ? null : view.villagers[t.orderedBy]
-    return sender ? { id: t.situation, concept: 'RIVER', speaker: i, aim: { x: sender.x, y: 1, z: sender.z } } : null
+    // Said TO the sender, POINTED AT the water just set down (work-order 1405):
+    // the hand names what was fetched, and the sender stands across the table.
+    const g = view.geography
+    // The stand's front faces the carrier's own spot (waterErrandSpots).
+    const aim = g.waterStand ? newestJarWater(g.waterStand, t.standSpot, state.standJars) : null
+    return sender && aim ? { id: t.situation, concept: 'RIVER', speaker: i, aim } : null
   }
   if (t.role === 'initiator' && t.phase === 'invite' && t.arrived && mate) {
     return { id: t.situation, concept: 'DIG', speaker: i, purpose: 'invitation', aim: { x: mate.x, y: 1, z: mate.z } }
@@ -493,11 +568,15 @@ function wordConsequence(state: AdultWorkState, view: AdultWorkView, t: AdultTas
     const carrier = state.tasks[t.partner]
     const fill = view.geography.waterFill
     if (carrier && fill) {
-      carrier.phase = 'fetch'
-      carrier.carry = 'emptyJar'
-      carrier.x = fill.x
-      carrier.z = fill.z
+      // HE TAKES THE EMPTY JAR UP FROM THE STAND (work-order 1405): it used to
+      // appear in his hand with the order. He steps up to the table first; the
+      // step below hands him the jar partway through the take.
+      const at = carrier.tableSpot ?? carrier.standSpot ?? { x: carrier.x, z: carrier.z }
+      carrier.phase = 'take'
+      carrier.x = at.x
+      carrier.z = at.z
       carrier.arrived = false
+      carrier.dug = 0
     }
   }
 }
@@ -539,6 +618,7 @@ export function stepAdultWork(
   if (dt <= 0) return null
   state.clock += dt
   state.emitted = []
+  state.digEnded = {}
   state.floor = view.floor ?? state.floor ?? new SpeechFloor(() => ({ x: 0, z: 0, active: false }), () => state.clock)
   if (state.last) state.last.age += dt
   let spoken: SpokenWord | null = null
@@ -656,10 +736,27 @@ export function stepAdultWork(
       t.dug += dt
       const progress = (state.siteProgress[t.siteIndex] ??= { dug: 0, strikes: 0 })
       progress.dug += dt
-      if (digStrikeCrossed(before, t.dug, i * 0.37)) progress.strikes++
+      if (digStrikeCrossed(before, t.dug, digPhaseOf(i), cfg.digStroke)) progress.strikes++
       if (t.dug >= cfg.digSeconds) {
         progress.completed = true
+        // both bodies' clocks as this step leaves them, for the drawn stroke
+        state.digEnded[i] = t.dug
+        const mate = t.partner === null ? null : state.tasks[t.partner]
+        if (mate && mate.phase === 'dig' && t.partner !== null) state.digEnded[t.partner] = mate.dug
         clearPair(state, i)
+      }
+    } else if (t.arrived && t.phase === 'take') {
+      t.dug += dt
+      const seconds = balance.waterJarTakeSeconds
+      if (t.carry === 'none' && t.dug >= seconds * TAKE_GRAB) t.carry = 'emptyJar'
+      const fill = view.geography.waterFill
+      if (t.dug >= seconds && fill) {
+        t.carry = 'emptyJar'
+        t.phase = 'fetch'
+        t.x = fill.x
+        t.z = fill.z
+        t.arrived = false
+        t.dug = 0
       }
     } else if (t.arrived && t.phase === 'fetch' && !t.via) {
       // ARRIVING AT THE WATER OPENS THE FILL, IT DOES NOT END THE ERRAND. The
@@ -681,12 +778,14 @@ export function stepAdultWork(
         t.carry = 'fullJar'
         t.situation = 'water-back'
         t.phase = 'walk'
-        t.x = t.standSpot.x
-        t.z = t.standSpot.z
-        // Only `say.at` is read for the report; its aim is always the SENDER's
-        // own position when the word falls (readyWord): the report is addressed
-        // to the man, not to the ground he stands on.
-        t.say = { at: { ...t.standSpot }, aim: { ...t.standSpot } }
+        // Back to the TABLE, not to the waiting ring 2.4 m off it (work-order
+        // 1405): the jar is set down where a man can reach the plank.
+        const back = t.tableSpot ?? t.standSpot
+        t.x = back.x
+        t.z = back.z
+        // Only `say.at` is read for the report; its aim is the water just set
+        // down, read when the word falls (readyWord).
+        t.say = { at: { ...back }, aim: { ...back } }
         t.owes = true
         const sender = t.orderedBy === null ? null : view.villagers[t.orderedBy]
         if (sender) t.pendingWord = { id: 'water-back', concept: 'RIVER', speaker: i, aim: { x: sender.x, y: 1, z: sender.z } }
@@ -744,13 +843,13 @@ export function stepAdultWork(
       // the side away from the water and points past the stand at the river.
       // One draw is still taken, so every later draw of the stream is unchanged.
       rand()
-      const senderSpot = facingSpot(view, stand, g.waterFoot)
-      if (!senderSpot) continue
-      // The carrier takes the FAR side, swept from straight opposite the sender:
-      // drawing a second spot at random gave the same one wherever the caller's
-      // rand is steady, and two men on one spot block each other.
-      const carrierSpot = facingSpot(view, stand, senderSpot)
-      if (!carrierSpot) continue
+      const spots = waterErrandSpots(view, g)
+      if (!spots) continue
+      const { senderSpot, carrierSpot } = spots
+      // No standable table edge: the errand does not cast this round rather
+      // than run from the waiting ring.
+      const atTable = tableSpot(stand, carrierSpot, view.standable)
+      if (!atTable) continue
       state.tasks[sender] = {
         situation: id, phase: 'send', carry: 'none', role: 'initiator', partner: carrier,
         siteIndex: null, orderedBy: null, standSpot: senderSpot,
@@ -760,6 +859,7 @@ export function stepAdultWork(
       state.tasks[carrier] = {
         situation: id, phase: 'wait', carry: 'none', role: 'partner', partner: sender,
         siteIndex: null, orderedBy: sender, standSpot: carrierSpot,
+        tableSpot: atTable,
         x: carrierSpot.x, z: carrierSpot.z, arrived: false, dug: 0, owes: false,
         say: null, via: null, age: 0,
       }

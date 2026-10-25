@@ -34,7 +34,7 @@ const boom = (what) => () => {
 
 /** A working set of dependencies; each test breaks exactly one of them. */
 const okDeps = () => ({
-  heldByOther: () => false,
+  holdsLock: () => true,
   revParseHead: () => 'headsha',
   branchOf: () => 'feat/x',
   readState: () => ({ clearedHeads: { 'feat/x': 'basesha' }, runs: [] }),
@@ -80,7 +80,7 @@ describe('gatherRenderVerifyInputs — the happy path it must keep', () => {
   })
 
   it('stands down for a non-owner session — and says WHY, without a head to write', () => {
-    const g = gatherWith({ heldByOther: () => true })
+    const g = gatherWith({ holdsLock: () => false })
     expect(g.applicable).toBe(false)
     expect(g.cause).toBe('not-lock-owner')
     // No head: the Stop hook only advances a baseline when it got one, so a
@@ -135,7 +135,7 @@ describe('ONLY the baseline diff may re-baseline (F1)', () => {
   })
 
   // One case per remaining error source. Each of these used to re-baseline.
-  for (const source of ['heldByOther', 'revParseHead', 'branchOf', 'readState', 'changeTimeOf']) {
+  for (const source of ['holdsLock', 'revParseHead', 'branchOf', 'readState', 'changeTimeOf']) {
     it(`does NOT raise BaselineDiffError when ${source} throws — the gate must survive`, () => {
       let caught
       try {
@@ -555,6 +555,12 @@ describe('commitMissing runs a real git probe (no injection)', () => {
 // the real CLI over a real state file.
 describe('render-verify-guard --status — what it prints about a run it cannot date', () => {
   const GUARD = join(process.cwd(), 'scripts', 'render-verify-guard.mjs')
+  /** The Stop hook binds only the batch-lock holder, so a no-option run makes
+   *  its session the owner of the throwaway checkout's lock (.claude must exist). */
+  const ownTheBatch = (root) => {
+    writeFileSync(join(root, '.claude', 'batch-lock.json'), JSON.stringify({ sessionId: 'render-cli-owner', claimedAt: Date.now() }))
+    return JSON.stringify({ session_id: 'render-cli-owner' })
+  }
 
   /** A throwaway checkout: HOA_REPO_ROOT points every path helper at it, so the
    *  real .claude/render-verify-state.json is never read or written. */
@@ -631,7 +637,7 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
           cwd: root,
           env: { ...process.env, HOA_REPO_ROOT: root },
           encoding: 'utf8',
-          input: argv.length === 0 ? '{}' : undefined,
+          input: argv.length === 0 ? ownTheBatch(root) : undefined,
           windowsHide: true,
         }),
       )
@@ -691,7 +697,7 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
         cwd: root,
         env: { ...process.env, HOA_REPO_ROOT: root },
         encoding: 'utf8',
-        input: '{}',
+        input: ownTheBatch(root),
         windowsHide: true,
       })
       const decision = JSON.parse(out)

@@ -37,6 +37,11 @@ import {
   digPose,
   fillPose,
   fillSquat,
+  copyPoseExtras,
+  FILL_CARRY_SIDE,
+  gestureArm,
+  INDICATE_LEAN,
+  WORK_LEAN_MAX,
   gestureEnvelope,
   gesturePose,
   isGesturing,
@@ -49,15 +54,15 @@ import {
   type GestureKind,
   type GestureState,
 } from '../../render/gesture'
-import { effectiveFaunaBodySegments, effectiveFigureBodySegments, effectiveFigureGltfBody, effectiveFigureLimbSegments, useUi } from '../../state/ui'
-import { useVillagerAsset } from './useVillagerAsset'
-import { placeDressDrivers, useColdCloaks } from './useColdCloaks'
+import { effectiveFaunaBodySegments, effectiveFigureLimbSegments, useUi } from '../../state/ui'
+import { useFigureLook } from './useFigureLook'
+import { useColdCloaks } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, balance } from '../../config/balance'
+import { START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
@@ -66,8 +71,12 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
-import { workStop, type WorkStopMode } from './taskWalkerStop'
-import { steerHeading } from '../../render/figureWalk'
+import {
+  SPARE_JAR_LOCAL, aimFromShoulder, standJarLocal, toFigureFrame, standToWorld, standYaw, takeJarTravel, takePose,
+} from './waterStand'
+import { workSpan, workStop, type StopMode } from './taskWalkerStop'
+import { correctAim, gripPoints, handlingPose, LOAD_GROUND, loadHandling, loadPlacement, type LoadHandling, type V3 } from './taskWalkerLoad'
+import { approach, steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
@@ -77,15 +86,25 @@ import {
   absorbSeparation,
   chaserGaze,
   createTagGame,
+  easeHandover,
+  easeWeight,
   grabAim,
   grabDue,
   handGapToBody,
+  handOverArm,
+  holdBearing,
+  newTagBodyWeights,
+  prepareDue,
+  readySeconds,
+  quarryBearing,
   stepTagGame,
   steerGrab,
   tagBody,
   tagFigurePose,
   bankFigurePose,
   takeCries,
+  type GrabAim,
+  type TagBodyWeights,
   type TagChild,
 } from './tagGame'
 import {
@@ -107,6 +126,7 @@ import {
   type BankUtterance,
   type BankWorld,
 } from './bankGame'
+import { FrameFirst } from './frameFirst'
 import {
   ADULT_SITUATIONS,
   carryOf,
@@ -114,10 +134,14 @@ import {
   createAdultWork,
   digProgressOf,
   digBout,
+  digPhaseOf,
+  drawnDigClock,
   isDigging,
+  PRIMITIVE_DIG_STROKE,
   goalOf,
   stepAdultWork,
   taskOf,
+  waterErrandSpots,
   type AdultSituationId,
   type AdultWorkGeography,
   type AdultWorkView,
@@ -153,7 +177,7 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { PORT_TALKERS, portTraderSpots, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
+import { PORT_TALKERS, portTraderSpots, talkerStances, type TalkerStance, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
 import { HELPER_SIDE_OFFSET, WARP_STAKE_RADIUS, WEAVER_SIDE_OFFSET, type LoomStation } from './loom'
 import {
   createLoomWork,
@@ -186,7 +210,6 @@ import {
   useInhabitantBodies,
   useStandingBodies,
   useStandingBody,
-  type FigureLook,
 } from './placeFigureContext'
 
 /** Collision radius of inhabitants (WALKER_RADIUS; the player's own is PLAYER_RADIUS). */
@@ -375,6 +398,7 @@ function Loom({
       Object.assign(p.right, next.right)
       p.lean = next.lean
       p.turn = next.turn
+      copyPoseExtras(p, next)
       applyFigurePose(weaverLimbs.current, p)
     }
 
@@ -423,6 +447,7 @@ function Loom({
       Object.assign(hp.right, next.right)
       hp.lean = next.lean
       hp.turn = next.turn
+      copyPoseExtras(hp, next)
       applyFigurePose(helperLimbs.current, hp)
     }
     // The body he presents to the rest of the village follows him.
@@ -968,6 +993,10 @@ function Kids({
   // last frame saw, and the pitch roll of the catcher's cry.
   const grabSides = useRef<Array<ArmSide | null>>([])
   const grabTurns = useRef<number[]>([])
+  // The glTF body's own (natural-villager-motion steps 15/16): each child's
+  // eased slump and readied arm, and its level grab while the hand is out.
+  const bodyWeights = useRef<TagBodyWeights[]>([])
+  const bodyAims = useRef<Array<GrabAim | null>>([])
   const seenTags = useRef(0)
   const cryRand = useMemo(() => mulberry32((seed + 9127) >>> 0), [seed])
   // Dev-only shutter on the catch (work-order 1176): `catch` holds the very
@@ -1132,6 +1161,7 @@ function Kids({
       // Only READ here: this frame's advance already ran above, before the
       // word could start a new gesture (work-order 1065).
       const gesture = gestures.current[i]
+      const weights = (bodyWeights.current[i] ??= newTagBodyWeights())
       if (game) {
         // THE TAG ROUND READS AT A GLANCE (work-order 1176). The chaser reaches
         // for its quarry from the commit distance in, re-aimed every frame; on
@@ -1155,25 +1185,59 @@ function Kids({
           )
           grabSides.current[i] = aim.side
           grabTurns.current[i] = aim.turn
+          // the glTF body's own grab: level at its shoulder, through the run's
+          // own capped lean, onto the quarry's surface (step 15)
+          const level = grabAim(
+            { x: c.x, z: c.z, facing: c.facing },
+            quarry,
+            Math.min(c.lean, VILLAGER_POSE.tagChaser.leanMax),
+            KID_SCALE,
+            tagCfg.gazeTurnMax,
+            weights.side,
+            { elevation: VILLAGER_POSE.tagChaser.reachElevation, reachMax: VILLAGER_POSE.tagChaser.reachMax },
+          )
+          bodyAims.current[i] = level
+          handOverArm(weights, level.side, pose.body)
           gesture.current = steerGrab(gesture.current, aim)
           if (i !== game.chaser) gesture.current = steerGrab(gesture.current, null)
         } else {
           gesture.current = steerGrab(gesture.current, null)
         }
-        if (gesture.current.kind !== 'touch') grabSides.current[i] = null
+        if (gesture.current.kind !== 'touch') {
+          grabSides.current[i] = null
+          bodyAims.current[i] = null
+        }
         const reach = gesture.current.kind === 'touch' ? gestureEnvelope(gesture.current) : 0
         const gaze = i === game.chaser ? chaserGaze(game, tagCfg) : 0
         const turn = (grabTurns.current[i] ?? 0) * reach + gaze * (1 - reach)
-        const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn, tagCfg)
+        // the glTF body's readied arm and caught hold, eased (steps 15/16)
+        weights.prepare = easeWeight(weights.prepare, i === game.chaser && prepareDue(game, tagCfg), readySeconds(), dt)
+        weights.reach = easeWeight(weights.reach, !!bodyAims.current[i], VILLAGER_POSE.tagChaser.prepareSeconds, dt)
+        weights.slump = easeWeight(weights.slump, tagBody(game, i) === 'caught', VILLAGER_POSE.caughtSlump.settleSeconds, dt)
+        easeHandover(weights, dt)
+        const bearing = quarry
+          ? Math.atan2(Math.sin(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing), Math.cos(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing))
+          : quarryBearing(game, i)
+        holdBearing(weights, bearing)
+        if (weights.prepare <= 0 && weights.reach <= 0 && !bodyAims.current[i]) weights.side = null
+        else weights.side ??= bearing >= 0 ? 'left' : 'right'
+        const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn, tagCfg, {
+          weights,
+          aim: bodyAims.current[i] ?? null,
+          bearing,
+        })
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
+        copyPoseExtras(pose, drawn)
         pose.lean = drawn.lean
       } else {
-        const drawn = bankFigurePose(slumped, gesturePose(gesture.current), c.lean, tagCfg)
+        weights.slump = easeWeight(weights.slump, slumped, VILLAGER_POSE.caughtSlump.settleSeconds, dt)
+        const drawn = bankFigurePose(slumped, gesturePose(gesture.current), c.lean, tagCfg, weights.slump)
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
+        copyPoseExtras(pose, drawn)
         pose.lean = drawn.lean
       }
       applyFigurePose(limbs.current[i]?.current ?? null, pose)
@@ -1307,6 +1371,10 @@ function Kids({
       chargeHeld: chargeCapture.current.held,
       // The tag round's catch reading (work-order 1176); null in the bank round.
       pauseFor: game ? game.pauseFor : null,
+      // Where the glTF chaser readies its arm and where it commits to the grab
+      // (natural-villager-motion step 15), so a check can read either window.
+      prepareDistance: VILLAGER_POSE.tagChaser.prepareDistance,
+      commitDistance: balance.villageLife.tag.commitDistance,
       immune: game ? game.immune : null,
       catchHeld: catchCapture.current.held,
       catchShot: catchShot.current,
@@ -1383,6 +1451,9 @@ function Kids({
         body: game ? tagBody(game, i) : null,
         facing: c.facing,
         turn: poses.current[i]?.current?.turn ?? 0,
+        // The glTF body's eased tag weights (natural-villager-motion steps
+        // 15/16): how far the readied arm, the reach and the caught hold are in.
+        bodyWeights: bodyWeights.current[i] ? { ...bodyWeights.current[i] } : null,
       })),
       /** The stone the off-game ROCK is climbed and spoken at, with the size the
        *  climb is played against (work-order 1080). Published rather than
@@ -1765,7 +1836,7 @@ function Porters({
   // crate's front corners. Constant — a porter holds the load, it does not wave.
   const carry = useRef<FigurePose | null>({ left: armAim(0.3, 0.45), right: armAim(-0.3, 0.45), lean: 0.05, turn: 0 })
   // Where each porter actually stands, so its move can be swept from there.
-  const pos = useRef<Array<{ x: number; z: number } | null>>([])
+  const pos = useRef<Array<{ x: number; z: number; yaw?: number } | null>>([])
   // The body each porter presents to the other inhabitants (point 578).
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(routes.length)
@@ -1805,7 +1876,10 @@ function Porters({
       const px = p.x
       const pz = p.z
       g.position.set(px, groundHeight(px, pz), pz)
-      g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
+      // Turned about at the route's end on the spot, never flipped in a frame.
+      const heading = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
+      p.yaw = turnToward(p.yaw ?? heading, heading, VILLAGER_MOTION.spotTurnRate * dt)
+      g.rotation.y = p.yaw
     })
   })
   return (
@@ -1832,12 +1906,6 @@ function Porters({
   )
 }
 
-/** Where a talker stands and which way it faces. */
-interface TalkerStance {
-  x: number
-  z: number
-  yaw: number
-}
 
 /** Widest bearing a figure points at. Beyond it the arm would reach back over
  *  its own shoulder at something the speaker is not even facing. */
@@ -1869,9 +1937,15 @@ function talkerAim(
 }
 
 /**
- * Two inhabitants standing together in conversation (point 479): they turn
- * toward each other and shift their weight, and they say nothing the player
- * cannot read.
+ * Two inhabitants standing together in conversation (point 479): they face
+ * each other and say nothing the player cannot read.
+ *
+ * THEIR ROOTS STAND STILL. The pair used to swivel ±10° on the spot and hop
+ * 3 cm off the ground in turn. The skinned body measures its own root
+ * (`stepWalk` in skinnedFigure.tsx), read that swivel as a turn on the spot
+ * and kept stepping and bending its legs to follow it: the restless fidget of
+ * the 21.10.2026 report. The idle clip already breathes and settles the trunk,
+ * neck and head; that is the calm life a standing listener shows.
  *
  * THEY NO LONGER GESTURE ON THEIR OWN (point 580). The pair used to cycle the
  * four gestures as ambient dressing, with no utterance behind any of them — the
@@ -1891,38 +1965,16 @@ function talkerAim(
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const groundHeight = usePlaceGround()
-  const a = useRef<THREE.Group>(null)
-  const b = useRef<THREE.Group>(null)
   const gestureA = useRef<GestureState>(restGesture())
   const gestureB = useRef<GestureState>(restGesture())
 
   // The two stand a metre apart facing each other, so figure A looks along
   // world +x and figure B along −x. Their aims are computed in each one's own
   // frame from that facing.
-  const stances = useMemo<TalkerStance[]>(
-    () => [
-      { x: x - 0.5, z, yaw: Math.PI / 2 },
-      { x: x + 0.5, z, yaw: -Math.PI / 2 },
-    ],
-    [x, z],
-  )
+  const stances = useMemo<TalkerStance[]>(() => talkerStances(x, z), [x, z])
   // Two bodies the passers-by go round (point 578); the pair stands a metre
   // apart, well clear of the separation distance, so it never pushes itself.
   useStandingBodies(stances)
-
-  useFrame(({ clock }) => {
-    if (isLifeFrozen()) return
-    const t = clock.elapsedTime
-    // Slight turns toward each other — the conversation's idle, and all of it.
-    if (a.current) {
-      a.current.rotation.y = Math.PI / 2 + Math.sin(t * 1.15) * 0.18
-      a.current.position.y = Math.max(0, Math.sin(t * 2.3)) * 0.03
-    }
-    if (b.current) {
-      b.current.rotation.y = -Math.PI / 2 + Math.sin(t * 1.15 + Math.PI) * 0.18
-      b.current.position.y = Math.max(0, Math.sin(t * 2.3 + Math.PI)) * 0.03
-    }
-  })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): the live gesture
   // state and the pose it draws, plus a way to hold one pose for a screenshot.
@@ -1956,12 +2008,12 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 
   return (
     <group position={[x, groundHeight(x, z), z]}>
-      <group ref={a} position={[-0.5, 0, 0]}>
+      <group position={[stances[0].x - x, 0, stances[0].z - z]} rotation={[0, stances[0].yaw, 0]}>
         {/* The conversing pair: the notable elder and a young man (work-order
             "villager dress": the pair the age-readability judgement compares). */}
         <Figure cloth={cloth[0]} gesture={gestureA} sex="male" age="elder" />
       </group>
-      <group ref={b} position={[0.5, 0, 0]}>
+      <group position={[stances[1].x - x, 0, stances[1].z - z]} rotation={[0, stances[1].yaw, 0]}>
         <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} sex="male" age="youth" />
       </group>
     </group>
@@ -2069,6 +2121,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     Object.assign(p.right, shown.right)
     p.lean = shown.lean
     p.turn = shown.turn
+    copyPoseExtras(p, shown)
     if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, frame.lowSwing)
     if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
@@ -2170,13 +2223,68 @@ function TaskWalker({
   const kneels = useRef(false)
   const load = useRef<THREE.Group>(null)
   const state = useRef({
-    mode: 'inside' as 'inside' | 'go' | WorkStopMode,
+    mode: 'inside' as 'inside' | 'go' | 'back' | StopMode,
     seg: 0,
     x: home.x,
     z: home.z,
     yaw: 0,
     timer: startDelay,
+    /** This stop's kneeling time (`workSpan`). */
+    span: 0,
   })
+  // The load in its hands (taskWalkerLoad.ts): its own pose, the kneel as the
+  // body draws it, and each hand's aim correction toward the drawn arm.
+  const pose = useRef<FigurePose>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 })
+  const kneelK = useRef(0)
+  const aimFix = useRef<[V3, V3]>([{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }])
+  const handle = useMemo(() => {
+    const inv = new THREE.Matrix4()
+    const m = new THREE.Matrix4()
+    const hp = new THREE.Vector3()
+    const hq = new THREE.Quaternion()
+    const hs = new THREE.Vector3()
+    const v = new THREE.Vector3()
+    const upright = new THREE.Quaternion()
+    const toV3 = (o: THREE.Vector3): V3 => ({ x: o.x, y: o.y, z: o.z })
+    // Places the load and writes the arms for this frame. On the walk it rides
+    // the crown untouched; in the stop it goes where the hands take it.
+    return (stand: THREE.Group, h: LoadHandling, dt: number, groundY = 0) => {
+      const g = load.current
+      const p = pose.current
+      if (!g) return
+      if (h.down === 0 && h.hold === 0 && h.reach === 0) {
+        g.position.set(0, 0, 0)
+        g.quaternion.identity()
+        g.scale.setScalar(1)
+        handlingPose(p, h, [hp, hp], kneelK.current)
+        for (const f of aimFix.current) f.x = f.y = f.z = 0
+        return
+      }
+      stand.updateMatrixWorld(true)
+      const crown = stand.getObjectByName('figure-crown')
+      if (!crown) return
+      inv.copy(stand.matrixWorld).invert()
+      // the crown as last drawn, in the walker's own frame
+      m.multiplyMatrices(inv, crown.matrixWorld).decompose(hp, hq, hs)
+      const drawn = (['hand-left', 'hand-right'] as const).map((n) => {
+        const o = stand.getObjectByName(n)
+        return o ? toV3(stand.worldToLocal(o.getWorldPosition(v))) : null
+      })
+      const hands = drawn[0] && drawn[1] ? ([drawn[0], drawn[1]] as [V3, V3]) : null
+      const placed = loadPlacement(h, toV3(hp), hands, carry, groundY)
+      const aims = gripPoints(placed.planned, carry).map((t, i) => {
+        const fix = (aimFix.current[i] = correctAim(aimFix.current[i], t, drawn[i], h.reach, dt))
+        return { x: t.x + fix.x, y: t.y + fix.y, z: t.z + fix.z }
+      }) as [V3, V3]
+      handlingPose(p, h, aims, kneelK.current)
+      // its transform in the walker's frame, brought into the crown's
+      hq.slerp(upright, placed.tilt)
+      hs.lerp(v.set(1, 1, 1), placed.tilt)
+      m.compose(hp.set(placed.base.x, placed.base.y, placed.base.z), hq, hs)
+      inv.copy(crown.matrixWorld).invert().multiply(stand.matrixWorld).multiply(m)
+      inv.decompose(g.position, g.quaternion, g.scale)
+    }
+  }, [carry])
   // The body it presents to the other inhabitants (point 578) — only while it is
   // out of its dwelling.
   const bodySet = useContext(InhabitantBodiesContext)
@@ -2220,29 +2328,39 @@ function TaskWalker({
       }
       return
     }
-    if (s.mode === 'work' || s.mode === 'rise') {
-      // Kneels where it stopped, the load set down; the figure folds down and
-      // stands up again on its own short transition — held on the spot until
-      // it is up, then it takes the load and walks.
-      const next = workStop(s.mode, s.timer, dt)
+    if (s.mode === 'take' || s.mode === 'work' || s.mode === 'rise' || s.mode === 'settle') {
+      // Stops where it is: takes the load off its head with both hands, kneels
+      // and sets it down beside it, works, grips it again and rises with it
+      // onto its head — the figure folding down and standing up on its own
+      // short transition, held on the spot until the hands let go on the head.
+      // The load is never hidden: it is always where the hands have it.
+      const next = workStop(s.mode, s.timer, dt, s.span)
       kneels.current = next.kneels
-      if (load.current) load.current.visible = next.mode !== 'work'
       s.mode = next.mode
       s.timer = next.timer
       if (next.mode === 'back') s.seg = 0
+      kneelK.current = approach(kneelK.current, next.kneels ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
       stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
       stand.rotation.y = s.yaw
+      // the terrain under the ground spot beside it, relative to its feet
+      const c = Math.cos(s.yaw)
+      const n = Math.sin(s.yaw)
+      const gx = s.x + LOAD_GROUND.x * c + LOAD_GROUND.z * n
+      const gz = s.z - LOAD_GROUND.x * n + LOAD_GROUND.z * c
+      handle(stand, loadHandling(s.mode, s.timer, s.span), dt, groundHeight(gx, gz) - groundHeight(s.x, s.z))
       return
     }
 
     stand.visible = true
     kneels.current = false
-    if (load.current) load.current.visible = true
+    kneelK.current = 0
+    handle(stand, loadHandling(s.mode, s.timer, s.span), dt)
     const tgt = route[s.seg + 1]
     if (!tgt) {
       if (s.mode === 'go') {
-        s.mode = 'work'
-        s.timer = 5 + Math.random() * 5
+        s.mode = 'take'
+        s.span = workSpan(5 + Math.random() * 5)
+        s.timer = TASK_LOAD_HANDLING.takeSeconds
       } else {
         s.mode = 'inside'
         s.timer = 10 + Math.random() * 16
@@ -2296,9 +2414,10 @@ function TaskWalker({
       <Figure
         cloth={cloth}
         kneeling={kneels}
+        pose={pose}
         headSteady={steadiedLoad(carry, taskLoadShape(carry))}
         headProp={
-          <group ref={load}>
+          <group ref={load} name="task-walker-load">
             {carry === 'bundle' ? (
               <mesh position={[0, TASK_BUNDLE.height / 2, 0]} castShadow>
                 <boxGeometry args={[TASK_BUNDLE.width, TASK_BUNDLE.height, TASK_BUNDLE.depth]} />
@@ -2436,6 +2555,9 @@ function Walkers({
       states: states.current,
       homes: defs.map((d) => d.home),
       carries: defs.map((d) => d.carries),
+      // Each walker's cruise pace (world units per second), so the walk probe
+      // can tell a walker at pace from one still easing up to it.
+      speeds: defs.map((d) => d.speed),
       // The drawn group, for the walk's foot and stride measurements.
       group: (who: number) => refs.current[who] ?? null,
       // Read the rendered body independently of the surface it should ride.
@@ -2639,14 +2761,6 @@ function Walkers({
   )
 }
 
-/** The heading a walker turns toward: where a full step toward its waypoint
- *  really goes (slid along a wall, round another body) — unless that is
- *  hardly a step, or a shove back, which never turns it about. */
-function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
-  const ahead = (tx - x) * dx + (tz - z) * dz > 0
-  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
-}
-
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
  *  figure sliding along a wall beside the waypoint still ticks it off instead of
  *  circling it. */
@@ -2704,6 +2818,8 @@ function ErrandVillagers({
   const refs = useRef<Array<THREE.Group | null>>([])
   /** The jars STANDING at the village water stand (work-order 1087). */
   const standJars = useRef<Array<THREE.Object3D | null>>([])
+  /** The EMPTY jar waiting on the stand for the next carrier (work-order 1405). */
+  const spareJar = useRef<THREE.Object3D | null>(null)
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
   // is empty. Both are mounted once and shown by the frame loop, like every other
   // per-frame visibility in this scene.
@@ -2719,7 +2835,15 @@ function ErrandVillagers({
   const works = useRef<Array<RefObject<FigureWork>>>([])
   /** The glTF body draws (and holds) its own shovel; the hand prop is for the
    *  primitive and the code-built bodies. */
-  const gltfBody = !!useContext(FigureLookContext)?.villager
+  const villagerAsset = useContext(FigureLookContext)?.villager ?? null
+  const gltfBody = !!villagerAsset
+  /** The stroke the dig progress counts strikes on: the drawn body's own —
+   *  the glTF dig clip's period and blade contact, the primitive's otherwise —
+   *  so each counted strike (the earth thrown) is a strike the player sees. */
+  const digStroke = useMemo(() => {
+    const dig = villagerAsset?.clips.dig
+    return dig ? { seconds: dig.duration, strikeAt: dig.strike ?? 0 } : PRIMITIVE_DIG_STROKE
+  }, [villagerAsset])
   /** A villager PINNED into the fill, by index and progress — the dev route the
    *  verification poses one by. The errand's own fill phase drives the live dip;
    *  this only overrides which man is held and how far along it is. Null
@@ -2845,6 +2969,12 @@ function ErrandVillagers({
   if (yaws.current.length !== count) {
     yaws.current = Array.from({ length: count }, (_, i) => yaws.current[i] ?? 0)
   }
+  // The heading a speaker still turns toward on the spot, or null.
+  const faceTo = useRef<Array<number | null>>([])
+  // Dev: each body's yaw as last drawn, and the worst turn beyond the bounded
+  // rate one game frame drew (point 1404) — measured in the frame, with its dt.
+  const drawnYaw = useRef<Array<number | null>>([])
+  const turnWorst = useRef({ over: 0, swing: 0, dt: 0, who: -1 })
 
   // May a body stand here? The settlement boundary and the collider set
   // together — the same question this component's own step asks. The work
@@ -2892,6 +3022,13 @@ function ErrandVillagers({
   )
   const speechFloor = useContext(SpeechFloorContext)
   const vocabulary = useGame((s) => s.vocabulary)
+  // The stand's plank turns its front, where the empty jar waits, to the
+  // water carrier's own working spot (work-order 1405).
+  const standFacing = useMemo(() => {
+    if (!geography.waterStand) return 0
+    const spots = waterErrandSpots({ standable }, geography)
+    return standYaw(geography.waterStand, spots?.carrierSpot ?? geography.waterFoot)
+  }, [geography, standable])
   const view = useMemo<AdultWorkView>(
     () => ({ vocabulary, villagers: people, geography, standable, invitationClear, childrenHear, floor: speechFloor ?? undefined }),
     [vocabulary, people, geography, standable, invitationClear, childrenHear, speechFloor],
@@ -2912,15 +3049,33 @@ function ErrandVillagers({
     [colliders, standable],
   )
 
-  useFrame((_, rawDt) => {
+  // Run as this component's first child (FrameFirst): after the children's
+  // frame, so the step's hearing guard reads where they stand this frame, and
+  // before the figures', so they draw this frame's work clock and step.
+  const errandFrame = (rawDt: number) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
-    const cfg = balance.villageLife.adultErrands
+    const cfg = { ...balance.villageLife.adultErrands, digStroke }
+    // The errands step first: the strokes drawn below run on the work clock
+    // as this step leaves it, so the progress published with it never leads
+    // the strike shown.
+    stepAdultWork(work, view, dt, cfg, rand)
+    onDigProgress(digProgressOf(work, geography.digSites.length))
     // The jars standing at the village water stand: as many as the errand
     // state says have been set down, capped at the stand's capacity.
     for (let k = 0; k < standJars.current.length; k++) {
       const jar = standJars.current[k]
       if (jar) jar.visible = k < work.standJars
+    }
+    // The empty jar stands on the plank's front edge until a carrier takes it
+    // up (work-order 1405); it is back there once he has set his full one down.
+    const stand = geography.waterStand
+    const yawOfStand = standFacing
+    const spareAt = stand ? standToWorld(stand, yawOfStand, SPARE_JAR_LOCAL) : null
+    const spare = spareJar.current
+    if (spare) {
+      spare.visible = true
+      spare.position.set(...SPARE_JAR_LOCAL)
     }
 
     // The first filling carrier's ring: its fill progress and the mouth's spot.
@@ -3024,18 +3179,28 @@ function ErrandVillagers({
           // errands send a villager out onto the bank lobe, and a circular rim
           // would have frozen it at the plain radius short of the water.
           const inside = insidePlace({ radius, bank, observed }, wantX, wantZ, NPC_RADIUS * 2)
-          const [nx, nz] = inside
+          const [tx, tz] = inside
             ? resolveMove(colliders, wantX, wantZ, NPC_RADIUS, [me.x, me.z])
             : [me.x, me.z]
+          // Facing where it WALKS (on a route the waypoint, not the destination
+          // behind the huts) — TURNED toward it, never snapped: a new waypoint or
+          // a fresh stroll used to swing the body round between two frames. A
+          // way far off its heading slows it nearly to a stand while it turns.
+          // The step stays the way round bodies and walls, only shortened by
+          // that pace, so the turn never walks it into a body it routes round.
+          const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
+          yaws.current[i] = turn.yaw
+          faceTo.current[i] = null
+          const sx = me.x + (tx - me.x) * turn.pace
+          const sz = me.z + (tz - me.z) * turn.pace
+          const [nx, nz] = turn.pace < 1 ? resolveMove(colliders, sx, sz, NPC_RADIUS, [me.x, me.z]) : [tx, tz]
           const moved = Math.hypot(nx - me.x, nz - me.z)
           me.x = nx
           me.z = nz
           state.walked += moved
-          // Facing where it WALKS, which on a route is the waypoint rather than
-          // the destination behind the huts.
-          yaws.current[i] = Math.atan2(ax, az)
-          // Use the same escape ladder as the household walkers.
-          if (moved < step * 0.25) {
+          // Use the same escape ladder as the household walkers. A body turning
+          // nearly on the spot is not stuck.
+          if (moved < step * 0.25 && turn.pace >= 0.3) {
             state.stuck += dt
             if (state.stuck > balance.walkerUnstuckSeconds) {
               const anchor = spawnAnchors[i]
@@ -3051,7 +3216,7 @@ function ErrandVillagers({
               }
               state.stuck = 0
             }
-          } else {
+          } else if (moved >= step * 0.25) {
             state.stuck = 0
           }
         }
@@ -3101,6 +3266,10 @@ function ErrandVillagers({
       const dipping = task && task.arrived && task.phase === 'fill'
         ? Math.min(1, task.dug / balance.bankFillSeconds)
         : null
+      // THE TAKE (work-order 1405): at the table, reaching for the empty jar.
+      const taking = task && task.arrived && task.phase === 'take'
+        ? Math.min(1, task.dug / balance.waterJarTakeSeconds)
+        : null
 
       // WHAT HE IS CARRYING, and what that does to his body: jars keep their
       // established positions; the digging tool lives in the hand pivot so the
@@ -3124,13 +3293,49 @@ function ErrandVillagers({
         handJar.position.set(...placed.position)
         handJar.rotation.set(...placed.rotation)
       }
+      // The empty jar is out with this carrier from the moment it is in his
+      // hand until his full one stands on the plank; during the take it travels
+      // from the plank into the hand that reaches for it.
+      if (spare && task?.role === 'partner' && task.situation === 'water-out') {
+        if (carry !== 'none') spare.visible = false
+        else if (taking !== null && handJar && spare.parent) {
+          const travel = takeJarTravel(taking)
+          if (travel > 0) {
+            handJar.updateWorldMatrix(true, false)
+            const inHand = handJar.getWorldPosition(new THREE.Vector3())
+            const from = spare.parent.localToWorld(new THREE.Vector3(...SPARE_JAR_LOCAL))
+            spare.position.copy(spare.parent.worldToLocal(from.lerp(inHand, travel)))
+          }
+        }
+      }
+      if (taking !== null && spareAt) faceTo.current[i] = Math.atan2(spareAt.x - me.x, spareAt.z - me.z)
 
       // The pose: a fill wins over everything, then digging, then the gesture,
       // then the load on the head, then rest.
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      if (filling !== null) {
+      if (taking !== null && spareAt) {
+        state.dug = 0
+        state.digK = 0
+        if (digTool) digTool.visible = false
+        figureWork.tool = false
+        // The carrying arm reaches for the jar's rim from its own drawn
+        // shoulder, through the trunk's lean at full reach.
+        const ground = groundHeight(me.x, me.z)
+        const reach = takePose(taking, aimFromShoulder(
+          drawnShoulder(refs.current[i], limbs.current[i]?.current, FILL_CARRY_SIDE),
+          toFigureFrame({ x: me.x, z: me.z, yaw: yaws.current[i] }, { x: spareAt.x, y: spareAt.y + JAR_HEIGHT / 2 - ground, z: spareAt.z }),
+          WORK_LEAN_MAX,
+        ))
+        if (pose) {
+          pose.left = reach.left
+          pose.right = reach.right
+          pose.lean = reach.lean
+          pose.turn = reach.turn
+          copyPoseExtras(pose, reach)
+        }
+      } else if (filling !== null) {
         state.dug = 0
         state.digK = 0
         // The jar rides the dipping hand of its own accord — it hangs inside the
@@ -3146,6 +3351,7 @@ function ErrandVillagers({
           pose.right = dip.right
           pose.lean = dip.lean
           pose.turn = dip.turn
+          copyPoseExtras(pose, dip)
         }
       } else {
         // THE STROKE HOLDS THROUGH A SHOVE (the dig flicker): a body pushed a
@@ -3159,22 +3365,30 @@ function ErrandVillagers({
         // trunk and the shovel's turn along the arm together, the stroke's
         // clock running on while it fades; it restarts from the top once gone.
         state.digK = easeDigWeight(state.digK, digging, dt)
-        state.dug = digging || state.digK > 0 ? state.dug + dt : 0
+        // the drawn stroke on the work's clock, for both bodies: it advances
+        // only while the hole deepens, so it freezes through a hold or a fade,
+        // and the strike the progress counts is the one drawn
+        const ended = work.digEnded[i]
+        state.dug = drawnDigClock(state.dug, task, digging || state.digK > 0, ended)
+        if ((task && task.phase === 'dig') || ended !== undefined) figureWork.digT = state.dug + digPhaseOf(i)
         if (digging) {
           figureWork.dig = true
           const siteIndex = task?.siteIndex
           const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
-          if (site) yaws.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
+          // turned to the pit on the spot, not swung round in one frame: the
+          // pit is its one aim, so a word's aim never adds a second turn
+          if (site) faceTo.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
         }
         // the shaft along the digging arm: the stroke drives the blade into the pit
         if (digTool) digTool.rotation.x = primitiveToolTilt(state.digK)
         const base = carry === 'fullJar' && !isGesturing(gesture.current) ? HEAD_CARRY_POSE.current : gesturePose(gesture.current)
-        const shown = state.digK > 0 ? mixDigPose(base, digPose(state.dug, i * 0.37), state.digK) : base
+        const shown = state.digK > 0 ? mixDigPose(base, digPose(state.dug, digPhaseOf(i)), state.digK) : base
         if (pose) {
           pose.left = shown.left
           pose.right = shown.right
           pose.lean = shown.lean
           pose.turn = shown.turn
+          copyPoseExtras(pose, shown)
         }
       }
       if (pose) applyFigurePose(limbs.current[i]?.current ?? null, pose)
@@ -3184,7 +3398,22 @@ function ErrandVillagers({
         // On the ground: the body's own stride carries the rise and fall.
         g.position.set(me.x, groundHeight(me.x, me.z), me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
+        const aim = faceTo.current[i]
         if (facing !== null) yaws.current[i] = facing
+        else if (aim !== null && aim !== undefined) {
+          yaws.current[i] = turnToward(yaws.current[i], aim, VILLAGER_MOTION.spotTurnRate * dt)
+          if (yaws.current[i] === aim) faceTo.current[i] = null
+        }
+        if (import.meta.env.DEV) {
+          const was = drawnYaw.current[i]
+          const now = yaws.current[i]
+          if (was !== null && was !== undefined && facing === null) {
+            const swing = Math.abs(Math.atan2(Math.sin(now - was), Math.cos(now - was)))
+            const over = swing - Math.max(cfg.pace / VILLAGER_MOTION.turnRadius, VILLAGER_MOTION.spotTurnRate) * dt
+            if (over > turnWorst.current.over) turnWorst.current = { over, swing, dt, who: i }
+          }
+          drawnYaw.current[i] = now
+        }
         g.rotation.y = yaws.current[i]
         // THE SINK, which is half of what makes a fill read as fetching rather
         // than as falling: a y-squash on the figure's own group (work-order 1085).
@@ -3217,21 +3446,22 @@ function ErrandVillagers({
       ;(mesh.material as THREE.MeshBasicMaterial).opacity = ring.opacity
     })
 
-    stepAdultWork(work, view, dt, cfg, rand)
-    const progress = digProgressOf(work, geography.digSites.length)
-    onDigProgress(progress)
     for (const said of work.emitted) {
       // The speaker turns to what he is talking about as he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all. The word and
-      // its gesture take the new yaw now; the body is drawn turned from the
-      // next frame.
+      // its gesture take the new yaw now; the body turns to it on the spot from
+      // the next frame, never swung round in one.
       const speaker = people[said.speaker]
       if (speaker) {
-        yaws.current[said.speaker] = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
-        speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+        const aim = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
+        faceTo.current[said.speaker] = aim
+        const lift = groundHeight(speaker.x, speaker.z)
+        const figure = refs.current[said.speaker]
+        const arms = limbs.current[said.speaker]?.current
+        speakWork(camera, said, speaker, aim, figure, gestures.current[said.speaker], (side) => drawnShoulder(figure, arms, side), lift)
       }
     }
-  })
+  }
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): what the adults
   // have said this visit, and what each of them is doing about it.
@@ -3242,6 +3472,8 @@ function ErrandVillagers({
       staged: { ...work.staged },
       last: work.last ? { ...work.last } : null,
       standJars: work.standJars,
+      standCapacity: balance.waterStandCapacity,
+      standArrivalRadius: balance.waterStandArrivalRadius,
       /** The fill ring as drawn (work-order 1117): up, and where the water is. */
       fillRing: {
         shown: fillRingShown.current,
@@ -3256,6 +3488,11 @@ function ErrandVillagers({
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
+      /** The worst turn past the bounded rate any frame drew (point 1404). */
+      turnWorst: { ...turnWorst.current },
+      resetTurnWorst: () => {
+        turnWorst.current = { over: 0, swing: 0, dt: 0, who: -1 }
+      },
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
         // WHAT IS ACTUALLY DRAWN, not what the pose intended (work-order 1085):
@@ -3267,11 +3504,16 @@ function ErrandVillagers({
         let handY = null
         let headAspect = null
         let mouthY = null
+        let gait: { walk: number; jog: number; sprint: number } | null = null
+        let speed: number | null = null
         if (g) {
           g.updateWorldMatrix(true, true)
           g.traverse((o) => {
             if (o.name === 'hand-left') handY = o.getWorldPosition(new THREE.Vector3()).y
             if (o.name === 'jar-mouth') mouthY = o.getWorldPosition(new THREE.Vector3()).y
+            // the gait the body is drawn in, at its own measured ground speed
+            if (o.userData.gait && !gait) gait = o.userData.gait
+            if (o.userData.walk && speed === null) speed = (o.userData.walk as { speed: number }).speed
             // THE HEAD AS DRAWN, in world extents: a squat shortens a man, it does
             // not deflate his skull, so the ratio of the head's world height to its
             // world width must stay 1 through the sink (work-order 1085).
@@ -3302,13 +3544,17 @@ function ErrandVillagers({
               ? Math.min(1, task.dug / balance.bankFillSeconds)
               : null,
           yaw: yaws.current[i] ?? 0,
-          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z) },
+          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z), gait, speed },
           carry: carryOf(work, i),
           work: task
             ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,
                 partner: task.partner, owes: !!task.owes, hushed: !!task.hushed, withheld: !!task.withheld,
-                pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z) }
+                pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z),
+                // The take at the stand and where he stands for it (work-order 1405).
+                taking: task.arrived && task.phase === 'take' ? Math.min(1, task.dug / balance.waterJarTakeSeconds) : null,
+                tableSpot: task.tableSpot ?? null }
             : null,
+          gesture: gestures.current[i] ? { ...gestures.current[i].current } : null,
         }
       }),
     })
@@ -3342,15 +3588,23 @@ function ErrandVillagers({
           ? null
           : { who, progress, facing, anchors: people.map((p) => ({ x: p.x, z: p.z })) }
     }
+    // Empties the water stand, so a browser check can watch one set-down add
+    // exactly one jar instead of meeting a stand already at its cap (work-order 1376);
+    // `keep` leaves older jars standing, so the newest is not the first slot.
+    w.__placeClearStand = (keep = 0) => {
+      work.standJars = keep
+    }
     return () => {
       delete w.__placeErrands
       delete w.__placeCastErrand
       delete w.__placeForceFill
+      delete w.__placeClearStand
     }
   }, [work, people, geography, view, groundHeight])
 
   return (
     <>
+      <FrameFirst frame={errandFrame} />
       {people.map((p, i) => (
         <group
           key={i}
@@ -3375,6 +3629,8 @@ function ErrandVillagers({
                 ref={(el) => {
                   headJars.current[i] = el
                 }}
+                name="carried-jar-full"
+                userData={{ villager: i }}
                 visible={false}
                 position={[0, JAR_HEIGHT / 2, 0]}
                 // A carried jar is not a plumb cylinder: a small lean turns the
@@ -3391,6 +3647,8 @@ function ErrandVillagers({
                   ref={(el) => {
                     handJars.current[i] = el
                   }}
+                  name="carried-jar-empty"
+                  userData={{ villager: i }}
                   visible={false}
                   position={[0, -0.12, 0.04]}
                   rotation={[0, 0, 0.12]}
@@ -3420,7 +3678,13 @@ function ErrandVillagers({
         </group>
       ))}
       {geography.waterStand && (
-        <WaterStand x={geography.waterStand.x} z={geography.waterStand.z} jarRefs={standJars} />
+        <WaterStand
+          x={geography.waterStand.x}
+          z={geography.waterStand.z}
+          yaw={standFacing}
+          jarRefs={standJars}
+          spareRef={spareJar}
+        />
       )}
       {Array.from({ length: balance.bankFillRing.count }, (_, k) => (
         <mesh
@@ -3533,6 +3797,27 @@ function Jar({ full }: { full: boolean }) {
 }
 
 /**
+ * Where a villager's shoulder on `side` is DRAWN, in metres in his own group's
+ * frame (work-order 1405): the glTF body's `upperArm` bone, else the
+ * primitive figure's arm pivot. Every body has its own build, so an aim solved
+ * from an assumed shoulder misses a jar a metre off by the difference.
+ */
+function drawnShoulder(
+  figure: THREE.Object3D | null,
+  limbs: FigureLimbs | null | undefined,
+  side: ArmSide,
+): [number, number, number] {
+  const fallback: [number, number, number] = [(side === 'left' ? 1 : -1) * FIGURE_LIMBS.shoulderX, FIGURE_LIMBS.shoulderY, 0]
+  if (!figure) return fallback
+  const joint = figure.getObjectByName(side === 'left' ? 'bone-upperArm.L' : 'bone-upperArm.R') ?? limbs?.arms[side === 'left' ? 0 : 1]
+  if (!joint) return fallback
+  figure.updateWorldMatrix(true, false)
+  joint.updateWorldMatrix(true, false)
+  const at = figure.worldToLocal(joint.getWorldPosition(new THREE.Vector3()))
+  return [at.x, at.y, at.z]
+}
+
+/**
  * THE VILLAGE WATER STAND (work-order 1087): a low platform beside the fire
  * where the filled jars are set down. It is what gives the errand's return leg a
  * destination — the carrier used to walk to a radius, where his task was nulled
@@ -3543,9 +3828,22 @@ function Jar({ full }: { full: boolean }) {
  * capacity, so a delivery past the cap replaces the oldest standing jar rather
  * than piling one more on.
  */
-function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObject<Array<THREE.Object3D | null>> }) {
+function WaterStand({
+  x,
+  z,
+  yaw,
+  jarRefs,
+  spareRef,
+}: {
+  x: number
+  z: number
+  /** Its front, where the empty jar waits, toward the water path (waterStand.ts). */
+  yaw: number
+  jarRefs: RefObject<Array<THREE.Object3D | null>>
+  spareRef: RefObject<THREE.Object3D | null>
+}) {
   return (
-    <group position={[x, 0, z]}>
+    <group position={[x, 0, z]} rotation={[0, yaw, 0]}>
       {/* Four short posts and a plank top — the same worn timber the village's
           other frames are built from. */}
       {[
@@ -3563,24 +3861,27 @@ function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObjec
         <boxGeometry args={[0.92, 0.07, 0.92]} />
         <meshStandardMaterial color="#6b5433" roughness={0.92} />
       </mesh>
-      {Array.from({ length: balance.waterStandCapacity }, (_, i) => {
-        // Set down in a row across the plank, so three read as three. All of
-        // them are mounted once and the frame loop shows as many as stand there.
-        const spread = 0.28
-        const offset = (i - (balance.waterStandCapacity - 1) / 2) * spread
-        return (
-          <group
-            key={i}
-            ref={(el) => {
-              if (jarRefs.current) jarRefs.current[i] = el
-            }}
-            visible={false}
-            position={[offset, 0.385 + JAR_HEIGHT / 2, i % 2 === 0 ? 0.04 : -0.06]}
-          >
-            <Jar full />
-          </group>
-        )
-      })}
+      {Array.from({ length: balance.waterStandCapacity }, (_, i) => (
+        // Set down in a row across the plank's back half, so three read as
+        // three. All of them are mounted once and the frame loop shows as many
+        // as stand there.
+        <group
+          key={i}
+          ref={(el) => {
+            if (jarRefs.current) jarRefs.current[i] = el
+          }}
+          name="stand-jar"
+          visible={false}
+          position={standJarLocal(i)}
+        >
+          <Jar full />
+        </group>
+      ))}
+      {/* The empty jar the next carrier takes up, at the front edge (work-order
+          1405). The frame loop moves it into his hand and hides it there. */}
+      <group ref={spareRef} name="stand-jar-empty" position={SPARE_JAR_LOCAL}>
+        <Jar full={false} />
+      </group>
     </group>
   )
 }
@@ -3605,6 +3906,9 @@ function speakWork(
   yaw: number,
   anchor: THREE.Group | null,
   gesture: RefObject<GestureState>,
+  shoulderOf: (side: ArmSide) => [number, number, number],
+  /** The ground under the speaker, so the aim is taken from his own shoulder. */
+  lift: number,
 ): void {
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
@@ -3623,8 +3927,13 @@ function speakWork(
       speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
+  // FROM THE ARM'S OWN SHOULDER (work-order 1405): measured from the body's
+  // centre, a point at a jar a metre off ran parallel past it.
+  const target = toFigureFrame({ x: speaker.x, z: speaker.z, yaw }, { ...said.aim, y: said.aim.y - lift })
+  const side = gestureArm(Math.atan2(target[0], target[2]))
   gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
-    ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
+    ...aimFromShoulder(shoulderOf(side), target, INDICATE_LEAN),
+    side,
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
 }
@@ -3827,20 +4136,9 @@ export function PlaceLife({
   // here, not per figure: a settlement mounts a couple of dozen of them.
   const limbSegments = useUi(effectiveFigureLimbSegments)
 
-  // The skinned, dressed villagers' look (work-order "villager dress"): this
-  // settlement's people, the visit's season and year, its cloth palette. Null
-  // on the low preset, which keeps the primitive figure. Read once per visit,
-  // like the cloaks: time does not advance inside a settlement.
-  const bodySegments = useUi(effectiveFigureBodySegments)
-  // The glTF body where the level draws it (work-order "glTF villager body"):
-  // loaded on the first such visit; the code-built body stands in until then.
-  const villager = useVillagerAsset(useUi(effectiveFigureGltfBody) && bodySegments > 0)
-  const figureLook = useMemo<FigureLook | null>(() => {
-    const place = placeId ? placeById(placeId) : null
-    if (!bodySegments || !place) return null
-    const { drivers, year } = placeDressDrivers(place.id, useGame.getState().day)
-    return { peopleId: place.peopleId ?? null, drivers, year, palette: style.cloth, radial: bodySegments, villager }
-  }, [bodySegments, placeId, style.cloth, villager])
+  // The skinned, dressed villagers' look (work-order "villager dress"); null
+  // on the low preset, which keeps the primitive figure.
+  const figureLook = useFigureLook(placeId, style.cloth)
 
   // Whether this village has a well at all (point 1092) — the same answer the
   // layout's colliders and keep-clear spots are built from, so the drawn prop

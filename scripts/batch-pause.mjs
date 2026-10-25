@@ -16,7 +16,7 @@
 import { isMainModule } from './is-main.mjs'
 import { setPaused } from './batch-lock.mjs'
 import { PID_START_TOLERANCE_MS, findClaudeAncestor, readOwnerLock } from './batch-singleton.mjs'
-import { namesUserUtterance } from './batch-pause-core.mjs'
+import { namesUserUtterance, quotesExplicitStopOrder } from './batch-pause-core.mjs'
 
 const pauseUsage = () =>
   'usage: node scripts/batch-pause.mjs --user-stop "<quoted user words>" | --awaiting-user "<reason>"'
@@ -51,6 +51,9 @@ function userStopRefusal(reason, { owner, lockPath } = {}) {
   }
   if (!namesUserUtterance(reason)) {
     return 'no-user-utterance: the reason must quote the user\'s own words in quotation marks'
+  }
+  if (!quotesExplicitStopOrder(reason)) {
+    return 'not-an-explicit-stop-order: the quoted words must order the batch stopped or paused; a question, complaint or discussion remark is never a stop reason'
   }
   return null
 }

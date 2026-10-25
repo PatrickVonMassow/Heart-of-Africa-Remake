@@ -486,7 +486,7 @@ function executesAttachedStdin(seg) {
 
 // ── The wrappers that HIDE a command ─────────────────────────────────────────
 //
-// Point 473, four-eyes review (Fable 5): the old whole-string regexes matched
+// Point 473, four-eyes review: the old whole-string regexes matched
 // `git push` wherever it stood, so they saw through `bash -c "…"`, `eval` and
 // `$( … )` BY ACCIDENT. Judging the head alone lost that, and at the LEASE FENCE
 // that is a real regression: a dispossessed session could have pushed shared
@@ -720,7 +720,11 @@ function directIntentOfParsed(seg) {
   // A script whose job is mutation stays a write under EVERY flag. In
   // particular, land-point.mjs does not implement a help/version exit path;
   // those words are merely ignored arguments before it merges and pushes.
-  if (argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
+  // A pure file reader naming it (`grep x scripts/land-point.mjs`, `sed -n 1p
+  // …`) merely reads it; every other head — interpreters, wrappers, find -exec —
+  // keeps the blanket rule. `sed -i` stays a write by the sed rule below.
+  if (MUTATING_SCRIPTS.has(head)) return 'write'
+  if (!SCRIPT_READERS.has(head) && argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
   if (argsOf(seg).some((a) => !a.quoted && (a.text === '--help' || a.text === '--version'))) return 'read'
   // `find . -delete` / `find . -exec rm {} \;` — the verb stands behind -exec.
@@ -734,7 +738,10 @@ function directIntentOfParsed(seg) {
   if (head === 'npm' || head === 'pnpm' || head === 'yarn') return packageIntent(seg)
   if (head === 'gh') return ghIntent(seg)
   if (head === 'sed' || head === 'perl') {
-    return argsOf(seg).some((a) => !a.quoted && /^-[A-Za-z]*i/.test(a.text)) ? 'write' : 'read'
+    // GNU getopt_long takes any unambiguous prefix: `--in-p`, `--i=.bak`.
+    const long = (t) => t.startsWith('--i') && 'in-place'.startsWith(t.slice(2).split('=')[0])
+    const inPlace = (t) => /^-[A-Za-z]*i/.test(t) || long(t)
+    return argsOf(seg).some((a) => !a.quoted && inPlace(a.text)) ? 'write' : 'read'
   }
   if (WRITING_HEADS.has(head)) return 'write'
   // Everything else — `node scripts/x.mjs --status`, `grep`, `cat`, an unknown
@@ -775,6 +782,8 @@ function intentOfParsed(seg, depth = 0) {
  * fallback exists. Over-blocking here costs a board publish that was due anyway.
  */
 const MUTATING_SCRIPTS = new Set(['land-point.mjs'])
+// Heads that only read the files they name; awk is absent because system() runs commands.
+const SCRIPT_READERS = new Set(['grep', 'egrep', 'fgrep', 'rg', 'cat', 'head', 'tail', 'wc', 'less', 'more', 'sed', 'diff', 'ls', 'stat', 'file'])
 
 /** An already-parsed segment passes straight through; a string is parsed. */
 function asSegments(input) {

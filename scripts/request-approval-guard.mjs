@@ -15,17 +15,23 @@
 // the quote. A transcript with no real human message (headless/launcher
 // session) passes. This wrapper reads the hook payload and its
 // `transcript_path` (JSONL). A request deposit whose transcript cannot be read
-// is DENIED (loud); any other guard error ALLOWS with a stderr note.
+// is DENIED (loud), and so is a garbled payload or any guard error during
+// evaluation (fail closed, 17.10.2026); an empty stdin (manual run) is a no-op.
 //
-// WHAT IS JUDGED is decided TEXTUALLY and fail-closed: any command whose words
-// (heredoc bodies and PowerShell here-strings excluded) mention `finding.mjs`
-// and the exact `--request` flag; every `--request` in it is a deposit needing
-// its own approval, and one without a readable title is denied. The guard keeps
+// WHAT IS JUDGED is decided TEXTUALLY and fail-closed: a command whose loose
+// view (quotes, backslashes, `$` removed) mentions `finding.mjs` or `--request`
+// is a possible deposit. Unless it is one plain canonical line it is denied in
+// a chat session; a canonical one has every `--request` judged as a deposit
+// needing its own approval, one without a readable title denied. The guard keeps
 // a cooperative session from forgetting the rule; it is no shell parser and
 // does not try to win against an adversary.
-// ACCEPTED FALSE POSITIVE: a command that merely MENTIONS
-// `finding.mjs … --request` (echo, grep, a test name) is judged as well. The
-// way out is to rephrase the command.
+// NOT JUDGED (22.10.2026): any command that does not mention either word —
+// a plain write, redirect, pipe or chain passes untouched (a cloud clone could
+// not write a file before). A deposit assembled purely by expansion
+// (`fin*.mjs`, `$F`) is therefore not seen: an accepted gap.
+// ACCEPTED FALSE POSITIVES: a command that merely MENTIONS `finding.mjs` or
+// `--request` (echo, grep, a test name) is judged as well. The way out is to
+// rephrase the command.
 //
 // KNOWN GAP: a batch-owner session appending a point directly to TASKS.md from
 // a chat discussion is not covered; there the memory rule alone applies.
@@ -39,7 +45,7 @@
 // NOT REGISTERED with guard-preflight.mjs, for the reason firewall-guard.mjs
 // gives: it judges a command that does not exist until the tool call is made.
 import { readFileSync } from 'node:fs'
-import { evaluate, parseTranscript, requestsOf, shellOf } from './request-approval-guard-core.mjs'
+import { evaluate, isPossibleDeposit, parseTranscript, shellOf } from './request-approval-guard-core.mjs'
 import { isMainModule } from './is-main.mjs'
 
 export const GUARDED_TOOLS = new Set(['Bash', 'PowerShell'])
@@ -69,7 +75,7 @@ export function readTranscript(path) {
 export function hookDecision(payload) {
   const command = commandFrom(payload)
   const shell = shellOf(payload && payload.tool_name)
-  if (!command || requestsOf(command, shell).length === 0) return null
+  if (!command || !isPossibleDeposit(command, shell)) return null
   const transcript = readTranscript(payload.transcript_path)
   const verdict = evaluate({ command, shell, entries: transcript && transcript.entries, malformed: transcript ? transcript.malformed : 0 })
   if (!verdict.block) return null
@@ -82,17 +88,51 @@ export function hookDecision(payload) {
   }
 }
 
+/** A deny output object naming why the guard could not judge the call. */
+function denyFor(why) {
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `request-approval-guard could not judge this call (${why}), so it is denied (fail closed). Repeat the call; if it keeps failing, report the guard error.`,
+    },
+  }
+}
+
+/**
+ * The hook's stdout for raw stdin text: '' to allow, else the deny JSON. Empty
+ * stdin (a manual run) allows, whitespace does not; a garbled payload or an evaluation error denies.
+ * REQUEST_APPROVAL_GUARD_TEST_THROW forces the error path for the spawned test
+ * — it can only deny, never allow.
+ */
+export function hookOutput(stdinText, decide = hookDecision) {
+  if (stdinText === '') return ''
+  let payload
+  try {
+    payload = JSON.parse(stdinText)
+  } catch (e) {
+    return JSON.stringify(denyFor(`garbled hook payload: ${e && e.message}`))
+  }
+  try {
+    if (process.env.REQUEST_APPROVAL_GUARD_TEST_THROW) throw new Error('forced test error')
+    const decision = decide(payload)
+    return decision ? JSON.stringify(decision) : ''
+  } catch (e) {
+    return JSON.stringify(denyFor(`evaluation error: ${e && e.message}`))
+  }
+}
+
 if (isMainModule(import.meta.url)) {
   try {
     const checkAt = process.argv.indexOf('--check')
     if (checkAt >= 0) {
       const command = process.argv[checkAt + 1] ?? ''
       const tAt = process.argv.indexOf('--transcript')
-      const shell = process.argv.includes('--powershell') ? 'powershell' : 'bash'
-      if (requestsOf(command, shell).length === 0) {
+      const shell = shellOf(process.argv.includes('--powershell') ? 'PowerShell' : 'Bash')
+      if (!isPossibleDeposit(command, shell)) {
         console.log('request-approval-guard: OK (not a request deposit)')
       } else if (tAt < 0) {
-        console.log('request-approval-guard: a request deposit — pass --transcript <path.jsonl> to judge its approval')
+        console.log('request-approval-guard: a possible request deposit — pass --transcript <path.jsonl> to judge its approval')
       } else {
         const transcript = readTranscript(process.argv[tAt + 1])
         const verdict = evaluate({ command, shell, entries: transcript && transcript.entries, malformed: transcript ? transcript.malformed : 0 })
@@ -101,18 +141,12 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    let payload = null
-    try {
-      payload = JSON.parse(readFileSync(0, 'utf8'))
-    } catch {
-      process.exit(0) // no/garbled stdin (manual run) — nothing to judge
-    }
-
-    const decision = hookDecision(payload)
-    if (decision) process.stdout.write(JSON.stringify(decision))
+    process.stdout.write(hookOutput(process.stdin.isTTY ? '' : readFileSync(0, 'utf8')))
     process.exit(0)
   } catch (e) {
-    console.error(`request-approval-guard error (allowing the call): ${e && e.message}`)
+    // A --check run only reports; a hook run that cannot read stdin denies.
+    console.error(`request-approval-guard error: ${e && e.message}`)
+    if (!process.argv.includes('--check')) process.stdout.write(JSON.stringify(denyFor(`stdin unreadable: ${e && e.message}`)))
     process.exit(0)
   }
 }

@@ -9,8 +9,9 @@
 // HARD SINGLETON (24.07.2026, after the e9407cae double-session incident):
 //   - It pushes ONLY the session that holds (or atomically acquires) the batch
 //     lock. A session with open work acquires a FREE, unreserved lock through the
-//     ATOMIC acquire in scripts/batch-singleton.mjs; the old check-then-claim
-//     conscription is gone. A session that does not own the lock — even one with
+//     ATOMIC acquire in scripts/batch-singleton.mjs — unless it is a window a
+//     person types into that holds no lock and made no claim (31.08.2026); the
+//     old check-then-claim conscription is gone. A session that does not own the lock — even one with
 //     no readable session id — STANDS DOWN, blocked only while a declared child of
 //     its own still needs a transfer (the stand-down boundary, point 716).
 //   - ACTIVE PARALLEL-SESSION DETECTOR: each turn-end, the owner checks for a
@@ -85,6 +86,13 @@ import { POOL_CAP, slotsRemedy, describeInFlight } from './batch-in-flight-core.
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
 import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
+import { transcriptOrdersStop, userStopEnd } from './batch-pause-core.mjs'
+import {
+  freeLockDeclinedLine,
+  ownershipChangeLine,
+  transcriptShowsPerson,
+  turnEndOwnership,
+} from './batch-resume-hook-core.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
@@ -163,6 +171,38 @@ function readOnlyOwnership(sessionId, {
   return assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work }).alive ? 'held' : 'acquired'
 }
 
+function readTranscriptText(transcriptPath) {
+  if (!transcriptPath) return null
+  try {
+    return readFileSync(transcriptPath, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/** MAY THIS TURN END ACQUIRE? (user 31.08.2026) A lock held here or the
+ * session's own claim invites it; otherwise a window the transcript proves a
+ * person is typing into does not take a freed lock — the launcher's worker is
+ * the successor. Read-only; the pure rule is `turnEndOwnership`. */
+export function turnEndInvitation(sessionId, transcriptPath, {
+  lockPath = LOCK_PATH,
+  lock,
+  now = Date.now(),
+  readTranscript = readTranscriptText,
+  claimOf = gatherClaim,
+} = {}) {
+  const held = lock === undefined ? readOwnerLock(lockPath) : lock
+  if (ownsLock(sessionId, { lockPath, lock: held, now }).mine) return turnEndOwnership({ heldHere: true })
+  let claimMine = false
+  try {
+    claimMine = claimOf(sessionId)?.mine === true
+  } catch {
+    /* an unreadable claim invites nobody */
+  }
+  if (claimMine) return turnEndOwnership({ claimMine })
+  return turnEndOwnership({ interactive: transcriptShowsPerson(readTranscript(transcriptPath)) })
+}
+
 /** Read-only batch-progress variant for guard-preflight. For an owning (or
  * acquiring) session it answers whether a boundary stop would be permitted from
  * the same pure decision as the Stop hook, but performs none of that hook's
@@ -182,7 +222,17 @@ export function gatherBatchProgressInputs({
   const paused = suppliedPaused ?? isPaused()
   if (paused) return { applicable: false, why: 'the batch is paused' }
 
-  const ownership = readOnlyOwnership(sessionId, { lockPath, lock, now })
+  let ownership = readOnlyOwnership(sessionId, { lockPath, lock, now })
+  if (
+    ownership === 'acquired' &&
+    !(probes.turnEndInvitation ?? turnEndInvitation)(sessionId, transcriptPath, { lockPath, lock, now }).mayAcquire
+  ) {
+    return {
+      applicable: false,
+      why: 'the batch lock is free, but this interactive window was not invited to take it',
+      cause: 'uninvited-interactive',
+    }
+  }
   if (ownership !== 'mine' && ownership !== 'acquired') {
     return {
       applicable: false,
@@ -306,8 +356,22 @@ export function decideBatchProgress(inputs = {}) {
   }
 }
 
+// AN OWNERSHIP CHANGE IS ITS OWN LINE (user 31.08.2026): set once per run, it
+// leads whatever this hook prints, so it is never a clause inside a refusal.
+let leadLine = ''
+/** The lead line as its own paragraph ahead of the hook's text. PURE. */
+export function composeHookText(lead, text) {
+  if (!lead) return text
+  return text ? `${lead}\n\n${text}` : lead
+}
+const withLead = (text) => {
+  const lead = leadLine
+  leadLine = ''
+  return composeHookText(lead, text)
+}
+
 const block = (reason) => {
-  process.stdout.write(JSON.stringify({ decision: 'block', reason }))
+  process.stdout.write(JSON.stringify({ decision: 'block', reason: withLead(reason) }))
   process.exit(0)
 }
 
@@ -315,7 +379,8 @@ const block = (reason) => {
  *  through; `systemMessage` surfaces the line to the session and the user. Used
  *  where the stop is legitimate but something the session believes is NOT true —
  *  a handover that did not reach the lock, or a guard that failed open. */
-const warn = (message) => {
+const warn = (raw) => {
+  const message = withLead(raw)
   try {
     process.stdout.write(JSON.stringify({ systemMessage: message }))
   } catch {
@@ -373,7 +438,21 @@ try {
     // WITH the owner's corroboration (point 556, four-eyes finding 2): a NON-owner
     // session's Stop guard must not take the batch from an owner whose expired
     // lease its advancing work outvotes.
-    if (!reserved) ownership = acquire(sid, { work: gatherOwnerWork(readOwnerLock(), { now: Date.now() }) })
+    // AN INVITATION BEFORE A FREED LOCK (user 31.08.2026): a window a person is
+    // typing into, which holds no lock and made no claim, does not take the batch
+    // — it says so instead. Unattended sessions acquire exactly as before.
+    if (!reserved) {
+      const plan = turnEndInvitation(sid, transcriptPath)
+      if (plan.mayAcquire) {
+        ownership = acquire(sid, { work: gatherOwnerWork(readOwnerLock(), { now: Date.now() }) })
+        if (ownership === 'acquired' && plan.invitation !== 'held') {
+          leadLine = ownershipChangeLine({ sessionId: sid, invitation: plan.invitation })
+          record(`OWNERSHIP TAKEN at a turn end by ${sid} (${plan.invitation}).`)
+        }
+      } else if (readOnlyOwnership(sid) === 'acquired') {
+        leadLine = freeLockDeclinedLine({ sessionId: sid })
+      }
+    }
   }
 
   // A pending CLAIM (point 395) — gathered before the parallel detector, because
@@ -404,7 +483,7 @@ try {
       // A claimant that has already been RELEASED to is just as sanctioned a
       // second session as a pending one — it is the window the batch was freed
       // for, and flagging it would demand the doctor before the takeover it is
-      // waiting to complete (four-eyes review, Fable 5, 30.07.2026, finding 3).
+      // waiting to complete (four-eyes review, 30.07.2026, finding 3).
       exclude: (claimInfo.honour || claimInfo.reserve) && claimInfo.claimantSid ? [claimInfo.claimantSid] : [],
     })
     if (parallel.length > 0) {
@@ -679,6 +758,13 @@ try {
         `HANDOVER ${what} by ${sid} — lock marked handed-over; the launcher may spawn the ` +
           `successor.${handed.attempts > 1 ? ` (the write needed ${handed.attempts} attempts)` : ''}`,
       )
+      // An acquisition at this very turn end is still announced on its own line.
+      if (leadLine) {
+        warn(
+          `This session then HANDED THE BATCH OVER at its valid boundary (${what}): the lock is marked ` +
+            'handed-over and the launcher may spawn the successor. It does not keep the batch.',
+        )
+      }
       process.exit(0)
     }
     // The stop may proceed — a guard never traps a session — but it must NEVER
@@ -799,10 +885,14 @@ try {
           'Do not drive the batch from this session; the current owner does that.',
       )
     }
+    if (leadLine) warn('')
     process.exit(0)
   }
 
-  if (decision === 'allow') process.exit(0)
+  if (decision === 'allow') {
+    if (leadLine) warn('')
+    process.exit(0)
+  }
 
   if (decision === 'block-format') {
     block(
@@ -838,8 +928,9 @@ try {
       `never idling by ending the turn. Keep the dashboard current. Legitimate ends: (a) every point is done; ` +
       `(a2) WAITING on handed-out work you cannot poll further (agent still building, suite on the machine): declare ` +
       `it with \`node scripts/batch-in-flight.mjs --waiting-on "<what>" --branch <b> --worktree <w> --pid <p> --log <l>\` ` +
-      `— allowed while a probe finds it alive; one dead item ends it, so act when it lands; (b) the user asked to stop: ` +
-      `\`node scripts/batch-pause.mjs --user-stop "<the user's words, quoted>"\`, then stop; (c) you just MERGED AND ` +
+      `— allowed while a probe finds it alive; one dead item ends it, so act when it lands; ` +
+      userStopEnd(transcriptOrdersStop(readTranscriptText(transcriptPath))) +
+      `(c) you just MERGED AND ` +
       `TICKED a point — POINT BOUNDARY: \`node scripts/batch-boundary.mjs --prepare <point>\`, its bookkeeping, ` +
       `\`--commit <point>\` as the last action, then END THE SESSION (a delegated author with pushed checkpoints is ` +
       `handed over with the boundary; unpushed, non-transferable work drains first); (d) EVERY open item waits on ` +

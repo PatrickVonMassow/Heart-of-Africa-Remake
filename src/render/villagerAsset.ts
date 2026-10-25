@@ -38,6 +38,18 @@ export interface VillagerClip {
   tool?: ToolGrip
   /** How far each hand is closed (0 … 1) through the clip. */
   grip?: { L?: number; R?: number }
+  /** A gait's support (natural-villager-motion step 5): per foot and contact
+   *  the phase intervals [a, b) it carries in (b > 1 wraps past the seam), and
+   *  the loop seam the pipeline closed (rad). */
+  contacts?: ClipContacts
+  /** A work stroke's blade contact (s from the clip's start): where the dig
+   *  counts its strike (scenes/place/adultWork.ts digStrikeCrossed). */
+  strike?: number
+}
+
+export interface ClipContacts {
+  seam: number
+  support: Record<'L' | 'R', Record<'heel' | 'ball' | 'tip', Array<[number, number]>>>
 }
 
 export interface ContactPoints {
@@ -69,6 +81,8 @@ export interface VillagerAsset {
   /** The tool-in-hand rotation and the fist's hole per hand (hand bone frame). */
   toolHold: { L: { rotation: THREE.Quaternion; offset: THREE.Vector3 }; R: { rotation: THREE.Quaternion; offset: THREE.Vector3 } }
   stature: number
+  /** The garments of the body's cover mask, in bit order (render/villagerGarmentMask.ts); empty without one. */
+  garmentMask: string[]
 }
 
 /** The bone name a glTF node carries ('.' is reserved by three's
@@ -87,9 +101,10 @@ interface Meta {
   jointDeltas: Record<string, Record<string, number[]>>
   tails: Record<string, number[]>
   contactPoints: Record<'L' | 'R', Record<'heel' | 'ball' | 'tip' | 'knee', number[]>>
-  clips: Record<string, { duration: number; kind: VillagerClipKind; speed?: number; tool?: ToolGrip; grip?: { L?: number; R?: number } }>
+  clips: Record<string, { duration: number; kind: VillagerClipKind; speed?: number; tool?: ToolGrip; grip?: { L?: number; R?: number }; contacts?: ClipContacts; strike?: number }>
   toolHold: Record<'L' | 'R', { rotation: number[]; offset: number[] }>
   stature: number
+  garmentMask?: { garments: string[] }
 }
 
 /** Turn a parsed glTF into the villager asset. */
@@ -129,6 +144,13 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     const mesh = o as THREE.SkinnedMesh
     if (!mesh.isMesh) return
     const g = mesh.geometry
+    // A garment's weights and morph deltas ship as normalized shorts
+    // (scripts/villager/export.py `compact`): as floats here, so every part
+    // merges with the body and the morph bake reads plain deltas.
+    const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute | undefined
+    if (sw?.normalized) g.setAttribute('skinWeight', toFloat(sw))
+    const morphs = g.morphAttributes.position
+    if (morphs) g.morphAttributes.position = morphs.map((m) => (m.normalized ? toFloat(m as THREE.BufferAttribute) : m))
     // three keeps the morph names on the mesh; carry them on the geometry.
     g.userData.targetNames = Object.keys(mesh.morphTargetDictionary ?? {}).sort((a, b) => mesh.morphTargetDictionary![a] - mesh.morphTargetDictionary![b])
     geometries[mesh.name] = g
@@ -152,7 +174,7 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
       if (prop === 'quaternion') rot[i] = t.values as Float32Array
       else if (prop === 'position' && i === 0) hips = t.values as Float32Array
     }
-    clips[a.name] = { name: a.name, kind: m.kind, duration: m.duration, speed: m.speed ?? 0, times, rot, hips, tool: m.tool, grip: m.grip }
+    clips[a.name] = { name: a.name, kind: m.kind, duration: m.duration, speed: m.speed ?? 0, times, rot, hips, tool: m.tool, grip: m.grip, contacts: m.contacts, strike: m.strike }
   }
   const cp = (s: 'L' | 'R'): ContactPoints => ({
     heel: v3(meta.contactPoints[s].heel),
@@ -178,7 +200,15 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     contactPoints: { L: cp('L'), R: cp('R') },
     toolHold: { L: hold('L'), R: hold('R') },
     stature: meta.stature,
+    garmentMask: meta.garmentMask?.garments ?? [],
   }
+}
+
+/** A normalized attribute as plain floats. */
+function toFloat(a: THREE.BufferAttribute): THREE.BufferAttribute {
+  const f = new Float32Array(a.count * a.itemSize)
+  for (let k = 0; k < a.count; k++) for (let c = 0; c < a.itemSize; c++) f[k * a.itemSize + c] = a.getComponent(k, c)
+  return new THREE.BufferAttribute(f, a.itemSize)
 }
 
 /** Bone indices with every parent before its children. */

@@ -3,7 +3,7 @@
 // input fails open, and a green re-run supersedes its red predecessor.
 import { describe, it, expect } from 'vitest'
 import { assessCiWait } from './batch-in-flight-core.mjs'
-import { successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
+import { ciTerminalPrompt, successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
   acknowledgeCiWaitState,
   blockReason,
@@ -11,7 +11,18 @@ import {
   ciWaitBackoffMs,
   ciWaitIdentity,
   ciRedAlertMessage,
+  blockingRunIds,
+  chargedReportsDue,
+  chargedRunIds,
   classifyRuns,
+  observedShaEntry,
+  observerClassification,
+  GATE_STATUS_CONTEXT,
+  readAllStatusPages,
+  refBranch,
+  targetBranch,
+  waitTarget,
+  withGateStatuses,
   failedRuns,
   notifiedFromState,
   pruneFamine,
@@ -117,6 +128,160 @@ describe('classifyRuns', () => {
 
   // A cancellation is only noise when something else JUDGED. Alone it still
   // demands attention, and it must never bury a genuine red standing behind it.
+  // A soft feat/** run concludes success while its gate is red; only the
+  // ci/gate (branch) commit status carries the verdict (run 38277768235).
+  const RUN_PAGE = 'https://github.com/o/r/actions/runs/1'
+  const gate = (state, over = {}) => ({
+    context: GATE_STATUS_CONTEXT,
+    state,
+    target_url: RUN_PAGE,
+    description: `gate ${state}: unit`,
+    ...over,
+  })
+  const feat = (over = {}) => run({ headBranch: 'feat/x', ...over })
+  const onFeat = (statuses) => ({ statuses, branch: 'feat/x' })
+
+  it('classifies a success-concluded run with a failing ci/gate status as red', () => {
+    const c = classifyRuns([feat()], HEAD, onFeat([gate('failure')]))
+    expect(c).toMatchObject({ state: 'failed', runId: 1, workflowName: 'CI', conclusion: 'failure' })
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('error')])).state).toBe('failed')
+    expect(failedRuns([feat()], HEAD, onFeat([gate('failure')]))).toHaveLength(1)
+    expect(recoveredWorkflows([feat()], HEAD, onFeat([gate('failure')]))).toEqual([])
+  })
+
+  // Review P1 (13.10.2026): the REST shape carries BOTH `url` (the API endpoint)
+  // and `html_url`; the status names the html_url, so `url` must not win.
+  it('matches the REST shape by html_url, not by its API url', () => {
+    const rest = {
+      id: 1, head_sha: HEAD, head_branch: 'feat/x', status: 'completed', conclusion: 'success', name: 'CI',
+      url: 'https://api.github.com/repos/o/r/actions/runs/1', html_url: RUN_PAGE,
+    }
+    expect(classifyRuns([rest], HEAD, onFeat([gate('failure')])).state).toBe('failed')
+  })
+
+  it('judges the gate by the newest status of the same run, and only that run', () => {
+    // GitHub lists statuses newest first: a re-run's green supersedes the old red.
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('success'), gate('failure')])).state).toBe('success')
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('failure'), gate('success')])).state).toBe('failed')
+    // A red status of an OLDER run cannot paint a newer green run red.
+    const other = gate('failure', { target_url: 'https://github.com/o/r/actions/runs/0' })
+    expect(classifyRuns([feat()], HEAD, onFeat([other])).state).toBe('success')
+    // Other contexts are not the gate.
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('failure', { context: 'ci/other' })])).state).toBe('success')
+    expect(classifyRuns([feat({ status: 'in_progress', conclusion: null })], HEAD, onFeat([gate('failure')])).state).toBe('pending')
+  })
+
+  // Review P2 (13.10.2026): a feature branch created at main's tip shares main's
+  // sha, and refTargets gives that sha to main. A red feature gate must not
+  // paint main red; the feature target itself still reads red.
+  it('keeps main unchanged on a sha it shares with a red-gated feature run', () => {
+    const mainRun = run({ databaseId: 1, headBranch: 'main', url: 'https://github.com/o/r/actions/runs/1' })
+    const featRun = feat({ databaseId: 2, url: 'https://github.com/o/r/actions/runs/2' })
+    const statuses = [gate('failure', { target_url: 'https://github.com/o/r/actions/runs/2' })]
+    expect(classifyRuns([mainRun, featRun], HEAD, { statuses, branch: 'main' }).state).toBe('success')
+    expect(classifyRuns([mainRun, featRun], HEAD, { statuses, branch: 'feat/x' }).state).toBe('failed')
+    // No gate input at all: exactly the old conclusion-only reading.
+    expect(classifyRuns([mainRun, featRun], HEAD).state).toBe('success')
+    expect(refBranch('origin/feat/x')).toBe('feat/x')
+    expect(refBranch('origin/main')).toBe('main')
+  })
+
+  it('sweeps a shared sha under main green and under the feature ref red', async () => {
+    const featRun = feat({ databaseId: 2, url: 'https://github.com/o/r/actions/runs/2' })
+    const runs = withGateStatuses(
+      [run({ databaseId: 1, headBranch: 'main' }), featRun],
+      [gate('failure', { target_url: 'https://github.com/o/r/actions/runs/2' })],
+    )
+    const sweep = (ref) => sweepTargets({
+      targets: [{ ref, sha: HEAD, at: 1 }],
+      cache: {}, notified: {}, famine: {}, now: 10 * 60 * 1000,
+      fetchRuns: async () => runs,
+      judgeRed: async ({ classification }) => ({ classification, standDown: false }),
+      notify: async () => {},
+    })
+    expect((await sweep('origin/main')).cache[HEAD].state).toBe('success')
+    expect((await sweep('origin/feat/x')).cache[HEAD].state).toBe('failed')
+  })
+
+  // Review round 2 (13.10.2026): three ways a branch identity got lost.
+  const sweepOnce = (target, runs, cache = {}) => {
+    const asked = []
+    return sweepTargets({
+      targets: [target],
+      cache, notified: {}, famine: {}, now: 10 * 60 * 1000,
+      fetchRuns: async (sha) => { asked.push(sha); return runs },
+      judgeRed: async ({ classification }) => ({ classification, standDown: false }),
+      notify: async () => {},
+    }).then((result) => ({ ...result, asked }))
+  }
+  const sharedSha = () => withGateStatuses(
+    [run({ databaseId: 1, headBranch: 'main' }), feat({ databaseId: 2, url: 'https://github.com/o/r/actions/runs/2' })],
+    [gate('failure', { target_url: 'https://github.com/o/r/actions/runs/2' })],
+  )
+
+  it('does not let a sha cached green under main skip the feature branch that later owns it', async () => {
+    const asMain = await sweepOnce({ ref: 'origin/main', sha: HEAD, at: 1 }, sharedSha())
+    expect(asMain.cache[HEAD]).toMatchObject({ state: 'success', branch: 'main' })
+    // Same branch again: still a free cache hit.
+    expect((await sweepOnce({ ref: 'origin/main', sha: HEAD, at: 1 }, sharedSha(), asMain.cache)).asked).toEqual([])
+    // main moved on, feat/x now owns the sha: asked again, and red.
+    const asFeat = await sweepOnce({ ref: 'origin/feat/x', sha: HEAD, at: 1 }, sharedSha(), asMain.cache)
+    expect(asFeat.asked).toEqual([HEAD])
+    expect(asFeat.cache[HEAD].state).toBe('failed')
+  })
+
+  it('does not let another branch\'s newer run supersede the target\'s red gate, in either order', () => {
+    const urls = (id) => `https://github.com/o/r/actions/runs/${id}`
+    const statuses = [gate('failure', { target_url: urls(1) }), gate('failure', { target_url: urls(2) })]
+    for (const [xId, yId] of [[1, 2], [2, 1]]) {
+      const runs = [
+        run({ databaseId: xId, headBranch: 'feat/x', url: urls(xId) }),
+        run({ databaseId: yId, headBranch: 'feat/y', url: urls(yId) }),
+      ]
+      expect(classifyRuns(runs, HEAD, { statuses, branch: 'feat/x' }).state).toBe('failed')
+      expect(classifyRuns(runs, HEAD, { statuses, branch: 'feat/y' }).state).toBe('failed')
+      expect(failedRuns(runs, HEAD, { statuses, branch: 'feat/x' })).toHaveLength(1)
+    }
+    // A green re-run of the target's OWN branch still supersedes its red.
+    const rerun = [feat({ databaseId: 1 }), feat({ databaseId: 3, url: urls(3) })]
+    expect(classifyRuns(rerun, HEAD, onFeat([gate('failure')])).state).toBe('success')
+  })
+
+  it('keeps the real branch of a HEAD pushed from another clone, through the sweep and the wait', async () => {
+    const [target] = refTargets({ headSha: HEAD, headPushed: true, headBranch: 'feat/x' })
+    expect(target).toEqual({ ref: 'HEAD', sha: HEAD, at: 0, branch: 'feat/x' })
+    expect(refTargets({ headSha: HEAD, headPushed: true })).toEqual([{ ref: 'HEAD', sha: HEAD, at: 0 }])
+    const soft = withGateStatuses([feat()], [gate('failure')])
+    expect((await sweepOnce(target, soft)).cache[HEAD].state).toBe('failed')
+    const wait = renewCiWait(null, {
+      target,
+      classification: { state: 'pending', workflowName: 'CI', runId: 1 },
+      firstSeenAt: 0,
+      observedAt: 0,
+    }, { now: 0, makeWakeToken: () => 'wake' })
+    expect(targetBranch(wait)).toBe('feat/x')
+    expect(classifyRuns(soft, HEAD, { branch: targetBranch(wait) }).state).toBe('failed')
+    // Review P2 (13.10.2026): a pending renewal from the wait keeps the branch.
+    for (const runId of [1, 2]) {
+      const renewed = renewCiWait(runId === 1 ? wait : null, {
+        target: waitTarget(wait),
+        classification: { state: 'pending', workflowName: 'CI', runId },
+        firstSeenAt: 0,
+        observedAt: 1,
+      }, { now: 1, makeWakeToken: () => 'wake' })
+      expect(targetBranch(renewed)).toBe('feat/x')
+      expect(classifyRuns(soft, HEAD, { branch: targetBranch(renewed) }).state).toBe('failed')
+    }
+  })
+
+  // Review P2 (13.10.2026): a red gate on an unread page must not pass as green.
+  it('reads every status page, and an incomplete read is unreadable', async () => {
+    const pages = { 1: Array(100).fill(gate('success')), 2: [gate('failure')] }
+    expect(await readAllStatusPages(async (n) => pages[n] ?? [])).toHaveLength(101)
+    expect(await readAllStatusPages(async (n) => (n === 1 ? pages[1] : null))).toBeNull()
+    expect(await readAllStatusPages(async () => Array(100).fill(gate('success')), { maxPages: 3 })).toBeNull()
+  })
+
   it('keeps a lone cancellation red, and never hides a real failure', () => {
     expect(classifyRuns([run({ conclusion: 'cancelled' })], HEAD).state).toBe('failed')
     const red = run({ databaseId: 10, conclusion: 'failure' })
@@ -563,6 +728,17 @@ describe('renewable durable CI wait', () => {
     })
   })
 
+  it('hands a failing ci/gate status on as a RED CI-terminal handoff, never green', () => {
+    const wait = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake-1' })
+    const soft = [run({ databaseId: 32462093487, headSha: BRANCH, headBranch: 'feat/x', url: 'https://github.com/o/r/actions/runs/32462093487' })]
+    const statuses = [{ context: GATE_STATUS_CONTEXT, state: 'failure', target_url: 'https://github.com/o/r/actions/runs/32462093487' }]
+    const terminal = observeCiWait(wait, classifyRuns(soft, BRANCH, { statuses, branch: refBranch(wait.ref) }), { now: NOW + 1 })
+    const prompt = ciTerminalPrompt(assessCiWait({ wait: terminal, now: NOW + 2 }))
+    expect(terminal.terminal).toMatchObject({ state: 'failed', verdict: 'red' })
+    expect(prompt).toMatch(/concluded RED/)
+    expect(prompt).not.toMatch(/GREEN/)
+  })
+
   it('backs off exponentially but never reaches the 900-second scheduler interval', () => {
     expect(ciWaitBackoffMs({ observations: 1 })).toBe(15_000)
     expect(ciWaitBackoffMs({ observations: 2 })).toBe(30_000)
@@ -988,5 +1164,282 @@ describe('ciRedAlertMessage', () => {
     expect(message).toContain('nothing in the repository can clear it')
     expect(message).toContain('the Pages queue is empty')
     expect(message).toContain('2026-08-18T02:03:00.000Z')
+  })
+})
+
+// A parked point's red that its OPEN TASKS.md entry charges is reported, not
+// blocked (15.10.2026, run 38591097319); main is never exempt.
+describe('charged reds', () => {
+  const RUN = '38591097319'
+  const tasks = [
+    '- [ ] 1342. Natural villager motion b',
+    `  Charged: run ${RUN} on feat/1342-natural-motion-b is this point's own unfinished state.`,
+    '- [ ] 1343. Another point',
+    '  Mentions run 99999999999 only here.',
+    '- [x] 1344. Closed point',
+    '  run 77777777777',
+  ].join('\n')
+  const red = (sha) => [run({ headSha: sha, conclusion: 'failure', databaseId: Number(RUN) })]
+  const featTarget = { ref: 'origin/feat/1342-natural-motion-b', sha: BRANCH, at: t(120) }
+  const fromTasks = (text) => (branch) => chargedRunIds(text, branch)
+
+  it('chargedRunIds reads only the owning OPEN point block', () => {
+    expect([...chargedRunIds(tasks, 'feat/1342-natural-motion-b')]).toEqual([RUN])
+    expect([...chargedRunIds(tasks, 'feat/1343-x')]).toEqual(['99999999999'])
+    expect(chargedRunIds(tasks, 'feat/1344-x').size).toBe(0) // closed point
+    expect(chargedRunIds(tasks, 'feat/1345-x').size).toBe(0) // no such point
+    expect(chargedRunIds(tasks, 'main').size).toBe(0)
+    expect(chargedRunIds(tasks, 'HEAD').size).toBe(0)
+    expect(chargedRunIds(null, 'feat/1342-x').size).toBe(0)
+  })
+
+  it('a charged red on a feature ref reports without blocking', async () => {
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    expect(got.cache[BRANCH]).toMatchObject({ state: 'failed', runId: Number(RUN) })
+    expect(got.alerts).toHaveLength(1) // notification unchanged
+  })
+
+  it('the same red without the note still blocks', async () => {
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks('- [ ] 1342. x') })
+    expect(got.decision).toContain(featTarget.ref)
+    expect(got.charged).toEqual([])
+    const noSource = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(noSource.decision).toContain('RED')
+  })
+
+  it('a red run on another point charged elsewhere does not exempt this branch', async () => {
+    const other = { ...featTarget, ref: 'origin/feat/1343-x' }
+    const got = await sweep({ targets: [other], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toContain('RED')
+  })
+
+  it('main is never exempt, even when the source names the run', async () => {
+    const mainTarget = { ref: 'origin/main', sha: HEAD, at: t(120) }
+    const got = await sweep({ targets: [mainTarget], runsBySha: { [HEAD]: red(HEAD) }, chargedRuns: () => new Set([RUN]) })
+    expect(got.decision).toContain('origin/main')
+    expect(got.charged).toEqual([])
+  })
+
+  it('the cached failed path honours the charge, and blocks without it', async () => {
+    const first = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(first.decision).toContain('RED')
+    const again = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks(tasks) })
+    expect(again.asked).toEqual([])
+    expect(again.decision).toBe(null)
+    expect(again.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    const uncharged = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks('') })
+    expect(uncharged.decision).toContain('RED')
+  })
+
+  // Review 15.10.2026, P1: a charge on one red must not exempt another red on
+  // the same sha, whichever of the two the API lists first.
+  const OTHER = '38591097320'
+  const mixed = (order) => {
+    const a = run({ headSha: BRANCH, conclusion: 'failure', databaseId: Number(RUN), workflowName: 'CI' })
+    const b = run({ headSha: BRANCH, conclusion: 'failure', databaseId: Number(OTHER), workflowName: 'Pages' })
+    return order === 'charged-first' ? [a, b] : [b, a]
+  }
+  for (const order of ['charged-first', 'uncharged-first']) {
+    it(`a charged and an uncharged red on one sha still block (${order})`, async () => {
+      const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: mixed(order) }, chargedRuns: fromTasks(tasks) })
+      expect(got.decision).toContain('RED')
+      expect(got.charged).toEqual([])
+      expect([...got.cache[BRANCH].runIds].sort()).toEqual([RUN, OTHER])
+      const again = await sweep({ targets: [featTarget], cache: got.cache, chargedRuns: fromTasks(tasks) })
+      expect(again.decision).toContain('RED')
+    })
+  }
+
+  it('two reds on one sha exempt only when both are charged', async () => {
+    const both = `${tasks}\n- [ ] 1399. y`.replace(`run ${RUN} on`, `run ${RUN} and run ${OTHER} on`)
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: mixed('uncharged-first') }, chargedRuns: fromTasks(both) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toHaveLength(1)
+  })
+
+  it('a judge naming its blocking reds narrows the set to them', async () => {
+    const got = await sweepTargets({
+      targets: [featTarget], now: NOW,
+      fetchRuns: async () => mixed('uncharged-first'),
+      // The uncharged red is GitHub's side (unactionable), so only the charged one blocks.
+      judgeRed: async ({ classification }) => ({ classification: { ...classification, runId: Number(RUN) }, standDown: false, blockingRunIds: [RUN] }),
+      notify: async () => {},
+      chargedRuns: fromTasks(tasks),
+    })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+  })
+
+  // Review 15.10.2026, P3: the durable observer's terminal entry keeps its run
+  // ids, so a charged red it finished does not block until the cache expires.
+  it('an observer-written failed entry honours the charge', async () => {
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const classification = { state: 'failed', runId: Number(RUN), workflowName: 'CI', conclusion: 'failure' }
+    const entry = observedShaEntry({ wait, classification, reason: blockReason(classification, BRANCH, wait.ref), runIds: [RUN], runs: red(BRANCH), observedAt: t(10) })
+    expect(entry).toMatchObject({ state: 'failed', runId: Number(RUN), runIds: [RUN], branch: 'feat/1342-natural-motion-b', settled: true })
+    const got = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks(tasks) })
+    expect(got.asked).toEqual([])
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    const uncharged = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks('') })
+    expect(uncharged.decision).toContain('RED')
+    expect(observedShaEntry({ wait, classification: { state: 'success' }, observedAt: t(10) })).not.toHaveProperty('runIds')
+  })
+
+  // Second review 15.10.2026, P1: a cached failed entry exempts only for the
+  // branch that produced it; a sibling feat branch on the same sha does not.
+  it('a cached charge from another branch, or from no branch, does not exempt', async () => {
+    const sibling = { ...featTarget, ref: 'origin/feat/1343-x' }
+    const first = await sweep({ targets: [sibling], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(first.cache[BRANCH]).toMatchObject({ state: 'failed', branch: 'feat/1343-x', runIds: [RUN] })
+    const cross = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks(tasks) })
+    expect(cross.asked).toEqual([])
+    expect(cross.decision).toContain('RED')
+    const { branch: _dropped, ...noBranch } = first.cache[BRANCH]
+    const bare = await sweep({ targets: [featTarget], cache: { [BRANCH]: noBranch }, chargedRuns: fromTasks(tasks) })
+    expect(bare.decision).toContain('RED')
+    const own = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(own.cache[BRANCH].branch).toBe('feat/1342-natural-motion-b')
+    const cachedOwn = await sweep({ targets: [featTarget], cache: own.cache, chargedRuns: fromTasks(tasks) })
+    expect(cachedOwn.decision).toBe(null)
+  })
+
+  // Second review 15.10.2026, P2: an actionable red without a run id can never
+  // be charged, so it keeps the sha blocking next to a charged one.
+  it('an id-less blocking red prevents the exemption', async () => {
+    const got = await sweepTargets({
+      targets: [featTarget], now: NOW,
+      fetchRuns: async () => red(BRANCH),
+      judgeRed: async ({ classification }) => ({ classification, standDown: false, blockingRunIds: [RUN, null] }),
+      notify: async () => {},
+      chargedRuns: fromTasks(tasks),
+    })
+    expect(got.decision).toContain('RED')
+    expect(got.cache[BRANCH].runIds).toEqual([RUN, null])
+    const again = await sweep({ targets: [featTarget], cache: got.cache, chargedRuns: fromTasks(tasks) })
+    expect(again.decision).toContain('RED')
+    const idless = run({ headSha: BRANCH, conclusion: 'failure', databaseId: undefined, workflowName: 'Pages' })
+    const ids = blockingRunIds({ runs: [...red(BRANCH), idless], sha: BRANCH, branch: 'feat/1342-natural-motion-b' })
+    expect(ids).toContain(null)
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const observed = observedShaEntry({ wait, classification: { state: 'failed', runId: Number(RUN) }, reason: 'RED', runIds: ids, observedAt: t(10) })
+    expect(observed.runIds).toContain(null)
+    const fromObserver = await sweep({ targets: [featTarget], cache: { [BRANCH]: observed }, chargedRuns: fromTasks(tasks) })
+    expect(fromObserver.decision).toBe('RED')
+  })
+
+  // Third review 15.10.2026: a charged red does not release the turn while
+  // another workflow on the sha is still running.
+  for (const order of ['red-first', 'running-first']) {
+    it(`a charged red beside a running workflow waits instead of exempting (${order})`, async () => {
+      const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+      const runs = order === 'red-first' ? [...red(BRANCH), running] : [running, ...red(BRANCH)]
+      const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: runs }, chargedRuns: fromTasks(tasks) })
+      expect(got.decision).toContain('NOT yet concluded')
+      expect(got.charged).toEqual([])
+      expect(got.cache[BRANCH]).toMatchObject({ state: 'pending', runId: 5, workflowName: 'Pages' })
+      expect(got.observations.at(-1)).toMatchObject({ verdict: 'wait', classification: { state: 'pending', runId: 5 } })
+    })
+  }
+
+  // Review 15.10.2026, P2: past the budget the sibling wait still reaches the
+  // durable wait through reconciliation instead of reading as a red.
+  it('a charged red beside a running workflow past the budget keeps a durable pending wait', async () => {
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const stale = { ...featTarget, at: NOW - WAIT_BUDGET_MS - 1000 }
+    const got = await sweep({ targets: [stale], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.failedOpen).toHaveLength(1)
+    expect(got.cache[BRANCH]).toMatchObject({ state: 'pending' })
+    expect(got.observations.at(-1)).toMatchObject({ verdict: 'gave-up', classification: { state: 'pending', runId: 5 } })
+    const wait = reconcileCiWait(null, got.observations, { now: NOW, makeWakeToken: () => 'tok' })
+    expect(wait).toMatchObject({ state: 'pending', runId: 5, wakeToken: 'tok' })
+  })
+
+  it('a charged red whose sibling workflows all finished is exempt', async () => {
+    const done = run({ headSha: BRANCH, conclusion: 'success', databaseId: 5, workflowName: 'Pages' })
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), done] }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    expect(got.cache[BRANCH].state).toBe('failed')
+  })
+
+  it('an uncharged red beside a running workflow still blocks', async () => {
+    const running = run({ headSha: BRANCH, status: 'queued', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks('') })
+    expect(got.decision).toContain('RED')
+  })
+
+  // Fourth review 15.10.2026, P1: a red cached beside a running workflow keeps
+  // that fact; charged later, it is asked again instead of exempted from cache.
+  it('a red cached beside a running workflow is rechecked, not exempted, once charged', async () => {
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const first = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks('') })
+    expect(first.decision).toContain('RED')
+    expect(first.cache[BRANCH]).toMatchObject({ state: 'failed', settled: false })
+    const still = await sweep({ targets: [featTarget], cache: first.cache, runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks(tasks) })
+    expect(still.asked).toEqual([BRANCH])
+    expect(still.decision).toContain('NOT yet concluded')
+    expect(still.charged).toEqual([])
+    const done = { ...running, status: 'completed', conclusion: 'success' }
+    const finished = await sweep({ targets: [featTarget], cache: first.cache, runsBySha: { [BRANCH]: [...red(BRANCH), done] }, chargedRuns: fromTasks(tasks) })
+    expect(finished.decision).toBe(null)
+    expect(finished.cache[BRANCH]).toMatchObject({ state: 'failed', settled: true })
+  })
+
+  it('a report-only red cached beside a running workflow is rechecked once it gates', async () => {
+    const running = run({ headSha: BRANCH, status: 'queued', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const runsBySha = { [BRANCH]: [...red(BRANCH), running] }
+    const report = await sweep({ targets: [{ ...featTarget, disposition: 'report' }], runsBySha, chargedRuns: fromTasks(tasks) })
+    expect(report.decision).toBe(null)
+    expect(report.cache[BRANCH].settled).toBe(false)
+    const gating = await sweep({ targets: [featTarget], cache: report.cache, runsBySha, chargedRuns: fromTasks(tasks) })
+    expect(gating.asked).toEqual([BRANCH])
+    expect(gating.decision).toContain('NOT yet concluded')
+  })
+
+  it('an observer entry without runs, or with a running sibling, is not settled', () => {
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const classification = { state: 'failed', runId: Number(RUN) }
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    expect(observedShaEntry({ wait, classification, runIds: [RUN], observedAt: t(10) }).settled).toBe(false)
+    expect(observedShaEntry({ wait, classification, runIds: [RUN], runs: [...red(BRANCH), running], observedAt: t(10) }).settled).toBe(false)
+  })
+
+  // Fourth review 15.10.2026, P2: the observer renews its wait on the running
+  // sibling instead of finishing on the charged red or polling unrecorded.
+  it('the observer classifies a charged red beside a running workflow as that pending wait', () => {
+    const branch = 'feat/1342-natural-motion-b'
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const runs = [...red(BRANCH), running]
+    const got = observerClassification(runs, BRANCH, { branch, chargedRuns: fromTasks(tasks) })
+    expect(got).toMatchObject({ state: 'pending', runId: 5, workflowName: 'Pages' })
+    expect(observerClassification(runs, BRANCH, { branch, chargedRuns: fromTasks('') }).state).toBe('failed')
+    const done = [...red(BRANCH), { ...running, status: 'completed', conclusion: 'success' }]
+    expect(observerClassification(done, BRANCH, { branch, chargedRuns: fromTasks(tasks) })).toMatchObject({ state: 'failed', runId: Number(RUN) })
+    expect(observerClassification(runs, BRANCH, { branch: 'main', chargedRuns: () => new Set([RUN]) }).state).toBe('failed')
+
+    // The same pending classification goes through the ordinary renewal.
+    const target = { ref: featTarget.ref, sha: BRANCH }
+    const observe = (at) => ({ target, classification: got, firstSeenAt: t(300), observedAt: at })
+    const opened = renewCiWait(null, observe(t(60)), { now: t(60), makeWakeToken: () => 'tok' })
+    const renewed = renewCiWait(opened, observe(t(10)), { now: t(10), makeWakeToken: () => 'other' })
+    expect(renewed).toMatchObject({ state: 'pending', wakeToken: 'tok', lastObservationAt: t(10), runId: 5 })
+    expect(renewed.firstObservationAt).toBe(opened.firstObservationAt)
+  })
+
+  // Review 15.10.2026, P2: reported once per session, again in a new one.
+  it('a charged red is reported once per session and again in a new session', () => {
+    const c = [{ ref: featTarget.ref, sha: BRANCH, runId: RUN }]
+    const first = chargedReportsDue(undefined, 's1', c)
+    expect(first.due).toEqual(c)
+    const repeat = chargedReportsDue(first.next, 's1', c)
+    expect(repeat.due).toEqual([])
+    expect(chargedReportsDue(repeat.next, 's1', c).due).toEqual([])
+    const fresh = chargedReportsDue(repeat.next, 's2', c)
+    expect(fresh.due).toEqual(c)
+    expect(fresh.next).toEqual({ session: 's2', keys: [`${featTarget.ref}@${BRANCH}`] })
   })
 })

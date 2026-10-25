@@ -1,0 +1,80 @@
+{
+ "model": "GPT-6 Astra",
+ "entries": [
+  {
+   "id": "B1",
+   "file": "scripts/villager/pipeline.py; scripts/villager/penetration.py",
+   "defect": "Stale garment names break the full sheet command, while unkeyed intermediate caches and clip-only verification leave final-pose coverage uncertain and the stored motion gate has failures. Repair the verification baseline and sheet definitions, hash all intermediate inputs, and gate final composed poses and every garment layer before accepting animation changes."
+  },
+  {
+   "id": "B2",
+   "file": "src/render/villagerFigureBody.ts; scripts/villager/body.py",
+   "defect": "The 21-joint rig already supports basic natural movement, but its finger weights are collapsed and bakePose deletes the existing grip morphs. Keep the compact skeleton, preserve and drive hand morphs through the hang/merge path, add pointing hand shapes, and validate anatomical axes and weights before considering extra bones."
+  },
+  {
+   "id": "B3",
+   "file": "scripts/villager/clips.py; scripts/villager/sources.json",
+   "defect": "A slow walk blends directly into a heavily repaired sprint with very short, asymmetric contact windows, while starts, stops, turns and pickups have no clips. Curate a small CC0 clip set with a moderate run, support events and clean loop boundaries, pin every imported file and licence, and author missing actions offline."
+  },
+  {
+   "id": "B4",
+   "file": "src/scenes/place/gltfClipLayers.ts; src/scenes/place/skinnedFigure.tsx",
+   "defect": "The runtime discards locomotion trunk tracks and applies clip transforms after contact IK, so whole-body coordination and solved contacts can be lost. Replace competing writes with one ordered pose evaluator: base clip, masked/additive actions, gaze and balance, then final foot and hand corrections."
+  },
+  {
+   "id": "B5",
+   "file": "src/render/villagerClipPose.ts",
+   "defect": "Foot holds operate before final pose blending, only in horizontal coordinates, and deliberately replant when correction grows; measured sliding increases sharply in the gait blend. Use explicit contact windows and persistent world-space heel/ball/toe anchors with terrain height, bounded pelvis adjustment and final-pose IK, including starts, stops and transitions."
+  },
+  {
+   "id": "B6",
+   "file": "src/render/figureWalk.ts; src/scenes/place/PlaceLife.tsx",
+   "defect": "Turning is converted into fictitious forward distance and played through a forward gait, with no dedicated pivot or curved-step plan. Separate travel, facing and turn phase, use short support-aware turn steps at rest, and coordinate inside/outside strides and bounded body lean while moving."
+  },
+  {
+   "id": "B7",
+   "file": "src/render/gesture.ts; src/render/figureRig.ts",
+   "defect": "The pose interface has no independent gaze and concentrates turn/lean in the trunk; unsquashHead also overwrites the head quaternion. Add a bounded head/neck/chest look-at chain and distribute spine motion while preserving authored head orientation and load constraints."
+  },
+  {
+   "id": "B8",
+   "file": "scripts/villager/toolclips.py; src/scenes/place/adultWork.ts",
+   "defect": "Digging uses fixed offline hand targets and a 2.4-second clip while progress counts a separate 1.5-second cycle. Keep the authored stroke, stage its weight transfer and soil contact, correct both grips on each body, and use one action clock with explicit strike and recovery events."
+  },
+  {
+   "id": "B9",
+   "file": "src/scenes/place/adultWork.ts; src/scenes/place/PlaceLife.tsx",
+   "defect": "Pickup and load transfer lack a contact-timed animation, and filling compresses the whole figure before switching visibility from hand jar to head jar. Add reach-grasp-lift-place phases with a continuous prop transform and bone-driven squat/kneel motion that preserves limb lengths."
+  },
+  {
+   "id": "B10",
+   "file": "src/render/gesture.ts; src/scenes/place/skinnedFigure.tsx",
+   "defect": "Pointing and reaching inherit straight-arm primitive targets, fixed elbow poles and neutral wrists, which limits natural articulation. Use semantic world targets, authored preparation/hold/recovery poses, shoulder participation and final hand IK with action-specific wrist and finger shapes."
+  },
+  {
+   "id": "B11",
+   "file": "src/scenes/place/gltfClipLayers.ts; src/render/figureWalk.ts",
+   "defect": "Carrying largely reserves one arm while the remaining body follows its ordinary gait, and load grips are solved before later pose changes. Add light upper-body carry layers and restrained load-dependent balance/cadence adjustments, then solve the support hand against the final prop frame."
+  },
+  {
+   "id": "B12",
+   "file": "src/scenes/place/tagGame.ts; src/scenes/place/PlaceLife.tsx",
+   "defect": "The chaser holds both arms forward and starts its touch without a preparation fade, suppressing running arm swing and giving the reach an abrupt onset. Preserve the run, prepare one reaching arm as the quarry approaches, and blend a bounded target-aware reach through hit, miss and recovery."
+  },
+  {
+   "id": "B13",
+   "file": "src/scenes/place/tagGame.ts",
+   "defect": "The caught child is represented by a symmetric 0.48-radian trunk lean with hanging arms and no separately posed head. Author a short settling transition into a planted, subtly asymmetric dejected stance with lowered head, rounded upper back and relaxed shoulders."
+  },
+  {
+   "id": "B14",
+   "file": "src/scenes/place/placeFigure.tsx; src/App.tsx",
+   "defect": "The low preset uses a separate rigid-limb gait that cannot inherit the skinned improvements, so motion quality and contact behavior diverge across presets. Feed shared action/contact semantics into a cheap primitive adapter, preserve the existing TSL material path, and verify low/medium/high on both WebGPU and WebGL 2."
+  },
+  {
+   "id": "B15",
+   "file": "src/config/balance.ts; scripts/villager/toolclips.py",
+   "defect": "Important motion values remain scattered through Python and TypeScript, and repeated scene-graph IK work lacks an established final-pose performance budget. Consolidate calibratable values in balance.ts with explicit units, reuse pose buffers, and profile bounded solvers before adding complexity."
+  }
+ ]
+}

@@ -176,6 +176,15 @@ export function sessionScratchpad({ tmp = '/tmp', uid, projectDir = '', sessionI
 /** Remedy scripts that only CHECK; a standing-down session may still run them. */
 const STAND_DOWN_CHECK_SCRIPTS = ['guard-preflight.mjs', 'dashboard-guard.mjs', 'board-first-guard.mjs']
 
+/** `board.mjs vdzk-keep` only records a keep in the decision-card guard state,
+ *  never the board, and is that guard's non-owner remedy for a false term match. */
+function isVdzkKeepSegment(seg) {
+  if (!segmentInvokesScript(seg, ['board.mjs'])) return false
+  const words = (seg.words ?? []).map((w) => String(w.text).replace(/\\/g, '/'))
+  const at = words.findIndex((w) => w === 'board.mjs' || w.endsWith('/board.mjs'))
+  return at >= 0 && words[at + 1] === 'vdzk-keep'
+}
+
 /**
  * classifyCall for a session that does NOT own the batch. The gate's 'escape'
  * (board writes, board.mjs, focus, publish) is the OWNER's remedy, so here it
@@ -185,9 +194,13 @@ function standDownCall({ toolName, command, filePath }) {
   const call = classifyCall({ toolName, command, filePath })
   if (call.kind !== 'escape') return call
   if (!SHELL_TOOLS.has(String(toolName ?? ''))) return { kind: 'mutating', segment: '' }
-  for (const seg of parseSegments(command)) {
+  const segments = parseSegments(command)
+  // The keep is admitted only as a lone command with no redirection at all.
+  if (segments.some(isVdzkKeepSegment) && (segments.length !== 1 || (segments[0].redirects ?? []).length))
+    return { kind: 'mutating', segment: segments.find(isVdzkKeepSegment).raw }
+  for (const seg of segments) {
     if (!isEscapeSegment(seg)) continue
-    if (!segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || checkWritesFile(seg))
+    if (!(segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || isVdzkKeepSegment(seg)) || checkWritesFile(seg))
       return { kind: 'mutating', segment: seg.raw }
   }
   return { kind: 'read-only', segment: '' }
@@ -276,9 +289,10 @@ export function ownershipStandDownDecision({
         'reads remain available so you can inspect and report the state. The current owner continues the batch.\n' +
         `ONE WRITE PATH STAYS OPEN: your session scratchpad ${pad} — the Write tool with an absolute path there, ` +
         "or one `cd <scratchpad> && cat > <file> <<'EOF'` call; the repository stays refused.\n" +
-        'To hand the user\'s request or a finding to the owner, use the carrier, which needs no file: ' +
-        '`node scripts/finding.mjs --request "<title>" --stdin --session <this session id>` with the parts ' +
-        '`--- spec ---`, `--- why ---`, `--- quotes ---` … on stdin (or `--record "<title>" --detail "<…>"` for a finding).\n' +
+        'To hand the user\'s request or a finding to the owner, use the carrier: write the spec and why into ' +
+        'scratchpad files with the Write tool, then run ONE plain line ' +
+        '`node scripts/finding.mjs --request "<title>" --spec-file <spec path> --why-file <why path> --session <this session id> --approved "<user words>"` ' +
+        '(or `--record "<title>" --detail "<…>"` for a finding).\n' +
         'To request ownership through the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
     }
   } catch {

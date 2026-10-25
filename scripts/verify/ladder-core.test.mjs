@@ -320,7 +320,7 @@ describe('a narrow run answers only for the material it RAN', () => {
   // section is a block and a changed line sits in one — a run of a different
   // section cannot stand in for it. Edit the `adult-errands` block, run only
   // `town-plan`, and the full pass used to count as climbed although the edited
-  // material was never checked once (four-eyes review, GPT-6 Astra).
+  // material was never checked once (four-eyes review).
   const editedBlock = { path: 'scripts/verify/polish-villagers.mjs', editedAt: T0, sections: ['adult-errands'] }
 
   it('does not credit a green run of a DIFFERENT section', () => {
@@ -426,7 +426,7 @@ describe('every entrypoint answers to the ladder', () => {
   // same README as an ordinary command, and the way the LARGE run of 11.09.2026
   // was actually started — asked nothing at all. A mechanism absent from the
   // command the house uses is a mechanism that does not exist (four-eyes
-  // review, GPT-6 Astra).
+  // review).
   const source = (file) => readFileSync(join(import.meta.dirname, file), 'utf8')
 
   it('run-all.mjs asks it before it spawns a suite', () => {

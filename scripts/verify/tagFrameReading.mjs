@@ -183,3 +183,82 @@ export function describeReading(reading) {
     `gap=${Number(reading.gap ?? 0).toFixed(1)}m wall=${Number(reading.nearestWall ?? 0).toFixed(1)}m`
   )
 }
+
+// --- The chaser's arms inside the prepare window ------------------------------
+// Each window is a series of frames of one chase, read off the drawn hand
+// pivots in the chaser's own frame (+z forward). EVERY observed window judges
+// the readied hand (ahead, and held: swept by under half the free hand's
+// swing) AND its own free hand. A full swing needs most of a stride, so a
+// window of `longSpan` must show one; the smallest such swing is the reference
+// every readied hand is held to. A shorter window of `measureSpan` must still
+// show the free hand moving by `freeMove`: the least the minimum accepted
+// swing (`freeSweep`, peak to peak) covers in 0.3 s of a 0.8 s stride centred
+// on its turn, 0.06·(1 − cos(π·0.3/0.8)) ≈ 0.037 m. A window shorter still
+// cannot show a swing; it is counted as unmeasured, never as evidence.
+/** Body-frame metres and seconds; calibratable (the 0.8 s stride is assumed). */
+export const PREPARE_ARMS = { readiedAhead: 0.15, freeSweep: 0.12, longSpan: 0.6, measureSpan: 0.3, freeMove: 0.03 }
+const handZ = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right')).local.z
+export const armSweep = (series, side) => {
+  const z = series.map((r) => handZ(r, side))
+  return Math.max(...z) - Math.min(...z)
+}
+export const armMinZ = (series, side) => Math.min(...series.map((r) => handZ(r, side)))
+const fmtArm = (series, side) => `${side} sweep ${armSweep(series, side).toFixed(3)} min z ${armMinZ(series, side).toFixed(3)}`
+const otherSide = (side) => (side === 'left' ? 'right' : 'left')
+
+/** The verdict over every prepare window observed, in order: `{ ok, detail }`. */
+export function judgePrepareArms(windows) {
+  const seen = windows.filter((w) => w && w.length > 0)
+  const span = (w) => w.at(-1).clock - w[0].clock
+  const freeOf = (w) => armSweep(w, otherSide(w[0].side))
+  const longs = seen.filter((w) => span(w) >= PREPARE_ARMS.longSpan)
+  if (!longs.length) return { ok: false, detail: `no chasing stride inside the prepare window (${seen.length} short windows)` }
+  const long = longs.reduce((a, b) => (freeOf(b) < freeOf(a) ? b : a))
+  const side = long[0].side
+  const other = otherSide(side)
+  const free = freeOf(long)
+  const heldIn = (w) => armMinZ(w, w[0].side) > PREPARE_ARMS.readiedAhead && armSweep(w, w[0].side) < 0.5 * free
+  const swingsIn = (w) =>
+    span(w) >= PREPARE_ARMS.longSpan ? freeOf(w) > PREPARE_ARMS.freeSweep : freeOf(w) >= PREPARE_ARMS.freeMove
+  const bad = seen.find((w) => !heldIn(w))
+  const still = seen.find((w) => span(w) >= PREPARE_ARMS.measureSpan && !swingsIn(w))
+  const unmeasured = seen.filter((w) => span(w) < PREPARE_ARMS.measureSpan).length
+  const detail =
+    `readied ${fmtArm(long, side)}; free ${fmtArm(long, other)} from ${long[0].gap.toFixed(2)} m; ` +
+    `${seen.length} windows judged` +
+    (unmeasured ? `, ${unmeasured} too short to measure the free hand` : '') +
+    (bad ? `; NOT HELD in a window from ${bad[0].gap.toFixed(2)} m: ${fmtArm(bad, bad[0].side)}` : '') +
+    (still
+      ? `; FREE HAND STILL in a ${span(still).toFixed(2)} s window from ${still[0].gap.toFixed(2)} m: ` +
+        fmtArm(still, otherSide(still[0].side))
+      : '')
+  return { ok: !bad && !still, detail }
+}
+
+/**
+ * How each window of the chaser's arms is acquired. `far` is read over its
+ * span; a PREPARE window (`near`) is recorded to its actual end, so reaching
+ * the span it needs to judge a swing never ends the observation, and a snap
+ * late in the window is seen. `maxFrames` bounds a stalled loop: a window cut
+ * off there was not observed to its end and is never complete.
+ */
+export const ARM_ACQUISITION = {
+  far: { span: 0.5, untilEnd: false, maxFrames: 600 },
+  near: { span: PREPARE_ARMS.longSpan, untilEnd: true, maxFrames: 600 },
+}
+
+/**
+ * One frame of a window's acquisition: `acq` is `{ first, all, frames }`, `r`
+ * this frame's probe (null once out of the window). Returns null to keep
+ * recording, else the finished `{ all, complete }` — complete when the window
+ * ran its `span` and, `untilEnd`, was followed to its end. Self-contained: the
+ * page runs it by its source.
+ */
+export function recordArmFrame(acq, r, { span, untilEnd, maxFrames }) {
+  const ran = () => acq.all.at(-1).clock - acq.first.clock >= span
+  if (!r || r.side !== acq.first.side) return { all: acq.all, complete: ran() }
+  if (r.clock !== acq.all.at(-1).clock) acq.all.push(r)
+  if (!untilEnd && ran()) return { all: acq.all, complete: true }
+  if (++acq.frames > maxFrames) return { all: acq.all, complete: false }
+  return null
+}

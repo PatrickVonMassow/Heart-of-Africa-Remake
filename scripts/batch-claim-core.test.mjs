@@ -269,7 +269,7 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
   })
 
   it('THE LAUNCHER\'S OWN pending-spawn lock is NOBODY to wait for', () => {
-    // Four-eyes review (Fable 5, 30.07.2026), finding 1. Read as mere lock
+    // Four-eyes review (30.07.2026), finding 1. Read as mere lock
     // EXISTENCE, `ownerHolding` also matched the launcher's placeholder — and
     // that closed a loop out of the crash path: the launcher reaps the dead
     // owner and spawns, the successor's resume hook reads `ownerHolding` off the
@@ -829,7 +829,7 @@ describe('takeoverDecision — the launcher does not grab a lock that was freed 
   it('…and never claims a calibrated window equals two ticks when it does not', () => {
     // A false diagnosis line is worse than a short one: with the window cut to
     // ten minutes, "10 min = 2 launcher ticks" would be a lie in the one place a
-    // human looks first (four-eyes review, Fable 5, finding 1).
+    // human looks first (four-eyes review, finding 1).
     const d = takeoverDecision({
       claim: releasedTo({ releasedAt: NOW - 60_000 }),
       now: NOW,
@@ -867,7 +867,7 @@ describe('takeoverDecision — the launcher does not grab a lock that was freed 
       ['claimant-no-start-time', claimOf({ pidStartedAt: undefined })],
       // The two RELEASE-shaped degenerates: a hand-over that left a name but no
       // stamp, and one stamped in the future. Neither describes a window anybody
-      // can measure, so neither may hold the lock (four-eyes review, Fable 5,
+      // can measure, so neither may hold the lock (four-eyes review,
       // finding 3 — both were pinned one layer down but not at this verdict).
       ['released-without-a-stamp', claimOf({ releasedBy: OWNER })],
       ['released-in-the-future', claimOf({ releasedBy: OWNER, releasedAt: NOW + 60_000 })],

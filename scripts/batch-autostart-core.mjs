@@ -42,14 +42,15 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
+import { servingFallbackModelId } from './lane-switch-core.mjs'
+import { MAIN } from './model-lanes.mjs'
 import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
-/** Model policy (CLAUDE.md §6). rule:model-policy@2f245cec
- *  The session starts on OPUS_MODEL_ID (scripts/fable-switch-core.mjs). Its one CLI fallback is the next member of the
- *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
+/** Model policy (CLAUDE.md §6). rule:model-policy@740d83c2
+ *  The session starts on the main lane's model id (scripts/model-lanes.mjs). Its one CLI fallback is the next member of the
+ *  chain reported by scripts/lane-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
-export const SPAWN_MODEL = OPUS_MODEL_ID
+export const SPAWN_MODEL = MAIN.modelId
 
 /**
  * ONE TURN, SEVERAL CALLS (point 593) — the German rendering of the paragraph the
@@ -570,6 +571,31 @@ const CI_WAIT_VETO_TRIGGERS = new Set([
 ])
 
 /**
+ * The reservation a start places on the pending-spawn lock. PURE.
+ *
+ * Shared by the start decision and the launcher's takeover from a live owner,
+ * which starts on a refused decision and so has no reservation of its own.
+ * `requestedFence` is null when the fence has no safe successor generation.
+ */
+export function startReservation({ trigger = null, spawnToken = '', lock = null, fenceState = null, now = Date.now() } = {}) {
+  const durableFence = Number.isSafeInteger(fenceState?.fence) && fenceState.fence >= 0 ? fenceState.fence : 0
+  const lockFence = Number.isSafeInteger(lock?.fence) && lock.fence >= 0 ? lock.fence : 0
+  const observedFence = Math.max(durableFence, lockFence)
+  return {
+    spawnToken,
+    sourceGeneration: Number.isSafeInteger(trigger?.generation) ? trigger.generation : null,
+    sourceSpawnToken: typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken ? trigger.predecessorToken : null,
+    wakeToken: typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null,
+    trigger: trigger && typeof trigger.kind === 'string' ? trigger.kind : '',
+    // This is a PROPOSAL, captured with the start decision rather than
+    // recomputed after the exclusive lock create. The serialized fence door
+    // refuses it if another grant advances the durable mark in between.
+    requestedFence: observedFence < Number.MAX_SAFE_INTEGER ? observedFence + 1 : null,
+    requestedAt: now,
+  }
+}
+
+/**
  * THE ONE SUCCESSOR-START DECISION. PURE.
  *
  * Callers gather policy state and process evidence, then every event comes
@@ -595,16 +621,8 @@ export function successorStartDecision({
   probePid = () => null,
   now = Date.now(),
 } = {}) {
-  const kind = trigger && typeof trigger.kind === 'string' ? trigger.kind : ''
-  const sourceGeneration = Number.isSafeInteger(trigger?.generation) ? trigger.generation : null
-  const sourceSpawnToken = typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken
-    ? trigger.predecessorToken
-    : null
-  const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
-  const durableFence = Number.isSafeInteger(fenceState?.fence) && fenceState.fence >= 0 ? fenceState.fence : 0
-  const lockFence = Number.isSafeInteger(lock?.fence) && lock.fence >= 0 ? lock.fence : 0
-  const observedFence = Math.max(durableFence, lockFence)
-  const requestedFence = observedFence < Number.MAX_SAFE_INTEGER ? observedFence + 1 : null
+  const reservation = startReservation({ trigger, spawnToken, lock, fenceState, now })
+  const { trigger: kind, sourceGeneration, sourceSpawnToken, wakeToken, requestedFence } = reservation
   const ciWaitDeadline = Number.isFinite(ciWait?.deadline) ? ciWait.deadline : null
   const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
     ? new Date(ciWaitDeadline).toISOString()
@@ -735,18 +753,7 @@ export function successorStartDecision({
     code: 'start',
     reason: ownership.reason,
     evidence,
-    reservation: {
-      spawnToken,
-      sourceGeneration,
-      sourceSpawnToken,
-      wakeToken,
-      trigger: kind,
-      // This is a PROPOSAL, captured with the start decision rather than
-      // recomputed after the exclusive lock create. The serialized fence door
-      // refuses it if another grant advances the durable mark in between.
-      requestedFence,
-      requestedAt: now,
-    },
+    reservation,
   }
 }
 
@@ -1488,7 +1495,7 @@ export function announceSpawn({ quota = null } = {}) {
  * which took the whole spawn with it and made the first failure permanent: the pid
  * file is only written after a spawn that never happened. Measured 12.08.2026 —
  * the top-up had not run once since the container came up, and the allowance for
- * api.openai.com aged out twice under it.
+ * the cross vendor's API host aged out twice under it.
  *
  * A LIVE PID IS NOT PROOF OF OUR CHILD either: after pid reuse an unrelated
  * long-lived process would suppress the top-up for as long as IT lives. So the

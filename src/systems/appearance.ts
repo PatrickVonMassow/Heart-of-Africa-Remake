@@ -50,6 +50,7 @@ export type LayerForm =
   | 'waistBeads'
   | 'limbRings'
   | 'bodyPaint' // a colour on the skin itself (ochre, camwood, red clay)
+  | 'babySling' // an infant carried on the back in the mantle
 
 export type DressMaterial =
   | 'hide'
@@ -70,7 +71,7 @@ export type DressPattern = 'plain' | 'bands' | 'stripes' | 'checks' | 'mottle' |
 
 export type DressWear =
   | 'waist'
-  | 'chest'
+  | 'chest' // a wrap from the chest; a cape, cloak or bead collar tied closed over the breast
   | 'bothShoulders'
   | 'leftShoulder'
   | 'rightShoulder'
@@ -111,6 +112,7 @@ const C = {
   barkPale: '#a88a62',
   barkRed: '#8a3a26', // camwood- or paint-reddened bark
   cotton: '#e6e1d3',
+  muslin: '#f3f0e8', // the finer white cloth a Mande king is set apart by (Park 1799)
   indigo: '#26355c',
   darkBlue: '#2b3550',
   black: '#211d1a',
@@ -168,6 +170,11 @@ function people(cells: {
 
 const NO_CHILD_RECORD = 'no period record of children’s dress (§8.3)'
 
+/** The rule of §8.6: a child always wears a hip layer — the adults' hip
+ *  garment of its people, scaled down; the waist beads stay as ornament. */
+const childHip = (form: LayerForm, material: DressMaterial, colour: string, pattern: DressPattern = 'plain', colour2: string | null = null) =>
+  layer('hip', form, material, colour, 'waist', G('a child always wears a hip layer: the adults’ own garment, scaled down (§8.6)'), pattern, colour2)
+
 // ---- the table --------------------------------------------------------------
 
 /** The everyday dress of every people in the game (src/world/geo.ts). */
@@ -190,7 +197,8 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
       youth: [
         layer('hip', 'skirtShort', 'beads', C.beadWhite, 'waist', S('§8.3 Zulu'), 'beadwork', C.beadBlue),
-        layer('ornament', 'neckBeads', 'beads', C.beadWhite, 'neck', S('§8.3 Zulu'), 'beadwork', C.beadRed),
+        // the bead strings built into a deep collar over the breast (§8.6)
+        layer('ornament', 'neckBeads', 'beads', C.beadWhite, 'chest', S('§8.6 Zulu'), 'beadwork', C.beadRed),
         layer('ornament', 'waistBeads', 'beads', C.beadRed, 'waist', S('§8.3 Zulu'), 'beadwork', C.beadWhite),
       ],
       adult: [
@@ -211,10 +219,14 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
     },
     female: {
       child: [layer('hip', 'loinFlap', 'hide', C.hide, 'waist', G(NO_CHILD_RECORD))],
-      youth: [layer('hip', 'apron', 'hide', C.hide, 'waist', S('§7.3 Pedi'))],
+      // Merensky's "eine Art ledernen Fracks", tied over the breast (§8.6)
+      youth: [
+        layer('hip', 'apron', 'hide', C.hide, 'waist', S('§7.3 Pedi')),
+        layer('shoulder', 'cape', 'hide', C.hideDark, 'chest', S('§8.6 Pedi')),
+      ],
       adult: [
         layer('hip', 'apron', 'hide', C.hide, 'waist', S('§7.3 Pedi')),
-        layer('shoulder', 'cape', 'hide', C.hideDark, 'bothShoulders', S('§7.3 Pedi')),
+        layer('shoulder', 'cape', 'hide', C.hideDark, 'chest', S('§8.6 Pedi')),
       ],
     },
   }),
@@ -232,68 +244,84 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
     },
     female: {
       child: [layer('hip', 'loinFlap', 'hide', C.hide, 'waist', G('Passarge: often not even a cloak (§7.3); the flap is a guess'))],
+      // Passarge: the women's Ledermantel, often larger, knotted under the
+      // chin over both shoulders — worn so the year round (§8.6)
       youth: [
         layer('hip', 'apron', 'hide', C.hide, 'waist', G('women’s apron form not described (§8.3)')),
-        layer('shoulder', 'cloak', 'hide', C.hideDark, 'rightShoulder', S('§7.3 San')),
+        layer('shoulder', 'cloak', 'hide', C.hideDark, 'chest', S('§8.6 San')),
       ],
       adult: [
         layer('hip', 'apron', 'hide', C.hide, 'waist', G('women’s apron form not described (§8.3)')),
-        layer('shoulder', 'cloak', 'hide', C.hideDark, 'rightShoulder', S('§7.3 San')),
+        layer('shoulder', 'cloak', 'hide', C.hideDark, 'chest', S('§8.6 San')),
       ],
     },
   }),
   wayeyi: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'hide', C.hide), childBeads(NO_CHILD_RECORD)],
       youth: [layer('hip', 'loinFlap', 'hide', C.hide, 'waist', S('§7.3 Wayeyi'))],
       adult: [layer('hip', 'loinFlap', 'hide', C.hide, 'waist', S('§7.3 Wayeyi'))],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
-      youth: [layer('hip', 'apron', 'hide', C.hide, 'waist', S('§7.3 Wayeyi'))],
-      adult: [layer('hip', 'apron', 'hide', C.hide, 'waist', S('§7.3 Wayeyi'))],
+      child: [childHip('apron', 'hide', C.hide), childBeads(NO_CHILD_RECORD)],
+      // Andersson's light goat-skin caross, tied over the breast (§8.6)
+      youth: [
+        layer('hip', 'apron', 'hide', C.hide, 'waist', S('§7.3 Wayeyi')),
+        layer('shoulder', 'cape', 'hide', '#8a7355', 'chest', S('§8.6 Wayeyi')),
+      ],
+      adult: [
+        layer('hip', 'apron', 'hide', C.hide, 'waist', S('§7.3 Wayeyi')),
+        layer('shoulder', 'cape', 'hide', '#8a7355', 'chest', S('§8.6 Wayeyi')),
+      ],
     },
   }),
   bemba: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'barkCloth', C.barkRed, 'mottle', C.bark), childBeads(NO_CHILD_RECORD)],
       youth: [layer('hip', 'skirtKnee', 'barkCloth', C.barkRed, 'waist', S('§7.3 Bemba'), 'mottle', C.bark)],
       adult: [layer('hip', 'skirtKnee', 'barkCloth', C.barkRed, 'waist', S('§7.3 Bemba'), 'mottle', C.bark)],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
-      youth: [layer('hip', 'wrapLong', 'barkCloth', C.barkRed, 'waist', S('§7.3 Bemba'), 'mottle', C.bark)],
-      adult: [layer('hip', 'wrapLong', 'barkCloth', C.barkRed, 'waist', S('§7.3 Bemba'), 'mottle', C.bark)],
+      // the buchushi apron: the girl's hip layer
+      child: [childHip('apron', 'barkCloth', C.barkRed, 'mottle', C.bark), childBeads(NO_CHILD_RECORD)],
+      // the camwood-red bark cloth, worn from the chest (§8.6)
+      youth: [layer('hip', 'wrapLong', 'barkCloth', C.barkRed, 'chest', S('§8.6 Bemba'), 'mottle', C.bark)],
+      adult: [layer('hip', 'wrapLong', 'barkCloth', C.barkRed, 'chest', S('§8.6 Bemba'), 'mottle', C.bark)],
     },
   }),
   lunda: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('apron', 'fur', C.fur, 'mottle', C.furSpot), childBeads(NO_CHILD_RECORD)],
       youth: [layer('hip', 'apron', 'fur', C.fur, 'waist', S('§7.3 Lunda'), 'mottle', C.furSpot)],
       adult: [layer('hip', 'apron', 'fur', C.fur, 'waist', S('§7.3 Lunda'), 'mottle', C.furSpot)],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'hide', C.hide), childBeads(NO_CHILD_RECORD)],
       youth: [
         layer('hip', 'loinFlap', 'hide', C.hide, 'waist', G('women’s everyday garment not described (§8.3)')),
+        layer('torso', 'breastCloth', 'cotton', C.cotton, 'chest', G('Arnot 1889: calico reaches commoners by the yard (§7.3 Lunda); worn over the breast by the rule of §8.6, never a kaross')),
         layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', S('§7.3 Lunda')),
       ],
       adult: [
         layer('hip', 'loinFlap', 'hide', C.hide, 'waist', G('women’s everyday garment not described (§8.3)')),
+        layer('torso', 'breastCloth', 'cotton', C.cotton, 'chest', G('Arnot 1889: calico reaches commoners by the yard (§7.3 Lunda); worn over the breast by the rule of §8.6, never a kaross')),
         layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', S('§7.3 Lunda')),
       ],
     },
   }),
   bambundu: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'cotton', 'cloth'), childBeads(NO_CHILD_RECORD)],
       youth: [layer('hip', 'loinFlap', 'cotton', 'cloth', 'waist', G('Monteiro gives only "nearly naked" (§7.3)'))],
       adult: [layer('hip', 'loinFlap', 'cotton', 'cloth', 'waist', G('Monteiro gives only "nearly naked" (§7.3)'))],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
-      youth: [layer('hip', 'skirtShort', 'cotton', 'cloth', 'waist', G('Monteiro gives only "nearly naked" (§7.3)'))],
-      adult: [layer('hip', 'skirtKnee', 'cotton', 'cloth', 'waist', G('Monteiro gives only "nearly naked" (§7.3)'))],
+      child: [childHip('skirtShort', 'cotton', 'cloth'), childBeads(NO_CHILD_RECORD)],
+      youth: [
+        layer('hip', 'skirtShort', 'cotton', 'cloth', 'waist', G('Monteiro gives only "nearly naked" (§7.3)')),
+        layer('torso', 'breastCloth', 'cotton', 'cloth', 'chest', G('Monteiro gives only "nearly naked" (§7.3); the cloth over the breast by the rule of §8.6')),
+      ],
+      adult: [layer('hip', 'wrapLong', 'cotton', 'cloth', 'chest', G('Monteiro gives only "nearly naked" (§7.3); the cloth over the breast by the rule of §8.6'))],
     },
   }),
   maasai: people({
@@ -311,6 +339,7 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       child: [layer('hip', 'loinFlap', 'hide', C.hide, 'waist', G('pre-initiation dress needs a passage (Astra B31, §8.3)'))],
       youth: [
         layer('hip', 'skirtKnee', 'hide', C.hide, 'waist', G('girls’ garment not described (§8.3)')),
+        layer('shoulder', 'cape', 'hide', C.hide, 'chest', G('girls’ garment not described; a hide over the breast, the women’s material (§8.6)')),
         layer('ornament', 'limbRings', 'metal', C.brass, 'limbs', S('§2.1')),
       ],
       adult: [
@@ -373,13 +402,16 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
   }),
   sidama: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'hide', C.hide), childBeads(NO_CHILD_RECORD)],
       youth: [layer('torso', 'toga', 'cotton', C.cream, 'leftShoulder', G('no source on Sidama dress c.1890; never the Amhara shamma (§7.1)'))],
       adult: [layer('torso', 'toga', 'cotton', C.cream, 'leftShoulder', G('no source on Sidama dress c.1890; never the Amhara shamma (§7.1)'))],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
-      youth: [layer('hip', 'skirtKnee', 'hide', C.hide, 'waist', G('no source on Sidama dress c.1890 (§7.1)'))],
+      child: [childHip('skirtShort', 'hide', C.hide), childBeads(NO_CHILD_RECORD)],
+      youth: [
+        layer('hip', 'skirtKnee', 'hide', C.hide, 'waist', G('no source on Sidama dress c.1890 (§7.1)')),
+        layer('torso', 'breastCloth', 'hide', C.hideDark, 'chest', G('no source on Sidama dress c.1890; a hide over the breast by the rule of §8.6')),
+      ],
       adult: [layer('hip', 'wrapLong', 'hide', C.hide, 'chest', G('no source on Sidama dress c.1890 (§7.1)'))],
     },
   }),
@@ -445,7 +477,10 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
     },
     female: {
       child: [layer('hip', 'skirtShort', 'hide', C.hideDark, 'waist', S('§8.3 Nubians'))],
-      youth: [layer('hip', 'skirtShort', 'hide', C.hideDark, 'waist', S('§8.3 Nubians'))],
+      youth: [
+        layer('hip', 'skirtShort', 'hide', C.hideDark, 'waist', S('§8.3 Nubians')),
+        layer('torso', 'breastCloth', 'cotton', C.darkBlue, 'chest', G('the women’s dark cotton over the breast, by the rule of §8.6')),
+      ],
       adult: [
         layer('torso', 'robe', 'cotton', C.darkBlue, 'chest', G('no 1890 eyewitness of village women (§7.2)')),
         layer('shoulder', 'hood', 'cotton', C.black, 'overHead', G('no 1890 eyewitness of village women (§7.2)')),
@@ -467,14 +502,14 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
     },
     female: {
-      child: [childBeads('one universal age rule unsupported (Astra B19)')],
+      child: [childHip('skirtShort', 'cotton', C.indigo), childBeads('one universal age rule unsupported (Astra B19)')],
       youth: [layer('hip', 'wrapLong', 'cotton', C.indigo, 'chest', S('§7.2 Hausa'))],
       adult: [layer('hip', 'wrapLong', 'cotton', C.indigo, 'chest', S('§7.2 Hausa'))],
     },
   }),
   bambara: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'cotton', 'cloth'), childBeads(NO_CHILD_RECORD)],
       youth: [
         layer('hip', 'trousers', 'cotton', C.cotton, 'waist', S('§7.2 Bambara')),
         layer('torso', 'shirt', 'cotton', C.indigo, 'chest', S('§7.2 Bambara')),
@@ -487,7 +522,7 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('skirtShort', 'cotton', 'cloth'), childBeads(NO_CHILD_RECORD)],
       youth: [
         layer('hip', 'wrapLong', 'cotton', 'cloth', 'waist', S('§7.2 Bambara')),
         layer('torso', 'breastCloth', 'cotton', C.cotton, 'chest', S('§7.2 Bambara')),
@@ -500,7 +535,7 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
   }),
   mandinka: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'cotton', 'cloth'), childBeads(NO_CHILD_RECORD)],
       youth: [
         layer('hip', 'trousers', 'cotton', C.cotton, 'waist', S('§7.2 Mandinka')),
         layer('torso', 'shirt', 'cotton', C.cotton, 'chest', S('§7.2 Mandinka')),
@@ -513,7 +548,7 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('skirtShort', 'cotton', 'cloth'), childBeads(NO_CHILD_RECORD)],
       youth: [
         layer('hip', 'wrapLong', 'cotton', 'cloth', 'waist', S('§7.2 Mandinka')),
         layer('torso', 'breastCloth', 'cotton', C.cotton, 'chest', S('§7.2 Mandinka')),
@@ -528,7 +563,7 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
   }),
   fang: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'barkCloth', C.barkPale, 'mottle', C.bark), childBeads(NO_CHILD_RECORD)],
       youth: [
         layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', S('§7.4 Fang'), 'mottle', C.bark),
         layer('hip', 'apron', 'fur', C.fur, 'waist', S('§7.4 Fang'), 'mottle', C.furSpot),
@@ -539,14 +574,24 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
-      youth: [layer('hip', 'loinFlap', 'barkCloth', C.red, 'waist', S('§7.4 Fang'))],
-      adult: [layer('hip', 'loinFlap', 'barkCloth', C.red, 'waist', S('§7.4 Fang'))],
+      child: [childHip('loinFlap', 'barkCloth', C.red), childBeads(NO_CHILD_RECORD)],
+      // the red-dyed "Fan cloth", a second strip worn over the breast (§8.6)
+      youth: [
+        layer('hip', 'loinFlap', 'barkCloth', C.red, 'waist', S('§7.4 Fang')),
+        layer('torso', 'breastCloth', 'barkCloth', C.red, 'chest', S('§8.6 Fang'), 'mottle', C.barkRed),
+      ],
+      adult: [
+        layer('hip', 'loinFlap', 'barkCloth', C.red, 'waist', S('§7.4 Fang')),
+        layer('torso', 'breastCloth', 'barkCloth', C.red, 'chest', S('§8.6 Fang'), 'mottle', C.barkRed),
+      ],
     },
   }),
   mongo: people({
     male: {
-      child: [layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', G('camwood on children assumed from the adults (§7.4)'))],
+      child: [
+        childHip('loinFlap', 'raffia', C.raffia, 'stripes', C.barkPale),
+        layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', G('camwood on children assumed from the adults (§7.4)')),
+      ],
       youth: [
         layer('hip', 'loinFlap', 'raffia', C.raffia, 'waist', S('§7.4 Mongo'), 'stripes', C.barkPale),
         layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', S('§7.4 Mongo')),
@@ -557,22 +602,25 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
     },
     female: {
-      child: [layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', G('camwood on children assumed from the adults (§7.4)'))],
+      child: [
+        childHip('loinFlap', 'raffia', C.raffia, 'stripes', C.barkPale),
+        layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', G('camwood on children assumed from the adults (§7.4)')),
+      ],
       youth: [
         layer('hip', 'loinFlap', 'leaves', C.leaves, 'waist', S('§7.4 Mongo')),
         layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', S('§7.4 Mongo')),
-        layer('ornament', 'neckBeads', 'beads', C.beadBlue, 'neck', S('§7.4 Mongo'), 'beadwork', C.beadWhite),
+        layer('ornament', 'neckBeads', 'beads', C.beadBlue, 'chest', S('§8.6 Mongo'), 'beadwork', C.beadWhite),
       ],
       adult: [
         layer('hip', 'loinFlap', 'leaves', C.leaves, 'waist', S('§7.4 Mongo')),
         layer('ornament', 'bodyPaint', 'pigment', C.ochre, 'skin', S('§7.4 Mongo')),
-        layer('ornament', 'neckBeads', 'beads', C.beadBlue, 'neck', S('§7.4 Mongo'), 'beadwork', C.beadWhite),
+        layer('ornament', 'neckBeads', 'beads', C.beadBlue, 'chest', S('§8.6 Mongo'), 'beadwork', C.beadWhite),
       ],
     },
   }),
   mbuti: people({
     male: {
-      child: [childBeads(NO_CHILD_RECORD)],
+      child: [childHip('loinFlap', 'barkCloth', C.barkPale, 'mottle', C.bark), childBeads(NO_CHILD_RECORD)],
       youth: [layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', S('§7.4 Mbuti'), 'mottle', C.bark)],
       adult: [
         layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', S('§7.4 Mbuti'), 'mottle', C.bark),
@@ -580,14 +628,20 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
     },
     female: {
-      child: [childBeads(NO_CHILD_RECORD)],
-      youth: [layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('women’s dress not described (§7.4)'), 'mottle', C.bark)],
-      adult: [layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('women’s dress not described (§7.4)'), 'mottle', C.bark)],
+      child: [childHip('loinFlap', 'barkCloth', C.barkPale, 'mottle', C.bark), childBeads(NO_CHILD_RECORD)],
+      youth: [
+        layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('women’s dress not described (§7.4)'), 'mottle', C.bark),
+        layer('shoulder', 'cape', 'barkCloth', C.bark, 'chest', G('women’s dress not described (§7.4); the bark cloth as a shoulder cape over the breast (§8.6)'), 'mottle', C.barkPale),
+      ],
+      adult: [
+        layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('women’s dress not described (§7.4)'), 'mottle', C.bark),
+        layer('shoulder', 'cape', 'barkCloth', C.bark, 'chest', G('women’s dress not described (§7.4); the bark cloth as a shoulder cape over the breast (§8.6)'), 'mottle', C.barkPale),
+      ],
     },
   }),
   banda: people({
     male: {
-      child: [childBeads('no period description of Banda dress at all (§7.4)')],
+      child: [childHip('loinFlap', 'barkCloth', C.barkPale, 'mottle', C.bark), childBeads('no period description of Banda dress at all (§7.4)')],
       youth: [layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('proxy: the Banziri, not Banda (§7.4)'), 'mottle', C.bark)],
       adult: [
         layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('proxy: the Banziri, not Banda (§7.4)'), 'mottle', C.bark),
@@ -595,10 +649,14 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
       ],
     },
     female: {
-      child: [childBeads('no period description of Banda dress at all (§7.4)')],
-      youth: [layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('proxy: the Banziri, not Banda (§7.4)'), 'mottle', C.bark)],
+      child: [childHip('loinFlap', 'barkCloth', C.barkPale, 'mottle', C.bark), childBeads('no period description of Banda dress at all (§7.4)')],
+      youth: [
+        layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('proxy: the Banziri, not Banda (§7.4)'), 'mottle', C.bark),
+        layer('torso', 'breastCloth', 'barkCloth', C.barkPale, 'chest', G('proxy: the Banziri bark pagne (§7.4), a second piece over the breast by the rule of §8.6'), 'mottle', C.bark),
+      ],
       adult: [
         layer('hip', 'loinFlap', 'barkCloth', C.barkPale, 'waist', G('proxy: the Banziri, not Banda (§7.4)'), 'mottle', C.bark),
+        layer('torso', 'breastCloth', 'barkCloth', C.barkPale, 'chest', G('proxy: the Banziri bark pagne (§7.4), a second piece over the breast by the rule of §8.6'), 'mottle', C.bark),
         layer('head', 'headband', 'beads', C.beadWhite, 'aroundHead', G('proxy: the Banziri hair beads (§7.4)'), 'beadwork', C.beadRed),
       ],
     },
@@ -619,6 +677,65 @@ const NO_PEOPLE: PeopleDress = people({
   },
 })
 
+/**
+ * The non-villager cast drawn on the same body (work-order "Giza figures and
+ * traveller"): the plateau's people and the expedition leader. Keyed like a
+ * people and passed as the figure look's `peopleId`; the hats are props on the
+ * head (the garment set holds no brimmed hat). Sources: docs/giza-1890.md §4.1;
+ * every colour is a calibratable guess, 'cloth' the figure's own colour.
+ */
+const GIZA = (why: string) => S(`giza-1890 §4.1: ${why}`)
+const CAST_GUESS = (why: string) => G(`giza-1890 §4.1 records no ${why}`)
+const galabiya = layer('torso', 'robe', 'cotton', 'cloth', 'chest', GIZA('the galabiya'))
+const suitCoat = layer('torso', 'shirt', 'wool', 'cloth', 'chest', GIZA('the suit coat, drawn knee-long'))
+const suitTrousers = layer('hip', 'trousers', 'wool', 'cloth', 'waist', GIZA('the suit'))
+const longGown = layer('torso', 'robe', 'wool', 'cloth', 'chest', GIZA('the long skirt and bodice as one gown'))
+export const CAST_DRESS: Record<'egyptian' | 'bedouin' | 'european', PeopleDress> = {
+  egyptian: people({
+    male: {
+      child: [{ ...galabiya }],
+      youth: [{ ...galabiya }, layer('head', 'cap', 'cotton', C.cotton, 'crown', GIZA("the boy's skullcap"))],
+      adult: [{ ...galabiya }, layer('head', 'turban', 'cotton', C.cotton, 'aroundHead', GIZA('the turban'))],
+    },
+    female: {
+      child: [{ ...galabiya }],
+      youth: [layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau'))],
+      adult: [
+        layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau')),
+        layer('shoulder', 'hood', 'cotton', C.black, 'overHead', CAST_GUESS('local women at the plateau')),
+      ],
+    },
+  }),
+  bedouin: people({
+    male: {
+      child: [{ ...galabiya }],
+      youth: [{ ...galabiya }, layer('shoulder', 'hood', 'cotton', C.cotton, 'overHead', GIZA('the head cloth'))],
+      adult: [{ ...galabiya }, layer('shoulder', 'hood', 'cotton', C.cotton, 'overHead', GIZA('the head cloth'))],
+    },
+    female: {
+      child: [{ ...galabiya }],
+      youth: [layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('Bedouin women at the plateau'))],
+      adult: [
+        layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('Bedouin women at the plateau')),
+        layer('shoulder', 'hood', 'cotton', C.black, 'overHead', CAST_GUESS('Bedouin women at the plateau')),
+      ],
+    },
+  }),
+  european: people({
+    male: {
+      child: [{ ...suitCoat }, { ...suitTrousers }],
+      youth: [{ ...suitCoat }, { ...suitTrousers }],
+      adult: [{ ...suitCoat }, { ...suitTrousers }],
+    },
+    female: {
+      child: [{ ...longGown }],
+      youth: [{ ...longGown }],
+      adult: [{ ...longGown }],
+    },
+  }),
+}
+export type CastId = keyof typeof CAST_DRESS
+
 // ---- the query --------------------------------------------------------------
 
 export interface AppearanceQuery {
@@ -636,6 +753,19 @@ export interface AppearanceQuery {
   palette: readonly string[]
   /** A stable per-figure number in [0, 1) for the choices a share decides. */
   pick: number
+  /** An office the figure holds: the village chief wears its dress. */
+  office?: 'chief'
+}
+
+/**
+ * The chief's dress of office, by people: the torso garment that replaces the
+ * everyday one. Only the Mande peoples carry a record — the boubou of finer
+ * cloth (Park 1799: blue Timbuktu cotton or white muslin; the Bamana boubou of
+ * Segou, Soleillet). Every other chief wears his people's dress at the rank cloth.
+ */
+const CHIEF_ROBE: Record<string, DressLayer> = {
+  bambara: layer('torso', 'robe', 'cotton', C.muslin, 'chest', G('dress research 17.10.2026, summaries only: Park 1799 finer cloth, the Bamana boubou of Segou (Soleillet)')),
+  mandinka: layer('torso', 'robe', 'cotton', C.muslin, 'chest', G('the Mande record of the Bambara chief (Park 1799)')),
 }
 
 /** The Zulu blanket share for a year (VILLAGER_DRESS, calibratable). */
@@ -645,7 +775,27 @@ export function zuluBlanketShare(year: number): number {
   return z.share + (z.shareTo - z.share) * t
 }
 
+/** The peoples whose record carries an infant in the women's mantle:
+ *  Passarge's San (§7.3 San, §8.6). */
+const BABY_SLING_PEOPLES = new Set(['san'])
+
 const bySlot = (a: DressLayer, b: DressLayer) => LAYER_SLOTS.indexOf(a.slot) - LAYER_SLOTS.indexOf(b.slot)
+
+/**
+ * The open outer garment rule (design.md §19.15): a cape or cloak not tied
+ * closed over the breast hangs open, and an inner top under it — a torso
+ * garment, or a hip wrap worn from the chest — would show through the opening
+ * against the outer cloth. The everyday dress never combines the two; the
+ * seasonal two-shoulder wrap is the recorded exemption, its inner top left to
+ * the garment cover mask (render/villagerGarmentMask.ts).
+ */
+export const isOpenOuter = (l: DressLayer): boolean => l.slot === 'shoulder' && (l.form === 'cape' || l.form === 'cloak') && l.wear !== 'chest'
+export const isRevealableTop = (l: DressLayer): boolean => l.slot === 'torso' || (l.slot === 'hip' && l.wear === 'chest')
+/** The everyday dress with the rule enforced: under an open outer garment the
+ *  revealable inner tops are left off. */
+export function withOpenOuterRule(layers: DressLayer[]): DressLayer[] {
+  return layers.some(isOpenOuter) ? layers.filter((l) => !isRevealableTop(l)) : layers
+}
 
 /**
  * The ordered dress layers this figure wears today: the people's everyday
@@ -656,8 +806,13 @@ const bySlot = (a: DressLayer, b: DressLayer) => LAYER_SLOTS.indexOf(a.slot) - L
  * The 'cloth' colour token is resolved to the figure's own cloth.
  */
 export function appearanceFor(q: AppearanceQuery): DressLayer[] {
-  const table = (q.peopleId && PEOPLE_DRESS[q.peopleId]) || NO_PEOPLE
+  const table = (q.peopleId && (PEOPLE_DRESS[q.peopleId] ?? CAST_DRESS[q.peopleId as CastId])) || NO_PEOPLE
   let layers = table[q.sex][q.age].map((l) => ({ ...l }))
+
+  // OFFICE: the chief's boubou replaces the everyday torso garment.
+  // OPEN: no record of a chief's dress of office for the non-Mande peoples.
+  const robe = q.office === 'chief' && q.peopleId ? CHIEF_ROBE[q.peopleId] : undefined
+  if (robe) layers = [...layers.filter((l) => l.slot !== 'torso'), { ...robe }]
 
   // YEAR: a Baganda man of rank takes the white cotton kanzu (VILLAGER_DRESS).
   const rank = wearsByRank(q.cloth, q.palette)
@@ -665,6 +820,10 @@ export function appearanceFor(q: AppearanceQuery): DressLayer[] {
     layers = layers.filter((l) => l.slot !== 'torso')
     layers.push(layer('torso', 'robe', 'cotton', C.cotton, 'chest', G('cotton for the rank from the protectorate, §2.5 / VILLAGER_DRESS')))
   }
+
+  // OUTFIT RULE: no revealable inner top under an everyday open outer garment.
+  // Applied before the season, so the seasonal wrap is its masked exemption.
+  layers = withOpenOuterRule(layers)
 
   // SEASON: the wrap the record supports, from dress.ts.
   const seasonal = q.peopleId ? seasonalDressFor(q.peopleId, q.drivers) : null
@@ -695,12 +854,22 @@ export function appearanceFor(q: AppearanceQuery): DressLayer[] {
       colour = raised.colour
       material = raised.material
     }
+    // A mantle tied over the breast stays tied in the cold (§8.6).
+    const closed = layers.some((l) => replaces(l) && l.wear === 'chest')
     layers = layers.filter((l) => !replaces(l))
     layers.push(
       seasonal.wear === 'head'
         ? layer('shoulder', 'hood', material, colour, 'overHead', source)
-        : layer('shoulder', 'cloak', material, colour, 'bothShoulders', source),
+        : layer('shoulder', 'cloak', material, colour, closed ? 'chest' : 'bothShoulders', source),
     )
+  }
+
+  // An infant carried in the mantle, for a share of the adult women whose
+  // record says so (VILLAGER_DRESS.babySlingShare, calibratable). Keyed on a
+  // second draw from `pick`, so it does not follow the blanket share.
+  const mantle = layers.find((l) => l.slot === 'shoulder' && l.form === 'cloak' && l.wear === 'chest')
+  if (q.peopleId && BABY_SLING_PEOPLES.has(q.peopleId) && q.sex === 'female' && q.age === 'adult' && mantle && (q.pick * 7.31) % 1 < VILLAGER_DRESS.babySlingShare) {
+    layers.push(layer('shoulder', 'babySling', mantle.material, mantle.colour, 'bothShoulders', S('§8.6 San')))
   }
 
   for (const l of layers) if (l.colour === 'cloth') l.colour = q.cloth

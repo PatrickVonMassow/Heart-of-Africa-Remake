@@ -90,7 +90,7 @@ const NON_TRANSIENT_PATTERNS = [
  *
  * The HTTP forms demand a status-ish context ("API Error: 500", "status 503",
  * "HTTP 429"), never a bare number, because a bare number in a stack trace is
- * not a status code. `Overloaded` is Anthropic's 529 by another name and
+ * not a status code. `Overloaded` is the main runtime's 529 by another name and
  * normalises to it, so the outage detector sees the two spellings as ONE
  * signature — which matters, since the same outage can print either.
  *

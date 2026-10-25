@@ -98,6 +98,23 @@ export function cardStats(bodyHtml) {
   }
 }
 
+/**
+ * A body split into the sections it is judged by: a card with the
+ * description/status divider is measured per section (each is read on its
+ * own), the heading and placeholder lines not counted; any other body whole.
+ */
+export function cardSections(bodyHtml) {
+  // The derived "Verteilung" paragraphs are never the author's words, divider or not.
+  const body = String(bodyHtml ?? '').replace(/<p class="(?:dist-head|dist)">[\s\S]*?<\/p>/g, ' ')
+  const at = body.indexOf('<hr class="split">')
+  if (at < 0) return [{ label: '', html: body }]
+  const drop = (html) => html.replace(/<p class="(?:status-head|desc-missing)">[\s\S]*?<\/p>/g, ' ')
+  return [
+    { label: 'description: ', html: drop(body.slice(0, at)) },
+    { label: '', html: drop(body.slice(at)) },
+  ]
+}
+
 /** The one card this guard does not judge: the machine's own derived state card. */
 function isDerivedStateCard(card) {
   return card?.kind === 'derived'
@@ -123,15 +140,17 @@ export function concisenessOffenders(html, options = {}) {
     // from becoming the "Text-Tapete" this guard exists to prevent; the budgets
     // below stay in force for every card a session writes by hand.
     if (isDerivedStateCard(card)) continue
-    const { words, paragraphs, techTokens } = cardStats(card.bodyHtml)
     const reasons = []
-    if (words > WORD_BUDGET) reasons.push(`${words} words (budget ${WORD_BUDGET}) — too verbose`)
-    if (techTokens > TECH_TOKEN_BUDGET)
-      reasons.push(
-        `${techTokens} technical tokens (code spans/commit hashes/file paths/§-refs; budget ${TECH_TOKEN_BUDGET}) — reads like a changelog`,
-      )
-    if (words > SINGLE_PARAGRAPH_WORD_BUDGET && paragraphs <= 1)
-      reasons.push(`one long unbroken paragraph (${words} words) — split into paragraphs`)
+    for (const { label, html } of cardSections(card.bodyHtml)) {
+      const { words, paragraphs, techTokens } = cardStats(html)
+      if (words > WORD_BUDGET) reasons.push(`${label}${words} words (budget ${WORD_BUDGET}) — too verbose`)
+      if (techTokens > TECH_TOKEN_BUDGET)
+        reasons.push(
+          `${label}${techTokens} technical tokens (code spans/commit hashes/file paths/§-refs; budget ${TECH_TOKEN_BUDGET}) — reads like a changelog`,
+        )
+      if (words > SINGLE_PARAGRAPH_WORD_BUDGET && paragraphs <= 1)
+        reasons.push(`${label}one long unbroken paragraph (${words} words) — split into paragraphs`)
+    }
     if (reasons.length) offenders.push({ where: card.where, point: card.point, reason: reasons.join('; ') })
   }
   return offenders
