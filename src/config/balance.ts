@@ -2642,6 +2642,43 @@ export const VILLAGER_MOTION = {
 } as const
 
 /**
+ * The village task walker's head load taken down and put back BY HAND
+ * (src/scenes/place/taskWalkerLoad.ts): seconds of each step of its stop and
+ * where the load stands while it works. Every value is a CALIBRATABLE educated
+ * guess, read off no picture yet.
+ */
+export const TASK_LOAD_HANDLING = {
+  /** Standing at the target, both hands go up and grip the load on the head. */
+  takeSeconds: 0.45,
+  /** The load brought down to the ground while the walker kneels down. */
+  lowerSeconds: 1.4,
+  /** The hands let go of the set-down load (and of the load back on the head). */
+  releaseSeconds: 0.35,
+  /** Before rising, the hands go down to the load on the ground and grip it. */
+  gripSeconds: 0.45,
+  /** The load lifted onto the head while the walker rises (never shorter than the kneel). */
+  liftSeconds: 1.4,
+  /** Where the load stands while the walker works, in its own frame (m):
+   *  `side` to its left (+x), `forward` in front of its knees. */
+  ground: { side: 0.32, forward: 0.34 },
+  /** The palms' gap off the load's side (m). */
+  gripClearance: 0.03,
+  /** How much faster the load moves out from the body than down, so the
+   *  path clears the shoulder instead of cutting through it. */
+  outFirst: 1.6,
+  /** The share of the way down (and up) over which the load passes from where
+   *  it rests into the moving hands, so a grip or release never pulls it
+   *  toward hands that stand still. */
+  handOver: 0.15,
+  /** The trunk's lean (rad) toward a load at the ground. */
+  groundLean: 0.4,
+  /** How fast each hand's aim corrects the gap between where it was aimed and
+   *  where it was drawn (1/s), and the largest correction (m). */
+  aimCorrectRate: 6,
+  aimCorrectMax: 0.35,
+} as const
+
+/**
  * The villager's glTF body as the asset pipeline builds it (work-order "glTF
  * villager body"; scripts/villager/build.mjs reads this block). BUILD-time values:
  * a change takes effect when the pipeline is re-run and the .glb committed.

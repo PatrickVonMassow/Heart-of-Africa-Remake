@@ -5881,6 +5881,125 @@ if (section('village-walk')) {
     }
   }
 
+  // The head load in the hands (work-order "the task walker takes its head
+  // load off with its hands"): caught going down with the load between head
+  // and ground, kneeling with it standing on the ground, and rising with it
+  // between ground and head again — visible in every caught frame. The
+  // timeline and the grip are pinned in src/scenes/place/taskWalkerLoad.test.ts.
+  const loadPhase = (phase) => stepUntil((phase) => {
+    const g = window.__placeScene.getObjectByName('village-task-walker')
+    const load = g?.getObjectByName('task-walker-load')
+    const k = g?.getObjectByName('inhabitant')?.userData.walk?.kneel
+    if (!g?.visible || !load || typeof k !== 'number') return false
+    const prev = window.__loadPhaseKneel ?? k
+    window.__loadPhaseKneel = k
+    const V = g.position.constructor
+    g.updateWorldMatrix(true, true)
+    const h = load.getWorldPosition(new V()).y - g.position.y
+    const head = g.getObjectByName('figure-head').getWorldPosition(new V()).y - g.position.y
+    let shown = true
+    for (let o = load; o; o = o.parent) if (!o.visible) shown = false
+    if (!shown) return false
+    // caught by the load's own travel: the kneel (0.6 s) ends long before the
+    // lowering (1.4 s) has brought the load clear of the head
+    const prevH = window.__loadPhaseH ?? h
+    window.__loadPhaseH = h
+    const between = h > 0.2 && h < head - 0.3
+    if (phase === 'down') return k > 0.2 && h < prevH - 1e-4 && between
+    if (phase === 'ground') return k > 0.97 && h < 0.08
+    return k < prev && h > prevH + 1e-4 && between
+  }, phase, phase === 'down' ? 9000 : 2400)
+  // Gripping from either side, in the load's own horizontal frame: each palm
+  // reaches out to a face (at least 0.6 of the half-extent from the centre on
+  // that axis, and that axis is its nearest face within 0.15), and the two faces
+  // are opposite. The box clamp alone reads zero gaps for palms collapsed into
+  // the middle or both on one face.
+  const opposingGrip = (palms, half) => {
+    const reach = palms.map(([x, z]) => [x / half[0], z / half[1]])
+    const k = [0, 1].find((a) => {
+      const [p, q] = reach.map((r) => r[a])
+      return Math.sign(p) !== Math.sign(q) && reach.every((r) => Math.abs(r[a]) >= 0.6 && Math.abs(r[a]) >= Math.abs(r[1 - a]) - 0.15)
+    })
+    return { reach: reach.map((r) => r.map((v) => +v.toFixed(2))), ok: k !== undefined }
+  }
+  for (const [what, palms, half, want] of [
+    ['two palms on one face', [[0.5, -0.4], [0.5, 0.4]], [0.5, 0.5], false],
+    ['two palms on one long face of a narrow load', [[0.2, -0.4], [0.2, 0.4]], [0.2, 0.5], false],
+    ["two palms collapsed into the load's middle", [[0.05, 0], [-0.05, 0]], [0.5, 0.5], false],
+    ['two palms on one side of the centre', [[0.05, 0.05], [0.5, 0.5]], [0.5, 0.5], false],
+    ['two palms on opposite faces', [[-0.5, 0.05], [0.5, -0.05]], [0.5, 0.5], true],
+    ['two palms on opposite short faces of a narrow load', [[0.02, -0.5], [-0.02, 0.5]], [0.2, 0.5], true],
+  ]) check(`head load: the grip check ${want ? 'accepts' : 'rejects'} ${what}`, opposingGrip(palms, half).ok === want, '')
+  for (const [phase, name, label] of [
+    ['down', '1432-village-load-set-down', 'the task walker kneeling down, its head load held in both hands on the way from its head to the ground'],
+    ['ground', '1432-village-load-on-ground', 'the task walker kneeling at its work, its head load standing on the ground beside it'],
+    ['up', '1432-village-load-pick-up', 'the task walker rising, its head load lifted in both hands on the way from the ground to its head'],
+  ]) {
+    const caught = await loadPhase(phase)
+    check(`head load: the task walker was caught ${phase === 'down' ? 'setting its load down' : phase === 'ground' ? 'kneeling with its load on the ground' : 'picking its load up'}, the load visible`, caught, '')
+    if (!caught) continue
+    await freezeLife(true)
+    try {
+      if (phase !== 'ground') {
+        // the drawn palms on the load, measured on the rig rather than the plan
+        const gaps = await page.evaluate(() => {
+          const g = window.__placeScene.getObjectByName('village-task-walker')
+          const load = g.getObjectByName('task-walker-load')
+          const V = g.position.constructor
+          g.updateWorldMatrix(true, true)
+          const lo = new V(Infinity, Infinity, Infinity)
+          const hi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(o.matrixWorld)
+              lo.min(c)
+              hi.max(c)
+            }
+          })
+          const palms = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n).getWorldPosition(new V()))
+          // the load's box in its own frame, the palms relative to its centre
+          const toLoad = load.matrixWorld.clone().invert()
+          const llo = new V(Infinity, Infinity, Infinity)
+          const lhi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            const m = toLoad.clone().multiply(o.matrixWorld)
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(m)
+              llo.min(c)
+              lhi.max(c)
+            }
+          })
+          const mid = new V().addVectors(llo, lhi).multiplyScalar(0.5)
+          return {
+            gaps: palms.map((p) => +new V().copy(p).clamp(lo, hi).distanceTo(p).toFixed(3)),
+            local: palms.map((p) => {
+              const q = p.clone().applyMatrix4(toLoad).sub(mid)
+              return [q.x, q.z]
+            }),
+            half: [(lhi.x - llo.x) / 2, (lhi.z - llo.z) / 2],
+          }
+        })
+        const grip = opposingGrip(gaps.local, gaps.half)
+        check(`head load (${phase}): both drawn hands are on the load (gaps ${gaps.gaps.join(', ')} m ≤ 0.1)`, gaps.gaps.every((d) => d <= 0.1), '')
+        check(`head load (${phase}): the hands hold it on opposite faces (reach per half-extent ${JSON.stringify(grip.reach)})`, grip.ok, '')
+      }
+      const at = await page.evaluate(() => {
+        const g = window.__placeScene.getObjectByName('village-task-walker')
+        return { x: g.position.x, z: g.position.z }
+      })
+      const seen = await sideOn(null, 2.6, -0.16)
+      check(`head load (${phase}): the camera found a free spot side-on to the task walker`, !!seen, seen ? '' : JSON.stringify(sideOnMisses))
+      if (seen) await frame(shot(name), { local: { x: at.x, y: 0.5, z: at.z }, label })
+    } finally {
+      await freezeLife(false)
+    }
+  }
+
   // THE LOW PRESET keeps the primitive figure, and items 1 and 5 hold for it
   // too: feet (the cone's base) on the ground, kneeling folded, never squashed
   // or popped, and up again before the first step.

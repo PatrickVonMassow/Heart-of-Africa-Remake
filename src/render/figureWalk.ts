@@ -602,6 +602,13 @@ export function primitiveLayout(k: number, legs: boolean, L: { hipY: number; arm
   }
 }
 
+/** The primitive's hip pivot under a trunk lean: the cone's base rim tips by
+ *  `radius·|sin lean|` below the hip, so a kneeling (low) hip rises by what the
+ *  rim would cut into the ground; a standing hip is already clear. */
+export function leanedHipY(hipY: number, radius: number, lean: number): number {
+  return Math.max(hipY, radius * Math.abs(Math.sin(lean)))
+}
+
 /** True when a pose leaves this arm hanging at rest — no contact to reach, so
  *  it is free to swing with the walk (or to steady a head load). */
 export function armAtRest(a: { pitch: number; yaw: number; roll: number }, rest: { pitch: number; yaw: number; roll: number }): boolean {
