@@ -1958,10 +1958,15 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /^the order at the stand can be photographed: a sender still there and a carrier already going\b/i,
     detailMatch: /^no order in 180 s/i,
+    detailReadsPrefix: true,
     why:
       'MEASURED 18.10.2026 on main f698cd920, webgpu full polish-villagers: the moment-catcher point 642 '
       + 'names as its fourth case found no order inside its 180 s window (charged before on 24.09.2026, '
-      + 'struck after one green pass). The charge dies with point 642.',
+      + 'struck after one green pass). AND IT READS THE FRONT OF A MEASUREMENT THE RECORD CUT '
+      + '(detailReadsPrefix): the detail is cut at the 200-character bound inside the phase list '
+      + '(25.10.2026, feat/1333 a2ed3ff3d webgpu, uncharged as cut), and what the bound removes is the '
+      + 'tail of the phase list and the carrier distance; the signature "no order in 180 s" sits at '
+      + 'the front, clear of the bound. The charge dies with point 642.',
   },
   {
     point: 1448,
