@@ -17,6 +17,7 @@ import {
   ALLOWED_TOP_DIRS,
   ALLOWED_ROOT_FILES,
 } from './commit-scope-guard-core.mjs'
+import { trailerFor } from './model-lanes.mjs'
 
 const KB = 1024
 
@@ -121,7 +122,7 @@ describe('evaluateCommitMessage', () => {
   it('leaves an ordinary commit message alone', () => {
     const v = evaluateCommitMessage(
       'Hold the freed lock for the window it was freed for\n\n' +
-        'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n',
+        `Co-Authored-By: ${trailerFor('main')}\n`,
     )
     expect(v.block).toBe(false)
     expect(v.findings).toEqual([])
@@ -139,7 +140,7 @@ describe('evaluateCommitMessage', () => {
   it('accepts a rescue that carries the marker in its subject', () => {
     const v = evaluateCommitMessage(
       `Keep the interrupted gait work [skip ci]\n\n${RESCUE_BODY}\n\n` +
-        'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n',
+        `Co-Authored-By: ${trailerFor('main')}\n`,
     )
     expect(v.block).toBe(false)
   })

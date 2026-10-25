@@ -96,6 +96,16 @@ describe('assessBranchHygiene — what never blocks', () => {
     expect(r.block).toBe(false)
   })
 
+  it('a doctor rescue branch is never debris, even once merged — it holds work-order bytes to inspect', () => {
+    const r = assessBranchHygiene(
+      base({
+        localMerged: [{ name: 'rescue/doctor-2026-10-21T11-15-21-622Z-4242', tipAt: OLD }],
+        remoteMerged: [{ name: 'origin/rescue/doctor-2026-10-21T11-15-21-622Z-4242', tipAt: OLD }],
+      }),
+    )
+    expect(r.block).toBe(false)
+  })
+
   it('main itself never blocks, local or remote', () => {
     const r = assessBranchHygiene(
       base({ localMerged: [{ name: 'main', tipAt: OLD }], remoteMerged: [{ name: 'origin/main', tipAt: OLD }] }),

@@ -137,7 +137,10 @@ describe('adult errand progress release', () => {
     // The order is spoken first and obeyed a moment later (work-order 1184), so
     // the budget covers the hold between the two.
     const ticks = 4 + Math.ceil(instructionDelay('RIVER', SHIPPED_VOCABULARY) / 0.25)
-    for (let tick = 0; tick < ticks && f.state.tasks[f.carrier]!.phase !== 'fetch'; tick++) f.step()
+    for (let tick = 0; tick < ticks && f.state.tasks[f.carrier]!.phase !== 'take'; tick++) f.step()
+    // He steps up to the table and takes the empty jar up (work-order 1405).
+    f.atGoal(f.carrier)
+    for (let tick = 0; tick < 40 && f.state.tasks[f.carrier]!.phase !== 'fetch'; tick++) f.step()
     f.atGoal(f.carrier)
     while (f.state.tasks[f.carrier]!.situation !== 'water-back') f.step()
     for (let elapsed = 0; elapsed < cfg.stallSeconds; elapsed += 0.25) f.step()

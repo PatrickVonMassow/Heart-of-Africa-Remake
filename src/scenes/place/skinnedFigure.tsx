@@ -285,8 +285,9 @@ const _rv = new THREE.Vector3()
 const _rn = new THREE.Vector3()
 const _rf = new THREE.Vector3()
 
-/** What the figure measured of its own walk, and its transitions in progress. */
+type ArmAngles = { pitch: number; yaw: number; roll: number }
 
+/** What the figure measured of its own walk, and its transitions in progress. */
 export function SkinnedFigure({
   look,
   cloth,
@@ -376,6 +377,12 @@ export function SkinnedFigure({
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const virtualHands = useRef<Array<THREE.Object3D | null>>([])
+  // A pose reach just given up (work-order 1405): the arm stays solved at its
+  // last reach while the clips take it back, so the release never snaps.
+  const releasing = useRef<[number | null, number | null]>([null, null])
+  const lastReach = useRef<[number | null, number | null]>([null, null])
+  // the pose's arm angles on the reach's last frame: a later change is a new gesture
+  const releasedAt = useRef<[ArmAngles | null, ArmAngles | null]>([null, null])
   const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
@@ -461,10 +468,21 @@ export function SkinnedFigure({
       // A pose that names a hand reach for the side takes that arm whatever its
       // angle (the tag chaser's readied arm from its first frame on, so the
       // clip lets go of it while the arm comes up).
+      const reachOfPose = (i: number) => (i === 0 ? extras?.reach?.left : extras?.reach?.right)
+      for (const i of [0, 1] as const) {
+        const k = reachOfPose(i)
+        const v = arms.current[i]
+        if (k !== undefined) {
+          releasing.current[i] = null
+          releasedAt.current[i] = v ? { pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z } : null
+        } else if (lastReach.current[i] !== null && gltf && clips) releasing.current[i] = lastReach.current[i]
+        lastReach.current[i] = k ?? null
+      }
+      const reachFor = (i: number) => reachOfPose(i) ?? releasing.current[i] ?? undefined
       const contactArm = [0, 1].map((i) => {
         const v = arms.current[i]
         if (!pose || !v || !virtualHands.current[i]) return false
-        if ((i === 0 ? extras?.reach?.left : extras?.reach?.right) !== undefined) return true
+        if (reachFor(i) !== undefined) return true
         const rest = REST_POSE_ARMS[i]
         return !armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, rest)
       })
@@ -524,7 +542,7 @@ export function SkinnedFigure({
       // k of the primitive arm out from its shoulder (the quarry's surface),
       // blended over k 1 … 1.15 so the reach never jumps.
       const handTarget = (s: 'L' | 'R', i: number, vh: THREE.Object3D, out: THREE.Vector3) => {
-        const k = i === 0 ? extras?.reach?.left : extras?.reach?.right
+        const k = reachFor(i)
         const pivot = arms.current[i]
         if (k === undefined || !pivot) return loc(vh, out)
         loc(pivot, _rv)
@@ -627,8 +645,18 @@ export function SkinnedFigure({
       if (gltf && clips) {
         const free = ([0, 1] as const).map((i) => {
           const v = arms.current[i]
+          // a releasing arm is the clips' again while its solve fades out
+          if (releasing.current[i] !== null && reachOfPose(i) === undefined) return i !== steadyArm
           return !contactArm[i] && i !== steadyArm && (!v || armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, REST_POSE_ARMS[i]))
         }) as [boolean, boolean]
+        // The release ends at the steadying hand, or once the clips hold the
+        // arm whole and the pose has moved it since (a new gesture, or rest).
+        for (const i of [0, 1] as const) {
+          const v = arms.current[i]
+          const at = releasedAt.current[i]
+          const moved = !v || !at || Math.max(Math.abs(v.rotation.x - at.pitch), Math.abs(v.rotation.y - at.yaw), Math.abs(v.rotation.z - at.roll)) > 1e-3
+          if (i === steadyArm || (clips.arms[i] >= 1 && moved)) releasing.current[i] = null
+        }
         applyClipLayers(gltf.asset, gltf.person, gb, clips, m, free)
         takeTrunkBase(gb, trunkBase)
         digShare = clips.dig
@@ -700,6 +728,8 @@ export function SkinnedFigure({
       }
       // THE HANDS ON THE FINAL BODY: each contact and the steadying hand.
       let steadyShown = 0
+      // how much of each solved hand the clips drew over (the prop anchor follows it)
+      const clipShown = [0, 0]
       ;(['L', 'R'] as const).forEach((s, i) => {
         const up = b[`upperArm.${s}`]
         const fore = b[`forearm.${s}`]
@@ -748,7 +778,7 @@ export function SkinnedFigure({
           // lunge) holds the arm straight toward it rather than dropping to the
           // unsolved fallback, so the hand runs on through k = 1 (the lean
           // search above still sees the full target)
-          if ((i === 0 ? extras?.reach?.left : extras?.reach?.right) !== undefined) {
+          if (reachFor(i) !== undefined) {
             loc(up, _s)
             if (_t.distanceTo(_s) > r) _t.sub(_s).setLength(r).add(_s)
           }
@@ -758,6 +788,7 @@ export function SkinnedFigure({
         // while the clips still own part of the arm (taken or given back), the
         // solve blends with what they left, never a snap
         const share = gltf && clips ? Math.max(clips.dig, clips.arms[i]) : 0
+        if (done) clipShown[i] = share
         if (done && share > 0) {
           up.quaternion.slerp(armBase[i][0], share)
           fore.quaternion.slerp(armBase[i][1], share)
@@ -795,6 +826,9 @@ export function SkinnedFigure({
         if (contactArm[i] && vh && anchor.parent) {
           const parentQ = anchor.parent.getWorldQuaternion(new THREE.Quaternion()).invert()
           anchor.quaternion.copy(parentQ.multiply(vh.getWorldQuaternion(new THREE.Quaternion())))
+          // as much the bone's as the clips drew the hand (a reach given back or
+          // taken anew), so neither end of the hand-over swings what hangs there
+          if (clipShown[i] > 0) anchor.quaternion.slerp(_q.identity(), clipShown[i])
         } else anchor.quaternion.identity()
         anchor.updateWorldMatrix(false, true)
       })

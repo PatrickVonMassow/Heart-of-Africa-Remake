@@ -1,0 +1,5 @@
+BLIND-PARALLEL ANALYSIS HALF for work-order point 1407 (repo /workspace/hoa, read-only). Material below: the point text, the doctor log of the incident, and the restore commit.
+Analyse the code paths (scripts/finding.mjs, scripts/findings-core.mjs, scripts/findings-request-core.mjs, scripts/batch-doctor.mjs, scripts/batch-doctor-core.mjs incl. quarantineStash and planRemediation, the session-start hook and scripts/land-point.mjs post-merge gate) and produce ONE complete list of entries, each a root cause, a required change, a failure mode or a test case needed to reach the four FINAL STATE items reliably. Name concrete functions/files. Include edge cases (worktree vs main tree, unpushed commits, carrier entries queued before this change, archive moves, renumbered points, other protected files that hold user content, stash sweep classification).
+OUTPUT FORMAT, strictly one entry per line, nothing else:
+<ID> | <file> | <one line: what is wrong or what must be done, and why>
+Use IDs prefixed with your letter given below, numbered from 1.

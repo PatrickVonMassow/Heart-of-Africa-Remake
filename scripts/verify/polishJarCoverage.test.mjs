@@ -62,7 +62,7 @@ describe('the jar assertion once its subject is created rather than hoped for', 
     // Digging used to ride inside the jar assertion and inherited its water
     // coverage, so a window with too few round trips turned a real animation
     // regression into NOT-COVERING — and the DIG utterance beside it cannot see
-    // an animation at all (GPT-6 Astra, cross-vendor round).
+    // an animation at all (cross-vendor round).
     const { failures, out } = observe({ dug: 0, trips: 0 })
     expect(failures).toBe(1)
     expect(failedChecks(out).map((c) => c.name)).toEqual([DIG])
@@ -88,7 +88,7 @@ describe('the jar assertion once its subject is created rather than hoped for', 
   it('withholds a POSITIVE reading below the minimum too', () => {
     // The below-minimum case above carries a failing reading, so a regression
     // that only suppressed REDS while still emitting a green for a positive
-    // reading under the minimum would have passed it (GPT-6 Astra, cross-vendor
+    // reading under the minimum would have passed it (cross-vendor
     // round). An undercovered pass is the more dangerous half: it is the twelve
     // green climbs of 09.09.2026 in miniature.
     const { out, notCovering } = observe({ trips: 0, dug: 9, carriedEmpty: 9, carriedFull: 9 })

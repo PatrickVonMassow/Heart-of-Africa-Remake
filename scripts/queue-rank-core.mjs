@@ -340,7 +340,7 @@ function pointList(open) {
  *
  * The first two cuts of this gate inferred "this point was appended" from where
  * it stands: the last point (and the ascending run before it) was taken to be
- * the append default. The cross-vendor review (GPT-5.6 Sol, 10.08.2026) refuted
+ * the append default. The cross-vendor review (10.08.2026) refuted
  * that twice over, and both refutations are decisive rather than cosmetic:
  *   - CLOSING a point makes its predecessor last. Open `[9, 5, 4]` with 4 ranked
  *     becomes `[9, 5]` when 4 lands, and 5 — which has stood there all along —

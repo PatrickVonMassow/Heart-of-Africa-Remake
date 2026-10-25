@@ -59,7 +59,7 @@ ticked before the gate existed owe nothing.
 
 ### Answered, not merely recorded
 
-Measured 30.07.2026: a delegated agent spawned its Fable-5 reviewer in the
+Measured 30.07.2026: a delegated agent spawned its the scarce lane reviewer in the
 background and then stopped. The review landed in the parent session minutes
 later with verdict `do-not-merge` and two blockers — one of which would have
 reddened main's unit gate the moment the branch merged. **The branch looked

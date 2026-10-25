@@ -9,6 +9,10 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-10-23 polish-children WebGL 2 — the 1239 check "a caught child was photographed standing slumped clear of the run" missed its window once in a full branch run of feat/1424 (86a68f5c1, log 2026-10-23T09-47-34-993; caught moments mostly "crowded"), green in the branch's section run (10-39-36-506) and on main (10-30-21-518, 10-51-21-476). Same chaotic class as the meeting count in 1424's commit; watch at the next LARGE.
+- 2026-10-23 polish-children WebGL 2 on main ac714e5cf — "the children are photographed from a standpoint in the open" red (2 of 5 in the clear, maasai-village), owned by no point (log 2026-10-23T10-51-21-476); WebGL-2-only, waits for the next LARGE.
+- 2026-10-23 cloud probe — `parseMarker` in `scripts/cloud-switch.mjs` reads only `hostname: <h>`; the probe of 23.10. wrote `hostname vm` and read NOT PASSED until recorded by hand. Accept both forms when the switch is next touched.
+- 2026-10-23 model guard — `model-handoff-core.mjs` sets `verifiedThrough` to the commit's own second while `findForbiddenCommits` skips only `c.when < sinceMs`, so a verified commit stays a hit and the handoff answers 'no advanceable timestamp' (199be6e; baseline advanced by hand in 657b243bd). Fix: compare `<=` or add 1000 ms; adjust model-handoff-core.test.mjs:41.
 - 2026-10-06 pre-push gate — the unit gate for 124d7b9 (TASKS split only) went red while a Blender fit loaded the host, without naming the failing file or test; the superset run on f8cb1ab was green (588 files / 17299 tests) and the next gated push passed. Suspected load-sensitive unit test; the gate should print the failing test names.
 - 2026-10-01 parked work-order point 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits — parked by point 1258 while the loom is
   switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
@@ -2137,7 +2141,7 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 
 - Board cannot record an Erledigt card after land-point settled the now-card away (03.10.2026, point 1276): `dashboard-guard --synced` refused [erledigt-missing] while `board.mjs done/now/promote` all refused because the point stood nowhere on the board. Workaround that worked: `board.mjs queue <next>`, `board.mjs closing <point> --title …`, then `board.mjs done <point> --next <next> …`.
 
-- CI terminal handoff treats a cancelled run as RED (04.10.2026): run 37211729457 on `feat/1284-detailed-animal-models` was cancelled after the merge deleted the branch, yet `ciTerminalPrompt` (`scripts/batch-autostart-core.mjs:821`) sent the successor a RED repair handoff; `ci-status-guard` exit 0 and main `f9b38f395` green. Cost: one session start; a cancelled run on a gone ref should count as superseded. Recurred 05.10.2026: main run 37227313531 (7429c3a0c, fast(2) cancelled by concurrency) handed a RED repair path 42 green main commits later. Recurred 10.10.2026: main run 38065924507 (1c2aa395b, both unit shards cancelled by concurrency when 6f1aedcd6 was pushed) handed a RED repair path; 6f1aedcd6 CI 38066589448 green.
+- CI terminal handoff treats a cancelled run as RED (04.10.2026): run 37211729457 on `feat/1284-detailed-animal-models` was cancelled after the merge deleted the branch, yet `ciTerminalPrompt` (`scripts/batch-autostart-core.mjs:821`) sent the successor a RED repair handoff; `ci-status-guard` exit 0 and main `f9b38f395` green. Cost: one session start; a cancelled run on a gone ref should count as superseded. Recurred 05.10.2026: main run 37227313531 (7429c3a0c, fast(2) cancelled by concurrency) handed a RED repair path 42 green main commits later. Recurred 10.10.2026: main run 38065924507 (1c2aa395b, both unit shards cancelled by concurrency when 6f1aedcd6 was pushed) handed a RED repair path; 6f1aedcd6 CI 38066589448 green. Recurred 22.10.2026: main run 39824992059 (4b3a2ff82, fast(2) unit cancelled by concurrency when 32a8cd653 was pushed) handed a RED repair path; 32a8cd653 CI 39826680255 green.
 
 - No rain streaks in the WebGL 2 rain-shelter frame (04.10.2026, point 1275): `collision --section=fish-shelter-rain` at 5ec8101ab draws rain streaks over the Bambara fishers' cook-shelter on WebGPU, while the WebGL 2 frame of the same section (1 FPS) shows none, although it is raining and the fire's rain checks pass. Cause open: frame timing at 1 FPS, or place rain not drawn on WebGL 2; a WebGL 2 rain frame taken after a wait will tell.
 
@@ -2171,7 +2175,50 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 - Tag chaser chest gaze jumps at the bearing wrap (19.10.2026, point 1384 author): `chestYaw * bearing` in `src/scenes/place/tagGame.ts` still jumps by chestYaw·2π when the quarry crosses straight behind the chaser; 1384 unwrapped only the readied arm (`holdBearing`). Unmeasured on screen.
 - Board cards fall back to the English work-order final-state sentence (board-core.mjs pointDescription fallback) although a German body stands in .claude/board-queue.json, and the closing status repeats the card subject (findings carrier 19.10.2026 22:50; proposal a-c awaits the user approval in the chat session).
 - Hint toast sits inside the status bar on the victory frame (20.10.2026, flow on WebGPU): `verification/07-victory.png` shows the swim hint toast at y≈16 over the location text "Norden · …", while `04-chief-hut-meeting.png` places its toast below the bar (y≈70). Seen only under the victory veil; becomes a point once an in-play frame shows the overlap.
-- Launcher-daemon HANGING-send test times out under full unit load (20.10.2026, point 1345 unit run): `scripts/batch-launcher-daemon.test.mjs` "a HANGING send loses to its budget" hit its 30 s timeout once in the full `test:unit` (1 of 17872) and passes alone in 1.2 s. Load-sensitive wall-clock wait; a point once it reddens a second gate (fake timers or a load-independent budget).
 - WebGL 2 walker frame passed with an orange slab across the walker (20.10.2026, point 1330): `verification/1295-village-walker-mid-stride-webgl2.png` (11:21) shows a near-lens orange slab over the walker's torso and arms, yet the side-on free-spot check accepted it; the feet stay visible. Possible false approval of that frame's occlusion probe — a point once a second frame shows it.
 - Blocked villager walker jitters ~2 cm per frame (20.10.2026, point 1330 author, sample dump): a walker blocked by another body oscillates back and forth while nearly standing (collision/separation). Not seen in play yet.
 - `village-walk` arm-swing check reddened once on WebGL 2 (20.10.2026, point 1330 diagnostic run, pre-fix code): armVsLeg −0.61 together with the camera free-spot side-on check; not reproduced in later green runs.
+
+- 22.10.2026 (Fable 5.1 review of point 1411): the main-write fence skips quoted
+  arguments, so `sed --in-place='.bak' …` and `sed -i'.bak' …` still classify as
+  reads. Predates 1411 and follows the module's "quoted text never decides" rule;
+  no player impact, collected here.
+
+- mechanism-review-guard `--status` passes on a git ENOBUFS crash (finding 22.10.2026 06:57) — should fail loud.
+- From the 1393 review: unlocked lane-switch read-modify-write; criticality fixture same-vendor review; cross-review `--brief` plan spends a round (finding 22.10.2026 06:57).
+- The 1402 interleave test (src/render/villagerClipPose.test.ts:583) passes trivially without a toe-release frame; assert a release-frame count > 0 (Fable 5.1 review, 22.10.2026).
+
+- polish-villagers full pass walls at 45 min with a 7.9 GB Chrome renderer (23.10.2026, feat/1404 983fe682f; village-walk alone 3:34) — the bundle LARGE cannot cover the suite until per-page memory growth across sections is fixed or the suite split.
+- Retro lesson from 1426: guards read missing local (unversioned) state as "off" and locked out the cloud clone; the loosening needed five cross-review rounds for seven gaps. Separate "state missing" from "state says no"; review loosenings like new code (finding 23.10.2026 04:23).
+
+- 23.10.2026 branch reconciliation (point 1429) — parked or removed branches, shas kept here
+  because the branches are gone (local, remote and worktree):
+  - `feat/847-brevity-guard-gaps` @ 42411828e — 17 commits closing the four ways past
+    `scripts/guide-brevity-core.mjs` plus later review rounds (last verdict: round sixteen);
+    missing: a clean cross-vendor pass and the merge. Parked under the infrastructure freeze
+    (a doc-length guard; no game blockade, no false approval of game work); point 847 closed.
+  - `feat/901-superseded-ci-run` @ d9b9ec985 — only a "Record hostile-test authoring
+    commission" commit; the fix (cancelled CI runs counted as failed) was never written.
+    Parked under the freeze (a false red, not a false approval); point 901 closed.
+  - `feat/834-durable-authoring-lane` @ 091f66b55 — 122 commits kept as material for the cut
+    points 889–895, all of which have landed; superseded.
+  - `feat/1049-queue-order-rule` @ 9815ce1b1 — only the commission record; abandoned, point
+    1049 stays open.
+  - `feat/1255-loom-plaza-distance` @ 79fcb509f — lowers the loom plaza height bar to 60 px;
+    point 1255 was parked by 1258 ("land nothing"), its red lives on in open point 1266, which
+    forbids weakening the check, so the commit is reference only.
+- Water carrier's report gesture reads as pointing at a villager (finding 23.10.2026 16:40): in `verification/1405-water-carrier-report.png` (WebGPU, feat/1405 98049d22b) a Bambara woman stands between him and the jars, so his aim at the water (0.032 m off) reads on screen as pointing at her. Staging only, the measured aim is right; a table-side keep-clear for idle villagers would end it.
+- Separate cloud-author cap (23.10.2026, union U11; A1 vs B6/B16, Fable 5.1: measure first): raise the authoring cap above 3 and stop counting pushed-but-unverified branches only if, after the branch clean-up and the cloud pre-check points, the pool sits at 3 with the owner idle; then change `POOL_CAP` (scripts/batch-in-flight-core.mjs) and `DAEMON_POOL_CAP` (scripts/batch-daemon-core.mjs) together — a test asserts they agree.
+- Rule-set review 23.10.2026 (memory fixes done directly; these repo-text findings are parked under the freeze):
+  - `scripts/batch-resume-hook.mjs:335` pause text names `scripts/batch-lock.mjs clearPaused`, which has no CLI entry; only deleting the marker works.
+  - `scripts/batch-resume-hook.mjs:272-276` "a delegated author still building does NOT hold the boundary" contradicts CLAUDE.md §6 and `scripts/batch-adoption-core.mjs:143` (a session-bound lane blocks it).
+  - `scripts/batch-resume-hook.mjs:267-268` "every user-reported defect becomes a ready TASKS point" overrides the CLAUDE.md §2 finding-intake filter.
+  - CLAUDE.md §7.2 "required render/mechanism PROOF supplied" has no enforcement left: `mechanism-review-guard.mjs:91` and `criticality-review-guard.mjs:71` are switched off, yet both (~2,000 lines) still run at every Stop — deletion candidate.
+  - `scripts/criticality-review-guard.mjs:983` says "end the turn again" while line 973 says only `--status` reaches it.
+  - `scripts/rule-echo-guard.mjs:140`, `scripts/queue-rank-core.mjs:493,539` and `scripts/board-currency-core.mjs:325` attribute a fail-open rule to CLAUDE.md §7.2, which has none.
+  - The rule-echo stamp on memory `fable-sparingly` read "ok" while that memory was stale; a stamp proves the hash, not the content.
+  - The reply timestamp is enforced twice at turn end (project `timestamp-guard` and the user-global `check-reply-timestamp.cjs`).
+- Cloud clone reds 10 Vitest cases that pass locally (finding 24.10.2026 03:37): the 1440 cloud author saw `scripts/container-entrypoint.test.mjs` (6) and `scripts/land-point-runner.test.mjs` (4) red in its clone, also on main 1ce3814; locally 615/615 files green. Environment-sensitive under the cloud clone; the local gate stays the decider, so no blockade — fix when a cloud delegate's handover is misread because of it.
+- One-off WebGL 2 red in villager-canoe (finding 25.10.2026): the full polish-villagers WebGL 2 run on feat/1446 957968566 (`local/verify-logs/2026-10-25T08-04-49-636-polish-villagers.log`, machine quiet unverified) failed "from behind the upstream rock the children's game is in frame, the children not hidden" with 2/5 children seen; `--section=villager-canoe` alone on WebGL 2 at the same head (09:48 UTC) passed it. Not reproduced, so no point; file one if it recurs, next to 1381 (same section, same occlusion reading).
+- Launcher daemon reads as "unknown" after clock drift (finding 25.10.2026 12:10): the probed pid start time of `hoa-batch-launcher` differed by more than the 2 s tolerance from the recorded one while the daemon was alive and ticking. No blockade (the session started normally); infrastructure freeze.
+- `finding.mjs --drained` cannot retire one of two entries with identical titles (batch-doctor filed the same rescue twice, 25.10.2026 11:26:40/43); the duplicate was marked by hand in the carrier.

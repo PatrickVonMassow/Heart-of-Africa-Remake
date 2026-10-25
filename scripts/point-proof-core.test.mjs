@@ -10,6 +10,7 @@ import {
   proofCommandsFor,
   proofSatisfied,
 } from './point-proof-core.mjs'
+import { MAIN } from './model-lanes.mjs'
 
 const HEAD = 'abc123def4567890'
 const OLDER = '0987654321fedcba'
@@ -259,7 +260,7 @@ describe('a landing command is a tick this gate must judge', () => {
     evaluate({ toolName: 'Bash', toolInput: { command }, tasksText, runs: [], ledgerReadable: true, headSha: HEAD })
 
   it('blocks a landing whose point has an unproven PROOF line', () => {
-    const d = judge('node scripts/land-point.mjs 594 --model "Claude Opus 5"')
+    const d = judge(`node scripts/land-point.mjs 594 --model "${MAIN.trailerName}"`)
     expect(d.block).toBe(true)
     expect(d.reason).toContain('594')
   })
@@ -267,7 +268,7 @@ describe('a landing command is a tick this gate must judge', () => {
   it('lets the landing through once the proof is recorded', () => {
     const d = evaluate({
       toolName: 'Bash',
-      toolInput: { command: 'node scripts/land-point.mjs 594 --model "Claude Opus 5"' },
+      toolInput: { command: `node scripts/land-point.mjs 594 --model "${MAIN.trailerName}"` },
       tasksText,
       runs: { 594: { evidence: 'measured', commit: HEAD, commands: [MEASURE] } },
       ledgerReadable: true,

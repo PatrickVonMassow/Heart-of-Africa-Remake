@@ -237,6 +237,14 @@ export function steerHeading(yaw: number, desired: number, speed: number, dt: nu
   return { yaw: yaw + turn, pace }
 }
 
+/** The heading a walker turns toward: where a full step toward its waypoint
+ *  really goes (slid along a wall, round another body) — unless that is
+ *  hardly a step, or a shove back, which never turns it about. */
+export function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
+  const ahead = (tx - x) * dx + (tz - z) * dz > 0
+  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
+}
+
 export interface FootPhase {
   z: number
   lift: number
@@ -592,6 +600,13 @@ export function primitiveLayout(k: number, legs: boolean, L: { hipY: number; arm
     labelHeight: mix(1.45, (0.55 + 0.45) * 0.75),
     groupScale: [1, 1, 1],
   }
+}
+
+/** The primitive's hip pivot under a trunk lean: the cone's base rim tips by
+ *  `radius·|sin lean|` below the hip, so a kneeling (low) hip rises by what the
+ *  rim would cut into the ground; a standing hip is already clear. */
+export function leanedHipY(hipY: number, radius: number, lean: number): number {
+  return Math.max(hipY, radius * Math.abs(Math.sin(lean)))
 }
 
 /** True when a pose leaves this arm hanging at rest — no contact to reach, so

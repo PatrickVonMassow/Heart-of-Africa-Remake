@@ -10,7 +10,7 @@ import {
   classifyTrailer,
   coAuthorTrailers,
   evaluateCommitTrailers,
-  fableStateAtCommit,
+  laneStateAtCommit,
   formatCommitTrailerVerdict,
   findForbiddenCommits,
   findUnidentifiedCommits,
@@ -26,11 +26,35 @@ import {
   POLICY_NEUTRAL,
   reviewerTrailers,
   splitTrailerField,
+  turnEndScarceState,
 } from './model-guard-core.mjs'
 import { RECENT_LOG_FORMAT } from './model-guard.mjs'
-import { CLAUDE_MODEL, readState, writeState } from './fable-switch-core.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
+import { CROSS, MAIN, SCARCE, VENDORS, trailerFor } from './model-lanes.mjs'
 
-const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
+// Every model spelling comes from the registry; synthetic unknowns (Haiku, Sonnet,
+// Nano, Gemini …) stay inline. Retired names are picked by shape: a display name
+// carries capitals, an id does not.
+const displays = (record) => record.retired.filter((name) => /[A-Z]/.test(name))
+const ids = (record) => record.retired.filter((name) => !/[A-Z]/.test(name))
+const bare = (name) => name.replace(/[\s,;/&_-]+/g, ' ').trim()
+const OLD_MAIN = displays(MAIN)[0] // a retired main-lane display name
+const OLD_MAIN_ID = ids(MAIN).find((id) => id.endsWith('[1m]')) // the raw `[1m]` model id history carries
+const FALLBACK = MAIN.fallback.displayName
+const [OLD_CROSS, OLDEST_CROSS] = displays(CROSS) // the retired cross-lane names, newest first
+const [OLD_CROSS_ID] = ids(CROSS)
+const CROSS_WORD = OLDEST_CROSS.split(' ').at(-1) // the family word the oldest cross name carries
+const MARKER = VENDORS[CROSS.vendor].versionedMarkers[0].toUpperCase() // the cross vendor's versioned marker
+const MAIN_AT = VENDORS[MAIN.vendor].trailerAddress
+const CROSS_AT = VENDORS[CROSS.vendor].trailerAddress
+const MAIN_HOST = MAIN_AT.split('@')[1]
+const CROSS_HOST = CROSS_AT.split('@')[1]
+const CROSS_VENDOR = CROSS.vendor
+const capital = (word) => word[0].toUpperCase() + word.slice(1)
+const MAIN_WORD = MAIN.familyWords[0] // the main lane's family word, bare
+const SCARCE_WORD = SCARCE.familyWords[0]
+
+const SCARCE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 const SWITCH_AT = Date.parse('2026-08-20T17:34:12.107Z')
 const switchState = (state) =>
   readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: SWITCH_AT })))
@@ -43,25 +67,25 @@ const line = (sha, iso, trailer) => `${sha}|${iso}|${trailer}`
 // separator=;)' | tr ';' '\n' | sort | uniq -c` on 06.08.2026. The tightening
 // below must leave every one of them green — a guard that reddens real history
 // is a regression, not a fix. The raw model-id form is the trap: 14 commits on
-// 29.07.2026 were stamped with it, and it names Opus 5 as plainly as the rest.
+// 29.07.2026 were stamped with it, and it names the main lane as plainly as the rest.
 const HISTORIC_TRAILERS = [
-  'Claude Opus 5 <noreply@anthropic.com>', // 655 commits
-  'Claude Opus 4.8 (1M context) <noreply@anthropic.com>', // 648
-  'Claude Opus 5 (1M context) <noreply@anthropic.com>', // 457
-  'Claude Fable 5.1 <noreply@anthropic.com>', // 450
-  'Claude Opus 4.8 <noreply@anthropic.com>', // 63
-  'Claude claude-opus-5[1m] <noreply@anthropic.com>', // 14 — the raw model id
+  `Claude ${OLD_MAIN} <${MAIN_AT}>`, // 655 commits
+  `Claude ${FALLBACK} (1M context) <${MAIN_AT}>`, // 648
+  `Claude ${OLD_MAIN} (1M context) <${MAIN_AT}>`, // 457
+  `Claude ${SCARCE.displayName} <${MAIN_AT}>`, // 450
+  `Claude ${FALLBACK} <${MAIN_AT}>`, // 63
+  `Claude ${OLD_MAIN_ID} <${MAIN_AT}>`, // 14 — the raw model id
 ]
 // The rest of what history carries, and what it must still be judged as: the
 // 24.07.2026 degradation (7 commits) and the point-397 bare trailer (7).
 const HISTORIC_REJECTS = [
-  ['Claude Haiku 4.5 <noreply@anthropic.com>', 'forbidden'],
-  ['Claude <noreply@anthropic.com>', 'unidentified'],
+  [`Claude Haiku 4.5 <${MAIN_AT}>`, 'forbidden'],
+  [`Claude <${MAIN_AT}>`, 'unidentified'],
 ]
 
 describe('parseLogLine', () => {
   it('parses sha, date and trailer field', () => {
-    const c = parseLogLine(line('a69d1bdedf18', '2026-07-24T23:35:54+02:00', 'Claude Haiku 4.5 <noreply@anthropic.com>'))
+    const c = parseLogLine(line('a69d1bdedf18', '2026-07-24T23:35:54+02:00', `Claude Haiku 4.5 <${MAIN_AT}>`))
     expect(c?.sha).toBe('a69d1bdedf18')
     expect(c?.when).toBe(Date.parse('2026-07-24T23:35:54+02:00'))
     expect(c?.trailers).toContain('Haiku')
@@ -82,8 +106,8 @@ describe('parseLogLine', () => {
 describe('the wrapper log format', () => {
   it('keeps two trailer lines separated for the core to judge independently', () => {
     const repo = mkdtempSync(join(tmpdir(), 'model-guard-log-'))
-    const anthropic = 'Claude Opus 5 <noreply@anthropic.com>'
-    const openai = 'GPT-5.6 Sol <noreply@openai.com>'
+    const mainTrailer = `Claude ${OLD_MAIN} <${MAIN_AT}>`
+    const crossTrailer = `${OLDEST_CROSS} <${CROSS_AT}>`
     const env = {
       ...process.env,
       GIT_AUTHOR_NAME: 'Test Author',
@@ -105,7 +129,7 @@ describe('the wrapper log format', () => {
           '-m',
           'Test two model trailers',
           '-m',
-          `Co-Authored-By: ${anthropic}\nCo-Authored-By: ${openai}`,
+          `Co-Authored-By: ${mainTrailer}\nCo-Authored-By: ${crossTrailer}`,
         ],
         { env, windowsHide: true },
       )
@@ -116,8 +140,8 @@ describe('the wrapper log format', () => {
       })
       const parsed = parseLogLine(log.trim())
 
-      expect(parsed?.trailers).toBe(`${anthropic},${openai}`)
-      expect(splitTrailerField(parsed?.trailers)).toEqual([anthropic, openai])
+      expect(parsed?.trailers).toBe(`${mainTrailer},${crossTrailer}`)
+      expect(splitTrailerField(parsed?.trailers)).toEqual([mainTrailer, crossTrailer])
       expect(classifyTrailer(parsed?.trailers, POLICY_NEUTRAL)).toBe('allowed')
       // EVERY split trailer is judged individually, FROM the parsed field
       // (point 863): the closing assertion used to rebuild the message by hand,
@@ -139,21 +163,21 @@ describe('the wrapper log format', () => {
   })
 })
 
-describe('isPolicyBreach (allowlist: Opus 5 / Opus 4.8 / Fable 5.1)', () => {
+describe('isPolicyBreach (allowlist: main lane / main fallback / scarce lane)', () => {
   it('passes every allowed model incl. variants', () => {
     for (const t of [
-      'Claude Opus 5 <noreply@anthropic.com>',
-      'Claude Opus 4.8 (1M context) <noreply@anthropic.com>',
-      'Claude Opus 4.8 <noreply@anthropic.com>',
-      'Claude Fable 5.1 <noreply@anthropic.com>',
+      `Claude ${OLD_MAIN} <${MAIN_AT}>`,
+      `Claude ${FALLBACK} (1M context) <${MAIN_AT}>`,
+      `Claude ${FALLBACK} <${MAIN_AT}>`,
+      `Claude ${SCARCE.displayName} <${MAIN_AT}>`,
     ]) expect(isPolicyBreach(t, POLICY_NEUTRAL)).toBe(false)
   })
   it('flags every non-allowlisted Claude model — Haiku AND Sonnet AND unknowns', () => {
     for (const t of [
-      'Claude Haiku 4.5 <noreply@anthropic.com>',
-      'claude haiku 4.5 <noreply@anthropic.com>',
-      'Claude Sonnet 5 <noreply@anthropic.com>',
-      'Claude Nano 6 <noreply@anthropic.com>',
+      `Claude Haiku 4.5 <${MAIN_AT}>`,
+      `claude haiku 4.5 <${MAIN_AT}>`,
+      `Claude Sonnet 5 <${MAIN_AT}>`,
+      `Claude Nano 6 <${MAIN_AT}>`,
     ]) expect(isPolicyBreach(t)).toBe(true)
   })
   it('ignores empty merge-commit trailers and human co-authors', () => {
@@ -161,75 +185,75 @@ describe('isPolicyBreach (allowlist: Opus 5 / Opus 4.8 / Fable 5.1)', () => {
     expect(isPolicyBreach('Patrick von Massow <patrick@example.com>')).toBe(false)
   })
   it('one forbidden co-author flags the commit even next to an allowed one', () => {
-    expect(isPolicyBreach('Claude Opus 4.8 <a@x>,Claude Haiku 4.5 <b@x>')).toBe(true)
-    expect(isPolicyBreach('Claude Opus 4.8 <a@x>,Claude Fable 5.1 <b@x>', POLICY_NEUTRAL)).toBe(false)
+    expect(isPolicyBreach(`Claude ${FALLBACK} <a@x>,Claude Haiku 4.5 <b@x>`)).toBe(true)
+    expect(isPolicyBreach(`Claude ${FALLBACK} <a@x>,Claude ${SCARCE.displayName} <b@x>`, POLICY_NEUTRAL)).toBe(false)
   })
 })
 
-describe('the serving allowlist follows the Fable switch', () => {
-  const fableTrailer = 'Claude Fable 5.1 <noreply@anthropic.com>'
-  const message = `A change\n\nCo-Authored-By: ${fableTrailer}\n`
+describe('the serving allowlist follows the lane switch', () => {
+  const scarceTrailer = `Claude ${SCARCE.displayName} <${MAIN_AT}>`
+  const message = `A change\n\nCo-Authored-By: ${scarceTrailer}\n`
 
-  it('drops Fable from the allowlist and advertised trailers while off', () => {
-    expect(isAllowedModelName('Fable 5.1', FABLE_OFF)).toBe(false)
-    expect(classifyTrailer(fableTrailer, FABLE_OFF)).toBe('forbidden')
-    expect(allowedTrailers(FABLE_OFF).join('\n')).not.toContain('Fable')
+  it('drops the scarce lane from the allowlist and advertised trailers while off', () => {
+    expect(isAllowedModelName(`${SCARCE.displayName}`, SCARCE_OFF)).toBe(false)
+    expect(classifyTrailer(scarceTrailer, SCARCE_OFF)).toBe('forbidden')
+    expect(allowedTrailers(SCARCE_OFF).join('\n')).not.toContain(SCARCE.displayName)
   })
 
-  it('does not admit Fable when a caller omits the policy state', () => {
-    expect(isAllowedModelName('Fable 5.1')).toBe(false)
-    expect(judgeTrailer(fableTrailer)).toEqual({ verdict: 'forbidden', names: ['Fable 5.1'] })
+  it('does not admit the scarce lane when a caller omits the policy state', () => {
+    expect(isAllowedModelName(`${SCARCE.displayName}`)).toBe(false)
+    expect(judgeTrailer(scarceTrailer)).toEqual({ verdict: 'forbidden', names: [`${SCARCE.displayName}`] })
   })
 
   it('generates the commit refusal from the switch record', () => {
-    const verdict = evaluateCommitTrailers(message, FABLE_OFF)
+    const verdict = evaluateCommitTrailers(message, SCARCE_OFF)
     expect(verdict.block).toBe(true)
     const text = formatCommitTrailerVerdict(verdict)
-    expect(text).toContain('node scripts/fable-switch.mjs --status')
+    expect(text).toContain('node scripts/lane-switch.mjs --status')
     expect(text).toContain('test capacity exhausted')
-    expect(text).not.toContain('Co-Authored-By: Claude Fable 5.1')
+    expect(text).not.toContain(`Co-Authored-By: Claude ${SCARCE.displayName}`)
   })
 
-  it('treats a Fable commit as the same serving breach as Sonnet and Haiku', () => {
-    const log = line('2222222', '2026-07-24T22:30:00Z', fableTrailer)
-    const hits = findForbiddenCommits(log, T0, FABLE_OFF)
+  it('treats a scarce-lane commit as the same serving breach as Sonnet and Haiku', () => {
+    const log = line('2222222', '2026-07-24T22:30:00Z', scarceTrailer)
+    const hits = findForbiddenCommits(log, T0, SCARCE_OFF)
     expect(hits).toHaveLength(1)
-    const text = formatForbiddenReason(hits, { fableState: FABLE_OFF })
-    expect(text).toContain('Fable 5.1 may author only while its recorded policy is ON')
-    expect(text).toContain('node scripts/fable-switch.mjs --status')
+    const text = formatForbiddenReason(hits, { scarceState: SCARCE_OFF })
+    expect(text).toContain(`${SCARCE.displayName} may author only while its recorded policy is ON`)
+    expect(text).toContain('node scripts/lane-switch.mjs --status')
   })
 })
 
 describe('the historical guard uses the policy at each commit\'s own time', () => {
-  const fableTrailer = 'Claude Fable 5.1 <noreply@anthropic.com>'
+  const scarceTrailer = `Claude ${SCARCE.displayName} <${MAIN_AT}>`
   const before = SWITCH_AT - 1
   const after = SWITCH_AT + 1
   const datedLine = (sha, when, trailer) => line(sha, new Date(when).toISOString(), trailer)
 
-  it('allows Fable before an OFF flip and refuses it from the flip onward', () => {
+  it('allows the scarce lane before an OFF flip and refuses it from the flip onward', () => {
     const off = switchState('off')
     const log = [
-      datedLine('1111111', before, fableTrailer),
-      datedLine('2222222', SWITCH_AT, fableTrailer),
-      datedLine('3333333', after, fableTrailer),
+      datedLine('1111111', before, scarceTrailer),
+      datedLine('2222222', SWITCH_AT, scarceTrailer),
+      datedLine('3333333', after, scarceTrailer),
     ].join('\n')
 
     expect(findForbiddenCommits(log, T0, off).map((hit) => hit.sha)).toEqual(['2222222', '3333333'])
-    expect(fableStateAtCommit(before, off).state).toBe('on')
-    expect(fableStateAtCommit(SWITCH_AT, off).state).toBe('off')
+    expect(laneStateAtCommit(before, off).state).toBe('on')
+    expect(laneStateAtCommit(SWITCH_AT, off).state).toBe('off')
   })
 
-  it('refuses Fable under the previous OFF policy before an ON flip, then allows it', () => {
+  it('refuses the scarce lane under the previous OFF policy before an ON flip, then allows it', () => {
     const on = switchState('on')
-    const log = [datedLine('1111111', before, fableTrailer), datedLine('2222222', after, fableTrailer)].join('\n')
+    const log = [datedLine('1111111', before, scarceTrailer), datedLine('2222222', after, scarceTrailer)].join('\n')
 
     expect(findForbiddenCommits(log, T0, on).map((hit) => hit.sha)).toEqual(['1111111'])
   })
 
   it('never changes Sonnet or Haiku verdicts in either switch direction', () => {
     const log = [
-      datedLine('1111111', before, 'Claude Sonnet 5 <noreply@anthropic.com>'),
-      datedLine('2222222', after, 'Claude Haiku 4.5 <noreply@anthropic.com>'),
+      datedLine('1111111', before, `Claude Sonnet 5 <${MAIN_AT}>`),
+      datedLine('2222222', after, `Claude Haiku 4.5 <${MAIN_AT}>`),
     ].join('\n')
 
     for (const state of [switchState('off'), switchState('on')]) {
@@ -240,22 +264,22 @@ describe('the historical guard uses the policy at each commit\'s own time', () =
   it('refuses loudly when the switch state is unreadable, even with no parseable commits', () => {
     const unreadable = readState('{')
     expect(() => findForbiddenCommits('', T0, unreadable)).toThrow(/not valid JSON/)
-    expect(() => findForbiddenCommits(datedLine('1111111', before, fableTrailer), T0, unreadable)).toThrow(
+    expect(() => findForbiddenCommits(datedLine('1111111', before, scarceTrailer), T0, unreadable)).toThrow(
       /not valid JSON/,
     )
   })
 
   it('names a post-flip emergency and a historical previous-policy breach differently', () => {
     const off = switchState('off')
-    const afterHit = findForbiddenCommits(datedLine('2222222', after, fableTrailer), T0, off)
-    const emergency = formatForbiddenReason(afterHit, { fableState: off })
-    expect(emergency).toContain('after the Fable switch changed to OFF')
+    const afterHit = findForbiddenCommits(datedLine('2222222', after, scarceTrailer), T0, off)
+    const emergency = formatForbiddenReason(afterHit, { scarceState: off })
+    expect(emergency).toContain('after the lane switch changed to OFF')
     expect(emergency).toContain('post-switch OFF policy')
 
     const on = switchState('on')
-    const beforeHit = findForbiddenCommits(datedLine('1111111', before, fableTrailer), T0, on)
-    const history = formatForbiddenReason(beforeHit, { fableState: on })
-    expect(history).toContain('before the Fable switch changed to ON')
+    const beforeHit = findForbiddenCommits(datedLine('1111111', before, scarceTrailer), T0, on)
+    const history = formatForbiddenReason(beforeHit, { scarceState: on })
+    expect(history).toContain('before the lane switch changed to ON')
     expect(history).toContain('historical')
     expect(history).toContain('previous OFF policy')
   })
@@ -263,12 +287,12 @@ describe('the historical guard uses the policy at each commit\'s own time', () =
 
 describe('findForbiddenCommits', () => {
   const log = [
-    line('1111111', '2026-07-24T21:35:00Z', 'Claude Haiku 4.5 <noreply@anthropic.com>'), // before baseline
-    line('2222222', '2026-07-24T22:30:00Z', 'Claude Fable 5.1 <noreply@anthropic.com>'),
-    line('3333333', '2026-07-24T23:00:00Z', 'Claude Sonnet 5 <noreply@anthropic.com>'),
+    line('1111111', '2026-07-24T21:35:00Z', `Claude Haiku 4.5 <${MAIN_AT}>`), // before baseline
+    line('2222222', '2026-07-24T22:30:00Z', `Claude ${SCARCE.displayName} <${MAIN_AT}>`),
+    line('3333333', '2026-07-24T23:00:00Z', `Claude Sonnet 5 <${MAIN_AT}>`),
     line('4444444', '2026-07-24T23:10:00Z', ''), // merge commit, no trailer
     'garbage line without pipes',
-    line('5555555', '2026-07-24T23:20:00Z', 'Claude Opus 4.8 <a@x>,Claude Haiku 4.5 <b@x>'),
+    line('5555555', '2026-07-24T23:20:00Z', `Claude ${FALLBACK} <a@x>,Claude Haiku 4.5 <b@x>`),
   ].join('\n')
 
   it('flags only forbidden commits at/after the baseline', () => {
@@ -286,36 +310,36 @@ describe('findForbiddenCommits', () => {
 })
 
 // POINT 397: the three-way split. The trailer that cost a round was
-// `Co-Authored-By: Claude <noreply@anthropic.com>` — no model at all.
+// `Co-Authored-By: Claude <main-vendor address>` — no model at all.
 describe('classifyTrailer', () => {
   it('calls an allowlisted model allowed, in every spelling', () => {
     for (const t of [
-      'Claude Opus 5 <noreply@anthropic.com>',
-      'Claude Opus 5 (1M context) <noreply@anthropic.com>',
-      'Claude Opus 4.8 <noreply@anthropic.com>',
-      'Claude Fable 5.1 <noreply@anthropic.com>',
+      `Claude ${OLD_MAIN} <${MAIN_AT}>`,
+      `Claude ${OLD_MAIN} (1M context) <${MAIN_AT}>`,
+      `Claude ${FALLBACK} <${MAIN_AT}>`,
+      `Claude ${SCARCE.displayName} <${MAIN_AT}>`,
     ]) expect(classifyTrailer(t, POLICY_NEUTRAL)).toBe('allowed')
   })
 
   it('calls the REAL bare trailer unidentified, not forbidden', () => {
-    expect(classifyTrailer('Claude <noreply@anthropic.com>')).toBe('unidentified')
-    expect(classifyTrailer('Claude Code <noreply@anthropic.com>')).toBe('unidentified')
-    expect(classifyTrailer('Claude (1M context) <noreply@anthropic.com>')).toBe('unidentified')
-    expect(isPolicyBreach('Claude <noreply@anthropic.com>')).toBe(false)
+    expect(classifyTrailer(`Claude <${MAIN_AT}>`)).toBe('unidentified')
+    expect(classifyTrailer(`Claude Code <${MAIN_AT}>`)).toBe('unidentified')
+    expect(classifyTrailer(`Claude (1M context) <${MAIN_AT}>`)).toBe('unidentified')
+    expect(isPolicyBreach(`Claude <${MAIN_AT}>`)).toBe(false)
   })
 
   it('calls a NAMED model outside the allowlist forbidden', () => {
     for (const t of [
-      'Claude Haiku 4.5 <noreply@anthropic.com>',
-      'claude sonnet 5 <noreply@anthropic.com>',
-      'Claude Nano 6 <noreply@anthropic.com>',
+      `Claude Haiku 4.5 <${MAIN_AT}>`,
+      `claude sonnet 5 <${MAIN_AT}>`,
+      `Claude Nano 6 <${MAIN_AT}>`,
     ]) expect(classifyTrailer(t)).toBe('forbidden')
   })
 
   it('judges a commit by its WORST trailer', () => {
-    expect(classifyTrailer('Claude Opus 5 <a@x>,Claude <b@x>')).toBe('unidentified')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} <a@x>,Claude <b@x>`)).toBe('unidentified')
     expect(classifyTrailer('Claude <a@x>,Claude Haiku 4.5 <b@x>')).toBe('forbidden')
-    expect(classifyTrailer('Claude Opus 5 <a@x>;Claude Fable 5.1 <b@x>', POLICY_NEUTRAL)).toBe('allowed')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} <a@x>;Claude ${SCARCE.displayName} <b@x>`, POLICY_NEUTRAL)).toBe('allowed')
   })
 
   it('does not judge what carries no model evidence', () => {
@@ -325,8 +349,8 @@ describe('classifyTrailer', () => {
   })
 
   it('reads the model name out of a trailer', () => {
-    expect(modelNameIn('Claude Opus 4.8 (1M context) <noreply@anthropic.com>')).toBe('Opus 4.8')
-    expect(modelNameIn('Claude <noreply@anthropic.com>')).toBe('')
+    expect(modelNameIn(`Claude ${FALLBACK} (1M context) <${MAIN_AT}>`)).toBe(`${FALLBACK}`)
+    expect(modelNameIn(`Claude <${MAIN_AT}>`)).toBe('')
   })
 })
 
@@ -350,53 +374,53 @@ describe('the allowlist is matched against the parsed name', () => {
   })
 
   it('reads the raw model id as the model it names', () => {
-    expect(modelNamesIn('Claude claude-opus-5[1m] <noreply@anthropic.com>')).toEqual(['opus 5'])
-    expect(classifyTrailer('Claude claude-sonnet-5[1m] <noreply@anthropic.com>')).toBe('forbidden')
-    expect(classifyTrailer('Claude claude-haiku-4-5 <noreply@anthropic.com>')).toBe('forbidden')
+    expect(modelNamesIn(`Claude ${OLD_MAIN_ID} <${MAIN_AT}>`)).toEqual([`${OLD_MAIN.toLowerCase()}`])
+    expect(classifyTrailer(`Claude claude-sonnet-5[1m] <${MAIN_AT}>`)).toBe('forbidden')
+    expect(classifyTrailer(`Claude claude-haiku-4-5 <${MAIN_AT}>`)).toBe('forbidden')
   })
 
   it('parses the claimed model names out of a trailer', () => {
-    expect(modelNamesIn('Claude Opus 5 (1M context) <noreply@anthropic.com>')).toEqual(['Opus 5'])
-    expect(modelNamesIn('Claude <noreply@anthropic.com>')).toEqual([])
+    expect(modelNamesIn(`Claude ${OLD_MAIN} (1M context) <${MAIN_AT}>`)).toEqual([`${OLD_MAIN}`])
+    expect(modelNamesIn(`Claude <${MAIN_AT}>`)).toEqual([])
     expect(modelNamesIn('Patrick von Massow <patrick@example.com>')).toEqual([])
-    expect(modelNamesIn('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toEqual(['Sonnet 5', 'Opus 5'])
-    expect(modelNameIn('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toBe('Sonnet 5 + Opus 5')
+    expect(modelNamesIn(`Claude Sonnet 5 / Claude ${OLD_MAIN} <x@y>`)).toEqual(['Sonnet 5', `${OLD_MAIN}`])
+    expect(modelNameIn(`Claude Sonnet 5 / Claude ${OLD_MAIN} <x@y>`)).toBe(`Sonnet 5 + ${OLD_MAIN}`)
   })
 
   it('reads several non-Claude claims as several, not as one composite name', () => {
     // Two claims in one trailer show no single author: unidentified, never the
-    // forbidden breach ritual (Sol review of a4975b0).
-    expect(modelNamesIn('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>')).toHaveLength(2)
-    expect(classifyTrailer('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    // forbidden breach ritual (cross-vendor review of a4975b0).
+    expect(modelNamesIn(`${OLDEST_CROSS} / ${OLDEST_CROSS} <${CROSS_AT}>`)).toHaveLength(2)
+    expect(classifyTrailer(`${OLDEST_CROSS} / ${OLDEST_CROSS} <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('unidentified')
     // Textual conjunctions and the plus sign are the same two claims as the
     // slash — each case pairs two ALLOWED names, so it can only pass through
     // the split (the unsplit composite would read forbidden, not unidentified).
-    expect(classifyTrailer('GPT-5.6 Sol and GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
-    expect(classifyTrailer('GPT-5.6 Sol und GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
-    expect(classifyTrailer('GPT-5.6 Sol + GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer(`${OLDEST_CROSS} and ${OLDEST_CROSS} <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer(`${OLDEST_CROSS} und ${OLDEST_CROSS} <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer(`${OLDEST_CROSS} + ${OLDEST_CROSS} <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('unidentified')
     // A forbidden model among the claims stays the breach it is.
-    expect(classifyTrailer('GPT-5.6 Sol + Codex 2 <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+    expect(classifyTrailer(`${OLDEST_CROSS} + Codex 2 <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('forbidden')
     // A lone model beside filler stays the composite name that fails LOUD —
     // the point-527 smuggling shape must not pass as its allowed half.
-    expect(classifyTrailer('GPT-5.6 Sol / Haiku <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
-    expect(classifyTrailer('GPT-5.6 Sol / experimental <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+    expect(classifyTrailer(`${OLDEST_CROSS} / Haiku <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('forbidden')
+    expect(classifyTrailer(`${OLDEST_CROSS} / experimental <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('forbidden')
   })
 
   it('does not read a look-alike domain as a vendor address', () => {
-    // `\b` after `.com` let `assistant@openai.com.evil` qualify as model
-    // evidence and refused the human carrying it (Sol review of a4975b0).
-    expect(classifyTrailer('Alice <assistant@openai.com.evil>', POLICY_NEUTRAL)).toBe('allowed')
-    expect(modelNamesIn('Alice <assistant@openai.com.evil>')).toEqual([])
+    // `\b` after `.com` let `assistant@<cross vendor>.com.evil` qualify as model
+    // evidence and refused the human carrying it (cross-vendor review of a4975b0).
+    expect(classifyTrailer(`Alice <assistant@${CROSS_HOST}.evil>`, POLICY_NEUTRAL)).toBe('allowed')
+    expect(modelNamesIn(`Alice <assistant@${CROSS_HOST}.evil>`)).toEqual([])
     // The genuine vendor forms keep qualifying, mid-line and at the end.
-    expect(classifyTrailer('OpenAI o3 <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+    expect(classifyTrailer(`${CROSS_VENDOR} o3 <${CROSS_AT}>`, POLICY_NEUTRAL)).toBe('forbidden')
   })
 
   it('no longer passes a forbidden name that merely CARRIES an allowed word', () => {
     for (const t of [
-      'Claude Haiku 4.5 (opus mode) <noreply@anthropic.com>',
-      'Claude Haiku 4.5, opus-equivalent <noreply@anthropic.com>',
-      'Claude Sonnet 5 (fable fallback) <noreply@anthropic.com>',
-      'Claude Opus-flavoured Sonnet 5 <noreply@anthropic.com>',
+      `Claude Haiku 4.5 (${MAIN_WORD} mode) <${MAIN_AT}>`,
+      `Claude Haiku 4.5, ${MAIN_WORD}-equivalent <${MAIN_AT}>`,
+      `Claude Sonnet 5 (${SCARCE_WORD} fallback) <${MAIN_AT}>`,
+      `Claude ${capital(MAIN_WORD)}-flavoured Sonnet 5 <${MAIN_AT}>`,
     ]) {
       expect(classifyTrailer(t), t).toBe('forbidden')
       expect(isPolicyBreach(t), t).toBe(true)
@@ -405,19 +429,19 @@ describe('the allowlist is matched against the parsed name', () => {
 
   it('flags a two-model line instead of passing it on its first allowed name', () => {
     // The smuggling shape: an allowed name standing beside a forbidden one.
-    expect(classifyTrailer('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toBe('forbidden')
-    expect(classifyTrailer('Claude Opus 5 / Claude Haiku 4.5 <x@y>')).toBe('forbidden')
+    expect(classifyTrailer(`Claude Sonnet 5 / Claude ${OLD_MAIN} <x@y>`)).toBe('forbidden')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} / Claude Haiku 4.5 <x@y>`)).toBe('forbidden')
     // Two ALLOWED names are no breach, but still show no single author.
-    expect(classifyTrailer('Claude Opus 5 / Claude Fable 5.1 <x@y>', POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} / Claude ${SCARCE.displayName} <x@y>`, POLICY_NEUTRAL)).toBe('unidentified')
     // One trailer PER co-author stays exactly as legitimate as it was.
-    expect(classifyTrailer('Claude Opus 5 <a@x>,Claude Fable 5.1 <b@x>', POLICY_NEUTRAL)).toBe('allowed')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} <a@x>,Claude ${SCARCE.displayName} <b@x>`, POLICY_NEUTRAL)).toBe('allowed')
   })
 
   it('accepts the allowed families with and without a version, and nothing else', () => {
-    for (const name of ['Opus 5', 'Opus 4.8', 'Fable 5.1', 'opus', 'OPUS 5']) {
+    for (const name of [`${OLD_MAIN}`, `${FALLBACK}`, `${SCARCE.displayName}`, MAIN_WORD, `${OLD_MAIN.toUpperCase()}`]) {
       expect(judgeTrailer(`Claude ${name} <x@y>`, POLICY_NEUTRAL).verdict, name).toBe('allowed')
     }
-    for (const name of ['Opusaurus 5', 'Fabled 5', 'Opus 5 turbo', 'Haiku 4.5']) {
+    for (const name of [`${capital(MAIN_WORD)}aurus 5`, `${capital(SCARCE_WORD)}d 5`, `${OLD_MAIN} turbo`, 'Haiku 4.5']) {
       expect(judgeTrailer(`Claude ${name} <x@y>`).verdict, name).toBe('forbidden')
     }
   })
@@ -428,24 +452,24 @@ describe('the allowlist is matched against the parsed name', () => {
     // suffix merged the whole field into one value, and the suffix strip then
     // carried the forbidden name away with it.
     for (const field of [
-      'Claude Opus 5 (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 (1M context) <c@x>',
-      'Claude Opus 5 [1m <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 [1m] <c@x>',
-      'Claude Opus 5 (x <a@x>;Claude Haiku 4.5 <b@x>;Claude Fable 5.1 (y) <c@x>',
-      'Claude Opus 5 <a@x(,Claude Haiku 4.5 <b@x>',
+      `Claude ${OLD_MAIN} (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude ${OLD_MAIN} (1M context) <c@x>`,
+      `Claude ${OLD_MAIN} [1m <a@x>,Claude Haiku 4.5 <b@x>,Claude ${OLD_MAIN} [1m] <c@x>`,
+      `Claude ${OLD_MAIN} (x <a@x>;Claude Haiku 4.5 <b@x>;Claude ${SCARCE.displayName} (y) <c@x>`,
+      `Claude ${OLD_MAIN} <a@x(,Claude Haiku 4.5 <b@x>`,
     ]) expect(classifyTrailer(field), field).toBe('forbidden')
   })
 
   it('errs toward MORE parts, so a stray half fails loud rather than allowing', () => {
-    expect(splitTrailerField('Claude Opus 5 (1M, extended) <a@x>')).toEqual([
-      'Claude Opus 5 (1M',
+    expect(splitTrailerField(`Claude ${OLD_MAIN} (1M, extended) <a@x>`)).toEqual([
+      `Claude ${OLD_MAIN} (1M`,
       ' extended) <a@x>',
     ])
     // Deliberate and documented: a suffix that carries the separator is cut, and
     // the half naming no allowed model fails CLOSED. The commit-msg gate splits
     // the same way, so such a trailer never reaches history to pause the batch.
-    expect(classifyTrailer('Claude Opus 5 (1M, extended) <noreply@anthropic.com>')).toBe('forbidden')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} (1M, extended) <${MAIN_AT}>`)).toBe('forbidden')
     expect(
-      evaluateCommitTrailers('x\n\nCo-Authored-By: Claude Opus 5 (1M, extended) <a@x>\n').block,
+      evaluateCommitTrailers(`x\n\nCo-Authored-By: Claude ${OLD_MAIN} (1M, extended) <a@x>\n`).block,
     ).toBe(true)
     expect(splitTrailerField('')).toEqual([''])
     expect(splitTrailerField(null)).toEqual([''])
@@ -456,12 +480,12 @@ describe('the allowlist is matched against the parsed name', () => {
     // What the gate lets through must never read as a breach in history.
     for (const t of [
       ...HISTORIC_TRAILERS,
-      'Claude <noreply@anthropic.com>',
-      'Claude Haiku 4.5 (opus mode) <x@y>',
-      'Claude Sonnet 5 / Claude Opus 5 <x@y>',
-      'Claude Opus 5 / Claude Fable 5.1 <x@y>',
-      'Claude Opus 5 (1M, extended) <a@x>',
-      'Claude Opus 5 (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 (1M context) <c@x>',
+      `Claude <${MAIN_AT}>`,
+      `Claude Haiku 4.5 (${MAIN_WORD} mode) <x@y>`,
+      `Claude Sonnet 5 / Claude ${OLD_MAIN} <x@y>`,
+      `Claude ${OLD_MAIN} / Claude ${SCARCE.displayName} <x@y>`,
+      `Claude ${OLD_MAIN} (1M, extended) <a@x>`,
+      `Claude ${OLD_MAIN} (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude ${OLD_MAIN} (1M context) <c@x>`,
     ]) {
       const blocked = evaluateCommitTrailers(`x\n\nCo-Authored-By: ${t}\n`, POLICY_NEUTRAL).block
       expect(blocked, t).toBe(classifyTrailer(t, POLICY_NEUTRAL) !== 'allowed')
@@ -477,11 +501,11 @@ describe('the allowlist is matched against the parsed name', () => {
 
 describe('findUnidentifiedCommits', () => {
   const log = [
-    line('1111111', '2026-07-24T21:00:00Z', 'Claude <noreply@anthropic.com>'), // before baseline
-    line('2222222', '2026-07-24T22:30:00Z', 'Claude <noreply@anthropic.com>'),
-    line('3333333', '2026-07-24T23:00:00Z', 'Claude Haiku 4.5 <noreply@anthropic.com>'),
+    line('1111111', '2026-07-24T21:00:00Z', `Claude <${MAIN_AT}>`), // before baseline
+    line('2222222', '2026-07-24T22:30:00Z', `Claude <${MAIN_AT}>`),
+    line('3333333', '2026-07-24T23:00:00Z', `Claude Haiku 4.5 <${MAIN_AT}>`),
     line('4444444', '2026-07-24T23:10:00Z', ''),
-    line('5555555', '2026-07-24T23:20:00Z', 'Claude Opus 5 <noreply@anthropic.com>'),
+    line('5555555', '2026-07-24T23:20:00Z', `Claude ${OLD_MAIN} <${MAIN_AT}>`),
     line('6666666', '2026-07-24T23:30:00Z', 'Patrick von Massow <patrick@example.com>'),
   ].join('\n')
 
@@ -498,7 +522,7 @@ describe('findUnidentifiedCommits', () => {
 })
 
 describe('the two block texts', () => {
-  const hits = [{ sha: '652a8ba1111', trailer: 'Claude <noreply@anthropic.com>' }]
+  const hits = [{ sha: '652a8ba1111', trailer: `Claude <${MAIN_AT}>` }]
 
   it('the unnamed one names the commit and where the answer lives', () => {
     const text = formatUnidentifiedReason(hits)
@@ -545,11 +569,11 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
 
   it('accepts each allowed spelling, with and without the context suffix', () => {
     for (const t of [
-      'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
-      'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>',
-      'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
-      'Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>',
-      'Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>',
+      `Co-Authored-By: Claude ${OLD_MAIN} <${MAIN_AT}>`,
+      `Co-Authored-By: Claude ${OLD_MAIN} (1M context) <${MAIN_AT}>`,
+      `Co-Authored-By: Claude ${FALLBACK} <${MAIN_AT}>`,
+      `Co-Authored-By: Claude ${FALLBACK} (1M context) <${MAIN_AT}>`,
+      `Co-Authored-By: Claude ${SCARCE.displayName} <${MAIN_AT}>`,
     ]) expect(evaluateCommitTrailers(msg(t), POLICY_NEUTRAL).block, t).toBe(false)
     // every spelling the refusal advertises must itself pass the gate
     for (const t of allowedTrailers(POLICY_NEUTRAL)) {
@@ -559,22 +583,22 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
 
   it('keeps a documented reviewer separate from the author and validates both', () => {
     const message = msg(
-      'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
-      'Reviewed-By: GPT-6 Astra <noreply@openai.com>',
+      `Co-Authored-By: Claude ${OLD_MAIN} <${MAIN_AT}>`,
+      `Reviewed-By: ${OLD_CROSS} <${CROSS_AT}>`,
     )
-    expect(modelTrailerIdentities(message)).toEqual({ authors: ['Opus 5'], reviewers: ['GPT 6 Astra'] })
-    expect(reviewerTrailers(message)).toEqual(['GPT-6 Astra <noreply@openai.com>'])
+    expect(modelTrailerIdentities(message)).toEqual({ authors: [`${OLD_MAIN}`], reviewers: [`${bare(OLD_CROSS)}`] })
+    expect(reviewerTrailers(message)).toEqual([`${OLD_CROSS} <${CROSS_AT}>`])
     expect(evaluateCommitTrailers(message, POLICY_NEUTRAL).block).toBe(false)
     expect(allowedReviewerTrailers(POLICY_NEUTRAL)).toContain(
-      'Reviewed-By: GPT-6 Astra <noreply@openai.com>',
+      `Reviewed-By: ${trailerFor('cross')}`,
     )
   })
 
   it('refuses undocumented or malformed reviewer model trailers', () => {
     const undocumented = evaluateCommitTrailers(
       msg(
-        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
-        'Reviewer: GPT-5.6 Sol <noreply@openai.com>',
+        `Co-Authored-By: Claude ${OLD_MAIN} <${MAIN_AT}>`,
+        `Reviewer: ${OLDEST_CROSS} <${CROSS_AT}>`,
       ),
       POLICY_NEUTRAL,
     )
@@ -582,7 +606,7 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
     expect(undocumented.findings[0].rule).toBe('undocumented-reviewer-trailer')
 
     const unnamed = evaluateCommitTrailers(
-      msg('Reviewed-By: Claude <noreply@anthropic.com>'),
+      msg(`Reviewed-By: Claude <${MAIN_AT}>`),
       POLICY_NEUTRAL,
     )
     expect(unnamed.block).toBe(true)
@@ -590,13 +614,13 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
   })
 
   it('rejects the bare trailer', () => {
-    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude <noreply@anthropic.com>'))
+    const v = evaluateCommitTrailers(msg(`Co-Authored-By: Claude <${MAIN_AT}>`))
     expect(v.block).toBe(true)
     expect(v.findings[0].rule).toBe('unnamed-model-trailer')
   })
 
   it('rejects a named model outside the allowlist', () => {
-    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>'))
+    const v = evaluateCommitTrailers(msg(`Co-Authored-By: Claude Haiku 4.5 <${MAIN_AT}>`))
     expect(v.block).toBe(true)
     expect(v.findings[0].rule).toBe('forbidden-model-trailer')
   })
@@ -609,22 +633,22 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
   })
 
   it('rejects a forbidden name that merely carries an allowed word', () => {
-    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Haiku 4.5 (opus mode) <x@y>'))
+    const v = evaluateCommitTrailers(msg(`Co-Authored-By: Claude Haiku 4.5 (${MAIN_WORD} mode) <x@y>`))
     expect(v.block).toBe(true)
     expect(v.findings[0].rule).toBe('forbidden-model-trailer')
   })
 
   it('rejects a trailer naming two models and names both', () => {
-    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Sonnet 5 / Claude Opus 5 <x@y>'))
+    const v = evaluateCommitTrailers(msg(`Co-Authored-By: Claude Sonnet 5 / Claude ${OLD_MAIN} <x@y>`))
     expect(v.block).toBe(true)
     expect(v.findings[0].rule).toBe('forbidden-model-trailer')
     const both = evaluateCommitTrailers(
-      msg('Co-Authored-By: Claude Opus 5 / Claude Fable 5.1 <x@y>'),
+      msg(`Co-Authored-By: Claude ${OLD_MAIN} / Claude ${SCARCE.displayName} <x@y>`),
       POLICY_NEUTRAL,
     )
     expect(both.block).toBe(true)
     expect(both.findings[0].rule).toBe('multiple-model-trailer')
-    expect(both.findings[0].detail).toContain('Opus 5, Fable 5.1')
+    expect(both.findings[0].detail).toContain(`${OLD_MAIN}, ${SCARCE.displayName}`)
     expect(formatCommitTrailerVerdict(both)).toContain('multiple-model-trailer')
   })
 
@@ -637,66 +661,66 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
 
   it('flags a bare trailer standing beside a named one', () => {
     const v = evaluateCommitTrailers(
-      msg('Co-Authored-By: Claude Opus 5 <a@x>', 'Co-Authored-By: Claude <b@x>'),
+      msg(`Co-Authored-By: Claude ${OLD_MAIN} <a@x>`, 'Co-Authored-By: Claude <b@x>'),
     )
     expect(v.block).toBe(true)
     expect(v.findings).toHaveLength(1)
   })
 
   it('reads trailers case-insensitively and never out of a comment line', () => {
-    expect(coAuthorTrailers('x\n\nco-authored-by: Claude Opus 5 <a@x>\n')).toEqual(['Claude Opus 5 <a@x>'])
+    expect(coAuthorTrailers(`x\n\nco-authored-by: Claude ${OLD_MAIN} <a@x>\n`)).toEqual([`Claude ${OLD_MAIN} <a@x>`])
     expect(coAuthorTrailers('x\n\n# Co-Authored-By: Claude <a@x>\n')).toEqual([])
     expect(evaluateCommitTrailers('x\n\n# Co-Authored-By: Claude <a@x>\n').block).toBe(false)
   })
 
   it('the refusal prints the exact trailer to write and where to look it up', () => {
     const text = formatCommitTrailerVerdict(
-      evaluateCommitTrailers(msg('Co-Authored-By: Claude <noreply@anthropic.com>'), POLICY_NEUTRAL),
+      evaluateCommitTrailers(msg(`Co-Authored-By: Claude <${MAIN_AT}>`), POLICY_NEUTRAL),
     )
-    expect(text).toContain(`Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
-    expect(text).toContain('Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>')
-    expect(text).toContain('Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>')
+    expect(text).toContain(`Co-Authored-By: ${trailerFor('main')}`)
+    expect(text).toContain(`Co-Authored-By: ${trailerFor('scarce')}`)
+    expect(text).toContain(`Co-Authored-By: ${trailerFor('main-fallback')}`)
     expect(text).toContain('~/.claude/projects/')
     expect(formatCommitTrailerVerdict({ block: false, findings: [] })).toBe('')
   })
 })
 
-// POINT 667: the OpenAI AUTHORING lane. Sol may author under the role swap —
+// POINT 667: the cross AUTHORING lane. It may author under the role swap —
 // where it authors, Claude reviews — so its trailer must pass the guard. The
 // same change TIGHTENS everything around it: a non-Claude trailer used to be
 // read as "no model evidence" and waved through whatever model it named.
-describe('the GPT-6 Astra authoring lane', () => {
+describe('the cross authoring lane', () => {
   const msg = (...trailers) => `Do a thing\n\n${trailers.join('\n')}\n`
 
-  it('accepts a Sol-authored commit as an author', () => {
+  it('accepts a cross-lane-authored commit as an author', () => {
     for (const t of [
-      'GPT-5.6 Sol <noreply@openai.com>',
-      'GPT-5.6 Sol (high effort) <noreply@openai.com>',
-      'gpt-6-astra <noreply@openai.com>',
-      'Sol <noreply@openai.com>',
+      `${OLDEST_CROSS} <${CROSS_AT}>`,
+      `${OLDEST_CROSS} (high effort) <${CROSS_AT}>`,
+      `${OLD_CROSS_ID} <${CROSS_AT}>`,
+      `${CROSS_WORD} <${CROSS_AT}>`,
     ]) {
       expect(judgeTrailer(t).verdict, t).toBe('allowed')
       expect(classifyTrailer(t), t).toBe('allowed')
       expect(isPolicyBreach(t), t).toBe(false)
     }
-    expect(modelNamesIn('GPT-5.6 Sol <noreply@openai.com>')).toEqual(['GPT 5.6 Sol'])
-    expect(modelNameIn('GPT-5.6 Sol <noreply@openai.com>')).toBe('GPT 5.6 Sol')
+    expect(modelNamesIn(`${OLDEST_CROSS} <${CROSS_AT}>`)).toEqual([`${bare(OLDEST_CROSS)}`])
+    expect(modelNameIn(`${OLDEST_CROSS} <${CROSS_AT}>`)).toBe(`${bare(OLDEST_CROSS)}`)
   })
 
-  it('advertises the Astra trailer, and every advertised trailer passes the gate', () => {
-    expect(allowedTrailers(POLICY_NEUTRAL)).toContain('Co-Authored-By: GPT-6 Astra <noreply@openai.com>')
+  it('advertises the cross-lane trailer, and every advertised trailer passes the gate', () => {
+    expect(allowedTrailers(POLICY_NEUTRAL)).toContain(`Co-Authored-By: ${trailerFor('cross')}`)
     for (const t of allowedTrailers(POLICY_NEUTRAL)) {
       expect(evaluateCommitTrailers(msg(t), POLICY_NEUTRAL).block, t).toBe(false)
     }
   })
 
-  it('names only SOL, never GPT at large — another GPT is a breach like any other', () => {
+  it('names only the cross family, never the vendor marker at large — another model of that vendor is a breach like any other', () => {
     // It judges the name `modelNamesIn` PARSED, where the separators are already
     // spaces — the raw hyphenated id is covered through a trailer above.
-    for (const name of ['GPT 5.6 Sol', 'gpt 5.6 sol', 'sol', 'Sol 5.6', 'SOL']) {
+    for (const name of [`${bare(OLDEST_CROSS)}`, `${bare(OLDEST_CROSS).toLowerCase()}`, CROSS_WORD.toLowerCase(), `${CROSS_WORD} 5.6`, CROSS_WORD.toUpperCase()]) {
       expect(isAllowedModelName(name), name).toBe(true)
     }
-    for (const name of ['GPT 5.6', 'GPT 4o mini', 'gpt', 'Solaris 2', 'Sol Turbo', 'Codex', '']) {
+    for (const name of [`${MARKER} 5.6`, `${MARKER} 4o mini`, MARKER.toLowerCase(), `${CROSS_WORD}aris 2`, `${CROSS_WORD} Turbo`, 'Codex', '']) {
       expect(isAllowedModelName(name), name).toBe(false)
     }
   })
@@ -705,11 +729,11 @@ describe('the GPT-6 Astra authoring lane', () => {
     // Before point 667 each of these carried no "Claude" token, so the guard read
     // them as a human co-author — no model evidence — and passed them. The list
     // was widened by the cross-vendor review of this branch (P0): naming only
-    // gpt/sol left `Haiku 4.5 <x@y>` walking past the tripwire built for it.
+    // the cross marker and family left `Haiku 4.5 <x@y>` walking past the tripwire built for it.
     for (const t of [
-      'GPT-4o mini <x@y>',
-      'GPT-5.6 <x@y>',
-      'gpt-4.1 <x@y>',
+      `${MARKER}-4o mini <x@y>`,
+      `${MARKER}-5.6 <x@y>`,
+      `${MARKER.toLowerCase()}-4.1 <x@y>`,
       'Haiku 4.5 <x@y>',
       'Sonnet 5 <x@y>',
       'Gemini 2.5 Pro <x@y>',
@@ -721,7 +745,7 @@ describe('the GPT-6 Astra authoring lane', () => {
       expect(evaluateCommitTrailers(msg(`Co-Authored-By: ${t}`)).findings[0].rule, t).toBe('forbidden-model-trailer')
     }
     // …while the allowed families stay allowed without the vendor word too.
-    for (const t of ['Opus 5 <x@y>', 'Fable 5.1 <x@y>']) {
+    for (const t of [`${OLD_MAIN} <x@y>`, `${SCARCE.displayName} <x@y>`]) {
       expect(classifyTrailer(t, POLICY_NEUTRAL), t).toBe('allowed')
     }
   })
@@ -731,33 +755,33 @@ describe('the GPT-6 Astra authoring lane', () => {
     // name written FIRST was invisible — the smuggling shape point 527 closed
     // only on the far side, because every test wrote the bad model second.
     for (const t of [
-      'Sonnet 5 / Claude Opus 5 <x@y>',
-      'GPT-4o mini / Claude Opus 5 <x@y>',
-      'Haiku 4.5 and Claude Fable 5.1 <x@y>',
+      `Sonnet 5 / Claude ${OLD_MAIN} <x@y>`,
+      `${MARKER}-4o mini / Claude ${OLD_MAIN} <x@y>`,
+      `Haiku 4.5 and Claude ${SCARCE.displayName} <x@y>`,
     ]) {
       expect(classifyTrailer(t), t).toBe('forbidden')
       expect(isPolicyBreach(t), t).toBe(true)
     }
     // Two ALLOWED names in one value still show no single author.
-    expect(classifyTrailer('Opus 4.8 / Claude Opus 5 <x@y>')).toBe('unidentified')
+    expect(classifyTrailer(`${FALLBACK} / Claude ${OLD_MAIN} <x@y>`)).toBe('unidentified')
     // …and an ordinary trailer has nothing in front of the token at all.
-    expect(modelNamesIn('Claude Opus 5 <noreply@anthropic.com>')).toEqual(['Opus 5'])
-    expect(modelNamesIn('Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>')).toEqual(['Opus 5'])
+    expect(modelNamesIn(`Claude ${OLD_MAIN} <${MAIN_AT}>`)).toEqual([`${OLD_MAIN}`])
+    expect(modelNamesIn(`Co-Authored-By: Claude ${OLD_MAIN} <${MAIN_AT}>`)).toEqual([`${OLD_MAIN}`])
   })
 
-  it('leaves the Anthropic lane exactly as it was', () => {
+  it('leaves the main vendor\'s lanes exactly as they were', () => {
     for (const t of HISTORIC_TRAILERS) expect(classifyTrailer(t, POLICY_NEUTRAL), t).toBe('allowed')
     for (const [t, want] of HISTORIC_REJECTS) expect(classifyTrailer(t), t).toBe(want)
     // The protection that must not weaken: the 24.07.2026 degradation.
-    expect(classifyTrailer('Claude Haiku 4.5 <noreply@anthropic.com>')).toBe('forbidden')
-    expect(classifyTrailer('Claude Sonnet 5 <noreply@anthropic.com>')).toBe('forbidden')
+    expect(classifyTrailer(`Claude Haiku 4.5 <${MAIN_AT}>`)).toBe('forbidden')
+    expect(classifyTrailer(`Claude Sonnet 5 <${MAIN_AT}>`)).toBe('forbidden')
     // …and the unnamed trailer stays resolvable rather than a breach.
-    expect(classifyTrailer('Claude <noreply@anthropic.com>')).toBe('unidentified')
+    expect(classifyTrailer(`Claude <${MAIN_AT}>`)).toBe('unidentified')
   })
 
   it('is not fooled by a line naming both vendors', () => {
     // One value naming two models shows which single model authored it: neither.
-    expect(classifyTrailer('Claude Opus 5 and GPT-5.6 Sol <x@y>')).toBe('forbidden')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} and ${OLDEST_CROSS} <x@y>`)).toBe('forbidden')
     // A human co-author is still not model evidence.
     expect(classifyTrailer('Patrick von Massow <patrick@example.com>')).toBe('allowed')
     expect(modelNamesIn('Patrick von Massow <patrick@example.com>')).toEqual([])
@@ -765,57 +789,105 @@ describe('the GPT-6 Astra authoring lane', () => {
 
   it('reads a model out of a SUFFIX instead of stripping the claim away (2nd round)', () => {
     // The `(1M context)` / `[1m]` strip took a forbidden name with it, so a
-    // suffix was a place to hide one: these read as the allowed `Opus 5`.
-    expect(classifyTrailer('Claude Opus 5 (Haiku 4.5) <x@y>')).toBe('forbidden')
-    expect(classifyTrailer('Claude Opus 5 [Sonnet 5] <x@y>')).toBe('forbidden')
+    // suffix was a place to hide one: these read as the allowed main-lane name.
+    expect(classifyTrailer(`Claude ${OLD_MAIN} (Haiku 4.5) <x@y>`)).toBe('forbidden')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} [Sonnet 5] <x@y>`)).toBe('forbidden')
     // …while the suffixes it exists for still vanish.
-    expect(classifyTrailer('Claude Opus 5 (1M context) <x@y>')).toBe('allowed')
-    expect(classifyTrailer('Claude claude-opus-5[1m] <x@y>')).toBe('allowed')
+    expect(classifyTrailer(`Claude ${OLD_MAIN} (1M context) <x@y>`)).toBe('allowed')
+    expect(classifyTrailer(`Claude ${OLD_MAIN_ID} <x@y>`)).toBe('allowed')
     // …and a bracketed name that IDENTIFIES the model is kept, not dropped.
-    expect(classifyTrailer('GPT-5.6 (Sol) <noreply@openai.com>')).toBe('allowed')
+    expect(classifyTrailer(`${MARKER}-5.6 (${CROSS_WORD}) <${CROSS_AT}>`)).toBe('allowed')
   })
 
   it('knows a model by its VENDOR ADDRESS when the name means nothing to it (2nd round)', () => {
-    // No word list can hold every future family: `o3`, `ChatGPT-4o`, `GPT4o`
-    // matched none of it, so an unknown OpenAI model was not model evidence.
-    for (const t of ['OpenAI o3 <noreply@openai.com>', 'some-new-model-9 <noreply@openai.com>', 'ChatGPT-4o <x@y>', 'GPT4o <x@y>']) {
+    // No word list can hold every future family: `o3`, `Chat<marker>-4o`, `<marker>4o`
+    // matched none of it, so an unknown cross-vendor model was not model evidence.
+    for (const t of [`${CROSS_VENDOR} o3 <${CROSS_AT}>`, `some-new-model-9 <${CROSS_AT}>`, `Chat${MARKER}-4o <x@y>`, `${MARKER}4o <x@y>`]) {
       expect(classifyTrailer(t), t).toBe('forbidden')
     }
     // The bare vendor trailer names nothing — resolvable, not a breach.
-    expect(classifyTrailer('<noreply@openai.com>')).toBe('unidentified')
+    expect(classifyTrailer(`<${CROSS_AT}>`)).toBe('unidentified')
   })
 
   it('does not redden a HUMAN whose name happens to be a family word (2nd round)', () => {
     // The widened recognition cut the other way: a family word ALONE made
     // `Sol Smith` a forbidden model. A non-Claude trailer is model evidence only
     // with a version beside the word, or a vendor address.
-    for (const t of ['Sol Smith <s@example.com>', 'Grok Andersen <g@example.com>', 'Patrick von Massow <p@example.com>']) {
+    for (const t of [`${CROSS_WORD} Smith <s@example.com>`, 'Grok Andersen <g@example.com>', 'Patrick von Massow <p@example.com>']) {
       expect(classifyTrailer(t), t).toBe('allowed')
       expect(modelNamesIn(t), t).toEqual([])
     }
     // A version, or the vendor's own address, still identifies the model.
-    expect(classifyTrailer('Sol <noreply@openai.com>')).toBe('allowed')
+    expect(classifyTrailer(`${CROSS_WORD} <${CROSS_AT}>`)).toBe('allowed')
     expect(classifyTrailer('Haiku 4.5 <s@example.com>')).toBe('forbidden')
     // THIRD ROUND, both halves of the same over-reach: a person who WORKS at a
     // vendor is not a model, and a digit merely present in the line is not a
-    // version. `alice@openai.com` and `Sol Smith 2nd` were both read as models.
-    for (const t of ['Alice <alice@openai.com>', 'Sol Smith 2nd <s@example.com>', 'Bob Grok III <b@anthropic.com>']) {
+    // version. `alice@<cross vendor>.com` and `Sol Smith 2nd` were both read as models.
+    for (const t of [`Alice <alice@${CROSS_HOST}>`, `${CROSS_WORD} Smith 2nd <s@example.com>`, `Bob Grok III <b@${MAIN_HOST}>`]) {
       expect(classifyTrailer(t), t).toBe('allowed')
       expect(modelNamesIn(t), t).toEqual([])
     }
     // …while the bot addresses our harnesses actually write still identify one.
-    for (const t of ['OpenAI o3 <noreply@openai.com>', 'whatever-9 <bot@anthropic.com>']) {
+    for (const t of [`${CROSS_VENDOR} o3 <${CROSS_AT}>`, `whatever-9 <bot@${MAIN_HOST}>`]) {
       expect(classifyTrailer(t), t).toBe('forbidden')
     }
   })
 
   it('finds a forbidden non-Claude commit in the log window', () => {
     const log = [
-      line('aaaaaaa', '2026-08-13T09:00:00Z', 'GPT-5.6 Sol <noreply@openai.com>'),
-      line('bbbbbbb', '2026-08-13T09:10:00Z', 'GPT-4o mini <x@y>'),
+      line('aaaaaaa', '2026-08-13T09:00:00Z', `${OLDEST_CROSS} <${CROSS_AT}>`),
+      line('bbbbbbb', '2026-08-13T09:10:00Z', `${MARKER}-4o mini <x@y>`),
     ].join('\n')
     expect(findForbiddenCommits(log, T0).map((h) => h.sha)).toEqual(['bbbbbbb'])
     expect(findUnidentifiedCommits(log, T0)).toEqual([])
-    expect(formatForbiddenReason(findForbiddenCommits(log, T0))).toContain('GPT-6 Astra')
+    expect(formatForbiddenReason(findForbiddenCommits(log, T0))).toContain(CROSS.displayName)
+  })
+})
+
+describe('turn end with an absent switch state (cloud clone, 22.10.2026)', () => {
+  // A fresh clone has no untracked .claude lane-switch file: that looped a cloud
+  // session through repeated stop refusals.
+  const absent = readState(null, 'scarce')
+  const log = [
+    line('aaaaaaa', '2026-07-24T22:30:00Z', `Claude ${SCARCE.displayName} <${MAIN_AT}>`),
+    line('bbbbbbb', '2026-07-24T22:40:00Z', `Claude Sonnet 5 <${MAIN_AT}>`),
+  ].join('\n')
+
+  it('does not refuse; it gives a notice and judges the scarce lane as off', () => {
+    expect(absent.ok).toBe(false)
+    const v = turnEndScarceState(absent)
+    expect(v.refuse).toBe('')
+    expect(v.notice).toMatch(/judged OFF/)
+    expect(v.scarceState).toMatchObject({ ok: true, state: 'off' })
+    expect(findForbiddenCommits('', T0, v.scarceState)).toEqual([])
+  })
+
+  it('a scarce-lane or out-of-chain commit still trips under the absent state', () => {
+    const { scarceState } = turnEndScarceState(absent)
+    expect(findForbiddenCommits(log, T0, scarceState).map((h) => h.sha)).toEqual(['aaaaaaa', 'bbbbbbb'])
+  })
+
+  it('a recorded OFF still trips a scarce-lane commit, exactly as before', () => {
+    const v = turnEndScarceState(SCARCE_OFF)
+    expect(v).toEqual({ scarceState: SCARCE_OFF, refuse: '', notice: '' })
+    expect(findForbiddenCommits(log, T0, v.scarceState).map((h) => h.sha)).toEqual(['aaaaaaa', 'bbbbbbb'])
+  })
+
+  it('a garbled or unreadable state still refuses', () => {
+    for (const broken of [readState('{not json', 'scarce'), readState('{"state":"off"}', 'scarce')]) {
+      const v = turnEndScarceState(broken)
+      expect(v.refuse).toMatch(/^SERVING-MODEL TRIPWIRE: /)
+      expect(v.notice).toBe('')
+    }
+  })
+
+  it('only a genuinely missing file or lane key counts as absent; a null or malformed entry still refuses', () => {
+    expect(turnEndScarceState(readState(null, 'scarce')).refuse).toBe('')
+    expect(turnEndScarceState(readState('{"lanes":{}}', 'scarce')).refuse).toBe('')
+    for (const raw of ['{"lanes":{"scarce":null}}', '{"lanes":{"scarce":{"state":"off"}}}', '{"lanes":{"scarce":"on"}}']) {
+      const state = readState(raw, 'scarce')
+      expect(state.absent, raw).toBeUndefined()
+      expect(turnEndScarceState(state).refuse, raw).toMatch(/^SERVING-MODEL TRIPWIRE: /)
+    }
   })
 })

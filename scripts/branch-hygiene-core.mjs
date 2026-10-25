@@ -25,6 +25,8 @@ export const DEFAULT_GRACE_MS = 10 * 60 * 1000
 
 /** Refs that are never debris, whatever `--merged` says about them. */
 const PROTECTED_REFS = new Set(['main', 'origin/main', 'origin/head', 'head', '@'])
+/** A doctor rescue branch holds work-order bytes a person must inspect — never debris (21.10.2026). */
+const isRescueRef = (name) => /^(origin\/)?rescue\//.test(name)
 
 /** `refs/heads/x`, `heads/x` and `x@{0}` all name the same branch here, and
  *  `refs/remotes/origin/x` becomes `origin/x`. The remote name is deliberately
@@ -204,7 +206,7 @@ export function assessBranchHygiene({
   // 2. LOCAL branches.
   for (const b of Array.isArray(localMerged) ? localMerged : []) {
     const name = normBranch(b?.name)
-    if (!name || PROTECTED_REFS.has(name)) continue
+    if (!name || PROTECTED_REFS.has(name) || isRescueRef(name)) continue
     if (heldBranches.has(name) || protectedByWorktree.has(name) || stubOfExistingTree(name)) continue
     if (fresh(b?.tipAt) || onMainTip(b?.tipSha)) continue
     findings.push({
@@ -221,7 +223,7 @@ export function assessBranchHygiene({
   //    point: the containment test is the rule, not a name list.
   for (const b of Array.isArray(remoteMerged) ? remoteMerged : []) {
     const name = normBranch(b?.name)
-    if (!name || PROTECTED_REFS.has(name)) continue
+    if (!name || PROTECTED_REFS.has(name) || isRescueRef(name)) continue
     const bare = name.replace(/^origin\//, '')
     if (heldBranches.has(bare) || heldBranches.has(name) || protectedByWorktree.has(bare) || stubOfExistingTree(bare))
       continue

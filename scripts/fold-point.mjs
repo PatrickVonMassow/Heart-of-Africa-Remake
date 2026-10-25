@@ -1,6 +1,6 @@
 // FOLD A POINT AWAY — tick, archive move and Erledigt card in one command (point 614).
 //
-//   node scripts/fold-point.mjs 613 --into 720 --model "Claude Opus 5.5"
+//   node scripts/fold-point.mjs 613 --into 720 --model "<the author's trailer name>"
 //   node scripts/fold-point.mjs 613 --delivered "der Fix sitzt seit c0ffee in main" --model "…"
 //   node scripts/fold-point.mjs 613 --into 720 --model "…" --dry        print the plan, touch nothing
 //   node scripts/fold-point.mjs 613 --into 720 --text-stdin --model "…" German card text on stdin
@@ -36,7 +36,7 @@ import { isMainModule } from './is-main.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import { berlinStamp, resolveCardText, TEXT_STDIN_FLAG } from './board-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
@@ -170,7 +170,7 @@ function main(argv) {
       if (e.repair) console.error(`  repair: ${e.repair}`)
       return 2
     }
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     if (!fableState.ok) {
       console.error(`fold-point: ${fableState.problem}`)
       return 2

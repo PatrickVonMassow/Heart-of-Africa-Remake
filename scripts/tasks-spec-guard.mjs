@@ -11,7 +11,7 @@ import { execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { evaluate } from './tasks-spec-guard-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 
@@ -88,8 +88,8 @@ function tasksAt(revision) {
  */
 export function gatherTasksSpecInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  if (!ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: 'not-lock-owner' }
   }
   if (!existsSync(TASKS)) return { applicable: false, why: 'no TASKS.md in this checkout' }
   const head = git('rev-parse HEAD')

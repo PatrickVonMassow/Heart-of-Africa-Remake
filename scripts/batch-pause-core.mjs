@@ -164,7 +164,7 @@ const isoOrNull = (v) => {
  * A full ISO stamp — date AND time. `Date.parse` alone would read the TRUNCATED
  * stamp of a torn write ("retry-after: 2026") as 1 January of that year, which is
  * in the past, which resumes the batch: the one corruption mode that can flip this
- * mechanism toward the unsafe direction (four-eyes review, Fable 5, finding 4).
+ * mechanism toward the unsafe direction (four-eyes review, finding 4).
  */
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
 

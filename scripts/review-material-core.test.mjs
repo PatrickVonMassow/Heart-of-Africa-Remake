@@ -16,6 +16,7 @@ import {
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
   MAX_PASS_TOTAL,
+  narrowPassStats,
   parseDiffHeader,
   parsePassFiles,
   parsePassSpec,
@@ -30,7 +31,8 @@ import {
   unquoteGitPath,
   worstVerdict,
 } from './review-material-core.mjs'
-import { formatReviewReport, OUTCOME } from './review-astra-core.mjs'
+import { formatReviewReport, OUTCOME } from './cross-review-core.mjs'
+import { CROSS, MAIN } from './model-lanes.mjs'
 
 const file = (path, size, ch = 'x') => ({ path, text: ch.repeat(size) })
 const patchFor = (paths) =>
@@ -458,7 +460,7 @@ describe('opaque file bodies are absent by design', () => {
   })
 })
 
-// These two reviewer-facing rulings are formatted in review-astra-core.mjs, but
+// These two reviewer-facing rulings are formatted in cross-review-core.mjs, but
 // belong in the material suite too: a reader checking pass delivery here must
 // see that one recorded pass never reads as range clearance, and that the route
 // to the remainder consults the ledger rather than assuming numeric order.
@@ -475,7 +477,7 @@ describe('the pass report keeps the range warning and ledger pointer', () => {
         decision: {
           fellBack: false,
           ready: true,
-          model: 'GPT-5.6 Sol',
+          model: CROSS.displayName,
           verdict: 'merge',
           evidence: 'read this pass whole and found no issue',
         },
@@ -490,8 +492,8 @@ describe('the pass report keeps the range warning and ledger pointer', () => {
           fellBack: true,
           ready: false,
           kind: OUTCOME.SWITCHED_OFF,
-          cause: 'the share switch is claude-only',
-          model: 'Opus 5',
+          cause: 'the routing setting is main-only',
+          model: MAIN.displayName,
           verdict: '',
           evidence: '',
         },
@@ -1563,5 +1565,47 @@ describe('the composition a set of pass records rests on', () => {
 describe('the budget itself', () => {
   it('is the measured 200k the 17.08.2026 overflow was taken against', () => {
     expect(MATERIAL_BUDGET_CHARS).toBe(200_000)
+  })
+})
+
+describe('a range whose diffstat exceeds its share', () => {
+  const wholeStat = 'x'.repeat(600) // over the 500-character share of a 10k budget
+  const plan = planPasses({
+    stat: wholeStat,
+    patch: patchFor(['a.mjs', 'b.mjs']),
+    files: [file('a.mjs', 4500), file('b.mjs', 4500)],
+    budget: 10_000,
+  })
+
+  it('lets every pass carry its own stat and assemble whole', () => {
+    expect(plan.statTruncated).toBe(true)
+    expect(plan.passes.length).toBeGreaterThan(1)
+    const narrowed = narrowPassStats(plan, (files) => files.map((f) => ` ${f} | 1 +`).join('\n'), 10_000)
+    expect(narrowed.statTruncated).toBe(false)
+    for (const pass of narrowed.passes) {
+      const out = assembleMaterial({
+        stat: pass.stat,
+        patch: joinPatchSections(pass.files, patchSectionMap(patchFor(['a.mjs', 'b.mjs']))),
+        files: [file('a.mjs', 4500), file('b.mjs', 4500)].filter((f) => pass.files.includes(f.path)),
+        budget: 10_000,
+        patchRoom: pass.patchRoom,
+        patchOnly: pass.patchOnly,
+        manifest: formatPassManifest(narrowed, pass),
+      })
+      expect(out.statTruncated).toBe(false)
+      expect(out.fit).toBe(true)
+      expect(formatPassManifest(narrowed, pass)).toContain('covers ONLY this pass')
+    }
+  })
+
+  it('stays truncated when the own stat of a pass is still over the share', () => {
+    expect(narrowPassStats(plan, () => wholeStat, 10_000).statTruncated).toBe(true)
+    // Without an explicit budget the plan's own budget sets the share.
+    expect(narrowPassStats(plan, () => wholeStat).statTruncated).toBe(true)
+  })
+
+  it('leaves a plan whose stat fits untouched', () => {
+    const fitting = { ...plan, statTruncated: false }
+    expect(narrowPassStats(fitting, () => 'unused')).toBe(fitting)
   })
 })

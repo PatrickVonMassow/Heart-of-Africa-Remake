@@ -44,6 +44,23 @@ export const VILLAGE_SPOTS = {
   well: [9, 8.5] as [number, number],
 }
 
+/** Where a talker of a conversing pair stands and which way it faces. */
+export interface TalkerStance {
+  x: number
+  z: number
+  yaw: number
+}
+
+/** The conversing pair around its spot: a metre apart, face to face — A looks
+ *  along world +x, B along −x. Fixed for the pair's life: a listener does not
+ *  swivel on his soles (the fidget of the 21.10.2026 report). */
+export function talkerStances(x: number, z: number): TalkerStance[] {
+  return [
+    { x: x - 0.5, z, yaw: Math.PI / 2 },
+    { x: x + 0.5, z, yaw: -Math.PI / 2 },
+  ]
+}
+
 /** Chatting pair on the port plaza. */
 export const PORT_TALKERS: [number, number] = [6, 6]
 

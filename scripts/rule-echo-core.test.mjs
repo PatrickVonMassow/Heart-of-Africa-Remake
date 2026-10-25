@@ -212,14 +212,14 @@ describe('the registry itself', () => {
     expect(rule.source).toEqual({ file: 'CLAUDE.md', startsWith: '- **Model policy' })
     expect(rule.echoes.map((e) => e.file)).toEqual([
       'docs/maximum-qa.md',
-      'docs/astra-routing.md',
+      'docs/lane-routing.md',
       'scripts/author-routing-core.mjs',
-      'scripts/author-astra-core.mjs',
+      'scripts/author-delegate-core.mjs',
       'scripts/batch-autostart-core.mjs',
       'scripts/batch-resume-hook.mjs',
       'scripts/model-guard-core.mjs',
-      'scripts/review-astra-core.mjs',
-      'scripts/astra-share-core.mjs',
+      'scripts/cross-review-core.mjs',
+      'scripts/lane-routing-core.mjs',
       'memory/hard-cases-go-to-sol.md',
       'memory/fable-sparingly.md',
       'memory/serving-model-watch.md',
@@ -269,11 +269,11 @@ describe('memoryDirs', () => {
 
 describe('quoteIsInFile', () => {
   it('accepts a verbatim phrase, across a line break too', () => {
-    expect(quoteIsInFile('the hard cases stay\n  with Opus 5 from now on', 'the hard cases stay with Opus 5').ok).toBe(true)
+    expect(quoteIsInFile('the hard cases stay\n  with the main lane from now on', 'the hard cases stay with the main lane').ok).toBe(true)
   })
 
   it('refuses a phrase that is not in the file — the whole point of it', () => {
-    expect(quoteIsInFile('some other text entirely, at length', 'the hard cases stay with Opus 5')).toMatchObject({
+    expect(quoteIsInFile('some other text entirely, at length', 'the hard cases stay with the main lane')).toMatchObject({
       ok: false,
       reason: 'that phrase does not occur in the file',
     })

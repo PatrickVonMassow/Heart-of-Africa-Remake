@@ -1,0 +1,653 @@
+// Pins the authoring lanes' decisions (point 667).
+//
+// The failure this lane must not have is the mirror of the read-only paths':
+// they refuse to record an answer nobody gave, and this one must refuse to
+// report work nobody did. So the cases are built around what GIT says, never
+// around what the run claimed about itself.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { evaluateCommitTrailers, allowedTrailers } from './model-guard-core.mjs'
+import {
+  AUTHOR_ROLES,
+  AUTHOR_TIMEOUT_MS,
+  authorCommitMessage,
+  authorLaneConfig,
+  authorTrailer,
+  authoringClaudeArgs,
+  authoringRuntime,
+  laneAuthoringOutcome,
+  parseClaudeAuthoringOutput,
+  authorCompletionMessage,
+  authoringCodexArgs,
+  buildAuthoringPrompt,
+  buildSpecExaminationPrompt,
+  childEnv,
+  formatAuthoringReport,
+  gatesProblem,
+  HOUSE_RULES,
+  isWithheldEnv,
+  judgeAuthoring,
+  parseAuthoringAnswer,
+  PUSH_INTERVAL_MS,
+  readinessProblems,
+  uncommittedSummary,
+  withheldEnvNames,
+} from './author-delegate-core.mjs'
+import { evaluateCommitMessage } from './commit-scope-guard-core.mjs'
+import { CROSS, MAIN, SCARCE, TEST_FOREIGN_MODELS, VENDORS, trailerFor } from './model-lanes.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
+
+const CROSS_TRAILER = `Co-Authored-By: ${trailerFor('cross')}`
+const crossCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: trailerFor('cross') })
+// A credential variable named the way a vendor SDK names it.
+const VENDOR_API_KEY = `${MAIN.vendor.toUpperCase()}_API_KEY`
+const okRun = { ok: true, kind: 'ok', cause: '' }
+const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: test:unit, build and lint all green\nOPEN: none\n')
+
+describe('the commit trailer of the lane', () => {
+  it('is the allowlist’s own spelling, and passes the commit-msg gate', () => {
+    expect(authorTrailer('cross')).toBe(`Co-Authored-By: ${CROSS.trailerName} <${VENDORS[CROSS.vendor].trailerAddress}>`)
+    expect(authorTrailer('scarce')).toBe(`Co-Authored-By: ${trailerFor('scarce')}`)
+    // The scarce lane's trailer is allowed while its switch is on.
+    const on = readState(JSON.stringify(writeState('on', { why: 'test', by: 'test', now: 1 })))
+    for (const role of AUTHOR_ROLES) {
+      expect(allowedTrailers(on)).toContain(authorTrailer(role))
+      expect(evaluateCommitTrailers(`Do a thing\n\n${authorTrailer(role)}\n`, on).block).toBe(false)
+    }
+  })
+})
+
+describe('author commit messages', () => {
+  it('marks an interim checkpoint with both halves of the rescue convention', () => {
+    const message = authorCommitMessage({ subject: 'Add branch selection', rescue: 'the guard tests are still in progress' })
+    expect(message.split('\n')[0]).toBe('Add branch selection [skip ci]')
+    expect(message).toContain('\nRescue: the guard tests are still in progress\n')
+    expect(message).toContain(`Rescue: the guard tests are still in progress\n${CROSS_TRAILER}`)
+    expect(message).toContain(CROSS_TRAILER)
+    expect(evaluateCommitMessage(message).block).toBe(false)
+  })
+
+  it('keeps both rescue halves out of the final completion commit', () => {
+    const message = authorCommitMessage({
+      subject: 'Complete the authored changes [skip ci]',
+      rescue: 'this must be ignored',
+      final: true,
+    })
+    expect(message).not.toMatch(/\[skip ci\]|^Rescue:/m)
+    expect(message).toContain(CROSS_TRAILER)
+    expect(evaluateCommitMessage(message).block).toBe(false)
+  })
+
+  it('offers no completion commit when the author run dies', () => {
+    expect(authorCompletionMessage({ clean: false, outcome: { cause: 'timeout' } })).toBe(null)
+    expect(authorCompletionMessage({ clean: true })).toBe(authorCommitMessage({ final: true }))
+  })
+})
+
+describe('authoringCodexArgs', () => {
+  it('bypasses the sandbox, because in this container there is none to use', () => {
+    // Measured: `codex sandbox read-only -- echo hi` dies in bwrap with "no
+    // permissions to create a new namespace". A reviewer works around that by
+    // being FED its material; an author that cannot run `git commit` cannot work.
+    const args = authoringCodexArgs({ cwd: '/w', outputFile: '/tmp/o', prompt: 'p' })
+    expect(args).toContain('--dangerously-bypass-approvals-and-sandbox')
+    expect(args).not.toContain('--sandbox')
+    expect(args.slice(args.indexOf('-C'), args.indexOf('-C') + 2)).toEqual(['-C', '/w'])
+    expect(args.slice(args.indexOf('-m'), args.indexOf('-m') + 2)).toEqual(['-m', CROSS.modelId])
+    expect(args[args.length - 1]).toBe('p')
+  })
+
+  it('carries the cross lane record\'s high reasoning effort on the authoring command line', () => {
+    expect(CROSS.reasoningEffort).toBe('high')
+    const args = authoringCodexArgs({ prompt: 'p' })
+    expect(args.slice(args.indexOf('-c'), args.indexOf('-c') + 2)).toEqual(['-c', 'model_reasoning_effort=high'])
+    // The runtime dispatch builds the same line for the cross lane.
+    expect(authoringRuntime('cross').args({ prompt: 'p' })).toEqual(args)
+  })
+
+  it('gives an authoring run room to build and test', () => {
+    expect(AUTHOR_TIMEOUT_MS).toBeGreaterThanOrEqual(30 * 60_000)
+  })
+
+  it('pushes often enough that an hour-long run is not an hour of local-only work', () => {
+    // The house rule is a push after every commit; the child cannot be given a
+    // credential, so the wrapper pushes on this interval (cross-vendor P2).
+    expect(PUSH_INTERVAL_MS).toBeGreaterThan(0)
+    expect(PUSH_INTERVAL_MS).toBeLessThanOrEqual(5 * 60_000)
+    expect(HOUSE_RULES.join(' ')).toMatch(/pushed FOR you/)
+    expect(HOUSE_RULES.join(' ')).toMatch(/Do NOT change branch/)
+  })
+})
+
+describe('childEnv — the one enforcement left once the sandbox is off', () => {
+  it('withholds anything that reads like a credential, and keeps the rest', () => {
+    const env = {
+      PATH: '/usr/bin',
+      HOME: '/home/node',
+      CODEX_HOME: '/home/node/.codex',
+      GH_TOKEN: 'ghp_x',
+      GITHUB_TOKEN: 'ghp_y',
+      [VENDOR_API_KEY]: 'sk-a',
+      NPM_TOKEN: 'npm_z',
+      MY_SECRET: 's',
+      GIT_ASKPASS: '/x',
+      SSH_AUTH_SOCK: '/s',
+      AWS_ACCESS_KEY_ID: 'a',
+      DATABASE_URL: 'postgres://x',
+      CI_JOB_JWT: 'j',
+      GIT_AUTHOR_NAME: 'Fixture',
+      DB_PASSWORD: 'p',
+      SOME_PRIVATE_KEY: 'k',
+      REPO_PAT: 'p',
+      AUTH_HEADER: 'a',
+    }
+    const kept = childEnv(env)
+    // What survives is what the run NEEDS, plus a git identity, which is not a
+    // credential: `GIT_AUTHOR_NAME` must not be swept up by the word "AUTH".
+    expect(kept).toEqual({
+      PATH: '/usr/bin',
+      HOME: '/home/node',
+      CODEX_HOME: '/home/node/.codex',
+      GIT_AUTHOR_NAME: 'Fixture',
+    })
+    expect(withheldEnvNames(env)).toEqual([
+      VENDOR_API_KEY,
+      'AUTH_HEADER',
+      'AWS_ACCESS_KEY_ID',
+      'CI_JOB_JWT',
+      'DATABASE_URL',
+      'DB_PASSWORD',
+      'GH_TOKEN',
+      'GITHUB_TOKEN',
+      'GIT_ASKPASS',
+      'MY_SECRET',
+      'NPM_TOKEN',
+      'REPO_PAT',
+      'SOME_PRIVATE_KEY',
+      'SSH_AUTH_SOCK',
+    ])
+    expect(childEnv()).toEqual({})
+    expect(withheldEnvNames()).toEqual([])
+  })
+
+  it('withholds the credentials the second round named, and the whole GIT_CONFIG family', () => {
+    // PGPASSWORD and MYSQL_PWD matched no segment and travelled.
+    for (const key of ['PGPASSWORD', 'PGPASSFILE', 'PGSERVICEFILE', 'NETRC', 'KUBECONFIG', 'MYSQL_PWD', 'GITHUB_TOKEN', 'SSH_AUTH_SOCK']) {
+      expect(isWithheldEnv(key), key).toBe(true)
+    }
+    // GIT_CONFIG_KEY_0 matched and GIT_CONFIG_COUNT did not, which leaves git a
+    // COUNT with no KEY — a malformed tuple that fails every git command in the
+    // run. They go together, or not at all.
+    const env = { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.x', GIT_CONFIG_VALUE_0: 'y', PATH: '/usr/bin' }
+    expect(childEnv(env)).toEqual({ PATH: '/usr/bin' })
+    // …and the working directory is not a credential.
+    for (const key of ['PWD', 'PATH', 'HOME', 'GIT_AUTHOR_NAME', 'CI']) expect(isWithheldEnv(key), key).toBe(false)
+  })
+
+  it('is hygiene, not containment — and the file says so', () => {
+    // The cross-vendor review's P0: with the sandbox off, the run can still read
+    // a token FILE and push. The regex must not be described as preventing that,
+    // and the wrapper is what pushes, so the claim to check is the narrow one.
+    const source = readFileSync(resolve('scripts', 'author-delegate-core.mjs'), 'utf8')
+    expect(source).toMatch(/HYGIENE, NOT CONTAINMENT/)
+    expect(source).toMatch(/can read `\.secrets\/`/)
+  })
+})
+
+describe('readinessProblems — where this run may not write', () => {
+  const good = { branch: 'feat/651-drum-bed', worktree: '/w/tree', mainCheckout: '/w/main', dirty: '', point: '651' }
+
+  it('lets an isolated worktree on a feature branch through', () => {
+    expect(readinessProblems(good)).toEqual([])
+    // A trailing separator is not a different directory.
+    expect(readinessProblems({ ...good, worktree: '/w/tree/' })).toEqual([])
+  })
+
+  it('refuses every branch that is not THIS point’s feature branch', () => {
+    // Naming `main` and `HEAD` let `master`, `release` and `gh-pages` through
+    // while the refusal claimed to demand a feat/ branch (third round)…
+    for (const branch of ['main', 'HEAD', 'master', 'release', 'gh-pages', 'poc', 'feature/x']) {
+      expect(readinessProblems({ ...good, branch }).join(' '), branch).toMatch(/feat\/651-<slug>/)
+    }
+    // …and a bare `feat/` prefix then let a run for one point commit onto
+    // ANOTHER point's branch (fifth round), which lands work under a number that
+    // never asked for it.
+    for (const branch of ['feat/667-sol-authoring-lane', 'feat/', 'feat/nonsense']) {
+      expect(readinessProblems({ ...good, branch }).join(' '), branch).toMatch(/own `feat\/651-<slug>` branch/)
+    }
+    expect(readinessProblems({ ...good, branch: 'feat/667-sol-authoring-lane', point: '667' })).toEqual([])
+    // With no point given it can only demand the shape, which it still does.
+    expect(readinessProblems({ ...good, point: '', branch: 'feat/651-drum-bed' })).toEqual([])
+    expect(readinessProblems({ ...good, point: '', branch: 'main' }).join(' ')).toMatch(/feat\/<point>-<slug>/)
+  })
+
+  it('refuses the main checkout, an unknown branch and a dirty tree', () => {
+    expect(readinessProblems({ ...good, branch: '' }).join(' ')).toMatch(/unknown ref/)
+    expect(readinessProblems({ ...good, worktree: '/w/main' }).join(' ')).toMatch(/MAIN checkout/)
+    expect(readinessProblems({ ...good, worktree: '' }).join(' ')).toMatch(/no worktree path/)
+    expect(readinessProblems({ ...good, dirty: ' M src/App.tsx' }).join(' ')).toMatch(/uncommitted changes/)
+    expect(readinessProblems()).not.toEqual([])
+  })
+})
+
+describe('buildAuthoringPrompt', () => {
+  it('states every house rule, and hands over the BRIEF rather than a reading list', () => {
+    const prompt = buildAuthoringPrompt({ point: 651, brief: 'THE POINT: fix the drum loop', branch: 'feat/651-x' })
+    for (const rule of HOUSE_RULES) expect(prompt, rule).toContain(rule.trim())
+    // A rule spanning two lines reads as one rule, not as two bullets.
+    expect(prompt).not.toMatch(/^ {2}- {3}/m)
+    expect(prompt).toContain(CROSS_TRAILER)
+    expect(prompt).toContain('THE POINT: fix the drum loop')
+    expect(prompt).toMatch(/Do NOT read TASKS\.md/)
+    expect(prompt).toMatch(/Do NOT push, do NOT merge/)
+    expect(prompt).toMatch(/feat\/651-x/)
+    // The reviewer is named up front: it changes how the work is written.
+    expect(prompt).toContain(`A session on ${MAIN.displayName} then REVIEWS`)
+    expect(prompt).toMatch(/DONE: <what you built/)
+  })
+
+  it('says so when there is no brief instead of authoring from nothing', () => {
+    expect(buildAuthoringPrompt({ point: 1 })).toMatch(/no brief was attached/)
+  })
+
+  it('turns into the SECOND leg when findings are handed back', () => {
+    const prompt = buildAuthoringPrompt({ point: 651, findings: 'F1 | a.mjs | the guard fails open', branch: 'b' })
+    expect(prompt).toMatch(/THIS IS THE SECOND LEG/)
+    expect(prompt).toContain('F1 | a.mjs | the guard fails open')
+    expect(prompt).toMatch(/Answer every/)
+    // The brief is not repeated: what is under discussion is the review.
+    expect(prompt).not.toMatch(/=== THE BRIEF ===/)
+  })
+
+  it('carries a hostile-tester framing beside the findings in a later round', () => {
+    const framing = 'Act as a hostile tester and break the adjacent state transitions.'
+    const prompt = buildAuthoringPrompt({ point: 651, findings: 'F1 | the state sticks', branch: 'b', framing })
+    expect(prompt).toContain(framing)
+    expect(prompt).toContain('F1 | the state sticks')
+    expect(prompt).toMatch(/supplements the findings/)
+  })
+})
+
+describe('buildSpecExaminationPrompt', () => {
+  it('puts the point, generated brief and every round finding into a read-only examination', () => {
+    const prompt = buildSpecExaminationPrompt({
+      point: 651,
+      pointText: 'The point text.',
+      brief: 'The generated brief.',
+      history: { rounds: [{ freshRound: 0, evidence: 'F0' }, { freshRound: null, evidence: 'repeat F1' }] },
+      currentFindings: 'The complete current findings hand-off.',
+    })
+    expect(prompt).toContain('The point text.')
+    expect(prompt).toContain('The generated brief.')
+    expect(prompt).toContain('round 0: F0')
+    expect(prompt).toContain('round repeat: repeat F1')
+    expect(prompt).toContain('The complete current findings hand-off.')
+    expect(prompt).toMatch(/not an authoring commission/i)
+    expect(prompt).toMatch(/Do not run a suite and do not write a commit/)
+  })
+})
+
+describe('parseAuthoringAnswer', () => {
+  it('reads the three closing lines, tolerating markdown around them', () => {
+    expect(answered).toMatchObject({ ok: true, done: 'built the thing', open: 'none' })
+    expect(parseAuthoringAnswer('**DONE:** a\n*GATES:* b\n- OPEN: c')).toMatchObject({ ok: true, done: 'a' })
+  })
+
+  it('refuses a message that does not carry the shape, or echoes the placeholders', () => {
+    expect(parseAuthoringAnswer('I did the work, all good.').ok).toBe(false)
+    expect(parseAuthoringAnswer('').ok).toBe(false)
+    expect(parseAuthoringAnswer('DONE: <what you built>\nGATES: <the result>\nOPEN: none').ok).toBe(false)
+  })
+
+  it('rules the placeholder on the STRIPPED capture — decoration cannot smuggle it', () => {
+    expect(
+      parseAuthoringAnswer('DONE: **<what you built>**\nGATES: test:unit green\nOPEN: none').ok,
+    ).toBe(false)
+  })
+
+  it('refuses an OPEN placeholder too — a clean-looking run with an unanswered field (landing round)', () => {
+    // The check covered only DONE and GATES: real DONE, green GATES and
+    // `OPEN: **<what you left undone>**` parsed clean.
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: <what you left undone>').ok,
+    ).toBe(false)
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: **<what you left undone>**').ok,
+    ).toBe(false)
+    // An UNPAIRED marker survives the pair strip and shielded the anchored
+    // test (landing round): the ruling reads the net-only spelling too.
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: _<what you left undone>').ok,
+    ).toBe(false)
+    // A MARKER-ONLY field is an unanswered field (fourth landing round).
+    expect(parseAuthoringAnswer('DONE: _\nGATES: test:unit, build and lint all green\nOPEN: _').ok).toBe(false)
+  })
+
+  it('quotes DONE/GATES/OPEN from the raw lines byte-for-byte', () => {
+    // A token the stripper would mangle must reach the caller unrewritten.
+    const parsed = parseAuthoringAnswer(
+      'prose\n\nDONE: ported src/__init__.py and its __slots__ handling\nGATES: test:unit, build and lint all green\nOPEN: the __all__ export list is still owed',
+    )
+    expect(parsed).toMatchObject({
+      ok: true,
+      done: 'ported src/__init__.py and its __slots__ handling',
+      gates: 'test:unit, build and lint all green',
+      open: 'the __all__ export list is still owed',
+    })
+  })
+})
+
+describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
+  it('accepts a clean run that committed under the cross lane’s name', () => {
+    const j = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: answered })
+    expect(j).toMatchObject({ delivered: true, clean: true })
+    expect(j.problems).toEqual([])
+  })
+
+  it('keeps the clean-tree no-commit problem unchanged', () => {
+    const j = judgeAuthoring({ outcome: okRun, commits: [], parsed: answered })
+    expect(j.delivered).toBe(false)
+    expect(j.problems[0]).toBe('NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review')
+  })
+
+  it('does not erase dirty work from the no-commit problem', () => {
+    const j = judgeAuthoring({
+      outcome: okRun,
+      commits: [],
+      parsed: answered,
+      dirty: ' M scripts/a.mjs\n?? scripts/b.mjs',
+      numstat: '4\t1\tscripts/a.mjs\n1\t0\tscripts/b.mjs',
+    })
+    expect(j.problems[0]).toBe(
+      'NOTHING WAS COMMITTED — the commits are missing, but the work is not; see its measured UNCOMMITTED SIZE and run CHECKPOINT IT NOW before the review',
+    )
+    expect(j.problems[0]).not.toMatch(/nothing to review/i)
+  })
+
+  it('catches a commit that names the wrong author, or none', () => {
+    const wrong = judgeAuthoring({
+      outcome: okRun,
+      commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers: `${TEST_FOREIGN_MODELS.haikuTrailer} <x@y>` }],
+      parsed: answered,
+    })
+    expect(wrong.problems.join(' ')).toMatch(/outside the author allowlist/)
+    const bare = judgeAuthoring({
+      outcome: okRun,
+      commits: [{ sha: 'c'.repeat(40), subject: 'x', trailers: 'Claude <x@y>' }],
+      parsed: answered,
+    })
+    expect(bare.problems.join(' ')).toMatch(/naming no single model/)
+    // An ALLOWED model that is not this lane's is still not this lane's commit.
+    const other = judgeAuthoring({
+      outcome: okRun,
+      commits: [{ sha: 'd'.repeat(40), subject: 'x', trailers: `${MAIN.trailerName} <x@y>` }],
+      parsed: answered,
+    })
+    expect(other.problems.join(' ')).toContain(`does not name ${CROSS.displayName}`)
+  })
+
+  it('does not read a cross-lane family word in an e-mail address as that lane’s authorship (cross-vendor P1)', () => {
+    // A main-lane trailer whose address carries the cross lane's family word is an
+    // allowlisted commit by ANOTHER model. Tested against the raw trailer, it counted
+    // as this lane's work.
+    const decoy = `${MAIN.trailerName} <build@${CROSS.familyWords.at(-1)}.example>`
+    const j = judgeAuthoring({
+      outcome: okRun,
+      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: decoy }],
+      parsed: answered,
+    })
+    expect(j.problems.join(' ')).toContain(`does not name ${CROSS.displayName}`)
+    // …while every real spelling of the cross lane's own trailer is accepted.
+    const familyName = CROSS.familyWords[0][0].toUpperCase() + CROSS.familyWords[0].slice(1)
+    const address = VENDORS[CROSS.vendor].trailerAddress
+    for (const trailers of [trailerFor('cross'), `${familyName} <${address}>`, `${CROSS.modelId} <x@y>`]) {
+      const ok = judgeAuthoring({ outcome: okRun, commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers }], parsed: answered })
+      expect(ok.problems, trailers).toEqual([])
+    }
+  })
+
+  it('refuses to attribute commits made on another branch (cross-vendor P1)', () => {
+    const j = judgeAuthoring({
+      outcome: okRun,
+      commits: [crossCommit('c'.repeat(40))],
+      parsed: answered,
+      branch: 'feat/667-x',
+      branchAfter: 'main',
+    })
+    expect(j.clean).toBe(false)
+    expect(j.problems.join(' ')).toMatch(/ended on `main`, not on `feat\/667-x`/)
+    // Ending where it started is silent.
+    expect(
+      judgeAuthoring({ outcome: okRun, commits: [crossCommit('d'.repeat(40))], parsed: answered, branch: 'b', branchAfter: 'b' }).problems,
+    ).toEqual([])
+  })
+
+  it('refuses to call a run clean when its GATES line is not three green gates', () => {
+    // `GATES: not run` parsed perfectly and the command exited 0 — a delivery
+    // reported as clean while breaking the prompt's own mandatory rule (2nd
+    // round). And a blacklist alone sees a CONFESSION, never an OMISSION: the
+    // three gates must each be NAMED (3rd round).
+    for (const gates of [
+      'not run',
+      'unit green, build FAILED, lint green',
+      'test:unit, build and lint: lint red',
+      'skipped: unit, build, lint',
+      'unit green', //                       says nothing about build or lint
+      'unit passed; build not executed; lint passed',
+      'all good', //                         names none of them
+      // …and the absence of a complaint is not a pass (fourth round): this line
+      // carries no blacklisted word at all and reports three failures.
+      'test:unit, build and lint all exited 1',
+      'ran test:unit, build and lint',
+      // One green word used to carry the whole line, so two red gates rode in
+      // behind one that passed (fifth round).
+      'test:unit passed; build exited 1; lint exited 1',
+      'test:unit green; build and lint pending',
+      '',
+    ]) {
+      const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates || 'x'}\nOPEN: none`)
+      const j = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: gates ? parsed : { ok: true, gates: '' } })
+      expect(j.clean, gates).toBe(false)
+      expect(j.problems.join(' '), gates).toMatch(/GATES line/)
+    }
+    // A report naming all three as green stays clean — including one that says
+    // so with a negative WORD in a positive sentence.
+    expect(judgeAuthoring({ outcome: okRun, commits: [crossCommit('b'.repeat(40))], parsed: answered }).clean).toBe(true)
+    for (const gates of [
+      'test:unit, build and lint all passed without errors',
+      'vitest green, build green, oxlint clean',
+      'unit 10707 passed, build ok, lint zero findings',
+      // A numeric none is a none, and "error-free" is a pass (fourth round).
+      'test:unit, build and lint passed with 0 errors',
+      'test:unit, build and lint were error-free',
+      // …and a clause-per-gate report is the normal way to write it.
+      'test:unit green; build green; lint clean',
+    ]) {
+      expect(gatesProblem(gates), gates).toBe('')
+    }
+  })
+
+  it('keeps the work of a run that died, and still names what went wrong', () => {
+    // A timeout that committed four steps is worth reviewing; throwing it away
+    // because the run ended badly would discard the only thing that survived.
+    const j = judgeAuthoring({
+      outcome: { ok: false, kind: 'timeout', cause: 'the review did not finish inside its time budget' },
+      commits: [crossCommit('e'.repeat(40))],
+      parsed: { ok: false, error: 'no closing lines' },
+      dirty: ' M scripts/x.mjs',
+      numstat: '118\t6\tscripts/x.mjs',
+    })
+    expect(j.delivered).toBe(true)
+    expect(j.clean).toBe(false)
+    expect(j.problems.join(' ')).toMatch(/did not finish cleanly/)
+    expect(j.problems.join(' ')).toMatch(/UNCOMMITTED changes behind: 1 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
+    expect(j.problems.join(' ')).toMatch(/CHECKPOINT IT NOW/)
+    expect(j.problems.join(' ')).not.toMatch(/discard/i)
+  })
+})
+
+describe('uncommittedSummary', () => {
+  it('measures text and binary changes while counting every dirty path', () => {
+    expect(
+      uncommittedSummary({
+        dirty: ' M scripts/a.mjs\n?? scripts/new.test.mjs\n?? image.png',
+        numstat: '52\t5\tscripts/a.mjs\n66\t1\tscripts/new.test.mjs\n-\t-\timage.png',
+      }),
+    ).toEqual({ changedPaths: 3, measuredPaths: 3, binaryPaths: 1, insertions: 118, deletions: 6 })
+  })
+})
+
+describe('formatAuthoringReport', () => {
+  it('hands the rest of the point to the reviewer, in order', () => {
+    const judged = judgeAuthoring({ outcome: okRun, commits: [crossCommit('f'.repeat(40), 'Fix the loop')], parsed: answered })
+    const text = formatAuthoringReport({ point: 651, branch: 'feat/651-x', judged, parsed: answered, pushed: true })
+    expect(text).toMatch(/authored 1 commit\(s\) on feat\/651-x/)
+    expect(text).toMatch(/ffffff {2}Fix the loop/)
+    expect(text).toMatch(/DONE: {2}built the thing/)
+    expect(text).toMatch(/MAY NOT REVIEW IT/)
+    expect(text).toMatch(/--point 651 --findings/)
+    expect(text).toMatch(/mechanism-review\.mjs --record/)
+    expect(text).toMatch(/land-point\.mjs 651/)
+    expect(text).toMatch(/the branch is pushed/)
+  })
+
+  it('says a failed push first, because only that work is at risk', () => {
+    const judged = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: answered })
+    expect(formatAuthoringReport({ point: 1, judged, parsed: answered, pushed: false })).toMatch(/PUSH FAILED/)
+  })
+
+  it('puts the exact author framing on the command that records the following review', () => {
+    const judged = judgeAuthoring({ outcome: okRun, commits: [crossCommit('a'.repeat(40))], parsed: answered })
+    const framing = 'Act as a hostile tester and probe every adjacent transition.'
+    const text = formatAuthoringReport({ point: 1, judged, parsed: answered, framing })
+    expect(text).toContain(`--mode review --point 1 --author-framing "${framing}"`)
+  })
+
+  it('reports NOTHING only for a clean tree with no commits', () => {
+    const judged = judgeAuthoring({ outcome: okRun, commits: [], parsed: answered })
+    const text = formatAuthoringReport({ point: 1, branch: 'b', judged, parsed: answered })
+    expect(text).toMatch(/authored NOTHING/)
+    expect(text).not.toMatch(/land-point/)
+    expect(text).toMatch(/NOTHING WAS COMMITTED/)
+  })
+
+  it('measures a dirty tree with no commits and offers a checkpoint instead of claiming NOTHING', () => {
+    const judged = judgeAuthoring({
+      outcome: okRun,
+      commits: [],
+      parsed: answered,
+      dirty: ' M scripts/model-guard-core.mjs\n M scripts/model-guard-core.test.mjs',
+      numstat: '52\t5\tscripts/model-guard-core.mjs\n66\t1\tscripts/model-guard-core.test.mjs',
+    })
+    const text = formatAuthoringReport({ point: 792, branch: 'feat/792-fable-state', judged, parsed: answered })
+    expect(text).toMatch(/left UNCOMMITTED WORK/)
+    expect(text).toMatch(/2 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
+    expect(text).toContain(
+      `git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${CROSS_TRAILER}'` +
+        ` && git push -u origin feat/792-fable-state`,
+    )
+    expect(text).not.toMatch(/authored NOTHING/)
+  })
+
+  it('reports commits first even when more work remains dirty', () => {
+    const judged = judgeAuthoring({
+      outcome: okRun,
+      commits: [crossCommit('a'.repeat(40), 'Save the first step')],
+      parsed: answered,
+      dirty: '?? scripts/next.mjs',
+      numstat: '7\t0\tscripts/next.mjs',
+    })
+    const text = formatAuthoringReport({ branch: 'feat/x', judged, parsed: answered })
+    expect(text).toMatch(/authored 1 commit\(s\)/)
+    expect(text).toMatch(/UNCOMMITTED SIZE: 1 changed path\(s\), 7 insertion\(s\)/)
+    expect(text).not.toMatch(/authored NOTHING/)
+  })
+})
+
+describe('the scarce lane authoring process (claude runtime)', () => {
+  it('pins the scarce lane without an attribution-breaking fallback', () => {
+    const args = authoringRuntime('scarce').args({ prompt: 'author it' })
+    expect(args).toEqual([
+      '-p',
+      'author it',
+      '--model',
+      SCARCE.modelId,
+      '--output-format',
+      'json',
+      '--dangerously-skip-permissions',
+    ])
+    expect(args).toEqual(authoringClaudeArgs({ modelId: SCARCE.modelId, prompt: 'author it' }))
+    expect(args).not.toContain('--fallback-model')
+    expect(authorTrailer('scarce')).toContain(SCARCE.trailerName)
+  })
+
+  it('extracts the final answer only when Claude reports the scarce lane as the serving model', () => {
+    const parsed = parseClaudeAuthoringOutput(
+      JSON.stringify({ result: 'DONE: built\nGATES: green\nOPEN: none', modelUsage: { [SCARCE.modelId]: {} } }),
+    )
+    expect(parsed).toMatchObject({ ok: true, result: expect.stringContaining('DONE: built') })
+    expect(authoringRuntime('scarce').attribute(JSON.stringify({ result: 'x', modelUsage: { [SCARCE.modelId]: {} } })).ok).toBe(true)
+    expect(laneAuthoringOutcome({ exitCode: 0, modelResult: parsed })).toEqual({ ok: true, cause: '' })
+  })
+
+  it('refuses silent substitution, missing metadata, malformed output, and failed runs', () => {
+    const substitute = MAIN.retired.find((s) => /^[a-z0-9-]+$/.test(s))
+    const substituted = parseClaudeAuthoringOutput(
+      JSON.stringify({ result: 'done', modelUsage: { [substitute]: {} } }),
+      SCARCE.displayName,
+    )
+    expect(substituted).toMatchObject({ ok: false, models: [substitute] })
+    expect(substituted.error).toContain(`not ${SCARCE.displayName}`)
+    expect(parseClaudeAuthoringOutput(JSON.stringify({ result: 'done' })).error).toMatch(/no serving model/)
+    expect(parseClaudeAuthoringOutput('not json').error).toMatch(/no readable result JSON/)
+    expect(laneAuthoringOutcome({ exitCode: 0, modelResult: substituted }).cause).toContain('Claude served')
+    expect(laneAuthoringOutcome({ exitCode: 2 }).cause).toContain('exited with code 2')
+    expect(laneAuthoringOutcome({ exitCode: 0, timedOut: true }).cause).toContain('timed out')
+  })
+})
+
+describe('authorLaneConfig — one command, every lane from its record', () => {
+  it('derives model, id, trailer, runtime and the other-vendor reviewer per lane', () => {
+    expect(authorLaneConfig('cross')).toMatchObject({
+      lane: 'cross',
+      model: CROSS.displayName,
+      modelId: CROSS.modelId,
+      trailer: authorTrailer('cross'),
+      reviewer: MAIN.displayName,
+      reviewerRole: 'main',
+      detail: `(effort ${CROSS.reasoningEffort})`,
+    })
+    expect(authorLaneConfig('cross').runtime.bin).toBe('codex')
+    expect(authorLaneConfig('scarce')).toMatchObject({
+      lane: 'scarce',
+      model: SCARCE.displayName,
+      modelId: SCARCE.modelId,
+      trailer: authorTrailer('scarce'),
+      reviewer: CROSS.displayName,
+      reviewerRole: 'cross',
+      detail: '',
+    })
+    expect(authorLaneConfig('scarce').runtime.bin).toBe('claude')
+  })
+
+  it('has no commissioning path for the main chain or an unknown lane', () => {
+    expect(() => authorLaneConfig('main')).toThrow(/no authoring path/)
+    expect(() => authorLaneConfig(TEST_FOREIGN_MODELS.haiku)).toThrow(/no authoring path/)
+  })
+
+  it('tells the next-step command which lane to hand the findings back to', () => {
+    const report = formatAuthoringReport({
+      point: 7,
+      branch: 'feat/7-x',
+      judged: { delivered: true, commits: [crossCommit('e'.repeat(40))], problems: [] },
+      role: 'scarce',
+      authorModel: SCARCE.displayName,
+      authorDetail: '',
+      authorTrailer: authorTrailer('scarce'),
+      reviewer: CROSS.displayName,
+    })
+    expect(report).toContain('node scripts/author-delegate.mjs --lane scarce --point 7 --findings <file>')
+    expect(report).toContain(`--model "${CROSS.displayName}"`)
+  })
+})

@@ -90,7 +90,7 @@ const SEAM_START = /^\s*(['"`])/
  *
  * — where no single physical line contains "reply again". A formatter wrapping a
  * long message re-creates that shape for free, so the ratchet has to read across
- * the seam (four-eyes review, Fable 5, 29.07.2026). `line` is the number of the
+ * the seam (four-eyes review, 29.07.2026). `line` is the number of the
  * FIRST line where the message begins, counted after comment stripping (a
  * multi-line block comment collapses to one line).
  */

@@ -16,7 +16,7 @@ const read = (name) => readFileSync(resolve(REPO_ROOT, 'scripts', name), 'utf8')
 
 /** Each recurring in-turn recording step, and the command that performs it. */
 const SITES = [
-  ['review-astra.mjs', 'REVIEW_ROUND'],
+  ['cross-review.mjs', 'REVIEW_ROUND'],
   ['mechanism-review.mjs', 'MECHANISM_RECORD'],
   ['batch-in-flight.mjs', 'IN_FLIGHT'],
 ]

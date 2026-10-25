@@ -17,7 +17,7 @@ import { join, relative, resolve } from 'node:path'
 import { ARCHIVE_PATH, readTasksAll, TASKS_PATH } from './tasks-source.mjs'
 import { BriefError, buildBrief, BRIEF_TOKEN_CEILING, ORIENTATION_LIMITS } from './point-brief-core.mjs'
 import { CLAUDE_PATH, DESIGN_PATH, REPO_ROOT, readDocCorpus } from './doc-corpus.mjs'
-import { currentSetting, settingProblemLine } from './astra-share.mjs'
+import { currentSetting, settingProblemLine } from './lane-routing.mjs'
 
 /**
  * The suites' own section parser, loaded ONLY if scripts/verify/ is there.
@@ -202,8 +202,8 @@ if (!number) {
 
 // The routing the brief will state — READ, never assumed, and a state file that is there
 // but unusable is NAMED rather than silently presented as the operator's choice.
-const astraShare = currentSetting()
-if (astraShare.problem) console.error(settingProblemLine(astraShare, 'point-brief'))
+const laneRouting = currentSetting()
+if (laneRouting.problem) console.error(settingProblemLine(laneRouting, 'point-brief'))
 
 try {
   if (!existsSync(DESIGN_PATH)) throw new BriefError(`design.md not found at ${DESIGN_PATH}`)
@@ -224,7 +224,7 @@ try {
     // assumed: the brief tells the agent what the switch actually says.
     // The whole STATE, not just the setting: a fallback must reach the brief AS a
     // fallback, and a separate flag is a thing a caller can forget.
-    astraShare,
+    laneRouting,
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
   if (showTokens || tokens > BRIEF_TOKEN_CEILING) {

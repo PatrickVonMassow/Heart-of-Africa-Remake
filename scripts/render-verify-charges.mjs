@@ -65,11 +65,83 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /water stand table: his report points at the water he set down/i,
+    detailMatch: /^[0-5] held frames/i,
+    why: 'WebGPU section run on feat/1432 f70d504a7, 25.10.2026: 5 held frames (needs > 5), aim within bounds; green the run before at the same app code. The charge dies with 1435.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: one whole water errand was recorded/i,
+    detailMatch: /timed out/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: he sets the full jar down standing at the table/i,
+    detailMatch: /no set-down seen/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: his report points at the water he set down/i,
+    detailMatch: /^0 held frames/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /water stand table: the empty jar is taken up from the plank/i,
+    detailMatch: /fastest in his first steps 6\.66 m\/s/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+  },
+  {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /water stand table: the empty jar is taken up from the plank/i,
+    detailMatch: /fastest in his first steps [6-9]\.\d+ m\/s/i,
+    why: 'Full WebGPU polish-villagers run on feat/1446-dress-gpu-process-loss 957968566, 25.10.2026 (log 07-06-50-791): his first steps 7.67 m/s against the 6 m/s bound, the same red (b) point 1435 owns on WebGL 2; also red in the full WebGPU runs of 23.10. and 25.10.2026 03:40. The charge dies with it.',
+  },
+  {
     point: 1340,
     suite: 'polish-children',
     kind: 'check',
     match: /at the catch frame the catcher's drawn hand is ON the caught child/i,
     why: 'Covering WebGPU run on main after point 1343 landed, 19.10.2026: hand 3.2 cm off the trunk at a 3.2 cm hand radius. Point 1340 keeps the catch-frame hand on the caught child (amended 19.10.2026); the charge dies with it.',
+  },
+  {
+    point: 1434,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /the children are photographed from a standpoint in the open/i,
+    why: 'Full WebGL 2 run on main ac714e5cf, 23.10.2026 (log 10-51-21-476), owned by no point until filed as 1434. The charge dies with it.',
+  },
+  {
+    point: 1434,
+    suite: 'polish-children',
+    kind: 'check',
+    backend: 'webgl',
+    match: /no child walks without getting anywhere/i,
+    detailMatch: /worst child 0 at 1\.47 % of its own judged time/i,
+    why: 'Full WebGL 2 run on main ac714e5cf, 23.10.2026 (log 10-51-21-476), owned by no point until filed as 1434; only this measured composition, every other one stays uncovered. The charge dies with it.',
   },
   {
     point: 1344,
@@ -231,6 +303,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1292,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /both women strike the mortar and every strike is heard/i,
@@ -246,6 +319,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1292,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /back at the mortar both strike again, half a stroke apart/i,
@@ -256,6 +330,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1381,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /at least three unhidden fish are in the frame/i,
@@ -1122,7 +1197,7 @@ export const RED_CHARGES = [
       'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
       'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
       'returns none of it. THIS IS THE WebGL 2 HALF OF A CHARGE THAT USED TO CARRY NO BACKEND ' +
-      'AT ALL, split into two measured halves (cross-vendor review, GPT-5.6 Sol, ' +
+      'AT ALL, split into two measured halves (cross-vendor review, ' +
       '30.08.2026, which rightly refused the earlier argument): the unscoped entry ' +
       'used to rest on the reasoning that the restore path is plain JavaScript state and has ' +
       'nothing to do with which renderer drew the rows — but reasoning is not a measurement, and ' +
@@ -1141,7 +1216,7 @@ export const RED_CHARGES = [
     match:
       /^(restored: (ssaoEnabled|travelZoom|travelSpeed|seed|day)|Math\.random is the original function again)$/i,
     why:
-      'THE WebGPU HALF, SCOPED TO THE COMPATIBILITY LEVEL (cross-vendor review, GPT-5.6 Sol, ' +
+      'THE WebGPU HALF, SCOPED TO THE COMPATIBILITY LEVEL (cross-vendor review, ' +
       '30.08.2026): one entry without a level also excused the CORE adapter the player runs and ' +
       'a run that recorded no level at all, neither of which this evidence measured. Both ' +
       'recorded WebGPU readings of 30.08.2026 carry featureLevel=compatibility. ' +
@@ -1155,7 +1230,7 @@ export const RED_CHARGES = [
       'the F8 measurement run borrows the world — a pinned seed and day, a fixed travel zoom and ' +
       'speed, the SSAO switch, and Math.random replaced so a frame draws the same way twice — and ' +
       'returns none of it. THIS IS THE WebGPU HALF OF A CHARGE THAT USED TO CARRY NO BACKEND ' +
-      'AT ALL, split into two measured halves (cross-vendor review, GPT-5.6 Sol, ' +
+      'AT ALL, split into two measured halves (cross-vendor review, ' +
       '30.08.2026, which rightly refused the earlier argument): the unscoped entry ' +
       'used to rest on the reasoning that the restore path is plain JavaScript state and has ' +
       'nothing to do with which renderer drew the rows — but reasoning is not a measurement, and ' +
@@ -1184,19 +1259,19 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^the children walk PAST the traveller/i,
-    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge
+    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, do-not-merge
     // finding 4): the name alone charged EVERY future failure of this check,
     // including one caused by a round that no longer plays at all — which is the
     // opposite of what 698 owns. 698's claim is DENSITY: the round runs, and the
     // crossing merely does not fall inside the window. So the detail must show the
     // round opening runs at all; a window that never reached the `run` phase is a
     // different defect and stays a real red.
-    // A POSITIVE COUNT, not merely the word (cross-vendor review, GPT-5.6 Sol,
+    // A POSITIVE COUNT, not merely the word (cross-vendor review,
     // round 2): `run×0` satisfied `run×` and would have charged away exactly
     // the broken round this narrowing exists to keep red.
     detailMatch: /crossed his line;[\s\S]*phases \[[^\]]*run×[1-9]/i,
     // AND IT READS THE FRONT OF THE MEASUREMENT, WHICH THIS ENTRY DECLARES
-    // (cross-vendor review, GPT-5.6 Sol, three refusals over the truncation
+    // (cross-vendor review, three refusals over the truncation
     // finding). The crossing line is 223 characters, so EVERY record of it is
     // cut at 200 — and a cut measurement may answer only an entry that says in
     // its own voice that its signature reads the front and the missing tail
@@ -1266,19 +1341,19 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^WebGPU: real GPU timestamps were measured for/i,
-    // NARROWED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge finding
+    // NARROWED 30.08.2026 (cross-vendor review, do-not-merge finding
     // 2): the feature level does NOT test the capability, so on a compatibility
     // adapter that DOES expose `timestamp-query` a genuine timestamp regression
     // would have been charged here. This cause-bearing every-row check therefore
     // rests on the red's own stated reason; the exact low-preset companion point
     // 1012 also names is owned separately below.
-    // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review, GPT-5.6 Sol,
+    // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review,
     // do-not-merge on a7e9ce5): unanchored, a detail carrying the known reason
     // PLUS a second, genuinely different failure still matched. The detail this
     // check prints is `<n>/<n> rows, reason "<reason>"` and nothing else, so the
     // excuse is that whole line or nothing.
-    // THE ROW COUNT MUST BE A REAL SAMPLE 30.08.2026 (cross-vendor review, GPT-5.6
-    // Sol, do-not-merge on a333f20): `\d+` accepted `0/0 rows` — a benchmark that
+    // THE ROW COUNT MUST BE A REAL SAMPLE 30.08.2026 (cross-vendor review,
+    // do-not-merge on a333f20): `\d+` accepted `0/0 rows` — a benchmark that
     // produced NO ROWS AT ALL. That report passes the earlier `every` check
     // vacuously and reaches this line with the same reason string, so the empty
     // measurement would have been charged as the measured 0/33 and 0/3.
@@ -1326,7 +1401,7 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'check',
     match: /^no console errors$/i,
-    // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review, GPT-5.6 Sol,
+    // ANCHORED AT BOTH ENDS 30.08.2026 (cross-vendor review,
     // do-not-merge finding 3): unanchored, a "no console errors" red carrying the
     // known sentence PLUS a brand-new console error still matched, so the entry
     // did not keep what it promised to keep. The detail must be that sentence and
@@ -1352,13 +1427,13 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    // SPLIT FROM THE COMPOSITE CHECK 30.08.2026 (cross-vendor review, GPT-5.6
-    // Sol): these two name the PICTURE in their own text — one names the missing
+    // SPLIT FROM THE COMPOSITE CHECK 30.08.2026 (cross-vendor review):
+    // these two name the PICTURE in their own text — one names the missing
     // `.png` member, the other says the archive carries no screenshot — so the
     // name alone is the evidence. The composite check below is a different case
     // and gets its own entry.
     // THE PNG MEMBER IS THE MEASURED ONE, NOT ANY PNG (cross-vendor review,
-    // GPT-5.6 Sol, do-not-merge on 5691e9f): `.*\.png` accepted every PNG-member
+    // do-not-merge on 5691e9f): `.*\.png` accepted every PNG-member
     // check the report suite might ever grow. The name the suite prints is built
     // from the download stem `hoa-state-<date>-<n>`, so that shape is the whole
     // of what 927 measured; a future `thumbnail.png` member is a different red.
@@ -1387,7 +1462,7 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /^the archive holds picture, state, overlay and description$/i,
     // THE COMPOSITE CHECK NEEDS ITS DETAIL, and this is why it is a separate
-    // entry (cross-vendor review, GPT-5.6 Sol, 30.08.2026). "the archive holds
+    // entry (cross-vendor review, 30.08.2026). "the archive holds
     // picture, state, overlay and description" fails whenever ANY of those four
     // members is missing — but point 927 owns exactly one of those failures, the
     // missing PICTURE. An archive that lost its state or its overlay is a defect
@@ -1396,7 +1471,7 @@ export const RED_CHARGES = [
     // The detail lists the members the archive DID hold, so the picture-loss
     // shape is: the other three present, and no `.png` anywhere in the list.
     // THE STATE LOOKAHEAD MUST NOT BE SATISFIED BY THE OVERLAY (cross-vendor
-    // review, GPT-5.6 Sol, do-not-merge on 5691e9f): `(?=.*\.json)` was already
+    // review, do-not-merge on 5691e9f): `(?=.*\.json)` was already
     // true of `-overlay.json`, so an archive that had ALSO lost its state matched
     // and was charged as the measured picture loss. The state member is named by
     // the download stem (cross-vendor review, round 2: `not the overlay` still
@@ -1578,7 +1653,7 @@ export const RED_CHARGES = [
     // below is the wording from before that restatement: the shape this entry
     // owns can no longer be printed. It stays until point 1010 closes, because it
     // is 1010's record of its own red and not this table's to retire.
-    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, GPT-5.6 Sol, do-not-merge on
+    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, do-not-merge on
     // ffc9c23): the name alone charged EVERY future failure of this check — a
     // SUSTAINED fusion regression, where most frames hold a fused pair, would have
     // been swallowed as the single-frame observation 1010 owns. What was measured
@@ -1590,7 +1665,7 @@ export const RED_CHARGES = [
     // The retry's own verdict is NOT in this detail and cannot be constrained here;
     // it is part of the record this charge cites, not of the red it reads.
     // THE SAMPLE AND THE PAIR ARE BOTH MANDATORY 30.08.2026 (cross-vendor review,
-    // GPT-5.6 Sol, do-not-merge on a333f20): `1/\d+` accepted the impossible
+    // do-not-merge on a333f20): `1/\d+` accepted the impossible
     // `1/0 frames`, and the optional `( \[…\])?` accepted a detail that has LOST
     // the pair identity. `worstDepth` and `worstPair` come from the same reading in
     // labelFusion.mjs, so a line printing a depth without its pair is a broken
@@ -1685,32 +1760,6 @@ export const RED_CHARGES = [
       + 'with 565.',
   },
   {
-    point: 1172,
-    suite: 'polish-villagers',
-    backend: 'webgpu',
-    // Measured on this host, whose WebGPU lane launches with --force-webgpu-compat
-    // and an opengles adapter, so the reading belongs to the compatibility level
-    // and says nothing about a core adapter.
-    featureLevel: 'compatibility',
-    // SHAPE-SCOPED: count 0 means the dig bout had ENDED before the shutter, so
-    // which villager left and by how much is the accident and the staging race
-    // is the defect. Scoped to WebGPU, the only lane it has been measured on;
-    // the same branch tip ran this check green on WebGL 2 thirty minutes
-    // earlier, so it must stay a real red there.
-    match: /^and both are still at the stroke, on opposite sides of the hole\b/i,
-    why:
-      'THE RED POINT 1172 WAS FILED FOR, measured 21.09.2026 on the WebGPU polish pass of '
-      + 'point 1158 (local/verify-logs/2026-09-21T09-35-28-998-polish.log, 303 pass 1 fail, '
-      + 'count 0 striking 0). It is not 1158\'s: that point changes pointer-lock input handling '
-      + 'and its only edit outside pointerLock.ts and its test is a comment in PlaceScene.tsx, '
-      + 'and the SAME tip ran the whole polish suite green on WebGL 2 thirty minutes earlier '
-      + '(304 pass 0 fail). It is not 1121\'s either: that race is the river-bank aim block at '
-      + '~6047, this is the dig-pair block at ~6660. The rung re-run ALONE on a quiet machine '
-      + 'went 39/0, and the red run printed "UNDER LOAD — NOT AUTHORITATIVE" itself — consistent '
-      + 'with load AND with a rare race, which is why the later green closes nothing (point 640). '
-      + 'The charge dies with 1172.',
-  },
-  {
     point: 642,
     suite: 'polish-settlement',
     backend: 'webgl',
@@ -1739,6 +1788,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1187,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /BOTH her hands are elsewhere half a pass later/i,
@@ -1760,6 +1810,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1202,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /the spoil crossing starts on flat ground/i,
@@ -1903,6 +1954,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1333,
+    backend: 'webgl',
     suite: 'polish-villagers',
     kind: 'check',
     match: /the jar's mouth is tipped under the water surface/i,
@@ -1915,10 +1967,23 @@ export const RED_CHARGES = [
     point: 642,
     suite: 'polish-villagers',
     kind: 'check',
-    match: /^the order at the stand can be photographed: a sender still there and a carrier already going — no order in 180 s/i,
+    match: /^the order at the stand can be photographed: a sender still there and a carrier already going\b/i,
+    detailMatch: /^no order in 180 s/i,
     why:
       'MEASURED 18.10.2026 on main f698cd920, webgpu full polish-villagers: the moment-catcher point 642 '
       + 'names as its fourth case found no order inside its 180 s window (charged before on 24.09.2026, '
       + 'struck after one green pass). The charge dies with point 642.',
+  },
+  {
+    point: 1448,
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^at least three unhidden fish are in the frame, each at least 25 px long$/i,
+    why:
+      'FILED AS 1448 ON 25.10.2026: red on main 6bd82b3ae and on feat/1414 9469159b5, webgpu, '
+      + 'villager-canoe section alone: the third fish ray hits an unnamed BoxGeometry first. '
+      + 'The charge dies with point 1448.',
   },
 ]

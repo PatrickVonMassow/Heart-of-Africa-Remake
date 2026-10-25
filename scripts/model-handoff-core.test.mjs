@@ -2,25 +2,26 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { modelHandoffDecision, modelHandoffSpawn, readModelHandoff } from './model-handoff-core.mjs'
+import { MAIN, SCARCE, VENDORS } from './model-lanes.mjs'
 
 const NOW = Date.parse('2026-08-23T12:00:00Z')
 const route = [
-  { model: 'Opus 5', id: 'claude-opus-5[1m]' },
-  { model: 'Fable 5', id: 'claude-fable-5' },
-  { model: 'Opus 4.8', id: 'claude-opus-4-8[1m]' },
+  { model: MAIN.displayName, id: MAIN.modelId },
+  { model: SCARCE.displayName, id: SCARCE.modelId },
+  { model: MAIN.fallback.displayName, id: MAIN.fallback.modelId },
 ]
-const hits = [{ sha: 'a'.repeat(40), trailer: 'Claude Haiku 4.5 <noreply@anthropic.com>', when: NOW - 1000 }]
+const hits = [{ sha: 'a'.repeat(40), trailer: `Claude Haiku 4.5 <${VENDORS[MAIN.vendor].trailerAddress}>`, when: NOW - 1000 }]
 
 describe('forbidden serving-model handoff', () => {
   it('skips the suspect primary and records the next lane', () => {
     const decision = modelHandoffDecision({ hits, route, sessionId: 'suspect', currentModel: 'Haiku 4.5', now: NOW })
     expect(decision).toMatchObject({ action: 'handoff', state: { targetIndex: 1, requestedBy: 'suspect', route } })
-    expect(modelHandoffSpawn(decision.state, NOW)).toMatchObject({ model: 'claude-fable-5', fallbackModel: 'claude-opus-4-8[1m]' })
+    expect(modelHandoffSpawn(decision.state, NOW)).toMatchObject({ model: SCARCE.modelId, fallbackModel: MAIN.fallback.modelId })
   })
 
   it('never lets the requesting session consume a lane or verify itself', () => {
     const first = modelHandoffDecision({ hits, route, sessionId: 'suspect', now: NOW })
-    const again = modelHandoffDecision({ hits, state: first.state, sessionId: 'suspect', currentModel: 'Fable 5', now: NOW + 1 })
+    const again = modelHandoffDecision({ hits, state: first.state, sessionId: 'suspect', currentModel: SCARCE.displayName, now: NOW + 1 })
     expect(again).toMatchObject({ action: 'handoff', state: { targetIndex: 1, requestedBy: 'suspect' } })
   })
 
@@ -33,11 +34,11 @@ describe('forbidden serving-model handoff', () => {
       hits,
       state: wrong.state,
       sessionId: 'trusted',
-      currentModel: 'claude-opus-4-8[1m]',
+      currentModel: MAIN.fallback.modelId,
       baselineMs: NOW - 10_000,
       now: NOW + 2,
     })
-    expect(verified).toMatchObject({ action: 'verify', verifiedBy: 'Opus 4.8', verifiedThrough: NOW - 1000 })
+    expect(verified).toMatchObject({ action: 'verify', verifiedBy: MAIN.fallback.displayName, verifiedThrough: NOW - 1000 })
   })
 
   it('does not advance over an unidentified trailer beside the breach', () => {
@@ -47,7 +48,7 @@ describe('forbidden serving-model handoff', () => {
       unidentified: [{ sha: 'b' }],
       state: first.state,
       sessionId: 'trusted',
-      currentModel: 'Fable 5',
+      currentModel: SCARCE.displayName,
       now: NOW + 1,
     })
     expect(decision.action).toBe('probe')
@@ -62,15 +63,15 @@ describe('forbidden serving-model handoff', () => {
 
   it('probes on a clock after every allowed lane was unreachable', () => {
     const first = modelHandoffDecision({ hits, route, sessionId: 'suspect', now: NOW })
-    const second = modelHandoffDecision({ hits, state: first.state, sessionId: 'fable-run', currentModel: 'Haiku 4.5', now: NOW + 1 })
-    const exhausted = modelHandoffDecision({ hits, state: second.state, sessionId: 'opus48-run', currentModel: 'Haiku 4.5', now: NOW + 2 })
+    const second = modelHandoffDecision({ hits, state: first.state, sessionId: 'scarce-run', currentModel: 'Haiku 4.5', now: NOW + 1 })
+    const exhausted = modelHandoffDecision({ hits, state: second.state, sessionId: 'fallback-run', currentModel: 'Haiku 4.5', now: NOW + 2 })
     expect(exhausted).toMatchObject({ action: 'probe', state: { targetIndex: 0 } })
     expect(exhausted.retryAfter).toBe(NOW + 2 + 20 * 60 * 1000)
     expect(exhausted.decisionRecord.title).toMatch(/^Entscheidungsprotokoll:/)
     expect(exhausted.decisionRecord.body).toMatch(/Retroaktives Veto/)
     expect(exhausted.state.decisionRecord).toEqual(exhausted.decisionRecord)
     expect(modelHandoffSpawn(exhausted.state, NOW + 2)).toMatchObject({ waitMs: exhausted.retryAfter - (NOW + 2) })
-    expect(modelHandoffSpawn(exhausted.state, exhausted.retryAfter)).toMatchObject({ model: 'claude-opus-5[1m]' })
+    expect(modelHandoffSpawn(exhausted.state, exhausted.retryAfter)).toMatchObject({ model: MAIN.modelId })
   })
 
   it('a missing owner session still leaves the serving route on a clock', () => {

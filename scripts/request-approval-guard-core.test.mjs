@@ -203,7 +203,7 @@ describe('the wrapper payload reader', () => {
   })
 })
 
-describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
+describe('cross-vendor review findings (cross-vendor review, 86cbc8f)', () => {
   const approvedChat = [human('start'), said(TITLE), human('passt so')]
 
   it('1: judges EVERY deposit in a command, not only the first', () => {
@@ -290,7 +290,7 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
   })
 })
 
-describe('confirming review findings (GPT-6 Astra, b9d21dd) — all caught by the textual rule', () => {
+describe('confirming review findings (cross-vendor review, b9d21dd) — all caught by the textual rule', () => {
   const approvedChat = [human('start'), said(TITLE), human('passt so')]
   const caught = (command, shell = 'bash') => {
     expect(requestOf(command, shell), command).toEqual({ title: TITLE, approved: '' })
@@ -448,7 +448,7 @@ describe('the flag word inside a finding detail', () => {
 
 })
 
-describe('shapes of earlier review rounds are denied by the pre-gate (GPT-6 Astra, rounds 6 and 2)', () => {
+describe('shapes of earlier review rounds are denied by the pre-gate (cross-vendor review, rounds 6 and 2)', () => {
   const shapes = [
     'node scripts/finding.mjs --request > /tmp/out Hidden --stdin --approved "passt so"',
     'node scripts/finding.mjs --request 2>/dev/null Hidden',
@@ -490,7 +490,7 @@ describe('shapes of earlier review rounds are denied by the pre-gate (GPT-6 Astr
   })
 })
 
-describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape fixes)', () => {
+describe('coarse fail-closed pre-gate (cross-vendor review, round 3 on the shape fixes)', () => {
   // the transcript approves only some OTHER, visible title
   const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
   const denied = (command) => {
@@ -560,7 +560,6 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
     const unapproved = [human('hallo')]
     const approved = [human('start'), said('Vorschlag: X'), human('passt so')]
     const wrapped = [
-      `bash -c 'node $F $R X'`,
       `bash -c 'node scripts/fin""ding.mjs --request X'`,
       `sh -c 'node scripts/finding.mjs --request X --approved "passt so"'`,
       `zsh -c 'node scripts/finding.mjs --request X --approved "passt so"'`,
@@ -594,155 +593,7 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
   })
 })
 
-describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra review of 1367, round 5)', () => {
-  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
-  const tail = ' Hidden --spec-file /tmp/s.md --why-file /tmp/w.md'
-  it.each([
-    `node scripts/fin{d..d}ing.mjs --re{q..q}uest${tail}`,
-    `node scripts/fin*.mjs --request${tail}`,
-    `node scripts/fin*.mjs --re?uest${tail}`,
-    `node scripts/finding.mjs $'--re\\x71uest'${tail}`,
-    `node $'scripts/fin\\x64ing.mjs' $'\\x2d\\x2d\\x72\\x65\\x71\\x75\\x65\\x73\\x74'${tail}`,
-    `node $'scripts/fin\\144ing.mjs' --re[q]uest${tail}`,
-    `node scripts/f@(i)nding.mjs --re\${Q:-q}uest${tail}`,
-    // the expansion supplies the whole marker word (Astra review of 0c4051d18)
-    `node $(printf 'scripts/fin%sing.mjs' d) $(printf -- '--re%suest' q)${tail}`,
-    `node $F $R${tail}`,
-    `node scripts/$F --request${tail}`,
-    `node {scripts/fin,x}{ding.mjs,y} {--re,x}{quest,y}${tail}`,
-    `node scripts/finding.mjs --re{q..q}uest=Hidden --spec-file /tmp/s.md`,
-    // bash joins continuations before it reads $'…'
-    `node $\\\n'scripts/fin\\x64ing.mjs' $\\\n'--re\\x71uest'${tail}`,
-  ])('denies: %s', (command) => {
-    expect(isPossibleDeposit(command), command).toBe(true)
-    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
-  })
-
-  it.each(['git status', 'ls *.md', 'ls README.md', 'npm run lint', "git commit -m 'Fix x'"])('leaves alone: %s', (command) => {
-    expect(isPossibleDeposit(command), command).toBe(false)
-    expect(evaluate({ command, entries: chat }).block, command).toBe(false)
-  })
-
-  // Astra round 10 on 70c46b122: splatting; a word that spells a marker and expands too
-  it.each([
-    ['node @depositArgs', 'powershell'],
-    ['node @depositArgs', 'bash'],
-    ["bash -c 'eval node scripts/finding.mjs?*'", 'powershell'],
-    ["bash -c 'eval node scripts/finding.mjs?*'", 'bash'],
-    ["bash -c 'node @a'", 'powershell'],
-    // Astra round 11 on 3cceeac5f: the ls exception checks splatting too
-    ['ls @depositArgs', 'powershell'],
-  ])('a possible deposit: %s (%s)', (command, shell) => {
-    expect(isPossibleDeposit(command, shell), command).toBe(true)
-    expect(evaluate({ command, entries: chat, shell }), command).toMatchObject({ block: true, id: 'non-canonical' })
-  })
-
-  it('a quoted literal path in a direct PowerShell call stays literal (Astra round 11, P2)', () => {
-    const command = "node scripts\\finding.mjs --request Outer --spec-file 'C:\\tmp\\finding.mjs[old].md' --why-file C:\\tmp\\w.md --approved \"passt so\""
-    expect(requestsOf(command, 'powershell')).toEqual([{ title: 'Outer', approved: 'passt so' }])
-    expect(evaluate({ command, entries: chat, shell: 'powershell' }).block).toBe(false)
-  })
-
-  it.each(['git status', 'ls *.md', 'ls README.md'])('leaves alone in PowerShell: %s (Astra round 9, P2)', (command) => {
-    expect(isPossibleDeposit(command, 'powershell'), command).toBe(false)
-    expect(evaluate({ command, entries: chat, shell: 'powershell' }).block, command).toBe(false)
-  })
-
-  // Accepted over-block: a non-canonical chat command with any character outside the plain set counts.
-  it.each([
-    'echo $HOME',
-    'cd "$(git rev-parse --show-toplevel)"',
-    "echo 'a $b' | wc -l",
-    'ls {src,docs}/*.ts',
-    'git log | head',
-    'cat scripts/*.json',
-    ['ls *.md', 'ls'].join('\n'),
-    ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'),
-    // a quoted command string is judged like a non-canonical command (round 7 on 5fc0e782c)
-    "git commit -m 'Fix (x)'",
-    "find . -name '*.ts'",
-  ])('a non-plain character counts (accepted over-block): %s', (command) => {
-    expect(isPossibleDeposit(command), command).toBe(true)
-    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
-  })
-
-  it.each([
-    `node scripts/fin*.mjs X${tail}`,
-    `node scripts/x.mjs --re?uest${tail}`,
-    `node scripts/x.mjs --re?uest=Hidden`,
-    'npx $F $R Hidden',
-    'bash -c "$CMD"',
-    'eval $CMD',
-    '. $FILE',
-    'xargs < /tmp/args $F',
-    '$N scripts/x.mjs $R Hidden',
-    'cd /tmp && $N $F',
-    // Astra round 2 on 23e1c913f: attached redirections, assignment prefix, expanded executor
-    `node scripts/fin*.mjs</dev/null --request>/dev/null${tail}`,
-    `node $F --re{q..q}uest>/dev/null${tail}`,
-    `A=1 $N $F $R${tail}`,
-    `n{o..o}de $F $R${tail}`,
-    `echo "$($N $F $R)"`,
-    'echo `$N $F $R`',
-    `>echo $N $F $R`,
-    // Astra round 3 on 243b02ae3: git runs an argument, heredoc substitution after a separator, quoted fake heredoc
-    `git -c alias.d='!node' d $F $R${tail}`,
-    ['cat <<EOF', '$(echo; $N $F $R)', 'EOF'].join('\n'),
-    ["echo '<<EOF'", `$N $F $R${tail}`, 'EOF'].join('\n'),
-    ["cat <<'EOF'", '$x', 'EOF', `node $F $R${tail}`].join('\n'),
-    // Astra round 4 on 59f33aa53: here-string, continuation in a quoted heredoc, POSIX bracket class
-    `cat <<<$F; node $F $R${tail}`,
-    ["cat <<'EOF'", 'x\\', 'EOF', `node $F $R${tail}`].join('\n'),
-    `node scripts/fin[[:alpha:]]ing.mjs --re[[:alpha:]]uest${tail}`,
-    // Astra round 5 on 2694444a0: a matched filename may hold a whole command
-    'eval cd*.md',
-    'bash x*',
-    // Astra round 6 on 9a0d7bd: the ls exception holds only for globs that cannot match a marker
-    'ls scripts/fin*.mjs',
-    'ls -la scripts/*.mjs',
-    'ls --re?uest',
-    // a quoted expansion that a nested shell re-reads
-    `bash -c 'node scripts/fin*.mjs --re* Hidden'`,
-    `bash -c 'node scripts/fin{d..d}ing.mjs --re{q..q}uest Hidden'`,
-    `eval 'node scripts/fin?ing.mjs --re?uest Hidden'`,
-    `bash -c 'node $(printf scripts/fin%sing.mjs d) X'`,
-    `bash -c 'node scripts/fin[d]ing.mjs X'`,
-    // Astra round 7 on 5fc0e782c: positional parameter; a quoted command string re-read by eval
-    `bash -c 'node scripts/fin$9ding.mjs --re$9quest${tail}'`,
-    `bash -c 'node scripts/fin$@ding.mjs X'`,
-    `bash -c 'eval cd*.md'`,
-    `bash -c 'echo hi; $N'`,
-    // Astra round 8 on 9561e5879: eval re-joins separately quoted words
-    `eval node 'scripts/fin""ding.mjs' '--reque""st'${tail}`,
-    "eval bash 'x*'",
-    `eval node 'scripts/f@(i)nding.mjs' X`,
-    // Astra round 9 on 4acdd52f0: a quoted tilde expands to $HOME under eval
-    `eval node '~' --request${tail}`,
-  ])('a possible deposit: %s', (command) => {
-    expect(isPossibleDeposit(command), command).toBe(true)
-    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
-  })
-
-  it('a single-quoted $ in a canonical deposit stays literal: one titled request (Astra round 3, P2)', () => {
-    const command = "node scripts/finding.mjs --request Outer --spec-file '/tmp/$SPEC.md' --why-file /tmp/w.md --approved \"passt so\""
-    expect(requestsOf(command)).toEqual([{ title: 'Outer', approved: 'passt so' }])
-    expect(evaluate({ command, entries: chat }).block).toBe(false)
-  })
-
-  it('a canonical read command behaves as before: no request (Astra round 5, P2)', () => {
-    const command = "grep '$' scripts/finding.mjs"
-    expect(requestsOf(command)).toEqual([])
-    expect(evaluate({ command, entries: chat }).block).toBe(false)
-  })
-
-  it('a PowerShell backslash path is a direct finding.mjs call: one titled request (Astra round 4, P2)', () => {
-    const command = "node scripts\\finding.mjs --request Outer --spec-file 'C:\\tmp\\$SPEC.md' --why-file C:\\tmp\\w.md --approved \"passt so\""
-    expect(requestsOf(command, 'powershell')).toEqual([{ title: 'Outer', approved: 'passt so' }])
-    expect(evaluate({ command, entries: chat, shell: 'powershell' }).block).toBe(false)
-  })
-})
-
-describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-parsing', () => {
+describe('cross-vendor review finding (cross-vendor review, 7589d5b): PowerShell stop-parsing', () => {
   it('denies an approved title behind --%, which PowerShell expands as %VAR%', () => {
     const command = 'node scripts/finding.mjs --% --request "%USERNAME%" --spec-file C:/tmp/s.md --why-file C:/tmp/w.md --approved "ok"'
     nonCanonical(command, 'powershell')
@@ -756,7 +607,7 @@ describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-pa
   })
 })
 
-describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', () => {
+describe('the hook wrapper fails closed (cross-vendor review of 1367, round 6)', () => {
   const GUARD = fileURLToPath(new URL('./request-approval-guard.mjs', import.meta.url))
   const spawnGuard = (input, env = {}) =>
     spawnSync(process.execPath, [GUARD], { input, encoding: 'utf8', env: { ...process.env, ...env }, windowsHide: true })
@@ -796,5 +647,59 @@ describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', 
     const run = spawnGuard(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }))
     expect(run.status).toBe(0)
     expect(run.stdout).toBe('')
+  })
+
+  it('the hook and --check pass a command without a marker in either dialect', () => {
+    const command = 'Get-Content C:\\tmp\\notes.md'
+    expect(isPossibleDeposit(command, 'bash')).toBe(false)
+    expect(isPossibleDeposit(command, 'powershell')).toBe(false)
+    const check = spawnSync(process.execPath, [GUARD, '--check', command, '--powershell'], { encoding: 'utf8', windowsHide: true })
+    expect(check.stdout).toContain('OK (not a request deposit)')
+    const marked = spawnSync(process.execPath, [GUARD, '--check', 'Get-Content scripts\\finding.mjs'], { encoding: 'utf8', windowsHide: true })
+    expect(marked.stdout).toContain('a possible request deposit')
+  })
+})
+
+describe('only a command that mentions finding.mjs or --request is judged (cloud clone blockade, 22.10.2026)', () => {
+  // a chat session that approved nothing: anything judged as a possible deposit is refused
+  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
+  const allowed = (command, shell = 'bash') => {
+    expect(isPossibleDeposit(command, shell), command).toBe(false)
+    expect(evaluate({ command, entries: chat, shell }).block, command).toBe(false)
+  }
+
+  it.each([
+    // the cloud probe's own write, refused before for its quote, operator and redirect
+    "mkdir -p docs/probes && printf 'hostname %s\\n' \"$(hostname)\" > docs/probes/1230-cloud-marker.txt",
+    'cat f > g',
+    'rg x && node y',
+    'cat f | grep y > g',
+    "find . -name '*.ts'",
+    'git commit -m "Fix?"',
+    'echo $HOME',
+    "cat > /tmp/notes.md <<'EOF'\nplain prose\nEOF",
+    'node scripts/board.mjs vdzk-keep "Kartenschrift für die Anweisungstexte?"',
+  ])('allowed: %s', (command) => allowed(command))
+
+  it.each(['Get-Content f > g', 'Get-Content f; node y', "Get-Content 'notes?.md'"])('allowed in PowerShell: %s', (command) =>
+    allowed(command, 'powershell'),
+  )
+
+  it.each([
+    'rg --request scripts/finding.mjs',
+    "rg -n -- '--request' scripts | head",
+    'Get-Content scripts/finding.mjs | head',
+    `bash -c 'node scripts/fin""ding.mjs --request X'`,
+    `node -e "console.log('scripts/finding.mjs')"`,
+  ])('still judged: %s', (command) => {
+    expect(isPossibleDeposit(command), command).toBe(true)
+  })
+
+  it('a judged non-canonical marker command still meets the chat refusal', () => {
+    expect(evaluate({ command: 'cat scripts/finding.mjs > g', entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
+  it('accepted gap: a deposit assembled purely by expansion is not judged (the guard is no shell parser)', () => {
+    expect(isPossibleDeposit('node scripts/fin*.mjs --re?uest Hidden')).toBe(false)
   })
 })

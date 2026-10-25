@@ -75,7 +75,7 @@ import {
   blockingDeployments,
   candidateDeployments,
 } from './pages-deploy-unblock-core.mjs'
-import { heldByOtherLiveOwner, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { ownsLock, probePid, readOwnerLock } from './batch-singleton.mjs'
 import { boundaryIsSealed } from './batch-boundary-core.mjs'
 import { assessCiWait } from './batch-in-flight-core.mjs'
 import { gatherInFlight, worktreeBranch } from './batch-in-flight.mjs'
@@ -653,10 +653,11 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
         'handoff instead of trapping a session that may only end.',
     }
   }
-  if (heldByOtherLiveOwner(sessionId)) {
+  // Batch duty: only the lock holder owes it — before any git, network or CI work.
+  if (!ownsLock(sessionId).mine) {
     return {
       applicable: false,
-      why: 'another live session owns the batch lock',
+      why: 'this session does not hold the batch lock',
       cause: 'not-lock-owner',
     }
   }

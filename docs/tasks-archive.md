@@ -34451,3 +34451,394 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: `polish-villagers --section=village-walk` green on both backends; Vitest for any gait/IK change in src/render/villagerClipPose.ts; walking frame picture-checked.
   Criticality: medium - every walking villager on medium/high presets; a standing red in the village suite.
   Bundle: Dorfleben.
+
+- [x] 1401. Two villagers standing in conversation fidget on the spot
+  Two adult villagers standing face to face in conversation in the village centre fidget restlessly on the spot instead of standing calmly. Done when a conversation pair stands still apart from deliberate small gestures, judged in a moving capture, not a still.
+  Source: user bug report hoa-state-2026-10-21-2694999956.zip (10:19:48Z), user words: "Die beiden stehen da und zappeln herum."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (the point currently in progress, 1347, continues). The five user-report points of 21.10.2026 keep the order given here.
+  Bundle: Dorfleben.
+- [x] 1406. Rank the five user-report points of 21.10.2026 ahead of 1347
+  Amendment to the five user-report requests of 21.10.2026 (fidgeting conversation pair, trembling rear leg, sideways-running children, abrupt direction changes, water carrier at the jar table): rank all five AHEAD of 1347 as well, at the very front of the work order, in the order they were filed. This replaces the line "the point currently in progress, 1347, continues" in their ranking note. 1347 pauses at its next clean step (branch and worktree stay as they are) and resumes after the five.
+  Closed 21.10.2026 16:45 by the owner: the five points were lost from TASKS.md by the batch-doctor quarantine stash of 11:15 (stash@{2}) after the carrier was ticked; 1401 was restored and landed earlier, 1402-1405 are restored verbatim ahead of 1347 with their ranking note amended per this point; 1347 paused at a clean, pushed step (e4edd6979).
+
+- [x] 1408. Request-approval guard: let pure read pipelines through a fail-closed allowlist
+  Final state: `isPossibleDeposit` in scripts/request-approval-guard-core.mjs returns false for a PURE READ PIPELINE, checked directly before its last return line; everything else keeps today's fail-closed answer.
+  A pure read pipeline is: the command split only at UNQUOTED `|` (`;`, `&&`, `||`, redirections, newlines, parentheses, substitutions stay non-plain and fall through); every segment passes `isCanonical`; no word satisfies `couldExpandToMarker`; the first word of every segment is in a small fixed list - bash: rg, grep, cat, head, tail, wc, sort, uniq, cut, tr, ls, date, sed only with -n, git only with log/status/diff/show/blame/branch/rev-parse, and `node -e`/`node --eval` whose script text contains no marker and no require/import of child_process or fs write APIs (U13: the timestamp command the UserPromptSubmit hook prescribes must pass); PowerShell: Select-String, Get-Content, Get-ChildItem, Get-Date; and no executing option word (`rg --pre`, `sort --compress-program`, `git -c`, `git --exec-path`, `sed -e` with `e`/`w` commands).
+  Also: a quoted argument containing `?`, `*`, `;` or `|` inside quotes is literal and must not by itself make a command a possible deposit (measured 21.10.2026: `vdzk-keep "...Anweisungstexte?"` and `--brief "...problem.md; answer..."` were refused).
+  Unchanged: `isCanonical`, `requestsOf`, `depositsIn`, `evaluate`, `DIRECT_CALL`, the `--approved` rule, judging every `--request`; a command that MENTIONS finding.mjs or --request (even a literal grep for it) stays a possible deposit. The guard stays independent of batch lock and pause. Wrapper scripts/request-approval-guard.mjs only: same `shellOf(tool_name)` in `hookDecision` and `--check`; update the "accepted over-block" comments.
+  Tests (Vitest, request-approval-guard-core.test.mjs): allowed - `rg "x" a | head`, `git log --oneline | head -5`, `cat f | grep y`, `grep -n "a\|b" f`, the exact hook timestamp `node -e "console.log(new Intl.DateTimeFormat('de-DE',{...}).format(new Date()))"`, a canonical command with `"...?"` in a quoted word; still judged - `rg --request scripts/finding.mjs`, `cat f > g`, `rg x; node y`, `rg --pre cmd x`, `x | bash`, `$(...)`, unquoted globs, `node -e` mentioning finding.mjs; PowerShell counterparts.
+  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
+  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
+  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
+  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Request-Approval-Guard: reine Lesepipelines über eine fail-closed Allowlist freigeben"); approved: "ja, alles ganz vorne in der Queue".
+  Bundle: Chat & Tafel.
+
+- [x] 1409. Stop guards apply only to the holder of the batch lock
+  Final state: every Stop guard that imposes BATCH DUTIES applies only when this session holds the batch lock, tested positively with `ownsLock(sessionId).mine` (ownsLock returns an object; `.mine` is mandatory). A missing, unreadable or dead-owner lock, a live foreign owner and a missing session id all mean "not applicable", returned before any git, network, CI or state work.
+  Concretely: scripts/push-arrival-guard.mjs `gatherPushArrivalInputs`: early exit becomes `!ignoreOwnership && !ownsLock(sessionId).mine`, keep `CAUSE.notLockOwner`, reason text "this session does not hold the batch lock", `--status` stays diagnostic. scripts/ci-status-guard.mjs `gatherCiStatusInputs`: same predicate before git/network/CI work; pause and sealed-boundary exceptions stay; `observeDurableWait`, successor notification and `readOnly` are NOT coupled to the session ownership check. scripts/dashboard-guard.mjs, dashboard-integrity-guard.mjs, decision-card-guard.mjs, retro-currency-guard.mjs: the same early exit (confirm insertion point and diagnostic exceptions per file before patching). decision-card-guard must not demand card reviews from a non-owner even while another session holds the batch (measured 21.10.2026 17:04).
+  Then sort the remaining ~30 importers of `heldByOtherLiveOwner` by purpose and switch ONLY further batch-duty checks; foreign-owner protection, acquisition logic and diagnostics keep `heldByOtherLiveOwner`. `heldByOtherLiveOwner` and `ownsLock` themselves stay unchanged - no global reinterpretation, no lease/handover addition to `ownsLock`.
+  Before changing: read the fail direction of `turnEndOwnership` (batch-resume-hook-core.mjs) for an empty/unreadable transcript right after /clear and the Stop-hook order in .claude/settings.json; do not change acquisition (freeze), but pin the case "lock free, transcript empty, chat session" as a test: neither acquisition nor duties. If it acquires there, file that as its own finding.
+  Tests (Vitest, per switched guard core): no lock / unreadable lock / dead foreign owner / live foreign owner / missing session id -> not applicable with no git, network or state work; own lock -> applicable; process-identity (compaction) case stays owner.
+  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
+  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
+  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
+  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Stop-Guards gelten nur für den Halter des Batch-Locks"); approved: "ja, alles ganz vorne in der Queue".
+  Bundle: Chat & Tafel.
+
+- [x] 1410. Board-first: the board duty applies only to the lock holder
+  Final state: scripts/board-first-guard.mjs exits without a board decision for a session that does not hold the batch lock: `if (!ownsLock(sid, { lock }).mine) process.exit(0)` placed AFTER the fence chokepoint, the main-write fence, the foreign-owner stand-down (`ownershipStandDownDecision`, still called only on an actually detected foreign owner via `heldByOtherLiveOwner`), the worktree exemption and the sealed-boundary check, and immediately BEFORE `gather()`/`evaluate()`. A non-owner thus gets no board-first deny and writes no `boardFirstFiredAt` into the shared state (which today consumes the real owner's once-per-turn stand-down).
+  Unchanged: lease and claim renewal, handover handling, pause exemption, `--status`; the end of a board duty grants no write permission and triggers no lock acquisition. Correct the comment claiming "board duties stand down for a non-owner" - it becomes true only with this change.
+  Tests (board-first-core.test.mjs / board-first-guard.test.mjs): non-owner with ownerless batch -> no board deny, no `boardFirstFiredAt` write; ownerless main write still refused; stale-fence holder still refused; owner, sealed boundary and isolated worktree keep today's rules.
+  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
+  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
+  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
+  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Board-first: Board-Pflicht nur für den Lock-Halter"); approved: "ja, alles ganz vorne in der Queue".
+  Bundle: Chat & Tafel.
+
+- [x] 1411. Main-write guard: do not classify pure read commands as writes
+  Final state: the main-write classification used by board-first (`mainWriteFenceDecision`, batch-lease-core.mjs, and the command classifier it relies on, e.g. command-classify-core.mjs) judges a command by write semantics, not by mere mention of a path or script name: a pure read such as `grep -c ownsLock scripts/land-point.mjs`, `grep -n -i "a\|b" scripts/land-point.mjs` or `sed -n 1,50p scripts/land-point.mjs` is not a state-changing segment and passes for a non-owner on main. Real writes (redirection into the tree, git commit/push/merge, running land-point.mjs or other mutating scripts, Edit/Write on tracked paths) stay refused without the lock.
+  First reproduce with the guard's own check path and locate the rule that classifies these reads as writes; change only that rule.
+  Tests: the three read commands above pass for a non-owner on main; `node scripts/land-point.mjs 1`, `echo x > src/a.ts`, `git commit -m x` stay refused; existing owner behaviour unchanged.
+  Queue position: FRONT of the work order, ahead of every other open point, in this order: (1) request-approval read pipelines, (2) Stop guards lock-holder only, (3) board-first board duty lock-holder only, (4) main-write read misclassification. User: "ja, alles ganz vorne in der Queue" (21.10.2026).
+  Infrastructure freeze 01.09.2026: these are fixes of a reproducible current blockade (two sessions forced into endless Stop loops on 21.10.2026). No new guards, ledger fields, routers or abstractions; only predicate swaps and one narrow allowlist inside existing functions.
+  Origin: blind four-eyes 21.10.2026 - Claude Opus 5.5 half A (7 entries), GPT-6 Astra half B (26 entries), merged by Fable 5.1 into 19 union entries U1-U19; nothing vanished (informal count; the official blind-merge count could not run because a standing-down session cannot commit the halves under docs/four-eyes/).
+  Source: user request 21.10.2026 (chat session e3fcc57b, carrier title "Main-Write-Schutz: reine Lesebefehle nicht als Schreibzugriff einstufen"); approved: "ja, alles ganz vorne in der Queue".
+  Bundle: Chat & Tafel.
+
+- [x] 1421. Lower the OpenAI reasoning effort from high to medium
+  Queue position: FRONT of the work order (infrastructure setting, user order 21.10.2026).
+  Final state: every OpenAI (GPT-6 Astra) call - review (scripts/review-astra.mjs), authoring (scripts/author-astra.mjs) and ask (scripts/ask-astra.mjs) - runs at reasoning effort medium. The single source is ASTRA_REASONING_EFFORT in scripts/review-astra-core.mjs:73 ('high' -> 'medium'); its header comment (line 8, "reasoning effort HIGH") says medium.
+  Tests: scripts/author-astra-core.test.mjs:83 expects model_reasoning_effort=medium; review-astra-core.test.mjs (uses the constant) stays green; no other hard-coded 'high' for the OpenAI lane remains in scripts/ (comments recording past reviews "GPT-5.6 Sol at effort high" are history and stay).
+  Criticality: low - cost/latency setting, one constant.
+  Bundle: Chat & Tafel.
+
+- [x] 1413. An empty transcript right after /clear must not take a free batch lock at turn end
+  Final state: turnEndOwnership (scripts/batch-resume-hook-core.mjs) never treats an empty or unreadable transcript as an unattended launcher session; a chat window right after /clear keeps a free batch lock free at turn end, so the batch-duty Stop guards do not bind it.
+  Verifiable: the it.fails case pinned in scripts/batch-turn-end-ownership.test.mjs on feat/1409-stop-guards-lock-holder turns into a passing test; a real launcher session still acquires.
+  Source: finding 21.10.2026 18:26 by the 1409 author: with the lock free, the empty transcript after /clear counted as unattended and acquired; batch-progress-guard is fifth in the Stop order, so every later batch-duty guard bound that chat window. Acquisition is frozen by 1409's spec, hence its own point.
+  Queue position: directly after 1409 (it follows its ownership change).
+  Criticality: medium - a real blockade of an attended chat window (infrastructure freeze exemption, CLAUDE.md section 2).
+  Bundle: Chat & Tafel.
+
+- [x] 1412. Village bank routing test fails under machine load
+  Queue position: after point 1411 (front-of-queue gate stability: it reddens unrelated branches and CI).
+  Source: finding 21.10.2026 18:14: `src/scenes/place/routing.test.ts` "a villager sent to the BANK gets there" failed in two independent full unit runs (1402 worktree seed 1337; 1410 worktree seeds 7 and 1337) at load average 13-16; the file alone passes 19/19, also on main. Caused red CI run 39625616367 on feat/1402-rear-leg-tremble.
+  Final state: the routing search and its test are deterministic: no wall-clock or time-budget dependency decides whether a route is found, so the bank test passes identically under load.
+  Verifiable: a Vitest case that runs the bank routing with a stalled clock (or artificially slow step) and still reaches all three bank points; the full unit suite green under parallel load.
+  Charged finding 21.10.2026 ~22:00: the main pre-push unit gate went red under parallel load (a worktree vitest run and an Astra review beside it) and kept no test name; the immediate quiet rerun was green (608 files). Likely this class; unproven because the name is lost.
+  Criticality: medium - a flaky unit gate reddens unrelated branches and CI.
+  Bundle: Dorfleben.
+
+- [x] 1407. No user instruction is ever lost: tick the carrier only after commit, the doctor stashes no task files, reconcile the carrier against TASKS.md
+  Rank: at the very front of the work order, ahead of 1402 (user order 21.10.2026).
+  Four eyes: GPT-6 Astra and Opus 5.5 analyse blind-parallel from identical inputs; a third model merges via scripts/blind-merge.mjs; cross-vendor review of the result.
+  What happened 21.10.2026: the carrier ticked "queued 1402..1406" at 10:31Z while the TASKS.md appends were only in the working tree, uncommitted. At 11:15Z batch-doctor --repair (ownerAlive=false, unhandled parallel alert) moved all dirty files incl. TASKS.md into stash doctor-quarantine-2026-10-21T11-15-21-622Z and judged "consistent". No check compared carrier ticks against TASKS.md; the loss was found only at 16:40 and restored by hand in 5ba920079. 218 quarantine stashes exist, none ever audited.
+  FINAL STATE:
+  1. A carrier entry becomes "queued N" only after a commit containing point N is pushed to main; until then it stays open.
+  2. batch-doctor never stashes TASKS.md, docs/tasks-archive.md or .claude/queue-rank.json silently; it secures them as a commit on a rescue branch and raises a loud alert.
+  3. A reconciliation runs at every doctor run, session start and in the post-merge gate: every "queued N" carrier entry must exist in TASKS.md or the archive; a mismatch is a red finding, never "consistent".
+  4. One-time sweep of all existing stashes for content not on main (user orders, quotes, points); findings are restored or filed.
+  VERIFIABLE: a Vitest replays the 21.10. sequence (append point, tick carrier, doctor --repair with ownerAlive=false) and ends with the point still in TASKS.md or with an alert, never a silent loss; a Vitest that a queued carrier entry without its TASKS.md point turns the reconciliation red.
+  Refs: scripts/batch-doctor.mjs, scripts/batch-doctor-core.mjs (quarantineStash, planRemediation), scripts/finding.mjs, .claude/doctor.log 2026-10-21T11:15, commit 5ba920079.
+  Criticality: HIGH - user orders were lost silently (data loss / false approval class, exempt from the infrastructure freeze per CLAUDE.md section 2).
+  Source: user 21.10.2026 (chat): "Wie kann so etwas passieren? Das ist absolut fatal. Wir brauche ganz vorne in der Queue einen neuen Punkt, der das Problem mit vier Augen analysiert und zuverlässig löst. Es darf nie etwas verlorengehen." Approved: "So einreihen".
+  Absorbs the carrier findings of 21.10.2026 "Doctor quarantine stash swallows committed-to-carrier TASKS.md appends" and "Doctor quarantine stashes carry unreviewed content" (final-state items 2 and 4).
+  Bundle: Chat & Tafel.
+
+- [x] 1393. Generic model lanes; the cross-vendor lane switches to GPT-6.1
+  Queue position: directly after point 1407 (user order 21.10.2026; before: directly before point 1347, user order 19.10.2026).
+  Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.
+  Execution: four eyes (CLAUDE.md 6): divergent design work blind-parallel from identical inputs, merged by a third model via scripts/blind-merge.mjs; the code is then reviewed cross-vendor, never by its author.
+  Amendment (user order 19.10.2026, approved "ok. freigegeben"; folded in from the findings carrier, supersedes the carrier finding "Global Codex CLI must go from 0.153.0 to 0.163.0 before gpt-6.1-sol works") — order of work:
+  1. FIRST STEP: update the global Codex CLI installation from 0.153.0 to 0.163.0 or newer (npm install -g). Only the batch owner can run this; the main write guard refuses npm install -g for non-owner sessions.
+  2. THEN prove that gpt-6.1-sol answers with the GLOBAL installation (a minimal probe prompt answered OK). If it does not answer, stop and report; do not start the rebuild.
+  3. ONLY THEN the rebuild of 1393 with four-eyes review across two vendors (CLAUDE.md 6), as the spec of 1393 describes.
+  Background measured 19.10.2026 22:07: codex 0.163.0 via npx with ChatGPT login: gpt-6.1-sol answered OK. codex 0.153.0 (the global install): 400 "not supported".
+  Progress 20.10.2026 08:10 (batch owner): steps 1-2 done — global Codex CLI updated 0.153.0 -> 0.163.0 (npm install -g @openai/codex@0.163.0); probe `codex exec -m gpt-6.1-sol` with the global install answered OK. Step 3 (rebuild) is open.
+  Goal: switching a model is a one-line data change. No file name, script name or constant name carries a vendor or model name; only data does.
+  Final state:
+  - scripts/model-lanes.mjs is the ONLY place naming concrete models. Each lane is a record: role, vendor, display name, model id, retired names, runtime (claude/codex), scarce flag. Guards, trailer checks, review chain, routing and tests read lanes only from it.
+  - The cross-vendor rule compares the vendor field of two lane records; no script knows a vendor name.
+  - Constants named by role (no ASTRA_MODEL, OPENAI_*, FABLE_* etc. in consumer code).
+  - Role-named scripts (proposal, author may refine names but keep them role-only):
+    fable-switch-core.mjs model identities -> model-lanes.mjs
+    fable-switch.mjs -> lane-switch.mjs (on/off per lane, scarce lanes included)
+    astra-share.mjs -> lane-routing.mjs (which task goes to which lane)
+    review-astra.mjs -> cross-review.mjs (review by a lane of another vendor than the author)
+    ask-astra.mjs -> ask-lane.mjs
+    author-astra.mjs / author-fable.mjs -> author-delegate.mjs --lane <role>
+    Matching core/test files follow. Hooks in .claude/settings.json (protected path: attended edit), docs (astra-routing.md, batch-owner-runbook.md, verify README) and memory entries naming old scripts follow.
+  - Tests import lane data instead of hard-coding names (today 114 literal occurrences in 28 test files).
+  - The OpenAI lane switches to GPT-6.1, model id gpt-6.1-sol, display name "GPT-6.1 Sol" (assumed; user may correct). "GPT-6 Astra" and "GPT-5.6 Sol" go into retired names so landed trailers keep verifying and the self-review ban treats all three as one lane. The new id is proven honoured on this machine (probe) before the lane counts as reachable.
+  - CLAUDE.md 6 speaks only of roles (main chain, cross-vendor reviewer, scarce lane); the outdated sentence "GPT-6 Astra authors difficult/complex/error-prone/HIGH points" is deleted. Commit trailers keep real model names, taken from model-lanes.mjs.
+  - Unit suite green; build and lint green.
+  Verifiable: unit suite, build and lint green; no consumer file outside scripts/model-lanes.mjs names a concrete model.
+  Bundle: Modell & Wächter.
+  Criticality: medium — policy text contradicts live routing.
+  Amendment (user request 21.10.2026, from the findings carrier):
+  Add to the final state of 1393:
+  - The OpenAI (cross-vendor) lane runs at reasoning effort HIGH. Its lane record in scripts/model-lanes.mjs carries effort `high`, and every codex invocation (review, author, ask) passes `model_reasoning_effort=high` taken from that record.
+  - 1393 sets this value explicitly, whatever the value on main is when 1393 starts: a point queued before 1393 is expected to lower the OpenAI effort to medium, and 1393 raises it back to high.
+  - A unit test asserts that the OpenAI lane record's effort is `high` and that the codex command line built for review and authoring carries `model_reasoning_effort=high`.
+  Today (HEAD e9249e591) the value is ASTRA_REASONING_EFFORT = 'high' in scripts/review-astra-core.mjs (re-exported by scripts/author-astra-core.mjs).
+
+- [x] 1402. A walking villager's rear leg trembles at every step
+  A walking adult villager (the water carrier crossing open ground, seen in profile) trembles with the rear leg at every step. Done when the trailing leg moves smoothly through each stride, judged in a moving capture.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (1).zip (10:20:29Z), user words: "Das hintere Bein zittert bei jedem Schritt."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+  State 22.10.2026 (branch ea18eef9b, cheap gate green): the toe-roll spring-back is gone, but at lift-off the trailing knee still jumps from the stretched reach into the clip's bent swing (fixed 60 Hz clock: shin rot.x 0.203 -> 0.457 -> 0.836, up to 36 rad/s; 20 Hz: 0.203 -> 1.384 in one frame). The reversal test misses this monotonic pop: bound each leg joint's angular speed against the clip's own maximum at 15/20/30/60/144 Hz and make the hand-over continuous. Deterministic moving capture: local/probe-1402.mjs (Playwright clock, env FRAMES/STEP/VERIFY_GL). Sharp curves (yaw rate >= 2.5 rad/s) also bring reversal spikes back; judge whether that belongs here or in its own point.
+  Bundle: Dorfleben.
+
+- [x] 1403. Running children move sideways to their facing
+  Running village children move sideways relative to where their body faces. Done when a running child faces its direction of travel, judged in a moving capture.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (2).zip (10:20:42Z), user words: "Die Kinder laufen seitwärts."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+  Bundle: Dorfleben.
+  State 22.10.2026 (branch c886e65b0, cheap gate green, picture RED): steady running faces its travel on both backends (max 0.4°), but a set-off from a stand still goes wrong. WebGL 2 capture, START=stand: the child first WALKS (bank `drive` with `wants=false`, 1.4 m/s) up to 158° off its body for 0.6 s (~0.8 m, backwards), then runs at 69° off for 0.2 s (inside `setOffTurn` = 90°). Dropping the `wants &&` guard in `drive` breaks two `bankGame.test.ts` cases (boulder-route retry, the watcher's turn-only) and still leaves 0.7 m walked sideways in `tagShuffle.facing.test.ts` once its bound covers 1 m/s, so a walked sideways course also comes from outside `drive`. Deterministic moving capture: local/probe-1403.mjs in the worktree (Playwright clock; env START=stand, FRAMES, STEP, VERIFY_GL).
+  Second try (reverted): a walk-only threshold `walkSetOffTurn` = 135° in `drive` still fails `bankGame.test.ts` "turns the rest of the group toward the stone … a turn only" — the roaming watcher walks through `drive` and its look at the stone holds it — and `tagShuffle.facing.test.ts` with a walked-backwards bound (>1 m/s, >135°) still measures 0.46 m, most likely that watcher. Third try (reverted): capping the watcher's look at a quarter turn off its walk leaves the same 0.46 m, so the watcher is NOT the source; trace which child and phase walks backwards in `tagShuffle.facing.test.ts` (seed 2694999956, first 160 s) before choosing a fix.
+  Trace (seed 2694999956, 60 Hz, >1 m/s and >135° off): the backwards walks are ROAM-phase walkers at 1.4 m/s with no edge commitment (t 0.7-22.6 s, 136-176°), and GATHER runners at 2.4-3.0 m/s while going round an obstacle (`edgeFor > 0`, t 102.8-104.2 s, ~145°) — the edge course turns the travel faster than the body follows. Roam root: the rim REFLECTION of `roamHeading` in bankGame.ts (~l. 1608-1616) flips the walk in one frame.
+Fourth try (branch bfabbe4df, facing replay GREEN incl. a new walked-backwards case, worst 0.28 m): the remaining roam backwards walks were HEAD-ON playmates — playmates are no steering obstacle, so the separation shoved one back at 1.4 m/s; the walk now bends away from a playmate within `roamGap` (1.6 m) and both bends turn at `turnRate`. RED: `tagShuffle.wedgeGate.test.ts` "re-pens with a sibling safely inside the yard" (refusedByClearYard 0) at every PEN_SEED 12-60 — its evidence needs a sibling inside the penned child's 0.65 m yard, the body-brushing the bend removes; roamGap 0.9/1.2 re-roll the facing replay red. Next: re-baseline that construction (e.g. siblings brought in by the `adultsAmongTheChildren`-style option or the pen sibling placed by the case) rather than tune the gap, then picture both backends. Measured further: over 130 s (into the gather) the re-pen replay still logs 0 refusals by the clear-yard rule and the two rules give 28.6 vs 24.0 rescues/min (case wants >2x) — with the bend no sibling stands inside the yard, so the case's PREMISE is gone, not just its seed. Recommended: keep its `penHasClearWall` unit assertions, drop the replay comparison (a simplification, cross-vendor reviewed). Separately "goes RED … at any frame cadence" reads judgedShare 0.389-0.392 against its 0.4 floor at seed 19. DONE on branch 3c6b16da4: re-pen replay comparison dropped (unit assertions kept), pen seed re-scanned to 12 (22 of 12..60 keep every comparison, thresholds unchanged); src/scenes/place/ unit layer 2608/2608 green. Left: full unit layer, cross-vendor review of bfabbe4df..3c6b16da4, moving capture both backends (local/probe-1403.mjs, START=stand and roaming). State 22.10.2026 (branch e634fa83d): full unit layer on 3c6b16da4 green (18278); cross-vendor review c886e65b0..3c6b16da4 pass 1 merge, pass 2 merge-with-fixes (a nearer playmate BEHIND masked one head-on AHEAD) — fixed in e634fa83d with a regression case in `bankGame.test.ts` (red without the fix). That fix shifts the replay: `tagShuffle.facing.test.ts` "never walks a child far backwards" now reads 0.303 m against its 0.3 bound. Traced: child 3 is the boulder CLIMBER (t 80.05 s, roam, walk 1.4 m/s via `drive` with `wants=false`): its edge commitment ends (`edgeSide` 1→0) and the travel snaps 90°→-95° in one frame while the body eases after it — the same edge-course family as the gather runners, at walk pace, not the playmate bend. Next: bound the travel turn when an edge commitment ends on a walk (or turn the walker in place past ~135°) without touching the watcher's turn-only case; do not raise the 0.3 bound. Then re-review e634fa83d.., moving capture both backends (local/probe-1403.mjs; stop it before editing src — the dev server hot-reloads). Fifth try (reverted): in `drive`, a walk whose course snapped >135° from the last course in one frame turned on the spot instead (position kept, heading eased at `turnRate`) — WORSE: backwards walk 0.47 m, plus `tagShuffle.test.ts` seed 42 shuffle 0.00282 (<0.0025) and the wedge gate cadence case 0.3775 (>0.4) red; the snap recurs every frame against the edge course, so the fix belongs where the edge commitment ends in `moveChild`, not after it. Where the commitment ends: `ageEdge` (clock expiry), the progress anchor and `releaseEdge` in tagGame.ts (~l. 552, 764, 787); the climber's snap at t 80.05 s came with `edgeSide` 1→0 at `goalFor` ~3 s. Sixth try (reverted): `releaseEdge` keeping the commitment while the opened way lies >135° off the course — worse (0.35 m, plus one more place case red), so the snap is not (only) `releaseEdge`; instrument which of the three ends fires at t 80.05 s before the next fix. Instrumented: it is the CLOCK expiry — `ageEdge` runs `edgeFor` 0.067→0 over t 79.97-80.03 s, `edgeSide` drops at 80.05 and the walk snaps 90°→-95° back toward the boulder (anchor 1.65 m out, `anchorFor` 1.2 s, so neither the anchor nor `releaseEdge` ends it). Next: on expiry for a child whose direct way lies >135° behind its course, renew or ease out of the commitment rather than drop it. Seventh try (branch 612b7c474, checkpoint): in bankGame `drive`, a walk whose edge commitment would expire with its goal >135° behind keeps it one more frame — facing replay GREEN (both cases), place layer 2608/2609; RED: `tagShuffle.test.ts` "and holds when the adults walk through the children's own ground" 60 (>100) — likely a walker now held round an obstacle; check that case's measure before bounding the hold (e.g. at most `unstuckSeconds`). Eighth try (reverted, on top of the checkpoint): holding only while `anchorFor < unstuckSeconds*0.5` turns the shuffle case green but the facing replay walks a child 5.0 m backwards — the hold is load-bearing; bound it by the way round itself (e.g. a hold cap per commitment) rather than by the anchor. Ninth try (reverted): a 1.5 s hold cap per commitment (WeakMap) — three place cases red (backwards 0.303 m, a 0.7575 > 0.75 bound, a count 3 vs 0). The branch head checkpoint keeps CI red (the one shuffle case) until a fix lands. SPLIT 22.10.2026 (owner, non-converging point): the walk-pace backwards snap at the edge-commitment expiry moves to 1424; this branch reverts the checkpoint 612b7c474 and skips the walked-backwards case pointing at 1424. Left here: full unit layer, cross-vendor re-review of e634fa83d.., moving capture both backends (START=stand and roaming). State 22.10.2026 18:45 (branch 94c53020c = main merged in): checkpoint reverted (37162bf8d), case skipped (b796f1b90), tagShuffle place tests 51 green + 1 skipped; cross-vendor review 3c6b16da4..94c53020c merge (GPT-6.1 Sol, recorded). Left: cheap gate on 94c53020c (tsc, lint, build, unit), moving capture both backends (local/probe-1403.mjs, START=stand and roaming), land.
+
+- [x] 1404. Villagers change walking direction abruptly instead of turning
+  Villagers change walking direction abruptly and unnaturally instead of turning. Done when a direction change reads as a natural turn, judged in a moving capture.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (3).zip (10:22:05Z), user words: "Die Einwohner wechseln apprupt und unnatürlich die Richtung."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+  Bundle: Dorfleben.
+  Handover 23.10.2026 00:10: the full `polish-villagers` pass at branch 983fe682f was KILLED by the 45-min suite wall on BOTH backends (WebGPU: last frames villager-dress 23:07, then 17 min inside village-walk); full passes before took 31-39 min. Next: run `--section=village-walk` alone on the branch and on main, compare durations, and fix the stall if the bounded turn causes it before landing.
+  Handover 23.10.2026 01:20 (983fe682f): the stall is NOT the turn — `--section=village-walk` alone 3:34 GREEN (38/38, WebGPU); `--section=adult-errands` swing check GREEN on WebGPU and WebGL 2, its only reds the two water-rim checks charged to 568. The full pass needs no merge (verify README "What finishes a feat/ point") and walls on a 7.9 GB renderer (finding filed). Left: the MOVING capture the point demands (no tool exists; a short frame sequence of one errand villager turning at a waypoint, both backends), cross review of the turning diff, then land.
+  Picture verdict 23.10.2026 01:40 on feat/1404 (frames 1404-errand-turn-1..4, WebGPU, commit after e04187e6f): INCONCLUSIVE — from the fixed spot the filmed turner is not identifiable (the camera must follow the chosen index or the frames must mark it), so the capture proves nothing yet. ODDITY in frame 1: the woman in the pink wrapper is drawn nearly HORIZONTAL in mid-air with legs splayed while moving (also a hard lean on the right-hand woman in frame 3) — check whether the bounded turn's slow-down/pace interplay or the walk cycle produces it before landing; if it reproduces on main it is its own point. WebGL 2 frames still owed.
+Handover 23.10.2026 02:15 (932882cd4): the capture now FOLLOWS the turner (label carries yaw, way heading, gait); review GPT-6.1 Sol merge-with-fixes on 0cf1d8f (digger + word double turn, index-0 capture, vacuous census) all fixed in the next commit, and the swing check now reads the turn bound INSIDE the game frame (`turnWorst`; the rAF sampler read a hitch as a snap, 0.038 rad over). The FLIGHT ODDITY is ours: new census "no village adult on an errand is drawn in a sprint" RED twice on the branch (sprint 1, 7.4-8.3 m/s, body moving 5.75 m/s against pace 1.25, player 16 m away), GREEN on main with the same census — the turned step bypassed `stepRoundBodies`, walked into the body it routed round and the separation (cap 8 m/s) shoved it. Fix 932882cd4 steps the resolved way scaled by the turn pace; unit 2635 green; NOT yet browser-verified. Next: `npm test -- polish-villagers --section=adult-errands` on WebGPU and WebGL 2 (census and swing green; reds charged to 568 allowed), look at the four following frames on both backends, confirming cross review of 0cf1d8f..932882cd4, then land.
+Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is REFUTED by measurement — in-frame telemetry read the separation shove at 0 and the worst frame jump at exactly 6.0 m/s with no escape: the section itself sets the errand pace to 6 m/s, at which every errand adult is rightly drawn in a sprint. The capture and the gait census now run at the SHIPPED pace (restored to 6 after); census and in-frame swing check GREEN on WebGPU and WebGL 2, the only reds the rim checks charged to 568 (plus once the stand-order moment-catcher charged to 642). Confirming cross review GPT-6.1 Sol 0cf1d8f..932882cd4: merge, both passes recorded. The two fixed waits the branch had added (fixedWaits unit red) are now a 300-frame count and a wait for the turner to walk on 0.35 m; build red on two untyped gait fields fixed; tsc, lint, build, 18280 unit GREEN. Left before landing: WebGPU frame 1404-errand-turn-1 shows NO turner (only water — the camera at 4 m off its flank, p.yaw = side, may be looking away; frames 2-4 show the carrier), and frame 3 shows the carrier in a deep lunge-like stride at the shipped pace — judge whether that is the loaded walk clip or ours; then look at the four WebGL 2 frames of this commit and land.
+
+- [x] 1426. Make the cloud clone able to work: path-scope, request-approval-guard and model-guard stop blocking it
+  QUEUE POSITION: front of the work order (user 22.10.2026: "Reihe das ganz vorne in der Queue ein.").
+  PROBLEM: a claude.ai/code cloud session on PatrickVonMassow/Heart-of-Africa-Remake (probe 22.10.2026,
+  host `vm`, machine-id a3942038ad9d43cba151ebad027d1061, kernel 6.18.44-fc-v140) could not write a
+  single file. Three repo hooks run in the clone and block it:
+  1. path-scope (scripts/path-scope-core.mjs): the clone lives at /home/user/Heart-of-Africa-Remake,
+     not in ALLOW_ROOTS, classed as "another user's home directory"; every Write/Edit and every Bash
+     call with the repo path is refused, so the clone cannot even fix itself.
+  2. request-approval-guard: refuses any Bash command holding a quote, redirect or operator
+     (`mkdir -p docs/probes && printf '...' > file`), although it neither mentions finding.mjs nor --request.
+  3. model-guard serving-model tripwire: the scarce-lane switch state is local/untracked, absent in
+     the clone, so every turn end is blocked and the session loops (observed: 6+ repeated stop refusals,
+     burning cloud credit).
+  FINAL STATE:
+  1. path-scope treats the checkout root of the running repository (git toplevel / project dir) as in
+     scope wherever it lives, so a cloud clone under /home/user/<repo> is in scope; foreign home dirs stay out.
+  2. request-approval-guard only fires on commands that actually mention finding.mjs or --request;
+     a plain write/redirect command without those words passes.
+  3. model-guard: an ABSENT lane-switch state in a clone without the local state files does not block
+     the turn end (notice, not refusal); a recorded OFF or an out-of-chain serving model still blocks.
+  4. Re-run the cloud probe: a claude.ai/code session writes docs/probes/1230-cloud-marker.txt
+     (hostname/machine-id/kernel lines) on branch probe/1230-cloud-marker and pushes it without any
+     workaround; then `node scripts/cloud-switch.mjs --record-probe probe/1230-cloud-marker` passes.
+     Switch ON additionally needs the user's confirmation that the cloud credit balance dropped.
+  Test: unit tests for each of the three guard cores (cloud-clone path in scope, plain redirect passes,
+  absent switch state in clone does not block); the probe branch as end-to-end proof.
+  Infrastructure freeze (CLAUDE.md §2): allowed — reproducible real blockade (cloud authoring
+  impossible), no new mechanism, only loosening three existing rules.
+  Criticality: medium. Deadline: cloud credits expire 05.11.2026 08:59 MEZ.
+  After landing (finding 22.10.2026 22:05): a "Von dir zu klären" card asks the user to start a cloud
+  session with the probe order and then confirm the credit drop under claude.ai/settings/usage; deadline 05.11.2026.
+  Bundle: Modell & Wächter.
+
+- [x] 1424. A walking child snaps backwards when its way round an obstacle expires
+  Split off 1403 (22.10.2026, after nine non-converging tries): a roaming child walking round an obstacle at 1.4 m/s (bank `drive`, `wants=false`) has its edge commitment end on the CLOCK (`ageEdge`, tagGame.ts) while its goal lies >135° behind; the walk snaps ~185° in one frame and the child walks backwards while its body eases after it. Done when `tagShuffle.facing.test.ts` "never walks a child far backwards" is un-skipped and green at its 0.3 m bound (measured 0.303 m, child 3, the boulder climber, t 80.05 s), with every other place case green, and a moving capture shows no backwards walk.
+  Tried and reverted on 1403 (do not repeat): turning in place on a >135° snap (0.47 m, two more cases red); `releaseEdge` holding the commitment (0.35 m); holding the commitment one frame while the goal is behind (green replay, but `tagShuffle.test.ts` "holds when the adults walk through the children's own ground" 60 < 100); that hold bounded by `anchorFor` (5.0 m backwards) or by a 1.5 s cap per commitment (three cases red). The hold is load-bearing, so the fix likely belongs in how the way round ends (ease the course out of the commitment) rather than how long it lasts.
+  Landing gate (findings 23.10.2026 05:21Z/05:30Z): frame 187-child-on-the-boulder came out washed white on feat/1424 with green checks (likely a child standing in the camera point); compare that frame on main and on the branch, both backends, before landing.
+  Landing gate 2 (23.10.2026 09:26): frame 187 re-taken clean on the branch (no whiteout). polish-children --section=children-bank-game is RED on the branch (WebGPU, 86a68f5c1, quiet host): tapping hand 34.5 cm off the flank (child 2, 38.6 cm in the word frame), arriving runner's hand 17.8 cm off the far stone. Run on main e35b98a19 (23.10.2026 09:54): the same three reds, so filed as 1428 and no longer 1424's gate. children-motion red on main too (ecea34998, 1.29 m inside 0.25 m), charged to 1068, so not 1424's gate. children-tag green on the branch (WebGPU, 86a68f5c1).
+  Bundle: Dorfleben.
+
+- [x] 1405. Water carrier sets the jar down too far from the table, his hand misses the water, and the new jar appears from nowhere
+  The Bambara water carrier at the jar table: (a) he sets the jar down while standing much too far from the table, (b) afterwards his hand does not point exactly at the water, (c) the new jar appears in his hand out of nothing. Related closed point 1376 (the water carrier shows his jar for the whole errand): check first whether this is a regression of it. Done when he steps up to the table before setting down, his pointing hand aims at the water, and the jar he carries next is visibly taken up.
+  Source: user bug report hoa-state-2026-10-21-2694999956 (4).zip (10:24:13Z), user words: "Der Wasserholer ist noch viel zu weit weg vom Tisch, wenn er das Wasser abstellt, seine Hand zeigt danach auch nicht genau aufs Wasser und der neue Krug erscheint aus dem Nichts in seiner Hand."
+  Repro for all: seed 2694999956, Bambara village (place mode), position x/z -59.45/-130.99, build b3b77ca, WebGPU, NVIDIA Lovelace, quality medium. Report archive (scene PNG, state JSON, overlay JSON) under local/bugreports-2026-10-21/.
+  Ranking: user order 21.10.2026, put at the very front of the work order queue, ahead of every waiting point (ahead of 1347 as well, per 1406; 1347 pauses at its next clean step and resumes after the five). The five user-report points of 21.10.2026 keep the order given here.
+  Bundle: Dorfleben.
+
+- [x] 847. The brevity guard has four ways past it, all found by one cross-vendor reading (GPT-5.6
+  Sol, effort high, 23.08.2026, 02:30, pass 2/3 over `2d80896`, verdict do-not-merge; recorded in
+  `.claude/mechanism-reviews.jsonl`). `scripts/guide-brevity-core.mjs` enforces the measured
+  ceilings of `docs/analysis_de/vibe-coding-anleitung.md`, and the document sits at an EXACT fit
+  (432 lines / the word ceiling beside it) — so every path past the rule is a path that lets the
+  document grow while the guard stays green. The four, at their measured lines:
+  1. LINE 210 — any line beginning with `<!--` is dropped whole from both budgets, so
+     `<!-- x --> visible prose …` renders prose at zero lines and zero words.
+  2. LINES 224-228 — only the FIRST `##` heading containing "Fallstrick" is audited and the scan
+     stops at the next `##`, so moving entries into a second `## Weitere Fallstricke` evades the
+     entry-length, risk-length, prompt and stray-prose checks while the totals stay put.
+  3. LINES 291 and 358-367 — the action check accepts the `→ *Prompt:*` marker ANYWHERE in the
+     entry and never looks at what follows it, so an empty prompt, or one followed by further
+     narrative, passes the rule that every pitfall must END in an actionable prompt.
+  4. LINE 190 — the repository-path detector accepts neither `./` nor a leading `/` before
+     `scripts`, so the ordinary spelling `./scripts/chat-spool.mjs` is not recognised as the
+     project-specific path the rule means to keep out of a beginner's guide.
+  FINAL STATE: each of the four is closed at its own line, and a Vitest case per path pins the
+  evasion as REFUSED — a comment line with trailing prose counted, a second pitfall section
+  audited like the first, a prompt that does not end its entry refused, and the two path
+  spellings recognised. The measured ceilings themselves are NOT reopened: they are the user's
+  ruling and this point only makes them enforceable as written.
+  VERIFIABLE: the four new unit cases red against today's core and green after the fix, and the
+  guide itself still passing unchanged, because nothing in it uses any of the four paths.
+  Criticality: low — no product behaviour and no lost work; it is a guard that measures less
+  than its own sentence, and the cost is a document that could grow past a ruling unnoticed.
+  Bundle: Session- & Repo-Hygiene.
+  Closed 23.10.2026 by point 1429 (branch reconciliation): parked under the infrastructure freeze (CLAUDE.md §2) — a doc-length guard, no current-game blockade, no possible false approval. Branch feat/847-brevity-guard-gaps @ 42411828e removed; what is done and missing stands in docs/backlog.md (23.10.2026 branch reconciliation).
+
+- [x] 901. A superseded CI run is reported as a failure and buys a whole session as its repair
+  path. MEASURED 24./25.08.2026 on this session's own start. `scripts/ci-status-guard-core.mjs:11`
+  puts `cancelled` into `FAILED_CONCLUSIONS`, so `classifyRuns` returns `state: 'failed'`,
+  `observeCiWait` turns that into `verdict: 'red'`, and `ciTerminalPrompt`
+  (`scripts/batch-autostart-core.mjs:774`) hands the successor "concluded RED. This successor is
+  the repair path: … inspect the named failure, repair it, … before selecting another work-order
+  point." What was actually measured: run 32781782698 on `04d8dfe2` was cancelled by the workflow's
+  OWN `concurrency: cancel-in-progress: true` (`.github/workflows/ci.yml:43-45`) because `508c3c40`
+  was pushed to the same ref three minutes later — and `508c3c40`'s own run 32782044122 concluded
+  `success`. There was no failure and nothing to repair; the handoff nevertheless opened this
+  session with a repair order over a green tree. `scripts/ci-gate-verdict-core.mjs:38-40` already
+  states the rule the wait path is missing: "`cancelled` is deliberately NOT a gate no — a
+  cancelled step is a superseded run, not a broken tree."
+  KEEP THE GATE STRICT, FIX THE STORY: a cancelled run still carries no verdict on its code, so it
+  must not read as green. The defect is the CLASSIFICATION of that no-verdict as a red to be
+  repaired, and the handoff text it produces.
+  FINAL STATE: `cancelled` is its own state — no verdict — separate from `failure`/`timed_out`/
+  `startup_failure`. Where a NEWER sha on the same ref has its own concluded run, the cancellation
+  is explained by that supersession and the older sha is moot: the successor is told the batch
+  moved on, not that it must repair. Where nothing supersedes it, the successor is told the run
+  never reached a verdict and which sha to re-run — still not that a defect exists. The gate keeps
+  refusing to call either case green.
+  VERIFIABLE: unit cases over the classifier and the handoff text — a cancelled run with a newer
+  concluded green sha on the same ref yields the supersession wording and no repair order; a
+  cancelled run with nothing newer yields the no-verdict wording naming the sha to re-run; a real
+  `failure` still yields the repair handoff; and neither cancelled case is ever reported green.
+  RECURRED 06.09.2026, unchanged in mechanism: run 34059652201 on `589d01e76` was cancelled by the
+  same `cancel-in-progress` when `b3c058821` was pushed to the ref one minute later, and that sha's
+  own run concluded `success`. The handoff again opened the successor session with "concluded RED.
+  This successor is the repair path", over a branch whose picture proof was green on both backends.
+  Second measured occurrence, no new mechanism — it does not change the final state above.
+  RECURRED 30.09.2026: run 36634558080 on `d2306c1be` was cancelled by `cancel-in-progress` when
+  `f2100d3f7` and `1f9c00c63` followed on main; `1f9c00c63`'s run 36643095205 concluded `success`
+  while the handoff again ordered a repair. Third occurrence, same mechanism.
+  Criticality: medium — it costs a whole session per occurrence and points it at work that does not
+  exist, but never loses code.
+  Bundle: Session- & Repo-Hygiene.
+  Closed 23.10.2026 by point 1429 (branch reconciliation): parked under the infrastructure freeze (CLAUDE.md §2) — a false red, not a false approval, and no current-game blockade. Branch feat/901-superseded-ci-run @ d9b9ec985 (commission record only) removed; entry in docs/backlog.md (23.10.2026 branch reconciliation).
+
+- [x] 1429. Reconcile the nine open branches and eight worktrees with the work order
+  QUEUE POSITION: front of the work order (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen"), ahead of the cloud pre-check point deposited with it.
+  GOAL: free the three-slot pool so cloud authoring can run at all. Measured 23.10.2026 14:30: POOL_CAP = 3 counts open feat/* branches (point 712), and nine are open remotely (1049-queue-order-rule, 1255-loom-plaza-distance, 1297-calf-shield-river, 1333-jar-mouth-under-water, 1347-garment-rebuild, 1405-water-carrier-table, 834-durable-authoring-lane, 847-brevity-guard-gaps, 901-superseded-ci-run), eight with local worktrees. The pool is oversubscribed threefold, so no new delegation starts and the user sees one task in progress.
+  FINAL STATE:
+  1. Reconcile: every open feat/* branch and worktree is checked against TASKS.md, docs/tasks-archive.md and docs/backlog.md and classified as merged, superseded, abandoned, or live (with its distance to acceptance). Read each branch log before deciding.
+  2. Close: merged, superseded and abandoned branches are removed (local branch, remote branch, worktree) after any still-needed diff is preserved (commit sha named in the point's closing record or backlog).
+  3. Infrastructure branches 834, 847, 901: triaged against the infrastructure freeze (CLAUDE.md §2). Only one that fixes a reproducible current-game blockade or a possible false approval continues; the rest are parked as entries in docs/backlog.md (branch name, last sha, what is done/missing) and their branches and worktrees removed; their TASKS.md points closed with that reason.
+  4. Land: after the running verify finishes, the remaining live feature branches are landed in order of distance to acceptance, each time-boxed; a branch that does not converge in its box is split or demoted instead of holding a slot (memory split-a-point-that-will-not-converge).
+  5. Evidence: closing record lists, per branch, its classification and outcome, and the open feat/* count after the point (target: at most 3, slots free for refill).
+  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entries U1, U2, U3.
+  Observed problem: The user asked why only one task is usually in progress although authoring now runs in the cloud. Measurement shows the pool cap of 3 is held by nine open branches, most waiting for review, verification or landing, or parked. Freeing those slots is the only change that lets parallel cloud authoring start today; raising the cap would only add branches waiting at the serial local acceptance step (Fable's verdict in the merged union, U11). It is a real blockade and mostly deletion, which satisfies the finding-intake rule of CLAUDE.md §2.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
+  Closing record (23.10.2026, Claude Opus 5.5, main-only hygiene, no feat branch): 1405-water-carrier-table had already landed before the start.
+  - 834-durable-authoring-lane @ 091f66b55: superseded (point closed, cut into 889-895, all landed) — branch, remote, worktree removed.
+  - 847-brevity-guard-gaps @ 42411828e: infrastructure, parked under the freeze — removed; point 847 closed; backlog entry.
+  - 901-superseded-ci-run @ d9b9ec985: infrastructure, parked under the freeze (commission record only) — removed; point 901 closed; backlog entry.
+  - 1049-queue-order-rule @ 9815ce1b1: abandoned (commission record only) — removed; point 1049 stays open.
+  - 1255-loom-plaza-distance @ 79fcb509f: abandoned per 1258 ("land nothing") — removed; sha kept in the backlog for 1266.
+  - 1297-calf-shield-river (+8, 2 weeks), 1333-jar-mouth-under-water (+2, 3 days), 1347-garment-rebuild (+66, 2 days): live; step 4 is split onto their own open points, landed through land-point in work-order order, each time-boxed there rather than held by this point.
+  Result: open feat/* 9 -> 3, point worktrees 8 -> 3 (pool at cap 3, no oversubscription; a slot frees with each live landing).
+
+- [x] 1430. Cloud authoring sessions deliver build, lint and Vitest green
+  QUEUE POSITION: front of the work order, directly after the branch clean-up point deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen").
+  GOAL: shorten local acceptance per point by moving the machine-independent gates into the cloud authoring session.
+  FINAL STATE:
+  1. The cloud authoring delegation (cloud switch ON, Agent isolation "remote") instructs the delegate to run build, lint and the unit layer (Vitest) on its branch before handing over, and to hand over: pushed commit sha, the three gate results, and open issues.
+  2. The local acceptance on the pushed branch then runs only what needs the quiet local machine: the covering browser tier suites (scripts/verify/tiers.mjs) and the picture check (both backends when isBackendSensitivePath applies), plus review and landing. The local tier run stays mandatory; cloud green is never accepted as local evidence for browser suites.
+  3. Change is limited to the delegation prompt/brief text and the place that documents the local acceptance steps (docs/batch-owner-runbook.md or docs/lane-routing.md); no new guard, ledger field, router or workflow abstraction (infrastructure freeze, CLAUDE.md §2). If a cloud unit result disagrees with a later local run, that is recorded as a finding, not handled by new machinery.
+  4. Evidence: one cloud-authored point landed under the new flow, with the handover message naming sha and gate results, and the local acceptance log showing no repeated build/lint/unit layer. SPLIT 23.10.2026 into point 1436 (no cloud-authored point exists yet to carry it); 1430 lands with items 1–3.
+  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entry U5 (A3 + B12).
+  Observed problem: Local acceptance is the measured bottleneck: review, suites, picture check and landing run serially in one session on one machine that must be quiet (memory verify-suites-need-a-quiet-machine). Build, lint and Vitest do not need that machine; running them in the cloud session removes them from the serial step for every point. It is a simplification of the local step without new infrastructure, which satisfies the finding-intake rule of CLAUDE.md §2.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1431. Hand the throughput working instruction to the batch-owning session
+  QUEUE POSITION: front of the work order together with the two points deposited with it (user order 23.10.2026 14:41, "ja, ganz vorne in der Queue einreihen"). This is a standing working instruction for the batch owner plus one backlog entry, not code; carry it in as one short point whose final state is the recorded instruction, or apply it directly and record it as closed.
+  FINAL STATE:
+  1. Working instruction for the batch-owning session, recorded where the owner reads its routine (docs/batch-owner-runbook.md, a short section "Throughput with cloud authoring"), effective immediately:
+     a. Quiet acceptance windows: while a local browser suite, unit gate or picture check runs, no other local agent, browser or Vitest run starts; cloud authoring continues (U4).
+     b. Gate a branch only after its author declares it final; rerun only the checks a later commit invalidates (U7).
+     c. Use suite wait time for lightweight work only: review other pushed commits early, prepare their acceptance steps; never start a second heavy check (U8).
+     d. When refilling the pool, prefer bounded ready points with clear acceptance and disjoint files/prerequisites; check overlap before delegating (U9).
+     e. Pace cloud authoring up to the credit expiry on 05.11.2026 to what local acceptance can land, not to what the cloud can produce (U12).
+  2. docs/backlog.md entry (non-blocking): "Separate cloud-author cap" — raise the authoring cap above 3 and stop counting pushed-but-unverified branches only if, after the branch clean-up and the cloud pre-check points, the pool sits at 3 with the owner idle; then change POOL_CAP (scripts/batch-in-flight-core.mjs) and DAEMON_POOL_CAP (scripts/batch-daemon-core.mjs) together, since a test asserts they agree (U11; disagreement A1 vs B6/B16, Fable's verdict: measure first).
+  3. Not repeated because already rules: tier selection (CLAUDE.md §5, U6) and reproducing loaded reds on a quiet machine (CLAUDE.md §7.2, memory verify-suites-need-a-quiet-machine, U10).
+  SOURCE: blind four-eyes stage 23.10.2026 (A Opus 5.5, B GPT-6.1 Sol, union merged by Fable 5.1): union entries U4, U7, U8, U9, U11, U12.
+  Observed problem: These union entries are working practices of the batch owner, not code; a point per entry would open branches with nothing to change, and enforcing them by guards is forbidden by the infrastructure freeze. The user approved recording them as an instruction to the batch-owning session and parking the cap question in the backlog with its measurement condition, so they are not lost.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from a47d01bba; approved: "ja, ganz vorne in der Queue einreihen".
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1439. Claude-lane authoring delegations really start as cloud sessions
+  Final state: with the cloud switch ON, a Claude-lane authoring delegation starts on a measured cloud path (candidates: `claude --cloud "<brief>"` from the CLI, or a claude.ai remote-trigger routine), not Agent `isolation: "remote"`, which this session measured to fall back to a local worktree. The working path is named in the cloud-switch instruction text the SessionStart hook prints and in docs/lane-routing.md, with its measured evidence: the session id or link, a hostname that is not the local container, and a pushed feat/<point>-<slug> branch from that session. If no path works without the user present, the cloud switch is turned off with that reason recorded, so the instruction stops promising a cloud start that falls back. No new machinery (CLAUDE.md §2 infrastructure freeze).
+  Observed problem: measured 24.10.2026 01:58: an Agent-tool probe with isolation "remote" ran in /workspace/hoa/.claude/worktrees/agent-af536fca721b0e288 on the local WSL host (hostname 66a0eaaacb4b, REMOTE_CONTAINERS set). The two authoring delegations of 24.10.2026 00:00 (1414, 1432) fell back the same way. The 250 USD cloud credit (expires 05.11.2026) therefore stays unused, and routing change 1438 alone cannot spend it.
+  Queue position: front, before 1438 (user 24.10.2026 00:18: "Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio.").
+  Source: finding "Agent isolation remote falls back to a local worktree in this session" (24.10.2026 00:15) plus the probe above; real blockade of the user's top priority (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1438. Route mid-difficulty points to the Claude lane while the cloud credit lasts
+  Final state: while the cloud switch routes Claude-lane authoring to the cloud (authoringVenue → 'cloud') and before the credit expiry (CREDIT_EXPIRY in scripts/cloud-switch-core.mjs, 05.11.2026 08:59 MEZ), authorLaneFor in scripts/author-routing-core.mjs routes a point that is "mechanical or mid-difficulty, and nothing marks it otherwise" to the main lane instead of the cross lane, with a reason naming the cloud credit. Tags, HIGH criticality, hard cases and the scarce escalation keep their current routing. After the expiry or with the switch off/unusable, routing is unchanged. author-delegate.mjs passes the venue to the decision; a node test covers on, off and expired.
+  Observed problem: the cloud switch has been ON since 23.10.2026 09:34, yet the 250 USD cloud credit is unused (248 left, expires 05.11.2026). Measured 24.10.2026: of the open points author routing sends 265 to the cross lane (local GPT) and only 100 to the main lane; 156 of the cross ones only because they are mid-difficulty with nothing marking them. Only main-lane (Claude) authoring can run in the cloud, so the credit had almost nothing to author.
+  Queue position: front (user 24.10.2026 00:03: "ja, so einreihen und direkt erledigen").
+  Source: user request 24.10.2026 via the findings carrier, spec cut from fee8a65c2; approved: "ja, so einreihen und direkt erledigen".
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1440. Board work cards show who built and reviewed a point, and where
+  Final state: every work card's details carry a section "Verteilung" with one fixed-form line, e.g. "Bau: Opus 5.5 · Cloud | Prüfung: GPT-6.1 Sol" ("offen" for a part still pending). The line is derived from the recorded delegation venue, the cross-review records and the commit trailers, never hand-typed. A Vitest covers a local build, a cloud build and a pending review.
+  Queue position: directly after 1438 (user order: first the cloud start, then 1438, then this card change).
+  Source: user request 24.10.2026 via the findings carrier; approved verbatim: "Ja, den Kartenumbau so einreihen. Mache das direkt nachdem du das Problem gelöst hast, das nichts in der Cloud läuft. Die Abarbeitung in der Cloud hat gerade höchste Prio." Title shown to the user: "Karten-Details: Abschnitt Verteilung mit Bau- und Prüfmodell und Ort (lokal/Cloud) aus den Protokollen".
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1441. Launcher-daemon HANGING-send test reddens fast gates under load
+  Final state: `scripts/batch-launcher-daemon.test.mjs` "a HANGING send loses to its budget" no longer depends on wall-clock time under machine load: it drives the alert budget with fake timers or an injected clock, so the full `test:unit` and the land-point fast gate never time it out. The test still proves the loop keeps ticking and sends no recovery notice after a hanging send.
+  Observed problem: passes alone in 1.2 s, but timed out in the full unit run on 20.10.2026 (point 1345), 22.10.2026 06:57 and 24.10.2026 02:3x (land-point fast gate of point 1439, run in parallel with build and lint). The backlog entry said: a point once it reddens a second gate.
+  Queue position: directly after 1440 (it reddens landings).
+  Source: docs/backlog.md entries of 20.10. and 22.10.2026 plus the 24.10.2026 gate; real blockade of landings (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1442. polish-villagers villager-dress hangs on WebGPU in its cost probe
+  Final state: `npm test -- polish-villagers --section=villager-dress` with VERIFY_GL=webgpu ends on its own (pass or a named red) within its measured runtime; the cost probe loop (`scripts/verify/polish-villagers.mjs`, `DRESS_COST` villages) records a `cost` row per village on WebGPU in `local/verify-measure/villager-dress.jsonl`, and every wait inside it (awaitPlaceDrawn, awaitGltfBody, the 61-frame rAF sampler) has a timeout that reports which village and level it stuck on instead of hanging. The full-suite run on both backends moved to 1446 (split 25.10.2026: section green, full run blocked by a GPU-process loss).
+  Observed problem: on 24.10.2026 the full WebGPU run was killed at the 45-min and then the 90-min wall timeout; the section alone is killed at 8 min. All dress frames and every `row-hidden` record are written (last frame 1294-dress-<people>), but no WebGPU `cost` record exists at all (the only ones are WebGL, 18.10.2026); `--section=village-walk` passes in 3 min 34 s.
+  Queue position: directly after 1441 (it holds the render coverage of every village landing).
+  Source: covering-run attempts of the 1440 session, 24.10.2026; real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1446. The full polish-villagers WebGPU run loses Chrome's GPU process inside villager-dress
+  Final state: the GPU-process loss in the full `VERIFY_GL=webgpu` polish-villagers run is located (which section/act accumulates GPU load before it, measured) and removed, or staged away without weakening a check; then the full polish-villagers suite runs to its end on both backends, which is the covering run render-verify-guard owes for the village render commits since 460b010.
+  Observed problem: run of 25.10.2026 03:40 UTC on feat/1442 3b70d4a87 (`VERIFY_SUITE_TIMEOUT_MS=5400000`): villager-dress `row-hidden` rows arrive every 15-30 s from 04:04 to hausa at 04:10:24, then nothing until bambara at 04:22:13; Chrome's `--type=gpu-process` was 11 s old at 04:22:22 (restarted), and afterwards rows took ~2 min each (fang 04:26, mongo 04:28, mbuti 04:30). run-wait declared it HUNG at 51 min; ended by hand. The earlier run of 02:57 UTC stalled at the same spot (last row nubians, then silence). `--section=villager-dress` alone passes with `cost` rows (01:36-01:39 UTC). WebGL 2 full run of 02:32 UTC ended exit 1 after 17 min (reds 1381, 1265, 1266 plus an uncaught exception, `local/verify-logs/2026-10-25T02-32-06-170-polish-villagers.log.suites.jsonl`).
+  Queue position: directly after 1442.
+  Source: covering run of the 1442 session, 25.10.2026; real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1414. Fishery figure at the canoe squats with his head inside the fish basket
+  The man in dark blue squatting at the beached canoe has his head buried in the woven fish basket: the basket stays near standing head height while he crouches and leans to the hull. Done when the basket clears the head in every squat and lean phase, with a Vitest asserting basket-head clearance over the whole swap cycle, judged in a capture.
+  Suspects: RiverFishery.tsx placeBasket case netman (fixed height ground+0.55-0.45*reach, 0.45 m ahead) against the placeNetMan squash and reachPose lean, or the carrier swap bend in carrierWalkPose while the basket is still at the carrier.
+  Source: user bug report KopfInKorb (/backup/hoa/local/KopfInKorb.zip), filed 21.10.2026 19:12Z.
+  Repro for all: seed 3318564123, Bambara village (place mode), position x/z -59.45/-130.99, build production 0562828, WebGPU.
+  Queue position: after the user-report points 1402-1405 (append-and-defer of a user-reported defect).
+  Bundle: Dorfleben.
+
+- [x] 1432. The task walker takes its head load off with its hands and puts it back on instead of letting it vanish
+  QUEUE POSITION: directly after point 1414 (user order 23.10.2026 15:51, "Ja, das so nach 1414 einreihen.").
+  GOAL: the village task walker (TaskWalker in src/scenes/place/PlaceLife.tsx, carry 'bundle' to the fire or 'jar' to the well) takes its head load off with its hands and puts it back on, instead of the load vanishing while it kneels. Today `load.current.visible = next.mode !== 'work'` (PlaceLife.tsx ~2273) only hides the load during the kneel; nothing sets it down.
+  FINAL STATE:
+  1. Set down: at the target the walker grips the load on its head with both hands; while kneeling down it brings the load down with its hands and sets it on the ground beside it, letting go only then. The load moves with the hands throughout and never jumps on its own.
+  2. Work: while it kneels and works, the load stands visibly on the ground beside it.
+  3. Pick up: before standing up it grips the load on the ground, lifts it with its hands while rising and puts it on its head; afterwards the hands hold it as they do now while walking.
+  4. Never invisible: in no phase is the load invisible or does it appear from nowhere — for the bundle and the jar.
+  5. Tests: a Vitest asserts the load is visible in every phase (walk, kneel down, work, rise) and stays close to the hands during set-down and pick-up; a picture check shows three frames: the set-down moment, the kneeling walker with the load on the ground, and the pick-up moment.
+  SOURCE: user bug report hoa-state-2026-10-23-1989448783.zip (13:45:37Z, seed 1989448783, bambara-village, build 6183b2b, webgpu), user words: "Eben hat er sich vor dem Feuer hingekniet und die Kiste auf seinem Kopf ist verschwunden. Als er dann wieder aufgestanden ist, ist sie wieder erschienen." Refinement 23.10.2026 15:49: "Wandern soll aber bedeuten, dass er sie aktiv mit seiner Hand vom Kopf nimmt und auf den Boden legt bzw. danach wieder in die Hand nimmt und auf seinen Kopf legt."
+  Observed problem: Reproducible player impact reported by the user: a villager kneeling at the fire makes the crate on its head vanish and reappear on standing up. The code comment promises the load is set down, but the code only hides it. No open point or backlog entry covers it (grep of TASKS.md and docs/backlog.md, 23.10.2026).
+  Source: user request 23.10.2026 via the findings carrier, spec cut from 6183b2bfa; approved: "Ja, das so nach 1414 einreihen.".
+  Bundle: Dorfleben.

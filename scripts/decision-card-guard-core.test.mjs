@@ -141,7 +141,7 @@ describe('fail-open: what cannot be read is never a violation', () => {
   })
 })
 
-// The four-eyes review (Fable 5, 30.07.2026) found these by probing, and they are
+// The four-eyes review (30.07.2026) found these by probing, and they are
 // the costly direction: each one PASSED a decision the user would never have seen.
 describe('the false passes the four-eyes review found', () => {
   it('does not accept a card connected only by a project-generic word', () => {

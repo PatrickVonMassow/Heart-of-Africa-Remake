@@ -1,0 +1,368 @@
+// THE ASK COMMAND AS IT IS ACTUALLY RUN (point 654) — spawned against a STUB `codex` on
+// PATH, so no network is touched and no allowance is spent. The core suite beside this
+// proves the decisions; this proves the command around them: the exit codes a caller
+// reads, that the material really travels on stdin, and above all that the SWITCH is
+// asked BEFORE anything is sent — a switch that only prints would protect no allowance.
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { CROSS, LEGACY, MAIN, SCARCE, TEST_FOREIGN_MODELS } from './model-lanes.mjs'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const CLI = join(HERE, 'ask-lane.mjs')
+
+/** A `codex` that answers however the case's env asks it to. */
+const STUB = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+if (argv[0] === '--version') {
+  process.stdout.write('codex-cli 0.147.0\\n')
+  process.exit(0)
+}
+const out = argv[argv.indexOf('-o') + 1]
+const model = argv[argv.indexOf('-m') + 1]
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+writeFileSync(process.env.STUB_PROMPT, argv[argv.length - 1])
+appendFileSync(process.env.STUB_LOG, model + '\\n')
+if (model !== process.env.STUB_CROSS_ID) {
+  process.stderr.write('The requested model is not supported when using Codex with a ChatGPT account.\\n')
+  process.exit(1)
+}
+if (process.env.STUB_MODE === 'fail') {
+  process.stderr.write('stream error: You are not logged in. Run \`codex login\`.\\n')
+  process.exit(1)
+}
+const answer = process.env.STUB_ANSWER || 'CAUSE: the fixture writes the frame before the shutter\\nEVIDENCE: scripts/verify/place.mjs:212 writes outside frameSubject'
+if (out) writeFileSync(out, answer)
+process.stdout.write(answer)
+process.exit(0)
+`
+
+/** A `claude` that proves the requested served model in modelUsage. */
+const CLAUDE_STUB = `#!/usr/bin/env node
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+const model = argv[argv.indexOf('--model') + 1]
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+writeFileSync(process.env.STUB_PROMPT, argv[argv.indexOf('-p') + 1])
+writeFileSync(process.env.STUB_ARGS, JSON.stringify(argv))
+appendFileSync(process.env.STUB_LOG, model + '\\n')
+const answer = process.env.STUB_ANSWER || 'The two lists overlap on the stale owner.\\nCAUSE: the stale owner remains authoritative\\nEVIDENCE: scripts/batch-lock.mjs keeps the dead lease'
+const served = process.env.STUB_SERVED_MODEL || model
+process.stdout.write(JSON.stringify({
+  result: answer,
+  usage: { input_tokens: 5, output_tokens: 9, cache_read_input_tokens: 0, cache_creation_input_tokens: 20 },
+  modelUsage: {
+    '${TEST_FOREIGN_MODELS.haikuId}': { inputTokens: 90, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    [served]: { inputTokens: 5, outputTokens: 9, cacheReadInputTokens: 0, cacheCreationInputTokens: 20, canonicalModel: served },
+  },
+}))
+process.exit(0)
+`
+
+let dir = ''
+let stubDir = ''
+let stateDir = ''
+let shareFile = ''
+let switchFile = ''
+let materialFile = ''
+
+const run = (args, env = {}) =>
+  spawnSync(process.execPath, [CLI, ...args], {
+    encoding: 'utf8',
+    windowsHide: true,
+    // stdin is closed rather than inherited: an inherited terminal would make the
+    // command wait for material that never comes.
+    input: env.INPUT ?? '',
+    env: {
+      ...process.env,
+      PATH: `${stubDir}${delimiter}${process.env.PATH}`,
+      CROSS_REVIEW_STATE_DIR: stateDir,
+      LANE_ROUTING_FILE: shareFile,
+      // The lane switch lives in the MAIN checkout's .claude/, which is
+      // git-ignored: a fresh clone and every CI runner have none, and the two
+      // scarce-lane cases below then died on "the switch state is absent" while
+      // passing on the developing machine. The fixture owns its own switch.
+      LANE_SWITCH_FILE: switchFile,
+      STUB_CROSS_ID: CROSS.modelId,
+      STUB_LOG: join(dir, 'calls.log'),
+      STUB_STDIN: join(dir, 'stdin.txt'),
+      STUB_PROMPT: join(dir, 'prompt.txt'),
+      STUB_ARGS: join(dir, 'args.json'),
+      ...env,
+    },
+  })
+
+const setting = (value) => writeFileSync(shareFile, JSON.stringify({ setting: value }))
+const calls = () => readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n').filter(Boolean)
+const clearCalls = () => writeFileSync(join(dir, 'calls.log'), '')
+
+beforeAll(() => {
+  dir = mkdtempSync(join(tmpdir(), 'hoa-ask-lane-'))
+  stubDir = join(dir, 'bin')
+  stateDir = join(dir, 'state')
+  mkdirSync(stubDir, { recursive: true })
+  mkdirSync(stateDir, { recursive: true })
+  writeFileSync(join(stubDir, 'codex'), STUB)
+  chmodSync(join(stubDir, 'codex'), 0o755)
+  writeFileSync(join(stubDir, 'claude'), CLAUDE_STUB)
+  chmodSync(join(stubDir, 'claude'), 0o755)
+  shareFile = join(dir, 'lane-routing.json')
+  setting('prefer-cross')
+  switchFile = join(dir, 'lane-switch.json')
+  writeFileSync(switchFile, JSON.stringify({
+    lanes: {
+      scarce: {
+        state: 'on', reason: 'fixture: the scarce lane is open for this suite',
+        setBy: 'ask-lane-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z'),
+      },
+    },
+  }))
+  materialFile = join(dir, 'suite.log')
+  writeFileSync(materialFile, 'FAIL place: the frame shows the port, not the village\n')
+  clearCalls()
+})
+afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+describe('what it refuses before spending anything', () => {
+  it('demands a kind and a question, with usage and exit 2', () => {
+    const r = run(['--kind', 'diagnose'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/--kind .* and --brief are both required/)
+    const bad = run(['--kind', 'author', '--brief', 'x'])
+    expect(bad.status).toBe(2)
+  })
+
+  it('refuses an explicit --lane without a value instead of defaulting to the cross lane', () => {
+    clearCalls()
+    const r = run(['--lane', '--kind', 'diagnose', '--brief', 'x', '--file', materialFile, '--anyway'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/--lane must be one of/)
+    expect(calls()).toEqual([])
+  })
+
+  it('refuses the retired --model selector instead of defaulting to the cross lane', () => {
+    clearCalls()
+    const r = run(['--model', 'fable', '--anyway', '--kind', 'diagnose', '--brief', 'x', '--file', materialFile])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/--model is retired/)
+    expect(calls()).toEqual([])
+  })
+
+  it.each(['diagnose', 'audit', 'explain'])('sends NOTHING for %s at default, and says which way out', (kind) => {
+    setting('default')
+    clearCalls()
+    const r = run(['--kind', kind, '--brief', 'inspect this material', '--file', materialFile])
+    expect(r.status).toBe(3)
+    expect(r.stderr).toMatch(/share switch is at `default`/)
+    expect(r.stderr).toMatch(/lane-routing\.mjs --more/)
+    expect(calls()).toEqual([])
+  })
+
+  // U13: `--lane <role>` replaced the old model keys, with no alias left behind.
+  it('refuses an old model key and an unknown lane before spending anything', () => {
+    clearCalls()
+    for (const key of [...Object.keys(LEGACY.cliKeys), 'nobody']) {
+      const r = run(['--lane', key, '--kind', 'diagnose', '--brief', 'why?', '--file', materialFile])
+      expect(r.status, key).toBe(2)
+      expect(r.stderr).toMatch(/--lane must be one of main, cross, scarce, main-fallback/)
+    }
+    expect(calls()).toEqual([])
+  })
+
+  it('sends a blind-parallel enumerate half to the cross lane at default without an override', () => {
+    setting('default')
+    clearCalls()
+    const r = run(['--kind', 'enumerate', '--brief', 'list the risks', '--file', materialFile], {
+      STUB_ANSWER: 'B1 | scripts/verify/place.mjs | The shutter may capture the port instead of the village',
+    })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).not.toMatch(/share switch is at `default`/)
+    expect(calls()).toContain(CROSS.modelId)
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
+  })
+
+  // Audit finding, 12.08.2026: a consumer that reads the setting but not the problem
+  // presents a fallback as the operator's choice. This is the guarantee, at the consumer.
+  it('SAYS SO when the setting it acted on came from a broken file', () => {
+    writeFileSync(shareFile, '{ not json at all')
+    clearCalls()
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile])
+    expect(r.stderr).toMatch(/share setting is UNUSABLE/)
+    // …and it acted on the safe setting, so nothing was sent.
+    expect(r.status).toBe(3)
+    expect(calls()).toEqual([])
+  })
+
+  it.each(['diagnose', 'audit'])('runs %s on an explicit --anyway at default', (kind) => {
+    setting('default')
+    clearCalls()
+    const r = run(['--kind', kind, '--brief', 'inspect this material', '--file', materialFile, '--anyway'],
+      kind === 'audit' ? { STUB_ANSWER: 'A1 | scripts/verify/place.mjs | The frame is written before the shutter' } : {})
+    expect(r.status, r.stderr).toBe(0)
+    expect(calls()).toContain(CROSS.modelId)
+  })
+
+  it('refuses to send an empty request when nothing was given as material', () => {
+    setting('prefer-cross')
+    clearCalls()
+    // Even with NO probe receipt: a request with nothing to send must cost no codex call
+    // at all, and the probe is a codex call (cross-vendor review, 12.08.2026).
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
+    const r = run(['--kind', 'explain', '--brief', 'what does it do?'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/no material at all/)
+    expect(calls()).toEqual([])
+  })
+
+  // Same review: an unreadable file used to travel as "(could not be read: …)", which is
+  // text a model will happily answer ABOUT — a shaped answer about nothing.
+  it('refuses a request whose material is ENTIRELY placeholders, naming what failed', () => {
+    setting('prefer-cross')
+    clearCalls()
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', join(dir, 'does-not-exist.log')])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/material MISSING/)
+    expect(r.stderr).toMatch(/NOTHING of the material actually travelled/)
+    expect(calls()).toEqual([])
+  })
+
+  // Second cross-vendor round: "the read succeeded" is not "something travelled" — a
+  // readable but EMPTY file carries nothing, and a shaped answer about it would be an
+  // answer about nothing.
+  it('refuses a request whose only material is a readable but EMPTY file', () => {
+    setting('prefer-cross')
+    clearCalls()
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
+    const empty = join(dir, 'empty.log')
+    writeFileSync(empty, '   \n')
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', empty])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/EMPTY or DROPPED/)
+    expect(calls()).toEqual([])
+  })
+
+  it('names a failed read but still runs when the rest of the material is real', () => {
+    setting('prefer-cross')
+    clearCalls()
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile, '--log', join(dir, 'does-not-exist.log')])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toMatch(/material MISSING/)
+    expect(calls()).toContain(CROSS.modelId)
+  })
+})
+
+describe('an ask that runs', () => {
+  it('runs the scarce lane read-only, proves the served model, and keeps the material off tools', () => {
+    clearCalls()
+    const r = run(['--lane', 'scarce', '--kind', 'diagnose', '--brief', 'fold the stage', '--file', materialFile])
+    expect(r.status, r.stderr).toBe(0)
+    expect(calls()).toEqual([SCARCE.modelId])
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
+    expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain(`READ-ONLY work for this repository as ${SCARCE.displayName}`)
+    const args = JSON.parse(readFileSync(join(dir, 'args.json'), 'utf8'))
+    expect(args).toContain('dontAsk')
+    expect(args).toContain('--tools')
+    expect(args[args.indexOf('--tools') + 1]).toBe('')
+    expect(args).not.toContain('--dangerously-skip-permissions')
+  })
+
+  it('refuses a substituted claude-runtime model instead of misattributing its answer', () => {
+    clearCalls()
+    const substitute = MAIN.fallback.modelId
+    const r = run(['--lane', 'scarce', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile], {
+      STUB_SERVED_MODEL: substitute,
+    })
+    expect(r.status).toBe(3)
+    expect(r.stderr).toContain(`top-level answer was not attributed to ${SCARCE.displayName}`)
+    expect(r.stderr).toContain(`usage named ${TEST_FOREIGN_MODELS.haikuId}, ${substitute}`)
+    expect(r.stderr).toContain(`${SCARCE.displayName} did NOT answer`)
+  })
+
+  it('refuses the scarce lane while its switch is off, before spending anything', () => {
+    const off = join(dir, 'lane-switch-off.json')
+    writeFileSync(off, JSON.stringify({ lanes: { scarce: { state: 'off', reason: 'fixture: off', setBy: 'ask-lane-cli.test', changedAt: Date.parse('2026-08-22T16:26:48.740Z') } } }))
+    clearCalls()
+    const r = run(['--lane', 'scarce', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile], { LANE_SWITCH_FILE: off })
+    expect(r.status).toBe(3)
+    expect(r.stderr).toMatch(/is switched off/)
+    expect(calls()).toEqual([])
+  })
+
+  it('supports the main lane and the main fallback as read-only lanes', () => {
+    clearCalls()
+    const r = run(['--lane', 'main', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile])
+    expect(r.status, r.stderr).toBe(0)
+    const fb = run(['--lane', 'main-fallback', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile])
+    expect(fb.status, fb.stderr).toBe(0)
+    expect(calls()).toEqual([MAIN.modelId, MAIN.fallback.modelId])
+  })
+
+  it('proves the model id first, sends the material on stdin and prints the answer', () => {
+    setting('prefer-cross')
+    clearCalls()
+    // With no receipt the id must be PROVEN before a word is attributed to the cross lane.
+    rmSync(join(stateDir, 'cross-review-probe.json'), { force: true })
+    const r = run(['--kind', 'diagnose', '--brief', 'why did the place suite go red?', '--file', materialFile], { INPUT: 'piped material too\n' })
+    expect(r.status, r.stderr).toBe(0)
+    // The unknown id is asked FIRST (the probe), then the real one: that refusal is the
+    // whole proof that an answer attributed to the cross lane really is its own.
+    expect(calls()[0]).not.toBe(CROSS.modelId)
+    expect(calls().at(-1)).toBe(CROSS.modelId)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('piped material too')
+    expect(sent).toContain('FAIL place: the frame shows the port')
+    expect(readFileSync(join(dir, 'prompt.txt'), 'utf8')).toContain('why did the place suite go red?')
+    expect(r.stdout).toMatch(/CAUSE:\s+the fixture writes the frame before the shutter/)
+  })
+
+  it('answers --json machine-readably, with the parsed answer and the setting it ran under', () => {
+    setting('prefer-cross')
+    const r = run(['--kind', 'enumerate', '--brief', 'what could go wrong?', '--file', materialFile, '--json'], {
+      STUB_ANSWER: 'B1 | scripts/x.mjs | the lease is not renewed while a suite runs\nB2 | scripts/y.mjs | the fence is off after a rebuild',
+    })
+    expect(r.status, r.stderr).toBe(0)
+    const json = JSON.parse(r.stdout)
+    expect(json.kind).toBe('enumerate')
+    expect(json.model).toBe(CROSS.displayName)
+    expect(json.effort).toBe(CROSS.reasoningEffort)
+    expect(json.setting).toBe('prefer-cross')
+    expect(json.answer.entries.map((e) => e.id)).toEqual(['B1', 'B2'])
+  })
+})
+
+describe('an ask that does not run', () => {
+  it('names the cause in ONE line, hands the work back and exits 3 — never 0', () => {
+    setting('prefer-cross')
+    const r = run(['--kind', 'audit', '--brief', 'sweep it', '--file', materialFile], { STUB_MODE: 'fail' })
+    expect(r.status).toBe(3)
+    // ONE line names the cause — the line itself, not a paragraph the reader must mine.
+    const said = r.stderr.split('\n').find((l) => l.includes('did NOT answer'))
+    expect(said).toMatch(/did NOT answer this audit: .*login/i)
+    expect(r.stderr).toMatch(/Do it in the main chain/)
+  })
+
+  it('treats an answer without its shape as no answer at all, and shows what came back', () => {
+    setting('prefer-cross')
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile], { STUB_ANSWER: 'it is probably a timing thing, hard to say' })
+    expect(r.status).toBe(3)
+    expect(r.stderr).toMatch(/no usable answer/)
+    expect(r.stderr).toMatch(/what came back, unusable as it is/)
+  })
+
+  it('treats a model that says it saw nothing as no answer, whatever shape it wrote', () => {
+    setting('prefer-cross')
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile], {
+      STUB_ANSWER: 'CAUSE: unknown\nEVIDENCE: none of my commands reached the repository, so I inspected nothing',
+    })
+    expect(r.status).toBe(3)
+  })
+})

@@ -57,7 +57,7 @@ import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 import { openPointStatus, ARCHIVE_PATH, TASKS_PATH } from './tasks-source.mjs'
 import { buildSpawnArgs, buildSpawnOptions, resolveClaudeCli, cliSearchSummary } from './batch-autostart-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import {
   CLAIM_SESSION_PREFIX,
   DEFERRAL_MS,
@@ -308,7 +308,7 @@ function spawnResponder(messages) {
     // windowsHide + detached + the background-task ceiling all come from the
     // launcher's own builder (point 401: a popping console window steals the
     // user's focus, and this process wakes while the user is elsewhere).
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     if (!fableState.ok) throw new Error(fableState.problem)
     const plan = responderSpawn({ args: buildSpawnArgs({ prompt, fableState }), env: process.env, sessionId: randomUUID() })
     child = spawn(exe, plan.args, buildSpawnOptions({ cwd: REPO_ROOT, stdio: ['ignore', out, out], env: plan.env }))

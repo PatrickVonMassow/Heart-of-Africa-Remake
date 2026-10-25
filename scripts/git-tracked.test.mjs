@@ -9,6 +9,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { canonicalTreePath, isTrackedInGit } from './git-tracked.mjs'
+import { CROSS, MAIN } from './model-lanes.mjs'
+
+const CROSS_JSON = `${JSON.stringify({ model: CROSS.displayName, entries: [] })}\n`
+const MAIN_JSON = `${JSON.stringify({ model: MAIN.displayName, entries: [] })}\n`
+// The cross lane's name as one sed word: its spaces escaped for the shell.
+const SED_CROSS = CROSS.displayName.replace(/ /g, '\\ ')
 
 let sandbox, repo, outside
 
@@ -33,8 +39,8 @@ beforeAll(() => {
   // ambient git configuration rather than the artefact.
   git(['config', 'core.autocrlf', 'false'], repo)
   mkdirSync(join(repo, 'docs'))
-  writeFileSync(join(repo, 'docs', 'half.json'), '{"model":"GPT-5.6 Sol","entries":[]}\n')
-  writeFileSync(join(repo, 'docs', 'other.json'), '{"model":"Opus 5","entries":[]}\n')
+  writeFileSync(join(repo, 'docs', 'half.json'), CROSS_JSON)
+  writeFileSync(join(repo, 'docs', 'other.json'), MAIN_JSON)
   git(['add', '.'], repo)
   git(['commit', '-q', '-m', 'seed'], repo)
   writeFileSync(join(outside, 'evil.json'), '{"model":"forged"}\n')
@@ -146,8 +152,8 @@ describe('isTrackedInGit — committed bytes only', () => {
     // matching clean filter maps them back, so `git status` compares clean
     // while the bytes any consumer READS are the smudged ones.
     writeFileSync(join(repo, '.gitattributes'), 'docs/half.json filter=forge\n')
-    git(['config', 'filter.forge.clean', "sed s/SMUDGED-MODEL/GPT-5.6\\ Sol/"], repo)
-    git(['config', 'filter.forge.smudge', "sed s/GPT-5.6\\ Sol/SMUDGED-MODEL/"], repo)
+    git(['config', 'filter.forge.clean', `sed s/SMUDGED-MODEL/${SED_CROSS}/`], repo)
+    git(['config', 'filter.forge.smudge', `sed s/${SED_CROSS}/SMUDGED-MODEL/`], repo)
     try {
       // Re-checkout through the smudge filter: the working bytes now differ.
       unlinkSync(join(repo, 'docs', 'half.json'))
@@ -171,7 +177,7 @@ describe('isTrackedInGit — committed bytes only', () => {
     mkdirSync(wsRoot)
     execFileSync('git', ['init', '-q'], { windowsHide: true, cwd: wsRoot })
     git(['config', 'core.autocrlf', 'false'], wsRoot)
-    writeFileSync(join(wsRoot, 'half.json'), '{"model":"Opus 5","entries":[]}\n')
+    writeFileSync(join(wsRoot, 'half.json'), MAIN_JSON)
     git(['add', 'half.json'], wsRoot)
     git(['commit', '-q', '-m', 'seed'], wsRoot)
     expect(isTrackedInGit('half.json', { root: wsRoot })).toBe(true)
@@ -180,7 +186,7 @@ describe('isTrackedInGit — committed bytes only', () => {
   it('checks a whitespace-bearing filename as itself, not as its trimmed cousin', () => {
     // Trimming turned " spaced.json" into "spaced.json" — a different pathname —
     // so the tracked answer was about a file the caller never named.
-    writeFileSync(join(repo, 'docs', ' spaced.json'), '{"model":"Opus 5","entries":[]}\n')
+    writeFileSync(join(repo, 'docs', ' spaced.json'), MAIN_JSON)
     git(['add', 'docs/ spaced.json'], repo)
     git(['commit', '-q', '-m', 'track a whitespace-bearing name'], repo)
     expect(isTrackedInGit('docs/ spaced.json', { root: repo })).toBe(true)
@@ -191,13 +197,13 @@ describe('isTrackedInGit — committed bytes only', () => {
   // already read the file passes what it read, so the answer is about the text
   // it will parse rather than about a second read that could differ.
   it('judges the bytes the caller actually read when it supplies them', () => {
-    const committed = '{"model":"GPT-5.6 Sol","entries":[]}\n'
+    const committed = CROSS_JSON
     expect(isTrackedInGit('docs/half.json', { root: repo, content: committed })).toBe(true)
     expect(isTrackedInGit('docs/half.json', { root: repo, content: '{"model":"forged","entries":[]}\n' })).toBe(false)
   })
 
   it('refuses a file that is staged but has never been committed', () => {
-    writeFileSync(join(repo, 'docs', 'fresh.json'), '{"model":"Opus 5","entries":[]}\n')
+    writeFileSync(join(repo, 'docs', 'fresh.json'), MAIN_JSON)
     git(['add', 'docs/fresh.json'], repo)
     expect(isTrackedInGit('docs/fresh.json', { root: repo })).toBe(false)
     git(['rm', '-q', '-f', '--cached', 'docs/fresh.json'], repo)

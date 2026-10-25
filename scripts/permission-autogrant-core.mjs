@@ -41,7 +41,7 @@
  * `ExitPlanMode` was in here for one round on the same reasoning and did not belong:
  * it takes a bare allow, and in a non-interactive `-p` session returning NO decision
  * does not fall through to a human — there is none — it DENIES. The entry meant to
- * protect the batch would have stopped it (GPT-5.6 Sol, second review, 11.08.2026).
+ * protect the batch would have stopped it (second review, 11.08.2026).
  * Nothing joins this list without that question answered: what does silence do where
  * nobody is watching?
  */
@@ -76,7 +76,7 @@ export function decide(input) {
  * `PreToolUse`. Emitting the flat field here is not an error the harness reports — the
  * output is simply ignored and the dialog appears anyway, which is exactly what happened:
  * the hook was registered and firing while the user kept being asked. Both reviewers
- * (GPT-5.6 Sol and Fable 5, independently, 11.08.2026) named this before anything else.
+ * (the cross-vendor and the scarce lane, independently, 11.08.2026) named this before anything else.
  *
  * @param {ReturnType<typeof decide>} verdict
  * @returns {string}
