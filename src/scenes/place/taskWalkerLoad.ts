@@ -86,12 +86,14 @@ export function loadGrip(carry: TaskLoad): { half: number; y: number } {
  * only while it is on its way: at either end it rests where it is, so hands
  * closing on it or opening never move it. The hands are aimed at the
  * `planned` path, never at the load they carry. `tilt` is how far its
- * orientation has gone over from the head's to upright.
+ * orientation has gone over from the head's to upright. `groundY` is the
+ * terrain at the ground spot relative to the walker's feet, so the load stands
+ * on a slope instead of floating over or sinking into it.
  */
-export function loadPlacement(h: LoadHandling, head: V3, hands: readonly [V3, V3] | null, carry: TaskLoad): { base: V3; planned: V3; tilt: number } {
+export function loadPlacement(h: LoadHandling, head: V3, hands: readonly [V3, V3] | null, carry: TaskLoad, groundY = 0): { base: V3; planned: V3; tilt: number } {
   const out = smooth(h.down * H.outFirst)
   const dn = smooth(h.down)
-  const planned = { x: mix(head.x, LOAD_GROUND.x, out), y: mix(head.y, LOAD_GROUND.y, dn), z: mix(head.z, LOAD_GROUND.z, out) }
+  const planned = { x: mix(head.x, LOAD_GROUND.x, out), y: mix(head.y, LOAD_GROUND.y + groundY, dn), z: mix(head.z, LOAD_GROUND.z, out) }
   const tilt = smooth(h.down * 2)
   const w = h.hold * smooth(Math.min(h.down, 1 - h.down) / H.handOver)
   if (!hands || w <= 0) return { base: planned, planned, tilt }

@@ -127,6 +127,13 @@ describe.each(['bundle', 'jar'] as const)('the task walker’s %s', (carry) => {
     expect(Math.hypot(LOAD_GROUND.x, LOAD_GROUND.z)).toBeGreaterThan(0.3)
   })
 
+  it('stands on sloping ground at the terrain height of its own spot', () => {
+    const down = { down: 1, hold: 0, reach: 0 }
+    for (const rise of [-0.06, 0.05]) {
+      expect(loadPlacement(down, { x: 0, y: 1, z: 0.02 }, null, carry, rise).base).toEqual({ ...LOAD_GROUND, y: LOAD_GROUND.y + rise })
+    }
+  })
+
   it('is back on the crown, untouched by the hands, once it walks home', () => {
     const last = frames.at(-1)!
     expect(last.base).toEqual({ x: 0, y: 1.5, z: 0.02 })

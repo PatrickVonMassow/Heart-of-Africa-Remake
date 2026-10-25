@@ -75,7 +75,7 @@ import {
   SPARE_JAR_LOCAL, aimFromShoulder, standJarLocal, toFigureFrame, standToWorld, standYaw, takeJarTravel, takePose,
 } from './waterStand'
 import { workSpan, workStop, type StopMode } from './taskWalkerStop'
-import { correctAim, gripPoints, handlingPose, loadHandling, loadPlacement, type LoadHandling, type V3 } from './taskWalkerLoad'
+import { correctAim, gripPoints, handlingPose, LOAD_GROUND, loadHandling, loadPlacement, type LoadHandling, type V3 } from './taskWalkerLoad'
 import { approach, steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
@@ -2248,7 +2248,7 @@ function TaskWalker({
     const toV3 = (o: THREE.Vector3): V3 => ({ x: o.x, y: o.y, z: o.z })
     // Places the load and writes the arms for this frame. On the walk it rides
     // the crown untouched; in the stop it goes where the hands take it.
-    return (stand: THREE.Group, h: LoadHandling, dt: number) => {
+    return (stand: THREE.Group, h: LoadHandling, dt: number, groundY = 0) => {
       const g = load.current
       const p = pose.current
       if (!g) return
@@ -2271,7 +2271,7 @@ function TaskWalker({
         return o ? toV3(stand.worldToLocal(o.getWorldPosition(v))) : null
       })
       const hands = drawn[0] && drawn[1] ? ([drawn[0], drawn[1]] as [V3, V3]) : null
-      const placed = loadPlacement(h, toV3(hp), hands, carry)
+      const placed = loadPlacement(h, toV3(hp), hands, carry, groundY)
       const aims = gripPoints(placed.planned, carry).map((t, i) => {
         const fix = (aimFix.current[i] = correctAim(aimFix.current[i], t, drawn[i], h.reach, dt))
         return { x: t.x + fix.x, y: t.y + fix.y, z: t.z + fix.z }
@@ -2342,7 +2342,12 @@ function TaskWalker({
       kneelK.current = approach(kneelK.current, next.kneels ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
       stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
       stand.rotation.y = s.yaw
-      handle(stand, loadHandling(s.mode, s.timer, s.span), dt)
+      // the terrain under the ground spot beside it, relative to its feet
+      const c = Math.cos(s.yaw)
+      const n = Math.sin(s.yaw)
+      const gx = s.x + LOAD_GROUND.x * c + LOAD_GROUND.z * n
+      const gz = s.z - LOAD_GROUND.x * n + LOAD_GROUND.z * c
+      handle(stand, loadHandling(s.mode, s.timer, s.span), dt, groundHeight(gx, gz) - groundHeight(s.x, s.z))
       return
     }
 
