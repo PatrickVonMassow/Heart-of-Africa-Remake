@@ -114,3 +114,15 @@ YOUR TASK:
 3. Then a section MERGED PLAN: the final plan as it would be written into docs/batch-owner-runbook.md (replacing the "Throughput with cloud authoring" section): concurrency bounds with derivation, the switch-over step, what is switched off/simplified, what is KEPT, and the measured-cycle check after landing. At most ~45 lines, plain markdown, no new orchestration layer (CLAUDE.md infrastructure freeze).
 4. Then a section DECISION LOGIC CHANGES: list any change to code decision logic the plan requires (file, function, what changes), or "none" — prefer none.
 ```
+
+## Final break check and re-checks
+
+- Break check (cross lane, other vendor than the merger): OBJECT, B1–B8 —
+  `1444-final-check-sol.md`; folded into the runbook plan.
+- Re-check 1: B1, B3, B5 still open, B9–B11 new — `1444-recheck-1-sol.md`.
+- Re-check 2: all resolved except B10 (one-output inventory) — `1444-recheck-2-sol.md`.
+- Re-check 3: B10 still open, no status output attached — `1444-recheck-3-sol.md`.
+- Re-check 4: B10 resolved by the real `batch-in-flight --status` output of a
+  two-job declaration in a scratch repository (`1444-b10-status-demo.txt`):
+  **APPROVE** — `1444-recheck-4-sol.md`.
+- Decision logic changed: none; no Vitest layer is owed.
