@@ -20,6 +20,7 @@ interface Frame {
   mode: WorkStopMode
   phase: 'take' | 'kneel down' | 'let go' | 'work' | 'grip' | 'rise' | 'settle' | 'walk'
   base: V3
+  planned: V3
   hands: [V3, V3]
   hold: number
   down: number
@@ -57,7 +58,7 @@ function simulate(carry: TaskLoad, lag = 0): Frame[] {
               ? 'grip'
               : 'work'
          : mode === 'back' ? 'walk' : (mode as Frame['phase'])
-    frames.push({ mode, phase, base: placed.base, hands, hold: h.hold, down: h.down })
+    frames.push({ mode, phase, base: placed.base, planned: placed.planned, hands, hold: h.hold, down: h.down })
     // the hands drawn for the next frame: toward the planned grip, `lag` short
     const aim = gripPoints(placed.planned, carry)
     hands = [0, 1].map((i) => {
@@ -101,10 +102,18 @@ describe.each(['bundle', 'jar'] as const)('the task walker’s %s', (carry) => {
 
   it('follows hands that fall short of their aim rather than the plan', () => {
     const g = loadGrip(carry)
-    for (const f of simulate(carry, 0.06).filter((x) => x.hold === 1)) {
+    const moving = simulate(carry, 0.06).filter((x) => x.hold === 1 && Math.min(x.down, 1 - x.down) >= H.handOver)
+    expect(moving.length).toBeGreaterThan(30)
+    for (const f of moving) {
       const mid = mixV(f.hands[0], f.hands[1], 0.5)
       expect(dist({ x: f.base.x, y: f.base.y + g.y, z: f.base.z }, mid)).toBeLessThan(1e-9)
     }
+  })
+
+  it('rests where it is while hands that fall short close on it or open', () => {
+    const still = simulate(carry, 0.06).filter((f) => ['take', 'let go', 'grip', 'settle'].includes(f.phase) && f.hold > 0)
+    expect(still.length).toBeGreaterThan(20)
+    for (const f of still) expect(f.base).toEqual(f.planned)
   })
 
   it('stands on the ground beside the kneeling walker while it works', () => {

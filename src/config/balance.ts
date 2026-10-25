@@ -2666,6 +2666,10 @@ export const TASK_LOAD_HANDLING = {
   /** How much faster the load moves out from the body than down, so the
    *  path clears the shoulder instead of cutting through it. */
   outFirst: 1.6,
+  /** The share of the way down (and up) over which the load passes from where
+   *  it rests into the moving hands, so a grip or release never pulls it
+   *  toward hands that stand still. */
+  handOver: 0.15,
   /** The trunk's lean (rad) toward a load at the ground. */
   groundLean: 0.4,
   /** How fast each hand's aim corrects the gap between where it was aimed and

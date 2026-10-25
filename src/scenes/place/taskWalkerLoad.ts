@@ -82,19 +82,22 @@ export function loadGrip(carry: TaskLoad): { half: number; y: number } {
  * The load's base point in the walker's frame: on its way from the crown
  * (`head`, measured on the drawn figure) to the ground spot — out from the body
  * before down, so the path clears the shoulder — pulled into the hands as far
- * as they `hold` it (`hands`: the two drawn hands, left first, or null). The
- * hands are aimed at the `planned` path, never at the load they carry. `tilt`
- * is how far its orientation has gone over from the head's to upright.
+ * as they `hold` it (`hands`: the two drawn hands, left first, or null) and
+ * only while it is on its way: at either end it rests where it is, so hands
+ * closing on it or opening never move it. The hands are aimed at the
+ * `planned` path, never at the load they carry. `tilt` is how far its
+ * orientation has gone over from the head's to upright.
  */
 export function loadPlacement(h: LoadHandling, head: V3, hands: readonly [V3, V3] | null, carry: TaskLoad): { base: V3; planned: V3; tilt: number } {
   const out = smooth(h.down * H.outFirst)
   const dn = smooth(h.down)
   const planned = { x: mix(head.x, LOAD_GROUND.x, out), y: mix(head.y, LOAD_GROUND.y, dn), z: mix(head.z, LOAD_GROUND.z, out) }
   const tilt = smooth(h.down * 2)
-  if (!hands || h.hold <= 0) return { base: planned, planned, tilt }
+  const w = h.hold * smooth(Math.min(h.down, 1 - h.down) / H.handOver)
+  if (!hands || w <= 0) return { base: planned, planned, tilt }
   const g = loadGrip(carry)
   const held = { x: (hands[0].x + hands[1].x) / 2, y: (hands[0].y + hands[1].y) / 2 - g.y, z: (hands[0].z + hands[1].z) / 2 }
-  return { base: { x: mix(planned.x, held.x, h.hold), y: mix(planned.y, held.y, h.hold), z: mix(planned.z, held.z, h.hold) }, planned, tilt }
+  return { base: { x: mix(planned.x, held.x, w), y: mix(planned.y, held.y, w), z: mix(planned.z, held.z, w) }, planned, tilt }
 }
 
 /** Where the two palms go on the load standing at `base` (left first): its
