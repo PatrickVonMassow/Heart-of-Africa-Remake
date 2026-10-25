@@ -8,6 +8,10 @@ import {
   unsquashHead,
   CONTACT_LEAN_MAX,
   contactLean,
+  contactWantsLean,
+  holdsPosedReach,
+  leastLean,
+  searchDeepBend,
   gestureArmEuler,
   hangToward,
   HANGING_ROLL_KEEP,
@@ -79,6 +83,53 @@ describe('the contact lean', () => {
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 0.75, -0.45), 0.5, pivot, fwd)).toBe(0)
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(0)
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(0)
+  })
+  it('still asks for a lean where the one-pivot lean falls short, so a deeper bend may try', () => {
+    // low in front of the feet: further than CONTACT_LEAN_MAX about one pivot
+    // brings the shoulder, but within CONTACT_LEAN_REACH of the arm's reach
+    const s = v(0.12, 0.65, 0.1)
+    const t = v(0.2, 0.15, 0.18)
+    const p0 = v(0, 0.35, 0)
+    expect(contactLean(s, t, 0.42, p0, fwd)).toBe(0)
+    expect(contactWantsLean(s, t, 0.42, p0, fwd)).toBe(true)
+  })
+  it('asks for no lean where contactLean refuses one by its limits', () => {
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, -0.45), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, 0.45), 0.5, pivot, fwd)).toBe(true)
+  })
+  it('searches the deep bend for a wanted contact, but never under a steadied head load', () => {
+    const base = { lean: 0, wants: true, posedReach: false, grab: false, steadying: false }
+    expect(searchDeepBend(base)).toBe(true)
+    expect(searchDeepBend({ ...base, steadying: true })).toBe(false)
+    expect(searchDeepBend({ ...base, posedReach: true })).toBe(false)
+    expect(searchDeepBend({ ...base, wants: false })).toBe(false)
+    // what the one-pivot lean or a lunge asked for is searched as before
+    expect(searchDeepBend({ ...base, wants: false, lean: 0.2, steadying: true })).toBe(true)
+    expect(searchDeepBend({ ...base, wants: false, grab: true, posedReach: true })).toBe(true)
+  })
+  it('takes the least lean that reaches, else the one that comes nearest', () => {
+    const leans = [0.05, 0.1, 0.15, 0.2]
+    expect(leastLean(leans, (l) => 0.12 - l)).toBe(0.15)
+    expect(leastLean(leans, (l) => 0.5 - l)).toBe(0.2)
+    // a bend that only moves the hand away keeps the trunk upright
+    expect(leastLean(leans, (l) => 0.1 + l)).toBe(0)
+    // without `nearest` a bend that never reaches keeps the trunk upright
+    expect(leastLean(leans, (l) => 0.5 - l, false)).toBe(0)
+    expect(leastLean(leans, (l) => 0.12 - l, false)).toBe(0.15)
+  })
+  it('holds a pose’s reach while it reaches and while its release eases back', () => {
+    const leans = [0.05, 0.1, 0.15, 0.2]
+    const unreachable = (l: number) => 0.5 - l
+    const bend = (reach: boolean, releasing: [number | null, number | null]) =>
+      leastLean(leans, unreachable, !holdsPosedReach(reach, releasing))
+    // an active reach and a reach releasing on either arm keep the trunk upright
+    expect(bend(true, [null, null])).toBe(0)
+    expect(bend(false, [0, null])).toBe(0)
+    expect(bend(false, [null, 1])).toBe(0)
+    // once the release has faded out an ordinary contact bends nearest again
+    expect(bend(false, [null, null])).toBe(0.2)
   })
 })
 

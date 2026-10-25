@@ -28,7 +28,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, newGaze, palmNormal, palmRollAngle, palmRollCenter, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, holdsPosedReach, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, newGaze, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -568,6 +568,11 @@ export function SkinnedFigure({
         loc(b.spine, _pivot)
         _fwd.set(0, 0, 1).applyQuaternion(qIn(b.spine, _q)).setY(0).normalize()
         let lean = 0
+        // a contact short of reach that the one-pivot lean cannot make up
+        // (a full squat's dip to the water at the feet) is still searched
+        // through the glTF trunk's distributed bend below, which goes further;
+        // not under a steadied head load, which a deep bend would tip off
+        let wants = false
         ;(['L', 'R'] as const).forEach((s, i) => {
           const vh = virtualHands.current[i]
           if (!vh || !contactArm[i]) return
@@ -575,6 +580,7 @@ export function SkinnedFigure({
           loc(b[`upperArm.${s}`], _s)
           handTarget(s, i, vh, _t)
           lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
+          wants ||= contactWantsLean(_s, _t, reach * 0.995, _pivot, _fwd)
         })
         // a pose's reach that may lunge (the tag catch's last stride) leans in
         // as far as it takes when a lean reaches its target; any other pose
@@ -583,23 +589,28 @@ export function SkinnedFigure({
         const lunge = Math.min(1, Math.max(0, Number(extras?.reach?.lunge ?? 0)))
         const grab = lunge > 0
         if (extras?.reach && !grab) lean = 0
-        if ((lean > 0 || grab) && gltf) {
+        const steadying = !!headSteady && rig.crown.children.some((c) => c.visible)
+        // a released reach easing back into the clips is still the pose's
+        // reach: a bend that only comes nearer would swing what the hand carries
+        const posedReach = holdsPosedReach(!!extras?.reach, releasing.current)
+        if (searchDeepBend({ lean, wants, posedReach, grab, steadying }) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
-          // least (in the same steps) that brings every contact within reach
-          lean = 0
-          for (let l = 0.05; l <= VILLAGER_POSE.contactLeanMax + 1e-9; l += 0.05) {
+          // least (in the same steps) that brings every contact within reach,
+          // else (without a pose's reach) the one that brings them nearest
+          const leans: number[] = []
+          for (let l = 0.05; l <= VILLAGER_POSE.contactLeanMax + 1e-9; l += 0.05) leans.push(l)
+          lean = leastLean(leans, (l) => {
             writeTrunk(l, hipYaw, chestYaw)
             b.hips.updateWorldMatrix(false, true)
-            const short = (['L', 'R'] as const).some((s, i) => {
+            let short = -Infinity
+            ;(['L', 'R'] as const).forEach((s, i) => {
               const vh = virtualHands.current[i]
-              return !!vh && contactArm[i] && loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) > reachOf(s) * 0.995
+              if (!vh || !contactArm[i]) return
+              short = Math.max(short, loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) - reachOf(s) * 0.995)
             })
-            if (!short) {
-              lean = l
-              break
-            }
-          }
+            return short
+          }, !posedReach)
           if (extras?.reach) lean *= lunge
           writeTrunk(lean, hipYaw, chestYaw)
           b.hips.updateWorldMatrix(false, true)
