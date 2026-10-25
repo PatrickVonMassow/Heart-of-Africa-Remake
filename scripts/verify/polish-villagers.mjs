@@ -5938,12 +5938,18 @@ if (section('village-walk')) {
               hi.max(c)
             }
           })
-          return ['hand-left', 'hand-right'].map((n) => {
-            const p = g.getObjectByName(n).getWorldPosition(new V())
-            return +new V().copy(p).clamp(lo, hi).distanceTo(p).toFixed(3)
-          })
+          const palms = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n).getWorldPosition(new V()))
+          // gripping from either side, not collapsed into the load's middle,
+          // where the box clamp alone would read zero gaps
+          const span = Math.max(hi.x - lo.x, hi.z - lo.z)
+          return {
+            gaps: palms.map((p) => +new V().copy(p).clamp(lo, hi).distanceTo(p).toFixed(3)),
+            spread: +Math.hypot(palms[0].x - palms[1].x, palms[0].z - palms[1].z).toFixed(3),
+            span: +span.toFixed(3),
+          }
         })
-        check(`head load (${phase}): both drawn hands are on the load (gaps ${gaps.join(', ')} m ≤ 0.1)`, gaps.every((d) => d <= 0.1), '')
+        check(`head load (${phase}): both drawn hands are on the load (gaps ${gaps.gaps.join(', ')} m ≤ 0.1)`, gaps.gaps.every((d) => d <= 0.1), '')
+        check(`head load (${phase}): the hands hold it from either side (spread ${gaps.spread} m ≥ 0.6 × span ${gaps.span} m)`, gaps.spread >= 0.6 * gaps.span, '')
       }
       const at = await page.evaluate(() => {
         const g = window.__placeScene.getObjectByName('village-task-walker')
