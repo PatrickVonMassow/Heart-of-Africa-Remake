@@ -2972,6 +2972,13 @@ describe('the shipped charge ledger', () => {
         '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
         'child-seconds, least judgeable child 4 at 99.1 %. Bad = over 1 m walked inside 0.35 m',
+      // The real text, from local/verify-logs/2026-10-25T16-55-07-991-polish-villagers.log.
+      '642/polish-villagers/undefined':
+        'no order in 180 s — phases seen: water-out:send×3997, water-out:fill×816, dig-second:site×3462, ' +
+        'dig-first:invite×2054, dig-second:dig×1200, water-back:walk×1506, dig-first:site×4124, ' +
+        'dig-first:dig×1334, dig-second:invite×1622, water-out:wait×350, water-out:take×217, ' +
+        'water-out:fetch×1108; returning carrier got to 0.95 m of the stand, arrived-samples 372, ' +
+        'his goal sits 0.95 m from it',
     }
     expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`).sort()).toEqual(
       Object.keys(measuredFor).sort(),
