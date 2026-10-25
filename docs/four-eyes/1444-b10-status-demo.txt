@@ -1,0 +1,50 @@
+{
+  "ownerSessionId": "demo-session",
+  "maxAgeMs": 2700000,
+  "declaration": {
+    "v": 1,
+    "sessionId": "demo-session",
+    "pid": 402801,
+    "pidStartedAt": 1792971115536,
+    "at": 1792971115633,
+    "waitingOn": "cloud author 1450 (cloud session sess_demo, why: one-cloud-author bound); local suite polish-villagers for 1449 (why: acceptance window)",
+    "focusPoint": null,
+    "evidence": [
+      {
+        "kind": "pid",
+        "pid": 402801,
+        "startedAt": 1792971115531,
+        "point": 1449,
+        "phase": "verification"
+      },
+      {
+        "kind": "log",
+        "path": "/tmp/claude-1000/-workspace-hoa/f1dff0d3-078d-4e32-84a8-5431da428614/scratchpad/inflight-demo/local/1450-cloud-author.log",
+        "point": 1449,
+        "phase": "verification"
+      },
+      {
+        "kind": "log",
+        "path": "/tmp/claude-1000/-workspace-hoa/f1dff0d3-078d-4e32-84a8-5431da428614/scratchpad/inflight-demo/local/1449-suite.log",
+        "point": 1449,
+        "phase": "verification"
+      }
+    ],
+    "slotsFree": ""
+  },
+  "live": true,
+  "reason": "live",
+  "ageMs": 79,
+  "summary": "pid 402801 — alive; log /tmp/claude-1000/-workspace-hoa/f1dff0d3-078d-4e32-84a8-5431da428614/scratchpad/inflight-demo/local/1450-cloud-author.log — written 28s ago; log /tmp/claude-1000/-workspace-hoa/f1dff0d3-078d-4e32-84a8-5431da428614/scratchpad/inflight-demo/local/1449-suite.log — written 28s ago",
+  "items": [
+    {
+      "ok": true,
+      "kind": "pid",
+      "describe": "pid 402801",
+      "detail": "alive",
+      "progressAt": 1792971115712
+    },
+    {
+      "ok": true,
+      "kind": "log",
+      "describe": "log /tmp/claude-1000/-workspace-hoa/f1dff0d3-078d-4e32-84a8-5431da428614/scratchpad/inflight-demo/local/1450-cloud-author.log",

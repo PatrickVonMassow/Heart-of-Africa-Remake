@@ -7,9 +7,9 @@ not need it and must not act on it.
 
 ## Dispatch and landing
 
-- Keep at most three non-overlapping, worktree-isolated authoring lanes busy
-  while independent work exists. `commission-guard` enforces the cap and the
-  explanation owed for a free slot. The owner retains picture judgment, serial
+- At most three non-overlapping, worktree-isolated authoring lanes may be open
+  (`commission-guard` enforces the cap and the explanation owed for a free slot);
+  how many are filled follows "Throughput with cloud authoring". The owner retains picture judgment, serial
   landing/deploy, and board publication.
 - Generate an author's spec with `node scripts/point-brief.mjs <N>`; named
   sections may be read on demand, an ambiguous or insufficient brief is
@@ -46,19 +46,88 @@ not need it and must not act on it.
 
 ## Throughput with cloud authoring
 
-Working instruction (user order 23.10.2026), practice only — no guard enforces it:
+Plan of point 1444 (six eyes: blind halves main chain / cross lane, merge scarce
+lane, break check cross lane; record `docs/four-eyes/1444-*`). Practice only — no guard
+enforces it; it replaces the user order of 23.10.2026 it refines.
 
-- Quiet acceptance windows: while a local browser suite, unit gate, or picture
-  check runs, start no other local agent, browser, or Vitest run; cloud
-  authoring continues.
-- Gate a branch only after its author declares it final; rerun only the checks
-  a later commit invalidates.
-- Spend suite wait time on lightweight work only: review other pushed commits
-  early and prepare their acceptance steps; never start a second heavy check.
-- When refilling the pool, prefer bounded ready points with clear acceptance and
-  disjoint files and prerequisites; check overlap before delegating.
-- Until the cloud credit expires on 05.11.2026, pace cloud authoring to what
-  local acceptance can land, not to what the cloud can produce.
+**Baseline.** 25 distinct points landed between the 1409 merge (21.10.2026 19:02Z)
+and the 1297 merge (25.10.2026 22:05Z): 99.0 h, **3.96 h per landed point**, 3.42 h
+without the 13.6 h host-down stretch of 24./25.10. Losses parallelism does not cure:
+host down 13.6 h, suite repeats about 8 h, hung WebGPU runs about 4 h. Only one cloud
+author ever ran (1440: submission to merge 1.3 h).
+
+**After 1443 alone.** 1443 drained the pool (1414, 1432, 1333, 1297 merged 25.10.2026
+11:53Z–22:05Z; closed 22:27Z). From the first free slot (1333 merge, 21:10Z) to
+26.10.2026 00:30 local, no cloud author was commissioned and no batch-daemon ran: the
+old mode has no step that commissions while a point is accepted, so a free pool does
+not by itself overlap anything. The goal is therefore not met by 1443 alone, and a
+further old-mode cycle is not run first — it would spend at least 48 h of the credit
+that expires 05.11.2026 to measure a mode with no overlap step. The measured cycle
+below compares the new mode against the pre-1443 3.42 h.
+
+**Bounds** (provisional; changed only by the measured cycle below):
+
+- Cloud authors submitted or running: at most **1**, counted from submission — a
+  cloud session has no branch until it pushes, so `commission-guard` cannot see it;
+  `batch-in-flight --status` (its declaration) is what is checked. Reason: 1 is the
+  smallest bound that overlaps authoring with acceptance at all; it carries no
+  capacity claim, and every branch that waited over a day needed post-sync rework.
+  A higher bound needs a measured cycle showing both acceptance standing idle for
+  want of a ready successor and no finished branch waiting over a day; it then
+  changes this number and the switch-over condition together.
+- Finished branches waiting for acceptance: at most **1**. `POOL_CAP` 3 stays the
+  branch ceiling, never a target; a free slot is explained with
+  `--slots-free "1444 bound: one cloud author"`.
+- Local heavy jobs: **1**. While a browser suite, unit gate or picture check runs,
+  start no other local agent, browser or Vitest run (a running local author is
+  checkpointed first); cloud authoring continues. Reason: both overlapped suite
+  runs of 23.10 went red, and load moves a suite by about a fifth.
+- Credit (expires 05.11.2026): commission only what local acceptance can land
+  before then.
+- `batch-daemon` stays off while these bounds hold: its refill fills to
+  `DAEMON_POOL_CAP` 3 and has no lower setting on its command line (measured
+  26.10.2026). Starting it first needs that cap set to the bound.
+
+**Switch-over.** From the first point after 1444: when a local acceptance window
+opens, `batch-in-flight --status` shows fewer submitted or running cloud authors than
+the bound and no finished branch waits, commission the next ready, file-disjoint queue point through
+`author-delegate`/cloud-switch, declare it, and continue the acceptance. The
+existing `independentOpenPoints` decides disjointness; the successor is adopted at
+the boundary as today. Picture-fix loops stay local (`author-routing-core`).
+
+**Acceptance discipline (kept).** Gate a branch only after its author declares it
+final, on its exact pushed SHA; rerun only the checks a later commit invalidates.
+Spend suite waits on lightweight work (early review, preparing the next acceptance).
+After **one** repeat of an unchanged SHA, section, backend and failure signature,
+diagnose before running it again; a relevant commit or a recorded changed condition
+(an environment repair) reopens it. A red already charged to an open point with
+`main` unchanged in that section reuses the recorded `main` run.
+
+**Manageable.** The in-flight declaration is one record that a new `--waiting-on`
+replaces, so each declaration names every concurrent job: its text says what runs
+where and why (`"cloud author 1450 (session <id>); local suite polish-villagers for
+1449"`), and each job adds its evidence (`--branch`, `--worktree`, `--log`, `--pid`).
+`node scripts/batch-in-flight.mjs --status` then prints that text and all items in
+one output; a job missing from it is the owner's defect, not a gap in the command.
+
+**Simplified.** Routine retrospective, guide-attest and queue-rank refreshes go into
+one bookkeeping commit per boundary; a user-order publication receipt keeps its own
+required timing and is never deferred into that commit. A wait declaration uses the suite's measured
+duration (`run-wait --plan`), not the 45-minute default.
+
+**Kept unchanged.** Pool cap and `commission-guard`, cloud-switch ON, lane routing
+`default`, single owner and serial landing, boundary and ownership fence,
+`run-wait` (a `running/-` hang is STALLED and diagnosed), `land-point.mjs`, local
+tier suites, both-backend picture check, cross-vendor review. Cloud green never
+stands in for a browser suite.
+
+**Measured cycle.** After 1444 lands, `batch-standstill-report.mjs` over the next
+five landed points or 48 h, whichever is later — this is also the post-1443
+baseline, since the drained pool is what first allows the one cloud author. Record
+per point where each delegation ran, cloud sessions active during acceptance,
+waiting branches and repeats. Success: below 3.42 h per landed point without
+host-down time; otherwise name the class that absorbed the gain. One cycle is an
+observation, not proof.
 
 ## Boundary, lease, claims, and wake-up
 
@@ -161,10 +230,10 @@ lane (when switched on), then the main fallback; a different serving model
 pauses the batch.
 
 **After a lane rename lands** (scripts or state files renamed, as on the
-generic-lane change): the owner restarts the batch daemon before the next
-point starts, because a running daemon keeps invoking the script names its
-loaded code holds, and the memory entries naming old commands are updated in
-the same handoff.
+generic-lane change): a running batch daemon is restarted before the next
+point starts, because it keeps invoking the script names its loaded code holds
+(a stopped daemon stays stopped while "Throughput with cloud authoring" keeps it
+off), and the memory entries naming old commands are updated in the same handoff.
 
 For blind-parallel work, each input entry carries an id. The third model merges
 by meaning through `scripts/blind-merge.mjs`, and every input is counted exactly
