@@ -1722,6 +1722,12 @@
       "why": "1446's fresh-page staging unblocks the suite; the leak fix is real player impact but not blocking, so it waits behind the open front of the queue",
       "origin": "machine",
       "place": "last"
+    },
+    "1448": {
+      "at": "2026-10-25T11:26:18.610Z",
+      "why": "A charged regression red, not a user report and not blocking any landing; append-and-defer position is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1751,7 +1757,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-25T10:03:42.322Z",
+    "at": "2026-10-25T11:26:18.618Z",
     "points": [
       184,
       200,
@@ -2228,7 +2234,8 @@
       1443,
       1444,
       1445,
-      1447
+      1447,
+      1448
     ]
   }
 }
