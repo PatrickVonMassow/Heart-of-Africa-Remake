@@ -9,6 +9,7 @@ import {
   CONTACT_LEAN_MAX,
   contactLean,
   contactWantsLean,
+  holdsPosedReach,
   leastLean,
   searchDeepBend,
   gestureArmEuler,
@@ -117,6 +118,18 @@ describe('the contact lean', () => {
     // without `nearest` a bend that never reaches keeps the trunk upright
     expect(leastLean(leans, (l) => 0.5 - l, false)).toBe(0)
     expect(leastLean(leans, (l) => 0.12 - l, false)).toBe(0.15)
+  })
+  it('holds a pose’s reach while it reaches and while its release eases back', () => {
+    const leans = [0.05, 0.1, 0.15, 0.2]
+    const unreachable = (l: number) => 0.5 - l
+    const bend = (reach: boolean, releasing: [number | null, number | null]) =>
+      leastLean(leans, unreachable, !holdsPosedReach(reach, releasing))
+    // an active reach and a reach releasing on either arm keep the trunk upright
+    expect(bend(true, [null, null])).toBe(0)
+    expect(bend(false, [0, null])).toBe(0)
+    expect(bend(false, [null, 1])).toBe(0)
+    // once the release has faded out an ordinary contact bends nearest again
+    expect(bend(false, [null, null])).toBe(0.2)
   })
 })
 

@@ -134,6 +134,13 @@ export function searchDeepBend(o: { lean: number; wants: boolean; posedReach: bo
   return o.lean > 0 || o.grab || (o.wants && !o.posedReach && !o.steadying)
 }
 
+/** Whether a figure's contacts are held by its pose's reach: an arm reaching
+ *  now, or a released reach still easing back into the clips (`releasing`
+ *  holds that arm's reach until its solve has faded out). */
+export function holdsPosedReach(reach: boolean, releasing: readonly (number | null)[]): boolean {
+  return reach || releasing.some((r) => r !== null)
+}
+
 /** The least of `leans` whose `shortfall` (m, ≤ 0 when every contact is in
  *  reach) is met; failing that, with `nearest` the one that comes closest, so
  *  a contact the bend cannot fully make up is still brought as near as it

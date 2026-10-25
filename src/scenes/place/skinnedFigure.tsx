@@ -28,7 +28,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, newGaze, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, holdsPosedReach, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, newGaze, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -592,7 +592,7 @@ export function SkinnedFigure({
         const steadying = !!headSteady && rig.crown.children.some((c) => c.visible)
         // a released reach easing back into the clips is still the pose's
         // reach: a bend that only comes nearer would swing what the hand carries
-        const posedReach = !!extras?.reach || releasing.current.some((r) => r !== null)
+        const posedReach = holdsPosedReach(!!extras?.reach, releasing.current)
         if (searchDeepBend({ lean, wants, posedReach, grab, steadying }) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
