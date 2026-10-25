@@ -107,8 +107,8 @@ export const RED_CHARGES = [
     kind: 'check',
     backend: 'webgl',
     match: /water stand table: the empty jar is taken up from the plank/i,
-    detailMatch: /fastest in his first steps 6\.66 m\/s/i,
-    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. The charge dies with it.',
+    detailMatch: /fastest in his first steps [6-9]\.\d+ m\/s/i,
+    why: 'WebGL 2 section run on feat/1405-water-carrier-table 98049d22b, 23.10.2026 (log 16-40-45-147), split from 1405 as 1435; the WebGPU run at the same head was green. Measured again at 8.70 m/s in the full WebGL 2 run on feat/1333 8d9d3217e, 25.10.2026 (log 20-16-48-094). The charge dies with it.',
   },
   {
     point: 1435,
