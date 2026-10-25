@@ -34842,3 +34842,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Observed problem: Reproducible player impact reported by the user: a villager kneeling at the fire makes the crate on its head vanish and reappear on standing up. The code comment promises the load is set down, but the code only hides it. No open point or backlog entry covers it (grep of TASKS.md and docs/backlog.md, 23.10.2026).
   Source: user request 23.10.2026 via the findings carrier, spec cut from 6183b2bfa; approved: "Ja, das so nach 1414 einreihen.".
   Bundle: Dorfleben.
+
+- [x] 1333. Water-carrying adult dips the jar's mouth under the water surface while filling
+  Queue position: after point 1330, in the same village-errands block.
+  Source: findings carrier 08.10.2026 20:23Z: `polish-villagers --section=adult-errands` fails "the jar's mouth is tipped under the water surface" on feat/1331 aceda635f (WebGPU mouth -0.197 m, WebGL 2 -0.221 m, surface -0.25 m) and identically on origin/main 6bd36687f at 20:45Z (mouth -0.200 m); runtime-identical to main, so pre-existing and not charged to 1331. Logs local/verify-logs/2026-10-08T20-40-46-090- and 2026-10-08T20-45-25-112-polish-villagers.log. The two water checks in the same runs belong to points 1242 and 568.
+  Final state: while a villager fills a jar at the bank, the jar's mouth dips below the water surface as the check requires, on both backends, without changing the carry pose elsewhere.
+  Verifiable: `polish-villagers --section=adult-errands` jar check green on both backends; the filling frame picture-checked.
+  Criticality: medium - a standing red in the village suite; visible at every water stand.
+  Bundle: Dorfleben.

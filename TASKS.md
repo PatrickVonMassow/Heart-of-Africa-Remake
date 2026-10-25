@@ -255,14 +255,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium - player-visible at Giza and in the whole travel view, both backends.
   Bundle: Dorfleben.
 
-- [ ] 1333. Water-carrying adult dips the jar's mouth under the water surface while filling
-  Queue position: after point 1330, in the same village-errands block.
-  Source: findings carrier 08.10.2026 20:23Z: `polish-villagers --section=adult-errands` fails "the jar's mouth is tipped under the water surface" on feat/1331 aceda635f (WebGPU mouth -0.197 m, WebGL 2 -0.221 m, surface -0.25 m) and identically on origin/main 6bd36687f at 20:45Z (mouth -0.200 m); runtime-identical to main, so pre-existing and not charged to 1331. Logs local/verify-logs/2026-10-08T20-40-46-090- and 2026-10-08T20-45-25-112-polish-villagers.log. The two water checks in the same runs belong to points 1242 and 568.
-  Final state: while a villager fills a jar at the bank, the jar's mouth dips below the water surface as the check requires, on both backends, without changing the carry pose elsewhere.
-  Verifiable: `polish-villagers --section=adult-errands` jar check green on both backends; the filling frame picture-checked.
-  Criticality: medium - a standing red in the village suite; visible at every water stand.
-  Bundle: Dorfleben.
-
 - [ ] 1340. Tag catcher's hands at chest height and on the caught child at the catch frame
   Amended 19.10.2026 from point 1343's author: concept step 15 removes the catcher's forward chest-height hands, so that half of this final state is obsolete; the catch-frame hand on the caught child stays here (flaky: red on 3 WebGPU runs, 0.45 m catch distance at lean cap 0.12 rad).
   Queue position: after point 1333; point 1343 reworks the port-city chaser pose (point 1316's item 7) — if 1343 lands with `polish-children --section=tag-catch` green on both backends, this point closes with that run as evidence.
