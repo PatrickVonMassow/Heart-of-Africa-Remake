@@ -5915,6 +5915,32 @@ if (section('village-walk')) {
     if (!caught) continue
     await freezeLife(true)
     try {
+      if (phase !== 'ground') {
+        // the drawn palms on the load, measured on the rig rather than the plan
+        const gaps = await page.evaluate(() => {
+          const g = window.__placeScene.getObjectByName('village-task-walker')
+          const load = g.getObjectByName('task-walker-load')
+          const V = g.position.constructor
+          g.updateWorldMatrix(true, true)
+          const lo = new V(Infinity, Infinity, Infinity)
+          const hi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(o.matrixWorld)
+              lo.min(c)
+              hi.max(c)
+            }
+          })
+          return ['hand-left', 'hand-right'].map((n) => {
+            const p = g.getObjectByName(n).getWorldPosition(new V())
+            return +new V().copy(p).clamp(lo, hi).distanceTo(p).toFixed(3)
+          })
+        })
+        check(`head load (${phase}): both drawn hands are on the load (gaps ${gaps.join(', ')} m ≤ 0.1)`, gaps.every((d) => d <= 0.1), '')
+      }
       const at = await page.evaluate(() => {
         const g = window.__placeScene.getObjectByName('village-task-walker')
         return { x: g.position.x, z: g.position.z }
