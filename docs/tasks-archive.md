@@ -34865,3 +34865,9 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   3. The lion is never drawn snapping across to a victim it did not reach.
   4. Right-layer tests: Vitest for the pure contact predicate; the existing wildlife Playwright suite for the staged river scene; picture check per §7.2.
   Bundle: Tierverhalten.
+
+- [x] 1443. Close the open branches first: 1441, 1442, then 1414, 1432, 1333, 1297; park 1347
+  Final state: the open-branch pool drains. Queue order at the front of the work order: 1441 -> 1442 -> 1414 -> 1432 -> 1333 -> 1297. 1441 and 1442 stay first because they block landings (1442 holds the covering polish-villagers run that render-verify-guard owes for every village landing). Then the four branch points are accepted and landed (1333 and 1297 after a sync with main; 1297 is an investigation point: land it or close it as a recorded finding). The branch feat/1347-garment-rebuild is parked in .claude/batch-in-flight.json (reason: large six-eyes rebuild, not quickly closable; frees a pool slot). Parking keeps the branch, its commits and point 1347 at its queue position untouched; it resumes there.
+  Observed problem (measured 24.10.2026 08:53): five open feat branches against POOL_CAP 3, none parked (1297 3 weeks old, 1496 behind main; 1333 412 behind; 1347 66 commits/368 files; 1414 and 1432 2-6 commits, 36 behind). commission-guard therefore refuses every new cloud authoring lane although cloud credit is available, so nothing ran in parallel to the ~2.5 h polish-villagers WebGPU run after 1440 landed. The in-flight declaration was also stale for ~2.5 h ("Landung 1440: Fast-Gate läuft", slotsFree empty).
+  Source: user request 24.10.2026 via the findings carrier; approved: "ja".
+  Bundle: Session- & Repo-Hygiene.
