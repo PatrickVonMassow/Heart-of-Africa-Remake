@@ -1,20 +1,4 @@
 {
   "v": 1,
-  "leases": [
-    {
-      "sessionId": "pid-2349772",
-      "runId": "2026-10-25T12-25-21-979-polish-villagers",
-      "pid": 2349802,
-      "pidStartedAt": 1792931250431,
-      "subject": "verify polish-villagers --section=village-walk",
-      "ownerGeneration": null,
-      "startedAt": 1792931250481,
-      "deadlineAt": 1792931550481,
-      "hungAt": 1792934250481,
-      "recordPath": "/workspace/hoa/local/verify-logs/2026-10-25T12-25-21-979-polish-villagers.log.run.json",
-      "logPath": "/workspace/hoa/local/verify-logs/2026-10-25T12-25-21-979-polish-villagers.log",
-      "timeoutReportedAt": null,
-      "hungReportedAt": null
-    }
-  ]
+  "leases": []
 }
