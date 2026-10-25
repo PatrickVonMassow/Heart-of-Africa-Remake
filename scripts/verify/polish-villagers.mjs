@@ -5909,19 +5909,27 @@ if (section('village-walk')) {
     if (phase === 'ground') return k > 0.97 && h < 0.08
     return k < prev && h > prevH + 1e-4 && between
   }, phase, phase === 'down' ? 9000 : 2400)
-  // Gripping from either side: the palms spread across most of the load and
-  // the load's centre lies on the line between them. The box clamp alone reads
-  // zero gaps for palms collapsed into the middle or both on one face.
-  const opposingGrip = ([[ax, az], [bx, bz]], [cx, cz], span) => {
-    const dx = bx - ax
-    const dz = bz - az
-    const spread = Math.hypot(dx, dz)
-    const offAxis = spread > 0 ? Math.abs((cx - ax) * dz - (cz - az) * dx) / spread : Infinity
-    return { spread: +spread.toFixed(3), offAxis: +offAxis.toFixed(3), ok: spread >= 0.6 * span && offAxis <= 0.25 * span }
+  // Gripping from either side, in the load's own horizontal frame: each palm
+  // reaches out to a face (at least 0.6 of the half-extent from the centre on
+  // that axis, and that axis is its nearest face within 0.15), and the two faces
+  // are opposite. The box clamp alone reads zero gaps for palms collapsed into
+  // the middle or both on one face.
+  const opposingGrip = (palms, half) => {
+    const reach = palms.map(([x, z]) => [x / half[0], z / half[1]])
+    const k = [0, 1].find((a) => {
+      const [p, q] = reach.map((r) => r[a])
+      return Math.sign(p) !== Math.sign(q) && reach.every((r) => Math.abs(r[a]) >= 0.6 && Math.abs(r[a]) >= Math.abs(r[1 - a]) - 0.15)
+    })
+    return { reach: reach.map((r) => r.map((v) => +v.toFixed(2))), ok: k !== undefined }
   }
-  check('head load: the grip check rejects two palms on one face of the load', !opposingGrip([[0.5, -0.4], [0.5, 0.4]], [0, 0], 1).ok, '')
-  check('head load: the grip check rejects two palms collapsed into the load\'s middle', !opposingGrip([[0.05, 0], [-0.05, 0]], [0, 0], 1).ok, '')
-  check('head load: the grip check accepts two palms on opposite faces of the load', opposingGrip([[-0.5, 0.05], [0.5, -0.05]], [0, 0], 1).ok, '')
+  for (const [what, palms, half, want] of [
+    ['two palms on one face', [[0.5, -0.4], [0.5, 0.4]], [0.5, 0.5], false],
+    ['two palms on one long face of a narrow load', [[0.2, -0.4], [0.2, 0.4]], [0.2, 0.5], false],
+    ["two palms collapsed into the load's middle", [[0.05, 0], [-0.05, 0]], [0.5, 0.5], false],
+    ['two palms on one side of the centre', [[0.05, 0.05], [0.5, 0.5]], [0.5, 0.5], false],
+    ['two palms on opposite faces', [[-0.5, 0.05], [0.5, -0.05]], [0.5, 0.5], true],
+    ['two palms on opposite short faces of a narrow load', [[0.02, -0.5], [-0.02, 0.5]], [0.2, 0.5], true],
+  ]) check(`head load: the grip check ${want ? 'accepts' : 'rejects'} ${what}`, opposingGrip(palms, half).ok === want, '')
   for (const [phase, name, label] of [
     ['down', '1432-village-load-set-down', 'the task walker kneeling down, its head load held in both hands on the way from its head to the ground'],
     ['ground', '1432-village-load-on-ground', 'the task walker kneeling at its work, its head load standing on the ground beside it'],
@@ -5952,16 +5960,33 @@ if (section('village-walk')) {
             }
           })
           const palms = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n).getWorldPosition(new V()))
+          // the load's box in its own frame, the palms relative to its centre
+          const toLoad = load.matrixWorld.clone().invert()
+          const llo = new V(Infinity, Infinity, Infinity)
+          const lhi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            const m = toLoad.clone().multiply(o.matrixWorld)
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(m)
+              llo.min(c)
+              lhi.max(c)
+            }
+          })
+          const mid = new V().addVectors(llo, lhi).multiplyScalar(0.5)
           return {
             gaps: palms.map((p) => +new V().copy(p).clamp(lo, hi).distanceTo(p).toFixed(3)),
-            palms: palms.map((p) => [p.x, p.z]),
-            center: [(lo.x + hi.x) / 2, (lo.z + hi.z) / 2],
-            span: Math.max(hi.x - lo.x, hi.z - lo.z),
+            local: palms.map((p) => {
+              const q = p.clone().applyMatrix4(toLoad).sub(mid)
+              return [q.x, q.z]
+            }),
+            half: [(lhi.x - llo.x) / 2, (lhi.z - llo.z) / 2],
           }
         })
-        const grip = opposingGrip(gaps.palms, gaps.center, gaps.span)
+        const grip = opposingGrip(gaps.local, gaps.half)
         check(`head load (${phase}): both drawn hands are on the load (gaps ${gaps.gaps.join(', ')} m ≤ 0.1)`, gaps.gaps.every((d) => d <= 0.1), '')
-        check(`head load (${phase}): the hands hold it from either side (spread ${grip.spread} m ≥ 0.6 × span, centre ${grip.offAxis} m off the palm axis ≤ 0.25 × span ${+gaps.span.toFixed(3)} m)`, grip.ok, '')
+        check(`head load (${phase}): the hands hold it on opposite faces (reach per half-extent ${JSON.stringify(grip.reach)})`, grip.ok, '')
       }
       const at = await page.evaluate(() => {
         const g = window.__placeScene.getObjectByName('village-task-walker')
