@@ -11,7 +11,7 @@ import { gaitBodyLift, legSwingAngle } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
-import { approach, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
+import { approach, leanedHipY, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
 import { VILLAGER_MOTION } from '../../config/balance'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
@@ -257,6 +257,11 @@ function PrimitiveFigure({
     // and a stretch. The head is a smooth sphere, so its counter-rotation is
     // invisible; only its roundness survives. `turn` needs no answer — a rotation
     // about y commutes with a scale along y.
+    // A forward lean while kneeling (setting a load down) would tip the cone's
+    // rim into the ground; the hip rises by just that much.
+    if (trunk.current && shape.current) {
+      trunk.current.position.y = leanedHipY(shape.current.hipY, trunkRadius(shape.current), trunk.current.rotation.x)
+    }
     if (head.current) {
       const squash = squat?.current ?? 1
       const flattened = squash > 0.01 && Math.abs(squash - 1) > 1e-4

@@ -21,6 +21,7 @@ import {
   lowestFoot,
   loadRadiusAt,
   phasePerDistance,
+  leanedHipY,
   primitiveLayout,
   restingMotion,
   solveLeg,
@@ -531,6 +532,20 @@ describe('kneeling folds the body, it never squashes it', () => {
       }
       expect(kneelBlend(d, stand, 0).hipHeight).toBeCloseTo(walkPose(d, 0, 0, 0, 'adult').hipHeight, 5)
     }
+  })
+
+  it('lifts a kneeling primitive hip just enough that a leaning trunk cone keeps its rim on the ground', () => {
+    const kneel = primitiveLayout(1, true, FIGURE_LIMBS)
+    const r = 0.25
+    for (const lean of [0, 0.2, 0.4, -0.3]) {
+      const hip = leanedHipY(kneel.hipY, r, lean)
+      // the lowest point of the tipped base rim, over the ground
+      expect(hip - r * Math.abs(Math.sin(lean))).toBeGreaterThanOrEqual(-1e-9)
+      expect(hip - r * Math.abs(Math.sin(lean))).toBeLessThanOrEqual(Math.max(kneel.hipY, 1e-9))
+    }
+    // a standing hip is already clear and stays where it is
+    const stand = primitiveLayout(0, true, FIGURE_LIMBS)
+    expect(leanedHipY(stand.hipY, r, 0.4)).toBe(stand.hipY)
   })
 
   it('the primitive keeps a uniform scale and its head radius through the whole transition', () => {
