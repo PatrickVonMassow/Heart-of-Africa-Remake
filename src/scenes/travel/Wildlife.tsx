@@ -62,6 +62,7 @@ import {
   chaseFleeStep,
   swimBrakedPace,
   chaseSwimEscaped,
+  feedFlank,
   safeBankTarget,
   calfWaterCause,
   calfFollowAcrossWater,
@@ -918,6 +919,9 @@ const SPAWN_RANGE_MAX = Math.ceil(SPAWN_COVER_RADIUS_MAX / CHUNK_SIZE)
  *  vulture flock (point 251) that flies in, lands and consumes it, dissolving
  *  it like a lion kill. */
 const CARCASS_DISSOLVE_SECONDS = 9
+/** A feeding predator stands this far from its victim, on the side it came
+ *  from (feedFlank) — the old fixed +x/+z flank's own distance. */
+const FEED_FLANK_DIST = Math.hypot(0.7, 0.25)
 /** Fast glide: the flights start beyond the view ring (design.md §19), so the
  *  birds must cover real distance to arrive while their reason still holds. */
 const VULTURE_SCAVENGE_SPEED = 16
@@ -2576,7 +2580,7 @@ function Herds() {
                   // straight to idle, which hides the scripted predator mesh
                   // — the carcass pushed into the herds replaces it in place,
                   // so nothing pops. No walk-off: the predator is dead.
-                  slayPredator(LION_STATE.predator, LION_STATE.px + 0.7, LION_STATE.pz + 0.25, Math.atan2(-0.7, -0.25))
+                  slayPredator(LION_STATE.predator, LION_STATE.lx, LION_STATE.lz, Math.atan2(LION_STATE.px - LION_STATE.lx, LION_STATE.pz - LION_STATE.lz))
                   LION_STATE.victimHunt = false
                   LION_STATE.mode = 'idle'
                   LION_STATE.timer = 30 + Math.random() * 30
@@ -2585,10 +2589,8 @@ function Herds() {
                   LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
                   LION_STATE.leaveHeading = undefined // fresh corridor pick (point 188)
                   LION_STATE.leaveT = 0
-                  // The feeding predator stood at the carcass flank — pick the
-                  // walk-off up from there, like the feed→leave exit does.
-                  LION_STATE.lx = LION_STATE.px + 0.7
-                  LION_STATE.lz = LION_STATE.pz + 0.25
+                  // The feeding predator already stands at the carcass flank
+                  // (feedFlank) — the walk-off starts where it is drawn.
                 }
               }
             } else {
@@ -5789,9 +5791,15 @@ function LionHunt() {
             s.leaveT = 0
             s.victim = null
             s.victimHunt = false
-            s.lx = s.px + 0.7
-            s.lz = s.pz + 0.25
           } else {
+            // Feed on the body the hunter actually reached (a shield take
+            // switched the victim to the parent this frame): the prey point
+            // follows it now, so the pose is never drawn at the calf.
+            s.px = v.x
+            s.pz = v.z
+            const f = feedFlank(s.px, s.pz, s.lx, s.lz, FEED_FLANK_DIST)
+            s.lx = f.x
+            s.lz = f.z
             s.mode = 'feed'
             s.timer = 30
           }
@@ -5867,6 +5875,9 @@ function LionHunt() {
           }
           s.mode = 'feed'
           s.timer = v ? 30 : FEED_DURATION
+          const f = feedFlank(s.px, s.pz, s.lx, s.lz, FEED_FLANK_DIST)
+          s.lx = f.x
+          s.lz = f.z
         }
         // Abort when the hunt strays beyond the visible surroundings — never
         // inside the view, so the animals do not vanish in sight (§19).
@@ -5885,6 +5896,12 @@ function LionHunt() {
         s.timer -= dt
         s.px = v.x
         s.pz = v.z
+        // Keep to the flank of the body being eaten, on the predator's own
+        // side (a victim switch — the charging parent taken in the calf's
+        // place — moves it only as far as the new body is from it).
+        const f = feedFlank(s.px, s.pz, s.lx, s.lz, FEED_FLANK_DIST)
+        s.lx = f.x
+        s.lz = f.z
         if (v.dead) {
           if (v.dissolve === undefined) v.dissolve = CARCASS_DISSOLVE_SECONDS
           v.dissolve -= dt
@@ -5911,8 +5928,6 @@ function LionHunt() {
           s.leaveHeading = undefined // fresh corridor pick per leave (point 188)
           s.leaveT = 0
           s.victim = null
-          s.lx = s.px + 0.7
-          s.lz = s.pz + 0.25
         }
       } else {
         s.timer -= dt
@@ -5923,8 +5938,6 @@ function LionHunt() {
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
           s.leaveHeading = undefined // fresh corridor pick per leave (point 188)
           s.leaveT = 0 // reset the overtime clock — the victim branch does too
-          s.lx = s.px + 0.7
-          s.lz = s.pz + 0.25
         }
       }
     } else {
@@ -5996,8 +6009,8 @@ function LionHunt() {
     // (rate-limited by the store). Every predator attacks on contact now — the
     // lion remains the apex (highest fatal risk), the others less dangerous.
     if (active) {
-      const predX = feeding ? s.px + 0.7 : s.lx
-      const predZ = feeding ? s.pz + 0.25 : s.lz
+      const predX = s.lx // a feeder stands at its flank (feedFlank)
+      const predZ = s.lz
       if (Math.hypot(predX - pos.x, predZ - pos.z) < LION_CONTACT_RADIUS) {
         useGame.getState().predatorContact(s.predator)
       }
@@ -6007,19 +6020,21 @@ function LionHunt() {
       lion.current.visible = active
       if (active) {
         const ll = worldToLatLon(s.lx, s.lz)
-        const ground = Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height)
+        const lt = sampleTerrain(ll.lat, ll.lon, seed)
+        const ground = Math.max(0.02, lt.height)
+        // In a river/lake (design.md §19.5): chest-deep on the rendered sheet,
+        // like every swimmer, never on the river bed — feeding at a body it
+        // reached in the water included.
+        const swimY =
+          lt.type === 'water' ? sheetAnchorY(waterSurfaceY(ll.lat, ll.lon, seed, lt.height), lt.height, 0.32) : ground
         if (feeding) {
-          // Feeding (design.md §19): stand at the carcass flank, head down,
-          // rhythmic tearing dips instead of the chase pose.
-          lion.current.position.set(s.px + 0.7, ground, s.pz + 0.25)
-          lion.current.rotation.y = Math.atan2(-0.7, -0.25)
+          // Feeding (design.md §19): stand at the carcass flank on the side it
+          // came from (feedFlank), facing the body, head down, rhythmic
+          // tearing dips instead of the chase pose.
+          lion.current.position.set(s.lx, swimY, s.lz)
+          lion.current.rotation.y = Math.atan2(s.px - s.lx, s.pz - s.lz)
           lion.current.rotation.x = 0.32 + Math.sin(t * 3.2) * 0.16
         } else {
-          // Swimming after its quarry (design.md §19.5): chest-deep on the
-          // rendered sheet, like every swimmer, never walking the river bed.
-          const lt = sampleTerrain(ll.lat, ll.lon, seed)
-          const swimY =
-            lt.type === 'water' ? sheetAnchorY(waterSurfaceY(ll.lat, ll.lon, seed, lt.height), lt.height, 0.32) : ground
           lion.current.position.set(s.lx, swimY, s.lz)
           // Face the direction of travel (weaving pursuit / walk-off).
           lion.current.rotation.y = s.mode === 'leave' ? s.heading : s.lionHeading
