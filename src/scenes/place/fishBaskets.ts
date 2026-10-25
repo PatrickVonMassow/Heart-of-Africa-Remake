@@ -15,6 +15,9 @@
 //
 // Pure logic: the scene draws what this records.
 
+/** A woven basket's size (m): its radius at the rim and its height. */
+export const FISH_BASKET = { radius: 0.26, height: 0.34 } as const
+
 /** Where a basket is. `netman` is while the fisherman holds it at the hull. */
 export type BasketPlace = 'bank' | 'netman' | 'carrier' | 'fire'
 

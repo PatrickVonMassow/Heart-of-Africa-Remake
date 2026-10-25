@@ -41,12 +41,12 @@ import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryM
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
 import { rainAmount } from '../../systems/season'
-import { blendPose, carrierWalkPose, copyPose, netFishRotation, ownPose, placeNetMan, reachPose } from './fisheryPoses'
+import { blendPose, CARRIER_BASKET_Y, carrierWalkPose, copyPose, netFishRotation, netManAshore, netManBasketAt, ownPose, placeNetMan, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
 import { BANK_WATER_DROP, type PlaceRiverBank } from './riverBank'
-import { basketRingViolation, type BasketRing, type FishBasket } from './fishBaskets'
+import { basketRingViolation, FISH_BASKET, type BasketRing, type FishBasket } from './fishBaskets'
 import {
   createFishFire,
   createFisheryRing,
@@ -87,8 +87,8 @@ const CANOE_DEPTH = 0.28
 /** The hull fish lie this high over the hull's water line. */
 const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
-const BASKET_R = 0.26
-const BASKET_H = 0.34
+const BASKET_R = FISH_BASKET.radius
+const BASKET_H = FISH_BASKET.height
 /** The rope's own axis and a scratch direction for orienting it. */
 const ROPE_UP = new THREE.Vector3(0, 1, 0)
 const ROPE_DIR = new THREE.Vector3()
@@ -450,7 +450,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
       applyFigurePose(netLimbs.current, np)
     } else if (np) {
       const holding = ring.baskets.some((b) => b.at === 'netman')
-      copyPose(np, holding && nm.reach < 0.05 ? { left: armAim(0.25, -0.55), right: armAim(-0.25, -0.55), lean: 0.12, turn: 0 } : reachPose(0, nm.reach))
+      copyPose(np, netManAshore(nm.reach, holding).pose)
       applyFigurePose(netLimbs.current, np)
     }
 
@@ -550,10 +550,10 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     if (carrierWalk.current) {
       carrierWalk.current.position.set(c.x, groundHeight(c.x, c.z), c.z)
       carrierWalk.current.rotation.y = c.yaw
-      // A basket on his head rests on his crown and rides its bob.
+      // A basket on his head rests on his crown, rides its bob and tilts with it.
       for (const b of ring.baskets) {
         const g = b.at === 'carrier' ? basketGroups.current[b.id] : null
-        if (g && !kneeling && crownIn(carrierWalk.current, g.parent, g.position)) g.rotation.set(0, c.yaw, 0)
+        if (g && !kneeling) crownIn(carrierWalk.current, g.parent, g.position, g.quaternion)
       }
     }
     const cw = carrierWalkPoseRef.current
@@ -1012,15 +1012,14 @@ function placeBasket(
       break
     }
     case 'netman': {
-      const nm = canoe.netMan
-      const x = nm.x + Math.sin(nm.yaw) * 0.45
-      const z = nm.z + Math.cos(nm.yaw) * 0.45
-      g.position.set(x, groundHeight(nm.x, nm.z) + 0.55 - 0.45 * nm.reach, z)
+      // Hanging from his hands by its rim, never at a height of its own.
+      const at = netManBasketAt(canoe.netMan, groundHeight)
+      g.position.set(at.x, at.y, at.z)
       break
     }
     case 'carrier': {
       const c = fire.carrier
-      g.position.set(c.x, groundHeight(c.x, c.z) + 1.36, c.z)
+      g.position.set(c.x, groundHeight(c.x, c.z) + CARRIER_BASKET_Y, c.z)
       g.rotation.set(0, c.yaw, 0)
       break
     }
