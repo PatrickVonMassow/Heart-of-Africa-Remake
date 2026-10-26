@@ -149,6 +149,14 @@ export const RED_CHARGES = [
     why: 'WebGPU on feat/1415 d3201e61c, 26.10.2026: the camera check red in the full run (log 06-39-00-663), the two stance checks red in one of three --section=village-walk runs (gait gaps, walker 2 gaitWalk 0 at ~2 m/s; local/1415-suspect-rungs.log); the same gait-gap signature 1381 names on WebGL 2. The charge dies with it.',
   },
   {
+    point: 1381,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgl',
+    match: /^(from behind the upstream rock the children.s game is in frame|village walk: each arm swings against its own side.s leg)/i,
+    why: 'Full WebGL 2 polish-villagers run on feat/1333 8d9d3217e, 25.10.2026 (log 2026-10-25T20-16-48-094): 2/5 children seen from behind the upstream rock, and the arm-swing check red on gait gaps; both named in point 1381 since that day, green on WebGPU. The charge dies with it.',
+  },
+  {
     point: 1382,
     suite: 'polish-villagers',
     kind: 'check',
