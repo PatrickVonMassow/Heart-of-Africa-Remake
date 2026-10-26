@@ -9,6 +9,7 @@ import { SEEDS, PORTS, VILLAGES,
   sharedLayout } from './layoutHarness'
 import { digFurnitureFootprints } from './digSiteAppearance'
 import {
+  digFurnitureColliders,
   digLocalToWorld,
   digStandingPlaces,
   placeGroundHeight,
@@ -92,10 +93,15 @@ describe('the ground work villagers dig at (work-order 483)', () => {
         expect(digStandingPlaces(site, (x, z) => standingClear(layout.colliders, x, z, WALKER_RADIUS)), where).not.toBeNull()
         const heap = spoilCentre(site)
         expect(standingClear(layout.colliders, heap.x, heap.z, SPOIL_RADIUS_X), where).toBe(true)
+        // The props are solid themselves (point 1418): each is measured
+        // against every collider but the site's own.
+        const own = digFurnitureColliders(site).map((c) => JSON.stringify(c))
+        const others = layout.colliders.filter((c) => !own.includes(JSON.stringify(c)))
+        expect(layout.colliders.length - others.length, where).toBe(own.length)
         for (const prop of digFurnitureFootprints(site.kind)) {
           const p = digLocalToWorld(site, prop.x, prop.z)
           expect(Math.hypot(p.x, p.z) + prop.radius, where).toBeLessThan(layout.radius)
-          expect(standingClear(layout.colliders, p.x, p.z, prop.radius), where).toBe(true)
+          expect(standingClear(others, p.x, p.z, prop.radius), where).toBe(true)
         }
         // No lane runs through it: the ground work never blocks the path net.
         for (const path of layout.paths) {
