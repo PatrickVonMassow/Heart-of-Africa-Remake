@@ -123,14 +123,6 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 1418. Villager walks into stacked baskets; baskets have no collision
-  Queue position: directly after point 1414 (user decision 21.10.2026).
-  Source: user bug report hoa-state-2026-10-21-3318564123 (3).zip (21:06:07Z), user words: "Er steht mitten in den Körben und die haben auch keine Kollisionsabfrage."
-  Observed: the man in dark blue with the white cap stands hip-deep inside two stacked baskets in the village compound (next to the mortar); the baskets do not block him.
-  Final state: stacked baskets (and comparable set-down props) are obstacles for villagers' paths and for the traveller per the settlement collision (§7.1 criterion 16); no villager is ever placed or walks inside one.
-  Verifiable: a Vitest asserts that no villager path point and no villager position lies inside any basket footprint over a simulated day; a capture of the basket group shows the man beside, not inside, the baskets.
-  Criticality: medium - player-visible clipping and missing collision.
-  Bundle: Dorfleben.
 - [ ] 1419. Village goats have no collision (walk through posts and figures)
   Queue position: directly after point 1414 (user decision 21.10.2026).
   Source: user bug report hoa-state-2026-10-21-3318564123 (4).zip (21:06:26Z), user words: "Das Tier hat keine Kollisionsabfrage."

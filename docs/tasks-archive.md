@@ -34981,3 +34981,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Observed problem: at the point-1416 picture check (26.10.2026, both backends, seed 42, frames local/1416-seq-webgpu and local/1416-seq-webgl, sheets local/1416-sheet-*-a.png) each pounding woman raises her left forearm onto/behind the top of her head; the bite reads as scratching the head. Pose source: the eat branch of `rackPose` in src/scenes/place/fisheryPoses.ts (armAim(0.35, -0.55+1.35*biteLift), reach 0.85). Whether 1416's bent-arm reach introduced it is not measured.
   Source: findings carrier 26.10.2026 14:20 (point-1416 picture check).
   Bundle: Dorfleben.
+
+- [x] 1418. Villager walks into stacked baskets; baskets have no collision
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123 (3).zip (21:06:07Z), user words: "Er steht mitten in den Körben und die haben auch keine Kollisionsabfrage."
+  Observed: the man in dark blue with the white cap stands hip-deep inside two stacked baskets in the village compound (next to the mortar); the baskets do not block him.
+  Final state: stacked baskets (and comparable set-down props) are obstacles for villagers' paths and for the traveller per the settlement collision (§7.1 criterion 16); no villager is ever placed or walks inside one.
+  Verifiable: a Vitest asserts that no villager path point and no villager position lies inside any basket footprint over a simulated day; a capture of the basket group shows the man beside, not inside, the baskets.
+  Criticality: medium - player-visible clipping and missing collision.
+  Bundle: Dorfleben.
