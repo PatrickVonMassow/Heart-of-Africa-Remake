@@ -77,6 +77,11 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1451. Cloud clone reds tooling Vitest files that pass locally
+  Final state: `npm run test:unit` in a fresh `claude --cloud` clone of main is green, or each environment-sensitive tooling case skips there with a named reason, so a cloud handover's unit result needs no local rerun.
+  Observed problem: the point-1416 cloud author (session_015yN1eEkcEwUPrKLmkMnkF7, 26.10.2026) reported 19 red cases in 6 `|tooling|` files (batch-reconcile 6, container-entrypoint 6, land-point-runner 4, batch-doctor-protected 1, finding-request-cli 1, repository-integrity 1) on a branch touching only src/scenes/place/; locally all 7 files passed (13:52). The owner had to rerun them before the merge, which is exactly what point 1436 item 2 forbids. Earlier sighting: docs/backlog.md "Cloud clone reds 10 Vitest cases that pass locally" (24.10.2026), promoted here because it now blocks 1436.
+  Source: point-1436 evidence review, 26.10.2026; a real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
@@ -94,6 +99,12 @@ put it is the mistake this line exists to stop.
   Final state: the fish work reads as a recognizable task (e.g. cleaning/gutting the fish on the board) and the fish never intersects her body or clothing in any phase.
   Verifiable: a Vitest asserts fish-to-body clearance over the whole work cycle; a capture of the kneeling woman shows a readable task without clipping, judged by a person.
   Criticality: medium - visible at the beach work site.
+  Bundle: Dorfleben.
+- [ ] 1450. Rack women's eating gesture lifts the hand over the head instead of to the mouth
+  Final state: during the eat phase at the Bambara fish rack the hand holding the fish comes to the mouth, never above the head, on WebGPU and WebGL 2.
+  Verifiable: a Vitest over `rackPose` bounds the eating hand's height to the mouth band across the whole eat cycle; a capture sequence of the rack, judged by a person, shows the bite at the mouth.
+  Observed problem: at the point-1416 picture check (26.10.2026, both backends, seed 42, frames local/1416-seq-webgpu and local/1416-seq-webgl, sheets local/1416-sheet-*-a.png) each pounding woman raises her left forearm onto/behind the top of her head; the bite reads as scratching the head. Pose source: the eat branch of `rackPose` in src/scenes/place/fisheryPoses.ts (armAim(0.35, -0.55+1.35*biteLift), reach 0.85). Whether 1416's bent-arm reach introduced it is not measured.
+  Source: findings carrier 26.10.2026 14:20 (point-1416 picture check).
   Bundle: Dorfleben.
 - [ ] 1418. Villager walks into stacked baskets; baskets have no collision
   Queue position: directly after point 1414 (user decision 21.10.2026).
@@ -15960,14 +15971,3 @@ to land than a mechanism that needs a review.
   Observed problem: full enrichments run on WebGPU, 26.10.2026 03:21-03:42, main 64bed6b45, machine quiet UNVERIFIED: 314 pass, 5 fail; three charged (938, 1236 twice), these two owned by no open point. Both stem from the calf-shield-river work landed with point 1297. Log: local/enrichments-webgpu-run.log.
   Source: findings carrier 26.10.2026 02:43 (enrichments run); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
   Bundle: Tierverhalten.
-- [ ] 1450. Rack women's eating gesture lifts the hand over the head instead of to the mouth
-  Final state: during the eat phase at the Bambara fish rack the hand holding the fish comes to the mouth, never above the head, on WebGPU and WebGL 2.
-  Verifiable: a Vitest over `rackPose` bounds the eating hand's height to the mouth band across the whole eat cycle; a capture sequence of the rack, judged by a person, shows the bite at the mouth.
-  Observed problem: at the point-1416 picture check (26.10.2026, both backends, seed 42, frames local/1416-seq-webgpu and local/1416-seq-webgl, sheets local/1416-sheet-*-a.png) each pounding woman raises her left forearm onto/behind the top of her head; the bite reads as scratching the head. Pose source: the eat branch of `rackPose` in src/scenes/place/fisheryPoses.ts (armAim(0.35, -0.55+1.35*biteLift), reach 0.85). Whether 1416's bent-arm reach introduced it is not measured.
-  Source: findings carrier 26.10.2026 14:20 (point-1416 picture check).
-  Bundle: Dorfleben.
-- [ ] 1451. Cloud clone reds tooling Vitest files that pass locally
-  Final state: `npm run test:unit` in a fresh `claude --cloud` clone of main is green, or each environment-sensitive tooling case skips there with a named reason, so a cloud handover's unit result needs no local rerun.
-  Observed problem: the point-1416 cloud author (session_015yN1eEkcEwUPrKLmkMnkF7, 26.10.2026) reported 19 red cases in 6 `|tooling|` files (batch-reconcile 6, container-entrypoint 6, land-point-runner 4, batch-doctor-protected 1, finding-request-cli 1, repository-integrity 1) on a branch touching only src/scenes/place/; locally all 7 files passed (13:52). The owner had to rerun them before the merge, which is exactly what point 1436 item 2 forbids. Earlier sighting: docs/backlog.md "Cloud clone reds 10 Vitest cases that pass locally" (24.10.2026), promoted here because it now blocks 1436.
-  Source: point-1436 evidence review, 26.10.2026; a real blockade (CLAUDE.md §2 finding intake).
-  Bundle: Session- & Repo-Hygiene.
