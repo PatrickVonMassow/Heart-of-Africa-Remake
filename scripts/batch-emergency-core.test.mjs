@@ -338,6 +338,14 @@ describe('the absolute deadline (union entry U5)', () => {
       .toMatchObject({ action: 'hard-recover', reason: 'past-absolute-deadline', strike: true })
   })
 
+  it('never strikes a fresh owner for its predecessor\'s dead time (point 1445)', () => {
+    const report = stalledFor(EMERGENCY_HARD_DEADLINE_MS * 3)
+    expect(emergencyDecision({ now: NOW, report, workablePoints: [1048], ownerSince: NOW - 16 * 60_000 }))
+      .toMatchObject({ action: 'observe', reason: 'progress-within-threshold', strike: false })
+    expect(emergencyDecision({ now: NOW, report, workablePoints: [1048], ownerSince: NOW - EMERGENCY_HARD_DEADLINE_MS }))
+      .toMatchObject({ action: 'hard-recover', reason: 'past-absolute-deadline' })
+  })
+
   it('recovers HARD past the deadline although a strike is still in cooldown', () => {
     const progressAt = NOW - EMERGENCY_HARD_DEADLINE_MS
     const state = { lastStrikeAt: NOW - 60_000, lastStrikeProgressAt: progressAt }
