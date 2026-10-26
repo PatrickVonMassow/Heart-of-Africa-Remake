@@ -34928,3 +34928,9 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Observed problem: User order 23.10.2026 21:25 in a chat session without the batch lock: the decision card is settled (leave as is), so it must leave the board. The chat session cannot edit the board under the stand-down.
   Source: user request 23.10.2026 via the findings carrier, spec cut from bc2ccc868; approved: "ja".
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1433. A chat session's /clear converts the successor's pending spawn and takes the batch lock
+  Final state: a session the user opens for something else never converts a pending-spawn reservation meant for the launcher's successor; only the process whose pid the reservation names converts it, with or without the authorized marker, and the real successor takes over. A Vitest drives the measured sequence (handover, launcher spawn reserved, a foreign session's SessionStart) and asserts the foreign session stays out and the reservation survives for the successor.
+  Observed problem: 23.10.2026 13:54 handover, the launcher spawned the successor, ~13:55 a /clear in a chat window converted the reservation; the real successor did not find it (log 13:58: previous spawn did NOT take over). No headless batch ran, four requests stayed in the carrier, and the Stop guards forced batch work in the chat in a loop; worked around by a manual release(). Cause: scripts/batch-resume-hook.mjs:417 calls convertPendingSpawn with authorized:!!auth, and scripts/batch-singleton.mjs:2364 then lets any session without a pid match convert. Closed point 1053 only closed the bare acquire.
+  Source: two findings of 23.10.2026 13:58 and 14:00 in the findings carrier (chat session), merged into one point. Real blockade of the batch (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
