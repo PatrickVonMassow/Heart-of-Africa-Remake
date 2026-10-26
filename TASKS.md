@@ -86,14 +86,6 @@ put it is the mistake this line exists to stop.
   Source: split of point 1430 item 4, which no point in the repository could yet evidence.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; the next cloud point (1416) carries it.
-- [ ] 1416. Villagers at the fish-drying rack jitter in place
-  Queue position: directly after point 1414 (user decision 21.10.2026).
-  Source: user bug report hoa-state-2026-10-21-3318564123.zip (21:03:11Z), user words: "Die Figuren zittern herum."
-  Observed: in the Bambara village beach work site (fish-drying rack beside the fire shelter) two women in a deep twisted crouch jitter visibly in place instead of holding or moving smoothly through their work pose.
-  Final state: the villagers at the fish-drying rack hold a steady pose or move continuously; no frame-to-frame pose or position flicker on WebGPU and WebGL 2.
-  Verifiable: a Vitest over the rack workers' runtime pose asserts bounded frame-to-frame change of hips/hand positions across a full work cycle; a capture sequence of the rack shows no jitter, judged by a person.
-  Criticality: medium - visible in every visit to the beach work site.
-  Bundle: Dorfleben.
 - [ ] 1417. Fish-handling woman only rocks the fish, which clips through her clothing
   Queue position: directly after point 1414 (user decision 21.10.2026).
   Source: user bug report hoa-state-2026-10-21-3318564123 (1).zip (21:04:01Z), user words: "Was macht die da? Sie schaukelt den Fisch nur hin und her und dabei clippt er in ihre Kleidung rein und raus."

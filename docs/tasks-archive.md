@@ -34950,3 +34950,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Verifiable: unit tests in scripts/request-approval-guard-core.test.mjs: those three commands pass; a real non-canonical deposit is still refused.
   Bundle: Testinfrastruktur.
   Criticality: medium — a real blockade (CLAUDE.md §2 infrastructure-freeze exception): the guard blocks routine reading and the prescribed timestamp command in chat sessions.
+
+- [x] 1416. Villagers at the fish-drying rack jitter in place
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123.zip (21:03:11Z), user words: "Die Figuren zittern herum."
+  Observed: in the Bambara village beach work site (fish-drying rack beside the fire shelter) two women in a deep twisted crouch jitter visibly in place instead of holding or moving smoothly through their work pose.
+  Final state: the villagers at the fish-drying rack hold a steady pose or move continuously; no frame-to-frame pose or position flicker on WebGPU and WebGL 2.
+  Verifiable: a Vitest over the rack workers' runtime pose asserts bounded frame-to-frame change of hips/hand positions across a full work cycle; a capture sequence of the rack shows no jitter, judged by a person.
+  Criticality: medium - visible in every visit to the beach work site.
+  Bundle: Dorfleben.
