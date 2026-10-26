@@ -85,6 +85,7 @@ put it is the mistake this line exists to stop.
   3. The sha, handover text excerpt and acceptance log path are recorded in this point's closing note. No new machinery (CLAUDE.md §2 infrastructure freeze).
   Source: split of point 1430 item 4, which no point in the repository could yet evidence.
   Bundle: Session- & Repo-Hygiene.
+  Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; the next cloud point (1416) carries it.
 - [ ] 1416. Villagers at the fish-drying rack jitter in place
   Queue position: directly after point 1414 (user decision 21.10.2026).
   Source: user bug report hoa-state-2026-10-21-3318564123.zip (21:03:11Z), user words: "Die Figuren zittern herum."
@@ -15136,6 +15137,7 @@ to land than a mechanism that needs a review.
   Refs: `scripts/render-verify-recorder.mjs` (armed.uncaught, line ~737), `scripts/verify/run-logged.mjs`,
   `scripts/verify/polish.mjs`, the six run records above; deferred around once on 22.09.2026 for
   point 1157 (`render-verify-guard --defer`).
+  Further evidence (finding 26.10.2026): five polish-villagers runs on feat/1415 d3201e61c/e8e50941d (WebGPU 05:00, 05:22, 07:24; WebGL 2 08:24, 08:41) ended crashSource uncaught-exception after 0-38 screenshots, each log stopping at '# → polish-villagers running' with no thrown message kept.
 
 - [ ] 1179. A session that is waiting cannot declare its wait while it does closing work, and
   the attempt leaves the board unpublishable (measured 22.09.2026 during the closing duties of
