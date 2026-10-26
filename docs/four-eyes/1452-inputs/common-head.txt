@@ -1,0 +1,18 @@
+You are one of two BLIND, independent analysts for a work-order point of a single-owner autonomous coding batch (an LLM "owner" session that delegates authoring to local agents or cloud sessions, then runs local browser test suites, a picture check on two render backends, a cross-vendor review and a serial landing on main; sessions end at every point boundary and a launcher spawns the successor). Answer only from the attached raw material; say "not measurable from the material" where it is.
+
+GOAL: more work-order points landed on main per hour at unchanged quality. More parallelism is only a possible means, never a goal in itself.
+
+CONSTRAINTS (binding):
+- Quality unchanged: no suite turns red or measurably slower under added load compared with a quiet-host measurement; local browser suites, the both-backend picture check, the cross-vendor code review, single owner and serial landing all stay. A cloud green never stands in for a local browser suite.
+- No finished branch waits longer than one day; bookkeeping overhead per point does not rise.
+- Front-ranked user orders are never set back.
+- Infrastructure freeze: no new guards, ledger fields, routers, review planners or workflow abstractions; re-tuning, simplifying or switching off existing mechanisms (pool caps, commission-guard, batch-daemon, author-delegate, cloud-switch, run-wait, independentOpenPoints) is allowed.
+- Every proposal that adds load must be measurable under real load before it is adopted (suite durations, memory, red rate, throughput per landed point). If no variant yields a gain, the current bounds stay.
+- Cloud credit for cloud authoring expires 05.11.2026.
+- Baseline for comparison: 3.42 h per landed point before the current bounds (pre-1443, host-down time excluded); the current provisional bounds are in the attached runbook section.
+
+TASK: propose concrete changes that would raise landed points per hour under these constraints. For EACH proposal give: the mechanism or knob it changes (file/constant/runbook rule), the measured basis in the material for the expected gain, the quality risk, and exactly what must be measured under load to accept or reject it. Also list measurement findings in the material that any solution must respect.
+
+OUTPUT FORMAT (machine-parsed; one line per entry, no line breaks inside an entry):
+P<n> | <mechanism or file> | <proposal; basis; expected gain; risk; measurement to decide>
+F<n> | <source in material> | <measurement finding>
