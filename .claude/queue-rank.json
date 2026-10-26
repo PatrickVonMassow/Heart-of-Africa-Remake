@@ -1609,12 +1609,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1333": {
-      "at": "2026-10-08T21:05:41.599Z",
-      "why": "moved directly after 1330: same village-errands suite, pre-existing red on main",
-      "origin": "machine",
-      "place": "last"
-    },
     "1361": {
       "at": "2026-10-16T08:31:35.821Z",
       "why": "Blocks only non-owner head sessions' Stop; the owner batch is unaffected, so behind the hygiene points already queued is right",
@@ -1757,7 +1751,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-25T17:36:11.762Z",
+    "at": "2026-10-25T23:54:26.628Z",
     "points": [
       184,
       200,
@@ -2185,7 +2179,6 @@
       1291,
       1292,
       1296,
-      1297,
       1300,
       1301,
       1304,
@@ -2193,7 +2186,6 @@
       1309,
       1318,
       1328,
-      1333,
       1340,
       1341,
       1344,
@@ -2229,8 +2221,6 @@
       1435,
       1436,
       1437,
-      1443,
-      1444,
       1445,
       1447,
       1448
