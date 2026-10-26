@@ -94,6 +94,12 @@ import {
   TAKEOVER_OVERRIDE_MAX_MS,
   dispossessionNotice,
 } from './batch-lease-core.mjs'
+import {
+  consumesLaunchAuthorization,
+  sessionStartConversion,
+  sessionStartOwnership,
+  spawnTokenProof,
+} from './batch-resume-hook-core.mjs'
 
 const NOW = 1_784_900_000_000
 const BOOT = NOW - 12 * 3600 * 1000 // machine booted 12 h ago
@@ -1123,21 +1129,41 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(lock.kind).toBe('session')
   })
 
-  it('a foreign session start after a handover never converts the successor reservation, marker or not', () => {
-    // The measured sequence of 23.10.2026: the owner hands over and leaves, the
-    // launcher reserves the batch for the child it spawned, then a /clear in an
-    // unrelated chat fires SessionStart while the authorization marker exists.
+  it("a foreign session's SessionStart after a handover stands down and leaves the reservation to the successor", () => {
+    // The measured sequence of 23.10.2026, driven through the hook's ownership
+    // path: the owner hands over and leaves, the launcher reserves the batch for
+    // the child it spawned, then a /clear in an unrelated chat fires SessionStart
+    // while the launcher's authorization marker exists.
     acquire('owner-1', opts())
     expect(markHandover('owner-1', { lockPath, point: 1, now: NOW })).toMatchObject({ handed: true })
     release('owner-1', lockPath)
     acquire('launcher-1', opts({ kind: 'pending-spawn' }))
     expect(updateOwnLock('launcher-1', { spawnedPid: 555, pid: 555, pidStartedAt: NOW }, lockPath)).toBe(true)
+    const auth = { at: NOW, pid: 555, spawnToken: 'tok' }
+    const lastSpawn = { pid: 555, spawnToken: 'tok' }
+    const convert = (sid, o) => convertPendingSpawn(sid, { ...o, lockPath })
+    const sessionStart = (sessionId, sessionProcess) => {
+      const converted = sessionStartConversion({ sessionId, lock: readOwnerLock(lockPath), sessionProcess, convert })
+      const plan = sessionStartOwnership({
+        converted,
+        heldHere: !converted && ownsLock(sessionId, { lock: readOwnerLock(lockPath) }).mine,
+        spawnProof: spawnTokenProof({ auth, lastSpawn, ancestorPid: sessionProcess?.pid }),
+        auth,
+      })
+      const ownership = converted ? 'acquired-spawn' : 'none'
+      return { converted, plan, consumes: consumesLaunchAuthorization({ ownership, invitation: plan.invitation }) }
+    }
 
-    expect(convertPendingSpawn('chat-window', { lockPath, pid: 777, authorized: true })).toBe(false)
-    expect(convertPendingSpawn('chat-window', { lockPath, findAncestorFn: () => null, authorized: true })).toBe(false)
-    expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'launcher-1', kind: 'pending-spawn', spawnedPid: 555 })
+    for (const foreign of [{ pid: 777, startedAt: NOW }, null]) {
+      const r = sessionStart('chat-window', foreign)
+      expect(r).toMatchObject({ converted: false, consumes: false })
+      expect(r.plan).toMatchObject({ invitation: null, mayAcquire: false })
+      expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'launcher-1', kind: 'pending-spawn', spawnedPid: 555 })
+    }
 
-    expect(convertPendingSpawn('successor', { lockPath, pid: 555 })).toBe(true)
+    const succ = sessionStart('successor', { pid: 555, startedAt: NOW })
+    expect(succ).toMatchObject({ converted: true, consumes: true })
+    expect(succ.plan.invitation).toBe('pending-spawn')
     expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'successor', kind: 'session', pid: 555 })
   })
 

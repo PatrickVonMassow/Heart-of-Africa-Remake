@@ -268,6 +268,18 @@ export function standDownMessage({
 }
 
 /**
+ * CONVERT THE LAUNCHER'S RESERVATION AT SESSION START. `convert` is the
+ * singleton's convertPendingSpawn (injected so a test drives the hook's own
+ * path). Only this session's claude process identity is offered: the
+ * reservation converts solely for the pid it names, never on the launcher's
+ * authorization marker (23.10.2026: a /clear in a chat window took the batch).
+ */
+export function sessionStartConversion({ sessionId, lock = null, sessionProcess = null, convert } = {}) {
+  if (!lock || lock.kind !== 'pending-spawn') return false
+  return convert(sessionId, { findAncestorFn: () => sessionProcess }) === true
+}
+
+/**
  * DOES A SPAWNED SUCCESSOR PROVE ITS LAUNCH WITHOUT ITS RESERVATION? PURE.
  *
  * The launcher writes one spawn token to the one-shot authorization marker
