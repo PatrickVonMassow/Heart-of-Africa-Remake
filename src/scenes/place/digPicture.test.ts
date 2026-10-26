@@ -5,7 +5,7 @@ import { setupGeodata } from '../../test/geodata'
 import { standingClear } from './collision'
 import { EYE_HEIGHT } from './roofClearance'
 import { digFurnitureFootprints } from './digSiteAppearance'
-import { digLocalToWorld, spoilOffset, placeGroundHeight } from './placeGround'
+import { digFurnitureColliders, digLocalToWorld, spoilOffset, placeGroundHeight } from './placeGround'
 // @ts-expect-error The verification driver is plain JS, also loaded by Node.
 import { DIG_PICTURE, digPictureView } from '../../../scripts/verify/digSitePicture.mjs'
 
@@ -20,13 +20,17 @@ it('keeps the picture fixture walkable, distinct, and in a standing camera proje
   camera.position.set(view.x, EYE_HEIGHT, view.z)
   camera.rotation.set(view.pitch, view.yaw, 0, 'YXZ')
   camera.updateMatrixWorld(true)
+  // The sight lines run over the knee-high set-down props (point 1418), so
+  // those are left out of the line-of-sight check.
+  const props = l.digSites.flatMap(digFurnitureColliders).map((c) => JSON.stringify(c))
+  const sightColliders = l.colliders.filter((c) => !props.includes(JSON.stringify(c)))
   for (const site of l.digSites) {
     const features = [{ x: 0, z: 0, radius: 1.3 }, ...digFurnitureFootprints(site.kind)]
     for (const f of features) {
       const p = digLocalToWorld(site, f.x, f.z)
       for (let i = 0; i <= 20; i++) {
         const u = i / 20
-        expect(standingClear(l.colliders, view.x + (p.x - view.x) * u, view.z + (p.z - view.z) * u, 0.05)).toBe(true)
+        expect(standingClear(sightColliders, view.x + (p.x - view.x) * u, view.z + (p.z - view.z) * u, 0.05)).toBe(true)
       }
       for (const dx of [-f.radius, f.radius]) for (const dz of [-f.radius, f.radius]) {
         const pt = digLocalToWorld(site, f.x + dx, f.z + dz)
