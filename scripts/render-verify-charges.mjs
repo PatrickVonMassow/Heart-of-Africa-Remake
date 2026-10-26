@@ -121,6 +121,16 @@ export const RED_CHARGES = [
     why: 'Full WebGPU polish-villagers run on feat/1446-dress-gpu-process-loss 957968566, 25.10.2026 (log 07-06-50-791): his first steps 7.67 m/s against the 6 m/s bound, the same red (b) point 1435 owns on WebGL 2; also red in the full WebGPU runs of 23.10. and 25.10.2026 03:40. The charge dies with it.',
   },
   {
+    point: 1435,
+    suite: 'polish-villagers',
+    kind: 'check',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /water stand table: the empty jar is taken up from the plank/i,
+    detailMatch: /jar lifted 0\.\d+ m off the plank before it is in his hand/i,
+    why: 'Full WebGPU polish-villagers runs on feat/1415 d3201e61c, 26.10.2026 (logs 05-52-03-752, 06-39-00-663): jar lifted 0.24-0.28 m off the plank before it is in his hand; equally red on the merge-base d034d5550. The charge dies with it.',
+  },
+  {
     point: 1340,
     suite: 'polish-children',
     kind: 'check',
