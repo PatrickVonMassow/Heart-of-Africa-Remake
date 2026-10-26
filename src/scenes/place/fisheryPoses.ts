@@ -63,18 +63,34 @@ export function blendPose(into: FigurePose, a: FigurePose, b: FigurePose, t: num
   into.turn = mix(a.turn, b.turn)
 }
 
+/** How far out a rack worker's posed hand is solved, as a share of her drawn
+ *  arm: a bent arm the standing body reaches. Without it the skinned body
+ *  crouched for the primitive's straight arm and re-chose that crouch every
+ *  frame — the jitter of point 1416. */
+const RACK_REACH = 0.85
+/** Seconds over which the eating arm comes up from rest and goes back. */
+const EAT_EASE_SECONDS = 0.4
+
 /** What a woman of the pounding pair does with her arms away from the mortar
- *  (point 1282): reaching to the rack, eating the fish she took, else at rest. */
+ *  (point 1282): reaching to the rack, eating the fish she took, else at rest.
+ *  Each starts and ends at rest, so the phases join without a jump (point 1416). */
 export function rackPose(
   duo: Pick<PoundingDuo, 'phase' | 'clock' | 'women'>,
   woman: number,
   cfg: FireConfig = balance.villageLife.fishFire,
 ): FigurePose {
-  if (duo.phase === 'take') return reachPose(0, 0.3 * Math.sin(Math.PI * Math.min(1, duo.clock / cfg.takeSeconds)))
-  if (duo.phase === 'eat' && duo.women[woman].fish > 0) {
-    return { left: armAim(0.35, -0.55 + 1.35 * biteLift(duo, cfg, woman)), right: { ...REST_POSE.right }, lean: 0.04, turn: 0 }
+  const rest = ownPose(REST_POSE)
+  if (duo.phase === 'take') {
+    const s = Math.sin(Math.PI * Math.min(1, duo.clock / cfg.takeSeconds))
+    blendPose(rest, REST_POSE, reachPose(0, 0.3 * s), s)
+    rest.reach = { left: RACK_REACH, right: RACK_REACH }
+  } else if (duo.phase === 'eat' && duo.women[woman].fish > 0) {
+    const e = Math.max(0, Math.min(1, duo.clock / EAT_EASE_SECONDS, (cfg.eatSeconds - duo.clock) / EAT_EASE_SECONDS))
+    const eat = { left: armAim(0.35, -0.55 + 1.35 * biteLift(duo, cfg, woman)), right: REST_POSE.right, lean: 0.04, turn: 0 }
+    blendPose(rest, REST_POSE, eat, e)
+    rest.reach = { left: RACK_REACH }
   }
-  return { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: REST_POSE.lean, turn: REST_POSE.turn }
+  return rest
 }
 
 /** How far down he goes as he lifts or sets the basket ashore (fraction of his height). */
