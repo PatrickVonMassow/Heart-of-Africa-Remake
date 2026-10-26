@@ -81,6 +81,9 @@ import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
 import { isLifeFrozen } from './lifeFreeze'
+import { figureSnapshot, loadsUnder, objectSnapshot, shownInScene, usePlaceDumpProvider } from './placeDumpRead'
+import { PlaceDumpGroup } from './PlaceDumpGroup'
+import type { PlaceFigureSnapshot, PlaceObjectSnapshot } from '../../systems/placeDump'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import {
   absorbSeparation,
@@ -1896,7 +1899,7 @@ function Porters({
         >
           <Figure cloth={cloth[i % cloth.length]} pose={carry} role="porter" />
           {/* Carried crate */}
-          <mesh position={[0, 1.05, 0.3]} castShadow>
+          <mesh name="porter-crate" position={[0, 1.05, 0.3]} castShadow>
             <boxGeometry args={[0.45, 0.35, 0.35]} />
             <meshStandardMaterial color="#7a5a32" roughness={0.9} />
           </mesh>
@@ -2483,7 +2486,10 @@ function Walkers({
   radius,
   bank,
   observed,
+  dumpId = 'walkers',
 }: {
+  /** Its vignette id in the bug-report dump. */
+  dumpId?: string
   seed: number
   homes: HomeDef[]
   errands: Array<[number, number]>
@@ -2545,6 +2551,27 @@ function Walkers({
     }),
     [colliders],
   )
+
+  // The walkers for the bug-report dump (placeDump.ts): where each is in its
+  // round and the load on its head.
+  usePlaceDumpProvider(dumpId, () => {
+    const figures: PlaceFigureSnapshot[] = []
+    const objects: PlaceObjectSnapshot[] = []
+    states.current.forEach((st, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      const id = `${dumpId}/${i}`
+      figures.push(figureSnapshot(g, {
+        id,
+        role: 'walker',
+        phase: st.mode,
+        action: st.pause > 0 ? 'pause' : st.mode === 'inside' ? null : 'walk',
+        extra: { carries: defs[i]?.carries ?? false, seg: st.seg, route: st.route.length, timer: st.timer, stuck: st.stuck },
+      }))
+      objects.push(...loadsUnder(g, id))
+    })
+    return { kind: 'walkers', figures, objects }
+  })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   const heldWalker = useRef<number | null>(null)
@@ -2748,7 +2775,7 @@ function Walkers({
             headSteady={def.carries ? steadiedLoad('basket', { ...WALKER_BASKET }) : null}
             headProp={
               def.carries ? (
-                <mesh position={[0, WALKER_BASKET.height / 2, 0]} castShadow>
+                <mesh name="head-basket" position={[0, WALKER_BASKET.height / 2, 0]} castShadow>
                   <cylinderGeometry args={[WALKER_BASKET.top, WALKER_BASKET.bottom, WALKER_BASKET.height, 8]} />
                   <meshStandardMaterial color="#a3702e" roughness={0.95} />
                 </mesh>
@@ -3462,6 +3489,50 @@ function ErrandVillagers({
       }
     }
   }
+
+  // The errands for the bug-report dump (placeDump.ts), in every build: each
+  // villager's task and carry, the jars on heads, in hands and on the stand,
+  // and the dig sites' progress.
+  usePlaceDumpProvider('errands', () => {
+    const figures: PlaceFigureSnapshot[] = []
+    const objects: PlaceObjectSnapshot[] = []
+    people.forEach((p, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      const id = `errands/${i}`
+      const task = taskOf(work, i)
+      figures.push(figureSnapshot(g, {
+        id,
+        role: 'villager',
+        phase: task ? task.phase : p.free ? 'free' : 'idle',
+        action: task ? task.situation : null,
+        extra: {
+          carry: carryOf(work, i),
+          digging: isDigging(work, i, view),
+          ...(task ? { siteIndex: task.siteIndex, target: { x: task.x, z: task.z }, arrived: task.arrived, partner: task.partner, progress: task.dug } : {}),
+        },
+      }))
+      objects.push(...loadsUnder(g, id))
+    })
+    standJars.current.forEach((jar, k) => {
+      if (jar && shownInScene(jar)) objects.push(objectSnapshot(jar, { id: `errands/stand-jar/${k}`, kind: 'jar-full', holder: 'water-stand' }))
+    })
+    if (spareJar.current && shownInScene(spareJar.current)) {
+      objects.push(objectSnapshot(spareJar.current, { id: 'errands/stand-jar/spare', kind: 'jar-empty', holder: 'water-stand' }))
+    }
+    const dug = digProgressOf(work, geography.digSites.length)
+    return {
+      kind: 'errand-villagers',
+      state: {
+        staged: { ...work.staged },
+        standJars: work.standJars,
+        waterStand: geography.waterStand,
+        digSites: geography.digSites.map((d, k) => ({ ...d, ...dug[k] })),
+      },
+      figures,
+      objects,
+    }
+  })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): what the adults
   // have said this visit, and what each of them is doing about it.
@@ -4286,23 +4357,31 @@ export function PlaceLife({
       <FigureLookContext.Provider value={figureLook}>
           <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
-            <Kids
-              childBodies={childBodies}
-              x={ground.x}
-              z={ground.z}
-              playRadius={ground.radius}
-              count={kidCount}
-              seed={localSeed}
-              cloth={style.cloth}
-              colliders={colliders}
-              radius={radius}
-              stage={null}
-              bank={bank}
-              observed={observed}
-            />
-            <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
-            <Traders seed={localSeed} cloth={style.cloth} />
-            <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
+            <PlaceDumpGroup id="kids" kind="kids">
+              <Kids
+                childBodies={childBodies}
+                x={ground.x}
+                z={ground.z}
+                playRadius={ground.radius}
+                count={kidCount}
+                seed={localSeed}
+                cloth={style.cloth}
+                colliders={colliders}
+                radius={radius}
+                stage={null}
+                bank={bank}
+                observed={observed}
+              />
+            </PlaceDumpGroup>
+            <PlaceDumpGroup id="porters" kind="porters">
+              <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
+            </PlaceDumpGroup>
+            <PlaceDumpGroup id="traders" kind="traders">
+              <Traders seed={localSeed} cloth={style.cloth} />
+            </PlaceDumpGroup>
+            <PlaceDumpGroup id="talkers" kind="talkers">
+              <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
+            </PlaceDumpGroup>
             <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
@@ -4317,33 +4396,39 @@ export function PlaceLife({
       <FigureLookContext.Provider value={figureLook}>
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
-          <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+          <PlaceDumpGroup id="cook" kind="cook">
+            <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+          </PlaceDumpGroup>
           <DressLineup cloth={style.cloth} />
           {loom && (
-            <Loom
-              key={`loom-${placeId}`}
-              placeId={placeId}
-              station={loom}
-              cloth={style.cloth[1 % style.cloth.length]}
-              weave={style.bandColor}
-              childBodies={childBodies}
-            />
+            <PlaceDumpGroup id="loom" kind="loom">
+              <Loom
+                key={`loom-${placeId}`}
+                placeId={placeId}
+                station={loom}
+                cloth={style.cloth[1 % style.cloth.length]}
+                weave={style.bandColor}
+                childBodies={childBodies}
+              />
+            </PlaceDumpGroup>
           )}
           {(!bank || bankStage) && (
-            <Kids
-              childBodies={childBodies}
-              x={ground.x}
-              z={ground.z}
-              playRadius={ground.radius}
-              count={kidCount}
-              seed={localSeed}
-              cloth={style.cloth}
-              colliders={colliders}
-              radius={radius}
-              stage={bankStage}
-              bank={bank}
-              observed={observed}
-            />
+            <PlaceDumpGroup id="kids" kind="kids">
+              <Kids
+                childBodies={childBodies}
+                x={ground.x}
+                z={ground.z}
+                playRadius={ground.radius}
+                count={kidCount}
+                seed={localSeed}
+                cloth={style.cloth}
+                colliders={colliders}
+                radius={radius}
+                stage={bankStage}
+                bank={bank}
+                observed={observed}
+              />
+            </PlaceDumpGroup>
           )}
           {/* Adults teach RIVER and DIG through water errands and paired digging. */}
           <ErrandVillagers
@@ -4363,37 +4448,49 @@ export function PlaceLife({
           />
           {/* The fisherman's dugout beside the children's bank game (work-order 1237). */}
           {bank && <RiverFishery key={`fishery-${placeId}`} bank={bank} cloth={[2, 0, 1, 3, 4].map((k) => style.cloth[k % style.cloth.length])} seed={localSeed} fireEnv={fisheryFire} />}
-          <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
+          <PlaceDumpGroup id="goats" kind="goats">
+            <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
+          </PlaceDumpGroup>
           <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           {/* Inhabitant/prop interactions (design.md §19). */}
-          <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
-          <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
+          <PlaceDumpGroup id="fire-tender" kind="fire-tender">
+            <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
+          </PlaceDumpGroup>
+          <PlaceDumpGroup id="talkers" kind="talkers">
+            <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
+          </PlaceDumpGroup>
           {/* A riverside village's pair pounds by the fishers' fire (RiverFishery, point 1282). */}
           {!bank && <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={[style.cloth[0], style.cloth[3 % style.cloth.length]]} />}
-          <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
+          <PlaceDumpGroup id="drummer" kind="drummer">
+            <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
+          </PlaceDumpGroup>
           {hasWell && <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />}
           {homes.length > 0 && (
-            <TaskWalker
-              home={homes[0]}
-              target={[firePos[0] + 0.7, firePos[1] + 1.8]}
-              cloth={style.cloth[0]}
-              carry="bundle"
-              colliders={colliders}
-              startDelay={4}
-            />
+            <PlaceDumpGroup id="task-walker-bundle" kind="task-walker-bundle">
+              <TaskWalker
+                home={homes[0]}
+                target={[firePos[0] + 0.7, firePos[1] + 1.8]}
+                cloth={style.cloth[0]}
+                carry="bundle"
+                colliders={colliders}
+                startDelay={4}
+              />
+            </PlaceDumpGroup>
           )}
           {/* The jar carrier belongs to the well. Where there is none, every jar
               journey is the errand adults' on the water path (point 1087) and
               no silent third carrier walks beside the teaching. */}
           {hasWell && homes.length > 1 && (
-            <TaskWalker
-              home={homes[1]}
-              target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
-              cloth={style.cloth[1 % style.cloth.length]}
-              carry="jar"
-              colliders={colliders}
-              startDelay={9}
-            />
+            <PlaceDumpGroup id="task-walker-jar" kind="task-walker-jar">
+              <TaskWalker
+                home={homes[1]}
+                target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
+                cloth={style.cloth[1 % style.cloth.length]}
+                carry="jar"
+                colliders={colliders}
+                startDelay={9}
+              />
+            </PlaceDumpGroup>
           )}
         </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>

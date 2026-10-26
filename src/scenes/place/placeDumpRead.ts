@@ -33,6 +33,8 @@ export const PLACE_DUMP_LOADS: readonly string[] = [
   'stand-jar',
   'stand-jar-empty',
   'fish-basket',
+  'head-basket',
+  'porter-crate',
 ]
 
 const _v = new THREE.Vector3()
@@ -155,6 +157,21 @@ export function scanVignette(
     return objectSnapshot(o, { id: `${prefix}/${o.name}/${j}`, holder: (h && idOf.get(h)) ?? 'ground' })
   })
   return { figures: figureEntries, objects: objectEntries }
+}
+
+/** Every visible named load under one figure's node, held by `holder`;
+ *  ids `<holder>/<name>/<j>`. */
+export function loadsUnder(node: THREE.Object3D, holder: string): PlaceObjectSnapshot[] {
+  const out: PlaceObjectSnapshot[] = []
+  const perName = new Map<string, number>()
+  node.updateWorldMatrix(true, true)
+  node.traverse((o) => {
+    if (!PLACE_DUMP_LOADS.includes(o.name) || !shownInScene(o)) return
+    const j = perName.get(o.name) ?? 0
+    perName.set(o.name, j + 1)
+    out.push(objectSnapshot(o, { id: `${holder}/${o.name}/${j}`, holder }))
+  })
+  return out
 }
 
 /** Registers `fn` as the dump provider `id` while the calling component is
