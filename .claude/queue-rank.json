@@ -1722,6 +1722,12 @@
       "why": "a suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the guard honest meanwhile",
       "origin": "machine",
       "place": "last"
+    },
+    "1452": {
+      "at": "2026-10-26T20:09:58.538Z",
+      "why": "User order 26.10.2026: front of the queue, never deferred for a pulled-forward point",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1751,7 +1757,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-26T15:50:13.792Z",
+    "at": "2026-10-26T20:09:58.554Z",
     "points": [
       184,
       200,
@@ -2220,7 +2226,7 @@
       1448,
       1449,
       1450,
-      1451
+      1452
     ]
   }
 }

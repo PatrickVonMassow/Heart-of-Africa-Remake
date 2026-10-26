@@ -41,7 +41,7 @@ import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryM
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
 import { rainAmount } from '../../systems/season'
-import { blendPose, CARRIER_BASKET_Y, carrierWalkPose, copyPose, netFishRotation, netManAshore, netManBasketAt, ownPose, placeNetMan, reachPose } from './fisheryPoses'
+import { CARRIER_BASKET_Y, carrierPose, carrierWalkPose, copyPose, GUT_FISH_SCALE, holdGutFish, netFishRotation, netManAshore, netManBasketAt, ownPose, placeNetMan, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
@@ -333,7 +333,6 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
   // villagers", from point 350) — never a second, kneeling figure swapped in.
   const carrierDown = useRef(false)
   const carrierKneelK = useRef(0)
-  const carrierCutPose = useRef<FigurePose>({ ...REST_POSE })
   const gutFish = useRef<THREE.Mesh>(null)
   const grillerG = useRef<THREE.Group>(null)
   const grillerPose = useRef<FigurePose | null>({ ...REST_POSE })
@@ -561,14 +560,13 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     }
     const cw = carrierWalkPoseRef.current
     if (cw) {
-      const cut = Math.sin(t * 7)
-      copyPose(carrierCutPose.current, { left: armAim(0.25, -0.75 + 0.18 * cut), right: armAim(-0.2, -0.7), lean: 0.35, turn: 0 })
-      blendPose(cw, carrierWalkPose(c.phase, c.clock, fireCfg.liftSeconds), carrierCutPose.current, carrierKneelK.current)
+      carrierPose(cw, carrierWalkPose(c.phase, c.clock, fireCfg.liftSeconds), carrierKneelK.current, t)
       applyFigurePose(carrierWalkLimbs.current, cw)
     }
     if (gutFish.current) {
       const basket = ring.baskets.find((b) => b.at === 'fire')
       gutFish.current.visible = kneeling && !!basket && basket.fish > 0 && c.clock > fireCfg.liftSeconds
+      if (gutFish.current.visible && carrierWalk.current) holdGutFish(gutFish.current, carrierWalk.current)
     }
     boardFish.current.forEach((m, i) => {
       if (m) m.visible = i < fire.board
@@ -1031,7 +1029,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
           gait={carrierGait}
           kneeling={carrierDown}
           handProp={
-            <mesh ref={gutFish} geometry={fishGeometry} material={materials.fresh} rotation={[0, 0, Math.PI / 2]} scale={0.3} visible={false} />
+            <mesh ref={gutFish} geometry={fishGeometry} material={materials.fresh} scale={GUT_FISH_SCALE} visible={false} />
           }
         />
       </group>

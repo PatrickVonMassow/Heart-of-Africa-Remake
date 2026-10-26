@@ -149,6 +149,11 @@ export interface FigurePose {
    *  without it a pose with a reach leans by its own lean alone. A number is
    *  that lean-in's share (true = 1), so a blend between poses eases it. */
   reach?: { left?: number; right?: number; lunge?: boolean | number }
+  /** Where a reached hand's elbow points (glTF body), in the chest's own
+   *  frame (absent: out, down and back): a hand brought up close in front of
+   *  the face needs its elbow down in front, or the solve raises it beside
+   *  the head (point 1450). */
+  elbow?: { left?: [number, number, number]; right?: [number, number, number] }
   /** The glTF body's own pose where it differs from this one, which the
    *  primitive figure keeps (the low preset untouched, natural-villager-motion
    *  constraint 7): applyFigurePose writes it onto a skinned figure's pivots. */
@@ -161,6 +166,10 @@ export interface ShoulderPose {
   elevation: number
 }
 
+/** Where a reached LEFT hand's elbow points by default, in the chest's
+ *  frame (glTF body; the right arm's mirrors x): out, down and back. */
+export const ELBOW_DEFAULT: readonly [number, number, number] = [0.5, -0.4, -1]
+
 /** Carry the pose's optional parts (the hand shapes) from `from` onto
  *  `into`, for a caller that copies the arms, lean and turn field by field. */
 export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
@@ -168,6 +177,7 @@ export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
   into.shoulders = from.shoulders
   into.gaze = from.gaze
   into.reach = from.reach
+  into.elbow = from.elbow
   into.body = from.body
 }
 

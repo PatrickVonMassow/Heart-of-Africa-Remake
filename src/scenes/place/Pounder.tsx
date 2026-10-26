@@ -21,7 +21,7 @@ import { useStandingBodies } from './placeFigureContext'
 import { placePlayerPosition } from './playerPosition'
 import { speechBearing } from './speechBearing'
 import { isLifeFrozen } from './lifeFreeze'
-import { rackPose } from './fisheryPoses'
+import { holdFishAcross, rackPose } from './fisheryPoses'
 import { figureSnapshot, objectSnapshot, shownInScene, usePlaceDumpProvider } from './placeDumpRead'
 import type { PlaceFigureSnapshot, PlaceObjectSnapshot } from '../../systems/placeDump'
 import {
@@ -52,6 +52,8 @@ function pestleProfile(length: number, r: number): THREE.Vector2[] {
 const UP = new THREE.Vector3(0, 1, 0)
 /** The most women `villageLife.mortar.pounders` can put at one mortar. */
 const MAX_POUNDERS = 2
+/** The length of the smoked fish a woman takes from the rack (m). */
+const EATEN_FISH_SCALE = 0.3
 
 /** Dev/verify probe of the pounding (read by the place verification). */
 export interface PoundingProbe {
@@ -149,7 +151,7 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn, dumpId = 'pounder
   const gaits = useRef(Array.from({ length: MAX_POUNDERS }, () => ({ current: 0 })))
   const figures = useRef<Array<THREE.Group | null>>([])
   const pestles = useRef<Array<THREE.Mesh | null>>([])
-  const fish = useRef<Array<THREE.Group | null>>([])
+  const fish = useRef<Array<THREE.Mesh | null>>([])
   const grains = useRef<Array<Array<THREE.Mesh | null>>>(Array.from({ length: MAX_POUNDERS }, () => []))
   const chaff = useRef<Array<THREE.Mesh | null>>([])
   const seen = useRef(Array.from({ length: MAX_POUNDERS }, () => 0))
@@ -275,7 +277,8 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn, dumpId = 'pounder
       const held = fish.current[i]
       if (held) {
         held.visible = woman.fish > 0
-        held.scale.set(1, 1, Math.max(0.15, woman.fish))
+        // level and across before her, what is left of it, whatever the hand's own turn
+        if (held.visible && figure) holdFishAcross(held, figure, EATEN_FISH_SCALE, 0, Math.max(0.15, woman.fish))
       }
       const since = womanSinceImpact(duo, i)
       grains.current[i].forEach((g, k) => {
@@ -339,9 +342,7 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn, dumpId = 'pounder
               gait={gaits.current[i]}
               legs
               handProp={
-                <group ref={(el) => { fish.current[i] = el }} visible={false}>
-                  <mesh geometry={fishGeometry} material={fishMaterial} rotation={[Math.PI / 2, 0, 0]} scale={0.3} />
-                </group>
+                <mesh ref={(el) => { fish.current[i] = el }} geometry={fishGeometry} material={fishMaterial} scale={EATEN_FISH_SCALE} visible={false} />
               }
             />
           </group>

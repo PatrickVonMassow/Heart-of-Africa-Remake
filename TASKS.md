@@ -77,6 +77,42 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1452. Raise batch throughput through measured parallelisation, cloud authors included, without losing quality (six eyes)
+  Rank: front of the queue (user order 26.10.2026). Never deferred in favour of a pulled-forward point.
+  Goal: more points landed on main per hour at unchanged quality. More parallelism is only the means, never a goal in itself ("nicht um jeden Preis mehr Parallelisierung, sondern eine schnellere Abarbeitung der Batch bei trotzdem gewährleisteter Qualität").
+  Procedure: six eyes with final check (memory six-eyes-with-final-check). Nothing is implemented before step 6 has approved the plan.
+  1. Measured inventory. From the logs of the last days (at least 10 landed points) measure where a point spends its time: commission, authoring, waiting, acceptance (suites, picture check, review), main sync, landing. Name the real bottleneck and the idle times. Result: a table under docs/.
+  2. Solution search, blind-parallel. Model A (Claude lane) and model B (cross lane, currently GPT-6.1 Sol) work out solutions independently from identical inputs. B starts WITHOUT prior knowledge: only the neutral goal, the constraints and the raw material; B never sees this point text's candidate list nor the chat interpretation it came from. At least examine:
+     - more cloud authors, together with whether local acceptance can absorb their branches at all;
+     - pool and waiting branches, including whether stale branches (e.g. 1347) block slots;
+     - whether the number of open branches is a good criterion for limiting free slots at all: POOL_CAP and "at most 1 finished branch waiting" may prevent parallelism unnecessarily often (stale or collision-free branches occupying slots without loading acceptance). Measure alternatives such as acceptance capacity, host load, branches actually waiting for acceptance, and main-sync conflict risk instead of the bare branch count;
+     - shortening acceptance per point (only the truly covering suites; second backend only when isBackendSensitivePath applies);
+     - two local suites at once (separate ports, memory budget) and the cause of the two overlapped reds of 23.10;
+     - acceptance steps that may move to the cloud without breaking "cloud green never stands in for a browser suite";
+     - per-point bookkeeping overhead that can be dropped.
+  3. Merge. A third, distinct model checks both proposals thoroughly and merges them via scripts/blind-merge.mjs; disagreements are resolved with reasons, not by union.
+  4. Final check. A model of the OTHER vendor than the merger checks the merged plan focused on "does this break anything". Objections are fixed and re-checked before implementation.
+  5. Measure directly, not later. Every solution that adds load is measured under real load inside this point, before the decision: suite durations, memory, red rate, throughput versus pre-1443 (3.42 h per point) and versus the 1444 bounds. Nothing is deferred.
+  6. Implement what the measurement supports: new bounds in docs/batch-owner-runbook.md and, if needed, DAEMON_POOL_CAP / POOL_CAP. Infrastructure freeze: no new guards or workflow abstractions; re-tuning, simplifying or switching off existing ones is allowed. The implementation gets the usual cross-vendor code review.
+  7. Pull points forward for parallelism. A free slot is filled with the frontmost queue point that does not collide with the running points, even if it stands far back. Example: 3 slots free, entries 1-3 work on the same corner, entries 4 and 5 on entirely different ones: then 1, 4 and 5 run in parallel.
+     - Collision is decided by the existing independentOpenPoints (same files / subsystem); check whether it already searches beyond the head of the queue and, if not, tune it without new machinery.
+     - Within a colliding group the queue order is kept; a pulled-forward point never displaces a front point that becomes free.
+     - Front-ranked user orders (this point included) are never set back for a pulled-forward point.
+     - No cloud author and no free slot idles while a fitting, ready point stands anywhere in the queue; the step-8 guardrails still apply (local acceptance must be able to absorb the extra branch).
+  8. Guardrails = acceptance conditions:
+     - no suite turns red or measurably slower under the load, compared with a quiet-host measurement;
+     - no finished branch waits longer than one day;
+     - bookkeeping overhead per point does not rise;
+     - throughput demonstrably rises over a measured cycle of at least 3 points;
+     - if no variant yields a gain, the bounds stay as they are and the result is recorded with its reasons.
+  Addendum (merged per its own text): Addendum to the waiting request "Raise batch throughput through measured parallelisation, cloud authors included, without losing quality (six eyes)" (deposited 26.10.2026 19:57). Merge into that point's spec; it is not a point of its own.
+  Option 1 (user decision 26.10.2026 20:18): the point stays at the front of the queue and does NOT wait for the end of the 1444 measured cycle (due ~28.10.2026 00:43). Its step-1 inventory starts from the data of that cycle collected so far as baseline (since the 1444 landing 26.10.2026 00:43: 7 landed points, about 2.4 h per point, three cloud-authored points 1433/1451/1418; only 2 of the 7 are game points, so the figure is likely flattering) and states that limitation. It also covers what is new versus 1444: pulling points forward across the queue, the open-branch count as a slot criterion, and immediate measurement.
+  Source: user order 26.10.2026 (findings carrier request 18:57, approved "Ja, nimm die Nachkontrolle mit dazu. So freigegeben."; addendum 19:20, approved "ja").
+  Owner hint (user decision 26.10.2026 21:26), no new point and no spec change to 1452 or 1436:
+  Accept the waiting cloud-authored branch feat/1418-basket-collision locally DURING 1452's analysis phase (its blind halves run in the cloud / cross lane and barely load the host), so 1418 carries the evidence of point 1436 (cloud gate flow without a repeated local build/lint/unit layer) while 1452 proceeds. 1452 keeps its front rank and does not wait for 1418. Feed 1436's outcome into 1452's step-1 inventory (whether cloud green can replace the local unit layer in acceptance).
+  Input finding (26.10.2026 19:09, carrier): the launcher took the batch lock from a live owner judged pid-reused — SessionStart reported 'owner lock assessed inactive (pid-reused)' and the predecessor child dead (pid 4083038), yet the predecessor claude -p session pid 4006293 was alive and blocking on a polish-villagers suite for point 1417 (batch-in-flight --agent-check said 'alive' for the same worktree); a second batch session got the lock mid-verification. Step 1 counts this as a parallel-session cost; a fix stays under the infrastructure freeze (CLAUDE.md §2: possible double owner = real blockade).
+  Input finding (26.10.2026 20:56, carrier): owner session 1cf5b053 delegated the 1450 eating-pose fix to a local Agent in worktree point-1417 without reading the 1417 cloud session log; the cloud session had already pushed 4133642/6933d7a, the local push was rejected non-fast-forward, ~180k agent tokens wasted, no damage. Lesson for step 1: read the point's cloud session log (local/<N>-fix-send.log, RemoteTrigger get_run_log) before commissioning a fix.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
@@ -87,20 +123,6 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 1417. Fish-handling woman only rocks the fish, which clips through her clothing
-  Queue position: directly after point 1414 (user decision 21.10.2026).
-  Source: user bug report hoa-state-2026-10-21-3318564123 (1).zip (21:04:01Z), user words: "Was macht die da? Sie schaukelt den Fisch nur hin und her und dabei clippt er in ihre Kleidung rein und raus."
-  Observed: a kneeling woman beside a board near the fire shelter only rocks a fish back and forth; the fish passes in and out of her wrap skirt.
-  Final state: the fish work reads as a recognizable task (e.g. cleaning/gutting the fish on the board) and the fish never intersects her body or clothing in any phase.
-  Verifiable: a Vitest asserts fish-to-body clearance over the whole work cycle; a capture of the kneeling woman shows a readable task without clipping, judged by a person.
-  Criticality: medium - visible at the beach work site.
-  Bundle: Dorfleben.
-- [ ] 1450. Rack women's eating gesture lifts the hand over the head instead of to the mouth
-  Final state: during the eat phase at the Bambara fish rack the hand holding the fish comes to the mouth, never above the head, on WebGPU and WebGL 2.
-  Verifiable: a Vitest over `rackPose` bounds the eating hand's height to the mouth band across the whole eat cycle; a capture sequence of the rack, judged by a person, shows the bite at the mouth.
-  Observed problem: at the point-1416 picture check (26.10.2026, both backends, seed 42, frames local/1416-seq-webgpu and local/1416-seq-webgl, sheets local/1416-sheet-*-a.png) each pounding woman raises her left forearm onto/behind the top of her head; the bite reads as scratching the head. Pose source: the eat branch of `rackPose` in src/scenes/place/fisheryPoses.ts (armAim(0.35, -0.55+1.35*biteLift), reach 0.85). Whether 1416's bent-arm reach introduced it is not measured.
-  Source: findings carrier 26.10.2026 14:20 (point-1416 picture check).
-  Bundle: Dorfleben.
 - [ ] 1418. Villager walks into stacked baskets; baskets have no collision
   Queue position: directly after point 1414 (user decision 21.10.2026).
   Source: user bug report hoa-state-2026-10-21-3318564123 (3).zip (21:06:07Z), user words: "Er steht mitten in den Körben und die haben auch keine Kollisionsabfrage."
