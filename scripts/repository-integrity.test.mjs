@@ -13,6 +13,11 @@ import {
   WIRED_KEY,
 } from './repository-integrity.mjs'
 
+// A shallow live checkout (cloud clones) makes `git clone --shared` ignore the
+// alternates and copy every object, so the clone is no shared clone and takes
+// 30-80 s; the shared-clone case skips there.
+const liveCheckoutShallow =
+  execFileSync('git', ['rev-parse', '--is-shallow-repository'], { encoding: 'utf8', windowsHide: true }).trim() === 'true'
 
 describe('unit-suite repository integrity guard', () => {
   let repo
@@ -272,7 +277,7 @@ describe('unit-suite repository integrity guard', () => {
     )
   }, 20_000)
 
-  it('keeps both a shared clone and its live source unchanged with clone-local GIT_DIR', () => {
+  it.skipIf(liveCheckoutShallow)('keeps both a shared clone and its live source unchanged with clone-local GIT_DIR', () => {
     const livePaths = repositoryStatePaths(resolve('.'))
     const liveRoot = dirname(livePaths.commonDir)
     const parent = mkdtempSync(join(tmpdir(), 'hoa-repository-integrity-shared-clone-'))
