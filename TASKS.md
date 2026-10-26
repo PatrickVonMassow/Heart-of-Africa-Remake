@@ -95,6 +95,12 @@ put it is the mistake this line exists to stop.
   Verifiable: a Vitest asserts fish-to-body clearance over the whole work cycle; a capture of the kneeling woman shows a readable task without clipping, judged by a person.
   Criticality: medium - visible at the beach work site.
   Bundle: Dorfleben.
+- [ ] 1450. Rack women's eating gesture lifts the hand over the head instead of to the mouth
+  Final state: during the eat phase at the Bambara fish rack the hand holding the fish comes to the mouth, never above the head, on WebGPU and WebGL 2.
+  Verifiable: a Vitest over `rackPose` bounds the eating hand's height to the mouth band across the whole eat cycle; a capture sequence of the rack, judged by a person, shows the bite at the mouth.
+  Observed problem: at the point-1416 picture check (26.10.2026, both backends, seed 42, frames local/1416-seq-webgpu and local/1416-seq-webgl, sheets local/1416-sheet-*-a.png) each pounding woman raises her left forearm onto/behind the top of her head; the bite reads as scratching the head. Pose source: the eat branch of `rackPose` in src/scenes/place/fisheryPoses.ts (armAim(0.35, -0.55+1.35*biteLift), reach 0.85). Whether 1416's bent-arm reach introduced it is not measured.
+  Source: findings carrier 26.10.2026 14:20 (point-1416 picture check).
+  Bundle: Dorfleben.
 - [ ] 1418. Villager walks into stacked baskets; baskets have no collision
   Queue position: directly after point 1414 (user decision 21.10.2026).
   Source: user bug report hoa-state-2026-10-21-3318564123 (3).zip (21:06:07Z), user words: "Er steht mitten in den Körben und die haben auch keine Kollisionsabfrage."
@@ -15944,6 +15950,7 @@ to land than a mechanism that needs a review.
   Also on WebGPU (measured 25.10.2026): red (b) is red in the full WebGPU polish-villagers run on feat/1446 957968566 (log local/verify-logs/2026-10-25T07-06-50-791-polish-villagers.log: first steps 7.67 m/s, frame 124, 0.375 m in 49 ms, body not turned) and in the full WebGPU runs of 23.10. and 25.10.2026 03:40; the section run alone stays green there. Charged to this point for WebGPU too.
   Also on WebGPU (measured 25.10.2026): "his report points at the water he set down" red with 5 held frames (needs > 5; aim 0.071 m off, within 0.1) in the section run on feat/1432 f70d504a7 (log local/verify-logs/2026-10-25T14-50*-polish-villagers.log); green at e792c98b1 the run before with the same app code — the held-frame count depends on the frame rate inside the gesture window.
   Also on WebGPU (measured 26.10.2026): "the empty jar is taken up from the plank" reds with a third cause — the jar is lifted 0.24-0.28 m off the plank before it is in his hand (plank-to-hand gap <= 0.009 m) — in the full runs on feat/1415 d3201e61c (logs local/verify-logs/2026-10-26T05-52-03-752 and 06-39-00-663) and on its merge-base d034d5550 (local/verify-baseline-logs/polish-villagers-baseline-d034d55502aa-run1.log); the same lift (0.24 m) and "his report points at the water he set down" with the aim 0.102 m off (14 held frames) reddened the full WebGL 2 run on feat/1415 (log local/verify-logs/2026-10-26T09-01-27-566). Charged to this point on both backends.
+  Also on WebGPU (measured 26.10.2026): "his report points at the water he set down" red with 9 held frames and the aim 0.137 m off (bound 0.1) in the section run on feat/1417 9bb6e1736, whose diff touches only the fishery (log local/verify-logs/2026-10-26T17-10-17-924-polish-villagers.log); the aim charge now covers both backends.
   Bundle: Dorfleben.
 - [ ] 1447. Every settlement visit leaves its render pipelines and heap behind
   Final state: leaving a place releases what it built: after entering and leaving N different villages the renderer's cached pipeline count (`renderer._pipelines.caches.size`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: which materials/objects outlive their place); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
@@ -15960,14 +15967,3 @@ to land than a mechanism that needs a review.
   Observed problem: full enrichments run on WebGPU, 26.10.2026 03:21-03:42, main 64bed6b45, machine quiet UNVERIFIED: 314 pass, 5 fail; three charged (938, 1236 twice), these two owned by no open point. Both stem from the calf-shield-river work landed with point 1297. Log: local/enrichments-webgpu-run.log.
   Source: findings carrier 26.10.2026 02:43 (enrichments run); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
   Bundle: Tierverhalten.
-- [ ] 1450. Rack women's eating gesture lifts the hand over the head instead of to the mouth
-  Final state: during the eat phase at the Bambara fish rack the hand holding the fish comes to the mouth, never above the head, on WebGPU and WebGL 2.
-  Verifiable: a Vitest over `rackPose` bounds the eating hand's height to the mouth band across the whole eat cycle; a capture sequence of the rack, judged by a person, shows the bite at the mouth.
-  Observed problem: at the point-1416 picture check (26.10.2026, both backends, seed 42, frames local/1416-seq-webgpu and local/1416-seq-webgl, sheets local/1416-sheet-*-a.png) each pounding woman raises her left forearm onto/behind the top of her head; the bite reads as scratching the head. Pose source: the eat branch of `rackPose` in src/scenes/place/fisheryPoses.ts (armAim(0.35, -0.55+1.35*biteLift), reach 0.85). Whether 1416's bent-arm reach introduced it is not measured.
-  Source: findings carrier 26.10.2026 14:20 (point-1416 picture check).
-  Bundle: Dorfleben.
-- [ ] 1451. Cloud clone reds tooling Vitest files that pass locally
-  Final state: `npm run test:unit` in a fresh `claude --cloud` clone of main is green, or each environment-sensitive tooling case skips there with a named reason, so a cloud handover's unit result needs no local rerun.
-  Observed problem: the point-1416 cloud author (session_015yN1eEkcEwUPrKLmkMnkF7, 26.10.2026) reported 19 red cases in 6 `|tooling|` files (batch-reconcile 6, container-entrypoint 6, land-point-runner 4, batch-doctor-protected 1, finding-request-cli 1, repository-integrity 1) on a branch touching only src/scenes/place/; locally all 7 files passed (13:52). The owner had to rerun them before the merge, which is exactly what point 1436 item 2 forbids. Earlier sighting: docs/backlog.md "Cloud clone reds 10 Vitest cases that pass locally" (24.10.2026), promoted here because it now blocks 1436.
-  Source: point-1436 evidence review, 26.10.2026; a real blockade (CLAUDE.md §2 finding intake).
-  Bundle: Session- & Repo-Hygiene.

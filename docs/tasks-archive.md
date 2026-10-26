@@ -34959,3 +34959,9 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Verifiable: a Vitest over the rack workers' runtime pose asserts bounded frame-to-frame change of hips/hand positions across a full work cycle; a capture sequence of the rack shows no jitter, judged by a person.
   Criticality: medium - visible in every visit to the beach work site.
   Bundle: Dorfleben.
+
+- [x] 1451. Cloud clone reds tooling Vitest files that pass locally
+  Final state: `npm run test:unit` in a fresh `claude --cloud` clone of main is green, or each environment-sensitive tooling case skips there with a named reason, so a cloud handover's unit result needs no local rerun.
+  Observed problem: the point-1416 cloud author (session_015yN1eEkcEwUPrKLmkMnkF7, 26.10.2026) reported 19 red cases in 6 `|tooling|` files (batch-reconcile 6, container-entrypoint 6, land-point-runner 4, batch-doctor-protected 1, finding-request-cli 1, repository-integrity 1) on a branch touching only src/scenes/place/; locally all 7 files passed (13:52). The owner had to rerun them before the merge, which is exactly what point 1436 item 2 forbids. Earlier sighting: docs/backlog.md "Cloud clone reds 10 Vitest cases that pass locally" (24.10.2026), promoted here because it now blocks 1436.
+  Source: point-1436 evidence review, 26.10.2026; a real blockade (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.

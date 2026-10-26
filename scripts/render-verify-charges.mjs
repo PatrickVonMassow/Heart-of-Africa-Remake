@@ -134,10 +134,10 @@ export const RED_CHARGES = [
     point: 1435,
     suite: 'polish-villagers',
     kind: 'check',
-    backend: 'webgl',
     match: /water stand table: his report points at the water he set down/i,
     detailMatch: /^\d+ held frames; the arm's line passes the jar's water at most 0\.1\d\d m off/i,
-    why: 'Full WebGL 2 polish-villagers run on feat/1415 d3201e61c, 26.10.2026 (log 09-01-27-566): 14 held frames, aim 0.102 m off against the 0.1 m bound. The charge dies with it.',
+    why: 'Full WebGL 2 polish-villagers run on feat/1415 d3201e61c, 26.10.2026 (log 09-01-27-566): 14 held frames, aim 0.102 m off against the 0.1 m bound; '
+      + 'also WebGPU, section run on feat/1417 9bb6e1736, 26.10.2026 (log 17-10-17-924): 9 held frames, aim 0.137 m off — so both backends. The charge dies with it.',
   },
   {
     point: 1381,
