@@ -15852,7 +15852,9 @@ to land than a mechanism that needs a review.
   (gait gaps) on WebGL 2 only. Name both causes here; split if they prove unrelated.
   Also (finding 26.10.2026, feat/1415 d3201e61c): the same gait-gap signature reddened WebGPU
   `--section=village-walk` once in three narrow runs ("planted stances were observed", "a planted
-  foot does not slide"; walker 2 gaitWalk 0 at ~2 m/s), log local/1415-suspect-rungs.log.
+  foot does not slide"; walker 2 gaitWalk 0 at ~2 m/s), log local/1415-suspect-rungs.log, and
+  "village walk: the camera found a free spot side-on to the walker" once in the full WebGPU run
+  (log local/verify-logs/2026-10-26T06-39-00-663).
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side occlusion, no player impact measured.
 - [ ] 1382. The WebGPU polish-villagers suite finishes inside its wall timeout.
@@ -15872,6 +15874,7 @@ to land than a mechanism that needs a review.
   Criticality: high — the villager picture suite yields no full WebGPU evidence.
   Recurred 19.10.2026 on BOTH backends at feat/1343 (WebGPU 3f4d620d9, log local/verify-logs/2026-10-19T09-37-31-282-polish-children-polish-villagers.log; WebGL 2 e5fbb1179, log local/verify-logs/2026-10-19T11-17-49-518-polish-children-polish-villagers.log): KILLED at 45 min each, so the fix covers both backends.
   Also owed once green (findings carrier 19.10.2026): the full `polish-villagers` covering run for landed point 1387, which was checked only with `--section villager-canoe` on both backends; its 19:20 run was aborted at the context watermark.
+  Also (26.10.2026, feat/1415 d3201e61c): two WebGPU reds appear only in the long full run — "figure micro-structure: walk frame B shows the same walker at the opposite stride phase" (walker moved out of frame B; log local/verify-logs/2026-10-26T06-39-00-663) and "and he is still under it at the shutter" (adult-errands, the 05:21 run that crashed) — green on the merge-base and in three `--section=figure-micro` runs; measure whether full-run load causes them and split them off if not.
 - [ ] 1383. Natural villager motion d: turning, point and reach, pick-up, carry, calibration sweep
   Queue position: directly after point 1343.
   Source: split from point 1343 on 19.10.2026 (owner decision under the standing split rule): its author delivered concept steps 15 and 16 only.
@@ -15953,7 +15956,7 @@ to land than a mechanism that needs a review.
   Source: picture check of the 1405 landing session, 23.10.2026.
   Also on WebGPU (measured 25.10.2026): red (b) is red in the full WebGPU polish-villagers run on feat/1446 957968566 (log local/verify-logs/2026-10-25T07-06-50-791-polish-villagers.log: first steps 7.67 m/s, frame 124, 0.375 m in 49 ms, body not turned) and in the full WebGPU runs of 23.10. and 25.10.2026 03:40; the section run alone stays green there. Charged to this point for WebGPU too.
   Also on WebGPU (measured 25.10.2026): "his report points at the water he set down" red with 5 held frames (needs > 5; aim 0.071 m off, within 0.1) in the section run on feat/1432 f70d504a7 (log local/verify-logs/2026-10-25T14-50*-polish-villagers.log); green at e792c98b1 the run before with the same app code — the held-frame count depends on the frame rate inside the gesture window.
-  Also on WebGPU (measured 26.10.2026): "the empty jar is taken up from the plank" reds with a third cause — the jar is lifted 0.24-0.28 m off the plank before it is in his hand (plank-to-hand gap <= 0.009 m) — in the full runs on feat/1415 d3201e61c (logs local/verify-logs/2026-10-26T05-52-03-752 and 06-39-00-663) and on its merge-base d034d5550 (local/verify-baseline-logs/polish-villagers-baseline-d034d55502aa-run1.log). Charged to this point for WebGPU.
+  Also on WebGPU (measured 26.10.2026): "the empty jar is taken up from the plank" reds with a third cause — the jar is lifted 0.24-0.28 m off the plank before it is in his hand (plank-to-hand gap <= 0.009 m) — in the full runs on feat/1415 d3201e61c (logs local/verify-logs/2026-10-26T05-52-03-752 and 06-39-00-663) and on its merge-base d034d5550 (local/verify-baseline-logs/polish-villagers-baseline-d034d55502aa-run1.log); the same lift (0.24 m) and "his report points at the water he set down" with the aim 0.102 m off (14 held frames) reddened the full WebGL 2 run on feat/1415 (log local/verify-logs/2026-10-26T09-01-27-566). Charged to this point on both backends.
   Bundle: Dorfleben.
 - [ ] 1447. Every settlement visit leaves its render pipelines and heap behind
   Final state: leaving a place releases what it built: after entering and leaving N different villages the renderer's cached pipeline count (`renderer._pipelines.caches.size`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: which materials/objects outlive their place); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.

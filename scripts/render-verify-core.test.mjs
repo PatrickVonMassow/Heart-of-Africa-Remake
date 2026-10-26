@@ -2972,6 +2972,11 @@ describe('the shipped charge ledger', () => {
         '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
         'child-seconds, least judgeable child 4 at 99.1 %. Bad = over 1 m walked inside 0.35 m',
+      // The real text, from local/verify-logs/2026-10-26T06-39-00-663-polish-villagers.log.
+      '1435/polish-villagers/undefined':
+        'order at frame 47, off the stand at 84, walking checked to 114; 27 take frames; jar lifted ' +
+        '0.28 m off the plank before it is in his hand; plank-to-hand gap 0.009 m; fastest take move ' +
+        '2.44 m/s (frame 81, hand, 0.134 m in 55 ms, body turned 0.000 rad and moved 0.000 m, phase take, gesture none)',
       // The real text, from local/verify-logs/2026-10-25T16-55-07-991-polish-villagers.log.
       '642/polish-villagers/undefined':
         'no order in 180 s — phases seen: water-out:send×3997, water-out:fill×816, dig-second:site×3462, ' +
