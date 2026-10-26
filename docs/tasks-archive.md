@@ -34965,3 +34965,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Observed problem: the point-1416 cloud author (session_015yN1eEkcEwUPrKLmkMnkF7, 26.10.2026) reported 19 red cases in 6 `|tooling|` files (batch-reconcile 6, container-entrypoint 6, land-point-runner 4, batch-doctor-protected 1, finding-request-cli 1, repository-integrity 1) on a branch touching only src/scenes/place/; locally all 7 files passed (13:52). The owner had to rerun them before the merge, which is exactly what point 1436 item 2 forbids. Earlier sighting: docs/backlog.md "Cloud clone reds 10 Vitest cases that pass locally" (24.10.2026), promoted here because it now blocks 1436.
   Source: point-1436 evidence review, 26.10.2026; a real blockade (CLAUDE.md §2 finding intake).
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1417. Fish-handling woman only rocks the fish, which clips through her clothing
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123 (1).zip (21:04:01Z), user words: "Was macht die da? Sie schaukelt den Fisch nur hin und her und dabei clippt er in ihre Kleidung rein und raus."
+  Observed: a kneeling woman beside a board near the fire shelter only rocks a fish back and forth; the fish passes in and out of her wrap skirt.
+  Final state: the fish work reads as a recognizable task (e.g. cleaning/gutting the fish on the board) and the fish never intersects her body or clothing in any phase.
+  Verifiable: a Vitest asserts fish-to-body clearance over the whole work cycle; a capture of the kneeling woman shows a readable task without clipping, judged by a person.
+  Criticality: medium - visible at the beach work site.
+  Bundle: Dorfleben.
