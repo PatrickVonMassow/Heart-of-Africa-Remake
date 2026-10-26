@@ -142,6 +142,8 @@ export function holdGutFish(fish: THREE.Object3D, figure: THREE.Object3D): void 
  *  crouched for the primitive's straight arm and re-chose that crouch every
  *  frame — the jitter of point 1416. */
 const RACK_REACH = 0.85
+/** The eating arm's reach at the mouth: folded at the elbow. */
+const BITE_REACH = 0.55
 /** Seconds over which the eating arm comes up from rest and goes back. */
 const EAT_EASE_SECONDS = 0.4
 
@@ -160,9 +162,12 @@ export function rackPose(
     rest.reach = { left: RACK_REACH, right: RACK_REACH }
   } else if (duo.phase === 'eat' && duo.women[woman].fish > 0) {
     const e = Math.max(0, Math.min(1, duo.clock / EAT_EASE_SECONDS, (cfg.eatSeconds - duo.clock) / EAT_EASE_SECONDS))
-    const eat = { left: armAim(0.35, -0.55 + 1.35 * biteLift(duo, cfg, woman)), right: REST_POSE.right, lean: 0.04, turn: 0 }
+    // The bite folds the arm in toward the mouth: a straighter arm at this
+    // elevation lifted the hand over the head (point 1450).
+    const bite = biteLift(duo, cfg, woman)
+    const eat = { left: armAim(0.35 - 0.8 * bite, -0.55 + 1.35 * bite), right: REST_POSE.right, lean: 0.04, turn: 0 }
     blendPose(rest, REST_POSE, eat, e)
-    rest.reach = { left: RACK_REACH }
+    rest.reach = { left: RACK_REACH - (RACK_REACH - BITE_REACH) * bite * e }
   }
   return rest
 }
