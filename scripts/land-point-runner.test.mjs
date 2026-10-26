@@ -90,7 +90,7 @@ describe('the gate runner', () => {
   it('truncates a chatty failure to its last lines', async () => {
     const r = await runCommand({
       cmd: process.execPath,
-      args: ['-e', 'for (let i = 0; i < 200; i++) console.log("line " + i); process.exit(1)'],
+      args: ['-e', 'for (let i = 0; i < 200; i++) console.log("line " + i); process.exitCode = 1'],
       id: 'unit',
       maxOutputLines: 5,
     })
