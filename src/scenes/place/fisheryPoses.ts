@@ -165,7 +165,7 @@ export function rackPose(
     // The bite folds the arm in toward the mouth: a straighter arm at this
     // elevation lifted the hand over the head (point 1450).
     const bite = biteLift(duo, cfg, woman)
-    const eat = { left: armAim(0.35 - 0.8 * bite, -0.55 + 1.35 * bite), right: REST_POSE.right, lean: 0.04, turn: 0 }
+    const eat = { left: armAim(0.35 - 0.8 * bite, -0.55 + 1.2 * bite), right: REST_POSE.right, lean: 0.04, turn: 0 }
     blendPose(rest, REST_POSE, eat, e)
     rest.reach = { left: RACK_REACH - (RACK_REACH - BITE_REACH) * bite * e }
   }
