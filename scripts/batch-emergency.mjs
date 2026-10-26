@@ -132,12 +132,13 @@ export function runEmergency({
   getWaitLeases = () => readRegistry(registryPath(repo)).leases ?? [], retireWaits = retireWaiters,
 } = {}) {
   const observed = inputs ?? defaultInputs({ repo, now, thresholdMs })
-  const owner = getLock()
-  const ownerSince = Number(owner?.acquiredAt ?? owner?.startedAt)
+  // ONE SNAPSHOT (point 1445): the owner whose tenure the decision measured is
+  // the only owner the recovery below may revoke, so the lock is read once.
+  const lock = getLock()
+  const ownerSince = Number(lock?.acquiredAt ?? lock?.startedAt)
   const decision = emergencyDecision({ now, thresholdMs, ownerSince, ...observed })
   if (!decision.strike || dryRun) return { decision, outcomes: [], restored: false, dryRun }
 
-  const lock = getLock()
   // ONE EPISODE, ONE ATTEMPT (union entries U7 and U9). The key is the progress
   // boundary being recovered from plus the owner generation being recovered —
   // the same key points 947 and 958 reach recovery under. A run that crashed

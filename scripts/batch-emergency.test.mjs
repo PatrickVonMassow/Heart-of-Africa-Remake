@@ -101,6 +101,25 @@ describe('the real emergency strike orchestration', () => {
     expect(result.outcomes.at(-1)).toMatchObject({ step: 'batch-autostart.mjs', ok: true })
   })
 
+  it('measures and recovers against one lock snapshot, so a fresh successor is never struck (point 1445)', () => {
+    const f = fixture()
+    f.inputs.state = { lastStrikeAt: f.now - EMERGENCY_COOLDOWN_MS - 1, lastStrikeProgressAt: f.progressAt }
+    const snapshots = [
+      { sessionId: 'stalled-a', pid: 1, pidStartedAt: 1, fence: 8, acquiredAt: f.progressAt - 1 },
+      { sessionId: 'fresh-b', pid: 2, pidStartedAt: 2, fence: 9, acquiredAt: f.now - 60_000 },
+    ]
+    const revoked = []
+    const result = runEmergency({
+      ...f,
+      getLock: () => snapshots.shift(),
+      revoke: (session) => { revoked.push(session); return { revoked: true, reason: 'revoked' } },
+      execute: () => '',
+    })
+    expect(result.decision.action).toBe('hard-recover')
+    expect(revoked).toEqual(['stalled-a'])
+    expect(snapshots.map((x) => x.sessionId)).toEqual(['fresh-b'])
+  })
+
   it('terminates every distinct recorded batch process and keeps doctor read-only when identity proof fails', () => {
     const f = fixture()
     f.inputs.state = { lastStrikeAt: f.now - EMERGENCY_COOLDOWN_MS - 1, lastStrikeProgressAt: f.progressAt }
