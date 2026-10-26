@@ -14,7 +14,7 @@ import { createPortal, useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { FIGURE_LIMBS } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
-import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
+import { advanceGesture, ELBOW_DEFAULT, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
 import {
   bodyProportions,
   buildBodyGeometry,
@@ -786,7 +786,9 @@ export function SkinnedFigure({
             loc(up, _s)
             if (_t.distanceTo(_s) > r) _t.sub(_s).setLength(r).add(_s)
           }
-          _pole.set(s === 'L' ? 0.5 : -0.5, -0.4, -1).applyQuaternion(chestQ())
+          const elbow = i === 0 ? extras?.elbow?.left : extras?.elbow?.right
+          if (elbow) _pole.set(elbow[0], elbow[1], elbow[2]).applyQuaternion(chestQ())
+          else _pole.set(s === 'L' ? ELBOW_DEFAULT[0] : -ELBOW_DEFAULT[0], ELBOW_DEFAULT[1], ELBOW_DEFAULT[2]).applyQuaternion(chestQ())
           done = solveTo(_t.clone(), _pole)
         }
         // while the clips still own part of the arm (taken or given back), the
