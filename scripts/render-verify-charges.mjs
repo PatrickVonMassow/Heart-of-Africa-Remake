@@ -1980,4 +1980,28 @@ export const RED_CHARGES = [
       + 'villager-canoe section alone: the third fish ray hits an unnamed BoxGeometry first. '
       + 'The charge dies with point 1448.',
   },
+  {
+    point: 1449,
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in$/i,
+    why:
+      'FILED AS 1449 ON 26.10.2026: red in the full enrichments run on webgpu, main 64bed6b45, '
+      + 'owned by no open point; from the calf-shield-river work of 1297 (crossing). '
+      + 'The charge dies with point 1449.',
+  },
+  {
+    point: 1449,
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up \(calf-in-water\)$/i,
+    why:
+      'FILED AS 1449 ON 26.10.2026: red in the full enrichments run on webgpu, main 64bed6b45, '
+      + 'owned by no open point; from the calf-shield-river work of 1297 (calf-in-water). '
+      + 'The charge dies with point 1449.',
+  },
 ]
