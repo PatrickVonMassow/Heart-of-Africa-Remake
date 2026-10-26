@@ -85,13 +85,6 @@ put it is the mistake this line exists to stop.
   3. The sha, handover text excerpt and acceptance log path are recorded in this point's closing note. No new machinery (CLAUDE.md §2 infrastructure freeze).
   Source: split of point 1430 item 4, which no point in the repository could yet evidence.
   Bundle: Session- & Repo-Hygiene.
-- [ ] 1415. Bug-report state dump captures the live place-scene runtime
-  Final state: the bug-report state dump (src/state/stateDump.ts, dumpGameState) carries a `place` section with the live runtime of the place scene the traveller is in, read through a registry like the wildlife section (src/systems/wildlifeDump.ts, point 454). Every place-scene vignette with its own runtime registers a snapshot provider: the river fishery (canoe state and clock, net man position/phase/inBoat/reach/squat, carrier position/phase/clock/kneel, every basket with its holder `at`, fish count and world position), the errand walkers and their head loads, fires and work sites, and any other animated villager group. Each figure entry names id, role, world position, yaw, phase/action, pose values (lean, squat/scale, kneel) and its head/crown world position; each carried or set-down object names its holder and world position. The section is bounded (radius and cap stated, omitted count named) and deterministic for a given runtime state. Rule going forward: a new place vignette with its own runtime registers its provider; a Vitest test asserts that every registered vignette mounted in a test place appears in the dump with these fields, and that the fishery entry contains its baskets with holders.
-  Principle (user order 21.10.2026): the state dump holds everything that is potentially helpful for diagnosing a bug report.
-  Observed problem: bug report "KopfInKorb" (21.10.2026) could not be diagnosed from its state dump: the fishery runtime (which figure, which phase, where the basket was) lives only in React refs and never reaches the dump. User: "Im Spielstand muss alles stehen, was potenziell hilfreich ist."
-  Placement (user order 21.10.2026): queue as a new point directly after point 1405 in the work order.
-  Source: user request 21.10.2026 (chat session 7ee60c4b), spec cut from 3063698ad; approved: "ja".
-  Bundle: Dorfleben.
 - [ ] 1416. Villagers at the fish-drying rack jitter in place
   Queue position: directly after point 1414 (user decision 21.10.2026).
   Source: user bug report hoa-state-2026-10-21-3318564123.zip (21:03:11Z), user words: "Die Figuren zittern herum."
