@@ -23,6 +23,11 @@ extend(THREE as unknown as Parameters<typeof extend>[0])
 
 const PALETTE = ['#3a5a8a', '#8a4a2a', '#c2b090']
 const FPS = 30
+/** The mouth band, as shares of the drawn head's height over its chin. */
+const MOUTH_BAND: [number, number] = [0.12, 0.42]
+/** How far the eating hand may be beside the mouth, and ahead of the face (m). */
+const MOUTH_SIDE = 0.1
+const MOUTH_AHEAD = 0.12
 let asset: VillagerAsset
 
 beforeAll(async () => {
@@ -57,40 +62,66 @@ describe('the pounding pair eating at the fish rack', () => {
     const mesh = group.getObjectByName('figure-body') as THREE.SkinnedMesh
     const headBone = mesh.skeleton.bones.find((b) => b.name === 'bone-head')!
     const hand = group.getObjectByName('hand-left')!
-    const crown = group.getObjectByName('figure-crown')!
     const h = new THREE.Vector3()
-    const head = new THREE.Vector3()
-    const top = new THREE.Vector3()
+    const v = new THREE.Vector3()
+    const toWorld = new THREE.Matrix4()
+    // The drawn head: the vertices its bone carries.
+    const pos = mesh.geometry.attributes.position
+    const si = mesh.geometry.attributes.skinIndex
+    const sw = mesh.geometry.attributes.skinWeight
+    const headIndex = mesh.skeleton.bones.indexOf(headBone)
+    const headVerts: number[] = []
+    for (let i = 0; i < pos.count; i++) {
+      let w = 0
+      for (let c = 0; c < 4; c++) if (si.getComponent(i, c) === headIndex) w += sw.getComponent(i, c)
+      if (w >= 0.5) headVerts.push(i)
+    }
+    expect(headVerts.length).toBeGreaterThan(20)
+    const lift = (clock: number) => biteLift(eating(clock, 1), cfg, woman)
 
-    let highest = -Infinity
     let overBand = -Infinity
-    let peaks = 0
-    let farAtPeak = 0
-    let frame = 0
-    for (; frame < cfg.eatSeconds * FPS; frame++) {
+    const peaks: { band: number; under: number; side: number; ahead: number }[] = []
+    for (let frame = 0; frame < cfg.eatSeconds * FPS; frame++) {
       const clock = frame / FPS
       now.duo = eating(clock, Math.max(1e-3, 1 - clock / cfg.eatSeconds))
       act(() => advance((frame + 1) / FPS))
       group.updateMatrixWorld(true)
       hand.getWorldPosition(h)
-      headBone.getWorldPosition(head)
-      crown.getWorldPosition(top)
-      // The mouth band: from just under the skull's base to under halfway up the head.
-      const mouthTop = head.y + 0.45 * (top.y - head.y)
-      overBand = Math.max(overBand, h.y - mouthTop)
-      highest = Math.max(highest, h.y - (head.y - 0.06))
-      if (biteLift(now.duo, cfg, woman) > 0.99) {
-        peaks++
-        // at the bite the hand is at the face, in front of it, not beside the head
-        farAtPeak = Math.max(farAtPeak, Math.abs(h.x - head.x), Math.max(0, head.z - h.z))
+      // The head as drawn this frame: chin, top, and where its face is at each height.
+      toWorld.copy(mesh.bindMatrixInverse).invert()
+      const at = headVerts.map((i) => {
+        v.fromBufferAttribute(pos, i)
+        mesh.applyBoneTransform(i, v)
+        return v.clone().applyMatrix4(toWorld)
+      })
+      const chin = Math.min(...at.map((p) => p.y))
+      const crown = Math.max(...at.map((p) => p.y))
+      // The mouth band: the lower face, from a little over the chin to under the nose.
+      const low = chin + MOUTH_BAND[0] * (crown - chin)
+      const high = chin + MOUTH_BAND[1] * (crown - chin)
+      overBand = Math.max(overBand, h.y - high)
+      const l = lift(clock)
+      if (l > 0.9 && l >= lift(clock - 1 / FPS) && l >= lift(clock + 1 / FPS)) {
+        // the mouth: the front of the face at the band's middle
+        const mid = (low + high) / 2
+        const face = at.filter((p) => Math.abs(p.y - mid) < 0.02)
+        const front = face.reduce((a, b) => (b.z > a.z ? b : a))
+        const middle = face.reduce((s, p) => s + p.x, 0) / face.length
+        peaks.push({ band: h.y - high, under: low - h.y, side: Math.abs(h.x - middle), ahead: h.z - front.z })
       }
     }
     await act(async () => root.unmount())
-    expect(peaks).toBeGreaterThan(5)
-    // each bite reaches the mouth band ...
-    expect(highest).toBeGreaterThan(0)
-    // ... and never rises over it
+    // a bite every few seconds over the whole meal
+    expect(peaks.length).toBeGreaterThanOrEqual(Math.floor(cfg.eatSeconds / cfg.biteSeconds) - 1)
+    // the hand never rises over the mouth band, and at EVERY bite it is in it,
+    // in front of the mouth and close to it
     expect(overBand).toBeLessThan(0)
-    expect(farAtPeak).toBeLessThan(0.1)
+    for (const p of peaks) {
+      expect(p.band).toBeLessThan(0)
+      expect(p.under).toBeLessThan(0)
+      expect(p.side).toBeLessThan(MOUTH_SIDE)
+      expect(p.ahead).toBeGreaterThan(0)
+      expect(p.ahead).toBeLessThan(MOUTH_AHEAD)
+    }
   }, 120_000)
 })
