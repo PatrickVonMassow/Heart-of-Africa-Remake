@@ -52,6 +52,7 @@ import {
   openPointsHeadline,
   ownerRunbookContext,
   ownerStartText,
+  sessionStartConversion,
   sessionStartOwnership,
   spawnTokenProof,
   standDownMessage,
@@ -413,8 +414,7 @@ try {
       // The same predicate the owner's Stop guard applies before ITS acquire, so
       // the rule lives in one place and cannot drift between the two doors.
       if (reservationDecision({ assessment: reservation }).acquire) {
-        const converted =
-          !!(lock && lock.kind === 'pending-spawn') && convertPendingSpawn(sessionId, { authorized: !!auth })
+        const converted = sessionStartConversion({ sessionId, lock, sessionProcess, convert: convertPendingSpawn })
         if (converted) ownership = 'acquired-spawn'
         const plan = sessionStartOwnership({
           converted,
