@@ -74,6 +74,7 @@ import {
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
   ownerKeepsBatch,
+  stallClockStart,
   takeoverHandsOver,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './lane-switch-core.mjs'
@@ -2175,6 +2176,38 @@ describe('may the owner keep the batch? (union entry U4)', () => {
         .toMatchObject({ keeps: true, reason: 'no-progress-measurement' })
     }
     expect(() => ownerKeepsBatch()).not.toThrow()
+  })
+})
+
+// --- POINT 1445: THE STALL BELONGS TO THE CURRENT OWNER -----------------------
+// 25.10.2026 02:33: progress last at 24.10. 13:39, owner acquired at 02:17 with a
+// fresh heartbeat and a declared advancing suite, yet the launcher took the
+// batch for 833 min of its dead predecessor's standstill.
+describe('the stall clock never starts before the current owner took the batch', () => {
+  const HOUR = 60 * 60 * 1000
+  const NOW = Date.parse('2026-10-25T02:33:00+02:00')
+  const base = { now: NOW, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR }
+
+  it('keeps a fresh owner with advancing work against inherited dead time', () => {
+    const verdict = ownerKeepsBatch({
+      ...base, progressAt: NOW - 13 * HOUR, ownerSince: NOW - 16 * 60_000, workAdvancing: true,
+    })
+    expect(verdict).toMatchObject({ keeps: true, reason: 'progress-within-threshold', stalledMs: 16 * 60_000 })
+  })
+
+  it('still fires the deadline once the owner itself has not moved for it', () => {
+    const verdict = ownerKeepsBatch({
+      ...base, progressAt: NOW - 13 * HOUR, ownerSince: NOW - 2 * HOUR - 60_000, workAdvancing: true,
+    })
+    expect(verdict).toMatchObject({ keeps: false, reason: 'past-absolute-deadline' })
+  })
+
+  it('ignores an unreadable or future acquisition', () => {
+    for (const ownerSince of [null, NaN, NOW + HOUR]) {
+      expect(ownerKeepsBatch({ ...base, progressAt: NOW - 13 * HOUR, ownerSince }).reason).toBe('past-absolute-deadline')
+    }
+    expect(stallClockStart(5, 9, 10)).toBe(9)
+    expect(stallClockStart(9, 5, 10)).toBe(9)
   })
 })
 

@@ -132,7 +132,9 @@ export function runEmergency({
   getWaitLeases = () => readRegistry(registryPath(repo)).leases ?? [], retireWaits = retireWaiters,
 } = {}) {
   const observed = inputs ?? defaultInputs({ repo, now, thresholdMs })
-  const decision = emergencyDecision({ now, thresholdMs, ...observed })
+  const owner = getLock()
+  const ownerSince = Number(owner?.acquiredAt ?? owner?.startedAt)
+  const decision = emergencyDecision({ now, thresholdMs, ownerSince, ...observed })
   if (!decision.strike || dryRun) return { decision, outcomes: [], restored: false, dryRun }
 
   const lock = getLock()

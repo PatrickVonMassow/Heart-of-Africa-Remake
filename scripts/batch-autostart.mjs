@@ -1454,6 +1454,7 @@ if (!startDecision.start) {
     etaMinutesPast,
     thresholdMs: EMERGENCY_THRESHOLD_MS,
     hardDeadlineMs: EMERGENCY_HARD_DEADLINE_MS,
+    ownerSince: Number(lock?.acquiredAt ?? lock?.startedAt),
   })
   // AND A TAKEOVER IS A HANDOVER (union entry U23) — it needs somebody to hand
   // to. On 04.09.2026 this tick took the batch from a live owner and refused, in
