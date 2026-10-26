@@ -253,14 +253,6 @@ put it is the mistake this line exists to stop.
   05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
   05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
   05.10.2026: "ja, aber nach 1294"
-- [ ] 1388. Request-approval guard stops refusing ordinary read commands
-  Queue position: directly after point 1308 (user order 19.10.2026: "nach 1308").
-  Source: user request 19.10.2026 (approved: "ja"): observed 19.10.2026 in a chat session (cf94cf28): four ordinary read commands, none mentioning finding.mjs or --request, plus the prescribed timestamp node -e command, were all refused as "non-canonical deposit". Work continued only via the Read tool.
-  Final state: request-approval-guard (scripts/request-approval-guard-core.mjs) refuses only Bash commands that actually mention a deposit (finding.mjs with --request). An ordinary read-only command with a pipe, quotes or $ — e.g. grep -rliE "unload|basket" src | head, sed -n 775,805p file, or the timestamp command node -e "console.log(new Intl.DateTimeFormat(...))" that the timestamp rule itself prescribes — passes without the "non-canonical" refusal.
-  Verifiable: unit tests in scripts/request-approval-guard-core.test.mjs: those three commands pass; a real non-canonical deposit is still refused.
-  Bundle: Testinfrastruktur.
-  Criticality: medium — a real blockade (CLAUDE.md §2 infrastructure-freeze exception): the guard blocks routine reading and the prescribed timestamp command in chat sessions.
-
 - [ ] 1318. The dressing-growth and channel-crossing checks are red on main
   Source: findings carrier 06.10.2026 13:22, found on the enrichments run of point 1297.
   On a quiet host, on main and feat/1297 alike: `--section=dressing-growth` reads samples [0,0,0,0,0] for "the streamed dressing does not grow over a session at a fixed anchor (point 278)" (nothing streamed at all); `--section=channel-crossing` reads sawOnWater false, sawLowY false, landed true for "a purposeful crossing swims the channel chest-deep and lands on the far bank (point 192)". With 1317 they keep a whole enrichments pass red.

@@ -34942,3 +34942,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Placement (user order 21.10.2026): queue as a new point directly after point 1405 in the work order.
   Source: user request 21.10.2026 (chat session 7ee60c4b), spec cut from 3063698ad; approved: "ja".
   Bundle: Dorfleben.
+
+- [x] 1388. Request-approval guard stops refusing ordinary read commands
+  Queue position: directly after point 1308 (user order 19.10.2026: "nach 1308").
+  Source: user request 19.10.2026 (approved: "ja"): observed 19.10.2026 in a chat session (cf94cf28): four ordinary read commands, none mentioning finding.mjs or --request, plus the prescribed timestamp node -e command, were all refused as "non-canonical deposit". Work continued only via the Read tool.
+  Final state: request-approval-guard (scripts/request-approval-guard-core.mjs) refuses only Bash commands that actually mention a deposit (finding.mjs with --request). An ordinary read-only command with a pipe, quotes or $ — e.g. grep -rliE "unload|basket" src | head, sed -n 775,805p file, or the timestamp command node -e "console.log(new Intl.DateTimeFormat(...))" that the timestamp rule itself prescribes — passes without the "non-canonical" refusal.
+  Verifiable: unit tests in scripts/request-approval-guard-core.test.mjs: those three commands pass; a real non-canonical deposit is still refused.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — a real blockade (CLAUDE.md §2 infrastructure-freeze exception): the guard blocks routine reading and the prescribed timestamp command in chat sessions.
