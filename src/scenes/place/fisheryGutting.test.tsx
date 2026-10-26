@@ -25,8 +25,9 @@ extend(THREE as unknown as Parameters<typeof extend>[0])
 
 const PALETTE = ['#2a3a6a', '#8a4a2a', '#c2b090']
 const DT = 1 / 30
-/** How far every fish point stays outside the body's surface (m). */
+/** How far every fish point stays outside the body's and dress's triangles (m). */
 const MARGIN = 0.01
+const OUT_RAYS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].map(([x, y, z]) => new THREE.Vector3(x, y, z))
 
 let asset: VillagerAsset
 beforeAll(async () => {
@@ -83,26 +84,47 @@ describe('the carrier gutting at the fire', () => {
     const handBones = new Set(['bone-hand.L', 'bone-hand.R'].map((n) => bones.indexOf(n)))
     expect(handBones.has(-1)).toBe(false)
     const pos = mesh.geometry.attributes.position
-    const nor = mesh.geometry.attributes.normal
     const si = mesh.geometry.attributes.skinIndex
     const sw = mesh.geometry.attributes.skinWeight
-    const body: number[] = []
+    const isBody: boolean[] = []
     for (let i = 0; i < pos.count; i++) {
       let w = 0
       for (let c = 0; c < 4; c++) if (handBones.has(si.getComponent(i, c))) w += sw.getComponent(i, c)
-      if (w < 0.5) body.push(i)
+      isBody.push(w < 0.5)
     }
-    const at = body.map(() => new THREE.Vector3())
-    const out = body.map(() => new THREE.Vector3())
+    // The body's and its dress's triangles, the hands' own left out.
+    const index = mesh.geometry.index
+    const corner = (k: number) => (index ? index.getX(k) : k)
+    const tris: [number, number, number][] = []
+    for (let k = 0; k + 2 < (index ? index.count : pos.count); k += 3) {
+      const tri: [number, number, number] = [corner(k), corner(k + 1), corner(k + 2)]
+      if (tri.every((i) => isBody[i])) tris.push(tri)
+    }
+    expect(tris.length).toBeGreaterThan(1000)
+    const at = Array.from({ length: pos.count }, () => new THREE.Vector3())
     const toWorld = new THREE.Matrix4()
     const v = new THREE.Vector3()
-    const n = new THREE.Vector3()
-    const p = new THREE.Vector3()
+    const q = new THREE.Vector3()
     const local = new THREE.Matrix4()
     const fishPos = fish.current!.geometry.attributes.position
+    // the fish's own triangles, three points each
+    expect(fish.current!.geometry.index).toBeNull()
+    const fishAt = Array.from({ length: fishPos.count }, () => new THREE.Vector3())
+    const tri = new THREE.Triangle()
+    const ray = new THREE.Ray()
+    const hit = new THREE.Vector3()
+    /** Whether the segment a→b passes through the triangle. */
+    const crosses = (a: THREE.Vector3, b: THREE.Vector3, t0: THREE.Vector3, t1: THREE.Vector3, t2: THREE.Vector3) => {
+      const len = a.distanceTo(b)
+      if (len < 1e-9) return false
+      ray.set(a, v.copy(b).sub(a).divideScalar(len))
+      return ray.intersectTriangle(t0, t1, t2, false, hit) !== null && hit.distanceTo(a) <= len
+    }
 
     let t = 0
     let worst = Infinity
+    let crossings = 0
+    let outside = 0
     let checked = 0
     let strokeMin = Infinity
     let strokeMax = -Infinity
@@ -117,33 +139,44 @@ describe('the carrier gutting at the fire', () => {
       if (clock <= cfg.liftSeconds) continue
       checked++
       outer.updateWorldMatrix(true, true)
-      toWorld.copy(mesh.bindMatrixInverse).invert().premultiply(mesh.matrixWorld)
-      body.forEach((i, j) => {
-        at[j].fromBufferAttribute(pos, i)
-        mesh.applyBoneTransform(i, at[j])
-        n.fromBufferAttribute(nor, i).multiplyScalar(0.01).add(v.fromBufferAttribute(pos, i))
-        mesh.applyBoneTransform(i, n)
-        at[j].applyMatrix4(toWorld)
-        out[j].copy(n.applyMatrix4(toWorld)).sub(at[j]).normalize()
-      })
+      // A bone-transformed vertex is the bones' world place under the bind inverse.
+      toWorld.copy(mesh.bindMatrixInverse).invert()
+      for (let i = 0; i < pos.count; i++) {
+        at[i].fromBufferAttribute(pos, i)
+        mesh.applyBoneTransform(i, at[i])
+        at[i].applyMatrix4(toWorld)
+      }
       // The fish in the figure's own frame (+X its left, +Z ahead): level and across.
       const f = fish.current!
       f.updateWorldMatrix(true, false)
       local.copy(outer.matrixWorld).invert().multiply(f.matrixWorld)
       const axis = new THREE.Vector3(0, 0, 1).transformDirection(local)
       tilt = Math.max(tilt, Math.abs(axis.y), Math.abs(axis.z))
-      for (let i = 0; i < fishPos.count; i++) {
-        p.fromBufferAttribute(fishPos, i).applyMatrix4(f.matrixWorld)
-        let best = Infinity
-        let bj = 0
-        for (let j = 0; j < at.length; j++) {
-          const d = p.distanceToSquared(at[j])
-          if (d < best) {
-            best = d
-            bj = j
-          }
+      const box = new THREE.Box3()
+      for (let i = 0; i < fishPos.count; i++) box.expandByPoint(fishAt[i].fromBufferAttribute(fishPos, i).applyMatrix4(f.matrixWorld))
+      // Every body triangle near the fish; one farther off cannot be within the margin.
+      box.expandByScalar(0.1)
+      const near = tris.filter(([a, b, c]) => box.intersectsBox(new THREE.Box3().setFromPoints([at[a], at[b], at[c]])))
+      // Each fish point's distance to the body's surface.
+      for (const p of fishAt) {
+        for (const [a, b, c] of near) {
+          tri.set(at[a], at[b], at[c])
+          worst = Math.min(worst, p.distanceTo(tri.closestPointToPoint(p, q)))
         }
-        worst = Math.min(worst, v.copy(p).sub(at[bj]).dot(out[bj]))
+      }
+      // Which side of that surface the fish is on: a ray from it that meets
+      // no body triangle at all leaves from outside. (The nearest triangle's
+      // own normal cannot tell: at a distance the nearest feature is an edge.)
+      const from = fishAt[0]
+      if (OUT_RAYS.some((d) => tris.every(([a, b, c]) => ray.set(from, d).intersectTriangle(at[a], at[b], at[c], false, hit) === null))) outside++
+      // And no edge of either surface passes through the other between the points.
+      for (let k = 0; k + 2 < fishAt.length; k += 3) {
+        const [f0, f1, f2] = [fishAt[k], fishAt[k + 1], fishAt[k + 2]]
+        for (const [a, b, c] of near) {
+          const [t0, t1, t2] = [at[a], at[b], at[c]]
+          if (crosses(f0, f1, t0, t1, t2) || crosses(f1, f2, t0, t1, t2) || crosses(f2, f0, t0, t1, t2)) crossings++
+          if (crosses(t0, t1, f0, f1, f2) || crosses(t1, t2, f0, f1, f2) || crosses(t2, t0, f0, f1, f2)) crossings++
+        }
       }
       // The knife hand, in the fish's own frame: along its length, at its belly.
       const knife = outer.getObjectByName('hand-right')!.getWorldPosition(v)
@@ -154,6 +187,9 @@ describe('the carrier gutting at the fire', () => {
     }
     await act(async () => root.unmount())
     expect(checked).toBeGreaterThan(60)
+    // the fish is outside the body in every frame, never through its surface, and clear of it
+    expect(outside).toBe(checked)
+    expect(crossings).toBe(0)
     expect(worst).toBeGreaterThan(MARGIN)
     // level and across the front, never hanging into the lap
     expect(tilt).toBeLessThan(0.05)
