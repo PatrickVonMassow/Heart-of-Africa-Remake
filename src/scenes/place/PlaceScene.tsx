@@ -204,6 +204,8 @@ import {
   type RingWalk,
 } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
+import { PlaceDumpGroup } from './PlaceDumpGroup'
+import { usePlaceDumpProvider } from './placeDumpRead'
 import { bandHeightAt, panoramaBandShown } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { emitFootstep } from '../../systems/ambience'
@@ -1196,6 +1198,14 @@ function FirePit({
   // and soft PCF edges on high. Fall back to the base size when off (unused).
   const fireShadowSize = useUi(effectiveFireShadowResolution) || FIRE_SHADOW_MAP_SIZE
   const fireShadowSoft = useUi(effectiveFireShadowSoft)
+  // The village fire for the bug-report dump (placeDump.ts): where it burns
+  // and how hard, after the rain.
+  usePlaceDumpProvider('village-fire', () => ({
+    kind: 'fire',
+    state: { blaze, sheltered, rainFactor: shelteredFireRainFactor(rainAmount(rainRef.current, balance.season.weatherStrength), sheltered), light: light.current?.intensity ?? null },
+    figures: [],
+    objects: [{ id: 'village-fire/pit', kind: 'fire-pit', holder: 'ground', pos: { x, y: 0, z } }],
+  }))
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     // Under the cook-shelter the fire burns on through the rain — only a touch
@@ -3361,11 +3371,13 @@ export function PlaceScene() {
       {/* The chief himself, once the use key has brought him out (design.md
           §12): he walks across to his drummer, stays his minute and walks home;
           back in the hut he leaves the scene until the hut is used afresh. */}
-      {isVillage &&
-        chiefOutside[place.id] &&
-        layout.interactives
-          .filter((it) => it.type === 'chief')
-          .map((it, i) => <Chief key={`chief-${i}`} item={it} style={style} dress={dress} />)}
+      {isVillage && chiefOutside[place.id] && (
+        <PlaceDumpGroup id="chief" kind="chief">
+          {layout.interactives
+            .filter((it) => it.type === 'chief')
+            .map((it, i) => <Chief key={`chief-${i}`} item={it} style={style} dress={dress} />)}
+        </PlaceDumpGroup>
+      )}
 
       {/* Orientation after meeting the chief (design.md §17): every interactive
           building, the chief's hut included, carries a pulsing marker. */}
@@ -3388,9 +3400,11 @@ export function PlaceScene() {
           sparse Thomas-Cook-era ambient life around them. */}
       {isMonument && <GizaMonuments />}
       {isMonument && (
-        <GizaAmbient
-          anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex }))}
-        />
+        <PlaceDumpGroup id="giza-ambient" kind="giza-ambient">
+          <GizaAmbient
+            anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex }))}
+          />
+        </PlaceDumpGroup>
       )}
 
       {isVillage && (
