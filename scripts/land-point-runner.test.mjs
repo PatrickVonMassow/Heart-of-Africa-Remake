@@ -44,6 +44,10 @@ import { childWords } from './land-point-core.mjs'
 import { gatherActiveWorkSource } from './active-work-source.mjs'
 import { DISPOSITION, branchDeletionBlocker, judgeCleanupTarget } from './land-cleanup-core.mjs'
 
+// Root ignores permission bits (cloud clones run as root), so a chmod cannot
+// make the real read or write path fail in-process; those cases skip there.
+const permissionBitsIgnored = process.getuid?.() === 0
+
 /** A child that takes a measurable, deterministic amount of time. */
 const slowChild = (ms) => ({ cmd: process.execPath, args: ['-e', `setTimeout(() => {}, ${ms})`], id: 'slow' })
 
@@ -799,7 +803,7 @@ describe('the landing settles the now-card before it publishes', () => {
     expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
   })
 
-  it("NEVER tells the operator to clear a focus that names another point's work", () => {
+  it.skipIf(permissionBitsIgnored)("NEVER tells the operator to clear a focus that names another point's work", () => {
     const { focusPath, declarationPath, dir } = settleScene()
     // The focus names 1091, which is still open; only the evidence names 1088.
     writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
@@ -955,7 +959,7 @@ describe('carryRunRecords', () => {
   // Astra, round 4: a predicate with a side effect charged ONE unreachable
   // record twice — once for the stat that could not judge it, once for the copy
   // that then failed on the same entry.
-  it('counts an unreachable destination entry exactly once', () => {
+  it.skipIf(permissionBitsIgnored)('counts an unreachable destination entry exactly once', () => {
     const { root, own } = scene()
     const dest = join(root, 'local', 'verify-logs')
     writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
@@ -974,7 +978,7 @@ describe('carryRunRecords', () => {
   })
 
   // Astra, confirming pass 1/3: an unreadable SOURCE is not "nothing to carry".
-  it('counts a discovery that failed, and not a logs directory that is simply absent', () => {
+  it.skipIf(permissionBitsIgnored)('counts a discovery that failed, and not a logs directory that is simply absent', () => {
     const { root, own } = scene()
     const logs = join(own, 'local', 'verify-logs')
     writeRecord(logs, 'stamp-docs.log.run.json', 'feat/608-x')
