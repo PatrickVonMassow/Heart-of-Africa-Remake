@@ -15862,6 +15862,11 @@ to land than a mechanism that needs a review.
   are truly hidden.
   Verifiable: `VERIFY_GL=webgl npm test -- polish-villagers --section=villager-canoe` green on two
   consecutive runs; WebGPU section stays green.
+  Also (findings 25.10.2026, same section and occlusion reading): the children's-game check
+  "from behind the upstream rock the children's game is in frame" saw 2/5 children on WebGL 2 at
+  feat/1446 957968566 and again at feat/1333 8d9d3217e (log 2026-10-25T20-16-48-094), green on
+  WebGPU; the same run also reddened "village walk: each arm swings against its own side's leg"
+  (gait gaps) on WebGL 2 only. Name both causes here; split if they prove unrelated.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side occlusion, no player impact measured.
 - [ ] 1382. The WebGPU polish-villagers suite finishes inside its wall timeout.
