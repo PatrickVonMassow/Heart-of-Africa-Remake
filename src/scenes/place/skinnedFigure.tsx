@@ -883,6 +883,10 @@ export function SkinnedFigure({
         g.userData.gait = f ? gaitWeights(m.speed / f.scale, f.legScale) : null
       }
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
+      // The kneel and trunk lean the bug-report dump reads, in every build
+    // (placeDumpRead.ts); the lean is the one drawn last frame.
+      g.userData.dumpKneel = m.kneel
+      g.userData.dumpLean = trunk.current?.rotation.x ?? null
       const actor = g.userData.actor as { height: number } | undefined
       if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown
     }

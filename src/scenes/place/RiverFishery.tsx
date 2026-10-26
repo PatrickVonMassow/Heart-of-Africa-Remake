@@ -76,6 +76,8 @@ import { devAssert } from '../../systems/devAssert'
 import { isLifeFrozen } from './lifeFreeze'
 import { Pounder } from './Pounder'
 import { FisheryNetMan } from './FisheryNetMan'
+import { figureSnapshot, objectSnapshot, shownInScene, usePlaceDumpProvider } from './placeDumpRead'
+import type { PlaceFigureSnapshot, PlaceObjectSnapshot } from '../../systems/placeDump'
 
 /** The speech-label id of the net man's words (the dugout's, as before). */
 export const CANOE_SPEAKER_ID = 'village-canoe'
@@ -333,6 +335,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
   const carrierKneelK = useRef(0)
   const carrierCutPose = useRef<FigurePose>({ ...REST_POSE })
   const gutFish = useRef<THREE.Mesh>(null)
+  const grillerG = useRef<THREE.Group>(null)
   const grillerPose = useRef<FigurePose | null>({ ...REST_POSE })
   const grillerLimbs = useRef<FigureLimbs | null>(null)
   const boardFish = useRef<Array<THREE.Mesh | null>>([])
@@ -630,6 +633,75 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
       // At the mortar `Pounder`'s standing bodies hold their places.
       b.active = away
     })
+  })
+
+  // THE FISHERY'S RUNTIME FOR THE BUG-REPORT DUMP (placeDump.ts), in every
+  // build: the dugout and its clock, the two men, the carrier, the griller and
+  // both baskets with who holds them — what a report about this vignette
+  // needs and what otherwise lives only in these refs. The pounding pair
+  // reports itself (`Pounder`, as `fishery-pounders`).
+  usePlaceDumpProvider('fishery', () => {
+    const nm = canoe.netMan
+    const c = fire.carrier
+    const g = fire.griller
+    const figs: PlaceFigureSnapshot[] = []
+    const objects: PlaceObjectSnapshot[] = []
+    if (paddlerG.current) {
+      figs.push(figureSnapshot(paddlerG.current, {
+        id: 'fishery/paddler', role: 'canoe-paddler', phase: canoe.phase, action: canoe.paddlerAction,
+        lean: paddlerPose.current?.lean ?? null, extra: { stroke: canoe.stroke },
+      }))
+    }
+    if (netMan.current) {
+      figs.push(figureSnapshot(netMan.current, {
+        id: 'fishery/netman', role: 'net-man', phase: canoe.phase, action: nm.action,
+        lean: netPose.current?.lean ?? null, squat: netSquat.current,
+        extra: { inBoat: nm.inBoat, reach: nm.reach, kneels: netKneels.current },
+      }))
+    }
+    if (carrierWalk.current) {
+      figs.push(figureSnapshot(carrierWalk.current, {
+        id: 'fishery/carrier', role: 'fish-carrier', phase: c.phase, action: carrierDown.current ? 'kneel' : c.phase === 'toBank' || c.phase === 'toFire' ? 'walk' : 'stand',
+        lean: carrierWalkPoseRef.current?.lean ?? null,
+        extra: { clock: c.clock, kneelArms: carrierKneelK.current, walked: c.walked, gutOf: c.gutOf, gutted: c.gutted, waiting: c.waiting },
+      }))
+    }
+    if (grillerG.current) {
+      figs.push(figureSnapshot(grillerG.current, {
+        id: 'fishery/griller', role: 'fish-griller', phase: g.action, action: g.action,
+        lean: grillerPose.current?.lean ?? null, extra: { clock: g.clock, slot: g.slot },
+      }))
+    }
+    const holderOf = { netman: 'fishery/netman', carrier: 'fishery/carrier', bank: 'bank', fire: 'fire' } as const
+    for (const b of ring.baskets) {
+      const node = basketGroups.current[b.id]
+      if (!node) continue
+      objects.push(objectSnapshot(node, { id: `fishery/basket/${b.id}`, kind: 'fish-basket', holder: holderOf[b.at], extra: { at: b.at, fish: b.fish } }))
+    }
+    if (gutFish.current && shownInScene(gutFish.current)) {
+      objects.push(objectSnapshot(gutFish.current, { id: 'fishery/gutting-fish', kind: 'fish', holder: 'fishery/carrier' }))
+    }
+    return {
+      kind: 'river-fishery',
+      state: {
+        canoe: {
+          phase: canoe.phase, clock: canoe.clock, s: canoe.s, x: canoe.x, z: canoe.z, yaw: canoe.yaw,
+          net: canoe.net, catch: canoe.catch, landed: canoe.landed, inHull: canoe.inHull,
+          word: canoe.word ? { ...canoe.word } : null, calls: canoe.calls, lastCall: canoe.lastCall,
+          basketWait: canoe.basketWait, rounds: canoe.rounds,
+        },
+        fire: {
+          board: fire.board, grill: fire.grill.length, rack: fire.rack.length, storage: fire.storage,
+          smoked: fire.smoked, eaten: fire.eaten, sheltered: fireRain.current.sheltered, rainFactor: fireRain.current.rainFactor,
+        },
+        sites: {
+          fire: sites.fire, rack: sites.rack, board: sites.board, storage: sites.storage,
+          fireBasket: sites.fireBasket, basketSpot: sites.basketSpot, duoMortar: sites.duoMortar,
+        },
+      },
+      figures: figs,
+      objects,
+    }
   })
 
   // Dev hooks for the headless verification (CLAUDE.md §7.2).
@@ -964,11 +1036,11 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
         />
       </group>
       {/* THE GRILLER, kneeling at the fire. */}
-      <group name="fish-griller" position={[sites.griller.x, groundHeight(sites.griller.x, sites.griller.z), sites.griller.z]} rotation={[0, sites.griller.yaw, 0]}>
+      <group ref={grillerG} name="fish-griller" position={[sites.griller.x, groundHeight(sites.griller.x, sites.griller.z), sites.griller.z]} rotation={[0, sites.griller.yaw, 0]}>
         <Figure cloth={clothOf(3)} kneel pose={grillerPose} limbs={grillerLimbs} />
       </group>
       {/* THE POUNDING PAIR at the village's one mortar outside the middle (point 1282). */}
-      <Pounder x={sites.duoMortar.x} z={sites.duoMortar.z} yaw={sites.duoYaw} cloth={[clothOf(4), clothOf(0)]} duo={fire.duo} />
+      <Pounder x={sites.duoMortar.x} z={sites.duoMortar.z} yaw={sites.duoYaw} cloth={[clothOf(4), clothOf(0)]} duo={fire.duo} dumpId="fishery-pounders" />
     </>
   )
 }

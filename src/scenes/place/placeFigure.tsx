@@ -235,6 +235,12 @@ function PrimitiveFigure({
     // Dev: the kneel the village-walk verification reads (as the skinned
     // walk's) — every frame, since a render replaces the group's userData.
     if (import.meta.env.DEV && outer.current) outer.current.userData.kneel = kneelK.current
+    // The kneel and trunk lean the bug-report dump reads, in every build
+    // (placeDumpRead.ts); the lean is the one drawn last frame.
+    if (outer.current) {
+      outer.current.userData.dumpKneel = kneelK.current
+      outer.current.userData.dumpLean = trunk.current?.rotation.x ?? null
+    }
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
       gesture.current = advanceGesture(gesture.current, dt)

@@ -23,6 +23,8 @@ import { speechBearing } from './speechBearing'
 import { isLifeFrozen } from './lifeFreeze'
 import { reachPose } from './fisheryPoses'
 import { biteLift } from './fishFire'
+import { figureSnapshot, objectSnapshot, shownInScene, usePlaceDumpProvider } from './placeDumpRead'
+import type { PlaceFigureSnapshot, PlaceObjectSnapshot } from '../../systems/placeDump'
 import {
   advancePounding,
   bowlRadiusAt,
@@ -97,12 +99,14 @@ function intoWomanFrame(
  * the fishers' fire steps — walking to the rack, eating, walking back.
  * `yaw` turns the mortar's frame; by default woman 0 faces the village middle.
  */
-export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn }: {
+export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn, dumpId = 'pounder' }: {
   x: number
   z: number
   yaw?: number
   cloth: readonly string[]
   duo?: PoundingDuo
+  /** Its vignette id in the bug-report dump (placeDump.ts). */
+  dumpId?: string
 }) {
   const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
@@ -180,6 +184,39 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn }: {
       delete w.__placePounding
     }
   }, [x, z, gy, yaw, count, cfg, duo, stands])
+
+  // The pair's runtime for the bug-report dump: each woman, her pestle and
+  // the fish she carries back from the rack.
+  usePlaceDumpProvider(dumpId, () => {
+    const figs: PlaceFigureSnapshot[] = []
+    const objects: PlaceObjectSnapshot[] = []
+    for (let i = 0; i < count; i++) {
+      const g = figures.current[i]
+      const woman = duo.women[i]
+      if (!g || !woman) continue
+      const id = `${dumpId}/${i}`
+      const stroke = womanStrokePhase(duo, i, cfg)
+      figs.push(figureSnapshot(g, {
+        id,
+        role: 'pounder',
+        phase: duo.phase,
+        action: stroke !== null ? 'pound' : woman.arrived ? 'stand' : 'walk',
+        lean: poses.current[i].current?.lean ?? null,
+        squat: squats.current[i].current,
+        extra: { clock: duo.clock, stroke, impacts: woman.impacts, fish: woman.fish, arrived: woman.arrived, resting: woman.resting },
+      }))
+      const pestle = pestles.current[i]
+      if (pestle) objects.push(objectSnapshot(pestle, { id: `${id}/pestle`, kind: 'pestle', holder: stroke !== null ? id : 'mortar' }))
+      const f = fish.current[i]
+      if (f && shownInScene(f)) objects.push(objectSnapshot(f, { id: `${id}/fish`, kind: 'smoked-fish', holder: id }))
+    }
+    return {
+      kind: 'pounding',
+      state: { mortar: { x, y: gy, z, yaw }, phase: duo.phase, clock: duo.clock, poundClock: duo.poundClock, next: duo.next, visits: duo.visits },
+      figures: figs,
+      objects,
+    }
+  })
 
   useFrame((_, rawDt) => {
     if (isLifeFrozen()) return
