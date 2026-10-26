@@ -15,6 +15,7 @@ import { dumpGameState } from '../../state/stateDump'
 import { placeDumpProviderIds, placeSection, type PlaceDump } from '../../systems/placeDump'
 import { PLACE_RADIUS } from './layout'
 import { buildRiverBank, type PlaceRiverBank } from './riverBank'
+import { canoeCycleSeconds } from './villagerCanoe'
 
 // A drawn figure as the dump reads it: the outer `inhabitant` group with its
 // kneel and lean, a crown 1.6 m up carrying the head load, and the hand load.
@@ -151,15 +152,38 @@ describe('the place section of the state dump', () => {
 
     const baskets = fishery.objects.filter((o) => o.kind === 'fish-basket')
     expect(baskets.map((b) => b.id).sort()).toEqual(['fishery/basket/0', 'fishery/basket/1'])
-    const figureIds = new Set(fishery.figures.map((f) => f.id))
-    for (const b of baskets) {
-      expect(['bank', 'fire'].includes(b.holder) || figureIds.has(b.holder), b.holder).toBe(true)
-      expect(b.extra).toMatchObject({ at: expect.any(String), fish: expect.any(Number) })
-      // A basket held by a figure is at that figure: on the carrier's crown,
-      // in the net man's hands.
-      const holder = fishery.figures.find((f) => f.id === b.holder)
-      if (holder) expect(Math.hypot(b.pos.x - holder.pos.x, b.pos.z - holder.pos.z)).toBeLessThan(1)
+  })
+
+  it('names each basket\'s holder exactly as the ring places it, through a whole round of the boat', () => {
+    // The holder each ring place must be reported as, and where it must stand.
+    const holderOf: Record<string, string> = { netman: 'fishery/netman', carrier: 'fishery/carrier', bank: 'bank', fire: 'fire' }
+    const seen = new Set<string>()
+    let t = 3
+    const limit = t + 2 * canoeCycleSeconds()
+    let samples = 0
+    while (t < limit && !(seen.has('netman') && seen.has('carrier') && seen.has('bank') && seen.has('fire'))) {
+      // 0.1 s frames, the step the scenes clamp to; a dump every second.
+      for (let k = 0; k < 10; k++) {
+        t += 0.1
+        act(() => advance(t))
+      }
+      const fishery = placeSection(null).vignettes.find((v) => v.id === 'fishery')!
+      const sites = (fishery.state as { sites: Record<string, { x: number; z: number }> }).sites
+      const baskets = fishery.objects.filter((o) => o.kind === 'fish-basket')
+      expect(baskets).toHaveLength(2)
+      for (const b of baskets) {
+        const at = (b.extra as { at: string }).at
+        seen.add(at)
+        expect(b.holder, `${b.id} at ${at}`).toBe(holderOf[at])
+        const stand = at === 'bank' ? sites.basketSpot : at === 'fire' ? sites.fireBasket : fishery.figures.find((f) => f.id === b.holder)!.pos
+        // On the bank two stand side by side for the moment of a swap.
+        expect(Math.hypot(b.pos.x - stand.x, b.pos.z - stand.z), `${b.id} at ${at}`).toBeLessThan(at === 'bank' ? 0.5 : 1)
+        if (at === 'carrier') expect(b.pos.y - fishery.figures.find((f) => f.id === b.holder)!.pos.y).toBeGreaterThan(1)
+      }
+      samples++
     }
+    expect([...seen].sort()).toEqual(['bank', 'carrier', 'fire', 'netman'])
+    expect(samples).toBeGreaterThan(5)
   })
 
   it('names a scanned figure\'s head load with its holder and the drawn pose values', () => {
