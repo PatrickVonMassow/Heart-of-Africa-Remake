@@ -15857,6 +15857,9 @@ to land than a mechanism that needs a review.
   feat/1446 957968566 and again at feat/1333 8d9d3217e (log 2026-10-25T20-16-48-094), green on
   WebGPU; the same run also reddened "village walk: each arm swings against its own side's leg"
   (gait gaps) on WebGL 2 only. Name both causes here; split if they prove unrelated.
+  Also (finding 26.10.2026, feat/1415 d3201e61c): the same gait-gap signature reddened WebGPU
+  `--section=village-walk` once in three narrow runs ("planted stances were observed", "a planted
+  foot does not slide"; walker 2 gaitWalk 0 at ~2 m/s), log local/1415-suspect-rungs.log.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side occlusion, no player impact measured.
 - [ ] 1382. The WebGPU polish-villagers suite finishes inside its wall timeout.
