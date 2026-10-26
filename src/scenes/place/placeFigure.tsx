@@ -235,12 +235,8 @@ function PrimitiveFigure({
     // Dev: the kneel the village-walk verification reads (as the skinned
     // walk's) — every frame, since a render replaces the group's userData.
     if (import.meta.env.DEV && outer.current) outer.current.userData.kneel = kneelK.current
-    // The kneel and trunk lean the bug-report dump reads, in every build
-    // (placeDumpRead.ts); the lean is the one drawn last frame.
-    if (outer.current) {
-      outer.current.userData.dumpKneel = kneelK.current
-      outer.current.userData.dumpLean = trunk.current?.rotation.x ?? null
-    }
+    // The kneel the bug-report dump reads, in every build (placeDumpRead.ts).
+    if (outer.current) outer.current.userData.dumpKneel = kneelK.current
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
       gesture.current = advanceGesture(gesture.current, dt)
@@ -305,7 +301,7 @@ function PrimitiveFigure({
         {/* The trunk pivots at the hip so a lean or a shake carries the arms and
             the head with it, and the legs (below) stay planted. The cone is a
             unit one laid out to the trunk's proportions. */}
-        <group ref={trunk} position={[0, hipY, 0]}>
+        <group ref={trunk} name="figure-trunk" position={[0, hipY, 0]}>
           <mesh ref={cone} position={[0, trunkH * 0.5, 0]} scale={[trunkRadius(lay), trunkH, trunkRadius(lay)]} castShadow>
             <coneGeometry args={[1, 1, TESSELLATION.figureBody]} />
             <meshStandardMaterial color={cloth} roughness={0.95} />

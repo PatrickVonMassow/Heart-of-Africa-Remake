@@ -21,7 +21,8 @@ import { buildRiverBank, type PlaceRiverBank } from './riverBank'
 vi.mock('./placeFigure', () => ({
   Figure({ kneel, headProp, handProp }: { kneel?: boolean; headProp?: React.ReactNode; handProp?: React.ReactNode }) {
     return (
-      <group name="inhabitant" userData={{ dumpKneel: kneel ? 1 : 0, dumpLean: 0.1 }}>
+      <group name="inhabitant" userData={{ dumpKneel: kneel ? 1 : 0 }}>
+        <group name="figure-trunk" rotation={[0.1, 0, 0]} />
         <group name="figure-crown" position={[0, 1.6, 0]}>
           {headProp}
         </group>

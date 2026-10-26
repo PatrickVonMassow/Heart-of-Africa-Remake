@@ -21,6 +21,8 @@ import { crownIn } from './placeFigureContext'
 
 /** The name every drawn figure's outer group carries (placeFigure, skinnedFigure). */
 const FIGURE_NAME = 'inhabitant'
+/** The trunk group the pose's lean tips (render/figurePose.ts). */
+const TRUNK_NAME = 'figure-trunk'
 
 /** Named meshes and groups that are a carried or set-down load. */
 export const PLACE_DUMP_LOADS: readonly string[] = [
@@ -82,7 +84,10 @@ export function figureSnapshot(node: THREE.Object3D, meta: FigureMeta): PlaceFig
   fig.getWorldDirection(_d)
   fig.getWorldScale(_s)
   const head = crownIn(fig, null, _v) ? vec(_v) : null
-  const ud = fig.userData as { dumpKneel?: number; dumpLean?: number | null; actor?: { kind?: string } }
+  const ud = fig.userData as { dumpKneel?: number; actor?: { kind?: string } }
+  // The lean as drawn NOW, read off the trunk rather than cached in a frame
+  // loop: a pose may be applied after the figure's own frame callback.
+  const trunk = fig.getObjectByName(TRUNK_NAME)
   return {
     id: meta.id,
     role: meta.role ?? ud.actor?.kind ?? 'figure',
@@ -91,7 +96,7 @@ export function figureSnapshot(node: THREE.Object3D, meta: FigureMeta): PlaceFig
     phase: meta.phase ?? null,
     action: meta.action ?? null,
     pose: {
-      lean: meta.lean !== undefined ? meta.lean : ud.dumpLean ?? null,
+      lean: meta.lean !== undefined ? meta.lean : trunk ? trunk.rotation.x : null,
       squat: meta.squat !== undefined ? meta.squat : _s.x > 1e-6 ? _s.y / _s.x : null,
       kneel: meta.kneel !== undefined ? meta.kneel : ud.dumpKneel ?? null,
     },

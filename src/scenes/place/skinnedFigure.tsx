@@ -883,10 +883,8 @@ export function SkinnedFigure({
         g.userData.gait = f ? gaitWeights(m.speed / f.scale, f.legScale) : null
       }
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
-      // The kneel and trunk lean the bug-report dump reads, in every build
-    // (placeDumpRead.ts); the lean is the one drawn last frame.
+      // The kneel the bug-report dump reads, in every build (placeDumpRead.ts).
       g.userData.dumpKneel = m.kneel
-      g.userData.dumpLean = trunk.current?.rotation.x ?? null
       const actor = g.userData.actor as { height: number } | undefined
       if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown
     }
@@ -922,7 +920,7 @@ export function SkinnedFigure({
       ))}
       {/* The virtual primitive rig — pivots only, nothing drawn. */}
       <group ref={virtualRoot} scale={[1, virtualSquash, 1]} visible={false}>
-        <group ref={trunk} position={[0, hipY, 0]}>
+        <group ref={trunk} name="figure-trunk" position={[0, hipY, 0]}>
           {[0, 1].map((i) => (
             <group key={i} position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]} ref={armRef[i]}>
               <object3D
