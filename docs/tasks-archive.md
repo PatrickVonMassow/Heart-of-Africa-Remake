@@ -34974,3 +34974,10 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Verifiable: a Vitest asserts fish-to-body clearance over the whole work cycle; a capture of the kneeling woman shows a readable task without clipping, judged by a person.
   Criticality: medium - visible at the beach work site.
   Bundle: Dorfleben.
+
+- [x] 1450. Rack women's eating gesture lifts the hand over the head instead of to the mouth
+  Final state: during the eat phase at the Bambara fish rack the hand holding the fish comes to the mouth, never above the head, on WebGPU and WebGL 2.
+  Verifiable: a Vitest over `rackPose` bounds the eating hand's height to the mouth band across the whole eat cycle; a capture sequence of the rack, judged by a person, shows the bite at the mouth.
+  Observed problem: at the point-1416 picture check (26.10.2026, both backends, seed 42, frames local/1416-seq-webgpu and local/1416-seq-webgl, sheets local/1416-sheet-*-a.png) each pounding woman raises her left forearm onto/behind the top of her head; the bite reads as scratching the head. Pose source: the eat branch of `rackPose` in src/scenes/place/fisheryPoses.ts (armAim(0.35, -0.55+1.35*biteLift), reach 0.85). Whether 1416's bent-arm reach introduced it is not measured.
+  Source: findings carrier 26.10.2026 14:20 (point-1416 picture check).
+  Bundle: Dorfleben.
