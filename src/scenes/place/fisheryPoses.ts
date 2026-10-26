@@ -5,10 +5,14 @@
 
 import type * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
-import { armAim, copyPoseExtras, handAt, type FigurePose } from '../../render/gesture'
+import { armAim, copyPoseExtras, handAt, REST_POSE, type FigurePose } from '../../render/gesture'
 import { FISH_BASKET } from './fishBaskets'
+import { biteLift } from './fishFire'
+import type { PoundingDuo } from './mortarPounding'
 import { HEAD_CARRY_POSE } from './placeFigureContext'
 import type { CanoeNetMan } from './villagerCanoe'
+
+type FireConfig = typeof balance.villageLife.fishFire
 
 /** Both arms reaching toward a bearing and down, for lifting or setting down. */
 export function reachPose(bearing: number, down: number): FigurePose {
@@ -57,6 +61,20 @@ export function blendPose(into: FigurePose, a: FigurePose, b: FigurePose, t: num
   into.right = { pitch: mix(a.right.pitch, b.right.pitch), yaw: mix(a.right.yaw, b.right.yaw), roll: mix(a.right.roll, b.right.roll) }
   into.lean = mix(a.lean, b.lean)
   into.turn = mix(a.turn, b.turn)
+}
+
+/** What a woman of the pounding pair does with her arms away from the mortar
+ *  (point 1282): reaching to the rack, eating the fish she took, else at rest. */
+export function rackPose(
+  duo: Pick<PoundingDuo, 'phase' | 'clock' | 'women'>,
+  woman: number,
+  cfg: FireConfig = balance.villageLife.fishFire,
+): FigurePose {
+  if (duo.phase === 'take') return reachPose(0, 0.3 * Math.sin(Math.PI * Math.min(1, duo.clock / cfg.takeSeconds)))
+  if (duo.phase === 'eat' && duo.women[woman].fish > 0) {
+    return { left: armAim(0.35, -0.55 + 1.35 * biteLift(duo, cfg, woman)), right: { ...REST_POSE.right }, lean: 0.04, turn: 0 }
+  }
+  return { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: REST_POSE.lean, turn: REST_POSE.turn }
 }
 
 /** How far down he goes as he lifts or sets the basket ashore (fraction of his height). */

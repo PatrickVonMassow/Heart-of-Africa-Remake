@@ -11,7 +11,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
-import { armAim, copyPoseExtras, REST_POSE, type FigurePose } from '../../render/gesture'
+import { copyPoseExtras, type FigurePose } from '../../render/gesture'
 import { gaitCadence, gaitPhase } from '../../render/fauna'
 import { buildFishGeometry, FISH_TONES } from '../../render/fishMesh'
 import { playPoundThud } from '../../systems/ambience'
@@ -21,8 +21,7 @@ import { useStandingBodies } from './placeFigureContext'
 import { placePlayerPosition } from './playerPosition'
 import { speechBearing } from './speechBearing'
 import { isLifeFrozen } from './lifeFreeze'
-import { reachPose } from './fisheryPoses'
-import { biteLift } from './fishFire'
+import { rackPose } from './fisheryPoses'
 import { figureSnapshot, objectSnapshot, shownInScene, usePlaceDumpProvider } from './placeDumpRead'
 import type { PlaceFigureSnapshot, PlaceObjectSnapshot } from '../../systems/placeDump'
 import {
@@ -261,13 +260,7 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn, dumpId = 'pounder
         const walking = !woman.arrived && (duo.phase === 'toRack' || duo.phase === 'back')
         gaits.current[i].current = walking ? gaitPhase(woman.walked, cadence) : 0
         if (pose) {
-          const fireCfg = balance.villageLife.fishFire
-          const next: FigurePose =
-            duo.phase === 'take'
-              ? reachPose(0, 0.3 * Math.sin(Math.PI * Math.min(1, duo.clock / fireCfg.takeSeconds)))
-              : duo.phase === 'eat' && woman.fish > 0
-                ? { left: armAim(0.35, -0.55 + 1.35 * biteLift(duo, fireCfg, i)), right: { ...REST_POSE.right }, lean: 0.04, turn: 0 }
-                : { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: REST_POSE.lean, turn: REST_POSE.turn }
+          const next = rackPose(duo, i)
           Object.assign(pose.left, next.left)
           Object.assign(pose.right, next.right)
           pose.lean = next.lean
