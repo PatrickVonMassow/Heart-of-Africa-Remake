@@ -703,3 +703,22 @@ describe('only a command that mentions finding.mjs or --request is judged (cloud
     expect(isPossibleDeposit('node scripts/fin*.mjs --re?uest Hidden')).toBe(false)
   })
 })
+
+describe('ordinary read commands pass in a chat session (19.10.2026 read blockade)', () => {
+  // the session that hit it: a human conversation, so every judged command meets the chat refusal
+  const chat = [human('start'), said(`Vorschlag: ${TITLE}`), human('ja')]
+  // the timestamp command scripts/hooks/berlin-timestamp.cjs itself prescribes
+  const TIMESTAMP =
+    `node -e "console.log(new Intl.DateTimeFormat('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',` +
+    `year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Berlin'}).format(new Date()))"`
+
+  it.each([`grep -rliE "unload|basket" src | head`, 'sed -n 775,805p src/main.ts', TIMESTAMP])('allowed: %s', (command) => {
+    expect(isPossibleDeposit(command), command).toBe(false)
+    expect(evaluate({ command, entries: chat }), command).toEqual({ block: false })
+  })
+
+  it('a real non-canonical deposit is still refused, even with the user approval on record', () => {
+    expect(evaluate({ command: `cat /tmp/s.md | ${deposit('ja')}`, entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
+    expect(evaluate({ command: deposit('ja'), entries: chat })).toEqual({ block: false })
+  })
+})
