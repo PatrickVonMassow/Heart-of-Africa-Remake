@@ -96,8 +96,11 @@ describe('the carrier gutting at the fire', () => {
     const index = mesh.geometry.index
     const corner = (k: number) => (index ? index.getX(k) : k)
     const tris: [number, number, number][] = []
+    // The whole closed surface, hands included: only it can tell inside from outside.
+    const allTris: [number, number, number][] = []
     for (let k = 0; k + 2 < (index ? index.count : pos.count); k += 3) {
       const tri: [number, number, number] = [corner(k), corner(k + 1), corner(k + 2)]
+      allTris.push(tri)
       if (tri.every((i) => isBody[i])) tris.push(tri)
     }
     expect(tris.length).toBeGreaterThan(1000)
@@ -113,6 +116,30 @@ describe('the carrier gutting at the fire', () => {
     const tri = new THREE.Triangle()
     const ray = new THREE.Ray()
     const hit = new THREE.Vector3()
+    const fishTri = new THREE.Triangle()
+    const centre = new THREE.Vector3()
+    /** Shortest distance between the segments p0→p1 and q0→q1. */
+    const segmentGap = (p0: THREE.Vector3, p1: THREE.Vector3, q0: THREE.Vector3, q1: THREE.Vector3) => {
+      const d1 = p1.clone().sub(p0)
+      const d2 = q1.clone().sub(q0)
+      const r = p0.clone().sub(q0)
+      const a = d1.dot(d1)
+      const e = d2.dot(d2)
+      const f = d2.dot(r)
+      const c = d1.dot(r)
+      const b = d1.dot(d2)
+      const den = a * e - b * b
+      let s = a > 1e-12 && den > 1e-12 ? THREE.MathUtils.clamp((b * f - c * e) / den, 0, 1) : 0
+      let u = e > 1e-12 ? (b * s + f) / e : 0
+      if (u < 0) {
+        u = 0
+        s = a > 1e-12 ? THREE.MathUtils.clamp(-c / a, 0, 1) : 0
+      } else if (u > 1) {
+        u = 1
+        s = a > 1e-12 ? THREE.MathUtils.clamp((b - c) / a, 0, 1) : 0
+      }
+      return p0.clone().addScaledVector(d1, s).distanceTo(q0.clone().addScaledVector(d2, u))
+    }
     /** Whether the segment a→b passes through the triangle. */
     const crosses = (a: THREE.Vector3, b: THREE.Vector3, t0: THREE.Vector3, t1: THREE.Vector3, t2: THREE.Vector3) => {
       const len = a.distanceTo(b)
@@ -157,18 +184,29 @@ describe('the carrier gutting at the fire', () => {
       // Every body triangle near the fish; one farther off cannot be within the margin.
       box.expandByScalar(0.1)
       const near = tris.filter(([a, b, c]) => box.intersectsBox(new THREE.Box3().setFromPoints([at[a], at[b], at[c]])))
-      // Each fish point's distance to the body's surface.
-      for (const p of fishAt) {
+      // Triangle-to-triangle distance between the fish and the body: with no
+      // crossing (checked below) it is the least of each surface's points to the
+      // other's triangles and of edge-to-edge gaps.
+      for (let k = 0; k + 2 < fishAt.length; k += 3) {
+        const fv = [fishAt[k], fishAt[k + 1], fishAt[k + 2]]
+        fishTri.set(fv[0], fv[1], fv[2])
         for (const [a, b, c] of near) {
-          tri.set(at[a], at[b], at[c])
-          worst = Math.min(worst, p.distanceTo(tri.closestPointToPoint(p, q)))
+          const bv = [at[a], at[b], at[c]]
+          tri.set(bv[0], bv[1], bv[2])
+          for (const p of fv) worst = Math.min(worst, p.distanceTo(tri.closestPointToPoint(p, q)))
+          for (const p of bv) worst = Math.min(worst, p.distanceTo(fishTri.closestPointToPoint(p, q)))
+          for (let i = 0; i < 3; i++)
+            for (let j = 0; j < 3; j++) worst = Math.min(worst, segmentGap(fv[i], fv[(i + 1) % 3], bv[j], bv[(j + 1) % 3]))
         }
       }
-      // Which side of that surface the fish is on: a ray from it that meets
-      // no body triangle at all leaves from outside. (The nearest triangle's
-      // own normal cannot tell: at a distance the nearest feature is an edge.)
-      const from = fishAt[0]
-      if (OUT_RAYS.some((d) => tris.every(([a, b, c]) => ray.set(from, d).intersectTriangle(at[a], at[b], at[c], false, hit) === null))) outside++
+      // Which side of the closed surface the fish is on: a ray from its centre
+      // that meets no triangle at all, hands included, leaves from outside. (The
+      // nearest triangle's own normal cannot tell: at a distance the nearest
+      // feature is an edge.)
+      centre.set(0, 0, 0)
+      for (const p of fishAt) centre.add(p)
+      centre.divideScalar(fishAt.length)
+      if (OUT_RAYS.some((d) => allTris.every(([a, b, c]) => ray.set(centre, d).intersectTriangle(at[a], at[b], at[c], false, hit) === null))) outside++
       // And no edge of either surface passes through the other between the points.
       for (let k = 0; k + 2 < fishAt.length; k += 3) {
         const [f0, f1, f2] = [fishAt[k], fishAt[k + 1], fishAt[k + 2]]
