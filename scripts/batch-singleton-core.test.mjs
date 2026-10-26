@@ -31,6 +31,7 @@ import {
   acquisitionExpectationMatches,
   heartbeat,
   release,
+  updateOwnLock,
   readOwnerLock,
   heldByOtherLiveOwner,
   convertPendingSpawn,
@@ -1108,7 +1109,7 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).claimedAt).toBe(before + 5000)
   })
 
-  it('convertPendingSpawn binds only a pending lock to the matching spawned pid (or a one-shot authorization)', () => {
+  it('convertPendingSpawn binds only a pending lock to the matching spawned pid', () => {
     // A live SESSION lock is never converted.
     acquire('s1', opts())
     expect(convertPendingSpawn('spawned', { lockPath, pid: 555, authorized: true })).toBe(false)
@@ -1120,6 +1121,24 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     const lock = readOwnerLock(lockPath)
     expect(lock.sessionId).toBe('spawned')
     expect(lock.kind).toBe('session')
+  })
+
+  it('a foreign session start after a handover never converts the successor reservation, marker or not', () => {
+    // The measured sequence of 23.10.2026: the owner hands over and leaves, the
+    // launcher reserves the batch for the child it spawned, then a /clear in an
+    // unrelated chat fires SessionStart while the authorization marker exists.
+    acquire('owner-1', opts())
+    expect(markHandover('owner-1', { lockPath, point: 1, now: NOW })).toMatchObject({ handed: true })
+    release('owner-1', lockPath)
+    acquire('launcher-1', opts({ kind: 'pending-spawn' }))
+    expect(updateOwnLock('launcher-1', { spawnedPid: 555, pid: 555, pidStartedAt: NOW }, lockPath)).toBe(true)
+
+    expect(convertPendingSpawn('chat-window', { lockPath, pid: 777, authorized: true })).toBe(false)
+    expect(convertPendingSpawn('chat-window', { lockPath, findAncestorFn: () => null, authorized: true })).toBe(false)
+    expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'launcher-1', kind: 'pending-spawn', spawnedPid: 555 })
+
+    expect(convertPendingSpawn('successor', { lockPath, pid: 555 })).toBe(true)
+    expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'successor', kind: 'session', pid: 555 })
   })
 
   it('pending-spawn conversion preserves the token which binds supervised exit to this child', () => {

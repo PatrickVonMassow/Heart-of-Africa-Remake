@@ -2347,9 +2347,10 @@ export function touchHandover(sessionId, opts = {}) {
 /**
  * Convert a launcher 'pending-spawn' lock to this (just-spawned) session.
  * Succeeds only when the lock is pending AND names this session's claude
- * process (spawnedPid == our claude ancestor) or the caller vouches for a fresh
- * one-shot authorization (`opts.authorized`). Atomic via the same reap mutex.
- * Returns true on success.
+ * process (spawnedPid == our claude ancestor). The launcher's authorization
+ * marker is no substitute: it is readable by every window, so a /clear in an
+ * unrelated chat converted the successor's reservation (23.10.2026). Atomic via
+ * the same reap mutex. Returns true on success.
  */
 export function convertPendingSpawn(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
@@ -2361,7 +2362,7 @@ export function convertPendingSpawn(sessionId, opts = {}) {
     ? { pid: opts.pid, startedAt: opts.pidStartedAt ?? null }
     : (opts.findAncestorFn ?? findClaudeAncestor)()
   const pidMatches = anc && typeof lock.spawnedPid === 'number' && anc.pid === lock.spawnedPid
-  if (!pidMatches && !opts.authorized) return false
+  if (!pidMatches) return false
   if (!enterReapMutex(mutexPath)) return false
   try {
     const recheck = readOwnerLock(lockPath)
