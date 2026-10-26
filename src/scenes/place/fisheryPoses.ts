@@ -3,7 +3,7 @@
 // pose object is COPIED, never aliased to a shared template such as the
 // head-carry pose other vignettes use too.
 
-import type * as THREE from 'three/webgpu'
+import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { armAim, copyPoseExtras, handAt, REST_POSE, type FigurePose } from '../../render/gesture'
 import { FISH_BASKET } from './fishBaskets'
@@ -61,6 +61,80 @@ export function blendPose(into: FigurePose, a: FigurePose, b: FigurePose, t: num
   into.right = { pitch: mix(a.right.pitch, b.right.pitch), yaw: mix(a.right.yaw, b.right.yaw), roll: mix(a.right.roll, b.right.roll) }
   into.lean = mix(a.lean, b.lean)
   into.turn = mix(a.turn, b.turn)
+}
+
+/** Seconds of one gutting stroke: the knife hand drawn along the belly, then
+ *  lifted back to the head end. */
+const GUT_STROKE_SECONDS = 1.2
+/** The share of the stroke that is the cut; the rest is the return. */
+const GUT_CUT_SHARE = 0.7
+
+/**
+ * The carrier gutting at the fire (point 1417): kneeling, the fish held level
+ * and across in front of the knees by its head in the left hand, the right
+ * hand drawing along its belly from the head end to the tail and lifting back.
+ * Both hands are solved out on the drawn arms, clear of the thighs; the hold
+ * itself is `holdGutFish`.
+ */
+export function carrierGutPose(t: number): FigurePose {
+  const u = (((t / GUT_STROKE_SECONDS) % 1) + 1) % 1
+  const ease = (x: number) => x * x * (3 - 2 * x)
+  // 1 at the head end, 0 at the tail
+  const along = u < GUT_CUT_SHARE ? 1 - ease(u / GUT_CUT_SHARE) : ease((u - GUT_CUT_SHARE) / (1 - GUT_CUT_SHARE))
+  const lift = u < GUT_CUT_SHARE ? 0 : Math.sin((Math.PI * (u - GUT_CUT_SHARE)) / (1 - GUT_CUT_SHARE))
+  return {
+    left: armAim(0.3, -0.45),
+    right: armAim(0.4 + 0.3 * along, -0.55 + 0.15 * lift),
+    lean: 0.35,
+    turn: 0,
+    reach: { left: 1, right: 0.85 },
+  }
+}
+
+/** The carrier's arms for this frame: from his walking pose over to the
+ *  gutting by the kneel's own transition `k` (0 walking … 1 kneeling). */
+export function carrierPose(into: FigurePose, walk: FigurePose, k: number, t: number): void {
+  const gut = carrierGutPose(t)
+  blendPose(into, walk, gut, k)
+  copyPoseExtras(into, k > 0 ? gut : walk)
+}
+
+/** The fish being gutted, length 1 scaled to this (m). */
+export const GUT_FISH_SCALE = 0.3
+/** How far behind its head the hand grips it, along the fish (m). */
+const GUT_FISH_GRIP = 0.03
+// Head (+Z of the fish) to the figure's left (+X), back away from it (+Z), belly toward it.
+const FISH_ACROSS = new THREE.Quaternion().setFromRotationMatrix(
+  new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)),
+)
+const _hand = new THREE.Vector3()
+const _turn = new THREE.Quaternion()
+const _size = new THREE.Vector3()
+const _back = new THREE.Vector3()
+const _held = new THREE.Matrix4()
+const _inHand = new THREE.Matrix4()
+
+/**
+ * Places the fish in the gutting hand (`fish`, a child of that hand) level and
+ * across in front of the figure `figure`, whatever way the hand itself is
+ * turned: its head end in the palm, the rest toward the other hand. A fish
+ * that took the hand's own turn hung down into the lap (point 1417).
+ */
+export function holdGutFish(fish: THREE.Object3D, figure: THREE.Object3D): void {
+  const hand = fish.parent
+  if (!hand) return
+  figure.updateWorldMatrix(true, false)
+  hand.updateWorldMatrix(true, false)
+  hand.getWorldPosition(_hand)
+  figure.getWorldQuaternion(_turn)
+  figure.getWorldScale(_size)
+  const s = _size.x
+  // the fish's middle: its head (0.42 of its length ahead of it) the grip past the palm
+  _hand.add(_back.set(-(GUT_FISH_SCALE * 0.42 - GUT_FISH_GRIP) * s, 0, 0).applyQuaternion(_turn))
+  _turn.multiply(FISH_ACROSS)
+  _held.compose(_hand, _turn, _size.setScalar(GUT_FISH_SCALE * s))
+  _held.premultiply(_inHand.copy(hand.matrixWorld).invert())
+  _held.decompose(fish.position, fish.quaternion, fish.scale)
 }
 
 /** How far out a rack worker's posed hand is solved, as a share of her drawn
