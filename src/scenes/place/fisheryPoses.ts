@@ -5,7 +5,7 @@
 
 import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
-import { armAim, copyPoseExtras, handAt, REST_POSE, type FigurePose } from '../../render/gesture'
+import { armAim, copyPoseExtras, ELBOW_DEFAULT, handAt, REST_POSE, type FigurePose } from '../../render/gesture'
 import { FISH_BASKET } from './fishBaskets'
 import { biteLift } from './fishFire'
 import type { PoundingDuo } from './mortarPounding'
@@ -115,12 +115,13 @@ const _held = new THREE.Matrix4()
 const _inHand = new THREE.Matrix4()
 
 /**
- * Places the fish in the gutting hand (`fish`, a child of that hand) level and
- * across in front of the figure `figure`, whatever way the hand itself is
- * turned: its head end in the palm, the rest toward the other hand. A fish
- * that took the hand's own turn hung down into the lap (point 1417).
+ * Places a fish held in a hand (`fish`, a child of that hand) level and across
+ * in front of the figure `figure`, whatever way the hand itself is turned:
+ * its middle `middle` (m, along the figure's left) from the palm, `scale` its
+ * length, `length` the share of it left. A fish that took the hand's own turn
+ * hung into the lap (point 1417) or stood up over the head (point 1450).
  */
-export function holdGutFish(fish: THREE.Object3D, figure: THREE.Object3D): void {
+export function holdFishAcross(fish: THREE.Object3D, figure: THREE.Object3D, scale: number, middle = 0, length = 1): void {
   const hand = fish.parent
   if (!hand) return
   figure.updateWorldMatrix(true, false)
@@ -129,12 +130,17 @@ export function holdGutFish(fish: THREE.Object3D, figure: THREE.Object3D): void 
   figure.getWorldQuaternion(_turn)
   figure.getWorldScale(_size)
   const s = _size.x
-  // the fish's middle: its head (0.42 of its length ahead of it) the grip past the palm
-  _hand.add(_back.set(-(GUT_FISH_SCALE * 0.42 - GUT_FISH_GRIP) * s, 0, 0).applyQuaternion(_turn))
+  _hand.add(_back.set(middle * s, 0, 0).applyQuaternion(_turn))
   _turn.multiply(FISH_ACROSS)
-  _held.compose(_hand, _turn, _size.setScalar(GUT_FISH_SCALE * s))
+  _held.compose(_hand, _turn, _size.set(scale * s, scale * s, scale * s * length))
   _held.premultiply(_inHand.copy(hand.matrixWorld).invert())
   _held.decompose(fish.position, fish.quaternion, fish.scale)
+}
+
+/** The fish being gutted, held by its head: its middle (its head 0.42 of its
+ *  length ahead of it) the grip past the palm, toward the other hand. */
+export function holdGutFish(fish: THREE.Object3D, figure: THREE.Object3D): void {
+  holdFishAcross(fish, figure, GUT_FISH_SCALE, -(GUT_FISH_SCALE * 0.42 - GUT_FISH_GRIP))
 }
 
 /** How far out a rack worker's posed hand is solved, as a share of her drawn
@@ -144,8 +150,11 @@ export function holdGutFish(fish: THREE.Object3D, figure: THREE.Object3D): void 
 const RACK_REACH = 0.85
 /** The eating arm's reach at the mouth: folded at the elbow. */
 const BITE_REACH = 0.55
+/** Where the eating arm's elbow points, in her chest's frame: out a little,
+ *  down and forward. */
+const BITE_ELBOW: [number, number, number] = [0.4, -1, 0.3]
 /** Seconds over which the eating arm comes up from rest and goes back. */
-const EAT_EASE_SECONDS = 0.4
+export const EAT_EASE_SECONDS = 0.4
 
 /** What a woman of the pounding pair does with her arms away from the mortar
  *  (point 1282): reaching to the rack, eating the fish she took, else at rest.
@@ -168,6 +177,9 @@ export function rackPose(
     const eat = { left: armAim(0.35 - 0.8 * bite, -0.55 + 1.2 * bite), right: REST_POSE.right, lean: 0.04, turn: 0 }
     blendPose(rest, REST_POSE, eat, e)
     rest.reach = { left: RACK_REACH - (RACK_REACH - BITE_REACH) * bite * e }
+    // the elbow down in front of her, so the forearm comes up to the mouth;
+    // eased in and out with the arm, so its solve never jumps
+    rest.elbow = { left: [0, 1, 2].map((k) => ELBOW_DEFAULT[k] + (BITE_ELBOW[k] - ELBOW_DEFAULT[k]) * e) as [number, number, number] }
   }
   return rest
 }

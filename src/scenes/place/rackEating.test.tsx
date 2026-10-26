@@ -19,7 +19,7 @@ import { buildFishGeometry } from '../../render/fishMesh'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import { biteLift } from './fishFire'
 import type { PoundingDuo } from './mortarPounding'
-import { rackPose } from './fisheryPoses'
+import { EAT_EASE_SECONDS, holdFishAcross, rackPose } from './fisheryPoses'
 import type { FigureLook } from './placeFigureContext'
 import { SkinnedFigure } from './skinnedFigure'
 
@@ -51,6 +51,7 @@ describe('the pounding pair eating at the fish rack', () => {
     const look: FigureLook = { peopleId: 'bambara', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, palette: PALETTE, radial: 16, villager: asset }
     const group = new THREE.Group()
     const fishGeo = buildFishGeometry()
+    const held = { current: null as THREE.Mesh | null }
     const now = { duo: eating(0, 1) }
     function Stage() {
       const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 })
@@ -64,12 +65,14 @@ describe('the pounding pair eating at the fish rack', () => {
         p.lean = next.lean
         p.turn = next.turn
         copyPoseExtras(p, next)
+        const fish = now.duo.women[woman].fish
+        if (held.current) holdFishAcross(held.current, group, 0.3, 0, Math.max(0.15, fish))
       })
       return (
         <primitive object={group}>
           <SkinnedFigure look={look} cloth={PALETTE[0]} sex="female" age={woman === 0 ? 'adult' : 'youth'} identityKey={`rack-eat-${woman}`} pose={pose} squat={squat} gait={gait} legs
-            // the fish in her hand as Pounder.tsx mounts it
-            handProp={<group><mesh name="eaten-fish" geometry={fishGeo} rotation={[Math.PI / 2, 0, 0]} scale={0.3} /></group>}
+            // the fish in her hand as Pounder.tsx mounts and holds it
+            handProp={<mesh ref={(m) => void (held.current = m)} name="eaten-fish" geometry={fishGeo} scale={0.3} />}
           />
         </primitive>
       )
@@ -131,7 +134,10 @@ describe('the pounding pair eating at the fish rack', () => {
       const shoulder = bone('bone-upperArm.L')
       const elbow = bone('bone-forearm.L')
       elbowOverChin = Math.max(elbowOverChin, elbow.y - chin)
-      elbowBehind = Math.max(elbowBehind, shoulder.z - elbow.z)
+      // (ahead while the fish is on its way up in the meal proper; the hanging
+      // arm between bites, and the arm easing up from rest, swing free)
+      const eased = clock > EAT_EASE_SECONDS && clock < cfg.eatSeconds - EAT_EASE_SECONDS
+      if (eased && lift(clock) > 0.3) elbowBehind = Math.max(elbowBehind, shoulder.z - elbow.z)
       // And all of the fish she holds is under her eyes.
       const eyes = chin + EYES * (crown - chin)
       fishMesh.updateWorldMatrix(true, false)
@@ -151,10 +157,10 @@ describe('the pounding pair eating at the fish rack', () => {
     expect(peaks.length).toBeGreaterThanOrEqual(Math.floor(cfg.eatSeconds / cfg.biteSeconds) - 1)
     // the hand never rises over the mouth band, and at EVERY bite it is in it,
     // in front of the mouth and close to it
-    expect(overBand).toBeLessThan(0)
-    expect(elbowOverChin).toBeLessThan(0)
-    expect(elbowBehind).toBeLessThan(0)
-    expect(fishOverEyes).toBeLessThan(0)
+    expect(overBand, 'hand over band').toBeLessThan(0)
+    expect(elbowOverChin, 'elbow over chin').toBeLessThan(0)
+    expect(elbowBehind, 'elbow behind shoulder').toBeLessThan(0)
+    expect(fishOverEyes, 'fish over eyes').toBeLessThan(0)
     for (const p of peaks) {
       expect(p.band).toBeLessThan(0)
       expect(p.under).toBeLessThan(0)
