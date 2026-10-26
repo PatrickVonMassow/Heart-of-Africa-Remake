@@ -77,11 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1437. Remove the settled queueing-feedback card from the board
-  Final state: Remove the board card "Rückmeldung beim Einreihen: welcher der drei Vorschläge?" from the dashboard and republish it. No point and no other change: the user leaves the queueing feedback as it is for now. Background: GPT-6.1 Sol judged Proposal 1 (chat session appends an approved order to TASKS.md itself) CRITICAL on 23.10.2026 16:03 (A1 concurrent main writers / number collisions, A2 guard compatibility unproven, A3 queue positions other than end, A4 not a simplification under the infrastructure freeze); the user then decided to leave it as it is.
-  Observed problem: User order 23.10.2026 21:25 in a chat session without the batch lock: the decision card is settled (leave as is), so it must leave the board. The chat session cannot edit the board under the stand-down.
-  Source: user request 23.10.2026 via the findings carrier, spec cut from bc2ccc868; approved: "ja".
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:

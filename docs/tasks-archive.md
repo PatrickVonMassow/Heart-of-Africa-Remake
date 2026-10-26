@@ -34922,3 +34922,9 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
 
   Real blockade / data risk (CLAUDE.md §2 finding intake): concurrent main writers.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1437. Remove the settled queueing-feedback card from the board
+  Final state: Remove the board card "Rückmeldung beim Einreihen: welcher der drei Vorschläge?" from the dashboard and republish it. No point and no other change: the user leaves the queueing feedback as it is for now. Background: GPT-6.1 Sol judged Proposal 1 (chat session appends an approved order to TASKS.md itself) CRITICAL on 23.10.2026 16:03 (A1 concurrent main writers / number collisions, A2 guard compatibility unproven, A3 queue positions other than end, A4 not a simplification under the infrastructure freeze); the user then decided to leave it as it is.
+  Observed problem: User order 23.10.2026 21:25 in a chat session without the batch lock: the decision card is settled (leave as is), so it must leave the board. The chat session cannot edit the board under the stand-down.
+  Source: user request 23.10.2026 via the findings carrier, spec cut from bc2ccc868; approved: "ja".
+  Bundle: Session- & Repo-Hygiene.
