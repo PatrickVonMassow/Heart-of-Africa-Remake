@@ -7,10 +7,25 @@ measured cycle (step 8).
 
 | Id | Entry | Load added | Protocol | Accept when |
 |---|---|---|---|---|
-| M1 | U4: cross-vendor review beside a running suite | a remote model call (`scripts/cross-review.mjs`) | one known-green suite section, same SHA, 2 quiet runs and 2 runs with a review running beside them | loaded duration not above the quiet median, zero added reds |
-| M2 | U5(2): one CPU gate (build, lint, unit) beside one browser suite | `npm run build`, `npm run lint`, `npm run test:unit` | same section and SHA, 2 quiet and 2 loaded runs, peak memory sampled | as M1, and peak memory within budget |
-| M3 | U5(1): two browser suites at once | a second suite on its own port | two different known-green sections, each 2 quiet and 2 overlapped | as M2; the bound stays 1 unless all hold |
+| M1 | U4: cross-vendor review beside a running suite | a remote model call (`scripts/cross-review.mjs`) | one known-green suite section, same build, 2 quiet runs and 2 runs with a review running beside them; peak RSS of the review process (`/usr/bin/time -v`) | loaded duration not above the quiet median, zero added reds, quiet peak host memory plus the review's peak RSS within budget |
+| M2 | U5(2): one CPU gate (build, lint, unit) beside one browser suite | `npm run build`, `npm run lint`, `npm run test:unit` | same section and build, 2 quiet and 2 loaded runs, host memory sampled | as M1, peak host memory within budget, and landed points/hour above a current-policy control |
+| M3 | U5(1): two browser suites at once | a second suite on its own port | two different known-green sections, same build, each 2 quiet and 2 overlapped, host memory sampled | as M2; the bound stays 1 unless all hold |
 | – | U5(3): local author beside a suite | – | not measured now: relevant only after the cloud credit expires 05.11.2026 (U5) | – |
+
+**Same build** (review 28b7f92, finding 1): the compared runs need not share a SHA, but
+`git diff --quiet <a> <b> -- src public index.html package.json package-lock.json 'vite.config.*' 'playwright*.config.*' tests scripts/verify`
+must exit 0 between every pair of them — game code, dependencies, build and browser-test
+configuration and the verification scripts. Checked 27.10: 69b25f938 = 8945394d7 = 9044a6684.
+
+**Memory budget** (review 28b7f92, finding 2; plan line 47 "peak host/process memory" for all
+three; calibratable): peak host memory in use (MemTotal − MemAvailable from `/proc/meminfo`,
+sampled every 5 s over the whole run, so every workload running counts) stays at or below
+85 % of MemTotal — on this 15 GiB host at least 2.3 GiB stay available. A sampled run records
+its peak and its sample log under `local/`. M1's quiet runs q1/q2 were not sampled; its memory check
+uses the sampled quiet runs of M2 (same section, same build).
+
+**Points/hour** (plan line 47, missing from the first draft): M2 and M3 also need landed
+points/hour above a current-policy control, read from the step-8 cycle notes.
 
 Every run is recorded by `scripts/verify/run-logged.mjs`; the comparison quotes each run's
 `local/verify-logs/*.run.json`. Results are appended below as they arrive.
