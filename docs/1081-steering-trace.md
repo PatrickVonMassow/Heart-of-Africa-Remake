@@ -102,7 +102,8 @@ heading, headings > 120° apart) both turn the SAME way by `veer`, held for
 | 40° / 0.3 s | 3 | 0.42 % | 2.15 % | 4 | 0.45 % |
 | 50° / 0.3 s | 4 | 0.51 % | 3.08 % | 7 | 0.90 % |
 
-Every variant lowers the sum (6-47 %), so the playmate cause is confirmed;
+Every variant lowers the sum (6-47 %), which supports the inferred playmate
+mechanism of section 4 without measuring its geometry;
 none holds every pair under the 0.25 % gate at every cadence, and the best
 (45°/0.3 s) has no robust neighbourhood. Taking it would pin a lucky
 parameter the way the old case pinned a lucky seed. Not committed.
@@ -111,7 +112,8 @@ wall (zulu/99 at 45°/0.5 s), then the `evadeHeading` flip of section 4.
 
 ## Next
 
-- The dominant cause is playmate head-on contact at the floor pace (section 4).
+- The best-supported cause is playmate contact at the floor pace, read as
+  head-on (section 4: inferred, the playmates' headings are not recorded).
   A cure must either let two evaders pass each other without re-deciding
   every frame (a stateful side, not a per-frame veer) or stop the
   `evadeHeading` flip without locking the side (attempt 1 locked it).
