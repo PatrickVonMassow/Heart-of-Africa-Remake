@@ -81,8 +81,10 @@ first; which section starts first alternates across repetitions; overlap interva
 read from `run.json` `startedAt`/`finishedAt`.
 The memory loop is a watcher, not only a recorder (F2): on a sample > 85 % it sends TERM
 to the later member's process group, confirms after 10 s that no child is left, and logs
-the abort; the owning session's blocking wait checks the sample log's freshness at every
-member finish, and a gap > 15 s counts as a failed sampler (stop, as a breach). Before the
+the abort. The watcher is the parent of both members (F2b): it launches them and its EXIT
+trap sends TERM to both process groups, so no member runs unsampled; a sample gap > 15 s
+seen by the watcher itself, or the watcher's death, ends the pair as a failed sampler
+(stop, as a breach). Before the
 next repetition reuses a checkout, every frame its run wrote is copied to
 `local/1455-frames/<log id>/` (F3); the picture judgement works only from those copies.
 
@@ -105,9 +107,12 @@ Statistics (F4, F7, F8): the independent unit is the **pair** (one shared host w
 not the member run. Qualification needs 20 pairs; if C1 does not admit block 3, its 5
 pairs are replaced by 5 more block-2 pairs, and fewer than 20 completed pairs never
 qualify. One rule: **any** unresolved red (C9) in a pair member → FAIL; a red that
-reproduces quiet is charged and the pair is repeated. 0 failing pairs out of 20 bounds the
-per-pair added red rate below 13.9 % at 95 % (1 − 0.05^(1/20)), under the worst-case
-break-even of ~17 % (5 min saved per pair against a 30 min false red); the 9.5 % per-run
+reproduces quiet is charged and the pair is repeated, at most twice in the test (a third
+repeat → FAIL). The bound covers **new** reds only (F11): 0 pairs with an unresolved red out
+of 20 bounds the per-pair rate of overlap-added unresolved reds below 13.9 % at 95 %
+(1 − 0.05^(1/20)), under the worst-case break-even of ~17 % (5 min saved per pair against a
+30 min false red). Known reds (charged, or reproduced quiet in the test) are outside that
+bound; overlap's effect on them is judged by the rate comparison below. The 9.5 % per-run
 figure of the halves assumed independent member runs and is withdrawn. Timing probe: the
 unit is the partner window (5 overlapped windows against 5 quiet windows of 2 runs each);
 per rotating check name (jar mouth, foam drift after shutter, walks on between frames,
@@ -115,9 +120,12 @@ order-at-stand, sprint, heading-in-one-frame) FAIL if overlapped total > quiet +
 50 % of quiet), or a name fires ≥ 2× overlapped that never fired quiet. At n = 5 windows
 the probe catches only a gross rise; finer drift is left to C9 in production. If the quiet
 arm shows a rotating red in more than 5 of 10 runs, the section is no usable probe and
-WebGL 2 timing-sensitive pairing stays unqualified. Charged signatures (1456, 1292) stay
-charged but are counted in both arms (F10): overlapped count > quiet + max(2, 50 % of
-quiet) fails the qualification like an uncharged rise.
+WebGL 2 timing-sensitive pairing stays unqualified. Known signatures (charged to 1456,
+1292, or charged during the test) stay charged but are compared as a **rate per run** of
+the same section and backend in both arms (F10): the quiet arm has ≥ 10 runs per section
+(the §4.2 references plus same-build quiet logs), and qualification FAILs if a signature's
+overlapped rate exceeds 1.5 × its quiet rate with a one-sided Fisher test p < 0.10, or a
+signature fires in ≥ 2 overlapped runs that never fired in its quiet runs.
 
 **4.4 Pass/fail thresholds** (U24, U17, U10, U28), all must hold: no sample > 85 % (≤ 80 %
 for a pairing admitted on measured peaks) and no failed sampler; 0 unresolved reds;
@@ -252,4 +260,13 @@ back to the same checker before anything is implemented.
 | F7 / A7 | member runs are not independent | §4.3: unit = pair (20 pairs → < 13.9 % per pair, under the ~17 % break-even); probe unit = partner window, power stated honestly. |
 | F8 / A8 | skipping block 3 drops below the floor | §4.3: replaced by 5 more block-2 pairs; < 20 pairs never qualify. |
 | F9 / A9 | block 1 denominator | §4.4: sum of every run's quiet median in the window, first launch to last completion. |
-| F10 / A10 | charged signatures could hide an overlap rise | §2, §4.3: charged signatures counted in both arms with a failing threshold. |
+| F10 / A10 | charged signatures could hide an overlap rise | §2, §4.3: known signatures compared as per-run rates of the same section/backend, quiet arm ≥ 10 runs. |
+
+Re-check by the same checker: A1, A3–A9 RESOLVED; A2 and A10 not resolved, one new
+blocker (the bound claimed more than it covers). Second fixes:
+
+| Id | Objection | Fix |
+|---|---|---|
+| F2b | freshness checked only at member finish | §4.1: the watcher is the members' parent; its own gap check or death ends the pair. |
+| F10 | raw totals with unequal exposure | §4.3: per-run rates, ≥ 10 quiet runs, Fisher p < 0.10 plus a 1.5 × ratio. |
+| F11 / new | bound did not cover charged or reproduced reds | §4.3: the bound is stated for new (unresolved) reds only; known reds go through the rate comparison; at most 2 repeated pairs. |
