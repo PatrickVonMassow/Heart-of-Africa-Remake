@@ -2224,6 +2224,20 @@ describe('filesNamedIn / openPointSpecs — what a queued point says it touches'
     expect(specs[1].files).toEqual(['docs/d.md'])
   })
 
+  it('ends a block at ANY column-0 checkbox line — upper-case [X] and unnumbered ones too', () => {
+    const tasks = [
+      '- [ ] 500. FIRST POINT touching scripts/a.mjs',
+      '- [X] 501. A closed point touching scripts/closed.mjs',
+      '- [ ] 502. SECOND POINT touching docs/d.md',
+      '- [ ] an unnumbered checkbox touching src/unnumbered.ts',
+      '- [ ] 503. THIRD POINT touching docs/e.md',
+    ].join('\n')
+    const specs = openPointSpecs(tasks)
+    expect(specs.map((s) => s.point)).toEqual([500, 502, 503])
+    expect(specs[0].files).toEqual(['scripts/a.mjs'])
+    expect(specs[1].files).toEqual(['docs/d.md'])
+  })
+
   it('an empty work order yields no points', () => {
     expect(openPointSpecs('')).toEqual([])
     expect(openPointSpecs()).toEqual([])

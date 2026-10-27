@@ -1924,8 +1924,8 @@ if (isMain) {
       )
     }
     // THE CAP AS A TARGET (point 427) is switched off in `slotReasonDecision`
-    // (point 1452), so this refusal no longer fires; kept for the decision's
-    // remaining reasons rather than rebuilt.
+    // (point 1452), so this refusal no longer fires; left inert rather than
+    // rebuilt.
     const slots = gatherSlots(declaration)
     if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
     // THE BOARD'S PROMISE MUST NOT AGE UNDER THIS WAIT (point 661): a wait is

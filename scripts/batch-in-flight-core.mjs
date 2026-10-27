@@ -1256,8 +1256,8 @@ export function filesNamedIn(text) {
 /**
  * The OPEN points of the work order with the files each names. PURE.
  *
- * A point's block runs from its `- [ ] N.` line to the next checkbox line, which is
- * how the work order is written; DEFERRED points are excluded exactly as
+ * A point's block runs from its `- [ ] N.` line to the next column-0 checkbox line
+ * (`[ ]`, `[x]` or `[X]`, numbered or not), which is how the work order is written; DEFERRED points are excluded exactly as
  * `openPointStatus` excludes them, since a deferred point is not commissionable.
  *
  * A point WAITING ON THE USER (point 450) is carried but FLAGGED, not dropped:
@@ -1270,11 +1270,11 @@ export function openPointSpecs(tasksText = '') {
   const out = []
   let current = null
   for (const line of String(tasksText ?? '').split('\n')) {
-    const head = line.match(/^- \[( |x)\] (\d+)\./)
-    if (head) {
+    if (/^- \[[ xX]\]/.test(line)) {
       if (current) out.push(current)
+      const head = line.match(/^- \[( |x|X)\] (\d+)\./)
       current =
-        head[1] === ' ' && !/\bDEFERRED\b/.test(line)
+        head && head[1] === ' ' && !/\bDEFERRED\b/.test(line)
           ? { point: Number(head[2]), text: line, gated: Boolean(parseGateLine(line)?.gated) }
           : null
       continue
