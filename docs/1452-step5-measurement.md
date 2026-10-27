@@ -42,3 +42,11 @@ runs on record). Second section for M3: `polish-speech --section=speech-distance
 | M1-l1 | review beside (`cross-review.mjs` on 8945394, GPT-6.1 Sol, ~10 min of the run) | 8945394d7 (main; no `src/` change since 69b25f938) | 27.10 01:12 | 13m 17s | GREEN, 28 frames | 1.96 (decaying pre-push gate) | `local/verify-logs/2026-10-27T01-12-34-675-polish-villagers.log` |
 | M1-l2 | review beside (`cross-review.mjs` of this protocol, GPT-6.1 Sol, 2.8k chars, first ~9 min of the run) | 9044a6684 (main; same build as q1/q2/l1) | 27.10 01:35 | 13m 19s | GREEN, 28 frames | 3.06 | `local/verify-logs/2026-10-27T01-34-59-921-polish-villagers.log` |
 | M1-q3 | quiet, memory-sampled (planned as l3; no review overlapped the run — the re-check of ef5db73 had finished before its start, so it counts as quiet) | 9044a6684 (main; same build) | 27.10 01:50 | 13m 27s | GREEN, 28 frames | 0.88 | `local/verify-logs/2026-10-27T01-50-17-866-polish-villagers.log`; samples `local/1452-mem-m1-l3.log`, peak 66.4 % (10.3 GiB of 15.5 GiB) |
+| M1-l4 | reviews beside, memory-sampled (two `cross-review.mjs` rounds, GPT-6.1 Sol, 02:06:55–02:08:43 only: the reviews of ee75f1f/b3cd89c were small, so this run's review overlap is ~2 min, not the ~9–10 min of l1/l2) | 9044a6684 (main; same build) | 27.10 02:06 | 13m 10s | GREEN, 28 frames | 0.77 | `local/verify-logs/2026-10-27T02-06-55-776-polish-villagers.log`; samples `local/1452-mem-m1-l4.log`, peak 64.8 % (10.1 GiB), 38.5 % during the review overlap |
+
+**M1 verdict: ACCEPTED.** Quiet median 13m 27s (q1 13m 12s, q3 13m 27s, q2 15m 05s); every loaded
+run is at or below it (l1 13m 17s, l2 13m 19s, l4 13m 10s); zero added reds in 3 loaded runs;
+sampled peaks 66.4 % quiet and 64.8 % loaded, inside the 85 % budget. Limit: the sampled loaded
+run carried only ~2 min of review, the two long-review runs were not sampled; a cross-review is a
+remote call whose local process is small, so the peak is set by the suite itself (both peaks fall
+in the suite's last minute).
