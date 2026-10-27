@@ -88,10 +88,10 @@ once, each on its own dev-server port (the runner picks a free port per run).
 **M3 verdict: REJECTED by the protocol rule — the bound stays at one browser suite at a time.**
 All four overlapped runs are above their quiet median: villager-dress 13m 44s and 13m 39s
 against 13m 27s (+2.1 %, +1.5 %), water-stand-table 5m 36s and 5m 41s against 5m 29.5s
-(+1.9 %, +3.5 %). Zero reds in 4 overlapped runs; sampled peaks 73.2 % and 75.0 % against
+(+2.0 %, +3.5 %). Zero reds in 4 overlapped runs; sampled peaks 73.2 % and 75.0 % against
 38–66 % quiet, inside the 85 % budget but with ~10 points of headroom. The duration condition
 fails, so the points/hour condition is not reached. Limits, stated for step 6: the slowdown is
 small and its direction is consistent (4 of 4), yet it lies inside the reference's own spread
 (q2 15m 05s is +12 %), so 2 pairs cannot call it measurable or not; the wall-clock gain of a
-pair is large (13m 44s for 19m 14s of serial work). The rule, applied as for M2, decides; only a
+pair is large (13m 44s for 18m 56.5s of serial work, the sum of the two quiet medians). The rule, applied as for M2, decides; only a
 user decision could trade a 2–4 % slower suite for that gain.
