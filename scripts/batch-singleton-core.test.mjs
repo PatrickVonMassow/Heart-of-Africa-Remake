@@ -20,6 +20,9 @@ import { parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { spawnProgressed, successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
   assessOwner,
+  pidCorroboration,
+  ownerStartTolerance,
+  PID_START_TOLERANCE_MS,
   classifyParallel,
   claimGeneration,
   detectParallel,
@@ -187,6 +190,25 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     })
     expect(a.alive).toBe(false)
     expect(a.reason).toBe('pid-reused')
+  })
+
+  it('THE 26.10.2026 INCIDENT: a live 1.1 h owner whose derived start time drifted 6.6 s is ALIVE, not pid-reused', () => {
+    const owner = lock({ claimedAt: NOW - 24 * 60_000, pidStartedAt: NOW - 66 * 60_000 })
+    const drifted = { exists: true, startedAt: NOW - 66 * 60_000 + 6_600 }
+    expect(assessOwner(owner, { now: NOW, bootTime: BOOT, probe: drifted })).toMatchObject({
+      alive: true,
+      reason: 'pid-alive',
+    })
+    expect(pidCorroboration(owner, drifted, { now: NOW }).live).toBe(true)
+    // Without a `now` the fixed tolerance stands, as before the re-tune.
+    expect(pidCorroboration(owner, drifted).live).toBe(false)
+  })
+
+  it('the owner tolerance grows with the recorded process age, from the fixed floor', () => {
+    expect(ownerStartTolerance({ pidStartedAt: NOW }, NOW)).toBe(PID_START_TOLERANCE_MS)
+    expect(ownerStartTolerance({ pidStartedAt: NOW - 3600_000 }, NOW)).toBe(PID_START_TOLERANCE_MS + 36_000)
+    expect(ownerStartTolerance({}, NOW)).toBe(PID_START_TOLERANCE_MS)
+    expect(ownerStartTolerance({ pidStartedAt: NOW - 3600_000 }, undefined)).toBe(PID_START_TOLERANCE_MS)
   })
 
   it('heartbeat predating the boot → dead (no claude survives a reboot) …', () => {

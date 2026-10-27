@@ -1007,7 +1007,7 @@ const claimantAssessment = claim
       ownerHolding: ownerIsHolding({
         lock,
         claimantSid: claim.sessionId,
-        alive: pidCorroboration(lock, probe).live === true,
+        alive: pidCorroboration(lock, probe, { now }).live === true,
       }),
       now,
       maxAgeMs: claimMaxAgeMs(),
