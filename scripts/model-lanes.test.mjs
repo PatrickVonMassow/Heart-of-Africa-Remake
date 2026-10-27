@@ -276,6 +276,8 @@ function hygienePatterns(registry = LANES) {
  *  them; a reference to one of them names a record, not a model, and is not scanned. */
 function hygieneViolations(paths, read, registry = LANES, records = []) {
   const recordNames = [...new Set(records.flatMap((path) => [path, path.split('/').pop()]))].sort((a, b) => b.length - a.length)
+  // One alternation, longest first: a per-name pass per line grew with every record and timed out in CI.
+  const recordName = recordNames.length ? new RegExp(recordNames.map(escapeRe).join('|'), 'g') : null
   const vendorHost = new RegExp(`(?<![@\\w.-])(?:[a-z0-9-]+\\.)+(?:${Object.values(VENDORS).map((v) => v.domain).join('|')})\\.com(?![\\w-]|\\.\\w)`, 'gi')
   const patterns = hygienePatterns(registry)
   const fileWords = [...new Set([...registry.flatMap((record) => record.familyWords), ...Object.keys(VENDORS)])]
@@ -287,7 +289,7 @@ function hygieneViolations(paths, read, registry = LANES, records = []) {
     const text = read(path)
     if (text == null) continue
     text.split('\n').forEach((raw, index) => {
-      const line = recordNames.reduce((acc, name) => acc.split(name).join(' '), raw).replace(vendorHost, ' ')
+      const line = (recordName ? raw.replace(recordName, ' ') : raw).replace(vendorHost, ' ')
       const hit = patterns.find(({ re }) => re.test(line))
       if (hit) out.push(`${path}:${index + 1}: ${hit.why} — ${line.trim().slice(0, 120)}`)
     })
