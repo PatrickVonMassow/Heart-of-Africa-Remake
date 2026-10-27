@@ -2818,6 +2818,7 @@ export const VILLAGER_ASSET = {
    *  against VILLAGER_GLTF.runFlight. */
   gaitStance: {
     jog: { slow: 0.7, bounce: 0.25 },
+    sprint: { slow: 0.7, bounce: 0.3 },
   } as Record<string, { slow: number; bounce: number }>,
   /** The widest loop seam the clip pipeline closes (rad, the worst bone's
    *  turn between a loop's last frame and its first once cut where they meet
@@ -2900,6 +2901,11 @@ export const VILLAGER_GLTF = {
    *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their
    *  cadence. Calibratable. */
   jogStride: { exponent: 0.8, min: 0.4, max: 1.08 },
+  /** The sprint's stride rule, same meaning: its stance lengthened
+   *  (VILLAGER_ASSET.gaitStance) lowers its natural speed, and a stride grown
+   *  past `max` would carry the planted foot beyond the leg's reach.
+   *  Calibratable. */
+  sprintStride: { exponent: 0.5, min: 0.75, max: 1.0 },
   /** Share of walk the runs keep blended in (villagerRig.ts `gaitWeights`):
    *  the shipped jog clip has each foot down only ~11 % of its cycle, so a
    *  pure jog spends ~3/4 of it with both feet off the ground and reads as

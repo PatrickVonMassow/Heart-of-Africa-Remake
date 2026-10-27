@@ -244,7 +244,7 @@ export function gaitAt(clips: GaitClips, speed: number, legScale: number) {
   const vs = clips.sprint.speed * legScale
   const kw = strideFactor(speed, vw)
   const kj = strideFactor(speed, vj, G.jogStride)
-  const ks = strideFactor(speed, vs)
+  const ks = strideFactor(speed, vs, G.sprintStride)
   const cycle = w.walk * vw * clips.walk.duration * kw + w.jog * vj * clips.jog.duration * kj + w.sprint * vs * clips.sprint.duration * ks
   return {
     ...w,

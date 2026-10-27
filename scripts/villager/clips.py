@@ -523,9 +523,8 @@ def restyle(c, name, joints, style):
 def restance(c, joints, cp, s):
     """A run's stance lengthened (VILLAGER_ASSET.gaitStance): the source jog
     keeps each foot down ~11 % of its cycle and reads as floating. The whole
-    clip is retimed by one smooth warp — new phase u plays the source at
-    u − slow/(4π)·sin 4π(u − c0), c0 the left stance's middle — so each
-    stance plays at 1 − `slow` of its pace and each flight at up to 1 + `slow`;
+    clip is retimed by one smooth warp that plays each foot's stance, at its
+    middle, at 1 − `slow` of the source's pace and the flights faster;
     the hips' rise over their lowest is scaled by `bounce` (a flight played
     faster with the same height reads as low gravity), and a foot the lower
     hips put under the ground is bent back onto it (its world turn kept), so
@@ -534,12 +533,22 @@ def restance(c, joints, cp, s):
     from toolclips import two_bone
     n = len(c['times'])
     an = analyse_gait(c, joints, cp)
-    sup = contact_intervals(an, n)['L']
-    spans = [x for k in ('heel', 'ball', 'tip') for x in sup[k]]
-    c0 = 0.5 * (min(x[0] for x in spans) + max(x[1] for x in spans))
-    u = np.linspace(0, 1, n)
-    w = lambda x: x - s['slow'] / (4 * np.pi) * np.sin(4 * np.pi * (x - c0))  # noqa: E731
-    phi = w(u) - w(0.0)
+    sup = contact_intervals(an, n)
+    centres = []
+    for side in ('L', 'R'):
+        spans = [x for k in ('heel', 'ball', 'tip') for x in sup[side][k]]
+        a = min(x[0] for x in spans)
+        centres.append(0.5 * (a + max(x[1] for x in spans if x[0] - a < 0.5)))
+    # the source's pace through its cycle: 1 − slow at each stance's middle
+    # (each foot's own: the source sprint lands its right foot off the half
+    # cycle), rising as cos² to 1 half a step away
+    grid = np.linspace(0, 1, 2001)
+    pace = np.ones_like(grid)
+    for m in centres:
+        d = (grid - m + 0.5) % 1 - 0.5
+        pace -= s['slow'] * np.where(np.abs(d) < 0.25, np.cos(2 * np.pi * d) ** 2, 0.0)
+    took = np.concatenate([[0], np.cumsum(0.5 * (1 / pace[1:] + 1 / pace[:-1]) * np.diff(grid))])
+    phi = np.interp(np.linspace(0, 1, n) * took[-1], took, grid)
     Q = np.zeros_like(c['q'])
     P = np.zeros_like(c['hips'])
     for k, p in enumerate(phi):
