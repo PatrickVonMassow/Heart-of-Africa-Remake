@@ -65,7 +65,7 @@ import { useGame } from '../../state/store'
 import { START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
-import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
@@ -163,7 +163,7 @@ import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
-import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
+import { animalAnchors, animalBodies, animalScene, liveFigureColliders, setAnimalFigures, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import {
   createInhabitantSet,
   groundOccupied,
@@ -194,7 +194,8 @@ import {
 import { initialLoomCloth } from '../../systems/loomCloth'
 import { FOLDED_STRIP, LOOM_BUILD, loomClothTransform, loomStackPosition, loomWeaveColor } from './loomVisual'
 import { drummerFacing } from './chiefWalk'
-import { DRUMMER_SPEAKER_ID } from './chiefPresence'
+import { chiefStandingPosition, DRUMMER_SPEAKER_ID } from './chiefPresence'
+import { fisheryLiveColliders } from './fisheryColliders'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
@@ -1611,6 +1612,9 @@ function Kids({
  *  velocity at a bounded rate (fast, but never a snap). The body rides the
  *  sampled settlement ground height but takes no slope pitch — the panorama
  *  silhouettes, which walk real relief, carry that half. */
+/** Walking pace of a DEV-steered goat (m/s), a calm grazing walk. */
+const GOAT_STEER_SPEED = 0.8
+
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
   const groundHeight = usePlaceGround()
   // Built at the detail level's body tessellation; a level change rebuilds it.
@@ -1634,7 +1638,16 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   const anchors = useMemo(() => animalAnchors(seed, count, pen, colliders), [seed, count, pen, colliders])
   const bodies = useMemo(() => animalBodies(anchors), [anchors])
   const scene = useMemo(() => animalScene(colliders, bodies), [colliders, bodies])
+  // The live figures the herd steps round (point 1419): the villagers in the
+  // shared body registry, the chief, the fishers and the traveller. Rebuilt into
+  // the scene every frame from reused circles.
+  const bodySet = useContext(InhabitantBodiesContext)
+  const figures = useMemo<Collider[]>(() => [], [])
+  const figurePool = useMemo<CircleCollider[]>(() => [], [])
+  const extraMovers = useMemo<Collider[]>(() => [], [])
   const refs = useRef<Array<THREE.Group | null>>([])
+  // DEV capture steer per goat (see `__placeGoatSteer` below); null = graze.
+  const steer = useRef<Array<{ x: number; z: number } | null>>([])
   // Per-goat leg-pivot groups (four each) and gait state (last position, walked
   // distance, held facing and each stance's world contact) so the swing rides
   // distance, the body faces travel and a planted foot does not follow either.
@@ -1659,6 +1672,19 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
     if (isLifeFrozen()) return
     const t = clock.elapsedTime
     const dt = Math.min(rawDt, 0.1)
+    extraMovers.length = 0
+    if (chiefStandingPosition.active) extraMovers.push(chiefStandingPosition)
+    for (const c of fisheryLiveColliders) extraMovers.push(c)
+    liveFigureColliders(
+      figures,
+      figurePool,
+      bodySet.bodies,
+      balance.villageLife.separation.bodyRadius,
+      extraMovers,
+      placePlayerPosition,
+      PLAYER_RADIUS,
+    )
+    setAnimalFigures(scene, colliders, bodies, figures)
     // Publish every animal's last position into the scene before anyone moves,
     // so each of them resolves against where the others actually stand.
     for (let i = 0; i < bodies.length; i++) {
@@ -1672,19 +1698,22 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       const s = gait.current[i]
       if (!g || !a || !s) return
       const wob = Math.sin(t * 0.2 + a.phase)
+      // A DEV steer (point 1419's capture) replaces the wobble target by a
+      // walk toward a fixed spot at grazing pace; the collision is untouched.
+      const goal = steer.current[i]
+      let tx = a.x + wob * a.amp
+      let tz = a.z + Math.cos(t * 0.17 + a.phase) * a.amp
+      if (goal) {
+        const gd = Math.hypot(goal.x - s.x, goal.z - s.z)
+        const reach = Math.min(gd, GOAT_STEER_SPEED * dt)
+        tx = gd > 1e-6 ? s.x + ((goal.x - s.x) / gd) * reach : s.x
+        tz = gd > 1e-6 ? s.z + ((goal.z - s.z) / gd) * reach : s.z
+      }
       // Swept from the position this animal actually holds (point 413): the old
       // position-only test resolved the raw wobble point, so the moment that
       // point crossed the ridge between two post circles the goat was pushed
       // out on the FAR side of the fence.
-      const [px, pz] = stepAnimal(
-        scene,
-        bodies,
-        i,
-        a.x + wob * a.amp,
-        a.z + Math.cos(t * 0.17 + a.phase) * a.amp,
-        s.x,
-        s.z,
-      )
+      const [px, pz] = stepAnimal(scene, bodies, i, tx, tz, s.x, s.z)
       const vx = px - s.x
       const vz = pz - s.z
       // The body swings round toward its travel direction at a bounded rate
@@ -1764,10 +1793,25 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       }
     })
   })
+  // DEV hook for the headless capture (point 1419): set goat `i` down at
+  // `from` (when given) and walk it toward `to`; `to` null hands it back to
+  // its grazing wobble.
   useEffect(() => {
     if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeGoatSteer = (i: number, to: { x: number; z: number } | null, from?: { x: number; z: number }) => {
+      const s = gait.current[i]
+      if (!s) return false
+      if (from) {
+        s.x = from.x
+        s.z = from.z
+      }
+      steer.current[i] = to
+      return true
+    }
     return () => {
-      delete (window as unknown as Record<string, unknown>).__placeGoatGait
+      delete w.__placeGoatGait
+      delete w.__placeGoatSteer
     }
   }, [])
   return (

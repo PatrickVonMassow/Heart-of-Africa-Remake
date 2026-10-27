@@ -417,6 +417,165 @@ if (section('panorama-wildlife')) {
         p.yaw = pose.yaw
       }, aimed.pose)
     }
+    // Point 1419: a goat beside a post steps round it rather than through it.
+    // Only a fence post standing as its own circle counts (a gate or end post:
+    // a round collider centred on a post of `__placeLayout.fences`; its radius
+    // is the fence's panel radius, 0.42-0.6 m). When no goat grazes
+    // within 0.6 m of one, the DEV steer sets the nearest goat down on one side
+    // of the post and walks it to the other, so the collision has to carry it
+    // round; its clearance is sampled the whole way, and the shutter frames the
+    // midpoint between goat and post with both projected in view.
+    const NEAR = 0.6
+    const pick = await page.evaluate(() => {
+      const herd = window.__placeGoatGait ?? {}
+      const cs = window.__placeLayout?.colliders ?? []
+      const fencePosts = (window.__placeLayout?.fences ?? []).flatMap((f) => f.posts)
+      const posts = cs.filter(
+        (c) => (!c.kind || c.kind === 'circle') && fencePosts.some((p) => Math.hypot(p[0] - c.x, p[1] - c.z) < 1e-6),
+      )
+      let best = null
+      for (const [i, g] of Object.entries(herd)) {
+        for (const c of posts) {
+          const gap = Math.hypot(g.x - c.x, g.z - c.z) - c.r
+          if (!best || gap < best.gap) best = { i: Number(i), gap, post: { x: c.x, z: c.z, r: c.r } }
+        }
+      }
+      return best
+    })
+    let staged = null
+    if (pick && pick.gap > NEAR) {
+      staged = await page.evaluate(({ i, post }) => {
+        const cs = window.__placeLayout?.colliders ?? []
+        const R = 0.3
+        const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
+        const free = (x, z) =>
+          cs.every((c) => {
+            if (c.x === post.x && c.z === post.z && (!c.kind || c.kind === 'circle')) return true
+            if (c.kind === 'box') {
+              const sin = Math.sin(c.rot)
+              const cos = Math.cos(c.rot)
+              const lx = cos * (x - c.x) - sin * (z - c.z)
+              const lz = sin * (x - c.x) + cos * (z - c.z)
+              return Math.hypot(lx - clamp(lx, -c.hx, c.hx), lz - clamp(lz, -c.hz, c.hz)) >= R + 0.05
+            }
+            if (c.kind === 'segment') {
+              const ex = c.x2 - c.x1
+              const ez = c.z2 - c.z1
+              const l2 = ex * ex + ez * ez
+              const t = l2 < 1e-12 ? 0 : clamp(((x - c.x1) * ex + (z - c.z1) * ez) / l2, 0, 1)
+              return Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t)) >= c.r + R + 0.05
+            }
+            return Math.hypot(x - c.x, z - c.z) >= c.r + R + 0.05
+          })
+        const off = post.r + R + 0.6
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const dx = Math.cos(a)
+          const dz = Math.sin(a)
+          // The goal sits slightly off the axis, so the goat slides round the
+          // post rather than butting it head-on.
+          const from = { x: post.x + dx * off, z: post.z + dz * off }
+          const to = { x: post.x - dx * off - dz * 0.15, z: post.z - dz * off + dx * 0.15 }
+          if (!free(from.x, from.z) || !free(to.x, to.z)) continue
+          if (!window.__placeGoatSteer?.(i, to, from)) return null
+          return { from, to, axis: { x: dx, z: dz } }
+        }
+        return null
+      }, pick)
+    }
+    // Walk (or watch) the goat until it is beside the post, sampling clearance.
+    let minGap = Infinity
+    let atShutter = null
+    // A staged goat stalled on the near face would pass the clearance check
+    // without ever stepping round, so reaching the post's line is asserted too.
+    let rounded = false
+    if (pick) {
+      for (let k = 0; k < 120; k++) {
+        await nextFrames(2)
+        const g = await page.evaluate((i) => {
+          const s = (window.__placeGoatGait ?? {})[i]
+          return s ? { x: s.x, z: s.z } : null
+        }, pick.i)
+        if (!g) break
+        const gap = Math.hypot(g.x - pick.post.x, g.z - pick.post.z) - pick.post.r
+        minGap = Math.min(minGap, gap)
+        atShutter = { ...g, gap }
+        if (!staged) break
+        // Beside the post: the goat has reached the post's own line across the axis.
+        const along = (g.x - pick.post.x) * staged.axis.x + (g.z - pick.post.z) * staged.axis.z
+        if (along <= 0) {
+          rounded = true
+          break
+        }
+      }
+    }
+    if (staged) {
+      check(
+        'the steered goat walks up beside the post before the frame cap (point 1419)',
+        rounded,
+        rounded ? 'reached the post line across its walk' : `still on the near side after 120 steps (gap ${atShutter?.gap.toFixed(3) ?? '?'} m)`,
+      )
+    }
+    check(
+      'a goat stands within 0.6 m of a fence post at the shutter (point 1419)',
+      !!atShutter && atShutter.gap <= NEAR,
+      atShutter
+        ? `gap ${atShutter.gap.toFixed(3)} m to a post of radius ${pick.post.r.toFixed(2)} m${staged ? ' (steered past it)' : ''}`
+        : pick
+          ? 'MEASURED NOTHING — the goat could not be read or steered'
+          : 'MEASURED NOTHING — no goat or no free-standing fence post in the place',
+    )
+    check(
+      'that goat never comes inside the post (point 1419)',
+      Number.isFinite(minGap) && minGap >= 0.3 - 0.02,
+      Number.isFinite(minGap) ? `closest gap ${minGap.toFixed(3)} m (needs ≥ 0.280)` : 'MEASURED NOTHING',
+    )
+    if (atShutter) {
+      const mid = { x: (atShutter.x + pick.post.x) / 2, z: (atShutter.z + pick.post.z) / 2 }
+      const pose = await page.evaluate(({ mid, axis }) => {
+        const p = window.__placePlayer
+        if (!p) return null
+        const pose = { x: p.x, z: p.z, yaw: p.yaw }
+        // Look across the walk, so the goat's way round the post reads sideways.
+        const dx = axis ? -axis.z : p.x - mid.x
+        const dz = axis ? axis.x : p.z - mid.z
+        const d = Math.hypot(dx, dz) || 1
+        p.x = mid.x + (dx / d) * 4
+        p.z = mid.z + (dz / d) * 4
+        p.yaw = Math.atan2(-(mid.x - p.x), -(mid.z - p.z))
+        return pose
+      }, { mid, axis: staged?.axis ?? null })
+      await nextFrames(2)
+      const offscreen = await page.evaluate(({ goat, post }) => {
+        const cam = window.__placeCamera
+        if (!cam) return ['camera:missing']
+        return [
+          ['goat', goat.x, 0.5, goat.z],
+          ['post', post.x, 0.5, post.z],
+        ]
+          .map(([name, x, y, z]) => {
+            const v = new cam.position.constructor(x, y, z).project(cam)
+            return Math.abs(v.x) <= 0.95 && Math.abs(v.y) <= 0.95 && v.z < 1 ? null : `${name}@(${v.x.toFixed(2)},${v.y.toFixed(2)})`
+          })
+          .filter(Boolean)
+      }, { goat: atShutter, post: pick.post })
+      check('goat and post both project inside the frame at the shutter (point 1419)', offscreen.length === 0, offscreen.join(' ') || 'both in view')
+      await frame('1419-goat-round-post', {
+        local: { x: mid.x, y: 0.5, z: mid.z },
+        label: 'a goat stepping round a post',
+      })
+      await page.evaluate(
+        ({ pose, i }) => {
+          window.__placeGoatSteer?.(i, null)
+          const p = window.__placePlayer
+          if (!p || !pose) return
+          p.x = pose.x
+          p.z = pose.z
+          p.yaw = pose.yaw
+        },
+        { pose, i: pick.i },
+      )
+    }
   }
 }
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —

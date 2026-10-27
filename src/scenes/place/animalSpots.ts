@@ -9,7 +9,7 @@
 // that body forever. And no animal was part of the collider set, so nothing
 // could ever separate two of them — several goats stood inside one another.
 
-import { nudgeToFree, resolveMove, WALKER_RADIUS, type Collider } from './collision'
+import { nudgeToFree, resolveMove, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
 import { mulberry32 } from '../../world/noise'
 
 /** The radius an animal MOVES with — the settlement's shared mover footprint. */
@@ -91,10 +91,79 @@ export function animalBodies(anchors: readonly AnimalAnchor[]): AnimalBody[] {
   return anchors.map((a) => ({ x: a.x, z: a.z, r: ANIMAL_BODY_RADIUS }))
 }
 
-/** The settlement's colliders with every animal body appended. The bodies keep
- *  their identity, so moving an animal is a field write, not a rebuild. */
+/** Every animal body, then the settlement's colliders. The herd comes FIRST so
+ *  the layout resolves after it and has the last word (point 1419): a goat
+ *  shouldered by a herd mate is pushed out of the mate and then back out of the
+ *  fence, never the other way round. The bodies keep their identity, so moving
+ *  an animal is a field write, not a rebuild. */
 export function animalScene(colliders: readonly Collider[], bodies: readonly AnimalBody[]): Collider[] {
-  return [...colliders, ...bodies]
+  return [...bodies, ...colliders]
+}
+
+/** A live position the herd must keep out of: the traveller's feet or a figure. */
+interface LiveSpot {
+  x: number
+  z: number
+  active: boolean
+}
+
+/** An inhabitant's body as the shared registry holds it (`inhabitantBodies.ts`). */
+interface LiveInhabitant extends LiveSpot {
+  scale: number
+}
+
+/**
+ * The live figures this frame as colliders the herd resolves against (point
+ * 1419: a goat walked through the villagers and the traveller, because only the
+ * static layout and the herd itself were in its set). Every active inhabitant
+ * at its own body radius, the extra movers (the chief's standing spot, the
+ * fishers) as they are, and the traveller at his radius. Circles come from
+ * `pool`, so a frame allocates nothing once the pool has grown.
+ */
+export function liveFigureColliders(
+  out: Collider[],
+  pool: CircleCollider[],
+  inhabitants: readonly LiveInhabitant[],
+  bodyRadius: number,
+  extra: readonly Collider[],
+  traveller: LiveSpot,
+  travellerRadius: number,
+): Collider[] {
+  out.length = 0
+  let used = 0
+  const circle = (x: number, z: number, r: number) => {
+    const c = (pool[used] ??= { x: 0, z: 0, r: 0 })
+    used++
+    c.x = x
+    c.z = z
+    c.r = r
+    out.push(c)
+  }
+  for (const b of inhabitants) if (b.active) circle(b.x, b.z, bodyRadius * b.scale)
+  for (const c of extra) out.push(c)
+  if (traveller.active) circle(traveller.x, traveller.z, travellerRadius)
+  return out
+}
+
+/**
+ * Rewrite the scene as the herd (first, which is where `stepAnimal` finds it),
+ * then this frame's live figures, then the static colliders. Later entries win
+ * a conflict, so the order is the priority: a goat pressed by a herd mate ends
+ * outside the figure beside it, and one a figure presses against a fence ends
+ * touching the figure, never inside the fence. The figures never yield to a
+ * goat; the goat steps round them, and one a figure walks into is pushed out
+ * on its own next step.
+ */
+export function setAnimalFigures(
+  scene: Collider[],
+  statics: readonly Collider[],
+  bodies: readonly AnimalBody[],
+  figures: readonly Collider[],
+): void {
+  scene.length = 0
+  for (const b of bodies) scene.push(b)
+  for (const f of figures) scene.push(f)
+  for (const c of statics) scene.push(c)
 }
 
 /** Stand-in for the mover's own body while IT resolves: a collider infinitely
@@ -131,11 +200,10 @@ export function stepAnimal(
   fromX: number,
   fromZ: number,
 ): [number, number] {
-  const base = scene.length - bodies.length
   const self = bodies[index]
-  scene[base + index] = NO_COLLIDER
+  scene[index] = NO_COLLIDER
   const [px, pz] = resolveMove(scene, targetX, targetZ, ANIMAL_RADIUS, [fromX, fromZ])
-  scene[base + index] = self
+  scene[index] = self
   self.x = px
   self.z = pz
   return [px, pz]
