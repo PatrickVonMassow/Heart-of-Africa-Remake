@@ -432,6 +432,46 @@ describe('the clip gait on the ground', () => {
     }
   })
 
+  it("a running child's flight is short and low: airborne share and apex within the balance bounds", () => {
+    const tag = balance.villageLife.tag
+    const { airborneMax, apexMax } = VILLAGER_GLTF.runFlight
+    const n = asset.bones.length
+    const pose = newPose(n)
+    const world = newWorld(n)
+    const dt = 1 / 60
+    // the tag game's trot and run (m/s, world).
+    // OPEN: a fresh runner's top pace (sprintSpeed × runnerBoost, ≈ 3.8 m/s)
+    // still floats (male child 59 %, 7.7 cm; female 44 %, 5.7 cm, measured
+    // 27.10.2026): the walk share fades out there to keep the no-slide and
+    // continuity tests, so that pace needs a re-authored jog clip.
+    for (const pace of [tag.sprintSpeed * tag.trotFactor, tag.sprintSpeed]) {
+      for (const sex of SEXES) {
+        const f = gltfPerson(asset, sex, 'child', 0).frame
+        const speed = pace / CHILD_FIGURE_SCALE
+        const g = newClipGait()
+        let z = 0
+        let frames = 0
+        let air = 0
+        let apex = 0
+        for (let t = 0; t < 4; t += dt) {
+          z += speed * dt
+          stepClipGait(g, asset, f, speed * dt, speed)
+          clipGaitPose(g, asset, f, speed, { x: 0, z, yaw: 0, unit: 1 }, pose)
+          forwardKinematics(asset, f.rest0, pose, world)
+          const c = contactPoints(asset, world, f.legScale)
+          const low = Math.min(...(['L', 'R'] as const).flatMap((s) => [c[s].heel.y, c[s].ball.y, c[s].tip.y]))
+          if (t < 1) continue
+          frames++
+          if (low > PLANT_TOUCH) air++
+          apex = Math.max(apex, low * f.scale * CHILD_FIGURE_SCALE)
+        }
+        const where = `${sex} child at ${pace.toFixed(2)} m/s`
+        expect(air / frames, where).toBeLessThan(airborneMax)
+        expect(apex, where).toBeLessThan(apexMax)
+      }
+    }
+  })
+
   it('the feet never sink below the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
   })

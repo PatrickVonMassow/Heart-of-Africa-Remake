@@ -2890,6 +2890,23 @@ export const VILLAGER_GLTF = {
    *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their
    *  cadence. Calibratable. */
   jogStride: { exponent: 0.8, min: 0.4, max: 1.08 },
+  /** Share of walk the runs keep blended in (villagerRig.ts `gaitWeights`):
+   *  the shipped jog clip has each foot down only ~11 % of its cycle, so a
+   *  pure jog spends ~3/4 of it with both feet off the ground and reads as
+   *  floating at a child's tag pace; the walk's stance lengthens the blended
+   *  stance by construction. Faded out towards the jog over the `runWalkFade`
+   *  per unit of leg below `runWalkUntil`, so a dash is the pure sprint.
+   *  Measured 27.10.2026 against the binding no-slide and walk → jog → sprint
+   *  continuity tests: a share above 0.6 slides a planted foot at 3.5–5.5 per
+   *  unit of leg, a full share at the sprint band's lower edge sinks it, and a
+   *  fade narrower than 1.2 jumps the joints. Calibratable. */
+  runWalkShare: 0.6,
+  runWalkUntil: 8.15,
+  runWalkFade: 1.2,
+  /** Bounds on a running child's flight (the run reads grounded): the share
+   *  of the gait cycle with both feet off the ground, and the lowest sole
+   *  contact's highest point over it (m, world). Calibratable. */
+  runFlight: { airborneMax: 0.4, apexMax: 0.06 },
   /** Body safety net (design.md clothing rule): no vertex of the chest front
    *  or of a child's pelvis midline may peak sharper than this — its offset above
    *  its neighbours' mean along the normal, over their mean edge length. The
