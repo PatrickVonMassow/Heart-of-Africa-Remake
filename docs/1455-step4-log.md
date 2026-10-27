@@ -76,3 +76,44 @@ post-loop step died with a syntax error, so no `status` was written and its fram
 archived before ref-vd-gpu-5 reused wt-a. Its duration, verdict, frame count and memory stand;
 its frames are not used for picture judgement (four archived quiet captures remain). Rule
 kept for the rest of the test: `pair.sh` is not edited while a watcher runs.
+
+## Block 1 pair 1 — ABORT-MEMORY (27.10.2026, 15:35–15:48)
+
+Run `local/1455/runs/2026-10-27T14-35-49-pair-b1-1` (start order: adult-errands WebGL 2 ×2
+on wt-a first, villager-dress WebGPU on wt-b 60 s later).
+
+| Member | Result | Duration | Frames | Note |
+|---|---|---|---|---|
+| A1 adult-errands WebGL 2 | RED | 6m 27s | 9/23 | order at the stand (642), water rim band (568), plus three names that never fired in the 10 quiet runs: jar's mouth under the surface (−0.2498 m against −0.25 m), "nothing stands between him and the lens", "still under it at the shutter" |
+| A2 adult-errands WebGL 2 | RED | — | 9/23 | order at the stand (642), water rim band (568) only |
+| B villager-dress WebGPU | ABORTED | 11m 40s of a 13m 12s median | 28 (= solo) | TERM by the watcher at 15:48:29, sample 85.5 % |
+
+Memory: rose with both members up to 80.2 % (15:43:49), dropped when A1 ended, then climbed
+again under A2 + B to 81.5, 82.3, 84.7 and 85.5 % (15:48:14–15:48:29). Samples were 5 s
+apart with no gap (154 samples). The sweep afterwards found no surviving process.
+
+Quiet profiles from the block-1 references (first sample → peak): adult-errands WebGL 2
+17.4–19.9 → 37.7–39.9 % (Δ ≈ 20 points), villager-dress WebGPU 10.9–19.0 → 62.5–69.5 %
+(Δ ≈ 47–55). That puts idle + Δa + Δb at ≈ 88 %, so C1 would not have admitted this
+pairing in production. The plan had made only block 3 conditional on C1 and left block 1
+unconditional, so the test ran into the budget it was meant to protect. The pair met
+exactly what C1 predicted. This is a finding about the plan, not a flaky run.
+
+## Verdict (step 5)
+
+**FAIL** under §4.4 ("no sample > 85 %"), and §4.3 stops the test at its first FAIL. The
+plan is not changed after the failure. Moving the criterion after seeing a result is the
+thing the six-eyes procedure exists to prevent, and C9 relaxes no threshold. So the point's
+step 5 applies: **the bound stays at one browser suite**, recorded in
+`docs/batch-owner-runbook.md` ("Local heavy jobs"). Step 6 (implementation) and step 7
+(practice) lapse.
+
+What the one completed window still shows, as information only:
+- every pairing with a villager-dress-class member (Δ ≈ 50) has at most ≈ 15 points of
+  headroom above idle, so only light partners would fit, and the measured pair gain was
+  largest exactly for the heavy suites;
+- adult-errands WebGL 2 under overlap fired three timing names never seen in its 10 quiet
+  runs (1 window, so no rate claim).
+
+A narrower re-qualification (only C1-admitted light pairings, a new six-eyes plan) is
+possible but not started: it is a new solution and needs a user order.
