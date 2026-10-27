@@ -9,7 +9,7 @@
 // that body forever. And no animal was part of the collider set, so nothing
 // could ever separate two of them — several goats stood inside one another.
 
-import { nudgeToFree, resolveMove, WALKER_RADIUS, type Collider } from './collision'
+import { nudgeToFree, resolveMove, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
 import { mulberry32 } from '../../world/noise'
 
 /** The radius an animal MOVES with — the settlement's shared mover footprint. */
@@ -95,6 +95,71 @@ export function animalBodies(anchors: readonly AnimalAnchor[]): AnimalBody[] {
  *  their identity, so moving an animal is a field write, not a rebuild. */
 export function animalScene(colliders: readonly Collider[], bodies: readonly AnimalBody[]): Collider[] {
   return [...colliders, ...bodies]
+}
+
+/** A live position the herd must keep out of: the traveller's feet or a figure. */
+interface LiveSpot {
+  x: number
+  z: number
+  active: boolean
+}
+
+/** An inhabitant's body as the shared registry holds it (`inhabitantBodies.ts`). */
+interface LiveInhabitant extends LiveSpot {
+  scale: number
+}
+
+/**
+ * The live figures this frame as colliders the herd resolves against (point
+ * 1419: a goat walked through the villagers and the traveller, because only the
+ * static layout and the herd itself were in its set). Every active inhabitant
+ * at its own body radius, the extra movers (the chief's standing spot, the
+ * fishers) as they are, and the traveller at his radius. Circles come from
+ * `pool`, so a frame allocates nothing once the pool has grown.
+ */
+export function liveFigureColliders(
+  out: Collider[],
+  pool: CircleCollider[],
+  inhabitants: readonly LiveInhabitant[],
+  bodyRadius: number,
+  extra: readonly Collider[],
+  traveller: LiveSpot,
+  travellerRadius: number,
+): Collider[] {
+  out.length = 0
+  let used = 0
+  const circle = (x: number, z: number, r: number) => {
+    const c = (pool[used] ??= { x: 0, z: 0, r: 0 })
+    used++
+    c.x = x
+    c.z = z
+    c.r = r
+    out.push(c)
+  }
+  for (const b of inhabitants) if (b.active) circle(b.x, b.z, bodyRadius * b.scale)
+  for (const c of extra) out.push(c)
+  if (traveller.active) circle(traveller.x, traveller.z, travellerRadius)
+  return out
+}
+
+/**
+ * Rewrite the scene as this frame's live figures, then the static colliders,
+ * then the herd — the herd stays last, which is where `stepAnimal` finds it.
+ * The figures never yield to a goat; the goat steps round them, and one a
+ * figure walks into is pushed out on its own next step. The walls resolve
+ * after the figures, so a goat a figure presses against a fence ends up
+ * touching the figure, never inside the fence.
+ */
+export function setAnimalFigures(
+  scene: Collider[],
+  statics: readonly Collider[],
+  bodies: readonly AnimalBody[],
+  figures: readonly Collider[],
+): void {
+  scene.length = 0
+  for (const f of figures) scene.push(f)
+  for (const c of statics) scene.push(c)
+  for (const b of bodies) scene.push(b)
 }
 
 /** Stand-in for the mover's own body while IT resolves: a collider infinitely

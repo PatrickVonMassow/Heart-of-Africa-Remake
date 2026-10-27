@@ -65,7 +65,7 @@ import { useGame } from '../../state/store'
 import { START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
-import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
@@ -163,7 +163,7 @@ import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
-import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
+import { animalAnchors, animalBodies, animalScene, liveFigureColliders, setAnimalFigures, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import {
   createInhabitantSet,
   groundOccupied,
@@ -194,7 +194,8 @@ import {
 import { initialLoomCloth } from '../../systems/loomCloth'
 import { FOLDED_STRIP, LOOM_BUILD, loomClothTransform, loomStackPosition, loomWeaveColor } from './loomVisual'
 import { drummerFacing } from './chiefWalk'
-import { DRUMMER_SPEAKER_ID } from './chiefPresence'
+import { chiefStandingPosition, DRUMMER_SPEAKER_ID } from './chiefPresence'
+import { fisheryLiveColliders } from './fisheryColliders'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
@@ -1634,6 +1635,13 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   const anchors = useMemo(() => animalAnchors(seed, count, pen, colliders), [seed, count, pen, colliders])
   const bodies = useMemo(() => animalBodies(anchors), [anchors])
   const scene = useMemo(() => animalScene(colliders, bodies), [colliders, bodies])
+  // The live figures the herd steps round (point 1419): the villagers in the
+  // shared body registry, the chief, the fishers and the traveller. Rebuilt into
+  // the scene every frame from reused circles.
+  const bodySet = useContext(InhabitantBodiesContext)
+  const figures = useMemo<Collider[]>(() => [], [])
+  const figurePool = useMemo<CircleCollider[]>(() => [], [])
+  const extraMovers = useMemo<Collider[]>(() => [], [])
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-goat leg-pivot groups (four each) and gait state (last position, walked
   // distance, held facing and each stance's world contact) so the swing rides
@@ -1659,6 +1667,19 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
     if (isLifeFrozen()) return
     const t = clock.elapsedTime
     const dt = Math.min(rawDt, 0.1)
+    extraMovers.length = 0
+    if (chiefStandingPosition.active) extraMovers.push(chiefStandingPosition)
+    for (const c of fisheryLiveColliders) extraMovers.push(c)
+    liveFigureColliders(
+      figures,
+      figurePool,
+      bodySet.bodies,
+      balance.villageLife.separation.bodyRadius,
+      extraMovers,
+      placePlayerPosition,
+      PLAYER_RADIUS,
+    )
+    setAnimalFigures(scene, colliders, bodies, figures)
     // Publish every animal's last position into the scene before anyone moves,
     // so each of them resolves against where the others actually stand.
     for (let i = 0; i < bodies.length; i++) {
