@@ -22,6 +22,12 @@ Plan: `docs/1455-step2-merged-plan.md` (approved by GPT-6.1 Sol, §8).
 - Next: block 1 pairs (adult-errands WebGL 2 ×2 back-to-back on wt-a ‖ villager-dress
   WebGPU on wt-b, 5 windows, alternating start order), then blocks 2–4 with their
   references directly before each block (§4.2–4.3).
+- Block 1 pairs, first attempt 14:13 (`runs/2026-10-27T14-13-36-pair-b1-1`): the watcher
+  died about 1 min in together with the session that had launched it (no `status`, last
+  memory sample 14:14:32, member A at 0/23 frames, member B never started). VOID — no
+  evidence either way. §4.1 sweep found no surviving browser, `run-logged`, `vite` or
+  checkout process. Restarted 14:37 detached from the session (`setsid nohup`), so a
+  session end no longer ends a watcher.
 
 ## Block 1 quiet references — adult-errands WebGL 2
 
