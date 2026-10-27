@@ -30,7 +30,7 @@ follow-up window (§4.5).
 | A: the second-started run is labelled loaded | **Confirmed** in the same log: "MACHINE UNDER LOAD … the run proceeds, its timing verdicts do NOT count as evidence". `annotateResult` lets a green count; `--on-load=off` still reports the load; `defer` would skip the member. The digest has no loaded branch. |
 | B: LARGE exclusivity | **Already enforced**: `run-logged.mjs` waits for a live LARGE wrapper in any worktree (README "Before launching a suite"); `VERIFY_NO_WAIT=1` is the only escape and stays unused. Sections do not wait on each other, which is why M3 could overlap. |
 | Memory sampler | The 1452 samples are an ad-hoc `/proc/meminfo` loop (`local/1452-mem-m3-*.log`, `HH:MM:SS used_kib= pct=`), not a script; reusing it is re-tuning, not a new mechanism. Host: 15.9 GB; 85 % ≈ 13.2 GiB; idle at M3 start 16.3 %. |
-| Charged reds | `scripts/render-verify-charges.mjs` already charges the steady polish-villagers shutter-timing signatures to 1456 and 1292; those never count as overlap reds. |
+| Charged reds | `scripts/render-verify-charges.mjs` already charges the steady polish-villagers shutter-timing signatures to 1456 and 1292; they stay charged, but their frequency is compared between arms (§4.3, F10). |
 
 A's per-name firing counts for adult-errands WebGL 2 (R5) were not re-counted; they are
 A's measurement and only set the expectation for the baseline arm.
@@ -58,10 +58,17 @@ A's measurement and only set the expectation for the baseline arm.
   informational; no red is discounted, filed as load, or covered by a retry.
 - **C9 Stop rule** (U18): any uncharged red in an overlapped run, a sample > 85 %, a HUNG
   run, a crash, lost coverage or doubtful frame provenance → bound back to 1, both
-  members' evidence kept, no threshold relaxed. Resumption only through a quiet rerun of
-  the red section on the same build: reproduces quiet → charged to its owning point,
-  pairs resume; absent in 2 quiet runs → overlap-attributed, pairs stay off until the cause
-  is diagnosed and filed. A quiet rerun attributes; it never erases.
+  members' evidence kept, no threshold relaxed. Recovery per cause (F5, F6):
+  - *uncharged red*: 2 quiet reruns of the red section on the same build; reproduces quiet
+    → charged to its owning point, pairs resume; absent in both → **unresolved** (not
+    "attributed": a ~4 % base-rate red also vanishes in 2 reruns ~92 % of the time), pairs
+    stay off until the cause is diagnosed and filed. A quiet rerun never erases the red.
+  - *sample > 85 %*: that pairing loses admission; it returns only after ≥ 5 pairs with
+    measured peak ≤ 80 % in a new qualification block.
+  - *HUNG run or crash*: pairs stay off until the run log names the cause and it is filed;
+    a cause reproduced solo is charged to its owner and pairs resume.
+  - *lost coverage or doubtful frame provenance*: the affected member is rerun solo for its
+    evidence; pairs stay off until the provenance cause is fixed and shown by one clean pair.
 - **C10 Waits name their log** (U19): `run-wait.mjs <log>` always; `--again` wherever a
   fresh run is the point.
 
@@ -72,6 +79,12 @@ no other heavy job, every run through `run-logged.mjs --again`, two separate che
 memory sampled every 5 s into one log per pair. The later member starts 60 s after the
 first; which section starts first alternates across repetitions; overlap intervals are
 read from `run.json` `startedAt`/`finishedAt`.
+The memory loop is a watcher, not only a recorder (F2): on a sample > 85 % it sends TERM
+to the later member's process group, confirms after 10 s that no child is left, and logs
+the abort; the owning session's blocking wait checks the sample log's freshness at every
+member finish, and a gap > 15 s counts as a failed sampler (stop, as a breach). Before the
+next repetition reuses a checkout, every frame its run wrote is copied to
+`local/1455-frames/<log id>/` (F3); the picture judgement works only from those copies.
 
 **4.2 Quiet references** (U20), run block-wise immediately before their pair block:
 solo memory profile for villager-dress WebGPU and WebGL 2, water-stand-table WebGPU,
@@ -88,26 +101,33 @@ WebGL 2 **10** quiet runs for the per-name base rate.
 | 3 | water-jar-carried WebGL 2 ‖ adult-errands WebGL 2 | 5 (if C1 admits) | WebGL 2 + WebGL 2 |
 | 4 | villager-dress WebGPU ‖ water-stand-table WebGPU | 3 | M3 redone across checkouts; proves frame integrity |
 
-Statistics: blocks give 30 known-green member runs (villager-dress WebGPU 25/26,
-water-jar-carried WebGL 2 5/5, water-stand-table WebGPU 9/9). 0 overlap-attributed reds
-bounds the added red rate below 9.5 % at 95 % (1 − 0.05^(1/30)); 1 attributed red passes
-only after 15 further clean pairs (≥ 60 runs, ≈ 5 %); 2 → FAIL. With a ~4 % base rate a
-chance red appears in ~70 % of 30-run sets, so every red is attributed through the C9
-quiet rerun before it counts. Timing probe: per rotating check name (jar mouth, foam drift
-after shutter, walks on between frames, order-at-stand, sprint, heading-in-one-frame;
-charged signatures excluded) FAIL if overlapped total > quiet + max(3, 50 % of quiet), or
-a name fires ≥ 2× overlapped that never fired quiet, or a one-sided Fisher test on
-any-rotating-red per run gives p < 0.10; power ≈ a 2× rise at n = 10 per arm. If the quiet
+Statistics (F4, F7, F8): the independent unit is the **pair** (one shared host window),
+not the member run. Qualification needs 20 pairs; if C1 does not admit block 3, its 5
+pairs are replaced by 5 more block-2 pairs, and fewer than 20 completed pairs never
+qualify. One rule: **any** unresolved red (C9) in a pair member → FAIL; a red that
+reproduces quiet is charged and the pair is repeated. 0 failing pairs out of 20 bounds the
+per-pair added red rate below 13.9 % at 95 % (1 − 0.05^(1/20)), under the worst-case
+break-even of ~17 % (5 min saved per pair against a 30 min false red); the 9.5 % per-run
+figure of the halves assumed independent member runs and is withdrawn. Timing probe: the
+unit is the partner window (5 overlapped windows against 5 quiet windows of 2 runs each);
+per rotating check name (jar mouth, foam drift after shutter, walks on between frames,
+order-at-stand, sprint, heading-in-one-frame) FAIL if overlapped total > quiet + max(3,
+50 % of quiet), or a name fires ≥ 2× overlapped that never fired quiet. At n = 5 windows
+the probe catches only a gross rise; finer drift is left to C9 in production. If the quiet
 arm shows a rotating red in more than 5 of 10 runs, the section is no usable probe and
-WebGL 2 timing-sensitive pairing stays unqualified.
+WebGL 2 timing-sensitive pairing stays unqualified. Charged signatures (1456, 1292) stay
+charged but are counted in both arms (F10): overlapped count > quiet + max(2, 50 % of
+quiet) fails the qualification like an uncharged rise.
 
 **4.4 Pass/fail thresholds** (U24, U17, U10, U28), all must hold: no sample > 85 % (≤ 80 %
-for a pairing admitted on measured peaks); 0 overlap-attributed reds; probe passes; every
-member's `framesWritten` equals its solo count (any cross-count FAIL); pair wall clock
-≤ 0.80 × the sum of the two quiet medians; each member ≤ 1.15 × its quiet median; each
+for a pairing admitted on measured peaks) and no failed sampler; 0 unresolved reds;
+probe passes; every member's `framesWritten` equals its solo count (any cross-count
+FAIL); pair wall clock, from the first launch to the last completion, ≤ 0.80 × the sum of
+the quiet medians of every run in the window (block 1: 2 × adult-errands + 1 ×
+villager-dress) (F9); each member ≤ 1.15 × its quiet median; each
 receipt names its own log, section, backend and load lines; a person judges every retained
 pair frame against its declared subject and the quiet capture — a missing, substituted or
-unusable required picture fails. Host time ≈ 6.5–7 h unattended (≈ 2.5–3 h references,
+unusable required picture fails. Host time ≈ 6.5–7 h without a person, supervised by the owning session (§4.1) (≈ 2.5–3 h references,
 ≈ 4 h pairs); ≈ 2 h if block 1 fails.
 
 **4.5 Operational follow-up** (U24): after admission, wall clock per landed point over the
@@ -213,3 +233,23 @@ merger does not record its own fold):
         --list-b "docs/four-eyes/1455-blind-b-sol.json" \
         --accounting "39 A + 34 B entries → 28 union entries (68 of the 73 input entries merged, 4 only A, 1 only B): every input entry accounted for" \
         --evidence "<what the stage found>"
+
+## 8. Final check (step 3) and fixes
+
+Checker: GPT-6.1 Sol (cross lane, other vendor than the merger Fable 5.1), via
+`scripts/ask-lane.mjs --kind audit`, 27.10.2026. First verdict: REJECT, 10 objections
+(A1–A10). Fixes by Claude Opus 5.5 (author of half A, not the merger); the fixed plan goes
+back to the same checker before anything is implemented.
+
+| Id | Objection (short) | Fix |
+|---|---|---|
+| F1 / A1 | runbook says only a user decision may trade single-suite slowdown for pair gain | No change: that user decision is point 1455 itself (user order 27.10.2026): "this point replaces that criterion for this question with the goal above" and step 5 "A 2-4 % slower single suite is acceptable when the pair's wall-clock gain outweighs it". The test (step 4) is ordered by the same point. |
+| F2 / A2 | > 85 % abort has no watcher; "unattended" | §4.1: the loop aborts the later member's process group, confirms no child is left, stale samples (> 15 s) stop the test; §4.4 wording. |
+| F3 / A3 | frames overwritten before the picture judgement | §4.1: copy each run's frames to `local/1455-frames/<log id>/` before reuse. |
+| F4 / A4 | two contradicting acceptance rules | §4.3: one rule — any unresolved red fails; the 15-pair extension is dropped. |
+| F5 / A5 | one recovery path for all stop causes | C9: recovery per cause. |
+| F6 / A6 | 2 quiet reruns cannot attribute a red to overlap | C9: such a red is "unresolved", not attributed; it still stops pairs and fails the test. |
+| F7 / A7 | member runs are not independent | §4.3: unit = pair (20 pairs → < 13.9 % per pair, under the ~17 % break-even); probe unit = partner window, power stated honestly. |
+| F8 / A8 | skipping block 3 drops below the floor | §4.3: replaced by 5 more block-2 pairs; < 20 pairs never qualify. |
+| F9 / A9 | block 1 denominator | §4.4: sum of every run's quiet median in the window, first launch to last completion. |
+| F10 / A10 | charged signatures could hide an overlap rise | §2, §4.3: charged signatures counted in both arms with a failing threshold. |
