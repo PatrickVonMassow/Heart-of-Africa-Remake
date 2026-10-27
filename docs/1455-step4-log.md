@@ -30,6 +30,7 @@ Plan: `docs/1455-step2-merged-plan.md` (approved by GPT-6.1 Sol, §8).
 | ref-ae-gl-1 | RED | 6m 18s | 9/23 | order at the stand (charged, point 642, webgl) |
 | ref-ae-gl-2 | RED | 6m 10s | 9/23 | same |
 | ref-ae-gl-3 | RED | 5m 51s | 9/23 | same |
+| ref-ae-gl-4 | RED | 6m 23s | 6/23 | order at the stand; adult walks on between moving-capture frames 1 and 2 (point 1404) |
 
 Reading after 3 of 10: the order-at-stand signature fires in every quiet run so far. If it
 holds above 5 of 10, §4.3 applies: adult-errands WebGL 2 is no usable probe and WebGL 2
