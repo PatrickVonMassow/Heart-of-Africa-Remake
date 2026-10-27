@@ -24,7 +24,9 @@ suites, picture check, cross-vendor review, and the fix rounds they triggered.
 Class: game = diff touches `src/`. Loc: cloud = a `claude --cloud` start or cloud-author
 log exists. Suites: runs / finished minutes / red (exit 1, own or unresolved) /
 partial (exit 2, every red charged elsewhere). The window caps start→merge for branches
-older than 24.10.
+older than 24.10 (window start 24.10 00:00Z to the merge time in UTC). Sync hours are
+added on top of the phases for 1446 and 1433 but contained in Wait/Accept for 1333 and
+1297; the rows keep their sources' convention.
 
 | Point | Class | Loc | Start→merge h | Author h | Wait h | Accept h | Suites | Sync (n / h) | Land h | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -36,8 +38,8 @@ older than 24.10.
 | 1446 | infra | local | 4.07 | 0.5 i | 0 | 2.87 i | 7/140/2/1 | 1 / 0.7 i | 0.13 | full runs 42 and 41 min |
 | 1414 | game | local | 36.7 | 0.05 (24.10 00:10) | 35.3 i (13.4 host down) | 1.42 | 3/17/2/1 (+1 main run) | 1 / – | 0.14 | sync then fix at acceptance start |
 | 1432 | game | local | 40.2 | 1.05 | 35.6 i (13.4 host down) | 3.17 | 19/116/9/2, 4 same-SHA repeats | 1 / – | 0.13 | 4 review rounds |
-| 1333 | game | local | 46.2 (branch from 20.10) | 0 in window | 41.8 i | 4.42 | 9/128/6/3 | 2 / 0.9 i | 0.13 | 5 fix commits, 4 reviews |
-| 1297 | game | local | 47.1 (branch from 05.10) | 0 in window | 46.6 i | 0.47 | 2/3/0/0 | 1 / 0.43 i | 0.13 | sync forced a harness rework |
+| 1333 | game | local | 45.2 (branch from 20.10) | 0 in window | 40.8 i | 4.42 | 9/128/6/3 | 2 / 0.9 i | 0.13 | 5 fix commits, 4 reviews |
+| 1297 | game | local | 46.1 (branch from 05.10) | 0 in window | 45.6 i | 0.47 | 2/3/0/0 | 1 / 0.43 i | 0.13 | sync forced a harness rework |
 | 1444 | infra | local | 1.08 i | 0.93 | 0 | 0.15 | – | 0 | 0.13 | six-eyes analysis |
 | 1445 | infra | local | 0.37 | 0.23 | 0 | 0.13 | – | 0 | 0.13 | |
 | 1437 | infra | local | 0.02 | 0.02 | 0 | 0 | – | 0 | 0.13 | one commit |
@@ -46,10 +48,10 @@ older than 24.10.
 | 1388 | infra | cloud | 5.07 | 0.07 | 3.6 i (finished, behind 1415) | 1.38 | – | 0 | 0.15 | authored 08:33–08:36 during 1415 acceptance |
 | 1416 | game | cloud | 1.32 | 0.50 | 0 | 0.75 | 4/24/1/3 | 1 / 0.07 | 0.15 | |
 | 1451 | infra | cloud | 0.75 (1.98 from filing) | 0.12 | 0.15 i | 0.48 | – | 0 | 0.13 | |
-| 1417 | game | cloud | 5.92 | 1.10 (3 cloud rounds) | 1.38 i (16:47–18:10) | 3.08 | 5/136/4/1 | 2 (1 cloud) / 1.4 i | 0.14 | 1450 folded in; incident (b); duplicate fix (c) |
+| 1417 | game | cloud | 5.92 | 1.10 (3 cloud rounds) | 1.38 i (16:47–18:10) | 3.08 | 5/136/4/1 | 2 (1 cloud) / 1.4 i | 0.14 | 1450 folded in; incident (b); duplicate fix (c), attribution open (see c); phases sum to 5.56 h (6.96 h with sync) against 5.92 h |
 | 1418 | game | cloud | 4.65 | 0.83 (2 rounds) | 2.49 i | 1.33 | 5/28/2/1 (+1 main run) | 1 / 0.02 | 0.15 | see (a) |
-| **Median** | | | **2.70** | **0.21** | **0** (0.6 among the 10 that waited) | **0.84** | | | **0.13** | |
-| **Total** | 8 game / 12 infra | 8 cloud | | **7.1** | not additive (see below) | **33.3** | 85 runs, 15.8 h finished + ~4.3 h hung i | 12 syncs / ~3.8 i | **3.2** | |
+| **Median** | | | **2.70** | **0.21** | **0** (8.5 among the 10 that waited; 1.38 among the 5 after 1444) | **0.84** | | | **0.13** | |
+| **Total** | 8 game / 12 infra | 8 cloud | | **7.1** | not additive (see below) | **33.3** | 85 runs (82 allocated per point + 2 main runs; 1 run and 2 of the 40 reds unallocated), 15.8 h finished + ~4.3 h hung i | 12 syncs / ~3.8 i | **3.2** | |
 
 \* 1415 is a game point by the diff rule (13/13 files in `src/`), but its content is a
 bug-report state dump, not gameplay.
@@ -64,7 +66,9 @@ local acceptance (1388 3.6, 1418 2.5, 1417 1.4) or a short idle stretch.
 - **Rate.** 70.5 h / 20 points = 3.52 h per point raw, and 2.86 h without host-down
   (13.4 h, 24.10 13:54 → 25.10 02:17). Before the 1444 landing (11 points, 47.7 h):
   4.34 raw / 3.12 without host-down. After the 1444 landing (9 points, 22.8 h): 2.53 h
-  per point, but **5.69 h per game point** (4 game points: 1415, 1416, 1417, 1418).
+  per point. Divided by the 4 game points (1415, 1416, 1417, 1418) the same 22.8 h give
+  5.69 h, a ratio, not a per-game-point cost: those points' own start→merge times are
+  6.37, 1.32, 5.92 and 4.65 h, and no pre-1443 game-only baseline exists to compare it with.
 - **Suites.** 85 runs: 28 green, 12 partial, 40 red, 5 hung. Finished runs total 15.8 h,
   of which red runs are 11.5 h. The 11 full `polish-villagers` runs (median 43 min)
   total 8.1 h. Hung WebGPU runs (all 1442) add about 4.3 h (i).
@@ -176,7 +180,10 @@ eating head-scratch pose" at 20:55. It ran for 17.4 min with 70 tool uses and
 20:53, pushed 413364252/6933d7a5d (20:56/20:59). The local push was rejected
 non-fast-forward and nothing from it landed. Wall-clock cost to the batch: none on the
 critical path, since the cloud fix arrived first. The cost is 181k tokens and 17 min
-of a local agent running beside the cloud author.
+of a local agent running beside the cloud author. Whether (c) belongs to 1417 or to the
+1418 fix of item (a) (review 20:56, fix sent 20:57), and which SHA 1417 was gated on,
+cannot be resolved from the material: 1417's handover cites only the 19:19–20:44
+re-runs, which predate these fix commits.
 
 **(d) feat/1347-garment-rebuild.**
 - **Pool slots.** `POOL_CAP` (3, `batch-in-flight-core.mjs`) counts unmerged
@@ -187,8 +194,11 @@ of a local agent running beside the cloud author.
 - **Park.** 1347 has been parked since 25.10.2026 21:38:35Z by point 1443, at tip
   e4edd697, which is unchanged. It occupies no slot now: measured today,
   `open []`, `slotsFree 3`, `parkedOut [feat/1347-garment-rebuild]`.
-- **Before the park.** From branch creation (20.10 14:19) to the park it held one of
-  the three slots, 45.6 h of it inside this window.
+- **Before the park.** From branch creation (20.10 14:19) to the park it held a slot,
+  45.6 h of it inside this window. With 1414, 1432, 1333 and 1297 also unmerged the pool
+  stood at four or more against the cap of 3 until the 1443 merges, so the guard refused every
+  call that opened a new feat branch; how 1439–1446, 1444 and 1433 were commissioned
+  then is not shown in the material.
 - **Leftovers.** The worktree `.claude/worktrees/point-1347` still stands. Its last
   commit is from 21.10 and it is 626 commits behind main.
 
