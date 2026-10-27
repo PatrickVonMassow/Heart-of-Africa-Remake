@@ -91,10 +91,13 @@ export function animalBodies(anchors: readonly AnimalAnchor[]): AnimalBody[] {
   return anchors.map((a) => ({ x: a.x, z: a.z, r: ANIMAL_BODY_RADIUS }))
 }
 
-/** The settlement's colliders with every animal body appended. The bodies keep
- *  their identity, so moving an animal is a field write, not a rebuild. */
+/** Every animal body, then the settlement's colliders. The herd comes FIRST so
+ *  the layout resolves after it and has the last word (point 1419): a goat
+ *  shouldered by a herd mate is pushed out of the mate and then back out of the
+ *  fence, never the other way round. The bodies keep their identity, so moving
+ *  an animal is a field write, not a rebuild. */
 export function animalScene(colliders: readonly Collider[], bodies: readonly AnimalBody[]): Collider[] {
-  return [...colliders, ...bodies]
+  return [...bodies, ...colliders]
 }
 
 /** A live position the herd must keep out of: the traveller's feet or a figure. */
@@ -143,12 +146,13 @@ export function liveFigureColliders(
 }
 
 /**
- * Rewrite the scene as this frame's live figures, then the static colliders,
- * then the herd — the herd stays last, which is where `stepAnimal` finds it.
- * The figures never yield to a goat; the goat steps round them, and one a
- * figure walks into is pushed out on its own next step. The walls resolve
- * after the figures, so a goat a figure presses against a fence ends up
- * touching the figure, never inside the fence.
+ * Rewrite the scene as the herd (first, which is where `stepAnimal` finds it),
+ * then this frame's live figures, then the static colliders. Later entries win
+ * a conflict, so the order is the priority: a goat pressed by a herd mate ends
+ * outside the figure beside it, and one a figure presses against a fence ends
+ * touching the figure, never inside the fence. The figures never yield to a
+ * goat; the goat steps round them, and one a figure walks into is pushed out
+ * on its own next step.
  */
 export function setAnimalFigures(
   scene: Collider[],
@@ -157,9 +161,9 @@ export function setAnimalFigures(
   figures: readonly Collider[],
 ): void {
   scene.length = 0
+  for (const b of bodies) scene.push(b)
   for (const f of figures) scene.push(f)
   for (const c of statics) scene.push(c)
-  for (const b of bodies) scene.push(b)
 }
 
 /** Stand-in for the mover's own body while IT resolves: a collider infinitely
@@ -196,11 +200,10 @@ export function stepAnimal(
   fromX: number,
   fromZ: number,
 ): [number, number] {
-  const base = scene.length - bodies.length
   const self = bodies[index]
-  scene[base + index] = NO_COLLIDER
+  scene[index] = NO_COLLIDER
   const [px, pz] = resolveMove(scene, targetX, targetZ, ANIMAL_RADIUS, [fromX, fromZ])
-  scene[base + index] = self
+  scene[index] = self
   self.x = px
   self.z = pz
   return [px, pz]

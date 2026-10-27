@@ -96,12 +96,34 @@ describe('stepAnimal among live figures (point 1419)', () => {
     expect(at[1]).toBeGreaterThan(1.5) // round it and on to the far side
   })
 
-  it('is pushed out by a villager that walks into it, and the herd stays last', () => {
+  it('ends at a villager who presses it against a fence, never inside the fence', () => {
+    const panel: Collider = { kind: 'segment', x1: -3, z1: 0, x2: 3, z2: 0, r: 0.1 }
+    const villager: CircleCollider = { x: 0, z: -2, r: BODY_R }
+    const { bodies, scene } = one(0, -0.6, [panel], [villager])
+    let at: [number, number] = [0, -0.6]
+    // The villager walks up until there is just room for the goat, then on
+    // into the space the goat needs; it never yields.
+    const room = -(0.1 + ANIMAL_RADIUS) - (BODY_R + ANIMAL_RADIUS)
+    for (let k = 0; k < 60; k++) {
+      villager.z = Math.min(room, -2 + k * 0.05)
+      at = stepAnimal(scene, bodies, 0, at[0], at[1], at[0], at[1])
+      expect(standingClear([panel], at[0], at[1], ANIMAL_RADIUS - 1e-6), `fence at frame ${k}`).toBe(true)
+      expect(Math.hypot(at[0] - villager.x, at[1] - villager.z), `villager at frame ${k}`).toBeGreaterThanOrEqual(
+        BODY_R + ANIMAL_RADIUS - 0.02,
+      )
+    }
+    villager.z = room + 0.2
+    at = stepAnimal(scene, bodies, 0, at[0], at[1], at[0], at[1])
+    expect(standingClear([panel], at[0], at[1], ANIMAL_RADIUS - 1e-6)).toBe(true)
+    expect(at[1]).toBeLessThan(0)
+  })
+
+  it('is pushed out by a villager that walks into it, and the herd stays first', () => {
     const villager: Collider = { x: 0.1, z: 0, r: BODY_R }
     const { bodies, scene } = one(0, 0, [], [villager])
     const [x, z] = stepAnimal(scene, bodies, 0, 0, 0, 0, 0)
     expect(Math.hypot(x - 0.1, z)).toBeGreaterThanOrEqual(BODY_R + ANIMAL_RADIUS - 1e-6)
-    expect(scene[scene.length - 1]).toBe(bodies[0])
+    expect(scene[0]).toBe(bodies[0])
   })
 })
 
@@ -150,7 +172,9 @@ describe('a herd among walking figures in real villages (point 1419)', () => {
     const pool: CircleCollider[] = []
 
     const dt = 1 / 30
-    let worstFigure = Infinity
+    let worstFree = Infinity
+    let worstPinched = 0
+    let pinched = 0
     for (let frame = 0; frame < 90 * 30; frame++) {
       const t = frame * dt
       villagers.forEach((v, i) => {
@@ -179,14 +203,24 @@ describe('a herd among walking figures in real villages (point 1419)', () => {
           g.z,
         )
         expect(standingClear(statics, g.x, g.z, ANIMAL_RADIUS - 1e-3), `${id}: goat ${i} inside the layout at ${t.toFixed(2)} s`).toBe(true)
-        for (const f of figures as CircleCollider[]) {
+        // A goat two figures close on from both sides has no free spot until
+        // one of them moves on — neither yields — so those frames are counted
+        // and reported apart; every other frame holds the strict bound.
+        const circles = figures as CircleCollider[]
+        const touching = circles.filter((f) => Math.hypot(g.x - f.x, g.z - f.z) < f.r + ANIMAL_RADIUS + 0.02).length
+        for (const f of circles) {
           const gap = Math.hypot(g.x - f.x, g.z - f.z) - (f.r + ANIMAL_RADIUS)
-          worstFigure = Math.min(worstFigure, gap)
+          if (touching >= 2) {
+            pinched++
+            worstPinched = Math.min(worstPinched, gap)
+          } else worstFree = Math.min(worstFree, gap)
         }
       })
     }
-    // A goat a figure presses against a wall may be left touching that figure
-    // (the wall wins), but its body never ends inside the figure's.
-    expect(worstFigure, `${id}: deepest goat/figure overlap`).toBeGreaterThan(-ANIMAL_RADIUS)
+    expect(worstFree, `${id}: deepest goat/figure overlap outside a two-figure pinch`).toBeGreaterThan(-0.02)
+    // Measured on this sweep (seed 42): outside a pinch no overlap at all; inside
+    // one, maasai-village at worst -0.039 m (3340 pinched goat/figure samples),
+    // tuareg-village ~0 (4265), hausa-village 0 (4). Calibrated, not a target.
+    expect(worstPinched, `${id}: deepest overlap in a two-figure pinch (${pinched} goat/figure samples)`).toBeGreaterThan(-0.05)
   })
 })

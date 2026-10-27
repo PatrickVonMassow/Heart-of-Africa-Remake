@@ -103,8 +103,8 @@ describe('stepAnimal (point 413 — the herd is an obstacle to itself)', () => {
       [5, 5],
     ])
     stepAnimal(scene, bodies, 0, 0, 0, 0, 0)
-    expect(scene[scene.length - 2]).toBe(bodies[0])
-    expect(scene[scene.length - 1]).toBe(bodies[1])
+    expect(scene[0]).toBe(bodies[0])
+    expect(scene[1]).toBe(bodies[1])
   })
 
   it('is swept, so an animal cannot cross a fence panel in one step', () => {
