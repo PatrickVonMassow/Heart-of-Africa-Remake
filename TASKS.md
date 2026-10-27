@@ -87,14 +87,6 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 1419. Village goats have no collision (walk through posts and figures)
-  Queue position: directly after point 1414 (user decision 21.10.2026).
-  Source: user bug report hoa-state-2026-10-21-3318564123 (4).zip (21:06:26Z), user words: "Das Tier hat keine Kollisionsabfrage."
-  Observed: a village goat walks unobstructed through settlement objects (posts, figures, the traveller).
-  Final state: village goats respect the settlement collision (§7.1 criterion 16): they path around posts, huts, fences, props and figures and never pass through the traveller.
-  Verifiable: a Vitest asserts that no goat position lies inside any collider over a simulated period; a capture shows a goat stepping around a post.
-  Criticality: medium - player-visible in every village with goats.
-  Bundle: Dorfleben.
 - [ ] 1454. Fresh runner's top pace still floats: re-author the villager jog clip with a longer stance
   Queue position: directly after point 1420.
   Source: split from point 1420 on 27.10.2026 (owner decision under the standing split rule; user words on 1420: "Die Kinder sind beim Laufen so lange in der Luft.").

@@ -35055,3 +35055,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   6. Implement on success: change the "Local heavy jobs" bound in docs/batch-owner-runbook.md (and whatever existing verify tooling needs, e.g. port separation) with the stop-on-red rule. Infrastructure freeze: no new guards or workflow abstractions; re-tuning existing ones is allowed. Usual cross-vendor code review.
   7. Confirm in practice: the next landed points use the pair mode where two suites are owed; record the measured acceptance time against the 1452 baseline.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1419. Village goats have no collision (walk through posts and figures)
+  Queue position: directly after point 1414 (user decision 21.10.2026).
+  Source: user bug report hoa-state-2026-10-21-3318564123 (4).zip (21:06:26Z), user words: "Das Tier hat keine Kollisionsabfrage."
+  Observed: a village goat walks unobstructed through settlement objects (posts, figures, the traveller).
+  Final state: village goats respect the settlement collision (§7.1 criterion 16): they path around posts, huts, fences, props and figures and never pass through the traveller.
+  Verifiable: a Vitest asserts that no goat position lies inside any collider over a simulated period; a capture shows a goat stepping around a post.
+  Criticality: medium - player-visible in every village with goats.
+  Bundle: Dorfleben.
