@@ -2817,7 +2817,7 @@ export const VILLAGER_ASSET = {
    *  a foot the lower hips put under the ground carries there. Calibratable
    *  against VILLAGER_GLTF.runFlight. */
   gaitStance: {
-    jog: { slow: 0.7, bounce: 0.25 },
+    jog: { slow: 0.75, bounce: 0.2 },
     sprint: { slow: 0.7, bounce: 0.3 },
   } as Record<string, { slow: number; bounce: number }>,
   /** The widest loop seam the clip pipeline closes (rad, the worst bone's
@@ -2916,7 +2916,7 @@ export const VILLAGER_GLTF = {
    *  continuity tests: a share above 0.6 slides a planted foot at 3.5–5.5 per
    *  unit of leg, a full share at the sprint band's lower edge sinks it, and a
    *  fade narrower than 1.2 jumps the joints. Calibratable. */
-  runWalkShare: 0.3,
+  runWalkShare: 0.4,
   runWalkUntil: 8.15,
   runWalkFade: 1.2,
   /** Bounds on a running child's flight (the run reads grounded): the share
