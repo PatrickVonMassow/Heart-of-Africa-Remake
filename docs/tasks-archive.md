@@ -35064,3 +35064,10 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Verifiable: a Vitest asserts that no goat position lies inside any collider over a simulated period; a capture shows a goat stepping around a post.
   Criticality: medium - player-visible in every village with goats.
   Bundle: Dorfleben.
+
+- [x] 1318. The dressing-growth and channel-crossing checks are red on main
+  Source: findings carrier 06.10.2026 13:22, found on the enrichments run of point 1297.
+  On a quiet host, on main and feat/1297 alike: `--section=dressing-growth` reads samples [0,0,0,0,0] for "the streamed dressing does not grow over a session at a fixed anchor (point 278)" (nothing streamed at all); `--section=channel-crossing` reads sawOnWater false, sawLowY false, landed true for "a purposeful crossing swims the channel chest-deep and lands on the far bank (point 192)". With 1317 they keep a whole enrichments pass red.
+  Final state: each cause is measured (game or check) and fixed; both sections run green on both backends.
+  Verifiable: both sections green on WebGPU and WebGL 2; a right-layer test per corrected cause.
+  Bundle: Tierverhalten.
