@@ -2809,6 +2809,16 @@ export const VILLAGER_ASSET = {
     sprint: { hipsTilt: 0.0, chestTilt: 0.19, chestTwist: 0.37 },
     idle: { square: true, chestTilt: 0.105 },
   },
+  /** A run's stance lengthened (scripts/villager/clips.py `restance`): the
+   *  source jog keeps each foot down ~11 % of its cycle, so a running child
+   *  floats. One smooth retiming plays each stance at 1 − `slow` of its pace
+   *  and each flight faster; the hips' rise over their lowest is scaled by
+   *  `bounce` (a quicker flight at the old height reads as low gravity), and
+   *  a foot the lower hips put under the ground carries there. Calibratable
+   *  against VILLAGER_GLTF.runFlight. */
+  gaitStance: {
+    jog: { slow: 0.7, bounce: 0.25 },
+  } as Record<string, { slow: number; bounce: number }>,
   /** The widest loop seam the clip pipeline closes (rad, the worst bone's
    *  turn between a loop's last frame and its first once cut where they meet
    *  best): beyond it the loop is refused, never smeared over its cycle
