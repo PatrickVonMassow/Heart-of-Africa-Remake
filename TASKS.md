@@ -244,42 +244,18 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
 
-- [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
-  nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
-  `main` on 09.09.2026 while work-order 1080 was being verified: the crowded construction of
-  `tagShuffle.test.ts` ("and holds when the adults walk through the children's own ground",
-  every errand villager planted INSIDE the children's quarter) reads 0 % at bambara-village
-  seed 2972259115, which is the one village and seed the case runs — and 0.51 % / 0.68 % /
-  0.54 % at mandinka-village seed 99 for the 20 fps, 7.5 fps and 2-12 frame resamplings,
-  against the 0.25 % `shareGate`. maasai-village reads 0.03-0.06 %. So the shipped code
-  already has the episode; the case simply never looked where it lives, and 1080's climb —
-  which moves the children's seeded paths and nothing else about their steering — surfaced
-  the same thing in bambara (0.20 % native, 0.45 % at 7.5 fps).
-  WHAT THE EPISODE IS. One child, one second: 1.4 m of legs inside a 0.29 m circle, roaming
-  its quarter eight to ten metres from anything this point's neighbours changed, with adult
-  bodies standing in its way. It reverses direction inside the second. That is the exact
-  shape the child-motion metric exists for — walking without getting anywhere — at a scale
-  of one episode per crowded minute rather than the penned child's persistent one.
-  Final state:
-  - The cause is named from a trace, not guessed: which of the deflection, the one-side
-    commitment or the roam-heading reflection turns a boxed child back on itself, and
-    whether an adult body standing still is handled differently from one walking.
-  - Either the steering is fixed so a boxed child works its way past the adult, or the
-    episode is shown to be legitimate avoidance and the metric is taught to tell the two
-    apart. Not a raised gate on its own.
-  - The crowded case is judged over more than one settlement afterwards, so it can never
-    again read clean because of the seed it happens to run.
-  - `CROWDED_CADENCE_GATE` in `tagShuffle.test.ts` — the 1 % bar 1080 measured for the
-    resampled cadences — is removed or re-derived from what the fix leaves behind.
-  Test: Vitest — the crowded construction over at least three village/seed pairs at every
-  cadence, including mandinka-village/99, which is the sample that fails today.
-  Criticality: medium — no crash and no blockade once 1080 has landed, but it is a live
-  reading over the gate in shipped code, and the gate that should have caught it was
-  measuring one seed's luck.
-  Refs: src/scenes/place/tagShuffle.test.ts (the crowded case and `CROWDED_CADENCE_GATE`),
-  scripts/verify/childMotionMetric.mjs (`shuffleWindows`, `CHILD_MOTION.shareGate`),
-  src/scenes/place/tagGame.ts (`moveChild`, the deflection and the one-side commitment),
-  src/scenes/place/bankGame.ts (`stepRoam`, the roam-heading reflection).
+- [ ] 1081. Name, from a trace, why a child in a crowded tag round walks a metre and gets nowhere
+  Final state: the cause of the crowded construction's episodes (`tagShuffle.test.ts`, "and
+  holds when the adults walk through the children's own ground") is named from a trace, not
+  guessed, and recorded in `docs/1081-steering-trace.md` with its probes under
+  `docs/1081-probes/`. The sweep covers the tag-round villages (maasai, hausa, swahili, zulu,
+  san, tuareg × seeds 1–10, 99) at every cadence and states whether the planted adults, static
+  edges or playmates turn the child back on itself. The steering fixes and the crowded case's
+  multi-settlement sample are points 1457 and 1458, split off because no single steering change
+  converged over the 66-pair sweep.
+  Test: none beyond the recorded probes — the deliverable is the traced cause; the Vitest
+  coverage arrives with 1458.
+  Refs: src/scenes/place/tagGame.ts (`moveChild`, `evadeHeading`), docs/1081-steering-trace.md.
   Bundle: Dorfleben.
 
 - [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
@@ -15942,4 +15918,33 @@ to land than a mechanism that needs a review.
   Observed problem: WebGPU 9bb6e1736 and 1e681ce07 (26.10.2026), WebGL 2 30a5b55f5 (27.10.2026, under load); WebGL 2 main f57fa3250 clean on 26.10. Shutter-timing verdicts on unrelated heads; recorded in docs/backlog.md as a finding of 27.10.2026, filed now because the render-verify guard blocks on them (four unaccounted runs).
   Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
   Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
+  Bundle: Dorfleben.
+- [ ] 1457. A fleeing child no longer flips to the other rim direction after a wall deflection
+  Final state: in the tag round, a wall deflection of an evader's course no longer feeds
+  `evadeHeading` a deflected `current` that flips the flee to the opposite rim direction
+  (traced at maasai-village/4 child 1, t≈5.95 s: −280° → −69°, then `turnBeforeRun` turns the
+  child on the spot into a playmate), and the side is not locked either (locking it, attempt 1
+  in `docs/1081-steering-trace.md` §5, made the sweep worse). Judged over the 66-pair sweep of
+  point 1081 (maasai, hausa, swahili, zulu, san, tuareg × seeds 1–10, 99) at every cadence:
+  the number of pairs at or above `CHILD_MOTION.shareGate` and the sum of worst shares fall
+  against the recorded baseline (6 pairs, sum 3.50 % native), with no pair worse than it was.
+  Test: Vitest — the traced maasai-village/4 episode as a case: the evader keeps its rim
+  direction through the deflection; plus the sweep numbers in the commit message.
+  Refs: src/scenes/place/tagGame.ts (`evadeHeading`, `moveChild`, `turnBeforeRun`),
+  docs/1081-steering-trace.md §4–§5, docs/1081-probes/ (sweepProbe, sweep.sh, sum.mjs).
+  Bundle: Dorfleben.
+- [ ] 1458. Two playmates meeting head-on pass each other, and the crowded case samples more than one settlement
+  Final state: two tag-round children meeting head-on at the floor pace pass each other on a
+  side they keep until they are past, rather than re-deciding every frame (the per-frame and
+  timed veers of `docs/1081-steering-trace.md` §6 lowered the sum by 6–47 % but none held the
+  gate and the best had no robust neighbourhood). Over the 66-pair sweep of point 1081 at every
+  cadence, every pair reads under `CHILD_MOTION.shareGate` (0.25 %), and neighbouring parameter
+  values hold it too, so no lucky constant is pinned. The crowded construction in
+  `tagShuffle.test.ts` then runs at least three tag-round village/seed pairs (including the
+  former worst, maasai-village/4, and mandinka-village/99) at every cadence, and
+  `CROWDED_CADENCE_GATE` is removed or re-derived from what the fix leaves. Not a raised gate on
+  its own. Builds on 1457.
+  Test: Vitest — the crowded construction over the named pairs at every cadence.
+  Refs: src/scenes/place/tagGame.ts (`moveChild`), src/scenes/place/tagShuffle.test.ts,
+  scripts/verify/childMotionMetric.mjs, docs/1081-steering-trace.md §4–§6.
   Bundle: Dorfleben.
