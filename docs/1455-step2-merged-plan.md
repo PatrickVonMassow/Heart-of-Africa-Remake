@@ -84,7 +84,11 @@ to the later member's process group, confirms after 10 s that no child is left, 
 the abort. The watcher is the parent of both members (F2b): it launches them and its EXIT
 trap sends TERM to both process groups; each member is launched through
 `setpriv --pdeathsig TERM` (util-linux, present on this host), so the kernel ends it even
-when the watcher dies by SIGKILL. Independently of any signal, a member whose
+when the watcher dies by SIGKILL. The direct child is `run-logged.mjs`; its existing
+`FORWARDED_SIGNALS` pass TERM through both wrapper layers to the runner, and
+`_server.mjs` `killTree` ends the dev server's detached group. After any watcher loss the
+owning session confirms that no process carrying either member's checkout path survives
+(`pgrep -f <checkout>`) and kills a survivor before anything else runs. Independently of any signal, a member whose
 `startedAt`–`finishedAt` interval is not covered by samples at ≤ 15 s spacing is void: the
 pair counts as a failed sampler (stop, as a breach) and its result is no evidence. Before the
 next repetition reuses a checkout, every frame its run wrote is copied to
@@ -282,3 +286,7 @@ SIGKILL), one new blocker (block 1's two probe runs counted as independent). Thi
 |---|---|---|
 | F2c | watcher killed by SIGKILL leaves members running | §4.1: members under `setpriv --pdeathsig TERM`; a member not fully covered by samples is void. |
 | F12 / new | Fisher units in block 1 | §4.3: one observation per window; block 1's two runs fold into one. |
+
+Third re-check: F12 RESOLVED, no new blocker; F2c not resolved (pdeathsig reaches only
+the direct child). F2d: §4.1 names the existing descendant path (wrapper signal
+forwarding, `killTree`) and adds a `pgrep -f <checkout>` sweep after any watcher loss.
