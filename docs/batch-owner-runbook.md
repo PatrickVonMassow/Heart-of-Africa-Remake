@@ -89,8 +89,10 @@ below compares the new mode against the pre-1443 3.42 h.
   - M2 REJECTED: no build/lint/unit gate beside a browser suite — 15m 01s and
     15m 07s (+12 %), and the unit layer itself 564 s against 517 s quiet.
   - M3 REJECTED: one browser suite at a time — 4 of 4 overlapped runs slower
-    (+1.5 to +3.5 %), 0 reds, peaks 73–75 %. Only a user decision may trade
-    that slowdown for a pair's wall-clock gain.
+    (+1.5 to +3.5 %), 0 reds, peaks 73–75 %. Point 1455 traded that slowdown
+    for wall clock and tested it (`docs/1455-step4-log.md`): FAILED at its first
+    pair — adult-errands WebGL 2 ‖ villager-dress WebGPU reached 85.5 %. The
+    bound stays at 1.
 - `POOL_CAP` and `DAEMON_POOL_CAP` stay at 3: no measurement supports a change.
 - Credit (expires 05.11.2026): commission only what local acceptance can land
   before then.
