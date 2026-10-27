@@ -80,3 +80,5 @@ once, each on its own dev-server port (the runner picks a free port per run).
 |---|---|---|---|---|---|---|---|
 | M3-wq1 | quiet, water-stand-table, memory-sampled | afe818d6e (main; same build) | 27.10 03:56 | 5m 32s | GREEN, 9 pass | 0.38 | `local/verify-logs/2026-10-27T03-56-54-724-polish-villagers.log`; samples `local/1452-mem-m3-wq1.log`, peak 38.4 % |
 | M3-wq2 | quiet, water-stand-table, memory-sampled | afe818d6e (main; same build) | 27.10 04:02 | 5m 27s | GREEN, 9 pass | 1.64 (decaying wq1) | `local/verify-logs/2026-10-27T04-02-33-796-polish-villagers.log`; samples `local/1452-mem-m3-wq2.log`, peak 40.3 % |
+| M3-o1d | overlapped with M3-o1w, villager-dress, memory-sampled | afe818d6e (main; same build) | 27.10 04:08 | 13m 44s | GREEN, 30 frames | 1.19 | `local/verify-logs/2026-10-27T04-08-26-304-polish-villagers.log`; samples `local/1452-mem-m3-o1.log` (shared by the pair), peak 73.2 % (11.4 GiB, at 04:12 while both ran) |
+| M3-o1w | overlapped with M3-o1d, water-stand-table | afe818d6e (main; same build) | 27.10 04:08 | 5m 36s | GREEN, 9 pass | 1.19 | `local/verify-logs/2026-10-27T04-08-28-344-polish-villagers.log`; samples as M3-o1d |
