@@ -68,3 +68,15 @@ lint ran from its cache in both runs, so its share of the load is not measured; 
 (15m 05s) shows the reference itself spreads by ~2 min, so 2 loaded runs cannot separate a
 +12 % effect from that spread with certainty — the protocol's rule decides, and it decides
 against the added load.
+
+### M3: two browser suites at once
+
+Sections `polish-villagers --section=villager-dress` (quiet runs M1-q1/q2/q3, median 13m 27s)
+and `polish-villagers --section=water-stand-table` (quiet runs below), WebGPU, same build
+(afe818d6e = 9044a6684 under the same-build diff). Each overlapped pair runs both sections at
+once, each on its own dev-server port (the runner picks a free port per run).
+
+| Run | Variant | SHA | Started (UTC) | Duration | Verdict | Load avg at start | Log |
+|---|---|---|---|---|---|---|---|
+| M3-wq1 | quiet, water-stand-table, memory-sampled | afe818d6e (main; same build) | 27.10 03:56 | 5m 32s | GREEN, 9 pass | 0.38 | `local/verify-logs/2026-10-27T03-56-54-724-polish-villagers.log`; samples `local/1452-mem-m3-wq1.log`, peak 38.4 % |
+| M3-wq2 | quiet, water-stand-table, memory-sampled | afe818d6e (main; same build) | 27.10 04:02 | 5m 27s | GREEN, 9 pass | 1.64 (decaying wq1) | `local/verify-logs/2026-10-27T04-02-33-796-polish-villagers.log`; samples `local/1452-mem-m3-wq2.log`, peak 40.3 % |
