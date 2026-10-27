@@ -296,3 +296,6 @@ the direct child). F2d: §4.1 names the existing descendant path (wrapper signal
 forwarding, `killTree`) and adds a `pgrep -f <checkout>` sweep after any watcher loss.
 Fourth re-check: F2d not resolved (the checkout-path sweep can miss browsers). F2e: the
 sweep is host-wide over browser, runner and dev-server processes, which C6 makes safe.
+
+Fifth re-check: F2e RESOLVED, no new blocker. **Final verdict of GPT-6.1 Sol: APPROVE**
+(27.10.2026). Step 3 is complete; step 4 (the deciding test) runs on this plan as it stands.
