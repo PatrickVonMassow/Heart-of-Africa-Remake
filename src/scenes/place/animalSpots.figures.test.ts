@@ -71,8 +71,16 @@ describe('stepAnimal among live figures (point 1419)', () => {
     const traveller: Collider = { x: 0, z: 0, r: PLAYER_RADIUS }
     const { bodies, scene } = one(0, -2, [], [traveller])
     let at: [number, number] = [0, -2]
-    for (let k = 0; k < 120; k++) at = stepAnimal(scene, bodies, 0, 0, 2, at[0], at[1])
-    expect(Math.hypot(at[0], at[1])).toBeGreaterThanOrEqual(PLAYER_RADIUS + ANIMAL_RADIUS - 1e-6)
+    let closest = Infinity
+    let furthest = -Infinity
+    for (let k = 0; k < 120; k++) {
+      at = stepAnimal(scene, bodies, 0, 0, 2, at[0], at[1])
+      closest = Math.min(closest, Math.hypot(at[0], at[1]))
+      furthest = Math.max(furthest, at[1])
+    }
+    // Head-on, every frame: never closer than contact, never past his centre.
+    expect(closest).toBeGreaterThanOrEqual(PLAYER_RADIUS + ANIMAL_RADIUS - 1e-6)
+    expect(furthest).toBeLessThan(0)
   })
 
   it('steps round a post standing on its way rather than through it', () => {
