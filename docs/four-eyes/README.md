@@ -104,3 +104,16 @@ folded this stage blind from the two versioned halves — before reading either 
 and landed the counted result as `676-union.json`, superseding both fallback folds. An earlier
 line here claimed the owner had confirmed the fallback as the standing position; no such ruling
 was given, and it is withdrawn.
+
+## Stage 1455 — two browser suites at once (27.10.2026)
+
+| Half | Model | Entries | File |
+|---|---|---|---|
+| A | main chain | 39 | `1455-blind-a-opus5.json`; verbatim `docs/1455-step1-eval-a.md` |
+| B | cross lane | 34 | `1455-blind-b-sol.json`; verbatim `docs/1455-step1-eval-b.md` |
+
+The verbatim `.md` halves were committed as `docs/1455-step1-eval-*.md` before this
+stage's union and stay there unchanged; the JSON halves normalise them (A's unlabelled
+verdict, protocol and tooling bullets received ids `AV1`, `AT0`, `AU1–AU8`; B's echoed
+accounting section is one entry per id). The union is `1455-union.json`, merged by the
+scarce lane; the plan is `docs/1455-step2-merged-plan.md`.

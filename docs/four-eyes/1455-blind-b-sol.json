@@ -1,0 +1,178 @@
+{
+ "model": "GPT-6.1 Sol",
+ "point": 1455,
+ "stage": "blind-parallel B — may two browser suites run at once on this host, and under which conditions",
+ "verbatim": "docs/1455-step1-eval-b.md (the 34 entries verbatim; the ask-lane accounting echo in that file repeats the same ids and is normalised to one entry per id)",
+ "entries": [
+  {
+   "id": "B1",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "V1 — YES-UNDER-CONDITIONS after qualification and policy re-tuning; current permission remains one suite. M3’s pairs completed about 27–28% sooner than the sum of quiet medians, implying about 38% more suite work/hour despite individual slowdowns; landed-point throughput remains unmeasured."
+  },
+  {
+   "id": "B2",
+   "file": "scripts/verify/README.md",
+   "defect": "E1 — Evidence limit: the README ends TRUNCATED and four further sections are omitted entirely; the named implementation files and raw verify logs are not visible here, so their isolation, receipt and failure-handling behavior cannot be independently confirmed."
+  },
+  {
+   "id": "B3",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "R1 — Added reds: likelihood unknown, credible; four green overlapped executions establish feasibility, not unchanged reliability, especially across untested sections and backends; failures would appear as new assertions, timeouts, console errors, crashes or incomplete runs."
+  },
+  {
+   "id": "B4",
+   "file": "docs/1452-throughput-inventory.md",
+   "defect": "R2 — Timing flakes: recurrence risk credible from the 23.10 overlap; one whole-water-errand timeout was overlap-only in the supplied account, while jar-take and pointing reds also occurred solo; rotating failures require check-level comparison, not a claim that every overlap red is caused by contention."
+  },
+  {
+   "id": "B5",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "R3 — Memory: low observed breach risk for the two measured section pairs, unknown elsewhere; peaks of 73–75% leave only 10–12 percentage points before the 85% limit, and five-second sampling can miss spikes; pressure could show as swapping, renderer loss, OOM or longer captures."
+  },
+  {
+   "id": "B6",
+   "file": "scripts/verify/README.md",
+   "defect": "R4 — GPU contention: some slowdown is likely, its worst case unknown; on this Linux host WebGPU uses Dawn’s GLES path and WebGL 2 uses the same hardware graphics chain, so different APIs provide no device isolation; symptoms include longer frame gaps, shader waits, missed subjects and capture timeouts even with spare host RAM."
+  },
+  {
+   "id": "B7",
+   "file": "scripts/verify/README.md",
+   "defect": "R5 — Backend extrapolation: high risk if WebGPU-only M3 results are treated as universal; bundled Chromium/WebGL 2, system Chrome/WebGPU, touch and voice exercise different paths, and compatibility WebGPU evidence does not establish core-feature coverage."
+  },
+  {
+   "id": "B8",
+   "file": "docs/1452-throughput-inventory.md",
+   "defect": "R6 — Long-run extrapolation: unknown and potentially material; M3 overlapped only the first roughly six minutes of a fourteen-minute run, so it did not test two simultaneous late memory peaks, two full suites, or LARGE’s changing workload; slowdown and extra diagnosis could consume the nominal gain."
+  },
+  {
+   "id": "B9",
+   "file": "scripts/verify/README.md",
+   "defect": "R7 — Pictures: timing and provenance risk is established; identical-code screenshots already vary substantially, load can race camera settlement, and a green suite need not prove an acceptable picture; wrong views, unfinished scenes or overwritten files could invalidate judgement without an ordinary assertion red."
+  },
+  {
+   "id": "B10",
+   "file": "scripts/verify/README.md",
+   "defect": "R8 — Shared state: collision likelihood depends on configuration and is unverified; shared screenshot names, verification state, preview/build output and writable TTS cache can overwrite evidence or change a peer’s inputs; separate ports alone cannot prevent this."
+  },
+  {
+   "id": "B11",
+   "file": "scripts/verify/README.md",
+   "defect": "R9 — Observation errors: credible under concurrent runs; “newest run” waits can select the peer, shared frame freshness can mask a stalled writer unless isolated, and cached green receipts can make an experiment execute nothing; symptoms are wrong receipts, false progress or missing failures."
+  },
+  {
+   "id": "B12",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C1 — Initially allow only the workload/backend combinations actually qualified, with at most two browser jobs; section measurements authorize those section combinations, not unrestricted whole-suite pairing, and section receipts retain their existing partial status."
+  },
+  {
+   "id": "B13",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C2 — One owner schedules both jobs from useful acceptance backlog; no build, lint/unit gate, local author, extra automation browser, third suite or simultaneous picture capture/judgement joins the pair; landing stays serial and remote review retains only its existing M1 allowance."
+  },
+  {
+   "id": "B14",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "C3 — Each acceptance run serves an immutable final pushed SHA with its correct dependencies; no edits, HMR changes, checkout changes, merges or dependency replacement occur underneath it; calibration additionally satisfies the documented same-build diff across quiet and overlapped runs."
+  },
+  {
+   "id": "B15",
+   "file": "scripts/verify/_server.mjs",
+   "defect": "C4 — Each job owns a distinct server and confirmed port, and its browser receives that exact BASE_URL; simultaneous allocation must not attach either run to its peer’s app, and cleanup must terminate only the owning job’s processes; the omitted implementation leaves these guarantees unverified."
+  },
+  {
+   "id": "B16",
+   "file": "scripts/verify/README.md",
+   "defect": "C5 — Use existing isolated worktrees/output locations and browser contexts so frames, records and progress cannot be supplied or overwritten by the peer; shared caches must already be complete and remain read-only during overlap; any shared mutable path lacking existing isolation keeps that combination serial."
+  },
+  {
+   "id": "B17",
+   "file": "scripts/verify/README.md",
+   "defect": "C6 — Preserve backend assertions, feature-level reporting, seeds, subject counts, NOT-COVERING results, screenshot shutters, scene-settlement checks, capture budgets and required per-point backend pictures; no golden-image comparison or relaxed timing/assertion threshold is an overlap remedy."
+  },
+  {
+   "id": "B18",
+   "file": "scripts/verify/README.md",
+   "defect": "C7 — LARGE remains exclusive, including its preflight, preview and both backend passes; do not bypass its existing wait with VERIFY_NO_WAIT, and do not infer permission to overlap LARGE from short-section results."
+  },
+  {
+   "id": "B19",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C8 — Stop admitting pairs immediately on host memory above 85%, an unexplained/new red, crash, timeout, missing coverage, suspect artefact provenance or lost throughput advantage; preserve both runs’ evidence, return to serial operation and diagnose quietly; a subsequent green never erases the original red."
+  },
+  {
+   "id": "B20",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "T1 — Proposed minimum pilot: 12 genuinely overlapped pairs, four repetitions each of WebGPU villager-dress + WebGPU water-stand-table, WebGL 2 villager-dress + WebGL 2 water-stand-table, and WebGL 2 adult-errands + WebGPU villager-dress; establish rather than assume each newly selected quiet reference."
+  },
+  {
+   "id": "B21",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "T2 — Obtain three fresh quiet runs of every participating section/backend on the calibration build, interleaved with pair trials in varied order; use --again to defeat receipt reuse and match seed, browser/driver, feature level, cache state and starting scene; historical runs supplement rather than replace these controls."
+  },
+  {
+   "id": "B22",
+   "file": "docs/1452-throughput-inventory.md",
+   "defect": "T3 — For the timing-sensitive adult-errands challenge, retain every check identity, subject count, signature and verdict from quiet and loaded runs; the prompt’s rotating WebGL 2 red is not established by an attached raw log, and an unstable quiet baseline leaves that combination unqualified rather than excusing loaded failures."
+  },
+  {
+   "id": "B23",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "T4 — Start both jobs close together, alternate launch order and record actual overlap intervals; repetitions must overlap the costly rendering/capture phases, not merely process lifetimes; any proposed whole-suite permission additionally needs fresh whole-suite quiet controls and four representative full-suite pairs covering coincident late peaks."
+  },
+  {
+   "id": "B24",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "T5 — Sample MemTotal − MemAvailable across the whole pair, including startup and cleanup, at least every five seconds using the existing sampler; retain samples and peaks, and record per-job start/end, pair makespan, actual backend/feature level, all failures, executed checks, subject counts, frames and capture/settlement warnings."
+  },
+  {
+   "id": "B25",
+   "file": "scripts/verify/README.md",
+   "defect": "T6 — Record available CPU/GPU load diagnostics and competing processes before and during representative overlap phases using existing facilities; unavailable GPU counters remain unknown, and a quiet launch snapshot cannot certify the subsequent pair; host RAM is not a measurement of GPU memory or queue pressure."
+  },
+  {
+   "id": "B26",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "T7 — Pilot thresholds: every sampled host reading ≤85%; zero new or overlap-attributable reds, crashes, timeouts or coverage losses; no unexplained failure-frequency increase; every pair completes sooner than the sum of its matching quiet medians; individual suites may slow within unchanged acceptance budgets."
+  },
+  {
+   "id": "B27",
+   "file": "scripts/verify/README.md",
+   "defect": "T8 — Independently inspect each retained picture against its declared subject, settled scene and correct point/backend; compare judgement usability with quiet captures rather than pixel equality; M3’s 28-versus-30 dress-frame counts need explanation, and a missing, substituted or unusable required picture fails qualification."
+  },
+  {
+   "id": "B28",
+   "file": "docs/1452-throughput-inventory.md",
+   "defect": "T9 — Decide operational success against a comparable current serial-policy control over the runbook’s five-landed-points-or-48-hours window, whichever is later; require lower wall-clock time per landed point while counting diagnosis, repeats, picture work, waiting and sync costs once; faster pair makespan alone does not pass this test."
+  },
+  {
+   "id": "B29",
+   "file": "docs/1452-step5-measurement.md",
+   "defect": "T10 — Twelve pairs are a scoped pilot, not statistical proof of zero added-red probability; retain quiet references and continue observing qualified pairs, with C8 applying to later failures; neither this small pilot nor M3 justifies permission for untested backends, touch/voice, full suites or arbitrary pairings."
+  },
+  {
+   "id": "B30",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "U1 — Re-tune the existing Local heavy jobs prose to specify qualified two-browser exceptions, exclusions and stop rule, and replace M3’s single-suite-duration veto with aggregate acceptance-throughput criteria; retain the CPU-gate prohibition and LARGE exclusivity."
+  },
+  {
+   "id": "B31",
+   "file": "scripts/verify/_server.mjs",
+   "defect": "U2 — Check and, where necessary, re-tune existing port selection, explicit port settings and BASE_URL propagation; prefer existing worktree/configuration isolation for outputs and caches; do not invent a port router, shared ledger or new scheduling abstraction."
+  },
+  {
+   "id": "B32",
+   "file": "scripts/verify/run-all.mjs",
+   "defect": "U3 — Keep the load probe honest: a peer remains competing load, not “quiet”; use existing flag behavior for controlled trials rather than disabling probes or raising quiet thresholds, and reconcile any qualified-pair policy exception with the current “UNDER LOAD — NOT AUTHORITATIVE” wording without discarding reds."
+  },
+  {
+   "id": "B33",
+   "file": "scripts/verify/run-wait.mjs",
+   "defect": "U4 — Await each explicit log path rather than the newest run, keep launch and inspection timeout environments identical, and re-measure expected durations under permitted overlap before changing existing planning values; do not enlarge failure budgets merely to make pairing pass or activate an unmeasured STALLED cutoff."
+  },
+  {
+   "id": "B34",
+   "file": "scripts/verify/run-digest-core.mjs",
+   "defect": "U5 — Confirm each existing digest/receipt preserves its own failures, PARTIAL/NOT-COVERING notices, backend and load warnings under overlap; separately identify both jobs using existing declaration items and log paths, with no new fields, guards or workflow machinery; the omitted source prevents claiming this already works."
+  }
+ ]
+}
