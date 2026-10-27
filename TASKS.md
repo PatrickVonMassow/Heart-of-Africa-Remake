@@ -15964,3 +15964,9 @@ to land than a mechanism that needs a review.
   Criticality: low — dev test hook, no player impact measured; it blocks the green of `polish-speech`.
   Source: findings carrier 27.10.2026 02:55 (1452 step 5, M3 quiet reference); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
   Bundle: Dorfleben.
+- [ ] 1456. Two intermittent polish-villagers shutter-timing reds owned by no point
+  Final state: `npm test -- polish-villagers --section=villager-canoe` and the adult-errands river-bank block are green on both backends on a quiet machine, or each red is charged to its owning open point with the cause named: "he was still squatting ashore, unloading, before and after the shutter" (measured `{before:true,after:false}`) and "the river-bank frame: the foam it was aimed at is still in the picture after the shutter" (drifted 13.22 m at lead 6 m). The check reads the pose and the aim from the shutter frame itself.
+  Observed problem: WebGPU 9bb6e1736 and 1e681ce07 (26.10.2026), WebGL 2 30a5b55f5 (27.10.2026, under load); WebGL 2 main f57fa3250 clean on 26.10. Shutter-timing verdicts on unrelated heads; recorded in docs/backlog.md as a finding of 27.10.2026, filed now because the render-verify guard blocks on them (four unaccounted runs).
+  Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
+  Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
+  Bundle: Dorfleben.
