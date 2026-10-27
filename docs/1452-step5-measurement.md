@@ -58,3 +58,13 @@ Same reference section and build as M1; the quiet runs are M1-q1/q2/q3 (median 1
 | Run | Variant | SHA | Started (UTC) | Duration | Verdict | Load avg at start | Log |
 |---|---|---|---|---|---|---|---|
 | M2-l1 | CPU gate beside, memory-sampled: `npm run build` 02:22:09–02:22:26 (exit 0), `npm run lint` 02:22:26–02:22:27 (exit 0, cached), `npm run test:unit` from 02:22:27, cut at 10 min by the owner's tool timeout (no failure up to the cut; quiet reference 517 s on the last main push) | 9044a6684 (main; same build) | 27.10 02:21 | 15m 07s | GREEN, 28 frames | 0.71 | `local/verify-logs/2026-10-27T02-21-53-962-polish-villagers.log`; samples `local/1452-mem-m2-l1.log`, peak 64.5 % |
+| M2-l2 | CPU gate beside, memory-sampled: `npm run build` 02:38:12–02:38:29 (exit 0), `npm run lint` 02:38:29 (exit 0, cached), `npm run test:unit` 02:38:29–02:47:55 (exit 0, 624 files, 18264 passed; 564 s against 517 s quiet) | 9044a6684 (main; same build) | 27.10 02:37 | 15m 01s | GREEN, 28 frames | 0.68 | `local/verify-logs/2026-10-27T02-37-56-264-polish-villagers.log`; samples `local/1452-mem-m2-l2.log`, peak 62.6 %; gate times `local/1452-m2-l2-gate.txt` |
+
+**M2 verdict: REJECTED — the bound stays at no CPU gate beside a browser suite.** Both loaded runs
+are above the quiet median (15m 07s and 15m 01s against 13m 27s, +12 %), and the unit layer
+itself slowed by 9 % (564 s against 517 s). No reds and memory inside budget (peaks 64.5 % and
+62.6 %), but the duration condition fails, so the points/hour condition is not reached. Limits:
+lint ran from its cache in both runs, so its share of the load is not measured; the quiet q2
+(15m 05s) shows the reference itself spreads by ~2 min, so 2 loaded runs cannot separate a
++12 % effect from that spread with certainty — the protocol's rule decides, and it decides
+against the added load.
