@@ -33,7 +33,7 @@ Every run is recorded by `scripts/verify/run-logged.mjs`; the comparison quotes 
 ## Results
 
 Reference section for M1/M2: `polish-villagers --section=villager-dress`, WebGPU (57 green
-runs on record). Second section for M3: `polish-speech --section=speech-distance-scale`.
+runs on record). Second section for M3: `polish-villagers --section=water-stand-table` (9 green WebGPU runs in the last 6 days, 337–370 s). The first choice, `polish-speech --section=speech-distance-scale`, was not known-green: its quiet reference run 27.10 02:54 on 9044a6684 went RED after 53 s in the `figureScreen` test hook (`local/verify-logs/2026-10-27T02-54-43-744-polish-speech.log`), filed as point 1453.
 
 | Run | Variant | SHA | Started (UTC) | Duration | Verdict | Load avg at start | Log |
 |---|---|---|---|---|---|---|---|
