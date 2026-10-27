@@ -7,7 +7,7 @@ measured cycle (step 8).
 
 | Id | Entry | Load added | Protocol | Accept when |
 |---|---|---|---|---|
-| M1 | U4: cross-vendor review beside a running suite | a remote model call (`scripts/cross-review.mjs`) | one known-green suite section, same build, 2 quiet runs and 2 runs with a review running beside them; peak RSS of the review process (`/usr/bin/time -v`) | loaded duration not above the quiet median, zero added reds, quiet peak host memory plus the review's peak RSS within budget |
+| M1 | U4: cross-vendor review beside a running suite | a remote model call (`scripts/cross-review.mjs`) | one known-green suite section, same build, 2 quiet runs and 2 runs with a review running beside them, host memory sampled in the loaded runs | loaded duration not above the quiet median, zero added reds, sampled loaded host peak within budget |
 | M2 | U5(2): one CPU gate (build, lint, unit) beside one browser suite | `npm run build`, `npm run lint`, `npm run test:unit` | same section and build, 2 quiet and 2 loaded runs, host memory sampled | as M1, peak host memory within budget, and landed points/hour above a current-policy control |
 | M3 | U5(1): two browser suites at once | a second suite on its own port | two different known-green sections, same build, each 2 quiet and 2 overlapped, host memory sampled | as M2; the bound stays 1 unless all hold |
 | – | U5(3): local author beside a suite | – | not measured now: relevant only after the cloud credit expires 05.11.2026 (U5) | – |
@@ -21,8 +21,8 @@ configuration and the verification scripts. Checked 27.10: 69b25f938 = 8945394d7
 three; calibratable): peak host memory in use (MemTotal − MemAvailable from `/proc/meminfo`,
 sampled every 5 s over the whole run, so every workload running counts) stays at or below
 85 % of MemTotal — on this 15 GiB host at least 2.3 GiB stay available. A sampled run records
-its peak and its sample log under `local/`. M1's quiet runs q1/q2 were not sampled; its memory check
-uses the sampled quiet runs of M2 (same section, same build).
+its peak and its sample log under `local/`. M1's loaded runs l1/l2 were not sampled (review f8b00a5d): M1's memory check needs one
+more loaded run with sampling; its duration joins the loaded set.
 
 **Points/hour** (plan line 47, missing from the first draft): M2 and M3 also need landed
 points/hour above a current-policy control, read from the step-8 cycle notes.
