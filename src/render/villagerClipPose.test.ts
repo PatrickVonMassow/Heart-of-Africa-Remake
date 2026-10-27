@@ -439,12 +439,8 @@ describe('the clip gait on the ground', () => {
     const pose = newPose(n)
     const world = newWorld(n)
     const dt = 1 / 60
-    // the tag game's trot and run (m/s, world).
-    // OPEN: a fresh runner's top pace (sprintSpeed × runnerBoost, ≈ 3.8 m/s)
-    // still floats (male child 59 %, 7.7 cm; female 44 %, 5.7 cm, measured
-    // 27.10.2026): the walk share fades out there to keep the no-slide and
-    // continuity tests, so that pace needs a re-authored jog clip.
-    for (const pace of [tag.sprintSpeed * tag.trotFactor, tag.sprintSpeed]) {
+    // the tag game's trot, run and a fresh runner's top pace (m/s, world)
+    for (const pace of [tag.sprintSpeed * tag.trotFactor, tag.sprintSpeed, tag.sprintSpeed * tag.runnerBoost]) {
       for (const sex of SEXES) {
         const f = gltfPerson(asset, sex, 'child', 0).frame
         const speed = pace / CHILD_FIGURE_SCALE

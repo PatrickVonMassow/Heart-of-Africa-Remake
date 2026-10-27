@@ -558,6 +558,33 @@ def restance(c, joints, cp, s):
                 t[1] -= under
                 pole = wp[SK.INDEX['shin.' + side]] - wp[SK.INDEX['thigh.' + side]]
                 two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, pole, wr[SK.INDEX['foot.' + side]], 'foot.' + side)
+    # the carrying foot swept back at one pace: its ankle moved evenly over the
+    # hips from where it touches down to where it lifts (the clamp above catches
+    # the swing still reaching forward, then slows, so it would stand on the
+    # ground at an uneven pace and the runtime hold would drag the leg)
+    for side in ('L', 'R'):
+        fi = SK.INDEX['foot.' + side]
+        low = np.array([min(p[1] for k, p in foot_points(joints, Q[f], P[f], cp)[side].items() if k != 'knee') for f in range(n - 1)])
+        down = low < 0.02
+        if down.all() or not down.any():
+            continue
+        m = n - 1
+        start = next(f for f in range(m) if down[f] and not down[f - 1])
+        span = 1
+        while down[(start + span) % m]:
+            span += 1
+        ends = [rig.fk(joints, Q[f % m], P[f % m]) for f in (start, start + span - 1)]
+        rel = [wp[fi] - wp[SK.INDEX['hips']] for _wr, wp in ends]
+        for k in range(1, span - 1):
+            f = (start + k) % m
+            q, h = Q[f], P[f]
+            wr, wp = rig.fk(joints, q, h)
+            t = wp[fi].copy()
+            a = k / (span - 1)
+            t[[0, 2]] = (wp[SK.INDEX['hips']] + rel[0] * (1 - a) + rel[1] * a)[[0, 2]]
+            pole = wp[SK.INDEX['shin.' + side]] - wp[SK.INDEX['thigh.' + side]]
+            two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, pole, wr[fi], 'foot.' + side)
+    Q[-1], P[-1] = Q[0], P[0]
     for f in range(1, n):
         flip = (Q[f] * Q[f - 1]).sum(1) < 0
         Q[f, flip] *= -1

@@ -2910,7 +2910,7 @@ export const VILLAGER_GLTF = {
    *  continuity tests: a share above 0.6 slides a planted foot at 3.5–5.5 per
    *  unit of leg, a full share at the sprint band's lower edge sinks it, and a
    *  fade narrower than 1.2 jumps the joints. Calibratable. */
-  runWalkShare: 0.6,
+  runWalkShare: 0.3,
   runWalkUntil: 8.15,
   runWalkFade: 1.2,
   /** Bounds on a running child's flight (the run reads grounded): the share
