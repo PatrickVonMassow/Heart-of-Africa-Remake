@@ -22,3 +22,18 @@ Plan: `docs/1455-step2-merged-plan.md` (approved by GPT-6.1 Sol, §8).
 - Next: block 1 pairs (adult-errands WebGL 2 ×2 back-to-back on wt-a ‖ villager-dress
   WebGPU on wt-b, 5 windows, alternating start order), then blocks 2–4 with their
   references directly before each block (§4.2–4.3).
+
+## Block 1 quiet references — adult-errands WebGL 2
+
+| Run | Result | Duration | Frames | Failing |
+|---|---|---|---|---|
+| ref-ae-gl-1 | RED | 6m 18s | 9/23 | order at the stand (charged, point 642, webgl) |
+| ref-ae-gl-2 | RED | 6m 10s | 9/23 | same |
+| ref-ae-gl-3 | RED | 5m 51s | 9/23 | same |
+
+Reading after 3 of 10: the order-at-stand signature fires in every quiet run so far. If it
+holds above 5 of 10, §4.3 applies: adult-errands WebGL 2 is no usable probe and WebGL 2
+timing-sensitive pairing stays unqualified (block 1 then reduces to the memory/duration
+role of its villager-dress member; the probe verdict is recorded as "unqualified"). The
+remaining 7 references run on to fix the base rate; nothing is filed — the signature is
+already charged.
