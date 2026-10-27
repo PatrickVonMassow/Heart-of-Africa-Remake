@@ -15963,3 +15963,4 @@ to land than a mechanism that needs a review.
   5. Decide by the goal: adopt when wall-clock per acceptance falls clearly, no added reds attributable to the overlap, and memory stays within budget. A 2-4 % slower single suite is acceptable when the pair's wall-clock gain outweighs it. If the test fails, the bound stays at one suite and the reason is recorded.
   6. Implement on success: change the "Local heavy jobs" bound in docs/batch-owner-runbook.md (and whatever existing verify tooling needs, e.g. port separation) with the stop-on-red rule. Infrastructure freeze: no new guards or workflow abstractions; re-tuning existing ones is allowed. Usual cross-vendor code review.
   7. Confirm in practice: the next landed points use the pair mode where two suites are owed; record the measured acceptance time against the 1452 baseline.
+  Bundle: Session- & Repo-Hygiene.
