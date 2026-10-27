@@ -1,0 +1,11 @@
+import { readFileSync } from 'node:fs'
+const rows = readFileSync(process.argv[2], 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+const keys = ['native', '60 fps', '20 fps', '7.5 fps', ...Object.keys(rows[0]).filter((k) => k.startsWith('2-') || k.includes('jitter') || (k.includes('fps') === false && !['id','seed','round','native','worst','nudges'].includes(k)))]
+const uniq = [...new Set(keys)].filter((k) => k in rows[0])
+console.log('pairs', rows.length, 'nudges', rows.reduce((s, r) => s + r.nudges, 0))
+for (const k of uniq) {
+  const v = rows.map((r) => r[k]); const pos = v.filter((x) => x > 0).length; const over = v.filter((x) => x >= 0.0025).length
+  const mx = Math.max(...v); const at = rows[v.indexOf(mx)]
+  console.log(`${k.padEnd(10)} >0:${String(pos).padStart(3)} >=gate:${String(over).padStart(3)} max ${(mx*100).toFixed(2)}% (${at.id}/${at.seed}) sum ${(v.reduce((a,b)=>a+b,0)*100).toFixed(2)}`)
+}
+if (process.argv[3]) for (const r of rows.filter((r) => r.native > 0).sort((a,b)=>b.native-a.native)) console.log(r.id, r.seed, (r.native*100).toFixed(2), JSON.stringify(r.worst))
