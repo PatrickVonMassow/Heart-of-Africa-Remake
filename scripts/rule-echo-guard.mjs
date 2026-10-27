@@ -37,6 +37,15 @@ export function memoryDirs({ home = homedir(), root = REPO_ROOT } = {}) {
   return [slug, `${slug}-`].map((s) => resolve(home, '.claude', 'projects', s, 'memory'))
 }
 
+/**
+ * A memory tree counts only when it holds the MEMORY.md index. A cloud clone gets
+ * a bare directory once finding.mjs writes its carrier there, and treating that
+ * as a full tree demanded unreadable stamps on every turn (measured 27.10.2026).
+ */
+export function memoryTreePresent(dirs = memoryDirs()) {
+  return dirs.some((d) => existsSync(resolve(d, 'MEMORY.md')))
+}
+
 /** Read every watched file. A `memory/…` entry resolves outside the repository. */
 export function gatherRuleEchoInputs(registry = RULE_REGISTRY) {
   // THE PREFLIGHT CALLS EVERY GATHER AS `gather({ sessionId })`, so a positional
@@ -50,7 +59,7 @@ export function gatherRuleEchoInputs(registry = RULE_REGISTRY) {
   const dirs = memoryDirs()
   // Whether the memory TREE exists at all — the difference between "this machine
   // keeps no memory entries" and "a registered entry was deleted".
-  files['memory/'] = dirs.some((d) => existsSync(d)) ? '' : null
+  files['memory/'] = memoryTreePresent(dirs) ? '' : null
   for (const rel of filesToRead(reg)) {
     const candidates = rel.startsWith('memory/')
       ? dirs.map((dir) => resolve(dir, rel.slice('memory/'.length)))

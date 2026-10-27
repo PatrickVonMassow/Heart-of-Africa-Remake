@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { memoryDirs } from './rule-echo-guard.mjs'
+import { memoryDirs, memoryTreePresent } from './rule-echo-guard.mjs'
 import {
   RULE_REGISTRY,
   checkAll,
@@ -247,6 +248,17 @@ describe('the registry itself', () => {
 
   it('offers the stamp text a file should carry', () => {
     expect(stampFor('model-policy', 'abcdef01')).toBe('rule:model-policy@abcdef01')
+  })
+})
+
+describe('memoryTreePresent', () => {
+  it('ignores a directory holding only the findings carrier, as a cloud clone has', () => {
+    const dir = resolve(mkdtempSync(resolve(tmpdir(), 'rule-echo-')), 'memory')
+    mkdirSync(dir)
+    writeFileSync(resolve(dir, 'findings-carrier.md'), 'x')
+    expect(memoryTreePresent([dir])).toBe(false)
+    writeFileSync(resolve(dir, 'MEMORY.md'), '# Memory Index')
+    expect(memoryTreePresent([dir])).toBe(true)
   })
 })
 
