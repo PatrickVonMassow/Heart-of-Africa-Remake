@@ -276,8 +276,9 @@ function hygienePatterns(registry = LANES) {
  *  them; a reference to one of them names a record, not a model, and is not scanned. */
 function hygieneViolations(paths, read, registry = LANES, records = []) {
   const recordNames = [...new Set(records.flatMap((path) => [path, path.split('/').pop()]))].sort((a, b) => b.length - a.length)
-  // One alternation, longest first: a per-name pass per line grew with every record and timed out in CI.
-  const recordName = recordNames.length ? new RegExp(recordNames.map(escapeRe).join('|'), 'g') : null
+  // One alternation only DETECTS a record name: the per-name pass on every line grew with each
+  // record and timed out in CI. Blanking stays longest-name-first, so overlapping names keep it.
+  const recordName = recordNames.length ? new RegExp(recordNames.map(escapeRe).join('|')) : null
   const vendorHost = new RegExp(`(?<![@\\w.-])(?:[a-z0-9-]+\\.)+(?:${Object.values(VENDORS).map((v) => v.domain).join('|')})\\.com(?![\\w-]|\\.\\w)`, 'gi')
   const patterns = hygienePatterns(registry)
   const fileWords = [...new Set([...registry.flatMap((record) => record.familyWords), ...Object.keys(VENDORS)])]
@@ -289,7 +290,8 @@ function hygieneViolations(paths, read, registry = LANES, records = []) {
     const text = read(path)
     if (text == null) continue
     text.split('\n').forEach((raw, index) => {
-      const line = (recordName ? raw.replace(recordName, ' ') : raw).replace(vendorHost, ' ')
+      const named = recordName?.test(raw) ? recordNames.reduce((acc, name) => acc.split(name).join(' '), raw) : raw
+      const line = named.replace(vendorHost, ' ')
       const hit = patterns.find(({ re }) => re.test(line))
       if (hit) out.push(`${path}:${index + 1}: ${hit.why} — ${line.trim().slice(0, 120)}`)
     })
@@ -343,5 +345,13 @@ describe('hygiene: no consumer outside the registry names a concrete model', () 
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('blanks overlapping record names longest first, so a vendor word around them still counts', () => {
+    const vendor = Object.keys(VENDORS)[0]
+    const records = [`docs/four-eyes/${vendor}-x.md`, `docs/four-eyes/x.md-${'p'.repeat(40)}.md`]
+    const text = `see ${vendor}-x.md-${'p'.repeat(40)}.md\n`
+    expect(hygieneViolations(['doc.md'], () => text, LANES, records)).toHaveLength(1)
+    expect(hygieneViolations(['doc.md'], () => `see ${vendor}-x.md\n`, LANES, records)).toEqual([])
   })
 })
