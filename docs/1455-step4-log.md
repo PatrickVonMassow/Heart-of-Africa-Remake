@@ -36,6 +36,9 @@ Plan: `docs/1455-step2-merged-plan.md` (approved by GPT-6.1 Sol, §8).
 | ref-ae-gl-7 | RED | 6m 09s | 6/23 | order at the stand; walks on between frames 1 and 2 (point 1404); water rim band (point 568) |
 | ref-ae-gl-8 | RED | 6m 05s | 9/23 | order at the stand; water rim band (point 568); exit 2 only from STRIKE notices of intermittent charges (1456, 1202) |
 | ref-ae-gl-9 | RED | 6m 09s | 9/23 | order at the stand; water rim band (point 568); exit 2 only from STRIKE notices of intermittent charges (1456, 1202) |
+| ref-ae-gl-10 | RED | 7m 41s | 9/23 | order at the stand; water rim band (point 568) |
+
+Base rate (10 quiet runs, counted from each run's `A.out` FAIL lines; the row texts above name only the leading signatures): order at the stand (642) 10/10; water rim band (568) 10/10; river-bank foam after the shutter (1456) 3/10 (runs 2, 4, 6); walks on between frames (1404) 2/10 (runs 4, 7). Median duration 6m 14s (5m 51s – 7m 41s).
 
 Verdict after 6 of 10 (27.10.2026): the order-at-stand signature fired in 6 quiet runs, above
 the "more than 5 of 10" bound of plan §4.3 whatever the last four show — adult-errands
