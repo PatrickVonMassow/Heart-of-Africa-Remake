@@ -23,3 +23,4 @@ runs on record). Second section for M3: `polish-speech --section=speech-distance
 | Run | Variant | SHA | Started (UTC) | Duration | Verdict | Load avg at start | Log |
 |---|---|---|---|---|---|---|---|
 | M1-q1 | quiet | 69b25f938 (main) | 27.10 00:30 | 13m 12s | GREEN, 28 frames | 0.13 | `local/verify-logs/2026-10-27T00-30-26-762-polish-villagers.log` |
+| M1-q2 | quiet | 69b25f938 (main) | 27.10 00:44 | 15m 05s | GREEN, 28 frames | not read (concurrent: owner session pushing the branch, CI remote) | `local/verify-logs/2026-10-27T00-44-14-560-polish-villagers.log` |
