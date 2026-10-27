@@ -139,6 +139,8 @@ put it is the mistake this line exists to stop.
   Final state: the children's run has a natural flight phase for a child's running speed (short airborne share, low apex), so the run reads as grounded.
   Verifiable: a Vitest over the run cycle asserts the airborne share and apex height stay within calibratable bounds in src/config/balance.ts (or the animation config); a capture sequence of running children, judged by a person.
   Criticality: low-medium - atmosphere, visible wherever children run.
+  Escalation (27.10.2026, cloud session_019XD8QuGmtZtNWBe3hGsfz5, measured by a Vitest probe): only the detailed glTF villager floats; the jog clip in public/models/villager.glb keeps each foot down 10.7 % of its cycle (sprint 10 %, walk 67.5 %), so at tag speeds 1.7/3.4/3.8 m/s both feet are off the ground 75-77 % of the cycle (~0.26 s per flight, lowest foot up to ~12 cm). No balance.ts value controls it. Lowering the pelvis by the lowest foot's height cut the apex to ~4 cm but the airborne share only to 42-47 %, and every setting broke the planted-foot no-slide test (0.014-0.069 vs 0.004 per frame).
+  Owner decision (27.10.2026, open to veto): first lever is the speed blend between walk and jog clips — keep a calibratable walk share at child tag speeds (balance.ts) so ground contact rises by construction; the existing no-slide and walk→jog→sprint continuity tests stay binding. If that blend cannot meet the airborne/apex bounds without breaking them, stop and escalate: the jog clip then needs re-authoring as an asset, which is a separate point.
   Bundle: Dorfleben.
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
@@ -15982,3 +15984,9 @@ to land than a mechanism that needs a review.
   Observed problem: full enrichments run on WebGPU, 26.10.2026 03:21-03:42, main 64bed6b45, machine quiet UNVERIFIED: 314 pass, 5 fail; three charged (938, 1236 twice), these two owned by no open point. Both stem from the calf-shield-river work landed with point 1297. Log: local/enrichments-webgpu-run.log.
   Source: findings carrier 26.10.2026 02:43 (enrichments run); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
   Bundle: Tierverhalten.
+- [ ] 1453. polish-speech speech-distance-scale crashes in the figureScreen test hook
+  Final state: `npm test -- polish-speech --section=speech-distance-scale` runs to its 9 frames and is green on WebGPU on a quiet machine, or each remaining red is charged to its owning open point with the cause named. `figureScreen` (src/scenes/place/SpeechLabels.tsx) finds the figure's head geometry for the current figure build instead of assuming the first visible `figure-head` is a Mesh; a Vitest case pins the lookup.
+  Observed problem: quiet WebGPU run 27.10.2026 02:54Z on main 9044a6684: RED after 53 s, 0/9 frames, `page.evaluate: TypeError: Cannot read properties of undefined (reading 'getAttribute') at figureScreen (SpeechLabels.tsx:261)`. The head found carries no geometry (likely a Group since a figure/garment rebuild). The suite last ran 03.10.2026, so the break went unseen for over three weeks. Log: local/verify-logs/2026-10-27T02-54-43-744-polish-speech.log.
+  Criticality: low — dev test hook, no player impact measured; it blocks the green of `polish-speech`.
+  Source: findings carrier 27.10.2026 02:55 (1452 step 5, M3 quiet reference); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
+  Bundle: Dorfleben.
