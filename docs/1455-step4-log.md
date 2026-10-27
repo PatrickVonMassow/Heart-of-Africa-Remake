@@ -34,7 +34,13 @@ Plan: `docs/1455-step2-merged-plan.md` (approved by GPT-6.1 Sol, §8).
 | ref-ae-gl-5 | RED | 7m 41s | 9/23 | order at the stand; water rim band (point 568) |
 | ref-ae-gl-6 | RED | 6m 29s | 9/23 | order at the stand; river-bank foam after the shutter (point 1456); water rim band (point 568) |
 
-Reading after 3 of 10: the order-at-stand signature fires in every quiet run so far. If it
+Verdict after 6 of 10 (27.10.2026): the order-at-stand signature fired in 6 quiet runs, above
+the "more than 5 of 10" bound of plan §4.3 whatever the last four show — adult-errands
+WebGL 2 is **no usable probe**; WebGL 2 timing-sensitive pairing stays unqualified. The
+remaining references still run: block 3 pairs adult-errands WebGL 2 and its signature-rate
+comparison needs ≥ 10 quiet runs.
+
+Earlier reading after 3 of 10: the order-at-stand signature fires in every quiet run so far. If it
 holds above 5 of 10, §4.3 applies: adult-errands WebGL 2 is no usable probe and WebGL 2
 timing-sensitive pairing stays unqualified (block 1 then reduces to the memory/duration
 role of its villager-dress member; the probe verdict is recorded as "unqualified"). The
