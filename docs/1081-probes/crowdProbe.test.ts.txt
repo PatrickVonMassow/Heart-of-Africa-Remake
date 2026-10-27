@@ -1,0 +1,21 @@
+import { it } from 'vitest'
+import { village, frame, sample, resample, CADENCES, type Track } from './tagShuffleHarness'
+import { shuffleWindows } from '../../../scripts/verify/childMotionMetric.mjs'
+const PAIRS: Array<[string, number]> = (process.env.PAIRS ?? 'bambara-village:2972259115,mandinka-village:99,maasai-village:2972259115')
+  .split(',').map((s) => { const [a, b] = s.split(':'); return [a, Number(b)] })
+it('probe', () => {
+  for (const [id, seed] of PAIRS) {
+    let v
+    try { v = village(id, seed, undefined, { adultsAmongTheChildren: true }) } catch (e) { console.log(id, seed, 'ERR', String(e).slice(0, 80)); continue }
+    const paths: Track[][] = v.children.map(() => [])
+    for (let t = 0; t < 60; t += 1 / 60) { frame(v, 1 / 60); sample(v, paths) }
+    const row = [id, seed, v.bank ? 'bank' : 'tag']
+    for (const [name, step] of CADENCES) {
+      const r = shuffleWindows(resample(paths, step, 4242))
+      row.push(`${name}=${(r.worstShare * 100).toFixed(2)}%`)
+    }
+    const n = shuffleWindows(paths)
+    row.push(`worst child ${n.worst.child} @${n.worst.clock.toFixed(2)} path ${n.worst.path.toFixed(2)} out ${n.worst.out.toFixed(2)}`)
+    console.log(row.join(' '))
+  }
+}, 600000)
