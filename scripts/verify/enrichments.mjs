@@ -2242,13 +2242,15 @@ if (section('dressing-growth')) {
       window.__game.getState().debugJumpTo(p.lat, p.lon)
       await window.__sleepSim(6) // let the streaming settle to steady state
     }
+    // Sampled at the SAVANNA anchor: the herds are kept only around the current
+    // window, so the empty desert anchor reads 0 by design (point 1318).
     await visit(A)
     await visit(B)
-    const first = liveInstances() >= 0 ? (await visit(A), liveInstances()) : -1
+    const first = liveInstances()
     const samples = [first]
     for (let i = 0; i < 4; i++) {
-      await visit(B)
       await visit(A)
+      await visit(B)
       samples.push(liveInstances())
     }
     const max = Math.max(...samples)
@@ -6891,7 +6893,16 @@ if (section('channel-crossing')) {
               const qt = window.__terrainType(-qz / U, qx / U, seed)
               if (qt === 'ocean') break
               if (qt === 'water') { sawWater = true; continue }
-              if (sawWater) { bank = { x: bx, z: bz }; far = { x: qx, z: qz }; break outer }
+              if (sawWater) {
+                // The whole swim stays clear of the traveller's shy ring (6, with
+                // margin): inside it the crossing yields to flight by design
+                // (point 1318, §19.5 (c)), and the zebra never enters the water.
+                const ex = qx - bx
+                const ez = qz - bz
+                const t = Math.max(0, Math.min(1, ((p0.x - bx) * ex + (p0.z - bz) * ez) / (ex * ex + ez * ez)))
+                if (Math.hypot(bx + ex * t - p0.x, bz + ez * t - p0.z) < 10) break
+                bank = { x: bx, z: bz }; far = { x: qx, z: qz }; break outer
+              }
               break // land before any water on this heading — not a crossing
             }
           }
