@@ -6893,7 +6893,16 @@ if (section('channel-crossing')) {
               const qt = window.__terrainType(-qz / U, qx / U, seed)
               if (qt === 'ocean') break
               if (qt === 'water') { sawWater = true; continue }
-              if (sawWater) { bank = { x: bx, z: bz }; far = { x: qx, z: qz }; break outer }
+              if (sawWater) {
+                // The whole swim stays clear of the traveller's shy ring (6, with
+                // margin): inside it the crossing yields to flight by design
+                // (point 1318, §19.5 (c)), and the zebra never enters the water.
+                const ex = qx - bx
+                const ez = qz - bz
+                const t = Math.max(0, Math.min(1, ((p0.x - bx) * ex + (p0.z - bz) * ez) / (ex * ex + ez * ez)))
+                if (Math.hypot(bx + ex * t - p0.x, bz + ez * t - p0.z) < 10) break
+                bank = { x: bx, z: bz }; far = { x: qx, z: qz }; break outer
+              }
               break // land before any water on this heading — not a crossing
             }
           }
