@@ -82,9 +82,11 @@ read from `run.json` `startedAt`/`finishedAt`.
 The memory loop is a watcher, not only a recorder (F2): on a sample > 85 % it sends TERM
 to the later member's process group, confirms after 10 s that no child is left, and logs
 the abort. The watcher is the parent of both members (F2b): it launches them and its EXIT
-trap sends TERM to both process groups, so no member runs unsampled; a sample gap > 15 s
-seen by the watcher itself, or the watcher's death, ends the pair as a failed sampler
-(stop, as a breach). Before the
+trap sends TERM to both process groups; each member is launched through
+`setpriv --pdeathsig TERM` (util-linux, present on this host), so the kernel ends it even
+when the watcher dies by SIGKILL. Independently of any signal, a member whose
+`startedAt`–`finishedAt` interval is not covered by samples at ≤ 15 s spacing is void: the
+pair counts as a failed sampler (stop, as a breach) and its result is no evidence. Before the
 next repetition reuses a checkout, every frame its run wrote is copied to
 `local/1455-frames/<log id>/` (F3); the picture judgement works only from those copies.
 
@@ -125,7 +127,9 @@ WebGL 2 timing-sensitive pairing stays unqualified. Known signatures (charged to
 the same section and backend in both arms (F10): the quiet arm has ≥ 10 runs per section
 (the §4.2 references plus same-build quiet logs), and qualification FAILs if a signature's
 overlapped rate exceeds 1.5 × its quiet rate with a one-sided Fisher test p < 0.10, or a
-signature fires in ≥ 2 overlapped runs that never fired in its quiet runs.
+signature fires in ≥ 2 overlapped runs that never fired in its quiet runs. The unit of
+that test is one member per window: block 1's two back-to-back probe runs count as one
+observation (fired if either fired), against quiet windows of two runs built the same way.
 
 **4.4 Pass/fail thresholds** (U24, U17, U10, U28), all must hold: no sample > 85 % (≤ 80 %
 for a pairing admitted on measured peaks) and no failed sampler; 0 unresolved reds;
@@ -270,3 +274,11 @@ blocker (the bound claimed more than it covers). Second fixes:
 | F2b | freshness checked only at member finish | §4.1: the watcher is the members' parent; its own gap check or death ends the pair. |
 | F10 | raw totals with unequal exposure | §4.3: per-run rates, ≥ 10 quiet runs, Fisher p < 0.10 plus a 1.5 × ratio. |
 | F11 / new | bound did not cover charged or reproduced reds | §4.3: the bound is stated for new (unresolved) reds only; known reds go through the rate comparison; at most 2 repeated pairs. |
+
+Second re-check: F10 and F11 RESOLVED; F2b not resolved (an EXIT trap does not run on
+SIGKILL), one new blocker (block 1's two probe runs counted as independent). Third fixes:
+
+| Id | Objection | Fix |
+|---|---|---|
+| F2c | watcher killed by SIGKILL leaves members running | §4.1: members under `setpriv --pdeathsig TERM`; a member not fully covered by samples is void. |
+| F12 / new | Fisher units in block 1 | §4.3: one observation per window; block 1's two runs fold into one. |
