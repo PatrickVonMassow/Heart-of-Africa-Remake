@@ -77,19 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1455. Run two browser suites at once when the measured pair gain holds, judged by acceptance throughput (six eyes)
-  Rank: front of the queue (user order 27.10.2026).
-  Goal: faster local acceptance (the measured bottleneck, docs/1452-throughput-inventory.md) by running two browser suites at once, at unchanged quality. The measure is wall-clock time per landed point, not the duration of a single suite.
-  Proposal under evaluation (from a chat session, 27.10.2026): allow two browser suites at once under the conditions measured in point 1452 M3 (docs/1452-step5-measurement.md): each suite on its own port, host memory below the 85 % budget, and a red in an overlapped run stops the parallel mode until diagnosed. M3 measured 13m 44s for a pair against 18m 56.5s serial (sum of the quiet medians), 0 reds in 4 overlapped runs, memory peaks 73-75 %, single suites 1.5-3.5 % slower. 1452 rejected it only by its guardrail "no suite turns red or measurably slower", which judged the single suite instead of throughput; this point replaces that criterion for this question with the goal above.
-  Procedure: six eyes with final check (memory six-eyes-with-final-check). Nothing is implemented before step 3 has approved the plan.
-  1. Blind evaluation. Model A (Claude lane) and model B (cross lane, currently GPT-6.1 Sol) evaluate the proposal independently from identical inputs: the goal, the constraints, docs/1452-step5-measurement.md, docs/1452-throughput-inventory.md, docs/batch-owner-runbook.md, scripts/verify/ and the verify logs. B does not see this point's "Proposal under evaluation" reasoning or the chat interpretation; B gets the proposal only as the neutral question "may two browser suites run at once, and under which conditions". Each names risks (red rate, flaky sections, memory, GPU contention, WebGL 2 vs WebGPU, LARGE runs, picture checks, timing-sensitive sections such as the rotating WebGL 2 adult-errands reds), the conditions and the test that would decide it.
-  2. Merge. A third, distinct model merges both via scripts/blind-merge.mjs; disagreements resolved with reasons, not by union.
-  3. Final check. A model of the OTHER vendor than the merger checks the merged plan for "does this break anything". Objections are fixed and re-checked first.
-  4. Test directly, not later, inside this point: enough overlapped pairs to judge the red rate, not just 2 (the merged plan names the number and which sections/backends, including at least one WebGL 2 pair and one timing-sensitive section), each against quiet references on the same build, with memory sampled. Record in docs/.
-  5. Decide by the goal: adopt when wall-clock per acceptance falls clearly, no added reds attributable to the overlap, and memory stays within budget. A 2-4 % slower single suite is acceptable when the pair's wall-clock gain outweighs it. If the test fails, the bound stays at one suite and the reason is recorded.
-  6. Implement on success: change the "Local heavy jobs" bound in docs/batch-owner-runbook.md (and whatever existing verify tooling needs, e.g. port separation) with the stop-on-red rule. Infrastructure freeze: no new guards or workflow abstractions; re-tuning existing ones is allowed. Usual cross-vendor code review.
-  7. Confirm in practice: the next landed points use the pair mode where two suites are owed; record the measured acceptance time against the 1452 baseline.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
