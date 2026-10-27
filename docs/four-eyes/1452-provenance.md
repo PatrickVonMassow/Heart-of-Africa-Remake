@@ -25,3 +25,16 @@ flagged its answer "no usable answer" only because it was the requested JSON rat
 The JSON halves are parsed in order from every `<LETTER><n> |` line of each answer, each
 text prefixed with its original label: A's P1–P12 are A1–A12, its F1–F10 are A13–A22,
 its material critiques A1–A16 are A23–A38; B's B1–B50 keep their numbers.
+
+## Final check and re-check
+
+- Final check (step 4): GPT-6.1 Sol, other vendor than the merger, `ask-lane.mjs --lane cross
+  --kind enumerate`: **OBJECT** with B1–B8 — `1452-final-check-sol.md`.
+- Revision: Fable 5.1 kept every id and `from` list and answered each objection (B1 rebutted
+  from the runbook text, B2–B8 fixed) in `objections` — `1452-union-r1.json`, raw answer
+  `1452-union-r1-fable.md` (it also appended ten material critiques after the JSON).
+- Re-check 1: GPT-6.1 Sol **APPROVE** — `1452-recheck-1-sol.md`. ask-lane printed its
+  "no usable answer" banner only because an approval carries no objection lines; the
+  verdict line is the model's answer verbatim.
+
+The approved plan is `1452-union-r1.json`. Next: step 5 measures every load-adding entry.
