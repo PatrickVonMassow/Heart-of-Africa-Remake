@@ -73,6 +73,32 @@ one-line hook `(globalThis as any).__t1081?.(c, desired, steer, heading,
 moved, blockedAt, len, look, stopAt, world)` after the substep loop in
 `moveChild`.
 
+## 6. Held passing side (27.10.2026, after the main merge)
+
+Head-on playmates (other child within 3 radii, inside ±45° of the wanted
+heading, headings > 120° apart) both turn the SAME way by `veer`, held for
+`hold` seconds (field `passFor`). Native / worst cadence, sum of worst shares:
+
+| veer / hold | >=gate native | max native | sum native | >=gate worst cadence | max any cadence |
+|---|---|---|---|---|---|
+| baseline | 6 | 0.54 % | 3.50 % | 9 (2-12) | 0.62 % |
+| 45° / 0.5 s | 2 | 0.88 % | 2.23 % | 4 (20 fps) | 0.90 % |
+| 45° / 0.5 s, only where walkable | 6 | 0.37 % | 2.85 % | 8 (2-12) | 0.79 % |
+| 30° / 0.5 s | 5 | 0.93 % | 3.02 % | 9 | 0.93 % |
+| 60° / 0.5 s | 2 | 0.45 % | 2.32 % | 7 | 0.65 % |
+| 45° / 0.2 s | 4 | 0.68 % | 3.28 % | 8 | 0.73 % |
+| 45° / 0.3 s | 1 | 0.25 % | 1.84 % | 5 | 0.45 % |
+| 45° / 0.4 s | 3 | 0.56 % | 2.74 % | 3 | 0.85 % |
+| 40° / 0.3 s | 3 | 0.42 % | 2.15 % | 4 | 0.45 % |
+| 50° / 0.3 s | 4 | 0.51 % | 3.08 % | 7 | 0.90 % |
+
+Every variant lowers the sum (6-47 %), so the playmate cause is confirmed;
+none holds every pair under the 0.25 % gate at every cadence, and the best
+(45°/0.3 s) has no robust neighbourhood. Taking it would pin a lucky
+parameter the way the old case pinned a lucky seed. Not committed.
+Residual episodes after the pass: the veer itself turning an evader into a
+wall (zulu/99 at 45°/0.5 s), then the `evadeHeading` flip of section 4.
+
 ## Next
 
 - The dominant cause is playmate head-on contact at the floor pace (section 4).
