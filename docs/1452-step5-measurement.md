@@ -16,3 +16,10 @@ Every run is recorded by `scripts/verify/run-logged.mjs`; the comparison quotes 
 `local/verify-logs/*.run.json`. Results are appended below as they arrive.
 
 ## Results
+
+Reference section for M1/M2: `polish-villagers --section=villager-dress`, WebGPU (57 green
+runs on record). Second section for M3: `polish-speech --section=speech-distance-scale`.
+
+| Run | Variant | SHA | Started (UTC) | Duration | Verdict | Load avg at start | Log |
+|---|---|---|---|---|---|---|---|
+| M1-q1 | quiet | 69b25f938 (main) | 27.10 00:30 | 13m 12s | GREEN, 28 frames | 0.13 | `local/verify-logs/2026-10-27T00-30-26-762-polish-villagers.log` |
