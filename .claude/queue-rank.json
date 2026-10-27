@@ -1728,6 +1728,12 @@
       "why": "User order 26.10.2026: front of the queue, never deferred for a pulled-forward point",
       "origin": "user",
       "place": "ahead"
+    },
+    "1453": {
+      "at": "2026-10-27T03:31:31.622Z",
+      "why": "low-criticality test-hook crash with no player impact; last in the order is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1757,7 +1763,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-26T22:59:45.393Z",
+    "at": "2026-10-27T03:31:31.631Z",
     "points": [
       184,
       200,
@@ -2223,7 +2229,8 @@
       1447,
       1448,
       1449,
-      1452
+      1452,
+      1453
     ]
   }
 }
