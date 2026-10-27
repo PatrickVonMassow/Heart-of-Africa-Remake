@@ -417,6 +417,50 @@ if (section('panorama-wildlife')) {
         p.yaw = pose.yaw
       }, aimed.pose)
     }
+    // Point 1419: a goat beside a post steps round it rather than through it.
+    // The goat nearest any round collider is the subject; its clearance to that
+    // collider is checked, then the camera is brought to ~4 m of it and the pose
+    // handed back afterwards.
+    const nearPost = await page.evaluate(() => {
+      const p = window.__placePlayer
+      const herd = Object.values(window.__placeGoatGait ?? {})
+      const posts = (window.__placeLayout?.colliders ?? []).filter((c) => !c.kind || c.kind === 'circle')
+      if (!p || herd.length === 0 || posts.length === 0) return null
+      let best = null
+      for (const g of herd) {
+        for (const c of posts) {
+          const d = Math.hypot(g.x - c.x, g.z - c.z) - c.r
+          if (!best || d < best.gap) best = { gap: d, dist: d + c.r, r: c.r, gx: g.x, gz: g.z }
+        }
+      }
+      const pose = { x: p.x, z: p.z, yaw: p.yaw }
+      const d = Math.hypot(best.gx - p.x, best.gz - p.z) || 1
+      p.x = best.gx - ((best.gx - p.x) / d) * 4
+      p.z = best.gz - ((best.gz - p.z) / d) * 4
+      p.yaw = Math.atan2(-(best.gx - p.x), -(best.gz - p.z))
+      return { pose, ...best }
+    })
+    check(
+      'the goat nearest a post stands clear of it (point 1419)',
+      !!nearPost && nearPost.dist >= nearPost.r + 0.3 - 0.02,
+      nearPost
+        ? `distance ${nearPost.dist.toFixed(3)} m to a post of radius ${nearPost.r.toFixed(2)} m (needs ≥ ${(nearPost.r + 0.28).toFixed(3)})`
+        : 'MEASURED NOTHING — no goat or no round collider in the place',
+    )
+    if (nearPost) {
+      await nextFrames(2)
+      await frame('1419-goat-round-post', {
+        local: { x: nearPost.gx, y: 0.5, z: nearPost.gz },
+        label: 'a goat stepping round a post',
+      })
+      await page.evaluate((pose) => {
+        const p = window.__placePlayer
+        if (!p) return
+        p.x = pose.x
+        p.z = pose.z
+        p.yaw = pose.yaw
+      }, nearPost.pose)
+    }
   }
 }
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —
