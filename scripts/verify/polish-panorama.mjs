@@ -486,6 +486,9 @@ if (section('panorama-wildlife')) {
     // Walk (or watch) the goat until it is beside the post, sampling clearance.
     let minGap = Infinity
     let atShutter = null
+    // A staged goat stalled on the near face would pass the clearance check
+    // without ever stepping round, so reaching the post's line is asserted too.
+    let rounded = false
     if (pick) {
       for (let k = 0; k < 120; k++) {
         await nextFrames(2)
@@ -500,8 +503,18 @@ if (section('panorama-wildlife')) {
         if (!staged) break
         // Beside the post: the goat has reached the post's own line across the axis.
         const along = (g.x - pick.post.x) * staged.axis.x + (g.z - pick.post.z) * staged.axis.z
-        if (along <= 0) break
+        if (along <= 0) {
+          rounded = true
+          break
+        }
       }
+    }
+    if (staged) {
+      check(
+        'the steered goat walks up beside the post before the frame cap (point 1419)',
+        rounded,
+        rounded ? 'reached the post line across its walk' : `still on the near side after 120 steps (gap ${atShutter?.gap.toFixed(3) ?? '?'} m)`,
+      )
     }
     check(
       'a goat stands within 0.6 m of a fence post at the shutter (point 1419)',
