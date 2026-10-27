@@ -77,43 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1452. Raise batch throughput through measured parallelisation, cloud authors included, without losing quality (six eyes)
-  Rank: front of the queue (user order 26.10.2026). Never deferred in favour of a pulled-forward point.
-  Goal: more points landed on main per hour at unchanged quality. More parallelism is only the means, never a goal in itself ("nicht um jeden Preis mehr Parallelisierung, sondern eine schnellere Abarbeitung der Batch bei trotzdem gewährleisteter Qualität").
-  Procedure: six eyes with final check (memory six-eyes-with-final-check). Nothing is implemented before step 6 has approved the plan.
-  1. Measured inventory. From the logs of the last days (at least 10 landed points) measure where a point spends its time: commission, authoring, waiting, acceptance (suites, picture check, review), main sync, landing. Name the real bottleneck and the idle times. Result: a table under docs/.
-  2. Solution search, blind-parallel. Model A (Claude lane) and model B (cross lane, currently GPT-6.1 Sol) work out solutions independently from identical inputs. B starts WITHOUT prior knowledge: only the neutral goal, the constraints and the raw material; B never sees this point text's candidate list nor the chat interpretation it came from. At least examine:
-     - more cloud authors, together with whether local acceptance can absorb their branches at all;
-     - pool and waiting branches, including whether stale branches (e.g. 1347) block slots;
-     - whether the number of open branches is a good criterion for limiting free slots at all: POOL_CAP and "at most 1 finished branch waiting" may prevent parallelism unnecessarily often (stale or collision-free branches occupying slots without loading acceptance). Measure alternatives such as acceptance capacity, host load, branches actually waiting for acceptance, and main-sync conflict risk instead of the bare branch count;
-     - shortening acceptance per point (only the truly covering suites; second backend only when isBackendSensitivePath applies);
-     - two local suites at once (separate ports, memory budget) and the cause of the two overlapped reds of 23.10;
-     - acceptance steps that may move to the cloud without breaking "cloud green never stands in for a browser suite";
-     - per-point bookkeeping overhead that can be dropped.
-  3. Merge. A third, distinct model checks both proposals thoroughly and merges them via scripts/blind-merge.mjs; disagreements are resolved with reasons, not by union.
-  4. Final check. A model of the OTHER vendor than the merger checks the merged plan focused on "does this break anything". Objections are fixed and re-checked before implementation.
-  5. Measure directly, not later. Every solution that adds load is measured under real load inside this point, before the decision: suite durations, memory, red rate, throughput versus pre-1443 (3.42 h per point) and versus the 1444 bounds. Nothing is deferred.
-  6. Implement what the measurement supports: new bounds in docs/batch-owner-runbook.md and, if needed, DAEMON_POOL_CAP / POOL_CAP. Infrastructure freeze: no new guards or workflow abstractions; re-tuning, simplifying or switching off existing ones is allowed. The implementation gets the usual cross-vendor code review.
-  7. Pull points forward for parallelism. A free slot is filled with the frontmost queue point that does not collide with the running points, even if it stands far back. Example: 3 slots free, entries 1-3 work on the same corner, entries 4 and 5 on entirely different ones: then 1, 4 and 5 run in parallel.
-     - Collision is decided by the existing independentOpenPoints (same files / subsystem); check whether it already searches beyond the head of the queue and, if not, tune it without new machinery.
-     - Within a colliding group the queue order is kept; a pulled-forward point never displaces a front point that becomes free.
-     - Front-ranked user orders (this point included) are never set back for a pulled-forward point.
-     - No cloud author and no free slot idles while a fitting, ready point stands anywhere in the queue; the step-8 guardrails still apply (local acceptance must be able to absorb the extra branch).
-  8. Guardrails = acceptance conditions:
-     - no suite turns red or measurably slower under the load, compared with a quiet-host measurement;
-     - no finished branch waits longer than one day;
-     - bookkeeping overhead per point does not rise;
-     - throughput demonstrably rises over a measured cycle of at least 3 points;
-     - if no variant yields a gain, the bounds stay as they are and the result is recorded with its reasons.
-  Addendum (merged per its own text): Addendum to the waiting request "Raise batch throughput through measured parallelisation, cloud authors included, without losing quality (six eyes)" (deposited 26.10.2026 19:57). Merge into that point's spec; it is not a point of its own.
-  Option 1 (user decision 26.10.2026 20:18): the point stays at the front of the queue and does NOT wait for the end of the 1444 measured cycle (due ~28.10.2026 00:43). Its step-1 inventory starts from the data of that cycle collected so far as baseline (since the 1444 landing 26.10.2026 00:43: 7 landed points, about 2.4 h per point, three cloud-authored points 1433/1451/1418; only 2 of the 7 are game points, so the figure is likely flattering) and states that limitation. It also covers what is new versus 1444: pulling points forward across the queue, the open-branch count as a slot criterion, and immediate measurement.
-  Source: user order 26.10.2026 (findings carrier request 18:57, approved "Ja, nimm die Nachkontrolle mit dazu. So freigegeben."; addendum 19:20, approved "ja").
-  Owner hint (user decision 26.10.2026 21:26), no new point and no spec change to 1452 or 1436:
-  Accept the waiting cloud-authored branch feat/1418-basket-collision locally DURING 1452's analysis phase (its blind halves run in the cloud / cross lane and barely load the host), so 1418 carries the evidence of point 1436 (cloud gate flow without a repeated local build/lint/unit layer) while 1452 proceeds. 1452 keeps its front rank and does not wait for 1418. Feed 1436's outcome into 1452's step-1 inventory (whether cloud green can replace the local unit layer in acceptance).
-  Input finding (26.10.2026 19:09, carrier): the launcher took the batch lock from a live owner judged pid-reused — SessionStart reported 'owner lock assessed inactive (pid-reused)' and the predecessor child dead (pid 4083038), yet the predecessor claude -p session pid 4006293 was alive and blocking on a polish-villagers suite for point 1417 (batch-in-flight --agent-check said 'alive' for the same worktree); a second batch session got the lock mid-verification. Step 1 counts this as a parallel-session cost; a fix stays under the infrastructure freeze (CLAUDE.md §2: possible double owner = real blockade).
-  Input finding (26.10.2026 20:56, carrier): owner session 1cf5b053 delegated the 1450 eating-pose fix to a local Agent in worktree point-1417 without reading the 1417 cloud session log; the cloud session had already pushed 4133642/6933d7a, the local push was rejected non-fast-forward, ~180k agent tokens wasted, no damage. Lesson for step 1: read the point's cloud session log (local/<N>-fix-send.log, RemoteTrigger get_run_log) before commissioning a fix.
-  Input finding (26.10.2026 22:28, carrier): on WebGL 2, polish-villagers --section=adult-errands ran three times 22:09-23:28 (load avg ~1.5) and each run added a different single timing red beyond the charged 568/642 ones, on main f57fa3250 too ('both are still at the stroke' count 0; 'river-bank frame foam drifted 8.88 m'; 'filmed errand adult walks on between frames 1 and 2 (1404)' plus 'jar mouth tipped under surface' -0.2480 vs -0.25 m). Step 1 counts it in the suite-repeats class (3 x 6 min per WebGL 2 acceptance).
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
