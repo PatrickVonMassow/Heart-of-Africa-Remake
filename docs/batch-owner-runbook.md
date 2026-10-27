@@ -31,10 +31,9 @@ not need it and must not act on it.
   worktree cleanup, stopping on the first failed step. The post-merge gate is
   mandatory even after a clean merge.
 - Schedule a heavy run onto a quiet machine. A whole `polish` pass and a full
-  LARGE are 55 and 119 measured minutes (`docs/picture-check-cost.md` §7), and
-  load alone moves a suite by about a fifth, so an expensive run started while a
-  second author is building buys a slower run and a redder one. This is
-  scheduling, not construction: no guard enforces it, and `--plan` printing the
+  LARGE are 55 and 119 measured minutes (`docs/picture-check-cost.md` §7); a
+  CPU gate beside a suite slowed it by 12 % and a second suite by 1.5–3.5 %
+  (`docs/1452-step5-measurement.md`). This is scheduling, not construction: no guard enforces it, and `--plan` printing the
   observed band is the whole of its machinery.
 - Await a background build log with `node scripts/verify/run-wait.mjs
   --await-log <log>` (as a background call), never an `until grep` loop. A
@@ -76,12 +75,23 @@ below compares the new mode against the pre-1443 3.42 h.
   want of a ready successor and no finished branch waiting over a day; it then
   changes this number and the switch-over condition together.
 - Finished branches waiting for acceptance: at most **1**. `POOL_CAP` 3 stays the
-  branch ceiling, never a target; a free slot is explained with
-  `--slots-free "1444 bound: one cloud author"`.
+  branch ceiling, never a target; a free slot owes no explanation (the point-427
+  `--slots-free` demand is switched off).
 - Local heavy jobs: **1**. While a browser suite, unit gate or picture check runs,
   start no other local agent, browser or Vitest run (a running local author is
-  checkpointed first); cloud authoring continues. Reason: both overlapped suite
-  runs of 23.10 went red, and load moves a suite by about a fifth.
+  checkpointed first); cloud authoring continues. Measured 27.10.2026 on a
+  known-green section against its quiet median of 13m 27s
+  (`docs/1452-step5-measurement.md`):
+  - M1 ACCEPTED: one cross-vendor review may run beside one browser suite —
+    loaded 13m 10s–13m 19s, 0 added reds in 3 runs, peak memory 64.8 % against
+    the 85 % budget. It covers only the owner session's remote review call; a
+    review that spawns a local model, subagent, browser or Vitest run is a heavy job.
+  - M2 REJECTED: no build/lint/unit gate beside a browser suite — 15m 01s and
+    15m 07s (+12 %), and the unit layer itself 564 s against 517 s quiet.
+  - M3 REJECTED: one browser suite at a time — 4 of 4 overlapped runs slower
+    (+1.5 to +3.5 %), 0 reds, peaks 73–75 %. Only a user decision may trade
+    that slowdown for a pair's wall-clock gain.
+- `POOL_CAP` and `DAEMON_POOL_CAP` stay at 3: no measurement supports a change.
 - Credit (expires 05.11.2026): commission only what local acceptance can land
   before then.
 - `batch-daemon` stays off while these bounds hold: its refill fills to
@@ -93,11 +103,17 @@ opens, `batch-in-flight --status` shows fewer submitted or running cloud authors
 the bound and no finished branch waits, commission the next ready, file-disjoint queue point through
 `author-delegate`/cloud-switch, declare it, and continue the acceptance. The
 existing `independentOpenPoints` decides disjointness; the successor is adopted at
-the boundary as today. Picture-fix loops stay local (`author-routing-core`).
+the boundary as today. A commission counts only on a `commission-guard --status`
+verdict without an unread notice: an allow printed beside one establishes nothing. Picture-fix loops stay local (`author-routing-core`).
 
 **Acceptance discipline (kept).** Gate a branch only after its author declares it
 final, on its exact pushed SHA; rerun only the checks a later commit invalidates.
-Spend suite waits on lightweight work (early review, preparing the next acceptance).
+Spend suite waits on lightweight work: the owner's cross-vendor review of the next
+finished branch's final SHA (M1) or preparing the next acceptance. Before the author
+declares a branch final and before the expensive gates start, sync `main` into it and
+fold in the known fixes. Send a fix to ONE destination (the cloud session or one local
+agent) with every known finding in that request, after reading the point's cloud
+session log (`local/<N>-fix-send.log`, its run log).
 After **one** repeat of an unchanged SHA, section, backend and failure signature,
 diagnose before running it again; a relevant commit or a recorded changed condition
 (an environment repair) reopens it. A red already charged to an open point with
@@ -120,6 +136,26 @@ duration (`run-wait --plan`), not the 45-minute default.
 `run-wait` (a `running/-` hang is STALLED and diagnosed), `land-point.mjs`, local
 tier suites, both-backend picture check, cross-vendor review. Cloud green never
 stands in for a browser suite.
+
+**Rejected without new data** (`docs/four-eyes/1452-union-r1.json`; re-propose only
+with a measurement that answers the reason):
+- U5, two local suites or a CPU gate beside a suite: measured slower (M2, M3 above);
+  a local author beside a suite stays unmeasured and matters only after the cloud
+  credit ends.
+- U7, more cloud authors: acceptance, not authoring, is the bottleneck; no idle
+  acceptance for want of a ready successor was measured.
+- U9, stale branches and the bare branch count as slot criterion: no slot is
+  blocked (`open []`, parks drop out) and no `branches-open` refusal met idle
+  acceptance; another criterion would be new machinery.
+- U10, pulling points forward past the front: a finished pulled-forward branch
+  would block the front point under the one-waiting-branch bound; no measured idle
+  slot with a wholly colliding front.
+- U11, second backend only on `isBackendSensitivePath`: its false-negative rate is
+  unmeasured; both backends stay.
+
+**Open.** U2, a per-suite STALLED cut-off in `run-wait` from its `--plan` duration,
+needs its false-stall rate measured per suite, section and backend under the
+permitted load before any activation.
 
 **Measured cycle.** After 1444 lands, `batch-standstill-report.mjs` over the next
 five landed points or 48 h, whichever is later — this is also the post-1443
