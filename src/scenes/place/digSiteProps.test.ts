@@ -129,6 +129,7 @@ describe('the props set down beside a dig site are obstacles (point 1418)', () =
     // far basket. So each prop also gets a stroll target just past its far
     // side, and the walk there runs on the same routing and colliders.
     const pastProps = layout.digSites.flatMap((site) => digFurnitureColliders(site).map((prop) => {
+      if (prop.kind === 'segment') throw new Error('dig furniture has no segment collider')
       const reach = ('r' in prop ? prop.r : Math.max(prop.hx, prop.hz)) + NPC_RADIUS + 0.2
       const d = Math.hypot(prop.x - site.x, prop.z - site.z) || 1
       const [x, z] = nudgeToFree(layout.colliders, prop.x + ((prop.x - site.x) / d) * reach, prop.z + ((prop.z - site.z) / d) * reach, NPC_RADIUS)
