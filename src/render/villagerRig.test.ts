@@ -144,7 +144,10 @@ describe('speed → clip, stride and cadence', () => {
       last = g
     }
     expect(gaitWeights(1.0, 1).walk).toBe(1)
-    expect(gaitWeights((VILLAGER_GLTF.jogThreshold + VILLAGER_GLTF.sprintThreshold) / 2, 1).jog).toBe(1)
+    // between the bands the jog runs with the walk share it keeps
+    const mid = gaitWeights((VILLAGER_GLTF.jogThreshold + VILLAGER_GLTF.sprintThreshold) / 2, 1)
+    expect(mid.jog).toBeCloseTo(1 - VILLAGER_GLTF.runWalkShare, 12)
+    expect(mid.walk).toBeCloseTo(VILLAGER_GLTF.runWalkShare, 12)
     expect(gaitWeights(VILLAGER_GLTF.sprintThreshold + VILLAGER_GLTF.sprintBand + 0.1, 1).sprint).toBe(1)
   })
 })
