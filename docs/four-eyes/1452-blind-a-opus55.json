@@ -1,0 +1,195 @@
+{
+  "model": "Opus 5.5",
+  "entries": [
+    {
+      "id": "A1",
+      "file": "runbook-throughput.md \"Acceptance discipline (kept)\", the one-repeat rule",
+      "defect": "[P1] Enforce the existing rule: after one repeat of an unchanged SHA, section, backend and failure signature, diagnose before any further run. Also reuse the recorded `main` run for reds already charged elsewhere. Basis: 1415 had 9 same-SHA repeats in 15 runs (208 min) and the longest post-1444 acceptance (5.1 h); 1432 had 4 repeats; red runs are 11.5 of 15.8 finished suite hours. Expected gain: up to roughly 1–2 h on a 1415-type point. The per-repeat minutes are not split out, so the exact gain is not measurable from the material. Risk: a real flake left undiagnosed, or a diagnosis that takes longer than a rerun. Measure over the next cycle: same-SHA repeats per point, acceptance hours per point, and post-merge red rate on main against this window."
+    },
+    {
+      "id": "A2",
+      "file": "run-wait.mjs stall handling (\"a running/- hang is STALLED and diagnosed\")",
+      "defect": "[P2] Re-tune the existing stall cut-off to the suite's measured `run-wait --plan` duration plus a margin, so a hung WebGPU run is flagged early instead of burning about 52 min. Basis: 5 hung 1442 runs cost ~4.3 h (i). Expected gain: most of that 4.3 h whenever hangs recur. Risk: a slow but valid run killed under load, which would be a false red. Measure: false-stall rate on quiet-host full WebGPU runs (about 43 min each) against the chosen cut-off; adopt only with zero false stalls."
+    },
+    {
+      "id": "A3",
+      "file": "runbook \"Spend suite waits on lightweight work (early review…)\"",
+      "defect": "[P3] Run the cross-vendor review of the next finished branch while the current branch's suite runs. A review is not a local heavy job. Basis: the 1418 review came at 20:56, after a 1.6 h wait behind 1417, while 1417's 84-min re-run filled 19:19–20:44; the 1418 cloud fix handover at 21:18 was picked up only about 22:10 (0.9 h). Expected gain: about 1–2.5 h of wait per queued cloud branch (1418 had 2.49 h). Risk: the review may need repeating if acceptance of the earlier point changes main. Measure: handover→review and handover→pickup latency per point, review rework count, and suite durations with the review running beside them against a quiet-host run."
+    },
+    {
+      "id": "A4",
+      "file": "runbook \"Local heavy jobs: 1\" (two local suites at once)",
+      "defect": "[P4] REJECTED for now. Basis: (e) does not establish load as the cause. Run A was exit 2 with its red charged to 1244; the jar-take and pointing reds repeated solo on the same SHA; 1405 also had a duplicate self-start at 05:08:27. The \"about a fifth\" slowdown has no measurement in the material. The constraint forbids any measurable slowdown. Measure before reconsidering: two suites on separate ports on a known-green SHA, durations and red rate against the same suites on a quiet host, plus peak memory. Adopt only if both durations stay within quiet-host spread and no red appears."
+    },
+    {
+      "id": "A5",
+      "file": "author-delegate / cloud-switch bound \"Cloud authors at most 1\" (more cloud authors)",
+      "defect": "[P5] REJECTED. Basis: authoring never limited throughput (cloud handovers within about 0.1–1.1 h). After 1444, 7.5 h of waits were finished cloud branches queued behind serial local acceptance, and acceptance idled for want of a successor only about 35 min (26.10 10:44). More authors would add waiting branches and sync-rework risk and spend credit that expires 05.11.2026, with no acceptance capacity to absorb them. Measure: acceptance-idle minutes caused by \"no ready successor\" over the measured cycle. Reconsider only if that rises while no branch waits over a day."
+    },
+    {
+      "id": "A6",
+      "file": "runbook \"Finished branches waiting: at most 1\" plus POOL_CAP 3 branch-count criterion",
+      "defect": "[P6] REJECTED as a throughput lever now, though the criticism of the bare count is valid. Basis: before 1443, the stale 1347 branch held a slot for 45.6 h, and the pool stood above its cap. Today `slotsFree 3` and `parkedOut [feat/1347-garment-rebuild]`, so the binding limit after 1444 was the one-cloud-author bound and acceptance, not POOL_CAP. Instead, use the existing `--park` promptly for stale or collision-free branches. Expected gain: none measurable after 1444. Risk: none. Measure: occurrences where commission-guard refused `branches-open` while acceptance stood idle; zero in the material."
+    },
+    {
+      "id": "A7",
+      "file": "commission-guard frontCandidates (count = POOL_CAP) plus independentOpenPoints (pulling points forward)",
+      "defect": "[P7] CONDITIONALLY REJECTED. Today a file-disjoint point beyond the first 3 workable candidates is refused as `behind-front` unless an `--override --reason` is recorded per point. That raises bookkeeping. Filtering `frontCandidates` by `independentOpenPoints` would re-tune an existing guard. However, there is no measured case of an idle slot with a colliding front, and acceptance is the bottleneck. A pulled-forward branch would compete for the single acceptance lane and could set back front-ranked user orders, unless acceptance keeps strict queue order. Measure: count of commissions refused `behind-front` while every front candidate collided and acceptance was idle; adopt only if that is non-zero."
+    },
+    {
+      "id": "A8",
+      "file": "acceptance per point: second backend only on backend-sensitive paths",
+      "defect": "[P8] NOT ADOPTABLE from the material. Basis: full `polish-villagers` takes about 43 min per backend; 11 full runs took 8.1 h. But `isBackendSensitivePath` does not appear in the material, so its coverage is not measurable. The both-backend picture check must stay regardless. Risk: missing backend-only reds. Measure: for one cycle, run both backends and record how often the second backend is red alone on a path the predicate would call insensitive. Adopt only at zero."
+    },
+    {
+      "id": "A9",
+      "file": "build/lint/unit layer in the cloud (point 1436 item 2, as used for 1418)",
+      "defect": "[P9] ADOPTED as already practised. Build, lint and unit are not browser suites, so a cloud green may cover them. The `land-point` fast gate still runs them post-merge. Browser suites, picture check and review stay local. Basis: 1418 relied on two cloud gate runs (622 files). Gain: small and not measurable from the material. Risk: a fast-gate red after the merge lands on main. Measure: post-merge fast-gate red rate."
+    },
+    {
+      "id": "A10",
+      "file": "autostart owner-liveness check (pid-reuse)",
+      "defect": "[P10] Fix the existing check that took over a live owner. Basis: incident (b) at 18:09:25Z; the live owner kept writing until 18:12Z; the cost was about 0.4 h (i) plus context. This is a bug fix to an existing mechanism, not a new guard. Gain: about 0.4 h per occurrence. Measure: takeover events against owner-write evidence afterward."
+    },
+    {
+      "id": "A11",
+      "file": "runbook practice for fix dispatch",
+      "defect": "[P11] Send a fix either to the cloud author or to a local agent, never both. Basis: (c) duplicate costing 181,408 tokens and 17.4 min of a local agent; no critical-path time was lost. Throughput gain: none; it saves cost and local load. Measure: count of duplicate dispatches."
+    },
+    {
+      "id": "A12",
+      "file": "per-point bookkeeping (runbook \"Simplified\", `--slots-free` reason)",
+      "defect": "[P12] Keep one bookkeeping commit per boundary. The `--slots-free \"1444 bound\"` explanation is owed only because of the one-author bound; it could be dropped only by switching off the point-427 lower-bound check, and the gain is not measurable. Post-landing gaps were 0.15–0.5 h; the larger ones were investigations, not bookkeeping. Measure: landing-to-next-commission time per point."
+    },
+    {
+      "id": "A13",
+      "file": "docs/1452-throughput-inventory.md Bottleneck",
+      "defect": "[F1] Local acceptance is 33.3 h of phase time against 7.1 h authoring and 3.2 h landing; finished suites total 15.8 h, of which 73 % are red runs."
+    },
+    {
+      "id": "A14",
+      "file": "inventory Window sums",
+      "defect": "[F2] After 1444, 9 points in 22.8 h (2.53 h each), but only 4 are game points. The measured cycle (5 points or 48 h, whichever is later) is not complete."
+    },
+    {
+      "id": "A15",
+      "file": "inventory per point/after 1444",
+      "defect": "[F3] Post-1444 waits of 8.2 h all sit behind local acceptance (1388 3.6, 1418 2.5, 1417 1.4) or a 35-min idle."
+    },
+    {
+      "id": "A16",
+      "file": "inventory Standstill report",
+      "defect": "[F4] All 70.92 h are `unknown` because of the contradictory `{previousSeq:66, seq:67}` journal item. The runbook's \"name the class that absorbed the gain\" is not measurable until that is resolved."
+    },
+    {
+      "id": "A17",
+      "file": "inventory (e)",
+      "defect": "[F5] The 23.10 overlap does not prove load caused the reds: the solo same-SHA runs repeated them, and only one check was unique to the overlapped run."
+    },
+    {
+      "id": "A18",
+      "file": "inventory per point",
+      "defect": "[F6] Same-SHA repeats: 1415 had 9, 1432 had 4."
+    },
+    {
+      "id": "A19",
+      "file": "inventory",
+      "defect": "[F7] Hung WebGPU runs cost ~4.3 h (all 1442); a full polish-villagers run takes about 43 min per backend."
+    },
+    {
+      "id": "A20",
+      "file": "inventory (d)",
+      "defect": "[F8] 1347 is parked at tip e4edd697 and now occupies no slot (`slotsFree 3`). Its worktree is still on disk, 626 commits behind main."
+    },
+    {
+      "id": "A21",
+      "file": "runbook Bounds",
+      "defect": "[F9] Every branch that waited over a day needed post-sync rework (the 1414, 1432, 1333 and 1297 syncs)."
+    },
+    {
+      "id": "A22",
+      "file": "inventory Limitations",
+      "defect": "[F10] Review durations are not logged, so review time is not measurable from the material."
+    },
+    {
+      "id": "A23",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A1] The Median row gives Wait \"0.6 among the 10 that waited\", but the 10 listed waits (0.15, 0.6, 1.38, 2.49, 3.6, 13.4, 35.3, 35.6, 41.8, 46.6) have a median of 8.5 (and the post-1444 five have 1.38)."
+    },
+    {
+      "id": "A24",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A2] Capped start→merge for 1333 (46.2 h) and 1297 (47.1 h) is about 1 h longer than the 24.10 00:00Z window start to their 21:10Z/22:05Z merges (45.2 h / 46.1 h), which suggests a Z start mixed with a local end."
+    },
+    {
+      "id": "A25",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A3] Suite totals do not reconcile with the rows: per-point reds sum to 38 (claimed 40), and runs sum to 82 plus 2 main runs = 84 (claimed 85)."
+    },
+    {
+      "id": "A26",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A4] The 1417 row does not sum: 1.10 + 1.38 + 3.08 = 5.56 h (6.96 h with the 1.4 h sync) against a start→merge of 5.92 h. Sync is also added to the phases for 1446/1433 but contained in them for 1333/1297."
+    },
+    {
+      "id": "A27",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A5] Item (c) has a cloud fix requested 20:53 and pushed 20:56/20:59, but item (a) has the 1418 review at 20:56 and the fix sent at 20:57. If (c) is 1417, its handover's cited 19:19–20:44 runs predate those fix commits."
+    },
+    {
+      "id": "A28",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A6] Item (e) attributes the reds to \"two authors' suites on one GPU\", but it also records a duplicate 1405 start at 05:08:27Z (a self-overlap) and a run A that was exit 2 charged to 1244."
+    },
+    {
+      "id": "A29",
+      "file": "runbook-throughput.md",
+      "defect": "[A7] \"both overlapped suite runs of 23.10 went red, and load moves a suite by about a fifth\" is contradicted by inventory (e): run A was partial, the B reds repeated solo, and no slowdown figure exists in the material."
+    },
+    {
+      "id": "A30",
+      "file": "runbook-throughput.md",
+      "defect": "[A8] The baseline subtracts a 13.6 h host-down stretch, while the inventory measures the same stretch as 13.4 h (802 min)."
+    },
+    {
+      "id": "A31",
+      "file": "runbook-throughput.md",
+      "defect": "[A9] The baseline is called \"pre-1443\", but its window ends at the 1297 merge (25.10 22:05Z), which is part of 1443's drain (1443 closed 22:27Z)."
+    },
+    {
+      "id": "A32",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A10] Item (d) says DAEMON_POOL_CAP counts only running/checkpointing/stalled attempts, but `activeAttemptCount` counts every state outside the freeing whitelist, including unknown or corrupt states (daemon-cap.mjs)."
+    },
+    {
+      "id": "A33",
+      "file": "runbook-throughput.md",
+      "defect": "[A11] \"Starting it first needs that cap set to the bound\" ignores that a test asserts DAEMON_POOL_CAP equals POOL_CAP, and that POOL_CAP also sets the depth of commission-guard's frontCandidates."
+    },
+    {
+      "id": "A34",
+      "file": "runbook-throughput.md",
+      "defect": "[A12] The switch-over says \"commission the next ready, file-disjoint queue point\", but commissionDecision refuses any point beyond the first 3 workable candidates as `behind-front` without an override, because frontCandidates skips only gated and busy points, not colliding ones."
+    },
+    {
+      "id": "A35",
+      "file": "pool-cap-independent.mjs.txt",
+      "defect": "[A13] The openPointSpecs comment says a block runs \"to the next checkbox line\", but the regex ends a block only at a column-0 numbered `- [ ]`/`- [x] N.` line, so `[X]` or unnumbered checkboxes extend a point's file set and inflate collisions."
+    },
+    {
+      "id": "A36",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A14] \"Owner lock held 70.81 h\" covers the 13.4 h host-down stretch, so lock evidence is not work evidence; the report's 70.92 h also does not match the 70.5 h window."
+    },
+    {
+      "id": "A37",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A15] The 1347 slot paragraph says it \"held one of the three slots\", yet 1347, 1414, 1432, 1333 and 1297 were all unmerged together (the runbook's first free slot came only at the 1333 merge), so the pool stood at about 5 against a cap of 3."
+    },
+    {
+      "id": "A38",
+      "file": "docs/1452-throughput-inventory.md",
+      "defect": "[A16] \"5.69 h per game point\" divides all post-1444 wall time by 4 game points, while those points' own start→merge times are 6.37, 1.32, 5.92 and 4.65 h, so it is not a per-game-point cost."
+    }
+  ]
+}
