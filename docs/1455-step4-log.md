@@ -52,3 +52,21 @@ timing-sensitive pairing stays unqualified (block 1 then reduces to the memory/d
 role of its villager-dress member; the probe verdict is recorded as "unqualified"). The
 remaining 7 references run on to fix the base rate; nothing is filed — the signature is
 already charged.
+
+## Block 1 quiet references — villager-dress WebGPU
+
+| Run | Result | Duration | Frames | Peak memory |
+|---|---|---|---|---|
+| ref-vd-gpu-1 | GREEN | 13m 12s | 28 | 66.0 % |
+| ref-vd-gpu-2 | GREEN | 13m 23s | 28 | 62.5 % |
+| ref-vd-gpu-3 | GREEN | 13m 04s | 28 | 69.5 % |
+| ref-vd-gpu-4 | GREEN | 12m 54s | 28 | 66.6 % |
+| ref-vd-gpu-5 | GREEN | 13m 46s | 28 | 69.0 % |
+
+Median 13m 12s; solo frame count 28; peak 62.5–69.5 %. ref-vd-gpu-4: `pair.sh` was edited
+on disk while that watcher was running (the pdeathsig/fold change, 4817cde03), and bash read
+the changed file mid-loop: the sampler covered the whole run (156 samples, no gap), the
+post-loop step died with a syntax error, so no `status` was written and its frames were not
+archived before ref-vd-gpu-5 reused wt-a. Its duration, verdict, frame count and memory stand;
+its frames are not used for picture judgement (four archived quiet captures remain). Rule
+kept for the rest of the test: `pair.sh` is not edited while a watcher runs.
