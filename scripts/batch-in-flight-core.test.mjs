@@ -2274,13 +2274,13 @@ describe('independentOpenPoints — a candidate must be provably independent', (
   })
 })
 
-describe('slotReasonDecision — the cap is a target, and the demand is narrow', () => {
+describe('slotReasonDecision — the cap is a ceiling; idle slots are reported, never demanded', () => {
   const independent = [{ point: 500, files: ['src/world/world.ts'] }]
   const running = ['scripts/batch-singleton.mjs']
 
-  it('THE MEASURED STATE: one agent, free slots, an independent point → a reason is DEMANDED', () => {
+  it('one agent, free slots, an independent point → reported as idle-slots, NO reason demanded (switched off)', () => {
     const d = slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running })
-    expect(d).toMatchObject({ needsReason: true, agents: 1, openBranches: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
+    expect(d).toMatchObject({ needsReason: false, agents: 1, openBranches: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
     expect(d.candidates.map((c) => c.point)).toEqual([500])
   })
 
@@ -2293,10 +2293,11 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
         reason: 'the queue\'s next points all rewrite the same guard the running agent is rebuilding',
       }),
     ).toMatchObject({ needsReason: false, why: 'reason-given' })
-    // Whitespace is not a reason.
-    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, reason: '   ' }).needsReason).toBe(
-      true,
-    )
+    // Whitespace is not a reason, and still demands none.
+    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, reason: '   ' })).toMatchObject({
+      needsReason: false,
+      why: 'idle-slots',
+    })
   })
 
   it('a FULL pool passes with no reason at all', () => {
@@ -2359,7 +2360,7 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
     ).toMatchObject({ needsReason: false, why: 'queue-overlaps' })
   })
 
-  it('and ONE workable point beside the gated ones still demands a reason', () => {
+  it('and ONE workable point beside the gated ones is reported, not demanded', () => {
     expect(
       slotReasonDecision({
         agents: 1,
@@ -2369,7 +2370,7 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
         ],
         runningFiles: running,
       }),
-    ).toMatchObject({ needsReason: true, why: 'idle-slots', candidates: [{ point: 501 }] })
+    ).toMatchObject({ needsReason: false, why: 'idle-slots', candidates: [{ point: 501 }] })
   })
 
   it('a PAUSED batch and a recorded CLOSING FREEZE both pass', () => {
@@ -4245,10 +4246,10 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     ).toMatchObject({ needsReason: false, why: 'at-cap', slotsFree: 0 })
   })
 
-  it('still demands a reason where branches and agents both leave room', () => {
+  it('reports idle slots where branches and agents both leave room, without a demand', () => {
     expect(
       slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running }),
-    ).toMatchObject({ needsReason: true, why: 'idle-slots' })
+    ).toMatchObject({ needsReason: false, why: 'idle-slots' })
   })
 
   // REWRITTEN after Sol's review of 91d88f9a: the old case pinned the bare
@@ -4267,9 +4268,9 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running })).toMatchObject(
       { needsReason: false, why: 'agents-at-cap', slotsFree: POOL_CAP, agents: 3, openBranches: 0 },
     )
-    // Neither full: the demand stands, and both counts are reported SEPARATELY.
+    // Neither full: idle slots, both counts reported SEPARATELY, no demand.
     expect(slotReasonDecision({ agents: 2, openBranches: 1, openPoints: independent, runningFiles: running })).toMatchObject(
-      { needsReason: true, why: 'idle-slots', slotsFree: POOL_CAP - 1, agents: 2, openBranches: 1 },
+      { needsReason: false, why: 'idle-slots', slotsFree: POOL_CAP - 1, agents: 2, openBranches: 1 },
     )
   })
 

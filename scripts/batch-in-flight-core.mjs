@@ -1209,10 +1209,14 @@ export function successorAgentOrientation({ declaration = null, sid = '', agentC
 // So the mechanism that already judges the wait also asks the lower bound — and it
 // must not become a nag, which is why every state in which the empty slots are
 // genuinely unusable answers "no reason needed" on its own.
+//
+// SWITCHED OFF (point 1452, 26.10.2026): the runbook makes POOL_CAP a ceiling, never
+// a target, and the demand fired on every boundary with a free slot, answered only by
+// boilerplate. `slotReasonDecision` still reports the free slots and candidates but
+// never demands a reason; the cap itself and `commission-guard` stay.
 
 /** The pool cap: at most three open feat/* branches (point 712) and three
- *  concurrent agents — and since point 427 also a TARGET while independent work
- *  is queued. */
+ *  concurrent agents. A ceiling only; the point-427 target is switched off. */
 export const POOL_CAP = 3
 
 /**
@@ -1392,7 +1396,8 @@ export function slotReasonDecision({
     return no(gatedOnly ? 'queue-user-gated' : 'queue-overlaps')
   }
   if (String(reason ?? '').trim()) return no('reason-given')
-  return { ...no('idle-slots'), needsReason: true }
+  // Reported, no longer demanded (point 1452: the cap is a ceiling, not a target).
+  return no('idle-slots')
 }
 
 /**

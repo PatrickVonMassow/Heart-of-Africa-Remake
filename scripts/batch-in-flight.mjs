@@ -1923,9 +1923,9 @@ if (isMain) {
           'Nothing recorded — a declaration is only worth as much as what proves it.',
       )
     }
-    // THE CAP IS ALSO A TARGET (point 427). Refused HERE as well as at the turn end,
-    // so the session learns at the declaration rather than at a blocked stop — the
-    // same discipline the evidence check above follows.
+    // THE CAP AS A TARGET (point 427) is switched off in `slotReasonDecision`
+    // (point 1452), so this refusal no longer fires; kept for the decision's
+    // remaining reasons rather than rebuilt.
     const slots = gatherSlots(declaration)
     if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
     // THE BOARD'S PROMISE MUST NOT AGE UNDER THIS WAIT (point 661): a wait is
