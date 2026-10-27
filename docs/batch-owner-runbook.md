@@ -8,7 +8,7 @@ not need it and must not act on it.
 ## Dispatch and landing
 
 - At most three non-overlapping, worktree-isolated authoring lanes may be open
-  (`commission-guard` enforces the cap and the explanation owed for a free slot);
+  (`commission-guard` enforces the cap; a free slot owes no explanation);
   how many are filled follows "Throughput with cloud authoring". The owner retains picture judgment, serial
   landing/deploy, and board publication.
 - Generate an author's spec with `node scripts/point-brief.mjs <N>`; named
@@ -150,8 +150,10 @@ with a measurement that answers the reason):
 - U10, pulling points forward past the front: a finished pulled-forward branch
   would block the front point under the one-waiting-branch bound; no measured idle
   slot with a wholly colliding front.
-- U11, second backend only on `isBackendSensitivePath`: its false-negative rate is
-  unmeasured; both backends stay.
+- U11, covering browser suites on the second backend only on
+  `isBackendSensitivePath`: its false-negative rate is unmeasured, so suites keep
+  their current backend lanes. The picture-check rule above (both backends when
+  `isBackendSensitivePath` applies, one otherwise; CLAUDE.md §6) is unchanged.
 
 **Open.** U2, a per-suite STALLED cut-off in `run-wait` from its `--plan` duration,
 needs its false-stall rate measured per suite, section and backend under the
