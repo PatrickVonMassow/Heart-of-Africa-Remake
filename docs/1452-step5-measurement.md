@@ -82,3 +82,16 @@ once, each on its own dev-server port (the runner picks a free port per run).
 | M3-wq2 | quiet, water-stand-table, memory-sampled | afe818d6e (main; same build) | 27.10 04:02 | 5m 27s | GREEN, 9 pass | 1.64 (decaying wq1) | `local/verify-logs/2026-10-27T04-02-33-796-polish-villagers.log`; samples `local/1452-mem-m3-wq2.log`, peak 40.3 % |
 | M3-o1d | overlapped with M3-o1w, villager-dress, memory-sampled | afe818d6e (main; same build) | 27.10 04:08 | 13m 44s | GREEN, 30 frames | 1.19 | `local/verify-logs/2026-10-27T04-08-26-304-polish-villagers.log`; samples `local/1452-mem-m3-o1.log` (shared by the pair), peak 73.2 % (11.4 GiB, at 04:12 while both ran) |
 | M3-o1w | overlapped with M3-o1d, water-stand-table | afe818d6e (main; same build) | 27.10 04:08 | 5m 36s | GREEN, 9 pass | 1.19 | `local/verify-logs/2026-10-27T04-08-28-344-polish-villagers.log`; samples as M3-o1d |
+| M3-o2d | overlapped with M3-o2w, villager-dress, memory-sampled | afe818d6e (main; same build) | 27.10 04:22 | 13m 39s | GREEN, 30 frames | 1.04 | `local/verify-logs/2026-10-27T04-22-51-339-polish-villagers.log`; samples `local/1452-mem-m3-o2.log` (shared by the pair), peak 75.0 % (11.6 GiB, at 04:26 while both ran) |
+| M3-o2w | overlapped with M3-o2d, water-stand-table | afe818d6e (main; same build) | 27.10 04:22 | 5m 41s | GREEN, 9 pass | 1.04 | `local/verify-logs/2026-10-27T04-22-53-350-polish-villagers.log`; samples as M3-o2d |
+
+**M3 verdict: REJECTED by the protocol rule — the bound stays at one browser suite at a time.**
+All four overlapped runs are above their quiet median: villager-dress 13m 44s and 13m 39s
+against 13m 27s (+2.1 %, +1.5 %), water-stand-table 5m 36s and 5m 41s against 5m 29.5s
+(+1.9 %, +3.5 %). Zero reds in 4 overlapped runs; sampled peaks 73.2 % and 75.0 % against
+38–66 % quiet, inside the 85 % budget but with ~10 points of headroom. The duration condition
+fails, so the points/hour condition is not reached. Limits, stated for step 6: the slowdown is
+small and its direction is consistent (4 of 4), yet it lies inside the reference's own spread
+(q2 15m 05s is +12 %), so 2 pairs cannot call it measurable or not; the wall-clock gain of a
+pair is large (13m 44s for 19m 14s of serial work). The rule, applied as for M2, decides; only a
+user decision could trade a 2–4 % slower suite for that gain.
