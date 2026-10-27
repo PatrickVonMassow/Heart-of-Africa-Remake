@@ -15,9 +15,11 @@ the trace probe needs a one-line hook in `moveChild`, see its header).
   above 0, native 60 fps up to 0.54 % (maasai/4), 0.45 % (swahili/5),
   0.42 % (san/6), 0.40 % (hausa/2) against the 0.25 % `shareGate`.
 
-## 2. The adults are not the cause
+## 2. No direct adult contact in the traced windows
 
-In every traced episode the nearest adult stands 3–7 m away. The obstacle is
+In every traced episode the nearest adult stands 3–7 m away. Adults were
+planted in every probe run and no adult-free control was paired, so an
+earlier adult-induced reroute is NOT excluded; only direct contact is. The obstacle is
 STATIC (`world.blocked`, not `occupied`):
 
 - **A. Released commitment at a thin barrier** (swahili/5, chaser, t≈31.1 s):
@@ -37,23 +39,31 @@ Sampling `wayOpen` from half a footprint (fixes A at swahili/5) changes the
 paths chaotically: 24 of 66 pairs above 0 afterwards instead of 19, the worst
 unchanged (maasai/4 is episode B). Reverted; not committed.
 
-## 4. Re-trace 27.10.2026 (second author): playmates, not static edges
+## 4. Re-trace 27.10.2026 (second author): playmate contact dominates
 
 Classifier probe (`classifyProbe`, window = metric `worst.clock` .. +1 s;
-the first trace read the second BEFORE the window start). Over the 13 worst
+the first trace read the second BEFORE the window start). The probe steps
+the simulation before comparing the pre-frame clock, so its samples sit
+one frame (~17 ms) after their loop timestamps; boundary counts may move
+by one frame. Over the 13 worst
 tag-round episodes of the baseline sweep:
 
-- **11 of 13: a playmate pushes the child back.** Separation displacement
-  inside the window 0.35–1.44 m against ~1.3 m walked. Shape: two (or three)
-  evaders at the floor pace head-on (headings ~150–180° apart), or jammed
+- **11 of 13: a playmate displaces the child.** Separation displacement
+  inside the window 0.35–1.44 m (unsigned) against ~1.3 m walked. Read as:
+  two (or three) evaders at the floor pace meeting head-on, or jammed
   against a wall with the flee pointing into it; playmates are no walls to
   each other (`PlaceLife` wiring, rejected 12.08.2026), so the separation
-  is the only thing between them and each walks into the other.
+  is the only thing between them. The probe records contact and the
+  child's own heading, NOT the playmates' headings, so "head-on" is an
+  inference from contact plus the reversal, not a measured angle.
 - 7 of 13 show a desired-heading jump of 73–169° in the window. Traced at
   maasai/4 child 1 (t 5.95): the wall deflection turns the course past the
   flee/inward opposition; `evadeHeading` gets that deflected course as
-  `current` and flips to the other rim direction (-280° -> -69°); the
-  child turns on the spot (`turnBeforeRun`) and runs head-on into child 0.
+  `current` and flips to the other rim direction (desired -280° -> -69°);
+  the child turns on the spot (`turnBeforeRun`) and runs into child 0.
+  The trace records the desired heading, not the flee/inward inputs to
+  `evadeHeading`, so the flip mechanism is inferred; point 1457 confirms it
+  with those inputs traced before fixing it.
 - Only swahili/5 (chaser, episode A) has no playmate contact.
 
 ## 5. Fix attempts, all judged on the 66-pair sweep (native / sum of worst shares)
