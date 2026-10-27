@@ -418,17 +418,21 @@ if (section('panorama-wildlife')) {
       }, aimed.pose)
     }
     // Point 1419: a goat beside a post steps round it rather than through it.
-    // Only post-sized round colliders count (r <= 0.3). When no goat grazes
+    // Only a fence post standing as its own circle counts (a gate or end post:
+    // a round collider centred on a post of `__placeLayout.fences`; its radius
+    // is the fence's panel radius, 0.42-0.6 m). When no goat grazes
     // within 0.6 m of one, the DEV steer sets the nearest goat down on one side
     // of the post and walks it to the other, so the collision has to carry it
     // round; its clearance is sampled the whole way, and the shutter frames the
     // midpoint between goat and post with both projected in view.
-    const POST_R = 0.3
     const NEAR = 0.6
-    const pick = await page.evaluate((POST_R) => {
+    const pick = await page.evaluate(() => {
       const herd = window.__placeGoatGait ?? {}
       const cs = window.__placeLayout?.colliders ?? []
-      const posts = cs.filter((c) => (!c.kind || c.kind === 'circle') && c.r <= POST_R)
+      const fencePosts = (window.__placeLayout?.fences ?? []).flatMap((f) => f.posts)
+      const posts = cs.filter(
+        (c) => (!c.kind || c.kind === 'circle') && fencePosts.some((p) => Math.hypot(p[0] - c.x, p[1] - c.z) < 1e-6),
+      )
       let best = null
       for (const [i, g] of Object.entries(herd)) {
         for (const c of posts) {
@@ -437,7 +441,7 @@ if (section('panorama-wildlife')) {
         }
       }
       return best
-    }, POST_R)
+    })
     let staged = null
     if (pick && pick.gap > NEAR) {
       staged = await page.evaluate(({ i, post }) => {
@@ -500,13 +504,13 @@ if (section('panorama-wildlife')) {
       }
     }
     check(
-      'a goat stands within 0.6 m of a post-sized collider at the shutter (point 1419)',
+      'a goat stands within 0.6 m of a fence post at the shutter (point 1419)',
       !!atShutter && atShutter.gap <= NEAR,
       atShutter
         ? `gap ${atShutter.gap.toFixed(3)} m to a post of radius ${pick.post.r.toFixed(2)} m${staged ? ' (steered past it)' : ''}`
         : pick
           ? 'MEASURED NOTHING — the goat could not be read or steered'
-          : 'MEASURED NOTHING — no goat or no post-sized round collider in the place',
+          : 'MEASURED NOTHING — no goat or no free-standing fence post in the place',
     )
     check(
       'that goat never comes inside the post (point 1419)',
