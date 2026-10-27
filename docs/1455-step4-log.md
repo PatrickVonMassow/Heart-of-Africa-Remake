@@ -34,6 +34,8 @@ Plan: `docs/1455-step2-merged-plan.md` (approved by GPT-6.1 Sol, §8).
 | ref-ae-gl-5 | RED | 7m 41s | 9/23 | order at the stand; water rim band (point 568) |
 | ref-ae-gl-6 | RED | 6m 29s | 9/23 | order at the stand; river-bank foam after the shutter (point 1456); water rim band (point 568) |
 | ref-ae-gl-7 | RED | 6m 09s | 6/23 | order at the stand; walks on between frames 1 and 2 (point 1404); water rim band (point 568) |
+| ref-ae-gl-8 | RED | 6m 05s | 9/23 | order at the stand; water rim band (point 568); exit 2 only from STRIKE notices of intermittent charges (1456, 1202) |
+| ref-ae-gl-9 | RED | 6m 09s | 9/23 | order at the stand; water rim band (point 568); exit 2 only from STRIKE notices of intermittent charges (1456, 1202) |
 
 Verdict after 6 of 10 (27.10.2026): the order-at-stand signature fired in 6 quiet runs, above
 the "more than 5 of 10" bound of plan §4.3 whatever the last four show — adult-errands
