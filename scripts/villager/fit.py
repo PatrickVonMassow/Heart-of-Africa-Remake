@@ -279,12 +279,15 @@ def tailor(src_dir, mh, body, clips, cfg):
     the head held up), they raised the robe's collar over the chin on every
     body but the adult man's (up to 0.035 figure units on the women and
     children, measured 15.10.2026). The exported clips keep their whole
-    style."""
+    style. The fit also takes the source runs' stance (no gaitStance): fitted
+    to the restanced jog, the girl's robe rose ~3 cm and the robe crossed the
+    cape in the build pose (measured 28.10.2026)."""
     import clips as CL
     import garments as G
     style = cfg['VILLAGER_ASSET']['clipStyle']
     trunk = {c: {k: v for k, v in s.items() if k in ('chestTilt', 'chestTwist')} for c, s in style.items()}
-    plain = CL.build_clips(src_dir, body, cfg, style=trunk) if style else clips
+    source = {**cfg, 'VILLAGER_ASSET': {k: v for k, v in cfg['VILLAGER_ASSET'].items() if k != 'gaitStance'}}
+    plain = CL.build_clips(src_dir, body, source, style=trunk) if style else clips
     return settle(body, fit(body, plain, G.build_garments(mh, body, plain, cfg), cfg), cfg)
 
 
