@@ -77,6 +77,41 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1462. Release v0.3.1: tag the current main state as v0.3.1 and poc and publish both
+  Source: User order 28.10.2026 in chat session cf715472: "Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ und außerdem als v0.3.1 und veröffentliche diesen getaggten Stand unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/" — to come before the infrastructure-simplification point, so a known-good tagged state exists before the teardown. Wording approved by the user: "ja, beide so einreichen".
+  Final state: the current main state is released as version v0.3.1 by the named "version release" process, and `poc` points at the same commit.
+   1. Full closing run (CLAUDE.md §9, `scripts/closing-guard-core.mjs` CLOSING_STEPS, LARGE regression on both backends) green on the commit to release: main HEAD when this point starts (code freeze from then on). A red closing run is fixed first and the closing run repeated on the fixed commit; nothing is tagged on red.
+   2. The user's go for this release is given (user order 28.10.2026, quoted in Source); no further approval wait.
+   3. Tag `v0.3.1` at that commit; move `poc` to the same commit; push both tags.
+   4. Run the Pages deploy (a tag push does not rebuild) and verify that https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/ and https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ both serve that commit's build.
+   `v0.3.1` is frozen once cut.
+  Queue position: at the very top of the open work order, directly before the infrastructure-simplification point deposited with it (user order 28.10.2026).
+  Bundle: unbundled (release).
+- [ ] 1463. Drastic zero-based simplification of the whole infrastructure, analysed six-eyes with final cross-vendor check
+  Source: User order 28.10.2026 in chat session cf715472: "Wie wäre es mit einer gründlichen Analyse, die feststellt, ob wir nicht drastische Vereinfachungen der gesamten Infrastruktur durchführen können, durch die auch ganz viele der noch offenen Infra-Punkte obsolet würden?" and "Ja, drastisch bedeutet, auch ganze Säulen ersatzlos zu streichen und zahlreiche noch offene Infra-Punkte zu löschen. Reihe einen solchen Punkt vorne in der Queue ein - wie du sagst, mit sechs Augen und Nachkontrolle." Limits on new points were rejected as symptom treatment; the cause is the infrastructure's own complexity. Wording approved by the user: "ja, beide so einreichen".
+  Final state: the repository's infrastructure (scripts/ outside the game's verify suites, hooks in .claude/settings.json, guards, lanes, locks, ledgers, board, daemon, launcher, their docs) is drastically simplified from a zero base, and every open infrastructure point made obsolete by it is deleted from the work order.
+
+  Measured 28.10.2026: infrastructure ~326k lines against ~167k in src/; 93 guard files, 100 hook entries; of 82 points landed 14.-28.10. only 33 touched src/; the open queue grew 451 -> 467, with 133 "Session- & Repo-Hygiene", 41 "Testinfrastruktur", 33 "Modell & Wächter", 19 "Chat & Tafel" points. The 01.09.2026 freeze did not stop the growth: mechanisms that block each other keep producing "real blockades", each a regular fix.
+
+  SCOPE (user decision 28.10.2026): "drastic" includes deleting whole pillars without replacement (e.g. lane routing, batch lock, board, daemon) and deleting numerous open infrastructure points.
+
+  ANALYSIS QUESTIONS:
+   1. Zero base: what minimum does the game need to be built, verified and landed safely (build, lint, unit tests, browser suites on both backends, picture check, cross-vendor review, landing)? Everything beyond it must justify its existence.
+   2. Inventory of every mechanism: the incident it was built for and whether that risk still exists; its cost (lines, refusals in the session transcripts, points it caused); which other mechanisms it collides with.
+   3. Cause count over closed and open infrastructure points: how many arose from interaction between mechanisms rather than from a game problem.
+   4. Result: a delete/replace list (standard tools such as GitHub CI and branch protection instead of own guards where that fits), for every open infrastructure point the verdict "obsolete: yes/no" with reason, and a teardown order in which the game stays buildable, testable and landable after every step.
+
+  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
+   1. Analysis A (main chain, Opus 5.5) and analysis B (cross-vendor lane) run BLIND and in parallel from identical raw material (scripts/, .claude/settings.json, hooks, tests, docs, TASKS.md, docs/tasks-archive.md, session transcripts). B receives only the analysis questions above, not A's work.
+   2. A third, distinct model (Fable 5.1 if node scripts/lane-switch.mjs --lane scarce --status permits, else Opus 4.8) checks both and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
+   3. The merged plan goes to the model of the other vendor than the merger for a final check: does every step keep the game buildable and every remaining safety duty covered? Objections are fixed and re-checked.
+   4. The approved plan, with its list of points to delete, is presented to the user; deletion of mechanisms and points starts only after the user approves it. Other points continue meanwhile.
+   5. Implementation follows the approved plan in small landable steps with the usual cross-vendor code review. Deleted points move to docs/tasks-archive.md with the reason "obsolete by infrastructure simplification", not to docs/backlog.md.
+
+  Infrastructure-freeze fit: a deletion/simplification (CLAUDE.md §2); this point adds no mechanism.
+  Queue position: at the very top of the open work order, directly after the v0.3.1 release point (user order 28.10.2026).
+  Bundle: Session- & Repo-Hygiene.
+  Criticality: high — touches every batch mechanism.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
