@@ -65,26 +65,6 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 1456,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /he was still squatting ashore, unloading, before and after the shutter/i,
-    why:
-      'FILED AS 1456 ON 27.10.2026: {before:true,after:false} on WebGPU 9bb6e1736 and 1e681ce07 '
-      + '(26.10.) and WebGL 2 30a5b55f5 (27.10., under load) - a shutter-timing verdict on unrelated '
-      + 'heads. 1456 owns reading the pose from the shutter frame; the charge dies with that point.',
-  },
-  {
-    point: 1456,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /the river-bank frame: the foam it was aimed at is still in the picture after the shutter/i,
-    why:
-      'FILED AS 1456 ON 27.10.2026: drifted 13.22 m at lead 6 m on WebGPU 9bb6e1736 (26.10.) and '
-      + 'WebGL 2 30a5b55f5 (27.10.); WebGL 2 main f57fa3250 clean. Same shutter-timing class as the '
-      + 'canoe red; 1456 owns it.',
-  },
-  {
     point: 1292,
     backend: 'webgpu',
     featureLevel: 'compatibility',
