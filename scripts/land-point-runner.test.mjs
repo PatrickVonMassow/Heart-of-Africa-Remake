@@ -1054,6 +1054,12 @@ describe('the closing card written by the landing', () => {
     expect(red).toBeGreaterThan(cleanupOk)
     expect(src.slice(red, red + 600)).toContain('closingCardCommand(number)')
   })
+
+  it('re-attests after a card written by hand, even when the landing attested the board', () => {
+    const src = readFileSync(join(process.cwd(), 'scripts', 'land-point.mjs'), 'utf8')
+    const red = src.indexOf("step('closing', VERDICT.failed, closing.detail)")
+    expect(src.slice(red, red + 600)).toContain('repair: closing.ok ? SYNCED_COMMAND : `${closingCardCommand(number)}, then ${SYNCED_COMMAND}`')
+  })
 })
 
 // POINT 1308 (U8): the landing records the board review at the tick commit, so

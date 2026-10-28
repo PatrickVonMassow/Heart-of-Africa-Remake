@@ -1417,7 +1417,9 @@ async function main(argv) {
       if (!closing.ok) step('closing', VERDICT.failed, closing.detail)
       error = new LandingError('the point landed and was cleaned up, but the board bookkeeping is behind', {
         step: closing.ok ? 'synced' : 'closing',
-        repair: [closing.ok ? '' : closingCardCommand(number), attested.ok ? '' : SYNCED_COMMAND].filter(Boolean).join(', then '),
+        // The card written by hand publishes the board again (board.mjs does), so
+        // the review recorded above covers the old board: attest after it too.
+        repair: closing.ok ? SYNCED_COMMAND : `${closingCardCommand(number)}, then ${SYNCED_COMMAND}`,
       })
       throw error
     }
