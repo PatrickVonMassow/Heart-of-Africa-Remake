@@ -224,6 +224,10 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
  * and judged again, so the compare covers exactly the copy that is removed; a
  * copy replaced in between is linked back unless a newer one took its place,
  * and a copy that cannot be removed is linked back and reported.
+ * Residuals, accepted without a lock (CLAUDE.md §2 freeze, docs/backlog.md): a
+ * declaration written between the first read and the rename is out of sight
+ * until its link-back, and a persistently unremovable aside copy stays behind,
+ * named in the returned error; nothing reads `.clear-*` files.
  * @returns {{cleared: boolean, prior: object|null, error?: string}}
  */
 export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAside = () => {}, remove = (p) => rmSync(p) } = {}) {
