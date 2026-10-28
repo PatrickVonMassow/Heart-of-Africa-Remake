@@ -586,6 +586,24 @@ export function clipGaitPose(
     const c = contactPoints(asset, world, frame.legScale)[s]
     for (const k of CONTACTS) c[k].y += _lift[i]
     _t.y += _lift[i]
+    // THE RUNS STAND ON THEIR STANCE FOOT: the clips are authored on the
+    // basis body; on another build the stance foot of a run rises off the
+    // ground through its stance (a girl's by ~3 cm, her thigh and shin in
+    // other proportion than her hips) and a child floated ~60 % of the cycle
+    // (measured 28.10.2026). Through the blended stance the ankle is lowered
+    // by the foot's lowest contact, by the runs' share, eased in after the
+    // landing and out before the lift (G.runGround).
+    const runs = 1 - gait.walk
+    const [land, liftAt] = _blendStance[i]
+    if (runs > 0 && liftAt - land > 1e-6) {
+      const u = ((((g.phase - land) % 1) + 1) % 1) / (liftAt - land)
+      if (u < 1) {
+        const e = smoothstep(Math.min(1, u / Math.max(1e-6, G.runGround.easeIn), (1 - u) / Math.max(1e-6, G.runGround.easeOut)))
+        const dy = runs * e * Math.max(0, Math.min(c.heel.y, c.ball.y, c.tip.y))
+        _t.y -= dy
+        for (const k of CONTACTS) c[k].y -= dy
+      }
+    }
     // lying flat, the ankle stands at its rest height over the drawn sole
     const fw = _flat[i]
     const flatY = flatAnkle(asset, frame, s)

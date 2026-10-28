@@ -195,15 +195,11 @@ export function sprintWeight(speed: number, legScale: number): number {
 
 /** The three gaits' weights at a ground speed (natural-villager-motion step 5):
  *  walk → jog → sprint by `jogThreshold`/`sprintThreshold` per unit of leg,
- *  each crossing over its band; they always sum to 1. The runs keep
- *  `runWalkShare` of walk in them (the ground contact the jog clip lacks),
- *  faded out below `runWalkUntil`. */
+ *  each crossing over its band; they always sum to 1. */
 export function gaitWeights(speed: number, legScale: number): { walk: number; jog: number; sprint: number } {
   const a = gaitShare(speed, legScale, G.jogThreshold, G.jogBand)
   const b = sprintWeight(speed, legScale)
-  const v = Math.abs(speed) / Math.max(1e-6, legScale)
-  const keep = G.runWalkShare * (1 - smooth(G.runWalkUntil - G.runWalkFade, G.runWalkUntil, v))
-  return { walk: 1 - a + a * keep, jog: a * (1 - keep) * (1 - b), sprint: a * (1 - keep) * b }
+  return { walk: 1 - a, jog: a * (1 - b), sprint: a * b }
 }
 
 /** How a gait's stride grows with pace: speed^exponent over its natural
