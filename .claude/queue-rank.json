@@ -1711,12 +1711,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1448": {
-      "at": "2026-10-28T19:32:23.367Z",
-      "why": "closing ladder red on main e581bec79; the v0.3.1 spec fixes a red before tagging",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1449": {
       "at": "2026-10-26T04:13:03.990Z",
       "why": "a suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the guard honest meanwhile",
@@ -1766,8 +1760,34 @@
       "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-10-28T17:15:50.023Z",
+    "at": "2026-10-28T21:01:16.624Z",
     "points": [
       184,
       200,
@@ -2227,7 +2247,6 @@
       1435,
       1436,
       1447,
-      1448,
       1449,
       1453,
       1454,
@@ -2239,31 +2258,5 @@
       1462,
       1463
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
