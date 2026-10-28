@@ -35071,3 +35071,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Final state: each cause is measured (game or check) and fixed; both sections run green on both backends.
   Verifiable: both sections green on WebGPU and WebGL 2; a right-layer test per corrected cause.
   Bundle: Tierverhalten.
+
+- [x] 1459. Launcher successor decision "registered-writer-live" ignores bookkeeping files under .claude/
+  Queue position: directly before point 1347 (user 27.10.2026), i.e. after 1308, 642, 568, 1456 and 1202.
+  Final state: the launcher's successor decision "registered-writer-live" measures feature-writer activity in a feature worktree without counting bookkeeping files under `.claude/` (guard state, queue rank, fence ledgers, carrier bell and the like). Only real work output (source, docs, tests, commits) or a live writer process keeps the successor from spawning.
+  Evidence (27.10.2026, .claude/batch-launcher.log and .claude/autostart.log): owner 84f5f163 handed over at the context watermark at 22:05 Berlin. The launcher refused the successor at 22:05, 22:05 and 22:20 with "registered-writer-live — recent registered feature-writer activity measured for feat/1081-boxed-child-steering (/workspace/hoa/.claude/worktrees/point-1081)". The 1081 author's last commit was fc0d35497 at 21:42. After that only .claude/queue-rank.json (21:54) and guard state files (.claude/ci-status-guard-state.json, .claude/timestamp-guard-state.json, .claude/context-fence-ledgers/*, 22:00) changed, and no 1081 process was alive. The successor started only at 22:35 ("no owner lock — taking over"): 30 min of batch standstill shown on the board.
+  Verifiable: a test of the activity measurement: a worktree whose only fresh files lie under `.claude/` counts as idle; a fresh file under src/ or docs/ still counts as live.
+  Source: user-approved findings-carrier request "Launcher-Sperre registered-writer-live zählt Verwaltungsdateien unter .claude/ als Autorenarbeit" (user 27.10.2026 22:39: "Reihe das direkt vor 1347 ein."; approved "ja"; rev 2e5102147). Reproducible current-game blockade, CLAUDE.md §2 infrastructure-freeze exception.
+  Bundle: Session- & Repo-Hygiene.
