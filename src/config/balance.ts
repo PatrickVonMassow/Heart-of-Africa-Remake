@@ -2814,12 +2814,17 @@ export const VILLAGER_ASSET = {
    *  floats. One smooth retiming plays each stance at 1 − `slow` of its pace
    *  and each flight faster; the hips' rise over their lowest is scaled by
    *  `bounce` (a quicker flight at the old height reads as low gravity), and
-   *  a foot the lower hips put under the ground carries there. Calibratable
-   *  against VILLAGER_GLTF.runFlight. */
+   *  a foot the lower hips put under the ground carries there. `flight`
+   *  (optional, 1 when absent): the share of the lower foot's height kept
+   *  where both feet are off the ground — the trailing heel kicks less high
+   *  and the landing foot reaches down sooner (measured 28.10.2026: the jog's
+   *  lowest foot rose ~10 cm at mid-flight, a child's flight apex 6.1–6.2 cm
+   *  over runFlight.apexMax; 0.7 keeps it at 5.2 cm). Calibratable against
+   *  VILLAGER_GLTF.runFlight. */
   gaitStance: {
-    jog: { slow: 0.75, bounce: 0.2 },
+    jog: { slow: 0.75, bounce: 0.2, flight: 0.7 },
     sprint: { slow: 0.7, bounce: 0.3 },
-  } as Record<string, { slow: number; bounce: number }>,
+  } as Record<string, { slow: number; bounce: number; flight?: number }>,
   /** The widest loop seam the clip pipeline closes (rad, the worst bone's
    *  turn between a loop's last frame and its first once cut where they meet
    *  best): beyond it the loop is refused, never smeared over its cycle

@@ -528,7 +528,8 @@ def restance(c, joints, cp, s):
     the hips' rise over their lowest is scaled by `bounce` (a flight played
     faster with the same height reads as low gravity), and a foot the lower
     hips put under the ground is bent back onto it (its world turn kept), so
-    it carries there. Expects the clip grounded and started at the left landing."""
+    it carries there; both feet are kept low through the flight by `flight`
+    (see below). Expects the clip grounded and started at the left landing."""
     from sheets import sample
     from toolclips import two_bone
     n = len(c['times'])
@@ -593,6 +594,27 @@ def restance(c, joints, cp, s):
             t[[0, 2]] = (wp[SK.INDEX['hips']] + rel[0] * (1 - a) + rel[1] * a)[[0, 2]]
             pole = wp[SK.INDEX['shin.' + side]] - wp[SK.INDEX['thigh.' + side]]
             two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, pole, wr[fi], 'foot.' + side)
+    # a low flight: where both feet are off the ground, both are lowered by
+    # 1 − `flight` of the lower one's height (the trailing heel kicks less
+    # high, the landing foot reaches down sooner), each foot's world turn
+    # kept. The lower foot's height is continuous and ~0 in stance, so the
+    # stance is untouched and no foot is put under the ground.
+    keep = s.get('flight', 1.0)
+    if keep < 1.0:
+        for f in range(n - 1):
+            q, h = Q[f], P[f]
+            fp = foot_points(joints, q, h, cp)
+            lows = [min(fp[side][k][1] for k in ('heel', 'ball', 'tip')) for side in ('L', 'R')]
+            dy = (1.0 - keep) * max(0.0, min(lows))
+            if dy <= 1e-6:
+                continue
+            for side in ('L', 'R'):
+                wr, wp = rig.fk(joints, q, h)
+                fi = SK.INDEX['foot.' + side]
+                t = wp[fi].copy()
+                t[1] -= dy
+                pole = wp[SK.INDEX['shin.' + side]] - wp[SK.INDEX['thigh.' + side]]
+                two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, pole, wr[fi], 'foot.' + side)
     Q[-1], P[-1] = Q[0], P[0]
     for f in range(1, n):
         flip = (Q[f] * Q[f - 1]).sum(1) < 0
