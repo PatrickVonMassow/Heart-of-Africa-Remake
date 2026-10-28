@@ -95,6 +95,208 @@ put it is the mistake this line exists to stop.
   Verifiable: the 1420 flight Vitest in src/render/villagerClipPose.test.ts extended to the top pace and green; the no-slide and continuity tests stay green; a capture sequence of a fresh runner, judged by a person.
   Criticality: low - atmosphere, visible only on a fresh runner's dash.
   Bundle: Dorfleben.
+  Evidence so far (28.10.2026, owner Opus 5.5): the branch's full pipeline build (06a332708, villager.glb 7.2 MB; the penetration red is main's own, 7 of 31 garments, point 1347) passes 27 of 28 clip-pose tests; the no-slide test misses at 7.65 per leg, 60 Hz, leg 0.96 (0.004008 for 0.004). Runtime sweeps (sprintStride, jogStride, runWalkShare 0.3-0.45, runWalkUntil 7.0-8.3, runWalkFade 1.3-1.4, sprintBand, sprintThreshold) and clip sweeps (jog slow 0.72-0.78, bounce 0-0.25) stay at 0.0040-0.0057 between 7.5 and 7.75 per leg. Cause measured: with the walk share faded out before 7.65 (runWalkUntil <= 7.6) the restanced jog sets no foot down there at all and a fresh runner floats 45-61 %, so the walk share fakes the stance and its stretched stride makes the slide. Next step: the jog itself must keep ground contact at long strides (stance reach / hip height under stretch), not a further tuning round.
+  Fast loop (no 2 h build): rebuild only the clips from the bundled config and export them with the cached garments (local/villager-build/{body,garments,mask}.pkl; clips.build_clips + export.export via scripts/blender.mjs run), ~14 s, byte-identical to the full build for unchanged inputs; the full build is owed only for the final glb.
+  CI charge (28.10.2026): run 40626999014 on feat/1454-jog-stance 06a3327 failed in shard-2/unit — the known no-slide red above (7.65 per leg, 0.004008 vs 0.004), reproduced locally; it closes with this point.
+- [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
+  Queue position: directly before point 1347 (user 27.10.2026); the earlier binding to 1294 is fulfilled, 1294 has landed.
+  Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
+  Final state: recurring mechanical work the LLM now performs step by step runs as local scripts/hooks, so measurably fewer LLM round-trips are spent, while NO existing functionality is endangered.
+
+  SAFETY REQUIREMENT (binding for every change):
+   1. No existing functionality is endangered — not only checks, but everything the batch does today.
+   2. No new problems are introduced: deadlocks, hooks blocking each other, Stop-refusal loops, hanging or aborting scripts, half-executed chains.
+   3. Every unexpected error has a fallback: if a new combined command or self-repairing hook fails, the flow falls back to today's behaviour (the LLM runs the single steps, or gets today's refusal). The error is reported loudly, never swallowed. A crashing hook must never paralyse the batch.
+   4. Evidence: the analyses list the failure cases of every candidate; the final check examines exactly 1-3; tests cover the failure paths (aborting intermediate step, timeout, held lock, missing file, ...) and prove the fallback engages.
+
+  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
+   1. Analysis A (Opus 5.5) and Analysis B (GPT-6 Astra) run BLIND and in parallel. A starts from this point text (measurement and candidate list). B STARTS WITHOUT PRIOR KNOWLEDGE: it receives ONLY the neutral brief below, handed to it directly as a separate text, plus access to the raw material (session transcripts under ~/.claude/projects/-workspace-hoa, scripts/, .claude/settings.json, hooks, tests). B never sees the measurement, the candidate list, or point-brief output of this point. B measures and interprets on its own. Each analysis delivers further savings with measured shares and, per candidate, the failure analysis demanded by the safety requirement plus the test that proves it.
+      NEUTRAL BRIEF FOR B (verbatim): "Find activities the LLM sessions of this repository perform repeatedly that a local script or hook could take over, so that fewer LLM round-trips are spent. Measure from the transcripts yourself. For every proposed change show that no existing functionality is endangered, that no new problems arise (deadlocks, hooks blocking each other, refusal loops, hanging or aborting scripts, half-executed chains), and that every unexpected error falls back to today's behaviour with a loud report. Name the test that proves each of these."
+   2. A third, distinct model (neither A nor B; Fable 5.1 if node scripts/fable-switch.mjs --status permits, else Opus 4.8) checks both proposals thoroughly and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
+   3. The merged plan goes to the model of the OTHER vendor than the merger (GPT-6 Astra via scripts/review-astra.mjs) for a final check focused on the safety requirement. Only an approved plan is implemented; objections are fixed and re-checked first. At this stage Astra may see everything.
+   4. Implementation follows the approved plan, with the usual cross-vendor code review afterwards.
+
+  Candidates for A (starting points, not a closed list; NOT shown to B):
+   a) Merge fixed ritual chains into single commands that run silently and report only failures (e.g. focus set -> board now -> attest -> board-publish -> dashboard-guard --synced; batch-boundary --prepare -> --commit -> --clear).
+   b) Timestamp/header: stop the LLM re-measuring the time and stop exact-minute refusals (tolerance, or header set outside the LLM).
+   c) Stop hooks that self-repair mechanical causes instead of refusing (unpushed main where pushing is permitted, dashboard/focus sync, carrier drain), leaving the LLM only cases needing judgment.
+   d) Retrospective / beginner-guide currency: a script pre-collects the raw delta; LLM only words it; or lower trigger frequency.
+   e) Screenshot pre-filter by pixel metric before LLM inspection (low priority, 1.7 %).
+   f) Small: finding.mjs syntax in hook texts (removes --help calls); more compact point-brief output.
+  Infrastructure-freeze fit: a simplification (fewer steps, no new guards); a new script replaces steps, never adds a check.
+
+  Tests: every changed hook/script keeps or extends its node tests; each merged chain has a test proving it performs every step the old chain did, fails loud on the same conditions, and falls back on injected failures. Evidence of saving: re-run the 05.10. measurement on a comparable later corpus and report calls and cache-read share before/after.
+  Bundle: Session- & Repo-Hygiene.
+  USER, verbatim:
+  05.10.2026: "Reihe einen Punkt für solche Vereinfachungen direkt nach 1294 ein. Der soll aber nicht einfach nur die von dir erwähnten Änderungen durchführen, sondern vorher sehr gründlich prüfen, ob zum einen noch mehr eingespart werden kann und zum anderen durch die Umbauten nichts kaputt geht. Das soll mit sechs Augen passieren, also ein anderes Modell soll blind vom ersten die selbe Analyse machen und ein drittes die Vorschläge nochmal gründlich prüfen und zusammenführen."
+  05.10.2026: "Und dieses Mal noch ein Schritt weiter: Die zusammengeführte Lösung durch das dritte Modell noch dann noch einmal dem Modell des anderen Anbieters zur Abschlussprüfung gegeben werden. Ich will ganz sicher gehen, dass wir uns mit so einem Umbau nichts kaputt machen."
+  05.10.2026: "Für die Opus 5.5-Seite ist es okay, mit deiner Liste zu starten, weil du ja auch Opus 5.5 bist, aber Astra sollte ohne Vorwissen starten."
+  05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
+  05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
+  05.10.2026: "ja, aber nach 1294"
+  Progress (28.10.2026, owner Opus 5.5): step 1 done — blind halves filed as docs/four-eyes/1308-blind-a-opus5.* and 1308-blind-b-sol.* (B's ask-lane material was cut to 199877 characters, corpus partly dropped, settings.json missing; the merger re-checked B against the code). Step 2 done — Fable 5.1 union docs/four-eyes/1308-union.json (10 A + 6 B → 12, 8 kept, 4 rejected, counted by blind-merge) and plan docs/1308-merged-plan.md. Step 3 — GPT-6.1 Sol final check: PLAN NEEDS FIXES, 5 objections (U1 ×2, U2, U4, U6; log local/1308-final-check.log), being answered by the merger, then re-checked.
+  Progress (28.10.2026, 06:07): Sol re-check round 1 (local/1308-final-check-2.log) — the five objections RESOLVED, one new: find/sed in U4's sealed read list allow -delete / 'w file'; the merger dropped find, sed and rg from that list and closed tail -f and git --output (round-2 section in docs/1308-merged-plan.md). NEXT: a third Sol check (ask-lane --lane cross --kind audit --anyway, same files plus local/1308-final-check-2.log); only on PLAN APPROVED does step 4 (implementation) start.
+- [ ] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
+  nicht mehr vor der 0.3 passieren, aber möglichst bald danach"). The rebuild that replaced
+  wall-clock waits with waiting on the app's own state was applied CASE BY CASE, never swept:
+  measured 11.08.2026, the bird's-eye half of the Ctrl-label check had taken the one-moment
+  snapshot on 08.08., the settlement half never did, and the same defect reappeared there
+  three days later. Nothing forbids the pattern, so the next one will appear again.
+  THE TWO KINDS MUST BE SEPARATED, because "no test may fail from load" is only half
+  achievable and pretending otherwise would produce a green that means nothing:
+  1. A STATE check — does this exist, is it drawn there, does the label read that — CAN be
+     made load-proof, and must be: poll on the app's own frames or state until the answer is
+     stable, read every side of a comparison in ONE evaluation, never compare two separate
+     round trips. Sweep every `scripts/verify/*.mjs` for the pattern and fix each site.
+  2. A TIMING check — frame budget, animation smoothness, how long a step takes — is
+     load-sensitive BY NATURE. It is not made load-proof; it is RECOGNISED: under load its
+     verdict does not count as evidence (the runner already prints exactly that) and it is
+     reported as UNMEASURED rather than red, so a loaded machine can never manufacture a
+     failure nor hide one.
+  3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
+     assembled from two separate `page.evaluate` calls. The agent that found this case left
+     the gate undone on purpose and asked for the decision — this point is the decision.
+  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
+  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
+  WebGPU `polish` run and two building agents shared the machine, and both green on the same
+  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
+  on its own retry. Each must come out of the sweep classified — repaired as a state check,
+  or declared timing and reported UNMEASURED under load.
+  A FOURTH CASE, measured 15.09.2026 on `polish`, is the sharpest of them because BOTH
+  sides of the comparison flutter: `the order at the stand can be photographed` waits up to
+  180 s for the LAST utterance in the village to be a water word at most 2.5 s old while a
+  second man is already walking off with the empty jar. It went red twice out of two on the
+  candidate of point 1056 and, on the untouched baseline of the same commit and the same
+  backend, its sibling `the return walk can be photographed` went red once out of two — same
+  section, same cause, no carrier moment inside the window. The check's own comment names
+  the reason: the window's width depends on the errand's pace, and the suite runs that pace
+  at six times normal. It is a moment-catcher, not a state check, and the sweep must decide
+  which of the two kinds it is. Point 1056 was verified past it: its branch does not touch
+  the water errand at all.
+  THE INVENTORY THE SWEEP STARTS FROM IS ALREADY COUNTED (carried over from point 200 on
+  20.08.2026, which measured it as Pillar-2 group E): 26 wall-clock/radius sites — 20 in
+  `enrichments`, plus `polish` 270, `settings` 183/277, `flow` 242, `voice` 56, `touch` 75 — and
+  the two patterns are named per site: a render-loop behaviour polled on the SIM clock
+  (`__pollSim`/`__sleepSim`/`simTime`) or on the check's OWN condition rather than on a fixed wall
+  wait, and "in view / beyond the ring" judged by `__camera.onScreen`/ndc projection rather than by
+  an assumed radius — a check that TESTS a radius feature keeps its radius and says so. Some of the
+  26 were fixed case by case since 21.07., which is the very drift this point exists to end: each
+  site is verified against HEAD before it is touched, each touched suite is run after its change
+  (both backends for the WebGPU-lane suites, `touch`/`voice` WebGL only), and the sweep's report
+  states how many of the 26 were already closed and by what. The fixed 1500 ms wait of point 521
+  is a member of this list and is fixed there.
+  A LANE THAT CANNOT ANSWER A CHECK SAYS SO, WITH ITS MEASURED RATE (folded in from point 506 on
+  20.08.2026). That point's four reds were taken on a SOFTWARE WebGPU lane drawing roughly one
+  frame per second, and that premise is dead here: `node scripts/verify/backend-lane-check.mjs`,
+  re-measured 20.08.2026, shows BOTH lanes hardware-backed on a real GPU, WebGPU running in
+  COMPATIBILITY mode rather than core. The mechanism survives it intact, and it is how kind 2 above
+  gets reported in practice:
+  - the run MEASURES the lane's delivered frame rate once, from the running page, and prints it in
+    the run header, so every verdict below NAMES the lane it was taken on instead of assuming one;
+  - a check whose subject is a RATE or a wall-clock budget (stance intervals per walk, a settle
+    deadline, a fixed-frame benchmark route) DECLARES the throughput it needs; below that figure it
+    SKIPS, naming the measured rate and that the lane cannot answer it, and it never reds and never
+    passes silently. That is the measured-nothing signature this removes: a check reporting a rule
+    as broken while its own reading says the rule held (`"ok":true` beside `anyMoved:false`) reads
+    as a product defect and is the worst red there is;
+  - NO product threshold moves for it — on a lane that meets the throughput the identical check
+    runs unchanged and must still fail on a real regression;
+  - the skips are COUNTED in the run summary, so a lane that skips half a suite can never be
+    mistaken for a green both-backend verification: what the §7.2 both-backend rule counts is what
+    actually RAN.
+  The checks that failed this way while the lane WAS software name the class the declaration has
+  to cover: `polish`'s goat planted foot (1 usable stance interval where it needs 3) and its dry
+  settlement-season settle (read after 60176 ms), `settings`' footstep surface class, the
+  fixed-frame `benchmark` route (`waitForFunction: Timeout 300000ms exceeded`), and `collision`'s
+  door transition and unstuck window. A lane can also HANG instead of skipping — 27 minutes with
+  no frame written, killed by hand — and while it does, a figure or settlement point has no second
+  backend at all: that merge owes a loud deferral, never a silent single-backend picture.
+
+  THE GOAT PLANTED FOOT IS NOT CLASSIFIED HERE (20.08.2026). Point 725 holds a cross-vendor
+  review verdict that the release frame really does teleport the foot and that `judgeStanceSlip`
+  excludes exactly that frame, so the check may be measuring around a defect rather than
+  suffering a slow lane. That point owns the measurement which decides between the two, and it
+  is taken on the hardware lane. This sweep may give that check a throughput declaration only
+  once the measurement has come back "no jump" — a skip laid over a real defect is the one
+  outcome this mechanism must never produce. The other named cases are unaffected and are
+  classified as specified.
+
+  VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
+  with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
+  passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
+  repaired state check that previously skewed.
+  A Vitest case pins the pure skip decision — needed against measured throughput — in both
+  directions, including that a lane which meets the throughput never skips.
+  Live, in the surviving lanes' terms: a run on a lane that cannot meet a check's declared
+  throughput ends GREEN with exactly that check reported as a lane skip naming the measured rate,
+  while the lane that meets it runs the same check for real.
+  Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
+  door point 640 closes from the other side.
+
+- [ ] 568. The polish water-sameness check rotates its verdict (measured 09.08.2026 by
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
+  launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
+  plate's rim is the SAME water as the water at the bank (≤ 12/255)" — went RED on the
+  first run with samples 13.8, 12.1 and 19.3 straddling the limit, and fully GREEN on a
+  second run at the IDENTICAL commit and the IDENTICAL seed (164 PASS, 0 FAIL). The seed
+  work is not the cause: `polish` was seeded 42 before and after, so the world it walked
+  was the same both times. What rotates therefore sits BELOW the layout — the water
+  shading itself, or the moment the sample is taken.
+  WHY IT MATTERS BEYOND THE FLAKE: point 549 pinned the seed precisely so a red could be
+  believed. A check that still rotates on a fixed world is the next layer of the same
+  problem, and it sits on the everyday gate where it costs a rerun every time.
+  FINAL STATE: the cause is IDENTIFIED before anything is tuned — the two candidates are
+  a genuine frame-timing dependence (the sample taken before the water material has
+  settled, in which case the check polls on the app's own clock rather than a fixed
+  wait) and a real shading seam at the plate rim that only sometimes exceeds the
+  tolerance (in which case it is a PRODUCT defect and the check is right to fire). The
+  tolerance is NOT widened to make the red go away until it is established which of the
+  two it is; if it is the product, the water fix comes first and the check stays.
+  SAME FAMILY AS POINT 200 (carried 20.08.2026 from the 10.08.2026 four-eyes work-order
+  analysis, not a fresh finding): points 336 and 570 already name 200's rotating-staging
+  family and this check is the third member of it. The ten-run reading below belongs to the
+  same quiet-machine round rather than a separate one.
+  VERIFIABLE: the check runs ten times on the pinned seed with the same verdict every
+  time, and whichever cause was found is named in the commit message with its evidence.
+  Criticality: medium — it does not itself hide a product defect, but it may BE one, and
+  it erodes the trust in a red that point 549 was built to restore.
+
+- [ ] 1456. Two intermittent polish-villagers shutter-timing reds owned by no point
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  Final state: `npm test -- polish-villagers --section=villager-canoe` and the adult-errands river-bank block are green on both backends on a quiet machine, or each red is charged to its owning open point with the cause named: "he was still squatting ashore, unloading, before and after the shutter" (measured `{before:true,after:false}`) and "the river-bank frame: the foam it was aimed at is still in the picture after the shutter" (drifted 13.22 m at lead 6 m). The check reads the pose and the aim from the shutter frame itself.
+  Observed problem: WebGPU 9bb6e1736 and 1e681ce07 (26.10.2026), WebGL 2 30a5b55f5 (27.10.2026, under load); WebGL 2 main f57fa3250 clean on 26.10. Shutter-timing verdicts on unrelated heads; recorded in docs/backlog.md as a finding of 27.10.2026, filed now because the render-verify guard blocks on them (four unaccounted runs).
+  Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
+  Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
+  Bundle: Dorfleben.
+- [ ] 1202. The dig picture's camera stand lies inside the settlement.
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  PROBLEM, measured 23.09.2026 while repairing point 1198: `digPictureView` (scripts/verify/
+  digSitePicture.mjs) puts the stand for fixture `bambara-village` seed 58 at x 12.0, z 30.6
+  (r 32.9 m), past the settlement boundary, so `isOutsidePlace` fires on the first frame,
+  PlaceScene leaves the place, and `polish --section=adult-errands` reads `the spoil crossing
+  starts on flat ground — {"error":"no patch dig site","place":null}`; frame
+  `1056-two-excavations-walkable-spoil` is never taken. `src/scenes/place/digPicture.test.ts`
+  stays green because it never asks for the stand to be inside. A seed search over 0-799 with
+  that extra condition found no seed on either side of the pair: the far side is outside, the
+  near side fails `standingClear` on the sight lines (636 of 1600 probes).
+  FINAL STATE: the fixture test asserts `isOutsidePlace(layout, view.x, view.z) === false`, a
+  composition (seed, stand side, or a stand-off rule) passes it with every existing condition,
+  and `polish --section=adult-errands` takes frame 1056 on WebGPU and WebGL 2 with no red but
+  those charged to point 568.
+  Criticality: medium — a picture proof of the dig spoil is missing on every run.
+  Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
+  Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
+  Bundle: Dorfleben
+- [ ] 1459. Launcher successor decision "registered-writer-live" ignores bookkeeping files under .claude/
+  Queue position: directly before point 1347 (user 27.10.2026), i.e. after 1308, 642, 568, 1456 and 1202.
+  Final state: the launcher's successor decision "registered-writer-live" measures feature-writer activity in a feature worktree without counting bookkeeping files under `.claude/` (guard state, queue rank, fence ledgers, carrier bell and the like). Only real work output (source, docs, tests, commits) or a live writer process keeps the successor from spawning.
+  Evidence (27.10.2026, .claude/batch-launcher.log and .claude/autostart.log): owner 84f5f163 handed over at the context watermark at 22:05 Berlin. The launcher refused the successor at 22:05, 22:05 and 22:20 with "registered-writer-live — recent registered feature-writer activity measured for feat/1081-boxed-child-steering (/workspace/hoa/.claude/worktrees/point-1081)". The 1081 author's last commit was fc0d35497 at 21:42. After that only .claude/queue-rank.json (21:54) and guard state files (.claude/ci-status-guard-state.json, .claude/timestamp-guard-state.json, .claude/context-fence-ledgers/*, 22:00) changed, and no 1081 process was alive. The successor started only at 22:35 ("no owner lock — taking over"): 30 min of batch standstill shown on the board.
+  Verifiable: a test of the activity measurement: a worktree whose only fresh files lie under `.claude/` counts as idle; a fresh file under src/ or docs/ still counts as live.
+  Source: user-approved findings-carrier request "Launcher-Sperre registered-writer-live zählt Verwaltungsdateien unter .claude/ als Autorenarbeit" (user 27.10.2026 22:39: "Reihe das direkt vor 1347 ein."; approved "ja"; rev 2e5102147). Reproducible current-game blockade, CLAUDE.md §2 infrastructure-freeze exception.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
   Source: user 12.10.2026 (chat), after two bug reports from the current production build eab3d6b (backup local/ClippingBeimLaufen.zip: a walking villager's swing leg leaves its trouser leg behind, bare thigh and knee; local/WindelLook.zip: a child's hip cloth stands off the body all round like a diaper). User: "Ich vermute, dass das nur eines von vielen Symptomen ist, das bestätigt, dass der bisherige Ansatz verkehrt war. Jetzt genau das zu beheben würde vermutlich nur ein Symptom flicken." Order: "Reihe den Neubau als mit 6-Augen-Prinzip für die Analyse als neuen Punkt nach 1330 ein." Both reports are filed as findings in the carrier and are charged to this point, not fixed singly.
@@ -187,42 +389,6 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: low - a test frame's aim; blocks the suite's covering run.
 
-- [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
-  Queue position: directly after point 1294 (ahead of 1301); worked only once 1294 has landed (user 05.10.2026: "ja, aber nach 1294").
-  Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
-  Final state: recurring mechanical work the LLM now performs step by step runs as local scripts/hooks, so measurably fewer LLM round-trips are spent, while NO existing functionality is endangered.
-
-  SAFETY REQUIREMENT (binding for every change):
-   1. No existing functionality is endangered — not only checks, but everything the batch does today.
-   2. No new problems are introduced: deadlocks, hooks blocking each other, Stop-refusal loops, hanging or aborting scripts, half-executed chains.
-   3. Every unexpected error has a fallback: if a new combined command or self-repairing hook fails, the flow falls back to today's behaviour (the LLM runs the single steps, or gets today's refusal). The error is reported loudly, never swallowed. A crashing hook must never paralyse the batch.
-   4. Evidence: the analyses list the failure cases of every candidate; the final check examines exactly 1-3; tests cover the failure paths (aborting intermediate step, timeout, held lock, missing file, ...) and prove the fallback engages.
-
-  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
-   1. Analysis A (Opus 5.5) and Analysis B (GPT-6 Astra) run BLIND and in parallel. A starts from this point text (measurement and candidate list). B STARTS WITHOUT PRIOR KNOWLEDGE: it receives ONLY the neutral brief below, handed to it directly as a separate text, plus access to the raw material (session transcripts under ~/.claude/projects/-workspace-hoa, scripts/, .claude/settings.json, hooks, tests). B never sees the measurement, the candidate list, or point-brief output of this point. B measures and interprets on its own. Each analysis delivers further savings with measured shares and, per candidate, the failure analysis demanded by the safety requirement plus the test that proves it.
-      NEUTRAL BRIEF FOR B (verbatim): "Find activities the LLM sessions of this repository perform repeatedly that a local script or hook could take over, so that fewer LLM round-trips are spent. Measure from the transcripts yourself. For every proposed change show that no existing functionality is endangered, that no new problems arise (deadlocks, hooks blocking each other, refusal loops, hanging or aborting scripts, half-executed chains), and that every unexpected error falls back to today's behaviour with a loud report. Name the test that proves each of these."
-   2. A third, distinct model (neither A nor B; Fable 5.1 if node scripts/fable-switch.mjs --status permits, else Opus 4.8) checks both proposals thoroughly and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
-   3. The merged plan goes to the model of the OTHER vendor than the merger (GPT-6 Astra via scripts/review-astra.mjs) for a final check focused on the safety requirement. Only an approved plan is implemented; objections are fixed and re-checked first. At this stage Astra may see everything.
-   4. Implementation follows the approved plan, with the usual cross-vendor code review afterwards.
-
-  Candidates for A (starting points, not a closed list; NOT shown to B):
-   a) Merge fixed ritual chains into single commands that run silently and report only failures (e.g. focus set -> board now -> attest -> board-publish -> dashboard-guard --synced; batch-boundary --prepare -> --commit -> --clear).
-   b) Timestamp/header: stop the LLM re-measuring the time and stop exact-minute refusals (tolerance, or header set outside the LLM).
-   c) Stop hooks that self-repair mechanical causes instead of refusing (unpushed main where pushing is permitted, dashboard/focus sync, carrier drain), leaving the LLM only cases needing judgment.
-   d) Retrospective / beginner-guide currency: a script pre-collects the raw delta; LLM only words it; or lower trigger frequency.
-   e) Screenshot pre-filter by pixel metric before LLM inspection (low priority, 1.7 %).
-   f) Small: finding.mjs syntax in hook texts (removes --help calls); more compact point-brief output.
-  Infrastructure-freeze fit: a simplification (fewer steps, no new guards); a new script replaces steps, never adds a check.
-
-  Tests: every changed hook/script keeps or extends its node tests; each merged chain has a test proving it performs every step the old chain did, fails loud on the same conditions, and falls back on injected failures. Evidence of saving: re-run the 05.10. measurement on a comparable later corpus and report calls and cache-read share before/after.
-  Bundle: Session- & Repo-Hygiene.
-  USER, verbatim:
-  05.10.2026: "Reihe einen Punkt für solche Vereinfachungen direkt nach 1294 ein. Der soll aber nicht einfach nur die von dir erwähnten Änderungen durchführen, sondern vorher sehr gründlich prüfen, ob zum einen noch mehr eingespart werden kann und zum anderen durch die Umbauten nichts kaputt geht. Das soll mit sechs Augen passieren, also ein anderes Modell soll blind vom ersten die selbe Analyse machen und ein drittes die Vorschläge nochmal gründlich prüfen und zusammenführen."
-  05.10.2026: "Und dieses Mal noch ein Schritt weiter: Die zusammengeführte Lösung durch das dritte Modell noch dann noch einmal dem Modell des anderen Anbieters zur Abschlussprüfung gegeben werden. Ich will ganz sicher gehen, dass wir uns mit so einem Umbau nichts kaputt machen."
-  05.10.2026: "Für die Opus 5.5-Seite ist es okay, mit deiner Liste zu starten, weil du ja auch Opus 5.5 bist, aber Astra sollte ohne Vorwissen starten."
-  05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
-  05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
-  05.10.2026: "ja, aber nach 1294"
 - [ ] 1301. Low-preset primitive villager kneels with constant limb lengths and stays above ground
   Queue position: directly behind point 1294.
   Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
@@ -2452,104 +2618,6 @@ put it is the mistake this line exists to stop.
   Criticality: high — it takes out the cross-vendor review the four-eyes rule depends on, and it
   did so twice unnoticed.
   Bundle: unbundled (infrastructure).
-
-- [ ] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
-  11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
-  nicht mehr vor der 0.3 passieren, aber möglichst bald danach"). The rebuild that replaced
-  wall-clock waits with waiting on the app's own state was applied CASE BY CASE, never swept:
-  measured 11.08.2026, the bird's-eye half of the Ctrl-label check had taken the one-moment
-  snapshot on 08.08., the settlement half never did, and the same defect reappeared there
-  three days later. Nothing forbids the pattern, so the next one will appear again.
-  THE TWO KINDS MUST BE SEPARATED, because "no test may fail from load" is only half
-  achievable and pretending otherwise would produce a green that means nothing:
-  1. A STATE check — does this exist, is it drawn there, does the label read that — CAN be
-     made load-proof, and must be: poll on the app's own frames or state until the answer is
-     stable, read every side of a comparison in ONE evaluation, never compare two separate
-     round trips. Sweep every `scripts/verify/*.mjs` for the pattern and fix each site.
-  2. A TIMING check — frame budget, animation smoothness, how long a step takes — is
-     load-sensitive BY NATURE. It is not made load-proof; it is RECOGNISED: under load its
-     verdict does not count as evidence (the runner already prints exactly that) and it is
-     reported as UNMEASURED rather than red, so a loaded machine can never manufacture a
-     failure nor hide one.
-  3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
-     assembled from two separate `page.evaluate` calls. The agent that found this case left
-     the gate undone on purpose and asked for the decision — this point is the decision.
-  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
-  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
-  WebGPU `polish` run and two building agents shared the machine, and both green on the same
-  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
-  on its own retry. Each must come out of the sweep classified — repaired as a state check,
-  or declared timing and reported UNMEASURED under load.
-  A FOURTH CASE, measured 15.09.2026 on `polish`, is the sharpest of them because BOTH
-  sides of the comparison flutter: `the order at the stand can be photographed` waits up to
-  180 s for the LAST utterance in the village to be a water word at most 2.5 s old while a
-  second man is already walking off with the empty jar. It went red twice out of two on the
-  candidate of point 1056 and, on the untouched baseline of the same commit and the same
-  backend, its sibling `the return walk can be photographed` went red once out of two — same
-  section, same cause, no carrier moment inside the window. The check's own comment names
-  the reason: the window's width depends on the errand's pace, and the suite runs that pace
-  at six times normal. It is a moment-catcher, not a state check, and the sweep must decide
-  which of the two kinds it is. Point 1056 was verified past it: its branch does not touch
-  the water errand at all.
-  THE INVENTORY THE SWEEP STARTS FROM IS ALREADY COUNTED (carried over from point 200 on
-  20.08.2026, which measured it as Pillar-2 group E): 26 wall-clock/radius sites — 20 in
-  `enrichments`, plus `polish` 270, `settings` 183/277, `flow` 242, `voice` 56, `touch` 75 — and
-  the two patterns are named per site: a render-loop behaviour polled on the SIM clock
-  (`__pollSim`/`__sleepSim`/`simTime`) or on the check's OWN condition rather than on a fixed wall
-  wait, and "in view / beyond the ring" judged by `__camera.onScreen`/ndc projection rather than by
-  an assumed radius — a check that TESTS a radius feature keeps its radius and says so. Some of the
-  26 were fixed case by case since 21.07., which is the very drift this point exists to end: each
-  site is verified against HEAD before it is touched, each touched suite is run after its change
-  (both backends for the WebGPU-lane suites, `touch`/`voice` WebGL only), and the sweep's report
-  states how many of the 26 were already closed and by what. The fixed 1500 ms wait of point 521
-  is a member of this list and is fixed there.
-  A LANE THAT CANNOT ANSWER A CHECK SAYS SO, WITH ITS MEASURED RATE (folded in from point 506 on
-  20.08.2026). That point's four reds were taken on a SOFTWARE WebGPU lane drawing roughly one
-  frame per second, and that premise is dead here: `node scripts/verify/backend-lane-check.mjs`,
-  re-measured 20.08.2026, shows BOTH lanes hardware-backed on a real GPU, WebGPU running in
-  COMPATIBILITY mode rather than core. The mechanism survives it intact, and it is how kind 2 above
-  gets reported in practice:
-  - the run MEASURES the lane's delivered frame rate once, from the running page, and prints it in
-    the run header, so every verdict below NAMES the lane it was taken on instead of assuming one;
-  - a check whose subject is a RATE or a wall-clock budget (stance intervals per walk, a settle
-    deadline, a fixed-frame benchmark route) DECLARES the throughput it needs; below that figure it
-    SKIPS, naming the measured rate and that the lane cannot answer it, and it never reds and never
-    passes silently. That is the measured-nothing signature this removes: a check reporting a rule
-    as broken while its own reading says the rule held (`"ok":true` beside `anyMoved:false`) reads
-    as a product defect and is the worst red there is;
-  - NO product threshold moves for it — on a lane that meets the throughput the identical check
-    runs unchanged and must still fail on a real regression;
-  - the skips are COUNTED in the run summary, so a lane that skips half a suite can never be
-    mistaken for a green both-backend verification: what the §7.2 both-backend rule counts is what
-    actually RAN.
-  The checks that failed this way while the lane WAS software name the class the declaration has
-  to cover: `polish`'s goat planted foot (1 usable stance interval where it needs 3) and its dry
-  settlement-season settle (read after 60176 ms), `settings`' footstep surface class, the
-  fixed-frame `benchmark` route (`waitForFunction: Timeout 300000ms exceeded`), and `collision`'s
-  door transition and unstuck window. A lane can also HANG instead of skipping — 27 minutes with
-  no frame written, killed by hand — and while it does, a figure or settlement point has no second
-  backend at all: that merge owes a loud deferral, never a silent single-backend picture.
-
-  THE GOAT PLANTED FOOT IS NOT CLASSIFIED HERE (20.08.2026). Point 725 holds a cross-vendor
-  review verdict that the release frame really does teleport the foot and that `judgeStanceSlip`
-  excludes exactly that frame, so the check may be measuring around a defect rather than
-  suffering a slow lane. That point owns the measurement which decides between the two, and it
-  is taken on the hardware lane. This sweep may give that check a throughput declaration only
-  once the measurement has come back "no jump" — a skip laid over a real defect is the one
-  outcome this mechanism must never produce. The other named cases are unaffected and are
-  classified as specified.
-
-  VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
-  with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
-  passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
-  repaired state check that previously skewed.
-  A Vitest case pins the pure skip decision — needed against measured throughput — in both
-  directions, including that a lane which meets the throughput never skips.
-  Live, in the surviving lanes' terms: a run on a lane that cannot meet a check's declared
-  throughput ends GREEN with exactly that check reported as a lane skip naming the measured rate,
-  while the lane that meets it runs the same check for real.
-  Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
-  door point 640 closes from the other side.
 
 - [ ] 630. A shell write into `.claude/` raises a prompt in the user's VS Code window
   (measured twice 11.08.2026 — once by a delegated agent, once by a direct probe; user
@@ -5494,34 +5562,6 @@ Build order, chosen so no two parallel agents own the same file:
   CANDIDATE REAL FAILURE under a measured-quiet machine and UNDECIDED under an unknown or
   loaded one; a rate-marked check is named as rate-sensitive in the verdict; and the
   diff-word list is absent from an UNDECIDED verdict.
-
-- [ ] 568. The polish water-sameness check rotates its verdict (measured 09.08.2026 by
-  the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
-  launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
-  plate's rim is the SAME water as the water at the bank (≤ 12/255)" — went RED on the
-  first run with samples 13.8, 12.1 and 19.3 straddling the limit, and fully GREEN on a
-  second run at the IDENTICAL commit and the IDENTICAL seed (164 PASS, 0 FAIL). The seed
-  work is not the cause: `polish` was seeded 42 before and after, so the world it walked
-  was the same both times. What rotates therefore sits BELOW the layout — the water
-  shading itself, or the moment the sample is taken.
-  WHY IT MATTERS BEYOND THE FLAKE: point 549 pinned the seed precisely so a red could be
-  believed. A check that still rotates on a fixed world is the next layer of the same
-  problem, and it sits on the everyday gate where it costs a rerun every time.
-  FINAL STATE: the cause is IDENTIFIED before anything is tuned — the two candidates are
-  a genuine frame-timing dependence (the sample taken before the water material has
-  settled, in which case the check polls on the app's own clock rather than a fixed
-  wait) and a real shading seam at the plate rim that only sometimes exceeds the
-  tolerance (in which case it is a PRODUCT defect and the check is right to fire). The
-  tolerance is NOT widened to make the red go away until it is established which of the
-  two it is; if it is the product, the water fix comes first and the check stays.
-  SAME FAMILY AS POINT 200 (carried 20.08.2026 from the 10.08.2026 four-eyes work-order
-  analysis, not a fresh finding): points 336 and 570 already name 200's rotating-staging
-  family and this check is the third member of it. The ten-run reading below belongs to the
-  same quiet-machine round rather than a separate one.
-  VERIFIABLE: the check runs ten times on the pinned seed with the same verdict every
-  time, and whichever cause was found is named in the commit message with its evidence.
-  Criticality: medium — it does not itself hide a product defect, but it may BE one, and
-  it erodes the trust in a red that point 549 was built to restore.
 
 - [ ] 570. The children-photographable check reds on the pinned world (measured
   09.08.2026 on `main` at 3e33ff83, WebGL 2, immediately after point 557 pinned the world
@@ -15200,24 +15240,6 @@ to land than a mechanism that needs a review.
   Criticality: medium. Test: Vitest over the five seeds; `polish --section=village-loom`.
   Refs: src/scenes/place/layout.ts (displacedBy, affordable, topUpCompounds),
   src/scenes/place/loom.ts (placeLoom passes), point 1191
-- [ ] 1202. The dig picture's camera stand lies inside the settlement.
-  PROBLEM, measured 23.09.2026 while repairing point 1198: `digPictureView` (scripts/verify/
-  digSitePicture.mjs) puts the stand for fixture `bambara-village` seed 58 at x 12.0, z 30.6
-  (r 32.9 m), past the settlement boundary, so `isOutsidePlace` fires on the first frame,
-  PlaceScene leaves the place, and `polish --section=adult-errands` reads `the spoil crossing
-  starts on flat ground — {"error":"no patch dig site","place":null}`; frame
-  `1056-two-excavations-walkable-spoil` is never taken. `src/scenes/place/digPicture.test.ts`
-  stays green because it never asks for the stand to be inside. A seed search over 0-799 with
-  that extra condition found no seed on either side of the pair: the far side is outside, the
-  near side fails `standingClear` on the sight lines (636 of 1600 probes).
-  FINAL STATE: the fixture test asserts `isOutsidePlace(layout, view.x, view.z) === false`, a
-  composition (seed, stand side, or a stand-off rule) passes it with every existing condition,
-  and `polish --section=adult-errands` takes frame 1056 on WebGPU and WebGL 2 with no red but
-  those charged to point 568.
-  Criticality: medium — a picture proof of the dig spoil is missing on every run.
-  Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
-  Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
-  Bundle: Dorfleben
 - [ ] 1203. The voice suite reds on a network hiccup at huggingface.co.
   PROBLEM, measured 23.09.2026 on feat/1174 e5b3b6407, webgl/voice: `TTS assets recorded into
   the local cache` (scripts/verify/voice.mjs) failed with 12 assets served and one
@@ -15913,12 +15935,6 @@ to land than a mechanism that needs a review.
   Criticality: low — dev test hook, no player impact measured; it blocks the green of `polish-speech`.
   Source: findings carrier 27.10.2026 02:55 (1452 step 5, M3 quiet reference); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
   Bundle: Dorfleben.
-- [ ] 1456. Two intermittent polish-villagers shutter-timing reds owned by no point
-  Final state: `npm test -- polish-villagers --section=villager-canoe` and the adult-errands river-bank block are green on both backends on a quiet machine, or each red is charged to its owning open point with the cause named: "he was still squatting ashore, unloading, before and after the shutter" (measured `{before:true,after:false}`) and "the river-bank frame: the foam it was aimed at is still in the picture after the shutter" (drifted 13.22 m at lead 6 m). The check reads the pose and the aim from the shutter frame itself.
-  Observed problem: WebGPU 9bb6e1736 and 1e681ce07 (26.10.2026), WebGL 2 30a5b55f5 (27.10.2026, under load); WebGL 2 main f57fa3250 clean on 26.10. Shutter-timing verdicts on unrelated heads; recorded in docs/backlog.md as a finding of 27.10.2026, filed now because the render-verify guard blocks on them (four unaccounted runs).
-  Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
-  Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
-  Bundle: Dorfleben.
 - [ ] 1457. A fleeing child no longer flips to the other rim direction after a wall deflection
   Final state: in the tag round, a wall deflection of an evader's course no longer feeds
   `evadeHeading` a deflected `current` that flips the flee to the opposite rim direction
@@ -15948,3 +15964,10 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/tagGame.ts (`moveChild`), src/scenes/place/tagShuffle.test.ts,
   scripts/verify/childMotionMetric.mjs, docs/1081-steering-trace.md §4–§6.
   Bundle: Dorfleben.
+
+- [ ] 1460. Covering enrichments suite run on both backends for the two suite fixes of 27.10.2026
+  Observed: commits 2eb353f2e (dressing-growth check sampled at the savanna anchor) and 27efb59ab (channel-crossing staged outside the shy ring) changed scripts/verify/enrichments.mjs; render-verify-guard records no covering run since — the last webgl run covered only section channel-crossing.
+  Final state: VERIFY_GL=webgpu and VERIFY_GL=webgl node scripts/verify/run-all.mjs enrichments recorded clean (or every red charged to an open point), frames of both backends inspected.
+  Criticality: low — verification debt; blocks the render-verify Stop guard. Needs a quiet machine.
+  Bundle: Session- & Repo-Hygiene.
+  Source: findings carrier 28.10.2026 04:10 'Enrichments covering run owed on both backends'.

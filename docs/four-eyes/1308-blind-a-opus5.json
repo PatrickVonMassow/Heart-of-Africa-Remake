@@ -1,0 +1,58 @@
+{
+ "model": "Claude Opus 5.5",
+ "point": 1308,
+ "stage": "blind-parallel A — bookkeeping round-trips a local script or hook could take over",
+ "input": "docs/four-eyes/1308-blind-a-opus5.md",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "Header (Berlin stamp + context reading) delivered by the hook, not measured by the LLM"
+  },
+  {
+   "id": "A2",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "Board remedy as ONE command (fold focus stamp + attest into the board edit)"
+  },
+  {
+   "id": "A3",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "\"Board claims nothing is running\": let the closing duties through"
+  },
+  {
+   "id": "A4",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "Retrospective/guide currency: refresh mechanically, ask only for the prose decision, less often"
+  },
+  {
+   "id": "A5",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "In-flight declaration owned by the command that starts/ends the wait"
+  },
+  {
+   "id": "A6",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "Remove `--help` round-trips"
+  },
+  {
+   "id": "A7",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "Boundary: one call when nothing is owed; reads after the seal"
+  },
+  {
+   "id": "A8",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "Dashboard OUT OF DATE after bookkeeping-only HEAD moves"
+  },
+  {
+   "id": "A9",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "CI pending: one blocking wait instead of manual polls"
+  },
+  {
+   "id": "A10",
+   "file": "docs/four-eyes/1308-blind-a-opus5.md",
+   "defect": "Small: compact/cached point-brief"
+  }
+ ]
+}
