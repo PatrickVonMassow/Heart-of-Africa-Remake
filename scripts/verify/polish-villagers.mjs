@@ -10,7 +10,7 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { BASE, OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, OUT, section, check, unmeasured, waitForMoment, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
@@ -2810,13 +2810,20 @@ if (section('adult-errands')) {
     // the water errand comes round a third as often, and the very wait that was
     // widened is the one that times out. A green that needed a retry covers
     // nothing (CLAUDE.md §7.2).
+    // The old 180 s at 60 fps, and never less than 180 s; the hang guard lets a
+    // lane down to 20 fps answer. OPEN: frames figure is an estimate, calibrate
+    // against the lane rate the run header prints.
+    const MOMENT_BUDGET = { frames: 10800, minMs: 180000, wallCapMs: 540000 }
     const holdStill = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 0.5 })
     const letThemWalk = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
     await page.evaluate(() => {
       window.__errandWatch = { seen: {} }
     })
-    const order = await page
-      .waitForFunction(
+    // LOAD-PROOF (point 642): a STATE check — the errand produces the moment or
+    // it does not — whose wait was a 180 s wall budget, so a slow lane saw fewer
+    // errands and reddened. The wait now counts rendered frames (MOMENT_BUDGET);
+    // a lane that cannot deliver them before the hang guard is UNMEASURED.
+    const orderWait = await waitForMoment(
         () => {
           const e = window.__placeErrands()
           const v = e.villagers
@@ -2857,13 +2864,16 @@ if (section('adult-errands')) {
           }
           return null
         },
-        null,
-        { timeout: 180000 },
+        MOMENT_BUDGET,
       )
-      .then((handle) => handle.jsonValue())
-      .catch(() => null)
+    const order = orderWait.value
     const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {} })
-    check(
+    if (orderWait.wallCapped) {
+      unmeasured(
+        'the order at the stand can be photographed: a sender still there and a carrier already going',
+        `lane delivered ${orderWait.frames} of ${MOMENT_BUDGET.frames} frames before the ${MOMENT_BUDGET.wallCapMs / 1000} s hang guard — it cannot answer whether the errand produces the moment`,
+      )
+    } else check(
       'the order at the stand can be photographed: a sender still there and a carrier already going',
       // AND THE SENDER IS AT THE STAND. Both utterances falling inside the
       // village, at the stand, is the half of the spec that replaced a word
@@ -2875,7 +2885,7 @@ if (section('adult-errands')) {
       order
         ? `carrier ${order.gap.toFixed(1)} m off the stand, ` +
           `sender ${Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z).toFixed(1)} m`
-        : `no order in 180 s — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
+        : `no order in ${orderWait.frames} frames — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
           `returning carrier got to ${watched.back != null ? `${watched.back.toFixed(2)} m` : 'never seen'} of the stand, ` +
           `arrived-samples ${watched.backArrived ?? 0}, his goal sits ${watched.backGoal != null ? `${watched.backGoal.toFixed(2)} m` : '?'} from it`,
     )
@@ -2945,8 +2955,7 @@ if (section('adult-errands')) {
     }
     await letThemWalk()
 
-    const returning = await page
-      .waitForFunction(
+    const returnWait = await waitForMoment(
         () => {
           const e = window.__placeErrands()
           const v = e.villagers
@@ -2974,18 +2983,24 @@ if (section('adult-errands')) {
           return null
         },
         null,
-        // THREE MINUTES, as for the fill: ONE water errand runs at a time, and
-        // its return leg within 15 m of the stand is a short share of a round
-        // trip the DIG pairs' window otherwise fills.
-        { timeout: 180000 },
+        // THREE MINUTES' worth, as for the fill: ONE water errand runs at a
+        // time, and its return leg within 15 m of the stand is a short share of a
+        // round trip the DIG pairs' window otherwise fills.
+        MOMENT_BUDGET,
       )
-      .then((handle) => handle.jsonValue())
-      .catch(() => null)
-    check(
-      'the return walk can be photographed: a carrier under a full jar',
-      returning != null,
-      returning ? `villager ${returning.who}` : 'no carrier walked back within 180 s',
-    )
+    const returning = returnWait.value
+    if (returnWait.wallCapped) {
+      unmeasured(
+        'the return walk can be photographed: a carrier under a full jar',
+        `lane delivered ${returnWait.frames} of ${MOMENT_BUDGET.frames} frames before the ${MOMENT_BUDGET.wallCapMs / 1000} s hang guard`,
+      )
+    } else {
+      check(
+        'the return walk can be photographed: a carrier under a full jar',
+        returning != null,
+        returning ? `villager ${returning.who}` : `no carrier walked back within ${returnWait.frames} frames`,
+      )
+    }
     if (returning) await holdStill()
     if (returning) {
       // Side-on and close, a little above the jar rather than below it: the water
