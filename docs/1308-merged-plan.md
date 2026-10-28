@@ -72,52 +72,7 @@ written; COLLISION: a fixture where duty (9) has a due report -> exactly one JSO
 `timestamp-guard.test.mjs` unchanged and green.
 Saving: 121 measuring calls (3.9 % rt, 4.1 % cache read) + most of 54 timestamp refusals; 4–6 % rt.
 
-### 3. U4 — sealed boundary lets reads through (A7, narrowed)
-
-Change: `batch-boundary-core.mjs sealedBoundaryDeny` returns `{deny:false}` when every segment of the
-command is on an EXPLICIT read list (`SEALED_READ_SEGMENTS`, a pure anchored set in
-`batch-boundary-core.mjs`): `^git (status|log|diff|show|rev-parse|ls-files)\b` and `^git branch --list\b`, plus the complete
-forms `^git remote -v$` and `^git worktree list(?: --porcelain| -v| --verbose)*$` (round 3: `-v` is
-`git remote`'s verbose flag and its subcommand follows it, so `git remote -v remove origin` passed the
-prefix), with no option before the subcommand (`git -c`, `-C`, `--git-dir` denied), no `--output`
-(the diff family's file writer), no `--ext-diff`/`--textconv` (round 3: they run `diff.external`/
-`diff.<driver>.command`/`diff.<driver>.textconv`) and no `--edit-description` after `branch --list`
-(git refuses `--list` with its other modes but not with that one). A helper configured before the
-seal (`diff.external`, a `diff=<driver>` attribute, `core.fsmonitor` under `git status`, clean
-filters) still runs on the default path; the seal does not guard pre-seal state, and after the seal
-nothing on the list can install one (`git config`, `-c`, edits of `.git/config` and `.gitattributes`
-are all denied); plain readers `grep|cat|head|tail|ls|wc|stat` with `tail`
-denied `-f`/`-F`/`--follow` (a never-returning wait); nothing else. `find`, `sed` and `rg` are NOT on
-the list (round 2 of the final check): `find . -delete`/`-exec`, `sed -n 'w TASKS.md'`/`e` and
-`rg --pre <cmd>` write or execute without any `>`/`$(` — `grep`/`cat`/`head` cover the read cases
-after a seal. `node scripts/*.mjs` outside the closing set stays denied as today: the
-general classifier (`command-classify-core.mjs` line 772) reads an unknown `node scripts/x.mjs
---status` as a READ by fallback, and a script may write while ignoring the flag (A4 of the final
-check). Heredocs, `$(`, backticks, redirects and `sed -i` stay denied. Verified: `heartbeat()` preserves the handover whenever the lock carries the
-seal (`preserveHandover === true || sealed`), so a passed read cannot delete the marker (the 13.08
-defeat). The Read/Grep/Glob tools never reached this guard; only Bash reads were denied.
-REJECTED half: "`--prepare` commits itself when nothing is owed" — `--commit` requires the handover
-card to be written after `--prepare` (`preparedReceipt.cardsBefore`, `boardCarriesCard`), so the
-card is always owed and the state does not exist. A card-writing `--commit --text-stdin` variant is an
-open question (see below), not part of this plan.
-Failure cases: list matching throws -> today's deny (existing catch); a command not on the list ->
-today's deny; the marker is never touched by a read.
-Tests (`batch-boundary-core.test.mjs`): sealed deny allows `grep`, `cat`, `git log`, `git status`,
-`git diff --stat`, `tail -n 20 f`; denies `node scripts/x.mjs --status` (unverified script),
-`node -e`, `git commit`, `git branch -d x`, `>` redirect, `sed -i`, `python3 - <<EOF`, `cat f | node
-scripts/x.mjs`, Edit of a non-closing file, and (round 2) `find . -delete`, `find . -exec rm {} \;`,
-`find . -fprint out`, `sed -n 'w TASKS.md' f`, `sed -n '1e cmd' f`, `sed -n 1,5p f` (sed dropped
-entirely), `rg --pre cat x`, `tail -f log`, `git log --output=f`, `git diff --output f`,
-`git -c core.pager=cmd log`, and (round 3) `git remote -v remove origin`, `git remote -v set-url
-origin https://x/y.git`, `git remote -v add x https://x/y.git`, `git remote -v rename origin x`,
-`git diff --ext-diff`, `git diff -p --ext-diff HEAD~1`, `git show --textconv HEAD:TASKS.md`,
-`git log -p --ext-diff`, `git log --textconv -p`, `git branch --list --edit-description feat/x`,
-`git worktree list add x`; allows (round 3) `git remote -v`, `git worktree list --porcelain`,
-`git diff --no-ext-diff`, `git branch --list 'feat/*'`; `batch-singleton` test: heartbeat after an allowed read keeps the sealed
-marker.
-Saving: 18 BOUNDARY IS COMMITTED refusals + the blocked subagent reads; ~1 % rt, more in cache read.
-
-### 4. U6 — closing duties pass the "nothing is running" deny (A3)
+### 3. U6 — closing duties pass the "nothing is running" deny (A3)
 
 Change: (a) `batch-boundary-core.mjs isClosingSetCommand` accepts anchored segments
 `^git fetch(?: (?:origin|--prune|-p|--all))*$` (NO refspec, NO `--force`/`-f`/`--update-head-ok`/
@@ -145,7 +100,7 @@ git merge`, `git fetch $(cat x)`;
 card-write failure -> step red, publish ran, message names `board.mjs closing <N>`.
 Saving: 64 refusals (2.1 % calls) + remedies; ~2–3 % rt.
 
-### 5. U2 — one board command (A2 + B6)
+### 4. U2 — one board command (A2 + B6)
 
 Change: `scripts/board.mjs`: every editing command (`now status title queue eta done none closing
 promote describe`) ends, inside the same `withBoardEditLock`, with (1) the focus stamp ONLY where it
@@ -166,17 +121,26 @@ Failure cases: publish fails -> card written, publish-due mark set as today, sta
 exit non-zero naming publish; `focus confirm` refuses (focus names a point no now-card carries) ->
 card + publish stand, exit non-zero "run `focus.mjs set <N>`" (today's state after an edit); `--synced`
 audit red -> same output as today's attest; a sub-step hangs -> `execFileSync` timeout (existing
-`run`, add `timeout: 15000`) -> FAIL line, lock released by `withBoardEditLock`'s finally.
+`run`, add `timeout: 15000, killSignal: 'SIGKILL'`; `SIGTERM`, the default, is ignorable and
+`spawnSync` waits for the child to exit after sending it, so a `SIGTERM`-ignoring child would hold the
+call and the lock — A10 of the final check) -> the child is killed, the call returns with `ETIMEDOUT`,
+FAIL line `<step> FAILED: timed out after 15 s — do it the old way: <command>`, exit non-zero, lock
+released by `withBoardEditLock`'s finally; a grandchild holding the child's stdio pipes is not guarded
+(none of the three children spawns one).
 Tests (`board-core.test.mjs`/`board-focus-behaviour.test.mjs`): `status` leaves focus stamped >= turn
 start, state published, `--synced` recorded — fields equal to running the four old commands on a
 fixture; injected publish failure -> focus and audit still done, exit != 0, message names publish;
-injected focus-write failure -> message names `focus confirm`; injected child timeout -> lock released,
-FAIL line; `title`/`eta`/`describe`/`queue` on a fixture leave `focus.confirmedAt` unchanged (negative
+injected focus-write failure -> message names `focus confirm`; injected child timeout: a fixture child that
+installs a no-op `SIGTERM` handler and keeps the event loop alive (`setInterval`), run through `run`
+with `timeout: 200` -> the merged command returns within the test's own bound (<2 s), the error has
+`code === 'ETIMEDOUT'` and `signal === 'SIGKILL'`, stdout carries the FAIL line naming the old single
+command, exit != 0, the board lock file is absent after return and a second editing command on the
+same fixture acquires the lock; the fixture child's pid no longer exists; `title`/`eta`/`describe`/`queue` on a fixture leave `focus.confirmedAt` unchanged (negative
 test for A3); `board-first-core.test.mjs`: the merged command's state passes `evaluate`, a failed
 sub-step state is denied exactly as today.
 Saving: 116 attest occurrences + part of 82 BOARD FIRST refusals; 3–4 % rt.
 
-### 6. U8 — land-point reviews its own HEAD move (A8, first half)
+### 5. U8 — land-point reviews its own HEAD move (A8, first half)
 
 Change: `land-point.mjs` ends its board step with the same rotate + `--synced` path as U2 (shared
 helper, not a shell-out to `attest`, so `--prepped` is not touched), after its tick commit and publish.
@@ -188,7 +152,7 @@ Tests (`land-point-runner.test.mjs`, `dashboard-guard-core.test.mjs`): after a s
 reviewed HEAD equals the tick commit; injected `--synced` refusal -> step red, text unchanged.
 Saving: up to 25 OUT OF DATE refusals; ~1 % rt.
 
-### 7. U5 — in-flight declaration by the launching command (A5, narrowed)
+### 6. U5 — in-flight declaration by the launching command (A5, narrowed)
 
 Change: `author-delegate.mjs` and `ask-lane.mjs` (both block on their child's `close`) call the
 existing `batch-in-flight.mjs` IO functions in-process: declare on start (pid, branch, worktree, log as
@@ -204,7 +168,7 @@ stderr names the manual command; overlapping declarations keep each other; kille
 today.
 Saving: part of 212 in-flight calls (6.9 % rt); re-measure the agent-wait share; <=4 % rt.
 
-### 8. U7 — retro currency fires less often (A4, narrowed)
+### 7. U7 — retro currency fires less often (A4, narrowed)
 
 Change: `retro-core.mjs computeFingerprint` drops `processPoints` from the hash (the rendered auto
 section keeps the counts; `retro-sources.mjs` still collects them). One pure function shared by
@@ -220,7 +184,7 @@ Tests (`retro-core.test.mjs`): TASKS-only change -> fingerprint equal; memory/gu
 differs; rendered section still counts process points; guard-preflight prediction equals the guard.
 Saving: the TASKS-only share of 28 refusals (~98 rt after them, 3.2 % upper bound); 1–3 % rt.
 
-Expected combined saving: 15–20 % rt (overlaps U1/U4, U2/U8), similar cache-read share; re-measure.
+Expected combined saving: 14–19 % rt (U4 dropped, round 4; overlaps U2/U8), similar cache-read share; re-measure.
 
 ## Rejected/deferred with reasons
 
@@ -235,7 +199,7 @@ Expected combined saving: 15–20 % rt (overlaps U1/U4, U2/U8), similar cache-re
 - U12 (B5, pkill helper): 0.35 %; new mechanism; the self-match hazard is wait-command-guard's subject.
   Backlog note: `pkill -f '[p]attern'`.
 - A7 first half (prepare commits itself), A4 first half (prepare runs refresh), A8 second half (HEAD
-  rule relaxation): see U4/U7/U8.
+  rule relaxation): see U7/U8 (U4 dropped in round 4, A9).
 - A's R1–R8 stand (screenshot pre-filter, auto-confirm focus, self-push, auto-drain, dropping chained
   appendages, folding preflight, tolerance widening, policy refusals).
 
@@ -299,3 +263,26 @@ before the fix; none was rejected.
   list can install one (`git config`, `-c`, `.git/config`/`.gitattributes` edits are all denied), and
   `git status` runs `core.fsmonitor` and clean filters on the same terms, so a "no helper" bar would
   empty the git list. No new mechanism; negative tests named in U4.
+
+### Round 4 (Sol, 28.10.2026)
+
+- A9 (U4) — DROPPED by the batch owner under the split rule: three rounds of objections (A4, A6, A7,
+  A8) against the sealed git read list for a saving of ~1 % rt; sealed Bash reads stay denied as today,
+  and the Read/Grep/Glob tools, which never reached this guard, keep serving reads after a seal. U4
+  leaves the plan (section 3 removed, later sections renumbered 3–7, `SEALED_READ_SEGMENTS` and its
+  tests are not written, the expected combined saving loses ~1 % and its "overlaps U1/U4" note); the
+  round-4 re-raise of A8 (default helper path) is thereby moot, since no command is added to the
+  sealed allow list. A4–A8 remain in the record as history of the dropped entry; open question 1
+  (`--commit --text-stdin` writes the card itself) is unaffected because it was never part of U4 and
+  stays open under its own heading. No other entry depends on U4: U1's sealed-boundary failure case
+  describes today's seal, not U4's read list, and stands unchanged; U6's widening of
+  `handoverSurvivesCall` reaches the sealed boundary through the closing set, not through U4, and
+  stands as written.
+- A10 (U2, round-4 A1) — confirmed: `execFileSync`'s `timeout` sends `killSignal` (default `SIGTERM`)
+  once and then waits for the child to exit, so a child that ignores `SIGTERM` holds the call and,
+  with it, the board lock (`withBoardEditLock`'s finally never runs). Fix (narrowest): the existing
+  `run` passes `killSignal: 'SIGKILL'` with `timeout: 15000`; the call returns within the bound with
+  `ETIMEDOUT`, the FAIL line names the old command, the finally releases the lock. Test: a
+  `SIGTERM`-ignoring fixture child proves return, FAIL line, non-zero exit and a released lock (U2).
+  Not guarded, stated: a grandchild inheriting the child's stdio pipes; none of the three children
+  spawns one.
