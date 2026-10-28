@@ -899,6 +899,10 @@ describe('the real docs/work-packages.md', () => {
       if (spec) {
         bySpec.push(n)
         if (filed.get(n) !== spec.id) wrong.push(`${n}: spec says ${spec.id}, table says ${filed.get(n) ?? 'nowhere'}`)
+      } else if (named && /^unbundled\b/.test(named[1]) && !listedThen) {
+        // a point whose own spec says it stands alone belongs in the Not bundled list
+        bySpec.push(n)
+        if (filed.get(n) !== 'Not bundled') wrong.push(`${n}: spec says unbundled, table says ${filed.get(n) ?? 'nowhere'}`)
       } else if (listedThen) {
         byPriorList.push(n)
         if (!listedThen.includes(filed.get(n))) {
