@@ -31,6 +31,7 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS } from './cross-review-core.mjs'
 import { ensureModelProven, runCodex } from './cross-review.mjs'
+import { clearOwnWait, declareOwnWait } from './declared-wait.mjs'
 import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
 import { effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
 import { currentLaneState } from './lane-switch.mjs'
@@ -249,17 +250,26 @@ if (isMainModule(import.meta.url)) {
       input: material,
       timeoutMs: Number(flag('--timeout')) || REVIEW_TIMEOUT_MS,
     }
-    let run = model.runtime === 'codex' ? runCodex({ ...request, modelId: model.id }) : runClaudeAsk({ ...request, model })
-    let outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
-    if (model.runtime === 'codex') {
-      // An outage signature records the fallback and serves this ask on the main lane.
-      const recorded = recordLaneRun({ role: model.key, outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
-      if (recorded.fellBack) {
-        model = MAIN_LANE
-        console.error(`ask-lane: serving the ${kind} on ${model.name} instead …`)
-        run = runClaudeAsk({ ...request, prompt: buildAskPrompt({ kind, brief, modelName: model.name }), model })
-        outcome = run
+    // The wait is declared for the owner while the ask blocks (point 1308, U5),
+    // and only our own declaration is cleared once it returns.
+    const wait = declareOwnWait({ waitingOn: `ask-lane ${kind} on ${model.name} (pid ${process.pid})` })
+    let run
+    let outcome
+    try {
+      run = model.runtime === 'codex' ? runCodex({ ...request, modelId: model.id }) : runClaudeAsk({ ...request, model })
+      outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
+      if (model.runtime === 'codex') {
+        // An outage signature records the fallback and serves this ask on the main lane.
+        const recorded = recordLaneRun({ role: model.key, outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-lane' })
+        if (recorded.fellBack) {
+          model = MAIN_LANE
+          console.error(`ask-lane: serving the ${kind} on ${model.name} instead …`)
+          run = runClaudeAsk({ ...request, prompt: buildAskPrompt({ kind, brief, modelName: model.name }), model })
+          outcome = run
+        }
       }
+    } finally {
+      clearOwnWait(wait)
     }
     const parsed = outcome.ok ? parseAnswer({ kind, text: run.finalMessage }) : { ok: false, error: '' }
     const elapsedMs = Date.now() - startedAt
