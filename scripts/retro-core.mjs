@@ -142,18 +142,21 @@ export function escalationCount(text) {
  *   guards         — basenames only (a guard's existence is the solution;
  *                    its internal churn is not a new problem class)
  *   reverts        — commit hashes
- *   processPoints  — "num:done:title" strings (a tick or a new point counts)
+ *
+ * PROCESS POINTS DO NOT RE-ARM IT (point 1308, U7): a TASKS-only change — a
+ * tick, a new process point — used to stale the doc on its own, and every
+ * refresh it forced cost a commit/push/CI chain for a count. The rendered auto
+ * section still counts them (`retro-sources.mjs` still collects them); the
+ * count simply waits for the next memory, guard or revert change. One pure
+ * function, so the guard, guard-preflight and retro-refresh agree.
  */
-export function computeFingerprint({ memories = [], guards = [], reverts = [], processPoints = [] } = {}) {
+export function computeFingerprint({ memories = [], guards = [], reverts = [] } = {}) {
   const canonical = {
     memories: memories
       .map((m) => [String(m.name), String(m.hash)])
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)),
     guards: [...guards].map(String).sort(),
     reverts: reverts.map((r) => String(r.hash)).sort(),
-    processPoints: processPoints
-      .map((p) => `${p.num}:${p.done ? 'x' : 'o'}:${p.title}`)
-      .sort(),
   }
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex')
 }
