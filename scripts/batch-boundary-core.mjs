@@ -1140,7 +1140,7 @@ export function boundaryRequestDrainLine({ cause = BOUNDARY_CAUSES.POINT } = {})
         'the successor queues them.'
     : `${head} are drained now: \`finding.mjs --show "<title>"\`, append it VERBATIM to TASKS.md, ` +
         '`finding.mjs --appending "<title>" --point <N>`, commit, push main, THEN ' +
-        '`finding.mjs --queued "<title>" --point <N>` (proven on origin/main); `--commit` refuses while one waits. `--blocked` is ' +
+        '`finding.mjs --queued "<title>" --point <N>` (proven on origin/main); `--commit` refuses while one waits. `--blocked "<title>" --why "<reason>"` is ' +
         'only for a request that cannot be carried out — a deferral leaves it pending (past the watermark ' +
         'take the `--context` boundary instead).'
 }
