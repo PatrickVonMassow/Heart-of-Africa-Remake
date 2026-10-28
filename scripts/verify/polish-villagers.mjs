@@ -3415,6 +3415,13 @@ if (section('adult-errands')) {
       // Measured on this machine: 49 with the panorama shaded as it was, 1–4 as
       // it is now.
       const RIM_STEP_LIMIT = 12
+      // The strips are chosen from the blockers read HERE and judged on pictures
+      // taken later; a speech label that walks into a strip between the two reads
+      // a villager as a seam, and how far it walks depends on the frame rate. So
+      // village life is held still from this read through the last capture
+      // (point 642) — the water keeps moving, which is what the three captures
+      // are for.
+      await page.evaluate(() => window.__placeFreezeLife?.(true))
       const seam = await page.evaluate((r) => {
         const cam = window.__placeCamera
         const apply = (e, v) => [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
@@ -3451,6 +3458,7 @@ if (section('adult-errands')) {
         return { top, bottom, froth, blockers, w: window.innerWidth }
       }, river)
       if (!seam || !seam.top || !seam.bottom || !seam.froth) {
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
         check('the river’s rim is in the picture to measure (work-order 525)', false, JSON.stringify(seam))
       } else {
         const MARGIN = 6 // clearance kept from the handover zone
@@ -3506,6 +3514,7 @@ if (section('adult-errands')) {
           })
           await nextFrames(20)
         }
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
         const say = (c) => c.map((v) => v.toFixed(0)).join('/')
         const mid = readings[1]
         const step = pick(readings.map((r) => r.step), 0.5)
