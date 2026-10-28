@@ -10,8 +10,7 @@
 // verbatim and numbers it. See findings-request-core.mjs for why that window,
 // and not a note saying "the user wants something", has to write it.
 //
-// Usage:
-//   node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]
+// Usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]
 //   node scripts/finding.mjs --none "<why this turn found nothing>"
 //   node scripts/finding.mjs --drain                      list what still waits
 //   node scripts/finding.mjs --drained "<title substring>" (--point <N> | --why "<…>")

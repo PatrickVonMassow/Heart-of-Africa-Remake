@@ -46,15 +46,18 @@ export const USAGE = Object.freeze({
 export const wantsHelp = (argv = []) => argv.includes('--help') || argv.includes('-h')
 
 /**
- * The SessionStart synopsis: the first line of every entry, `usage: ` cut off,
+ * The SessionStart synopsis: the first line of every entry, its prefix cut off,
  * under one header. Throws on a malformed table — the hook catches it and omits
  * the synopsis, so a broken entry never costs the session start.
  */
+// Spelled in two parts so scripts/help.mjs does not harvest the code as a usage line.
+const PREFIX = 'usage' + ': '
+
 export function usageSynopsis(usage = USAGE) {
   const lines = Object.entries(usage).map(([name, text]) => {
     const first = String(text).split('\n')[0]
-    if (!first.startsWith('usage: ')) throw new Error(`usage of ${name} does not start with "usage: "`)
-    return `  ${first.slice('usage: '.length)}`
+    if (!first.startsWith(PREFIX)) throw new Error(`the usage of ${name} does not start with "${PREFIX}"`)
+    return `  ${first.slice(PREFIX.length)}`
   })
   return [
     'COMMAND SYNOPSIS (full syntax: the command with --help; run-wait, cross-review, board, batch-in-flight, author-delegate and focus print theirs the same way):',
