@@ -326,6 +326,34 @@ describe('progressGuardDecision at a point boundary (the point-373 witnesses)', 
 // three such rounds happened on the first live run. A boundary that only
 // survives a turn with nothing left to do is not a mechanism, because finding
 // something left to do is the Stop chain's whole purpose.
+describe('isClosingSetCommand — the anchored git closing duties (point 1308, U6)', () => {
+  it.each(['git fetch', 'git fetch origin --prune', 'git fetch -p --all', 'git branch -d feat/x', 'git worktree remove .claude/worktrees/x'])(
+    'accepts %s',
+    (command) => expect(isClosingSetCommand(command)).toBe(true),
+  )
+  it.each([
+    'git fetch --force origin main:saved-work',
+    'git fetch -f origin',
+    'git fetch origin +main:main',
+    'git fetch origin main:x',
+    'git fetch --update-head-ok',
+    'git fetch --tags',
+    'git branch -D feat/x',
+    'git branch -d -f x',
+    'git branch -d a b',
+    'git worktree remove --force .claude/worktrees/x',
+    'git worktree remove -f x',
+    'git fetch && git merge origin/main',
+    'git fetch $(cat x)',
+    'git fetch > log.txt',
+    'git fetch &',
+  ])('refuses %s', (command) => expect(isClosingSetCommand(command)).toBe(false))
+  it('keeps a taken boundary through the same forms (the heartbeat and the sealed boundary read this verdict)', () => {
+    expect(handoverSurvivesCall({ toolName: 'Bash', command: 'git branch -d feat/x' }).survives).toBe(true)
+    expect(handoverSurvivesCall({ toolName: 'Bash', command: 'git branch -D feat/x' }).survives).toBe(false)
+  })
+})
+
 describe('handoverSurvivesCall — closing work keeps the boundary, anything else ends it', () => {
   const call = (over) => handoverSurvivesCall({ toolName: 'Bash', ...over })
 
