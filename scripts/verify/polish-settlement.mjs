@@ -501,13 +501,20 @@ if (section('campfire-shadows')) {
   // Poll the cube-map tear-down/rebuild out rather than sleeping a fixed 1.5 s on
   // it: the measurement is the condition, so read it until two successive reads
   // agree, and judge the reading it settles on.
+  // Load-proof (point 642): the toggle takes hold over RENDERED frames, so the
+  // poll first lets the app draw 30 of them, and two agreeing reads are not
+  // enough — on a slow lane both can still show the state before the rebuild.
+  // Three consecutive agreements, each a frame-paced step apart.
   const settledContrasts = async () => {
+    await nextFrames(30)
     let prev = await fireContrasts()
-    const deadline = Date.now() + 25000
+    let agreed = 0
+    const deadline = Date.now() + 60000
     while (Date.now() < deadline) {
-      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 400))))
+      await nextFrames(10)
       const cur = await fireContrasts()
-      if (cur.every((c, i) => Math.abs(c - prev[i]) <= 4)) return cur
+      agreed = cur.every((c, i) => Math.abs(c - prev[i]) <= 4) ? agreed + 1 : 0
+      if (agreed >= 3) return cur
       prev = cur
     }
     return prev
