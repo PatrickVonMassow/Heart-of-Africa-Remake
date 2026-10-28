@@ -2053,18 +2053,6 @@ export const RED_CHARGES = [
       + 'the front, clear of the bound. The charge dies with point 642.',
   },
   {
-    point: 1448,
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^at least three unhidden fish are in the frame, each at least 25 px long$/i,
-    why:
-      'FILED AS 1448 ON 25.10.2026: red on main 6bd82b3ae and on feat/1414 9469159b5, webgpu, '
-      + 'villager-canoe section alone: the third fish ray hits an unnamed BoxGeometry first. '
-      + 'The charge dies with point 1448.',
-  },
-  {
     point: 1449,
     backend: 'webgpu',
     featureLevel: 'compatibility',
