@@ -195,9 +195,9 @@ export const awaitPlaceDrawn = async (label, capFrames = 900) => {
 }
 
 /** The frame shutter (point 375), behind the pipeline wait above. */
-export const frame = async (name, decl) => {
+export const frame = async (name, decl, extra) => {
   await awaitPlaceDrawn(name)
-  return shutter(name, decl)
+  return shutter(name, decl, extra)
 }
 
 /**

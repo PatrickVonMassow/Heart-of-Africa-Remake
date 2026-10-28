@@ -366,7 +366,9 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     const t = clock.elapsedTime
     const nm = canoe.netMan
     const sources = () => [{ x: nm.x, z: nm.z, register: 'call' as const }]
-    const said = stepCanoe(
+    // The dugout and its crew hold still under the dev life freeze too, so a
+    // pose read at a proof frame's shutter is the pose in the picture.
+    const said = isLifeFrozen() ? null : stepCanoe(
       canoe,
       lane,
       ring,
