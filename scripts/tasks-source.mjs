@@ -18,6 +18,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { isMainModule } from './is-main.mjs'
 
 export const TASKS_PATH = resolve(REPO_ROOT, 'TASKS.md')
 export const ARCHIVE_PATH = resolve(REPO_ROOT, 'docs/tasks-archive.md')
@@ -78,4 +79,10 @@ export function openPointStatus({ tasksText = '', archiveText = '' } = {}) {
   }
   const ticksExist = /- \[x\] \d+\./.test(String(archiveText))
   return { open, alarm: open === 0 && sawCheckbox && !ticksExist }
+}
+
+// Started directly (`--help` or anything else): a module, so it prints how to use it.
+if (isMainModule(import.meta.url)) {
+  const { USAGE } = await import('./cli-usage.mjs')
+  console.log(USAGE['tasks-source'])
 }
