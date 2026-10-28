@@ -32,7 +32,7 @@
 // again (`--clear`). Otherwise `batch-progress-guard` stops demanding work the
 // session cannot do while it waits — and it stops the moment the evidence stops
 // checking out, or the declaration ages out.
-import { readFileSync, rmSync, statSync, existsSync } from 'node:fs'
+import { readFileSync, rmSync, statSync, existsSync, renameSync, linkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -216,6 +216,39 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
   } catch {
     return false
   }
+}
+
+/**
+ * Remove the declaration only when it is waiting on `waitingOn` (point 1308).
+ * The file is first renamed aside, so the compare judges exactly the copy that
+ * is removed; a declaration written meanwhile lands beside it and stays. A
+ * non-matching copy is linked back unless a newer one already took its place.
+ * @returns {{cleared: boolean, prior: object|null, error?: string}}
+ */
+export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAside = () => {} } = {}) {
+  const aside = `${path}.clear-${process.pid}-${Date.now()}`
+  try {
+    renameSync(path, aside)
+  } catch (e) {
+    return e?.code === 'ENOENT' ? { cleared: false, prior: null } : { cleared: false, prior: null, error: String(e?.message ?? e) }
+  }
+  afterAside() // test seam: a writer racing the compare
+  const prior = readDeclaration(aside)
+  if (prior?.waitingOn === waitingOn) {
+    try {
+      rmSync(aside, { force: true })
+      return { cleared: true, prior }
+    } catch (e) {
+      return { cleared: false, prior, error: String(e?.message ?? e) }
+    }
+  }
+  try {
+    linkSync(aside, path)
+  } catch (e) {
+    if (e?.code !== 'EEXIST') return { cleared: false, prior, error: `could not restore ${path}: ${e?.message ?? e} (copy kept at ${aside})` }
+  }
+  rmSync(aside, { force: true })
+  return { cleared: false, prior }
 }
 
 /**
@@ -1708,18 +1741,28 @@ if (isMain) {
     )
     process.exit(1)
   } else if (argv[0] === '--clear') {
-    const prior = readDeclaration()
-    // `--if-waiting-on <name>` (point 1308, Sol review of 28df442): the compare
-    // and the removal happen in this one call, so a waiting command clears only
-    // its own declaration even when another replaced it after the command read it.
+    // `--if-waiting-on <name>` (point 1308, Sol reviews of 28df442 and 8659f41):
+    // compare and removal act on one renamed-aside copy, so a waiting command
+    // clears only its own declaration even when another replaces it meanwhile.
     const onlyIf = argv[1] === '--if-waiting-on' ? String(argv[2] ?? '') : null
-    if (onlyIf !== null && prior?.waitingOn !== onlyIf) {
-      console.log(`in-flight declaration left as it is — it is not "${onlyIf}".`)
-      process.exit(0)
+    let prior
+    if (onlyIf !== null) {
+      const peek = readDeclaration()
+      const refusal = transferredMutationRefusal({ declaration: peek, marker: readBoundaryMarker() })
+      if (refusal) fail(refusal)
+      const r = clearDeclarationIf(onlyIf)
+      if (r.error) fail(`in-flight declaration NOT cleared: ${r.error}`)
+      if (!r.cleared) {
+        console.log(`in-flight declaration left as it is — it is not "${onlyIf}".`)
+        process.exit(0)
+      }
+      prior = r.prior
+    } else {
+      prior = readDeclaration()
+      const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
+      if (refusal) fail(refusal)
+      if (!clearDeclaration()) fail(`in-flight declaration NOT cleared: ${IN_FLIGHT_PATH} could not be removed`)
     }
-    const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
-    if (refusal) fail(refusal)
-    clearDeclaration()
     // …and the lease extension the declaration bought (point 556). The lock must
     // not go on carrying a `declaredWait` whose declaration is gone: the marker is
     // what makes the window conditional, and a conditional window with nothing left

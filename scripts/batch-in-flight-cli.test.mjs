@@ -2,12 +2,12 @@
 // loop against an isolated repository so a bare --transferable cannot skip the
 // option that follows it, and assert what is actually persisted.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { reapDeadDeclaration } from './batch-in-flight.mjs'
+import { clearDeclarationIf, reapDeadDeclaration } from './batch-in-flight.mjs'
 const CLI = resolve(import.meta.dirname, 'batch-in-flight.mjs')
 const OWNER = 'cli-owner'
 let root = ''
@@ -328,6 +328,67 @@ describe('--clear --if-waiting-on (point 1308)', () => {
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain('declaration cleared')
     expect(existsSync(inFlightPath())).toBe(false)
+  })
+  it('refuses loudly and keeps the declaration when it cannot be removed', () => {
+    standing('mine')
+    const dir = join(inFlightPath(), '..')
+    chmodSync(dir, 0o500)
+    try {
+      const result = clearIf('mine')
+      expect(result.status).not.toBe(0)
+      expect(result.stderr + result.stdout).toContain('NOT cleared')
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+    expect(declaration().waitingOn).toBe('mine')
+  })
+})
+
+describe('clearDeclarationIf (point 1308)', () => {
+  let dir
+  let path
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'hoa-inflight-clearif-'))
+    path = join(dir, 'batch-in-flight.json')
+  })
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+  const put = (waitingOn) => writeFileSync(path, JSON.stringify({ waitingOn }))
+  const read = () => JSON.parse(readFileSync(path, 'utf8'))
+  it('keeps a declaration written between the rename and the compare', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { afterAside: () => put('theirs') })
+    expect(r.cleared).toBe(true)
+    expect(read().waitingOn).toBe('theirs')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('does not restore an older non-matching copy over a newer one', () => {
+    put('old')
+    const r = clearDeclarationIf('mine', path, { afterAside: () => put('newer') })
+    expect(r).toMatchObject({ cleared: false })
+    expect(r.error).toBeUndefined()
+    expect(read().waitingOn).toBe('newer')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('restores a non-matching declaration unchanged', () => {
+    put('theirs')
+    expect(clearDeclarationIf('mine', path).cleared).toBe(false)
+    expect(read().waitingOn).toBe('theirs')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('reports no declaration without an error', () => {
+    expect(clearDeclarationIf('mine', path)).toEqual({ cleared: false, prior: null })
+  })
+  it('reports a failed rename as an error', () => {
+    put('mine')
+    chmodSync(dir, 0o500)
+    try {
+      const r = clearDeclarationIf('mine', path)
+      expect(r.cleared).toBe(false)
+      expect(r.error).toBeTruthy()
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+    expect(read().waitingOn).toBe('mine')
   })
 })
 
