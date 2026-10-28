@@ -180,7 +180,7 @@ describe('registered writer liveness beside detached verification output', () =>
     })
   })
 
-  it.each(['src/author.ts', 'docs/author.md'])(
+  it.each(['src/author.ts', 'docs/author.md', '.claude/hooks/author.mjs', '.claude/commands/author.md'])(
     'ignores bookkeeping files under .claude/, but still vetoes a fresh %s', (path) => {
       withCheckout(({ git, touch, measure }) => {
         touch('.claude/queue-rank.json', '{}')
