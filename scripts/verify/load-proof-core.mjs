@@ -1,0 +1,136 @@
+// LOAD-PROOF CHECKS, the two kinds (point 642). A loaded machine must neither
+// manufacture a red nor hide one, and that splits every browser check in two:
+//
+// 1. A STATE check (does it exist, is it drawn there, what does the label read) is
+//    made load-proof: polled on the app's own frames or sim clock, and every side of
+//    a comparison read in ONE evaluation. `findSplitComparisons` is the gate that
+//    keeps the opposite shape out of scripts/verify — two consecutive
+//    `await x.evaluate(...)` reads whose results meet in one comparison. Nothing
+//    happens between the two reads except the frames the round trip lets pass, so
+//    their sides describe two different moments and load decides the verdict.
+//    A before/after pair with an action between the reads is a different shape and
+//    is not refused.
+// 2. A TIMING check (a rate, a frame budget, a settle deadline) is load-sensitive by
+//    nature. It DECLARES the throughput it needs and `laneSkipVerdict` decides, from
+//    the lane's measured frame rate, whether the lane can answer it. Below the
+//    declared figure the check is reported UNMEASURED with the measured rate, never
+//    red and never silently green; at or above it the identical check runs.
+import ts from 'typescript'
+
+/**
+ * Can this lane answer a check that needs `needFps` delivered frames per second?
+ * `measuredFps` is the rate the run measured once from the running page; a missing
+ * measurement runs the check for real — a skip must always name a measured rate.
+ */
+export function laneSkipVerdict({ needFps, measuredFps }) {
+  if (!(typeof needFps === 'number' && needFps > 0)) {
+    throw new Error(`laneSkipVerdict: a timing check must declare a positive needFps, got ${needFps}`)
+  }
+  if (!(typeof measuredFps === 'number' && Number.isFinite(measuredFps))) return { skip: false, reason: null }
+  if (measuredFps >= needFps) return { skip: false, reason: null }
+  return {
+    skip: true,
+    reason: `lane delivers ${measuredFps.toFixed(1)} fps, the check needs ${needFps} fps — this lane cannot answer it`,
+  }
+}
+
+/** Page function: count the frames the page delivers over `ms` of wall time, in ONE
+ *  evaluation. Returns frames per second. Serialised into the page, so it is
+ *  self-contained. */
+export function laneFpsProbe(ms = 2000) {
+  return new Promise((resolve) => {
+    let frames = 0
+    let t0 = null
+    const tick = (t) => {
+      if (t0 === null) t0 = t
+      else frames++
+      if (t - t0 < ms) requestAnimationFrame(tick)
+      else resolve((frames * 1000) / Math.max(1, t - t0))
+    }
+    requestAnimationFrame(tick)
+  })
+}
+
+const COMPARISON = new Set([
+  ts.SyntaxKind.LessThanToken,
+  ts.SyntaxKind.GreaterThanToken,
+  ts.SyntaxKind.LessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanEqualsToken,
+  ts.SyntaxKind.EqualsEqualsToken,
+  ts.SyntaxKind.EqualsEqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsEqualsToken,
+  ts.SyntaxKind.MinusToken,
+])
+
+/** `const A = await <expr>.evaluate(...)` with one plain identifier → 'A', else null. */
+function evaluateBinding(stmt) {
+  if (!ts.isVariableStatement(stmt)) return null
+  const decls = stmt.declarationList.declarations
+  if (decls.length !== 1 || !ts.isIdentifier(decls[0].name) || !decls[0].initializer) return null
+  const init = decls[0].initializer
+  if (!ts.isAwaitExpression(init) || !ts.isCallExpression(init.expression)) return null
+  const callee = init.expression.expression
+  return ts.isPropertyAccessExpression(callee) && callee.name.text === 'evaluate' ? decls[0].name.text : null
+}
+
+function mentions(node, name) {
+  let hit = false
+  const visit = (n) => {
+    if (hit) return
+    if (ts.isIdentifier(n) && n.text === name) hit = true
+    else ts.forEachChild(n, visit)
+  }
+  visit(node)
+  return hit
+}
+
+/**
+ * The gate: every comparison in `source` assembled from two separate, consecutive
+ * `await x.evaluate(...)` reads. Returns `[{ line, first, second, text }]` (line is
+ * 1-based, the comparison's own line).
+ */
+export function findSplitComparisons(source, fileName = 'source.mjs') {
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  const findings = []
+  const scanBlock = (statements) => {
+    for (let i = 0; i < statements.length; i++) {
+      const run = []
+      let j = i
+      for (; j < statements.length; j++) {
+        const name = evaluateBinding(statements[j])
+        if (!name) break
+        run.push(name)
+      }
+      if (run.length < 2) continue
+      const pairs = []
+      for (let a = 0; a < run.length; a++) for (let b = a + 1; b < run.length; b++) pairs.push([run[a], run[b]])
+      const visit = (n) => {
+        if (ts.isBinaryExpression(n) && COMPARISON.has(n.operatorToken.kind)) {
+          for (const [x, y] of pairs) {
+            const xy = mentions(n.left, x) && mentions(n.right, y)
+            const yx = mentions(n.left, y) && mentions(n.right, x)
+            if (xy || yx) {
+              findings.push({
+                line: sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1,
+                first: x,
+                second: y,
+                text: n.getText(sf).replace(/\s+/g, ' ').slice(0, 120),
+              })
+            }
+          }
+        }
+        ts.forEachChild(n, visit)
+      }
+      for (let k = j; k < statements.length; k++) visit(statements[k])
+      i = j - 1
+    }
+  }
+  const walk = (n) => {
+    if (ts.isSourceFile(n) || ts.isBlock(n) || ts.isModuleBlock(n)) scanBlock(n.statements)
+    else if (ts.isCaseClause(n) || ts.isDefaultClause(n)) scanBlock(n.statements)
+    ts.forEachChild(n, walk)
+  }
+  walk(sf)
+  return findings
+}

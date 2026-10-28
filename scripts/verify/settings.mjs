@@ -1268,8 +1268,12 @@ if (section('render-leak-watch')) {
     // The other half: a REAL leak must be caught. forceLeak() allocates render
     // targets and initialises them (which is what three counts) without ever
     // disposing them — exactly the shape of the point-276 pipeline-rebuild leak.
-    const rtBefore = await page.evaluate(() => window.__renderer.info.memory.renderTargets)
-    const rtAfter = await page.evaluate(() => window.__renderLeak.forceLeak(6))
+    // Both counts in ONE evaluation (point 642): a frame between two round trips may
+    // dispose an unrelated target and shift the baseline.
+    const { rtBefore, rtAfter } = await page.evaluate(() => {
+      const rtBefore = window.__renderer.info.memory.renderTargets
+      return { rtBefore, rtAfter: window.__renderLeak.forceLeak(6) }
+    })
     check('the forced leak really raises the render-target count', rtAfter >= rtBefore + 6,
       `${rtBefore} -> ${rtAfter}`)
     await transition((v) => window.__ui.getState().setTraaEnabled(v), false)
