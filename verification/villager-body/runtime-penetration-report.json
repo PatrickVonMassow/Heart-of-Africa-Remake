@@ -4,13 +4,13 @@
   "walk": {
    "g-robe-chest": {
     "cloth": {
-     "value": 0.03814328167553276,
-     "at": "walk t 2.10 s (male adult build +0.0)",
+     "value": 0.0360939405753807,
+     "at": "walk t 2.30 s (male adult build +0.0)",
      "over": 12,
-     "part": "shin.L"
+     "part": "shin.R"
     },
     "shown": {
-     "value": 0.008396429009735584,
+     "value": 0.011601799167692661,
      "at": "walk t 1.70 s (male adult build +0.0)",
      "over": 3,
      "part": "thigh.R"
@@ -44,75 +44,65 @@
      "walk": 12
     },
     "cases": {
+     "cloth walk hand.L None": {
+      "value": 0.007904653067609426,
+      "at": "walk t 2.30 s (male adult build +0.0)",
+      "over": 6
+     },
      "cloth walk shin.L None": {
-      "value": 0.03814328167553276,
+      "value": 0.0359078745472764,
       "at": "walk t 2.10 s (male adult build +0.0)",
       "over": 12
      },
      "cloth walk shin.R None": {
-      "value": 0.03448356004575012,
-      "at": "walk t 1.50 s (male adult build +0.0)",
+      "value": 0.0360939405753807,
+      "at": "walk t 2.30 s (male adult build +0.0)",
       "over": 12
      },
      "cloth walk thigh.R None": {
-      "value": 0.03193059955083397,
-      "at": "walk t 1.50 s (male adult build +0.0)",
+      "value": 0.03585452917106684,
+      "at": "walk t 2.30 s (male adult build +0.0)",
       "over": 7
      },
      "cloth walk upperArm.L None": {
-      "value": 0.02033690171341434,
-      "at": "walk t 2.60 s (male adult build +0.0)",
-      "over": 10
+      "value": 0.01932177495932989,
+      "at": "walk t 2.30 s (male adult build +0.0)",
+      "over": 9
      },
      "cloth walk upperArm.R None": {
-      "value": 0.023997435136508777,
-      "at": "walk t 2.00 s (male adult build +0.0)",
-      "over": 11
+      "value": 0.0246087439773111,
+      "at": "walk t 1.90 s (male adult build +0.0)",
+      "over": 12
      },
      "cloth walk hand.R None": {
-      "value": 0.008216467325301693,
-      "at": "walk t 1.70 s (male adult build +0.0)",
-      "over": 5
-     },
-     "shown walk thigh.R None": {
-      "value": 0.008396429009735584,
-      "at": "walk t 1.70 s (male adult build +0.0)",
-      "over": 3
-     },
-     "cloth walk chest None": {
-      "value": 0.005519185606724302,
+      "value": 0.005877219965446199,
       "at": "walk t 1.90 s (male adult build +0.0)",
-      "over": 3
+      "over": 5
      },
      "cloth walk thigh.L None": {
-      "value": 0.03481535443237275,
-      "at": "walk t 2.20 s (male adult build +0.0)",
-      "over": 5
+      "value": 0.03464571288851223,
+      "at": "walk t 2.10 s (male adult build +0.0)",
+      "over": 10
      },
-     "cloth walk hand.L None": {
-      "value": 0.00953158497475296,
-      "at": "walk t 2.20 s (male adult build +0.0)",
-      "over": 5
+     "shown walk thigh.R None": {
+      "value": 0.011601799167692661,
+      "at": "walk t 1.70 s (male adult build +0.0)",
+      "over": 3
      },
      "cloth walk forearm.L None": {
-      "value": 0.01809773988853511,
+      "value": 0.014874838397045741,
       "at": "walk t 2.60 s (male adult build +0.0)",
       "over": 4
      },
-     "cloth walk neck None": {
-      "value": 0.010554335131156141,
-      "at": "walk t 2.50 s (male adult build +0.0)",
-      "over": 3
-     },
      "cloth walk foot.L None": {
-      "value": 0.015351605748497263,
-      "at": "walk t 2.60 s (male adult build +0.0)",
-      "over": 2
+      "value": 0.004279237863175635,
+      "at": "walk t 2.40 s (male adult build +0.0)",
+      "over": 1
      }
     },
     "clips": {
-     "cloth walk": 0.03814328167553276,
-     "shown walk": 0.008396429009735584,
+     "cloth walk": 0.0360939405753807,
+     "shown walk": 0.011601799167692661,
      "hole walk": 0.0,
      "cut walk": 0.0
     }
@@ -160,23 +150,26 @@
     },
     "cases": {},
     "clips": {
-     "cloth walk": 0.0
+     "cloth walk": 0.0,
+     "shown walk": 0.0,
+     "hole walk": 0.0,
+     "cut walk": 0.0
     }
    }
   },
   "turn": {
    "g-robe-chest": {
     "cloth": {
-     "value": 0.035771421031971264,
-     "at": "turn t 0.67 s (male adult build +0.0)",
+     "value": 0.03832611793748075,
+     "at": "turn t 0.79 s (male adult build +0.0)",
      "over": 12,
-     "part": "shin.R"
+     "part": "thigh.L"
     },
     "shown": {
-     "value": 0.0,
-     "at": null,
-     "over": 0,
-     "part": null
+     "value": 0.017619747668504715,
+     "at": "turn t 0.79 s (male adult build +0.0)",
+     "over": 5,
+     "part": "thigh.R"
     },
     "hole": {
      "value": 0.0,
@@ -185,10 +178,10 @@
      "part": null
     },
     "cut": {
-     "value": 0.0,
-     "at": null,
+     "value": 0.01378133986145258,
+     "at": "turn t 0.79 s (male adult build +0.0)",
      "over": 0,
-     "part": null
+     "part": "thigh.R"
     },
     "inner": {
      "value": 0.0,
@@ -207,77 +200,72 @@
      "turn": 12
     },
     "cases": {
-     "cloth turn chest None": {
-      "value": 0.010542918969578844,
-      "at": "turn t 1.50 s (male adult build +0.0)",
-      "over": 8
-     },
      "cloth turn foot.L None": {
-      "value": 0.018674885283160837,
+      "value": 0.013820888795056493,
       "at": "turn t 1.38 s (male adult build +0.0)",
       "over": 6
      },
      "cloth turn forearm.L None": {
-      "value": 0.017047038884983923,
+      "value": 0.011064171507302111,
       "at": "turn t 1.38 s (male adult build +0.0)",
-      "over": 5
-     },
-     "cloth turn forearm.R None": {
-      "value": 0.010754443314483438,
-      "at": "turn t 0.32 s (male adult build +0.0)",
-      "over": 5
-     },
-     "cloth turn hand.L None": {
-      "value": 0.01569938251819868,
-      "at": "turn t 1.50 s (male adult build +0.0)",
       "over": 6
      },
-     "cloth turn hand.R None": {
-      "value": 0.015602784402033509,
-      "at": "turn t 0.20 s (male adult build +0.0)",
-      "over": 8
-     },
      "cloth turn shin.L None": {
-      "value": 0.03357571549046868,
-      "at": "turn t 0.79 s (male adult build +0.0)",
+      "value": 0.038151671047303444,
+      "at": "turn t 0.91 s (male adult build +0.0)",
       "over": 11
      },
-     "cloth turn spine1 None": {
-      "value": 0.010775410323945786,
-      "at": "turn t 0.32 s (male adult build +0.0)",
-      "over": 5
-     },
      "cloth turn thigh.L None": {
-      "value": 0.03256178094836307,
+      "value": 0.03832611793748075,
       "at": "turn t 0.79 s (male adult build +0.0)",
       "over": 10
      },
      "cloth turn upperArm.L None": {
-      "value": 0.017990711767103675,
+      "value": 0.016419223309293324,
       "at": "turn t 0.44 s (male adult build +0.0)",
       "over": 8
      },
      "cloth turn upperArm.R None": {
-      "value": 0.023759285177030017,
-      "at": "turn t 0.67 s (male adult build +0.0)",
-      "over": 11
+      "value": 0.024193150003694108,
+      "at": "turn t 1.03 s (male adult build +0.0)",
+      "over": 12
      },
      "cloth turn shin.R None": {
-      "value": 0.035771421031971264,
-      "at": "turn t 0.67 s (male adult build +0.0)",
-      "over": 6
+      "value": 0.03593719952089931,
+      "at": "turn t 0.44 s (male adult build +0.0)",
+      "over": 8
      },
      "cloth turn thigh.R None": {
-      "value": 0.033489609124469716,
+      "value": 0.03415742432217409,
       "at": "turn t 0.55 s (male adult build +0.0)",
+      "over": 7
+     },
+     "cloth turn hand.R None": {
+      "value": 0.004458407960031922,
+      "at": "turn t 1.15 s (male adult build +0.0)",
+      "over": 7
+     },
+     "cloth turn foot.R None": {
+      "value": 0.018346692225409265,
+      "at": "turn t 0.67 s (male adult build +0.0)",
+      "over": 1
+     },
+     "shown turn thigh.R None": {
+      "value": 0.017619747668504715,
+      "at": "turn t 0.79 s (male adult build +0.0)",
+      "over": 5
+     },
+     "shown turn shin.R None": {
+      "value": 0.003116987179964781,
+      "at": "turn t 1.03 s (male adult build +0.0)",
       "over": 3
      }
     },
     "clips": {
-     "cloth turn": 0.035771421031971264,
-     "shown turn": 0.0,
+     "cloth turn": 0.03832611793748075,
+     "shown turn": 0.017619747668504715,
      "hole turn": 0.0,
-     "cut turn": 0.0
+     "cut turn": 0.01378133986145258
     }
    },
    "g-cap-crown": {
@@ -323,22 +311,25 @@
     },
     "cases": {},
     "clips": {
-     "cloth turn": 0.0
+     "cloth turn": 0.0,
+     "shown turn": 0.0,
+     "hole turn": 0.0,
+     "cut turn": 0.0
     }
    }
   },
   "run": {
    "g-robe-chest": {
     "cloth": {
-     "value": 0.03496621963045619,
-     "at": "run t 1.81 s (male adult build -0.6)",
+     "value": 0.03683017836667965,
+     "at": "run t 1.97 s (male adult build -0.6)",
      "over": 10,
-     "part": "thigh.L"
+     "part": "shin.R"
     },
     "shown": {
-     "value": 0.01290633250027895,
-     "at": "run t 2.04 s (male adult build -0.6)",
-     "over": 4,
+     "value": 0.024729296565055847,
+     "at": "run t 1.73 s (male adult build -0.6)",
+     "over": 3,
      "part": "thigh.R"
     },
     "hole": {
@@ -348,10 +339,10 @@
      "part": null
     },
     "cut": {
-     "value": 0.0024728679563850164,
-     "at": "run t 2.04 s (male adult build -0.6)",
+     "value": 0.015185138210654259,
+     "at": "run t 1.73 s (male adult build -0.6)",
      "over": 0,
-     "part": "thigh.R"
+     "part": "shin.R"
     },
     "inner": {
      "value": 0.0,
@@ -370,57 +361,57 @@
      "run": 10
     },
     "cases": {
-     "cloth run chest None": {
-      "value": 0.013315921854570924,
-      "at": "run t 1.73 s (male adult build -0.6)",
-      "over": 9
-     },
      "cloth run forearm.L None": {
-      "value": 0.022787027781988038,
-      "at": "run t 1.89 s (male adult build -0.6)",
-      "over": 10
+      "value": 0.02137153591059333,
+      "at": "run t 1.50 s (male adult build -0.6)",
+      "over": 8
      },
      "cloth run shin.L None": {
-      "value": 0.03457745482797828,
-      "at": "run t 1.50 s (male adult build -0.6)",
+      "value": 0.03604986937332427,
+      "at": "run t 1.73 s (male adult build -0.6)",
       "over": 10
      },
      "cloth run shin.R None": {
-      "value": 0.034508412826445525,
-      "at": "run t 1.89 s (male adult build -0.6)",
+      "value": 0.03683017836667965,
+      "at": "run t 1.97 s (male adult build -0.6)",
       "over": 10
      },
      "cloth run thigh.L None": {
-      "value": 0.03496621963045619,
+      "value": 0.03573913071333146,
       "at": "run t 1.81 s (male adult build -0.6)",
       "over": 10
      },
      "cloth run thigh.R None": {
-      "value": 0.03341261547869943,
-      "at": "run t 1.89 s (male adult build -0.6)",
-      "over": 7
+      "value": 0.03409517986101188,
+      "at": "run t 2.12 s (male adult build -0.6)",
+      "over": 10
      },
      "cloth run upperArm.L None": {
-      "value": 0.021974164573811475,
-      "at": "run t 1.66 s (male adult build -0.6)",
-      "over": 10
+      "value": 0.023501668965335863,
+      "at": "run t 2.04 s (male adult build -0.6)",
+      "over": 7
      },
      "cloth run upperArm.R None": {
-      "value": 0.02208899866635342,
-      "at": "run t 2.04 s (male adult build -0.6)",
-      "over": 10
+      "value": 0.022233256443605562,
+      "at": "run t 1.73 s (male adult build -0.6)",
+      "over": 7
+     },
+     "shown run shin.R None": {
+      "value": 0.016684817150235176,
+      "at": "run t 1.73 s (male adult build -0.6)",
+      "over": 2
      },
      "shown run thigh.R None": {
-      "value": 0.01290633250027895,
-      "at": "run t 2.04 s (male adult build -0.6)",
-      "over": 4
+      "value": 0.024729296565055847,
+      "at": "run t 1.73 s (male adult build -0.6)",
+      "over": 3
      }
     },
     "clips": {
-     "cloth run": 0.03496621963045619,
-     "shown run": 0.01290633250027895,
+     "cloth run": 0.03683017836667965,
+     "shown run": 0.024729296565055847,
      "hole run": 0.0,
-     "cut run": 0.0024728679563850164
+     "cut run": 0.015185138210654259
     }
    },
    "g-cap-crown": {
@@ -466,20 +457,23 @@
     },
     "cases": {},
     "clips": {
-     "cloth run": 0.0
+     "cloth run": 0.0,
+     "shown run": 0.0,
+     "hole run": 0.0,
+     "cut run": 0.0
     }
    }
   },
   "dig": {
    "g-robe-chest": {
     "cloth": {
-     "value": 0.036405029025698414,
-     "at": "dig t 1.77 s (male adult build +0.0)",
+     "value": 0.03997014321635721,
+     "at": "dig t 1.34 s (male adult build +0.0)",
      "over": 12,
-     "part": "thigh.L"
+     "part": "upperArm.L"
     },
     "shown": {
-     "value": 0.003736271755769849,
+     "value": 0.003876420669257641,
      "at": "dig t 2.86 s (male adult build +0.0)",
      "over": 2,
      "part": "spine"
@@ -514,79 +508,79 @@
     },
     "cases": {
      "cloth dig chest None": {
-      "value": 0.02919999696314335,
-      "at": "dig t 1.34 s (male adult build +0.0)",
-      "over": 12
+      "value": 0.032481955738203776,
+      "at": "dig t 1.12 s (male adult build +0.0)",
+      "over": 11
      },
      "cloth dig forearm.L None": {
-      "value": 0.02408708135428439,
+      "value": 0.023995246164839668,
       "at": "dig t 2.65 s (male adult build +0.0)",
       "over": 12
      },
      "cloth dig neck None": {
-      "value": 0.030019599944353104,
-      "at": "dig t 3.08 s (male adult build +0.0)",
-      "over": 11
+      "value": 0.01924939959495985,
+      "at": "dig t 1.12 s (male adult build +0.0)",
+      "over": 9
      },
      "cloth dig shin.L None": {
-      "value": 0.03467304304291792,
-      "at": "dig t 2.86 s (male adult build +0.0)",
+      "value": 0.035391716385644346,
+      "at": "dig t 1.77 s (male adult build +0.0)",
       "over": 12
      },
      "cloth dig shin.R None": {
-      "value": 0.03474184758852841,
-      "at": "dig t 2.86 s (male adult build +0.0)",
+      "value": 0.03594741540790564,
+      "at": "dig t 1.12 s (male adult build +0.0)",
       "over": 12
      },
      "cloth dig shoulder.L None": {
-      "value": 0.014930215664207935,
+      "value": 0.011328257620334625,
       "at": "dig t 0.90 s (male adult build +0.0)",
       "over": 5
      },
      "cloth dig thigh.L None": {
-      "value": 0.036405029025698414,
-      "at": "dig t 1.77 s (male adult build +0.0)",
+      "value": 0.03636644198638664,
+      "at": "dig t 1.12 s (male adult build +0.0)",
       "over": 12
      },
      "cloth dig thigh.R None": {
-      "value": 0.03426022338619618,
-      "at": "dig t 2.86 s (male adult build +0.0)",
+      "value": 0.036037846292330346,
+      "at": "dig t 1.34 s (male adult build +0.0)",
       "over": 12
      },
      "cloth dig upperArm.L None": {
-      "value": 0.03414568956498668,
+      "value": 0.03997014321635721,
       "at": "dig t 1.34 s (male adult build +0.0)",
       "over": 12
      },
      "cloth dig upperArm.R None": {
-      "value": 0.024762856350291868,
-      "at": "dig t 1.12 s (male adult build +0.0)",
+      "value": 0.0251783595552873,
+      "at": "dig t 2.86 s (male adult build +0.0)",
       "over": 12
      },
      "cloth dig shoulder.R None": {
-      "value": 0.008706820329705113,
-      "at": "dig t 2.21 s (male adult build +0.0)",
+      "value": 0.01007265715794677,
+      "at": "dig t 2.86 s (male adult build +0.0)",
       "over": 4
      },
      "cloth dig spine None": {
-      "value": 0.026254286989569664,
+      "value": 0.02799638733267784,
       "at": "dig t 2.86 s (male adult build +0.0)",
       "over": 3
      },
      "cloth dig spine1 None": {
-      "value": 0.02951846644282341,
-      "at": "dig t 2.86 s (male adult build +0.0)",
+      "value": 0.027298463508486748,
+      "at": "dig t 3.08 s (male adult build +0.0)",
       "over": 2
      },
      "shown dig spine None": {
-      "value": 0.003736271755769849,
+      "value": 0.003876420669257641,
       "at": "dig t 2.86 s (male adult build +0.0)",
       "over": 2
      }
     },
     "clips": {
-     "cloth dig": 0.036405029025698414,
-     "shown dig": 0.003736271755769849,
+     "cloth dig": 0.03997014321635721,
+     "shown dig": 0.003876420669257641,
      "hole dig": 0.0,
      "cut dig": 0.0
     }
@@ -634,35 +628,38 @@
     },
     "cases": {},
     "clips": {
-     "cloth dig": 0.0
+     "cloth dig": 0.0,
+     "shown dig": 0.0,
+     "hole dig": 0.0,
+     "cut dig": 0.0
     }
    }
   },
   "pickup": {
    "g-wrapLong-chest": {
     "cloth": {
-     "value": 0.03170020150824383,
-     "at": "pickup t 0.39 s (female adult build -0.6)",
+     "value": 0.033940549939870834,
+     "at": "pickup t 1.41 s (female adult build -0.6)",
      "over": 12,
-     "part": "shin.L"
+     "part": "chest"
     },
     "shown": {
-     "value": 0.0,
-     "at": null,
-     "over": 0,
-     "part": null
+     "value": 0.02243461087346077,
+     "at": "pickup t 1.41 s (female adult build -0.6)",
+     "over": 7,
+     "part": "chest"
     },
     "hole": {
-     "value": 0.0,
-     "at": null,
-     "over": 0,
-     "part": null
+     "value": 0.003810293972492218,
+     "at": "pickup t 1.41 s (female adult build -0.6)",
+     "over": 7,
+     "part": "thigh.R"
     },
     "cut": {
-     "value": 0.0018788346787914634,
-     "at": "pickup t 0.68 s (female adult build -0.6)",
+     "value": 0.011570248752832413,
+     "at": "pickup t 1.41 s (female adult build -0.6)",
      "over": 0,
-     "part": "hips"
+     "part": "spine"
     },
     "inner": {
      "value": 0.0,
@@ -681,70 +678,80 @@
      "pickup": 12
     },
     "cases": {
-     "cloth pickup forearm.L None": {
-      "value": 0.021121013976751767,
-      "at": "pickup t 0.39 s (female adult build -0.6)",
-      "over": 12
-     },
-     "cloth pickup forearm.R None": {
-      "value": 0.015002781209104551,
-      "at": "pickup t 1.70 s (female adult build -0.6)",
-      "over": 4
-     },
-     "cloth pickup hand.L None": {
-      "value": 0.012609561816590715,
-      "at": "pickup t 1.26 s (female adult build -0.6)",
-      "over": 12
-     },
-     "cloth pickup hand.R None": {
-      "value": 0.009132951154908883,
-      "at": "pickup t 0.10 s (female adult build -0.6)",
-      "over": 4
-     },
-     "cloth pickup upperArm.L None": {
-      "value": 0.020908284534904054,
-      "at": "pickup t 1.41 s (female adult build -0.6)",
-      "over": 12
-     },
      "cloth pickup upperArm.R None": {
-      "value": 0.010995810667737702,
-      "at": "pickup t 0.10 s (female adult build -0.6)",
+      "value": 0.00973628844279963,
+      "at": "pickup t 0.39 s (female adult build -0.6)",
       "over": 5
      },
+     "cloth pickup hand.R None": {
+      "value": 0.011083243027013061,
+      "at": "pickup t 1.55 s (female adult build -0.6)",
+      "over": 3
+     },
      "cloth pickup shin.L None": {
-      "value": 0.03170020150824383,
+      "value": 0.03216007271653915,
       "at": "pickup t 0.39 s (female adult build -0.6)",
       "over": 10
      },
      "cloth pickup shin.R None": {
-      "value": 0.03089030065734452,
+      "value": 0.03056628341204064,
       "at": "pickup t 0.39 s (female adult build -0.6)",
       "over": 10
      },
      "cloth pickup thigh.L None": {
-      "value": 0.030779510266688816,
+      "value": 0.03232666407732422,
       "at": "pickup t 0.39 s (female adult build -0.6)",
       "over": 10
      },
      "cloth pickup thigh.R None": {
-      "value": 0.02460794505931302,
-      "at": "pickup t 1.55 s (female adult build -0.6)",
+      "value": 0.025418258405599428,
+      "at": "pickup t 1.41 s (female adult build -0.6)",
       "over": 9
+     },
+     "cloth pickup chest None": {
+      "value": 0.033940549939870834,
+      "at": "pickup t 1.41 s (female adult build -0.6)",
+      "over": 7
+     },
+     "shown pickup chest None": {
+      "value": 0.02243461087346077,
+      "at": "pickup t 1.41 s (female adult build -0.6)",
+      "over": 7
+     },
+     "hole pickup thigh.R None": {
+      "value": 0.003810293972492218,
+      "at": "pickup t 1.41 s (female adult build -0.6)",
+      "over": 7
+     },
+     "cloth pickup forearm.L None": {
+      "value": 0.008483971987980211,
+      "at": "pickup t 1.55 s (female adult build -0.6)",
+      "over": 1
+     },
+     "cloth pickup hand.L None": {
+      "value": 0.01041121198363284,
+      "at": "pickup t 1.55 s (female adult build -0.6)",
+      "over": 1
+     },
+     "cloth pickup upperArm.L None": {
+      "value": 0.007410466420665738,
+      "at": "pickup t 1.55 s (female adult build -0.6)",
+      "over": 1
      }
     },
     "clips": {
-     "cloth pickup": 0.03170020150824383,
-     "shown pickup": 0.0,
-     "hole pickup": 0.0,
-     "cut pickup": 0.0018788346787914634
+     "cloth pickup": 0.033940549939870834,
+     "shown pickup": 0.02243461087346077,
+     "hole pickup": 0.003810293972492218,
+     "cut pickup": 0.011570248752832413
     }
    }
   },
   "point": {
    "g-robe-chest": {
     "cloth": {
-     "value": 0.06503111155567068,
-     "at": "point t 1.92 s (male adult build +0.6)",
+     "value": 0.05869707714499102,
+     "at": "point t 1.15 s (male adult build +0.6)",
      "over": 12,
      "part": "upperArm.L"
     },
@@ -761,10 +768,10 @@
      "part": null
     },
     "cut": {
-     "value": 0.0010103961685672402,
-     "at": "point t 2.11 s (male adult build +0.6)",
+     "value": 0.0,
+     "at": null,
      "over": 0,
-     "part": "thigh.R"
+     "part": null
     },
     "inner": {
      "value": 0.0,
@@ -783,77 +790,67 @@
      "point": 12
     },
     "cases": {
-     "cloth point chest None": {
-      "value": 0.06203983595165916,
-      "at": "point t 0.39 s (male adult build +0.6)",
-      "over": 12
-     },
      "cloth point foot.L None": {
-      "value": 0.012077013704363202,
+      "value": 0.009389493994521528,
       "at": "point t 0.20 s (male adult build +0.6)",
-      "over": 1
+      "over": 9
      },
      "cloth point forearm.L None": {
-      "value": 0.028008039613626336,
-      "at": "point t 0.58 s (male adult build +0.6)",
-      "over": 11
-     },
-     "cloth point forearm.R None": {
-      "value": 0.01625615963670847,
-      "at": "point t 2.11 s (male adult build +0.6)",
-      "over": 12
-     },
-     "cloth point hand.L None": {
-      "value": 0.01433788440489386,
-      "at": "point t 0.20 s (male adult build +0.6)",
-      "over": 2
-     },
-     "cloth point hand.R None": {
-      "value": 0.015740321515225687,
-      "at": "point t 1.92 s (male adult build +0.6)",
-      "over": 11
+      "value": 0.026218802847624623,
+      "at": "point t 1.73 s (male adult build +0.6)",
+      "over": 10
      },
      "cloth point shin.L None": {
-      "value": 0.034481243340319545,
+      "value": 0.03491465547260169,
       "at": "point t 0.39 s (male adult build +0.6)",
-      "over": 12
-     },
-     "cloth point spine1 None": {
-      "value": 0.015072841963260057,
-      "at": "point t 2.11 s (male adult build +0.6)",
       "over": 12
      },
      "cloth point thigh.L None": {
-      "value": 0.03456430123813799,
-      "at": "point t 2.30 s (male adult build +0.6)",
-      "over": 12
-     },
-     "cloth point upperArm.L None": {
-      "value": 0.06503111155567068,
-      "at": "point t 1.92 s (male adult build +0.6)",
-      "over": 12
-     },
-     "cloth point upperArm.R None": {
-      "value": 0.01672845626405079,
-      "at": "point t 0.58 s (male adult build +0.6)",
-      "over": 12
-     },
-     "cloth point shin.R None": {
-      "value": 0.034826384887952554,
-      "at": "point t 2.30 s (male adult build +0.6)",
+      "value": 0.0355100127378426,
+      "at": "point t 2.11 s (male adult build +0.6)",
       "over": 11
      },
-     "cloth point thigh.R None": {
-      "value": 0.02845658546313411,
-      "at": "point t 0.39 s (male adult build +0.6)",
+     "cloth point upperArm.L None": {
+      "value": 0.05869707714499102,
+      "at": "point t 1.15 s (male adult build +0.6)",
+      "over": 11
+     },
+     "cloth point upperArm.R None": {
+      "value": 0.024694514158515854,
+      "at": "point t 0.20 s (male adult build +0.6)",
+      "over": 12
+     },
+     "cloth point hand.R None": {
+      "value": 0.014381798524437288,
+      "at": "point t 0.77 s (male adult build +0.6)",
       "over": 10
+     },
+     "cloth point shin.R None": {
+      "value": 0.035354361436402075,
+      "at": "point t 2.11 s (male adult build +0.6)",
+      "over": 3
+     },
+     "cloth point thigh.R None": {
+      "value": 0.030303674266967437,
+      "at": "point t 2.11 s (male adult build +0.6)",
+      "over": 2
+     },
+     "cloth point chest None": {
+      "value": 0.05766066993617714,
+      "at": "point t 1.73 s (male adult build +0.6)",
+      "over": 5
+     },
+     "cloth point hand.L None": {
+      "value": 0.0060469981481226,
+      "at": "point t 2.11 s (male adult build +0.6)",
+      "over": 2
      }
     },
     "clips": {
-     "cloth point": 0.06503111155567068,
+     "cloth point": 0.05869707714499102,
      "shown point": 0.0,
      "hole point": 0.0,
-     "cut point": 0.0010103961685672402
+     "cut point": 0.0
     }
    },
    "g-cap-crown": {
@@ -899,35 +896,38 @@
     },
     "cases": {},
     "clips": {
-     "cloth point": 0.0
+     "cloth point": 0.0,
+     "shown point": 0.0,
+     "hole point": 0.0,
+     "cut point": 0.0
     }
    }
   },
   "chaser": {
    "g-shirt-chest": {
     "cloth": {
-     "value": 0.08679945021867752,
-     "at": "chaser t 2.45 s (male child build +0.0)",
+     "value": 0.07385705411434174,
+     "at": "chaser t 2.30 s (male child build +0.0)",
      "over": 12,
      "part": "thigh.L"
     },
     "shown": {
-     "value": 0.00263724522665143,
-     "at": "chaser t 2.15 s (male child build +0.0)",
-     "over": 0,
-     "part": "upperArm.L"
+     "value": 0.07125157117843628,
+     "at": "chaser t 0.80 s (male child build +0.0)",
+     "over": 9,
+     "part": "thigh.R"
     },
     "hole": {
-     "value": 0.0,
-     "at": null,
-     "over": 0,
-     "part": null
+     "value": 0.020953649654984474,
+     "at": "chaser t 2.15 s (male child build +0.0)",
+     "over": 1,
+     "part": "hips"
     },
     "cut": {
-     "value": 0.0037388349883258343,
-     "at": "chaser t 1.10 s (male child build +0.0)",
-     "over": 0,
-     "part": "thigh.R"
+     "value": 0.02047189325094223,
+     "at": "chaser t 0.80 s (male child build +0.0)",
+     "over": 1,
+     "part": "hips"
     },
     "inner": {
      "value": 0.0,
@@ -946,78 +946,98 @@
      "chaser": 12
     },
     "cases": {
-     "cloth chaser chest None": {
-      "value": 0.012480505406349957,
-      "at": "chaser t 1.10 s (male child build +0.0)",
-      "over": 12
-     },
-     "cloth chaser forearm.L None": {
-      "value": 0.026981475834199912,
-      "at": "chaser t 1.10 s (male child build +0.0)",
-      "over": 12
-     },
-     "cloth chaser shin.L None": {
-      "value": 0.03519006962822811,
-      "at": "chaser t 0.80 s (male child build +0.0)",
-      "over": 12
-     },
-     "cloth chaser shin.R None": {
-      "value": 0.034238467238770394,
-      "at": "chaser t 0.80 s (male child build +0.0)",
-      "over": 12
-     },
      "cloth chaser thigh.L None": {
-      "value": 0.08679945021867752,
-      "at": "chaser t 2.45 s (male child build +0.0)",
-      "over": 12
+      "value": 0.07385705411434174,
+      "at": "chaser t 2.30 s (male child build +0.0)",
+      "over": 11
+     },
+     "cloth chaser thigh.R None": {
+      "value": 0.049652814865112305,
+      "at": "chaser t 2.15 s (male child build +0.0)",
+      "over": 11
      },
      "cloth chaser upperArm.L None": {
-      "value": 0.026177417186288507,
-      "at": "chaser t 0.95 s (male child build +0.0)",
-      "over": 12
+      "value": 0.029015890747575365,
+      "at": "chaser t 2.15 s (male child build +0.0)",
+      "over": 11
      },
      "cloth chaser upperArm.R None": {
-      "value": 0.02654585022072797,
-      "at": "chaser t 1.10 s (male child build +0.0)",
-      "over": 6
+      "value": 0.02454149161846784,
+      "at": "chaser t 1.85 s (male child build +0.0)",
+      "over": 10
      },
-     "cloth chaser shoulder.L None": {
-      "value": 0.008309371769242188,
+     "shown chaser thigh.R None": {
+      "value": 0.07125157117843628,
+      "at": "chaser t 0.80 s (male child build +0.0)",
+      "over": 9
+     },
+     "cut chaser hips None": {
+      "value": 0.02047189325094223,
+      "at": "chaser t 0.80 s (male child build +0.0)",
+      "over": 1
+     },
+     "cloth chaser chest None": {
+      "value": 0.014397467004753412,
       "at": "chaser t 2.00 s (male child build +0.0)",
-      "over": 8
-     },
-     "cloth chaser spine None": {
-      "value": 0.08076019585132599,
-      "at": "chaser t 2.45 s (male child build +0.0)",
-      "over": 5
-     },
-     "cloth chaser spine1 None": {
-      "value": 0.061204440891742706,
-      "at": "chaser t 2.15 s (male child build +0.0)",
       "over": 6
+     },
+     "shown chaser thigh.L None": {
+      "value": 0.011382087133824825,
+      "at": "chaser t 2.15 s (male child build +0.0)",
+      "over": 4
+     },
+     "cloth chaser shin.R None": {
+      "value": 0.03417876655473006,
+      "at": "chaser t 1.40 s (male child build +0.0)",
+      "over": 3
+     },
+     "cloth chaser forearm.L None": {
+      "value": 0.02850271432911403,
+      "at": "chaser t 1.25 s (male child build +0.0)",
+      "over": 9
+     },
+     "cloth chaser shin.L None": {
+      "value": 0.03495152835059108,
+      "at": "chaser t 1.25 s (male child build +0.0)",
+      "over": 2
+     },
+     "cloth chaser shoulder.R None": {
+      "value": 0.004470142920965047,
+      "at": "chaser t 1.85 s (male child build +0.0)",
+      "over": 1
+     },
+     "cloth chaser hand.R None": {
+      "value": 0.00316139156152851,
+      "at": "chaser t 2.15 s (male child build +0.0)",
+      "over": 1
+     },
+     "hole chaser hips None": {
+      "value": 0.020953649654984474,
+      "at": "chaser t 2.15 s (male child build +0.0)",
+      "over": 1
      }
     },
     "clips": {
-     "cloth chaser": 0.08679945021867752,
-     "shown chaser": 0.00263724522665143,
-     "hole chaser": 0.0,
-     "cut chaser": 0.0037388349883258343
+     "cloth chaser": 0.07385705411434174,
+     "shown chaser": 0.07125157117843628,
+     "hole chaser": 0.020953649654984474,
+     "cut chaser": 0.02047189325094223
     }
    }
   },
   "caught": {
    "g-skirtShort-waist": {
     "cloth": {
-     "value": 0.025301182419519102,
-     "at": "caught t 0.20 s (female child build +0.0)",
-     "over": 9,
+     "value": 0.02479163017934646,
+     "at": "caught t 0.78 s (female child build +0.0)",
+     "over": 10,
      "part": "forearm.R"
     },
     "shown": {
-     "value": 0.0018706396222114563,
-     "at": "caught t 0.78 s (female child build +0.0)",
+     "value": 0.0,
+     "at": null,
      "over": 0,
-     "part": "spine"
+     "part": null
     },
     "hole": {
      "value": 0.0,
@@ -1048,60 +1068,30 @@
      "caught": 10
     },
     "cases": {
-     "cloth caught forearm.L None": {
-      "value": 0.02518406182860645,
-      "at": "caught t 0.20 s (female child build +0.0)",
-      "over": 3
+     "cloth caught hand.R None": {
+      "value": 0.015749863562035143,
+      "at": "caught t 1.36 s (female child build +0.0)",
+      "over": 8
      },
      "cloth caught forearm.R None": {
-      "value": 0.025301182419519102,
-      "at": "caught t 0.20 s (female child build +0.0)",
-      "over": 3
+      "value": 0.02479163017934646,
+      "at": "caught t 0.78 s (female child build +0.0)",
+      "over": 8
+     },
+     "cloth caught forearm.L None": {
+      "value": 0.015859472239664475,
+      "at": "caught t 0.78 s (female child build +0.0)",
+      "over": 7
      },
      "cloth caught hand.L None": {
-      "value": 0.012313560173785359,
-      "at": "caught t 0.63 s (female child build +0.0)",
-      "over": 3
-     },
-     "cloth caught hand.R None": {
-      "value": 0.01248080478863581,
-      "at": "caught t 0.20 s (female child build +0.0)",
-      "over": 2
-     },
-     "cloth caught chest None": {
-      "value": 0.010662708487522264,
-      "at": "caught t 0.78 s (female child build +0.0)",
-      "over": 6
-     },
-     "cloth caught hips None": {
-      "value": 0.015199439061238914,
-      "at": "caught t 0.78 s (female child build +0.0)",
-      "over": 6
-     },
-     "cloth caught spine None": {
-      "value": 0.015277983534047971,
-      "at": "caught t 0.78 s (female child build +0.0)",
-      "over": 6
-     },
-     "cloth caught spine1 None": {
-      "value": 0.013463935168947502,
-      "at": "caught t 0.78 s (female child build +0.0)",
-      "over": 6
-     },
-     "cloth caught thigh.L None": {
-      "value": 0.00796382687985897,
-      "at": "caught t 0.78 s (female child build +0.0)",
-      "over": 6
-     },
-     "cloth caught thigh.R None": {
-      "value": 0.01631376123178043,
-      "at": "caught t 0.78 s (female child build +0.0)",
-      "over": 6
+      "value": 0.014159918756131769,
+      "at": "caught t 1.07 s (female child build +0.0)",
+      "over": 7
      }
     },
     "clips": {
-     "cloth caught": 0.025301182419519102,
-     "shown caught": 0.0018706396222114563,
+     "cloth caught": 0.02479163017934646,
+     "shown caught": 0.0,
      "hole caught": 0.0,
      "cut caught": 0.0
     }
