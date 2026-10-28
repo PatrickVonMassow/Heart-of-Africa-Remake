@@ -118,6 +118,7 @@ export const NON_RENDER_VERIFY = new Set([
   'ladder.mjs', // the ladder's git/ledger/source reads; it opens no page
   'launch-args-core.mjs', // the launcher's PLATFORM policy; _browser.mjs opens the browser
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
+  'load-proof-core.mjs', // the two-kinds gate and lane-skip decision (point 642); _polish.mjs drives the page
   'machine-load-core.mjs',
   'machine-load.mjs',
   'red-ownership-core.mjs', // whether a red holds, read off the charge ledger; it draws nothing

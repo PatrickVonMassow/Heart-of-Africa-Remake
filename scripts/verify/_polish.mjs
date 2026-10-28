@@ -40,9 +40,9 @@ export const unmeasured = (name, reason) => {
   console.log(`UNMEASURED  ${name} — ${reason}${sections.tag()}`)
   unmeasuredChecks.push({ name, reason })
 }
-/** A TIMING check declares the frame rate it needs; below it the lane cannot
- *  answer and the check is reported UNMEASURED with the measured rate. On a lane
- *  that meets it the identical check runs. */
+// A TIMING check declares the frame rate it needs; below it the lane cannot
+// answer and the check is reported UNMEASURED with the measured rate. On a lane
+// that meets it the identical check runs.
 export const checkTiming = (name, needFps, ok, detail) => {
   const v = laneSkipVerdict({ needFps, measuredFps: laneFps })
   if (v.skip) unmeasured(name, v.reason)
