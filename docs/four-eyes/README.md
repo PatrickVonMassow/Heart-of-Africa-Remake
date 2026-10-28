@@ -117,3 +117,15 @@ stage's union and stay there unchanged; the JSON halves normalise them (A's unla
 verdict, protocol and tooling bullets received ids `AV1`, `AT0`, `AU1–AU8`; B's echoed
 accounting section is one entry per id). The union is `1455-union.json`, merged by the
 scarce lane; the plan is `docs/1455-step2-merged-plan.md`.
+
+## Stage 1308 — bookkeeping round-trips a script could take over (28.10.2026)
+
+| Half | Model | Entries | File |
+|---|---|---|---|
+| A | main chain | 10 | `1308-blind-a-opus5.json` / `.md` |
+| B | cross lane | 6 | `1308-blind-b-sol.json` / `.md` |
+
+B's `.md` is the verbatim ask-lane log; its first entry is a corpus caveat (truncated
+material, no settings.json), not a candidate, so the JSON half carries its six
+candidates as `B1–B6`. The union is `1308-union.json`, merged by the scarce lane; the
+plan is `docs/1308-merged-plan.md`.

@@ -1,0 +1,38 @@
+{
+ "model": "GPT-6.1 Sol",
+ "point": 1308,
+ "stage": "blind-parallel B — neutral brief, no prior knowledge",
+ "input": "docs/four-eyes/1308-blind-b-sol.md",
+ "entries": [
+  {
+   "id": "B1",
+   "file": "docs/four-eyes/1308-blind-b-sol.md",
+   "defect": "Startup reconnaissance repeats in the first CALL of all 11 visible sessions: 11/860 calls, 1.28%. A local startup digest could supply status, branch, merge state, focus, and worktree information. Six opening calls also invoke batch-doctor --repair: those mutations must remain explicit, so 11 calls is the activity footprint, not demonstrated savings. Failures include stale snapshots, unreadable state, and timeout; fallback must loudly mark the digest unavailable and retain today’s commands. Required tests: startup-digest-read-only-parity, startup-digest-retains-repair, and startup-digest-stale-state-timeout-fallback; assert unchanged files, preserved repair execution, bounded completion, and visible fallback diagnostics."
+  },
+  {
+   "id": "B2",
+   "file": "docs/four-eyes/1308-blind-b-sol.md",
+   "defect": "Ten standalone Intl.DateTimeFormat calls consume 10/860 calls, 1.16%; five receive explicit post-boundary refusals: 1cf5b053 20:43:03, d3afba74 22:52:14, 272b6100 00:55:36, e17e27ce 03:55:22, and 379a3e4b 05:32:48. Emit the requested timestamp in an existing report or boundary result, avoiding another tool call. Formatting failure must preserve the boundary result, report loudly, and leave the existing manual route available without clearing the boundary. Required tests: boundary-clock-no-extra-tool-call and boundary-clock-formatting-failure-preserves-commit; include timezone transitions, unavailable locale data, and formatter exceptions."
+  },
+  {
+   "id": "B3",
+   "file": "docs/four-eyes/1308-blind-b-sol.md",
+   "defect": "Two JSON extraction episodes require six calls, 6/860, 0.70%: 272b6100 00:14:39/42/46 and 00:27:24/26/31. The first extraction uses the wrong response delimiter; the second produces “Unexpected non-whitespace character after JSON.” A bounded response extractor could replace these repair rounds while preserving the raw responses and model judgments. Unknown delimiters, ambiguous payloads, malformed/truncated JSON, unexpected trailing content, schema failures, or write errors must produce a loud diagnostic and return to manual inspection without publishing output. Required tests: payload-extractor-six-call-fixtures and payload-extractor-malformed-timeout-atomic-output; verify complete entry preservation, unchanged raw logs, no overwritten valid artifact, and explicit failure reporting."
+  },
+  {
+   "id": "B4",
+   "file": "docs/four-eyes/1308-blind-b-sol.md",
+   "defect": "Four receipt-recording calls execute text extracted from review logs: 1cf5b053 19:57:22 and 20:24:08 use bash; a2f8af6e 05:33:40 and 05:35:05 use eval. That is 4/860 calls, 0.47%. Structured receipt collection could remove the manual extraction call and avoid treating reviewer output as executable shell. It must validate SHA, worktree, point, verdict, and review coverage while preserving merge-with-fixes findings. Malformed data or interrupted recording must loudly return to manual recording with completed entries identified, never replay the whole batch blindly. Required tests: receipt-collector-shell-injection-and-target-mismatch and receipt-collector-duplicate-partial-write-recovery; actual recording guards must participate in these tests."
+  },
+  {
+   "id": "B5",
+   "file": "docs/four-eyes/1308-blind-b-sol.md",
+   "defect": "Three pkill -f chains return errors: 1cf5b053 20:32:19, 45ade3ec 20:48:53, and e17e27ce 03:09:47; 3/860 calls, 0.35%. Each pattern also occurs in its enclosing command text, creating a self-matching termination risk; the truncated results do not establish which process was killed or which later steps executed. An owned-process cleanup helper should use recorded process identity and bounded waits. Missing identity, PID reuse, permission failure, or timeout must leave unrelated processes untouched and loudly return control for manual recovery, reporting completed stages. Required tests: cleanup-parent-self-match-and-pid-reuse and cleanup-timeout-interruption-no-chain-replay; prove unrelated processes survive and landing or testing is never silently skipped or duplicated."
+  },
+  {
+   "id": "B6",
+   "file": "docs/four-eyes/1308-blind-b-sol.md",
+   "defect": "Five compound preparation calls are refused before their board update can establish the prerequisite: 45ade3ec 20:43:39, d3afba74 22:51:04, 80c0edf7 23:25:09, e17e27ce 03:32:00, and a2f8af6e 06:12:49; 5/860 calls, 0.58%. Each is followed by a separate board-preparation attempt. A phased executor could remove these refusal/retry rounds, but cannot be approved without the omitted hook inventory. It must use explicitly supplied status text, reapply existing guards before dependent work, avoid automatic attestation, and hold no preparation lock while invoking another guard. Refusal or unexpected failure must terminate boundedly, report the completed phase loudly, and return to today’s manual recovery without replaying mutations. Required tests: board-executor-real-hook-order-and-refusal-parity and board-executor-concurrent-lock-timeout-fence-crash-recovery; prove no guard bypass, recursive refusal loop, deadlock, or unreported partial execution."
+  }
+ ]
+}
