@@ -9,7 +9,7 @@ male adult, build +0.0, figure scale 1; 12 frames 1.50–2.60 s.
 | Garment | Cloth | where | frames over (of 12) | Shown | where | frames over (of 12) | Hole | where | frames over (of 12) | Cut | where | frames over (of 12) | Inner | where | frames over (of 12) | Inner hole | where | frames over (of 12) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `g-cap-crown` | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
-| `g-robe-chest` | 0.0361 ✗ | walk t 2.30 s (male adult build +0.0) — shin.R | 12 | 0.0116 ✗ | walk t 1.70 s (male adult build +0.0) — thigh.R | 3 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-robe-chest` | 0.0376 ✗ | walk t 2.30 s (male adult build +0.0) — shin.R | 12 | 0.0075 ✗ | walk t 1.70 s (male adult build +0.0) — thigh.R | 2 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 1 of 2 worn garments within tolerance in every frame.
 
@@ -20,7 +20,7 @@ male adult, build +0.0, figure scale 1; 12 frames 0.20–1.50 s.
 | Garment | Cloth | where | frames over (of 12) | Shown | where | frames over (of 12) | Hole | where | frames over (of 12) | Cut | where | frames over (of 12) | Inner | where | frames over (of 12) | Inner hole | where | frames over (of 12) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `g-cap-crown` | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
-| `g-robe-chest` | 0.0383 ✗ | turn t 0.79 s (male adult build +0.0) — thigh.L | 12 | 0.0176 ✗ | turn t 0.79 s (male adult build +0.0) — thigh.R | 5 | 0.0000 | — | 0 | 0.0138 | turn t 0.79 s (male adult build +0.0) — thigh.R | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-robe-chest` | 0.0376 ✗ | turn t 0.79 s (male adult build +0.0) — shin.L | 12 | 0.0204 ✗ | turn t 0.79 s (male adult build +0.0) — thigh.R | 5 | 0.0000 | — | 0 | 0.0166 | turn t 0.79 s (male adult build +0.0) — thigh.R | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 1 of 2 worn garments within tolerance in every frame.
 
@@ -31,7 +31,7 @@ male adult, build -0.6, figure scale 1; 10 frames 1.50–2.20 s.
 | Garment | Cloth | where | frames over (of 10) | Shown | where | frames over (of 10) | Hole | where | frames over (of 10) | Cut | where | frames over (of 10) | Inner | where | frames over (of 10) | Inner hole | where | frames over (of 10) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `g-cap-crown` | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
-| `g-robe-chest` | 0.0368 ✗ | run t 1.97 s (male adult build -0.6) — shin.R | 10 | 0.0247 ✗ | run t 1.73 s (male adult build -0.6) — thigh.R | 3 | 0.0000 | — | 0 | 0.0152 | run t 1.73 s (male adult build -0.6) — shin.R | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-robe-chest` | 0.0376 ✗ | run t 1.97 s (male adult build -0.6) — thigh.L | 10 | 0.0240 ✗ | run t 1.97 s (male adult build -0.6) — thigh.R | 4 | 0.0000 | — | 0 | 0.0129 | run t 1.97 s (male adult build -0.6) — shin.R | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 1 of 2 worn garments within tolerance in every frame.
 
@@ -42,7 +42,7 @@ male adult, build +0.0, figure scale 1; 12 frames 0.90–3.30 s.
 | Garment | Cloth | where | frames over (of 12) | Shown | where | frames over (of 12) | Hole | where | frames over (of 12) | Cut | where | frames over (of 12) | Inner | where | frames over (of 12) | Inner hole | where | frames over (of 12) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `g-cap-crown` | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
-| `g-robe-chest` | 0.0400 ✗ | dig t 1.34 s (male adult build +0.0) — upperArm.L | 12 | 0.0039 ✗ | dig t 2.86 s (male adult build +0.0) — spine | 2 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-robe-chest` | 0.0398 ✗ | dig t 2.86 s (male adult build +0.0) — spine | 12 | 0.0054 ✗ | dig t 2.86 s (male adult build +0.0) — spine | 2 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 1 of 2 worn garments within tolerance in every frame.
 
@@ -52,7 +52,7 @@ female adult, build -0.6, figure scale 1; 12 frames 0.10–1.70 s.
 
 | Garment | Cloth | where | frames over (of 12) | Shown | where | frames over (of 12) | Hole | where | frames over (of 12) | Cut | where | frames over (of 12) | Inner | where | frames over (of 12) | Inner hole | where | frames over (of 12) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `g-wrapLong-chest` | 0.0339 ✗ | pickup t 1.41 s (female adult build -0.6) — chest | 12 | 0.0224 ✗ | pickup t 1.41 s (female adult build -0.6) — chest | 7 | 0.0038 ✗ | pickup t 1.41 s (female adult build -0.6) — thigh.R | 7 | 0.0116 | pickup t 1.41 s (female adult build -0.6) — spine | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-wrapLong-chest` | 0.0339 ✗ | pickup t 1.41 s (female adult build -0.6) — chest | 12 | 0.0224 ✗ | pickup t 1.41 s (female adult build -0.6) — chest | 7 | 0.0020 | pickup t 0.68 s (female adult build -0.6) — thigh.R | 0 | 0.0115 | pickup t 1.41 s (female adult build -0.6) — spine | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 0 of 1 worn garments within tolerance in every frame.
 
@@ -63,7 +63,7 @@ male adult, build +0.6, figure scale 1; 12 frames 0.20–2.30 s.
 | Garment | Cloth | where | frames over (of 12) | Shown | where | frames over (of 12) | Hole | where | frames over (of 12) | Cut | where | frames over (of 12) | Inner | where | frames over (of 12) | Inner hole | where | frames over (of 12) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `g-cap-crown` | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
-| `g-robe-chest` | 0.0587 ✗ | point t 1.15 s (male adult build +0.6) — upperArm.L | 12 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-robe-chest` | 0.0498 ✗ | point t 1.15 s (male adult build +0.6) — upperArm.L | 12 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 1 of 2 worn garments within tolerance in every frame.
 
@@ -73,7 +73,7 @@ male child, build +0.0, figure scale 0.55; 12 frames 0.80–2.45 s.
 
 | Garment | Cloth | where | frames over (of 12) | Shown | where | frames over (of 12) | Hole | where | frames over (of 12) | Cut | where | frames over (of 12) | Inner | where | frames over (of 12) | Inner hole | where | frames over (of 12) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `g-shirt-chest` | 0.0739 ✗ | chaser t 2.30 s (male child build +0.0) — thigh.L | 12 | 0.0713 ✗ | chaser t 0.80 s (male child build +0.0) — thigh.R | 9 | 0.0210 ✗ | chaser t 2.15 s (male child build +0.0) — hips | 1 | 0.0205 ✗ | chaser t 0.80 s (male child build +0.0) — hips | 1 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-shirt-chest` | 0.0745 ✗ | chaser t 2.00 s (male child build +0.0) — thigh.L | 12 | 0.0808 ✗ | chaser t 0.95 s (male child build +0.0) — thigh.R | 8 | 0.0318 ✗ | chaser t 2.00 s (male child build +0.0) — thigh.R | 3 | 0.0258 ✗ | chaser t 0.95 s (male child build +0.0) — thigh.R | 1 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 0 of 1 worn garments within tolerance in every frame.
 
@@ -83,6 +83,6 @@ female child, build +0.0, figure scale 0.55; 10 frames 0.20–1.50 s.
 
 | Garment | Cloth | where | frames over (of 10) | Shown | where | frames over (of 10) | Hole | where | frames over (of 10) | Cut | where | frames over (of 10) | Inner | where | frames over (of 10) | Inner hole | where | frames over (of 10) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `g-skirtShort-waist` | 0.0248 ✗ | caught t 0.78 s (female child build +0.0) — forearm.R | 10 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-skirtShort-waist` | 0.0239 ✗ | caught t 0.63 s (female child build +0.0) — forearm.R | 10 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 0 of 1 worn garments within tolerance in every frame.
