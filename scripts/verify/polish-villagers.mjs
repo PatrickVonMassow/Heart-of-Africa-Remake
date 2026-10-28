@@ -439,42 +439,49 @@ if (section('villager-canoe')) {
         .catch(() => false)
       check('at the landing the net man steps ashore to unload', ashore)
       if (ashore && atBoat) {
-        const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
-        await standAt(boat.stand, nm)
         const squatting = () => page.evaluate(() => {
           const c = window.__placeCanoe()
           return c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3
         })
-        const one = await page.evaluate(() => {
-          const c = window.__placeCanoe()
-          let named = 0
-          let visible = 0
-          window.__placeScene.traverse((o) => {
-            if (!o.name.startsWith('village-canoe-netman')) return
-            named++
-            if (o.visible) visible++
+        // HELD FROM A SQUATTING FRAME THROUGH THE SHUTTER (point 1456): the
+        // positioning and the shutter's readiness wait ran seconds under load
+        // while he finished unloading, so a reading before them judged a pose
+        // the picture never showed. Life is frozen in the very frame that
+        // reads him squatting, before either, so the readings are the pose in
+        // the picture; the thaw runs whatever the capture does.
+        const before = await page
+          .waitForFunction(() => {
+            const c = window.__placeCanoe()
+            if (!(c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3)) return false
+            window.__placeFreezeLife(true)
+            return true
+          }, null, { timeout: 30000, polling: 'raf' })
+          .then(() => true)
+          .catch(() => false)
+        let after = false
+        try {
+          const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
+          await standAt(boat.stand, nm)
+          const one = await page.evaluate(() => {
+            const c = window.__placeCanoe()
+            let named = 0
+            let visible = 0
+            window.__placeScene.traverse((o) => {
+              if (!o.name.startsWith('village-canoe-netman')) return
+              named++
+              if (o.visible) visible++
+            })
+            return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
           })
-          return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
-        })
-        check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
-        // READ AT THE SHUTTER (point 1456): the readiness wait inside the
-        // shutter ran seconds under load while he finished unloading, so a
-        // reading before it judged a pose the picture never showed. Life is
-        // held from the last reading through the exposure, so both readings
-        // are the pose in the picture.
-        let before = false
-        await frame('1387-netman-ashore-unloading', {
-          local: { x: nm.x, y: 0.5, z: nm.z },
-          label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
-        }, {
-          beforeCapture: async () => {
-            await page.evaluate(() => window.__placeFreezeLife(true))
-            await nextFrames(1)
-            before = await squatting()
-          },
-        })
-        const after = await squatting()
-        await page.evaluate(() => window.__placeFreezeLife(false))
+          check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
+          await frame('1387-netman-ashore-unloading', {
+            local: { x: nm.x, y: 0.5, z: nm.z },
+            label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
+          })
+          after = await squatting()
+        } finally {
+          await page.evaluate(() => window.__placeFreezeLife(false))
+        }
         check('he was still squatting ashore, unloading, before and after the shutter', before && after, JSON.stringify({ before, after }))
       }
       // The net man's word to the paddler once the basket is set down, and the
