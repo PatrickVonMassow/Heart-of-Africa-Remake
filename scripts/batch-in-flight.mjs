@@ -232,7 +232,17 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
  */
 export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAside = () => {}, remove = (p) => rmSync(p) } = {}) {
   const words = (e) => String(e?.message ?? e)
-  const seen = readDeclaration(path)
+  // Absence is null; an unreadable or unparsable declaration is an error, never a mismatch.
+  const load = (p) => {
+    try {
+      return { d: JSON.parse(readFileSync(p, 'utf8')) }
+    } catch (e) {
+      return e?.code === 'ENOENT' ? { d: null } : { error: `${p} unreadable: ${words(e)}` }
+    }
+  }
+  const first = load(path)
+  if (first.error) return { cleared: false, prior: null, error: first.error }
+  const seen = first.d
   if (seen?.waitingOn !== waitingOn) return { cleared: false, prior: seen }
   const aside = `${path}.clear-${process.pid}-${Date.now()}`
   try {
@@ -241,7 +251,8 @@ export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAsid
     return e?.code === 'ENOENT' ? { cleared: false, prior: null } : { cleared: false, prior: seen, error: words(e) }
   }
   afterAside() // test seam: a writer racing the compare
-  const prior = readDeclaration(aside)
+  const second = load(aside)
+  const prior = second.d ?? null
   const putBack = () => {
     try {
       linkSync(aside, path)
@@ -254,6 +265,10 @@ export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAsid
       return `left ${aside} behind: ${words(e)}`
     }
     return null
+  }
+  if (second.error) {
+    const restore = putBack()
+    return { cleared: false, prior: null, error: `${second.error}${restore ? `; ${restore}` : ''}` }
   }
   if (prior?.waitingOn === waitingOn) {
     try {

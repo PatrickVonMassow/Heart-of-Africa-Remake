@@ -329,7 +329,8 @@ describe('--clear --if-waiting-on (point 1308)', () => {
     expect(result.stdout).toContain('declaration cleared')
     expect(existsSync(inFlightPath())).toBe(false)
   })
-  it('refuses loudly and keeps the declaration when it cannot be removed', () => {
+  // chmod denies only a non-root POSIX process; elsewhere the fixture would not fail.
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('refuses loudly and keeps the declaration when it cannot be removed', () => {
     standing('mine')
     const dir = join(inFlightPath(), '..')
     chmodSync(dir, 0o500)
@@ -390,10 +391,25 @@ describe('clearDeclarationIf (point 1308)', () => {
     expect(read().waitingOn).toBe('theirs')
     expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
   })
+  it('reports an unparsable declaration as an error and leaves it in place', () => {
+    writeFileSync(path, '{not json')
+    const r = clearDeclarationIf('mine', path)
+    expect(r.cleared).toBe(false)
+    expect(r.error).toContain('unreadable')
+    expect(readFileSync(path, 'utf8')).toBe('{not json')
+  })
+  it('puts back a copy that turns unreadable after the rename', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { afterAside: () => writeFileSync(join(dir, readdirSync(dir)[0]), '{torn') })
+    expect(r.cleared).toBe(false)
+    expect(r.error).toContain('unreadable')
+    expect(readFileSync(path, 'utf8')).toBe('{torn')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
   it('reports no declaration without an error', () => {
     expect(clearDeclarationIf('mine', path)).toEqual({ cleared: false, prior: null })
   })
-  it('reports a failed rename as an error', () => {
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('reports a failed rename as an error', () => {
     put('mine')
     chmodSync(dir, 0o500)
     try {
