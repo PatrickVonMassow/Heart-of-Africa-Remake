@@ -11,7 +11,7 @@ import { TIERS_USAGE } from './verify/tiers.mjs'
 import { repoPath } from './repo-paths.mjs'
 
 const run = (script, args) =>
-  spawnSync(process.execPath, [repoPath('scripts', script), ...args], { encoding: 'utf8', timeout: 60_000 })
+  spawnSync(process.execPath, [repoPath('scripts', script), ...args], { encoding: 'utf8', timeout: 60_000, windowsHide: true })
 
 describe('--help prints the usage', () => {
   it.each([

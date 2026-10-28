@@ -60,7 +60,7 @@ export function declareOwnWait({
   waitingOn,
   point = null,
   pid = process.pid,
-  exec = runInFlight,
+  runCli = runInFlight,
   readDecl = readDeclaration,
   owner = runsForOwner,
   paused = () => existsSync(repoPath('.claude', 'batch-paused')),
@@ -77,7 +77,7 @@ export function declareOwnWait({
       )
       return token
     }
-    exec(waitArgs({ waitingOn, point, pid }))
+    runCli(waitArgs({ waitingOn, point, pid }))
     return { ...token, declared: true }
   } catch (e) {
     say(`in-flight declaration FAILED: ${words(e)} — do it the old way: ${manualDeclare({ waitingOn, point, pid })}`)
@@ -86,12 +86,12 @@ export function declareOwnWait({
 }
 
 /** Clear the declaration `token` made — and only that one. Never throws. */
-export function clearOwnWait(token, { exec = runInFlight, readDecl = readDeclaration, say = (line) => console.error(line) } = {}) {
+export function clearOwnWait(token, { runCli = runInFlight, readDecl = readDeclaration, say = (line) => console.error(line) } = {}) {
   try {
     if (!token?.declared) return false
     const standing = readDecl()
     if (!standing || standing.waitingOn !== token.waitingOn) return false
-    exec(['--clear'])
+    runCli(['--clear'])
     return true
   } catch (e) {
     say(`in-flight clear FAILED: ${words(e)} — do it the old way: ${MANUAL_CLEAR}`)

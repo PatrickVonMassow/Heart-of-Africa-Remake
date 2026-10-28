@@ -8,7 +8,7 @@ import { MANUAL_CLEAR, clearOwnWait, declareOwnWait, manualDeclare, runsForOwner
 function fakeStore({ failDeclare = null, failClear = null } = {}) {
   let declaration = null
   const calls = []
-  const exec = (args) => {
+  const runCli = (args) => {
     calls.push(args)
     if (args[0] === '--waiting-on') {
       if (failDeclare) throw failDeclare
@@ -19,7 +19,7 @@ function fakeStore({ failDeclare = null, failClear = null } = {}) {
     }
     return ''
   }
-  return { exec, readDecl: () => declaration, set: (d) => (declaration = d), calls }
+  return { runCli, readDecl: () => declaration, set: (d) => (declaration = d), calls }
 }
 
 const owner = () => true

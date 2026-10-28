@@ -3,9 +3,11 @@
 // the failing call, `--help` and the SessionStart synopsis print the same words
 // and no second copy can drift.
 //
-// Pure: no I/O. Each script prints its entry; batch-resume-hook.mjs builds the
-// synopsis from the first line of every entry through `usageSynopsis`.
-import { TIERS_USAGE } from './verify/tiers.mjs'
+// Pure: no I/O, and no import — every hook that loads a user of this table
+// must keep loading in a fixture that copies only the top-level scripts. Each
+// script prints its entry; batch-resume-hook.mjs builds the synopsis from the
+// first line of every entry through `usageSynopsis`. verify/tiers.mjs appends
+// its live suite lists to its own entry.
 
 export const USAGE = Object.freeze({
   finding: [
@@ -34,7 +36,10 @@ export const USAGE = Object.freeze({
     '       readTasksOpen()  TASKS.md alone — what is still to do',
     '       readTasksAll()   TASKS.md + docs/tasks-archive.md — every point number, closed ones included',
   ].join('\n'),
-  tiers: TIERS_USAGE,
+  tiers: [
+    'usage: npm test -- <suite>… [--section=<name>] | npm test -- small | npm test -- large   (tiers.mjs is the map, no CLI)',
+    '       sections of a suite: node scripts/verify/run-all.mjs <suite> --section=list',
+  ].join('\n'),
 })
 
 /** Is this argument list a request for the usage? */
