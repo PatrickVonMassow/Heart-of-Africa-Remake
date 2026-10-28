@@ -25,6 +25,15 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeF
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
+/** The hook's stdout minus duty (13)'s reply-header envelope, which a fresh
+ *  session receives on its first call: the token rule these cases pin is about
+ *  the chat and fence channels, and the header has its own suite. */
+const withoutHeader = (out) =>
+  String(out)
+    .split('\n')
+    .filter((line) => line && !line.includes('[reply-header]'))
+    .join('\n')
+
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const OWNER = 'chat-delivery-session'
 let repo
@@ -105,14 +114,14 @@ describe('the user message at the next tool call', () => {
   it('THE TOKEN RULE: an empty spool writes not one byte', () => {
     const r = runHook()
     expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
+    expect(withoutHeader(r.stdout)).toBe('')
   })
 
   it('stands down for a session that does not own the batch, consuming nothing', () => {
     spool(message())
     const r = runHook('somebody-else')
     expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
+    expect(withoutHeader(r.stdout)).toBe('')
     expect(pendingFiles()).toEqual(['n1.json'])
   })
 
@@ -120,7 +129,7 @@ describe('the user message at the next tool call', () => {
     const transcript = resolve(claudeDir(), 'projects', 'owner', 'subagents', 'agent-a.jsonl')
     const r = runHook(OWNER, transcript)
     expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
+    expect(withoutHeader(r.stdout)).toBe('')
     expect(pendingFiles()).toEqual(['n1.json'])
   })
 
@@ -128,7 +137,7 @@ describe('the user message at the next tool call', () => {
     // Measured 12.10.2026: this shape consumed a user message into a subagent.
     const r = runHook(OWNER, resolve(claudeDir(), 'projects', 'owner.jsonl'), { agent_id: 'a27e192a39170f873' })
     expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
+    expect(withoutHeader(r.stdout)).toBe('')
     expect(pendingFiles()).toEqual(['n1.json'])
   })
 
@@ -148,14 +157,14 @@ describe('the user message at the next tool call', () => {
   it('says nothing at the NEXT call — the same message is never injected twice', () => {
     const r = runHook()
     expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
+    expect(withoutHeader(r.stdout)).toBe('')
   })
 
   it('stays silent and does not fail the tool call on a corrupt spool', () => {
     writeFileSync(resolve(spoolDir(), 'n9.json'), 'not json at all')
     const r = runHook()
     expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
+    expect(withoutHeader(r.stdout)).toBe('')
   })
 
   it('rings a waiting carrier as the exact additionalContext envelope', () => {
@@ -218,18 +227,22 @@ describe('lock-heartbeat-hook — the dispossession notice', () => {
   })
 
   it('says it ONCE — injected context is paid for on every later request', () => {
-    expect(runHook(FENCED).stdout).toBe('')
+    // …and the reply header (duty 13) that the notice held back arrives on this call.
+    const next = runHook(FENCED).stdout
+    expect(withoutHeader(next)).toBe('')
+    expect(next.trim().split('\n')).toHaveLength(1)
+    expect(next).toContain('[reply-header] Current reply header: **')
   })
 
   it('says nothing at all to the current owner or to a session that never held a fence', () => {
-    expect(runHook('the-successor').stdout).toBe('')
-    expect(runHook('some-attended-window').stdout).toBe('')
+    expect(withoutHeader(runHook('the-successor').stdout)).toBe('')
+    expect(withoutHeader(runHook('some-attended-window').stdout)).toBe('')
   })
 
   it('stands down for a PAUSED batch', () => {
     writeFileSync(resolve(claudeDir(), 'fence-notice.json'), JSON.stringify({ v: 1, sessionId: FENCED, fence: 0 }))
     writeFileSync(resolve(claudeDir(), 'batch-paused'), 'paused for a human')
-    expect(runHook(FENCED).stdout).toBe('')
+    expect(withoutHeader(runHook(FENCED).stdout)).toBe('')
     rmSync(resolve(claudeDir(), 'batch-paused'), { force: true })
   })
 })

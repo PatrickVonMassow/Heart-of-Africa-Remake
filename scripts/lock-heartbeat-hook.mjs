@@ -78,6 +78,12 @@
 //      silent and fail-open.
 // (12) THE FOREGROUND JOURNAL: each owning-session call is recorded as a
 //      FOREGROUND_ACTIVITY event in the batch activity journal.
+// (13) THE REPLY HEADER (point 1308, U1): the exact header the timestamp Stop
+//      guard expects (stamp + context reading, one shared `headerReading`) as
+//      `additionalContext`, re-sent only when the minute or the reading bucket
+//      changed and only when duties (6), (7) and (9) stayed silent this call.
+//      It replaces the `node -e Intl.DateTimeFormat` measuring call; a failure
+//      writes one stderr line and changes nothing else.
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
@@ -93,6 +99,8 @@ import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 import { recordContextPermitResult } from './context-fence-permit.mjs'
 import { observeHandoverAttributionCall } from './handover-attribution.mjs'
+import { headerDelivery, headerReading } from './timestamp-guard-core.mjs'
+import { isSubagentHook } from './chat-delivery-core.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -330,9 +338,40 @@ try {
     process.stdout.write(
       `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: observed.context } })}\n`,
     )
+    spoke = true
   }
 } catch {
   /* an observer may never break a tool call */
+}
+
+// (13) the reply header — see the header comment. Last of the speaking duties
+// and gated on `!spoke`, so stdout still carries one JSON envelope per call; a
+// withheld header keeps its stored record unchanged and is delivered next call.
+// Recorded only once written, through the same atomic state merge.
+try {
+  // A subagent's reply is not the one the Stop guard judges — it gets nothing.
+  if (!spoke && !isSubagentHook(data)) {
+    const delivery = headerDelivery({
+      sessionId: sid,
+      reading: headerReading(data.transcript_path ?? data.transcriptPath ?? ''),
+      last: (readJson(STATE_PATH) ?? {}).replyHeader ?? null,
+    })
+    if (delivery.emit) {
+      process.stdout.write(
+        `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: delivery.context } })}\n`,
+      )
+      spoke = true
+      mergeState({ replyHeader: delivery.record })
+    }
+  }
+} catch (e) {
+  // Loud but harmless: every older duty already ran, and the Stop guard still
+  // hands over the header in its refusal as before.
+  try {
+    process.stderr.write(`header-inject failed: ${(e && e.message) || e}\n`)
+  } catch {
+    /* stderr gone — nothing left to tell */
+  }
 }
 
 // (10) context permit result — silent and fail-open. Session/call matching is

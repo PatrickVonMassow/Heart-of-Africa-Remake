@@ -2916,7 +2916,7 @@ export function setCardDescription(html, point, text) {
   if (words > DESCRIPTION_WORD_LIMIT) {
     throw new Error(
       `board: a description is 1-3 sentences on what the point delivers — ${words} words is over ` +
-        `${DESCRIPTION_WORD_LIMIT}; progress belongs in the status (board.mjs status)`,
+        `${DESCRIPTION_WORD_LIMIT}; progress belongs in the status (node scripts/board.mjs status <point> "<text>")`,
     )
   }
   const key = describedSection(html, point)

@@ -27,6 +27,7 @@
 import { CLAIM_BY } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 import { humanText } from './request-approval-guard-core.mjs'
+import { usageSynopsis } from './cli-usage.mjs'
 
 const OWNER_OWNERSHIP = new Set(['acquired-spawn', 'acquired', 'mine'])
 
@@ -435,4 +436,58 @@ export function freeLockDeclinedLine({ sessionId = '' } = {}) {
     `own the batch; answer the user normally. If the user wants the batch here, they say "${BATCH_START_WORD}"; ` +
     `only then take it with \`node scripts/batch-claim.mjs --take --session ${sessionId}\`.`
   )
+}
+
+/**
+ * One line over the agent worktrees `git worktree list --porcelain` names (the
+ * main checkout excluded), or '' when there are none or the text is unreadable.
+ */
+export function worktreeSummaryLine(porcelain = '', mainRoot = '') {
+  const trees = []
+  for (const block of String(porcelain ?? '').split(/\n\s*\n/)) {
+    const path = /^worktree (.+)$/m.exec(block)?.[1]?.trim()
+    if (!path || path === mainRoot) continue
+    const branch = /^branch refs\/heads\/(.+)$/m.exec(block)?.[1]?.trim() ?? (/^detached$/m.test(block) ? 'detached' : '?')
+    trees.push(`${path} [${branch}]`)
+  }
+  return trees.length ? `Worktrees (${trees.length}): ${trees.join(', ')}` : ''
+}
+
+/**
+ * The SessionStart command synopsis: the usage lines (scripts/cli-usage.mjs)
+ * plus the worktree line, at most 15 lines. A throwing `synopsis` omits the
+ * synopsis — the caller reports that on stderr — and the resume text stands.
+ */
+export function commandSynopsisText({ synopsis, worktreeLine = '' } = {}) {
+  const lines = [...synopsis(), ...(worktreeLine ? [worktreeLine] : [])].slice(0, 15)
+  return lines.join('\n')
+}
+
+/**
+ * The command synopsis appended to the start text, so the first call carries the
+ * syntax instead of a `--help` round-trip. Every failure omits only its own part:
+ * a git error drops the worktree line, a usage error drops the synopsis (stderr
+ * line via `say`), and the resume text is printed either way. `git` is the
+ * caller's execFileSync; nothing here runs without it.
+ */
+export function commandSynopsis({ synopsis = usageSynopsis, git = null, root = '', say = console.error } = {}) {
+  let worktreeLine = ''
+  try {
+    const porcelain = git('git', ['worktree', 'list', '--porcelain'], {
+      windowsHide: true,
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    worktreeLine = worktreeSummaryLine(porcelain, root)
+  } catch {
+    /* git unreadable — the worktree line is omitted */
+  }
+  try {
+    return `\n${commandSynopsisText({ synopsis, worktreeLine })}`
+  } catch (e) {
+    say(`[batch-resume] command synopsis omitted: ${(e && e.message) || e}`)
+    return ''
+  }
 }

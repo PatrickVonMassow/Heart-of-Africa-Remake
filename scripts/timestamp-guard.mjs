@@ -23,36 +23,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { berlinStamp, evaluate, inspectLastAssistantText } from './timestamp-guard-core.mjs'
+import { berlinStamp, evaluate, headerReading, inspectLastAssistantText } from './timestamp-guard-core.mjs'
 import { shortAckDemand } from './closing-reply-core.mjs'
 import { contextLevelSuffix } from './dashboard-reminder-core.mjs'
-import { parseContextTokens } from './context-watermark-core.mjs'
-import { readTail } from './context-watermark.mjs'
-
-/**
- * The header suffix this turn, read the same way the UserPromptSubmit hook
- * reads it — one definition of what "context" means. An unreadable transcript
- * yields the `--` reading rather than nothing: the suffix belongs in the header
- * either way, and "unknown" is an honest value where a silent omission is not.
- *
- * `real` says whether anything actually measured. It separates the two
- * questions the guard has to keep apart: what the reply is TOLD to write (always
- * the whole header) from what it can be BLOCKED for omitting (only a reading
- * that exists).
- */
-function headerReading(transcriptPath) {
-  let tokens = null
-  try {
-    const tail = transcriptPath ? readTail(transcriptPath) : null
-    tokens = tail === null ? null : (parseContextTokens(tail)?.tokens ?? null)
-  } catch {
-    tokens = null
-  }
-  return {
-    suffix: contextLevelSuffix(tokens),
-    real: typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0,
-  }
-}
 
 // Overridable for the test harness so tests never touch the live state file.
 const STATE_PATH =
