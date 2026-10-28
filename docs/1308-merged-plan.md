@@ -76,9 +76,17 @@ Saving: 121 measuring calls (3.9 % rt, 4.1 % cache read) + most of 54 timestamp 
 
 Change: `batch-boundary-core.mjs sealedBoundaryDeny` returns `{deny:false}` when every segment of the
 command is on an EXPLICIT read list (`SEALED_READ_SEGMENTS`, a pure anchored set in
-`batch-boundary-core.mjs`): `^git (status|log|diff|show|rev-parse|branch --list|worktree list|
-remote -v|ls-files)\b` with no option before the subcommand (`git -c`, `-C`, `--git-dir` denied) and no
-`--output` (the diff family's file writer); plain readers `grep|cat|head|tail|ls|wc|stat` with `tail`
+`batch-boundary-core.mjs`): `^git (status|log|diff|show|rev-parse|ls-files)\b` and `^git branch --list\b`, plus the complete
+forms `^git remote -v$` and `^git worktree list(?: --porcelain| -v| --verbose)*$` (round 3: `-v` is
+`git remote`'s verbose flag and its subcommand follows it, so `git remote -v remove origin` passed the
+prefix), with no option before the subcommand (`git -c`, `-C`, `--git-dir` denied), no `--output`
+(the diff family's file writer), no `--ext-diff`/`--textconv` (round 3: they run `diff.external`/
+`diff.<driver>.command`/`diff.<driver>.textconv`) and no `--edit-description` after `branch --list`
+(git refuses `--list` with its other modes but not with that one). A helper configured before the
+seal (`diff.external`, a `diff=<driver>` attribute, `core.fsmonitor` under `git status`, clean
+filters) still runs on the default path; the seal does not guard pre-seal state, and after the seal
+nothing on the list can install one (`git config`, `-c`, edits of `.git/config` and `.gitattributes`
+are all denied); plain readers `grep|cat|head|tail|ls|wc|stat` with `tail`
 denied `-f`/`-F`/`--follow` (a never-returning wait); nothing else. `find`, `sed` and `rg` are NOT on
 the list (round 2 of the final check): `find . -delete`/`-exec`, `sed -n 'w TASKS.md'`/`e` and
 `rg --pre <cmd>` write or execute without any `>`/`$(` — `grep`/`cat`/`head` cover the read cases
@@ -100,7 +108,12 @@ Tests (`batch-boundary-core.test.mjs`): sealed deny allows `grep`, `cat`, `git l
 scripts/x.mjs`, Edit of a non-closing file, and (round 2) `find . -delete`, `find . -exec rm {} \;`,
 `find . -fprint out`, `sed -n 'w TASKS.md' f`, `sed -n '1e cmd' f`, `sed -n 1,5p f` (sed dropped
 entirely), `rg --pre cat x`, `tail -f log`, `git log --output=f`, `git diff --output f`,
-`git -c core.pager=cmd log`; `batch-singleton` test: heartbeat after an allowed read keeps the sealed
+`git -c core.pager=cmd log`, and (round 3) `git remote -v remove origin`, `git remote -v set-url
+origin https://x/y.git`, `git remote -v add x https://x/y.git`, `git remote -v rename origin x`,
+`git diff --ext-diff`, `git diff -p --ext-diff HEAD~1`, `git show --textconv HEAD:TASKS.md`,
+`git log -p --ext-diff`, `git log --textconv -p`, `git branch --list --edit-description feat/x`,
+`git worktree list add x`; allows (round 3) `git remote -v`, `git worktree list --porcelain`,
+`git diff --no-ext-diff`, `git branch --list 'feat/*'`; `batch-singleton` test: heartbeat after an allowed read keeps the sealed
 marker.
 Saving: 18 BOUNDARY IS COMMITTED refusals + the blocked subagent reads; ~1 % rt, more in cache read.
 
@@ -271,3 +284,18 @@ before the fix; none was rejected.
   read list — `grep`/`cat`/`head`/`tail` cover reads after a seal; same hazard class closed for the
   rest: `tail -f/-F/--follow` (never returns), `git … --output=<file>` (writes) and any option before
   the git subcommand (`git -c …`) are denied. Negative tests named in U4.
+
+### Round 3 (Sol, 28.10.2026)
+
+- A7 (U4, round-3 A1) — confirmed: `git remote -v remove origin` / `git remote -v set-url origin …`
+  passed the prefix (`-v` is `git remote`'s verbose flag; its subcommand follows it). Fix (narrowest):
+  `git remote -v` and `git worktree list` become complete anchored forms; `git branch --list` denies
+  the `--edit-description` token (git itself refuses `--list` with its other modes). Negative tests
+  named in U4.
+- A8 (U4, round-3 A2) — confirmed for the explicit flags, rejected for the default path: `--ext-diff`
+  and `--textconv` passed the list and run configured commands; they are denied like `--output`. The
+  default `diff.external`/textconv path runs only a helper configured BEFORE the seal, which the seal
+  does not guard (as it does not guard a pre-seal background process); after the seal nothing on the
+  list can install one (`git config`, `-c`, `.git/config`/`.gitattributes` edits are all denied), and
+  `git status` runs `core.fsmonitor` and clean filters on the same terms, so a "no helper" bar would
+  empty the git list. No new mechanism; negative tests named in U4.
