@@ -996,3 +996,62 @@ describe('carryRunRecords', () => {
     expect(quiet.failed).toBe(0)
   })
 })
+
+// POINT 1308 (U6 b): the landing writes the `closing <N>` card before its
+// publish. The write never stops the chain; a failure names the one command.
+describe('the closing card written by the landing', () => {
+  it('calls board.mjs closing with the point and the owed duties, killed by SIGKILL on a hang', async () => {
+    const { writeClosingCard, closingCardReason } = await import('./land-point.mjs')
+    const calls = []
+    const r = writeClosingCard({ number: 544, run: (cmd, args, opts) => calls.push({ cmd, args, opts }) })
+    expect(r.ok).toBe(true)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].args.slice(1)).toEqual(['closing', '544', closingCardReason(544)])
+    expect(calls[0].opts).toEqual(expect.objectContaining({ timeout: 15000, killSignal: 'SIGKILL' }))
+  })
+
+  it('reports a refused write with the exact manual command, and throws nothing', async () => {
+    const { writeClosingCard, closingCardCommand } = await import('./land-point.mjs')
+    const r = writeClosingCard({
+      number: 544,
+      run: () => {
+        const e = new Error('Command failed')
+        e.stderr = 'board: no German subject for point 544 stands anywhere on the board'
+        throw e
+      },
+    })
+    expect(r.ok).toBe(false)
+    expect(r.detail).toContain('no German subject for point 544')
+    expect(r.detail).toContain(closingCardCommand(544))
+    expect(closingCardCommand(544)).toMatch(/^node scripts\/board\.mjs closing 544 "/)
+  })
+
+  it('the card it writes survives the publish projection once the point is closed', async () => {
+    const { closingCardReason } = await import('./land-point.mjs')
+    const { toClosingWork, projectNowForPublish, closingWorkCards } = await import('./board-core.mjs')
+    const bare =
+      '<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Erledigt</h2></summary>\n</details>\n</main>\n'
+    const html = toClosingWork(bare, 544, { subject: 'Die dritte Kartenart', reason: closingCardReason(544), stamp: '23:40' })
+    for (const focusPoint of [null, 544]) {
+      const published = projectNowForPublish(html, { ok: true, points: [], focusPoint }, { knownPoints: [] }).html
+      expect(closingWorkCards(published)).toHaveLength(1)
+      expect(published).toContain(closingCardReason(544))
+    }
+  })
+
+  it('reports the missing card as the LAST step, after the publish and the cleanup ran', () => {
+    const src = readFileSync(join(process.cwd(), 'scripts', 'land-point.mjs'), 'utf8')
+    const write = src.indexOf('const closing = writeClosingCard({ number })')
+    const publish = src.indexOf("sh('node', [join('scripts', 'board-publish.mjs')]", write)
+    const cleanupOk = src.indexOf("      'cleanup',\n      VERDICT.ok,", publish)
+    const red = src.indexOf("step('closing', VERDICT.failed, closing.detail)", cleanupOk)
+    expect(write).toBeGreaterThan(0)
+    expect(publish).toBeGreaterThan(write)
+    expect(cleanupOk).toBeGreaterThan(publish)
+    expect(red).toBeGreaterThan(cleanupOk)
+    expect(src.slice(red, red + 400)).toContain('repair: closingCardCommand(number)')
+  })
+})

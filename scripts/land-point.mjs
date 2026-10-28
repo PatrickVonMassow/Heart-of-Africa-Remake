@@ -728,6 +728,41 @@ function boardDecision(postTickTasks) {
   })
 }
 
+/** The closing card's reason: the duties a landed point still owes. */
+export const closingCardReason = (number) =>
+  `Punkt ${number} ist gelandet; offen sind das Aufräumen von Branch und Worktree und die Batch-Grenze.`
+
+/** The single command that writes the closing card by hand — named by a failed write. */
+export const closingCardCommand = (number) => `node scripts/board.mjs closing ${number} "${closingCardReason(number)}"`
+
+/**
+ * THE CLOSING CARD, WRITTEN BY THE LANDING (point 1308, U6 b). The tick has
+ * closed the point, so the now-section owes the reader "this point's closing
+ * duties are running" — the card `board.mjs closing` writes and the boundary's
+ * `done <N> --none` later replaces. Writing it here, before the publish, saves
+ * the session the call the board gate would otherwise demand next.
+ *
+ * NEVER STOPS THE CHAIN: a refused or failing write is reported (`ok: false`,
+ * the manual command in `detail`) and the publish runs with today's derived
+ * card, exactly as it did before this step existed. `run` is the seam a test
+ * drives instead of the real board.
+ */
+export function writeClosingCard({ number, run = sh } = {}) {
+  try {
+    run('node', [join('scripts', 'board.mjs'), 'closing', String(number), closingCardReason(number)], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 15000,
+      killSignal: 'SIGKILL',
+    })
+    return { ok: true, detail: `closing card for ${number} written` }
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `closing card NOT written (${childWords(e)}) — write it by hand: ${closingCardCommand(number)}`,
+    }
+  }
+}
+
 /**
  * SETTLE THE NOW-CARD — before the board is published, never after (point 1091).
  *
@@ -1197,7 +1232,15 @@ async function main(argv) {
     }
     const settleNote = settled.settled ? ' (now-card settled first)' : ''
 
-    // 6b. BOARD PUBLISH (rider b: skipped when nothing changed). Re-decided here
+    // 6b. THE CLOSING CARD (point 1308, U6 b) — written before the publish so
+    // the page goes out naming this point's closing duties. A failed write
+    // changes nothing of today's chain: the publish runs with the derived card,
+    // the cleanup runs, and only then is the missing card reported red as the
+    // last step, its repair the one manual command.
+    const closing = writeClosingCard({ number })
+    const closingNote = closing.ok ? `; ${closing.detail}` : ''
+
+    // 6c. BOARD PUBLISH (rider b: skipped when nothing changed). Re-decided here
     // against the state as it now stands on disk: the plan's decision was taken
     // against the same POST-tick work order, but the board file and the recorded
     // publish state may have moved since — a publish is cheap, a stale page is
@@ -1206,7 +1249,7 @@ async function main(argv) {
     if (board.run) {
       try {
         sh('node', [join('scripts', 'board-publish.mjs')], { stdio: ['ignore', 'pipe', 'pipe'] })
-        step('board', VERDICT.ok, `${board.reason}${settleNote}`)
+        step('board', VERDICT.ok, `${board.reason}${settleNote}${closingNote}`)
       } catch (e) {
         error = new LandingError('the board publish failed', {
           step: 'board',
@@ -1219,7 +1262,7 @@ async function main(argv) {
         throw error
       }
     } else {
-      step('board', VERDICT.skipped, `${board.reason}${settleNote}`)
+      step('board', VERDICT.skipped, `${board.reason}${settleNote}${closingNote}`)
     }
     if (batchId) {
       const boardHash = createHash('sha256').update(readIf(BOARD_FILE)).digest('hex')
@@ -1335,6 +1378,14 @@ async function main(argv) {
         cleanup.remove.length - refused.length > 0 ? ` + ${cleanup.remove.length - refused.length} worktree(s)` : ''
       }${kept ? `, ${kept} kept on purpose` : ''}`,
     )
+    if (!closing.ok) {
+      step('closing', VERDICT.failed, closing.detail)
+      error = new LandingError('the point landed and was cleaned up, but its closing card was not written', {
+        step: 'closing',
+        repair: closingCardCommand(number),
+      })
+      throw error
+    }
   } catch (e) {
     if (!(e instanceof LandingError)) {
       error = new LandingError(`${(e && e.message) || e}`, { step: 'unknown' })
@@ -1353,7 +1404,8 @@ async function main(argv) {
     (error
       ? '\nDONE BY THIS COMMAND: only the steps marked OK above.\n'
       : '\nDONE BY THIS COMMAND: the merge, the gate, the tick, the archive move, the tick\n' +
-        'COMMIT and the push of main, the now-card settlement, the board publish and the\n' +
+        'COMMIT and the push of main, the now-card settlement, the closing card, the board\n' +
+        'publish and the\n' +
         'branch/worktree cleanup.\n') +
       'NOT DONE: the picture verification on both backends (it belongs BEFORE the merge,\n' +
       'on the branch), and the point boundary — two-phase (point 675):\n' +
