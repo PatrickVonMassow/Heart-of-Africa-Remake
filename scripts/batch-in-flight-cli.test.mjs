@@ -2,12 +2,12 @@
 // loop against an isolated repository so a bare --transferable cannot skip the
 // option that follows it, and assert what is actually persisted.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { reapDeadDeclaration } from './batch-in-flight.mjs'
+import { clearDeclarationIf, reapDeadDeclaration } from './batch-in-flight.mjs'
 const CLI = resolve(import.meta.dirname, 'batch-in-flight.mjs')
 const OWNER = 'cli-owner'
 let root = ''
@@ -305,6 +305,124 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
 })
 
 // --- POINT 1048: THE PAPERWORK OF A DEAD SESSION -----------------------------
+describe('--clear --if-waiting-on (point 1308)', () => {
+  const standing = (waitingOn) =>
+    writeFileSync(inFlightPath(), JSON.stringify({ sessionId: OWNER, at: Date.now(), waitingOn, pid: process.pid, evidence: [{ kind: 'pid', pid: process.pid }] }))
+  const clearIf = (name) =>
+    spawnSync(process.execPath, [CLI, '--clear', '--if-waiting-on', name], {
+      encoding: 'utf8',
+      env: { ...process.env, HOA_REPO_ROOT: root, HOA_ALERT_ESCALATION: 'off', HOA_ACTIVITY_JOURNAL_PATH: journalPath() },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+  it('leaves a declaration with another name standing', () => {
+    standing('theirs')
+    const result = clearIf('mine')
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('left as it is')
+    expect(declaration().waitingOn).toBe('theirs')
+  })
+  it('removes the declaration that carries the name', () => {
+    standing('mine')
+    const result = clearIf('mine')
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('declaration cleared')
+    expect(existsSync(inFlightPath())).toBe(false)
+  })
+  // chmod denies only a non-root POSIX process; elsewhere the fixture would not fail.
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('refuses loudly and keeps the declaration when it cannot be removed', () => {
+    standing('mine')
+    const dir = join(inFlightPath(), '..')
+    chmodSync(dir, 0o500)
+    try {
+      const result = clearIf('mine')
+      expect(result.status).not.toBe(0)
+      expect(result.stderr + result.stdout).toContain('NOT cleared')
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+    expect(declaration().waitingOn).toBe('mine')
+  })
+})
+
+describe('clearDeclarationIf (point 1308)', () => {
+  let dir
+  let path
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'hoa-inflight-clearif-'))
+    path = join(dir, 'batch-in-flight.json')
+  })
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+  const put = (waitingOn) => writeFileSync(path, JSON.stringify({ waitingOn }))
+  const read = () => JSON.parse(readFileSync(path, 'utf8'))
+  it('keeps a declaration written between the rename and the compare', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { afterAside: () => put('theirs') })
+    expect(r.cleared).toBe(true)
+    expect(read().waitingOn).toBe('theirs')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('never moves a non-matching declaration out of sight', () => {
+    put('theirs')
+    let seen = 'not called'
+    const r = clearDeclarationIf('mine', path, { afterAside: () => { seen = existsSync(path) } })
+    expect(r.cleared).toBe(false)
+    expect(seen).toBe('not called')
+    expect(read().waitingOn).toBe('theirs')
+  })
+  it('puts the declaration back and reports when its removal fails after the rename', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { remove: () => { throw new Error('EBUSY') } })
+    expect(r.cleared).toBe(false)
+    expect(r.error).toContain('EBUSY')
+    expect(read().waitingOn).toBe('mine')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('a failed removal does not restore over a newer declaration', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { afterAside: () => put('newer'), remove: () => { throw new Error('EBUSY') } })
+    expect(r.cleared).toBe(false)
+    expect(read().waitingOn).toBe('newer')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('restores a non-matching declaration unchanged', () => {
+    put('theirs')
+    expect(clearDeclarationIf('mine', path).cleared).toBe(false)
+    expect(read().waitingOn).toBe('theirs')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('reports an unparsable declaration as an error and leaves it in place', () => {
+    writeFileSync(path, '{not json')
+    const r = clearDeclarationIf('mine', path)
+    expect(r.cleared).toBe(false)
+    expect(r.error).toContain('unreadable')
+    expect(readFileSync(path, 'utf8')).toBe('{not json')
+  })
+  it('puts back a copy that turns unreadable after the rename', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { afterAside: () => writeFileSync(join(dir, readdirSync(dir)[0]), '{torn') })
+    expect(r.cleared).toBe(false)
+    expect(r.error).toContain('unreadable')
+    expect(readFileSync(path, 'utf8')).toBe('{torn')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('reports no declaration without an error', () => {
+    expect(clearDeclarationIf('mine', path)).toEqual({ cleared: false, prior: null })
+  })
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('reports a failed rename as an error', () => {
+    put('mine')
+    chmodSync(dir, 0o500)
+    try {
+      const r = clearDeclarationIf('mine', path)
+      expect(r.cleared).toBe(false)
+      expect(r.error).toBeTruthy()
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+    expect(read().waitingOn).toBe('mine')
+  })
+})
+
 describe('a declaration whose writing session is gone', () => {
   it('is cleared before any command reads it, and the clearing is said out loud', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-inflight-reap-'))

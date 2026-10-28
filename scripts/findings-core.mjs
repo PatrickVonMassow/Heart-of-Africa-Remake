@@ -371,7 +371,7 @@ export function auditFindings({
         `${carrierPending} Befund(e) liegen noch im Memory-Träger, während diese Sitzung den Batch HÄLT. ` +
         `Diese Pflicht schuldet Sitzung ${sessionId || '<unknown owner>'}; der Träger ist ihr Eingangskorb. ` +
         'Der Träger ist Transport, nie Lager: übertrage sie in TASKS.md (als Bündel-Mitglied, ' +
-        'bundle-first) und leere sie dann mit node scripts/finding.mjs --drained "<Titel>".',
+        'bundle-first) und leere sie dann mit node scripts/finding.mjs --drained "<Titel>" --point <N> (ohne Punkt: --why "<Grund>").',
     })
   }
 

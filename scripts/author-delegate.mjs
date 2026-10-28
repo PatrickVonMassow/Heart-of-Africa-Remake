@@ -45,6 +45,7 @@ import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core
 import { readTasksOpen } from './tasks-source.mjs'
 import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
 import { ensureModelProven } from './cross-review.mjs'
+import { clearOwnWait, declareOwnWait } from './declared-wait.mjs'
 import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
 import { FALLBACK_AUTHOR, effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
 import { CROSS } from './model-lanes.mjs'
@@ -924,21 +925,29 @@ export async function runAuthoringCli({ argv = process.argv.slice(2) } = {}) {
     )
     if (withheld.length) console.error(`  withheld from its environment: ${withheld.join(', ')}`)
 
-    const run = await runAuthoringLane({
-      prompt,
-      cwd: worktree,
-      branch,
-      runtime: config.runtime,
-      timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS,
-      onPush: ({ ok, skipped, head, why }) =>
-        console.error(
-          ok
-            ? `${commandName}: pushed ${String(head).slice(0, 7)} while the run continues`
-            : skipped
-              ? `${commandName}: interim push deferred — ${why}`
-              : `${commandName}: interim push failed — ${why}`,
-        ),
-    })
+    // The wait is declared for the owner while the run blocks (point 1308, U5),
+    // and only our own declaration is cleared once it returns.
+    const wait = declareOwnWait({ waitingOn: `author-delegate point ${point} on ${branch} (pid ${process.pid})`, point })
+    let run
+    try {
+      run = await runAuthoringLane({
+        prompt,
+        cwd: worktree,
+        branch,
+        runtime: config.runtime,
+        timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS,
+        onPush: ({ ok, skipped, head, why }) =>
+          console.error(
+            ok
+              ? `${commandName}: pushed ${String(head).slice(0, 7)} while the run continues`
+              : skipped
+                ? `${commandName}: interim push deferred — ${why}`
+                : `${commandName}: interim push failed — ${why}`,
+          ),
+      })
+    } finally {
+      clearOwnWait(wait)
+    }
     const outcome = config.runtime.outcome(run)
     // A vendor outage is a fallback, not the point's red: recorded, then handed to FALLBACK_AUTHOR.
     // Only the cross lane's outage moves the routing; recordLaneRun ignores the others.

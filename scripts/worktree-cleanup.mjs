@@ -23,6 +23,7 @@ import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
+import { USAGE, wantsHelp } from './cli-usage.mjs'
 import { worktreeActiveAt } from './batch-in-flight.mjs'
 import {
   judgeTarget,
@@ -787,9 +788,14 @@ export function parseCleanupArgs(argv = []) {
 }
 
 if (isMainModule(import.meta.url)) {
-  const { target, dry, expected, error } = parseCleanupArgs(process.argv.slice(2))
+  const { target, dry, expected, error: parseError } = parseCleanupArgs(process.argv.slice(2))
+  // `--help` never removes anything, even beside a path; exit 2 as a bare `--help` always had.
+  const error = wantsHelp(process.argv.slice(2)) ? 'usage requested' : parseError
   if (error) {
+    // The refusal carries the syntax (stdout) so the next call needs no --help;
+    // the exit code is today's.
     console.error(`worktree-cleanup: ${error}`)
+    console.log(USAGE['worktree-cleanup'])
     process.exit(2)
   }
   try {

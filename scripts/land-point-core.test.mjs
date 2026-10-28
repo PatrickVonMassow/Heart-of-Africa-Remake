@@ -38,13 +38,16 @@ import {
 
 // ---------------------------------------------------------------------------
 describe('the chain itself', () => {
-  it('runs the seven steps in the order the guards need', () => {
+  it('runs the eight steps in the order the guards need', () => {
     // The gate is AFTER the merge (two points that auto-merge cleanly can still
-    // break together) and the cleanup is LAST (a branch deleted before the tick
-    // is one nobody can go back to when the tick fails).
-    expect(STEP_IDS).toEqual(['merge', 'gate', 'tick', 'archive', 'push', 'board', 'cleanup'])
+    // break together) and the cleanup comes after the push (a branch deleted
+    // before the tick is one nobody can go back to when the tick fails). Only
+    // the board audit follows it (point 1308, U8): it deletes nothing, and a
+    // refusal there must not cost the cleanup.
+    expect(STEP_IDS).toEqual(['merge', 'gate', 'tick', 'archive', 'push', 'board', 'cleanup', 'synced'])
     expect(STEP_IDS.indexOf('gate')).toBeGreaterThan(STEP_IDS.indexOf('merge'))
-    expect(STEP_IDS.indexOf('cleanup')).toBe(STEP_IDS.length - 1)
+    expect(STEP_IDS.indexOf('cleanup')).toBeGreaterThan(STEP_IDS.indexOf('push'))
+    expect(STEP_IDS.indexOf('synced')).toBe(STEP_IDS.length - 1)
   })
 
   it('makes the work DURABLE before it deletes anything', () => {

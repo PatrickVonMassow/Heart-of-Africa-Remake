@@ -20,6 +20,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { openSetFingerprint } from './board-currency-core.mjs'
+import { berlinStamp, evaluate, headerReading } from './timestamp-guard-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 let repo
@@ -116,5 +117,127 @@ describe('lock-heartbeat-hook — the board-publish due mark', () => {
     const r = runHook({ tool_name: 'Read', tool_input: { file_path: 'x.ts' } })
     expect(r.status).toBe(0)
     writeTasks([10, 30])
+  })
+})
+
+// DUTY (13), THE REPLY HEADER (point 1308, U1): the header the timestamp Stop
+// guard will expect, delivered as PostToolUse context — change-only, never for a
+// subagent, and never at the cost of another duty or of the tool call.
+describe('lock-heartbeat-hook — the reply header (duty 13)', () => {
+  const transcript = () => {
+    const path = resolve(repo, 'transcript.jsonl')
+    writeFileSync(path, `${JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 123456 } } })}\n`)
+    return path
+  }
+  const headerOf = (stdout) => {
+    const lines = String(stdout).split('\n').filter(Boolean)
+    expect(lines).toHaveLength(1)
+    const context = JSON.parse(lines[0]).hookSpecificOutput.additionalContext
+    expect(context.startsWith('[reply-header] Current reply header: ')).toBe(true)
+    return context.slice('[reply-header] Current reply header: '.length)
+  }
+  const seedHeader = (record) => {
+    const s = state() ?? {}
+    writeFileSync(resolve(repo, '.claude', 'dashboard-state.json'), JSON.stringify({ ...s, replyHeader: record }, null, 2))
+  }
+
+  it('hands over exactly the header the timestamp guard accepts, through the shared headerReading', () => {
+    const path = transcript()
+    const before = berlinStamp()
+    const r = runHook({ session_id: 'hdr-a', tool_name: 'Read', tool_input: { file_path: 'x' }, transcript_path: path })
+    expect(r.status).toBe(0)
+    const header = headerOf(r.stdout)
+    const { suffix } = headerReading(path)
+    expect(suffix).toBe(' · Kontext: 123.456 Tokens')
+    expect([`**${before}**${suffix}`, `**${berlinStamp()}**${suffix}`]).toContain(header)
+    expect(evaluate({ lastText: `${header}\n\ntext`, headerSuffix: suffix, enforceSuffix: true })).toBeNull()
+  })
+
+  it('is not sent again within the same minute and reading bucket', () => {
+    const path = transcript()
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const stamp = berlinStamp()
+      seedHeader({ sessionId: 'hdr-b', stamp, bucket: 12 })
+      const r = runHook({ session_id: 'hdr-b', tool_name: 'Read', tool_input: { file_path: 'x' }, transcript_path: path })
+      if (berlinStamp() !== stamp) continue // the minute rolled over mid-case; ask again
+      expect(r.stdout).toBe('')
+      return
+    }
+  })
+
+  it('is sent again once the minute changed', () => {
+    const path = transcript()
+    seedHeader({ sessionId: 'hdr-c', stamp: 'Montag, 01.01.2001, 00:00', bucket: 12 })
+    const r = runHook({ session_id: 'hdr-c', tool_name: 'Read', tool_input: { file_path: 'x' }, transcript_path: path })
+    expect(headerOf(r.stdout)).toContain(' · Kontext: 123.456 Tokens')
+    expect(state().replyHeader).toEqual(expect.objectContaining({ sessionId: 'hdr-c', bucket: 12 }))
+  })
+
+  it('carries the honest `--` reading for a missing transcript or one without a usage row', () => {
+    const missing = runHook({ session_id: 'hdr-d', tool_name: 'Read', tool_input: { file_path: 'x' }, transcript_path: resolve(repo, 'nope.jsonl') })
+    expect(headerOf(missing.stdout).endsWith('** · Kontext: -- Tokens')).toBe(true)
+    const bare = resolve(repo, 'bare.jsonl')
+    writeFileSync(bare, `${JSON.stringify({ type: 'user', message: { content: 'hi' } })}\n`)
+    const noUsage = runHook({ session_id: 'hdr-e', tool_name: 'Read', tool_input: { file_path: 'x' }, transcript_path: bare })
+    expect(headerOf(noUsage.stdout).endsWith('** · Kontext: -- Tokens')).toBe(true)
+  })
+
+  it('says nothing to a subagent', () => {
+    const r = runHook({ session_id: 'hdr-f', agent_id: 'a1', tool_name: 'Read', tool_input: { file_path: 'x' }, transcript_path: transcript() })
+    expect(r.stdout).toBe('')
+  })
+
+  it('duty (9) marks its envelope as spoken, and the header waits behind every speaking duty', () => {
+    // Source order is the contract: (6), (7) and (9) set `spoke`, (13) runs last on `!spoke`.
+    const src = readFileSync(resolve(SOURCE_SCRIPTS, 'lock-heartbeat-hook.mjs'), 'utf8')
+    const duty9 = src.indexOf('const observed = observeOwnerLoops({')
+    const duty9Spoke = src.indexOf('spoke = true', duty9)
+    const duty13 = src.indexOf('const delivery = headerDelivery({')
+    expect(duty9).toBeGreaterThan(0)
+    expect(duty9Spoke).toBeGreaterThan(duty9)
+    expect(duty9Spoke).toBeLessThan(duty13)
+    expect(src.slice(duty9Spoke - 400, duty13)).toContain('if (!spoke && !isSubagentHook(data))')
+  })
+})
+
+describe('lock-heartbeat-hook — a failing header delivery changes nothing else', () => {
+  let broken
+  beforeAll(() => {
+    broken = mkdtempSync(resolve(tmpdir(), 'hoa-header-throw-'))
+    mkdirSync(resolve(broken, '.claude'), { recursive: true })
+    mkdirSync(resolve(broken, 'docs'), { recursive: true })
+    cpSync(SOURCE_SCRIPTS, resolve(broken, 'scripts'), { recursive: true })
+    writeFileSync(resolve(broken, 'docs', 'tasks-archive.md'), '- [x] 1. done\n')
+    writeFileSync(resolve(broken, 'TASKS.md'), tasks([10, 20]))
+    // ICU gone: the copied core's stamp throws.
+    const core = resolve(broken, 'scripts', 'timestamp-guard-core.mjs')
+    const text = readFileSync(core, 'utf8')
+    const head = 'export function berlinStamp(date = new Date()) {'
+    expect(text).toContain(head)
+    writeFileSync(core, text.replace(head, `${head}\n  throw new Error('ICU gone')`))
+  })
+  afterAll(() => {
+    try {
+      rmSync(broken, { recursive: true, force: true })
+    } catch {
+      /* a temp dir left behind is harmless */
+    }
+  })
+
+  it('exits 0 with one stderr line, and the heartbeat and publish-due duties still write', () => {
+    const r = spawnSync(process.execPath, [resolve(broken, 'scripts', 'lock-heartbeat-hook.mjs')], {
+      windowsHide: true,
+      encoding: 'utf8',
+      cwd: broken,
+      input: JSON.stringify({ session_id: 'hdr-throw', hook_event_name: 'PostToolUse', tool_name: 'Read', tool_input: { file_path: 'x' } }),
+    })
+    expect(r.status).toBe(0)
+    expect(r.stdout).toBe('')
+    expect(r.stderr).toContain('header-inject failed: ICU gone')
+    const dash = JSON.parse(readFileSync(resolve(broken, '.claude', 'dashboard-state.json'), 'utf8'))
+    expect(dash.openFingerprint).toBe(openSetFingerprint([10, 20]))
+    expect(dash.replyHeader).toBeUndefined()
+    const activity = JSON.parse(readFileSync(resolve(broken, '.claude', 'tool-activity.json'), 'utf8'))
+    expect(activity.sessionId).toBe('hdr-throw')
   })
 })

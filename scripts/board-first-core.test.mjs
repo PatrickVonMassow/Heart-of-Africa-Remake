@@ -663,6 +663,35 @@ describe('the no-work claim binds the turn', () => {
     expect(reason).toContain('scripts/batch-boundary.mjs')
   })
 
+  // Point 1308 (U6): branch hygiene after a landing is ENDING work, so the
+  // remedy the deny itself prescribes no longer costs a refusal first.
+  it('allows the anchored git closing duties while the claim stands', () => {
+    for (const command of [
+      'git fetch',
+      'git fetch origin --prune',
+      'git branch -d feat/x',
+      'git worktree remove .claude/worktrees/x',
+    ]) {
+      expect(evaluate(cleanCall({ boardHtml: board(idleCard), toolName: 'Bash', command, filePath: undefined })).block, command).toBe(false)
+    }
+  })
+
+  it('still denies every forcing, refspec or chained git form under the claim', () => {
+    for (const command of [
+      'git fetch --force origin main:saved-work',
+      'git fetch origin +main:main',
+      'git fetch origin main:x',
+      'git fetch --update-head-ok',
+      'git branch -D feat/x',
+      'git branch -d -f x',
+      'git worktree remove --force .claude/worktrees/x',
+      'git fetch && git merge origin/main',
+      'git fetch $(cat x)',
+    ]) {
+      expect(evaluate(cleanCall({ boardHtml: board(idleCard), toolName: 'Bash', command, filePath: undefined })).block, command).toBe(true)
+    }
+  })
+
   // ═══ Point 544 — a remedy must reach the state the session is in ══════════
   // The two remedies above could not: `now <N>` needs an open point that already
   // has a queue card, `none` rewrites only the reason. A session owing its

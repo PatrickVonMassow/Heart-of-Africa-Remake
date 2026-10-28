@@ -57,6 +57,7 @@ import {
   spawnTokenProof,
   standDownMessage,
   uninvitedSessionMessage,
+  commandSynopsis,
 } from './batch-resume-hook-core.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
@@ -482,12 +483,12 @@ try {
         const opening = ownerStartText({ ownership, startEvidence: auth?.startReason })
         const noIdle = ownership === 'mine' ? '' : ' Do NOT idle-stop (the batch-progress-guard enforces this).'
         console.log(
-          `${header} ${gitStanding()}${repoLine} ${opening} ${RESUME_BODY}${noIdle}${agentLine}${ownerContext}`,
+          `${header} ${gitStanding()}${repoLine} ${opening} ${RESUME_BODY}${noIdle}${agentLine}${ownerContext}${commandSynopsis({ git: execFileSync, root: REPO_ROOT })}`,
         )
       } else if (!invitation && reservationDecision({ assessment: reservation }).acquire && !ownerAlive(readOwnerLock())) {
         // Uninvited and nobody holds the batch: orient, name the way in, take nothing.
         noteSessionStandDown(sessionId, { processIdentity: sessionProcess, lock: readOwnerLock(), claim, now })
-        console.log(`${header} ${gitStanding()} ${uninvitedSessionMessage({ sessionId })}`)
+        console.log(`${header} ${gitStanding()} ${uninvitedSessionMessage({ sessionId })}${commandSynopsis({ git: execFileSync, root: REPO_ROOT })}`)
       } else {
         // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
         // Five situations reach this branch and they need different words — most
