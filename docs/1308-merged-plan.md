@@ -286,3 +286,9 @@ before the fix; none was rejected.
   `SIGTERM`-ignoring fixture child proves return, FAIL line, non-zero exit and a released lock (U2).
   Not guarded, stated: a grandchild inheriting the child's stdio pipes; none of the three children
   spawns one.
+
+### Round 5 (Sol, 28.10.2026) — PLAN APPROVED
+
+All earlier objections RESOLVED (A1–A3, A5 on their fixes; A4, A6–A8 by dropping U4 under A9;
+round-4 A1 by A10), no new findings (log `local/1308-final-check-5.log`). Step 4 (implementation of
+U3, U1, U6, U2, U8, U5, U7 in the order above) may start.
