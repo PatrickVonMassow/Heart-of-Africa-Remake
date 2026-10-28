@@ -439,31 +439,49 @@ if (section('villager-canoe')) {
         .catch(() => false)
       check('at the landing the net man steps ashore to unload', ashore)
       if (ashore && atBoat) {
-        const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
-        await standAt(boat.stand, nm)
         const squatting = () => page.evaluate(() => {
           const c = window.__placeCanoe()
           return c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3
         })
-        const before = await squatting()
-        const one = await page.evaluate(() => {
-          const c = window.__placeCanoe()
-          let named = 0
-          let visible = 0
-          window.__placeScene.traverse((o) => {
-            if (!o.name.startsWith('village-canoe-netman')) return
-            named++
-            if (o.visible) visible++
+        // HELD FROM A SQUATTING FRAME THROUGH THE SHUTTER (point 1456): the
+        // positioning and the shutter's readiness wait ran seconds under load
+        // while he finished unloading, so a reading before them judged a pose
+        // the picture never showed. Life is frozen in the very frame that
+        // reads him squatting, before either, so the readings are the pose in
+        // the picture; the thaw runs whatever the capture does.
+        const before = await page
+          .waitForFunction(() => {
+            const c = window.__placeCanoe()
+            if (!(c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3)) return false
+            window.__placeFreezeLife(true)
+            return true
+          }, null, { timeout: 30000, polling: 'raf' })
+          .then(() => true)
+          .catch(() => false)
+        let after = false
+        try {
+          const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
+          await standAt(boat.stand, nm)
+          const one = await page.evaluate(() => {
+            const c = window.__placeCanoe()
+            let named = 0
+            let visible = 0
+            window.__placeScene.traverse((o) => {
+              if (!o.name.startsWith('village-canoe-netman')) return
+              named++
+              if (o.visible) visible++
+            })
+            return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
           })
-          return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
-        })
-        check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
-        await frame('1387-netman-ashore-unloading', {
-          local: { x: nm.x, y: 0.5, z: nm.z },
-          label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
-        })
-        // The squat held from the positioning through the shutter (cross-vendor review).
-        const after = await squatting()
+          check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
+          await frame('1387-netman-ashore-unloading', {
+            local: { x: nm.x, y: 0.5, z: nm.z },
+            label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
+          })
+          after = await squatting()
+        } finally {
+          await page.evaluate(() => window.__placeFreezeLife(false))
+        }
         check('he was still squatting ashore, unloading, before and after the shutter', before && after, JSON.stringify({ before, after }))
       }
       // The net man's word to the paddler once the basket is set down, and the
@@ -3367,12 +3385,21 @@ if (section('adult-errands')) {
         !!aim,
         aim ? `patch ${aim.index} at ${aim.x.toFixed(1)}, ${aim.z.toFixed(1)}` : 'no patch in the picture now and 6 m downstream',
       )
+      // THE AIM IS TAKEN AGAIN AT THE SHUTTER (point 1456): the readiness wait
+      // inside the shutter ran long enough under load for the first patch to
+      // ride 13 m, past its lead. The camera stands still, so the patch chosen
+      // right before the exposure is the one the picture holds.
+      let atShutter = null
       const shot = await frame('482-village-river-bank', {
         local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
         label: 'the river bank, with the foam riding the current',
+      }, {
+        beforeCapture: async () => {
+          atShutter = await page.evaluate(aimRead, { lead: AIM_LEAD_M, span: 40 })
+        },
       })
       if (aim && shot) {
-        const after = await page.evaluate(aimRead, { index: aim.index, drift: aim.drift })
+        const after = atShutter ? await page.evaluate(aimRead, { index: atShutter.index, drift: atShutter.drift }) : null
         // The drift phase only grows, so a drift within the validated lead means
         // the patch rode a straight stretch whose both ends were checked inside
         // the (convex) frustum, without wrapping upstream: it was in the picture
@@ -3381,8 +3408,10 @@ if (section('adult-errands')) {
         check(
           'the river-bank frame: the foam it was aimed at is still in the picture after the shutter',
           !!after && after.inPicture && withinLead,
-          after
-            ? `drifted ${after.driftedM.toFixed(2)} m (lead ${AIM_LEAD_M} m)` +
+          !atShutter
+            ? 'no patch in the picture and 6 m downstream at the shutter'
+            : after
+            ? `patch ${atShutter.index}: drifted ${after.driftedM.toFixed(2)} m (lead ${AIM_LEAD_M} m)` +
                 (after.ndc ? `, ndc ${after.ndc.x.toFixed(2)}, ${after.ndc.y.toFixed(2)}` : ', out of the picture')
             : 'no reading',
         )
