@@ -45,12 +45,15 @@ Saving: 161 calls, ~4 % rt upper bound (B1/B3 add <1 %).
 
 ### 2. U1 — header delivered by the PostToolUse hook (A1 + B2)
 
-Change: `scripts/lock-heartbeat-hook.mjs` gains duty (13): compute `berlinStamp()` +
-`contextLevelSuffix(parseContextTokens(readTail(transcript)))` (the two functions
-`timestamp-guard.mjs` uses) and emit `additionalContext` with the exact header when the minute or the
-reading bucket changed since the last emission (state field in `dashboard-state.json`, written via
-`mergeState`) and only when duties (6)/(7)/(9) did not speak this call (`spoke` false; a skipped
-emission keeps its state so it retries next call — one JSON envelope per call stays true).
+Change: `scripts/lock-heartbeat-hook.mjs` gains duty (13): it reuses `timestamp-guard.mjs`'s
+`headerReading(transcriptPath)` (moved to `timestamp-guard-core.mjs` and imported by both, so there is
+ONE definition: `parseContextTokens(tail)?.tokens ?? null` → `contextLevelSuffix(tokens)`, unreadable
+or null → the `--` reading, `real` false) and `berlinStamp()`, and emits `additionalContext` with the
+exact header when the minute or the reading bucket changed since the last emission (state field in
+`dashboard-state.json`, written via `mergeState`) and only when duties (6)/(7)/(9) did not speak this
+call. Today duty (9) writes its envelope WITHOUT setting `spoke = true` (A2 of the final check); the
+change sets `spoke = true` right after duty (9)'s write, and duty (13) runs after it gated on `!spoke`;
+a skipped emission keeps its state so it retries next call — one JSON envelope per call stays true.
 `timestamp-guard`'s refusal text adds "the latest tool result carries the header". The user-scope
 `berlin-timestamp.cjs` prompt-submit injection stays; this refreshes it during long turns.
 Simplification: replaces the `node -e Intl.DateTimeFormat` call; no check added; the refusal exit
@@ -61,36 +64,46 @@ try); emission spam -> bounded by the change-only rule; reply composed >15 min a
 guard refuses as today with the paste-ready header; sealed boundary -> this hook runs on the
 `--commit` call's own PostToolUse, so the header exists without a measuring call (B2).
 Tests (`lock-heartbeat-hook.test.mjs`): header byte-equal to timestamp-guard's expected header for the
-same clock/transcript; not re-emitted within the same minute and bucket; emitted again when the minute
-changes; missing transcript -> `--`; injected throw in `berlinStamp` -> exit 0, stderr line, heartbeat
-and publish-due duties still written; another duty spoke -> header withheld this call, emitted next
-call; `timestamp-guard.test.mjs` unchanged and green.
+same clock/transcript (both through the shared `headerReading`); not re-emitted within the same minute
+and bucket; emitted again when the minute changes; missing transcript or a tail without a usage row ->
+`--`; injected throw in `berlinStamp` -> exit 0, stderr line, heartbeat and publish-due duties still
+written; COLLISION: a fixture where duty (9) has a due report -> exactly one JSON line on stdout (duty
+(9)'s), header withheld and emitted on the next call; same for duty (6) and (7);
+`timestamp-guard.test.mjs` unchanged and green.
 Saving: 121 measuring calls (3.9 % rt, 4.1 % cache read) + most of 54 timestamp refusals; 4–6 % rt.
 
 ### 3. U4 — sealed boundary lets reads through (A7, narrowed)
 
 Change: `batch-boundary-core.mjs sealedBoundaryDeny` returns `{deny:false}` when every segment of the
-command is non-mutating per `command-classify-core.mjs isMutatingSegment` (imported from there, not
-from board-first-core, which imports batch-boundary-core — no cycle); heredocs, `$(`, redirects and
-`sed -i` stay mutating. Verified: `heartbeat()` preserves the handover whenever the lock carries the
+command is on an EXPLICIT read list (`SEALED_READ_SEGMENTS`, a pure anchored set in
+`batch-boundary-core.mjs`): `git` with `status|log|diff|show|rev-parse|branch --list|worktree list|
+remote -v|ls-files` and no `-i`/`>`/`$(`; plain readers `grep|rg|cat|head|tail|ls|wc|stat|find|sed -n`
+(no `-i`); nothing else. `node scripts/*.mjs` outside the closing set stays denied as today: the
+general classifier (`command-classify-core.mjs` line 772) reads an unknown `node scripts/x.mjs
+--status` as a READ by fallback, and a script may write while ignoring the flag (A4 of the final
+check). Heredocs, `$(`, backticks, redirects and `sed -i` stay denied. Verified: `heartbeat()` preserves the handover whenever the lock carries the
 seal (`preserveHandover === true || sealed`), so a passed read cannot delete the marker (the 13.08
 defeat). The Read/Grep/Glob tools never reached this guard; only Bash reads were denied.
 REJECTED half: "`--prepare` commits itself when nothing is owed" — `--commit` requires the handover
 card to be written after `--prepare` (`preparedReceipt.cardsBefore`, `boardCarriesCard`), so the
 card is always owed and the state does not exist. A card-writing `--commit --text-stdin` variant is an
 open question (see below), not part of this plan.
-Failure cases: classifier throws -> today's deny (existing catch); a write misjudged as read ->
-limited to the classifier's tested read set; the marker is never touched by a read.
+Failure cases: list matching throws -> today's deny (existing catch); a command not on the list ->
+today's deny; the marker is never touched by a read.
 Tests (`batch-boundary-core.test.mjs`): sealed deny allows `grep`, `cat`, `git log`, `git status`,
-`node scripts/x.mjs --status`; denies `git commit`, `>` redirect, `sed -i`, `python3 - <<EOF`, Edit
-of a non-closing file; `batch-singleton` test: heartbeat after an allowed read keeps the sealed marker.
+`git diff --stat`, `sed -n 1,5p f`; denies `node scripts/x.mjs --status` (unverified script),
+`node -e`, `git commit`, `git branch -d x`, `>` redirect, `sed -i`, `python3 - <<EOF`, `cat f | node
+scripts/x.mjs`, Edit of a non-closing file; `batch-singleton` test: heartbeat after an allowed read
+keeps the sealed marker.
 Saving: 18 BOUNDARY IS COMMITTED refusals + the blocked subagent reads; ~1 % rt, more in cache read.
 
 ### 4. U6 — closing duties pass the "nothing is running" deny (A3)
 
 Change: (a) `batch-boundary-core.mjs isClosingSetCommand` accepts anchored segments
-`^git fetch( \S+)*$`, `^git branch -d \S+$`, `^git worktree remove \S+$` (no `-D`, `-f`,
-`--force`, no `$(`/redirect — `OPAQUE_SEGMENT_RE` already excludes those). git itself refuses an
+`^git fetch(?: (?:origin|--prune|-p|--all))*$` (NO refspec, NO `--force`/`-f`/`--update-head-ok`/
+`--tags`: `git fetch --force origin main:saved-work` force-updates a local ref and stays denied — A5 of
+the final check), `^git branch -d [A-Za-z0-9._/-]+$`, `^git worktree remove [^\s-][^\s]*$` (no `-D`,
+`-f`, `--force`, no `$(`/redirect — `OPAQUE_SEGMENT_RE` already excludes those). git itself refuses an
 unmerged `-d` and a dirty `worktree remove`, so no git call enters the pure classifier. The widening
 reaches the three users of `handoverSurvivesCall` coherently: the deny exception, the sealed boundary
 and the heartbeat's handover preservation (branch hygiene is ending work; `branch-hygiene-guard`
@@ -103,8 +116,11 @@ Failure cases: `git branch -d` of an unmerged branch -> git refuses (today); `-d
 it deletes nothing itself); `board.mjs closing` fails inside land-point -> publish still runs with
 today's derived card, step reported red with the manual command; land-point aborts earlier -> card
 unchanged (today). Heredocs stay denied (unknowable).
-Tests (`board-first-core.test.mjs`/`batch-boundary-core.test.mjs`): allow the three segments; deny
-`git branch -D`, `git worktree remove --force`, `git fetch && git merge`, `git fetch $(cat x)`;
+Tests (`board-first-core.test.mjs`/`batch-boundary-core.test.mjs`): allow `git fetch`, `git fetch
+origin --prune`, `git branch -d feat/x`, `git worktree remove .claude/worktrees/x`; deny `git fetch
+--force origin main:saved-work`, `git fetch origin +main:main`, `git fetch origin main:x`, `git fetch
+--update-head-ok`, `git branch -D`, `git branch -d -f x`, `git worktree remove --force`, `git fetch &&
+git merge`, `git fetch $(cat x)`;
 `land-point-core.test.mjs`/`land-point-runner.test.mjs`: board shows `closing` after landing; injected
 card-write failure -> step red, publish ran, message names `board.mjs closing <N>`.
 Saving: 64 refusals (2.1 % calls) + remedies; ~2–3 % rt.
@@ -112,8 +128,12 @@ Saving: 64 refusals (2.1 % calls) + remedies; ~2–3 % rt.
 ### 5. U2 — one board command (A2 + B6)
 
 Change: `scripts/board.mjs`: every editing command (`now status title queue eta done none closing
-promote describe`) ends, inside the same `withBoardEditLock`, with (1) the focus stamp — `set` where
-the transition already sets it (`now/done/closing/promote`), `focus.mjs confirm` for the others — (2)
+promote describe`) ends, inside the same `withBoardEditLock`, with (1) the focus stamp ONLY where it
+is the LLM's own statement about the active work: `set` where the transition already sets it
+(`now/done/closing/promote`, and `none` via its transition), `focus.mjs confirm` after `status` alone
+(a restated now-card status); `title`, `eta`, `describe` and `queue` stamp NOTHING — `title` and
+`describe` also edit queued cards and `describe` records a requirement change, so an automatic
+confirm would attest active focus the LLM did not confirm (A3 of the final check) — (2)
 `board-archive-rotate`, (3) `dashboard-guard --synced` (validates first, refuses violations as today);
 each sub-step prints PASS/FAIL and a FAIL prints the old single command. None of the children takes the
 lock (verified in `attest`), so nothing deadlocks. `prep-guard --prepped` is NOT folded (B6: it records
@@ -131,8 +151,9 @@ Tests (`board-core.test.mjs`/`board-focus-behaviour.test.mjs`): `status` leaves 
 start, state published, `--synced` recorded — fields equal to running the four old commands on a
 fixture; injected publish failure -> focus and audit still done, exit != 0, message names publish;
 injected focus-write failure -> message names `focus confirm`; injected child timeout -> lock released,
-FAIL line; `board-first-core.test.mjs`: the merged command's state passes `evaluate`, a failed sub-step
-state is denied exactly as today.
+FAIL line; `title`/`eta`/`describe`/`queue` on a fixture leave `focus.confirmedAt` unchanged (negative
+test for A3); `board-first-core.test.mjs`: the merged command's state passes `evaluate`, a failed
+sub-step state is denied exactly as today.
 Saving: 116 attest occurrences + part of 82 BOARD FIRST refusals; 3–4 % rt.
 
 ### 6. U8 — land-point reviews its own HEAD move (A8, first half)
@@ -206,10 +227,32 @@ Expected combined saving: 15–20 % rt (overlaps U1/U4, U2/U8), similar cache-re
 2. U7: the retro design lists process TASKS points as source (4) ("process work = process history").
    Is a count that lags until the next memory/guard/revert refresh acceptable to the retrospective's
    lesson #1 (only blocking mechanisms hold)?
-3. U2: is `focus.mjs confirm` after `status`/`title`/`eta` an acceptable stamp (the LLM has just
-   restated the card it confirms), or must `status` remain stamp-free so an unchanged card is never
-   confirmed by accident?
+3. U2: is `focus.mjs confirm` after `status` an acceptable stamp (the LLM has just restated the
+   now-card it confirms; `title`/`eta`/`describe`/`queue` stamp nothing since A3), or must `status`
+   remain stamp-free too?
 4. U6(b): after land-point writes `closing <N>`, the daemon-driven `--batch` landing path hands over
    without an LLM — does the boundary's `done <N> --none` card still replace the closing card there?
 5. U1: PostToolUse `additionalContext` lines persist in the transcript; confirm ~25 tokens per
    emission is acceptable, or raise the emission threshold to every 10 minutes within the 15-min window.
+
+## Final-check objections (Sol, 28.10.2026) and their resolution
+
+U3, U5, U7, U8 approved; no rejection judged wrong. Each objection was verified against the code
+before the fix; none was rejected.
+
+- A1 (U1) — confirmed: `timestamp-guard.mjs headerReading` passes `parseContextTokens(tail)?.tokens ??
+  null` to `contextLevelSuffix`, the plan passed the result object. Fix: `headerReading` moves to
+  `timestamp-guard-core.mjs` and both the guard and duty (13) import it (one definition, null -> `--`).
+- A2 (U1) — confirmed: duty (9) writes `observed.context` without `spoke = true`. Fix: set `spoke`
+  after duty (9)'s write; duty (13) runs after it gated on `!spoke`; collision test asserts one JSON
+  line per call with the header deferred.
+- A3 (U2) — confirmed: `title` edits now- or queue cards, `describe` records a requirement change.
+  Fix: automatic `confirm` only after `status`; `title`/`eta`/`describe`/`queue` stamp nothing;
+  negative test on `focus.confirmedAt`.
+- A4 (U4) — confirmed: `command-classify-core.mjs` (line 772) reads an unknown `node scripts/x.mjs
+  --status` as a READ by fallback. Fix: an explicit anchored read list (`SEALED_READ_SEGMENTS`: git
+  read subcommands, plain readers); `node scripts/*` outside the closing set keeps today's deny; tests
+  deny `node scripts/x.mjs --status`.
+- A5 (U6) — confirmed: `^git fetch( \S+)*$` accepted `git fetch --force origin main:saved-work`. Fix:
+  `^git fetch(?: (?:origin|--prune|-p|--all))*$` — no refspec, no force flags; tests deny the forced
+  and the `+main:main` / `main:x` refspec forms.
