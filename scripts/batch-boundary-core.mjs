@@ -885,13 +885,15 @@ export function isClosingSetPath(p) {
  * flag (`git fetch --force origin main:saved-work` force-updates a local ref);
  * `git branch -d` takes one plain name (git itself refuses an unmerged one, and
  * `-D`/`-f` never match); `git worktree remove` takes one path and no option (git
- * refuses a dirty tree). Substitution and redirection stay excluded by
- * `OPAQUE_SEGMENT_RE` before these are consulted.
+ * refuses a dirty tree). Both names are limited to plain path characters, so
+ * brace expansion (`{--force,x}`), globs, quotes and variables cannot smuggle an
+ * option in (Sol review of 28df442). Substitution and redirection stay excluded
+ * by `OPAQUE_SEGMENT_RE` before these are consulted.
  */
 const CLOSING_GIT_SEGMENT_RES = [
   /^git fetch(?: (?:origin|--prune|-p|--all))*$/,
   /^git branch -d [A-Za-z0-9._/][A-Za-z0-9._/-]*$/,
-  /^git worktree remove [^\s-][^\s]*$/,
+  /^git worktree remove [A-Za-z0-9._/][A-Za-z0-9._/-]*$/,
 ]
 
 // Command substitution or file redirection makes a segment opaque (see
