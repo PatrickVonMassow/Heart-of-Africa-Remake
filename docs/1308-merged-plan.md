@@ -76,9 +76,13 @@ Saving: 121 measuring calls (3.9 % rt, 4.1 % cache read) + most of 54 timestamp 
 
 Change: `batch-boundary-core.mjs sealedBoundaryDeny` returns `{deny:false}` when every segment of the
 command is on an EXPLICIT read list (`SEALED_READ_SEGMENTS`, a pure anchored set in
-`batch-boundary-core.mjs`): `git` with `status|log|diff|show|rev-parse|branch --list|worktree list|
-remote -v|ls-files` and no `-i`/`>`/`$(`; plain readers `grep|rg|cat|head|tail|ls|wc|stat|find|sed -n`
-(no `-i`); nothing else. `node scripts/*.mjs` outside the closing set stays denied as today: the
+`batch-boundary-core.mjs`): `^git (status|log|diff|show|rev-parse|branch --list|worktree list|
+remote -v|ls-files)\b` with no option before the subcommand (`git -c`, `-C`, `--git-dir` denied) and no
+`--output` (the diff family's file writer); plain readers `grep|cat|head|tail|ls|wc|stat` with `tail`
+denied `-f`/`-F`/`--follow` (a never-returning wait); nothing else. `find`, `sed` and `rg` are NOT on
+the list (round 2 of the final check): `find . -delete`/`-exec`, `sed -n 'w TASKS.md'`/`e` and
+`rg --pre <cmd>` write or execute without any `>`/`$(` — `grep`/`cat`/`head` cover the read cases
+after a seal. `node scripts/*.mjs` outside the closing set stays denied as today: the
 general classifier (`command-classify-core.mjs` line 772) reads an unknown `node scripts/x.mjs
 --status` as a READ by fallback, and a script may write while ignoring the flag (A4 of the final
 check). Heredocs, `$(`, backticks, redirects and `sed -i` stay denied. Verified: `heartbeat()` preserves the handover whenever the lock carries the
@@ -91,10 +95,13 @@ open question (see below), not part of this plan.
 Failure cases: list matching throws -> today's deny (existing catch); a command not on the list ->
 today's deny; the marker is never touched by a read.
 Tests (`batch-boundary-core.test.mjs`): sealed deny allows `grep`, `cat`, `git log`, `git status`,
-`git diff --stat`, `sed -n 1,5p f`; denies `node scripts/x.mjs --status` (unverified script),
+`git diff --stat`, `tail -n 20 f`; denies `node scripts/x.mjs --status` (unverified script),
 `node -e`, `git commit`, `git branch -d x`, `>` redirect, `sed -i`, `python3 - <<EOF`, `cat f | node
-scripts/x.mjs`, Edit of a non-closing file; `batch-singleton` test: heartbeat after an allowed read
-keeps the sealed marker.
+scripts/x.mjs`, Edit of a non-closing file, and (round 2) `find . -delete`, `find . -exec rm {} \;`,
+`find . -fprint out`, `sed -n 'w TASKS.md' f`, `sed -n '1e cmd' f`, `sed -n 1,5p f` (sed dropped
+entirely), `rg --pre cat x`, `tail -f log`, `git log --output=f`, `git diff --output f`,
+`git -c core.pager=cmd log`; `batch-singleton` test: heartbeat after an allowed read keeps the sealed
+marker.
 Saving: 18 BOUNDARY IS COMMITTED refusals + the blocked subagent reads; ~1 % rt, more in cache read.
 
 ### 4. U6 — closing duties pass the "nothing is running" deny (A3)
@@ -256,3 +263,11 @@ before the fix; none was rejected.
 - A5 (U6) — confirmed: `^git fetch( \S+)*$` accepted `git fetch --force origin main:saved-work`. Fix:
   `^git fetch(?: (?:origin|--prune|-p|--all))*$` — no refspec, no force flags; tests deny the forced
   and the `+main:main` / `main:x` refspec forms.
+
+### Round 2 (Sol, 28.10.2026)
+
+- A6 (U4) — confirmed: `find . -delete` and `sed -n 'w TASKS.md' input.txt` carry no `>`/`$(` and
+  passed the list. Fix (narrowest): `find`, `sed` and `rg` (`--pre <cmd>` executes) leave the sealed
+  read list — `grep`/`cat`/`head`/`tail` cover reads after a seal; same hazard class closed for the
+  rest: `tail -f/-F/--follow` (never returns), `git … --output=<file>` (writes) and any option before
+  the git subcommand (`git -c …`) are denied. Negative tests named in U4.

@@ -135,6 +135,7 @@ put it is the mistake this line exists to stop.
   05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
   05.10.2026: "ja, aber nach 1294"
   Progress (28.10.2026, owner Opus 5.5): step 1 done — blind halves filed as docs/four-eyes/1308-blind-a-opus5.* and 1308-blind-b-sol.* (B's ask-lane material was cut to 199877 characters, corpus partly dropped, settings.json missing; the merger re-checked B against the code). Step 2 done — Fable 5.1 union docs/four-eyes/1308-union.json (10 A + 6 B → 12, 8 kept, 4 rejected, counted by blind-merge) and plan docs/1308-merged-plan.md. Step 3 — GPT-6.1 Sol final check: PLAN NEEDS FIXES, 5 objections (U1 ×2, U2, U4, U6; log local/1308-final-check.log), being answered by the merger, then re-checked.
+  Progress (28.10.2026, 06:07): Sol re-check round 1 (local/1308-final-check-2.log) — the five objections RESOLVED, one new: find/sed in U4's sealed read list allow -delete / 'w file'; the merger dropped find, sed and rg from that list and closed tail -f and git --output (round-2 section in docs/1308-merged-plan.md). NEXT: a third Sol check (ask-lane --lane cross --kind audit --anyway, same files plus local/1308-final-check-2.log); only on PLAN APPROVED does step 4 (implementation) start.
 - [ ] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
   Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
   11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
@@ -15963,3 +15964,10 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/tagGame.ts (`moveChild`), src/scenes/place/tagShuffle.test.ts,
   scripts/verify/childMotionMetric.mjs, docs/1081-steering-trace.md §4–§6.
   Bundle: Dorfleben.
+
+- [ ] 1460. Covering enrichments suite run on both backends for the two suite fixes of 27.10.2026
+  Observed: commits 2eb353f2e (dressing-growth check sampled at the savanna anchor) and 27efb59ab (channel-crossing staged outside the shy ring) changed scripts/verify/enrichments.mjs; render-verify-guard records no covering run since — the last webgl run covered only section channel-crossing.
+  Final state: VERIFY_GL=webgpu and VERIFY_GL=webgl node scripts/verify/run-all.mjs enrichments recorded clean (or every red charged to an open point), frames of both backends inspected.
+  Criticality: low — verification debt; blocks the render-verify Stop guard. Needs a quiet machine.
+  Bundle: Session- & Repo-Hygiene.
+  Source: findings carrier 28.10.2026 04:10 'Enrichments covering run owed on both backends'.

@@ -31,7 +31,7 @@
       "from": [
         "A7"
       ],
-      "defect": "The sealed-boundary deny lets through only segments on an explicit anchored read list (git status/log/diff/show/rev-parse/branch --list/worktree list/remote -v/ls-files; grep/rg/cat/head/tail/ls/wc/stat/find/sed -n), never an unverified `node scripts/x.mjs` (the general classifier reads it as a READ by fallback, a script may write regardless) — those keep today's deny; the heartbeat already preserves a sealed handover, so a read cannot withdraw the marker. The prepare->commit fold is REJECTED: the handover card is always owed between the phases by design, so a 'nothing owed' prepare does not exist."
+      "defect": "The sealed-boundary deny lets through only segments on an explicit anchored read list — `git status|log|diff|show|rev-parse|branch --list|worktree list|remote -v|ls-files` with no option before the subcommand and no --output, and `grep|cat|head|tail|ls|wc|stat` with tail -f/-F/--follow denied; `find`, `sed` and `rg` are excluded (find -delete/-exec, sed w/e commands and rg --pre write or execute without any redirect), and never an unverified `node scripts/x.mjs` (the general classifier reads it as a READ by fallback, a script may write regardless) — everything else keeps today's deny; the heartbeat already preserves a sealed handover, so a read cannot withdraw the marker. The prepare->commit fold is REJECTED: the handover card is always owed between the phases by design, so a 'nothing owed' prepare does not exist."
     },
     {
       "id": "U5",
