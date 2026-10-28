@@ -205,7 +205,7 @@ import {
 } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
 import { PlaceDumpGroup } from './PlaceDumpGroup'
-import { usePlaceDumpProvider } from './placeDumpRead'
+import { shownInScene, usePlaceDumpProvider } from './placeDumpRead'
 import { bandHeightAt, panoramaBandShown } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { emitFootstep } from '../../systems/ambience'
@@ -2748,12 +2748,14 @@ export function PlaceScene() {
       const dir = target.clone().sub(origin).normalize()
       const rc = new THREE.Raycaster(origin, dir, 0.1, 4000)
       const hits = rc.intersectObject(r3fScene, true)
-      const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+      // The raycaster also strikes meshes under a hidden group (the stowed paddle,
+      // work-order 1448), so a surface counts only when it and its ancestors show.
+      const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && shownInScene(h.object))
       // Behind the transparent water: the first surface a sight line meets once
       // it has passed under the drawn river (work-order 1250) — null for none.
       const behind = hit?.object.name === 'place-river'
         ? hits.find((h) => h.distance > hit.distance && h.object.name !== 'place-river' && h.object.name !== 'place-river-foam' &&
-          h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+          h.object.name !== 'panorama-silhouette' && shownInScene(h.object))
         : undefined
       // Whether the surface hit is drawn as WATER: the backdrop's own mask at
       // the hit face (work-order 1250 — map land lay on the river as a band).
