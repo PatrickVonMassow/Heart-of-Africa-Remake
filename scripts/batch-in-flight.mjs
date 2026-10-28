@@ -880,8 +880,11 @@ export function registeredFeatureWriters({
         // Exclude its output before the dirty-path limit so it neither proves a
         // writer alive nor crowds source edits out of the measurement. Keep the
         // shared probe's default intact: declared runs still need that progress.
+        // `.claude/` holds session bookkeeping (guard state, queue rank, fence
+        // ledgers) that observers rewrite after the author has gone; only a
+        // commit or real work output elsewhere keeps the writer live.
         worktreeProbe: (path) => worktreeActiveAt(path, {
-          excludePaths: ['verification/', 'local/verify-logs/', 'test-results/', 'playwright-report/'],
+          excludePaths: ['verification/', 'local/verify-logs/', 'test-results/', 'playwright-report/', '.claude/'],
         }),
       })
       return {

@@ -180,6 +180,29 @@ describe('registered writer liveness beside detached verification output', () =>
     })
   })
 
+  it.each(['src/author.ts', 'docs/author.md'])(
+    'ignores bookkeeping files under .claude/, but still vetoes a fresh %s', (path) => {
+      withCheckout(({ git, touch, measure }) => {
+        touch('.claude/queue-rank.json', '{}')
+        git('add', '--', '.claude/queue-rank.json')
+        for (const bookkeeping of ['.claude/queue-rank.json', '.claude/ci-status-guard-state.json',
+          '.claude/timestamp-guard-state.json', '.claude/context-fence-ledgers/ledger.json']) touch(bookkeeping)
+        const bookkeepingOnly = measure()
+        expect(bookkeepingOnly).toMatchObject({ readable: true, writers: [{
+          recognized: false, output: { verdict: 'quiet' },
+        }] })
+        expect(decision(bookkeepingOnly)).toMatchObject({ start: true })
+
+        touch(path)
+        expect(decision(measure())).toMatchObject({
+          start: false,
+          code: 'registered-writer-live',
+          veto: { output: { verdict: 'alive', detail: expect.stringContaining('(working files)') } },
+        })
+      })
+    },
+  )
+
   it('preserves the live author process veto beside verification-only writes', () => {
     withCheckout(({ touch, measure }) => {
       for (const path of outputPaths) touch(path)
