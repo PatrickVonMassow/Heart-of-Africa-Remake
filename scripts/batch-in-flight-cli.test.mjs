@@ -305,6 +305,32 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
 })
 
 // --- POINT 1048: THE PAPERWORK OF A DEAD SESSION -----------------------------
+describe('--clear --if-waiting-on (point 1308)', () => {
+  const standing = (waitingOn) =>
+    writeFileSync(inFlightPath(), JSON.stringify({ sessionId: OWNER, at: Date.now(), waitingOn, pid: process.pid, evidence: [{ kind: 'pid', pid: process.pid }] }))
+  const clearIf = (name) =>
+    spawnSync(process.execPath, [CLI, '--clear', '--if-waiting-on', name], {
+      encoding: 'utf8',
+      env: { ...process.env, HOA_REPO_ROOT: root, HOA_ALERT_ESCALATION: 'off', HOA_ACTIVITY_JOURNAL_PATH: journalPath() },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+  it('leaves a declaration with another name standing', () => {
+    standing('theirs')
+    const result = clearIf('mine')
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('left as it is')
+    expect(declaration().waitingOn).toBe('theirs')
+  })
+  it('removes the declaration that carries the name', () => {
+    standing('mine')
+    const result = clearIf('mine')
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('declaration cleared')
+    expect(existsSync(inFlightPath())).toBe(false)
+  })
+})
+
 describe('a declaration whose writing session is gone', () => {
   it('is cleared before any command reads it, and the clearing is said out loud', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-inflight-reap-'))

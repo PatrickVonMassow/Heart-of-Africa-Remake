@@ -1606,7 +1606,7 @@ if (isMain) {
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N] [--branch REF] ' +
     '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] ' +
-    '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear | ' +
+    '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear [--if-waiting-on "<what>"] | ' +
     '--agent-check [--worktree PATH]… [--branch REF]… [--log PATH]… | --handover-check | --adopt'
 
   if (argv[0] === '--handover-check') {
@@ -1709,6 +1709,14 @@ if (isMain) {
     process.exit(1)
   } else if (argv[0] === '--clear') {
     const prior = readDeclaration()
+    // `--if-waiting-on <name>` (point 1308, Sol review of 28df442): the compare
+    // and the removal happen in this one call, so a waiting command clears only
+    // its own declaration even when another replaced it after the command read it.
+    const onlyIf = argv[1] === '--if-waiting-on' ? String(argv[2] ?? '') : null
+    if (onlyIf !== null && prior?.waitingOn !== onlyIf) {
+      console.log(`in-flight declaration left as it is — it is not "${onlyIf}".`)
+      process.exit(0)
+    }
     const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
     if (refusal) fail(refusal)
     clearDeclaration()

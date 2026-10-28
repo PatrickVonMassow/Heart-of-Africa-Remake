@@ -15,7 +15,9 @@ function fakeStore({ failDeclare = null, failClear = null } = {}) {
       declaration = { waitingOn: args[1], evidence: [{ kind: 'pid', pid: Number(args.at(-1)) }] }
     } else if (args[0] === '--clear') {
       if (failClear) throw failClear
+      if (args[1] === '--if-waiting-on' && declaration?.waitingOn !== args[2]) return 'in-flight declaration left as it is'
       declaration = null
+      return 'in-flight declaration cleared'
     }
     return ''
   }
@@ -83,6 +85,17 @@ describe('declareOwnWait / clearOwnWait', () => {
     store.set({ waitingOn: 'theirs' })
     expect(clearOwnWait(token, store)).toBe(false)
     expect(store.readDecl().waitingOn).toBe('theirs')
+  })
+
+  it('clears through one conditional call, so a replacement after any earlier read survives', () => {
+    const store = fakeStore()
+    const token = declareOwnWait({ waitingOn: 'mine', pid: 2, owner, paused: notPaused, say: () => {}, ...store })
+    // The replacement lands after clearOwnWait could have read the store: only
+    // the CLI's own compare decides.
+    const runCli = (args) => (args[0] === '--clear' && store.set({ waitingOn: 'theirs' }), store.runCli(args))
+    expect(clearOwnWait(token, { ...store, runCli })).toBe(false)
+    expect(store.readDecl().waitingOn).toBe('theirs')
+    expect(store.calls.at(-1)).toEqual(['--clear', '--if-waiting-on', 'mine'])
   })
 
   it('a failing clear names the manual --clear and throws nothing', () => {

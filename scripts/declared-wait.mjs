@@ -86,13 +86,12 @@ export function declareOwnWait({
 }
 
 /** Clear the declaration `token` made — and only that one. Never throws. */
-export function clearOwnWait(token, { runCli = runInFlight, readDecl = readDeclaration, say = (line) => console.error(line) } = {}) {
+export function clearOwnWait(token, { runCli = runInFlight, say = (line) => console.error(line) } = {}) {
   try {
     if (!token?.declared) return false
-    const standing = readDecl()
-    if (!standing || standing.waitingOn !== token.waitingOn) return false
-    runCli(['--clear'])
-    return true
+    // The CLI compares and removes in one call; a separate read here would let a
+    // declaration replaced between the read and the clear be erased.
+    return /declaration cleared/.test(runCli(['--clear', '--if-waiting-on', token.waitingOn]) ?? '')
   } catch (e) {
     say(`in-flight clear FAILED: ${words(e)} — do it the old way: ${MANUAL_CLEAR}`)
     return false
