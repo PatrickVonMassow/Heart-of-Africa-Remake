@@ -220,35 +220,48 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
 
 /**
  * Remove the declaration only when it is waiting on `waitingOn` (point 1308).
- * The file is first renamed aside, so the compare judges exactly the copy that
- * is removed; a declaration written meanwhile lands beside it and stays. A
- * non-matching copy is linked back unless a newer one already took its place.
+ * A non-matching declaration is never touched. A matching one is renamed aside
+ * and judged again, so the compare covers exactly the copy that is removed; a
+ * copy replaced in between is linked back unless a newer one took its place,
+ * and a copy that cannot be removed is linked back and reported.
  * @returns {{cleared: boolean, prior: object|null, error?: string}}
  */
-export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAside = () => {} } = {}) {
+export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAside = () => {}, remove = (p) => rmSync(p) } = {}) {
+  const words = (e) => String(e?.message ?? e)
+  const seen = readDeclaration(path)
+  if (seen?.waitingOn !== waitingOn) return { cleared: false, prior: seen }
   const aside = `${path}.clear-${process.pid}-${Date.now()}`
   try {
     renameSync(path, aside)
   } catch (e) {
-    return e?.code === 'ENOENT' ? { cleared: false, prior: null } : { cleared: false, prior: null, error: String(e?.message ?? e) }
+    return e?.code === 'ENOENT' ? { cleared: false, prior: null } : { cleared: false, prior: seen, error: words(e) }
   }
   afterAside() // test seam: a writer racing the compare
   const prior = readDeclaration(aside)
-  if (prior?.waitingOn === waitingOn) {
+  const putBack = () => {
+    try {
+      linkSync(aside, path)
+    } catch (e) {
+      if (e?.code !== 'EEXIST') return `could not restore ${path}: ${words(e)} (copy kept at ${aside})`
+    }
     try {
       rmSync(aside, { force: true })
+    } catch (e) {
+      return `left ${aside} behind: ${words(e)}`
+    }
+    return null
+  }
+  if (prior?.waitingOn === waitingOn) {
+    try {
+      remove(aside)
       return { cleared: true, prior }
     } catch (e) {
-      return { cleared: false, prior, error: String(e?.message ?? e) }
+      const restore = putBack()
+      return { cleared: false, prior, error: `could not remove it: ${words(e)}${restore ? `; ${restore}` : ''}` }
     }
   }
-  try {
-    linkSync(aside, path)
-  } catch (e) {
-    if (e?.code !== 'EEXIST') return { cleared: false, prior, error: `could not restore ${path}: ${e?.message ?? e} (copy kept at ${aside})` }
-  }
-  rmSync(aside, { force: true })
-  return { cleared: false, prior }
+  const restore = putBack()
+  return restore ? { cleared: false, prior, error: restore } : { cleared: false, prior }
 }
 
 /**

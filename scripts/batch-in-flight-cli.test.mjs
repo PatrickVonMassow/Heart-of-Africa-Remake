@@ -361,11 +361,26 @@ describe('clearDeclarationIf (point 1308)', () => {
     expect(read().waitingOn).toBe('theirs')
     expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
   })
-  it('does not restore an older non-matching copy over a newer one', () => {
-    put('old')
-    const r = clearDeclarationIf('mine', path, { afterAside: () => put('newer') })
-    expect(r).toMatchObject({ cleared: false })
-    expect(r.error).toBeUndefined()
+  it('never moves a non-matching declaration out of sight', () => {
+    put('theirs')
+    let seen = 'not called'
+    const r = clearDeclarationIf('mine', path, { afterAside: () => { seen = existsSync(path) } })
+    expect(r.cleared).toBe(false)
+    expect(seen).toBe('not called')
+    expect(read().waitingOn).toBe('theirs')
+  })
+  it('puts the declaration back and reports when its removal fails after the rename', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { remove: () => { throw new Error('EBUSY') } })
+    expect(r.cleared).toBe(false)
+    expect(r.error).toContain('EBUSY')
+    expect(read().waitingOn).toBe('mine')
+    expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
+  })
+  it('a failed removal does not restore over a newer declaration', () => {
+    put('mine')
+    const r = clearDeclarationIf('mine', path, { afterAside: () => put('newer'), remove: () => { throw new Error('EBUSY') } })
+    expect(r.cleared).toBe(false)
     expect(read().waitingOn).toBe('newer')
     expect(readdirSync(dir)).toEqual(['batch-in-flight.json'])
   })
