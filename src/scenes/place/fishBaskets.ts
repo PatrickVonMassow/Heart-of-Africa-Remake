@@ -128,9 +128,9 @@ export function carrierTakesUpAtFire(ring: BasketRing): boolean {
 }
 
 /**
- * What must always hold, or null: exactly two baskets, ids 0 and 1, never a
- * negative count, the net man and the carrier holding one basket each at most,
- * and at most two on the bank. The dev hook and the unit tests read this.
+ * What must always hold, or null: exactly two baskets with distinct ids, a
+ * whole non-negative fish count in each, and never both at the net man, the
+ * carrier or the fire. The dev hook and the unit tests read this.
  */
 export function basketRingViolation(ring: BasketRing): string | null {
   const [a, b] = ring.baskets
