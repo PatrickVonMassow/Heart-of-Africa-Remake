@@ -405,8 +405,9 @@ interface Animal {
    *  backstop leaves it alone; once it lapses the swim-to-bank takes over. */
   fleeAt?: number
   /** A calf swam during its chase or its flight from the traveller (design.md
-   *  §19.5), holding the spot where it was first seen on the water: for the
-   *  hunted calf, landing across the water from that spot ends the chase (far
+   *  §19.5), holding the spot where it was first seen on the water (for the
+   *  hunted calf, the entry-bank spot it stepped in from): for the hunted
+   *  calf, landing across the water from that spot ends the chase (far
    *  bank), landing back on the entry bank does not. Once the chase or flight
    *  is over it swims out to the safe bank (safeBankTarget). Cleared once it
    *  stands on land. */

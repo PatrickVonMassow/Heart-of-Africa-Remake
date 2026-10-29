@@ -141,7 +141,7 @@ describe('buildWedgeCarve in the quarter the reported village measured (seed 297
 // The bambara plan with the most carved ground among seeds 1-15 stands in.
 const TODAY_SEED = 5
 
-describe('buildWedgeCarve in the quarter the reporting village places today (seed 5)', () => {
+describe('buildWedgeCarve in the quarter the stand-in Bambara plan places today (seed 5)', () => {
   const layout = buildLayout('bambara-village', TODAY_SEED)
   const NPC_RADIUS = WALKER_RADIUS
   // THE LAYOUT'S OWN QUARTER, not a second one derived here. Work-order 688
@@ -151,7 +151,7 @@ describe('buildWedgeCarve in the quarter the reporting village places today (see
   // cross-vendor round, D8). It is required, not defaulted: a village with no
   // quarter is the regression, not a case to be papered over.
   const ground = layout.playGround
-  if (!ground) throw new Error('the reported village carries no children`s quarter')
+  if (!ground) throw new Error('the stand-in village carries no children`s quarter')
   const carve = buildWedgeCarve(layout.colliders, NPC_RADIUS, ground)
 
   it('still decides something where the children are actually put', () => {

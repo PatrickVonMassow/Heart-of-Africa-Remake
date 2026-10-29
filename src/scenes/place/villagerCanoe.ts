@@ -87,7 +87,7 @@ const BASKET_INLAND = 0.3
 const ASHORE_ALONG = -0.55
 /** How far aft of the canoe's centre the paddler kneels, and how far forward
  *  of it the net man. */
-export const CANOE_PADDLER_AFT = 1.6
+const CANOE_PADDLER_AFT = 1.6
 export const CANOE_NETMAN_FORE = 1.2
 
 /** A point `s` along the bank from the frame's origin, `out` along the normal. */
@@ -128,7 +128,7 @@ export function lanePoint(lane: CanoeLane, s: number): BankPoint {
 }
 
 /** Closest distance between two segments in the plane. */
-export function segmentGap(a: BankPoint, b: BankPoint, c: BankPoint, d: BankPoint): number {
+function segmentGap(a: BankPoint, b: BankPoint, c: BankPoint, d: BankPoint): number {
   const toSeg = (p: BankPoint, q0: BankPoint, q1: BankPoint) => {
     const dx = q1.x - q0.x
     const dz = q1.z - q0.z
@@ -172,7 +172,7 @@ export function yawOf(x: number, z: number): number {
 }
 
 /** Wraps an angle to (−π, π]. */
-export function wrapAngle(a: number): number {
+function wrapAngle(a: number): number {
   let r = a % (Math.PI * 2)
   if (r > Math.PI) r -= Math.PI * 2
   if (r <= -Math.PI) r += Math.PI * 2
