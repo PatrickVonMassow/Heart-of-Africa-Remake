@@ -123,8 +123,8 @@ spread out. Its order inside the bundle is 442 first (largest lever, smallest
 change) and 449 last, because the drill is what makes the others more than a claim.
 
 **Not bundled**, each for its own reason:
-- **#1464** — the uncharged reds of the v0.3.1 closing regression; they span six suites and
-  gate the release, so they travel with point 1462 rather than any feature bundle.
+- **#1465** — the uncharged WebGPU reds of polish-speech that the v0.3.1 closing never reached;
+  they gate the release, so they travel with point 1462 rather than any feature bundle.
 
 - **#184, #200, #203, #205, #207** — the big audits. They sweep the whole codebase and would
   swallow any bundle they were put in.
