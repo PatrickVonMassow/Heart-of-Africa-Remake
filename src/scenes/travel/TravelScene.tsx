@@ -2664,7 +2664,7 @@ function Player() {
     }
     if (import.meta.env.DEV) {
       // Merged EVERY frame, not inside the change gate above: the gate only
-      // fires when canoe/carry/wound state FLIPS, so a check that jumped the
+      // fires when canoe/carry state FLIPS, so a check that jumped the
       // player (e.g. onto Lake Edward, point 152) read a stale snapshot from
       // wherever the last flip happened. Object.assign, not replacement —
       // the drag block earlier in this frame writes __player.drag and a

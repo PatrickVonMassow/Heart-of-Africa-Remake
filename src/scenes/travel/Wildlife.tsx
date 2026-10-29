@@ -4664,7 +4664,8 @@ function Herds() {
             familyHeld = true
           } else if (a.crossing !== undefined) {
             // A swim for a bank (point 192's crossing, and point 312's swim-out
-            // to the nearest unthreatened bank, `safeBankTarget`): straight for the target at the seasonal
+            // to the nearest unthreatened bank, or the least threatened one when
+            // every bank in reach is threatened, `safeBankTarget`): straight for the target at the seasonal
             // wade speed, chest-deep ON the rendered surface; landing — or the
             // resolve deadline (invariant I4) — ends it.
             // (crossingStep: an arrival within balance.waterCross.arriveUnits
