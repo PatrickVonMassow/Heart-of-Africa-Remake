@@ -264,8 +264,8 @@ motion design (a bug).
 
 ### 6.2 Defects found by the measurement (X)
 
-- **Teleport threshold in figure units.** `stepWalk` (`src/render/figureWalk.ts:441`)
-  treats a ground speed above `VILLAGER_MOTION.teleportSpeed` = 6 person units/s as a
+- **Teleport threshold in figure units.** `stepWalk` (then `src/render/figureWalk.ts:441`)
+  treated a ground speed above `VILLAGER_MOTION.teleportSpeed` = 6 person units/s (now 10) as a
   placement; the speed is divided by the figure's world scale (`skinnedFigure.tsx:551`),
   so a child (0.55) at the tag sprint speed 3.4 u/s measures 6.18: every frame is
   "placed, not walked", the measured speed stays 0, no gait plays. Checked by
