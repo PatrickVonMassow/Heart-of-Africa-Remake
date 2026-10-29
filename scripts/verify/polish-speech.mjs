@@ -212,10 +212,20 @@ if (section('speech-hypothesis')) {
         figure.updateWorldMatrix(true, false)
         const e = figure.matrixWorld.elements
         const cam = window.__placeCamera
-        // The chest at THIS figure's own scale, not a flat metre: a metre above
+        // The chest at THIS figure's own size, not a flat metre: a metre above
         // a child's feet is over its head, and once the note rides close over
-        // that head (point 582) the two would read as one point.
-        const chest = Math.max(0.4, Math.hypot(e[4], e[5], e[6]))
+        // that head (point 582) the two would read as one point. The DRAWN head
+        // sets it, as for the aim above: measured 29.10.2026, a figure at group
+        // scale 1 carried its head 0.78 m up, so the scale's metre stood over
+        // its crown and every frame read "above its own note".
+        let head = null
+        figure.traverseVisible((o) => {
+          if (!head && o.name === 'figure-head') head = o
+        })
+        if (head) head.updateWorldMatrix(true, false)
+        const chest = head
+          ? 0.75 * (head.matrixWorld.elements[13] - e[13])
+          : Math.max(0.4, Math.hypot(e[4], e[5], e[6]))
         const v = new (Object.getPrototypeOf(cam.position).constructor)(e[12], e[13] + chest, e[14])
         v.project(cam)
         const r = el.getBoundingClientRect()

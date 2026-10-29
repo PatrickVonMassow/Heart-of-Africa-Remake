@@ -397,6 +397,12 @@ if (section('communication-errand')) {
         const g = window.__game.getState()
         g.setToast(null)
         g.setJournalOpen(false)
+        // The errand's hand-over starts the drums on the WALL clock; on a slow
+        // host their display opened by itself over the inventory mid-block
+        // (closing run 29.10.2026). Settle them before the click.
+        const ui = window.__ui.getState()
+        ui.clearDrumMessage()
+        ui.setDialog(null)
         window.__toastLog = []
         window.__toastUnsub =
           window.__toastUnsub ??
@@ -409,6 +415,12 @@ if (section('communication-errand')) {
       // different causes — he was never brought there, or the click itself
       // moved him — and only the pair of readings tells them apart.
       const before = await at()
+      // A dialog standing over the inventory turns the click into a bare
+      // Playwright timeout; name the dialog instead.
+      const blocking = await page.evaluate(() => window.__ui.getState().dialog ?? null)
+      if (blocking) {
+        throw new Error(`a dialog stands over the inventory before the click: ${JSON.stringify(blocking)}`)
+      }
       await page.locator('[data-form="rock-relief"]').click()
       const after = await at()
       return page.evaluate(

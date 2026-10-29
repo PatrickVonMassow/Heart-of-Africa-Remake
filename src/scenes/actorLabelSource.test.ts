@@ -181,6 +181,15 @@ describe('drawnHeadRise', () => {
     expect(drawnHeadRise(anchor)).toBeCloseTo(1.34 * 0.55)
   })
 
+  it('reaches the crown over a skinned figure’s geometry-less head anchor', () => {
+    // skinnedFigure.tsx: a bare anchor at the head centre, scaled so 0.16 × its
+    // scale above it is the crown. Read as radius 0, the note's tip sat at the
+    // head's centre.
+    const bare: HeadNode = { name: 'figure-head', matrixWorld: { elements: at(1.5, 0.75) } }
+    const anchor: HeadNode = { matrixWorld: { elements: at(0) }, children: [bare] }
+    expect(drawnHeadRise(anchor)).toBeCloseTo(1.5 + 0.16 * 0.75)
+  })
+
   it('reads the y row, so a head kept round through a squash stays round', () => {
     // Squashed figure, counter-scaled head: world y row length 1.
     const anchor: HeadNode = { matrixWorld: { elements: at(0) }, children: [head(at(0.9))] }

@@ -137,7 +137,9 @@ export function markedActorRise(root: MarkedNode | null | undefined): number | n
 }
 
 /** A drawn head as this module reads it: named `figure-head` by placeFigure,
- *  a sphere whose radius its geometry carries. Structural, like MarkedNode. */
+ *  a sphere whose radius its geometry carries — or, on the skinned figure, a
+ *  bare anchor at the head's centre scaled so `ANCHOR_HEAD_RADIUS` reaches its
+ *  crown (skinnedFigure.tsx). Structural, like MarkedNode. */
 export interface HeadNode {
   name?: string
   visible?: boolean
@@ -161,13 +163,20 @@ export interface HeadNode {
  * in world space, so its x/z follow the tilt too. Matrices are read as they
  * stand: the caller refreshes them (`updateWorldMatrix`) when the scene moved.
  */
+/** The radius a geometry-less head anchor stands for: the skinned figure
+ *  scales its `figure-head` anchor so this much above it is the crown. */
+export const ANCHOR_HEAD_RADIUS = 0.16
+
+/** The head sphere's radius: its geometry's, else the anchor convention. */
+const headRadius = (head: HeadNode) => head.geometry?.parameters?.radius ?? ANCHOR_HEAD_RADIUS
+
 export function drawnHeadTop(root: HeadNode | null | undefined): [number, number, number] | null {
   const base = root?.matrixWorld?.elements
   if (!root || base === undefined) return null
   const head = findHead(root)
   if (!head) return null
   const e = head.matrixWorld!.elements
-  const r = head.geometry?.parameters?.radius ?? 0
+  const r = headRadius(head)
   // Column-major: the world y of L·u is e1·ux + e5·uy + e9·uz, largest over
   // the unit sphere at u = (e1, e5, e9)/len; the top point is centre + r·L·u.
   const len = Math.hypot(e[1], e[5], e[9])
@@ -199,7 +208,7 @@ export function drawnHeadShape(
   const head = findHead(root)
   if (!head) return null
   const e = head.matrixWorld!.elements
-  const r = head.geometry?.parameters?.radius ?? 0
+  const r = headRadius(head)
   return {
     center: [e[12], e[13], e[14]],
     axes: [
