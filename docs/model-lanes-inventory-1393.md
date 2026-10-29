@@ -20,7 +20,7 @@ files (historical attribution comments, game prose, one routing test).
 
 Retired names still carried by landed trailers and ledgers: `GPT-5.6 Sol`
 (OpenAI lane until 05.09.2026), `Opus 5`, `Claude Opus 5`, `Fable 5`,
-`claude-opus-5[1m]`. Other model ids: `ASTRA_REASONING_EFFORT`, `ASTRA_MODEL_NAME`
+`claude-opus-5[1m]`. Related variables (not ids): `ASTRA_REASONING_EFFORT`, `ASTRA_MODEL_NAME`
 (second copy of the display name), `CODEX_BIN`, `CODEX_HOME`.
 
 ## I2. Vendor-named scripts (file: lines)

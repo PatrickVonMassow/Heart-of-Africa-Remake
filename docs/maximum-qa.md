@@ -9,7 +9,7 @@ session/weekly token budget in minutes. Maximum QA runs as ordinary inline
 work: sequential checks (the Phase 8 cleanup's two blind halves excepted), the
 driven visual sweep inspected in the main loop, and at most one model-diverse
 pass per phase that calls for one (Phases 1, 5 and 8) by the OTHER vendor (`scripts/cross-review.mjs`
-/ `scripts/ask-lane.mjs --lane cross --kind audit`) whose findings are always harvested and verified inline. See the memory
+/ `scripts/ask-lane.mjs --lane cross --kind audit --anyway`) whose findings are always harvested and verified inline. See the memory
 `workflows-token-budget`.
 
 Run the phases **in the order below**. Each real finding becomes its own atomic
