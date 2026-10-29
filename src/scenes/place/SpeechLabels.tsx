@@ -31,6 +31,7 @@ import { labelPresentation } from '../../communication/speechTarget'
 import { speechBubbleScale } from '../../communication/speechBubbleScale'
 import { balance } from '../../config/balance'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
+import { ANCHOR_HEAD_RADIUS } from '../actorLabelSource'
 import {
   clearSpeechLabels,
   pruneSpeechLabels,
@@ -67,6 +68,12 @@ const tipGap = () => `${Math.max(0, balance.communication.labelTipGap.px)}px`
  * speaker by one frame (point 1276). A sibling ahead of the <Html> subscribes
  * first, and the projection reads this frame's place.
  */
+let anchorSphere: THREE.SphereGeometry | null = null
+/** The head sphere a geometry-less `figure-head` anchor stands for (dev hook only). */
+function anchorHeadSphere(): THREE.SphereGeometry {
+  return (anchorSphere ??= new THREE.SphereGeometry(ANCHOR_HEAD_RADIUS, 24, 16))
+}
+
 function NoteFollower({
   label,
   group,
@@ -257,7 +264,8 @@ export function SpeechLabels() {
         const feet = v.z > 1 ? null : toScreen(v)
         if (!head) return { feet, headTop: null }
         const mesh = head as THREE.Mesh
-        const pos = mesh.geometry.getAttribute('position')
+        // The skinned figure's head is a bare anchor; its sphere stands in.
+        const pos = (mesh.geometry ?? anchorHeadSphere()).getAttribute('position')
         let top: { x: number; y: number } | null = null
         let left = Infinity
         let right = -Infinity
