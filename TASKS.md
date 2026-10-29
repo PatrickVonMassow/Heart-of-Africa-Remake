@@ -77,6 +77,34 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1464. Clear the uncharged reds of the v0.3.1 closing regression
+  PROBLEM, measured 29.10.2026: the closing LARGE on main 54b326987 went red on WebGL 2
+  (13 suites; WebGPU not reached). Re-run alone on a quiet machine, these reds REPRODUCE
+  and carry no charge in scripts/render-verify-charges.mjs:
+  - touch --section=virtual-stick: "lifting the stick stops the walk — settled" (the walk
+    does not stop when the stick is released);
+  - world: a click times out because `.dialog-backdrop` intercepts pointer events after 7
+    checks (local/verify-logs/2026-10-29T00-55-43-773-world.log);
+  - polish-speech: "the speaking figure itself stands in the frame, under its note"
+    0/8 frames — label bottom 556 below body 547;
+  - enrichments --section=calf-crossing-flee: the archived crossing ends on mountain
+    terrain 13 m up, not on its bank target (likely the safeBankTarget swim-out change);
+  - polish-villagers --section=village-loom: the station stands 62 px, not ≥ 70 px, from
+    the plaza;
+  - polish-villagers --section=villager-canoe: 2/5 children seen from behind the upstream rock;
+  - polish-villagers --section=mute-shore-scene (boatman reading) and water-stand-table
+    (3 fails, the jar leaves the plank before the hand holds it) — charge status to confirm;
+  - polish-villagers --section=adult-errands: new red "the jar's mouth is tipped under the
+    water surface" (0.04 mm above) plus one console error.
+  Load artefacts on the quiet machine (green, nothing to do): flow, enrichments
+  traveller-figure, polish-villagers village-walk.
+  FINAL STATE: each listed red is fixed, or charged to a named open point when it is a known
+  defect outside this release; the closing LARGE of point 1462 can then run on the fixed HEAD.
+  Split per suite when it does not converge. Criticality: high — blocks the v0.3.1 release.
+  Test: each named suite/section green on both backends (touch on WebGL 2).
+  Queue position: directly before point 1462 (a red closing run is fixed first).
+  Source: the closing run of point 1462, findings recorded 29.10.2026 00:59–01:31 UTC.
+
 - [ ] 1462. Release v0.3.1: tag the current main state as v0.3.1 and poc and publish both
   Source: User order 28.10.2026 in chat session cf715472: "Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ und außerdem als v0.3.1 und veröffentliche diesen getaggten Stand unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/" — to come before the infrastructure-simplification point, so a known-good tagged state exists before the teardown. Wording approved by the user: "ja, beide so einreichen".
   Final state: the current main state is released as version v0.3.1 by the named "version release" process, and `poc` points at the same commit.
