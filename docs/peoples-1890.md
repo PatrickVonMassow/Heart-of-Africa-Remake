@@ -2494,8 +2494,9 @@ The station, its words and its tests stay in the game, and
 
 ### 8.2 The villager's dugout canoe (point 1237)
 
-At a riverside village a local fisherman paddles a dugout beside the children's
-bank game, as a second UPSTREAM/DOWNSTREAM picture. The regional reference is
+At a riverside village two men work a drift net from one dugout, downstream of
+the children's bank game, as a second UPSTREAM/DOWNSTREAM picture: the net man
+forward calls the direction, the paddler aft answers it with his stroke. The regional reference is
 the Niger's specialist river people of 1890, the Bozo fishermen and the Somono
 boatmen, whose dugout pirogues worked the river beside the Bambara farming
 villages; the Bambara village keeps its own speaker lect. **Provenance
@@ -2504,11 +2505,12 @@ from a source; a web search the same day did not confirm the Somono in Park's
 *Travels* (1799). Treat the Bozo/Somono attribution as a working assumption
 until a PERIOD source is read. Adapted, and marked as
 such: a small fishing pirogue of about 5.5 m paddled kneeling with a single
-blade, a conical basket trap at the waterline, and paces chosen as an educated
-guess (about 1.3 m/s through the water against a dry-season current of about
-0.5 m/s). **IMPLEMENTATION.** `src/scenes/place/villagerCanoe.ts` lays the lane
-and runs the cycle; `VillagerCanoe` in `src/scenes/place/PlaceLife.tsx` draws
-it; every value is in `balance.villageLife.canoe`.
+blade, a drift net worked from the bow, and paces chosen as an educated guess
+(0.8 m/s upstream, 1.5 m/s downstream). The bank beside the lane carries the
+fishery: baskets, the fishers' fire, a griller, a smoking rack and a pounding
+pair. **IMPLEMENTATION.** `src/scenes/place/villagerCanoe.ts` lays the lane and
+runs the cycle; `RiverFishery` in `src/scenes/place/RiverFishery.tsx` draws it;
+every value is in `balance.villageLife.canoe`.
 
 ### 8.3 The villager dress table: people × sex × age × season × year (work-order 1293)
 

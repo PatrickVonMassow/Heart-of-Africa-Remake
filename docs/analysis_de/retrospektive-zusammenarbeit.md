@@ -145,6 +145,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 18.09. vormittags | Ein Ein-Wort-Fix am Zeitstempel-Hook landete auf dem Zweig von Punkt 1155, weil die Sitzung „Current branch: main" aus ihrem Startschnappschuss glaubte, statt den Zweig des Arbeitsbaums zu messen; Cherry-Pick auf main, Revert auf dem Zweig, und der neue Test fiel im Push-Tor erst noch am `windowsHide`-Audit durch (§3.288) |
 
 | 23.09. abends | Ein Nutzerauftrag, der kein Auftragspunkt ist, kommt nicht los: Nach dem regelkonformen Anspruch auf den Batch-Lock verweigerte die Leerlauf-Behauptung der Tafel JEDE Schreiboperation — auch die, die den Punkt erst angelegt hätte. Die beiden dokumentierten Auswege greifen nicht: `now <N>` braucht eine Warteschlangen-Karte, die aus TASKS.md gebaut wird, `closing <N>` einen gemergten Punkt. Durchgekommen bin ich nur, weil das board-first-Tor pro Zug genau einmal feuert — eine Einmal-Freigabe, kein vorgesehener Weg (§3.306) |
+| 29.10. abends | Vierter Wiedergänger von §3.271/§3.267, diesmal ohne `--gate`: Die Startpflicht `batch-doctor --repair` fand eine einzige geänderte Datei — die Zustandsdatei des Closing-Wächters, die der Vorgänger offen gelassen hatte — und stashte sie, obwohl sie den laufenden Prüflauf erkannt hatte (sie ließ `verification/` ausdrücklich draußen). Der Stash änderte den Index mitten in der Unit-Stufe des zweiten Abschluss-LARGE; die Integritätsprüfung brach den Lauf nach 8 m 41 s ab, bei 18 367 grünen Unit-Tests. Ein Neustart kostete gut zwei Stunden; der Fall steht als Punkt 1467 in der Arbeitsliste |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1749,7 +1750,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 29.10.2026, 17:37 · Quellen-Fingerprint: `9ef5697e8dc9…`
+Zuletzt aktualisiert: Donnerstag, 29.10.2026, 20:06 · Quellen-Fingerprint: `bcef8cfb410f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1864,10 +1865,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 107 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 181 Prozess-/Meta-TASKS-Punkte (davon 70 offen).
+Erfasste Quellen: 107 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 182 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
 
-<!-- RETRO-FINGERPRINT: 9ef5697e8dc90c2592a93bc7f5e39fb2183e4e3e7c3ca21efa8ef305c5a1a963 -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-29T16:37:04.515Z -->
+<!-- RETRO-FINGERPRINT: bcef8cfb410f4dbefd651bf9a39cd7bca0a63ccfedac82dba1452fd8552ee989 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-29T19:06:32.258Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
