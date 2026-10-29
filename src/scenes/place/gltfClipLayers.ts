@@ -50,7 +50,8 @@ export interface ClipLayers {
    *  contact (or given back) blends between the clip and the code. */
   arms: [number, number]
   free: [boolean, boolean]
-  /** Seconds into the dig clip (a loop), and the carry-idle clip. */
+  /** Seconds into the dig clip (a loop), and the clock of the idle standing
+   *  base and the carry-idle clip. */
   digT: number
   idleT: number
   pose: VillagerPose
