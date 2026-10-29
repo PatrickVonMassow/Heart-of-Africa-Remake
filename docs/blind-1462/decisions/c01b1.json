@@ -1,0 +1,6 @@
+[
+ {"id":"U1","decision":"rewritten","reason":"Union header now adds that U4 was dropped in round 4, leaving 7 kept entries."},
+ {"id":"U2","decision":"rewritten","reason":"Pair-count decision now names the §4.3 per-pair 13.9 % bound as binding and A's 9.5 % figure as withdrawn."},
+ {"id":"U3","decision":"rewritten","reason":"Dugout paragraph now says 'Like the bank's', matching line 224 where bank cycles announce directions regardless of what the player has heard."},
+ {"id":"U111","decision":"rewritten","reason":"Open question 1 no longer calls itself a U4 variant, matching the round 4 note that it never belonged to U4."},
+ {"id":"U113","decision":"rewritten","reason":"Fishery evidence now says the lane runs from about 1 m upstream to 47 m downstream, matching balance.ts laneStart -1 / laneEnd 47."},
