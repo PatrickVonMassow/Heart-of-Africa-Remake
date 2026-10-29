@@ -1448,7 +1448,9 @@ function shoulderIn(side: ArmSide): [number, number, number] {
  * the shoulder), so the hand the player sees is the hand this aims. The arm
  * points straight at the target point, which puts the hand as close to it as an
  * arm of that length can — on it once the quarry is within reach, and INTO the
- * body a little on the frame the gap closes past it.
+ * body a little on the frame the gap closes past it. With `level` the aim is
+ * taken at the reaching shoulder's own height and tilted by `level.elevation`,
+ * and the reach stops at the quarry's surface, capped at `level.reachMax`.
  *
  * `prevSide` is the arm already reaching: it is kept while it can still aim
  * without crossing the chest.

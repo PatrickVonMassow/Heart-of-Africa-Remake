@@ -613,11 +613,6 @@ export function canoeCycleSeconds(cfg: CanoeConfig = balance.villageLife.canoe, 
   )
 }
 
-/**
- * The drift net's float line, as the picture draws it: `count` floats from the
- * net man's hand in toward the bank and trailing upstream behind the hull,
- * `net` of the way out. Empty while the net is folded.
- */
 /** Where the net's headline leaves the hull: its SHORE side (set between the
  *  hull and the bank, where the current is slack and the net is seen from the
  *  village), level with the
@@ -629,6 +624,11 @@ export function netHand(state: Pick<CanoeState, 'netMan' | 'x' | 'z'>, lane: Pic
   return { x: state.x + lane.fx * along - lane.nx * side, z: state.z + lane.fz * along - lane.nz * side }
 }
 
+/**
+ * The drift net's float line, as the picture draws it: `cfg.netFloats` floats
+ * (at least two) from the net man's hand in toward the bank and trailing
+ * upstream behind the hull, `net` of the way out. Empty while the net is folded.
+ */
 export function netFloats(state: Pick<CanoeState, 'net' | 'netMan' | 'x' | 'z' | 'phase'>, lane: Pick<CanoeLane, 'nx' | 'nz' | 'fx' | 'fz'>, cfg: CanoeConfig = balance.villageLife.canoe): BankPoint[] {
   if (state.net <= 1e-3) return []
   const hand = netHand(state, lane, cfg)

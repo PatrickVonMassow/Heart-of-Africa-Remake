@@ -234,7 +234,7 @@ describe('the drift-net cycle (work-order 1245 item 1)', () => {
     }
     for (const call of [...lengths.get('callDown')!, ...lengths.get('callUp')!]) expect(call).toBeCloseTo(OBEY, 0)
     for (const launch of lengths.get('launch')!) expect(launch).toBeCloseTo(cfg.launchSeconds, 0)
-    // A 49 m lane instead of 20 m (item 9), at regionally plausible paces.
+    // A 48 m lane instead of 20 m (item 9), at regionally plausible paces.
     expect(span).toBe(48)
     expect(cfg.upstreamSpeed).toBeCloseTo(0.8, 9)
     expect(cfg.downstreamSpeed).toBeCloseTo(1.5, 9)

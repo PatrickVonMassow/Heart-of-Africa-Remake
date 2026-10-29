@@ -161,7 +161,7 @@ describe('the arms aimed at the load', () => {
     }
   })
 
-  it('leaves the walking pose untouched when the hands are free', () => {
+  it('resets the arms, lean and reach to rest when the hands are free', () => {
     const pose: FigurePose = { left: { pitch: 1, yaw: 1, roll: 1 }, right: { pitch: 1, yaw: 1, roll: 1 }, lean: 0.3, turn: 0.2, reach: { left: 0.5 } }
     const zero = { x: 0, y: 0, z: 0 }
     handlingPose(pose, { down: 0, hold: 0, reach: 0 }, [zero, zero], 0)
