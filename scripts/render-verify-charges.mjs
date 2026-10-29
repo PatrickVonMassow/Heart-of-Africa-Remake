@@ -2083,4 +2083,18 @@ export const RED_CHARGES = [
       + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
       + 'note is left to target. The charge dies with point 1395.',
   },
+  {
+    point: 1466,
+    suite: 'polish-speech',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^no two Ctrl labels fuse in the village crowd/i,
+    // The sustained shape only (two or more fused frames); the single-frame shape stays 1010's.
+    detailMatch:
+      /^(?:[2-9]|[1-9]\d+)\/\d+ frames held a pair fused beyond \d+ px \(allowed \d+\), \d+ of them at the \d+ px unreadable bar, deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — the unreadable overlap STANDS$/i,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 56d0a9ae6, whole polish-speech on webgl (2026-10-29T06-29-04-941): '
+      + '50/90 frames fused, 22 at the unreadable bar, Child×Child; --section=ctrl-actor-labels alone green on the '
+      + 'same head, webgpu whole run clean. Filed as point 1466. The charge dies with point 1466.',
+  },
 ]
