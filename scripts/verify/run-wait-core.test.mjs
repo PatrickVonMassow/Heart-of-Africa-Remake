@@ -186,7 +186,8 @@ describe('planRun — what the command will really do', () => {
     const plan = planRun({ argv: ['large'], verifyGl: undefined })
     expect(plan.passes).toHaveLength(2)
     expect(plan.suites).toContain('preview')
-    // The full pass (2536.0 s less the split `polish` row, plus the preview)
+    // The full pass (2536.0 s, which already counts the preview, less the
+    // split `polish` row)
     // and the render-only WebGPU pass.
     expect(plan.expectedMs).toBeGreaterThan(2_536_000)
     expect(plan.expectedFrames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication)
