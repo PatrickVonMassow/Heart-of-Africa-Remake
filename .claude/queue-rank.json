@@ -1752,6 +1752,12 @@
       "why": "User order 28.10.2026: directly after the v0.3.1 release point",
       "origin": "user",
       "place": "ahead"
+    },
+    "1465": {
+      "at": "2026-10-29T04:34:24.083Z",
+      "why": "A red closing run is fixed before the release tag (point 1462 step 1)",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1781,7 +1787,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-29T01:42:10.113Z",
+    "at": "2026-10-29T04:34:24.091Z",
     "points": [
       184,
       200,
@@ -2250,7 +2256,7 @@
       1461,
       1462,
       1463,
-      1464
+      1465
     ]
   }
 }
