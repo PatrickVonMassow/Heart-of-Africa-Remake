@@ -13,9 +13,10 @@ the text. B's file echoes its 34 entries twice; normalised to one entry per id.
 browser suite until the deciding test (§4) passes. Both halves agree, and the merger
 confirms, that the 1452 M3 rejection measured the wrong quantity: single-suite duration
 (+1.5–3.5 %) instead of acceptance throughput (13m 44s for 18m 56.5s of serial work,
-−27 %). Pairing pays while the overlap-added red rate stays below ~17 % per false red (30 min
-against 5 min saved per pair); a pair can fail on more than one member, so the binding per-pair
-bound is §4.3's 13.9 %; the real gain is smaller than the pair gain
+−27 %). Pairing pays while overlap-added false reds cost less than the 5 min a pair saves: at
+30 min per false red that is below ~0.17 false reds per pair (~17 % of pairs if a failing pair
+fails on one member, less if on both); §4.3's deciding test bounds the per-pair red rate below
+13.9 % at 95 %, which is a confidence bound, not the break-even; the real gain is smaller than the pair gain
 because only both-backend passes of one point and two points in acceptance pair, and fix
 loops (73 % of suite minutes) do not. Landed-point throughput stays unmeasured until the
 follow-up window (§4.5).
