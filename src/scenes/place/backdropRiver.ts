@@ -79,8 +79,9 @@ export function backdropRiverFill(
     if (first !== null) {
       for (let out = first + STEP; out <= bandEnd; out += STEP) {
         if (!water(out)) {
-          // Bisected between the last wet and first dry sample to the map's
-          // own edge, so no land between two samples is drawn as water.
+          // Bisected between the last wet and first dry sample toward the
+          // map's own edge, so no more land than the bisection's last interval
+          // between two samples is drawn as water.
           let wet = out - STEP
           let dry = out
           for (let k = 0; k < FAR_EDGE_BISECTIONS; k++) {

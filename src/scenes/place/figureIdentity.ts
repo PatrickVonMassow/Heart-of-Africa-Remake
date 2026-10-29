@@ -6,7 +6,7 @@ import type { AgeGroup, Sex } from '../../systems/appearance'
 export interface FigureIdentity {
   sex: Sex
   age: AgeGroup
-  /** −1 slight .. +1 stout. */
+  /** On the −1 slight .. +1 stout scale; drawn as −0.6, 0 or +0.6. */
   build: number
   /** A stable per-figure number in [0, 1) for the choices a share decides. */
   pick: number

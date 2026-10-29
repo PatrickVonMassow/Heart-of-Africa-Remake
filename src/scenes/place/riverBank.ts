@@ -176,8 +176,9 @@ export const BANK_DRESSING_CLEARANCE = 0.9
 // spectator at the start line sees the near rock beside him and the far one
 // down the bank: the far rock is 2.4 m across and its detailed, lying
 // silhouette remains large enough to identify. The horizontal frame is
-// 2*atan(tan(25 deg)*1.6) = 73.4 deg, so the whole stretch fits with either rock
-// a good 20 deg inside the edge for a spectator standing back from the line.
+// 2*atan(tan(25 deg)*1.6) = 73.4 deg, so the whole stretch fits for a spectator
+// standing back from the line: at `BANK_VIEW_STANDOFF` either rock lies 32 deg
+// off the line of sight, inside the 36.7 deg half-frame.
 // `riverBank.test.ts` computes both angles rather than restating them.
 //
 // THE LANE IS FIVE WALKER DIAMETERS (THE SPEC'S FLOOR IS THREE). `BANK_PLAY_LANE_HALF` is kept clear of

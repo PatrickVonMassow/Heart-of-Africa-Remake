@@ -59,6 +59,12 @@ const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,calc(-100% - var(--speech-t
 /** The calibrated tip gap as a CSS length. */
 const tipGap = () => `${Math.max(0, balance.communication.labelTipGap.px)}px`
 
+let anchorSphere: THREE.SphereGeometry | null = null
+/** The head sphere a geometry-less `figure-head` anchor stands for (dev hook only). */
+function anchorHeadSphere(): THREE.SphereGeometry {
+  return (anchorSphere ??= new THREE.SphereGeometry(ANCHOR_HEAD_RADIUS, 24, 16))
+}
+
 /**
  * Stands one note on its speaker's head each frame. Its own component, drawn
  * BEFORE the note's <Html>: R3F subscribes a frame callback in a layout
@@ -68,12 +74,6 @@ const tipGap = () => `${Math.max(0, balance.communication.labelTipGap.px)}px`
  * speaker by one frame (point 1276). A sibling ahead of the <Html> subscribes
  * first, and the projection reads this frame's place.
  */
-let anchorSphere: THREE.SphereGeometry | null = null
-/** The head sphere a geometry-less `figure-head` anchor stands for (dev hook only). */
-function anchorHeadSphere(): THREE.SphereGeometry {
-  return (anchorSphere ??= new THREE.SphereGeometry(ANCHOR_HEAD_RADIUS, 24, 16))
-}
-
 function NoteFollower({
   label,
   group,
@@ -243,8 +243,9 @@ export function SpeechLabels() {
         const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
         return label && speechTipWorld(label, WORLD, camera) ? WORLD.toArray() : null
       },
-      // The speaker's DRAWN head top and feet on screen, measured on the
-      // projected geometry itself (point 1276): every vertex of the visible
+      // The speaker's DRAWN head top on screen, measured on the projected
+      // geometry itself, and its feet as the anchor's projected origin
+      // (point 1276): every vertex of the visible
       // head mesh goes through the camera, and the head's top on screen is the
       // smallest screen y among them — the silhouette's upper edge under any
       // perspective and pitch, not a projected world-up offset of its centre.

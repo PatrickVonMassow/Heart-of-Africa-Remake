@@ -3,11 +3,10 @@
 //
 // ONE GAME, FOUR WORDS, NOTHING STAGED. The children roam their own quarter of
 // the village out of earshot of the adults; at the end of that phase one of them
-// calls RIVER (once the listener has heard ROCK; before that the cycle opens
-// silently), points at the water and the whole group runs to the bank — and
+// calls RIVER, points at the water and the whole group runs to the bank — and
 // that caller is the first catcher. Between two rocks, one upstream and one
-// downstream, they then play run after run: once ROCK is known the direction is
-// announced before each one, a catcher lays its hand on its own rock and says
+// downstream, they then play run after run: the direction is announced before
+// each one, a catcher lays its hand on its own rock and says
 // ROCK while everybody holds (the run opens silently where the hand cannot reach
 // the stone), a runner who reaches the far rock and can touch it calls ROCK,
 // whoever is caught drops out where he stands, slumped in frustration (trunk

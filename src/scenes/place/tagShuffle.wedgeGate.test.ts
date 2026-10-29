@@ -158,7 +158,9 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // Thresholds unchanged.
     // A NINTH move: roaming children bend away from a playmate ahead, which
     // took seed 19's judged share to 0.389. Re-scanned 12..60: 22 seeds retain
-    // every comparison; 12 is taken. Thresholds unchanged.
+    // every comparison; 12 is taken. Thresholds unchanged. The clear-yard
+    // comparison has since been dropped (see the pen-rule case below), so a
+    // refused re-pen is no longer a scan criterion.
     const v = village(PEN_VILLAGE, PEN_SEED, undefined, { pen: { r, carry } })
     const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {
@@ -170,10 +172,10 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
       // it round a passer-by would leave that child inside a collider — a broken
       // settlement rather than a wedged one. Asking for a clear yard of r + 1.6 m
       // all round was stricter than that and, with the bank round's children
-      // walking their quarter together, it refused nearly every re-pen — 1.5
-      // rescues a child-minute where the wall-band rule produces 25.5, which is
-      // the construction losing its grip on the symptom rather than the gate
-      // losing sight of it.
+      // walking their quarter together, it once refused nearly every re-pen —
+      // 1.5 rescues a child-minute where the wall-band rule produced 25.5. Since
+      // roaming children bend away from a playmate ahead the two rules re-pen
+      // alike (see the pen-rule case below).
       const clear = penHasClearWall(v.children, 0, r, clearance)
       if (clear && v.clock() > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
         v.pen.x = c.x

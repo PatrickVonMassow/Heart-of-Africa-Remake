@@ -51,7 +51,7 @@ export function standJarLocal(i: number, capacity = balance.waterStandCapacity):
 }
 
 /** The water in the newest jar standing on the stand: the mouth of the last
- *  shown slot. `count` is the state's `standJars`; with none, the row's middle. */
+ *  shown slot. `count` is the state's `standJars`; with none, the first slot. */
 export function newestJarWater(stand: StandPoint, front: StandPoint | null, count: number): { x: number; y: number; z: number } {
   const slot = Math.max(0, Math.min(balance.waterStandCapacity, count) - 1)
   const [x, y, z] = standJarLocal(slot)
@@ -60,10 +60,11 @@ export function newestJarWater(stand: StandPoint, front: StandPoint | null, coun
 
 /**
  * Where the carrier stands AT the table: on the line from the stand's centre
- * out to his own working spot, `reach` from the centre (work-order 1405). His
- * working spot on the 2.4 m ring is where he waits for the order; the jar is
- * taken up and set down from here. Off standable ground, null: an errand
- * worked from the waiting ring is the defect this point removes.
+ * out to his own working spot, `reach` from the centre (work-order 1405); a
+ * spot already within `reach` is kept as it is, unchecked. His working spot on
+ * the 2.4 m ring is where he waits for the order; the jar is taken up and set
+ * down from here. Off standable ground, null: an errand worked from the
+ * waiting ring is the defect this point removes.
  */
 export function tableSpot(
   stand: StandPoint,

@@ -34,12 +34,11 @@ import {
 } from './riverBank'
 
 /** How many angles the band's boundary lookup samples (see `buildBoundaryLut`).
- *  1024, not the historical 256: a plain circle needs one texel, but the bank
- *  lobe's edge climbs from the walkable radius out to the wade edge across ~12°,
- *  and at 256 texels one step of the lookup already moved the painted edge by
- *  most of a metre — a band that misplaces itself by a stride is a band that
- *  lies. Four kilobytes of lookup buy the angular resolution back. 4096 since
- *  work-order 1252: where a scene's room meets the wade limit the edge turns a
+ *  Not the historical 256: a plain circle needs one texel, but the bank lobe's
+ *  edge climbs from the walkable radius out to the wade edge across ~12°, and
+ *  at 256 texels one step of the lookup already moved the painted edge by most
+ *  of a metre — a band that misplaces itself by a stride is a band that lies.
+ *  4096 (16 KB of floats) since work-order 1252: where a scene's room meets the wade limit the edge turns a
  *  corner, and at 1024 the lookup cut it by more than a decimetre. */
 export const BOUNDARY_LUT_SIZE = 4096
 
@@ -154,7 +153,7 @@ function lobeRadius(bounds: PlaceBounds, angle: number): number {
   const plateau = BANK_PLATEAU_ANGLE
   const fade = BANK_FADE_ANGLE
   if (delta >= fade) return bounds.radius
-  // Both fades stay < π/2, so cos stays well above zero past the early return.
+  // The fade stays < π/2, so cos stays well above zero past the early return.
   const cos = Math.cos(delta)
   // The wade limit at this bearing, and how much of the way out to it the lobe
   // reaches here (all of it across the plateau, none of it past the fade).
@@ -224,8 +223,10 @@ export function groundPlateRadius(bounds: PlaceBounds, angle: number, discEdge: 
  * How far the drawn ground disc is pushed out past its plain edge at a bearing
  * (work-order 1237, both sides since 1245). Zero everywhere except where the
  * boundary reaches past the plain radius — across a bank's lobe, and around a
- * watched scene's room: there the disc moves out by exactly that excess, so it keeps the same overhang beyond
- * the last step as it has everywhere else. The backdrop's inner rim moves with it
+ * watched scene's room: there the disc moves out by that excess (eased in off
+ * the bank's bearing, never short of the river's far edge across the plateau),
+ * so it keeps the same overhang beyond the last step as it has everywhere
+ * else. The backdrop's inner rim moves with it
  * (`PlaceScene`'s `LandscapeBackdrop`), so the panorama starts where the drawn
  * ground ends instead of standing on it.
  */
