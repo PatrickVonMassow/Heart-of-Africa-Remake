@@ -2,8 +2,8 @@
 // body", final state 3): which morphs a person of a sex, age group and build
 // gets, the skeleton those morphs imply, and the geometry with the fixed morphs
 // baked in — a figure's sex, age and build never change while it lives, so only
-// the closing hands stay live morph targets on the GPU, and the normals are the
-// person's own rather than the basis body's.
+// the hand shapes (LIVE_MORPHS) stay live morph targets on the GPU, and the
+// normals are the person's own rather than the basis body's.
 
 import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF } from '../config/balance'
@@ -74,7 +74,7 @@ export function legScale(asset: VillagerAsset, rest: Float32Array): number {
 /**
  * A geometry with the fixed morphs baked into its positions and its normals
  * recomputed, keeping only the live morphs (the hands) as morph targets.
- * Shares nothing mutable with the source.
+ * Shares no geometry data with the source (userData is a shallow copy).
  */
 export function bakeMorphs(src: THREE.BufferGeometry, influences: Record<string, number>): THREE.BufferGeometry {
   const g = src.clone()

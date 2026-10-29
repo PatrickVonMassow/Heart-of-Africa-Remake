@@ -99,7 +99,7 @@ describe('the contact lean', () => {
     expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(false)
     expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, 0.45), 0.5, pivot, fwd)).toBe(true)
   })
-  it('searches the deep bend for a wanted contact, but never under a steadied head load', () => {
+  it('searches the deep bend for a wanted contact, but not for one under a steadied head load', () => {
     const base = { lean: 0, wants: true, posedReach: false, grab: false, steadying: false }
     expect(searchDeepBend(base)).toBe(true)
     expect(searchDeepBend({ ...base, steadying: true })).toBe(false)

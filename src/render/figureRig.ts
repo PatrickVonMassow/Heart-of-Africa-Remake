@@ -77,7 +77,8 @@ export function gestureArmEuler(a: ArmPose, out = new THREE.Euler()): THREE.Eule
  * Two-bone IK: from shoulder `s` toward target `t` with an upper arm `a` and a
  * forearm `b`, the elbow bent toward `pole`. Returns the upper-arm and forearm
  * DIRECTIONS (unit, same space as the inputs) and whether `t` was in reach;
- * out of reach, the arm points straight at it.
+ * beyond reach the arm points straight at it, inside the inner limit it folds
+ * flat.
  */
 export function solveTwoBone(
   s: THREE.Vector3,
@@ -128,8 +129,9 @@ export function contactWantsLean(s: THREE.Vector3, t: THREE.Vector3, reach: numb
 
 /** Whether the glTF trunk's distributed bend is searched for a contact lean:
  *  when the one-pivot lean found one, for a lunging grab, or when a contact
- *  wants a lean the one pivot cannot make up — but not for a pose's own reach
- *  and not under a steadied head load, which a deep bend would tip off. */
+ *  wants a lean the one pivot cannot make up — that last case not for a pose's
+ *  own reach and not under a steadied head load, which a deep bend would tip
+ *  off. */
 export function searchDeepBend(o: { lean: number; wants: boolean; posedReach: boolean; grab: boolean; steadying: boolean }): boolean {
   return o.lean > 0 || o.grab || (o.wants && !o.posedReach && !o.steadying)
 }
@@ -249,7 +251,7 @@ const _palmD = new THREE.Vector3()
 const _palmQ = new THREE.Quaternion()
 
 /**
- * The roll (rad, in (−π, π]) that turns a hand's palm toward `toward`: a turn
+ * The roll (rad, in (center − π, center + π]) that turns a hand's palm toward `toward`: a turn
  * about the hand bone's own axis (local +y; the bone hangs along −y), so the
  * hand stays where the arm solve put it and only rolls. `parentWorld` is the
  * orientation of the hand's parent (the forearm) and `toward` a direction,
