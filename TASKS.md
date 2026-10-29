@@ -104,6 +104,13 @@ put it is the mistake this line exists to stop.
   Test: each named suite/section green on both backends (touch on WebGL 2).
   Queue position: directly before point 1462 (a red closing run is fixed first).
   Source: the closing run of point 1462, findings recorded 29.10.2026 00:59–01:31 UTC.
+  RE-MEASURED 29.10.2026 04:05–04:18 on main cf77ff4, WebGL 2, quiet host: touch virtual-stick
+  GREEN (2 pass); enrichments calf-crossing-flee, village-loom, villager-canoe, mute-shore-scene and
+  water-stand-table are charged to open points 1236, 1266, 1381, 1265, 1435 (chargeFor); adult-errands
+  now reds only on checks charged to 568 (rim band, plate water) and 642 (stand order), the jar-mouth
+  red did not recur. STILL UNCHARGED AND REPRODUCING: polish-speech speech-hypothesis (body 547,
+  label bottom 556, 0/8; SpeechLabels/SpeechLabelCard unchanged since 15.10., so look at the figure
+  scale or the crown anchor) and world (`.dialog-backdrop` intercepts the click, TimeoutError after 8 pass).
   Bundle: unbundled (release gate, travels with 1462).
 
 - [ ] 1462. Release v0.3.1: tag the current main state as v0.3.1 and poc and publish both
