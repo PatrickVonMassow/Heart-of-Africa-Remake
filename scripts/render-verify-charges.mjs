@@ -2056,4 +2056,53 @@ export const RED_CHARGES = [
       + 'owned by no open point; from the calf-shield-river work of 1297 (calf-in-water). '
       + 'The charge dies with point 1449.',
   },
+  {
+    point: 1465,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the man and his word offer their keys at the same time \(point 1139\)$/i,
+    why: 'MEASURED 29.10.2026 04:57-04:59 on WebGPU, identical on a clean main 66df922f7 and on feat/1464-closing-reds, so not caused by point 1464; the v0.3.1 closing LARGE never reached WebGPU. Filed as 1465. The charge dies with point 1465.',
+  },
+  {
+    point: 1465,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the drummer.s arm is raised in the pointing frame \(point 1272\)$/i,
+    why: 'MEASURED 29.10.2026 04:57-04:59 on WebGPU, identical on a clean main 66df922f7 and on feat/1464-closing-reds, so not caused by point 1464; the v0.3.1 closing LARGE never reached WebGPU. Filed as 1465. The charge dies with point 1465.',
+  },
+  {
+    point: 1465,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^two close speakers are shot unobstructed, each tail on its own speaker.s anchor, the older note receded and neither targeted \(point \d+\)$/i,
+    why:
+      'MEASURED 29.10.2026 in the whole-suite WebGPU run 2026-10-29T03-48-21-257 (tails false); point 1270 holds it on webgl only. '
+      + 'Filed as 1465. The charge dies with point 1465.',
+  },
+  {
+    point: 1465,
+    suite: 'touch',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^lifting the stick stops the walk\b/i,
+    why:
+      'Red in the v0.3.1 closing LARGE (29.10.2026 00:59); --section=virtual-stick re-ran green 2/2 on main cf77ff4 the same morning, '
+      + 'but no whole touch run on WebGL 2 has covered it since. Point 1465 owes that run. The charge dies with point 1465.',
+  },
+  {
+    point: 1465,
+    suite: 'enrichments',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^Traveller \(low\): his head stands at villager height$/i,
+    why:
+      'Red in the v0.3.1 closing LARGE (29.10.2026); the traveller-figure section loaded green on the quiet machine the same morning, '
+      + 'but no whole enrichments run on WebGL 2 has covered it since. Point 1465 owes that run. The charge dies with point 1465.',
+  },
 ]
