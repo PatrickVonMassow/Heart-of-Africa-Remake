@@ -172,8 +172,8 @@ export const SILHOUETTE_PALE = 1.8
  * Colour node of a skyline silhouette (point 102 haze look, work-order 1284
  * species marks): the flat aerial-perspective `tint` scaled per fragment by the
  * pelt marking at a haze-reduced `contrast` — so the zebra still reads striped
- * and the gazelle as dark-banded over a pale belly, while the mean tone stays
- * the hazed one. Bands are widened by `bandScale` (and the flank band by
+ * and the gazelle as dark-banded over a pale belly, every tone a shade of the
+ * hazed tint. Bands are widened by `bandScale` (and the flank band by
  * `flankWiden`) to survive the small size.
  */
 export function silhouetteMarkingColorNode(tint: THREE.Color, contrast: number, bandScale: number, flankWiden = 1) {

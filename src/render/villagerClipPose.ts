@@ -59,7 +59,8 @@ export interface ClipGait {
   /** The phase the slip was last eased at. */
   slipPhase: number
   /** Per foot, the world heading (rad, as GroundBody.yaw) a flat-lying foot
-   *  keeps while it lies flat; null while it does not. */
+   *  keeps while it lies flat; null once it neither lies flat, holds its tip,
+ *  nor releases its toes. */
   flatYaw: [number | null, number | null]
   /** Per foot, whether the planted foot (rather than the clip's hold) placed it last. */
   planted: [boolean, boolean]
@@ -103,7 +104,8 @@ export function releaseClipGait(g: ClipGait): void {
   g.lift = [freeLift(), freeLift()]
 }
 
-/** How far a contact may lie above the ground and still carry (person units). */
+/** How far above the ground a contact takes hold (person units); a held
+ *  contact lets go only above VILLAGER_GLTF.plantLetGo times this. */
 export const PLANT_TOUCH = 0.02
 
 /**
@@ -132,8 +134,9 @@ const LEG_BONES = (['L', 'R'] as const).map((s) => [`thigh.${s}`, `shin.${s}`, `
 
 /** A gait clip's stance of one foot (phase it lands, phase it lifts; the
  *  lift may lie past 1), from its support intervals: the earliest touch of
- *  that foot's contacts and the last lift of the continuous support that touch
- *  begins (overlapping heel/ball/tip spans chain into one stance). Cached per
+ *  that foot's contacts and the last lift of the support that touch begins
+ *  (overlapping heel/ball/tip spans, and a span beginning within a tenth of
+ *  the support's first touch, chain into one stance). Cached per
  *  clip object, so a replaced clip of the same name is read afresh. [0, 0]
  *  without support metadata (no warp). */
 export function stanceOf(clip: VillagerClip, side: 'L' | 'R'): [number, number] {
@@ -259,8 +262,9 @@ function flatAnkle(asset: VillagerAsset, frame: PersonFrame, side: 'L' | 'R'): n
  * limit — the ankle at the leg's reach, the foot pointing at the pivot —
  * the same pose the roll tends to as the pivot nears the limit, so the foot
  * never springs back to the clip's pitch for a frame (the trailing foot's
- * tremble at every toe-off). 'out' only where no direction to the pivot is
- * defined.
+ * tremble at every toe-off). 'out' where no direction to the pivot is
+ * defined, or where the target lies on the hip–pivot line while the reach
+ * circle still has a radius.
  */
 export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion): 'reached' | 'rolled' | 'out' {
   const hip = world.p[thigh]
@@ -493,7 +497,7 @@ function groundLevel(asset: VillagerAsset, frame: PersonFrame, walkClip: Village
 
 /**
  * The gait pose at the gait's phase and `speed` (figure units/s) on the
- * person's A-pose skeleton: walk and sprint blended by the sprint share, the
+ * person's A-pose skeleton: walk, jog and sprint blended by the gait weights, the
  * stride warped to the blended cycle, and every planted foot held at its spot
  * (`body`; null holds nothing). Writes `out` and returns it.
  */
@@ -993,7 +997,9 @@ const _qw = new THREE.Quaternion()
  * turned about the pose's own hinge to the length the target needs (bent
  * toward the pose's knee, or straight ahead once the leg is straighter than
  * `straight`), then the whole leg swung about the hip by the shortest turn.
- * An ankle on its target leaves every local as it was. Mutates `pose` and
+ * An ankle on its target leaves every local as it was, except on a leg at its
+ * straight or folded limit, whose length is clamped just inside, and on a knee
+ * bent backward against the pose's hinge, which is turned to it. Mutates `pose` and
  * recomputes `world`.
  */
 export function correctLeg(
@@ -1082,15 +1088,4 @@ export function shovelOnHungHand(
   const t = toolInHand(asset, hand, grip)
   const h = frame.hang[asset.bones.indexOf(`hand.${hand}`)]
   return { position: t.position.applyQuaternion(h).multiplyScalar(frame.scale), quaternion: h.clone().multiply(t.quaternion) }
-}
-
-/** Where a shovel's blade tip lies for a hand bone's world transform (any
- *  frame): the tool frame's −y end at `VILLAGER_ASSET.shovel.tip`. */
-export function shovelTip(
-  handWorld: THREE.Matrix4,
-  attach: { position: THREE.Vector3; quaternion: THREE.Quaternion },
-  tip: number,
-  out = new THREE.Vector3(),
-): THREE.Vector3 {
-  return out.set(0, tip, 0).applyQuaternion(attach.quaternion).add(attach.position).applyMatrix4(handWorld)
 }
