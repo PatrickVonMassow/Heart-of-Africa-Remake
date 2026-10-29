@@ -78,5 +78,25 @@
   "id": "U211",
   "decision": "rewritten",
   "reason": "§21.1 now says Esc closes the report only outside filled text (StateDump.tsx blurs a filled field first), without growing design.md."
+ },
+ {
+  "id": "U227",
+  "decision": "rewritten",
+  "reason": "The cross-lane audit command now carries --anyway, which lane-routing-core.mjs requires because audit routes to main at default."
+ },
+ {
+  "id": "U228",
+  "decision": "rewritten",
+  "reason": "I1 now lists ASTRA_*, CODEX_BIN and CODEX_HOME as related variables, not model ids, consistent with I4."
+ },
+ {
+  "id": "U229",
+  "decision": "rewritten",
+  "reason": "The merge record now says both halves use main/cross/scarce, as the union's U2 records; no half proposed 'alternate'."
+ },
+ {
+  "id": "U230",
+  "decision": "rewritten",
+  "reason": "The six-peoples count is correct for the seasonal dress table in design-reference.md §19.15, so the overview now names it the seasonal dress table to separate it from the 22-people §8.3 table."
  }
 ]
