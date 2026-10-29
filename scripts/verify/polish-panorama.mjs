@@ -1,6 +1,7 @@
 // Headless polish verification, theme polish-panorama: the skyline and the
 // panorama: the Giza skyline over Cairo, panorama wildlife and its footing, port
 // skylines, the travel panorama capture, the Sphinx and the walkable Giza site
+// with its figures, the detailed animal models and the skyline species scale
 // (design.md §2.5/§4.4).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
@@ -478,7 +479,7 @@ if (section('panorama-wildlife')) {
           const to = { x: post.x - dx * off - dz * 0.15, z: post.z - dz * off + dx * 0.15 }
           if (!free(from.x, from.z) || !free(to.x, to.z)) continue
           if (!window.__placeGoatSteer?.(i, to, from)) return null
-          return { from, to, axis: { x: dx, z: dz } }
+          return { axis: { x: dx, z: dz } }
         }
         return null
       }, pick)
@@ -737,7 +738,7 @@ if (section('travel-panorama-capture')) {
   const before = await page.evaluate(() => window.__placePanoramaActive ?? null)
   check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
   // Point 96 gate: in a whole run this leave happens AFTER several settlement
-  // visits (maasai, bambara, swahili, pedi or sidama, capetown and cairo among
+  // visits (cairo, maasai, pedi or sidama, capetown and timbuktu among
   // them; a single --section run stages none of them) — exactly the recipe that used to freeze the main thread 13-16 s on
   // synchronous shader re-links. With the module-singleton meshes/materials/
   // CSM the travel programs survive the place visits, so the transition must

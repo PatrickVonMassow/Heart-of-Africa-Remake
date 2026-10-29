@@ -1251,7 +1251,7 @@ if (section('children-bank-game')) {
   // shipped 55 s is chosen so a VISITING player does not miss the call that opens
   // a cycle. This section needs the RUN, twice, so it shortens the roam the way
   // the debug menu would and puts it back afterwards. It also lengthens the tap
-  // pause (below) and, for the tap photograph, the arrival hold, and latches the
+  // pause (below) and, for the arrival-contact frame, the arrival hold, and latches the
   // charge; the walk down to the bank and every run are the shipped ones.
   //
   // BOTH LENGTHS OF THAT PHASE, not only the first. `roamSeconds` is what the
