@@ -15978,3 +15978,17 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright check; no new mechanism.
   Bundle: Testinfrastruktur.
   Criticality: low - WebGL 2 only, whole-suite only; a player may see two child Ctrl labels overlap.
+
+- [ ] 1467. batch-doctor quarantine-stash aborts a live LARGE run
+  Source: findings carrier 29.10.2026 19:04. At 19:02 `batch-doctor --repair` stashed the owner's
+  uncommitted `.claude/closing-state.json` while the second closing LARGE on bcf9224ed was in its
+  unit stage; the repository-integrity teardown failed with "own index changed" and the LARGE
+  aborted red after 8m41s although all 18367 unit tests passed
+  (`local/verify-logs/2026-10-29T18-54-19-533-large.log`). The doctor had seen the live run (it kept
+  `verification/` out of the stash) and stashed anyway.
+  Final state:
+  - While a verify run is live, the doctor performs no index-mutating repair; it reports the dirty
+    file instead. `.claude/closing-state.json` is not treated as an unattributable concurrent edit.
+  Tests: a Vitest case in the doctor's test file for the live-run case.
+  Bundle: Testinfrastruktur.
+  Criticality: medium - a false red costs a full LARGE (2-3 h) and can stall a closing.
