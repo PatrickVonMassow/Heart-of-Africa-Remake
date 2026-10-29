@@ -2409,13 +2409,13 @@ and the Congo* vol. 2 (1908) · Ward, *Five Years with the Congo Cannibals* (189
 
 ## 8. Research → game: where the implementation record lives, and the loom (TASKS point 158)
 
-The implementation record (the live dress table — six peoples, drivers, gates,
+The implementation record (the live seasonal dress table — six peoples, drivers, gates,
 sources — and its notes) is kept current in `docs/design-reference.md` §19.15;
 design.md §19.15 is the pointer to it. It left this document on the user's
 decision (17.07.2026), first for design.md and since 27.07.2026 (point 367) for
 design-reference.md: it documents the game design, not the research. This
-document remains the underlying research; only the loom, the canoe and the
-villager dress table (§8.3) stay here.
+document remains the underlying research; only the loom, the canoe, the
+villager dress table and the figure notes (§8.1–§8.7) stay here.
 
 ### 8.1 The weaver's loom: what the sources carry, and what the game adapts
 
