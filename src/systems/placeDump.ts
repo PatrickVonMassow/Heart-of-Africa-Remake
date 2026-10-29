@@ -137,7 +137,8 @@ function r3(n: number): number {
   return Math.round(n * 1000) / 1000
 }
 
-/** Rounds every number of a plain value, deeply; drops functions. */
+/** Rounds every number of a plain value down to six levels deep (deeper
+ *  values pass unchanged); drops functions. */
 function rounded(v: unknown, depth = 0): unknown {
   if (typeof v === 'number') return Number.isFinite(v) ? r3(v) : String(v)
   if (v === null || typeof v !== 'object' || depth > 6) return typeof v === 'function' ? undefined : v
