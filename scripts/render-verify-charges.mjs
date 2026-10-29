@@ -2085,16 +2085,6 @@ export const RED_CHARGES = [
   },
   {
     point: 1465,
-    suite: 'touch',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^lifting the stick stops the walk\b/i,
-    why:
-      'Red in the v0.3.1 closing LARGE (29.10.2026 00:59); --section=virtual-stick re-ran green 2/2 on main cf77ff4 the same morning, '
-      + 'but no whole touch run on WebGL 2 has covered it since. Point 1465 owes that run. The charge dies with point 1465.',
-  },
-  {
-    point: 1465,
     suite: 'enrichments',
     backend: 'webgl',
     kind: 'check',
