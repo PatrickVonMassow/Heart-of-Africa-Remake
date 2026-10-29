@@ -1,6 +1,8 @@
 // Headless polish verification, theme polish-villagers: the adults of a village:
 // gestures, the canoe and its fishermen, the mute shore scene, no wedged adult, the
-// well, the stations, the loom, the errands and the mortar (design.md §19.10).
+// well, the stations, the loom, the errands, the carried jar, the water stand,
+// the steadying palm, the mortar, dress, the village walk and figure
+// micro-structure (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { waitForSceneBuilt, assertBackend, VERIFY_GL } from './_browser.mjs'
@@ -822,7 +824,7 @@ if (section('mute-shore-scene')) {
   const REPORT_SEED = 2425147265
   const shore = page
   const shoreFrame = frame
-  // A fresh game on `seed` (the suite's own boot, above, with the seed named).
+  // A fresh game on `seed` (the boot of ./_polish.mjs, with the seed named).
   const bootOn = async (seed) => {
     const url = new URL(BASE)
     if (seed !== null) url.searchParams.set('seed', String(seed))
@@ -2320,7 +2322,7 @@ if (section('adult-errands')) {
     // exactly the state twelve green climbs used to report as green on
     // 09.09.2026.
     const errandsCast = staged['water-out'] ?? 0
-    // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
+    // WHAT THE JAR ASSERTION NEEDS IS A FILLED TRIP TURNED FOR HOME, not a casting
     // (cross-vendor round): the game stages 'water-back' at the
     // moment the fill ends and the carrier turns for home, so it counts the
     // trips that had an empty leg and filled — the full leg home has begun,
@@ -2640,7 +2642,7 @@ if (section('adult-errands')) {
       // he is pinned: the others keep walking their errands through the search
       // and the settling frames, and in a full pass, with the errands well on,
       // a line clear when chosen came back with two cones over him while the
-      // suite stayed green. So the line is read again after the exposure, from
+      // suite stayed green. So the line is read again at the shutter, from
       // where the lens actually stands — a bearing is a request the ground's
       // collision may move — and a spoiled frame is taken again from a bearing
       // chosen afresh; only a search that runs out reds.
@@ -3011,8 +3013,9 @@ if (section('adult-errands')) {
       // the lens drops toward the jar's own height.
       // NEVER ON THE WATER SIDE: a lens there lies outside the walkable region
       // and the leave check tears the scene down. So only bearings no further
-      // from the settlement's middle than he stands are tried (the river lies
-      // outward; a proxy, not the bank normal), SIDE-ON first: he walks
+      // from the settlement's middle than he stands, or well inside its own
+      // edge, are tried (the river lies outward; a proxy, not the bank normal),
+      // SIDE-ON first: he walks
       // inland, so a lens along his path is one he walks into — the frame came
       // back filled by the shadowed flank of his own cone.
       // JUDGED AT THE SHUTTER (work-order 1108): a fence panel in the near
@@ -3283,8 +3286,8 @@ if (section('adult-errands')) {
       // failed. Nothing short of the real projection settles it, so this asks the
       // place camera itself, with the SAME matrix math the shutter judges a
       // `local` subject with (scripts/verify/frameSubject.mjs), and keeps the
-      // fleck that sits well inside the picture. The camera pose is left exactly
-      // as it was — the seam reading below stands at this same spot.
+      // fleck that sits well inside the picture; the probe itself does not move
+      // the camera.
       //
       // OFF THE FOAM (red of 01.10.2026, every WebGPU pass): `river.bank` is the
       // middle of the children's stretch, ~28 m upstream since 0bd2d2992, while
@@ -3608,8 +3611,8 @@ if (section('adult-errands')) {
   }
 
   // The shared excavation picture has its own measured composition, within the
-  // same adult-errands run. Seed 12 puts a store pit and patch 6.38 m apart with
-  // an open standing view (the layout unit test pins both the view and crossing).
+  // same adult-errands run. DIG_PICTURE's seed puts a store pit and patch 9-14 m
+  // apart with an open standing view (the layout unit test pins both the view and crossing).
   //
   // IT ASKS THE BUILD WHETHER IT CAN BE PHOTOGRAPHED AT ALL. The baseline
   // classifier (run by hand since point 1135) runs THIS suite file against the
@@ -3766,7 +3769,7 @@ if (section('water-jar-carried')) {
     let shown = 0
     window.__placeScene.traverse((o) => { if (o.name === 'stand-jar' && o.visible) shown++ })
     const e = window.__placeErrands()
-    return { shown, count: e.standJars, capacity: e.standCapacity }
+    return { shown, count: e.standJars }
   })
   // A lens beside the jar, on the first bearing the ground accepts and from
   // which the jar's pixels are really there.
@@ -3800,7 +3803,7 @@ if (section('water-jar-carried')) {
       if (!probe.rect) continue
       const changed = await jarPixels(who, name, probe.rect)
       const verdict = judgeCarriedJar(probe, changed)
-      best = { verdict, probe, tried, changed }
+      best = { verdict, probe, tried }
       if (verdict.ok) {
         await frame(shotName(`1376-water-carrier-${phase}-${body}`), {
           local: probe.center,
@@ -4001,7 +4004,7 @@ if (section('water-stand-table')) {
       scene.traverse((o) => { if (o.name === 'stand-jar') rows.push(o) })
       const wp = (o) => { o.updateWorldMatrix(true, false); const e = o.matrixWorld.elements; return { x: e[12], y: e[13], z: e[14] } }
       const shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true }
-      const rec = { who: null, samples: [], started: performance.now(), castAt: 0, cleared: false }
+      const rec = { who: null, samples: [], started: performance.now(), castAt: 0 }
       let hand = null
       let inh = null
       const tick = () => {
@@ -4382,7 +4385,7 @@ if (section('steadying-palm')) {
       const hidden = await sharp(await capturePixels(page, `${name} hidden`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
       await setShown(true)
       await nextFrames(6)
-      return { changed: countChangedPixels(shown.data, hidden.data, shown.info.channels), rect }
+      return { changed: countChangedPixels(shown.data, hidden.data, shown.info.channels) }
     }
     const VIEWS = [
       { view: 'side', label: `close on the water carrier walking back under the full jar, side-on: his steadying ${arm.toUpperCase()} hand on the jar, palm to it`, out: 1, ahead: 0.5 },
@@ -4605,9 +4608,9 @@ if (section('village-pounding')) {
             p.z = z
             p.yaw = Math.atan2(m.x - x, m.z - z) + Math.PI
             p.pitch = standOff < 5 ? -0.18 : -0.08
-            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2), at: standOff }, people: people.length }
+            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2), at: standOff } }
           }
-          return { probe, stand: null, people: people.length, why }
+          return { probe, stand: null, why }
         }, { standOffs: shot.stand, maxOff: MAX_OFF_SQUARE })
         if (!staged.stand && attempt < SEARCHES) {
           refused.push(`${attempt}: ${staged.why.join(', ')}`)
@@ -5133,9 +5136,10 @@ if (section('villager-dress')) {
   await page.evaluate(() => window.__dressLineup(null))
 
   // THE COST PER VILLAGE (graphics-detail-levels.md): the same village, the
-  // same view, on each level, each once with the primitive figure (the
-  // "before": `figureBodySegments` forced to 0 in the dev server's live preset
-  // table) and once with the skinned body — so the difference is the figures'.
+  // same view, on each level; medium and high each once with the primitive
+  // figure (the "before": `figureBodySegments` forced to 0 in the dev server's
+  // live preset table), once with the code-built skinned body and once with the
+  // glTF one — so the difference is the figures'.
   // Draw calls and triangles from the renderer's per-frame counters; the frame
   // time is the median of 60 rendered frames (a shared, software-rendered
   // machine: compare the levels, not the absolute milliseconds).
@@ -5261,7 +5265,6 @@ if (section('villager-dress')) {
 if (section('village-walk')) {
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   // The measured numbers, also into a file when asked (a passing check prints no detail).
-  const { appendFileSync } = await import('node:fs')
   const report = (line) => {
     console.log(line)
     if (process.env.VILLAGE_WALK_REPORT) appendFileSync(process.env.VILLAGE_WALK_REPORT, `${VERIFY_GL ?? 'webgpu'} ${line.trim()}\n`)
@@ -6119,7 +6122,7 @@ if (section('figure-micro')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   // One villager `d` ahead of the player with a clear sight line to its hips
   // and chest, on the first of 16 bearings that has one.
-  const stageOne = (village, who, d) =>
+  const stageOne = (who, d) =>
     page.evaluate(
       ({ who, d }) => {
         const p = window.__placePlayer
@@ -6136,7 +6139,7 @@ if (section('figure-micro')) {
           p.yaw = yaw
           p.pitch = -0.12
           window.__dressLineup({ x: cx, z: cz, yaw, only: [who] })
-          return { cx, cz, yaw }
+          return { cx, cz }
         }
         return null
       },
@@ -6148,7 +6151,7 @@ if (section('figure-micro')) {
   ]) {
     await goToPlace(village)
     await page.evaluate(() => window.__placeFreezeLife?.(true))
-    const at = await stageOne(village, who, 1.25)
+    const at = await stageOne(who, 1.25)
     check(`figure micro-structure: ${village} ${who} staged close with a clear view`, !!at, 'no clear bearing at 1.25 m')
     if (!at) continue
     await nextFrames(4)

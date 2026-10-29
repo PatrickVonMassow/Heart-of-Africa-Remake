@@ -179,7 +179,7 @@ export const stepUntil = async (ready, arg = null, capFrames = 240) => {
  * 1129, which in the unsplit run only looked right because earlier sections had
  * warmed the same materials. Warm must HOLD for a few frames, because an object
  * drawn for the first time starts its pipeline a frame later. A set that never
- * settles is a red, not a shot taken anyway.
+ * settles is a red check; the shot is still taken, for the record.
  */
 export const awaitPlaceDrawn = async (label, capFrames = 900) => {
   let warmRun = 0

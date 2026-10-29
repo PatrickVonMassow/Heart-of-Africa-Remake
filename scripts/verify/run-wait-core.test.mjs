@@ -186,7 +186,8 @@ describe('planRun — what the command will really do', () => {
     const plan = planRun({ argv: ['large'], verifyGl: undefined })
     expect(plan.passes).toHaveLength(2)
     expect(plan.suites).toContain('preview')
-    // 2536.0 s (full pass + preview) + the render-only WebGPU pass.
+    // The full pass (2536.0 s less the split `polish` row, plus the preview)
+    // and the render-only WebGPU pass.
     expect(plan.expectedMs).toBeGreaterThan(2_536_000)
     expect(plan.expectedFrames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication)
   })
@@ -332,7 +333,7 @@ describe('the observed band a plan prints under its expectation (point 1083)', (
   it('gives a both-backend LARGE the 115–121 min band it really ran in', () => {
     const plan = planRun({ argv: ['large'], verifyGl: undefined })
     expect(plan.observedBand?.key).toBe('large')
-    // The plan says ~81 min; the band says 115–121. Both are printed, and the
+    // The plan says ~69 min; the band says 115–121. Both are printed, and the
     // gap between them is the whole point: 118 reads as inside it, 200 does not.
     expect(plan.expectedMs).toBeLessThan(plan.observedBand.medianMin * 60_000)
     const lines = formatObservedBand(plan.observedBand)
