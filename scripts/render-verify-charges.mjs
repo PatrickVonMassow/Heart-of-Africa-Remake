@@ -2083,14 +2083,4 @@ export const RED_CHARGES = [
       + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
       + 'note is left to target. The charge dies with point 1395.',
   },
-  {
-    point: 1465,
-    suite: 'enrichments',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^Traveller \(low\): his head stands at villager height$/i,
-    why:
-      'Red in the v0.3.1 closing LARGE (29.10.2026); the traveller-figure section loaded green on the quiet machine the same morning, '
-      + 'but no whole enrichments run on WebGL 2 has covered it since. Point 1465 owes that run. The charge dies with point 1465.',
-  },
 ]
