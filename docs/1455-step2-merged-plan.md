@@ -122,8 +122,8 @@ qualify. One rule: **any** unresolved red (C9) in a pair member → FAIL; a red 
 reproduces quiet is charged and the pair is repeated, at most twice in the test (a third
 repeat → FAIL). The bound covers **new** reds only (F11): 0 pairs with an unresolved red out
 of 20 bounds the per-pair rate of overlap-added unresolved reds below 13.9 % at 95 %
-(1 − 0.05^(1/20)), under the worst-case break-even of ~17 % (5 min saved per pair against a
-30 min false red). Known reds (charged, or reproduced quiet in the test) are outside that
+(1 − 0.05^(1/20)), under the one-red-per-pair break-even of ~17 % (5 min saved per pair against a
+30 min false red); a pair red on both members halves that break-even, which this bound does not cover. Known reds (charged, or reproduced quiet in the test) are outside that
 bound; overlap's effect on them is judged by the rate comparison below. The 9.5 % per-run
 figure of the halves assumed independent member runs and is withdrawn. Timing probe: the
 unit is the partner window (5 overlapped windows against 5 quiet windows of 2 runs each);
