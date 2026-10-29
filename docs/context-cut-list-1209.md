@@ -1,6 +1,6 @@
 # Context-load cut list — merged result of the blind-parallel stage
 
-Four-eyes divergent stage for the smaller-context-load point. Both halves were written blind from one identical input bundle (CLAUDE.md, MEMORY.md with every memory file frontmatter, the enabled tool surface, the hook texts with their firing conditions, except the project Stop guards' bodies (U164, U168), and the task statement). Baseline: `docs/context-load-1209.md`.
+Four-eyes divergent stage for the smaller-context-load point. Both halves were written blind from one identical input bundle (CLAUDE.md, MEMORY.md with every memory file frontmatter, the enabled tool surface, the available hook texts with their firing conditions — omissions are recorded per entry (U157, U161, U163, U164, U168) — and the task statement). Baseline: `docs/context-load-1209.md`.
 
 - List A: Claude Opus 5.5 — `docs/four-eyes/1209-blind-a-opus55.json` (verbatim `.md` beside it)
 - List B: GPT-6 Astra — `docs/four-eyes/1209-blind-b-astra.json` (verbatim `.md` beside it)
