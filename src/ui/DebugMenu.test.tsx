@@ -266,8 +266,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.tagCaughtSlumpLean, read: () => balance.villageLife.tag.caughtSlumpLean, value: 0.5 },
     { label: en.debug.tagCaughtSlumpArmRoll, read: () => balance.villageLife.tag.caughtSlumpArmRoll, value: 0.2 },
     // The children's round at the bank (point 687), one from each family its
-    // twenty-two controls fall into: a PHASE length, a DISTANCE, a PACE and one of
-    // the roaming bounds. Until 29.08.2026 the then nineteen were only ever asserted
+    // twenty-two numeric controls (beside one toggle) fall into: a PHASE
+    // length, a DISTANCE, a PACE and one of the roaming bounds. Until 29.08.2026 the then nineteen were only ever asserted
     // to EXIST — a control wired to nothing, or to the wrong field, passed —
     // and `bankGame` was missing from the restore below, so the first case to
     // exercise one would have leaked its value into every case after it

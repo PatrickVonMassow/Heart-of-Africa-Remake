@@ -998,7 +998,8 @@ const _qw = new THREE.Quaternion()
  * toward the pose's knee, or straight ahead once the leg is straighter than
  * `straight`), then the whole leg swung about the hip by the shortest turn.
  * An ankle on its target leaves every local as it was, except on a leg at its
- * straight or folded limit, whose length is clamped just inside. Mutates `pose` and
+ * straight or folded limit, whose length is clamped just inside, and on a knee
+ * bent backward against the pose's hinge, which is turned to it. Mutates `pose` and
  * recomputes `world`.
  */
 export function correctLeg(

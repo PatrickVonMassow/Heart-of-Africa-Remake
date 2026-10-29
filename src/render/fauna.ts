@@ -522,7 +522,7 @@ export function faceVelocity(vx: number, vz: number, prevYaw: number, eps = 1e-4
 }
 
 /** Shared quadruped body plan (wildebeest, warthog, lion, hyena and the cat
- *  predators; the ungulates build in faunaUngulates.ts). */
+ *  predators; zebra, antelope and goat build in faunaUngulates.ts). */
 function buildQuadruped(s: QuadrupedSpec): THREE.BufferGeometry[] {
   const parts: THREE.BufferGeometry[] = []
   const backY = s.legH + s.bodyR * 0.8

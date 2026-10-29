@@ -23,7 +23,7 @@
  {"id":"U37","decision":"rewritten","reason":"The penetration report header limits the gate to the build pose and notes the pending motion comparison."},
  {"id":"U38","decision":"rewritten","reason":"The chaser-stride comment was moved down onto the feet-spread check."},
  {"id":"U107","decision":"rewritten","reason":"The prompt comment anchors the enter hint below the traveller via enterHintTopFraction."},
- {"id":"U108","decision":"rewritten","reason":"The bank round's control count reads twenty-two (counted in EXPECTED_CONTROLS); the historical nineteen is marked as then."},
+ {"id":"U108","decision":"rewritten","reason":"The bank round's control count reads twenty-two numeric controls beside one toggle (counted in EXPECTED_CONTROLS); the historical nineteen is marked as then."},
  {"id":"U154","decision":"rewritten","reason":"GROWN_FIGURE_HEIGHT doc says a speaker is measured from its drawn head or record."},
  {"id":"U155","decision":"removed","reason":"VILLAGER_GLTF.standSpeed had no reader in src, scripts or tests and was deleted."},
  {"id":"U156","decision":"kept","reason":"buildUngulateParts is called by the species builders in its own module; it is not dead and only the export is unneeded."},
