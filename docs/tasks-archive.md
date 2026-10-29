@@ -35137,3 +35137,39 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
   Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
   Bundle: Dorfleben.
+
+- [x] 1464. Clear the uncharged reds of the v0.3.1 closing regression
+  PROBLEM, measured 29.10.2026: the closing LARGE on main 54b326987 went red on WebGL 2
+  (13 suites; WebGPU not reached). Re-run alone on a quiet machine, these reds REPRODUCE
+  and carry no charge in scripts/render-verify-charges.mjs:
+  - touch --section=virtual-stick: "lifting the stick stops the walk — settled" (the walk
+    does not stop when the stick is released);
+  - world: a click times out because `.dialog-backdrop` intercepts pointer events after 7
+    checks (local/verify-logs/2026-10-29T00-55-43-773-world.log);
+  - polish-speech: "the speaking figure itself stands in the frame, under its note"
+    0/8 frames — label bottom 556 below body 547;
+  - enrichments --section=calf-crossing-flee: the archived crossing ends on mountain
+    terrain 13 m up, not on its bank target (likely the safeBankTarget swim-out change);
+  - polish-villagers --section=village-loom: the station stands 62 px, not ≥ 70 px, from
+    the plaza;
+  - polish-villagers --section=villager-canoe: 2/5 children seen from behind the upstream rock;
+  - polish-villagers --section=mute-shore-scene (boatman reading) and water-stand-table
+    (3 fails, the jar leaves the plank before the hand holds it) — charge status to confirm;
+  - polish-villagers --section=adult-errands: new red "the jar's mouth is tipped under the
+    water surface" (0.04 mm above) plus one console error.
+  Load artefacts on the quiet machine (green, nothing to do): flow, enrichments
+  traveller-figure, polish-villagers village-walk.
+  FINAL STATE: each listed red is fixed, or charged to a named open point when it is a known
+  defect outside this release; the closing LARGE of point 1462 can then run on the fixed HEAD.
+  Split per suite when it does not converge. Criticality: high — blocks the v0.3.1 release.
+  Test: each named suite/section green on both backends (touch on WebGL 2).
+  Queue position: directly before point 1462 (a red closing run is fixed first).
+  Source: the closing run of point 1462, findings recorded 29.10.2026 00:59–01:31 UTC.
+  RE-MEASURED 29.10.2026 04:05–04:18 on main cf77ff4, WebGL 2, quiet host: touch virtual-stick
+  GREEN (2 pass); enrichments calf-crossing-flee, village-loom, villager-canoe, mute-shore-scene and
+  water-stand-table are charged to open points 1236, 1266, 1381, 1265, 1435 (chargeFor); adult-errands
+  now reds only on checks charged to 568 (rim band, plate water) and 642 (stand order), the jar-mouth
+  red did not recur. STILL UNCHARGED AND REPRODUCING: polish-speech speech-hypothesis (body 547,
+  label bottom 556, 0/8; SpeechLabels/SpeechLabelCard unchanged since 15.10., so look at the figure
+  scale or the crown anchor) and world (`.dialog-backdrop` intercepts the click, TimeoutError after 8 pass).
+  Bundle: unbundled (release gate, travels with 1462).
