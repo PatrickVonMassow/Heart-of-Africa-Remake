@@ -104,6 +104,7 @@ put it is the mistake this line exists to stop.
   Test: each named suite/section green on both backends (touch on WebGL 2).
   Queue position: directly before point 1462 (a red closing run is fixed first).
   Source: the closing run of point 1462, findings recorded 29.10.2026 00:59–01:31 UTC.
+  Bundle: unbundled (release gate, travels with 1462).
 
 - [ ] 1462. Release v0.3.1: tag the current main state as v0.3.1 and poc and publish both
   Source: User order 28.10.2026 in chat session cf715472: "Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ und außerdem als v0.3.1 und veröffentliche diesen getaggten Stand unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/" — to come before the infrastructure-simplification point, so a known-good tagged state exists before the teardown. Wording approved by the user: "ja, beide so einreichen".
