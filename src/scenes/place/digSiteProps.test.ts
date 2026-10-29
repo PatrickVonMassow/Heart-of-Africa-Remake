@@ -36,8 +36,8 @@ const WORKING_DAY_SECONDS = 1800
 
 // OPEN: in these layouts the nav grid finds no route from any standable spawn
 // point to the store pit, WITH OR WITHOUT its props; the walkers reach it only
-// where the straight line is open (the working day below measures them beside
-// its baskets). A routing gap of the dig site's placement, not of the props,
+// where the straight line is open (the working day below, run at seed 42 only,
+// measures them beside its baskets). A routing gap of the dig site's placement, not of the props,
 // reported for its own point. The route test proves for each that the props
 // did not cause it, and fails once a route exists so the exception is removed.
 const KNOWN_UNROUTABLE_PITS: ReadonlyArray<readonly [string, number]> = [

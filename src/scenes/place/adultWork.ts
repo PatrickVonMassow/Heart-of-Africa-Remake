@@ -131,17 +131,19 @@ export interface AdultTask extends ErrandPoint {
    *  back to him. He is NOT an escort — he walks only to his own spot beside
    *  the stand and stays there. */
   orderedBy: number | null
-  /** The spot BESIDE the water stand this errand's carrier works from
-   *  (work-order 1087). He is never sent to the stand's own centre: it is a
-   *  solid body, so a man sent there stalls a walker's width off it and is never
-   *  counted as arrived. He stands next to it, as one does at a table. */
+  /** The spot BESIDE the water stand this worker waits on (work-order 1087);
+   *  the carrier steps from it to its `tableSpot` for the jars. He is never
+   *  sent to the stand's own centre: it is a solid body, so a man sent there
+   *  stalls a walker's width off it and is never counted as arrived. He stands
+   *  next to it, as one does at a table. */
   standSpot: ErrandPoint | null
   /** The water carrier's place AT the stand's table (work-order 1405): he waits
    *  for the order on his `standSpot`, then steps up here to take the empty jar
    *  and comes back here to set the full one down. */
   tableSpot?: ErrandPoint
   arrived: boolean
-  /** Seconds this worker has dug in the current bout. */
+  /** Seconds into the current bout: the dig's, and the clock of the take
+   *  and the fill too. */
   dug: number
   /** The utterance belonging to the current phase is still owed. */
   owes: boolean

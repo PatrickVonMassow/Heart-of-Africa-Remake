@@ -9,7 +9,8 @@
 // poses drive, which is also what lets the comparison with point 1293 separate
 // what the body changes from what the clips would change (final state 5).
 //
-// Pure: plain geometry and arrays, no scene graph; the tests read it directly.
+// Pure: plain geometry and arrays, no scene graph beyond createGltfSkeleton's
+// bones; the tests read it directly.
 
 import * as THREE from 'three/webgpu'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
@@ -181,7 +182,7 @@ const quantile = (xs: number[], q: number) => {
 
 /** One person on the glTF body, hung, grounded and sized like the code-built body. */
 export interface GltfPerson {
-  /** Skinned to the asset's bone order, no morphs, normals of its own. */
+  /** Skinned to the asset's bone order, only the live hand morphs, normals of its own. */
   geometry: THREE.BufferGeometry
   /** Rest heads of the hanging skeleton (bones × 3), identity rotations. */
   rest: Float32Array

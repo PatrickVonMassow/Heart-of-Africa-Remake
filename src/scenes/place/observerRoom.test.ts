@@ -93,7 +93,8 @@ function sceneParts(l: PlaceLayout, placeId: string): Part[] {
   // The fixed vignettes: every prop AND every performer's body, as the layout's
   // collision reserves them (`villageLifeFootprints`) — the cook, tender and
   // carrier round the fire, the well's carrier, the pounder's and talkers'
-  // bodies. The loom's reservation is left out: the laid loom is above.
+  // bodies. The loom's reservation is left out: a laid loom is above (none is
+  // laid while weaving is parked).
   for (const f of villageLifeFootprints(VILLAGE_FIRE, placeId)) {
     if (Math.hypot(f.x - LOOM_SPOT[0], f.z - LOOM_SPOT[1]) < 1) continue
     parts.push({ what: `vignette (${f.x.toFixed(1)}, ${f.z.toFixed(1)})`, x: f.x, z: f.z, r: f.r })
