@@ -77,28 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1465. Clear the uncharged WebGPU reds of polish-speech before the v0.3.1 closing
-  PROBLEM, measured 29.10.2026 04:57-04:59 Europe/Berlin on WebGPU, identical on a clean main
-  66df922f7 and on feat/1464-closing-reds 7b616b501 (so not caused by point 1464): the v0.3.1
-  closing LARGE of point 1462 never reached WebGPU, and there `polish-speech` carries reds no
-  entry in scripts/render-verify-charges.mjs charges:
-  - --section=chief-to-drummer: "the man and his word offer their keys at the same time
-    (point 1139)" fails in both attempts ({prompt: "Space — Ask the drummer", invite:
-    "E — guess meaning", targeted: villager-0, guessKeyArmed: true});
-  - --section=chief-to-drummer: "the drummer's arm is raised in the pointing frame (point 1272)"
-    fails the first attempt (restHandY 0.645, shotHandY 0.640) and passes the retry;
-  - --section=speech-owner: "two close speakers are shot unobstructed, each tail on its own
-    speaker's anchor…" red in the whole-suite run 2026-10-29T03-48-21-257 (tails false); the
-    charge to point 1270 is scoped to webgl only.
-  Neither chief-to-drummer check appears red in any earlier kept log.
-  FINAL STATE: each listed red is fixed, or charged to a named open point when it is a known
-  defect outside this release; the closing LARGE of point 1462 can then run on the fixed HEAD.
-  Split per check when it does not converge. Criticality: high — blocks the v0.3.1 release.
-  Test: the named sections green on both backends.
-  Queue position: directly before point 1462 (a red closing run is fixed first).
-  Source: findings carrier 29.10.2026 04:00 "Uncharged WebGPU reds in polish-speech block the
-  v0.3.1 closing", measured during point 1464.
-  Bundle: unbundled (release gate, travels with 1462).
 - [ ] 1462. Release v0.3.1: tag the current main state as v0.3.1 and poc and publish both
   Source: User order 28.10.2026 in chat session cf715472: "Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ und außerdem als v0.3.1 und veröffentliche diesen getaggten Stand unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/" — to come before the infrastructure-simplification point, so a known-good tagged state exists before the teardown. Wording approved by the user: "ja, beide so einreichen".
   Final state: the current main state is released as version v0.3.1 by the named "version release" process, and `poc` points at the same commit.

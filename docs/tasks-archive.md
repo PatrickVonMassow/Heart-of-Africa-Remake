@@ -35173,3 +35173,26 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   label bottom 556, 0/8; SpeechLabels/SpeechLabelCard unchanged since 15.10., so look at the figure
   scale or the crown anchor) and world (`.dialog-backdrop` intercepts the click, TimeoutError after 8 pass).
   Bundle: unbundled (release gate, travels with 1462).
+
+- [x] 1465. Clear the uncharged WebGPU reds of polish-speech before the v0.3.1 closing
+  PROBLEM, measured 29.10.2026 04:57-04:59 Europe/Berlin on WebGPU, identical on a clean main
+  66df922f7 and on feat/1464-closing-reds 7b616b501 (so not caused by point 1464): the v0.3.1
+  closing LARGE of point 1462 never reached WebGPU, and there `polish-speech` carries reds no
+  entry in scripts/render-verify-charges.mjs charges:
+  - --section=chief-to-drummer: "the man and his word offer their keys at the same time
+    (point 1139)" fails in both attempts ({prompt: "Space — Ask the drummer", invite:
+    "E — guess meaning", targeted: villager-0, guessKeyArmed: true});
+  - --section=chief-to-drummer: "the drummer's arm is raised in the pointing frame (point 1272)"
+    fails the first attempt (restHandY 0.645, shotHandY 0.640) and passes the retry;
+  - --section=speech-owner: "two close speakers are shot unobstructed, each tail on its own
+    speaker's anchor…" red in the whole-suite run 2026-10-29T03-48-21-257 (tails false); the
+    charge to point 1270 is scoped to webgl only.
+  Neither chief-to-drummer check appears red in any earlier kept log.
+  FINAL STATE: each listed red is fixed, or charged to a named open point when it is a known
+  defect outside this release; the closing LARGE of point 1462 can then run on the fixed HEAD.
+  Split per check when it does not converge. Criticality: high — blocks the v0.3.1 release.
+  Test: the named sections green on both backends.
+  Queue position: directly before point 1462 (a red closing run is fixed first).
+  Source: findings carrier 29.10.2026 04:00 "Uncharged WebGPU reds in polish-speech block the
+  v0.3.1 closing", measured during point 1464.
+  Bundle: unbundled (release gate, travels with 1462).
