@@ -15982,3 +15982,21 @@ to land than a mechanism that needs a review.
   Criticality: low — verification debt; blocks the render-verify Stop guard. Needs a quiet machine.
   Bundle: Session- & Repo-Hygiene.
   Source: findings carrier 28.10.2026 04:10 'Enrichments covering run owed on both backends'.
+
+- [ ] 1466. Ctrl actor labels fuse over most frames in a whole polish-speech run on WebGL 2
+  Source: measured 29.10.2026 07:29 by point 1465 on feat/1465-polish-speech-webgpu-reds 56d0a9ae6,
+  whole `polish-speech` on WebGL 2 (log `local/verify-logs/2026-10-29T06-29-04-941-polish-speech.log`).
+  THE RED. "no two Ctrl labels fuse in the village crowd (point 628)": 50/90 frames held a pair fused
+  beyond 6 px (allowed 13), 22 at the 18 px unreadable bar, deepest 19 px ["Child"×"Child" 30×19 px],
+  16-19 labels in the sample. A SUSTAINED fusion, not the single-frame shape point 1010's charge owns.
+  `--section=ctrl-actor-labels` alone was green on WebGL 2 on the same head minutes later (9/0), which
+  does not close it; the WebGPU whole run of the same head had no such red.
+  Final state:
+  - The cause is measured: what the preceding sections leave behind (children's run state, crowd
+    density, camera) that makes two child labels sit in each other over half the sample; a real
+    label-placement defect is fixed in the labels, a staging leftover in the suite, no check weakened.
+  - Whole `polish-speech` on WebGL 2 shows the check green; the charge in
+    scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low - WebGL 2 only, whole-suite only; a player may see two child Ctrl labels overlap.
