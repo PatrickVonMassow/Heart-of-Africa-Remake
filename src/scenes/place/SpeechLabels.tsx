@@ -243,8 +243,9 @@ export function SpeechLabels() {
         const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
         return label && speechTipWorld(label, WORLD, camera) ? WORLD.toArray() : null
       },
-      // The speaker's DRAWN head top and feet on screen, measured on the
-      // projected geometry itself (point 1276): every vertex of the visible
+      // The speaker's DRAWN head top on screen, measured on the projected
+      // geometry itself, and its feet as the anchor's projected origin
+      // (point 1276): every vertex of the visible
       // head mesh goes through the camera, and the head's top on screen is the
       // smallest screen y among them — the silhouette's upper edge under any
       // perspective and pitch, not a projected world-up offset of its centre.

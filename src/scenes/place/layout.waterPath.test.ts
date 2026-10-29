@@ -97,9 +97,10 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
 })
 
 // THE WATER PATH (work-order 688). The adults teach RIVER by fetching water, so
-// there has to be a path to fetch it along: a head in the village where both
-// carriers speak, a foot at the river where neither does, and a walk between the
-// two that crosses neither a building nor the children's running lane.
+// there has to be a path to fetch it along: a head in the village by the water
+// stand, on whose work ring both RIVER words fall, a foot at the river where
+// neither does, and a walk between the two that crosses neither a building nor
+// the children's running lane.
 describe('the village water path (work-order 688)', () => {
   const random = mulberry32(1045)
   const waterSeeds = [...new Set([

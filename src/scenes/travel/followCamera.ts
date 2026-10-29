@@ -3,7 +3,8 @@
  * follow point AND aims at that same point, so the viewing angle never changes
  * with the walking direction or on a stop — only the follow point lags. The
  * smoothing is time-based (exponential in dt), so the lag is the same at any
- * frame rate. A jump farther than `snapDistance` (a teleport, a resumed save)
+ * frame rate but for sampling a moving target once per frame (a few per cent).
+ * A jump farther than `snapDistance` (a teleport, a resumed save)
  * places the camera at once instead of sliding across the map.
  *
  * South reach (design.md §2.1): the oblique view reaches farther north than

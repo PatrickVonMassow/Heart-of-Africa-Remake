@@ -153,8 +153,8 @@ function bearingFor(side: 'left' | 'right', elevation: number, cfg: MortarConfig
   return Math.asin(Math.max(-1, Math.min(1, needed)))
 }
 
-/** How far toward her the pestle foot hangs at a foot height: none in the
- *  bowl, `footDrift` at the top. Above the rim the foot only has to be over
+/** How far toward her the pestle foot hangs at a foot height: none at the
+ *  impact, rising linearly to `footDrift` at the top. Above the rim the foot only has to be over
  *  the opening, and drawing it toward her is what keeps the lifted shaft
  *  upright in front of her face instead of slanting through her head. */
 export function footDriftAt(footY: number, cfg: MortarConfig = balance.villageLife.mortar): number {

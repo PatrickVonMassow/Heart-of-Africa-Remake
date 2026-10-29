@@ -2334,8 +2334,9 @@ function Herds() {
     // The rings a swim-out bank keeps clear of (the water-edge flee fix): the
     // traveller for a species that shies from it, an active predator for one
     // that flees it, each widened by the calibratable clearance — so a swim
-    // never lands inside the ring it fled and re-triggers that flight at the
-    // waterline. The chosen bank becomes the crossing target and is held.
+    // lands outside the ring it fled wherever a bank in reach allows, rather
+    // than re-triggering that flight at the waterline (with every bank in reach
+    // threatened, the landing farthest outside the rings). The chosen bank becomes the crossing target and is held.
     const bankClear = balance.waterCross.fleeBankClearance
     const bankThreatsFor = (sp: Species, young: boolean): BankThreat[] => {
       const out: BankThreat[] = []
@@ -2734,7 +2735,8 @@ function Herds() {
           }
           // A calf that swam in its chase or its flight (design.md §19.5) is no
           // fall-in: once the chase or flight is over it swims for the nearest
-          // bank clear of what it fled (safeBankTarget — the plain nearest bank
+          // bank clear of what it fled where one is in reach, else the least
+          // threatened (safeBankTarget — the plain nearest bank
           // was the traveller's own, and the calf shuttled back into the shy
           // ring) under the 312 no-lingering rule (the crossing mover,
           // deadline-bounded — I4) rather than starting the §19.8 struggle.
@@ -3497,7 +3499,8 @@ function Herds() {
           }
           const inFlight = a.fleeAt !== undefined && simTimeRef.current - a.fleeAt < FLIGHT_GRACE_SECONDS
           const exit = waterExit(ter, false, inFlight)
-          // The nearest bank clear of what it fled (safeBankTarget): the plain
+          // The nearest bank clear of what it fled, else the least threatened
+          // (safeBankTarget): the plain
           // nearest one was often the traveller's own, and the animal swam
           // back into the shy ring and bolted into the water again.
           const bank = exit === 'swim-to-bank' ? swimOutBank(a, sp) : null

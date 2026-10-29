@@ -17,7 +17,6 @@ const dist = (a: V3, b: V3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
 const mixV = (a: V3, b: V3, t: number): V3 => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t })
 
 interface Frame {
-  mode: WorkStopMode
   phase: 'take' | 'kneel down' | 'let go' | 'work' | 'grip' | 'rise' | 'settle' | 'walk'
   base: V3
   planned: V3
@@ -58,7 +57,7 @@ function simulate(carry: TaskLoad, lag = 0): Frame[] {
               ? 'grip'
               : 'work'
          : mode === 'back' ? 'walk' : (mode as Frame['phase'])
-    frames.push({ mode, phase, base: placed.base, planned: placed.planned, hands, hold: h.hold, down: h.down })
+    frames.push({ phase, base: placed.base, planned: placed.planned, hands, hold: h.hold, down: h.down })
     // the hands drawn for the next frame: toward the planned grip, `lag` short
     const aim = gripPoints(placed.planned, carry)
     hands = [0, 1].map((i) => {

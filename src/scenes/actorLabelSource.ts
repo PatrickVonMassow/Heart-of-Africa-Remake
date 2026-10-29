@@ -263,8 +263,9 @@ export function silhouetteTop(
   const A = dot(lb, lb) - cz * cz
   const B = dot(lu, lb) - cy * cz
   const C = dot(lu, lu) - cy * cy
-  // A < 0 exactly when the whole ellipsoid lies in front of the eye
-  // (its depth half-extent |Lᵀback| is less than its depth −cz).
+  // With cz < 0 (centre in front of the eye), A < 0 exactly when the whole
+  // ellipsoid lies in front of it (its depth half-extent |Lᵀback| is less
+  // than its depth −cz).
   if (!(cz < 0) || !(A < 0)) return false
   const disc = B * B - A * C
   if (!(disc >= 0)) return false

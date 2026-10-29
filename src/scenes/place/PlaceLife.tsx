@@ -1923,7 +1923,8 @@ function Porters({
       const px = p.x
       const pz = p.z
       g.position.set(px, groundHeight(px, pz), pz)
-      // Turned about at the route's end on the spot, never flipped in a frame.
+      // Turned about at the route's end at the spot-turn rate while the route
+      // carries it on, never flipped in a frame.
       const heading = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
       p.yaw = turnToward(p.yaw ?? heading, heading, VILLAGER_MOTION.spotTurnRate * dt)
       g.rotation.y = p.yaw
@@ -3431,7 +3432,8 @@ function ErrandVillagers({
         const digging = digBout(state, isDigging(work, i, view), !!task && task.phase === 'dig' && task.arrived, dt)
         // The dig comes and goes as a blend (easeDigWeight): the arms, the
         // trunk and the shovel's turn along the arm together, the stroke's
-        // clock running on while it fades; it restarts from the top once gone.
+        // clock held where it stopped while it fades; it restarts from the top
+        // once gone.
         state.digK = easeDigWeight(state.digK, digging, dt)
         // the drawn stroke on the work's clock, for both bodies: it advances
         // only while the hole deepens, so it freezes through a hold or a fade,

@@ -122,12 +122,9 @@ describe('the canoe lane (work-order 1245 items 9 and 10)', () => {
 })
 
 interface Sample {
-  t: number
   phase: CanoePhase
-  s: number
   x: number
   z: number
-  yaw: number
   paddler: PaddlerAction
   net: number
   inHull: number
@@ -187,12 +184,9 @@ function run(
     if (state.phase !== before) phases.push({ phase: state.phase, t })
     if (!actions.length || actions[actions.length - 1].action !== state.paddlerAction) actions.push({ t, action: state.paddlerAction })
     states.push({
-      t,
       phase: state.phase,
-      s: state.s,
       x: state.x,
       z: state.z,
-      yaw: state.yaw,
       paddler: state.paddlerAction,
       net: state.net,
       inHull: state.inHull,

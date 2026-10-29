@@ -1,6 +1,7 @@
-// The settlement's villager on the code-built skinned body, dressed from the
-// appearance table (work-order "villager dress"; medium and high presets — the
-// low preset keeps the primitive figure of placeFigure.tsx).
+// The settlement's villager on a skinned body (code-built, or the glTF body
+// once its asset is loaded), dressed from the appearance table (work-order
+// "villager dress"; medium and high presets — the low preset keeps the
+// primitive figure of placeFigure.tsx).
 //
 // It takes exactly the primitive figure's props and publishes the same pivots
 // (`limbs`), so no vignette changes how it poses a person: the pivots are an

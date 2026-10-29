@@ -68,8 +68,9 @@ export interface ClipLayers {
   settleStand: [{ x: number; z: number }, { x: number; z: number }]
   settleTurn: [THREE.Quaternion, THREE.Quaternion]
   /** The walk weight the settle last ran at: as it falls, the stand's spots
-   *  are drawn onto the body's own stand (the miss kept as the square of
-   *  the weight's share), met at weight 0. */
+   *  are drawn onto the body's own stand (for a foot in the air the miss kept
+   *  as the square of the weight's share; a landed foot holds, then steps
+   *  over in the last `settleRestep`), met at weight 0. */
   settleW: number
 }
 
