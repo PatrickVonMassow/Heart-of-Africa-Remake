@@ -23,7 +23,7 @@ export const OUT = fileURLToPath(new URL('../../verification/', import.meta.url)
 // pass. The names are read out of the RUNNING theme file (process.argv[1]) by
 // scripts/verify/sections.mjs, so an unknown one is refused with the list of the
 // real ones — and the run is stamped PARTIAL, never counted as suite coverage.
-export const sections = sectionGate()
+const sections = sectionGate()
 export const { section } = sections
 if (sections.banner()) console.log(sections.banner())
 
@@ -110,7 +110,7 @@ export const probeSilhouetteFooting = async (page, check, label) => {
   )
 }
 
-export const browser = await launchVerifyBrowser()
+const browser = await launchVerifyBrowser()
 export const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // Point 375: every frame below states the subject it must show — the settlement
 // it stands in, the building it is aimed at, the overlay it documents — and the
@@ -120,7 +120,7 @@ export const page = await browser.newPage({ viewport: { width: 1440, height: 900
 const shutter = frameShutter(page, OUT)
 // The collider geometry the wedged-adults and village sections read with (scripts/verify/colliderProbe.mjs).
 await installColliderProbe(page)
-export const errors = []
+const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
 })
@@ -179,7 +179,7 @@ export const stepUntil = async (ready, arg = null, capFrames = 240) => {
  * 1129, which in the unsplit run only looked right because earlier sections had
  * warmed the same materials. Warm must HOLD for a few frames, because an object
  * drawn for the first time starts its pipeline a frame later. A set that never
- * settles is a red, not a shot taken anyway.
+ * settles is a red check; the shot is still taken, for the record.
  */
 export const awaitPlaceDrawn = async (label, capFrames = 900) => {
   let warmRun = 0

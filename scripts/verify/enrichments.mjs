@@ -972,7 +972,7 @@ if (section('canoe-depiction')) {
     )
 
     // --- Injured figure: a wound shows on the explorer, scaling with severity ----
-    // (§7.1.35, design.md §6). __player.wounds mirrors the toggled wound meshes.
+    // (§7.1.22, design.md §6). __player.wounds mirrors the toggled wound meshes.
     await page.evaluate(() => {
       const g = window.__game.getState()
       window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })

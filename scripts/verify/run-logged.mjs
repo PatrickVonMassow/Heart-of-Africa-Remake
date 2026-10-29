@@ -645,9 +645,9 @@ else {
         process.env.VERIFY_GL = rejudged.missing[0]
         console.log(`running only ${rejudged.missing[0]}: VERIFY_GL=${rejudged.missing[0]} ${forward.join(' ')}`)
       } else if (rejudged?.covered.length) {
-        // Both backends stand; a changed *.md is what the docs suite reads.
+        // Every requested backend stands; a changed *.md is what the docs suite reads.
         forward.splice(0, forward.length, 'docs')
-        console.log('both backends are covered; a *.md changed, so the docs suite runs fresh')
+        console.log('every requested backend is covered; a *.md changed, so the docs suite runs fresh')
       }
       await waitForLargeRun()
       if (own.logFile && isAbsolute(own.logFile)) runVerify()

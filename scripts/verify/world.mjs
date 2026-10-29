@@ -16,10 +16,10 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 mkdirSync(OUT, { recursive: true })
 
-// SECTIONS (points 566/595). Three blocks that share only the boot and the step
+// SECTIONS (points 566/595). Four blocks that share only the boot and the step
 // out into travel: the first frame after the scene switch (the point-489 blank
 // picture), the communication errand (its frames, digs and hand-over checks),
-// and the landmark frames.
+// the landmark frames and the follow camera.
 // Re-shooting one landmark used to replay the whole errand, dig included;
 // `--section=landmark-frames` is that repair loop. The names are read out of
 // THIS FILE by scripts/verify/sections.mjs, so an unknown one is refused with
