@@ -169,11 +169,9 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
 /** The figure's whole scene graph, built once per identity and look. */
 interface Rig {
   p: BodyProportions
-  layers: DressLayer[]
   meshes: THREE.SkinnedMesh[]
   bones: Record<BoneName, THREE.Bone>
   skeleton: THREE.Skeleton
-  head: THREE.Object3D
   /** The top of the drawn head, on the head bone: where a head load rests. */
   crown: THREE.Object3D
   hands: [THREE.Object3D, THREE.Object3D]
@@ -232,10 +230,6 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   const headAt = bones.head.getWorldPosition(new THREE.Vector3())
   crown.position.set(0, figureCrownOffset(p, geo, skeleton.bones.indexOf(bones.head), headAt), 0)
   bones.head.add(crown)
-  // The thighs turn against the pelvis's walking yaw before they swing, so the
-  // stride stays in the line of travel.
-  bones['thigh.L'].rotation.order = 'YXZ'
-  bones['thigh.R'].rotation.order = 'YXZ'
   const hand = (side: 'L' | 'R', name: string) => {
     const o = new THREE.Object3D()
     o.name = name
@@ -245,11 +239,9 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   }
   return {
     p,
-    layers,
     meshes,
     bones,
     skeleton,
-    head,
     crown,
     hands: [hand('L', 'hand-left'), hand('R', 'hand-right')],
     gltf: asset && person ? { asset, person } : null,
@@ -287,7 +279,8 @@ const _rf = new THREE.Vector3()
 
 type ArmAngles = { pitch: number; yaw: number; roll: number }
 
-/** What the figure measured of its own walk, and its transitions in progress. */
+/** The villager on the skinned body (code-built or glTF): the primitive
+ *  figure's props, posed through its virtual pivots (see the file header). */
 export function SkinnedFigure({
   look,
   cloth,
@@ -627,7 +620,7 @@ export function SkinnedFigure({
       chestYaw = gltf ? 0 : walk.chestYaw
       writeTrunk(0, hipYaw, chestYaw)
       b.hips.updateWorldMatrix(false, true)
-      // THE STEADYING HAND on a head load: the free arm on the load's side.
+      // THE STEADYING HAND on a head load: the first free arm, left before right.
       const loadShown = rig.crown.children.some((c) => c.visible)
       const steadyArm = headSteady && loadShown && m.kneel < 0.5 ? (!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1) : -1
       // THE ARMS THE CODE GESTURES WITH (and every arm's fallback): the pose's

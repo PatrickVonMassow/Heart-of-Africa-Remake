@@ -160,7 +160,6 @@ function PrimitiveFigure({
   const crown = useRef<THREE.Group>(null)
   const armMeshes = useRef<Array<THREE.Object3D | null>>([])
   const handEnds = useRef<Array<THREE.Object3D | null>>([])
-  const legGroup = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
   // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
@@ -382,7 +381,7 @@ function PrimitiveFigure({
             silhouettes already use, so a faster child steps faster and a stopped
             one stands still — never a wall-clock bob. */}
         {withLegs && (
-          <group ref={legGroup}>
+          <group>
             {[0, 1].map((i) => (
               <group
                 key={i}

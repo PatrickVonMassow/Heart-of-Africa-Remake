@@ -1,6 +1,6 @@
 // Grain pounding at the village mortar (design.md §19 "grain is pounded with
 // pestle and mortar"). Pure geometry and timing, so the stroke is pinned in the
-// fast test layer and the scene (`Pounder` in PlaceLife.tsx) only draws the
+// fast test layer and the scene (`Pounder`, Pounder.tsx) only draws the
 // numbers computed here.
 //
 // THE PICTURE IT HAS TO GIVE. The old vignette was a short brown cylinder with
