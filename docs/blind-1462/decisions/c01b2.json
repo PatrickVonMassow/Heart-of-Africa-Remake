@@ -1,0 +1,7 @@
+[
+ {"id":"U4","decision":"rewritten","reason":"Step 20 now cites the research document's own source table as its §4 instead of the concept's §5 (rejected items)."},
+ {"id":"U5","decision":"rewritten","reason":"The §8 overview now names the figure notes and the §8.1–§8.7 range that stay in this document."},
+ {"id":"U110","decision":"rewritten","reason":"Already fixed by 61e2474bb: design.md now starts the net lane about 1 m upstream, matching balance.ts laneStart -1."},
+ {"id":"U112","decision":"rewritten","reason":"CLAUDE.md §4 now says \"build rules\" instead of \"build order\", matching the retitled session-rules file without growing its budget."},
+ {"id":"U122","decision":"rewritten","reason":"The CLAUDE.md row now reports 1 word of headroom, matching the measured 1327 against the 1328-word ceiling."}
+]
