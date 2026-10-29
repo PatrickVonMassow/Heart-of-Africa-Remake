@@ -2008,6 +2008,21 @@ export const RED_CHARGES = [
   {
     point: 1270,
     suite: 'polish-speech',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^two close speakers are shot unobstructed, each tail on its own speaker.s anchor, the older note receded and neither targeted \(point \d+\)$/i,
+    why:
+      'MEASURED 02.10.2026 on feat/1129 001ef76f1, webgl/polish-speech (speech-owner): 16 close pairs '
+      + 'tried, sight clear but every tail off its anchor — first occurrence since point 1238 landed, the '
+      + 'section alone green on the same head; point 1270 owns the pair staging. The same signature on webgpu '
+      + 'in the whole-suite run 2026-10-29T03-48-21-257 (tails false), the section alone green on webgpu at 97ecef7d0 '
+      + '(point 1465), so the charge holds on both backends. The charge dies with point 1270.',
+  },
+  {
+    point: 1270,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /^two close speakers are shot unobstructed, each tail on its own speaker.s anchor, the older note receded and neither targeted \(point \d+\)$/i,
     why:
@@ -2060,8 +2075,11 @@ export const RED_CHARGES = [
   {
     point: 1395,
     suite: 'polish-speech',
+    backend: 'webgl',
     kind: 'check',
     match: /^the man and his word offer their keys at the same time \(point 1139\)$/i,
+    // Only the measured shape: the drummer's prompt stands while a villager's note is targeted.
+    detailMatch: /^\{"prompt":"Space — Ask the drummer","invite":"E — guess meaning","targeted":"villager-\d+","guessKeyArmed":true\}$/,
     why:
       'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
       + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
@@ -2073,6 +2091,39 @@ export const RED_CHARGES = [
   {
     point: 1395,
     suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the man and his word offer their keys at the same time \(point 1139\)$/i,
+    // Only the measured shape: the drummer's prompt stands while a villager's note is targeted.
+    detailMatch: /^\{"prompt":"Space — Ask the drummer","invite":"E — guess meaning","targeted":"villager-\d+","guessKeyArmed":true\}$/,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
+      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
+      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
+      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
+      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
+      + 'note is left to target. The charge dies with point 1395.',
+  },
+  {
+    point: 1395,
+    suite: 'polish-speech',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the drummer.s arm is raised in the pointing frame \(point 1272\)$/i,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
+      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
+      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
+      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
+      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
+      + 'note is left to target. The charge dies with point 1395.',
+  },
+  {
+    point: 1395,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /^the drummer.s arm is raised in the pointing frame \(point 1272\)$/i,
     why:
@@ -2091,7 +2142,7 @@ export const RED_CHARGES = [
     match: /^no two Ctrl labels fuse in the village crowd/i,
     // The sustained shape only (two or more fused frames); the single-frame shape stays 1010's.
     detailMatch:
-      /^(?:[2-9]|[1-9]\d+)\/\d+ frames held a pair fused beyond \d+ px \(allowed \d+\), \d+ of them at the \d+ px unreadable bar, deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — the unreadable overlap STANDS$/i,
+      /^(?:[2-9]|[1-9]\d+)\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), \d+ of them at the \d+ px unreadable bar, deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — the unreadable overlap STANDS$/i,
     why:
       'MEASURED 29.10.2026 by point 1465 on 56d0a9ae6, whole polish-speech on webgl (2026-10-29T06-29-04-941): '
       + '50/90 frames fused, 22 at the unreadable bar, Child×Child; --section=ctrl-actor-labels alone green on the '
