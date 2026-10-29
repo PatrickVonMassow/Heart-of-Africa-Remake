@@ -148,6 +148,13 @@ export interface HeadNode {
   geometry?: { parameters?: { radius?: number } }
 }
 
+/** The radius a geometry-less head anchor stands for: the skinned figure
+ *  scales its `figure-head` anchor so this much above it is the crown. */
+export const ANCHOR_HEAD_RADIUS = 0.16
+
+/** The head sphere's radius: its geometry's, else the anchor convention. */
+const headRadius = (head: HeadNode) => head.geometry?.parameters?.radius ?? ANCHOR_HEAD_RADIUS
+
 /**
  * Where the TOP of the drawn head under `root` stands relative to root's own
  * origin, as a world-space offset [dx, dy, dz] — null when no visible head is
@@ -159,17 +166,11 @@ export interface HeadNode {
  *
  * A sphere of radius r under the linear map L reaches r·|row y of L| above its
  * centre (the top of the ellipsoid it becomes) — squash, lean and the head's
- * own counter-rotation included. That top point lies at centre + r·rowY/|rowY|
- * in world space, so its x/z follow the tilt too. Matrices are read as they
- * stand: the caller refreshes them (`updateWorldMatrix`) when the scene moved.
+ * own counter-rotation included. That top point lies at centre + r·L·u with
+ * u = rowY/|rowY| in world space, so its x/z follow the tilt too. Matrices are
+ * read as they stand: the caller refreshes them (`updateWorldMatrix`) when the
+ * scene moved.
  */
-/** The radius a geometry-less head anchor stands for: the skinned figure
- *  scales its `figure-head` anchor so this much above it is the crown. */
-export const ANCHOR_HEAD_RADIUS = 0.16
-
-/** The head sphere's radius: its geometry's, else the anchor convention. */
-const headRadius = (head: HeadNode) => head.geometry?.parameters?.radius ?? ANCHOR_HEAD_RADIUS
-
 export function drawnHeadTop(root: HeadNode | null | undefined): [number, number, number] | null {
   const base = root?.matrixWorld?.elements
   if (!root || base === undefined) return null

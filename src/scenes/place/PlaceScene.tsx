@@ -1166,9 +1166,9 @@ function PlaceFlora({
  * ~1890 sub-Saharan settlements kept the cooking hearth alight through the rains
  * under a roofed cook-shelter / thatch canopy on posts (docs/peoples-1890.md
  * §10), so the fire's burning in rain reads plausibly: under the canopy it burns
- * on (a touch lower/steamier as rain rises), gated by `fireRainFactor`. `blaze`
- * is the cold-season warming factor (point 142); `rainRef` reads the place's
- * live wetness so the flame dims with the rain each frame.
+ * on (a touch lower/steamier as rain rises), gated by `shelteredFireRainFactor`.
+ * `blaze` is the cold-season warming factor (point 142); `rainRef` reads the
+ * place's live wetness so the flame dims with the rain each frame.
  */
 function FirePit({
   x,
@@ -1210,7 +1210,7 @@ function FirePit({
     const t = clock.elapsedTime
     // Under the cook-shelter the fire burns on through the rain — only a touch
     // lower/steamier; an unsheltered fire (the dome-dweller villages) is beaten
-    // down by rain (point 256, the two branches of fireRainFactor).
+    // down by rain (point 256, the two branches of shelteredFireRainFactor).
     const rain = rainAmount(rainRef.current, balance.season.weatherStrength)
     const rainFactor = shelteredFireRainFactor(rain, sheltered)
     if (light.current) {
@@ -2202,7 +2202,8 @@ function PlaceRiver({
   })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): where the water
-  // is, which way it runs, and where its foam stands right now.
+  // is, which way it runs, where its flotsam (foam, leaves, grass, twigs)
+  // floats right now, and the drift phase that carries it.
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
@@ -2391,7 +2392,7 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
     anchors.forEach((a, i) => {
       const g = refs.current[i]
       if (!g) return
-      // Each stands and looks slowly around; a person steps with the turn.
+      // Each stands on the spot and looks slowly around.
       g.rotation.y = phases[i] + Math.sin(t * 0.3 + phases[i]) * 0.5
       g.position.y = groundHeight(a.x, a.z)
     })

@@ -230,7 +230,7 @@ function WovenBasket({ name, fishRef, fishGeometry, fishMaterial }: {
   )
 }
 
-/** Where fish `i` of `n` lies in a basket's heap (local), and its yaw. */
+/** Where fish `i` lies in a basket's heap (local), and its yaw and roll. */
 function basketFishSpot(i: number): { x: number; y: number; z: number; yaw: number; roll: number } {
   const a = i * 2.4
   const r = 0.07 + 0.05 * (i % 3)
@@ -246,10 +246,6 @@ function fishLength(i: number): number {
 
 // --- The dugout ----------------------------------------------------------------
 
-/**
- * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the
- * boat and the fire, because the two baskets pass between them every round.
- */
 /** What the fishers' fire needs of its settlement (point 1275): the thatch
  *  its cook-shelter is roofed with, the place's live wetness and its people. */
 export interface FisheryFireEnv {
@@ -261,6 +257,10 @@ export interface FisheryFireEnv {
 /** The fishers' fire's light at full flame, before the rain damps it. */
 const FISH_FIRE_LIGHT = 6
 
+/**
+ * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the
+ * boat and the fire, because the two baskets pass between them every round.
+ */
 export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverBank; cloth: readonly string[]; seed: number; fireEnv?: FisheryFireEnv }) {
   const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
@@ -931,7 +931,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
             grill, its forked posts and the kneeling griller stand beneath it. */}
         {sheltered && fireEnv && <CookShelter thatchMat={fireEnv.thatchMat} postR={fireCfg.shelterPostR} />}
       </group>
-      {/* THE SMOKING RACK: four posts, two rails and slats, the fish across them. */}
+      {/* THE SMOKING RACK: four posts and two rails, the fish hung from them. */}
       {/* Turned so its rails run along the bank: seen from the village, the fish
           hang side by side. */}
       <group name="fish-rack" position={[sites.rack.x, rackY, sites.rack.z]} rotation={[0, along + Math.PI / 2, 0]}>

@@ -1603,6 +1603,9 @@ function Kids({
   )
 }
 
+/** Walking pace of a DEV-steered goat (m/s), a calm grazing walk. */
+const GOAT_STEER_SPEED = 0.8
+
 /** Goats drifting around, grazing — inside the pen when one exists. Each goat
  *  walks with a real gait (design.md §19, points 228/300): its legs swing about
  *  their hips on a phase driven by the DISTANCE it covers, at the cadence its own
@@ -1612,9 +1615,6 @@ function Kids({
  *  velocity at a bounded rate (fast, but never a snap). The body rides the
  *  sampled settlement ground height but takes no slope pitch — the panorama
  *  silhouettes, which walk real relief, carry that half. */
-/** Walking pace of a DEV-steered goat (m/s), a calm grazing walk. */
-const GOAT_STEER_SPEED = 0.8
-
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
   const groundHeight = usePlaceGround()
   // Built at the detail level's body tessellation; a level change rebuilds it.
@@ -2976,13 +2976,12 @@ function ErrandVillagers({
   )
 
   // Per-villager scene state: where it is strolling on its own, how long it has
-  // been standing, how far it has walked (the bob), how long it has dug, and the
-  // waypoints it is following round the building fabric.
+  // been standing, how long it has dug, and the waypoints it is following round
+  // the building fabric.
   const idle = useRef<
     Array<{
       target: ErrandPoint | null
       pause: number
-      walked: number
       dug: number
       /** Seconds the dig pose is still held after the rim test last passed
        *  (a shove across the rim's edge must not flicker the stroke). */
@@ -3002,7 +3001,6 @@ function ErrandVillagers({
         idle.current[i] ?? {
           target: null,
           pause: 1 + i * 0.7,
-          walked: 0,
           dug: 0,
           digHold: 0,
           digK: 0,
@@ -3268,7 +3266,6 @@ function ErrandVillagers({
           const moved = Math.hypot(nx - me.x, nz - me.z)
           me.x = nx
           me.z = nz
-          state.walked += moved
           // Use the same escape ladder as the household walkers. A body turning
           // nearly on the spot is not stuck.
           if (moved < step * 0.25 && turn.pace >= 0.3) {
@@ -3381,8 +3378,8 @@ function ErrandVillagers({
       }
       if (taking !== null && spareAt) faceTo.current[i] = Math.atan2(spareAt.x - me.x, spareAt.z - me.z)
 
-      // The pose: a fill wins over everything, then digging, then the gesture,
-      // then the load on the head, then rest.
+      // The pose: a take from the stand wins over everything, then a fill, then
+      // digging, then the gesture, then the load on the head, then rest.
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
