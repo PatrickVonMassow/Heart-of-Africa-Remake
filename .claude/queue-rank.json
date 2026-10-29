@@ -1758,6 +1758,12 @@
       "why": "low criticality, WebGL-2 whole-suite-only red, charged; no release blocker, so it waits behind the ranked work",
       "origin": "machine",
       "place": "last"
+    },
+    "1467": {
+      "at": "2026-10-29T19:06:31.715Z",
+      "why": "test-infra defect, no player impact; Testinfrastruktur bundle order is fine",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1787,7 +1793,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-29T07:41:42.241Z",
+    "at": "2026-10-29T19:06:31.727Z",
     "points": [
       184,
       200,
@@ -2256,7 +2262,8 @@
       1461,
       1462,
       1463,
-      1466
+      1466,
+      1467
     ]
   }
 }
