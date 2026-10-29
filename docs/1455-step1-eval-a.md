@@ -65,7 +65,7 @@ calibratable and must be read off a real cycle.
 - **C1 Admission by pairing, not globally.** Pair two suites or sections only if both have a
   measured solo memory profile and either:
   - the coincident-peak sum (idle + Δa + Δb) is ≤ 85 %, or
-  - T1 measured the pair peak ≤ 80 % over ≥ 5 pairs.
+  - the sampled pair peak (T6) stayed ≤ 80 % over ≥ 5 pairs.
 
   heavy+heavy (two villager-dress-class runs) stays forbidden until T1 shows otherwise.
 - **C2 Separate checkouts.** Each pair member runs in its own checkout, so `verification/`,
@@ -132,7 +132,7 @@ Common to all blocks:
     - 0 overlap-attributed reds (C9 attribution) in ≥ 30 known-green member runs.
       That bounds the added red rate below 9.5 % at 95 %.
     - At most 1 attributed red is allowed only if 15 more pairs then show 0 (≥ 60 runs,
-      bound ≈ 5 %).
+      bound ≈ 7.7 % for one red in 60).
     - 2 or more attributed reds: FAIL.
   - Statistical note: with a base red rate of ~4 % (1/26), plain "0 reds" over 30 runs would
     fail by chance ~70 % of the time. That is why each red is attributed through a quiet
