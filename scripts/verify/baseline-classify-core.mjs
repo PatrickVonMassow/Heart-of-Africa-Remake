@@ -474,7 +474,7 @@ export function formatBaselineReport({
 // THE ENVIRONMENT A SPAWNED SUITE SEES, as far as the LANE is concerned.
 //
 // A suite may stand a block down because the PRE-change app cannot pose it (the
-// excavation picture in polish.mjs, which needs a durable dig record the
+// excavation picture in polish-villagers.mjs, which needs a durable dig record the
 // baseline build does not have). That exemption belongs to the baseline tree
 // and nowhere else: on the candidate the same missing capability IS the
 // regression, and a silent SKIP would report it green.
