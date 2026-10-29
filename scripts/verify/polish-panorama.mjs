@@ -1427,7 +1427,7 @@ if (section('animal-models')) {
   // Two walkers can share a bearing in one settlement for the whole run, so the
   // aim tries the region's settlements in turn (east first: the zebra and the
   // antelope both walk there) and takes the first where the named one stands
-  // clear — else the clearest seen.
+  // clear; a species with no clear stand gets no shot.
   // Clear standpoints for `sp` here, best first: on the settlement edge
   // looking OUT, scored by how far in bearing the nearest silhouette of another
   // species stands from the named one (walkers sharing an azimuth from the

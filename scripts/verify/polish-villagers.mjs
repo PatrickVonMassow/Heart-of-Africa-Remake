@@ -225,16 +225,18 @@ if (section('villager-gestures')) {
 
 // THE FISHERMEN BESIDE THE CHILDREN'S BANK GAME (work-order 1237, rebuilt by
 // 1245). Two men work a drift net from their dugout; the net man's words go to
-// the paddler, the catch goes in a woven basket to their own fire. Three
+// the paddler, the catch goes in a woven basket to their own fire. Five
 // standing places, each judged by the rendered projection:
-//  - the boat's, s = +36 m on the waterline looking out toward the landing:
+//  - the lane's upstream end, for the DOWNSTREAM word;
+//  - the boat's, s = +49 m, 2.4 m off the waterline looking out toward the landing:
 //    the haul and then the UPSTREAM word over the net man's head are in frame,
 //    no child and no play rock is;
 //  - behind the UPSTREAM play rock, looking downstream along the moved stretch:
 //    the children's game is in frame, and the boat's words cannot be heard
 //    there (the stand lies beyond the CALL reach of every place they fall);
 //  - inland of the fishers' fire: the carrier, the griller and the smoking rack
-//    with its fish are in frame.
+//    with its fish are in frame;
+//  - the pounding pair by the fishers' fire.
 // Spectator-time knobs only, put back afterwards: the roam is shortened as the
 // children-bank-game section does, the reading is held long enough for a
 // headless shutter, and ROCK is marked heard — the direction words follow the
@@ -341,10 +343,8 @@ if (section('villager-canoe')) {
       const boat = await page.evaluate(() => {
         const c = window.__placeCanoe()
         const L = c.lane
-        // A few paces upstream of where the haul happens (s = +47, 7 m out):
-        // close enough that the float line and the fish read at their size.
-        // The net is set on the hull's shore side and trails upstream behind
-        // it, so the stand is upstream too, looking out between the two.
+        // Near where the haul happens (s = +47, 7 m out): close enough that
+        // the float line and the fish read at their size.
         // Waded out ankle-to-knee deep, about 5 m from the hull's shore side and
         // a little DOWNSTREAM of it: the float line trails upstream, so the
         // floats still out lie beyond the hull rather than under the lens.
@@ -6177,7 +6177,7 @@ if (section('figure-micro')) {
   }
 
   // THE WALK-CYCLE PAIR: one walker, frozen at two phases of its stride with
-  // the camera at the same offset from it, so the weave can be compared on the
+  // the camera on the same flank of it, so the weave can be compared on the
   // limb from frame to frame.
   await goToPlace('hausa-village')
   // Every walker out on the walk, on the glTF body.
@@ -6207,7 +6207,7 @@ if (section('figure-micro')) {
   check('figure micro-structure: a villager is out walking on the glTF body', who !== null, 'no skinned walker out in 600 frames')
   if (who !== null) {
     // The camera at the walker's flank, `dist` off, looking at it; returns the
-    // thigh swing and whether the hips and head project into the picture.
+    // stand it set.
     const flankView = (i, flank, dist) =>
       page.evaluate(
         ({ i, flank, dist }) => {
@@ -6218,7 +6218,7 @@ if (section('figure-micro')) {
           p.z = g.position.z + Math.cos(side) * dist
           p.yaw = side
           p.pitch = -0.3
-          return { x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }
+          return { x: p.x, z: p.z }
         },
         { i, flank, dist },
       )
@@ -6255,7 +6255,6 @@ if (section('figure-micro')) {
         }
         return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView: why === null, why, at: { x: g.position.x, z: g.position.z } }
       }, i)
-    // Stand at a flank that holds the legs in the picture and is not pushed off.
     // The walker's screen box (CSS px) from its projected joints, padded.
     const walkerBox = (i) =>
       page.evaluate((i) => {
@@ -6280,6 +6279,7 @@ if (section('figure-micro')) {
       }, i)
     const pair = []
     const misses = []
+    // Stand at a flank that holds the legs in the picture and is not pushed off.
     const standAt = async (flanks = [1, -1]) => {
       for (const flank of flanks) {
         for (const dist of [1.6, 1.9, 1.3, 2.3, 2.8]) {

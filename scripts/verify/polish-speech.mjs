@@ -954,8 +954,8 @@ if (section('speech-distance-scale')) {
       },
       { near: pair.near, far: pair.far, back: pair.back, side: pair.side },
     )
-  // Both heads in plain sight: the first surface along each sight line is the
-  // figure itself (the speech-owner instrument), and no roof over the camera.
+  // Both heads in plain sight: the first surface along each sight line lies at
+  // the figure's distance (ratio 0.85–1.15), and no roof over the camera.
   const seen = (pair) =>
     page.evaluate(
       ({ near, far }) => {

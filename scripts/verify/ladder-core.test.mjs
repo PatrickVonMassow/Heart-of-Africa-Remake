@@ -347,7 +347,7 @@ describe('a narrow run answers only for the material it RAN', () => {
   })
 
   it('still credits any narrow green where the link cannot be read', () => {
-    // `src/scenes/place/` reaches three suites and no section in particular, so
+    // `src/scenes/place/` reaches seven suites and no section in particular, so
     // the ladder keeps its approximation — and puts it on the record by naming
     // the section it credited, instead of hiding it inside the verdict.
     const verdict = ladderVerdict({
@@ -396,7 +396,7 @@ describe('the deliberate escape', () => {
 describe('when a file was really last edited', () => {
   it('dates a CLEAN file by the commit it carries, not by its mtime', () => {
     // Measured the first time the ladder was used in anger: switching to `main`
-    // and back rewrote polish-villagers.mjs, moved its mtime past every green rung, and
+    // and back rewrote the polish suite file, moved its mtime past every green rung, and
     // refused the covering run of the point that built the ladder — without one
     // byte of the file changing. An mtime is not an edit.
     expect(editTimeFor({ dirty: false, mtime: T0 + HOUR, committedAt: T0 })).toBe(T0)
