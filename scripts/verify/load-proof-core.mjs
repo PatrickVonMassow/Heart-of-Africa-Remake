@@ -59,18 +59,26 @@ export function laneSkips(out) {
   return [...byName].map(([name, reason]) => ({ name, reason }))
 }
 
-/** Page function: count the frames the page delivers over `ms` of wall time, in ONE
- *  evaluation. Returns frames per second. Serialised into the page, so it is
- *  self-contained. */
-export function laneFpsProbe(ms = 2000) {
+/** Page function: the page's delivered frame rate, in ONE evaluation, as 1000 over
+ *  the MEDIAN frame interval. Samples at least `ms` of wall time and 10 intervals
+ *  (capped at `maxMs`), so one multi-second hitch does not stand for the lane:
+ *  measured 30.10.2026, frames/window read 0.37 fps where 3 s later the same lane
+ *  delivered 17.2. A genuinely slow lane still reads slow. Serialised into the
+ *  page, so it is self-contained. */
+export function laneFpsProbe(ms = 2000, maxMs = 10000) {
   return new Promise((resolve) => {
-    let frames = 0
+    const deltas = []
     let t0 = null
+    let last = null
     const tick = (t) => {
       if (t0 === null) t0 = t
-      else frames++
-      if (t - t0 < ms) requestAnimationFrame(tick)
-      else resolve((frames * 1000) / Math.max(1, t - t0))
+      else deltas.push(t - last)
+      last = t
+      const elapsed = t - t0
+      if ((elapsed < ms || deltas.length < 10) && elapsed < maxMs) return requestAnimationFrame(tick)
+      if (deltas.length === 0) return resolve(1000 / Math.max(1, elapsed))
+      const sorted = deltas.slice().sort((a, b) => a - b)
+      resolve(1000 / Math.max(1e-3, sorted[Math.floor(sorted.length / 2)]))
     }
     requestAnimationFrame(tick)
   })

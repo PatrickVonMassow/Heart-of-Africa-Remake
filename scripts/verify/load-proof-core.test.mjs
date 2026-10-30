@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { laneSkipVerdict, findSplitComparisons, laneSkips } from './load-proof-core.mjs'
+import { laneSkipVerdict, findSplitComparisons, laneSkips, laneFpsProbe } from './load-proof-core.mjs'
 import { REPO_ROOT } from '../repo-paths.mjs'
 
 describe('laneSkipVerdict — a timing check declares the throughput it needs', () => {
@@ -114,5 +114,26 @@ describe('the verify sources carry no two-round-trip comparison (point 642 gate)
       const hits = findSplitComparisons(readFileSync(join(dir, l.file), 'utf8'), l.file)
       expect(hits.some((x) => x.first === l.first && x.second === l.second), `${l.file} ${l.first}/${l.second}`).toBe(true)
     }
+  })
+})
+
+describe('laneFpsProbe — one hitch does not stand for the lane', () => {
+  // Drives the probe with a scripted frame clock instead of a browser.
+  const runWith = async (intervals) => {
+    let t = 0
+    let i = 0
+    globalThis.requestAnimationFrame = (cb) => {
+      const at = t
+      t += intervals[Math.min(i++, intervals.length - 1)]
+      queueMicrotask(() => cb(at))
+    }
+    try { return await laneFpsProbe(2000) } finally { delete globalThis.requestAnimationFrame }
+  }
+  it('reads the steady rate behind a 2.7 s hitch (measured 30.10.2026: 0.37 vs 17.2 fps)', async () => {
+    const fps = await runWith([2700, ...Array(40).fill(58)])
+    expect(fps).toBeGreaterThan(15)
+  })
+  it('still reads a genuinely slow lane as slow', async () => {
+    expect(await runWith([2000])).toBeLessThan(1)
   })
 })
