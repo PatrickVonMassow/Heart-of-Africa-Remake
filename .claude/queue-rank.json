@@ -1800,12 +1800,6 @@
       "why": "amendment to 1463; it rides with 1463 and needs no earlier slot",
       "origin": "machine",
       "place": "last"
-    },
-    "1475": {
-      "at": "2026-10-30T18:44:33.132Z",
-      "why": "already recorded ahead of the release by user origin; the file position behind 1474 is fine, it must land before 05.11.2026",
-      "origin": "machine",
-      "place": "last"
     }
   },
   "boundary": {
@@ -1835,7 +1829,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-30T18:44:33.141Z",
+    "at": "2026-10-30T20:55:09.581Z",
     "points": [
       184,
       200,
@@ -2311,8 +2305,7 @@
       1471,
       1472,
       1473,
-      1474,
-      1475
+      1474
     ]
   }
 }
