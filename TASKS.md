@@ -16086,3 +16086,12 @@ to land than a mechanism that needs a review.
   Tests: Vitest for the errand scheduler; the existing Playwright step.
   Bundle: Dorfleben.
   Criticality: medium - a villager stuck on an errand is player-visible.
+
+- [ ] 1474. Backlog-Befunde zur Infrastruktur in die Analyse und das Obsolet-Urteil von 1463 einbeziehen
+  Amendment to point 1463 (zero-based infrastructure simplification) — user remark 29.10.2026: "Schaut sich 1463 auch die ganzen Befunde an, die von Problemen angelegt wurden? Ich denke, die sollten berücksichtigt werden. Viele Probleme mit der aktuellen Infrastruktur sind ja wegen des Infra-Freezes nur dort festgehalten."
+  Measured 29.10.2026: 1463's raw material names "docs" only generically and its verdict list covers only open TASKS.md points. Under the infrastructure freeze (CLAUDE.md §2) many infrastructure findings were filed only in docs/backlog.md (109 sections; about 22 by title alone are about guards, hooks, lanes, batch, board, launcher, daemon, doctor, review, push or gate). Findings carried through the findings carrier landed in TASKS.md and are already covered.
+  Change to 1463:
+  1. Raw material for analyses A and B names docs/backlog.md explicitly, plus the closed entries of the findings carrier (memory/findings-carrier.md) as a record of incidents.
+  2. Analysis question 2 (inventory: the incident each mechanism was built for, its cost, its collisions) and question 3 (cause count) also count the backlog findings, not only work-order points.
+  3. Result (question 4) also gives, for every infrastructure entry in docs/backlog.md, a verdict "obsolete: yes/no" with reason; obsolete entries are closed in docs/backlog.md with the reason "obsolete by infrastructure simplification"; a non-obsolete entry that shows a real defect of the remaining infrastructure is named in the plan so the user can decide on it.
+  No new mechanism.
