@@ -652,6 +652,12 @@ if (section('village')) {
     // and the check still read "nothing moved". Cumulative displacement asks what
     // the check means to ask — did anyone get anywhere.
     const start = w.states.map((s) => ({ x: s.x, z: s.z }))
+    // The lane rate is counted INSIDE the observation (point 642): a probe run
+    // afterwards could read a slowdown or a recovery the window never saw.
+    let frames = 0
+    let counting = true
+    const count = () => { frames++; if (counting) requestAnimationFrame(count) }
+    requestAnimationFrame(count)
     const t0 = Date.now()
     // Watch for the window + a generous margin so a would-be pin has time to pass it.
     while (Date.now() - t0 < (win + 5) * 1000) {
@@ -662,17 +668,18 @@ if (section('village')) {
       }
       await sleep(150)
     }
-    return { ok: true, maxPinned, anyMoved, win, n: w.states.length }
+    counting = false
+    const fps = (1000 * frames) / (Date.now() - t0)
+    return { ok: true, maxPinned, anyMoved, win, n: w.states.length, fps }
   })
   // A TIMING check (point 642): a WALL window over walkers paced by rendered
   // frames. It declares the rate it needs; below it the lane cannot answer
   // (the `ok:true` beside `anyMoved:false` signature) and the check is
   // UNMEASURED. OPEN: 10 fps is an estimate, calibrate against the lane header.
   const UNSTUCK_NEED_FPS = 10
-  // Re-measured here, in the steady state: the boot-time reading included a
-  // multi-second build hitch and read 0.2 fps on a hardware lane.
-  const pinFps = await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
-  const pinLane = laneSkipVerdict({ needFps: UNSTUCK_NEED_FPS, measuredFps: pinFps })
+  // Measured during the observation itself (frames over its window), not at
+  // boot nor by a later probe.
+  const pinLane = laneSkipVerdict({ needFps: UNSTUCK_NEED_FPS, measuredFps: pinResult.fps ?? laneFps })
   if (pinLane.skip) {
     console.log(unmeasuredLine('Village: no inhabitant stays pinned past the unstuck window (point 155)', pinLane.reason))
     unmeasuredCount++
