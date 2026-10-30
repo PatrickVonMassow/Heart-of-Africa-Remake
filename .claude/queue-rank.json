@@ -1802,14 +1802,40 @@
       "place": "last"
     },
     "1475": {
-      "at": "2026-10-30T18:32:16.206Z",
-      "why": "user order 29.10.2026; must land before the 05.11.2026 credit expiry",
-      "origin": "user",
-      "place": "ahead"
+      "at": "2026-10-30T18:44:33.132Z",
+      "why": "already recorded ahead of the release by user origin; the file position behind 1474 is fine, it must land before 05.11.2026",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-10-30T17:03:29.316Z",
+    "at": "2026-10-30T18:44:33.141Z",
     "points": [
       184,
       200,
@@ -2285,33 +2311,8 @@
       1471,
       1472,
       1473,
-      1474
+      1474,
+      1475
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
