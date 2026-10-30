@@ -1,13 +1,57 @@
 {
-  "commit": "8e0b368610916ab25f77c235fa4189aac5c4515b",
+  "commit": "ade3d93c23129ca8088b0d99fcb801572d87f299",
   "steps": {
     "large-regression": {
-      "evidence": "LARGE both backends on 8e0b36861, both complete, NOT all green: every red is charged to an open point, no uncharged red. WebGL 2: local/verify-logs/2026-10-29T08-48-49-743-large.log (10 suites red, charged 568 603 642 1009 1050 1217 1236 1265 1266 1270 1344 1381 1395 1435). WebGPU: local/verify-logs/2026-10-29T11-43-28-797-large.log (9 suites red, charged 514 568 642 733 1009 1012 1217 1236 1265 1266 1344 1382 1395 1435). Both marked UNDER LOAD (machine quiet unreadable).",
-      "at": "2026-10-29T14:30:26.876Z"
+      "evidence": "First LARGE both backends on 8e0b36861 (user amendment 29.10.2026: counts for large-regression): WebGL 2 local/verify-logs/2026-10-29T08-48-49-743-large.log, WebGPU local/verify-logs/2026-10-29T11-43-28-797-large.log; every red charged to an open point, none uncharged",
+      "at": "2026-10-30T11:09:07.329Z"
     },
     "lint-audit": {
-      "evidence": "npm run lint (oxlint) exit 0 and node scripts/audit-check.mjs OK (4 known-accepted, recorded; tinypool/vitest dev-only, point 1079) on 8e0b36861, measured 29.10.2026 15:35 by session a515298c; the release commit changes no lockfile",
-      "at": "2026-10-29T14:35:04.741Z"
+      "evidence": "npm run lint (oxlint) exit 0 and audit-check OK (4 known-accepted, recorded; dev-only, point 1079) measured on ade3d93c2 by the pre-push gate 30.10.2026 12:00-12:08 (local/closing-1462-push-4.log), unit 18369 passed; no lockfile change since v0.3",
+      "at": "2026-10-30T11:09:07.364Z"
+    },
+    "dead-code": {
+      "evidence": "dead-code category of the blind-parallel union docs/blind-1462/U.json (315 entries, merged by Fable 5.1 from halves A main chain / B cross lane on identical QUESTION.md + parts-manifest.json, diff 647540855..54b326987); decisions docs/blind-1462/decisions c01a-c03 applied via merges b395ce034, 01c316fe8, bcf9224ed",
+      "at": "2026-10-30T11:12:21.521Z"
+    },
+    "stale-doc": {
+      "evidence": "stale-doc category of the blind-parallel union docs/blind-1462/U.json (315 entries, merged by Fable 5.1 from halves A main chain / B cross lane on identical QUESTION.md + parts-manifest.json, diff 647540855..54b326987); decisions docs/blind-1462/decisions c01a-c03 applied via merges b395ce034, 01c316fe8, bcf9224ed",
+      "at": "2026-10-30T11:12:21.564Z"
+    },
+    "stale-comment": {
+      "evidence": "stale-comment category of the blind-parallel union docs/blind-1462/U.json (315 entries, merged by Fable 5.1 from halves A main chain / B cross lane on identical QUESTION.md + parts-manifest.json, diff 647540855..54b326987); decisions docs/blind-1462/decisions c01a-c03 applied via merges b395ce034, 01c316fe8, bcf9224ed",
+      "at": "2026-10-30T11:12:21.600Z"
+    },
+    "md-audit": {
+      "evidence": "md-audit category of the blind-parallel union docs/blind-1462/U.json (315 entries, merged by Fable 5.1 from halves A main chain / B cross lane on identical QUESTION.md + parts-manifest.json, diff 647540855..54b326987); decisions docs/blind-1462/decisions c01a-c03 applied via merges b395ce034, 01c316fe8, bcf9224ed",
+      "at": "2026-10-30T11:12:21.639Z"
+    },
+    "cleanup-blind-parallel": {
+      "evidence": "blind-parallel union docs/blind-1462/U.json (315 entries, merged by Fable 5.1 from halves A main chain / B cross lane on identical QUESTION.md + parts-manifest.json, diff 647540855..54b326987); decisions docs/blind-1462/decisions c01a-c03 applied via merges b395ce034, 01c316fe8, bcf9224ed; neither half saw the other before finishing (A via cloud sessions on closing/1462-blind-a, B via local cross-lane loop local/blind-1462-b)",
+      "at": "2026-10-30T11:12:21.678Z"
+    },
+    "impl-sections": {
+      "evidence": "peoples-1890 §8 brought current in d6fe67e7c (chief's robe, load set-down, shared body); climate-1890 §9 checked current; no src change since",
+      "at": "2026-10-30T11:12:21.721Z"
+    },
+    "graphics-detail-doc": {
+      "evidence": "src/config/qualityDoc.test.ts 3/3 passed against QUALITY_PRESETS, measured 30.10.2026 12:12",
+      "at": "2026-10-30T11:12:21.761Z"
+    },
+    "acceptance-criteria": {
+      "evidence": "docs/acceptance-evidence.md carries all 32 §7.1 criterion sections with evidence; open criteria are charged to open points",
+      "at": "2026-10-30T11:12:21.797Z"
+    },
+    "open-items": {
+      "evidence": "9 // OPEN markers in src (grep), listed in the closing report",
+      "at": "2026-10-30T11:12:21.840Z"
+    },
+    "simplifications": {
+      "evidence": "249 calibratable placeholder values in src/config/balance.ts; simplifications named in README",
+      "at": "2026-10-30T11:12:21.875Z"
+    },
+    "regression-after-cleanup": {
+      "evidence": "Second LARGE both backends on ade3d93c2 (after the last cleanup merges b395ce034, 01c316fe8, bcf9224ed): WebGL 2 local/verify-logs/2026-10-30T11-12-31-926-large.log (10 suites red, all charged: 568 603 642 1009 1050 1217 1236 1265 1266 1270 1344 1395 1435), WebGPU pinned local/verify-logs/2026-10-30T14-05-14-190-large.log (10 suites red, all charged: 514 568 642 733 1009 1012 1217 1236 1265 1266 1344 1385 1395 1435 1469); no uncharged red; both marked UNDER LOAD (machine quiet unreadable)",
+      "at": "2026-10-30T16:43:44.339Z"
     }
   }
 }

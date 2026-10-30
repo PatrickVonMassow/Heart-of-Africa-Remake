@@ -1788,6 +1788,18 @@
       "why": "test-only acquisition red charged in the 1462 closing run; last in order is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1472": {
+      "at": "2026-10-30T12:52:24.227Z",
+      "why": "closing-LARGE red charged after the v0.3.1 cut; post-release work, no point ahead of it depends on it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1473": {
+      "at": "2026-10-30T12:52:24.361Z",
+      "why": "closing-LARGE red, already placed in the Dorfleben bundle column; post-release, nothing ahead depends on it",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1817,7 +1829,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-30T06:21:48.482Z",
+    "at": "2026-10-30T12:52:24.371Z",
     "points": [
       184,
       200,
@@ -2291,7 +2303,9 @@
       1468,
       1469,
       1470,
-      1471
+      1471,
+      1472,
+      1473
     ]
   }
 }
