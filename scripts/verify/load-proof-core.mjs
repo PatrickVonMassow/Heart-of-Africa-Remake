@@ -34,6 +34,13 @@ export function laneSkipVerdict({ needFps, measuredFps }) {
   }
 }
 
+/** Did a wait end on its wall budget? Only Playwright's TimeoutError is a lane
+ *  that could not deliver (reported UNMEASURED); a predicate that threw or a value
+ *  that would not serialise is a broken assertion and must stay loud. */
+export function isWallCap(err) {
+  return err?.name === 'TimeoutError'
+}
+
 /** The run-header line naming the lane every timing verdict was taken on. */
 export function laneHeader(measuredFps) {
   const rate = typeof measuredFps === 'number' && Number.isFinite(measuredFps) ? measuredFps.toFixed(1) : 'unmeasured'

@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { laneSkipVerdict, findSplitComparisons, laneSkips, laneFpsProbe } from './load-proof-core.mjs'
+import { laneSkipVerdict, findSplitComparisons, laneSkips, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
 import { REPO_ROOT } from '../repo-paths.mjs'
 
 describe('laneSkipVerdict — a timing check declares the throughput it needs', () => {
@@ -175,5 +175,18 @@ describe('laneFpsProbe — one hitch does not stand for the lane', () => {
       expect(fps).toBe(0)
       expect(laneSkipVerdict({ needFps: 10, measuredFps: fps }).skip).toBe(true)
     } finally { delete globalThis.requestAnimationFrame }
+  })
+})
+
+describe('isWallCap — only a timeout is a lane that could not deliver', () => {
+  it('classifies a Playwright timeout as wall-capped', () => {
+    const e = new Error('page.waitForFunction: Timeout 30000ms exceeded.')
+    e.name = 'TimeoutError'
+    expect(isWallCap(e)).toBe(true)
+  })
+  it('keeps a throwing predicate and a serialisation error loud', () => {
+    expect(isWallCap(new TypeError("Cannot read properties of undefined (reading 'getState')"))).toBe(false)
+    expect(isWallCap(new Error('page.waitForFunction: ReferenceError: __moment is not defined'))).toBe(false)
+    expect(isWallCap(undefined)).toBe(false)
   })
 })

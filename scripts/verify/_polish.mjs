@@ -11,7 +11,7 @@ import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { sectionGate } from './sections.mjs'
-import { laneSkipVerdict, laneFpsProbe } from './load-proof-core.mjs'
+import { laneSkipVerdict, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
 import { fileURLToPath } from 'node:url'
 
 // The seed is applied by the launcher (verify-seed.mjs), so this is the plain URL.
@@ -197,7 +197,8 @@ export const stepUntil = async (ready, arg = null, capFrames = 240) => {
  *  rendered frame; the budget is `frames` rendered frames AND at least `minMs`,
  *  so a fast lane waits no less than a wall budget did and a slow lane gets the
  *  same number of chances. `wallCapped` says the hang guard ended the wait first:
- *  the lane could not deliver the budget, and the caller reports UNMEASURED. */
+ *  the lane could not deliver the budget, and the caller reports UNMEASURED. Any
+ *  other rejection (the predicate threw) is re-thrown, never wall-capped. */
 export const waitForMoment = async (predicate, { frames, minMs, wallCapMs }) => {
   await page.evaluate((src) => {
     window.__moment = { n: 0, t0: performance.now(), fn: new Function('return (' + src + ')')() }
@@ -215,7 +216,10 @@ export const waitForMoment = async (predicate, { frames, minMs, wallCapMs }) => 
       { timeout: wallCapMs, polling: 'raf' },
     )
     .then((h) => h.jsonValue())
-    .catch(async () => ({ value: null, frames: await page.evaluate(() => window.__moment?.n ?? 0).catch(() => 0), wallCapped: true }))
+    .catch(async (err) => {
+      if (!isWallCap(err)) throw err
+      return { value: null, frames: await page.evaluate(() => window.__moment?.n ?? 0).catch(() => 0), wallCapped: true }
+    })
 }
 
 /**
