@@ -4735,6 +4735,9 @@ if (section('calf-predation-drama')) {
     vigil.carcassKept === true,
     JSON.stringify(vigil),
   )
+  // RADIUS KEPT ON PURPOSE (point 642): spawnDist is the walk-in from the spawn
+  // ring (VIEW_AT_ZOOM1·zoom+2 .. offstageR), a radius feature; the off-frame
+  // half of the spawn is the product's projection predicate, not judged here.
   check(
     'the carcass DRAWS a predator from beyond the view ring and it takes the standing parent (point 121f)',
     vigil.drawn && vigil.spawnDist !== null && vigil.spawnDist > 20 && vigil.parentTaken,
@@ -8120,6 +8123,8 @@ if (section('predator-despawn')) {
     L.timer = 99999
     return out
   })
+  // RADIUS KEPT ON PURPOSE (point 642): the leave despawn IS the offstageR ring
+  // (Wildlife.tsx), so this tests a radius feature, not an in-view judgement.
   check('after the meal the predator walks off and despawns only outside the view',
     leaveOffstage.sawLeave && leaveOffstage.hideDist !== null && leaveOffstage.hideDist > 100,
     JSON.stringify(leaveOffstage))
@@ -8151,6 +8156,7 @@ if (section('predator-despawn')) {
     L.timer = 99999
     return { abortDist }
   })
+  // RADIUS KEPT ON PURPOSE (point 642): the chase abort is the offstageR ring.
   check('a strayed chase aborts only beyond the view ring (not in sight)',
     chaseAbort.abortDist !== null && chaseAbort.abortDist > 100, JSON.stringify(chaseAbort))
 }
@@ -8237,6 +8243,7 @@ if (section('walk-off-land-constraint')) {
     window.__ui.getState().setTravelZoom(1)
     return { hideDist }
   })
+  // RADIUS KEPT ON PURPOSE (point 642): the zoom-scaled offstageR ring is the subject.
   check('the predator despawn ring scales with the zoom (narrow zoom hides sooner)',
     leaveZoom.hideDist !== null && leaveZoom.hideDist >= 80 && leaveZoom.hideDist < 100,
     JSON.stringify(leaveZoom))
@@ -9845,10 +9852,18 @@ if (section('region-border-at-river')) {
     // drift downstream and the border sits stably on screen.
     window.__borderPark = { x: 317.28, z: -21 }
   })
-  for (let i = 0; i < 14; i++) {
-    await page.evaluate(() => window.__game.setState({ pos: { ...window.__borderPark } }))
-    await page.waitForTimeout(120)
-  }
+  // Re-park on every rendered frame until the border hook is up and the follow
+  // camera has settled (point 642), not a fixed 14×120 ms the frame rate decides.
+  await page
+    .waitForFunction(
+      () => {
+        window.__game.setState({ pos: { ...window.__borderPark } })
+        return !!window.__regionBorder && window.__camera?.settled?.() !== false
+      },
+      null,
+      { polling: 'raf', timeout: 30000 },
+    )
+    .catch(() => {})
   const borderMat = await page.evaluate(() => {
     const b = window.__regionBorder
     return b ? { matType: b.matType, opaque: b.opaque, ink: b.ink } : null
@@ -9861,9 +9876,8 @@ if (section('region-border-at-river')) {
     JSON.stringify(borderMat),
   )
   // The luminance below is read off the PICTURE, so the picture has to be
-  // finished. The park loop above is a fixed 14×120 ms, which is only ever
-  // enough because the sections before it had already drawn this stretch of the
-  // Nile; run on its own, the probe read a scene that had not come up yet.
+  // finished. The park wait above only knows the camera has settled; run on its
+  // own, the probe read a scene that had not come up yet.
   await waitForSceneReady(page)
   const probe = await page.evaluate(() => window.__regionBorder?.screenProbe())
   let borderLum = null

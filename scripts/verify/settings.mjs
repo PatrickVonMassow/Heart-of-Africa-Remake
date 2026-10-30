@@ -533,12 +533,23 @@ if (section('lion-feeding')) {
         preyOnSide: h.prey.current?.rotation.z,
         stainRadius: h.stain.r,
         mode: h.state.mode,
+        frames: window.__wildlife?.frames?.() ?? null,
+        now: performance.now(),
       }
     })
     pitches.push(s.headPitch ?? 0)
     // Keep the frame with the head most clearly lowered (the sine peak).
     if (!feedA || (s.headPitch ?? 0) > (feedA.headPitch ?? 0)) feedA = s
-    await page.waitForTimeout(300)
+    // The bob is posed per RENDERED frame (point 642): a wall-only gap could span
+    // no frame on a loaded lane and read the same pose twice. Each gap holds at
+    // least 3 drawn frames and the old 300 ms spacing.
+    await page
+      .waitForFunction(
+        ({ f0, t0 }) => (f0 == null || (window.__wildlife?.frames?.() ?? f0) >= f0 + 3) && performance.now() - t0 >= 300,
+        { f0: s.frames, t0: s.now },
+        { polling: 'raf', timeout: 15000 },
+      )
+      .catch(() => {})
   }
   const pitchSwing = Math.max(...pitches) - Math.min(...pitches)
   check('feeding: lion and carcass visible', feedA.lionVisible === true && feedA.preyVisible === true, '')
