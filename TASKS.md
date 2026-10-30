@@ -15992,3 +15992,33 @@ to land than a mechanism that needs a review.
   Tests: a Vitest case in the doctor's test file for the live-run case.
   Bundle: Testinfrastruktur.
   Criticality: medium - a false red costs a full LARGE (2-3 h) and can stall a closing.
+
+- [ ] 1468. Traveller head-height check at low detail reads just above its bound
+  Source: findings carrier 30.10.2026 02:06. `enrichments --section=traveller-figure` on WebGL 2:
+  "Traveller (low): his head stands at villager height" red on 54b326987 (28.10.2026 LARGE, headRise
+  1.352 m) and a48606517 (30.10.2026, `local/verify-logs/2026-10-30T01-42-54-258-touch-enrichments.log`,
+  1.356 m) against the bound 0.95 < headRise < 1.35; green in the 29.10.2026 LARGE on 8e0b36861.
+  Not caused by the 1462 cleanup (red before it).
+  Final state:
+  - The cause is measured: whether the primitive (low) traveller figure stands too tall or the
+    reading samples a pose-dependent head height; the figure or the bound is corrected with that
+    reason, no check weakened without it.
+  - The check is green on WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - 6 mm over the bound at the low graphics level; hardly visible to a player.
+
+- [ ] 1469. Load-sensitive waits in touch virtual-stick and the enrichments river-mouth hygiene step
+  Source: findings carrier 30.10.2026 01:40/02:06. In the closing LARGE on a48606517
+  (`local/verify-logs/2026-10-29T22-40-04-498-large.log`, WebGL 2, UNDER LOAD) touch "lifting the
+  stick stops the walk — settled" was red and enrichments crashed at the river-mouth state-hygiene
+  `page.waitForFunction` (scripts/verify/enrichments.mjs:1245, 30 s timeout). Both were green alone on a
+  quiet machine 30.10.2026 03:05 (`local/verify-logs/2026-10-30T01-42-54-258-touch-enrichments.log`).
+  Final state:
+  - The touch settle wait (150 ms settle, then 200 ms drift < 0.1 m) cannot read a stalled frame as
+    "settled" or a resumed one as drift; the river-mouth return wait waits on the jump completing
+    with a cause-naming failure instead of a bare timeout.
+  - Both suites are green in a whole LARGE on WebGL 2; the touch charge is struck.
+  Tests: the existing Playwright checks.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-only; a false red costs a full LARGE.

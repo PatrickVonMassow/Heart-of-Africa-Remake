@@ -272,6 +272,24 @@ export const RED_CHARGES = [
       + 'interruption. Point 1236 owns the cause; the charge dies with it.',
   },
   {
+    point: 1468,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^Traveller \(low\): his head stands at villager height/i,
+    why:
+      'FILED AS 1468 ON 30.10.2026: headRise 1.352-1.356 m against the 1.35 m bound on 54b326987 and '
+      + 'a48606517, red before the 1462 cleanup. The charge dies with 1468.',
+  },
+  {
+    point: 1469,
+    suite: 'touch',
+    kind: 'check',
+    match: /^lifting the stick stops the walk/i,
+    why:
+      'FILED AS 1469 ON 30.10.2026: red under load in the a48606517 LARGE, green alone on a quiet '
+      + 'machine; the settle wait is load-sensitive. The charge dies with 1469.',
+  },
+  {
     point: 1217,
     suite: 'gamepad',
     kind: 'check',
