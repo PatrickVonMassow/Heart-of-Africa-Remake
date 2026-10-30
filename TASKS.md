@@ -16026,3 +16026,33 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright checks.
   Bundle: Testinfrastruktur.
   Criticality: low - test-only; a false red costs a full LARGE.
+
+- [ ] 1470. Caught-child frame of the bank game finds no shot inside its window in a whole run
+  Source: v0.3.1 closing LARGE on d6fe67e7c, WebGL 2 (`local/verify-logs/2026-10-30T02-55-25-354-large.log`,
+  30.10.2026): polish-children `children-bank-game` "a caught child was photographed standing slumped
+  clear of the run, 10-14 m off (work-order 1239)" red — "no caught child could be photographed inside
+  the window" (caughtMoments 568, alone 160, outside 3840, crowded 10720, collider 800). The same
+  acquisition red was filed once before from a WebGPU run (archived, 19.10.2026) and closed by a quiet
+  re-run; it recurs inside a whole LARGE.
+  Final state:
+  - The cause is measured: whether the window or the standpoint search misses caught moments that exist
+    (568 seen, none shot), or the scene offers none clear of the run; the acquisition is fixed with that
+    reason, no check weakened without it.
+  - The check is green in a whole polish-children run on WebGL 2 and WebGPU; its charge in
+    scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-frame acquisition; no player impact shown.
+
+- [ ] 1471. Moving capture of the turning errand adult reads it walking on between frames 1 and 2
+  Source: v0.3.1 closing LARGE on d6fe67e7c, WebGL 2 (`local/verify-logs/2026-10-30T02-55-25-354-large.log`,
+  30.10.2026): polish-villagers `adult-errands` "the filmed errand adult walks on between moving-capture
+  frames 1 and 2 (point 1404)" red with no detail printed; not red in the earlier closing LARGE runs.
+  Final state:
+  - The check prints what it measured (positions/yaw of frames 1 and 2) and the cause is named: the
+    adult standing still across the freeze, or the freeze holding life still between the two exposures.
+  - The capture or the check is corrected with that reason; green in a whole polish-villagers run on
+    WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-only; a false red costs a full LARGE.

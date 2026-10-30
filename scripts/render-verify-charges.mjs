@@ -290,6 +290,24 @@ export const RED_CHARGES = [
       + 'machine; the settle wait is load-sensitive. The charge dies with 1469.',
   },
   {
+    point: 1470,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /^a caught child was photographed standing slumped clear of the run/i,
+    why:
+      'FILED AS 1470 ON 30.10.2026: no caught child shot inside the window in the d6fe67e7c closing '
+      + 'LARGE (WebGL 2); a frame-acquisition red seen before on WebGPU. The charge dies with 1470.',
+  },
+  {
+    point: 1471,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^the filmed errand adult walks on between moving-capture frames 1 and 2/i,
+    why:
+      'FILED AS 1471 ON 30.10.2026: red without detail in the d6fe67e7c closing LARGE (WebGL 2); '
+      + 'test-only moving capture. The charge dies with 1471.',
+  },
+  {
     point: 1217,
     suite: 'gamepad',
     kind: 'check',
