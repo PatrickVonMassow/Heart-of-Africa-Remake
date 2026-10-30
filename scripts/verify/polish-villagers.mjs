@@ -3002,7 +3002,6 @@ if (section('adult-errands')) {
           }
           return null
         },
-        null,
         // THREE MINUTES' worth, as for the fill: ONE water errand runs at a
         // time, and its return leg within 15 m of the stand is a short share of a
         // round trip the DIG pairs' window otherwise fills.
