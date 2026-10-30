@@ -16095,3 +16095,4 @@ to land than a mechanism that needs a review.
   2. Analysis question 2 (inventory: the incident each mechanism was built for, its cost, its collisions) and question 3 (cause count) also count the backlog findings, not only work-order points.
   3. Result (question 4) also gives, for every infrastructure entry in docs/backlog.md, a verdict "obsolete: yes/no" with reason; obsolete entries are closed in docs/backlog.md with the reason "obsolete by infrastructure simplification"; a non-obsolete entry that shows a real defect of the remaining infrastructure is named in the plan so the user can decide on it.
   No new mechanism.
+  Bundle: Session- & Repo-Hygiene (amendment to 1463, rides with it).
