@@ -2585,6 +2585,12 @@ rank from 1894 (`VILLAGER_DRESS.bagandaCottonFrom`; §2.5: the protectorate
 favoured cotton — rank-gated because Astra B44 finds no population-wide
 replacement).
 
+*Office* — the Bambara and Mandinka village chief wears a white boubou of finer
+cotton in place of the everyday torso garment (`CHIEF_ROBE`; Park 1799 finer
+cloth, the Bamana boubou of Ségou per Soleillet — summaries only). Open: no
+record of a chief's dress of office for the other peoples; their chief wears
+his people's dress at the rank cloth.
+
 Sources of the own search: [Met, Belt (umutsha)](https://www.metmuseum.org/art/collection/search/314793);
 [Khumalo 2000, Isicoco as a symbol of Ubudoda](https://phambo.wiser.org.za/files/seminars/Khumalo2000.pdf);
 [Nkumane 2001, The traditional dress of Zulu women](https://datalib.usask.ca/iportal/2007.10.17/IKC-2001/IKC-2001-Nkumane.pdf);
@@ -2604,9 +2610,17 @@ at a fixed height read as neither. The walk, the kneel and the stride values
 are educated guesses in the same block; a period source naming a people's
 carrying posture would replace the guess for that people.
 
+At its stop a task walker grips the load with both hands, lowers it while
+kneeling and stands it on the ground beside it, then grips it again and lifts it
+back onto the head while rising; the load is never hidden. Timings and the
+ground spot are guesses in `TASK_LOAD_HANDLING`.
+
 ### 8.5 The villager's body (work-order "glTF villager body")
 
-On the medium and high presets the villagers stand on a CC0 MakeHuman base body
+On the medium and high presets the villagers — and on the same body at
+villager stature the village chief, the Giza plateau's guides and tourists
+(dress in `docs/giza-1890.md` §4.1) and the bird's-eye traveller — stand on a
+CC0 MakeHuman base body
 (`scripts/villager/`, sources and licences in `sources.json`), built headless in
 a pinned Blender (`node scripts/blender.mjs`) into `villager.glb` with morph
 targets for age, sex and build and a bust from MakeHuman's cup targets; the
