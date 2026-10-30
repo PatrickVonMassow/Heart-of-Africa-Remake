@@ -111,15 +111,27 @@ const COMPARISON = new Set([
   ts.SyntaxKind.MinusToken,
 ])
 
-/** `const A = await <expr>.evaluate(...)` with one plain identifier → 'A', else null. */
+/** Every name a binding introduces: a plain identifier, or each identifier a
+ *  destructuring pattern binds (`{ x: a }`, `[a, b]`, nested, defaults, rest). */
+function boundNames(name) {
+  if (ts.isIdentifier(name)) return [name.text]
+  if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    return name.elements.flatMap((el) => (ts.isBindingElement(el) ? boundNames(el.name) : []))
+  }
+  return []
+}
+
+/** `const <binding> = await <expr>.evaluate(...)` → the names it binds, else null. */
 function evaluateBinding(stmt) {
   if (!ts.isVariableStatement(stmt)) return null
   const decls = stmt.declarationList.declarations
-  if (decls.length !== 1 || !ts.isIdentifier(decls[0].name) || !decls[0].initializer) return null
+  if (decls.length !== 1 || !decls[0].initializer) return null
   const init = decls[0].initializer
   if (!ts.isAwaitExpression(init) || !ts.isCallExpression(init.expression)) return null
   const callee = init.expression.expression
-  return ts.isPropertyAccessExpression(callee) && callee.name.text === 'evaluate' ? decls[0].name.text : null
+  if (!(ts.isPropertyAccessExpression(callee) && callee.name.text === 'evaluate')) return null
+  const names = boundNames(decls[0].name)
+  return names.length ? names : null
 }
 
 function mentions(node, name) {
@@ -146,13 +158,17 @@ export function findSplitComparisons(source, fileName = 'source.mjs') {
       const run = []
       let j = i
       for (; j < statements.length; j++) {
-        const name = evaluateBinding(statements[j])
-        if (!name) break
-        run.push(name)
+        const names = evaluateBinding(statements[j])
+        if (!names) break
+        run.push(names)
       }
       if (run.length < 2) continue
       const pairs = []
-      for (let a = 0; a < run.length; a++) for (let b = a + 1; b < run.length; b++) pairs.push([run[a], run[b]])
+      // Pairs only across two evaluations: names one evaluation binds together
+      // (the single-evaluation fix) describe one moment.
+      for (let a = 0; a < run.length; a++) {
+        for (let b = a + 1; b < run.length; b++) for (const x of run[a]) for (const y of run[b]) pairs.push([x, y])
+      }
       const visit = (n) => {
         if (ts.isBinaryExpression(n) && COMPARISON.has(n.operatorToken.kind)) {
           for (const [x, y] of pairs) {

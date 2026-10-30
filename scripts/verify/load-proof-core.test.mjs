@@ -61,6 +61,26 @@ describe('findSplitComparisons — the gate over two-round-trip comparisons', ()
     `
     expect(findSplitComparisons(src)).toEqual([])
   })
+  it('refuses destructured reads from two evaluations, and still passes one destructured evaluation', () => {
+    const split = `
+      const { x: a } = await page.evaluate(() => readPos())
+      const { x: b } = await page.evaluate(() => readPos())
+      check('position', a === b)
+    `
+    expect(findSplitComparisons(split)).toEqual([expect.objectContaining({ first: 'a', second: 'b', line: 4 })])
+    const nested = `
+      const [{ v: first } = {}] = await page.evaluate(() => [read()])
+      const { ...rest } = await page.evaluate(() => read())
+      check('n', rest.v > first)
+    `
+    expect(findSplitComparisons(nested)).toHaveLength(1)
+    const one = `
+      const { x: a, y: b } = await page.evaluate(() => ({ x: readPos(), y: readPos() }))
+      const other = await page.evaluate(() => 1)
+      check('position', a === b)
+    `
+    expect(findSplitComparisons(one)).toEqual([])
+  })
   it('passes a before/after pair with an action between the reads', () => {
     const src = `
       const before = await page.evaluate(() => count())
