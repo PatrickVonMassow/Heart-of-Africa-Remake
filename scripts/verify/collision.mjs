@@ -669,7 +669,10 @@ if (section('village')) {
   // (the `ok:true` beside `anyMoved:false` signature) and the check is
   // UNMEASURED. OPEN: 10 fps is an estimate, calibrate against the lane header.
   const UNSTUCK_NEED_FPS = 10
-  const pinLane = laneSkipVerdict({ needFps: UNSTUCK_NEED_FPS, measuredFps: laneFps })
+  // Re-measured here, in the steady state: the boot-time reading included a
+  // multi-second build hitch and read 0.2 fps on a hardware lane.
+  const pinFps = await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
+  const pinLane = laneSkipVerdict({ needFps: UNSTUCK_NEED_FPS, measuredFps: pinFps })
   if (pinLane.skip) {
     console.log(unmeasuredLine('Village: no inhabitant stays pinned past the unstuck window (point 155)', pinLane.reason))
     unmeasuredCount++
