@@ -24,8 +24,8 @@ export const NO_READING = '???'
  * How high a GROWN figure reaches above its own feet, in metres (place units) —
  * the height its actor record carries (`markActor` in PlaceLife's Figure, the
  * body height plus the head). Only a FALLBACK: a speaker is measured from its
- * own record, and this stands in for one that carries none (the dev hook can
- * speak over any object at all).
+ * own drawn head or record, and this stands in for one that carries neither
+ * (the dev hook can speak over any object at all).
  */
 export const GROWN_FIGURE_HEIGHT = 1.45
 

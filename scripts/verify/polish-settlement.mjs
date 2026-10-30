@@ -205,8 +205,8 @@ if (section('settlement-season')) {
   }
   check('Cairo stays bone dry in every month (hyper-arid, no rain)', cairoMaxRain === 0, `max rain ${cairoMaxRain.toFixed(3)}`)
   // Leave a DIRECTLY entered place behind (place->place, no travel scene, so no
-  // capture), as a whole run always has; the capture section below stages its
-  // own. Enter without leaving first, and reset the calendar.
+  // capture), as a whole run always has; the travel-panorama capture in
+  // polish-panorama.mjs stages its own. Enter without leaving first, and reset the calendar.
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.debugJumpToMonth(1)

@@ -137,7 +137,9 @@ export function markedActorRise(root: MarkedNode | null | undefined): number | n
 }
 
 /** A drawn head as this module reads it: named `figure-head` by placeFigure,
- *  a sphere whose radius its geometry carries. Structural, like MarkedNode. */
+ *  a sphere whose radius its geometry carries — or, on the skinned figure, a
+ *  bare anchor at the head's centre scaled so `ANCHOR_HEAD_RADIUS` reaches its
+ *  crown (skinnedFigure.tsx). Structural, like MarkedNode. */
 export interface HeadNode {
   name?: string
   visible?: boolean
@@ -145,6 +147,13 @@ export interface HeadNode {
   matrixWorld?: { elements: ArrayLike<number> }
   geometry?: { parameters?: { radius?: number } }
 }
+
+/** The radius a geometry-less head anchor stands for: the skinned figure
+ *  scales its `figure-head` anchor so this much above it is the crown. */
+export const ANCHOR_HEAD_RADIUS = 0.16
+
+/** The head sphere's radius: its geometry's, else the anchor convention. */
+const headRadius = (head: HeadNode) => head.geometry?.parameters?.radius ?? ANCHOR_HEAD_RADIUS
 
 /**
  * Where the TOP of the drawn head under `root` stands relative to root's own
@@ -157,9 +166,10 @@ export interface HeadNode {
  *
  * A sphere of radius r under the linear map L reaches r·|row y of L| above its
  * centre (the top of the ellipsoid it becomes) — squash, lean and the head's
- * own counter-rotation included. That top point lies at centre + r·rowY/|rowY|
- * in world space, so its x/z follow the tilt too. Matrices are read as they
- * stand: the caller refreshes them (`updateWorldMatrix`) when the scene moved.
+ * own counter-rotation included. That top point lies at centre + r·L·u with
+ * u = rowY/|rowY| in world space, so its x/z follow the tilt too. Matrices are
+ * read as they stand: the caller refreshes them (`updateWorldMatrix`) when the
+ * scene moved.
  */
 export function drawnHeadTop(root: HeadNode | null | undefined): [number, number, number] | null {
   const base = root?.matrixWorld?.elements
@@ -167,7 +177,7 @@ export function drawnHeadTop(root: HeadNode | null | undefined): [number, number
   const head = findHead(root)
   if (!head) return null
   const e = head.matrixWorld!.elements
-  const r = head.geometry?.parameters?.radius ?? 0
+  const r = headRadius(head)
   // Column-major: the world y of L·u is e1·ux + e5·uy + e9·uz, largest over
   // the unit sphere at u = (e1, e5, e9)/len; the top point is centre + r·L·u.
   const len = Math.hypot(e[1], e[5], e[9])
@@ -199,7 +209,7 @@ export function drawnHeadShape(
   const head = findHead(root)
   if (!head) return null
   const e = head.matrixWorld!.elements
-  const r = head.geometry?.parameters?.radius ?? 0
+  const r = headRadius(head)
   return {
     center: [e[12], e[13], e[14]],
     axes: [
@@ -253,8 +263,9 @@ export function silhouetteTop(
   const A = dot(lb, lb) - cz * cz
   const B = dot(lu, lb) - cy * cz
   const C = dot(lu, lu) - cy * cy
-  // A < 0 exactly when the whole ellipsoid lies in front of the eye
-  // (its depth half-extent |Lᵀback| is less than its depth −cz).
+  // With cz < 0 (centre in front of the eye), A < 0 exactly when the whole
+  // ellipsoid lies in front of it (its depth half-extent |Lᵀback| is less
+  // than its depth −cz).
   if (!(cz < 0) || !(A < 0)) return false
   const disc = B * B - A * C
   if (!(disc >= 0)) return false

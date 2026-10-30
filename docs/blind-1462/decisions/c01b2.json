@@ -1,0 +1,102 @@
+[
+ {
+  "id": "U4",
+  "decision": "rewritten",
+  "reason": "Step 20 now cites the research document's own source table as its §4 instead of the concept's §5 (rejected items)."
+ },
+ {
+  "id": "U5",
+  "decision": "rewritten",
+  "reason": "The §8 overview now names the figure notes and the §8.1–§8.7 range that stay in this document."
+ },
+ {
+  "id": "U110",
+  "decision": "rewritten",
+  "reason": "Already fixed by 61e2474bb: design.md now starts the net lane about 1 m upstream, matching balance.ts laneStart -1."
+ },
+ {
+  "id": "U112",
+  "decision": "rewritten",
+  "reason": "CLAUDE.md §4 now says \"build rules\" instead of \"build order\", matching the retitled session-rules file without growing its budget."
+ },
+ {
+  "id": "U122",
+  "decision": "rewritten",
+  "reason": "The CLAUDE.md row now reports 1 word of headroom, matching the measured 1327 against the 1328-word ceiling."
+ },
+ {
+  "id": "U123",
+  "decision": "rewritten",
+  "reason": "The stdio section now labels the codex spawn as the code of the failed run and names today's spawn(runtime.bin, …) beside it."
+ },
+ {
+  "id": "U124",
+  "decision": "rewritten",
+  "reason": "Step 5 now says batch-dispatch.mjs and its core test exist instead of calling the step unbuilt."
+ },
+ {
+  "id": "U125",
+  "decision": "rewritten",
+  "reason": "Step 6 now says batch-checkpoint.mjs and its core test exist instead of calling the step unbuilt."
+ },
+ {
+  "id": "U126",
+  "decision": "rewritten",
+  "reason": "Step 10 drops the \"(unbuilt)\" mark on scripts/batch-board-core.test.mjs, which exists."
+ },
+ {
+  "id": "U127",
+  "decision": "rewritten",
+  "reason": "Step 11 now says batch-metrics-core.test.mjs and batch-metrics.mjs exist instead of calling the step unbuilt."
+ },
+ {
+  "id": "U128",
+  "decision": "rewritten",
+  "reason": "The main-only paragraph now hands the review down the crossUnavailable chain (scarce first, then main), matching cross-review-core.mjs and line 82."
+ },
+ {
+  "id": "U129",
+  "decision": "rewritten",
+  "reason": "The receipt note now says a re-run overwrote the file then and that it is appended to now (author-delegate.mjs opens it 'a+')."
+ },
+ {
+  "id": "U130",
+  "decision": "rewritten",
+  "reason": "The quoted command now carries --lane cross as batch-resume-hook.mjs prints it, and no longer claims identical wording."
+ },
+ {
+  "id": "U131",
+  "decision": "rewritten",
+  "reason": "The defect section now marks threshold 6 and figureWalk.ts:441 as the measured state of that time and names the current value 10."
+ },
+ {
+  "id": "U210",
+  "decision": "rewritten",
+  "reason": "§19.5 now says the animal leaves by the nearest bank clear of threats, matching safeBankTarget, without growing design.md."
+ },
+ {
+  "id": "U211",
+  "decision": "rewritten",
+  "reason": "§21.1 now says Esc closes the report only outside filled text (StateDump.tsx blurs a filled field first), without growing design.md."
+ },
+ {
+  "id": "U227",
+  "decision": "rewritten",
+  "reason": "The cross-lane audit command now carries --anyway, which lane-routing-core.mjs requires because audit routes to main at default."
+ },
+ {
+  "id": "U228",
+  "decision": "rewritten",
+  "reason": "I1 now lists ASTRA_*, CODEX_BIN and CODEX_HOME as related variables, not model ids, consistent with I4."
+ },
+ {
+  "id": "U229",
+  "decision": "rewritten",
+  "reason": "The merge record now says both halves use main/cross/scarce, as the union's U2 records; no half proposed 'alternate'."
+ },
+ {
+  "id": "U230",
+  "decision": "rewritten",
+  "reason": "The six-peoples count is correct for the seasonal dress table in design-reference.md §19.15, so the overview now names it the seasonal dress table to separate it from the 22-people §8.3 table."
+ }
+]

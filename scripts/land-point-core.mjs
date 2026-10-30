@@ -75,6 +75,7 @@ export const LANDING_STEPS = Object.freeze([
   { id: 'push', label: 'commit the tick and push main' },
   { id: 'board', label: 'publish the board' },
   { id: 'cleanup', label: 'delete branch, remote branch and worktree' },
+  { id: 'synced', label: 'record the board review at the tick commit (dashboard-guard --synced)' },
 ])
 
 export const STEP_IDS = Object.freeze(LANDING_STEPS.map((s) => s.id))

@@ -50,7 +50,7 @@ added on top of the phases for 1446 and 1433 but contained in Wait/Accept for 13
 | 1451 | infra | cloud | 0.75 (1.98 from filing) | 0.12 | 0.15 i | 0.48 | – | 0 | 0.13 | |
 | 1417 | game | cloud | 5.92 | 1.10 (3 cloud rounds) | 1.38 i (16:47–18:10) | 3.08 | 5/136/4/1 | 2 (1 cloud) / 1.4 i | 0.14 | 1450 folded in; incident (b); duplicate fix (c), attribution open (see c); phases sum to 5.56 h (6.96 h with sync) against 5.92 h |
 | 1418 | game | cloud | 4.65 | 0.83 (2 rounds) | 2.49 i | 1.33 | 5/28/2/1 (+1 main run) | 1 / 0.02 | 0.15 | see (a) |
-| **Median** | | | **2.70** | **0.21** | **0** (8.5 among the 10 that waited; 1.38 among the 5 after 1444) | **0.84** | | | **0.13** | |
+| **Median** | | | **2.70** | **0.21** | **0.08** (8.5 among the 10 that waited; 1.38 among the 5 after 1444) | **0.84** | | | **0.13** | |
 | **Total** | 8 game / 12 infra | 8 cloud | | **7.1** | not additive (see below) | **33.3** | 85 runs (82 allocated per point + 2 main runs; 1 run and 2 of the 40 reds unallocated), 15.8 h finished + ~4.3 h hung i | 12 syncs / ~3.8 i | **3.2** | |
 
 \* 1415 is a game point by the diff rule (13/13 files in `src/`), but its content is a
@@ -77,7 +77,8 @@ local acceptance (1388 3.6, 1418 2.5, 1417 1.4) or a short idle stretch.
 - **Post-landing to next commission** (bookkeeping, retrospective, queue rank, session
   handover): mostly 0.15–0.5 h. Larger gaps: 1440→1441 3.1 h (main-based dress
   investigations), 1432→1333 1.3 h, 1445→1437 1.0 h, 1433→1415 1.1 h.
-- **Standstill report classes.** `totals.byClass` puts the whole 70.92 h under
+- **Standstill report classes.** `totals.byClass` puts the whole 70.92 h (its own window, 0.4 h wider than
+  the 70.5 h inventory window) under
   `unknown`. Every one of the 27,709 timeline intervals has the cause
   `contradictory-evidence` and carries the journal-sequence item
   `{previousSeq:66, seq:67}`, so the report yields no class split. Union of time by

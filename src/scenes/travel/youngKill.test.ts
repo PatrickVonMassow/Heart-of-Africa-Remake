@@ -31,7 +31,7 @@ interface Body {
 }
 
 const DT = 0.1
-const CARCASS_SECONDS = 10 // the predator's feed on the dead young (Wildlife CARCASS_DISSOLVE_SECONDS)
+const CARCASS_SECONDS = 9 // the predator's feed on the dead young (Wildlife CARCASS_DISSOLVE_SECONDS)
 const TOO_LATE = 3.2 // PARENT_TOO_LATE_DIST
 const VIGIL_HOLD = 1 // the keeper holds this close to the remains
 

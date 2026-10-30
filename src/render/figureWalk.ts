@@ -55,7 +55,8 @@ export function legExtent(d: LegDims, f: number): number {
 /**
  * Two-bone IK in the sagittal plane: the hip at the origin, the ankle wanted at
  * (z, y) (y < 0). The knee bends FORWARD; the foot is kept flat on its sole.
- * Out of reach the leg points straight at the target.
+ * Beyond reach the leg points straight at the target; inside the inner limit
+ * the knee folds as far as it goes.
  */
 export function solveLeg(d: LegDims, z: number, y: number): LegAngles {
   const a = d.thigh
@@ -128,8 +129,6 @@ export function rephase(phase: number, from: number, to: number): number {
   return phase + (next - w)
 }
 
-/** A foot's place in the walk: the gait's fore/aft target (hip frame), its
- *  lift, whether it carries the body, and its swing progress (0 → 1). */
 /** One foot's hold on the ground (render/fauna.ts `footPlantPose` is the
  *  reference): its world contact while planted, the offset that keeps the
  *  ankle there, and the offset it lifted off with. */
@@ -245,6 +244,8 @@ export function wayHeading(x: number, z: number, tx: number, tz: number, dx: num
   return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
 }
 
+/** A foot's place in the walk: the gait's fore/aft target (hip frame), its
+ *  lift, whether it carries the body, and its swing progress (0 → 1). */
 export interface FootPhase {
   z: number
   lift: number
@@ -493,7 +494,8 @@ export function stepWalk(
     const dz = body.z - m.last.z
     if (Math.hypot(dx, dz) / unit / dt <= M.teleportSpeed) {
       // The step along the facing is the stride; a sideways shove and a turn
-      // are stepped too (the held foot cannot follow them far), never backward.
+      // are stepped too (the held foot cannot follow them far), in the sense the
+      // body moves along its facing.
       const ahead = (dx * Math.sin(body.yaw) + dz * Math.cos(body.yaw)) / unit
       const aside = Math.abs(dx * Math.cos(body.yaw) - dz * Math.sin(body.yaw)) / unit
       const turned = Math.abs(Math.atan2(Math.sin(body.yaw - m.last.yaw), Math.cos(body.yaw - m.last.yaw)))
@@ -580,8 +582,6 @@ export interface PrimitiveLayout {
   headRadius: number
   /** Height the actor label reads for this figure. */
   labelHeight: number
-  /** The figure group's scale factor over its own `scale` — uniform. */
-  groupScale: [number, number, number]
 }
 
 /** The primitive figure from standing (k = 0) to kneeling (k = 1). */
@@ -598,7 +598,6 @@ export function primitiveLayout(k: number, legs: boolean, L: { hipY: number; arm
     headY: height + mix(0.18, 0.175),
     headRadius: PRIMITIVE_HEAD_RADIUS,
     labelHeight: mix(1.45, (0.55 + 0.45) * 0.75),
-    groupScale: [1, 1, 1],
   }
 }
 

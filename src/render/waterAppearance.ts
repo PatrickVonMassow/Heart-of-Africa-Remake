@@ -11,7 +11,8 @@
 // downstream, and it read as a rendering fault rather than as distance.
 //
 // So both read their appearance HERE. In the shading nothing distinguishes near
-// from far but DISTANCE (the near mesh additionally rides the ripple): the
+// from far but DISTANCE (the near mesh additionally rides the ripple, and the
+// panorama damps the fine field where its heightfield leaves the water): the
 // moving detail is scaled by the shared `detailFade`, so the far
 // continuation resolves into the calm sheet the same water becomes at that
 // range instead of into a second, independently tuned material.

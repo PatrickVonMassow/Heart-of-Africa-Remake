@@ -38,7 +38,7 @@ game. `design.md` = target state; this file = build and verification policy.
 ## 4. Project Structure
 
 A requested design change updates `design.md`, this file where it changes the
-build order, and the code together. Organize game code by topic under `src/`;
+build rules, and the code together. Organize game code by topic under `src/`;
 do not create a monolith.
 
 ## 5. Commands

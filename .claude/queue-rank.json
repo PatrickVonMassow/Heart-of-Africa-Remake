@@ -1711,12 +1711,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1448": {
-      "at": "2026-10-25T11:26:18.610Z",
-      "why": "A charged regression red, not a user report and not blocking any landing; append-and-defer position is right",
-      "origin": "machine",
-      "place": "last"
-    },
     "1449": {
       "at": "2026-10-26T04:13:03.990Z",
       "why": "a suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the guard honest meanwhile",
@@ -1728,12 +1722,6 @@
       "why": "low-criticality test-hook crash with no player impact; last in the order is right",
       "origin": "machine",
       "place": "last"
-    },
-    "1456": {
-      "at": "2026-10-27T23:33:27.564Z",
-      "why": "user 27.10.2026: after 1308, before 1347 — known red on main that keeps suites red",
-      "origin": "user",
-      "place": "ahead"
     },
     "1457": {
       "at": "2026-10-27T23:20:16.318Z",
@@ -1750,6 +1738,66 @@
     "1460": {
       "at": "2026-10-28T05:42:05.460Z",
       "why": "verification debt with no product effect; last is right until a quiet machine is free",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1463": {
+      "at": "2026-10-28T17:15:50.227Z",
+      "why": "User order 28.10.2026: directly after the v0.3.1 release point",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1466": {
+      "at": "2026-10-29T07:41:42.233Z",
+      "why": "low criticality, WebGL-2 whole-suite-only red, charged; no release blocker, so it waits behind the ranked work",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1467": {
+      "at": "2026-10-29T19:06:31.715Z",
+      "why": "test-infra defect, no player impact; Testinfrastruktur bundle order is fine",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1468": {
+      "at": "2026-10-30T06:00:03.888Z",
+      "why": "test-only load/bound flake charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1469": {
+      "at": "2026-10-30T06:00:04.005Z",
+      "why": "test-only load/bound flake charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1470": {
+      "at": "2026-10-30T06:21:48.366Z",
+      "why": "test-only acquisition red charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1471": {
+      "at": "2026-10-30T06:21:48.474Z",
+      "why": "test-only acquisition red charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1472": {
+      "at": "2026-10-30T12:52:24.227Z",
+      "why": "closing-LARGE red charged after the v0.3.1 cut; post-release work, no point ahead of it depends on it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1473": {
+      "at": "2026-10-30T12:52:24.361Z",
+      "why": "closing-LARGE red, already placed in the Dorfleben bundle column; post-release, nothing ahead depends on it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1474": {
+      "at": "2026-10-30T17:03:29.305Z",
+      "why": "amendment to 1463; it rides with 1463 and needs no earlier slot",
       "origin": "machine",
       "place": "last"
     }
@@ -1781,7 +1829,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-28T05:42:05.469Z",
+    "at": "2026-10-30T20:55:09.581Z",
     "points": [
       184,
       200,
@@ -2212,7 +2260,6 @@
       1300,
       1301,
       1304,
-      1308,
       1309,
       1328,
       1340,
@@ -2242,15 +2289,23 @@
       1435,
       1436,
       1447,
-      1448,
       1449,
       1453,
       1454,
-      1456,
       1457,
       1458,
-      1459,
-      1460
+      1460,
+      1461,
+      1463,
+      1466,
+      1467,
+      1468,
+      1469,
+      1470,
+      1471,
+      1472,
+      1473,
+      1474
     ]
   }
 }

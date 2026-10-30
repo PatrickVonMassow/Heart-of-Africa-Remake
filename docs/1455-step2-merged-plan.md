@@ -13,8 +13,10 @@ the text. B's file echoes its 34 entries twice; normalised to one entry per id.
 browser suite until the deciding test (§4) passes. Both halves agree, and the merger
 confirms, that the 1452 M3 rejection measured the wrong quantity: single-suite duration
 (+1.5–3.5 %) instead of acceptance throughput (13m 44s for 18m 56.5s of serial work,
-−27 %). Pairing pays while the overlap-added red rate stays below ~10 % (a false red costs
-20–30 min against 5–12 min saved per pair); the real gain is smaller than the pair gain
+−27 %). Pairing pays while overlap-added false reds cost less than the 5 min a pair saves: at
+30 min per false red that is below ~0.17 false reds per pair (~17 % of pairs if a failing pair
+fails on one member, less if on both); §4.3's deciding test bounds the per-pair red rate below
+13.9 % at 95 %, which is a confidence bound, not the break-even; the real gain is smaller than the pair gain
 because only both-backend passes of one point and two points in acceptance pair, and fix
 loops (73 % of suite minutes) do not. Landed-point throughput stays unmeasured until the
 follow-up window (§4.5).
@@ -27,10 +29,10 @@ follow-up window (§4.5).
 | A: frames and the counter resolve per checkout | **Confirmed.** `OUT` in `scripts/verify/_polish.mjs:18` and `FRAME_DIR` in `run-record.mjs:30` both resolve from the checkout; logs go to the common root. `HOA_FRAME_DIR` would move only the counter. |
 | A's open item / B's C4: does the both-backend guard credit a run from a second worktree at the same SHA | **Yes — no blockade.** `render-verify-guard.mjs:104` "Shared evidence is scoped to commits, never to the checkout that wrote it"; `coverageForHead` keys on `run.head` ancestry; state lives at the common repo path; `render-verify-worktree.test.mjs` pins "writes worktree state and receipts to the main checkout". |
 | B: ports and BASE_URL unverified | **Verified, nothing to re-tune.** `_server.mjs`: `listen(0)` → `--strictPort` → one retry on a fresh port; base built from that port; per-child kill tree. |
-| A: the second-started run is labelled loaded | **Confirmed** in the same log: "MACHINE UNDER LOAD … the run proceeds, its timing verdicts do NOT count as evidence". `annotateResult` lets a green count; `--on-load=off` still reports the load; `defer` would skip the member. The digest has no loaded branch. |
+| A: the second-started run is labelled loaded | **Confirmed** in the same log: "MACHINE UNDER LOAD … the run proceeds, its timing verdicts do NOT count as evidence". `annotateResult` lets a green count; `--on-load=off` skips the probe in `run-all.mjs`, so no load label is recorded; `defer` would skip the member. The digest has no loaded branch. |
 | B: LARGE exclusivity | **Already enforced**: `run-logged.mjs` waits for a live LARGE wrapper in any worktree (README "Before launching a suite"); `VERIFY_NO_WAIT=1` is the only escape and stays unused. Sections do not wait on each other, which is why M3 could overlap. |
-| Memory sampler | The 1452 samples are an ad-hoc `/proc/meminfo` loop (`local/1452-mem-m3-*.log`, `HH:MM:SS used_kib= pct=`), not a script; reusing it is re-tuning, not a new mechanism. Host: 15.9 GB; 85 % ≈ 13.2 GiB; idle at M3 start 16.3 %. |
-| Charged reds | `scripts/render-verify-charges.mjs` already charges the steady polish-villagers shutter-timing signatures to 1456 and 1292; they stay charged, but their frequency is compared between arms (§4.3, F10). |
+| Memory sampler | The 1452 samples are an ad-hoc `/proc/meminfo` loop (`local/1452-mem-m3-*.log`, `HH:MM:SS used_kib= pct=`), not a script; reusing it is re-tuning, not a new mechanism. Host: 15.5 GiB; 85 % ≈ 13.2 GiB; idle at M3 start 16.3 %. |
+| Charged reds | `scripts/render-verify-charges.mjs` charged the steady polish-villagers shutter-timing signatures to 1456 and 1292 (the 1456 charges were struck once both checks passed); charged ones stay charged, but their frequency is compared between arms (§4.3, F10). |
 
 A's per-name firing counts for adult-errands WebGL 2 (R5) were not re-counted; they are
 A's measurement and only set the expectation for the baseline arm.
@@ -120,8 +122,8 @@ qualify. One rule: **any** unresolved red (C9) in a pair member → FAIL; a red 
 reproduces quiet is charged and the pair is repeated, at most twice in the test (a third
 repeat → FAIL). The bound covers **new** reds only (F11): 0 pairs with an unresolved red out
 of 20 bounds the per-pair rate of overlap-added unresolved reds below 13.9 % at 95 %
-(1 − 0.05^(1/20)), under the worst-case break-even of ~17 % (5 min saved per pair against a
-30 min false red). Known reds (charged, or reproduced quiet in the test) are outside that
+(1 − 0.05^(1/20)), under the one-red-per-pair break-even of ~17 % (5 min saved per pair against a
+30 min false red); a pair red on both members halves that break-even, which this bound does not cover. Known reds (charged, or reproduced quiet in the test) are outside that
 bound; overlap's effect on them is judged by the rate comparison below. The 9.5 % per-run
 figure of the halves assumed independent member runs and is withdrawn. Timing probe: the
 unit is the partner window (5 overlapped windows against 5 quiet windows of 2 runs each);
@@ -130,7 +132,7 @@ order-at-stand, sprint, heading-in-one-frame) FAIL if overlapped total > quiet +
 50 % of quiet), or a name fires ≥ 2× overlapped that never fired quiet. At n = 5 windows
 the probe catches only a gross rise; finer drift is left to C9 in production. If the quiet
 arm shows a rotating red in more than 5 of 10 runs, the section is no usable probe and
-WebGL 2 timing-sensitive pairing stays unqualified. Known signatures (charged to 1456,
+WebGL 2 timing-sensitive pairing stays unqualified. Known signatures (charged to
 1292, or charged during the test) stay charged but are compared as a **rate per run** of
 the same section and backend in both arms (F10): the quiet arm has ≥ 10 runs per section
 (the §4.2 references plus same-build quiet logs), and qualification FAILs if a signature's
@@ -177,7 +179,7 @@ stays only if not worse.
 
 | Topic | A | B | Decision and reason |
 |---|---|---|---|
-| Pair count | 13 pairs, ≥ 30 known-green member runs | 12 pairs, 3 pairings × 4 | 20 pairs in 4 blocks; A's statistical floor (30 green member runs → 9.5 % bound) is the binding number, B's count carried no bound. |
+| Pair count | 13 pairs, ≥ 30 known-green member runs | 12 pairs, 3 pairings × 4 | 20 pairs in 4 blocks; the binding number is the §4.3 per-pair bound (13.9 %); A's 9.5 % figure is withdrawn there, B's count carried no bound. |
 | WebGL 2 villager-dress ‖ water-stand-table WebGL 2 | not proposed | 4 pairs | Rejected: water-stand-table WebGL 2 is red on every recent run (charged), so it detects nothing, and the coincident sum (16 + 49 + 23 = 88–89 %) is inadmissible under C1. |
 | Mixed-backend pair | villager-dress WebGPU ‖ water-jar-carried WebGL 2 | adult-errands WebGL 2 ‖ villager-dress WebGPU | Both kept: B's is A's timing probe (block 1); A's is the production both-backend case (block 2, 7 pairs so the green floor is reached). |
 | Reference order | all references first, then pairs | interleaved, varied order | Block-wise: references directly before their block; launch order alternates. Bounds host drift at no extra host time while keeping A's stop-at-first-FAIL. |

@@ -65,26 +65,6 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 1456,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /he was still squatting ashore, unloading, before and after the shutter/i,
-    why:
-      'FILED AS 1456 ON 27.10.2026: {before:true,after:false} on WebGPU 9bb6e1736 and 1e681ce07 '
-      + '(26.10.) and WebGL 2 30a5b55f5 (27.10., under load) - a shutter-timing verdict on unrelated '
-      + 'heads. 1456 owns reading the pose from the shutter frame; the charge dies with that point.',
-  },
-  {
-    point: 1456,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /the river-bank frame: the foam it was aimed at is still in the picture after the shutter/i,
-    why:
-      'FILED AS 1456 ON 27.10.2026: drifted 13.22 m at lead 6 m on WebGPU 9bb6e1736 (26.10.) and '
-      + 'WebGL 2 30a5b55f5 (27.10.); WebGL 2 main f57fa3250 clean. Same shutter-timing class as the '
-      + 'canoe red; 1456 owns it.',
-  },
-  {
     point: 1292,
     backend: 'webgpu',
     featureLevel: 'compatibility',
@@ -290,6 +270,42 @@ export const RED_CHARGES = [
       'Measured 29.09.2026 on the same webgl pass: sawOnWater false, landed true. The purposeful '
       + 'crossing is suspected to arrive or end early since the 1234 arrival snap or shy-ring '
       + 'interruption. Point 1236 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1468,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^Traveller \(low\): his head stands at villager height/i,
+    why:
+      'FILED AS 1468 ON 30.10.2026: headRise 1.352-1.356 m against the 1.35 m bound on 54b326987 and '
+      + 'a48606517, red before the 1462 cleanup. The charge dies with 1468.',
+  },
+  {
+    point: 1469,
+    suite: 'touch',
+    kind: 'check',
+    match: /^lifting the stick stops the walk/i,
+    why:
+      'FILED AS 1469 ON 30.10.2026: red under load in the a48606517 LARGE, green alone on a quiet '
+      + 'machine; the settle wait is load-sensitive. The charge dies with 1469.',
+  },
+  {
+    point: 1470,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /^a caught child was photographed standing slumped clear of the run/i,
+    why:
+      'FILED AS 1470 ON 30.10.2026: no caught child shot inside the window in the d6fe67e7c closing '
+      + 'LARGE (WebGL 2); a frame-acquisition red seen before on WebGPU. The charge dies with 1470.',
+  },
+  {
+    point: 1471,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^the filmed errand adult walks on between moving-capture frames 1 and 2/i,
+    why:
+      'FILED AS 1471 ON 30.10.2026: red without detail in the d6fe67e7c closing LARGE (WebGL 2); '
+      + 'test-only moving capture. The charge dies with 1471.',
   },
   {
     point: 1217,
@@ -2034,7 +2050,23 @@ export const RED_CHARGES = [
     why:
       'MEASURED 02.10.2026 on feat/1129 001ef76f1, webgl/polish-speech (speech-owner): 16 close pairs '
       + 'tried, sight clear but every tail off its anchor — first occurrence since point 1238 landed, the '
-      + 'section alone green on the same head; point 1270 owns the pair staging. The charge dies with point 1270.',
+      + 'section alone green on the same head; point 1270 owns the pair staging. The same signature on webgpu '
+      + 'in the whole-suite run 2026-10-29T03-48-21-257 (tails false), the section alone green on webgpu at 97ecef7d0 '
+      + '(point 1465), so the charge holds on both backends. The charge dies with point 1270.',
+  },
+  {
+    point: 1270,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^two close speakers are shot unobstructed, each tail on its own speaker.s anchor, the older note receded and neither targeted \(point \d+\)$/i,
+    why:
+      'MEASURED 02.10.2026 on feat/1129 001ef76f1, webgl/polish-speech (speech-owner): 16 close pairs '
+      + 'tried, sight clear but every tail off its anchor — first occurrence since point 1238 landed, the '
+      + 'section alone green on the same head; point 1270 owns the pair staging. The same signature on webgpu '
+      + 'in the whole-suite run 2026-10-29T03-48-21-257 (tails false), the section alone green on webgpu at 97ecef7d0 '
+      + '(point 1465), so the charge holds on both backends. The charge dies with point 1270.',
   },
   {
     point: 642,
@@ -2051,18 +2083,6 @@ export const RED_CHARGES = [
       + '(25.10.2026, feat/1333 a2ed3ff3d webgpu, uncharged as cut), and what the bound removes is the '
       + 'tail of the phase list and the carrier distance; the signature "no order in 180 s" sits at '
       + 'the front, clear of the bound. The charge dies with point 642.',
-  },
-  {
-    point: 1448,
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^at least three unhidden fish are in the frame, each at least 25 px long$/i,
-    why:
-      'FILED AS 1448 ON 25.10.2026: red on main 6bd82b3ae and on feat/1414 9469159b5, webgpu, '
-      + 'villager-canoe section alone: the third fish ray hits an unnamed BoxGeometry first. '
-      + 'The charge dies with point 1448.',
   },
   {
     point: 1449,
@@ -2088,4 +2108,100 @@ export const RED_CHARGES = [
       + 'owned by no open point; from the calf-shield-river work of 1297 (calf-in-water). '
       + 'The charge dies with point 1449.',
   },
+  {
+    point: 1395,
+    suite: 'polish-speech',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the man and his word offer their keys at the same time \(point 1139\)$/i,
+    // Only the measured shape: the drummer's prompt stands while a villager's note is targeted.
+    detailMatch: /^\{"prompt":"Space — Ask the drummer","invite":"E — guess meaning","targeted":"villager-\d+","guessKeyArmed":true\}$/,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
+      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
+      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
+      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
+      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
+      + 'note is left to target. The charge dies with point 1395.',
+  },
+  {
+    point: 1395,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the man and his word offer their keys at the same time \(point 1139\)$/i,
+    // Only the measured shape: the drummer's prompt stands while a villager's note is targeted.
+    detailMatch: /^\{"prompt":"Space — Ask the drummer","invite":"E — guess meaning","targeted":"villager-\d+","guessKeyArmed":true\}$/,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
+      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
+      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
+      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
+      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
+      + 'note is left to target. The charge dies with point 1395.',
+  },
+  {
+    point: 1395,
+    suite: 'polish-speech',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the drummer.s arm is raised in the pointing frame \(point 1272\)$/i,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
+      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
+      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
+      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
+      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
+      + 'note is left to target. The charge dies with point 1395.',
+  },
+  {
+    point: 1395,
+    suite: 'polish-speech',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the drummer.s arm is raised in the pointing frame \(point 1272\)$/i,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
+      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
+      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
+      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
+      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
+      + 'note is left to target. The charge dies with point 1395.',
+  },
+  {
+    point: 1466,
+    suite: 'polish-speech',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^no two Ctrl labels fuse in the village crowd/i,
+    // The sustained shape only (two or more fused frames); the single-frame shape stays 1010's.
+    detailMatch:
+      /^(?:[2-9]|[1-9]\d+)\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), \d+ of them at the \d+ px unreadable bar, deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — the unreadable overlap STANDS$/i,
+    why:
+      'MEASURED 29.10.2026 by point 1465 on 56d0a9ae6, whole polish-speech on webgl (2026-10-29T06-29-04-941): '
+      + '50/90 frames fused, 22 at the unreadable bar, Child×Child; --section=ctrl-actor-labels alone green on the '
+      + 'same head, webgpu whole run clean. Filed as point 1466. The charge dies with point 1466.',
+  },
+  {
+    point: 1472,
+    suite: 'communication',
+    kind: 'check',
+    match: /^continuous route at 8-downstream-destination: No traversable route\b/i,
+    why:
+      'MEASURED 30.10.2026 in the v0.3.1 closing LARGE on aed84aa2f (webgpu): the traveller stood on a water cell near '
+      + 'Bandiagara and no route led to the step-8 target. The section alone on the same head passed step 8. Filed as '
+      + 'point 1472. The charge dies with point 1472.',
+  },
+  {
+    point: 1473,
+    suite: 'communication',
+    kind: 'check',
+    match: /^continuous route at [^:]+: continuous route has no browser errors — \[ASSERT\] adult-atom-lost — bambara-village: water-back\b/i,
+    why:
+      'MEASURED 30.10.2026, communication --section=continuous-route alone on aed84aa2f (webgpu): the errand '
+      + 'assert fired for a Bambara water-back pair forced after 240 s. Filed as point 1473. The charge dies with point 1473.',
+  },
+
 ]

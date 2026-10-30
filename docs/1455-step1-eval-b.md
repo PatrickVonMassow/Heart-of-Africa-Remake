@@ -1,6 +1,6 @@
 # 1455 step 1: blind evaluation B (GPT-6.1 Sol, cross lane)
 
-Verbatim answer to the neutral question below. Material note: ask-lane dropped scripts/verify/run-wait.mjs and scripts/verify/run-digest-core.mjs for its budget, so B saw the three docs, README, _server.mjs and run-all.mjs only.
+Verbatim answer to the neutral question below. Material note: ask-lane dropped scripts/verify/run-wait.mjs and scripts/verify/run-digest-core.mjs for its budget, so B saw the three docs, a truncated README, _server.mjs and run-all.mjs only.
 
 ## Neutral question
 

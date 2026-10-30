@@ -2,7 +2,7 @@
 // villager body"): sampling and blending the clips, forward kinematics on the
 // villager skeleton (identity rest rotations — a bone's rest is its offset),
 // the feet's contact heights, and the two-bone IK that warps a stride and puts
-// a hand where a contact wants it. The figure (scenes/place/gltfFigure.tsx)
+// a hand where a contact wants it. The figure (scenes/place/skinnedFigure.tsx)
 // writes the result onto its bones; the tests read it directly.
 
 import * as THREE from 'three/webgpu'
@@ -22,7 +22,7 @@ export const newPose = (bones: number): VillagerPose => {
   return { rot, hips: new THREE.Vector3() }
 }
 
-/** Clip time for a phase (0 … 1) or a time in seconds: loops wrap, the rest clamp. */
+/** Clip time for a time in seconds: loops wrap, the rest clamp. */
 export function clipTime(clip: VillagerClip, t: number): number {
   if (clip.kind === 'gait' || clip.kind === 'loop') {
     const d = clip.duration
@@ -64,7 +64,7 @@ export function sampleClip(clip: VillagerClip, t: number, out: VillagerPose): Vi
 /**
  * Blend poses: `into` = Σ wᵢ·poseᵢ / Σ wᵢ, rotations by normalized weighted
  * sum with every quaternion turned into the first one's hemisphere (exact for
- * two poses, smooth for more), the hips linearly.
+ * two equally weighted poses, smooth otherwise), the hips linearly.
  */
 export function blendPoses(parts: ReadonlyArray<{ pose: VillagerPose; w: number }>, into: VillagerPose): VillagerPose {
   const total = parts.reduce((s, p) => s + Math.max(0, p.w), 0)
@@ -235,7 +235,8 @@ export interface GaitClips {
  * distance one cycle covers (blended) and so the phase advance per unit
  * walked — the planted foot sweeps exactly the distance walked, so it holds
  * its spot (point 1295's no-slide) at every speed and body size. All three
- * clips start at the left heel strike (phase 0), so they blend in step.
+ * clips start at the left foot's landing (phase 0; the sprint lands on the
+ * ball), so they blend in step.
  */
 export function gaitAt(clips: GaitClips, speed: number, legScale: number) {
   const w = gaitWeights(speed, legScale)

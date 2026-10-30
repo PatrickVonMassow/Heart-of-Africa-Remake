@@ -163,9 +163,18 @@ describe('computeFingerprint', () => {
     newRevert.reverts.push({ hash: 'r2', subject: 'Revert "y"' })
     expect(computeFingerprint(newRevert)).not.toBe(a)
 
+  })
+
+  // POINT 1308 (U7): a TASKS-only change no longer re-arms the currency guard.
+  it('stays equal when only the process points change — a tick or a new point', () => {
+    const a = computeFingerprint(base())
     const tickedPoint = base()
     tickedPoint.processPoints[0].done = true
-    expect(computeFingerprint(tickedPoint)).not.toBe(a)
+    expect(computeFingerprint(tickedPoint)).toBe(a)
+    const newPoint = base()
+    newPoint.processPoints.push({ num: 1308, done: false, title: 'Cut round-trips' })
+    expect(computeFingerprint(newPoint)).toBe(a)
+    expect(computeFingerprint({ ...base(), processPoints: [] })).toBe(a)
   })
 
   it('is total on empty/missing input', () => {

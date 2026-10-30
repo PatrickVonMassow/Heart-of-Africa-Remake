@@ -124,7 +124,7 @@ export function castCarriedJarShadow({ who, name, on }) {
 }
 
 /** A pixel counts as changed when its summed RGB difference reaches this. */
-export const PIXEL_CHANGE_THRESHOLD = 36
+const PIXEL_CHANGE_THRESHOLD = 36
 /** The fewest changed pixels that count as a jar drawn on the screen: a jar at
  *  reading distance covers thousands; a few dozen is the background shimmering. */
 export const MIN_JAR_PIXELS = 150

@@ -792,8 +792,8 @@ CI free.
   `polish-villagers` (gestures, canoe, mute shore, wedged adults, well,
   stations, loom, errands) — so a red costs only its own theme's pass. Every
   section kept its name, its checks and its frames. The boot, the frame shutter,
-  the console-error gate and the helpers two themes share (`check`,
-  `nextFrames`, `stepUntil`, `goToPlace`, `probeSilhouetteFooting`) live in
+  the console-error gate and the shared helpers (`check`,
+  `nextFrames`, `stepUntil`, `goToPlace`) and `probeSilhouetteFooting` live in
   `_polish.mjs`, whose top-level await boots the page; each theme calls
   `finishPolishSuite()` last. An edit to `_polish.mjs` is prologue for all five
   themes. All five together are the whole former `polish`, and need

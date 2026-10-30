@@ -118,7 +118,8 @@ interface LiveInhabitant extends LiveSpot {
  * static layout and the herd itself were in its set). Every active inhabitant
  * at its own body radius, the extra movers (the chief's standing spot, the
  * fishers) as they are, and the traveller at his radius. Circles come from
- * `pool`, so a frame allocates nothing once the pool has grown.
+ * `pool`, so once the pool has grown a frame allocates no colliders (only the
+ * small `circle` helper closure).
  */
 export function liveFigureColliders(
   out: Collider[],

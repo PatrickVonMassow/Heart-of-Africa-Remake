@@ -45,8 +45,9 @@ which is why the guard's refusal says *correct the point, not the ledger*.
 ## What enforces it
 
 `scripts/criticality-review-guard.mjs` (Stop hook, pure core +
-`criticality-review-guard-core.test.mjs`, fail-open) blocks the turn end when a
-point tagged HIGH is ticked without an **answered** review by a different model
+`criticality-review-guard-core.test.mjs`, fail-open) is SWITCHED OFF: its hook path
+exits silently, and `--status` reports the debt it once blocked the turn end for: a
+point tagged HIGH ticked without an **answered** review by a different model
 (or, for files no vendor can review, the verified-unavailability receipt below).
 
 It stands down for a paused batch, for a session that does not own the batch

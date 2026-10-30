@@ -35071,3 +35071,154 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Final state: each cause is measured (game or check) and fixed; both sections run green on both backends.
   Verifiable: both sections green on WebGPU and WebGL 2; a right-layer test per corrected cause.
   Bundle: Tierverhalten.
+
+- [x] 1459. Launcher successor decision "registered-writer-live" ignores bookkeeping files under .claude/
+  Queue position: directly before point 1347 (user 27.10.2026), i.e. after 1308, 642, 568, 1456 and 1202.
+  Final state: the launcher's successor decision "registered-writer-live" measures feature-writer activity in a feature worktree without counting bookkeeping files under `.claude/` (guard state, queue rank, fence ledgers, carrier bell and the like). Only real work output (source, docs, tests, commits) or a live writer process keeps the successor from spawning.
+  Evidence (27.10.2026, .claude/batch-launcher.log and .claude/autostart.log): owner 84f5f163 handed over at the context watermark at 22:05 Berlin. The launcher refused the successor at 22:05, 22:05 and 22:20 with "registered-writer-live — recent registered feature-writer activity measured for feat/1081-boxed-child-steering (/workspace/hoa/.claude/worktrees/point-1081)". The 1081 author's last commit was fc0d35497 at 21:42. After that only .claude/queue-rank.json (21:54) and guard state files (.claude/ci-status-guard-state.json, .claude/timestamp-guard-state.json, .claude/context-fence-ledgers/*, 22:00) changed, and no 1081 process was alive. The successor started only at 22:35 ("no owner lock — taking over"): 30 min of batch standstill shown on the board.
+  Verifiable: a test of the activity measurement: a worktree whose only fresh files lie under `.claude/` counts as idle; a fresh file under src/ or docs/ still counts as live.
+  Source: user-approved findings-carrier request "Launcher-Sperre registered-writer-live zählt Verwaltungsdateien unter .claude/ als Autorenarbeit" (user 27.10.2026 22:39: "Reihe das direkt vor 1347 ein."; approved "ja"; rev 2e5102147). Reproducible current-game blockade, CLAUDE.md §2 infrastructure-freeze exception.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
+  Queue position: directly before point 1347 (user 27.10.2026); the earlier binding to 1294 is fulfilled, 1294 has landed.
+  Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
+  Final state: recurring mechanical work the LLM now performs step by step runs as local scripts/hooks, so measurably fewer LLM round-trips are spent, while NO existing functionality is endangered.
+
+  SAFETY REQUIREMENT (binding for every change):
+   1. No existing functionality is endangered — not only checks, but everything the batch does today.
+   2. No new problems are introduced: deadlocks, hooks blocking each other, Stop-refusal loops, hanging or aborting scripts, half-executed chains.
+   3. Every unexpected error has a fallback: if a new combined command or self-repairing hook fails, the flow falls back to today's behaviour (the LLM runs the single steps, or gets today's refusal). The error is reported loudly, never swallowed. A crashing hook must never paralyse the batch.
+   4. Evidence: the analyses list the failure cases of every candidate; the final check examines exactly 1-3; tests cover the failure paths (aborting intermediate step, timeout, held lock, missing file, ...) and prove the fallback engages.
+
+  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
+   1. Analysis A (Opus 5.5) and Analysis B (GPT-6 Astra) run BLIND and in parallel. A starts from this point text (measurement and candidate list). B STARTS WITHOUT PRIOR KNOWLEDGE: it receives ONLY the neutral brief below, handed to it directly as a separate text, plus access to the raw material (session transcripts under ~/.claude/projects/-workspace-hoa, scripts/, .claude/settings.json, hooks, tests). B never sees the measurement, the candidate list, or point-brief output of this point. B measures and interprets on its own. Each analysis delivers further savings with measured shares and, per candidate, the failure analysis demanded by the safety requirement plus the test that proves it.
+      NEUTRAL BRIEF FOR B (verbatim): "Find activities the LLM sessions of this repository perform repeatedly that a local script or hook could take over, so that fewer LLM round-trips are spent. Measure from the transcripts yourself. For every proposed change show that no existing functionality is endangered, that no new problems arise (deadlocks, hooks blocking each other, refusal loops, hanging or aborting scripts, half-executed chains), and that every unexpected error falls back to today's behaviour with a loud report. Name the test that proves each of these."
+   2. A third, distinct model (neither A nor B; Fable 5.1 if node scripts/fable-switch.mjs --status permits, else Opus 4.8) checks both proposals thoroughly and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
+   3. The merged plan goes to the model of the OTHER vendor than the merger (GPT-6 Astra via scripts/review-astra.mjs) for a final check focused on the safety requirement. Only an approved plan is implemented; objections are fixed and re-checked first. At this stage Astra may see everything.
+   4. Implementation follows the approved plan, with the usual cross-vendor code review afterwards.
+
+  Candidates for A (starting points, not a closed list; NOT shown to B):
+   a) Merge fixed ritual chains into single commands that run silently and report only failures (e.g. focus set -> board now -> attest -> board-publish -> dashboard-guard --synced; batch-boundary --prepare -> --commit -> --clear).
+   b) Timestamp/header: stop the LLM re-measuring the time and stop exact-minute refusals (tolerance, or header set outside the LLM).
+   c) Stop hooks that self-repair mechanical causes instead of refusing (unpushed main where pushing is permitted, dashboard/focus sync, carrier drain), leaving the LLM only cases needing judgment.
+   d) Retrospective / beginner-guide currency: a script pre-collects the raw delta; LLM only words it; or lower trigger frequency.
+   e) Screenshot pre-filter by pixel metric before LLM inspection (low priority, 1.7 %).
+   f) Small: finding.mjs syntax in hook texts (removes --help calls); more compact point-brief output.
+  Infrastructure-freeze fit: a simplification (fewer steps, no new guards); a new script replaces steps, never adds a check.
+
+  Tests: every changed hook/script keeps or extends its node tests; each merged chain has a test proving it performs every step the old chain did, fails loud on the same conditions, and falls back on injected failures. Evidence of saving: re-run the 05.10. measurement on a comparable later corpus and report calls and cache-read share before/after.
+  Bundle: Session- & Repo-Hygiene.
+  USER, verbatim:
+  05.10.2026: "Reihe einen Punkt für solche Vereinfachungen direkt nach 1294 ein. Der soll aber nicht einfach nur die von dir erwähnten Änderungen durchführen, sondern vorher sehr gründlich prüfen, ob zum einen noch mehr eingespart werden kann und zum anderen durch die Umbauten nichts kaputt geht. Das soll mit sechs Augen passieren, also ein anderes Modell soll blind vom ersten die selbe Analyse machen und ein drittes die Vorschläge nochmal gründlich prüfen und zusammenführen."
+  05.10.2026: "Und dieses Mal noch ein Schritt weiter: Die zusammengeführte Lösung durch das dritte Modell noch dann noch einmal dem Modell des anderen Anbieters zur Abschlussprüfung gegeben werden. Ich will ganz sicher gehen, dass wir uns mit so einem Umbau nichts kaputt machen."
+  05.10.2026: "Für die Opus 5.5-Seite ist es okay, mit deiner Liste zu starten, weil du ja auch Opus 5.5 bist, aber Astra sollte ohne Vorwissen starten."
+  05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
+  05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
+  05.10.2026: "ja, aber nach 1294"
+  Progress (28.10.2026, owner Opus 5.5): step 1 done — blind halves filed as docs/four-eyes/1308-blind-a-opus5.* and 1308-blind-b-sol.* (B's ask-lane material was cut to 199877 characters, corpus partly dropped, settings.json missing; the merger re-checked B against the code). Step 2 done — Fable 5.1 union docs/four-eyes/1308-union.json (10 A + 6 B → 12, 8 kept, 4 rejected, counted by blind-merge) and plan docs/1308-merged-plan.md. Step 3 — GPT-6.1 Sol final check: PLAN NEEDS FIXES, 5 objections (U1 ×2, U2, U4, U6; log local/1308-final-check.log), being answered by the merger, then re-checked.
+  Progress (28.10.2026, 06:07): Sol re-check round 1 (local/1308-final-check-2.log) — the five objections RESOLVED, one new: find/sed in U4's sealed read list allow -delete / 'w file'; the merger dropped find, sed and rg from that list and closed tail -f and git --output (round-2 section in docs/1308-merged-plan.md). NEXT: a third Sol check (ask-lane --lane cross --kind audit --anyway, same files plus local/1308-final-check-2.log); only on PLAN APPROVED does step 4 (implementation) start.
+  Progress (28.10.2026, 11:45): Sol re-check round 2 (local/1308-final-check-3.log) — all earlier objections RESOLVED, two new against U4's git read list: `git remote -v remove origin` passed the prefix, `--ext-diff`/`--textconv` run configured helpers. The merger Fable 5.1 (local/1308-merger-round3.log) confirmed both for the explicit forms (remote -v and worktree list now complete anchored forms, --ext-diff/--textconv/--edit-description denied, negative tests named) and rejected the default helper path with reasons (pre-seal configuration, nothing on the list can install a helper); round-3 section in docs/1308-merged-plan.md.
+  Progress (28.10.2026, 12:05): Sol round 4 (local/1308-final-check-4.log) held A8 (default helper path) and raised A1 against U2 (a SIGTERM-ignoring child holds the timeout and the board lock). Owner decision under the split rule, for veto: U4 (sealed boundary lets reads through, ~1 % rt) leaves the plan after three rounds of objections; sealed Bash reads stay denied as today. Merger Fable 5.1 (local/1308-merger-round4b.log; its first answer local/1308-merger-round4.log was refused by ask-lane as unusable) recorded the drop as A9 and answered A1 as A10 (killSignal SIGKILL with the timeout, SIGTERM-ignoring fixture test). NEXT: a fifth Sol check (plan plus local/1308-final-check-4.log and local/1308-merger-round4b.log); only on PLAN APPROVED does step 4 start.
+  Progress (28.10.2026, 12:15): Sol round 5 (local/1308-final-check-5.log) — PLAN APPROVED, every earlier objection RESOLVED, no new findings; round-5 section in docs/1308-merged-plan.md. NEXT: step 4, implementation of U3, U1, U6, U2, U8, U5, U7 in plan order on feat/1308-ritual-roundtrips, then the cross-vendor code review.
+
+- [x] 1448. Villager canoe: the third hauled fish is hidden behind an unnamed box
+  Queue position: directly before the v0.3.1 release point 1462 (owner decision 28.10.2026, Opus 5.5, for veto: the v0.3.1 release's closing ladder went red on main e581bec79 on this point; the release spec fixes a red before tagging).
+  Final state: `polish-villagers --section=villager-canoe` is green on WebGPU again: "at least three unhidden fish are in the frame, each at least 25 px long" passes, or the cause is named and fixed — either a product occlusion (an unnamed `BoxGeometry` mesh sits between the boat's standing place and a fish in the hull: name it and decide whether it belongs there) or a fixture cause (the boat view or the fish ray). Its charge in scripts/render-verify-charges.mjs dies with this point.
+  Observed problem: red twice on 25.10.2026, WebGPU, section run alone: on main 6bd82b3ae and on feat/1414 9469159b5 (log local/verify-logs/2026-10-25T10-34-34-903-polish-villagers.log); two fish seen (72-84 px), the third (62-64 px) has the camera ray hit `BoxGeometry` first. Not caused by 1414 (its change is ashore only; the red stands on main).
+  Source: picture check of the 1414 landing, 25.10.2026.
+  Bundle: Dorfleben.
+  Evidence 28.10.2026 (owner Opus 5.5, branch feat/1448-canoe-fish-occluder 14e9ecd3b, pushed): cause is a FIXTURE one — the paddler's paddle is hidden during the haul via its group (`paddle.current.visible = false`), but `__placeRayHit` filtered only the hit mesh's own `visible`, so the raycaster still struck the invisible paddle blade (unnamed BoxGeometry). Fix: the hook now uses `shownInScene` (whole ancestry), Vitest added, the 1448 charge struck. WebGPU villager-canoe section: the fish check green twice (2df3a46e6), picture checked (three fish clear in the hull). WebGL 2 section (VERIFY_GL=webgl, 14e9ecd3b): the fish check green; both later runs. only red was 1456's "squatting ashore" {before:true,after:false}, charged to 1456.
+
+- [x] 1456. Two intermittent polish-villagers shutter-timing reds owned by no point
+  Queue position: directly before the v0.3.1 release point 1462, after point 1448 (owner decision 28.10.2026, Opus 5.5, for veto: the v0.3.1 release's closing ladder went red on main e581bec79 on this point; the release spec fixes a red before tagging; an intermittent red breaks a flake-free closing).
+  Final state: `npm test -- polish-villagers --section=villager-canoe` and the adult-errands river-bank block are green on both backends on a quiet machine, or each red is charged to its owning open point with the cause named: "he was still squatting ashore, unloading, before and after the shutter" (measured `{before:true,after:false}`) and "the river-bank frame: the foam it was aimed at is still in the picture after the shutter" (drifted 13.22 m at lead 6 m). The check reads the pose and the aim from the shutter frame itself.
+  Observed problem: WebGPU 9bb6e1736 and 1e681ce07 (26.10.2026), WebGL 2 30a5b55f5 (27.10.2026, under load); WebGL 2 main f57fa3250 clean on 26.10. Shutter-timing verdicts on unrelated heads; recorded in docs/backlog.md as a finding of 27.10.2026, filed now because the render-verify guard blocks on them (four unaccounted runs).
+  Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
+  Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
+  Bundle: Dorfleben.
+
+- [x] 1464. Clear the uncharged reds of the v0.3.1 closing regression
+  PROBLEM, measured 29.10.2026: the closing LARGE on main 54b326987 went red on WebGL 2
+  (13 suites; WebGPU not reached). Re-run alone on a quiet machine, these reds REPRODUCE
+  and carry no charge in scripts/render-verify-charges.mjs:
+  - touch --section=virtual-stick: "lifting the stick stops the walk — settled" (the walk
+    does not stop when the stick is released);
+  - world: a click times out because `.dialog-backdrop` intercepts pointer events after 7
+    checks (local/verify-logs/2026-10-29T00-55-43-773-world.log);
+  - polish-speech: "the speaking figure itself stands in the frame, under its note"
+    0/8 frames — label bottom 556 below body 547;
+  - enrichments --section=calf-crossing-flee: the archived crossing ends on mountain
+    terrain 13 m up, not on its bank target (likely the safeBankTarget swim-out change);
+  - polish-villagers --section=village-loom: the station stands 62 px, not ≥ 70 px, from
+    the plaza;
+  - polish-villagers --section=villager-canoe: 2/5 children seen from behind the upstream rock;
+  - polish-villagers --section=mute-shore-scene (boatman reading) and water-stand-table
+    (3 fails, the jar leaves the plank before the hand holds it) — charge status to confirm;
+  - polish-villagers --section=adult-errands: new red "the jar's mouth is tipped under the
+    water surface" (0.04 mm above) plus one console error.
+  Load artefacts on the quiet machine (green, nothing to do): flow, enrichments
+  traveller-figure, polish-villagers village-walk.
+  FINAL STATE: each listed red is fixed, or charged to a named open point when it is a known
+  defect outside this release; the closing LARGE of point 1462 can then run on the fixed HEAD.
+  Split per suite when it does not converge. Criticality: high — blocks the v0.3.1 release.
+  Test: each named suite/section green on both backends (touch on WebGL 2).
+  Queue position: directly before point 1462 (a red closing run is fixed first).
+  Source: the closing run of point 1462, findings recorded 29.10.2026 00:59–01:31 UTC.
+  RE-MEASURED 29.10.2026 04:05–04:18 on main cf77ff4, WebGL 2, quiet host: touch virtual-stick
+  GREEN (2 pass); enrichments calf-crossing-flee, village-loom, villager-canoe, mute-shore-scene and
+  water-stand-table are charged to open points 1236, 1266, 1381, 1265, 1435 (chargeFor); adult-errands
+  now reds only on checks charged to 568 (rim band, plate water) and 642 (stand order), the jar-mouth
+  red did not recur. STILL UNCHARGED AND REPRODUCING: polish-speech speech-hypothesis (body 547,
+  label bottom 556, 0/8; SpeechLabels/SpeechLabelCard unchanged since 15.10., so look at the figure
+  scale or the crown anchor) and world (`.dialog-backdrop` intercepts the click, TimeoutError after 8 pass).
+  Bundle: unbundled (release gate, travels with 1462).
+
+- [x] 1465. Clear the uncharged WebGPU reds of polish-speech before the v0.3.1 closing
+  PROBLEM, measured 29.10.2026 04:57-04:59 Europe/Berlin on WebGPU, identical on a clean main
+  66df922f7 and on feat/1464-closing-reds 7b616b501 (so not caused by point 1464): the v0.3.1
+  closing LARGE of point 1462 never reached WebGPU, and there `polish-speech` carries reds no
+  entry in scripts/render-verify-charges.mjs charges:
+  - --section=chief-to-drummer: "the man and his word offer their keys at the same time
+    (point 1139)" fails in both attempts ({prompt: "Space — Ask the drummer", invite:
+    "E — guess meaning", targeted: villager-0, guessKeyArmed: true});
+  - --section=chief-to-drummer: "the drummer's arm is raised in the pointing frame (point 1272)"
+    fails the first attempt (restHandY 0.645, shotHandY 0.640) and passes the retry;
+  - --section=speech-owner: "two close speakers are shot unobstructed, each tail on its own
+    speaker's anchor…" red in the whole-suite run 2026-10-29T03-48-21-257 (tails false); the
+    charge to point 1270 is scoped to webgl only.
+  Neither chief-to-drummer check appears red in any earlier kept log.
+  FINAL STATE: each listed red is fixed, or charged to a named open point when it is a known
+  defect outside this release; the closing LARGE of point 1462 can then run on the fixed HEAD.
+  Split per check when it does not converge. Criticality: high — blocks the v0.3.1 release.
+  Test: the named sections green on both backends.
+  Queue position: directly before point 1462 (a red closing run is fixed first).
+  Source: findings carrier 29.10.2026 04:00 "Uncharged WebGPU reds in polish-speech block the
+  v0.3.1 closing", measured during point 1464.
+  Bundle: unbundled (release gate, travels with 1462).
+
+- [x] 1462. Release v0.3.1: tag the current main state as v0.3.1 and poc and publish both
+  Source: User order 28.10.2026 in chat session cf715472: "Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ und außerdem als v0.3.1 und veröffentliche diesen getaggten Stand unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/" — to come before the infrastructure-simplification point, so a known-good tagged state exists before the teardown. Wording approved by the user: "ja, beide so einreichen".
+  Final state: the current main state is released as version v0.3.1 by the named "version release" process, and `poc` points at the same commit.
+   1. Full closing run (CLAUDE.md §9, `scripts/closing-guard-core.mjs` CLOSING_STEPS, LARGE regression on both backends) green on the commit to release: main HEAD when this point starts (code freeze from then on). A red closing run is fixed first and the closing run repeated on the fixed commit; nothing is tagged on red.
+   2. The user's go for this release is given (user order 28.10.2026, quoted in Source); no further approval wait.
+   3. Tag `v0.3.1` at that commit; move `poc` to the same commit; push both tags.
+   4. Run the Pages deploy (a tag push does not rebuild) and verify that https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/ and https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ both serve that commit's build.
+   `v0.3.1` is frozen once cut.
+  Queue position: at the very top of the open work order, directly before the infrastructure-simplification point deposited with it (user order 28.10.2026).
+  Amendment (user decisions 29.10.2026 21:05, carrier request "1462: Abschlussreihenfolge", approved "ja"): "Zählt ein Lauf, in dem jedes Rot einem offenen Punkt zugeordnet ist, für 1462 als „grün“?" — "Ja." / "Reicht der erste LARGE auf 8e0b36861 plus ein LARGE auf dem endgültigen Commit, oder sollen beide Läufe auf dem endgültigen Commit stattfinden?" — "Ja, das reicht."
+   - "Green" in step 1 = every red charged to an OPEN point (scripts/verify/README.md point 550); an uncharged red, a red charged to a ticked/deferred point, or a crashed run still blocks.
+   - large-regression is satisfied by the first LARGE on 8e0b36861 (WebGL 2 local/verify-logs/2026-10-29T08-48-49-743-large.log, WebGPU local/verify-logs/2026-10-29T11-43-28-797-large.log, all reds charged); regression-after-cleanup needs ONE LARGE on both backends on the final release commit.
+   - Order (reviewed by GPT-6.1 Sol 29.10.2026 21:02): a. write and commit every doc closing step that may change files, then code AND doc freeze until the tag; b. switch off batch-doctor's index-mutating repair for the run (point 1467 stays open) and keep the machine quiet; c. start the LARGE on that commit as its own process with a durable log and receipt, WebGPU right after WebGL 2 when WebGL 2 holds only charged reds; d. afterwards only record closing-guard steps (no commit), then tag v0.3.1 + poc and verify the Pages deploy.
+  Bundle: unbundled (release).
+
+- [x] 1475. Cloud switch stays on until the user's explicit order: remove the 05.11. expiry prompt and the runbook's credit-bound commissioning limit
+  Source: User order 29.10.2026 (verbatim): "Dann nimm das automatische Ausschalten am 05.11. wieder raus. Lasse den Cloud-Schalter so lange eingeschaltet, bis ich ausdrücklich dazu auffordere, ihn auszuschalten - unabgängig vom Gratis-Volumen." Approved: "freigegeben". Reason: one cloud author beside local acceptance measured about 20 % faster (3.12 → 2.53 h per landed point, docs/1452-throughput-inventory.md); the user accepts the extra plan-volume overhead and watches the volume personally. Without this change, the switch's EXPIRED notice and the runbook's "commission only … before then" bound would stop cloud commissioning on 05.11.2026 against the user's order. Spec cut from a48606517.
+  The cloud switch stays ON until the user explicitly orders it OFF, independent of the free cloud credits and their 05.11.2026 expiry.
+  Final state:
+  - `scripts/cloud-switch-core.mjs`: the credit-expiry line in `--status` no longer says "EXPIRED: revisit the switch now" (or any revisit prompt); either drop the expiry line or state it as information only ("free credits expire …; switch stays as set until the user orders otherwise"). `CREDIT_EXPIRY`/its comment adjusted accordingly; `scripts/cloud-switch-core.test.mjs` updated to match.
+  - `docs/batch-owner-runbook.md` ("Throughput with cloud authoring", Bounds): remove "Credit (expires 05.11.2026): commission only what local acceptance can land before then." and the expiry-driven wording in the "After 1443 alone" paragraph where it reads as a stop rule; cloud commissioning continues after 05.11.
+  - Any other repo text tying the switch's ON state to the credit expiry (grep `05.11`, `CREDIT_EXPIRY`, `credit` in scripts/ and docs/) is aligned the same way.
+  - No change to the switch state itself, to the bounds (1 cloud author, 1 waiting branch, 1 local heavy job), or to the probe requirement for `--on`.
+  Bundle: Session- & Repo-Hygiene.
+  Criticality: medium - without it cloud commissioning stops on 05.11.2026 against the user's order.

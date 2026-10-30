@@ -145,6 +145,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 18.09. vormittags | Ein Ein-Wort-Fix am Zeitstempel-Hook landete auf dem Zweig von Punkt 1155, weil die Sitzung „Current branch: main" aus ihrem Startschnappschuss glaubte, statt den Zweig des Arbeitsbaums zu messen; Cherry-Pick auf main, Revert auf dem Zweig, und der neue Test fiel im Push-Tor erst noch am `windowsHide`-Audit durch (§3.288) |
 
 | 23.09. abends | Ein Nutzerauftrag, der kein Auftragspunkt ist, kommt nicht los: Nach dem regelkonformen Anspruch auf den Batch-Lock verweigerte die Leerlauf-Behauptung der Tafel JEDE Schreiboperation — auch die, die den Punkt erst angelegt hätte. Die beiden dokumentierten Auswege greifen nicht: `now <N>` braucht eine Warteschlangen-Karte, die aus TASKS.md gebaut wird, `closing <N>` einen gemergten Punkt. Durchgekommen bin ich nur, weil das board-first-Tor pro Zug genau einmal feuert — eine Einmal-Freigabe, kein vorgesehener Weg (§3.306) |
+| 29.10. abends | Vierter Wiedergänger von §3.271/§3.267, diesmal ohne `--gate`: Die Startpflicht `batch-doctor --repair` fand eine einzige geänderte Datei — die Zustandsdatei des Closing-Wächters, die der Vorgänger offen gelassen hatte — und stashte sie, obwohl sie den laufenden Prüflauf erkannt hatte (sie ließ `verification/` ausdrücklich draußen). Der Stash änderte den Index mitten in der Unit-Stufe des zweiten Abschluss-LARGE; die Integritätsprüfung brach den Lauf nach 8 m 41 s ab, bei 18 367 grünen Unit-Tests. Ein Neustart kostete gut zwei Stunden; der Fall steht als Punkt 1467 in der Arbeitsliste |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1749,7 +1750,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 28.10.2026, 06:42 · Quellen-Fingerprint: `b110270716ec…`
+Zuletzt aktualisiert: Freitag, 30.10.2026, 21:55 · Quellen-Fingerprint: `895192b3fd70…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1779,6 +1780,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A side window that claims the batch only queues the user's point and hands over at once — never propose or do further work after the claim | 2 | mittel | clear-claim-guard.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
+| Cloud switch stays ON until the user explicitly orders it OFF — regardless of free credits or their 05.11.2026 expiry | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Never measure a model's spend by commit trailers — unlanded, looping work has no commits and is the most expensive kind | 2 | mittel | commit-scope-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | container-ask-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
@@ -1795,7 +1797,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Pure read/search delegations (locate or summarize only) use subagent_type Explore, not general-purpose; writing, committing, verifying, authoring, review and suites keep their agent types | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either ; the main chain authors, the cross lane reviews; switch: lane-switch --lane scarce | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 155 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 159 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1812,6 +1814,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | never stretch a scoped user remark into a standing instruction or cite it as one | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Never commit, push or stage in the main tree while a LARGE/verify run is live there — the integrity teardown aborts it | 1 | niedrig | commit-scope-guard.mjs | ✔ Mechanismus |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | There is exactly one head session — this chat; every other session is headless and the user cannot be reached through it | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1864,10 +1867,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 107 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 179 Prozess-/Meta-TASKS-Punkte (davon 70 offen).
+Erfasste Quellen: 109 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 182 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
 
-<!-- RETRO-FINGERPRINT: b110270716ec101a922773c68a0769fdc3be178431bab437241b802fe2366c3b -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-28T05:42:08.943Z -->
+<!-- RETRO-FINGERPRINT: 895192b3fd70b70378581a266800b45f13f2b7c66466ae014db50729259accb9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-30T20:55:14.344Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

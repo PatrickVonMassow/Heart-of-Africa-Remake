@@ -77,6 +77,31 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1463. Drastic zero-based simplification of the whole infrastructure, analysed six-eyes with final cross-vendor check
+  Source: User order 28.10.2026 in chat session cf715472: "Wie wäre es mit einer gründlichen Analyse, die feststellt, ob wir nicht drastische Vereinfachungen der gesamten Infrastruktur durchführen können, durch die auch ganz viele der noch offenen Infra-Punkte obsolet würden?" and "Ja, drastisch bedeutet, auch ganze Säulen ersatzlos zu streichen und zahlreiche noch offene Infra-Punkte zu löschen. Reihe einen solchen Punkt vorne in der Queue ein - wie du sagst, mit sechs Augen und Nachkontrolle." Limits on new points were rejected as symptom treatment; the cause is the infrastructure's own complexity. Wording approved by the user: "ja, beide so einreichen".
+  Final state: the repository's infrastructure (scripts/ outside the game's verify suites, hooks in .claude/settings.json, guards, lanes, locks, ledgers, board, daemon, launcher, their docs) is drastically simplified from a zero base, and every open infrastructure point made obsolete by it is deleted from the work order.
+
+  Measured 28.10.2026: infrastructure ~326k lines against ~167k in src/; 93 guard files, 100 hook entries; of 82 points landed 14.-28.10. only 33 touched src/; the open queue grew 451 -> 467, with 133 "Session- & Repo-Hygiene", 41 "Testinfrastruktur", 33 "Modell & Wächter", 19 "Chat & Tafel" points. The 01.09.2026 freeze did not stop the growth: mechanisms that block each other keep producing "real blockades", each a regular fix.
+
+  SCOPE (user decision 28.10.2026): "drastic" includes deleting whole pillars without replacement (e.g. lane routing, batch lock, board, daemon) and deleting numerous open infrastructure points.
+
+  ANALYSIS QUESTIONS:
+   1. Zero base: what minimum does the game need to be built, verified and landed safely (build, lint, unit tests, browser suites on both backends, picture check, cross-vendor review, landing)? Everything beyond it must justify its existence.
+   2. Inventory of every mechanism: the incident it was built for and whether that risk still exists; its cost (lines, refusals in the session transcripts, points it caused); which other mechanisms it collides with.
+   3. Cause count over closed and open infrastructure points: how many arose from interaction between mechanisms rather than from a game problem.
+   4. Result: a delete/replace list (standard tools such as GitHub CI and branch protection instead of own guards where that fits), for every open infrastructure point the verdict "obsolete: yes/no" with reason, and a teardown order in which the game stays buildable, testable and landable after every step.
+
+  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
+   1. Analysis A (main chain, Opus 5.5) and analysis B (cross-vendor lane) run BLIND and in parallel from identical raw material (scripts/, .claude/settings.json, hooks, tests, docs, TASKS.md, docs/tasks-archive.md, session transcripts). B receives only the analysis questions above, not A's work.
+   2. A third, distinct model (Fable 5.1 if node scripts/lane-switch.mjs --lane scarce --status permits, else Opus 4.8) checks both and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
+   3. The merged plan goes to the model of the other vendor than the merger for a final check: does every step keep the game buildable and every remaining safety duty covered? Objections are fixed and re-checked.
+   4. The approved plan, with its list of points to delete, is presented to the user; deletion of mechanisms and points starts only after the user approves it. Other points continue meanwhile.
+   5. Implementation follows the approved plan in small landable steps with the usual cross-vendor code review. Deleted points move to docs/tasks-archive.md with the reason "obsolete by infrastructure simplification", not to docs/backlog.md.
+
+  Infrastructure-freeze fit: a deletion/simplification (CLAUDE.md §2); this point adds no mechanism.
+  Queue position: at the very top of the open work order, directly after the v0.3.1 release point (user order 28.10.2026).
+  Bundle: Session- & Repo-Hygiene.
+  Criticality: high — touches every batch mechanism.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
@@ -87,47 +112,6 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try. Point 1419 (cloud session_019XD8Qts48RxNzEfjXP9wSR, 27.10.2026) does not meet item 2 either: owner commits after the handover (capture subject fix, review fix) changed the tree, so build, lint and test:unit ran again before the merge; acceptance log local/1419-land.log.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
-  Queue position: directly before point 1347 (user 27.10.2026); the earlier binding to 1294 is fulfilled, 1294 has landed.
-  Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
-  Final state: recurring mechanical work the LLM now performs step by step runs as local scripts/hooks, so measurably fewer LLM round-trips are spent, while NO existing functionality is endangered.
-
-  SAFETY REQUIREMENT (binding for every change):
-   1. No existing functionality is endangered — not only checks, but everything the batch does today.
-   2. No new problems are introduced: deadlocks, hooks blocking each other, Stop-refusal loops, hanging or aborting scripts, half-executed chains.
-   3. Every unexpected error has a fallback: if a new combined command or self-repairing hook fails, the flow falls back to today's behaviour (the LLM runs the single steps, or gets today's refusal). The error is reported loudly, never swallowed. A crashing hook must never paralyse the batch.
-   4. Evidence: the analyses list the failure cases of every candidate; the final check examines exactly 1-3; tests cover the failure paths (aborting intermediate step, timeout, held lock, missing file, ...) and prove the fallback engages.
-
-  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
-   1. Analysis A (Opus 5.5) and Analysis B (GPT-6 Astra) run BLIND and in parallel. A starts from this point text (measurement and candidate list). B STARTS WITHOUT PRIOR KNOWLEDGE: it receives ONLY the neutral brief below, handed to it directly as a separate text, plus access to the raw material (session transcripts under ~/.claude/projects/-workspace-hoa, scripts/, .claude/settings.json, hooks, tests). B never sees the measurement, the candidate list, or point-brief output of this point. B measures and interprets on its own. Each analysis delivers further savings with measured shares and, per candidate, the failure analysis demanded by the safety requirement plus the test that proves it.
-      NEUTRAL BRIEF FOR B (verbatim): "Find activities the LLM sessions of this repository perform repeatedly that a local script or hook could take over, so that fewer LLM round-trips are spent. Measure from the transcripts yourself. For every proposed change show that no existing functionality is endangered, that no new problems arise (deadlocks, hooks blocking each other, refusal loops, hanging or aborting scripts, half-executed chains), and that every unexpected error falls back to today's behaviour with a loud report. Name the test that proves each of these."
-   2. A third, distinct model (neither A nor B; Fable 5.1 if node scripts/fable-switch.mjs --status permits, else Opus 4.8) checks both proposals thoroughly and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
-   3. The merged plan goes to the model of the OTHER vendor than the merger (GPT-6 Astra via scripts/review-astra.mjs) for a final check focused on the safety requirement. Only an approved plan is implemented; objections are fixed and re-checked first. At this stage Astra may see everything.
-   4. Implementation follows the approved plan, with the usual cross-vendor code review afterwards.
-
-  Candidates for A (starting points, not a closed list; NOT shown to B):
-   a) Merge fixed ritual chains into single commands that run silently and report only failures (e.g. focus set -> board now -> attest -> board-publish -> dashboard-guard --synced; batch-boundary --prepare -> --commit -> --clear).
-   b) Timestamp/header: stop the LLM re-measuring the time and stop exact-minute refusals (tolerance, or header set outside the LLM).
-   c) Stop hooks that self-repair mechanical causes instead of refusing (unpushed main where pushing is permitted, dashboard/focus sync, carrier drain), leaving the LLM only cases needing judgment.
-   d) Retrospective / beginner-guide currency: a script pre-collects the raw delta; LLM only words it; or lower trigger frequency.
-   e) Screenshot pre-filter by pixel metric before LLM inspection (low priority, 1.7 %).
-   f) Small: finding.mjs syntax in hook texts (removes --help calls); more compact point-brief output.
-  Infrastructure-freeze fit: a simplification (fewer steps, no new guards); a new script replaces steps, never adds a check.
-
-  Tests: every changed hook/script keeps or extends its node tests; each merged chain has a test proving it performs every step the old chain did, fails loud on the same conditions, and falls back on injected failures. Evidence of saving: re-run the 05.10. measurement on a comparable later corpus and report calls and cache-read share before/after.
-  Bundle: Session- & Repo-Hygiene.
-  USER, verbatim:
-  05.10.2026: "Reihe einen Punkt für solche Vereinfachungen direkt nach 1294 ein. Der soll aber nicht einfach nur die von dir erwähnten Änderungen durchführen, sondern vorher sehr gründlich prüfen, ob zum einen noch mehr eingespart werden kann und zum anderen durch die Umbauten nichts kaputt geht. Das soll mit sechs Augen passieren, also ein anderes Modell soll blind vom ersten die selbe Analyse machen und ein drittes die Vorschläge nochmal gründlich prüfen und zusammenführen."
-  05.10.2026: "Und dieses Mal noch ein Schritt weiter: Die zusammengeführte Lösung durch das dritte Modell noch dann noch einmal dem Modell des anderen Anbieters zur Abschlussprüfung gegeben werden. Ich will ganz sicher gehen, dass wir uns mit so einem Umbau nichts kaputt machen."
-  05.10.2026: "Für die Opus 5.5-Seite ist es okay, mit deiner Liste zu starten, weil du ja auch Opus 5.5 bist, aber Astra sollte ohne Vorwissen starten."
-  05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
-  05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
-  05.10.2026: "ja, aber nach 1294"
-  Progress (28.10.2026, owner Opus 5.5): step 1 done — blind halves filed as docs/four-eyes/1308-blind-a-opus5.* and 1308-blind-b-sol.* (B's ask-lane material was cut to 199877 characters, corpus partly dropped, settings.json missing; the merger re-checked B against the code). Step 2 done — Fable 5.1 union docs/four-eyes/1308-union.json (10 A + 6 B → 12, 8 kept, 4 rejected, counted by blind-merge) and plan docs/1308-merged-plan.md. Step 3 — GPT-6.1 Sol final check: PLAN NEEDS FIXES, 5 objections (U1 ×2, U2, U4, U6; log local/1308-final-check.log), being answered by the merger, then re-checked.
-  Progress (28.10.2026, 06:07): Sol re-check round 1 (local/1308-final-check-2.log) — the five objections RESOLVED, one new: find/sed in U4's sealed read list allow -delete / 'w file'; the merger dropped find, sed and rg from that list and closed tail -f and git --output (round-2 section in docs/1308-merged-plan.md). NEXT: a third Sol check (ask-lane --lane cross --kind audit --anyway, same files plus local/1308-final-check-2.log); only on PLAN APPROVED does step 4 (implementation) start.
-  Progress (28.10.2026, 11:45): Sol re-check round 2 (local/1308-final-check-3.log) — all earlier objections RESOLVED, two new against U4's git read list: `git remote -v remove origin` passed the prefix, `--ext-diff`/`--textconv` run configured helpers. The merger Fable 5.1 (local/1308-merger-round3.log) confirmed both for the explicit forms (remote -v and worktree list now complete anchored forms, --ext-diff/--textconv/--edit-description denied, negative tests named) and rejected the default helper path with reasons (pre-seal configuration, nothing on the list can install a helper); round-3 section in docs/1308-merged-plan.md.
-  Progress (28.10.2026, 12:05): Sol round 4 (local/1308-final-check-4.log) held A8 (default helper path) and raised A1 against U2 (a SIGTERM-ignoring child holds the timeout and the board lock). Owner decision under the split rule, for veto: U4 (sealed boundary lets reads through, ~1 % rt) leaves the plan after three rounds of objections; sealed Bash reads stay denied as today. Merger Fable 5.1 (local/1308-merger-round4b.log; its first answer local/1308-merger-round4.log was refused by ask-lane as unusable) recorded the drop as A9 and answered A1 as A10 (killSignal SIGKILL with the timeout, SIGTERM-ignoring fixture test). NEXT: a fifth Sol check (plan plus local/1308-final-check-4.log and local/1308-merger-round4b.log); only on PLAN APPROVED does step 4 start.
-  Progress (28.10.2026, 12:15): Sol round 5 (local/1308-final-check-5.log) — PLAN APPROVED, every earlier objection RESOLVED, no new findings; round-5 section in docs/1308-merged-plan.md. NEXT: step 4, implementation of U3, U1, U6, U2, U8, U5, U7 in plan order on feat/1308-ritual-roundtrips, then the cross-vendor code review.
 - [ ] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
   Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
   11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
@@ -256,13 +240,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it does not itself hide a product defect, but it may BE one, and
   it erodes the trust in a red that point 549 was built to restore.
 
-- [ ] 1456. Two intermittent polish-villagers shutter-timing reds owned by no point
-  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
-  Final state: `npm test -- polish-villagers --section=villager-canoe` and the adult-errands river-bank block are green on both backends on a quiet machine, or each red is charged to its owning open point with the cause named: "he was still squatting ashore, unloading, before and after the shutter" (measured `{before:true,after:false}`) and "the river-bank frame: the foam it was aimed at is still in the picture after the shutter" (drifted 13.22 m at lead 6 m). The check reads the pose and the aim from the shutter frame itself.
-  Observed problem: WebGPU 9bb6e1736 and 1e681ce07 (26.10.2026), WebGL 2 30a5b55f5 (27.10.2026, under load); WebGL 2 main f57fa3250 clean on 26.10. Shutter-timing verdicts on unrelated heads; recorded in docs/backlog.md as a finding of 27.10.2026, filed now because the render-verify guard blocks on them (four unaccounted runs).
-  Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
-  Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
-  Bundle: Dorfleben.
 - [ ] 1202. The dig picture's camera stand lies inside the settlement.
   Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
   PROBLEM, measured 23.09.2026 while repairing point 1198: `digPictureView` (scripts/verify/
@@ -282,12 +259,11 @@ put it is the mistake this line exists to stop.
   Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
   Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
   Bundle: Dorfleben
-- [ ] 1459. Launcher successor decision "registered-writer-live" ignores bookkeeping files under .claude/
-  Queue position: directly before point 1347 (user 27.10.2026), i.e. after 1308, 642, 568, 1456 and 1202.
-  Final state: the launcher's successor decision "registered-writer-live" measures feature-writer activity in a feature worktree without counting bookkeeping files under `.claude/` (guard state, queue rank, fence ledgers, carrier bell and the like). Only real work output (source, docs, tests, commits) or a live writer process keeps the successor from spawning.
-  Evidence (27.10.2026, .claude/batch-launcher.log and .claude/autostart.log): owner 84f5f163 handed over at the context watermark at 22:05 Berlin. The launcher refused the successor at 22:05, 22:05 and 22:20 with "registered-writer-live — recent registered feature-writer activity measured for feat/1081-boxed-child-steering (/workspace/hoa/.claude/worktrees/point-1081)". The 1081 author's last commit was fc0d35497 at 21:42. After that only .claude/queue-rank.json (21:54) and guard state files (.claude/ci-status-guard-state.json, .claude/timestamp-guard-state.json, .claude/context-fence-ledgers/*, 22:00) changed, and no 1081 process was alive. The successor started only at 22:35 ("no owner lock — taking over"): 30 min of batch standstill shown on the board.
-  Verifiable: a test of the activity measurement: a worktree whose only fresh files lie under `.claude/` counts as idle; a fresh file under src/ or docs/ still counts as live.
-  Source: user-approved findings-carrier request "Launcher-Sperre registered-writer-live zählt Verwaltungsdateien unter .claude/ als Autorenarbeit" (user 27.10.2026 22:39: "Reihe das direkt vor 1347 ein."; approved "ja"; rev 2e5102147). Reproducible current-game blockade, CLAUDE.md §2 infrastructure-freeze exception.
+- [ ] 1461. Cloud author clones judge the scarce lane OFF and stop on the serving-model tripwire
+  Queue position: directly after point 1308 (owner 28.10.2026: reproducible blockade of the cloud authoring flow the cloud switch makes the default).
+  Final state: a cloud-session clone of this repository, which carries no local lane-switch state, no longer stops a delegated Opus 5.5 author on the serving-model tripwire for admitted Fable 5.1 trailers on main; the owner checkout's tripwire keeps refusing a commit naming Fable 5.1 while the recorded switch is OFF. Narrowest fix under the CLAUDE.md §2 infrastructure freeze (e.g. the tripwire stands down for a session that does not hold the batch lock, as every other session guard already does per the house facts), no new guard.
+  Evidence (28.10.2026, owner 9c5950f8): cloud authors for 1308 (session_019XD8QvphJSWxogsH5cmKJf) and 642 (session_019XD8Qtdz4X4qrvHCwnZwbr) ended their sessions on "SERVING-MODEL TRIPWIRE: commit(s) 813efab, ffdeaa0, 873a1b5, 3bb62f1 … Fable 5.1 … refused because the recorded lane switch is OFF … no recorded switch state in this checkout; judged as off" (scripts/model-guard-core.mjs:129), nine Stop refusals each, after one commit (1308) and two commits (642); the owner checkout reads scarce ON (user 31.08.2026). Both were told by message to continue.
+  Verifiable: a test of the tripwire decision: no switch state plus no batch lock held → no stop; switch OFF in the owner session → today's refusal.
   Bundle: Session- & Repo-Hygiene.
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
@@ -320,6 +296,9 @@ put it is the mistake this line exists to stop.
   Fast loop (no 2 h build): rebuild only the clips from the bundled config and export them with the cached garments (local/villager-build/{body,garments,mask}.pkl; clips.build_clips + export.export via scripts/blender.mjs run), ~14 s, byte-identical to the full build for unchanged inputs; the full build is owed only for the final glb.
   CI charge (28.10.2026): run 40626999014 on feat/1454-jog-stance 06a3327 failed in shard-2/unit — the known no-slide red above (7.65 per leg, 0.004008 vs 0.004), reproduced locally; it closes with this point.
   Evidence 28.10.2026 (local author, Opus 5.5, branch head 246b51a49): jog restance with a low flight (clips.py `flight` 0.7) plus a runtime stance-foot grounding (VILLAGER_GLTF.runGround, commit 66e4b7a9d, own commit for veto) replace the walk share completely; villagerClipPose + villagerRig 47/47 green, airborne 0.25-0.33 and apex <= 5.24 cm at 1.70/3.40/3.81 m/s, worst slide at 7.65 per leg 0.00306 (was 0.004008). Measured cause: basis-body clips retargeted onto child proportions lift the stance foot (girl 3.3 cm), which no clip-only stance length fixes. Blocker: the full build (b030b8595, 7.25 MB) refits the garments because tailor() takes the clips as input; test:unit is then red 4 of 18273 in villagerFigureBody.test.ts (female child -1 morph follow 1.185 vs 1.157, already red at 06a332708) and villagerPenetrationReport.test.ts (one new build-pose row g-robe-chest under g-cape-chest 0.0061, female adult right upper arm); main's glb passes both. A refit retry is deterministic (~4.5 h) and buys nothing; point 1347 stage 1 rebuilds that construction and removes the penetration gate (point 1339), so the branch is rebuilt on its result. Still owed then: full build, covering browser suites, fresh-runner picture check, cross-vendor review.
+  CI charge (28.10.2026, owner): run 40670490523 on feat/1454-jog-stance 246b51a, first attempt red in fast (1) — src/render/villagerPenetrationReport.test.ts:222 "g-robe-chest: inner build upperArm.R g-cape-chest: expected false to be true"; the run's later attempt concluded success, which is SUSPECT and covers nothing. The rebuilt villager.glb or its refreshed penetration reports are the suspects; reproduce with npx vitest run src/render/villagerPenetrationReport.test.ts on the branch before landing.
+  Build stopped (28.10.2026 20:14, owner Opus 5.5): an orphaned full build (scripts/villager/build.mjs, ppid 1, 4 h old, step sheets,penetration) was stopped so the v0.3.1 closing runs on a quiet machine; the worktree keeps its partial uncommitted output (villager.glb, verification/villager-body PNGs) — discard it and rebuild from the branch head bc2b576db.
+  CI charge (29.10.2026, owner): run 40713828399 on feat/1454-jog-stance bc2b576 red in shard-1/2 unit — villagerFigureBody.test.ts:671 (female child stance 1.185 vs < 1.157) and villagerPenetrationReport.test.ts:164/180/222 (g-robe-chest inner build); the garment refit commit's reds. The cloud fixer session_019XD8QtpttouGtwzgDvF3j4 stopped on the clone tripwire (point 1461) without a push; it closes with this point.
 - [ ] 1398. Villager garments stage 3: skirts, loin flap, apron and girdle tails on driven column bones
   Queue position: directly after point 1347.
   Source: split from point 1347 on 21.10.2026 (owner decision under the standing split rule): point 1347 delivered stage 1 of the approved staged garment plan (docs/garment-merge-r9-1347.md, user decision on the board "Kleidungsplan stufenweise prüfen"); its user goal (user 12.10.2026: a walking villager's swing leg leaves its trouser leg behind; a child's hip cloth stands off the body like a diaper) is finished by this point and its siblings.
@@ -15853,6 +15832,7 @@ to land than a mechanism that needs a review.
   Bundle: Dorfleben.
   Further source: user bug report hoa-state-2026-10-21-3318564123 (2).zip (21:05:18Z), user words: "Warum bückt er sich, wenn er zum Häuptlingshütte zeit und warum zeigt seine Hand nicht geradeaus, sondern leicht nach unten." The man in dark blue points toward the chief's hut in a crouch with his arm slightly below horizontal - consistent with the measured release phase (arm pitch -1.71 to -1.50 while the crouch fires).
   Additional check: after the fix, the pointing hand aims level at the target while the gesture is held (not only at release); if it does not, split a separate point for the aim.
+  Owned browser checks (charged by point 1465, 29.10.2026, bisected to the 1295 glTF merge 2eb4f1384; trace: hand 0.65 -> 0.82 -> 0.34 squat -> rest within a second): polish-speech --section=chief-to-drummer "the drummer's arm is raised in the pointing frame (point 1272)" and "the man and his word offer their keys at the same time (point 1139)" green on both backends; strike both charges in scripts/render-verify-charges.mjs.
 
 - [ ] 1396. Two walking villagers stand inside each other at the village centre
   Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
@@ -15923,11 +15903,6 @@ to land than a mechanism that needs a review.
   Observed problem: `polish-villagers --section=villager-dress` on feat/1446 6e1622764, 25.10.2026 05:51-05:58 UTC, 22 villages visited in turn (`gpu-load` rows in local/verify-measure/villager-dress.jsonl): pipelines 64 -> 993 (~40 per village, never falling), JS heap 286 -> 1709 MB, renderer-tracked textures 56 -> 156; Chrome's `--type=gpu-process` RSS 0.4 -> 9.7 GB at ~1.35 GB per minute (host has 15 GB). In the full suite the earlier sections add to it and the GPU process was lost around the 16th village (point 1446). A player who travels village to village grows the same load without bound.
   Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
   Bundle: Session- & Repo-Hygiene.
-- [ ] 1448. Villager canoe: the third hauled fish is hidden behind an unnamed box
-  Final state: `polish-villagers --section=villager-canoe` is green on WebGPU again: "at least three unhidden fish are in the frame, each at least 25 px long" passes, or the cause is named and fixed — either a product occlusion (an unnamed `BoxGeometry` mesh sits between the boat's standing place and a fish in the hull: name it and decide whether it belongs there) or a fixture cause (the boat view or the fish ray). Its charge in scripts/render-verify-charges.mjs dies with this point.
-  Observed problem: red twice on 25.10.2026, WebGPU, section run alone: on main 6bd82b3ae and on feat/1414 9469159b5 (log local/verify-logs/2026-10-25T10-34-34-903-polish-villagers.log); two fish seen (72-84 px), the third (62-64 px) has the camera ray hit `BoxGeometry` first. Not caused by 1414 (its change is ashore only; the red stands on main).
-  Source: picture check of the 1414 landing, 25.10.2026.
-  Bundle: Dorfleben.
 - [ ] 1449. Two unowned calf-in-river reds in the enrichments suite on WebGPU
   Final state: `npm test -- enrichments --section=calf-crossing-flee` and `--section=calf-shield-river` are green on WebGPU on a quiet machine, or each red is charged to its owning open point with the cause named: "the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in" (measured `fallIn: true` at t 5.05 s, `chaseSwim: false`, `bouted: false`) and "a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up (calf-in-water)" (measured: parent killed in the water at frame 34, the lion feeds and leaves, the calf alive on the savanna bank — the shield-ahead swim never staged). The stale charge of "every predator fits the region and period" to point 1013 is removed (it passed). The WebGL 2 run of both sections is recorded.
   Observed problem: full enrichments run on WebGPU, 26.10.2026 03:21-03:42, main 64bed6b45, machine quiet UNVERIFIED: 314 pass, 5 fail; three charged (938, 1236 twice), these two owned by no open point. Both stem from the calf-shield-river work landed with point 1297. Log: local/enrichments-webgpu-run.log.
@@ -15975,3 +15950,135 @@ to land than a mechanism that needs a review.
   Criticality: low — verification debt; blocks the render-verify Stop guard. Needs a quiet machine.
   Bundle: Session- & Repo-Hygiene.
   Source: findings carrier 28.10.2026 04:10 'Enrichments covering run owed on both backends'.
+
+- [ ] 1466. Ctrl actor labels fuse over most frames in a whole polish-speech run on WebGL 2
+  Source: measured 29.10.2026 07:29 by point 1465 on feat/1465-polish-speech-webgpu-reds 56d0a9ae6,
+  whole `polish-speech` on WebGL 2 (log `local/verify-logs/2026-10-29T06-29-04-941-polish-speech.log`).
+  THE RED. "no two Ctrl labels fuse in the village crowd (point 628)": 50/90 frames held a pair fused
+  beyond 6 px (allowed 13), 22 at the 18 px unreadable bar, deepest 19 px ["Child"×"Child" 30×19 px],
+  16-19 labels in the sample. A SUSTAINED fusion, not the single-frame shape point 1010's charge owns.
+  `--section=ctrl-actor-labels` alone was green on WebGL 2 on the same head minutes later (9/0), which
+  does not close it; the WebGPU whole run of the same head had no such red.
+  Final state:
+  - The cause is measured: what the preceding sections leave behind (children's run state, crowd
+    density, camera) that makes two child labels sit in each other over half the sample; a real
+    label-placement defect is fixed in the labels, a staging leftover in the suite, no check weakened.
+  - Whole `polish-speech` on WebGL 2 shows the check green; the charge in
+    scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low - WebGL 2 only, whole-suite only; a player may see two child Ctrl labels overlap.
+
+- [ ] 1467. batch-doctor quarantine-stash aborts a live LARGE run
+  Source: findings carrier 29.10.2026 19:04. At 19:02 `batch-doctor --repair` stashed the owner's
+  uncommitted `.claude/closing-state.json` while the second closing LARGE on bcf9224ed was in its
+  unit stage; the repository-integrity teardown failed with "own index changed" and the LARGE
+  aborted red after 8m41s although all 18367 unit tests passed
+  (`local/verify-logs/2026-10-29T18-54-19-533-large.log`). The doctor had seen the live run (it kept
+  `verification/` out of the stash) and stashed anyway.
+  Final state:
+  - While a verify run is live, the doctor performs no index-mutating repair; it reports the dirty
+    file instead. `.claude/closing-state.json` is not treated as an unattributable concurrent edit.
+  Tests: a Vitest case in the doctor's test file for the live-run case.
+  Bundle: Testinfrastruktur.
+  Criticality: medium - a false red costs a full LARGE (2-3 h) and can stall a closing.
+
+- [ ] 1468. Traveller head-height check at low detail reads just above its bound
+  Source: findings carrier 30.10.2026 02:06. `enrichments --section=traveller-figure` on WebGL 2:
+  "Traveller (low): his head stands at villager height" red on 54b326987 (28.10.2026 LARGE, headRise
+  1.352 m) and a48606517 (30.10.2026, `local/verify-logs/2026-10-30T01-42-54-258-touch-enrichments.log`,
+  1.356 m) against the bound 0.95 < headRise < 1.35; green in the 29.10.2026 LARGE on 8e0b36861.
+  Not caused by the 1462 cleanup (red before it).
+  Final state:
+  - The cause is measured: whether the primitive (low) traveller figure stands too tall or the
+    reading samples a pose-dependent head height; the figure or the bound is corrected with that
+    reason, no check weakened without it.
+  - The check is green on WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - 6 mm over the bound at the low graphics level; hardly visible to a player.
+
+- [ ] 1469. Load-sensitive waits in touch virtual-stick and the enrichments river-mouth hygiene step
+  Source: findings carrier 30.10.2026 01:40/02:06. In the closing LARGE on a48606517
+  (`local/verify-logs/2026-10-29T22-40-04-498-large.log`, WebGL 2, UNDER LOAD) touch "lifting the
+  stick stops the walk — settled" was red and enrichments crashed at the river-mouth state-hygiene
+  `page.waitForFunction` (scripts/verify/enrichments.mjs:1245, 30 s timeout). Both were green alone on a
+  quiet machine 30.10.2026 03:05 (`local/verify-logs/2026-10-30T01-42-54-258-touch-enrichments.log`).
+  Final state:
+  - The touch settle wait (150 ms settle, then 200 ms drift < 0.1 m) cannot read a stalled frame as
+    "settled" or a resumed one as drift; the river-mouth return wait waits on the jump completing
+    with a cause-naming failure instead of a bare timeout.
+  - Both suites are green in a whole LARGE on WebGL 2; the touch charge is struck.
+  Tests: the existing Playwright checks.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-only; a false red costs a full LARGE.
+
+- [ ] 1470. Caught-child frame of the bank game finds no shot inside its window in a whole run
+  Source: v0.3.1 closing LARGE on d6fe67e7c, WebGL 2 (`local/verify-logs/2026-10-30T02-55-25-354-large.log`,
+  30.10.2026): polish-children `children-bank-game` "a caught child was photographed standing slumped
+  clear of the run, 10-14 m off (work-order 1239)" red — "no caught child could be photographed inside
+  the window" (caughtMoments 568, alone 160, outside 3840, crowded 10720, collider 800). The same
+  acquisition red was filed once before from a WebGPU run (archived, 19.10.2026) and closed by a quiet
+  re-run; it recurs inside a whole LARGE.
+  Final state:
+  - The cause is measured: whether the window or the standpoint search misses caught moments that exist
+    (568 seen, none shot), or the scene offers none clear of the run; the acquisition is fixed with that
+    reason, no check weakened without it.
+  - The check is green in a whole polish-children run on WebGL 2 and WebGPU; its charge in
+    scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-frame acquisition; no player impact shown.
+
+- [ ] 1471. Moving capture of the turning errand adult reads it walking on between frames 1 and 2
+  Source: v0.3.1 closing LARGE on d6fe67e7c, WebGL 2 (`local/verify-logs/2026-10-30T02-55-25-354-large.log`,
+  30.10.2026): polish-villagers `adult-errands` "the filmed errand adult walks on between moving-capture
+  frames 1 and 2 (point 1404)" red with no detail printed; not red in the earlier closing LARGE runs.
+  Final state:
+  - The check prints what it measured (positions/yaw of frames 1 and 2) and the cause is named: the
+    adult standing still across the freeze, or the freeze holding life still between the two exposures.
+  - The capture or the check is corrected with that reason; green in a whole polish-villagers run on
+    WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-only; a false red costs a full LARGE.
+
+- [ ] 1472. Continuous route's downstream step finds no route from a water standpoint near Bandiagara
+  Source: v0.3.1 closing LARGE on aed84aa2f, WebGPU (`local/verify-logs/2026-10-30T06-59-46-060-large.log`,
+  30.10.2026): communication `continuous-route` "continuous route at 8-downstream-destination: No
+  traversable route" — the traveller stood at lat 14.5628 / lon -3.8854 on terrain "water" (target
+  x -34, z -141, toast "Discovered: Bandiagara"). The section alone on the same head (09:58 run) passed
+  step 8, so it does not reproduce on every run.
+  Final state:
+  - The cause is measured: how the traveller came to stand on a water cell at the step-8 start (route
+    overshoot, river crossing, spawn) and whether a player can reach the same state.
+  - If a player can: the route or the movement keeps the traveller off untraversable water, with a unit
+    test; otherwise the test's standpoint is corrected with that reason. Green in a whole communication
+    run on WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: Vitest for a movement/route fix; the existing Playwright step.
+  Bundle: Testinfrastruktur.
+  Criticality: medium - possibly a player stuck on water; until measured, a false red costs a full LARGE.
+
+- [ ] 1473. Bambara errand adult lost in the water-back walk during the continuous route
+  Source: communication `continuous-route` alone on aed84aa2f, WebGPU (`local/verify-logs/
+  2026-10-30T09-58-38-857-communication.log`, 30.10.2026), step 9-fit-and-journal: the dev invariant
+  `[ASSERT] adult-atom-lost — bambara-village: water-back pair 2/3/walk: forced after 239.96s; overrun
+  situation water-out pair 3/2 (speaker blocked)`. Not seen in the closing LARGE runs.
+  Final state:
+  - The cause is measured: why pair 2/3's water-back walk never completes while pair 3/2's water-out
+    overruns with a blocked speaker (a mutual block between the two pairs or a lost goal).
+  - The errand completes or releases inside its bound with that reason fixed, with a unit test; the
+    assert stays loud. Green in a whole communication run on both backends; its charge is struck.
+  Tests: Vitest for the errand scheduler; the existing Playwright step.
+  Bundle: Dorfleben.
+  Criticality: medium - a villager stuck on an errand is player-visible.
+
+- [ ] 1474. Backlog-Befunde zur Infrastruktur in die Analyse und das Obsolet-Urteil von 1463 einbeziehen
+  Amendment to point 1463 (zero-based infrastructure simplification) — user remark 29.10.2026: "Schaut sich 1463 auch die ganzen Befunde an, die von Problemen angelegt wurden? Ich denke, die sollten berücksichtigt werden. Viele Probleme mit der aktuellen Infrastruktur sind ja wegen des Infra-Freezes nur dort festgehalten."
+  Measured 29.10.2026: 1463's raw material names "docs" only generically and its verdict list covers only open TASKS.md points. Under the infrastructure freeze (CLAUDE.md §2) many infrastructure findings were filed only in docs/backlog.md (109 sections; about 22 by title alone are about guards, hooks, lanes, batch, board, launcher, daemon, doctor, review, push or gate). Findings carried through the findings carrier landed in TASKS.md and are already covered.
+  Change to 1463:
+  1. Raw material for analyses A and B names docs/backlog.md explicitly, plus the closed entries of the findings carrier (memory/findings-carrier.md) as a record of incidents.
+  2. Analysis question 2 (inventory: the incident each mechanism was built for, its cost, its collisions) and question 3 (cause count) also count the backlog findings, not only work-order points.
+  3. Result (question 4) also gives, for every infrastructure entry in docs/backlog.md, a verdict "obsolete: yes/no" with reason; obsolete entries are closed in docs/backlog.md with the reason "obsolete by infrastructure simplification"; a non-obsolete entry that shows a real defect of the remaining infrastructure is named in the plan so the user can decide on it.
+  No new mechanism.
+  Bundle: Session- & Repo-Hygiene (amendment to 1463, rides with it).

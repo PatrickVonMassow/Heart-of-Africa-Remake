@@ -38,7 +38,7 @@ Both halves' authorship is UNVERIFIED in the count (no transcript path recorded)
 
 ## Decided disagreements (from the union, reasons in each entry)
 
-- Role keys `main`, `cross`, `scarce` (B's `alternate` not used) — U2.
+- Role keys `main`, `cross`, `scarce` (both halves use these names) — U2.
 - Opus 4.8 is a fallback field of `main`, not a lane; B's selected-identity descriptor layer
   rejected under the infrastructure freeze — U3.
 - Current and retired names collapse to their lane for every lane — U5.

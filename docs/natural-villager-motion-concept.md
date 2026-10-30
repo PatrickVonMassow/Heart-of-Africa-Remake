@@ -377,8 +377,8 @@ time and allocations before/after on both backends.
 
 **Step 20 — Evidence the point owes.** The research document
 `docs/research/natural-villager-motion.md` (final state 1; built from §1 of both halves
-plus §1 of this document as the measured diagnosis, with the source table of §5
-below); the before/after strip of step 1 for walk, turn, run, dig, pick-up, point,
+plus §1 of this document as the measured diagnosis, with its source table as its
+§4); the before/after strip of step 1 for walk, turn, run, dig, pick-up, point,
 chaser and caught child; the named Vitest cases of steps 9, 10, 15, 16; the port-city
 and river-bank pictures on both backends; the cross-vendor code review record.
 

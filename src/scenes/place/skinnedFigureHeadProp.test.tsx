@@ -51,7 +51,7 @@ it('keeps the head load on the drawn crown across a rig rebuilt in place', async
     expect(crowns).toHaveLength(1)
     return crowns[0].children.map((o) => o.name)
   }
-  // primitive-built skeleton first, then the glTF arriving, then a preset change
+  // code-built skinned body first, then the glTF arriving, then a preset change
   for (const l of [look(16, null), look(16, asset), look(24, asset)]) {
     await act(async () => root.render(<Stage l={l} />))
     expect(crownLoad()).toEqual(['basket'])

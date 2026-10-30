@@ -86,7 +86,8 @@ const CANOE_SEAT_Y = 0.1
 /** The hull's own rise over the water and its depth under the gunwale. */
 const CANOE_FREEBOARD = 0.18
 const CANOE_DEPTH = 0.28
-/** The hull fish lie this high over the hull's water line. */
+/** The hull fish's base height in their own group, whose offset cancels it:
+ *  the fish lie 2 cm over the freeboard plus their own heap offsets. */
 const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
 const BASKET_R = FISH_BASKET.radius
@@ -94,7 +95,8 @@ const BASKET_H = FISH_BASKET.height
 /** The rope's own axis and a scratch direction for orienting it. */
 const ROPE_UP = new THREE.Vector3(0, 1, 0)
 const ROPE_DIR = new THREE.Vector3()
-/** How long a fish hangs in the net at the gunwale as it comes up. */
+/** How long a fish takes to sink from its lift in the net at the gunwale as
+ *  it comes up; it hangs there for the rest of the haul. */
 const FISH_IN_NET_SECONDS = 1.4
 
 // --- Poses -------------------------------------------------------------------
@@ -230,7 +232,7 @@ function WovenBasket({ name, fishRef, fishGeometry, fishMaterial }: {
   )
 }
 
-/** Where fish `i` of `n` lies in a basket's heap (local), and its yaw. */
+/** Where fish `i` lies in a basket's heap (local), and its yaw and roll. */
 function basketFishSpot(i: number): { x: number; y: number; z: number; yaw: number; roll: number } {
   const a = i * 2.4
   const r = 0.07 + 0.05 * (i % 3)
@@ -246,10 +248,6 @@ function fishLength(i: number): number {
 
 // --- The dugout ----------------------------------------------------------------
 
-/**
- * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the
- * boat and the fire, because the two baskets pass between them every round.
- */
 /** What the fishers' fire needs of its settlement (point 1275): the thatch
  *  its cook-shelter is roofed with, the place's live wetness and its people. */
 export interface FisheryFireEnv {
@@ -261,6 +259,10 @@ export interface FisheryFireEnv {
 /** The fishers' fire's light at full flame, before the rain damps it. */
 const FISH_FIRE_LIGHT = 6
 
+/**
+ * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the
+ * boat and the fire, because the two baskets pass between them every round.
+ */
 export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverBank; cloth: readonly string[]; seed: number; fireEnv?: FisheryFireEnv }) {
   const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
@@ -366,7 +368,10 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     const t = clock.elapsedTime
     const nm = canoe.netMan
     const sources = () => [{ x: nm.x, z: nm.z, register: 'call' as const }]
-    const said = stepCanoe(
+    // The dugout's state holds still under the dev life freeze too (no step),
+    // so its place and phase at a proof frame's shutter are those in the
+    // picture; the gesture clock and the pay-out arm swing still run.
+    const said = isLifeFrozen() ? null : stepCanoe(
       canoe,
       lane,
       ring,
@@ -929,7 +934,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
             grill, its forked posts and the kneeling griller stand beneath it. */}
         {sheltered && fireEnv && <CookShelter thatchMat={fireEnv.thatchMat} postR={fireCfg.shelterPostR} />}
       </group>
-      {/* THE SMOKING RACK: four posts, two rails and slats, the fish across them. */}
+      {/* THE SMOKING RACK: four posts and two rails, the fish hung from them. */}
       {/* Turned so its rails run along the bank: seen from the village, the fish
           hang side by side. */}
       <group name="fish-rack" position={[sites.rack.x, rackY, sites.rack.z]} rotation={[0, along + Math.PI / 2, 0]}>

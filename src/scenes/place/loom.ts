@@ -82,7 +82,8 @@ const PLAZA_SWEEP_DEGREE_STEP = 2
 /** Metres between candidate radii in that sweep. */
 const PLAZA_SWEEP_RADIUS_STRIDE = 1
 /** Valid seats whose plaza view that sweep measures before it settles for the
- *  widest found. Every settlement lays a loom, and a plan with no full line
+ *  widest found. With weaving placed every settlement lays a loom (it is
+ *  parked in the shipped game, `loom.placed`), and a plan with no full line
  *  otherwise measured every seat: layouts ran 2.4x slower, up to 5x in the
  *  bankless villages, and a layout test crossed its 20 s timeout. The shipped
  *  Bambara plan finds its full line at the 58th. Raised from 120 by work-order

@@ -10,8 +10,7 @@
 // verbatim and numbers it. See findings-request-core.mjs for why that window,
 // and not a note saying "the user wants something", has to write it.
 //
-// Usage:
-//   node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]
+// Usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]
 //   node scripts/finding.mjs --none "<why this turn found nothing>"
 //   node scripts/finding.mjs --drain                      list what still waits
 //   node scripts/finding.mjs --drained "<title substring>" (--point <N> | --why "<…>")
@@ -60,6 +59,7 @@ import {
   parseRequestDocument,
 } from './findings-request-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { USAGE, wantsHelp } from './cli-usage.mjs'
 import { gatherWorkOrder, provePoint } from './carrier-reconcile.mjs'
 import { withBoardEditLock as withCarrierLock } from './board-edit-lock.mjs'
 
@@ -262,6 +262,12 @@ function withApproval(quotes, approved) {
   if (!approved || !approved.trim()) return quotes
   const line = `approved: "${approved.replace(/\s+/g, ' ').trim()}"`
   return quotes && quotes.trim() ? `${quotes}\n${line}` : line
+}
+
+// `--help` is the usage alone, never the carrier, and acts before any writing form.
+if (wantsHelp(argv)) {
+  console.log(USAGE.finding)
+  process.exit(0)
 }
 
 if (has('--request')) {
@@ -497,12 +503,5 @@ if (!existsSync(CARRIER)) {
 }
 if (!has('--drain') && !has('--requests')) {
   console.log('')
-  console.log('usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]')
-  console.log('       node scripts/finding.mjs --none "<why this turn found nothing>"')
-  console.log('       node scripts/finding.mjs --drain | --drained "<title>" (--point <N> | --why "<…>")')
-  console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path|-> --why-file <path|-> [--approved "<words>"] [--once] […]')
-  console.log('       node scripts/finding.mjs --request "<title>" --stdin [--approved "<words>"]   (parts: --- spec ---, --- why ---, …)')
-  console.log('       node scripts/finding.mjs --requests | --show "<title>"')
-  console.log('       node scripts/finding.mjs --appending "<title>" --point <N>   (after the TASKS.md append)')
-  console.log('       node scripts/finding.mjs --queued "<title>" --point <N>      (after commit AND push of main) | --blocked "<title>" --why "<reason>"')
+  console.log(USAGE.finding)
 }

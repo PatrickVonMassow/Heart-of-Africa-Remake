@@ -21,6 +21,9 @@
 // unchanged (a closing message, led by the exact stamp handed over); only the
 // deliverable is now named honestly, through the shared `shortAckDemand()`.
 import { shortAckDemand } from './closing-reply-core.mjs'
+import { contextLevelSuffix } from './dashboard-reminder-core.mjs'
+import { parseContextTokens } from './context-watermark-core.mjs'
+import { readTail } from './context-watermark.mjs'
 
 const BERLIN = { timeZone: 'Europe/Berlin' }
 
@@ -35,6 +38,31 @@ export function berlinStamp(date = new Date()) {
     ...BERLIN, hour: '2-digit', minute: '2-digit', hour12: false,
   })
   return `${weekday}, ${day}, ${time}`
+}
+
+/**
+ * The header suffix this turn, read the same way the UserPromptSubmit hook
+ * reads it — one definition of what "context" means, shared by the Stop guard
+ * and the PostToolUse header delivery (lock-heartbeat-hook duty 13). An
+ * unreadable transcript yields the `--` reading rather than nothing: the suffix
+ * belongs in the header either way, and "unknown" is an honest value where a
+ * silent omission is not.
+ *
+ * `real` says whether anything actually measured. It separates the two
+ * questions the guard has to keep apart: what the reply is TOLD to write (always
+ * the whole header) from what it can be BLOCKED for omitting (only a reading
+ * that exists). `tokens` is the raw reading (null where none).
+ */
+export function headerReading(transcriptPath, { read = readTail } = {}) {
+  let tokens = null
+  try {
+    const tail = transcriptPath ? read(transcriptPath) : null
+    tokens = tail === null ? null : (parseContextTokens(tail)?.tokens ?? null)
+  } catch {
+    tokens = null
+  }
+  const real = typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0
+  return { suffix: contextLevelSuffix(tokens), real, tokens: real ? tokens : null }
 }
 
 // Tolerance: a reply composed over a long turn keeps its stamp valid for a
@@ -185,7 +213,8 @@ export function evaluate({ lastText, now = new Date(), headerSuffix = '', enforc
   const expected = copyLine(now, headerSuffix)
   const rule =
     'Chat-timestamp rule: EVERY reply to the user begins with the bold Berlin ' +
-    'timestamp (**Wochentag, TT.MM.JJJJ, HH:MM**, German weekday, Europe/Berlin).'
+    'timestamp (**Wochentag, TT.MM.JJJJ, HH:MM**, German weekday, Europe/Berlin); ' +
+    'the latest tool result carries the header.'
   if (typeof lastText !== 'string' || lastText.trim() === '') {
     return {
       decision: 'block',
@@ -230,4 +259,23 @@ export function evaluate({ lastText, now = new Date(), headerSuffix = '', enforc
     }
   }
   return null
+}
+
+/** Re-emit the header within a minute only once the reading moves this far. */
+export const HEADER_READING_BUCKET = 10_000
+
+/**
+ * THE HEADER, DELIVERED DURING LONG TURNS (lock-heartbeat-hook duty 13): the
+ * exact header the Stop guard will expect, handed over as PostToolUse context so
+ * the reply needs no measuring call. Change-only: a session is told again only
+ * when the minute or the reading bucket moved since its last delivery, so the
+ * cost is ~25 tokens per minute of work. Pure; `last` is the stored record.
+ */
+export function headerDelivery({ sessionId = '', now = new Date(), reading, last = null } = {}) {
+  const stamp = berlinStamp(now)
+  const bucket = reading.tokens === null ? '--' : Math.floor(reading.tokens / HEADER_READING_BUCKET)
+  const record = { sessionId, stamp, bucket }
+  const same = last && last.sessionId === sessionId && last.stamp === stamp && last.bucket === bucket
+  if (same) return { emit: false, record: last, context: '' }
+  return { emit: true, record, context: `[reply-header] Current reply header: ${copyLine(now, reading.suffix)}` }
 }

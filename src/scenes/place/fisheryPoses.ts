@@ -33,7 +33,8 @@ export function copyPose(into: FigurePose, from: FigurePose): void {
   copyPoseExtras(into, from)
 }
 
-/** A pose object of a figure's own, starting as a copy of `from`. */
+/** A pose object of a figure's own, starting as a copy of `from`'s arms, lean
+ *  and turn (its extras, such as `reach`, are not copied). */
 export function ownPose(from: FigurePose): FigurePose {
   return { left: { ...from.left }, right: { ...from.right }, lean: from.lean, turn: from.turn }
 }
