@@ -2184,4 +2184,24 @@ export const RED_CHARGES = [
       + '50/90 frames fused, 22 at the unreadable bar, Child×Child; --section=ctrl-actor-labels alone green on the '
       + 'same head, webgpu whole run clean. Filed as point 1466. The charge dies with point 1466.',
   },
+  {
+    point: 1472,
+    suite: 'communication',
+    kind: 'check',
+    match: /^continuous route at 8-downstream-destination: No traversable route\b/i,
+    why:
+      'MEASURED 30.10.2026 in the v0.3.1 closing LARGE on aed84aa2f (webgpu): the traveller stood on a water cell near '
+      + 'Bandiagara and no route led to the step-8 target. The section alone on the same head passed step 8. Filed as '
+      + 'point 1472. The charge dies with point 1472.',
+  },
+  {
+    point: 1473,
+    suite: 'communication',
+    kind: 'check',
+    match: /^continuous route at [^:]+: continuous route has no browser errors — \[ASSERT\] adult-atom-lost — bambara-village: water-back\b/i,
+    why:
+      'MEASURED 30.10.2026, communication --section=continuous-route alone on aed84aa2f (webgpu): the errand '
+      + 'assert fired for a Bambara water-back pair forced after 240 s. Filed as point 1473. The charge dies with point 1473.',
+  },
+
 ]

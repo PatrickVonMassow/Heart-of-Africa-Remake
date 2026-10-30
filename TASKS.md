@@ -16056,3 +16056,33 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright check.
   Bundle: Testinfrastruktur.
   Criticality: low - test-only; a false red costs a full LARGE.
+
+- [ ] 1472. Continuous route's downstream step finds no route from a water standpoint near Bandiagara
+  Source: v0.3.1 closing LARGE on aed84aa2f, WebGPU (`local/verify-logs/2026-10-30T06-59-46-060-large.log`,
+  30.10.2026): communication `continuous-route` "continuous route at 8-downstream-destination: No
+  traversable route" — the traveller stood at lat 14.5628 / lon -3.8854 on terrain "water" (target
+  x -34, z -141, toast "Discovered: Bandiagara"). The section alone on the same head (09:58 run) passed
+  step 8, so it does not reproduce on every run.
+  Final state:
+  - The cause is measured: how the traveller came to stand on a water cell at the step-8 start (route
+    overshoot, river crossing, spawn) and whether a player can reach the same state.
+  - If a player can: the route or the movement keeps the traveller off untraversable water, with a unit
+    test; otherwise the test's standpoint is corrected with that reason. Green in a whole communication
+    run on WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: Vitest for a movement/route fix; the existing Playwright step.
+  Bundle: Testinfrastruktur.
+  Criticality: medium - possibly a player stuck on water; until measured, a false red costs a full LARGE.
+
+- [ ] 1473. Bambara errand adult lost in the water-back walk during the continuous route
+  Source: communication `continuous-route` alone on aed84aa2f, WebGPU (`local/verify-logs/
+  2026-10-30T09-58-38-857-communication.log`, 30.10.2026), step 9-fit-and-journal: the dev invariant
+  `[ASSERT] adult-atom-lost — bambara-village: water-back pair 2/3/walk: forced after 239.96s; overrun
+  situation water-out pair 3/2 (speaker blocked)`. Not seen in the closing LARGE runs.
+  Final state:
+  - The cause is measured: why pair 2/3's water-back walk never completes while pair 3/2's water-out
+    overruns with a blocked speaker (a mutual block between the two pairs or a lost goal).
+  - The errand completes or releases inside its bound with that reason fixed, with a unit test; the
+    assert stays loud. Green in a whole communication run on both backends; its charge is struck.
+  Tests: Vitest for the errand scheduler; the existing Playwright step.
+  Bundle: Dorfleben.
+  Criticality: medium - a villager stuck on an errand is player-visible.
