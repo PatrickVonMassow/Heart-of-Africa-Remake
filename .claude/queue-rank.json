@@ -1764,6 +1764,18 @@
       "why": "test-infra defect, no player impact; Testinfrastruktur bundle order is fine",
       "origin": "machine",
       "place": "last"
+    },
+    "1468": {
+      "at": "2026-10-30T06:00:03.888Z",
+      "why": "test-only load/bound flake charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1469": {
+      "at": "2026-10-30T06:00:04.005Z",
+      "why": "test-only load/bound flake charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1793,7 +1805,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-29T19:06:31.727Z",
+    "at": "2026-10-30T06:00:04.014Z",
     "points": [
       184,
       200,
@@ -2263,7 +2275,9 @@
       1462,
       1463,
       1466,
-      1467
+      1467,
+      1468,
+      1469
     ]
   }
 }
