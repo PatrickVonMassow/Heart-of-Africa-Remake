@@ -35196,3 +35196,18 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Source: findings carrier 29.10.2026 04:00 "Uncharged WebGPU reds in polish-speech block the
   v0.3.1 closing", measured during point 1464.
   Bundle: unbundled (release gate, travels with 1462).
+
+- [x] 1462. Release v0.3.1: tag the current main state as v0.3.1 and poc and publish both
+  Source: User order 28.10.2026 in chat session cf715472: "Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ und außerdem als v0.3.1 und veröffentliche diesen getaggten Stand unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/" — to come before the infrastructure-simplification point, so a known-good tagged state exists before the teardown. Wording approved by the user: "ja, beide so einreichen".
+  Final state: the current main state is released as version v0.3.1 by the named "version release" process, and `poc` points at the same commit.
+   1. Full closing run (CLAUDE.md §9, `scripts/closing-guard-core.mjs` CLOSING_STEPS, LARGE regression on both backends) green on the commit to release: main HEAD when this point starts (code freeze from then on). A red closing run is fixed first and the closing run repeated on the fixed commit; nothing is tagged on red.
+   2. The user's go for this release is given (user order 28.10.2026, quoted in Source); no further approval wait.
+   3. Tag `v0.3.1` at that commit; move `poc` to the same commit; push both tags.
+   4. Run the Pages deploy (a tag push does not rebuild) and verify that https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3.1/ and https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ both serve that commit's build.
+   `v0.3.1` is frozen once cut.
+  Queue position: at the very top of the open work order, directly before the infrastructure-simplification point deposited with it (user order 28.10.2026).
+  Amendment (user decisions 29.10.2026 21:05, carrier request "1462: Abschlussreihenfolge", approved "ja"): "Zählt ein Lauf, in dem jedes Rot einem offenen Punkt zugeordnet ist, für 1462 als „grün“?" — "Ja." / "Reicht der erste LARGE auf 8e0b36861 plus ein LARGE auf dem endgültigen Commit, oder sollen beide Läufe auf dem endgültigen Commit stattfinden?" — "Ja, das reicht."
+   - "Green" in step 1 = every red charged to an OPEN point (scripts/verify/README.md point 550); an uncharged red, a red charged to a ticked/deferred point, or a crashed run still blocks.
+   - large-regression is satisfied by the first LARGE on 8e0b36861 (WebGL 2 local/verify-logs/2026-10-29T08-48-49-743-large.log, WebGPU local/verify-logs/2026-10-29T11-43-28-797-large.log, all reds charged); regression-after-cleanup needs ONE LARGE on both backends on the final release commit.
+   - Order (reviewed by GPT-6.1 Sol 29.10.2026 21:02): a. write and commit every doc closing step that may change files, then code AND doc freeze until the tag; b. switch off batch-doctor's index-mutating repair for the run (point 1467 stays open) and keep the machine quiet; c. start the LARGE on that commit as its own process with a durable log and receipt, WebGPU right after WebGL 2 when WebGL 2 holds only charged reds; d. afterwards only record closing-guard steps (no commit), then tag v0.3.1 + poc and verify the Pages deploy.
+  Bundle: unbundled (release).
