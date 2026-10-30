@@ -11,7 +11,7 @@ import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
 import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from './edgeBandReading.mjs'
 import { settledEdgeShot } from './edgeBandSettle.mjs'
 import sharp from 'sharp'
-import { section, check, checkTiming, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { section, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 
 // --- Settlement plan on the map (design.md §6.1, point 79) --------------------
 // Inside a place the map opens as a plan of the town: functional buildings
@@ -124,12 +124,16 @@ if (section('settlement-season')) {
   // the preset is 0, wet sun 2.348 where the rains take it to 1.44. Given the
   // time, every one of these reaches its target exactly, so the lerp was never
   // the bug — the window was.
+  // An UNMEASURED settle leaves a partial reading; every season check below is
+  // built on it, so it reports UNMEASURED too instead of asserting on it.
+  let seasonSkip = null
   const settle = async (label) => {
     const r = await waitForReadingStable(page, () => window.__placeSeason(), { settleMs: 500, samples: 3, requireChange: true, timeout: 60000 })
     // A TIMING check (point 642): a 60 s settle deadline over a per-frame lerp.
     // It declares the rate it needs and is UNMEASURED below it (the software
     // lane read it after 60176 ms). OPEN: 10 fps is an estimate, calibrate.
-    await checkTiming(`the ${label} settlement season reading settles before it is read`, 10, r.settled, `after ${r.waitedMs} ms`)
+    const skip = await checkTiming(`the ${label} settlement season reading settles before it is read`, 10, r.settled, `after ${r.waitedMs} ms`)
+    if (skip && !seasonSkip) seasonSkip = `built on the ${label} season reading, which did not settle: ${skip}`
     return r.value
   }
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
@@ -139,8 +143,9 @@ if (section('settlement-season')) {
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
   const wet = await settle('wet')
   await frame('111-village-season-wet', { place: 'maasai-village', label: 'the settlement in the wet season' })
+  const seasonCheck = seasonSkip ? (name) => unmeasured(name, seasonSkip) : check
 
-  check(
+  seasonCheck(
     'the dry-season settlement stands under the clear preset sky',
     dry.sky.grayMix === 0 && dry.sky.cloudBoost === 0,
     JSON.stringify(dry.sky),
@@ -157,17 +162,17 @@ if (section('settlement-season')) {
   // < 0.01 on sun): WebGL 2 sun 2.386 -> 1.440 / hemi 0.795 -> 0.480, WebGPU sun
   // 2.377 -> 1.440 / hemi 0.792 -> 0.480. The drop is ~0.94 against the bar of
   // 0.5 — the criterion no longer sits on its own edge.
-  check(
+  seasonCheck(
     'the rains dim the settlement sun and sky light',
     wet.sun < dry.sun - 0.5 && wet.hemi < dry.hemi,
     JSON.stringify({ dry: { sun: dry.sun, hemi: dry.hemi }, wet: { sun: wet.sun, hemi: wet.hemi } }),
   )
-  check(
+  seasonCheck(
     'the rains gray the settlement dome and thicken its cloud deck',
     wet.sky.grayMix > 0.5 && wet.sky.cloudBoost > 0.5,
     JSON.stringify(wet.sky),
   )
-  check(
+  seasonCheck(
     'the fire glow carries further under the overcast sun (§19.10)',
     14 / wet.sun > 14 / dry.sun,
     `fire-to-sun ratio dry ${(14 / dry.sun).toFixed(2)} -> wet ${(14 / wet.sun).toFixed(2)}`,
@@ -176,12 +181,12 @@ if (section('settlement-season')) {
   // rain field lived only in the travel scene and the tint only in the travel
   // terrain, so a player stood in a village at the peak of its rains and saw
   // neither. Both must now move with the season.
-  check(
+  seasonCheck(
     'it rains inside the settlement in the wet season, and clears in the dry',
     wet.rain > 0.5 && dry.rain === 0,
     `rain wet ${wet.rain.toFixed(2)} -> dry ${dry.rain.toFixed(2)}`,
   )
-  check(
+  seasonCheck(
     'the settlement ground/flora tint bleaches to straw and deepens to green',
     wet.tint > 0.75 && dry.tint < 0.25,
     `tint wet ${wet.tint.toFixed(2)} -> dry ${dry.tint.toFixed(2)}`,

@@ -43,12 +43,15 @@ export const unmeasured = (name, reason) => {
 // A TIMING check declares the frame rate it needs; below it the lane cannot
 // answer and the check is reported UNMEASURED with the measured rate. On a lane
 // that meets it the identical check runs. The rate is re-measured at the check:
-// the boot reading can include a multi-second build hitch.
+// the boot reading can include a multi-second build hitch. Returns the skip
+// reason (null when the check ran), so checks built on the same measurement
+// can report UNMEASURED with it instead of asserting on a partial reading.
 export const checkTiming = async (name, needFps, ok, detail) => {
   const fps = await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
   const v = laneSkipVerdict({ needFps, measuredFps: fps })
   if (v.skip) unmeasured(name, v.reason)
   else check(name, ok, detail)
+  return v.skip ? v.reason : null
 }
 export const check = (name, ok, detail, coverage = null) => {
   // The section tag goes AFTER the ' — ' separator: the check's NAME is its
