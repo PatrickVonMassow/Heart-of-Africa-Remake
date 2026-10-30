@@ -16082,3 +16082,13 @@ to land than a mechanism that needs a review.
   3. Result (question 4) also gives, for every infrastructure entry in docs/backlog.md, a verdict "obsolete: yes/no" with reason; obsolete entries are closed in docs/backlog.md with the reason "obsolete by infrastructure simplification"; a non-obsolete entry that shows a real defect of the remaining infrastructure is named in the plan so the user can decide on it.
   No new mechanism.
   Bundle: Session- & Repo-Hygiene (amendment to 1463, rides with it).
+- [ ] 1475. Cloud switch stays on until the user's explicit order: remove the 05.11. expiry prompt and the runbook's credit-bound commissioning limit
+  Source: User order 29.10.2026 (verbatim): "Dann nimm das automatische Ausschalten am 05.11. wieder raus. Lasse den Cloud-Schalter so lange eingeschaltet, bis ich ausdrücklich dazu auffordere, ihn auszuschalten - unabgängig vom Gratis-Volumen." Approved: "freigegeben". Reason: one cloud author beside local acceptance measured about 20 % faster (3.12 → 2.53 h per landed point, docs/1452-throughput-inventory.md); the user accepts the extra plan-volume overhead and watches the volume personally. Without this change, the switch's EXPIRED notice and the runbook's "commission only … before then" bound would stop cloud commissioning on 05.11.2026 against the user's order. Spec cut from a48606517.
+  The cloud switch stays ON until the user explicitly orders it OFF, independent of the free cloud credits and their 05.11.2026 expiry.
+  Final state:
+  - `scripts/cloud-switch-core.mjs`: the credit-expiry line in `--status` no longer says "EXPIRED: revisit the switch now" (or any revisit prompt); either drop the expiry line or state it as information only ("free credits expire …; switch stays as set until the user orders otherwise"). `CREDIT_EXPIRY`/its comment adjusted accordingly; `scripts/cloud-switch-core.test.mjs` updated to match.
+  - `docs/batch-owner-runbook.md` ("Throughput with cloud authoring", Bounds): remove "Credit (expires 05.11.2026): commission only what local acceptance can land before then." and the expiry-driven wording in the "After 1443 alone" paragraph where it reads as a stop rule; cloud commissioning continues after 05.11.
+  - Any other repo text tying the switch's ON state to the credit expiry (grep `05.11`, `CREDIT_EXPIRY`, `credit` in scripts/ and docs/) is aligned the same way.
+  - No change to the switch state itself, to the bounds (1 cloud author, 1 waiting branch, 1 local heavy job), or to the probe requirement for `--on`.
+  Bundle: Session- & Repo-Hygiene.
+  Criticality: medium - without it cloud commissioning stops on 05.11.2026 against the user's order.
