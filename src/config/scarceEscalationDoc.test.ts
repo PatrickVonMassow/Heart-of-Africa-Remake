@@ -11,6 +11,8 @@ const EXCLUDED = new Set([
   // Generated command syntax lists both --on and --off; it records no current state.
   'docs/command-index.md',
   'docs/tasks-archive.md',
+  // Verbatim snapshot of the work order and archive for the simplification analysis.
+  'docs/1463-raw-material.md',
   'scripts/author-routing-core.mjs',
   'src/config/scarceEscalationDoc.test.ts',
 ])
