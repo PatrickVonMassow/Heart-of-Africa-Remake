@@ -57,9 +57,9 @@ batch 119/58730 · board 48/21435 · mechanism 15/14536 · render 9/13609 · que
 - atomic-write.mjs · 108 · Atomic JSON writes that survive a Windows moment (point 388, first live
 - attended-context-notice.mjs · 46 · Durable once-per-session state for the attended context-ceiling notice.
 - audit-check.mjs · 108 · Dependency audit gate (CLAUDE.md §7.1 pt.18). `npm audit` fails the whole run
-- author-delegate-core.mjs · 811 · THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@740d83c2
+- author-delegate-core.mjs · 811 · THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule-stamp model-policy@740d83c2
 - author-delegate.mjs · 1059 · THE COMMAND THAT LETS AN OUTSIDE LANE AUTHOR A POINT (work-order point 667):
-- author-routing-core.mjs · 573 · WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@740d83c2
+- author-routing-core.mjs · 573 · WHICH AUTHORING LANE A POINT GOES TO (point 667). rule-stamp model-policy@740d83c2
 - authorship-check-core.mjs · 278 · PROVE WHO WROTE AN ARTEFACT FROM THE SESSION TRANSCRIPT (point 840).
 - authorship-check-io.mjs · 40 · Filesystem adapter shared by every permission path that verifies authorship.
 - authorship-check.mjs · 92 · Check an artefact's claimed author against per-message session metadata.
@@ -312,10 +312,10 @@ batch 119/58730 · board 48/21435 · mechanism 15/14536 · render 9/13609 · que
 - mechanism-review-merge.mjs · 20 · Git merge driver for .claude/mechanism-reviews.jsonl.
 - mechanism-review-range-core.mjs · 631 · Pure planning core for end-state mechanism reviews.
 - mechanism-review.mjs · 1602 · The record half of the four-eyes gate on mechanisms (point 377).
-- model-guard-core.mjs · 775 · Pure decision core of the serving-model tripwire (point 309). rule:model-policy@740d83c2
+- model-guard-core.mjs · 775 · Pure decision core of the serving-model tripwire (point 309). rule-stamp model-policy@740d83c2
 - model-guard.mjs · 228 · Stop hook (point 309): catch a silently DEGRADED serving model at its FIRST
 - model-handoff-core.mjs · 208 · Pure state machine for a forbidden-serving-model handoff.
-- model-lanes.mjs · 384 · THE ONE PLACE THAT NAMES CONCRETE MODELS. rule:model-policy
+- model-lanes.mjs · 384 · THE ONE PLACE THAT NAMES CONCRETE MODELS. rule-stamp model-policy
 - model-trailer-gate.mjs · 57 · The commit-msg gate on author and reviewer MODEL trailers (points 397 b / 425 a / 982).
 - module-link-check.builtin-fixture.mjs · 7 · FIXTURE, never loaded by anything that runs: `readFileSyc` is a typo, and
 - module-link-check.default-fixture.mjs · 7 · FIXTURE, never loaded by anything that runs: `module-link-check.mjs` has no
