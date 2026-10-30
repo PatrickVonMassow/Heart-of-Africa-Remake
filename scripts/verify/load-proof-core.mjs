@@ -34,6 +34,20 @@ export function laneSkipVerdict({ needFps, measuredFps }) {
   }
 }
 
+/**
+ * The lane skips one suite run reported: every `UNMEASURED  <name> — <reason>`
+ * line, once per check name (the polish harness repeats them beside its verdict,
+ * and the inline copy carries a section tag). Returns `[{ name, reason }]`.
+ */
+export function laneSkips(out) {
+  const byName = new Map()
+  for (const line of String(out ?? '').split('\n')) {
+    const m = /^UNMEASURED {2,}(.+?) — (.+)$/.exec(line.trim())
+    if (m && !byName.has(m[1])) byName.set(m[1], m[2].replace(/\s*\[--section=[^\]]*\]\s*$/, ''))
+  }
+  return [...byName].map(([name, reason]) => ({ name, reason }))
+}
+
 /** Page function: count the frames the page delivers over `ms` of wall time, in ONE
  *  evaluation. Returns frames per second. Serialised into the page, so it is
  *  self-contained. */

@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { laneSkipVerdict, findSplitComparisons } from './load-proof-core.mjs'
+import { laneSkipVerdict, findSplitComparisons, laneSkips } from './load-proof-core.mjs'
 import { REPO_ROOT } from '../repo-paths.mjs'
 
 describe('laneSkipVerdict — a timing check declares the throughput it needs', () => {
@@ -24,6 +24,22 @@ describe('laneSkipVerdict — a timing check declares the throughput it needs', 
   it('refuses a check that declares no positive throughput', () => {
     expect(() => laneSkipVerdict({ needFps: 0, measuredFps: 30 })).toThrow(/needFps/)
     expect(() => laneSkipVerdict({ measuredFps: 30 })).toThrow(/needFps/)
+  })
+})
+
+describe('laneSkips — the run summary counts what did not run', () => {
+  it('counts each UNMEASURED check once, dropping the section tag of the inline copy', () => {
+    const out = [
+      'PASS  a — ok',
+      'UNMEASURED  the return walk — lane delivered 900 of 10800 frames [--section=adult-errands]',
+      'FAIL  b — red',
+      'UNMEASURED  the return walk — lane delivered 900 of 10800 frames',
+      'unmeasured checks: 1 (they did not run; not both-backend coverage)',
+    ].join('\n')
+    expect(laneSkips(out)).toEqual([{ name: 'the return walk', reason: 'lane delivered 900 of 10800 frames' }])
+  })
+  it('finds none in a run that answered everything', () => {
+    expect(laneSkips('PASS  a — ok\nPASS  b — ok')).toEqual([])
   })
 })
 
