@@ -1,0 +1,165 @@
+{
+ "model": "GPT-6.1 Sol",
+ "entries": [
+  {
+   "id": "BD1",
+   "file": "infrastructure",
+   "defect": "CI/local Git enforcement: `ci` 5,256 lines; `pre` 2,093; `push` 322; `commit` 616. Headers identify the fast push gate, noticing red CI, and proving push arrival. Section 3 records 1,189 CI-status and 1,078 push-arrival blocks. REPLACE-BY required CI and protected merges. Retain build, lint, unit te"
+  },
+  {
+   "id": "BD2",
+   "file": "infrastructure",
+   "defect": "Game browser suites and harness: 153 files, 63,222 lines. Real risks are demonstrated by empty pictures, wrong subjects, device loss and backend-specific reds: 507, 574, 620, 1175, 1192. KEEP, simplify and repair. Require explicit suite selection, actual backend identity, an owned server, readiness-"
+  },
+  {
+   "id": "BD3",
+   "file": "infrastructure",
+   "defect": "Render gate/evidence machinery: `render` 13,609 lines; `picture` 376. Section 3 records 495 render-verify blocks. The family contains the Stop guard, recorder and red-charge ledger. DELETE the Stop gate and red-charge waiver system; REPLACE-BY ordinary test results and artifacts. Retain only the sma"
+  },
+  {
+   "id": "BD4",
+   "file": "infrastructure",
+   "defect": "Review machinery: `mechanism` 14,536; `criticality` 3,327; `cross` 5,420; `review` 3,101; `blind` 1,814; `authorship` 659 lines. It was built for independent review and authorship proof. REPLACE-BY a complete cross-vendor review attached to the change. DELETE custom coverage ledgers, attribution pla"
+  },
+  {
+   "id": "BD5",
+   "file": "infrastructure",
+   "defect": "Model and lane orchestration: `author` 4,483; `lane` 2,108; `model` 3,244; `ask` 1,614; `cloud` 653 lines. Routing, escalation, delegated authoring and serving-model policy are described in the headers. DELETE. Select the author and the other-vendor reviewer directly through the available execution "
+  },
+  {
+   "id": "BD6",
+   "file": "infrastructure",
+   "defect": "Board/dashboard: `board` 21,435; `dashboard` 7,115 lines, plus active-work/focus projections. The original concern was trustworthy progress reporting. Section 3 contains 5,329 board-first PreToolUse occurrences and 1,853 dashboard-related Stop errors. DELETE the board, publication, projections, edit"
+  },
+  {
+   "id": "BD7",
+   "file": "infrastructure",
+   "defect": "Autonomous batch runtime: `batch` 58,730 lines; `lock` 660; `launcher` 319; `detached` 2,298; `windows` 899; `child` 1,526; `alert` 1,647. The singleton header names the parallel-session incident; other headers describe resurrection and recovery. Section 3 records 1,382 batch-progress blocks. DELETE"
+  },
+  {
+   "id": "BD8",
+   "file": "infrastructure",
+   "defect": "Context/handover enforcement: `context` 6,822; `handover` 1,991; `clear` 937; `session` 528; `cut` 1,478 lines. These attempted to bound context use and enforce handover. Section 3 shows 416 committed-boundary and 252 watermark refusals among the displayed heads. DELETE fences, admission transaction"
+  },
+  {
+   "id": "BD9",
+   "file": "infrastructure",
+   "defect": "Custom communication and user-decision control: `chat` 6,886; `request` 1,298; `decision` 1,880; `user` 1,745; `vdzk` 980; `defer` 532 lines. Built to deliver phone messages, route decisions and avoid unnecessary user waits. Decision-card guard: 497 recorded Stop errors. DELETE custom chat watcher/r"
+  },
+  {
+   "id": "BD10",
+   "file": "infrastructure",
+   "defect": "Work tracking/intake: `queue` 7,743; `point` 4,525; `findings` 2,688; `finding` 877; `carrier` 1,391; `fold` 1,304; `bundle` 1,385; `tasks` 1,022; `commission` 1,030 lines. Built to preserve findings, rank work and enforce task completion. Findings guard: 614 recorded blocks; queue-order guard: 232."
+  },
+  {
+   "id": "BD11",
+   "file": "infrastructure",
+   "defect": "Documentation/rule enforcement: `doc` 1,491; `guide` 1,915; `retro` 1,588; `rule` 1,854; `timestamp` 1,075; `closing` 2,252 lines. Built against document growth, drift, stale retrospectives and missing reply stamps. Timestamp plus retrospective guards account for 2,302 recorded Stop errors. DELETE d"
+  },
+  {
+   "id": "BD12",
+   "file": "infrastructure",
+   "defect": "Landing/worktree controls: `land` 4,860; `worktree` 3,044; `branch` 922; `commit` 616; `stash` 427 lines. Built to land verified points and prevent destructive cleanup. REPLACE-BY normal Git/PR landing and native worktree operations. Preserve native lock protection and check for unmerged/uncommitted"
+  },
+  {
+   "id": "BD13",
+   "file": "infrastructure",
+   "defect": "Enforcement of enforcement: `guard` 5,289 lines, including inventory, health, registration, compatibility and preflight. Built to find inert or contradictory guards. DELETE after their consumers are removed. The need to predict or reconcile guards disappears with those guards. Existing contradiction"
+  },
+  {
+   "id": "BD14",
+   "file": "infrastructure",
+   "defect": "Wait/process controls: `wait` 2,048; `declared` 234; `prep` 211 lines, plus pause/resume helpers. Built to prevent endless polling and distinguish progress from hangs. Section 3 shows 342 “wait can never return” and 318 polling refusals. REPLACE-BY process handles, cancellation and evidence-based te"
+  },
+  {
+   "id": "BD15",
+   "file": "infrastructure",
+   "defect": "Shell/permission interception: `command` 1,527; `path` 1,099; `tool` 1,233; `firewall` 2,543; `permission` 209; `container` 1,286 lines. Built to classify writes, control scope, cap output and protect firewall changes. REPLACE-BY environment permissions, sandboxing and host-managed networking. DELET"
+  },
+  {
+   "id": "BD16",
+   "file": "infrastructure",
+   "defect": "Build/assets/shared utilities: geodata and revision builders; Blender/villager pipeline; texture generators/core; PNG codec; dependency/tool/path/atomic-write helpers. Individual sizes and purposes are listed in section 1. KEEP the tools required to reproduce game assets or run the retained pipeline"
+  },
+  {
+   "id": "BD17",
+   "file": "infrastructure",
+   "defect": "Deployment: `deploy` 847; `pages` 812 lines, plus build revision and deployment checks. Built for stale sites and stuck deployments. REPLACE-BY a normal CI deployment workflow with visible status and deployed revision. Delete autonomous stale-site polling and launcher escalation. Publishing remains "
+  },
+  {
+   "id": "BD18",
+   "file": "infrastructure",
+   "defect": "Cost/calibration/standstill machinery: `measure` 4,520 lines; queue calibration within `queue`; standstill/activity reporting within `batch`. Built to explain slow throughput and scheduling estimates. DELETE recurring infrastructure accounting and routing calibration. Retain the supplied measurement"
+  },
+  {
+   "id": "BD19",
+   "file": "infrastructure",
+   "defect": "One-time, retired and discovery material: stash sweep, cut attestations, takeover/escape/chaos drills, legacy dashboard transport, generated command index and helper discovery. Headers explicitly identify several as one-time or legacy. DELETE executable leftovers after preserving useful historical e"
+  },
+  {
+   "id": "BD20",
+   "file": "infrastructure",
+   "defect": "Tests and optional game diagnostics: 279 non-verify test files, 122,796 lines; performance probes and stability/load measurements. DELETE tests whose only subject is a deleted mechanism; KEEP game tests and tests of the remaining runner. Keep game-performance probes for targeted diagnosis, without m"
+  },
+  {
+   "id": "BS1",
+   "file": "infrastructure",
+   "defect": "Preserve current work and evidence before D6–D12. Inventory active verification processes, uncommitted changes, unpushed commits, rescue branches and unresolved carrier instructions. Section 7 specifically names unpushed `9a6b92d` and repeated rescue `2026-10-30T17-28-53-077Z-2139385`. Do not invoke"
+  },
+  {
+   "id": "BS2",
+   "file": "infrastructure",
+   "defect": "Establish D1–D4’s ordinary landing path alongside the old one. Confirm the actual install/build/lint/unit/type-check commands, both backend commands, picture artifacts and complete cross-vendor review procedure. Establish a known tested candidate. Configure required platform checks before relying on"
+  },
+  {
+   "id": "BS3",
+   "file": "infrastructure",
+   "defect": "Remove mandatory turn-end duties under D6/D8/D9/D11: dashboard, progress, timestamp, retrospective, guide, decision-card, prep and similar content-writing Stop hooks. Update their binding instructions in the same change. A normal session must be able to finish without manufacturing bookkeeping write"
+  },
+  {
+   "id": "BS4",
+   "file": "infrastructure",
+   "defect": "Remove PreToolUse workflow gates under D6/D8/D10/D13/D15: board-first, ownership write restrictions, point proof, context admission and request-deposit parsing. Keep execution-environment permissions. Ordinary reads, edits and worktree work must no longer depend on batch/board state."
+  },
+  {
+   "id": "BS5",
+   "file": "infrastructure",
+   "defect": "Retire D7’s external launch paths. Stop scheduled resurrection, launcher/daemon supervision, watcher wakeups and emergency recovery while preserving legitimate running verification. Confirm that ending a session cannot spawn a successor or trigger quarantine. Then remove their hooks and implementati"
+  },
+  {
+   "id": "BS6",
+   "file": "infrastructure",
+   "defect": "Retire D5’s lane and model machinery. Drain or recover already commissioned work first. Remove switches, routers, tripwires and model-trailer dependencies together. Confirm that cloud/local work can use the same ordinary checks without local switch-state assumptions."
+  },
+  {
+   "id": "BS7",
+   "file": "infrastructure",
+   "defect": "Replace review bookkeeping under D4. Attach complete review scope and outstanding fixes to each live change, then remove ledger gates, receipt writers, merge drivers and attribution planners. Confirm that an independent reviewer can review the complete candidate without an impossible authorship cons"
+  },
+  {
+   "id": "BS8",
+   "file": "infrastructure",
+   "defect": "Simplify D2/D3/D14’s runner. Remove Stop enforcement, charge accounting, wait registries and mandatory retry loops. Preserve explicit suites/backends, cancellation, logs and run-specific pictures. Verify help/invalid-option behavior, nonempty execution, backend confirmation and both-backend completi"
+  },
+  {
+   "id": "BS9",
+   "file": "infrastructure",
+   "defect": "Migrate unresolved work once under D10, then remove carrier/queue/commissioning/fold/proof systems. Apply the 368 point verdicts above and individual backlog dispositions. Preserve unknown B58/B68 payloads rather than bulk-closing them. Retire board publishing, edit locks and chat transport under D6"
+  },
+  {
+   "id": "BS10",
+   "file": "infrastructure",
+   "defect": "Simplify landing and deployment under D12/D17. Remove board/tick/model-trailer side effects from landing. Preserve native worktree locks and unmerged work. Confirm a normal PR can pass required checks, merge and publish the intended revision."
+  },
+  {
+   "id": "BS11",
+   "file": "infrastructure",
+   "defect": "Remove enforcement residue under D11/D13/D18/D19/D20. Delete unused guards, tests, fixtures, scheduler/config references, generated command index and compulsory document accounting. Keep short executable instructions and historical records without live currency requirements. Run the retained checks "
+  },
+  {
+   "id": "BS12",
+   "file": "infrastructure",
+   "defect": "Validate the resulting minimal workflow. Build, lint, unit/type-check, run the browser suites on both backends, inspect production-build pictures, obtain complete cross-vendor review and land through the ordinary path. Confirm that no deleted hook, scheduler or shared-state file is needed. Any remai"
+  }
+ ]
+}

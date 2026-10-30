@@ -1,0 +1,185 @@
+{
+ "model": "Claude Opus 5.5",
+ "entries": [
+  {
+   "id": "AD1",
+   "file": "infrastructure",
+   "defect": "P1 batch autonomy: all `batch-*`, launcher, daemon, autostart, singleton, lease, claim, boundary, emergency, standstill, in-flight, reconcile, resume, pause, Windows tasks, window-hide, alert ladder, child-retry, detached-*, session-death, active-work-source, durable-lane-flag, quota/pause drills. H"
+  },
+  {
+   "id": "AD2",
+   "file": "infrastructure",
+   "defect": "`batch-doctor*`, `stash-sweep*` (one-time, done 22.10), `repository-integrity` DELETE. It fires almost daily, creates rescue branches nobody reads, and kills live LARGE runs (1467, 1150, B91)"
+  },
+  {
+   "id": "AD3",
+   "file": "infrastructure",
+   "defect": "P2 context: fence, watermark, budget, permit, incidents, ceiling, attended notice, handover-*, `measure-context-cost`, `measure-task-cost`, `measure-point-cost`, `measure-picture-cost` DELETE. Harness compaction covers it"
+  },
+  {
+   "id": "AD4",
+   "file": "infrastructure",
+   "defect": "P3 board/dashboard/chat/queue/decision/vdzk/request/focus/user-gate/defer/notify/publish/`dashboard-publish` (already LEGACY). Hooks: UserPromptSubmit `dashboard-reminder-hook`, the six dashboard Stop guards, `decision-card-guard`, `queue-order-guard`, PreToolUse `board-first-guard`, `request-approv"
+  },
+  {
+   "id": "AD5",
+   "file": "infrastructure",
+   "defect": "P4 lanes: lane-routing/switch, author-delegate/routing, ask-lane, cloud-switch, commission-guard, model-handoff, worktree-reminder, blind-merge DELETE. One Claude author, the other vendor reviews (M4)"
+  },
+  {
+   "id": "AD6",
+   "file": "infrastructure",
+   "defect": "P5 gates: mechanism-review (all 15), criticality-review (Stop hook already \"SWITCHED OFF\"), review-material-core, authorship-check, model-trailer-gate, cut-account, settled-rulings, rule-echo fingerprints DELETE"
+  },
+  {
+   "id": "AD7",
+   "file": "infrastructure",
+   "defect": "`cross-review(-core)`, `model-lanes.mjs` KEEP, shrink (M4). Posts commit status `cross-review` as a required check"
+  },
+  {
+   "id": "AD8",
+   "file": "infrastructure",
+   "defect": "`model-guard` (Stop) DELETE. 70 blocks. Caused 1461, 1426, 875, 854. The author model is recorded in a commit trailer, unpoliced"
+  },
+  {
+   "id": "AD9",
+   "file": "infrastructure",
+   "defect": "P6 render-verify guard, recorder, state, charge ledger (2,208 lines), throttle-probe, picture-stability, wait-lease/marker/command-guard, declared-wait, prep-guard, prep-arm-hook, run-wait hang detector REPLACE-BY M3. A red is red: fix it, or skip the check in the suite source with a point reference"
+  },
+  {
+   "id": "AD10",
+   "file": "infrastructure",
+   "defect": "P7 land-point, land-cleanup, worktree-cleanup, branch-hygiene, closing-guard, fold-point, pre-push-gate, ci-status-guard, ci-gate-verdict, ci-failure-cause, push-arrival-guard, commit-scope-guard, git hooks (commit-msg, pre-commit, pre-push), `enable-hooks` REPLACE-BY M1 + M2. Plain workflow jobs, b"
+  },
+  {
+   "id": "AD11",
+   "file": "infrastructure",
+   "defect": "`worktree-bootstrap` REPLACE-BY `npm ci` in the worktree"
+  },
+  {
+   "id": "AD12",
+   "file": "infrastructure",
+   "defect": "P8 findings carrier, finding.mjs, findings-guard, carrier-*, findings-request, bundle-first-guard, tasks-archive/spec guards, tasks-source, point-brief, point-proof-guard, queue-rank REPLACE-BY \"commit the user order or finding as a TASKS.md/backlog line in the same turn\", or an Issue"
+  },
+  {
+   "id": "AD13",
+   "file": "infrastructure",
+   "defect": "P9 meta-guards and docs guards: guard-health/preflight/registration/inventory/compatibility/duty, mandatory-duty, rule-review, rule-echo, guide-brevity, doc-budget, doc-corpus, retro-*, timestamp-guard, `hooks/check-reply-timestamp.cjs`, container-ask, command-classify, tool-output-*, help/cli-usage"
+  },
+  {
+   "id": "AD14",
+   "file": "infrastructure",
+   "defect": "`path-scope-guard`, `permission-autogrant` (PermissionRequest hook) REPLACE-BY M8 declarative permissions. A hook that auto-grants permissions is harder to audit than an allowlist"
+  },
+  {
+   "id": "AD15",
+   "file": "infrastructure",
+   "defect": "`firewall-guard`, `firewall-rebuild`, `firewall-allow` REPLACE-BY one allowlist in the devcontainer init script (M7). The guard goes"
+  },
+  {
+   "id": "AD16",
+   "file": "infrastructure",
+   "defect": "`module-link-check` + fixtures REPLACE-BY eslint `import/named` / tsc `checkJs`"
+  },
+  {
+   "id": "AD17",
+   "file": "infrastructure",
+   "defect": "`audit-check` REPLACE-BY Dependabot + `npm audit --audit-level=high` CI step"
+  },
+  {
+   "id": "AD18",
+   "file": "infrastructure",
+   "defect": "`deploy-staleness`, `pages-deploy-unblock` DELETE. The Pages workflow's own failure notification covers it"
+  },
+  {
+   "id": "AD19",
+   "file": "infrastructure",
+   "defect": "`scripts/verify/docs.mjs` (doc-pointer suite; 857, 776) DELETE *(est.: only its pointer role is visible)*"
+  },
+  {
+   "id": "AD20",
+   "file": "infrastructure",
+   "defect": "Utilities: repo-paths, local-bin, atomic-write, git-tracked, is-main, main-checkout-core, settled-ruling-core DELETE with their dependents. KEEP whatever the verify harness imports. Check with `grep` at S9"
+  },
+  {
+   "id": "AD21",
+   "file": "infrastructure",
+   "defect": "Infra docs: batch-autonomy (3,270), handover-architecture (986), lane-routing, batch-resilience, batch-singleton-analysis, batch-owner-runbook, command-index, criticality-review, guard-memory-audit, rule-corpus-audit, standstill-analysis-809, stash-sweep-2026-10-22, context-cut-list/-load-1209, docu"
+  },
+  {
+   "id": "AD22",
+   "file": "infrastructure",
+   "defect": "`docs/tasks-archive.md` (35,214 lines) DELETE (git history is the archive). `TASKS.md` loses the 279 obsolete points"
+  },
+  {
+   "id": "AD23",
+   "file": "infrastructure",
+   "defect": "CLAUDE.md (197) + memory index REWRITE to the zero-base rules M1–M8. Lessons stay as prose, not as enforcers"
+  },
+  {
+   "id": "AD24",
+   "file": "infrastructure",
+   "defect": "KEEP: verify harness, verify-bringup, verify-host-setup.sh, build-info, section-tag-core, all game tools (M9) KEEP. They answer a game need"
+  },
+  {
+   "id": "AS1",
+   "file": "infrastructure",
+   "defect": "S1 Quiesce. - Disable the OS scheduler entries (Linux launcher/daemon, both Windows tasks) and the chat watcher. - Copy the 9 open carrier rows (§7) into TASKS.md. - Inspect the `rescue/doctor-2026-10-30T17-28-53-077Z-2139385` branch. - Confirm that 9a6b92d is on `origin/main`. - No code deleted yet"
+  },
+  {
+   "id": "AS2",
+   "file": "infrastructure",
+   "defect": "S2 Stand up the replacement. - CI jobs M1, including typecheck of tests. - Branch protection on `main` (required: M1), auto-delete branches. - From here on, landing means PR merge. `land-point` is dead."
+  },
+  {
+   "id": "AS3",
+   "file": "infrastructure",
+   "defect": "S3 Unhook. - Empty `.claude/settings.json` hooks: all 29 Stop, all PreToolUse, PostToolUse, SessionStart/End, UserPromptSubmit, PermissionRequest. - Add M8 permissions. - Unset `core.hooksPath`; remove `enable-hooks` from `prepare`. - This is the largest relief: ≈17k refusals per corpus disappear. T"
+  },
+  {
+   "id": "AS4",
+   "file": "infrastructure",
+   "defect": "Delete D1 and D2 (batch, doctor, daemon, launcher, Windows). Install M5 if the unattended mode is still wanted."
+  },
+  {
+   "id": "AS5",
+   "file": "infrastructure",
+   "defect": "Delete D4 (board/chat/queue). Check first that the Pages workflow does not publish board files alongside the game."
+  },
+  {
+   "id": "AS6",
+   "file": "infrastructure",
+   "defect": "Delete D3 (context/handover/measure)."
+  },
+  {
+   "id": "AS7",
+   "file": "infrastructure",
+   "defect": "S7 Review. - Shrink D7 to M4 and post the `cross-review` status. - Delete D5, D6, D8. - Add `cross-review` to the required checks."
+  },
+  {
+   "id": "AS8",
+   "file": "infrastructure",
+   "defect": "S8 Verification. - Add `verify:both` posting `verify-webgpu` and `verify-webgl2` statuses, and make them required. - Delete D9. - Every red that was \"charged\" becomes a fix or an explicit skip with a point reference in the suite. - Fix the † harness defects B27 and B59 first, so the required check i"
+  },
+  {
+   "id": "AS9",
+   "file": "infrastructure",
+   "defect": "Delete D10, D11, D18 and the D20 utilities that are no longer imported (`grep` from the harness)."
+  },
+  {
+   "id": "AS10",
+   "file": "infrastructure",
+   "defect": "Delete D12. Convert TASKS.md and drop the 279 obsolete points. Delete D22."
+  },
+  {
+   "id": "AS11",
+   "file": "infrastructure",
+   "defect": "Delete D13–D17 and D19. M7 firewall allowlist lives in one place."
+  },
+  {
+   "id": "AS12",
+   "file": "infrastructure",
+   "defect": "D21 docs, D23 rewrite of CLAUDE.md and memory. Re-measure the line counts of §1 and close 1463."
+  }
+ ]
+}
