@@ -97,7 +97,10 @@ check(
 // lane that meets it runs the identical route and judges it unchanged.
 const ROUTE_BUDGET_MS = 300000
 const routeNeedFps = Math.max(1, Math.ceil(progressNames.total / ((ROUTE_BUDGET_MS / 1000) * 0.8)))
-const routeLane = laneSkipVerdict({ needFps: routeNeedFps, measuredFps: laneFps })
+// Re-measured here, in the steady state: a boot-time reading can include a
+// multi-second build hitch (collision read 0.2 fps on a hardware lane).
+const routeFps = await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
+const routeLane = laneSkipVerdict({ needFps: routeNeedFps, measuredFps: routeFps })
 if (routeLane.skip) {
   console.log(unmeasuredLine('the fixed-frame benchmark route completes and reports', routeLane.reason))
   check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))

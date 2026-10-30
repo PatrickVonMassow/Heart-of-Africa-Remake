@@ -129,7 +129,7 @@ if (section('settlement-season')) {
     // A TIMING check (point 642): a 60 s settle deadline over a per-frame lerp.
     // It declares the rate it needs and is UNMEASURED below it (the software
     // lane read it after 60176 ms). OPEN: 10 fps is an estimate, calibrate.
-    checkTiming(`the ${label} settlement season reading settles before it is read`, 10, r.settled, `after ${r.waitedMs} ms`)
+    await checkTiming(`the ${label} settlement season reading settles before it is read`, 10, r.settled, `after ${r.waitedMs} ms`)
     return r.value
   }
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
