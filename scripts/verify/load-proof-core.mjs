@@ -34,6 +34,17 @@ export function laneSkipVerdict({ needFps, measuredFps }) {
   }
 }
 
+/** The run-header line naming the lane every timing verdict was taken on. */
+export function laneHeader(measuredFps) {
+  const rate = typeof measuredFps === 'number' && Number.isFinite(measuredFps) ? measuredFps.toFixed(1) : 'unmeasured'
+  return `lane rate: ${rate} fps delivered — timing verdicts below were taken on this lane`
+}
+
+/** The line a check the lane cannot answer prints instead of PASS/FAIL. */
+export function unmeasuredLine(name, reason) {
+  return `UNMEASURED  ${name} — ${reason}`
+}
+
 /**
  * The lane skips one suite run reported: every `UNMEASURED  <name> — <reason>`
  * line, once per check name (the polish harness repeats them beside its verdict,

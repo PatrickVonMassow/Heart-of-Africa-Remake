@@ -263,18 +263,28 @@ if (section('head-bob')) {
   })
   await page.waitForTimeout(120)
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
-  const bobSamples = []
-  let footSurface = null
-  for (let i = 0; i < 20; i++) {
-    await page.waitForTimeout(100)
-    const s = await page.evaluate(() => {
-      const p = window.__placePlayer; p.x = 0; p.z = 0 // pin to centre
-      return { y: window.__walkFeel?.cameraY ?? null, foot: window.__walkFeel?.lastFootstepSurface ?? null }
-    })
-    if (s.y !== null) bobSamples.push(s.y)
-    if (s.foot) footSurface = s.foot
-    if (footSurface && bobSamples.length >= 8) break
-  }
+  // Sampled once per RENDERED frame (point 642): a 20×100 ms wall window held
+  // too few frames on a slow lane for a stride to land, and read no footstep.
+  // Done once a footstep has fired and 60 frames (about a stride) were seen;
+  // the wall timeout is only the hang guard.
+  const walk = await page
+    .waitForFunction(
+      () => {
+        const w = (window.__bobWalk ??= { ys: [], foot: null })
+        const p = window.__placePlayer; p.x = 0; p.z = 0 // pin to centre
+        const y = window.__walkFeel?.cameraY ?? null
+        if (y !== null) w.ys.push(y)
+        w.foot = w.foot ?? window.__walkFeel?.lastFootstepSurface ?? null
+        return w.foot && w.ys.length >= 60 ? w : null
+      },
+      null,
+      { polling: 'raf', timeout: 30000 },
+    )
+    .then((h) => h.jsonValue())
+    .catch(() => page.evaluate(() => window.__bobWalk ?? { ys: [], foot: null }))
+  await page.evaluate(() => { delete window.__bobWalk })
+  const bobSamples = walk.ys
+  const footSurface = walk.foot
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
   const bobDev = bobSamples.length ? Math.max(...bobSamples.map((y) => Math.abs(y - 1.5))) : 0
   check(

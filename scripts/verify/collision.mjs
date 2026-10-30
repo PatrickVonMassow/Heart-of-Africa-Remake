@@ -13,6 +13,7 @@ import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { fileURLToPath } from 'node:url'
+import { laneSkipVerdict, laneFpsProbe, laneHeader, unmeasuredLine } from './load-proof-core.mjs'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
 // collision/reachability checks are reproducible. It is applied by the LAUNCHER
@@ -79,6 +80,11 @@ await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await assertBackend(page)
 await page.waitForTimeout(5000)
+// The lane's delivered rate (point 642), printed so every timing verdict names
+// the lane it was taken on.
+const laneFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
+console.log(laneHeader(laneFps))
+let unmeasuredCount = 0
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 
@@ -658,11 +664,22 @@ if (section('village')) {
     }
     return { ok: true, maxPinned, anyMoved, win, n: w.states.length }
   })
-  check(
-    'Village: no inhabitant stays pinned past the unstuck window (point 155)',
-    pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6,
-    JSON.stringify(pinResult),
-  )
+  // A TIMING check (point 642): a WALL window over walkers paced by rendered
+  // frames. It declares the rate it needs; below it the lane cannot answer
+  // (the `ok:true` beside `anyMoved:false` signature) and the check is
+  // UNMEASURED. OPEN: 10 fps is an estimate, calibrate against the lane header.
+  const UNSTUCK_NEED_FPS = 10
+  const pinLane = laneSkipVerdict({ needFps: UNSTUCK_NEED_FPS, measuredFps: laneFps })
+  if (pinLane.skip) {
+    console.log(unmeasuredLine('Village: no inhabitant stays pinned past the unstuck window (point 155)', pinLane.reason))
+    unmeasuredCount++
+  } else {
+    check(
+      'Village: no inhabitant stays pinned past the unstuck window (point 155)',
+      pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6,
+      JSON.stringify(pinResult),
+    )
+  }
 }
 
 // === The chief's body at his hut ===============================================
@@ -1701,6 +1718,7 @@ if (section('stranded-shore')) {
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)
 
+if (unmeasuredCount) console.log(`unmeasured checks: ${unmeasuredCount} (they did not run; not both-backend coverage)`)
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 // Said again where the verdict is read: a green one-section run is not a green

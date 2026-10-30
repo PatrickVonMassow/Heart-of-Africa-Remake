@@ -11,7 +11,7 @@ import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
 import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from './edgeBandReading.mjs'
 import { settledEdgeShot } from './edgeBandSettle.mjs'
 import sharp from 'sharp'
-import { section, check, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { section, check, checkTiming, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 
 // --- Settlement plan on the map (design.md §6.1, point 79) --------------------
 // Inside a place the map opens as a plan of the town: functional buildings
@@ -126,7 +126,10 @@ if (section('settlement-season')) {
   // the bug — the window was.
   const settle = async (label) => {
     const r = await waitForReadingStable(page, () => window.__placeSeason(), { settleMs: 500, samples: 3, requireChange: true, timeout: 60000 })
-    check(`the ${label} settlement season reading settles before it is read`, r.settled, `after ${r.waitedMs} ms`)
+    // A TIMING check (point 642): a 60 s settle deadline over a per-frame lerp.
+    // It declares the rate it needs and is UNMEASURED below it (the software
+    // lane read it after 60176 ms). OPEN: 10 fps is an estimate, calibrate.
+    checkTiming(`the ${label} settlement season reading settles before it is read`, 10, r.settled, `after ${r.waitedMs} ms`)
     return r.value
   }
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
