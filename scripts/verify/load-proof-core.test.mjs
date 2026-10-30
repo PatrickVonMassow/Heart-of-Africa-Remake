@@ -136,4 +136,24 @@ describe('laneFpsProbe — one hitch does not stand for the lane', () => {
   it('still reads a genuinely slow lane as slow', async () => {
     expect(await runWith([2000])).toBeLessThan(1)
   })
+  it('counts delivered frames over elapsed time, so an uneven qualifying lane qualifies', async () => {
+    const pattern = [60, 60, 60, 16, 16]
+    const fps = await runWith(Array.from({ length: 200 }, (_, i) => pattern[i % 5]))
+    expect(fps).toBeCloseTo(23.6, 0)
+    expect(laneSkipVerdict({ needFps: 20, measuredFps: fps }).skip).toBe(false)
+  })
+  it('answers by its own deadline when the frame clock stops delivering', async () => {
+    let n = 0
+    globalThis.requestAnimationFrame = (cb) => { if (n < 3) { const at = 16 * n++; queueMicrotask(() => cb(at)) } }
+    try {
+      const fps = await laneFpsProbe(20, 50)
+      expect(fps).toBeCloseTo(40, 5)
+    } finally { delete globalThis.requestAnimationFrame }
+    globalThis.requestAnimationFrame = () => {}
+    try {
+      const fps = await laneFpsProbe(20, 50)
+      expect(fps).toBe(0)
+      expect(laneSkipVerdict({ needFps: 10, measuredFps: fps }).skip).toBe(true)
+    } finally { delete globalThis.requestAnimationFrame }
+  })
 })

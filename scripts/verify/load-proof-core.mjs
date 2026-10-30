@@ -59,26 +59,41 @@ export function laneSkips(out) {
   return [...byName].map(([name, reason]) => ({ name, reason }))
 }
 
-/** Page function: the page's delivered frame rate, in ONE evaluation, as 1000 over
- *  the MEDIAN frame interval. Samples at least `ms` of wall time and 10 intervals
- *  (capped at `maxMs`), so one multi-second hitch does not stand for the lane:
- *  measured 30.10.2026, frames/window read 0.37 fps where 3 s later the same lane
- *  delivered 17.2. A genuinely slow lane still reads slow. Serialised into the
- *  page, so it is self-contained. */
+/** Page function: the page's delivered frame rate, in ONE evaluation, as the
+ *  frames delivered over the time they took. Samples at least `ms` of wall time and
+ *  10 intervals (capped at `maxMs`). A leading hitch (intervals longer than 4x the
+ *  median) is trimmed before counting, so one multi-second build stall does not
+ *  stand for the lane: measured 30.10.2026, frames/window read 0.37 fps where 3 s
+ *  later the same lane delivered 17.2. A median-interval rate would under-read an
+ *  uneven lane (60,60,60,16,16 ms delivers 23.6 fps, its median says 16.7). A
+ *  deadline independent of the frame clock answers even when frames stop: the
+ *  frames delivered over `maxMs`. Serialised into the page, so it is self-contained. */
 export function laneFpsProbe(ms = 2000, maxMs = 10000) {
   return new Promise((resolve) => {
     const deltas = []
     let t0 = null
     let last = null
+    let done = false
+    const finish = (fps) => {
+      if (done) return
+      done = true
+      clearTimeout(cap)
+      resolve(fps)
+    }
+    const cap = setTimeout(() => finish((1000 * deltas.length) / maxMs), maxMs)
     const tick = (t) => {
+      if (done) return
       if (t0 === null) t0 = t
       else deltas.push(t - last)
       last = t
       const elapsed = t - t0
       if ((elapsed < ms || deltas.length < 10) && elapsed < maxMs) return requestAnimationFrame(tick)
-      if (deltas.length === 0) return resolve(1000 / Math.max(1, elapsed))
-      const sorted = deltas.slice().sort((a, b) => a - b)
-      resolve(1000 / Math.max(1e-3, sorted[Math.floor(sorted.length / 2)]))
+      if (deltas.length === 0) return finish(1000 / Math.max(1, elapsed))
+      const median = deltas.slice().sort((a, b) => a - b)[Math.floor(deltas.length / 2)]
+      let k = 0
+      while (k < deltas.length - 1 && deltas[k] > 4 * median) k++
+      const kept = deltas.slice(k)
+      finish((1000 * kept.length) / Math.max(1e-3, kept.reduce((a, b) => a + b, 0)))
     }
     requestAnimationFrame(tick)
   })
