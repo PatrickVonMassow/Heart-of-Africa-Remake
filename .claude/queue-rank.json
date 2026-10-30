@@ -1800,6 +1800,12 @@
       "why": "closing-LARGE red, already placed in the Dorfleben bundle column; post-release, nothing ahead depends on it",
       "origin": "machine",
       "place": "last"
+    },
+    "1474": {
+      "at": "2026-10-30T17:03:29.305Z",
+      "why": "amendment to 1463; it rides with 1463 and needs no earlier slot",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1829,7 +1835,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-30T12:52:24.371Z",
+    "at": "2026-10-30T17:03:29.316Z",
     "points": [
       184,
       200,
@@ -2305,7 +2311,8 @@
       1470,
       1471,
       1472,
-      1473
+      1473,
+      1474
     ]
   }
 }
