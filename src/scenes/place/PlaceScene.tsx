@@ -141,6 +141,7 @@ import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newSt
 import { bankDrawnReach, buildBoundaryLut, groundDiscShift, isOutsidePlace, placeBoundaryRadius, type PlaceBounds } from './boundary'
 import {
   RIVER_HALF_LENGTH,
+  RIVER_REACH,
   buildRiverFloorGeometry,
   buildBankShoreGeometry,
   buildFoamPatchGeometry,
@@ -2212,6 +2213,9 @@ function PlaceRiver({
       normal: { x: bank.nx, z: bank.nz },
       downstream: { x: bank.fx, z: bank.fz },
       distance: bank.distance,
+      /** How far past the waterline the drawn surface runs (m) — where it hands
+       *  over to the §2.5 panorama's water along the bank. */
+      reach: RIVER_REACH,
       walkEdge: bank.walkEdge,
       bank: bank.bank,
       upstream: bank.upstream,
