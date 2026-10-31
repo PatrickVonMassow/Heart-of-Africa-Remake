@@ -16,6 +16,7 @@
 // probe's record when it is due.
 // An ABSENT lane-switch state (a clone without the untracked state file) is a
 // notice, not a refusal: the scarce lane is judged OFF (turnEndScarceState).
+// Without the batch lock as well (a cloud clone) the guard stands down (point 1461).
 // Manual drive: node scripts/model-guard.mjs --status
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { execSync } from 'node:child_process'
@@ -26,6 +27,7 @@ import {
   formatForbiddenReason,
   formatUnidentifiedReason,
   turnEndScarceState,
+  cloneStandsDown,
 } from './model-guard-core.mjs'
 import { notify } from './notify.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -35,6 +37,7 @@ import { readTranscriptMessages } from './authorship-check-core.mjs'
 import { modelHandoffDecision } from './model-handoff-core.mjs'
 import { writeJsonAtomic, writeTextAtomic } from './atomic-write.mjs'
 import { formatPauseRecord, PAUSE_TYPES } from './batch-pause-core.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 
 const BASELINE = repoPath('.claude/model-guard-baseline.json')
 const PAUSE = repoPath('.claude/batch-paused')
@@ -138,6 +141,10 @@ if (isMainModule(import.meta.url)) {
     // to notice it (the identity test can only see a shared function).
     const gathered = gatherModelGuardInputs()
     const { log, baselineMs: baseline, backupRefs } = gathered.inputs
+    const statusMode = process.argv[2] === '--status'
+    const payload = statusMode ? {} : hookPayload()
+    const sessionId = String(payload.session_id ?? payload.sessionId ?? '').trim()
+    if (!statusMode && cloneStandsDown(gathered.inputs.scarceState, ownsLock(sessionId).mine)) process.exit(0)
     const { scarceState, refuse, notice } = turnEndScarceState(gathered.inputs.scarceState)
     if (refuse && !gathered.applicable) {
       if (process.argv[2] === '--status') console.log(JSON.stringify({ applicable: false, scarceProblem: scarceState.problem }, null, 2))
@@ -161,8 +168,6 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
     if (hits.length && gathered.applicable) {
-      const payload = hookPayload()
-      const sessionId = String(payload.session_id ?? payload.sessionId ?? '').trim()
       const currentModel = transcriptModel(payload.transcript_path ?? payload.transcriptPath)
       const handoff = modelHandoffDecision({
         hits,
