@@ -2868,12 +2868,18 @@ if (section('adult-errands')) {
           // RIVER that has just been spoken on the outward leg — the sender is
           // its speaker and is still standing there, the carrier is the man
           // walking off with the empty jar.
+          // NO AGE BOUND (point 642): since work-orders 1184/1405 the carrier
+          // waits out the RIVER instruction delay (word + 2.5 s) and then takes
+          // the jar up at the table, so a word at most 2.5 s old never met a
+          // carrier with the jar. The order binds sender and carrier instead:
+          // the sender's word is the last one, he is still on the errand, and
+          // the carrier is HIS partner.
           const said = e.last
-          if (!said || said.id !== 'water-out' || said.age > 2.5) return null
+          if (!said || said.id !== 'water-out') return null
           const sender = said.speaker
-          if (!v[sender]) return null
+          if (!v[sender] || v[sender].work?.situation !== 'water-out') return null
           for (let i = 0; i < v.length; i++) {
-            if (i === sender || v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
+            if (i === sender || v[i].work?.situation !== 'water-out' || v[i].work.partner !== sender || v[i].carry !== 'emptyJar') continue
             const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
             return {
               stand,
