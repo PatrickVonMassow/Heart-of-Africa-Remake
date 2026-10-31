@@ -3421,6 +3421,8 @@ if (section('adult-errands')) {
       // Measured on this machine: 49 with the panorama shaded as it was, 1–4 as
       // it is now.
       const RIM_STEP_LIMIT = 12
+      // Drift phases in metres: twelve over 44 m, wider than the streaks (STREAK_ALONG).
+      const RIM_PHASES = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44]
       // The strips are chosen from the blockers read HERE and judged on pictures
       // taken later; a speech label that walks into a strip between the two reads
       // a villager as a seam, and how far it walks depends on the frame rate. So
@@ -3473,7 +3475,17 @@ if (section('adult-errands')) {
         const HALF = 6 // strip half-width, in CSS pixels
         const pick = (xs, at) => xs.slice().sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * at))]
         const readings = []
-        for (let pass = 0; pass < 3; pass++) {
+        // The near band carries the drifting streaks, the far sheet their mean
+        // (waterAppearance.ts), so one capture's step follows the pattern's phase:
+        // measured 0.2-16/255 across pinned drift phases, sign included. Compare
+        // the phase MEAN instead: pin the drift to RIM_PHASES spread over the
+        // streaks and average each band across them (work-order 568).
+        for (let pass = 0; pass < RIM_PHASES.length; pass++) {
+          await page.evaluate(async (d) => {
+            const m = await import('/src/render/waterAppearance.ts')
+            m.riverDrift.value = d
+          }, RIM_PHASES[pass])
+          await nextFrames(2)
           const shot = await capturePixels(page, 'river rim colour step')
           const { data, info } = await sharp(shot).raw().toBuffer({ resolveWithObject: true })
           const scale = info.width / seam.w
@@ -3535,6 +3547,7 @@ if (section('adult-errands')) {
                 cam: { p: cam.position.toArray().map((v) => +v.toFixed(3)), q: cam.quaternion.toArray().map((v) => +v.toFixed(4)) },
                 vp: [window.innerWidth, window.innerHeight, window.devicePixelRatio],
                 t: performance.now(),
+                drift: window.__placeRiver?.()?.drift,
               }
             })
             appendFileSync(process.env.RIM_INPUTS_DUMP, JSON.stringify({ gl: VERIFY_GL ?? 'webgpu', pass, inputs, seam, y: [y0, yTop, yBottom, y1], strips, far, near, zone, step: worst(far, near) }) + '\n')
@@ -3549,26 +3562,27 @@ if (section('adult-errands')) {
             step: worst(far, near),
             zoneStep: worst(zone, [0, 1, 2].map((i) => (far[i] + near[i]) / 2)),
           })
-          await nextFrames(20)
         }
         await page.evaluate(() => window.__placeFreezeLife?.(false))
         const say = (c) => c.map((v) => v.toFixed(0)).join('/')
         const mid = readings[1]
-        const step = pick(readings.map((r) => r.step), 0.5)
-        const zoneStep = pick(readings.map((r) => r.zoneStep), 0.5)
+        const mean = (key) => [0, 1, 2].map((i) => readings.reduce((a, r) => a + r[key][i], 0) / readings.length)
+        const avg = { far: mean('far'), near: mean('near'), zone: mean('zone') }
+        const step = Math.max(...[0, 1, 2].map((i) => Math.abs(avg.far[i] - avg.near[i])))
+        const zoneStep = Math.max(...[0, 1, 2].map((i) => Math.abs(avg.zone[i] - (avg.far[i] + avg.near[i]) / 2)))
         const BAND_ROWS_MIN = 4
         const enough = readings.every((r) => r.strips >= 6 && r.farRows >= BAND_ROWS_MIN && r.nearRows >= BAND_ROWS_MIN)
         check(
           `the water beyond the plate’s rim is the SAME water as the water at the bank (≤ ${RIM_STEP_LIMIT}/255 per channel)`,
           enough && step <= RIM_STEP_LIMIT,
-          `middle capture: ${mid.strips} clear strips · far/near band ${mid.farRows}/${mid.nearRows} rows (≥ ${BAND_ROWS_MIN}) · far ${say(mid.far)} against near ${say(mid.near)} — median step ${step.toFixed(1)} ` +
-            `(${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
+          `middle capture: ${mid.strips} clear strips · far/near band ${mid.farRows}/${mid.nearRows} rows (≥ ${BAND_ROWS_MIN}) · far ${say(avg.far)} against near ${say(avg.near)} over ${readings.length} drift phases — mean step ${step.toFixed(1)} ` +
+            `(per phase ${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
         )
         check(
           'and the handover zone itself carries neither band’s edge — no line at the rim',
           enough && zoneStep <= RIM_STEP_LIMIT,
-          `middle capture: rim zone ${say(mid.zone)} against the water either side — median step ${zoneStep.toFixed(1)} ` +
-            `(${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
+          `rim zone ${say(avg.zone)} against the water either side over ${readings.length} drift phases — mean step ${zoneStep.toFixed(1)} ` +
+            `(per phase ${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
         )
       }
     }
