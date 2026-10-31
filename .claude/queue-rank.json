@@ -1800,6 +1800,12 @@
       "why": "amendment to 1463; it rides with 1463 and needs no earlier slot",
       "origin": "machine",
       "place": "last"
+    },
+    "1476": {
+      "at": "2026-10-31T13:31:41.747Z",
+      "why": "A standing red on adult-errands runs, no earlier dependency; last in Dorfleben is fine",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1829,7 +1835,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-31T05:29:11.596Z",
+    "at": "2026-10-31T13:31:41.756Z",
     "points": [
       184,
       200,
@@ -1931,7 +1937,6 @@
       564,
       565,
       567,
-      568,
       570,
       574,
       591,
@@ -2304,7 +2309,8 @@
       1471,
       1472,
       1473,
-      1474
+      1474,
+      1476
     ]
   }
 }
