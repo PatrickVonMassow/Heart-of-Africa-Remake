@@ -681,8 +681,9 @@ if (section('village')) {
   const pinName = 'Village: no inhabitant stays pinned past the unstuck window (point 155)'
   const pinOk = pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6
   // Measured during the observation itself (frames over its window), not at
-  // boot nor by a later probe.
-  const pinLane = timingVerdict({ ok: pinOk, needFps: UNSTUCK_NEED_FPS, measuredFps: pinResult.fps ?? laneFps })
+  // boot nor by a later probe. An observation that returned without a rate (no
+  // walkers) leaves it unmeasured, so that failure stays red.
+  const pinLane = timingVerdict({ ok: pinOk, needFps: UNSTUCK_NEED_FPS, measuredFps: pinResult.fps ?? null })
   if (pinLane.verdict === 'unmeasured') {
     console.log(unmeasuredLine(pinName, pinLane.reason))
     unmeasuredCount++

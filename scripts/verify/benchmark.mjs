@@ -100,7 +100,8 @@ const ROUTE_BUDGET_MS = 300000
 const routeNeedFps = Math.max(1, Math.ceil(progressNames.total / ((ROUTE_BUDGET_MS / 1000) * 0.8)))
 // Measured before the route, in the steady state: a boot-time reading can
 // include a multi-second build hitch (collision read 0.2 fps on a hardware lane).
-const routeFps = await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
+// A failed probe leaves the rate unmeasured (null), never the boot reading.
+const routeFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
 const routeStarted = Date.now()
 const routeDone = await page
   .waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: ROUTE_BUDGET_MS })

@@ -44,6 +44,14 @@ describe('timingVerdict — a timing check is judged after it ran', () => {
     expect(timingVerdict({ ok: false, needFps: 10, measuredFps: 10 })).toEqual({ verdict: 'fail', reason: null })
     expect(timingVerdict({ ok: false, needFps: 10, measuredFps: 58 })).toEqual({ verdict: 'fail', reason: null })
   })
+  it('keeps a failure whose current rate could not be measured FAIL, even after a slow boot reading', () => {
+    // The caller passes null for a probe that rejected or an observation that
+    // returned no rate; a boot reading of 5 fps must not stand in for it.
+    const bootFps = 5
+    expect(timingVerdict({ ok: false, needFps: 10, measuredFps: bootFps }).verdict).toBe('unmeasured')
+    expect(timingVerdict({ ok: false, needFps: 10, measuredFps: null }).verdict).toBe('fail')
+    expect(timingVerdict({ ok: false, needFps: 10, measuredFps: undefined }).verdict).toBe('fail')
+  })
   it('keeps a failure on an unmeasurable lane FAIL and passes a success there', () => {
     expect(timingVerdict({ ok: false, needFps: 10, measuredFps: null }).verdict).toBe('fail')
     expect(timingVerdict({ ok: false, needFps: 10, measuredFps: Number.NaN }).verdict).toBe('fail')

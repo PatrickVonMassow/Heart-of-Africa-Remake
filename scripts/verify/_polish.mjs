@@ -48,7 +48,9 @@ export const unmeasured = (name, reason) => {
 // otherwise), so checks built on the same measurement can report UNMEASURED
 // with it instead of asserting on a partial reading.
 export const checkTiming = async (name, needFps, ok, detail) => {
-  const fps = ok ? null : await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
+  // A probe that fails leaves the rate unmeasured (null), never the boot reading:
+  // a failure is UNMEASURED only on a rate measured now, else it stays red.
+  const fps = ok ? null : await page.evaluate(laneFpsProbe, 2000).catch(() => null)
   const v = timingVerdict({ ok, needFps, measuredFps: fps })
   if (v.verdict === 'unmeasured') {
     unmeasured(name, v.reason)
