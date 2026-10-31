@@ -35222,3 +35222,102 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   - No change to the switch state itself, to the bounds (1 cloud author, 1 waiting branch, 1 local heavy job), or to the probe requirement for `--on`.
   Bundle: Session- & Repo-Hygiene.
   Criticality: medium - without it cloud commissioning stops on 05.11.2026 against the user's order.
+
+- [x] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
+  nicht mehr vor der 0.3 passieren, aber möglichst bald danach"). The rebuild that replaced
+  wall-clock waits with waiting on the app's own state was applied CASE BY CASE, never swept:
+  measured 11.08.2026, the bird's-eye half of the Ctrl-label check had taken the one-moment
+  snapshot on 08.08., the settlement half never did, and the same defect reappeared there
+  three days later. Nothing forbids the pattern, so the next one will appear again.
+  THE TWO KINDS MUST BE SEPARATED, because "no test may fail from load" is only half
+  achievable and pretending otherwise would produce a green that means nothing:
+  1. A STATE check — does this exist, is it drawn there, does the label read that — CAN be
+     made load-proof, and must be: poll on the app's own frames or state until the answer is
+     stable, read every side of a comparison in ONE evaluation, never compare two separate
+     round trips. Sweep every `scripts/verify/*.mjs` for the pattern and fix each site.
+  2. A TIMING check — frame budget, animation smoothness, how long a step takes — is
+     load-sensitive BY NATURE. It is not made load-proof; it is RECOGNISED: under load its
+     verdict does not count as evidence (the runner already prints exactly that) and it is
+     reported as UNMEASURED rather than red, so a loaded machine can never manufacture a
+     failure nor hide one.
+  3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
+     assembled from two separate `page.evaluate` calls. The agent that found this case left
+     the gate undone on purpose and asked for the decision — this point is the decision.
+  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
+  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
+  WebGPU `polish` run and two building agents shared the machine, and both green on the same
+  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
+  on its own retry. Each must come out of the sweep classified — repaired as a state check,
+  or declared timing and reported UNMEASURED under load.
+  A FOURTH CASE, measured 15.09.2026 on `polish`, is the sharpest of them because BOTH
+  sides of the comparison flutter: `the order at the stand can be photographed` waits up to
+  180 s for the LAST utterance in the village to be a water word at most 2.5 s old while a
+  second man is already walking off with the empty jar. It went red twice out of two on the
+  candidate of point 1056 and, on the untouched baseline of the same commit and the same
+  backend, its sibling `the return walk can be photographed` went red once out of two — same
+  section, same cause, no carrier moment inside the window. The check's own comment names
+  the reason: the window's width depends on the errand's pace, and the suite runs that pace
+  at six times normal. It is a moment-catcher, not a state check, and the sweep must decide
+  which of the two kinds it is. Point 1056 was verified past it: its branch does not touch
+  the water errand at all.
+  THE INVENTORY THE SWEEP STARTS FROM IS ALREADY COUNTED (carried over from point 200 on
+  20.08.2026, which measured it as Pillar-2 group E): 26 wall-clock/radius sites — 20 in
+  `enrichments`, plus `polish` 270, `settings` 183/277, `flow` 242, `voice` 56, `touch` 75 — and
+  the two patterns are named per site: a render-loop behaviour polled on the SIM clock
+  (`__pollSim`/`__sleepSim`/`simTime`) or on the check's OWN condition rather than on a fixed wall
+  wait, and "in view / beyond the ring" judged by `__camera.onScreen`/ndc projection rather than by
+  an assumed radius — a check that TESTS a radius feature keeps its radius and says so. Some of the
+  26 were fixed case by case since 21.07., which is the very drift this point exists to end: each
+  site is verified against HEAD before it is touched, each touched suite is run after its change
+  (both backends for the WebGPU-lane suites, `touch`/`voice` WebGL only), and the sweep's report
+  states how many of the 26 were already closed and by what. The fixed 1500 ms wait of point 521
+  is a member of this list and is fixed there.
+  A LANE THAT CANNOT ANSWER A CHECK SAYS SO, WITH ITS MEASURED RATE (folded in from point 506 on
+  20.08.2026). That point's four reds were taken on a SOFTWARE WebGPU lane drawing roughly one
+  frame per second, and that premise is dead here: `node scripts/verify/backend-lane-check.mjs`,
+  re-measured 20.08.2026, shows BOTH lanes hardware-backed on a real GPU, WebGPU running in
+  COMPATIBILITY mode rather than core. The mechanism survives it intact, and it is how kind 2 above
+  gets reported in practice:
+  - the run MEASURES the lane's delivered frame rate once, from the running page, and prints it in
+    the run header, so every verdict below NAMES the lane it was taken on instead of assuming one;
+  - a check whose subject is a RATE or a wall-clock budget (stance intervals per walk, a settle
+    deadline, a fixed-frame benchmark route) DECLARES the throughput it needs; below that figure it
+    SKIPS, naming the measured rate and that the lane cannot answer it, and it never reds and never
+    passes silently. That is the measured-nothing signature this removes: a check reporting a rule
+    as broken while its own reading says the rule held (`"ok":true` beside `anyMoved:false`) reads
+    as a product defect and is the worst red there is;
+  - NO product threshold moves for it — on a lane that meets the throughput the identical check
+    runs unchanged and must still fail on a real regression;
+  - the skips are COUNTED in the run summary, so a lane that skips half a suite can never be
+    mistaken for a green both-backend verification: what the §7.2 both-backend rule counts is what
+    actually RAN.
+  The checks that failed this way while the lane WAS software name the class the declaration has
+  to cover: `polish`'s goat planted foot (1 usable stance interval where it needs 3) and its dry
+  settlement-season settle (read after 60176 ms), `settings`' footstep surface class, the
+  fixed-frame `benchmark` route (`waitForFunction: Timeout 300000ms exceeded`), and `collision`'s
+  door transition and unstuck window. A lane can also HANG instead of skipping — 27 minutes with
+  no frame written, killed by hand — and while it does, a figure or settlement point has no second
+  backend at all: that merge owes a loud deferral, never a silent single-backend picture.
+
+  THE GOAT PLANTED FOOT IS NOT CLASSIFIED HERE (20.08.2026). Point 725 holds a cross-vendor
+  review verdict that the release frame really does teleport the foot and that `judgeStanceSlip`
+  excludes exactly that frame, so the check may be measuring around a defect rather than
+  suffering a slow lane. That point owns the measurement which decides between the two, and it
+  is taken on the hardware lane. This sweep may give that check a throughput declaration only
+  once the measurement has come back "no jump" — a skip laid over a real defect is the one
+  outcome this mechanism must never produce. The other named cases are unaffected and are
+  classified as specified.
+
+  VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
+  with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
+  passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
+  repaired state check that previously skewed.
+  A Vitest case pins the pure skip decision — needed against measured throughput — in both
+  directions, including that a lane which meets the throughput never skips.
+  Live, in the surviving lanes' terms: a run on a lane that cannot meet a check's declared
+  throughput ends GREEN with exactly that check reported as a lane skip naming the measured rate,
+  while the lane that meets it runs the same check for real.
+  Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
+  door point 640 closes from the other side.
