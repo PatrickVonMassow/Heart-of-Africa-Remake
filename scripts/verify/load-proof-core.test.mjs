@@ -167,7 +167,8 @@ describe('laneFpsProbe — one hitch does not stand for the lane', () => {
     globalThis.requestAnimationFrame = (cb) => { if (n < 3) { const at = 16 * n++; queueMicrotask(() => cb(at)) } }
     try {
       const fps = await laneFpsProbe(20, 50)
-      expect(fps).toBeCloseTo(40, 5)
+      expect(fps).toBeLessThanOrEqual(40)
+      expect(fps).toBeGreaterThan(30)
     } finally { delete globalThis.requestAnimationFrame }
     globalThis.requestAnimationFrame = () => {}
     try {
@@ -175,6 +176,21 @@ describe('laneFpsProbe — one hitch does not stand for the lane', () => {
       expect(fps).toBe(0)
       expect(laneSkipVerdict({ needFps: 10, measuredFps: fps }).skip).toBe(true)
     } finally { delete globalThis.requestAnimationFrame }
+  })
+  it('divides by the wall time that passed when the deadline timer fires late', async () => {
+    let n = 0
+    globalThis.requestAnimationFrame = (cb) => { if (n < 3) { const at = 16 * n++; queueMicrotask(() => cb(at)) } }
+    const realSetTimeout = globalThis.setTimeout
+    globalThis.setTimeout = (cb, ms) => realSetTimeout(cb, ms * 4)
+    try {
+      // 2 intervals over ~200 ms of wall time, not over the nominal 50 ms cap (40 fps).
+      const fps = await laneFpsProbe(20, 50)
+      expect(fps).toBeLessThanOrEqual(10.5)
+      expect(fps).toBeGreaterThan(5)
+    } finally {
+      globalThis.setTimeout = realSetTimeout
+      delete globalThis.requestAnimationFrame
+    }
   })
 })
 

@@ -74,7 +74,7 @@ export function laneSkips(out) {
  *  later the same lane delivered 17.2. A median-interval rate would under-read an
  *  uneven lane (60,60,60,16,16 ms delivers 23.6 fps, its median says 16.7). A
  *  deadline independent of the frame clock answers even when frames stop: the
- *  frames delivered over `maxMs`. Serialised into the page, so it is self-contained. */
+ *  frames delivered over the wall time that passed. Serialised into the page, so it is self-contained. */
 export function laneFpsProbe(ms = 2000, maxMs = 10000) {
   return new Promise((resolve) => {
     const deltas = []
@@ -87,7 +87,10 @@ export function laneFpsProbe(ms = 2000, maxMs = 10000) {
       clearTimeout(cap)
       resolve(fps)
     }
-    const cap = setTimeout(() => finish((1000 * deltas.length) / maxMs), maxMs)
+    // The timer can fire late on a busy main thread: divide by the wall time
+    // that actually passed, never by the nominal cap.
+    const started = performance.now()
+    const cap = setTimeout(() => finish((1000 * deltas.length) / Math.max(maxMs, performance.now() - started)), maxMs)
     const tick = (t) => {
       if (done) return
       if (t0 === null) t0 = t
