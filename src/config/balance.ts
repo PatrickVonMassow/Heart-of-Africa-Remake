@@ -2731,7 +2731,7 @@ export const VILLAGER_ASSET = {
     tau: 0.002,
     rounds: 8,
     reach: { spine: 25, spine1: 25, chest: 25, hips: 25, neck: 25, head: 25, shoulder: 20, thigh: 60, shin: 90, foot: 40, toe: 30, upperArm: 60, forearm: 60, hand: 40 },
-    snapLimit: 0.003,
+    snapLimit: 0.0014,
     gateLimit: 0.003,
   },
   /** How far a garment vertex may lie inside the body in any frame of any clip
