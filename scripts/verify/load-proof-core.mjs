@@ -144,11 +144,18 @@ function evaluateBinding(stmt) {
   return names.length ? names : null
 }
 
+/** A property NAME (`o.y`, `{ y: 1 }`) is no reference to a binding `y`; a
+ *  shorthand `{ y }` still is. */
+function isPropertyName(n) {
+  const p = n.parent
+  return !!p && (ts.isPropertyAccessExpression(p) || ts.isPropertyAssignment(p)) && p.name === n
+}
+
 function mentions(node, name) {
   let hit = false
   const visit = (n) => {
     if (hit) return
-    if (ts.isIdentifier(n) && n.text === name) hit = true
+    if (ts.isIdentifier(n) && n.text === name && !isPropertyName(n)) hit = true
     else ts.forEachChild(n, visit)
   }
   visit(node)

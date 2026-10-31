@@ -81,6 +81,21 @@ describe('findSplitComparisons — the gate over two-round-trip comparisons', ()
     `
     expect(findSplitComparisons(one)).toEqual([])
   })
+  it('does not take a property name for a binding reference', () => {
+    const src = `
+      const { x } = await page.evaluate(() => readPos())
+      const { y } = await page.evaluate(() => readPos())
+      check('x matches', x === expected.y)
+      check('x matches the literal', x === ({ y: 1 }).y)
+    `
+    expect(findSplitComparisons(src)).toEqual([])
+    const shorthand = `
+      const { x } = await page.evaluate(() => readPos())
+      const { y } = await page.evaluate(() => readPos())
+      check('x matches', x === pick({ y }))
+    `
+    expect(findSplitComparisons(shorthand)).toHaveLength(1)
+  })
   it('passes a before/after pair with an action between the reads', () => {
     const src = `
       const before = await page.evaluate(() => count())
