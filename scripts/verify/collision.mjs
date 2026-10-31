@@ -13,7 +13,7 @@ import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { fileURLToPath } from 'node:url'
-import { laneSkipVerdict, laneFpsProbe, laneHeader, unmeasuredLine } from './load-proof-core.mjs'
+import { timingVerdict, laneFpsProbe, laneHeader, unmeasuredLine } from './load-proof-core.mjs'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
 // collision/reachability checks are reproducible. It is applied by the LAUNCHER
@@ -673,22 +673,21 @@ if (section('village')) {
     return { ok: true, maxPinned, anyMoved, win, n: w.states.length, fps }
   })
   // A TIMING check (point 642): a WALL window over walkers paced by rendered
-  // frames. It declares the rate it needs; below it the lane cannot answer
-  // (the `ok:true` beside `anyMoved:false` signature) and the check is
-  // UNMEASURED. OPEN: 10 fps is an estimate, calibrate against the lane header.
+  // frames. It declares the rate it needs and is judged after the window: a pass
+  // passes on any lane; a failure below the rate (the `ok:true` beside
+  // `anyMoved:false` signature) is UNMEASURED, at or above it red.
+  // OPEN: 10 fps is an estimate, calibrate against the lane header.
   const UNSTUCK_NEED_FPS = 10
+  const pinName = 'Village: no inhabitant stays pinned past the unstuck window (point 155)'
+  const pinOk = pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6
   // Measured during the observation itself (frames over its window), not at
   // boot nor by a later probe.
-  const pinLane = laneSkipVerdict({ needFps: UNSTUCK_NEED_FPS, measuredFps: pinResult.fps ?? laneFps })
-  if (pinLane.skip) {
-    console.log(unmeasuredLine('Village: no inhabitant stays pinned past the unstuck window (point 155)', pinLane.reason))
+  const pinLane = timingVerdict({ ok: pinOk, needFps: UNSTUCK_NEED_FPS, measuredFps: pinResult.fps ?? laneFps })
+  if (pinLane.verdict === 'unmeasured') {
+    console.log(unmeasuredLine(pinName, pinLane.reason))
     unmeasuredCount++
   } else {
-    check(
-      'Village: no inhabitant stays pinned past the unstuck window (point 155)',
-      pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6,
-      JSON.stringify(pinResult),
-    )
+    check(pinName, pinOk, JSON.stringify(pinResult))
   }
 }
 
