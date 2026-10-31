@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, chownSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,9 @@ import ts from 'typescript'
 const containerDir = join(dirname(fileURLToPath(import.meta.url)), '../.devcontainer')
 const entrypoint = join(containerDir, 'container-entrypoint.sh')
 const places = []
+// Root passes bash's `-w` test on a 0444 file (cloud clones run as root), so
+// root runs the fixture as `nobody` to keep the read-only check meaningful.
+const unprivileged = process.getuid?.() === 0 ? 65534 : undefined
 afterEach(() => {
   for (const dir of places.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
@@ -49,12 +52,19 @@ function fixture({ empty = false, missingLauncher = false, writable = false } = 
     }) + '\\n')
     process.exit(Number(process.env.HOA_COMMAND_EXIT || 0))
   `)
+  if (unprivileged !== undefined) {
+    for (const path of [dir, repo, config, bin, join(bin, 'sudo'), command,
+      ...(empty ? [] : [join(repo, '.git')]),
+      ...(empty || missingLauncher ? [] : [join(repo, 'scripts'), join(repo, 'scripts/batch-launcher.mjs')])]) {
+      chownSync(path, unprivileged, unprivileged)
+    }
+  }
   return {
     repo, config,
     run(env = {}) {
       return spawnSync('bash', ['-c', 'source "$1"; shift; container_entrypoint "$@"',
         'fixture', entrypoint, repo, config, process.execPath, command, 'one argument', '$literal'], {
-        encoding: 'utf8', timeout: 10_000, windowsHide: true,
+        encoding: 'utf8', timeout: 10_000, windowsHide: true, uid: unprivileged, gid: unprivileged,
         env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOA_START_EVENTS: events, ...env },
       })
     },

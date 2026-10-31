@@ -34,6 +34,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
+import { USAGE, wantsHelp } from './cli-usage.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { QUEUE_REBUILD_CMD, RELEASE_TAG_POINT, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
@@ -234,9 +235,20 @@ function flagValue(argv, flag) {
   return value
 }
 
-if (isMainModule(import.meta.url)) {
+/** Flags this command does not know — printed with the usage, the action still runs. */
+export function unknownFlags(argv = []) {
+  return argv.filter((a) => a.startsWith('-') && !ACTION_FLAGS.includes(a) && !VALUE_FLAGS.includes(a))
+}
+
+if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
+  console.log(USAGE['queue-rank'])
+} else if (isMainModule(import.meta.url)) {
   try {
     const argv = process.argv.slice(2)
+    // An unknown flag used to vanish silently; it is named with the usage, and the
+    // invocation keeps today's action and exit code.
+    const unknown = unknownFlags(argv)
+    if (unknown.length) console.log(`queue-rank: unknown option ${unknown.join(' ')}\n${USAGE['queue-rank']}`)
     const tasksMd = readTasksOpen()
     const open = openPointsOf(tasksMd)
     const record = readRankRecord()

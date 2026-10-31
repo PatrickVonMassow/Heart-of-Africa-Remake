@@ -32,7 +32,7 @@
 // again (`--clear`). Otherwise `batch-progress-guard` stops demanding work the
 // session cannot do while it waits — and it stops the moment the evidence stops
 // checking out, or the declaration ages out.
-import { readFileSync, rmSync, statSync, existsSync } from 'node:fs'
+import { readFileSync, rmSync, statSync, existsSync, renameSync, linkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -216,6 +216,71 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
   } catch {
     return false
   }
+}
+
+/**
+ * Remove the declaration only when it is waiting on `waitingOn` (point 1308).
+ * A non-matching declaration is never touched. A matching one is renamed aside
+ * and judged again, so the compare covers exactly the copy that is removed; a
+ * copy replaced in between is linked back unless a newer one took its place,
+ * and a copy that cannot be removed is linked back and reported.
+ * Residuals, accepted without a lock (CLAUDE.md §2 freeze, docs/backlog.md): a
+ * declaration written between the first read and the rename is out of sight
+ * until its link-back, and a persistently unremovable aside copy stays behind,
+ * named in the returned error; nothing reads `.clear-*` files.
+ * @returns {{cleared: boolean, prior: object|null, error?: string}}
+ */
+export function clearDeclarationIf(waitingOn, path = IN_FLIGHT_PATH, { afterAside = () => {}, remove = (p) => rmSync(p) } = {}) {
+  const words = (e) => String(e?.message ?? e)
+  // Absence is null; an unreadable or unparsable declaration is an error, never a mismatch.
+  const load = (p) => {
+    try {
+      return { d: JSON.parse(readFileSync(p, 'utf8')) }
+    } catch (e) {
+      return e?.code === 'ENOENT' ? { d: null } : { error: `${p} unreadable: ${words(e)}` }
+    }
+  }
+  const first = load(path)
+  if (first.error) return { cleared: false, prior: null, error: first.error }
+  const seen = first.d
+  if (seen?.waitingOn !== waitingOn) return { cleared: false, prior: seen }
+  const aside = `${path}.clear-${process.pid}-${Date.now()}`
+  try {
+    renameSync(path, aside)
+  } catch (e) {
+    return e?.code === 'ENOENT' ? { cleared: false, prior: null } : { cleared: false, prior: seen, error: words(e) }
+  }
+  afterAside() // test seam: a writer racing the compare
+  const second = load(aside)
+  const prior = second.d ?? null
+  const putBack = () => {
+    try {
+      linkSync(aside, path)
+    } catch (e) {
+      if (e?.code !== 'EEXIST') return `could not restore ${path}: ${words(e)} (copy kept at ${aside})`
+    }
+    try {
+      rmSync(aside, { force: true })
+    } catch (e) {
+      return `left ${aside} behind: ${words(e)}`
+    }
+    return null
+  }
+  if (second.error) {
+    const restore = putBack()
+    return { cleared: false, prior: null, error: `${second.error}${restore ? `; ${restore}` : ''}` }
+  }
+  if (prior?.waitingOn === waitingOn) {
+    try {
+      remove(aside)
+      return { cleared: true, prior }
+    } catch (e) {
+      const restore = putBack()
+      return { cleared: false, prior, error: `could not remove it: ${words(e)}${restore ? `; ${restore}` : ''}` }
+    }
+  }
+  const restore = putBack()
+  return restore ? { cleared: false, prior, error: restore } : { cleared: false, prior }
 }
 
 /**
@@ -452,7 +517,8 @@ export function worktreeFilesActiveAt(root, { excludePaths = [] } = {}) {
         '--ignore-submodules=all',
         '--',
         '.',
-        ...excludePaths.map((path) => `:(top,literal,exclude)${path}`),
+        // A ready pathspec (leading `:`) passes verbatim; a bare path is literal.
+        ...excludePaths.map((path) => (path.startsWith(':') ? path : `:(top,literal,exclude)${path}`)),
       ],
       {
         windowsHide: true,
@@ -880,8 +946,12 @@ export function registeredFeatureWriters({
         // Exclude its output before the dirty-path limit so it neither proves a
         // writer alive nor crowds source edits out of the measurement. Keep the
         // shared probe's default intact: declared runs still need that progress.
+        // Top-level `.claude/` files are session bookkeeping (guard state, queue
+        // rank) that observers rewrite after the author has gone; its authored
+        // subdirectories (agents/, skills/, hooks/, commands/) stay measured.
         worktreeProbe: (path) => worktreeActiveAt(path, {
-          excludePaths: ['verification/', 'local/verify-logs/', 'test-results/', 'playwright-report/'],
+          excludePaths: ['verification/', 'local/verify-logs/', 'test-results/', 'playwright-report/',
+            ':(top,glob,exclude).claude/*', '.claude/context-fence-ledgers/'],
         }),
       })
       return {
@@ -1606,7 +1676,7 @@ if (isMain) {
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N] [--branch REF] ' +
     '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] ' +
-    '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear | ' +
+    '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear [--if-waiting-on "<what>"] | ' +
     '--agent-check [--worktree PATH]… [--branch REF]… [--log PATH]… | --handover-check | --adopt'
 
   if (argv[0] === '--handover-check') {
@@ -1708,10 +1778,28 @@ if (isMain) {
     )
     process.exit(1)
   } else if (argv[0] === '--clear') {
-    const prior = readDeclaration()
-    const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
-    if (refusal) fail(refusal)
-    clearDeclaration()
+    // `--if-waiting-on <name>` (point 1308, Sol reviews of 28df442 and 8659f41):
+    // compare and removal act on one renamed-aside copy, so a waiting command
+    // clears only its own declaration even when another replaces it meanwhile.
+    const onlyIf = argv[1] === '--if-waiting-on' ? String(argv[2] ?? '') : null
+    let prior
+    if (onlyIf !== null) {
+      const peek = readDeclaration()
+      const refusal = transferredMutationRefusal({ declaration: peek, marker: readBoundaryMarker() })
+      if (refusal) fail(refusal)
+      const r = clearDeclarationIf(onlyIf)
+      if (r.error) fail(`in-flight declaration NOT cleared: ${r.error}`)
+      if (!r.cleared) {
+        console.log(`in-flight declaration left as it is — it is not "${onlyIf}".`)
+        process.exit(0)
+      }
+      prior = r.prior
+    } else {
+      prior = readDeclaration()
+      const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
+      if (refusal) fail(refusal)
+      if (!clearDeclaration()) fail(`in-flight declaration NOT cleared: ${IN_FLIGHT_PATH} could not be removed`)
+    }
     // …and the lease extension the declaration bought (point 556). The lock must
     // not go on carrying a `declaredWait` whose declaration is gone: the marker is
     // what makes the window conditional, and a conditional window with nothing left
@@ -1923,9 +2011,9 @@ if (isMain) {
           'Nothing recorded — a declaration is only worth as much as what proves it.',
       )
     }
-    // THE CAP IS ALSO A TARGET (point 427). Refused HERE as well as at the turn end,
-    // so the session learns at the declaration rather than at a blocked stop — the
-    // same discipline the evidence check above follows.
+    // THE CAP AS A TARGET (point 427) is switched off in `slotReasonDecision`
+    // (point 1452), so this refusal no longer fires; left inert rather than
+    // rebuilt.
     const slots = gatherSlots(declaration)
     if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
     // THE BOARD'S PROMISE MUST NOT AGE UNDER THIS WAIT (point 661): a wait is

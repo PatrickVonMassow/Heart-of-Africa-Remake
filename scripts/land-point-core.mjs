@@ -37,7 +37,7 @@
 //     INTRODUCE a finding that guard would block on (pre-existing ones are
 //     tolerated — see transitionAccepted).
 
-import { CLAUDE_MODEL } from './fable-switch-core.mjs'
+import { MAIN, trailerAddressFor } from './model-lanes.mjs'
 
 /** A landing failure that is the CHAIN's own verdict, not a crash. */
 export class LandingError extends Error {
@@ -75,6 +75,7 @@ export const LANDING_STEPS = Object.freeze([
   { id: 'push', label: 'commit the tick and push main' },
   { id: 'board', label: 'publish the board' },
   { id: 'cleanup', label: 'delete branch, remote branch and worktree' },
+  { id: 'synced', label: 'record the board review at the tick commit (dashboard-guard --synced)' },
 ])
 
 export const STEP_IDS = Object.freeze(LANDING_STEPS.map((s) => s.id))
@@ -133,7 +134,7 @@ export function tickCommitMessage({ number, model } = {}) {
   if (!name) {
     throw new LandingError('no authoring model given for the tick commit', {
       step: 'push',
-      repair: `pass --model "${CLAUDE_MODEL}" (the model running this landing) — the trailer is model-guard's only evidence`,
+      repair: `pass --model "${MAIN.trailerName}" (the model running this landing) — the trailer is model-guard's only evidence`,
     })
   }
   return [
@@ -142,7 +143,7 @@ export function tickCommitMessage({ number, model } = {}) {
     `Point ${number} is verified and merged; its block moves verbatim into`,
     'docs/tasks-archive.md so TASKS.md keeps only the open work.',
     '',
-    `Co-Authored-By: ${name} <noreply@anthropic.com>`,
+    `Co-Authored-By: ${name} <${trailerAddressFor(name)}>`,
     '',
   ].join('\n')
 }
@@ -457,7 +458,7 @@ const findingKey = (f) => `${f?.rule ?? '?'}:${[...(f?.points ?? [])].sort((a, b
  *
  * FAILS CLOSED on a missing "after" verdict: no verdict is not a pass.
  */
-export function transitionAccepted({ before = null, after = null, verdict = null } = {}) {
+export function transitionAccepted({ before = null, after = null, verdict = null, lost = [] } = {}) {
   const post = after ?? verdict
   if (!post || typeof post !== 'object') {
     return { ok: false, findings: [{ rule: 'no-verdict', detail: 'the archive guard returned nothing to judge' }], preexisting: [] }
@@ -468,6 +469,13 @@ export function transitionAccepted({ before = null, after = null, verdict = null
   )
   const introduced = postFindings.filter((f) => !priorKeys.has(findingKey(f)))
   const preexisting = postFindings.filter((f) => priorKeys.has(findingKey(f)))
+  // A TICK MOVES ONE POINT AND LOSES NONE (21.10.2026): any point of the union of
+  // TASKS.md and the archive that the transition removes is refused, whatever
+  // the archive guard says (`lostPoints` in carrier-reconcile-core.mjs).
+  const lostPoints = (Array.isArray(lost) ? lost : []).filter((n) => Number.isInteger(n))
+  if (lostPoints.length) {
+    introduced.push({ rule: 'point-lost', detail: `the transition removes point(s) ${lostPoints.join(', ')} from TASKS.md and the archive` })
+  }
   return { ok: introduced.length === 0, findings: introduced, preexisting }
 }
 

@@ -2,14 +2,17 @@
 // game state to pretty-printed JSON — a self-describing header (app/build
 // marker + generation date), the reproduction summary, the environment, every
 // data field of the useGame store (unlike the §18 port snapshot, which
-// captures only the checkpoint fields), the live wildlife section, the full
+// captures only the checkpoint fields), the live wildlife section, the live
+// place-scene section (every registered vignette's runtime), the full
 // balance object (so every debug override is visible) and the transient UI
 // state. Deterministic given a state, an injected date and the same balance,
-// build mode and wildlife runtime; store actions and any other function fields
+// build mode and wildlife and place runtime; store actions and any other function fields
 // are stripped by the JSON replacer.
 
 import { balance, START_YEAR } from '../config/balance'
+import { placeSection } from '../systems/placeDump'
 import { wildlifeSection, type WildlifeDump } from '../systems/wildlifeDump'
+import { placePlayerPosition } from '../scenes/place/playerPosition'
 import { regionAt, worldToLatLon, type RegionId } from '../world/geo'
 import type { GameState } from './store'
 
@@ -112,6 +115,11 @@ function dataOnly(_key: string, value: unknown): unknown {
  * its registered read-only source: bounded by a radius and a cap that the
  * section itself names, deterministic for a given runtime state, and
  * empty (`active: false`) wherever no travel scene is mounted.
+ *
+ * The `place` section reads every registered place vignette the same way
+ * (src/systems/placeDump.ts): its figures with position, yaw, phase, pose and
+ * crown, its carried and set-down objects with their holders — bounded around
+ * the traveller's place-local position, empty outside a place scene.
  */
 export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {
   const dump = {
@@ -123,6 +131,7 @@ export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {
     env: opts.env,
     game,
     wildlife: wildlifeSection(game.pos),
+    place: placeSection(placePlayerPosition.active ? { x: placePlayerPosition.x, z: placePlayerPosition.z } : null),
     balance,
     ui: opts.ui,
   }

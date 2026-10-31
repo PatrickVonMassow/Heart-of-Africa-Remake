@@ -750,8 +750,8 @@ async function checkChildrenMotion(motionPlace) {
   await page.waitForFunction(() => window.__game && window.__balance, null, { timeout: 60000 })
   await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
   await assertBackend(page)
-  // Settle in DRAWN FRAMES, not on the wall clock (the rule this file states at
-  // `nextFrames`). Everything this block needs is already awaited above as a
+  // Settle in DRAWN FRAMES, not on the wall clock (the rule ./_polish.mjs states
+  // at `nextFrames`). Everything this block needs is already awaited above as a
   // condition, so the only thing left to wait for is the reloaded scene actually
   // drawing — and four rendered frames prove that, while four wall seconds prove
   // nothing on a renderer that stalled (point 690).
@@ -1251,7 +1251,7 @@ if (section('children-bank-game')) {
   // shipped 55 s is chosen so a VISITING player does not miss the call that opens
   // a cycle. This section needs the RUN, twice, so it shortens the roam the way
   // the debug menu would and puts it back afterwards. It also lengthens the tap
-  // pause (below) and, for the tap photograph, the arrival hold, and latches the
+  // pause (below) and, for the arrival-contact frame, the arrival hold, and latches the
   // charge; the walk down to the bank and every run are the shipped ones.
   //
   // BOTH LENGTHS OF THAT PHASE, not only the first. `roamSeconds` is what the
@@ -2051,7 +2051,7 @@ if (section('children-bank-game')) {
         // let the loop leave INSIDE a later hold on readings taken during an
         // earlier one, which is the same coin toss in a longer disguise: the
         // trace is therefore restarted at every hold and only a hold that was
-        // read from the word to its far side counts (GPT-6 Astra, second round).
+        // read from the word to its far side counts (cross-vendor review, second round).
         if (holding) {
           if (!inHold) {
             inHold = true

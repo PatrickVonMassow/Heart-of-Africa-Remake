@@ -13,16 +13,15 @@
 // Vitest-covered in retro-core.test.mjs).
 //
 // No-ops (exit 0, never block): the doc is absent (nothing to keep current —
-// e.g. another machine), the batch is paused, or this session does not own
-// the live batch lock (ownership-aware like every guard since the hard
-// singleton). Where the sources cannot be collected — a git worktree, whose
+// e.g. another machine), the batch is paused, or this session does not hold
+// the batch lock (a free or dead lock included). Where the sources cannot be collected — a git worktree, whose
 // memory dir resolves to nothing, a git failure — only the currency half
-// stands down and the ledger half still decides. Unreadable stdin only loses
-// the session id. Fail-OPEN: any other internal error allows the stop; this
+// stands down and the ledger half still decides. Unreadable stdin loses
+// the session id and with it the duty. Fail-OPEN: any other internal error allows the stop; this
 // guard must never trap the session.
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { ownsLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { computeFingerprint, evaluateCurrency, evaluateLedger } from './retro-core.mjs'
 import { collectSources, DOC_PATH, GUIDE_PATH, LEDGER_PATH, REPO_ROOT } from './retro-sources.mjs'
@@ -48,8 +47,8 @@ const pathExists = (rel) =>
 export function gatherRetroCurrencyInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   if (!existsSync(DOC_PATH)) return { applicable: false, why: 'no retrospective in this checkout' }
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  if (!ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: CAUSE.notLockOwner }
   }
   let currentFingerprint = null
   let fingerprintError = ''

@@ -2,7 +2,7 @@ import { useContext, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import type { DigSite, DigSiteProgress } from './adultWork'
-import { digSiteAppearance, digSiteFurniture, DIG_BASKETS, DIG_STORE_COVER, DIG_SEEDLING_TRAY } from './digSiteAppearance'
+import { digSiteAppearance, digSiteFurniture, DIG_BASKETS, DIG_POSTS, DIG_STORE_COVER, DIG_SEEDLING_TRAY } from './digSiteAppearance'
 import { digEarthFlight, digSiteRotation } from './placeGround'
 import { PlaceGroundContext } from './PlaceGroundContext'
 import { buildDigSpoilGeometry, updateDigSpoilGeometry } from './digSpoilGeometry'
@@ -107,11 +107,11 @@ export function DigSites({ sites, progress }: { sites: readonly DigSite[]; progr
           {!furniture.result && <mesh position={[DIG_STORE_COVER.x, 0.06, DIG_STORE_COVER.z]}><cylinderGeometry args={[0.65, 0.65, 0.08, 16]} /><meshStandardMaterial color="#967548" roughness={1} /></mesh>}
         </>}
         {furniture.beside === 'seedling-tray' && <group position={[DIG_SEEDLING_TRAY.x, 0, DIG_SEEDLING_TRAY.z]}>
-          <mesh position={[0, 0.055, 0]}><boxGeometry args={[0.85, 0.11, 0.45]} /><meshStandardMaterial color="#93754d" roughness={1} /></mesh>
+          <mesh position={[0, 0.055, 0]}><boxGeometry args={[DIG_SEEDLING_TRAY.hx * 2, 0.11, DIG_SEEDLING_TRAY.hz * 2]} /><meshStandardMaterial color="#93754d" roughness={1} /></mesh>
           {[-0.25, 0, 0.25].map((x) => <Seedling key={x} x={x} z={0} />)}
         </group>}
-        {furniture.beside === 'stacked-posts' && [0, 1, 2].map((k) => <mesh key={k} position={[0.6 + k * 0.22, 0.12, -1.6]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.08, 0.1, 1.8, 7]} /><meshStandardMaterial color="#886239" roughness={1} />
+        {furniture.beside === 'stacked-posts' && Array.from({ length: DIG_POSTS.count }, (_, k) => <mesh key={k} position={[DIG_POSTS.x + k * DIG_POSTS.step, 0.12, DIG_POSTS.z]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.08, DIG_POSTS.radius, DIG_POSTS.length, 7]} /><meshStandardMaterial color="#886239" roughness={1} />
         </mesh>)}
       </group>
       {furniture.result && <group name={furniture.result}>

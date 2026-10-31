@@ -1,0 +1,10 @@
+
+ADDITIONAL CANDIDATES YOU MUST EXAMINE (each gets a verdict, adopted or rejected with reason):
+- more cloud authors, together with whether local acceptance can absorb their branches at all;
+- pool and waiting branches, including whether stale branches (e.g. 1347) block slots;
+- whether the number of open branches is a good criterion for limiting free slots at all: POOL_CAP and "at most 1 finished branch waiting" may prevent parallelism unnecessarily often (stale or collision-free branches occupying slots without loading acceptance); alternatives such as acceptance capacity, host load, branches actually waiting for acceptance, and main-sync conflict risk instead of the bare branch count;
+- shortening acceptance per point (only the truly covering suites; second backend only when isBackendSensitivePath applies);
+- two local suites at once (separate ports, memory budget) and the cause of the two overlapped reds of 23.10;
+- acceptance steps that may move to the cloud without breaking "cloud green never stands in for a browser suite";
+- per-point bookkeeping overhead that can be dropped;
+- pulling points forward: a free slot is filled with the frontmost queue point that does not collide with running points even if it stands far back (collision via existing independentOpenPoints; within a colliding group queue order is kept; front-ranked user orders never set back; no free slot idles while a fitting ready point stands anywhere in the queue, as long as local acceptance can absorb the branch).

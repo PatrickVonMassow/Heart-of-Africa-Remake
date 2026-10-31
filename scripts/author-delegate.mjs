@@ -1,0 +1,1058 @@
+#!/usr/bin/env node
+// THE COMMAND THAT LETS AN OUTSIDE LANE AUTHOR A POINT (work-order point 667):
+// `--lane <role>` picks the lane (cross | scarce); without it the routing decides.
+//
+//   node scripts/author-delegate.mjs --point 651                  # author it, here, on this branch
+//   node scripts/author-delegate.mjs --lane scarce --point 651    # commission the scarce lane
+//   node scripts/author-delegate.mjs --point 651 --findings f.md  # the second leg: answer the review
+//   node scripts/author-delegate.mjs --routing --point 651        # which lane owns it, and why
+//   node scripts/author-delegate.mjs --routing --all              # the whole open queue
+//   node scripts/author-delegate.mjs --point 651 --dry-run        # the prompt and argv, no spend
+//
+// Exit codes: 0 clean delivery, 1 failure, 2 usage or readiness refusal,
+// 3 not a clean delivery or routed elsewhere, 4 spec examination due,
+// 5 cross-lane outage fallback (author in the main chain).
+//
+// It is the delegated-agent flow with the author swapped: an isolated worktree,
+// its own `feat/` branch, the point handed over as a BRIEF, atomic commits, and
+// the branch pushed the moment the run ends so nothing lives only here. What it
+// does NOT do is VERIFY its own work: the authoring model runs the three cheap
+// gates (test:unit, build, lint) and must name each in its report, which this
+// wrapper judges; the browser suites, the picture and the verdict are the
+// reviewing session's, and nothing here merges. The report ends by naming what that session owes.
+//
+// The decisions are pure and tested (author-delegate-core.mjs, author-routing-core.mjs);
+// this half does the process work, the git work and the push, and fails LOUD.
+import { spawn, spawnSync } from 'node:child_process'
+import { closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs'
+import { constants, tmpdir } from 'node:os'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { once } from 'node:events'
+import { isMainModule } from './is-main.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
+import { REPO_ROOT } from './repo-paths.mjs'
+import {
+  authorRoundHistory,
+  AUTHORING_COMMISSION_KIND,
+  authorLaneFor,
+  formatAuthorRoundHistory,
+  formatLaneReport,
+  LANE_MODEL,
+  nextAuthoringStep,
+  specExaminerFor,
+} from './author-routing-core.mjs'
+import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
+import { readTasksOpen } from './tasks-source.mjs'
+import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
+import { ensureModelProven } from './cross-review.mjs'
+import { clearOwnWait, declareOwnWait } from './declared-wait.mjs'
+import { currentSetting, recordLaneRun, settingProblemLine } from './lane-routing.mjs'
+import { FALLBACK_AUTHOR, effectiveRoute, fallbackLine } from './lane-routing-core.mjs'
+import { CROSS } from './model-lanes.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { currentVenue } from './cloud-switch.mjs'
+import { laneIsOn, laneRefusalReason } from './lane-switch-core.mjs'
+import {
+  AUTHOR_ROLES,
+  AUTHOR_TIMEOUT_MS,
+  DEFAULT_AUTHOR_ROLE,
+  authorCommitMessage,
+  authorCompletionMessage,
+  authorLaneConfig,
+  buildAuthoringPrompt,
+  buildSpecExaminationPrompt,
+  childEnv,
+  formatAuthoringReport,
+  judgeAuthoring,
+  interimCommitProblem,
+  KILL_GRACE_MS,
+  parseAuthoringAnswer,
+  PUSH_INTERVAL_MS,
+  FINAL_PUSH_TIMEOUT_MS,
+  PUSH_TIMEOUT_MS,
+  readinessProblems,
+  withheldEnvNames,
+} from './author-delegate-core.mjs'
+
+/** One git read in the WORKTREE this command was started in — never REPO_ROOT's
+ *  idea of it: the whole lane exists to work in an isolated checkout. */
+function git(args, { cwd = process.cwd(), required = false, input } = {}) {
+  const res = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024, input })
+  if ((res.status !== 0 || res.error) && required) {
+    throw new Error(`git ${args.join(' ')} failed: ${(res.stderr || res.error?.message || '').trim()}`)
+  }
+  return res.status === 0 && !res.error ? (res.stdout ?? '').trim() : null
+}
+
+/** The point's own text out of the OPEN work order, or '' when it is not there. */
+function pointBody(number, text = readTasksOpen()) {
+  const block = parsePointBlocks(text).find((b) => b.n === Number(number))
+  return block ? block.body : ''
+}
+
+/**
+ * The ledger's state before an append: its BYTES and its INDEX entry.
+ *
+ * The index half is not decoration (cross-vendor review of point 780, finding
+ * 2). The commit that seals a commission runs `git add` first, so an undo that
+ * only rewrites the working tree leaves the appended line STAGED — the next
+ * commit in that worktree would carry it, and the record would claim a round
+ * that never ran after all. `git ls-files --stage` is the whole prior entry:
+ * mode, blob and name, or nothing at all when the file was not staged.
+ */
+export function ledgerSnapshot(path, { cwd = process.cwd(), git: run = git } = {}) {
+  let bytes = null
+  try {
+    bytes = readFileSync(path)
+  } catch (e) {
+    // ONLY "IT IS NOT THERE" MEANS ABSENT (cross-vendor review, round 2): any
+    // other read failure was being recorded as "there was no file", and the undo
+    // would then DELETE a ledger it had simply failed to read. Refuse instead —
+    // a commission is cheap to repeat, an erased append-only record is not.
+    if (!e || e.code !== 'ENOENT') {
+      throw new Error(`cannot read the ledger at ${path}: ${(e && e.message) || e}`)
+    }
+    bytes = null
+  }
+  const staged = (run(['ls-files', '--stage', '--', path], { cwd }) ?? '').trim()
+  return { path, bytes, staged, cwd }
+}
+
+/** Put both halves back exactly as `ledgerSnapshot` found them. Loud on
+ *  failure: a restore that quietly did not happen is worse than the append. */
+export function restoreLedger(snapshot, { git: run = git } = {}) {
+  const { path, bytes, staged, cwd } = snapshot ?? {}
+  if (!path) throw new Error('restoreLedger needs the snapshot it is undoing')
+  if (bytes === null || bytes === undefined) rmSync(path, { force: true })
+  else writeFileSync(path, bytes)
+
+  // gitToplevel, NOT the local git helper (cross-vendor review, round 2): that
+  // one trims, so a checkout whose path ends in whitespace would name a
+  // different directory here and the index entry would be removed by a name
+  // that is not the one git holds.
+  const top = gitToplevel(cwd)
+  if (staged) {
+    // "<mode> <blob> <stage>\t<name>" — the name git itself uses for the entry.
+    const [meta, name] = staged.split('\t')
+    const [mode, blob] = String(meta).trim().split(/\s+/)
+    run(['update-index', '--add', '--cacheinfo', `${mode},${blob},${name}`], { cwd, required: true })
+    return
+  }
+  // Nothing was staged before, so nothing may be staged after — including the
+  // ADDITION of a file that no longer exists.
+  const name = top ? relative(top, path).split(sep).join('/') : path
+  run(['update-index', '--force-remove', '--', name], { cwd, required: true })
+}
+
+/**
+ * Append one commission to the shared ledger and make that append durable.
+ * The injected callbacks keep the state transition unit-testable; production
+ * appends to the tracked review ledger and commits it before the author starts.
+ */
+export function recordAuthoringCommission({
+  records = [],
+  point = '',
+  round = 0,
+  framing = '',
+  sha = '',
+  model = CROSS.displayName,
+  now = Date.now(),
+  append = () => {},
+  commit = () => {},
+  rollback = () => {},
+} = {}) {
+  const wanted = Number(point)
+  const attempt = Number(round)
+  const frame = String(framing ?? '').trim()
+  const commitSha = String(sha ?? '').trim()
+  const authorModel = String(model ?? '').trim()
+  if (!Number.isSafeInteger(wanted) || wanted < 0) throw new Error('an authoring commission needs a numeric point')
+  if (!Number.isSafeInteger(attempt) || attempt < 0) throw new Error('an authoring commission needs a non-negative round')
+  if (!/^[0-9a-f]{7,40}$/i.test(commitSha)) throw new Error('an authoring commission needs the current commit sha')
+  if (!authorModel) throw new Error('an authoring commission needs the lane model')
+
+  const existing = (Array.isArray(records) ? records : []).find(
+    (record) =>
+      record?.kind === AUTHORING_COMMISSION_KIND &&
+      Number(record?.point) === wanted &&
+      Number(record?.round) === attempt,
+  )
+  if (existing) {
+    if (String(existing.authorFraming ?? '').trim() !== frame) {
+      throw new Error(`authoring round ${attempt} already has a different framing on record`)
+    }
+    if (String(existing.model ?? '').trim() !== authorModel) {
+      throw new Error(`authoring round ${attempt} already has a different lane model on record`)
+    }
+    return { written: false, record: existing }
+  }
+
+  const at = Number(now)
+  if (!Number.isSafeInteger(at) || at < 0) throw new Error('an authoring commission needs a millisecond timestamp')
+  const record = {
+    sha: commitSha,
+    kind: AUTHORING_COMMISSION_KIND,
+    point: wanted,
+    round: attempt,
+    authorFraming: frame,
+    model: authorModel,
+    at,
+    atIso: new Date(at).toISOString(),
+  }
+  // THE APPEND AND ITS COMMIT STAND OR FALL TOGETHER (point 780). A failed
+  // commit used to leave the appended line behind, so the append-only ledger
+  // described a commission that never ran and the next session reading it would
+  // count a round the point never had — the exact half-state this record exists
+  // to prevent, in the one file that is supposed to be the honest ledger.
+  // THE APPEND IS INSIDE THE TRANSACTION TOO (cross-vendor review, finding 3):
+  // a write that fails PART WAY THROUGH would otherwise leave a fragment in the
+  // append-only ledger and never reach the undo at all.
+  try {
+    append(record)
+    commit(record)
+  } catch (error) {
+    try {
+      rollback(record)
+    } catch (undo) {
+      // BOTH failures are reported. A rollback that itself failed leaves the
+      // half-state the caller has to see, and hiding it behind the first error
+      // is how a ledger goes quietly wrong.
+      throw new Error(
+        `${(error && error.message) || error}\n  AND the ledger could not be restored: ${(undo && undo.message) || undo}`,
+      )
+    }
+    throw error
+  }
+  return { written: true, record }
+}
+
+/** The lane a point belongs to, with the reasons that decided it. */
+export function laneFor(
+  number,
+  { override = '', reworkRounds, records, scarceState = currentLaneState('scarce'), venue = currentVenue().venue } = {},
+) {
+  const body = pointBody(number)
+  const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+  const roundHistory = authorRoundHistory(rows, number)
+  const rounds = reworkRounds ?? roundHistory.freshRounds
+  return {
+    body,
+    roundHistory,
+    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds, scarceState, venue }),
+  }
+}
+
+/** The brief, cut by the project's own command — never a reading assignment. */
+function briefFor(number) {
+  const res = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts', 'point-brief.mjs'), String(number)], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+    maxBuffer: 32 * 1024 * 1024,
+  })
+  return res.status === 0 && !res.error ? (res.stdout ?? '').trim() : ''
+}
+
+/**
+ * The commits that appeared since `base`, newest first.
+ *
+ * READ FROM THE BRANCH REF, not from HEAD (second cross-vendor round): a run
+ * that committed on the approved branch and then checked out something else
+ * would otherwise have its work discarded from the inspection, left unpushed,
+ * and reported as "nothing was committed" while it sat on the branch all along.
+ */
+export function commitsSince(base, { cwd = process.cwd(), ref = 'HEAD' } = {}) {
+  // The full body is intentional. The commit-msg hook accepts Rescue in its own
+  // `-m` paragraph (the convention before this wrapper existed), while git's
+  // `%(trailers:key=Rescue)` sees only the final contiguous trailer block and
+  // would miss it. NUL cannot occur in a commit message, so it is a safe record
+  // separator even when the body contains arbitrary newlines.
+  const field = '%H%x1f%s%x1f%B%x1f%(trailers:key=Co-Authored-By,valueonly,separator=;)%x00'
+  const log = git(['log', `--format=${field}`, `${base}..${ref}`], { cwd }) ?? ''
+  return log
+    .split('\0')
+    .map((record) => record.trim())
+    .filter(Boolean)
+    .map((record) => {
+      const [sha, subject, body, trailers] = record.split(UNIT)
+      const rescue = /^\s*Rescue:\s*(\S.*)$/im.exec(body ?? '')?.[1] ?? ''
+      return { sha, subject: subject ?? '', rescue, trailers: trailers ?? '' }
+    })
+}
+
+/**
+ * The line-level size of every change left outside a commit. `git diff HEAD`
+ * covers both the index and tracked worktree; untracked files need measuring
+ * separately because Git deliberately omits them from that diff.
+ */
+export function uncommittedNumstat({ cwd = process.cwd(), read = readFileSync } = {}) {
+  const rows = [git(['diff', '--numstat', 'HEAD', '--'], { cwd }) ?? '']
+  const untracked = (git(['ls-files', '--others', '--exclude-standard', '-z'], { cwd }) ?? '').split('\0').filter(Boolean)
+  for (const path of untracked) {
+    try {
+      const bytes = read(join(cwd, path))
+      if (bytes.includes(0)) rows.push('-\t-\tuntracked')
+      else {
+        let lines = 0
+        for (const byte of bytes) if (byte === 10) lines += 1
+        if (bytes.length && bytes[bytes.length - 1] !== 10) lines += 1
+        rows.push(`${lines}\t0\tuntracked`)
+      }
+    } catch {
+      // The status still counts a file that vanished or became unreadable
+      // between the two reads. A binary marker keeps that uncertainty visible.
+      rows.push('-\t-\tuntracked')
+    }
+  }
+  return rows.filter(Boolean).join('\n')
+}
+
+/** git's unit separator, so a subject holding any punctuation still parses. */
+const UNIT = String.fromCharCode(31)
+
+/** Push the branch, quietly. Returns `{ ok, why }`; `ok` only on a real success.
+ *
+ *  A CHECKPOINT PUSH DOES NOT RUN THE FAST GATE (`verify: false`). Measured
+ *  04.09.2026 on point 1051: `scripts/git-hooks/pre-push` runs build, lint and
+ *  the unit suite, which took 3 min 20 s on this machine, so EVERY interim push
+ *  was SIGKILLed at the 60 s bound and not one checkpoint reached the remote —
+ *  six in a row, each having burnt a full gate run against the author's own
+ *  gates first. The gate exists so CI never reports a break first; a checkpoint
+ *  commit is marked `[skip ci]` and starts no CI at all, and the author's own
+ *  three gates, the final push and the landing all still run it. This is the
+ *  same cut the durable lane already makes, where `installPrePushHook`
+ *  (`scripts/detached-agent.mjs`) replaces the gate hook outright for the
+ *  checkpoints of a worktree.
+ */
+export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEOUT_MS, verify = true } = {}) {
+  // TIMED, because the interim push runs on the event loop the kill timer lives
+  // on (second cross-vendor round): a push that hangs on the network would
+  // otherwise block the timeout that is supposed to bound the whole run.
+  const res = spawnSync('git', ['push', ...(verify ? [] : ['--no-verify']), '-u', 'origin', branch], {
+    cwd,
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: timeoutMs,
+    // SIGKILL, not SIGTERM (third round): a polite signal a hung transport can
+    // ignore is not a bound, and this call blocks the loop the run's own timer
+    // lives on. Bounded at one minute, it delays that timer by at most a minute.
+    killSignal: 'SIGKILL',
+  })
+  return { ok: res.status === 0 && !res.error, why: (res.stderr || res.error?.message || '').trim() }
+}
+
+/**
+ * Run the lane's author CLI (its runtime: codex or claude) as an AUTHOR: sandbox
+ * bypassed (it cannot work here), credentials stripped from the environment,
+ * the worktree as the working root.
+ *
+ * ASYNCHRONOUS, so the branch can be PUSHED WHILE IT WORKS (cross-vendor review
+ * of point 667, P2). The house rule is a push after every commit; the child
+ * cannot be given the credential to do it, so the wrapper does it on an interval
+ * instead and a commit is durable within two minutes rather than at the end of
+ * an hour-long run.
+ */
+async function runAuthoringLane({
+  prompt,
+  cwd,
+  branch = '',
+  timeoutMs = AUTHOR_TIMEOUT_MS,
+  runtime,
+  pushEveryMs = PUSH_INTERVAL_MS,
+  onPush = () => {},
+}) {
+  const outFile = runtime.writesOutputFile ? join(tmpdir(), `author-delegate-${process.pid}-${Date.now()}.txt`) : ''
+  const args = runtime.args({ cwd, outputFile: outFile, prompt })
+  // ITS OWN PROCESS GROUP (third cross-vendor round). Signalling the child alone
+  // left its shells and test runners alive: they went on writing to the worktree
+  // AFTER the commits had been inspected, pushed and reported, so the report
+  // described a branch that was still moving. `detached` makes the run a group
+  // leader, and the kill below takes the group.
+  const child = spawn(runtime.bin, args, {
+    cwd,
+    env: childEnv(process.env),
+    windowsHide: true,
+    detached: process.platform !== 'win32',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  /** Signal the whole run — group where we have one, the child otherwise. */
+  const killRun = (signal) => {
+    try {
+      if (child.pid && process.platform !== 'win32') process.kill(-child.pid, signal)
+      else child.kill(signal)
+    } catch {
+      /* already gone: nothing to signal, and that is the outcome we wanted */
+    }
+  }
+  let stdout = ''
+  let stderr = ''
+  child.stdout.on('data', (d) => {
+    stdout += d
+  })
+  child.stderr.on('data', (d) => {
+    stderr += d
+  })
+
+  let timedOut = false
+  let settle = () => {}
+  const escalations = []
+  const killer = setTimeout(() => {
+    timedOut = true
+    killRun('SIGTERM')
+    // A BOUND, NOT A REQUEST (second cross-vendor round): a run that ignores
+    // SIGTERM gets SIGKILL, and if its pipes are still held open after that, the
+    // wrapper stops waiting rather than hanging for ever. What was committed is
+    // on the branch either way, and that is what gets judged.
+    escalations.push(setTimeout(() => killRun('SIGKILL'), KILL_GRACE_MS))
+    escalations.push(setTimeout(() => settle({ spawnError: null, exitCode: 1 }), KILL_GRACE_MS * 2))
+  }, timeoutMs)
+  // The interim push only runs while the branch has moved, so an idle run costs
+  // no network calls at all. It starts at NOTHING pushed rather than at the
+  // current head: assuming the branch is already on the remote would skip the
+  // one push that matters if it is not.
+  let lastPushed = null
+  const tip = () => git(['rev-parse', branch ? `refs/heads/${branch}` : 'HEAD'], { cwd })
+  const pusher = branch && pushEveryMs > 0
+    ? setInterval(() => {
+        const head = tip()
+        if (!head || head === lastPushed) return
+        const checkpoint = commitsSince(`${head}^`, { cwd, ref: head })[0]
+        const problem = interimCommitProblem(checkpoint)
+        if (problem) {
+          onPush({ ok: false, skipped: true, head, why: `checkpoint not pushed: ${problem}` })
+          return
+        }
+        const { ok, why } = pushBranch(branch, { cwd, verify: false })
+        if (ok) lastPushed = head
+        onPush({ ok, head, why })
+      }, pushEveryMs)
+    : null
+
+  const { spawnError, exitCode } = await new Promise((resolve) => {
+    settle = resolve
+    child.on('error', (error) => resolve({ spawnError: error, exitCode: 1 }))
+    child.on('close', (code) => resolve({ spawnError: null, exitCode: code ?? 1 }))
+  })
+  clearTimeout(killer)
+  for (const t of escalations) clearTimeout(t)
+  // A TIMED-OUT RUN IS KILLED HARD BEFORE THE TIMERS ARE DROPPED (fourth
+  // cross-vendor round). The child closing after the group SIGTERM cancelled the
+  // pending SIGKILL, so a grandchild that ignored the polite signal — and had
+  // closed its inherited pipes — went on writing to the worktree behind the
+  // report. Whatever is still in the group goes now, not on a timer.
+  if (timedOut) killRun('SIGKILL')
+  if (pusher) clearInterval(pusher)
+
+  let last = ''
+  if (outFile) {
+    try {
+      last = readFileSync(outFile, 'utf8')
+    } catch {
+      /* codex writes it only on a completed run; stdout still carries the answer */
+    }
+    try {
+      rmSync(outFile, { force: true })
+    } catch {
+      /* a leftover temp file is not worth an exit code */
+    }
+  }
+  const modelResult = runtime.attribute(stdout)
+  return {
+    spawnError,
+    exitCode,
+    stdout,
+    stderr,
+    timedOut,
+    // What the interim pushes already made durable, so a transient failure of
+    // the FINAL push cannot report work as local-only that is on the remote
+    // (second cross-vendor round).
+    lastPushed,
+    modelResult,
+    finalMessage: modelResult?.result || last || stdout || '',
+  }
+}
+
+/** Re-exec only the commissioner that still belongs to its caller's session.
+ * Node's detached spawn calls setsid on POSIX; the model's existing timeout
+ * group remains separate. A caller owns only the wait and the log reader. */
+export async function startAuthoringSession({ point, lane, logPath = '' }) {
+  const cwd = process.cwd()
+  const common = logPath ? '' : git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd })
+  // Landing removes the point's worktree; keep the default log in its owning
+  // checkout. Explicit paths remain the caller's choice, relative to its cwd.
+  const log = logPath
+    ? resolve(cwd, logPath)
+    : resolve(mainCheckoutFrom(common, cwd) ?? cwd, `local/${point}-${lane}-author.log`)
+  const session = spawnSync('ps', ['-o', 'sid=', '-p', String(process.pid)], { encoding: 'utf8', windowsHide: true })
+  if (session.error || session.status !== 0 || !/^\d+$/.test(session.stdout.trim())) {
+    throw new Error('cannot determine the authoring session id; POSIX setsid support is required')
+  }
+  mkdirSync(dirname(log), { recursive: true })
+  const fd = openSync(log, 'a+')
+  if (Number(session.stdout.trim()) === process.pid) {
+    // Already detached (including daemon-owned callers): retain this PID so
+    // their cancellation group still names the commissioner. Mirror its writes
+    // to stdout unless stdout is already this log, as in our own re-exec.
+    const target = fstatSync(fd)
+    const stdout = fstatSync(1)
+    const alreadyLogging = target.dev === stdout.dev && target.ino === stdout.ino
+    const visible = process.stdout.write.bind(process.stdout)
+    let visibleOpen = !alreadyLogging
+    process.stdout.on('error', (error) => {
+      if (error.code !== 'EPIPE') throw error
+      visibleOpen = false
+    })
+    const write = (chunk, encoding, callback) => {
+      if (typeof encoding === 'function') { callback = encoding; encoding = undefined }
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding)
+      writeFileSync(fd, bytes)
+      if (visibleOpen) return visible(bytes, callback)
+      if (callback) callback()
+      return true
+    }
+    process.stdout.write = write
+    process.stderr.write = write
+    console.log(`author-delegate: log ${log} (append)`)
+    return null
+  }
+
+  let offset = fstatSync(fd).size
+  const child = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
+    cwd: process.cwd(), env: process.env, windowsHide: true, detached: true, stdio: ['ignore', fd, fd],
+  })
+  let finished = false
+  let failure = null
+  let exitCode = 1
+  child.once('error', (error) => { failure = error; finished = true })
+  child.once('exit', (code, signal) => {
+    exitCode = code ?? (128 + (constants.signals[signal] || 0))
+    finished = true
+  })
+  const buffer = Buffer.alloc(64 * 1024)
+  try {
+    // Snapshot each pass: concurrent appends cannot make one pass unbounded.
+    // Start at the old EOF, so a repeated commission never replays old output.
+    for (;;) {
+      const lastPass = finished
+      const end = fstatSync(fd).size
+      while (offset < end) {
+        const count = readSync(fd, buffer, 0, Math.min(buffer.length, end - offset), offset)
+        if (!count) break
+        offset += count
+        if (!process.stdout.write(Buffer.from(buffer.subarray(0, count)))) await once(process.stdout, 'drain')
+      }
+      if (lastPass) break
+      await new Promise((done) => setTimeout(done, 100))
+    }
+    if (failure) throw failure
+    return exitCode
+  } finally {
+    closeSync(fd)
+  }
+}
+
+export const usage = ({ lane: role = '', model = '', reviewer = '' } = {}) =>
+  [
+    'usage: node scripts/author-delegate.mjs [--lane <cross|scarce>] --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
+    '           [--log <path>] [--anyway] [--dry-run]',
+    '       node scripts/author-delegate.mjs --routing (--point <N> [--rounds <n>] | --all)',
+    '',
+    `${model || 'The lane'} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
+    'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
+    'lint) on its own work and merges nothing: the browser suites, the picture and the landing',
+    `belong to the main-chain session that called it and the REVIEW to ${reviewer || 'a lane of the other vendor'}, which is what keeps`,
+    'two vendors on the point and neither reviewing itself.',
+    '',
+    `Without --lane the routing decides the lane (${AUTHOR_ROLES.join(' or ')}; ${DEFAULT_AUTHOR_ROLE} when it names neither).`,
+    `The script appends to local/<point>-${role || '<lane>'}-author.log in the main checkout (--log overrides it).`,
+    'It detaches itself, waits for completion and streams the log to stdout.',
+    'Use the command alone: no setsid, tee or redirection is needed.',
+    'Redirecting or piping through tee onto that SAME log path destroys it and is unsupported.',
+    'Redirecting stdout to a different file is supported. Read-only modes create no log.',
+    '',
+    'The lane is decided by the point itself (--routing shows why). A point the routing gives to',
+    'another lane is refused unless --anyway is given; the lane switch can turn a lane off',
+    '(node scripts/lane-switch.mjs --status) and the share setting keeps the cross lane from',
+    'authoring (node scripts/lane-routing.mjs --status).',
+  ].join('\n')
+
+export async function runAuthoringCli({ argv = process.argv.slice(2) } = {}) {
+  const commandName = 'author-delegate'
+  const knownFlags = new Set([
+    '--point',
+    '--findings',
+    '--rounds',
+    '--timeout',
+    '--log',
+    '--anyway',
+    '--dry-run',
+    '--lane',
+    '--routing',
+    '--all',
+    '--help',
+    '-h',
+  ])
+  const flag = (name) => {
+    const i = argv.indexOf(name)
+    return i >= 0 && i + 1 < argv.length && !argv[i + 1].startsWith('--') ? argv[i + 1] : ''
+  }
+  try {
+    const requestedLane = flag('--lane')
+    if (argv.includes('--lane') && !AUTHOR_ROLES.includes(requestedLane)) {
+      console.error(
+        `${commandName}: --lane needs one of ${AUTHOR_ROLES.join(', ')}` +
+          `${requestedLane ? ` — the ${requestedLane} lane has no authoring path here` : ''}.\n`,
+      )
+      console.error(usage())
+      process.exit(2)
+    }
+    if (argv.includes('--help') || argv.includes('-h')) {
+      console.log(usage(requestedLane ? authorLaneConfig(requestedLane) : {}))
+      process.exit(0)
+    }
+    const unknown = argv.find((arg) => arg.startsWith('-') && !knownFlags.has(arg))
+    if (unknown) {
+      console.error(`${commandName}: unknown option ${unknown}.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+    const roundsText = flag('--rounds')
+    const roundsValue = Number(roundsText)
+    if (argv.includes('--rounds') && (!/^\d+$/.test(roundsText) || !Number.isSafeInteger(roundsValue))) {
+      console.error(`${commandName}: --rounds needs a non-negative integer.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+    const roundsOverride = argv.includes('--rounds') ? roundsValue : undefined
+    if (argv.includes('--log') && !flag('--log')) {
+      console.error(`${commandName}: --log needs a path.`)
+      process.exit(2)
+    }
+    const scarceState = currentLaneState('scarce')
+
+    // THE ROUTING REPORT: read-only, no allowance spent, no state touched.
+    if (argv.includes('--routing')) {
+      if (argv.includes('--all')) {
+        if (roundsOverride !== undefined) {
+          console.error(`${commandName}: --rounds applies to one --point, not --all.`)
+          process.exit(2)
+        }
+        const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+        const { venue } = currentVenue()
+        const rows = parsePointBlocks(readTasksOpen())
+          .filter((b) => !b.done)
+          .map((b) => {
+            const roundHistory = authorRoundHistory(records, b.n)
+            const reworkRounds = roundHistory.freshRounds
+            const decided = authorLaneFor({
+              body: b.body,
+              criticality: criticalityOf(b.body).level,
+              reworkRounds,
+              scarceState,
+              venue,
+            })
+            return {
+              number: b.n,
+              ...decided,
+              why: [
+                `${decided.why[0]} (${roundHistory.unsuccessfulRounds} unsuccessful review round(s), ` +
+                  `${reworkRounds} fresh attempt(s), spec examination ${roundHistory.examination ? 'recorded' : 'not recorded'})`,
+              ],
+            }
+          })
+        console.log(formatLaneReport(rows))
+        process.exit(0)
+      }
+      const number = flag('--point')
+      if (!number) {
+        console.error(`${commandName}: --routing needs --point <N> or --all.\n`)
+        console.error(usage())
+        process.exit(2)
+      }
+      const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+      const decided = laneFor(number, { reworkRounds: roundsOverride, records, scarceState })
+      if (!decided.body) console.error(`${commandName}: point ${number} is not in the OPEN work order — routing what is known.`)
+      console.log(`${commandName}: point ${number} → ${decided.lane || 'blocked'} (${decided.model || 'no model'})`)
+      console.log(formatAuthorRoundHistory(decided.roundHistory))
+      const step = nextAuthoringStep({ records, point: number, reworkRounds: roundsOverride })
+      console.log(`  next step: ${step.kind} — ${step.reason}`)
+      for (const why of decided.why) console.log(`  because ${why}`)
+      if (AUTHOR_ROLES.includes(decided.lane)) {
+        console.log(`  commission: node scripts/author-delegate.mjs --lane ${decided.lane} --point ${number}`)
+      }
+      process.exit(0)
+    }
+
+    const point = flag('--point')
+    if (!/^\d+$/.test(point)) {
+      console.error(`${commandName}: --point <N> is required.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+
+    // THE EXAMINATION IS READ-ONLY. Decide it before asking whether this is a
+    // writable feature worktree: the examiner changes no code, starts no author
+    // and needs neither the point's branch nor a clean checkout.
+    const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+    const decided = laneFor(point, { reworkRounds: roundsOverride, records, scarceState })
+    // THE LANE: the one asked for, else the one the routing names, else the default.
+    const role = requestedLane || (AUTHOR_ROLES.includes(decided.lane) ? decided.lane : DEFAULT_AUTHOR_ROLE)
+    const config = authorLaneConfig(role)
+    const authorModel = config.model
+    const authoringStep = nextAuthoringStep({ records, point, reworkRounds: roundsOverride })
+    const readFindings = () => {
+      const findingsFile = flag('--findings')
+      if (!findingsFile) return ''
+      let findings = ''
+      try {
+        findings = readFileSync(findingsFile, 'utf8')
+      } catch (e) {
+        console.error(`${commandName}: --findings ${findingsFile}: ${e.message}`)
+        process.exit(2)
+      }
+      if (!findings.trim()) {
+        console.error(`${commandName}: --findings ${findingsFile} is empty — there is nothing to answer.`)
+        process.exit(2)
+      }
+      return findings
+    }
+    if (authoringStep.kind === 'spec-examination') {
+      const findings = readFindings()
+      const brief = briefFor(point)
+      if (!brief) {
+        console.error(`${commandName}: point-brief.mjs produced no brief for point ${point} — the spec cannot be examined from half its text.`)
+        process.exit(2)
+      }
+      const examinationRoute = specExaminerFor(decided.roundHistory, authorModel)
+      const route = examinationRoute.route === 'main-read'
+        ? 'The main chain reads this packet directly because the cross lane authored the round.'
+        : 'Run `node scripts/ask-lane.mjs --kind audit` with this packet because the main chain authored the round.'
+      const packet = buildSpecExaminationPrompt({
+        point,
+        pointText: decided.body,
+        brief,
+        history: decided.roundHistory,
+        currentFindings: findings,
+      })
+      const head = git(['rev-parse', 'HEAD'], { cwd: process.cwd() }) ?? '<reviewed-sha>'
+      console.log(
+        `${commandName}: SPEC EXAMINATION REQUIRED before another authoring commission.\n` +
+          `  ${authoringStep.reason}\n` +
+          `  cross-vendor route: ${route}\n\n` +
+          `${packet}\n\n` +
+          `Record the result once it has been read (use amended only after the point text is amended):\n` +
+          `  node scripts/mechanism-review.mjs --record ${head} --model "${examinationRoute.model}" --verdict merge ` +
+          `--evidence "<what the examination established>" --mode review --point ${point} ` +
+          `--spec-examination <sound|amended>`,
+      )
+      process.exit(4)
+    }
+
+    if (!argv.includes('--dry-run')) {
+      const exitCode = await startAuthoringSession({ point, lane: config.lane, logPath: flag('--log') })
+      if (exitCode !== null) {
+        process.exitCode = exitCode
+        return
+      }
+    }
+
+    // WHERE THIS RUN WOULD WRITE, asked before anything is spent.
+    const cwd = process.cwd()
+    const worktree = git(['rev-parse', '--show-toplevel'], { cwd }) ?? ''
+    const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd }) ?? ''
+    const common = git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd }) ?? ''
+    const problems = readinessProblems({
+      branch,
+      worktree,
+      // THE POINT travels with it (fifth cross-vendor round): without it any
+      // `feat/` branch passed, so a run for one point could commit and push onto
+      // another point's branch.
+      point,
+      // Readiness needs the owning checkout so equality can refuse a run in
+      // main; the shared resolver deliberately returns null for that case.
+      mainCheckout: mainCheckoutFrom(common, REPO_ROOT) ?? REPO_ROOT,
+      dirty: git(['status', '--porcelain'], { cwd }) ?? '',
+      authorName: authorModel,
+    })
+    // A DRY RUN IS STILL SHOWN THE REFUSALS, but is not stopped by them: it
+    // spends nothing and writes nothing, and inspecting the prompt is exactly
+    // what one does while the tree is still dirty.
+    const dryRun = argv.includes('--dry-run')
+    if (problems.length) {
+      console.error(`${commandName}: ${dryRun ? 'this run WOULD be refused' : `refusing to start ${authorModel} here`}.`)
+      for (const p of problems) console.error(`  · ${p}`)
+      if (!dryRun) process.exit(2)
+    }
+
+    // THE LANE IS THE POINT'S OWN ANSWER, not the dispatcher's mood (point 667).
+    // Its automatic escalation signal comes from the review ledger. `--rounds`
+    // is the deliberate override for a history that the ledger cannot know.
+    console.error(
+      `${commandName}: lane verdict for point ${point}: ${decided.lane} (${LANE_MODEL[decided.lane]}); ` +
+        `${decided.roundHistory.unsuccessfulRounds} unsuccessful review round(s), ` +
+        `${decided.signals.reworkRounds} fresh attempt(s).`,
+    )
+    console.error(formatAuthorRoundHistory(decided.roundHistory))
+    if (decided.lane !== config.lane && !argv.includes('--anyway')) {
+      if (dryRun && decided.lane === 'scarce' && config.lane === 'cross') {
+        console.error(`${commandName}: this point is commissioned with: node scripts/author-delegate.mjs --lane scarce --point ${point}`)
+        process.exit(0)
+      }
+      console.error(
+        `${commandName}: point ${point} routes to the ${decided.lane} lane (${LANE_MODEL[decided.lane]}), not to ${authorModel}:\n` +
+          `  because ${decided.why[0]}\n` +
+          '  Author it in that lane, or override this once with --anyway.',
+      )
+      process.exit(3)
+    }
+
+    // THE LANE SWITCH CAN TURN A WHOLE LANE OFF, and --anyway does not reach past it.
+    const switchState = currentLaneState(role)
+    if (!laneIsOn(switchState)) {
+      console.error(`${commandName}: ${authorModel} is switched off; node scripts/lane-switch.mjs --status`)
+      console.error(`  ${laneRefusalReason(switchState)}`)
+      process.exit(3)
+    }
+    // THE SHARE SETTING CAN KEEP THE CROSS LANE FROM AUTHORING (point 654's lever,
+    // extended here to the biggest spender of the two vendors).
+    if (role === 'cross') {
+      const share = currentSetting()
+      if (share.problem) console.error(settingProblemLine(share, commandName))
+      const routed = effectiveRoute('author', share)
+      // A MEASURED OUTAGE: the point is authored in the main chain (point 1194).
+      if (routed.fallback && !argv.includes('--anyway')) {
+        console.error(`${commandName}: ${fallbackLine(share)}\n  Author point ${point} in the main chain on ${FALLBACK_AUTHOR}.`)
+        process.exit(5)
+      }
+      if (routed.to !== role && !argv.includes('--anyway')) {
+        console.error(
+          `${commandName}: the share switch is at \`${share.setting}\`, which keeps authoring in the main chain.\n` +
+            '  node scripts/lane-routing.mjs --more   (override once with --anyway)',
+        )
+        process.exit(3)
+      }
+    }
+
+    const findings = readFindings()
+
+    // The brief is cut fresh: a stale one describes a work order that has moved.
+    const brief = !findings ? briefFor(point) : ''
+    if (!findings && !brief) {
+      console.error(`${commandName}: point-brief.mjs produced no brief for point ${point} — refusing to author from nothing.`)
+      process.exit(2)
+    }
+
+    const prompt = buildAuthoringPrompt({
+      point,
+      brief,
+      branch,
+      findings,
+      framing: authoringStep.framing,
+      authorModel,
+      authorTrailer: config.trailer,
+      reviewer: config.reviewer,
+      laneDescription: config.laneDescription,
+    })
+    const withheld = withheldEnvNames(process.env)
+    if (dryRun) {
+      console.log(`${commandName}: DRY RUN — nothing is spent and nothing is written.\n`)
+      const dryArgs = config.runtime.args({ cwd: worktree, prompt: '<the prompt>' })
+      console.log(`  ${config.runtime.bin} ${dryArgs.join(' ')}`)
+      console.log(`  withheld from its environment: ${withheld.length ? withheld.join(', ') : 'nothing matched'}`)
+      console.log(`\n--- the prompt ---\n${prompt}\n--- end ---`)
+      process.exit(0)
+    }
+
+    // The identity is PROVEN before a commit is stamped with the cross lane's name: nothing
+    // in a run's output says which model answered, so the attribution rests on
+    // the server refusing an unknown id (cross-review.mjs --probe).
+    if (role === 'cross' && !ensureModelProven({ who: commandName })) {
+      console.error(`${commandName}: the model id is not proven honoured — refusing to attribute commits to ${authorModel}.`)
+      process.exit(2)
+    }
+
+    // RECORD THE COMMISSION BEFORE IT RUNS. The review sha is not known yet,
+    // but the point, attempt number and exact prompt framing are. Keeping that
+    // fact in the append-only ledger makes the later --author-framing flag a
+    // confirmation rather than the only evidence, and committing it now means
+    // a killed authoring run cannot erase which commission was actually sent.
+    const commissionSha = git(['rev-parse', 'HEAD'], { cwd, required: true })
+    // THE LEDGER OF THE CHECKOUT THIS RUN IS IN, not of the module's own tree
+    // (point 780): the commit below runs in `cwd`, so an absolute main-tree path
+    // is "outside repository" here and the whole delegated lane was shut from
+    // the only place it is meant to run. The override stays a knob for a test.
+    const recordsPath = process.env.AUTHOR_REVIEW_RECORDS_FILE || recordsPathFor(cwd)
+    // Both halves of the ledger's state before the append: bytes and index.
+    const ledgerBefore = ledgerSnapshot(recordsPath, { cwd })
+    const commissioned = recordAuthoringCommission({
+      records,
+      point,
+      round: authoringStep.round,
+      framing: authoringStep.framing,
+      sha: commissionSha,
+      model: authorModel,
+      append: (record) => appendRecord(record, recordsPath),
+      rollback: () => restoreLedger(ledgerBefore),
+      commit: () => {
+        git(['add', '--', recordsPath], { cwd, required: true })
+        git(['commit', '-F', '-'], {
+          cwd,
+          required: true,
+          input: authorCommitMessage({
+            subject: 'Record the authoring commission',
+            rescue: 'the commissioned authoring run has not started yet',
+            trailer: config.trailer,
+          }),
+        })
+      },
+    })
+    if (commissioned.written) {
+      records.push(commissioned.record)
+      const saved = pushBranch(branch, { cwd, verify: false })
+      console.error(
+        saved.ok
+          ? `${commandName}: recorded and pushed the authoring commission before starting it`
+          : `${commandName}: recorded the authoring commission locally; its immediate push failed — ${saved.why}`,
+      )
+    }
+
+    // The commission receipt is orchestration, not authored work. Start the
+    // delivered range after it so the report and reviewer see only the author's edits.
+    const base = git(['rev-parse', 'HEAD'], { cwd, required: true })
+    console.error(
+      `${commandName}: ${authorModel}${config.detail ? ` ${config.detail}` : ''} is authoring point ${point} on ${branch}` +
+        `${findings ? ' — second leg, answering the review' : ''} …`,
+    )
+    if (withheld.length) console.error(`  withheld from its environment: ${withheld.join(', ')}`)
+
+    // The wait is declared for the owner while the run blocks (point 1308, U5),
+    // and only our own declaration is cleared once it returns.
+    const wait = declareOwnWait({ waitingOn: `author-delegate point ${point} on ${branch} (pid ${process.pid})`, point })
+    let run
+    try {
+      run = await runAuthoringLane({
+        prompt,
+        cwd: worktree,
+        branch,
+        runtime: config.runtime,
+        timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS,
+        onPush: ({ ok, skipped, head, why }) =>
+          console.error(
+            ok
+              ? `${commandName}: pushed ${String(head).slice(0, 7)} while the run continues`
+              : skipped
+                ? `${commandName}: interim push deferred — ${why}`
+                : `${commandName}: interim push failed — ${why}`,
+          ),
+      })
+    } finally {
+      clearOwnWait(wait)
+    }
+    const outcome = config.runtime.outcome(run)
+    // A vendor outage is a fallback, not the point's red: recorded, then handed to FALLBACK_AUTHOR.
+    // Only the cross lane's outage moves the routing; recordLaneRun ignores the others.
+    const outage = recordLaneRun({ role, outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'author', who: commandName })
+    const parsed = parseAuthoringAnswer(run.finalMessage)
+    // WHERE THE RUN ENDED, not where it began: nothing stops a sandbox-less run
+    // from checking out another branch, and the commits below would then belong
+    // to something else entirely (cross-vendor review, P1).
+    const branchAfter = git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd }) ?? ''
+    // READ OFF THE BRANCH, not off HEAD: a run that wandered elsewhere still
+    // committed its work here, and discarding it would lose it (second
+    // cross-vendor round). That it wandered is a PROBLEM, reported as one.
+    const commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
+
+    // `-uall` prevents Git from collapsing a wholly untracked directory into
+    // one `?? dir/` row, so the path count agrees with the files numstat reads.
+    const dirty = git(['status', '--porcelain', '-uall'], { cwd }) ?? ''
+    const judged = judgeAuthoring({
+      outcome,
+      commits,
+      parsed,
+      branch,
+      branchAfter,
+      dirty,
+      numstat: dirty ? uncommittedNumstat({ cwd }) : '',
+      authorModel,
+      scarceState,
+      runtime: config.runtime.label,
+    })
+    for (const commit of commits) {
+      const problem = interimCommitProblem(commit)
+      if (problem) judged.problems.push(`${String(commit.sha).slice(0, 8)} is not an interim rescue commit: ${problem}`)
+    }
+    judged.clean = judged.problems.length === 0
+
+    // ONLY A CLEANLY FINISHED RUN CLAIMS COMPLETENESS. This commit is created
+    // after the process is gone, the tree is clean and its report names three
+    // green gates. A killed or malformed run can therefore leave rescue
+    // checkpoints, but can never acquire this unskipped claim from the wrapper.
+    const completionMessage = authorCompletionMessage(judged, config.trailer)
+    if (completionMessage) {
+      git(['commit', '--allow-empty', '-F', '-'], {
+        cwd,
+        required: true,
+        input: completionMessage,
+      })
+      judged.commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
+    } else if (commits.length && interimCommitProblem(commits[0])) {
+      // Once the child has stopped it is safe to put one rescue commit above a
+      // malformed checkpoint. The branch is then durable without starting CI;
+      // the validation problem remains visible and no completion is claimed.
+      git(['commit', '--allow-empty', '-F', '-'], {
+        cwd,
+        required: true,
+        input: authorCommitMessage({
+          rescue: 'the authoring run ended before a valid completion checkpoint',
+          trailer: config.trailer,
+        }),
+      })
+      judged.commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
+    }
+
+    // The last push carries either the sole unskipped completion commit or a
+    // rescue tip. A failed push over the exact tip already sent by the timer is
+    // not local-only work.
+    let pushed = null
+    if (judged.commits.length) {
+      const res = pushBranch(branch, { cwd, timeoutMs: FINAL_PUSH_TIMEOUT_MS })
+      const tip = git(['rev-parse', `refs/heads/${branch}`], { cwd })
+      pushed = res.ok || (Boolean(tip) && tip === run.lastPushed)
+      if (!res.ok) {
+        console.error(`${commandName}: final push failed — ${res.why}`)
+        if (pushed) console.error('  (the interim push already carried this commit to the remote)')
+      }
+    }
+    const said = String(run.finalMessage ?? '').trim()
+    if (said) console.log(`--- ${authorModel} said ---\n${said}\n--- end ---\n`)
+    console.log(formatAuthoringReport({
+      point,
+      branch,
+      judged,
+      parsed,
+      pushed,
+      framing: authoringStep.framing,
+      reviewer: config.reviewer,
+      commandName,
+      role,
+      authorModel,
+      authorDetail: config.detail,
+      authorTrailer: config.trailer,
+      reviewCommand: config.reviewerRole !== 'main'
+        ? `node scripts/cross-review.mjs --sha <sha> --brief "review point ${point}" --mode review --point ${point}`
+        : '',
+    }))
+    // 0 only for a clean run that produced work; 3 says "look at this before you
+    // treat it as a delivery", which is what a script chaining on it must see;
+    // 5 is the outage fallback — author the point in the main chain on FALLBACK_AUTHOR.
+    if (outage.fellBack) {
+      console.error(`${commandName}: ${authorModel} is out — author point ${point} in the main chain on ${FALLBACK_AUTHOR} (not the point's red).`)
+      process.exitCode = 5
+    } else process.exitCode = judged.clean ? 0 : 3
+  } catch (e) {
+    console.error(`${commandName} failed: ${(e && e.message) || e}`)
+    process.exit(1)
+  }
+}
+
+if (isMainModule(import.meta.url)) await runAuthoringCli()

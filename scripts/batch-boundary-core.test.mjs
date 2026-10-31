@@ -78,6 +78,7 @@ import {
   durablePrepareReceipt,
   durablePrepareVerdict,
 } from './batch-boundary-plane-core.mjs'
+import { MAIN } from './model-lanes.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -325,6 +326,38 @@ describe('progressGuardDecision at a point boundary (the point-373 witnesses)', 
 // three such rounds happened on the first live run. A boundary that only
 // survives a turn with nothing left to do is not a mechanism, because finding
 // something left to do is the Stop chain's whole purpose.
+describe('isClosingSetCommand — the anchored git closing duties (point 1308, U6)', () => {
+  it.each(['git fetch', 'git fetch origin --prune', 'git fetch -p --all', 'git branch -d feat/x', 'git worktree remove .claude/worktrees/x'])(
+    'accepts %s',
+    (command) => expect(isClosingSetCommand(command)).toBe(true),
+  )
+  it.each([
+    'git fetch --force origin main:saved-work',
+    'git fetch -f origin',
+    'git fetch origin +main:main',
+    'git fetch origin main:x',
+    'git fetch --update-head-ok',
+    'git fetch --tags',
+    'git branch -D feat/x',
+    'git branch -d -f x',
+    'git branch -d a b',
+    'git worktree remove --force .claude/worktrees/x',
+    'git worktree remove -f x',
+    'git worktree remove {--force,.claude/worktrees/x}',
+    'git worktree remove .claude/worktrees/*',
+    'git worktree remove "$W"',
+    'git worktree remove ~/x',
+    'git fetch && git merge origin/main',
+    'git fetch $(cat x)',
+    'git fetch > log.txt',
+    'git fetch &',
+  ])('refuses %s', (command) => expect(isClosingSetCommand(command)).toBe(false))
+  it('keeps a taken boundary through the same forms (the heartbeat and the sealed boundary read this verdict)', () => {
+    expect(handoverSurvivesCall({ toolName: 'Bash', command: 'git branch -d feat/x' }).survives).toBe(true)
+    expect(handoverSurvivesCall({ toolName: 'Bash', command: 'git branch -D feat/x' }).survives).toBe(false)
+  })
+})
+
 describe('handoverSurvivesCall — closing work keeps the boundary, anything else ends it', () => {
   const call = (over) => handoverSurvivesCall({ toolName: 'Bash', ...over })
 
@@ -369,7 +402,7 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
   })
 
   it('a single & is a separator too — it hid real work behind a closing head', () => {
-    // Four-eyes review (Fable 5): with `&&` and `;` as the only separators this
+    // Four-eyes review: with `&&` and `;` as the only separators this
     // parsed as ONE segment, matched the closing head and KEPT the handover
     // through `npm test` — a successor could then spawn beside a working session.
     expect(call({ command: 'node scripts/board.mjs & npm test' }).survives).toBe(false)
@@ -770,6 +803,8 @@ describe('the boundary card names where the batch actually goes', () => {
     expect(ctx).toMatch(/no `finding\.mjs --blocked`, no decision card/)
     const pt = boundaryRequestDrainLine({ cause: BOUNDARY_CAUSES.POINT })
     expect(pt).toMatch(/--queued "<title>" --point <N>/)
+    // Push first, tick second (21.10.2026): the order is append, commit, push, THEN --queued.
+    expect(pt).toMatch(/--appending[\s\S]*commit, push main, THEN[\s\S]*--queued/)
     expect(pt).toMatch(/a deferral leaves it pending/)
     expect(commitGatesRequests(['--commit', '1305'])).toBe(true)
     expect(commitGatesRequests(['--commit', '--context', '--transcript', 'x'])).toBe(false)
@@ -1011,11 +1046,11 @@ function stopGuardRemedies(root, guard) {
     if (!ts.isImportDeclaration(statement)) continue
     const importedFile = statement.moduleSpecifier.text
     // Most refusal text lives in a `-core`, but the mechanism guard now prints
-    // its repair commands through review-astra's contribution formatter so the
+    // its repair commands through cross-review's contribution formatter so the
     // guard and executable planner cannot drift. Follow that named formatter
-    // too; otherwise this inventory reports that review-astra vanished precisely
+    // too; otherwise this inventory reports that cross-review vanished precisely
     // because the command acquired a single authoritative source.
-    const carriesRemedyText = importedFile.endsWith('-core.mjs') || importedFile === './review-astra.mjs'
+    const carriesRemedyText = importedFile.endsWith('-core.mjs') || importedFile === './cross-review.mjs'
     if (!importedFile.startsWith('./') || !carriesRemedyText) continue
     const bindings = statement.importClause?.namedBindings
     if (!bindings || !ts.isNamedImports(bindings)) continue
@@ -1056,7 +1091,7 @@ describe('every Stop-guard remedy is closing work or explicitly deferred at the 
     for (const [script, reason] of closingAdditions) {
       expect(isClosingSetCommand(`node scripts/${script}.mjs`), reason).toBe(true)
     }
-    for (const script of ['review-astra', 'throttle-probe', 'verify/run-all']) {
+    for (const script of ['cross-review', 'throttle-probe', 'verify/run-all']) {
       expect(isClosingSetCommand(`node scripts/${script}.mjs`), `${script} starts real work`).toBe(false)
     }
   })
@@ -1107,7 +1142,7 @@ describe('every Stop-guard remedy is closing work or explicitly deferred at the 
         pendingCommits: [{
           sha: 'a'.repeat(40),
           subject: 'Change a guard',
-          authorModel: 'Claude Opus 5',
+          authorModel: MAIN.trailerName,
           files: ['scripts/pending-guard.mjs'],
           coveringRecordShas: [],
         }],
@@ -1124,7 +1159,7 @@ describe('every Stop-guard remedy is closing work or explicitly deferred at the 
       deferredRemedies.push(command)
     }
     expect(new Set(deferredRemedies.map((command) => /scripts[\\/]([\w/-]+)\.mjs/.exec(command)?.[1]))).toEqual(
-      new Set(['review-astra', 'throttle-probe', 'verify/run-all']),
+      new Set(['cross-review', 'throttle-probe', 'verify/run-all']),
     )
   })
 

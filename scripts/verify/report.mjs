@@ -149,7 +149,7 @@ if (section('bug-report-archive')) {
     check(memberPresentCheckName(stem, suffix), names.includes(expected[i]))
   }
   // THE ORDER IS PART OF WHAT THE COMPOSITE CHECK PRINTS (cross-vendor review,
-  // GPT-5.6 Sol, 30.08.2026): the detail above is the archive's own member list
+  // 30.08.2026): the detail above is the archive's own member list
   // joined, and a charge in the red table reads that line. Without this the
   // assembler could reorder its entries and the charge would stop matching in
   // silence. A missing picture keeps the remaining three in their order.

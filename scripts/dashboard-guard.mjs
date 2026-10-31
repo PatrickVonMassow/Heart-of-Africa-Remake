@@ -55,7 +55,7 @@ import {
 
 /** Hash of the now-card BODIES — the text the reader sees (invariant 8c). */
 const nowHash = (html) => createHash('sha256').update(nowCardText(html)).digest('hex')
-import { heldByOtherLiveOwner, readOwnerLock } from './batch-singleton.mjs'
+import { ownsLock, readOwnerLock } from './batch-singleton.mjs'
 import { openFingerprintOfTasks, syncedPublishPatch } from './board-currency-core.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
@@ -104,10 +104,11 @@ function head() {
  * would drift and report a false "clean", so there is exactly one of it.
  */
 export function gatherDashboardInputs({ sessionId = '' } = {}) {
-  // Hard singleton: a session that does not own the live batch lock has no
-  // dashboard duty — it must stand down entirely, not be pushed to publish.
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  // Hard singleton: only the session holding the batch lock has a dashboard
+  // duty — any other (no lock, a dead or foreign owner, no session id) stands
+  // down entirely, not be pushed to publish.
+  if (!ownsLock(sessionId).mine) {
+    return { applicable: false, why: 'this session does not hold the batch lock', cause: 'not-lock-owner' }
   }
 
   const marker = readJson(STATE_PATH)
@@ -145,7 +146,7 @@ export function gatherDashboardInputs({ sessionId = '' } = {}) {
       // The board's own clock, for the expected-end rule. Gathered HERE and not
       // only at --synced: the Stop chain is where the rule has to bite, because
       // a card whose status text is refreshed and whose HEAD has not moved
-      // satisfies every other invariant while its header ages (Fable 5, four-eyes).
+      // satisfies every other invariant while its header ages (four-eyes review).
       nowMinutes: berlinMinutes(),
       // Calibratable without a code change: minutes in dashboard-state.json.
       freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,

@@ -44,7 +44,7 @@ describe('the calibration fixtures are real, whole and usable', () => {
     }
   })
 
-  // Names the VALUES, not only the field names (four-eyes finding 5, Fable 5): the
+  // Names the VALUES, not only the field names (four-eyes finding 5): the
   // first cut passed the field check while committing a Windows username and full
   // session UUIDs, which a check on shapes alone can never see.
   it('carries no home directory, user name or session id', () => {

@@ -44,6 +44,23 @@ export const VILLAGE_SPOTS = {
   well: [9, 8.5] as [number, number],
 }
 
+/** Where a talker of a conversing pair stands and which way it faces. */
+export interface TalkerStance {
+  x: number
+  z: number
+  yaw: number
+}
+
+/** The conversing pair around its spot: a metre apart, face to face — A looks
+ *  along world +x, B along −x. Fixed for the pair's life: a listener does not
+ *  swivel on his soles (the fidget of the 21.10.2026 report). */
+export function talkerStances(x: number, z: number): TalkerStance[] {
+  return [
+    { x: x - 0.5, z, yaw: Math.PI / 2 },
+    { x: x + 0.5, z, yaw: -Math.PI / 2 },
+  ]
+}
+
 /** Chatting pair on the port plaza. */
 export const PORT_TALKERS: [number, number] = [6, 6]
 
@@ -109,7 +126,8 @@ export function villageKeepClearSpots(placeId: string): Array<[number, number]> 
  * two groups — among the children the player hears the children, among the
  * adults the adults, and in the middle of the village no babble of both.
  *
- * The well and its water-carrier drop out where `villageHasWell` says no.
+ * The well and its water-carrier drop out where `villageHasWell` says no, the
+ * centre pounder where `villagePoundsAtCentre` does.
  */
 export function villageAdultStations(
   firePos: readonly [number, number],
@@ -315,8 +333,9 @@ export function childPlayGround(
     near?: { x: number; z: number; within: number }
     /** A point the ground's CALLS must reach (work-order 1245 — the stand the
      *  bank stage is watched from): a ground whose far rim lies beyond `within`
-     *  of it is taken only when no floor-keeping ground is in reach, and then
-     *  the nearest one is. Never bought with a floor. */
+     *  of it is taken only when no floor-keeping ground is in reach and no
+     *  nearly clear one (`REACH_OPENNESS`) is in reach at the cost of the fabric
+     *  floor, and then the nearest one is. The separation never gives way. */
     reach?: { x: number; z: number; within: number }
   } = {},
 ): PlayGround {
@@ -394,13 +413,14 @@ export function childPlayGround(
   // is held in an object rather than a `let`, because the assignment happens
   // inside the visitor and a captured `let` keeps its initial narrowing.
   //
-  // Two picks are kept, and the order between them is the rule: the best ground
-  // that meets BOTH floors wins, and only where the settlement offers no such
-  // ground does the openness floor give way — never the separation, which is
-  // what the whole placement exists for.
+  // Several picks are kept, and the order between them is the rule: the best
+  // ground that meets BOTH floors wins, and only where the settlement offers no
+  // such ground does the openness floor give way — never the separation, which
+  // is what the whole placement exists for.
   //
   // The `near` and `reach` points are PREFERENCES inside this rank only
-  // (work-order 1245): no floor is ever given up for either.
+  // (work-order 1245): no floor is given up for `near`; for `reach` only the
+  // fabric floor is, and only for a nearly clear ground (`openInReach`).
   const picked: {
     best: PlayGround | null
     both: PlayGround | null
@@ -437,8 +457,9 @@ export function childPlayGround(
       }
     }
   })
-  // Beside the stage and in reach of its stand; else in reach; else the
-  // nearest to the stand — each among the grounds that keep every floor.
+  // Beside the stage and in reach of its stand; else in reach; else a nearly
+  // clear ground in reach without the fabric floor; else the nearest to the
+  // stand — all but that third among the grounds that keep every floor.
   const preferred = picked.near ?? picked.both
   if (preferred && (!reach || rimFrom(preferred) <= reach.within)) return preferred
   // A ground both beside the stage and in reach beats one merely in reach.
@@ -446,7 +467,6 @@ export function childPlayGround(
   if (picked.inReach) return picked.inReach
   if (picked.openInReach) return picked.openInReach
   if (picked.nearest) return picked.nearest
-  if (picked.both) return picked.both
   const separated = picked.best
   if (separated && separated.fabric >= MIN_FABRIC) return separated
 

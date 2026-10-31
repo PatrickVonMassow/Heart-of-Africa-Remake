@@ -12,6 +12,7 @@
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
+import { timingVerdict, isWallCap, laneFpsProbe, laneHeader, unmeasuredLine } from './load-proof-core.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
@@ -37,6 +38,10 @@ await page.reload()
 await page.waitForFunction(() => window.__game && window.__ui && window.__renderer, null, { timeout: 60000 })
 await assertBackend(page)
 await page.waitForTimeout(3000)
+// The lane's delivered rate (point 642): the route below is a fixed frame count
+// inside a wall budget, so it declares the rate it needs.
+const laneFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
+console.log(laneHeader(laneFps))
 await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
   window.__game.getState().leavePlace()
@@ -86,7 +91,35 @@ check(
 )
 
 // --- the sweep finishes with one row per config × phase ----------------------
-await page.waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: 300000 })
+// A TIMING check (point 642): a fixed frame count must fit the 300 s budget, so
+// the route needs its total over 80 % of the budget. The route always runs and
+// is judged after it: completing is PASS on any lane; missing the budget on a
+// lane below that rate is UNMEASURED and the run ends without the report checks;
+// missing it on a lane that meets the rate is red.
+const ROUTE_BUDGET_MS = 300000
+const routeNeedFps = Math.max(1, Math.ceil(progressNames.total / ((ROUTE_BUDGET_MS / 1000) * 0.8)))
+// Measured before the route, in the steady state: a boot-time reading can
+// include a multi-second build hitch (collision read 0.2 fps on a hardware lane).
+// A failed probe leaves the rate unmeasured (null), never the boot reading.
+const routeFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
+const routeStarted = Date.now()
+const routeDone = await page
+  .waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: ROUTE_BUDGET_MS })
+  .then(() => true, (err) => {
+    if (!isWallCap(err)) throw err
+    return false
+  })
+const routeName = 'the fixed-frame benchmark route completes and reports'
+const routeLane = timingVerdict({ ok: routeDone, needFps: routeNeedFps, measuredFps: routeFps })
+if (routeLane.verdict === 'unmeasured') console.log(unmeasuredLine(routeName, routeLane.reason))
+else check(routeName, routeDone, `${Date.now() - routeStarted} ms of a ${ROUTE_BUDGET_MS} ms budget`)
+if (!routeDone) {
+  check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
+  await browser.close()
+  console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`)
+  if (routeLane.verdict === 'unmeasured') console.log('unmeasured checks: 1 (they did not run; not both-backend coverage)')
+  process.exit(failures === 0 ? 0 : 1)
+}
 const result = await page.evaluate(() => {
   const file = window.__ui.getState().benchReport
   return { filename: file.filename, aborted: file.aborted, report: JSON.parse(file.json) }

@@ -2,7 +2,7 @@
 // wording lives in mechanism-review-guard-gap-core.mjs.
 //
 // Called by mechanism-review-guard.mjs ONLY on a turn it would block: it
-// assembles the same shape of material `review-astra` would send for the range
+// assembles the same shape of material `cross-review` would send for the range
 // (diffstat + patch + every touched path's content at head), measures it
 // against the budget, asks the pass-splitting tool whether a split covers the
 // range, and hands the numbers to the pure ruling. The common clear turn never reaches this file.
@@ -74,7 +74,7 @@ export const runGitArgs = (args, { cwd = REPO_ROOT, env = process.env } = {}) =>
 
 /**
  * Assemble and measure the range's material. Character counts over the same
- * parts `review-astra` sends, restricted to the review end-state files (the
+ * parts `cross-review` sends, restricted to the review end-state files (the
  * work-order documents excluded): the diffstat, the patch, and each path's
  * content at `head` (a path absent there — deleted — still counts its patch).
  * Binary sections and blobs beyond any pass's room are priced, not read whole.

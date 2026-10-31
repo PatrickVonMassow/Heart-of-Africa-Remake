@@ -141,6 +141,7 @@ import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newSt
 import { bankDrawnReach, buildBoundaryLut, groundDiscShift, isOutsidePlace, placeBoundaryRadius, type PlaceBounds } from './boundary'
 import {
   RIVER_HALF_LENGTH,
+  RIVER_REACH,
   buildRiverFloorGeometry,
   buildBankShoreGeometry,
   buildFoamPatchGeometry,
@@ -204,6 +205,8 @@ import {
   type RingWalk,
 } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
+import { PlaceDumpGroup } from './PlaceDumpGroup'
+import { shownInScene, usePlaceDumpProvider } from './placeDumpRead'
 import { bandHeightAt, panoramaBandShown } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { emitFootstep } from '../../systems/ambience'
@@ -1164,9 +1167,9 @@ function PlaceFlora({
  * ~1890 sub-Saharan settlements kept the cooking hearth alight through the rains
  * under a roofed cook-shelter / thatch canopy on posts (docs/peoples-1890.md
  * §10), so the fire's burning in rain reads plausibly: under the canopy it burns
- * on (a touch lower/steamier as rain rises), gated by `fireRainFactor`. `blaze`
- * is the cold-season warming factor (point 142); `rainRef` reads the place's
- * live wetness so the flame dims with the rain each frame.
+ * on (a touch lower/steamier as rain rises), gated by `shelteredFireRainFactor`.
+ * `blaze` is the cold-season warming factor (point 142); `rainRef` reads the
+ * place's live wetness so the flame dims with the rain each frame.
  */
 function FirePit({
   x,
@@ -1196,11 +1199,19 @@ function FirePit({
   // and soft PCF edges on high. Fall back to the base size when off (unused).
   const fireShadowSize = useUi(effectiveFireShadowResolution) || FIRE_SHADOW_MAP_SIZE
   const fireShadowSoft = useUi(effectiveFireShadowSoft)
+  // The village fire for the bug-report dump (placeDump.ts): where it burns
+  // and how hard, after the rain.
+  usePlaceDumpProvider('village-fire', () => ({
+    kind: 'fire',
+    state: { blaze, sheltered, rainFactor: shelteredFireRainFactor(rainAmount(rainRef.current, balance.season.weatherStrength), sheltered), light: light.current?.intensity ?? null },
+    figures: [],
+    objects: [{ id: 'village-fire/pit', kind: 'fire-pit', holder: 'ground', pos: { x, y: 0, z } }],
+  }))
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     // Under the cook-shelter the fire burns on through the rain — only a touch
     // lower/steamier; an unsheltered fire (the dome-dweller villages) is beaten
-    // down by rain (point 256, the two branches of fireRainFactor).
+    // down by rain (point 256, the two branches of shelteredFireRainFactor).
     const rain = rainAmount(rainRef.current, balance.season.weatherStrength)
     const rainFactor = shelteredFireRainFactor(rain, sheltered)
     if (light.current) {
@@ -2192,7 +2203,8 @@ function PlaceRiver({
   })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): where the water
-  // is, which way it runs, and where its foam stands right now.
+  // is, which way it runs, where its flotsam (foam, leaves, grass, twigs)
+  // floats right now, and the drift phase that carries it.
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
@@ -2201,6 +2213,9 @@ function PlaceRiver({
       normal: { x: bank.nx, z: bank.nz },
       downstream: { x: bank.fx, z: bank.fz },
       distance: bank.distance,
+      /** How far past the waterline the drawn surface runs (m) — where it hands
+       *  over to the §2.5 panorama's water along the bank. */
+      reach: RIVER_REACH,
       walkEdge: bank.walkEdge,
       bank: bank.bank,
       upstream: bank.upstream,
@@ -2381,7 +2396,7 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
     anchors.forEach((a, i) => {
       const g = refs.current[i]
       if (!g) return
-      // Each stands and looks slowly around; a person steps with the turn.
+      // Each stands on the spot and looks slowly around.
       g.rotation.y = phases[i] + Math.sin(t * 0.3 + phases[i]) * 0.5
       g.position.y = groundHeight(a.x, a.z)
     })
@@ -2738,12 +2753,14 @@ export function PlaceScene() {
       const dir = target.clone().sub(origin).normalize()
       const rc = new THREE.Raycaster(origin, dir, 0.1, 4000)
       const hits = rc.intersectObject(r3fScene, true)
-      const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+      // The raycaster also strikes meshes under a hidden group (the stowed paddle,
+      // work-order 1448), so a surface counts only when it and its ancestors show.
+      const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && shownInScene(h.object))
       // Behind the transparent water: the first surface a sight line meets once
       // it has passed under the drawn river (work-order 1250) — null for none.
       const behind = hit?.object.name === 'place-river'
         ? hits.find((h) => h.distance > hit.distance && h.object.name !== 'place-river' && h.object.name !== 'place-river-foam' &&
-          h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+          h.object.name !== 'panorama-silhouette' && shownInScene(h.object))
         : undefined
       // Whether the surface hit is drawn as WATER: the backdrop's own mask at
       // the hit face (work-order 1250 — map land lay on the river as a band).
@@ -3361,11 +3378,13 @@ export function PlaceScene() {
       {/* The chief himself, once the use key has brought him out (design.md
           §12): he walks across to his drummer, stays his minute and walks home;
           back in the hut he leaves the scene until the hut is used afresh. */}
-      {isVillage &&
-        chiefOutside[place.id] &&
-        layout.interactives
-          .filter((it) => it.type === 'chief')
-          .map((it, i) => <Chief key={`chief-${i}`} item={it} style={style} dress={dress} />)}
+      {isVillage && chiefOutside[place.id] && (
+        <PlaceDumpGroup id="chief" kind="chief">
+          {layout.interactives
+            .filter((it) => it.type === 'chief')
+            .map((it, i) => <Chief key={`chief-${i}`} item={it} style={style} dress={dress} />)}
+        </PlaceDumpGroup>
+      )}
 
       {/* Orientation after meeting the chief (design.md §17): every interactive
           building, the chief's hut included, carries a pulsing marker. */}
@@ -3388,9 +3407,11 @@ export function PlaceScene() {
           sparse Thomas-Cook-era ambient life around them. */}
       {isMonument && <GizaMonuments />}
       {isMonument && (
-        <GizaAmbient
-          anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex }))}
-        />
+        <PlaceDumpGroup id="giza-ambient" kind="giza-ambient">
+          <GizaAmbient
+            anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex }))}
+          />
+        </PlaceDumpGroup>
       )}
 
       {isVillage && (

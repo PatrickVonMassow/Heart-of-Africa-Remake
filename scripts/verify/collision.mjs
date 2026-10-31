@@ -13,6 +13,7 @@ import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { fileURLToPath } from 'node:url'
+import { timingVerdict, laneFpsProbe, laneHeader, unmeasuredLine } from './load-proof-core.mjs'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
 // collision/reachability checks are reproducible. It is applied by the LAUNCHER
@@ -79,6 +80,11 @@ await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await assertBackend(page)
 await page.waitForTimeout(5000)
+// The lane's delivered rate (point 642), printed so every timing verdict names
+// the lane it was taken on.
+const laneFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
+console.log(laneHeader(laneFps))
+let unmeasuredCount = 0
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 
@@ -327,7 +333,7 @@ async function reachableBuildings(sceneLabel) {
         await page.evaluate(() => window.__chiefHome())
         // …and the reset itself is CHECKED, or a half-reset that leaves the flag
         // standing would let the press below pass without anybody coming out
-        // (GPT-6 Astra, pass 3/9). Indoors means: the flag is down and the
+        // (cross-vendor review, pass 3/9). Indoors means: the flag is down and the
         // figure is off the scene.
         const home = await page
           .waitForFunction(
@@ -646,6 +652,12 @@ if (section('village')) {
     // and the check still read "nothing moved". Cumulative displacement asks what
     // the check means to ask — did anyone get anywhere.
     const start = w.states.map((s) => ({ x: s.x, z: s.z }))
+    // The lane rate is counted INSIDE the observation (point 642): a probe run
+    // afterwards could read a slowdown or a recovery the window never saw.
+    let frames = 0
+    let counting = true
+    const count = () => { frames++; if (counting) requestAnimationFrame(count) }
+    requestAnimationFrame(count)
     const t0 = Date.now()
     // Watch for the window + a generous margin so a would-be pin has time to pass it.
     while (Date.now() - t0 < (win + 5) * 1000) {
@@ -656,13 +668,28 @@ if (section('village')) {
       }
       await sleep(150)
     }
-    return { ok: true, maxPinned, anyMoved, win, n: w.states.length }
+    counting = false
+    const fps = (1000 * frames) / (Date.now() - t0)
+    return { ok: true, maxPinned, anyMoved, win, n: w.states.length, fps }
   })
-  check(
-    'Village: no inhabitant stays pinned past the unstuck window (point 155)',
-    pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6,
-    JSON.stringify(pinResult),
-  )
+  // A TIMING check (point 642): a WALL window over walkers paced by rendered
+  // frames. It declares the rate it needs and is judged after the window: a pass
+  // passes on any lane; a failure below the rate (the `ok:true` beside
+  // `anyMoved:false` signature) is UNMEASURED, at or above it red.
+  // OPEN: 10 fps is an estimate, calibrate against the lane header.
+  const UNSTUCK_NEED_FPS = 10
+  const pinName = 'Village: no inhabitant stays pinned past the unstuck window (point 155)'
+  const pinOk = pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6
+  // Measured during the observation itself (frames over its window), not at
+  // boot nor by a later probe. An observation that returned without a rate (no
+  // walkers) leaves it unmeasured, so that failure stays red.
+  const pinLane = timingVerdict({ ok: pinOk, needFps: UNSTUCK_NEED_FPS, measuredFps: pinResult.fps ?? null })
+  if (pinLane.verdict === 'unmeasured') {
+    console.log(unmeasuredLine(pinName, pinLane.reason))
+    unmeasuredCount++
+  } else {
+    check(pinName, pinOk, JSON.stringify(pinResult))
+  }
 }
 
 // === The chief's body at his hut ===============================================
@@ -1034,14 +1061,14 @@ if (section('play-rocks')) {
     // line between the two rocks and aimed at the near one, which puts the far
     // one exactly behind it — and the shutter gated the near rock alone, so the
     // claimed two-rock photograph would have passed with the second stone
-    // occluded or missing outright (GPT-5.6 Sol, first cross-vendor round, D3).
+    // occluded or missing outright (first cross-vendor round, D3).
     // The stand comes from the scene itself (`bankPlayRocksView`), so the suite
     // and `bankStage.test.ts` judge one description of it and not two.
     const view = await page.evaluate(() => window.__bankStageView?.() ?? null)
     // AND THE STAND IS REALLY OFF THE AXIS. A stand ON it would satisfy every
     // other claim here — both rocks project inside the frame, because they are
     // on one line through its middle — while showing a single stone with another
-    // hidden behind it (GPT-5.6 Sol, confirming round). The angle the pair
+    // hidden behind it (cross-vendor review, confirming round). The angle the pair
     // subtends from the camera is what says otherwise, measured from the rocks
     // and the stand rather than assumed.
     const spread = view
@@ -1701,6 +1728,7 @@ if (section('stranded-shore')) {
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)
 
+if (unmeasuredCount) console.log(`unmeasured checks: ${unmeasuredCount} (they did not run; not both-backend coverage)`)
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 // Said again where the verdict is read: a green one-section run is not a green

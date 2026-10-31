@@ -7,8 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import {
-  ancestorIndex,
+import { ancestorIndex,
   CLEARING_VERDICT,
   criticalityOf,
   evaluateCriticalityReview,
@@ -20,12 +19,12 @@ import {
   parsePointBlocks,
   REVIEW_UNAVAILABLE_KIND,
   strictAncestorProbe,
-  tickedNumbers,
-} from './criticality-review-guard-core.mjs'
+  tickedNumbers } from './criticality-review-guard-core.mjs'
+import { CROSS, MAIN, SCARCE } from './model-lanes.mjs'
 
-const OPUS = 'Claude Opus 5'
-const FABLE = 'Fable 5'
-const SOL = 'GPT-5.6 Sol'
+const OPUS = MAIN.trailerName
+const FABLE = SCARCE.displayName
+const SOL = CROSS.retired[2]
 
 /** One work-order point block, as TASKS.md/the archive really write them. */
 const point = (n, { done = false, body = 'DOES A THING', tail = '' } = {}) =>
@@ -485,7 +484,7 @@ describe('evaluateCriticalityReview', () => {
     const v = evaluateCriticalityReview({
       baseline: 'b',
       ticks: [tick()],
-      records: [record({ model: 'Claude Opus 5', authoredBy: 'Claude Opus 5' })],
+      records: [record({ model: MAIN.trailerName, authoredBy: MAIN.trailerName })],
     })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('self-review')
@@ -728,7 +727,7 @@ describe('ancestorIndex', () => {
   const M = 'm'.repeat(40)
 
   // D → C → B → A, oldest last, as git prints it.
-  const line = graph(`${D} ${C}`, `${C} ${B}`, `${B} ${A}`, `${A}`)
+  const line = graph(`${D} ${C}`, `${C} ${B}`, `${B} ${A}`, A)
 
   it('reports every wanted sha that is a strict ancestor, from one listing', () => {
     const idx = ancestorIndex(line, [A, B, C])
@@ -748,7 +747,7 @@ describe('ancestorIndex', () => {
 
   it('follows every parent of a merge', () => {
     // M merges the B line and the C line; both sides are its ancestors.
-    const merged = graph(`${M} ${B} ${C}`, `${C} ${A}`, `${B} ${A}`, `${A}`)
+    const merged = graph(`${M} ${B} ${C}`, `${C} ${A}`, `${B} ${A}`, A)
     expect([...ancestorIndex(merged, [A, B, C]).ancestorsOf(M)].sort()).toEqual([A, B, C].sort())
   })
 
@@ -776,7 +775,7 @@ describe('strictAncestorProbe', () => {
   const B = 'b'.repeat(40)
   const C = 'c'.repeat(40)
   const M = 'm'.repeat(40)
-  const line = [`${C} ${B}`, `${B} ${A}`, `${A}`].join('\n')
+  const line = [`${C} ${B}`, `${B} ${A}`, A].join('\n')
 
   const spying = () => {
     const asked = []

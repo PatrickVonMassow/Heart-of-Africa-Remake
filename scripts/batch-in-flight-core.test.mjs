@@ -119,6 +119,7 @@ import {
   tagEvidencePoint,
 } from './batch-in-flight.mjs'
 import { selfCommandLine } from './verify/run-record.mjs'
+import { MAIN } from './model-lanes.mjs'
 
 const NOW = 1_785_100_000_000
 const SID = 'session-owner'
@@ -2223,6 +2224,20 @@ describe('filesNamedIn / openPointSpecs — what a queued point says it touches'
     expect(specs[1].files).toEqual(['docs/d.md'])
   })
 
+  it('ends a block at ANY column-0 checkbox line — upper-case [X] and unnumbered ones too', () => {
+    const tasks = [
+      '- [ ] 500. FIRST POINT touching scripts/a.mjs',
+      '- [X] 501. A closed point touching scripts/closed.mjs',
+      '- [ ] 502. SECOND POINT touching docs/d.md',
+      '- [ ] an unnumbered checkbox touching src/unnumbered.ts',
+      '- [ ] 503. THIRD POINT touching docs/e.md',
+    ].join('\n')
+    const specs = openPointSpecs(tasks)
+    expect(specs.map((s) => s.point)).toEqual([500, 502, 503])
+    expect(specs[0].files).toEqual(['scripts/a.mjs'])
+    expect(specs[1].files).toEqual(['docs/d.md'])
+  })
+
   it('an empty work order yields no points', () => {
     expect(openPointSpecs('')).toEqual([])
     expect(openPointSpecs()).toEqual([])
@@ -2273,13 +2288,13 @@ describe('independentOpenPoints — a candidate must be provably independent', (
   })
 })
 
-describe('slotReasonDecision — the cap is a target, and the demand is narrow', () => {
+describe('slotReasonDecision — the cap is a ceiling; idle slots are reported, never demanded', () => {
   const independent = [{ point: 500, files: ['src/world/world.ts'] }]
   const running = ['scripts/batch-singleton.mjs']
 
-  it('THE MEASURED STATE: one agent, free slots, an independent point → a reason is DEMANDED', () => {
+  it('one agent, free slots, an independent point → reported as idle-slots, NO reason demanded (switched off)', () => {
     const d = slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running })
-    expect(d).toMatchObject({ needsReason: true, agents: 1, openBranches: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
+    expect(d).toMatchObject({ needsReason: false, agents: 1, openBranches: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
     expect(d.candidates.map((c) => c.point)).toEqual([500])
   })
 
@@ -2292,10 +2307,11 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
         reason: 'the queue\'s next points all rewrite the same guard the running agent is rebuilding',
       }),
     ).toMatchObject({ needsReason: false, why: 'reason-given' })
-    // Whitespace is not a reason.
-    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, reason: '   ' }).needsReason).toBe(
-      true,
-    )
+    // Whitespace is not a reason, and still demands none.
+    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, reason: '   ' })).toMatchObject({
+      needsReason: false,
+      why: 'idle-slots',
+    })
   })
 
   it('a FULL pool passes with no reason at all', () => {
@@ -2358,7 +2374,7 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
     ).toMatchObject({ needsReason: false, why: 'queue-overlaps' })
   })
 
-  it('and ONE workable point beside the gated ones still demands a reason', () => {
+  it('and ONE workable point beside the gated ones is reported, not demanded', () => {
     expect(
       slotReasonDecision({
         agents: 1,
@@ -2368,7 +2384,7 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
         ],
         runningFiles: running,
       }),
-    ).toMatchObject({ needsReason: true, why: 'idle-slots', candidates: [{ point: 501 }] })
+    ).toMatchObject({ needsReason: false, why: 'idle-slots', candidates: [{ point: 501 }] })
   })
 
   it('a PAUSED batch and a recorded CLOSING FREEZE both pass', () => {
@@ -4244,10 +4260,10 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     ).toMatchObject({ needsReason: false, why: 'at-cap', slotsFree: 0 })
   })
 
-  it('still demands a reason where branches and agents both leave room', () => {
+  it('reports idle slots where branches and agents both leave room, without a demand', () => {
     expect(
       slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running }),
-    ).toMatchObject({ needsReason: true, why: 'idle-slots' })
+    ).toMatchObject({ needsReason: false, why: 'idle-slots' })
   })
 
   // REWRITTEN after Sol's review of 91d88f9a: the old case pinned the bare
@@ -4266,9 +4282,9 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running })).toMatchObject(
       { needsReason: false, why: 'agents-at-cap', slotsFree: POOL_CAP, agents: 3, openBranches: 0 },
     )
-    // Neither full: the demand stands, and both counts are reported SEPARATELY.
+    // Neither full: idle slots, both counts reported SEPARATELY, no demand.
     expect(slotReasonDecision({ agents: 2, openBranches: 1, openPoints: independent, runningFiles: running })).toMatchObject(
-      { needsReason: true, why: 'idle-slots', slotsFree: POOL_CAP - 1, agents: 2, openBranches: 1 },
+      { needsReason: false, why: 'idle-slots', slotsFree: POOL_CAP - 1, agents: 2, openBranches: 1 },
     )
   })
 
@@ -4500,14 +4516,14 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   })
 
   it('recognises an authoring run as the commissioning it is', () => {
-    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-astra.mjs --point 697' })).toEqual({
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --lane cross --point 697' })).toEqual({
       point: 697,
       points: [697],
       refs: [],
       refsLoose: false,
       how: 'author',
     })
-    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' })).toEqual({
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --lane scarce --point 834' })).toEqual({
       point: 834,
       points: [834],
       refs: [],
@@ -4517,20 +4533,20 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   })
 
   it('opens NOTHING on the read-only authoring legs — routing and dry-run', () => {
-    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-astra.mjs --routing --point 697' })).toEqual(
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --routing --point 697' })).toEqual(
       { point: null, points: [], refs: [], refsLoose: false, how: 'none' },
     )
     expect(
-      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-astra.mjs --point 697 --dry-run' }).point,
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --point 697 --dry-run' }).point,
     ).toBeNull()
     expect(
-      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834 --dry-run' }).point,
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-delegate.mjs --lane scarce --point 834 --dry-run' }).point,
     ).toBeNull()
     // …and a read-only leg beside a real cut does not shield the cut.
     expect(
       commissionTarget({
         toolName: 'Bash',
-        command: 'node scripts/author-astra.mjs --routing --point 705 && git checkout -b feat/697-a',
+        command: 'node scripts/author-delegate.mjs --routing --point 705 && git checkout -b feat/697-a',
       }).points,
     ).toEqual([697])
   })
@@ -4543,7 +4559,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       'git branch -D feat/697-goat',
       'git merge --no-ff feat/697-goat',
       'git log feat/697-goat',
-      'node scripts/land-point.mjs 697 --model opus-5',
+      `node scripts/land-point.mjs 697 --model "${MAIN.trailerName}"`,
       'node scripts/point-brief.mjs 697',
     ]) {
       expect(commissionTarget({ toolName: 'Bash', command }).point, command).toBeNull()

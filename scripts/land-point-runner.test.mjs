@@ -44,6 +44,10 @@ import { childWords } from './land-point-core.mjs'
 import { gatherActiveWorkSource } from './active-work-source.mjs'
 import { DISPOSITION, branchDeletionBlocker, judgeCleanupTarget } from './land-cleanup-core.mjs'
 
+// Root ignores permission bits (cloud clones run as root), so a chmod cannot
+// make the real read or write path fail in-process; those cases skip there.
+const permissionBitsIgnored = process.getuid?.() === 0
+
 /** A child that takes a measurable, deterministic amount of time. */
 const slowChild = (ms) => ({ cmd: process.execPath, args: ['-e', `setTimeout(() => {}, ${ms})`], id: 'slow' })
 
@@ -86,7 +90,7 @@ describe('the gate runner', () => {
   it('truncates a chatty failure to its last lines', async () => {
     const r = await runCommand({
       cmd: process.execPath,
-      args: ['-e', 'for (let i = 0; i < 200; i++) console.log("line " + i); process.exit(1)'],
+      args: ['-e', 'for (let i = 0; i < 200; i++) console.log("line " + i); process.exitCode = 1'],
       id: 'unit',
       maxOutputLines: 5,
     })
@@ -799,7 +803,7 @@ describe('the landing settles the now-card before it publishes', () => {
     expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
   })
 
-  it("NEVER tells the operator to clear a focus that names another point's work", () => {
+  it.skipIf(permissionBitsIgnored)("NEVER tells the operator to clear a focus that names another point's work", () => {
     const { focusPath, declarationPath, dir } = settleScene()
     // The focus names 1091, which is still open; only the evidence names 1088.
     writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
@@ -955,7 +959,7 @@ describe('carryRunRecords', () => {
   // Astra, round 4: a predicate with a side effect charged ONE unreachable
   // record twice — once for the stat that could not judge it, once for the copy
   // that then failed on the same entry.
-  it('counts an unreachable destination entry exactly once', () => {
+  it.skipIf(permissionBitsIgnored)('counts an unreachable destination entry exactly once', () => {
     const { root, own } = scene()
     const dest = join(root, 'local', 'verify-logs')
     writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
@@ -974,7 +978,7 @@ describe('carryRunRecords', () => {
   })
 
   // Astra, confirming pass 1/3: an unreadable SOURCE is not "nothing to carry".
-  it('counts a discovery that failed, and not a logs directory that is simply absent', () => {
+  it.skipIf(permissionBitsIgnored)('counts a discovery that failed, and not a logs directory that is simply absent', () => {
     const { root, own } = scene()
     const logs = join(own, 'local', 'verify-logs')
     writeRecord(logs, 'stamp-docs.log.run.json', 'feat/608-x')
@@ -990,5 +994,128 @@ describe('carryRunRecords', () => {
     const quiet = carryRunRecords({ branch: 'feat/590-y', cwd: root, mainRoot: root })
     expect(quiet.copied).toEqual([])
     expect(quiet.failed).toBe(0)
+  })
+})
+
+// POINT 1308 (U6 b): the landing writes the `closing <N>` card before its
+// publish. The write never stops the chain; a failure names the one command.
+describe('the closing card written by the landing', () => {
+  it('calls board.mjs closing with the point and the owed duties, killed by SIGKILL on a hang', async () => {
+    const { writeClosingCard, closingCardReason } = await import('./land-point.mjs')
+    const calls = []
+    const r = writeClosingCard({ number: 544, run: (cmd, args, opts) => calls.push({ cmd, args, opts }) })
+    expect(r.ok).toBe(true)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].args.slice(1)).toEqual(['closing', '544', closingCardReason(544)])
+    expect(calls[0].opts).toEqual(expect.objectContaining({ timeout: 15000, killSignal: 'SIGKILL' }))
+  })
+
+  it('reports a refused write with the exact manual command, and throws nothing', async () => {
+    const { writeClosingCard, closingCardCommand } = await import('./land-point.mjs')
+    const r = writeClosingCard({
+      number: 544,
+      run: () => {
+        const e = new Error('Command failed')
+        e.stderr = 'board: no German subject for point 544 stands anywhere on the board'
+        throw e
+      },
+    })
+    expect(r.ok).toBe(false)
+    expect(r.detail).toContain('no German subject for point 544')
+    expect(r.detail).toContain(closingCardCommand(544))
+    expect(closingCardCommand(544)).toMatch(/^node scripts\/board\.mjs closing 544 "/)
+  })
+
+  it('the card it writes survives the publish projection once the point is closed', async () => {
+    const { closingCardReason } = await import('./land-point.mjs')
+    const { toClosingWork, projectNowForPublish, closingWorkCards } = await import('./board-core.mjs')
+    const bare =
+      '<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Erledigt</h2></summary>\n</details>\n</main>\n'
+    const html = toClosingWork(bare, 544, { subject: 'Die dritte Kartenart', reason: closingCardReason(544), stamp: '23:40' })
+    for (const focusPoint of [null, 544]) {
+      const published = projectNowForPublish(html, { ok: true, points: [], focusPoint }, { knownPoints: [] }).html
+      expect(closingWorkCards(published)).toHaveLength(1)
+      expect(published).toContain(closingCardReason(544))
+    }
+  })
+
+  it('reports the missing card as the LAST step, after the publish and the cleanup ran', () => {
+    const src = readFileSync(join(process.cwd(), 'scripts', 'land-point.mjs'), 'utf8')
+    const write = src.indexOf('const closing = writeClosingCard({ number })')
+    const publish = src.indexOf("sh('node', [join('scripts', 'board-publish.mjs')]", write)
+    const cleanupOk = src.indexOf("      'cleanup',\n      VERDICT.ok,", publish)
+    const red = src.indexOf("step('closing', VERDICT.failed, closing.detail)", cleanupOk)
+    expect(write).toBeGreaterThan(0)
+    expect(publish).toBeGreaterThan(write)
+    expect(cleanupOk).toBeGreaterThan(publish)
+    expect(red).toBeGreaterThan(cleanupOk)
+    expect(src.slice(red, red + 600)).toContain('closingCardCommand(number)')
+  })
+
+  it('re-attests after a card written by hand, even when the landing attested the board', () => {
+    const src = readFileSync(join(process.cwd(), 'scripts', 'land-point.mjs'), 'utf8')
+    const red = src.indexOf("step('closing', VERDICT.failed, closing.detail)")
+    expect(src.slice(red, red + 600)).toContain('repair: closing.ok ? SYNCED_COMMAND : `${closingCardCommand(number)}, then ${SYNCED_COMMAND}`')
+  })
+})
+
+// POINT 1308 (U8): the landing records the board review at the tick commit, so
+// the next turn does not meet dashboard-guard's OUT OF DATE refusal.
+describe('the board audit run by the landing', () => {
+  it('runs dashboard-guard --synced on the board, SIGKILL on a hang, and never --prepped', async () => {
+    const { attestLandedBoard } = await import('./land-point.mjs')
+    const calls = []
+    const r = attestLandedBoard({
+      run: (cmd, args, opts) => {
+        calls.push({ cmd, args, opts })
+        return 'dashboard registered at HEAD abc1234: .batch-dashboard.html\nfocus confirmed by the review'
+      },
+    })
+    expect(r).toEqual({ ok: true, detail: 'dashboard registered at HEAD abc1234: .batch-dashboard.html' })
+    expect(calls).toHaveLength(1)
+    expect(calls[0].args).toEqual([join('scripts', 'dashboard-guard.mjs'), '--synced', '.batch-dashboard.html'])
+    expect(calls[0].opts).toEqual(expect.objectContaining({ timeout: 15000, killSignal: 'SIGKILL' }))
+    expect(JSON.stringify(calls)).not.toContain('--prepped')
+  })
+
+  it('hands a refusal back in dashboard-guard\'s own words, plus the old command', async () => {
+    const { attestLandedBoard, SYNCED_COMMAND } = await import('./land-point.mjs')
+    const refusal = 'dashboard-guard --synced REFUSED — this board was never published:'
+    const r = attestLandedBoard({
+      run: () => {
+        const e = new Error('Command failed')
+        e.stderr = refusal
+        throw e
+      },
+    })
+    expect(r.ok).toBe(false)
+    expect(r.detail).toBe(`${refusal} — do it the old way: ${SYNCED_COMMAND}`)
+  })
+
+  it('names a hang as a timeout', async () => {
+    const { attestLandedBoard } = await import('./land-point.mjs')
+    const r = attestLandedBoard({
+      run: () => {
+        const e = new Error('spawnSync node ETIMEDOUT')
+        e.code = 'ETIMEDOUT'
+        throw e
+      },
+    })
+    expect(r.detail).toMatch(/^timed out after 15 s — do it the old way: node scripts\/dashboard-guard\.mjs --synced/)
+  })
+
+  it('runs after the tick push, the publish and the cleanup — the reviewed HEAD is the tick commit', () => {
+    const src = readFileSync(join(process.cwd(), 'scripts', 'land-point.mjs'), 'utf8')
+    const push = src.indexOf("git(['push', 'origin', 'main']")
+    const publish = src.indexOf("sh('node', [join('scripts', 'board-publish.mjs')]")
+    const cleanupOk = src.indexOf("      'cleanup',\n      VERDICT.ok,")
+    const audit = src.indexOf('const attested = attestLandedBoard()')
+    expect(publish).toBeGreaterThan(0)
+    expect(cleanupOk).toBeGreaterThan(publish)
+    expect(audit).toBeGreaterThan(cleanupOk)
+    if (push > 0) expect(audit).toBeGreaterThan(push)
   })
 })

@@ -1,8 +1,9 @@
 // @vitest-environment node
 // The garment penetration report (scripts/villager/penetration.py) counts
-// only VISIBLE show-through and names every remaining case; its numbers are
-// never worse than main's report measured by the same step before the
-// visible-only count (penetration-report-main.json).
+// only VISIBLE show-through and names every remaining case; in the build pose
+// its numbers are never worse than main's report measured by the same step
+// before the visible-only count (penetration-report-main.json; the motion
+// comparison is pending, below).
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'

@@ -1032,7 +1032,7 @@ describe('the pending-request card', () => {
   })
 
   it('repairs the transliteration a shell-mangled title arrives with', () => {
-    // Four-eyes finding 2 (Fable 5): the title is the one field that travels as
+    // Four-eyes finding 2: the title is the one field that travels as
     // an argument, so a depositor writes "fuer"/"pruefen" — and the board audit
     // then blocks the OWNER for text it never wrote.
     // Only the flagged words are repaired: "loesen" is not on the audit's stem
@@ -1048,7 +1048,7 @@ describe('the pending-request card', () => {
   })
 
   it('neutralises the blocked card’s title the same way the queue card’s is', () => {
-    // Four-eyes finding 4 (Fable 5, 31.07.2026): `--blocked` handed the raw
+    // Four-eyes finding 4 (31.07.2026): `--blocked` handed the raw
     // deposit title to vdzk-add while the queue card already routed through
     // boardSafeTitle — and the audit reads the whole published board, titles
     // included, on the OWNER's turn.

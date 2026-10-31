@@ -997,6 +997,31 @@ export interface FlightState {
   z: number
 }
 
+/**
+ * Where a feeding predator stands (user report 05.10.2026): at `dist` from its
+ * victim on the side it actually came from, so it is never drawn snapping
+ * across to the far side of a body — or across a river — it reached from the
+ * other. A predator standing on the victim falls back to the legacy flank
+ * direction (+x, +z slightly).
+ */
+export function feedFlank(
+  victimX: number,
+  victimZ: number,
+  fromX: number,
+  fromZ: number,
+  dist: number,
+): { x: number; z: number } {
+  let dx = fromX - victimX
+  let dz = fromZ - victimZ
+  let d = Math.hypot(dx, dz)
+  if (d < 1e-4) {
+    dx = 0.7
+    dz = 0.25
+    d = Math.hypot(dx, dz)
+  }
+  return { x: victimX + (dx / d) * dist, z: victimZ + (dz / d) * dist }
+}
+
 /** Distance from point (px,pz) to the segment (ax,az)-(bx,bz). The SWEPT
  *  predator catch (point 179): a big clamped-dt step or a tangential pass must
  *  not carry a hunter THROUGH its target without registering the catch — the

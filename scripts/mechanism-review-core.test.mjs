@@ -7,8 +7,7 @@
 // odd guards that predate the gate and owe nothing.
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
-import {
-  BLIND_PARALLEL,
+import { BLIND_PARALLEL,
   BLOCKING_VERDICT,
   CONTRIBUTION_DISPOSITION_KIND,
   AUTHORSHIP_CHECK_SINCE,
@@ -16,6 +15,7 @@ import {
   evaluateMechanismReview,
   formatArgErrors,
   formatMechanismReviewVerdict,
+  handoverChainFor,
   independentReviewProblem,
   isMechanismPath,
   KNOWN_FLAGS,
@@ -41,11 +41,14 @@ import {
   validatePass,
   validateRecord,
   verifiedPlannerPasses,
-  VERDICTS,
-} from './mechanism-review-core.mjs'
-import { CLAUDE_MODEL, readState, writeState } from './fable-switch-core.mjs'
+  VERDICTS } from './mechanism-review-core.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
+import { CROSS, LANES, LEGACY, MAIN, SCARCE, TEST_FOREIGN_MODELS, VENDORS, trailerFor } from './model-lanes.mjs'
 
-const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
+/** A lane spelling as a literal regex fragment. */
+const rx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const SCARCE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
 const SCRIPTS = [
   'mechanism-review-guard.mjs',
@@ -174,57 +177,102 @@ describe('isMechanismPath', () => {
   })
 })
 
+describe('ledger rows read through the lane registry (point 1393)', () => {
+  const crossTrailer = (name) => `${name} <${VENDORS[CROSS.vendor].trailerAddress}>`
+  const mainTrailer = (name) => `${name} <${VENDORS[MAIN.vendor].trailerAddress}>`
+
+  it('resolves an old record written under retired names unchanged', () => {
+    // A landed row as the ledger holds it: retired reviewer name, retired author
+    // trailer, a former handover spelling. Ledgers are never rewritten.
+    const old = { model: CROSS.retired[2], authoredBy: mainTrailer(MAIN.retired[1]) }
+    expect(independentReviewProblem(old, { authorModels: [old.authoredBy] })).toBe('')
+    expect(modelVendor(old.model)).toBe(CROSS.vendor)
+    expect(sameModel(old.model, CROSS.displayName)).toBe(true)
+    expect(sameModel(old.authoredBy, trailerFor('main'))).toBe(true)
+    const legacyHandover = Object.keys(LEGACY.handovers).find((key) => LEGACY.handovers[key] === 'cross-authored')
+    const viaLegacy = independentReviewProblem(
+      { model: MAIN.retired[0], handover: legacyHandover },
+      { authorModels: [crossTrailer(CROSS.retired[0]), mainTrailer(SCARCE.retired[1])] },
+    )
+    const viaCurrent = independentReviewProblem(
+      { model: MAIN.retired[0], handover: 'cross-authored' },
+      { authorModels: [crossTrailer(CROSS.retired[0]), mainTrailer(SCARCE.retired[1])] },
+    )
+    expect(viaLegacy).toBe(viaCurrent)
+    expect(viaCurrent).toBe('')
+  })
+
+  it('keeps resolving a record after the cross lane is moved to a new model id', () => {
+    // A synthetic registry in which the cross lane's model id changed and the old id
+    // moved into `retired` — the data change model-lanes.mjs prescribes for a switch.
+    const nextId = `${CROSS.familyWords[0]}-next`
+    const registry = LANES.map((record) =>
+      record.role === 'cross' ? { ...record, modelId: nextId, retired: [...record.retired, record.modelId] } : record,
+    )
+    expect(sameModel(CROSS.modelId, nextId, registry)).toBe(true)
+    expect(sameModel(CROSS.retired[2], nextId, registry)).toBe(true)
+    expect(modelVendor(nextId, registry)).toBe(CROSS.vendor)
+    expect(parseModel(CROSS.modelId, registry).family).toBe('cross')
+    expect(sameModel(nextId, MAIN.displayName, registry)).toBe(false)
+    expect(handoverChainFor('cross-authored', undefined, registry)).toEqual(handoverChainFor('cross-authored'))
+  })
+})
+
 describe('model identity', () => {
   it('reads family and version out of a trailer designation', () => {
-    expect(parseModel('Claude Opus 4.8 <noreply@anthropic.com>')).toMatchObject({
-      family: 'opus',
-      version: '4.8',
+    // The family is the lane identity the registry resolves (the main fallback is
+    // its own identity); the version is the one written.
+    expect(parseModel(trailerFor('main-fallback'))).toMatchObject({
+      family: 'main-fallback',
+      version: MAIN.fallback.displayName.match(/\d+(?:\.\d+)?/)[0],
     })
-    expect(parseModel('Fable 5')).toMatchObject({ family: 'fable', version: '5' })
+    expect(parseModel(SCARCE.retired[0])).toMatchObject({ family: 'scarce', version: SCARCE.retired[0].match(/\d+/)[0] })
   })
 
   it('calls the same model the same, however it was written down', () => {
-    expect(sameModel('Claude Opus 5 <noreply@anthropic.com>', 'opus 5')).toBe(true)
-    expect(sameModel('opus', 'Claude Opus 5')).toBe(true)
+    expect(sameModel(trailerFor('main'), MAIN.displayName.toLowerCase())).toBe(true)
+    expect(sameModel('opus', MAIN.trailerName)).toBe(true)
   })
 
   // AN API ID WRITES ITS MINOR WITH A DASH AND ITS SNAPSHOT DATE THE SAME WAY, so
   // reading either as a version is how a model stops matching its own human name —
   // and two designations that do not match are two models, i.e. a self-review the
   // ledger would wave through. The dated major-only form is the case the
-  // cross-vendor round (GPT-5.6 Sol, 01.09.2026) found open on the first fix.
+  // cross-vendor round (cross-vendor review, 01.09.2026) found open on the first fix.
   it('reads a dashed minor as a minor and a dashed snapshot date as neither', () => {
-    expect(parseModel('claude-opus-4-8')).toMatchObject({ family: 'opus', version: '4.8' })
-    expect(parseModel('claude-fable-5-1')).toMatchObject({ family: 'fable', version: '5.1' })
-    expect(parseModel('claude-opus-5-20260801')).toMatchObject({ family: 'opus', version: '5' })
-    expect(parseModel('claude-haiku-4-5-20251001')).toMatchObject({ family: 'haiku', version: '4.5' })
-    expect(parseModel('claude-opus-5[1m]')).toMatchObject({ family: 'opus', version: '5' })
+    const versionOf = (name) => name.match(/\d+(?:\.\d+)?/)[0]
+    expect(parseModel(MAIN.fallback.modelId)).toMatchObject({ family: 'main-fallback', version: versionOf(MAIN.fallback.displayName) })
+    expect(parseModel(SCARCE.modelId)).toMatchObject({ family: 'scarce', version: versionOf(SCARCE.displayName) })
+    expect(parseModel(MAIN.retired[4])).toMatchObject({ family: 'main', version: versionOf(MAIN.retired[0]) })
+    expect(parseModel(TEST_FOREIGN_MODELS.haikuDatedId)).toMatchObject({ family: 'other:haiku', version: versionOf(TEST_FOREIGN_MODELS.haiku) })
+    expect(parseModel(MAIN.retired[3])).toMatchObject({ family: 'main', version: versionOf(MAIN.retired[0]) })
   })
 
   it('recognises the API id and the human name of one model as the same eyes', () => {
-    expect(sameModel('claude-opus-4-8', 'Claude Opus 4.8')).toBe(true)
-    expect(sameModel('claude-fable-5-1', 'Fable 5.1')).toBe(true)
-    expect(sameModel('claude-opus-5-20260801', 'Claude Opus 5')).toBe(true)
-    expect(sameModel('claude-haiku-4-5-20251001', 'Haiku 4.5')).toBe(true)
-    // A released successor is NOT the same eyes as its predecessor.
-    expect(sameModel('claude-fable-5-1', 'Fable 5')).toBe(false)
+    expect(sameModel(MAIN.fallback.modelId, MAIN.fallback.trailerName)).toBe(true)
+    expect(sameModel(SCARCE.modelId, SCARCE.displayName)).toBe(true)
+    expect(sameModel(MAIN.retired[4], MAIN.trailerName)).toBe(true)
+    expect(sameModel(TEST_FOREIGN_MODELS.haikuDatedId, TEST_FOREIGN_MODELS.haiku)).toBe(true)
+    // A released successor IS the same lane as its predecessor (lane-level identity,
+    // point 1393): a retired name of a lane never reviews that lane's work.
+    expect(sameModel(SCARCE.modelId, SCARCE.retired[0])).toBe(true)
   })
 
   it('treats a different family or a different version as a different model', () => {
-    expect(sameModel('Fable 5', 'Claude Opus 5')).toBe(false)
-    expect(sameModel('Claude Opus 4.8', 'Claude Opus 5')).toBe(false)
+    expect(sameModel(SCARCE.displayName, MAIN.trailerName)).toBe(false)
+    expect(sameModel(MAIN.fallback.trailerName, MAIN.trailerName)).toBe(false)
   })
 
   it('never claims a self-review it cannot prove', () => {
     // A merge commit carries no model trailer. Refusing a review over authorship
     // nobody can read would block a turn on an unanswerable question.
-    expect(sameModel('', 'Claude Opus 5')).toBe(false)
-    expect(sameModel('Claude Opus 5', '')).toBe(false)
+    expect(sameModel('', MAIN.trailerName)).toBe(false)
+    expect(sameModel(MAIN.trailerName, '')).toBe(false)
   })
 
   it('picks the Claude co-author out of a trailer field, ignoring the humans', () => {
-    expect(modelFromTrailers('Patrick von Massow <p@example.com>;Claude Opus 5 <n@a.com>')).toMatch(
-      /Claude Opus 5/,
+    expect(modelFromTrailers(`Patrick von Massow <p@example.com>;${MAIN.trailerName} <n@a.com>`)).toMatch(
+      new RegExp(rx(MAIN.trailerName)),
     )
     expect(modelFromTrailers('Patrick von Massow <p@example.com>')).toBe('')
     expect(modelFromTrailers('')).toBe('')
@@ -233,9 +281,9 @@ describe('model identity', () => {
   // POINT 667: Sol authors as well as reviews, so "who wrote this" must read its
   // trailer too — every self-review refusal downstream is built on that answer.
   it('reads a Sol-authored commit as authored, and by ONE model', () => {
-    expect(modelFromTrailers('GPT-5.6 Sol <noreply@openai.com>')).toBe('GPT-5.6 Sol <noreply@openai.com>')
-    expect(modelsFromTrailers('Patrick von Massow <p@example.com>;GPT-5.6 Sol <n@o.com>')).toEqual([
-      'GPT-5.6 Sol <n@o.com>',
+    expect(modelFromTrailers(`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`)).toBe(`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`)
+    expect(modelsFromTrailers(`Patrick von Massow <p@example.com>;${CROSS.retired[2]} <n@o.com>`)).toEqual([
+      `${CROSS.retired[2]} <n@o.com>`,
     ])
     // A HUMAN IS STILL NOT A MODEL, however their address reads (2nd round):
     // the test used to run against the raw trailer, so `<build@sol.example>`
@@ -243,14 +291,14 @@ describe('model identity', () => {
     expect(modelsFromTrailers('Patrick <build@sol.example>')).toEqual([])
     expect(modelFromTrailers('Patrick <build@sol.example>')).toBe('')
     // Both halves of Sol's name are the same model, whichever is written.
-    expect(sameModel('GPT-5.6 Sol <noreply@openai.com>', 'Sol')).toBe(true)
-    expect(sameModel('GPT-5.6 Sol', 'GPT-5.6 Sol')).toBe(true)
-    expect(sameModel('GPT-5.6 Sol', 'Claude Opus 5')).toBe(false)
+    expect(sameModel(`${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`, 'Sol')).toBe(true)
+    expect(sameModel(CROSS.retired[2], CROSS.retired[2])).toBe(true)
+    expect(sameModel(CROSS.retired[2], MAIN.trailerName)).toBe(false)
     // THE RETIRED NAME READS INTO THE LANE IT WAS (point 1061), so the recorded
-    // reviews naming Sol keep judging as the OpenAI lane — and the VERSION is
-    // what tells the retired model apart from the one serving it now.
-    expect(parseModel('GPT-5.6 Sol')).toMatchObject({ family: 'astra', version: '5.6' })
-    expect(sameModel('GPT-5.6 Sol', 'GPT-6 Astra')).toBe(false)
+    // reviews naming it keep judging as the cross lane — and since point 1393 it IS
+    // that lane: the version no longer tells a retired name apart from the current one.
+    expect(parseModel(CROSS.retired[2])).toMatchObject({ family: 'cross', version: CROSS.retired[2].match(/\d+(?:\.\d+)?/)[0] })
+    expect(sameModel(CROSS.retired[2], CROSS.displayName)).toBe(true)
   })
 
   it('refuses Sol reviewing what Sol authored, and lets Claude review it', () => {
@@ -258,24 +306,24 @@ describe('model identity', () => {
       sha: 'b'.repeat(40),
       verdict: 'merge',
       evidence: 'read the routing core and its cases; the hard-case branch is covered',
-      authoredBy: 'GPT-5.6 Sol <noreply@openai.com>',
+      authoredBy: `${CROSS.retired[2]} <${VENDORS[CROSS.vendor].trailerAddress}>`,
       mode: 'review',
     }
-    const self = validateRecord({ ...record, model: 'GPT-5.6 Sol' })
+    const self = validateRecord({ ...record, model: CROSS.retired[2] })
     expect(self.ok).toBe(false)
     expect(self.errors.join(' ')).toMatch(/SAME-VENDOR REVIEW is refused/)
     expect(validateRecord({ ...record, model: 'Sol' }).ok).toBe(false)
-    expect(validateRecord({ ...record, model: 'Opus 5' }).ok).toBe(true)
+    expect(validateRecord({ ...record, model: MAIN.displayName }).ok).toBe(true)
   })
 })
 
 describe('validateRecord', () => {
   const good = {
     sha: 'a'.repeat(40),
-    model: 'GPT-5.6 Sol',
+    model: CROSS.retired[2],
     verdict: 'merge',
     evidence: 'read the core and the wrapper, ran the spawned-hook cases',
-    authoredBy: 'Claude Opus 5',
+    authoredBy: MAIN.trailerName,
     mode: 'review',
   }
 
@@ -289,7 +337,7 @@ describe('validateRecord', () => {
   })
 
   it('REFUSES a self-review rather than warning about it', () => {
-    const r = validateRecord({ ...good, model: 'Claude Opus 5' })
+    const r = validateRecord({ ...good, model: MAIN.trailerName })
     expect(r.ok).toBe(false)
     expect(r.errors.join(' ')).toMatch(/SAME-VENDOR REVIEW is refused/)
   })
@@ -387,22 +435,22 @@ describe('validateRecord', () => {
   })
 
   it('uses vendor identity over every co-author, including empty and unknown lists', () => {
-    expect(reviewIdentityProblem('GPT-5.6', { authorModels: ['GPT-5.6 Sol'] })).toBe('same-vendor')
-    expect(reviewIdentityProblem('GPT-5.6 Sol', { authorModels: ['Claude Opus 5', 'GPT-5.6 Sol'] })).toBe('same-vendor')
-    expect(reviewIdentityProblem('Opus 5', { authorModels: ['GPT-5.6 Sol', 'Claude Fable 5'] })).toBe('same-vendor')
-    expect(reviewIdentityProblem('GPT-5.6 Sol', { authorModels: [] })).toBe('unknown-author')
-    expect(reviewIdentityProblem('Opus 5', { authorModels: ['Mystery 9'] })).toBe('unknown-author')
-    expect(reviewIdentityProblem('Opus 5', { authorModels: ['GPT-5.6 Sol'] })).toBe('')
+    expect(reviewIdentityProblem(`${VENDORS[CROSS.vendor].versionedMarkers[0].toUpperCase()}-5.6`, { authorModels: [CROSS.retired[2]] })).toBe('same-vendor')
+    expect(reviewIdentityProblem(CROSS.retired[2], { authorModels: [MAIN.trailerName, CROSS.retired[2]] })).toBe('same-vendor')
+    expect(reviewIdentityProblem(MAIN.displayName, { authorModels: [CROSS.retired[2], SCARCE.trailerName] })).toBe('same-vendor')
+    expect(reviewIdentityProblem(CROSS.retired[2], { authorModels: [] })).toBe('unknown-author')
+    expect(reviewIdentityProblem(MAIN.displayName, { authorModels: ['Mystery 9'] })).toBe('unknown-author')
+    expect(reviewIdentityProblem(MAIN.displayName, { authorModels: [CROSS.retired[2]] })).toBe('')
   })
 
   it('lets the gate judge a routed file pass by its authors instead of the range tip', () => {
     const scoped = {
       ...good,
-      model: 'Opus 5',
-      authoredBy: 'Claude Opus 5',
-      authors: ['Claude Opus 5'],
-      handover: 'sol-authored',
-      handoverChain: ['Opus 5', 'Fable 5', 'Opus 4.8'],
+      model: MAIN.displayName,
+      authoredBy: MAIN.trailerName,
+      authors: [MAIN.trailerName],
+      handover: Object.keys(LEGACY.handovers)[1],
+      handoverChain: [MAIN.displayName, SCARCE.displayName, MAIN.fallback.displayName],
       pass: '4/16',
       passFiles: 'src/communication/speaking.test.ts',
     }
@@ -411,11 +459,11 @@ describe('validateRecord', () => {
     // complete range history. A valid scoped handover must reach that second
     // decision even when the reviewer also authored an unrelated tip commit.
     expect(validateRecord(scoped)).toEqual({ ok: true, errors: [] })
-    expect(independentReviewProblem({ model: 'Opus 5', handover: 'sol-authored' }, {
-      authorModels: ['GPT-5.6 Sol'],
+    expect(independentReviewProblem({ model: MAIN.displayName, handover: Object.keys(LEGACY.handovers)[1] }, {
+      authorModels: [CROSS.retired[2]],
     })).toBe('')
-    expect(independentReviewProblem({ model: 'Opus 5', handover: 'sol-authored' }, {
-      authorModels: ['GPT-5.6 Sol', 'Claude Opus 5'],
+    expect(independentReviewProblem({ model: MAIN.displayName, handover: Object.keys(LEGACY.handovers)[1] }, {
+      authorModels: [CROSS.retired[2], MAIN.trailerName],
     })).not.toBe('')
   })
 })
@@ -428,14 +476,14 @@ describe('evaluateMechanismReview', () => {
     sha: 'c'.repeat(40),
     subject: 'Give the pre-push gate its fast path',
     at: MERGE_ACCOUNTING_SINCE - 10_000,
-    authorModel: 'Claude Opus 5',
+    authorModel: MAIN.trailerName,
     files: ['scripts/pre-push-gate-core.mjs'],
     coveringRecordShas: [],
     ...over,
   })
   const record = (over = {}) => {
-    const model = over.model ?? 'GPT-5.6 Sol'
-    const reviewerAuthorship = modelVendor(model) === 'openai'
+    const model = over.model ?? CROSS.retired[2]
+    const reviewerAuthorship = modelVendor(model) === CROSS.vendor
       ? { status: 'unverified', claimedModel: model, reason: 'external CLI reviewer, no harness transcript' }
       : { status: 'agreement', claimedModel: model, actualModel: model }
     return {
@@ -445,7 +493,7 @@ describe('evaluateMechanismReview', () => {
       evidence: 'checked the fast path against the unit layer',
       mode: 'review',
       at: 1_787_000_001_000,
-      authoredBy: 'Claude Opus 5',
+      authoredBy: MAIN.trailerName,
       reviewerAuthorship,
       ...over,
     }
@@ -458,10 +506,10 @@ describe('evaluateMechanismReview', () => {
 
     const anthropicUnverified = (at) => record({
       at,
-      model: 'Claude Opus 5',
+      model: MAIN.trailerName,
       reviewerAuthorship: {
         status: 'unverified',
-        claimedModel: 'Claude Opus 5',
+        claimedModel: MAIN.trailerName,
         reason: 'the recorder did not verify transcripts in this era',
       },
     })
@@ -515,7 +563,7 @@ describe('evaluateMechanismReview', () => {
 
     const unverified = {
       ...base,
-      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
+      reviewerAuthorship: { status: 'unverified', claimedModel: CROSS.retired[2], reason: 'external CLI reviewer' },
     }
     expect(
       evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered], records: [unverified] }).block,
@@ -525,8 +573,8 @@ describe('evaluateMechanismReview', () => {
       ...base,
       reviewerAuthorship: {
         status: 'disagreement',
-        claimedModel: 'GPT-5.6 Sol',
-        actualModel: 'Claude Opus 5',
+        claimedModel: CROSS.retired[2],
+        actualModel: MAIN.trailerName,
       },
     }
     expect(
@@ -538,7 +586,7 @@ describe('evaluateMechanismReview', () => {
     // Cross-vendor review of point 889 (pass 3): "unverified" used to clear for
     // every vendor, so an unknown actual reviewer could claim an independent
     // model and clear the commit without anyone having proved who read the code.
-    // An Anthropic reviewer's session transcript exists at recording time, so
+    // A main-vendor reviewer's session transcript exists at recording time, so
     // agreement is achievable and anything less no longer composes.
     const claim = (model, authorship) => ({
       ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model }),
@@ -553,46 +601,46 @@ describe('evaluateMechanismReview', () => {
         pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel })],
         records: [rec],
       }).block
-    expect(judge(claim('Claude Opus 5', { status: 'unverified', reason: 'transcript expired' }), 'GPT-5.6 Sol')).toBe(true)
+    expect(judge(claim(MAIN.trailerName, { status: 'unverified', reason: 'transcript expired' }), CROSS.retired[2])).toBe(true)
     expect(
-      judge(claim('Claude Opus 5', { status: 'agreement', actualModel: 'Claude Opus 5' }), 'GPT-5.6 Sol'),
+      judge(claim(MAIN.trailerName, { status: 'agreement', actualModel: MAIN.trailerName }), CROSS.retired[2]),
     ).toBe(false)
-    // An OpenAI reviewer runs outside the harness — no Claude transcript can
+    // A cross-vendor reviewer runs outside the harness — no Claude transcript can
     // hold its messages — so a REASONED unverified claim still composes…
     expect(
-      judge(claim('GPT-5.6 Sol', { status: 'unverified', reason: 'external CLI reviewer, no harness transcript' }), 'Claude Opus 5'),
+      judge(claim(CROSS.retired[2], { status: 'unverified', reason: 'external CLI reviewer, no harness transcript' }), MAIN.trailerName),
     ).toBe(false)
     // …a reasonless one does not, and an unknown vendor never does.
-    expect(judge(claim('GPT-5.6 Sol', { status: 'unverified' }), 'Claude Opus 5')).toBe(true)
-    expect(judge(claim('Mystery 9', { status: 'unverified', reason: 'who knows' }), 'Claude Opus 5')).toBe(true)
+    expect(judge(claim(CROSS.retired[2], { status: 'unverified' }), MAIN.trailerName)).toBe(true)
+    expect(judge(claim('Mystery 9', { status: 'unverified', reason: 'who knows' }), MAIN.trailerName)).toBe(true)
     // Contradictory vendor markers are nobody: a label naming both families
-    // reached the OpenAI branch by first-match and cleared with only a reason.
+    // reached the cross-vendor branch by first-match and cleared with only a reason.
     expect(
-      judge(claim('Claude Opus 5 GPT-5', { status: 'unverified', reason: 'mixed markers' }), 'GPT-5.6 Sol'),
+      judge(claim(`${MAIN.trailerName} ${VENDORS[CROSS.vendor].versionedMarkers[0].toUpperCase()}-5`, { status: 'unverified', reason: 'mixed markers' }), CROSS.retired[2]),
     ).toBe(true)
-    // An OpenAI "agreement" is fabricated evidence — no harness transcript can
+    // A cross-vendor "agreement" is fabricated evidence — no harness transcript can
     // hold that vendor's messages — and is refused even with matching names.
     expect(
-      judge(claim('GPT-5.6 Sol', { status: 'agreement', actualModel: 'GPT-5.6 Sol' }), 'Claude Opus 5'),
+      judge(claim(CROSS.retired[2], { status: 'agreement', actualModel: CROSS.retired[2] }), MAIN.trailerName),
     ).toBe(true)
     // A genuinely pre-boundary row keeps the rule under which it was recorded.
     const older = {
-      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
-      reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
+      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: MAIN.trailerName }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: MAIN.trailerName, reason: 'transcript expired' },
     }
-    expect(judge(older, 'GPT-5.6 Sol')).toBe(false)
+    expect(judge(older, CROSS.retired[2])).toBe(false)
   })
 
   it('preserves the reviewer-verification era without letting an old row clear newer code', () => {
     const backdated = {
-      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
-      reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
+      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: MAIN.trailerName }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: MAIN.trailerName, reason: 'transcript expired' },
     }
     const judgeAt = (commitAt) =>
       evaluateMechanismReview({
         baseline: 'b',
         head: 'h',
-        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: 'GPT-5.6 Sol', at: commitAt })],
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: CROSS.retired[2], at: commitAt })],
         records: [backdated],
       }).block
     expect(judgeAt(VERIFIED_REVIEWER_SINCE + 1)).toBe(true)
@@ -600,13 +648,13 @@ describe('evaluateMechanismReview', () => {
   })
 
   it('preserves the authorship era without letting an old row clear newer code', () => {
-    const bare = record({ at: AUTHORSHIP_CHECK_SINCE - 1, model: 'Fable 5' })
+    const bare = record({ at: AUTHORSHIP_CHECK_SINCE - 1, model: SCARCE.displayName })
     delete bare.reviewerAuthorship
     const judgeAt = (commitAt) =>
       evaluateMechanismReview({
         baseline: 'b',
         head: 'h',
-        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: 'GPT-5.6 Sol', at: commitAt })],
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: CROSS.retired[2], at: commitAt })],
         records: [bare],
       }).block
     expect(judgeAt(AUTHORSHIP_CHECK_SINCE + 1)).toBe(true)
@@ -619,9 +667,9 @@ describe('evaluateMechanismReview', () => {
     // merger (re-review round 4). The merger here appears in no trailer, so the
     // proxy would have cleared it.
     const row = {
-      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: 'GPT-5.6 Sol', mode: 'blind-parallel' }),
-      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
-      mergedBy: 'Fable 5',
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: CROSS.retired[2], mode: 'blind-parallel' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: CROSS.retired[2], reason: 'external CLI reviewer' },
+      mergedBy: SCARCE.displayName,
       accounting: RECEIPT,
     }
     const v = evaluateMechanismReview({
@@ -638,8 +686,8 @@ describe('evaluateMechanismReview', () => {
     // " blind-parallel " passed well-formedness (which trims) and fell out of
     // mergeProblem (which compared raw), so one space bypassed every fold check.
     const row = {
-      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: 'GPT-5.6 Sol', mode: ' blind-parallel ' }),
-      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: CROSS.retired[2], mode: ' blind-parallel ' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: CROSS.retired[2], reason: 'external CLI reviewer' },
     }
     const v = evaluateMechanismReview({
       baseline: 'b',
@@ -655,10 +703,10 @@ describe('evaluateMechanismReview', () => {
     // "which wrote one of the two lists" — a false self-merge diagnosis for a
     // row whose halves the repository simply did not confirm.
     const row = {
-      ...record({ at: MERGE_ACCOUNTING_SINCE + 1, model: 'GPT-5.6 Sol', mode: 'blind-parallel' }),
-      mergedBy: 'Fable 5',
+      ...record({ at: MERGE_ACCOUNTING_SINCE + 1, model: CROSS.retired[2], mode: 'blind-parallel' }),
+      mergedBy: SCARCE.displayName,
       accounting: RECEIPT,
-      halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
+      halfAuthors: [MAIN.trailerName, CROSS.retired[2]],
       halfAuthorsVerified: false,
     }
     const v = evaluateMechanismReview({
@@ -696,16 +744,16 @@ describe('evaluateMechanismReview', () => {
         groups: [
           {
             kind: 'files',
-            vendor: 'anthropic',
-            reviewer: 'GPT-5.6 Sol',
-            reviewerVendor: 'openai',
+            vendor: MAIN.vendor,
+            reviewer: CROSS.retired[2],
+            reviewerVendor: CROSS.vendor,
             files: ['scripts/claude-guard.mjs'],
           },
           {
             kind: 'files',
-            vendor: 'openai',
-            reviewer: 'Opus 5',
-            reviewerVendor: 'anthropic',
+            vendor: CROSS.vendor,
+            reviewer: MAIN.displayName,
+            reviewerVendor: MAIN.vendor,
             files: ['scripts/sol-guard.mjs'],
           },
         ],
@@ -713,8 +761,8 @@ describe('evaluateMechanismReview', () => {
       },
     })
     expect(text).toContain('MIX AUTHORSHIP')
-    expect(text).toContain('anthropic-authored contribution files → openai reviewer GPT-5.6 Sol')
-    expect(text).toContain('openai-authored contribution files → anthropic reviewer Opus 5')
+    expect(text).toContain(`${MAIN.vendor}-authored contribution files → ${CROSS.vendor} reviewer ${CROSS.retired[2]}`)
+    expect(text).toContain(`${CROSS.vendor}-authored contribution files → ${MAIN.vendor} reviewer ${MAIN.displayName}`)
     expect(text).toContain('mechanism-review-guard.mjs --status')
     expect(text).not.toContain('reviewing the branch head is enough')
   })
@@ -768,10 +816,10 @@ describe('evaluateMechanismReview', () => {
 
     it('refuses same-vendor models, every co-author, and unknown authorship on the ordinary path', () => {
       const fable = record({
-        model: 'Fable 5',
-        reviewerAuthorship: { status: 'agreement', claimedModel: 'Fable 5', actualModel: 'Fable 5' },
+        model: SCARCE.displayName,
+        reviewerAuthorship: { status: 'agreement', claimedModel: SCARCE.displayName, actualModel: SCARCE.displayName },
       })
-      const secondAuthor = covered({ authorModels: ['Claude Opus 5', 'GPT-5.6 Sol'] })
+      const secondAuthor = covered({ authorModels: [MAIN.trailerName, CROSS.retired[2]] })
       const unknown = covered({ authorModels: ['Unrecognised Reviewer 9'] })
       const empty = covered({ authorModels: [] })
       for (const [pending, reading] of [
@@ -906,7 +954,7 @@ describe('evaluateMechanismReview', () => {
     it('keeps both spec examinations and blind-parallel folds outside code coverage', () => {
       for (const reading of [
         record({ specExamination: 'sound' }),
-        record({ mode: 'blind-parallel', mergedBy: 'Fable 5', accounting: RECEIPT }),
+        record({ mode: 'blind-parallel', mergedBy: SCARCE.displayName, accounting: RECEIPT }),
       ]) {
         const verdict = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered()], records: [reading] })
         expect(verdict.block).toBe(true)
@@ -920,7 +968,7 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
-      records: [record({ model: 'Claude Opus 5' })],
+      records: [record({ model: MAIN.trailerName })],
     })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('self-review')
@@ -992,7 +1040,7 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
-      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT })],
+      records: [record({ mode: 'blind-parallel', mergedBy: MAIN.displayName, accounting: RECEIPT })],
     })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('no-review')
@@ -1004,7 +1052,7 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: pending,
-      records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol', accounting: RECEIPT })],
+      records: [record({ mode: 'blind-parallel', mergedBy: CROSS.retired[2], accounting: RECEIPT })],
     })
     expect(third.block).toBe(true)
     const fallback = evaluateMechanismReview({
@@ -1014,7 +1062,7 @@ describe('evaluateMechanismReview', () => {
       records: [
         record({
           mode: 'blind-parallel',
-          mergedBy: 'Opus 5',
+          mergedBy: MAIN.displayName,
           accounting: RECEIPT,
           mergeFallback: 'Sol was unreachable',
         }),
@@ -1038,8 +1086,8 @@ describe('evaluateMechanismReview', () => {
     // A row written since owes both — leaving the fields out is not a legacy row.
     for (const over of [
       {},
-      { mergedBy: 'GPT-5.6 Sol' },
-      { mergedBy: 'GPT-5.6 Sol', accounting: 'I counted them all' },
+      { mergedBy: CROSS.retired[2] },
+      { mergedBy: CROSS.retired[2], accounting: 'I counted them all' },
     ]) {
       const v = evaluateMechanismReview({
         baseline: 'b',
@@ -1056,7 +1104,7 @@ describe('evaluateMechanismReview', () => {
           baseline: 'b',
           head: 'h',
           pendingCommits: pending,
-          records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, mergedBy: 'GPT-5.6 Sol' })],
+          records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, mergedBy: CROSS.retired[2] })],
         }),
       ),
     ).toMatch(/no review recorded/)
@@ -1069,7 +1117,7 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
-      records: [{ sha: 'c'.repeat(40), model: 'Fable 5', verdict: 'merge', mode: 'blind-parallel' }],
+      records: [{ sha: 'c'.repeat(40), model: SCARCE.displayName, verdict: 'merge', mode: 'blind-parallel' }],
     })
     expect(v.block).toBe(true)
   })
@@ -1079,7 +1127,7 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
-      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT, mergeFallback: 'x' })],
+      records: [record({ mode: 'blind-parallel', mergedBy: MAIN.displayName, accounting: RECEIPT, mergeFallback: 'x' })],
     })
     expect(v.block).toBe(true)
   })
@@ -1134,7 +1182,7 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
-      records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol', accounting: cooked })],
+      records: [record({ mode: 'blind-parallel', mergedBy: CROSS.retired[2], accounting: cooked })],
     })
     expect(v.block).toBe(true)
   })
@@ -1144,9 +1192,9 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: [
-        commit({ coveringRecordShas: ['c'.repeat(40)], authorModels: ['Claude Opus 5', 'Claude Fable 5'] }),
+        commit({ coveringRecordShas: ['c'.repeat(40)], authorModels: [MAIN.trailerName, SCARCE.trailerName] }),
       ],
-      records: [record({ mode: 'blind-parallel', mergedBy: 'Fable 5', accounting: RECEIPT })],
+      records: [record({ mode: 'blind-parallel', mergedBy: SCARCE.displayName, accounting: RECEIPT })],
     })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('no-review')
@@ -1257,16 +1305,16 @@ describe('evaluateMechanismReview', () => {
     const files = ['docs/guide.md', 'scripts/guide-brevity-core.mjs']
     const refused = commit({
       sha: refusedSha,
-      authorModel: 'Claude Opus 5',
-      authorModels: ['Claude Opus 5'],
+      authorModel: MAIN.trailerName,
+      authorModels: [MAIN.trailerName],
       files,
       coveringRecordShas: [refusedSha, answerSha],
     })
     const answer = commit({
       sha: answerSha,
       at: 1_787_000_004_000,
-      authorModel: 'GPT-5.6 Sol',
-      authorModels: ['GPT-5.6 Sol'],
+      authorModel: CROSS.retired[2],
+      authorModels: [CROSS.retired[2]],
       files,
       coveringRecordShas: [answerSha],
     })
@@ -1279,8 +1327,8 @@ describe('evaluateMechanismReview', () => {
     })
     const answerClearance = record({
       sha: answerSha,
-      model: 'Claude Opus 5',
-      authoredBy: 'GPT-5.6 Sol',
+      model: MAIN.trailerName,
+      authoredBy: CROSS.retired[2],
       verdict: 'merge',
       at: 1_787_000_005_000,
       containedShas: new Set([answerSha, refusedSha]),
@@ -1335,8 +1383,8 @@ describe('evaluateMechanismReview', () => {
     const files = ['docs/guide.md', 'scripts/guide-brevity-core.mjs']
     const refused = commit({
       sha: refusedSha,
-      authorModel: 'Claude Opus 5',
-      authorModels: ['Claude Opus 5'],
+      authorModel: MAIN.trailerName,
+      authorModels: [MAIN.trailerName],
       files,
       coveringRecordShas: [refusedSha, answerSha],
     })
@@ -1349,8 +1397,8 @@ describe('evaluateMechanismReview', () => {
     })
     const ungroundedClearance = record({
       sha: answerSha,
-      model: 'Claude Opus 5',
-      authoredBy: 'GPT-5.6 Sol',
+      model: MAIN.trailerName,
+      authoredBy: CROSS.retired[2],
       verdict: 'merge',
       at: 1_787_000_005_000,
       containedShas: new Set([answerSha, refusedSha]),
@@ -1373,16 +1421,16 @@ describe('evaluateMechanismReview', () => {
     const file = 'scripts/guide-brevity-core.mjs'
     const refused = commit({
       sha: refusedSha,
-      authorModel: 'Claude Opus 5',
-      authorModels: ['Claude Opus 5'],
+      authorModel: MAIN.trailerName,
+      authorModels: [MAIN.trailerName],
       files: [file],
       coveringRecordShas: [refusedSha, answerSha],
     })
     const sameVendorAnswer = commit({
       sha: answerSha,
       at: 1_787_000_004_000,
-      authorModel: 'Claude Fable 5',
-      authorModels: ['Claude Fable 5'],
+      authorModel: SCARCE.trailerName,
+      authorModels: [SCARCE.trailerName],
       files: [file],
       coveringRecordShas: [answerSha],
     })
@@ -1395,8 +1443,8 @@ describe('evaluateMechanismReview', () => {
     })
     const selfReview = record({
       sha: answerSha,
-      model: 'Claude Opus 5',
-      authoredBy: 'Claude Fable 5',
+      model: MAIN.trailerName,
+      authoredBy: SCARCE.trailerName,
       verdict: 'merge',
       at: 1_787_000_005_000,
       containedShas: new Set([answerSha, refusedSha]),
@@ -1588,26 +1636,26 @@ describe('evaluateMechanismReview', () => {
       const text = formatMechanismReviewVerdict(v)
       expect(text).toContain('split into 3 passes')
       expect(text).toContain('missing pass 2')
-      expect(text).not.toContain('review-astra.mjs --sha')
+      expect(text).not.toContain('cross-review.mjs --sha')
       expect(text).toContain('immutable commit boundary')
     })
 
     it('replays the measured 408757d mixed-vendor split through the planner assignment', () => {
       const sha = '408757db2bc0b6bc8a7f57dc0d2b6ea5981c3ece'
       const shape = [
-        ['GPT-5.6 Sol', ['.claude/queue-rank.json', 'docs/analysis_de/vibe-coding-anleitung.md', 'docs/command-index.md', 'docs/document-cut-757.md']],
-        ['GPT-5.6 Sol', ['docs/work-packages.md', 'scripts/author-routing-core.mjs']],
-        ['GPT-5.6 Sol', ['scripts/author-routing-core.test.mjs', 'scripts/guide-brevity-core.mjs', 'scripts/guide-brevity-core.test.mjs']],
-        ['GPT-5.6 Sol', ['scripts/render-verify-charges.mjs', 'scripts/verify/report-archive-names.mjs', 'scripts/verify/report.mjs']],
-        ['Fable 5', ['.claude/mechanism-reviews.jsonl', 'scripts/mechanism-review-guard.mjs']],
-        ['Fable 5', ['scripts/mechanism-review-guard.test.mjs', 'scripts/render-verify-core.mjs']],
-        ['Fable 5', ['scripts/render-verify-core.test.mjs', 'scripts/section-tag-core.mjs', 'scripts/verify/sections.mjs']],
-        ['Opus 5', ['scripts/criticality-review-guard.mjs', 'scripts/mechanism-review-core.test.mjs']],
-        ['Opus 5', ['scripts/render-verify-guard.mjs', 'scripts/render-verify-guard.test.mjs', 'scripts/render-verify-recorder.mjs']],
-        ['Opus 5', ['scripts/review-astra.mjs', 'scripts/tasks-spec-guard.mjs', 'scripts/verify/sections.test.mjs', 'scripts/review-astra-plan.test.mjs']],
-        ['Fable 5', ['scripts/mechanism-review-core.mjs']],
-        ['Fable 5', ['scripts/render-verify-recorder.test.mjs']],
-        ['Fable 5', ['scripts/verify/README.md']],
+        [CROSS.retired[2], ['.claude/queue-rank.json', 'docs/analysis_de/vibe-coding-anleitung.md', 'docs/command-index.md', 'docs/document-cut-757.md']],
+        [CROSS.retired[2], ['docs/work-packages.md', 'scripts/author-routing-core.mjs']],
+        [CROSS.retired[2], ['scripts/author-routing-core.test.mjs', 'scripts/guide-brevity-core.mjs', 'scripts/guide-brevity-core.test.mjs']],
+        [CROSS.retired[2], ['scripts/render-verify-charges.mjs', 'scripts/verify/report-archive-names.mjs', 'scripts/verify/report.mjs']],
+        [SCARCE.displayName, ['.claude/mechanism-reviews.jsonl', 'scripts/mechanism-review-guard.mjs']],
+        [SCARCE.displayName, ['scripts/mechanism-review-guard.test.mjs', 'scripts/render-verify-core.mjs']],
+        [SCARCE.displayName, ['scripts/render-verify-core.test.mjs', 'scripts/section-tag-core.mjs', 'scripts/verify/sections.mjs']],
+        [MAIN.displayName, ['scripts/criticality-review-guard.mjs', 'scripts/mechanism-review-core.test.mjs']],
+        [MAIN.displayName, ['scripts/render-verify-guard.mjs', 'scripts/render-verify-guard.test.mjs', 'scripts/render-verify-recorder.mjs']],
+        [MAIN.displayName, ['scripts/cross-review.mjs', 'scripts/tasks-spec-guard.mjs', 'scripts/verify/sections.test.mjs', 'scripts/cross-review-plan.test.mjs']],
+        [SCARCE.displayName, ['scripts/mechanism-review-core.mjs']],
+        [SCARCE.displayName, ['scripts/render-verify-recorder.test.mjs']],
+        [SCARCE.displayName, ['scripts/verify/README.md']],
       ]
       const rows = shape.map(([model, files], offset) => record({
         sha,
@@ -1632,7 +1680,7 @@ describe('evaluateMechanismReview', () => {
         baseline: 'b',
         head: 'h',
         pendingCommits: [commit({
-          authorModel: 'Claude Opus 5',
+          authorModel: MAIN.trailerName,
           files: ['scripts/mechanism-review-core.mjs'],
           coveringRecordShas: [sha],
         })],
@@ -1653,7 +1701,7 @@ describe('evaluateMechanismReview', () => {
       expect(missing.findings[0].kind).toBe('incomplete-passes')
       expect(missing.findings[0].passes.missing).toContain(7)
 
-      const changed = rows.map((row) => row.pass.index === 11 ? { ...row, model: 'Opus 5' } : row)
+      const changed = rows.map((row) => row.pass.index === 11 ? { ...row, model: MAIN.displayName } : row)
       const mismatched = evaluateMechanismReview({
         ...input,
         records: changed,
@@ -1827,7 +1875,7 @@ describe('evaluateMechanismReview', () => {
           record({ at: MERGE_ACCOUNTING_SINCE + 1000 }),
           record({
             sha: descendant,
-            model: 'Claude Opus 5',
+            model: MAIN.trailerName,
             containedShas: new Set(['c'.repeat(40), descendant]),
             pass: { index: 1, total: 2, files: [MECH], endState: descendant },
             at: MERGE_ACCOUNTING_SINCE + 2000,
@@ -1996,7 +2044,7 @@ describe('evaluateMechanismReview', () => {
         baseline: 'b',
         head: 'h',
         pendingCommits: [commit(covered)],
-        records: [pass(1, 2, { model: 'Claude Opus 5' }), pass(2, 2, { model: 'Claude Opus 5' })],
+        records: [pass(1, 2, { model: MAIN.trailerName }), pass(2, 2, { model: MAIN.trailerName })],
       })
       expect(v.block).toBe(true)
       expect(v.findings[0].kind).toBe('self-review')
@@ -2011,7 +2059,7 @@ describe('evaluateMechanismReview', () => {
         baseline: 'b',
         head: 'h',
         pendingCommits: [commit(covered)],
-        records: [pass(1, 2, { model: 'Claude Opus 5' }), record({ at: MERGE_ACCOUNTING_SINCE + 9000 })],
+        records: [pass(1, 2, { model: MAIN.trailerName }), record({ at: MERGE_ACCOUNTING_SINCE + 9000 })],
       })
       expect(v.block).toBe(true)
     })
@@ -2160,7 +2208,7 @@ describe('evaluateMechanismReview', () => {
 describe('parseArgs — a known command line', () => {
   const full = [
     '--record', 'abc1234',
-    '--model', 'Fable 5',
+    '--model', SCARCE.displayName,
     '--verdict', 'merge',
     '--evidence', 'read the core against its spec',
     '--point', '298',
@@ -2172,7 +2220,7 @@ describe('parseArgs — a known command line', () => {
     expect(p.mode).toBe('record')
     expect(p.values).toEqual({
       sha: 'abc1234',
-      model: 'Fable 5',
+      model: SCARCE.displayName,
       verdict: 'merge',
       evidence: 'read the core against its spec',
       point: '298',
@@ -2239,7 +2287,7 @@ describe('parseArgs — an argument it does not recognise', () => {
   })
 
   it('reports an ABBREVIATED known flag the same way', () => {
-    const p = parseArgs(['--mod', 'Fable 5'])
+    const p = parseArgs(['--mod', SCARCE.displayName])
     expect(p.ok).toBe(false)
     expect(p.errors.join('\n')).toContain('unknown flag --mod')
     expect(p.errors.join('\n')).toContain('did you mean --model')
@@ -2412,11 +2460,11 @@ describe('validatePass', () => {
   it('is asked by validateRecord, so a broken pass cannot be WRITTEN', () => {
     const base = {
       sha: 'a'.repeat(40),
-      model: 'GPT-5.6 Sol',
+      model: CROSS.retired[2],
       verdict: 'merge',
       evidence: 'read both scripts of this pass end to end',
       mode: 'review',
-      authoredBy: 'Claude Opus 5',
+      authoredBy: MAIN.trailerName,
     }
     expect(validateRecord({ ...base, pass: '1/2', passFiles: 'scripts/a.mjs' }).ok).toBe(true)
     expect(validateRecord({ ...base, pass: '1/2' }).ok).toBe(false)
@@ -2485,10 +2533,10 @@ describe('validateMode', () => {
 describe('validateRecord carries the mode', () => {
   const good = {
     sha: 'a'.repeat(40),
-    model: 'GPT-5.6 Sol',
+    model: CROSS.retired[2],
     verdict: 'merge',
     evidence: 'read the core and the wrapper against the spec',
-    authoredBy: 'Claude Opus 5',
+    authoredBy: MAIN.trailerName,
   }
 
   it('refuses an otherwise complete record that names no mode', () => {
@@ -2500,7 +2548,7 @@ describe('validateRecord carries the mode', () => {
   /** A blind-parallel record names the third model AND carries the count. */
   const counted = {
     mode: 'blind-parallel',
-    mergedBy: 'Fable 5',
+    mergedBy: SCARCE.displayName,
     accounting: '7 A + 5 B entries → 9 union entries (6 merged, 4 only A, 2 only B): every input entry accounted for',
   }
 
@@ -2512,42 +2560,42 @@ describe('validateRecord carries the mode', () => {
   it('derives an Astra merger and the weaker switch reason while Fable is off', () => {
     const input = {
       sha: 'a'.repeat(40),
-      model: 'GPT-6 Astra',
+      model: CROSS.displayName,
       verdict: 'merge',
       evidence: 'read both independent lists against the same invariants',
-      authoredBy: CLAUDE_MODEL,
+      authoredBy: MAIN.trailerName,
       mode: 'blind-parallel',
       accounting: counted.accounting,
-      fableState: FABLE_OFF,
+      fableState: SCARCE_OFF,
     }
     expect(validateRecord(input).ok, validateRecord(input).errors).toBe(true)
     expect(resolveMergePolicy({ ...input, authors: [input.model, input.authoredBy] })).toMatchObject({
-      mergedBy: 'GPT-6 Astra',
-      mergeFallback: expect.stringContaining('node scripts/fable-switch.mjs --status'),
+      mergedBy: CROSS.displayName,
+      mergeFallback: expect.stringContaining('node scripts/lane-switch.mjs --status'),
       errors: [],
     })
-    expect(validateRecord({ ...input, mergedBy: 'Fable 5' }).ok).toBe(false)
+    expect(validateRecord({ ...input, mergedBy: SCARCE.displayName }).ok).toBe(false)
   })
 
   // THE RETIRED LANE STILL VALIDATES (point 1061). A blind record naming
-  // GPT-5.6 Sol is history, and history keeps clearing: the merger derived for
-  // it today is the lane's CURRENT model, which authored none of those halves
-  // and therefore owes no self-merge reason.
-  it('keeps a Sol-authored blind record valid, and derives no self-merge for it', () => {
+  // the cross lane's retired name is history, and history keeps clearing. Since point
+  // 1393 a retired name IS its lane, so the merger derived for it today (the lane's
+  // current model) is that half's author and owes the switch's self-merge reason.
+  it('keeps a retired-name blind record valid, and derives the self-merge reason for it', () => {
     const historical = {
       sha: 'a'.repeat(40),
-      model: 'GPT-5.6 Sol',
+      model: CROSS.retired[2],
       verdict: 'merge',
       evidence: 'read both independent lists against the same invariants',
-      authoredBy: 'Claude Opus 5',
+      authoredBy: MAIN.trailerName,
       mode: 'blind-parallel',
       accounting: counted.accounting,
-      fableState: FABLE_OFF,
+      fableState: SCARCE_OFF,
     }
     expect(validateRecord(historical).ok, validateRecord(historical).errors).toBe(true)
     expect(resolveMergePolicy({ ...historical, authors: [historical.model, historical.authoredBy] })).toMatchObject({
-      mergedBy: 'GPT-6 Astra',
-      mergeFallback: '',
+      mergedBy: CROSS.displayName,
+      mergeFallback: expect.stringContaining('--status'),
       errors: [],
     })
   })
@@ -2559,7 +2607,7 @@ describe('validateRecord carries the mode', () => {
   })
 
   it('refuses a merge by either of the two models that wrote the lists', () => {
-    for (const who of ['GPT-5.6 Sol', 'Claude Opus 5']) {
+    for (const who of [CROSS.retired[2], MAIN.trailerName]) {
       const v = validateRecord({ ...good, ...counted, mergedBy: who })
       expect(v.ok, who).toBe(false)
       expect(v.errors.join('\n')).toMatch(/may not merge them/i)
@@ -2572,8 +2620,8 @@ describe('validateRecord carries the mode', () => {
     const v = validateRecord({
       ...good,
       ...counted,
-      authors: ['Claude Opus 5', 'Claude Fable 5'],
-      mergedBy: 'Fable 5',
+      authors: [MAIN.trailerName, SCARCE.trailerName],
+      mergedBy: SCARCE.displayName,
     })
     expect(v.ok).toBe(false)
     expect(v.errors.join('\n')).toMatch(/may not merge them/i)
@@ -2594,14 +2642,14 @@ describe('validateRecord carries the mode', () => {
   })
 
   it('lets the recorded two-model fallback through, and refuses one naming no model', () => {
-    const fb = { ...good, ...counted, mergedBy: 'Claude Opus 5' }
-    expect(validateRecord({ ...fb, mergeFallback: 'Fable 5 was unreachable all session' }).ok).toBe(true)
+    const fb = { ...good, ...counted, mergedBy: MAIN.trailerName }
+    expect(validateRecord({ ...fb, mergeFallback: `${SCARCE.displayName} was unreachable all session` }).ok).toBe(true)
     expect(validateRecord({ ...fb, mergeFallback: 'nobody else was around' }).ok).toBe(false)
     expect(validateRecord({ ...fb, mergeFallback: 'none' }).ok).toBe(false)
   })
 
   it('refuses a merging model or a count under a review, which folds nothing', () => {
-    const v = validateRecord({ ...good, mode: 'review', mergedBy: 'GPT-5.6 Sol' })
+    const v = validateRecord({ ...good, mode: 'review', mergedBy: CROSS.retired[2] })
     expect(v.ok).toBe(false)
     expect(v.errors.join('\n')).toMatch(/meaningless under --mode review/i)
     const c = validateRecord({ ...good, mode: 'review', accounting: counted.accounting })
@@ -2616,18 +2664,18 @@ describe('validateRecord carries the mode', () => {
   })
 
   it('reads every Claude co-author out of the trailers, not just the first', () => {
-    expect(modelsFromTrailers('Claude Opus 5 <a@b>; Claude Fable 5 <c@d>')).toEqual([
-      'Claude Opus 5 <a@b>',
-      'Claude Fable 5 <c@d>',
+    expect(modelsFromTrailers(`${MAIN.trailerName} <a@b>; ${SCARCE.trailerName} <c@d>`)).toEqual([
+      `${MAIN.trailerName} <a@b>`,
+      `${SCARCE.trailerName} <c@d>`,
     ])
     expect(modelsFromTrailers('Someone Else <x@y>')).toEqual([])
     // The single-author read stays what it was — the gate compares one to one.
-    expect(modelFromTrailers('Claude Opus 5 <a@b>; Claude Fable 5 <c@d>')).toBe('Claude Opus 5 <a@b>')
+    expect(modelFromTrailers(`${MAIN.trailerName} <a@b>; ${SCARCE.trailerName} <c@d>`)).toBe(`${MAIN.trailerName} <a@b>`)
   })
 
   it('still refuses a self-review, whichever mode is claimed', () => {
     for (const mode of MODES) {
-      const v = validateRecord({ ...good, model: 'Claude Opus 5', mode })
+      const v = validateRecord({ ...good, model: MAIN.trailerName, mode })
       expect(v.ok).toBe(false)
       expect(v.errors.join(' ')).toMatch(/SAME-VENDOR REVIEW is refused/)
     }
@@ -2637,7 +2685,7 @@ describe('validateRecord carries the mode', () => {
 describe('the mode and reviewer identity are required on every clearance path', () => {
   const legacy = (over = {}) => ({
     sha: 'r'.repeat(40),
-    model: 'GPT-5.6 Sol',
+    model: CROSS.retired[2],
     verdict: 'merge',
     evidence: 'a verdict recorded before --mode existed',
     at: 1_710_000_000_000,
@@ -2646,7 +2694,7 @@ describe('the mode and reviewer identity are required on every clearance path', 
   const commit = (over = {}) => ({
     sha: '1'.repeat(40),
     subject: 'change a guard',
-    authorModel: 'Claude Opus 5',
+    authorModel: MAIN.trailerName,
     files: ['scripts/demo-guard.mjs'],
     coveringRecordShas: ['r'.repeat(40)],
     ...over,
@@ -2678,8 +2726,8 @@ describe('the mode and reviewer identity are required on every clearance path', 
     // as answered by an earlier merge on a descendant.
     const base = {
       sha: 'c'.repeat(40),
-      model: 'GPT-5.6 Sol',
-      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      model: CROSS.retired[2],
+      authoredBy: trailerFor('main'),
       evidence: 'checked the guard change against its spec end to end',
       mode: 'review',
       verdict: 'merge',
@@ -2700,8 +2748,8 @@ describe('the mode and reviewer identity are required on every clearance path', 
     // the valid (even older) merge stood alone.
     const base = {
       sha: 'c'.repeat(40),
-      model: 'GPT-5.6 Sol',
-      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      model: CROSS.retired[2],
+      authoredBy: trailerFor('main'),
       evidence: 'checked the guard change against its spec end to end',
       mode: 'review',
     }
@@ -2727,8 +2775,8 @@ describe('the mode and reviewer identity are required on every clearance path', 
     // carried refusal poisons — a hand-edited carry clears nothing.
     const base = {
       sha: 'c'.repeat(40),
-      model: 'GPT-5.6 Sol',
-      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      model: CROSS.retired[2],
+      authoredBy: trailerFor('main'),
       evidence: 'CARRIED from abcdef0 (blobs verified identical): read the whole pass',
       mode: 'review',
       verdict: 'merge',
@@ -2736,7 +2784,7 @@ describe('the mode and reviewer identity are required on every clearance path', 
       carried: { from: 'a'.repeat(40) },
       reviewerAuthorship: {
         status: 'unverified',
-        claimedModel: 'GPT-5.6 Sol',
+        claimedModel: CROSS.retired[2],
         reason: 'external CLI reviewer',
       },
     }
@@ -2781,8 +2829,8 @@ describe('the mode and reviewer identity are required on every clearance path', 
         records: [
           {
             sha: 'c'.repeat(40),
-            model: 'GPT-5.6 Sol',
-            authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+            model: CROSS.retired[2],
+            authoredBy: trailerFor('main'),
             evidence: 'checked the guard change against its spec end to end',
             mode: 'review',
             verdict: 'merge',
@@ -2798,8 +2846,8 @@ describe('the mode and reviewer identity are required on every clearance path', 
   it('a whitespace-decorated refusal verdict poisons rather than vanishing (landing round)', () => {
     const base = {
       sha: 'c'.repeat(40),
-      model: 'GPT-5.6 Sol',
-      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      model: CROSS.retired[2],
+      authoredBy: trailerFor('main'),
       evidence: 'checked the guard change against its spec end to end',
       mode: 'review',
     }
@@ -2826,8 +2874,8 @@ describe('the mode and reviewer identity are required on every clearance path', 
     // well-formedness criterion now poisons a refusal, mode included.
     const base = {
       sha: 'c'.repeat(40),
-      model: 'GPT-5.6 Sol',
-      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      model: CROSS.retired[2],
+      authoredBy: trailerFor('main'),
       evidence: 'checked the guard change against its spec end to end',
       rangeFiles: ['scripts/demo-guard.mjs', 'scripts/other.mjs'],
     }
@@ -2876,8 +2924,8 @@ describe('the mode and reviewer identity are required on every clearance path', 
     // "latest" past a later, finite-dated refusal and cleared it.
     const base = {
       sha: 'c'.repeat(40),
-      model: 'GPT-5.6 Sol',
-      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      model: CROSS.retired[2],
+      authoredBy: trailerFor('main'),
       evidence: 'checked the guard change against its spec end to end',
       mode: 'review',
     }
@@ -2918,7 +2966,7 @@ describe('the refusal teaches the command that actually works', () => {
         {
           sha: '1'.repeat(40),
           subject: 'change a guard',
-          authorModel: 'Claude Opus 5',
+          authorModel: MAIN.trailerName,
           files: ['scripts/demo-guard.mjs'],
           coveringRecordShas: [],
         },
@@ -2958,15 +3006,15 @@ describe('a recorded merge is re-judged by the halves it names', () => {
   const base = {
     mode: BLIND_PARALLEL,
     at: MERGE_ACCOUNTING_SINCE + 1,
-    model: 'GPT-5.6 Sol',
+    model: CROSS.retired[2],
     accounting: '14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B): every input entry accounted for',
   }
   // The union commit is Claude's, because Claude performed the merge and committed
   // it. The trailer proxy therefore reads Claude as an author of the material.
-  const commit = { authorModels: ['Claude Opus 5 (1M context)'] }
+  const commit = { authorModels: [`${MAIN.trailerName} (1M context)`] }
 
   it('accepts the merger only when VERIFIED halves leave it untainted, whoever committed the union', () => {
-    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
+    const record = { ...base, mergedBy: MAIN.trailerName, halfAuthors: [SCARCE.displayName, CROSS.retired[2]], halfAuthorsVerified: true }
     expect(mergeProblem(record, commit)).toBe('')
   })
 
@@ -2975,7 +3023,7 @@ describe('a recorded merge is re-judged by the halves it names', () => {
     // would otherwise bypass the self-merge fence. An unverified claim is a
     // problem in itself — not trusted, and not silently degraded to the proxy,
     // which would let a forger probe wordings until one passes.
-    const forged = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+    const forged = { ...base, mergedBy: MAIN.trailerName, halfAuthors: [SCARCE.displayName, CROSS.retired[2]] }
     expect(mergeProblem(forged, commit)).toBe('unverified-halves')
     const stampedFalse = { ...forged, halfAuthorsVerified: false }
     expect(mergeProblem(stampedFalse, commit)).toBe('unverified-halves')
@@ -2986,17 +3034,17 @@ describe('a recorded merge is re-judged by the halves it names', () => {
   it('would have condemned that same merge on the commit trailers alone', () => {
     // Without the halves the gate falls back to the proxy and calls the accepted
     // merge a self-merge — the recorder and the gate disagreeing by construction.
-    const record = { ...base, mergedBy: 'Claude Opus 5' }
+    const record = { ...base, mergedBy: MAIN.trailerName }
     expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 
   it('still refuses a merger the verified halves name as an author', () => {
-    const record = { ...base, mergedBy: 'GPT-5.6 Sol', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
+    const record = { ...base, mergedBy: CROSS.retired[2], halfAuthors: [SCARCE.displayName, CROSS.retired[2]], halfAuthorsVerified: true }
     expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 
   it('a verified half list that does not name both authors still falls back to the proxy', () => {
-    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5'], halfAuthorsVerified: true }
+    const record = { ...base, mergedBy: MAIN.trailerName, halfAuthors: [SCARCE.displayName], halfAuthorsVerified: true }
     expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 })

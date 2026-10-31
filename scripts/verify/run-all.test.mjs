@@ -10,6 +10,7 @@ import * as load from './machine-load-core.mjs'
 import * as sections from './sections.mjs'
 import * as ownership from './red-ownership-core.mjs'
 import * as tagCore from '../section-tag-core.mjs'
+import * as loadProof from './load-proof-core.mjs'
 
 const { chargeReds, RETRY_ENV, runVerdict } = core
 const ground = 'first-person ground shows micro-detail (edge energy)'
@@ -50,7 +51,7 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
     return { status, stdout: out, stderr: '', error: spawnError }
   }
   const context = {
-    ...core, ...classify, ...tiers, ...load, ...sections, ...ownership, ...tagCore,
+    ...core, ...classify, ...tiers, ...load, ...sections, ...ownership, ...tagCore, ...loadProof,
     spawnSync, dirname, join, fileURLToPath, readFileSync,
     readRenderState: () => ({ runs: saved }), readTasksAll: () => tasks,
     launchServer: async () => ({ base: 'http://test', child: null }), killTree: () => {},
@@ -152,6 +153,18 @@ describe('one pass per suite (point 1135)', () => {
     expect(clean.status).toBe(0)
     expect(clean.log).not.toContain('charged to open points')
     expect(clean.log).not.toContain('POINT REDS')
+  })
+
+  it('ends green with a lane skip named and counted, never as a pass (point 642)', async () => {
+    const skipped = await run({ outputs: [
+      'PASS  all checks\nUNMEASURED  the walk — lane delivers 4.0 fps, the check needs 20 fps — this lane cannot answer it [--section=walk]\n' +
+        'UNMEASURED  the walk — lane delivers 4.0 fps, the check needs 20 fps — this lane cannot answer it',
+    ] })
+    expect(skipped.status).toBe(0)
+    expect(skipped.log).toMatch(/^UNMEASURED {2}settings +the walk — lane delivers 4\.0 fps/m)
+    expect(skipped.log).toContain('lane skips: 1 check(s) UNMEASURED')
+    const clean = await run({ outputs: ['PASS  all checks'] })
+    expect(clean.log).not.toContain('lane skips')
   })
 
   it.each([
@@ -356,7 +369,7 @@ describe('the both-backend sequencer (point 1135)', () => {
   })
 })
 
-// THE THREE DEFECTS THE CROSS-VENDOR REVIEW OF 17.09.2026 FOUND (GPT-6 Astra,
+// THE THREE DEFECTS THE CROSS-VENDOR REVIEW OF 17.09.2026 FOUND (cross-vendor review,
 // pass 3/5 of 264cac0). Each one is a way the deleted retry's safety net used to
 // cover for the runner, and each is pinned here rather than remembered.
 describe('what the ledger classification must not lose (Astra review, 17.09.2026)', () => {

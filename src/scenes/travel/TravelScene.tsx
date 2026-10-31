@@ -2513,7 +2513,6 @@ function Player() {
   const bobTime = useRef(0)
   const wasCanoeing = useRef<boolean | null>(null)
   const wasCarrying = useRef<boolean | null>(null)
-  const wasWounds = useRef<number | null>(null)
   const trailRef = useRef<TrailPoint | null>(null)
 
   useEffect(() => {
@@ -2541,7 +2540,7 @@ function Player() {
     const onWater = t.type === 'water' || t.type === 'ocean'
     bobTime.current += dt
 
-    // Face the movement direction; bob gently while walking.
+    // Face the movement direction; the gait carries the walk's rise and fall.
     const prev = last.current
     let moving = false
     if (prev) {
@@ -2640,11 +2639,11 @@ function Player() {
       trailRef.current = null
     }
 
-    // Wounds show on the figure, scaling with severity (design.md §6/§16).
-    if (wasCanoeing.current !== canoeing || wasCarrying.current !== carrying || wasWounds.current !== wounds) {
+    // Boat and load show on a flip of their state; the wound marks, scaling
+    // with severity (design.md §6/§16), are set every frame below.
+    if (wasCanoeing.current !== canoeing || wasCarrying.current !== carrying) {
       wasCanoeing.current = canoeing
       wasCarrying.current = carrying
-      wasWounds.current = wounds
       if (boat.current) boat.current.visible = canoeing
       if (carry.current) carry.current.visible = carrying
     }
@@ -2665,7 +2664,7 @@ function Player() {
     }
     if (import.meta.env.DEV) {
       // Merged EVERY frame, not inside the change gate above: the gate only
-      // fires when canoe/carry/wound state FLIPS, so a check that jumped the
+      // fires when canoe/carry state FLIPS, so a check that jumped the
       // player (e.g. onto Lake Edward, point 152) read a stale snapshot from
       // wherever the last flip happened. Object.assign, not replacement —
       // the drag block earlier in this frame writes __player.drag and a

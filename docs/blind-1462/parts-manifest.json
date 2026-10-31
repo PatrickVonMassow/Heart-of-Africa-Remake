@@ -1,0 +1,619 @@
+[
+ {
+  "id": "p01",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 136974,
+  "files": [
+   "CLAUDE.md",
+   "README.md",
+   "design.md",
+   "docs/1308-merged-plan.md",
+   "docs/1452-step5-measurement.md",
+   "docs/1452-throughput-inventory.md",
+   "docs/1455-step1-eval-a.md"
+  ]
+ },
+ {
+  "id": "p02",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 122716,
+  "files": [
+   "docs/1455-step1-eval-b.md",
+   "docs/1455-step2-merged-plan.md",
+   "docs/1455-step4-log.md",
+   "docs/acceptance-criteria-detail.md",
+   "docs/acceptance-evidence.md"
+  ]
+ },
+ {
+  "id": "p03",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 137928,
+  "files": [
+   "docs/analysis_de/lesson-mechanisms.md",
+   "docs/analysis_de/vibe-coding-anleitung.md",
+   "docs/batch-owner-runbook.md",
+   "docs/command-index.md",
+   "docs/communication-playthrough.md"
+  ]
+ },
+ {
+  "id": "p04",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 125343,
+  "files": [
+   "docs/communication-poc-spec.md",
+   "docs/context-cut-list-1209.md",
+   "docs/context-load-1209.md",
+   "docs/criticality-review.md",
+   "docs/design-reference.md",
+   "docs/document-cut-757.md",
+   "docs/giza-1890.md",
+   "docs/graphics-detail-levels.md",
+   "docs/handover-architecture.md",
+   "docs/harness-primitives-evaluation.md"
+  ]
+ },
+ {
+  "id": "p05",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 134543,
+  "files": [
+   "docs/lane-routing.md",
+   "docs/maximum-qa.md",
+   "docs/model-lanes-design-a-1393.md",
+   "docs/model-lanes-design-b-1393.md",
+   "docs/model-lanes-inventory-1393.md",
+   "docs/model-lanes-merge-1393.md",
+   "docs/model-lanes-union-1393-raw.txt"
+  ]
+ },
+ {
+  "id": "p06",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 129670,
+  "files": [
+   "docs/natural-villager-motion-concept.md",
+   "docs/peoples-1890.md",
+   "docs/picture-check-levers.md",
+   "docs/research/natural-villager-motion.md",
+   "docs/stash-sweep-2026-10-22.md"
+  ]
+ },
+ {
+  "id": "p07",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 134524,
+  "files": [
+   "scripts/verify/README.md",
+   "scripts/verify/_polish.mjs",
+   "scripts/verify/baseline-classify-core.mjs",
+   "scripts/verify/baseline-classify.test.mjs",
+   "scripts/verify/board-layout.mjs",
+   "scripts/verify/carriedJar.mjs",
+   "scripts/verify/carriedJar.test.mjs",
+   "scripts/verify/collision.mjs",
+   "scripts/verify/communication.mjs",
+   "scripts/verify/communication.test.mjs",
+   "scripts/verify/crossbrowser.mjs",
+   "scripts/verify/digSitePicture.mjs",
+   "scripts/verify/drumFrame.mjs"
+  ]
+ },
+ {
+  "id": "p08",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 141053,
+  "files": [
+   "scripts/verify/enrichments.mjs",
+   "scripts/verify/errandShutter.mjs",
+   "scripts/verify/errandShutter.test.mjs",
+   "scripts/verify/flow.mjs",
+   "scripts/verify/frameSubject.mjs",
+   "scripts/verify/frameSubject.test.mjs",
+   "scripts/verify/invariants.mjs",
+   "scripts/verify/ladder-core.test.mjs",
+   "scripts/verify/machine-load-core.mjs",
+   "scripts/verify/machine-load.mjs"
+  ]
+ },
+ {
+  "id": "p09",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 11509,
+  "files": [
+   "scripts/verify/machine-load.test.mjs"
+  ]
+ },
+ {
+  "id": "p10",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 161777,
+  "files": [
+   "scripts/verify/polish-children.mjs"
+  ]
+ },
+ {
+  "id": "p11",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 90137,
+  "files": [
+   "scripts/verify/polish-panorama.mjs"
+  ]
+ },
+ {
+  "id": "p12",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 83016,
+  "files": [
+   "scripts/verify/polish-settlement.mjs"
+  ]
+ },
+ {
+  "id": "p13",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 125444,
+  "files": [
+   "scripts/verify/polish-speech.mjs"
+  ]
+ },
+ {
+  "id": "p14",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 368138,
+  "files": [
+   "scripts/verify/polish-villagers.mjs"
+  ]
+ },
+ {
+  "id": "p15",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 121694,
+  "files": [
+   "scripts/verify/polishArrival.test.mjs",
+   "scripts/verify/polishBankCall.test.mjs",
+   "scripts/verify/polishJarCoverage.test.mjs",
+   "scripts/verify/polishVillageLoom.test.mjs",
+   "scripts/verify/polishVillageStations.test.mjs",
+   "scripts/verify/report-archive-names.mjs",
+   "scripts/verify/report.mjs",
+   "scripts/verify/rowStaging.mjs",
+   "scripts/verify/rowStaging.test.mjs",
+   "scripts/verify/run-all.mjs",
+   "scripts/verify/run-all.test.mjs",
+   "scripts/verify/run-green-cache.mjs",
+   "scripts/verify/run-green-cache.test.mjs",
+   "scripts/verify/run-logged-args.mjs",
+   "scripts/verify/run-logged.mjs",
+   "scripts/verify/run-wait-core.mjs",
+   "scripts/verify/run-wait-core.test.mjs",
+   "scripts/verify/run-wait.mjs",
+   "scripts/verify/run-wait.test.mjs",
+   "scripts/verify/sections.mjs",
+   "scripts/verify/sections.test.mjs"
+  ]
+ },
+ {
+  "id": "p16",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 117912,
+  "files": [
+   "scripts/verify/settings.mjs",
+   "scripts/verify/tagFrameReading.mjs",
+   "scripts/verify/tagFrameReading.test.mjs",
+   "scripts/verify/tiers.mjs",
+   "scripts/verify/tiers.test.mjs",
+   "scripts/verify/verify-seed.test.mjs",
+   "scripts/verify/vite-reload-signal.mjs",
+   "scripts/verify/vite-reload-signal.test.mjs",
+   "scripts/verify/world.mjs",
+   "src/App.tsx",
+   "src/communication/speechBubbleScale.test.ts",
+   "src/communication/speechBubbleScale.ts",
+   "src/communication/speechLabel.test.ts",
+   "src/communication/speechLabel.ts",
+   "src/config/balance.test.ts"
+  ]
+ },
+ {
+  "id": "p17",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 149818,
+  "files": [
+   "src/config/balance.ts",
+   "src/config/quality.ts",
+   "src/config/scarceEscalationDoc.test.ts",
+   "src/config/viteDevServer.test.ts",
+   "src/i18n/de.ts",
+   "src/i18n/en.ts",
+   "src/i18n/types.ts"
+  ]
+ },
+ {
+  "id": "p18",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 137978,
+  "files": [
+   "src/index.css",
+   "src/render/fauna.ts",
+   "src/render/faunaGeometry.ts",
+   "src/render/faunaMarkings.ts",
+   "src/render/faunaUngulates.test.ts",
+   "src/render/faunaUngulates.ts",
+   "src/render/figureBody.test.ts",
+   "src/render/figureBody.ts",
+   "src/render/figureDress.test.ts"
+  ]
+ },
+ {
+  "id": "p19",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 138266,
+  "files": [
+   "src/render/figureDress.ts",
+   "src/render/figurePose.ts",
+   "src/render/figureRig.test.ts",
+   "src/render/figureRig.ts",
+   "src/render/figureWalk.test.ts",
+   "src/render/figureWalk.ts",
+   "src/render/figures.test.ts",
+   "src/render/figures.ts",
+   "src/render/fishMesh.test.ts",
+   "src/render/fishMesh.ts"
+  ]
+ },
+ {
+  "id": "p20",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 108681,
+  "files": [
+   "src/render/gesture.ts",
+   "src/render/materials.test.ts",
+   "src/render/materials.ts",
+   "src/render/placeRiver.test.ts",
+   "src/render/placeRiver.ts",
+   "src/render/renderSupport.test.ts",
+   "src/render/renderSupport.ts",
+   "src/render/riverCurrent.test.ts",
+   "src/render/villagerAsset.ts",
+   "src/render/villagerBody.ts",
+   "src/render/villagerBodySafety.test.ts"
+  ]
+ },
+ {
+  "id": "p21",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 138138,
+  "files": [
+   "src/render/villagerClipPose.test.ts",
+   "src/render/villagerClipPose.ts",
+   "src/render/villagerFigureBody.test.ts"
+  ]
+ },
+ {
+  "id": "p22",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 149097,
+  "files": [
+   "src/render/villagerFigureBody.ts",
+   "src/render/villagerGarmentMask.test.ts",
+   "src/render/villagerGarmentMask.ts",
+   "src/render/villagerKneelGround.test.tsx",
+   "src/render/villagerPenetrationReport.test.ts",
+   "src/render/villagerRig.test.ts",
+   "src/render/villagerRig.ts",
+   "src/render/villagerRuntimePose.test.tsx",
+   "src/render/waterAppearance.test.ts",
+   "src/render/waterAppearance.ts",
+   "src/scenes/actorLabelSource.test.ts"
+  ]
+ },
+ {
+  "id": "p23",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 34235,
+  "files": [
+   "src/scenes/actorLabelSource.ts",
+   "src/scenes/place/CookShelter.tsx",
+   "src/scenes/place/DigSites.tsx",
+   "src/scenes/place/FisheryNetMan.test.tsx",
+   "src/scenes/place/FisheryNetMan.tsx",
+   "src/scenes/place/PlaceDumpGroup.tsx",
+   "src/scenes/place/PlaceGroundContext.ts",
+   "src/scenes/place/PlaceLife.escape.test.ts",
+   "src/scenes/place/PlaceLife.games.test.ts",
+   "src/scenes/place/PlaceLife.talkers.test.ts"
+  ]
+ },
+ {
+  "id": "p24",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 180543,
+  "files": [
+   "src/scenes/place/PlaceLife.tsx"
+  ]
+ },
+ {
+  "id": "p25",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 111343,
+  "files": [
+   "src/scenes/place/PlaceLife.walkerProbe.test.ts",
+   "src/scenes/place/PlaceScene.tsx",
+   "src/scenes/place/Pounder.tsx"
+  ]
+ },
+ {
+  "id": "p26",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 149692,
+  "files": [
+   "src/scenes/place/RiverFishery.tsx",
+   "src/scenes/place/SpeechLabels.test.tsx",
+   "src/scenes/place/SpeechLabels.tsx",
+   "src/scenes/place/adultWork.digBout.test.ts",
+   "src/scenes/place/adultWork.hold.test.ts",
+   "src/scenes/place/adultWork.report.test.ts",
+   "src/scenes/place/adultWork.stall.test.ts",
+   "src/scenes/place/adultWork.test.ts",
+   "src/scenes/place/adultWork.ts",
+   "src/scenes/place/animalSpots.figures.test.ts"
+  ]
+ },
+ {
+  "id": "p27",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 147855,
+  "files": [
+   "src/scenes/place/animalSpots.test.ts",
+   "src/scenes/place/animalSpots.ts",
+   "src/scenes/place/backdrop.ts",
+   "src/scenes/place/backdropMaterial.ts",
+   "src/scenes/place/backdropRiver.test.ts",
+   "src/scenes/place/backdropRiver.ts",
+   "src/scenes/place/bankGame.test.ts",
+   "src/scenes/place/bankGame.ts",
+   "src/scenes/place/bankLobe.test.ts",
+   "src/scenes/place/bankStage.test.ts",
+   "src/scenes/place/boundary.ts",
+   "src/scenes/place/castHats.tsx",
+   "src/scenes/place/collision.ts",
+   "src/scenes/place/digPicture.test.ts"
+  ]
+ },
+ {
+  "id": "p28",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 142418,
+  "files": [
+   "src/scenes/place/digSiteAppearance.ts",
+   "src/scenes/place/digSiteProps.test.ts",
+   "src/scenes/place/dressLineup.tsx",
+   "src/scenes/place/figureIdentity.ts",
+   "src/scenes/place/fillJar.test.ts",
+   "src/scenes/place/fillJar.ts",
+   "src/scenes/place/fishBaskets.ts",
+   "src/scenes/place/fishFire.test.ts",
+   "src/scenes/place/fishFire.ts",
+   "src/scenes/place/fisheryBasketClearance.test.tsx",
+   "src/scenes/place/fisheryColliders.test.ts",
+   "src/scenes/place/fisheryColliders.ts",
+   "src/scenes/place/fisheryGutting.test.tsx",
+   "src/scenes/place/fisheryPoses.test.ts",
+   "src/scenes/place/fisheryPoses.ts",
+   "src/scenes/place/frameFirst.test.tsx",
+   "src/scenes/place/frameFirst.tsx",
+   "src/scenes/place/gizaSite.test.ts"
+  ]
+ },
+ {
+  "id": "p29",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 148607,
+  "files": [
+   "src/scenes/place/gizaSite.ts",
+   "src/scenes/place/gltfClipLayers.test.ts",
+   "src/scenes/place/gltfClipLayers.ts",
+   "src/scenes/place/headLoads.ts",
+   "src/scenes/place/layout.groundWork.test.ts",
+   "src/scenes/place/layout.marketBearing.test.ts",
+   "src/scenes/place/layout.test.ts",
+   "src/scenes/place/layout.ts",
+   "src/scenes/place/layout.waterPath.test.ts",
+   "src/scenes/place/lifeFreeze.ts"
+  ]
+ },
+ {
+  "id": "p30",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 131171,
+  "files": [
+   "src/scenes/place/lifeSpots.test.ts",
+   "src/scenes/place/lifeSpots.ts",
+   "src/scenes/place/lifeStationClearance.test.ts",
+   "src/scenes/place/loom.test.ts",
+   "src/scenes/place/loom.ts",
+   "src/scenes/place/loomParked.test.ts",
+   "src/scenes/place/loomWork.test.ts",
+   "src/scenes/place/loomWork.ts",
+   "src/scenes/place/mortarPounding.test.ts",
+   "src/scenes/place/mortarPounding.ts",
+   "src/scenes/place/observerRoom.test.ts",
+   "src/scenes/place/panoramaWildlife.test.ts",
+   "src/scenes/place/panoramaWildlife.ts",
+   "src/scenes/place/placeDump.test.tsx",
+   "src/scenes/place/placeDumpLean.test.tsx",
+   "src/scenes/place/placeDumpRead.test.ts",
+   "src/scenes/place/placeDumpRead.ts"
+  ]
+ },
+ {
+  "id": "p31",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 125081,
+  "files": [
+   "src/scenes/place/placeFigure.tsx",
+   "src/scenes/place/placeFigureContext.ts",
+   "src/scenes/place/placeGround.ts",
+   "src/scenes/place/placeRadius.ts",
+   "src/scenes/place/poundingPair.test.ts",
+   "src/scenes/place/rackEating.test.tsx",
+   "src/scenes/place/rackWorkerSteady.test.tsx",
+   "src/scenes/place/riverBank.test.ts",
+   "src/scenes/place/riverBank.ts",
+   "src/scenes/place/rockTouch.test.ts",
+   "src/scenes/place/roofClearance.ts",
+   "src/scenes/place/routing.test.ts",
+   "src/scenes/place/sceneGrounds.ts",
+   "src/scenes/place/shovel.test.ts",
+   "src/scenes/place/shovel.tsx",
+   "src/scenes/place/shovelHold.ts"
+  ]
+ },
+ {
+  "id": "p32",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 147488,
+  "files": [
+   "src/scenes/place/skinnedFigure.tsx",
+   "src/scenes/place/skinnedFigureCrouch.test.tsx",
+   "src/scenes/place/skinnedFigureHeadProp.test.tsx",
+   "src/scenes/place/skinnedFigureReach.test.tsx",
+   "src/scenes/place/skinnedFigureReachRelease.test.tsx",
+   "src/scenes/place/skinnedFigureRelease.test.tsx",
+   "src/scenes/place/speechChannel.test.ts",
+   "src/scenes/place/speechChannel.ts",
+   "src/scenes/place/steadyingPalm.test.tsx",
+   "src/scenes/place/tagBodyPose.test.ts",
+   "src/scenes/place/tagGame.test.ts"
+  ]
+ },
+ {
+  "id": "p33",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 126495,
+  "files": [
+   "src/scenes/place/tagGame.ts",
+   "src/scenes/place/tagShuffle.bankRoaming.test.ts",
+   "src/scenes/place/tagShuffle.bankRound.test.ts",
+   "src/scenes/place/tagShuffle.facing.test.ts",
+   "src/scenes/place/tagShuffle.test.ts",
+   "src/scenes/place/tagShuffle.wedgeGate.test.ts",
+   "src/scenes/place/tagShuffleHarness.ts",
+   "src/scenes/place/taskWalkerLoad.test.ts",
+   "src/scenes/place/taskWalkerLoad.ts",
+   "src/scenes/place/taskWalkerStop.ts",
+   "src/scenes/place/teachingDirection.test.ts",
+   "src/scenes/place/useColdCloaks.ts",
+   "src/scenes/place/useFigureLook.ts",
+   "src/scenes/place/useVillagerAsset.ts",
+   "src/scenes/place/villagerCanoe.test.ts"
+  ]
+ },
+ {
+  "id": "p34",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 82563,
+  "files": [
+   "src/scenes/place/villagerCanoe.ts",
+   "src/scenes/place/waterStand.test.ts",
+   "src/scenes/place/waterStand.ts",
+   "src/scenes/place/wedgeCarve.test.ts",
+   "src/scenes/travel/TravelScene.tsx"
+  ]
+ },
+ {
+  "id": "p35",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 138643,
+  "files": [
+   "src/scenes/travel/Wildlife.tsx",
+   "src/scenes/travel/calfCrossingFlee.test.ts",
+   "src/scenes/travel/calfShieldContact.test.ts",
+   "src/scenes/travel/followCamera.test.ts",
+   "src/scenes/travel/followCamera.ts",
+   "src/scenes/travel/panoramaCapture.ts",
+   "src/scenes/travel/panoramaMath.test.ts",
+   "src/scenes/travel/panoramaMath.ts",
+   "src/scenes/travel/traveller.test.ts",
+   "src/scenes/travel/travellerPose.ts",
+   "src/scenes/travel/waterEdgeFlee.test.ts"
+  ]
+ },
+ {
+  "id": "p36",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 138984,
+  "files": [
+   "src/scenes/travel/wildlifeBehavior.ts",
+   "src/scenes/travel/youngKill.test.ts",
+   "src/scenes/travel/youngKill.ts",
+   "src/state/stateDump.ts",
+   "src/state/store.communication.test.ts",
+   "src/state/ui.ts",
+   "src/systems/ambience.test.ts",
+   "src/systems/ambience.ts",
+   "src/systems/appearance.test.ts",
+   "src/systems/appearance.ts",
+   "src/systems/cookShelter.ts",
+   "src/systems/dress.test.ts",
+   "src/systems/dress.ts",
+   "src/systems/placeDump.ts",
+   "src/test/axisClearance.ts"
+  ]
+ },
+ {
+  "id": "p37",
+  "range": "647540855..54b326987",
+  "diffContext": 15,
+  "chars": 55912,
+  "files": [
+   "src/ui/DebugMenu.test.tsx",
+   "src/ui/DebugMenu.tsx",
+   "src/ui/Hud.test.tsx",
+   "src/ui/Hud.tsx",
+   "src/ui/MapOverlay.test.tsx",
+   "src/ui/SpeechLabelCard.test.tsx",
+   "src/ui/SpeechLabelCard.tsx",
+   "src/ui/StateDump.test.tsx",
+   "src/ui/StateDump.tsx",
+   "src/ui/enterHintPlacement.ts"
+  ]
+ }
+]

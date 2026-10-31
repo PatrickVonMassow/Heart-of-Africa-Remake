@@ -320,7 +320,7 @@ describe('a narrow run answers only for the material it RAN', () => {
   // section is a block and a changed line sits in one — a run of a different
   // section cannot stand in for it. Edit the `adult-errands` block, run only
   // `town-plan`, and the full pass used to count as climbed although the edited
-  // material was never checked once (four-eyes review, GPT-6 Astra).
+  // material was never checked once (four-eyes review).
   const editedBlock = { path: 'scripts/verify/polish-villagers.mjs', editedAt: T0, sections: ['adult-errands'] }
 
   it('does not credit a green run of a DIFFERENT section', () => {
@@ -347,7 +347,7 @@ describe('a narrow run answers only for the material it RAN', () => {
   })
 
   it('still credits any narrow green where the link cannot be read', () => {
-    // `src/scenes/place/` reaches three suites and no section in particular, so
+    // `src/scenes/place/` reaches seven suites and no section in particular, so
     // the ladder keeps its approximation — and puts it on the record by naming
     // the section it credited, instead of hiding it inside the verdict.
     const verdict = ladderVerdict({
@@ -396,7 +396,7 @@ describe('the deliberate escape', () => {
 describe('when a file was really last edited', () => {
   it('dates a CLEAN file by the commit it carries, not by its mtime', () => {
     // Measured the first time the ladder was used in anger: switching to `main`
-    // and back rewrote polish-villagers.mjs, moved its mtime past every green rung, and
+    // and back rewrote the polish suite file, moved its mtime past every green rung, and
     // refused the covering run of the point that built the ladder — without one
     // byte of the file changing. An mtime is not an edit.
     expect(editTimeFor({ dirty: false, mtime: T0 + HOUR, committedAt: T0 })).toBe(T0)
@@ -426,7 +426,7 @@ describe('every entrypoint answers to the ladder', () => {
   // same README as an ordinary command, and the way the LARGE run of 11.09.2026
   // was actually started — asked nothing at all. A mechanism absent from the
   // command the house uses is a mechanism that does not exist (four-eyes
-  // review, GPT-6 Astra).
+  // review).
   const source = (file) => readFileSync(join(import.meta.dirname, file), 'utf8')
 
   it('run-all.mjs asks it before it spawns a suite', () => {

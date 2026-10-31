@@ -161,7 +161,7 @@ export function listNonPredictive(source) {
  */
 export function coverageVerdict(coverage) {
   if (coverage === null || coverage === undefined) return null
-  // THE TYPE IS CHECKED BEFORE ANY CONVERSION (GPT-6 Astra, cross-vendor round).
+  // THE TYPE IS CHECKED BEFORE ANY CONVERSION (cross-vendor round).
   // `Number()` coerces before it validates: `true` becomes 1 and `null` becomes
   // 0, so a malformed declaration would have MANUFACTURED a count — one subject
   // against a minimum of one, reported as covering — which is precisely the

@@ -74,15 +74,17 @@ import {
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
   ownerKeepsBatch,
+  stallClockStart,
   takeoverHandsOver,
 } from './batch-autostart-core.mjs'
-import { readState, writeState } from './fable-switch-core.mjs'
+import { readState, writeState } from './lane-switch-core.mjs'
+import { MAIN, SCARCE } from './model-lanes.mjs'
 import { PAUSE_RETRY_LADDER_MS } from './batch-pause-core.mjs'
 import { checkAgentOutput, registeredFeatureWriters, worktreeActiveAt } from './batch-in-flight.mjs'
 
-const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test', by: 'test', now: 1 })))
-const FABLE_ON = fable('on')
-const FABLE_OFF = fable('off')
+const switchState = (state) => readState(JSON.stringify(writeState(state, { why: 'test', by: 'test', now: 1 })))
+const SCARCE_ON = switchState('on')
+const SCARCE_OFF = switchState('off')
 import { isOwnSpawn } from './batch-singleton.mjs'
 
 describe('registered writer liveness beside detached verification output', () => {
@@ -177,6 +179,29 @@ describe('registered writer liveness beside detached verification output', () =>
       expect(decision(measure())).toMatchObject({ start: false, code: 'registered-writer-live' })
     })
   })
+
+  it.each(['src/author.ts', 'docs/author.md', '.claude/hooks/author.mjs', '.claude/commands/author.md'])(
+    'ignores bookkeeping files under .claude/, but still vetoes a fresh %s', (path) => {
+      withCheckout(({ git, touch, measure }) => {
+        touch('.claude/queue-rank.json', '{}')
+        git('add', '--', '.claude/queue-rank.json')
+        for (const bookkeeping of ['.claude/queue-rank.json', '.claude/ci-status-guard-state.json',
+          '.claude/timestamp-guard-state.json', '.claude/context-fence-ledgers/ledger.json']) touch(bookkeeping)
+        const bookkeepingOnly = measure()
+        expect(bookkeepingOnly).toMatchObject({ readable: true, writers: [{
+          recognized: false, output: { verdict: 'quiet' },
+        }] })
+        expect(decision(bookkeepingOnly)).toMatchObject({ start: true })
+
+        touch(path)
+        expect(decision(measure())).toMatchObject({
+          start: false,
+          code: 'registered-writer-live',
+          veto: { output: { verdict: 'alive', detail: expect.stringContaining('(working files)') } },
+        })
+      })
+    },
+  )
 
   it('preserves the live author process veto beside verification-only writes', () => {
     withCheckout(({ touch, measure }) => {
@@ -928,23 +953,23 @@ describe('buildSpawnOptions — the ten-minute execution is switched off', () =>
 
 describe('buildSpawnArgs — print mode, the model chain, and no prompt that can block', () => {
   it('spawns print mode with the resume prompt and the permission flag', () => {
-    const args = buildSpawnArgs({ fableState: FABLE_ON })
+    const args = buildSpawnArgs({ fableState: SCARCE_ON })
     expect(args[0]).toBe('-p')
     expect(args[1]).toBe(RESUME_PROMPT)
     expect(args).toContain('--dangerously-skip-permissions')
   })
 
-  it('carries the switch-selected serving fallback behind Opus 5', () => {
-    const args = buildSpawnArgs({ fableState: FABLE_ON })
+  it('carries the switch-selected serving fallback behind the main lane', () => {
+    const args = buildSpawnArgs({ fableState: SCARCE_ON })
     expect(args[args.indexOf('--model') + 1]).toBe(SPAWN_MODEL)
-    expect(args[args.indexOf('--fallback-model') + 1]).toBe('claude-fable-5-1')
-    expect(SPAWN_MODEL).toMatch(/opus-5/)
-    expect(buildSpawnArgs({ fableState: FABLE_OFF })[args.indexOf('--fallback-model') + 1]).toBe('claude-opus-4-8[1m]')
+    expect(args[args.indexOf('--fallback-model') + 1]).toBe(SCARCE.modelId)
+    expect(SPAWN_MODEL).toBe(MAIN.modelId)
+    expect(buildSpawnArgs({ fableState: SCARCE_OFF })[args.indexOf('--fallback-model') + 1]).toBe(MAIN.fallback.modelId)
   })
 
   it('can pin the last trusted handoff lane without falling back toward the suspect', () => {
-    const args = buildSpawnArgs({ model: 'claude-opus-4-8[1m]', fallbackModel: null })
-    expect(args[args.indexOf('--model') + 1]).toBe('claude-opus-4-8[1m]')
+    const args = buildSpawnArgs({ model: MAIN.fallback.modelId, fallbackModel: null })
+    expect(args[args.indexOf('--model') + 1]).toBe(MAIN.fallback.modelId)
     expect(args).not.toContain('--fallback-model')
   })
 })
@@ -1118,7 +1143,7 @@ describe('chatPromptSuffix', () => {
     for (const empty of [[], null, undefined, 'nope', 42, [{}, { text: '   ' }]]) {
       expect(chatPromptSuffix(empty)).toBe('')
     }
-    expect(buildSpawnArgs({ prompt: RESUME_PROMPT + chatPromptSuffix([]), fableState: FABLE_ON })[1]).toBe(RESUME_PROMPT)
+    expect(buildSpawnArgs({ prompt: RESUME_PROMPT + chatPromptSuffix([]), fableState: SCARCE_ON })[1]).toBe(RESUME_PROMPT)
   })
 
   it('carries the message text and its time', () => {
@@ -2174,6 +2199,38 @@ describe('may the owner keep the batch? (union entry U4)', () => {
         .toMatchObject({ keeps: true, reason: 'no-progress-measurement' })
     }
     expect(() => ownerKeepsBatch()).not.toThrow()
+  })
+})
+
+// --- POINT 1445: THE STALL BELONGS TO THE CURRENT OWNER -----------------------
+// 25.10.2026 02:33: progress last at 24.10. 13:39, owner acquired at 02:17 with a
+// fresh heartbeat and a declared advancing suite, yet the launcher took the
+// batch for 833 min of its dead predecessor's standstill.
+describe('the stall clock never starts before the current owner took the batch', () => {
+  const HOUR = 60 * 60 * 1000
+  const NOW = Date.parse('2026-10-25T02:33:00+02:00')
+  const base = { now: NOW, thresholdMs: HOUR, hardDeadlineMs: 2 * HOUR }
+
+  it('keeps a fresh owner with advancing work against inherited dead time', () => {
+    const verdict = ownerKeepsBatch({
+      ...base, progressAt: NOW - 13 * HOUR, ownerSince: NOW - 16 * 60_000, workAdvancing: true,
+    })
+    expect(verdict).toMatchObject({ keeps: true, reason: 'progress-within-threshold', stalledMs: 16 * 60_000 })
+  })
+
+  it('still fires the deadline once the owner itself has not moved for it', () => {
+    const verdict = ownerKeepsBatch({
+      ...base, progressAt: NOW - 13 * HOUR, ownerSince: NOW - 2 * HOUR - 60_000, workAdvancing: true,
+    })
+    expect(verdict).toMatchObject({ keeps: false, reason: 'past-absolute-deadline' })
+  })
+
+  it('ignores an unreadable or future acquisition', () => {
+    for (const ownerSince of [null, NaN, NOW + HOUR]) {
+      expect(ownerKeepsBatch({ ...base, progressAt: NOW - 13 * HOUR, ownerSince }).reason).toBe('past-absolute-deadline')
+    }
+    expect(stallClockStart(5, 9, 10)).toBe(9)
+    expect(stallClockStart(9, 5, 10)).toBe(9)
   })
 })
 

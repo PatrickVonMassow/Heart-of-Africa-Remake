@@ -52,17 +52,19 @@ import {
   openPointsHeadline,
   ownerRunbookContext,
   ownerStartText,
+  sessionStartConversion,
   sessionStartOwnership,
   spawnTokenProof,
   standDownMessage,
   uninvitedSessionMessage,
+  commandSynopsis,
 } from './batch-resume-hook-core.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
-import { currentFableState } from './fable-switch.mjs'
-import { servingPolicyLine } from './fable-switch-core.mjs'
+import { currentLaneState } from './lane-switch.mjs'
+import { servingPolicyLine } from './lane-switch-core.mjs'
 import { currentVenue } from './cloud-switch.mjs'
 import { venueInstruction } from './cloud-switch-core.mjs'
 
@@ -76,6 +78,7 @@ function cloudVenueLine() {
 }
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { noteHandoverAttributionSuccessorStart } from './handover-attribution.mjs'
+import { reconcileHookLine } from './carrier-reconcile-core.mjs'
 
 const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
 
@@ -240,6 +243,18 @@ try {
   /* an unreadable or unstartable launcher must never block session orientation */
 }
 
+// NO USER ORDER IS EVER LOST (21.10.2026). The carrier reconciliation runs at
+// EVERY session start — owner or not, whatever the doctor's mandate marker says
+// — and a red result, or one that could not run, is PRINTED here: an exit code
+// nobody reads is how five queued orders went missing for five hours.
+try {
+  const { runReconcile } = await import('./carrier-reconcile.mjs')
+  const line = reconcileHookLine(runReconcile({ fetch: false }))
+  if (line) console.log(`[batch-resume] ${line}`)
+} catch (e) {
+  console.log(`[batch-resume] ${reconcileHookLine({ ran: false, error: (e && e.message) || String(e) })}`)
+}
+
 // Condensed per docs/context-cut-list-1209.md (U158/U159): the workflow rules
 // CLAUDE.md §6/§9 and docs/batch-owner-runbook.md already carry are named, not
 // restated; what only this text carried stays in it.
@@ -286,31 +301,31 @@ try {
     if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
-    const fableState = currentFableState()
+    const scarceState = currentLaneState()
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
     // degraded to Haiku and wrecked three points — name the authoring policy at
     // every session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
     // The policy wording also NAMES THE COMMISSION COMMAND (point 1077,
     // 09.09.2026): the cut ran and the command did not — 280 of 379 open points
-    // were routed to Astra and one was commissioned in three days, while
-    // fourteen Astra reviews landed. Announcing the routing without its command
+    // were routed to the cross lane and one was commissioned in three days, while
+    // fourteen cross-lane reviews landed. Announcing the routing without its command
     // is what the measurement found. Kept out of the stamped block below, where
     // nothing but the stamp may stand.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@2f245cec
-      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
+      // rule:model-policy@740d83c2
+      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES (role records in scripts/model-lanes.mjs). ' +
       'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
       'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +
-      'reached Fable escalation threshold in scripts/author-routing-core.mjs). scripts/astra-share.mjs --status says what routes now; ' +
-      'an UNREACHABLE Astra lane (exhausted OpenAI volume included) authors on Opus 5.5 instead of ' +
-      'waiting. REVIEW is CROSS-VENDOR (scripts/review-astra.mjs for Anthropic-authored work, Claude ' +
-      'for Astra-authored work); no model reviews its own. AN ASTRA-LANE POINT IS COMMISSIONED, NOT ' +
-      'WRITTEN HERE: node scripts/author-astra.mjs --point <N> in its worktree, then review, suites, ' +
-      'picture, landing (docs/astra-routing.md, "Routed and not commissioned"). ' +
-      (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`) +
+      'reached scarce-lane escalation threshold in scripts/author-routing-core.mjs). scripts/lane-routing.mjs --status says what routes now; ' +
+      'an UNREACHABLE cross lane (exhausted volume included) authors on the main chain instead of ' +
+      'waiting. REVIEW is CROSS-VENDOR (scripts/cross-review.mjs for main-chain work, the main chain ' +
+      'for cross-lane work); no model reviews its own. A CROSS-LANE POINT IS COMMISSIONED, NOT ' +
+      'WRITTEN HERE: node scripts/author-delegate.mjs --lane cross --point <N> in its worktree, then review, suites, ' +
+      'picture, landing (docs/lane-routing.md, "Routed and not commissioned"). ' +
+      (scarceState.ok ? servingPolicyLine(scarceState) : `SCARCE-LANE SWITCH UNKNOWN: ${scarceState.problem}`) +
       // Where authoring delegations start (point 1230): the cloud switch's routing read.
       ` ${cloudVenueLine()}`
     const now = Date.now()
@@ -400,8 +415,7 @@ try {
       // The same predicate the owner's Stop guard applies before ITS acquire, so
       // the rule lives in one place and cannot drift between the two doors.
       if (reservationDecision({ assessment: reservation }).acquire) {
-        const converted =
-          !!(lock && lock.kind === 'pending-spawn') && convertPendingSpawn(sessionId, { authorized: !!auth })
+        const converted = sessionStartConversion({ sessionId, lock, sessionProcess, convert: convertPendingSpawn })
         if (converted) ownership = 'acquired-spawn'
         const plan = sessionStartOwnership({
           converted,
@@ -469,12 +483,12 @@ try {
         const opening = ownerStartText({ ownership, startEvidence: auth?.startReason })
         const noIdle = ownership === 'mine' ? '' : ' Do NOT idle-stop (the batch-progress-guard enforces this).'
         console.log(
-          `${header} ${gitStanding()}${repoLine} ${opening} ${RESUME_BODY}${noIdle}${agentLine}${ownerContext}`,
+          `${header} ${gitStanding()}${repoLine} ${opening} ${RESUME_BODY}${noIdle}${agentLine}${ownerContext}${commandSynopsis({ git: execFileSync, root: REPO_ROOT })}`,
         )
       } else if (!invitation && reservationDecision({ assessment: reservation }).acquire && !ownerAlive(readOwnerLock())) {
         // Uninvited and nobody holds the batch: orient, name the way in, take nothing.
         noteSessionStandDown(sessionId, { processIdentity: sessionProcess, lock: readOwnerLock(), claim, now })
-        console.log(`${header} ${gitStanding()} ${uninvitedSessionMessage({ sessionId })}`)
+        console.log(`${header} ${gitStanding()} ${uninvitedSessionMessage({ sessionId })}${commandSynopsis({ git: execFileSync, root: REPO_ROOT })}`)
       } else {
         // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
         // Five situations reach this branch and they need different words — most

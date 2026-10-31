@@ -303,8 +303,8 @@ NO VILLAGER SPEAKS TO NOBODY. Every utterance has an addressee who reacts and a
 consequence the player sees; the teaching comes from the act that follows the
 word, never from a word spoken beside an act. With nobody free to send, the
 order is not given at all, and the errand simply waits for the next round.
-The one exception is the fisherman's direction call from his dugout: a call, not
-speech (user 29.09.2026), it needs no addressee; his heading is the act it names.
+The dugout's direction words follow the same rule: the net man says each to the
+paddler, whose changed stroke is the consequence (user 30.09.2026).
 
 THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as
 WATER. The chief's message carries just as well as `WATER · UPSTREAM · ROCK ·
@@ -328,14 +328,16 @@ through the settlement's actual huts and fence gates, across world seeds.
 
 ## The fisherman's dugout
 
-A local fisherman paddles a dugout on a lane of his own 7 m out from the
-waterline, 27-47 m downstream of the children's stretch and never nearer than
-20 m to it (work-order 1237): the second picture of UPSTREAM and DOWNSTREAM, on
-ONE body working against the current and then riding it. Once per leg, shortly
-after he is under way, he CALLS the word of his heading at the call register,
-with the reading over his head and his arm pointing the way he heads, through
-the same distance gate as every village voice; the settlement's floor grants
-the call. Unlike the bank's, these direction words do not wait for the
+Two fishermen, a PADDLER aft and a NET MAN forward, work a drift net from one
+dugout on a lane of their own 7 m out from the waterline, from about 1 m upstream
+to 47 m downstream, never nearer than 20 m to the children's stretch (work-orders
+1237, 1245): the second picture of UPSTREAM and DOWNSTREAM, on ONE boat working
+against the current and then riding it. At the upstream end the net man says
+DOWNSTREAM to the paddler, who swings the bow into the current; back aboard after
+the landing he says UPSTREAM, and the paddler pushes off. Both words stay at the
+call register, with the reading over the net man's head, through the same
+distance gate as every village voice; the settlement's floor grants the call.
+Like the bank's, these direction words do not wait for the
 listener's first ROCK: they name the current, not a rock, and a spectator at the
 boat hears no ROCK (work-order 1250). A visit finds the dugout a few seconds
 short of its upstream end, so the first word falls as the player arrives. Because the lane keeps the talk hearing radius twice over from the

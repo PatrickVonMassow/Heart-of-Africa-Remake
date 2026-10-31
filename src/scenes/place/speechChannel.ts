@@ -80,7 +80,7 @@ function publish(next: SpeechLabelState) {
 /**
  * Shows what a figure is saying over its head. Replaces whatever that speaker
  * was saying, and sweeps out labels whose time has run out — so a scene with no
- * label layer mounted still cannot pile them up.
+ * label layer mounted still cannot pile them up. An empty phrase changes nothing.
  *
  * Which atoms actually carry a reading, and whether the label shows at all, is
  * decided at render time against the player's live memory: passing an utterance

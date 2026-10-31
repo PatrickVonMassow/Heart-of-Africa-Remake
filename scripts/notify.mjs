@@ -1,4 +1,4 @@
-// Out-of-band notification channel (Fable-5 audit finding D — the design could
+// Out-of-band notification channel (scarce-lane audit finding D — the design could
 // detect a DEAD session but not a SICK one, and had no way to TELL anyone). A
 // plain HTTPS POST to ntfy.sh reaches the user's phone with NO auth and NO
 // claude.ai connection — so it works headless in `claude -p` AND from the OS

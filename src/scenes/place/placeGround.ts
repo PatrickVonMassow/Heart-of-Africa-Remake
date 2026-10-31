@@ -1,5 +1,6 @@
 import type { DigSite, DigSiteProgress, ErrandPoint } from './adultWork'
-import { digSiteAppearance } from './digSiteAppearance'
+import { boxCollider, type Collider } from './collision'
+import { DIG_BASKETS, DIG_POSTS_BOX, DIG_SEEDLING_TRAY, digSiteAppearance } from './digSiteAppearance'
 import { looseRockRise } from './looseRocks'
 import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
 import { balance } from '../../config/balance'
@@ -31,6 +32,20 @@ export function digSiteRotation(site: DigSite): number {
 export function digLocalToWorld(site: DigSite, x: number, z: number): ErrandPoint {
   const a = digSiteRotation(site)
   return { x: site.x + Math.cos(a) * x + Math.sin(a) * z, z: site.z - Math.sin(a) * x + Math.cos(a) * z }
+}
+
+/** The set-down props beside a dig site as settlement colliders, in world
+ *  placement (user report: a villager stood hip-deep in the grain baskets).
+ *  The pit, the spoil and the flat store cover stay walkable. */
+export function digFurnitureColliders(site: DigSite): Collider[] {
+  const at = (x: number, z: number) => digLocalToWorld(site, x, z)
+  const box = (b: { x: number; z: number; hx: number; hz: number }) => {
+    const c = at(b.x, b.z)
+    return boxCollider(c.x, c.z, b.hx, b.hz, digSiteRotation(site), 0)
+  }
+  if (site.kind === 'pit') return DIG_BASKETS.map((b) => ({ ...at(b.x, b.z), r: b.radius }))
+  if (site.kind === 'patch') return [box(DIG_SEEDLING_TRAY)]
+  return [box(DIG_POSTS_BOX)]
 }
 
 export function spoilOffset(site: DigSite): number {

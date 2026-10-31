@@ -1,0 +1,2663 @@
+{
+ "mergedBy": "Fable 5.1",
+ "entries": [
+  {
+   "id": "U1",
+   "from": [
+    "A2",
+    "B1"
+   ],
+   "file": "docs/1308-merged-plan.md:4",
+   "defect": "Header still says \"12 entries, 8 kept, 4 rejected\" though Round 4 drops U4 and only seven kept entries remain (U3, U1, U6, U2, U8, U5, U7)"
+  },
+  {
+   "id": "U2",
+   "from": [
+    "A8",
+    "B8"
+   ],
+   "file": "docs/1455-step2-merged-plan.md:180",
+   "defect": "Disagreement table still calls A's \"30 green member runs → 9.5 % bound\" binding although §4.3 (line 126) withdraws that figure for the per-pair 13.9 % bound"
+  },
+  {
+   "id": "U3",
+   "from": [
+    "A14",
+    "B17"
+   ],
+   "file": "docs/communication-poc-spec.md:338",
+   "defect": "Dugout paragraph says bank direction words wait for the listener's first ROCK, but line 224 of the same file now says every cycle calls RIVER and announces whatever the player has heard"
+  },
+  {
+   "id": "U4",
+   "from": [
+    "A25",
+    "B22"
+   ],
+   "file": "docs/natural-villager-motion-concept.md:380",
+   "defect": "Step 20 cites \"the source table of §5 below\", but §5 is \"Rejected items and refuted claims\"; the source table is §4 of the research document"
+  },
+  {
+   "id": "U5",
+   "from": [
+    "A26",
+    "B24"
+   ],
+   "file": "docs/peoples-1890.md:2417",
+   "defect": "\"only the loom, the canoe and the villager dress table (§8.3) stay here\" omits the §8.4–§8.7 subsections the same diff adds below it"
+  },
+  {
+   "id": "U6",
+   "from": [
+    "A34",
+    "B28"
+   ],
+   "file": "scripts/verify/ladder-core.test.mjs:350",
+   "defect": "Comment says `src/scenes/place/` reaches three suites, but the MAP fixture now maps it to seven (collision, five polish themes, settings)"
+  },
+  {
+   "id": "U7",
+   "from": [
+    "A36",
+    "B29"
+   ],
+   "file": "scripts/verify/polish-children.mjs:753",
+   "defect": "\"the rule this file states at `nextFrames`\" points at a definition that moved to ./_polish.mjs (lines 144-151); nextFrames is only imported here"
+  },
+  {
+   "id": "U8",
+   "from": [
+    "A40",
+    "B33"
+   ],
+   "file": "scripts/verify/polish-panorama.mjs:1427",
+   "defect": "The settlement-in-turn comment above `standpoints` (duplicated at 1485-1487) promises \"else the clearest seen\", but the STAGES loop only admits sep ≥ 12° candidates and `if (!aimed) continue` skips the shot"
+  },
+  {
+   "id": "U9",
+   "from": [
+    "A41",
+    "B34"
+   ],
+   "file": "scripts/verify/polish-settlement.mjs:208",
+   "defect": "\"the capture section below stages its own\" names a section this file lacks; travel-panorama-capture lives in polish-panorama.mjs:735"
+  },
+  {
+   "id": "U10",
+   "from": [
+    "A45",
+    "B40"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:947",
+   "defect": "Comment claims the first surface on each sight line is checked to be the figure, but `seen` only tests the ratio band `r >= 0.85 && r <= 1.15`, never object identity"
+  },
+  {
+   "id": "U11",
+   "from": [
+    "A48",
+    "B41"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:229",
+   "defect": "\"Three standing places\" but the section stages five numbered stands (0-4, incl. the upstream-end `upEnd` stand and the pounding pair)"
+  },
+  {
+   "id": "U12",
+   "from": [
+    "A49",
+    "B42"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:230",
+   "defect": "Header says the boat stand is \"s = +36 m on the waterline\", code has `const s = 49` at `L.waterline + 2.4`"
+  },
+  {
+   "id": "U13",
+   "from": [
+    "A50",
+    "B43"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:346",
+   "defect": "Boat-stand comment says \"upstream of where the haul happens … the stand is upstream too\", then \"a little DOWNSTREAM of it\"; code at s = 49 (haul 47, look 46) is downstream"
+  },
+  {
+   "id": "U14",
+   "from": [
+    "A55",
+    "B168"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:6180",
+   "defect": "Walk-cycle pair promises \"the camera at the same offset\" in both frames, but frame B's `standAt([a.flank])` searches all distances again and only `b.flank === a.flank` is checked"
+  },
+  {
+   "id": "U15",
+   "from": [
+    "A59",
+    "B51"
+   ],
+   "file": "scripts/verify/world.mjs:19",
+   "defect": "SECTIONS header counts \"Three blocks\" but the file now also has `if (section('follow-camera'))` (point 1286)"
+  },
+  {
+   "id": "U16",
+   "from": [
+    "A61",
+    "B52"
+   ],
+   "file": "src/config/balance.ts:2101",
+   "defect": "stallSeconds 20 s called \"a fifteenth of the backstop above\" after errandSeconds rose from 300 to 375 (20/375 ≈ 1/18.75)"
+  },
+  {
+   "id": "U17",
+   "from": [
+    "A62",
+    "B53"
+   ],
+   "file": "src/config/balance.ts:2116",
+   "defect": "\"THE LOOM (work-order 1157)\" rationale block is orphaned above `canoe:` and `fishFire:`; `loom:` only follows at line 2228"
+  },
+  {
+   "id": "U18",
+   "from": [
+    "A63",
+    "B54"
+   ],
+   "file": "src/config/balance.ts:2140",
+   "defect": "First dugout block says the lane lies \"between s = +27 and +47 m\" while laneStart is −1 and the next block says s = −2 to +47"
+  },
+  {
+   "id": "U19",
+   "from": [
+    "A64",
+    "B55"
+   ],
+   "file": "src/config/balance.ts:2144",
+   "defect": "Fishermen block says \"from s = −2 to s = +47 (49 m)\" while `laneStart: -1`, `laneEnd: 47` give 48 m"
+  },
+  {
+   "id": "U20",
+   "from": [
+    "A66",
+    "B56"
+   ],
+   "file": "src/render/fauna.ts:524",
+   "defect": "buildQuadruped doc still lists zebra, antelope, goat, but those builders now call buildUngulate/buildUngulateParts in faunaUngulates.ts"
+  },
+  {
+   "id": "U21",
+   "from": [
+    "A67",
+    "B59"
+   ],
+   "file": "src/render/figureBody.ts:361",
+   "defect": "`const g = geo.index ? geo : geo` in tidy() picks the same value on both arms; the test is a no-op"
+  },
+  {
+   "id": "U22",
+   "from": [
+    "A72",
+    "B63"
+   ],
+   "file": "src/render/figureRig.ts:252",
+   "defect": "palmRollAngle doc states range (−π, π], but the return lies in (center − π, center + π] with callers passing center ∓2.5, so results reach about ±5.6"
+  },
+  {
+   "id": "U23",
+   "from": [
+    "A70",
+    "B65"
+   ],
+   "file": "src/render/figureWalk.ts:131",
+   "defect": "FootPhase doc (fore/aft target, lift, stance, swing) is stranded above `export interface FootPlant` (contact, offset, lifted); FootPhase at line 248 has no doc"
+  },
+  {
+   "id": "U24",
+   "from": [
+    "A73",
+    "B67"
+   ],
+   "file": "src/render/fishMesh.ts:16",
+   "defect": "\"length 1 along +Z (head at +0.5), centred on the origin\" but the profile `0.42 - t * 0.84` and `tip = -0.58` put the fish from −0.58 to +0.42"
+  },
+  {
+   "id": "U25",
+   "from": [
+    "A83",
+    "B68"
+   ],
+   "file": "src/render/gesture.ts:173",
+   "defect": "copyPoseExtras doc says \"(the hand shapes)\" but it copies pointHand, shoulders, gaze, reach, elbow and body"
+  },
+  {
+   "id": "U26",
+   "from": [
+    "A84",
+    "B69"
+   ],
+   "file": "src/render/placeRiver.ts:349",
+   "defect": "\"Index 0 is always foam\" but the largest-deficit walk gives index 0 to the largest share (e.g. { foam: 0.1, leaf: 0.9 } starts with leaf)"
+  },
+  {
+   "id": "U27",
+   "from": [
+    "A85",
+    "B71"
+   ],
+   "file": "src/render/villagerBody.ts:5",
+   "defect": "Header says only the closing hands stay live morphs, but LIVE_MORPHS also keeps point.L/R and relax.L/R"
+  },
+  {
+   "id": "U28",
+   "from": [
+    "A106",
+    "B79"
+   ],
+   "file": "src/render/villagerClipPose.ts:496",
+   "defect": "clipGaitPose doc says \"walk and sprint blended by the sprint share\" but blendGait mixes walk, jog and sprint by the three gait weights"
+  },
+  {
+   "id": "U29",
+   "from": [
+    "A109",
+    "B74"
+   ],
+   "file": "src/render/villagerClipPose.test.ts:152",
+   "defect": "\"per foot, frames with a contact down\" but `downs[s]++` runs once per contact key (heel/ball/tip), so it counts contacts, not frames"
+  },
+  {
+   "id": "U30",
+   "from": [
+    "A107",
+    "B75"
+   ],
+   "file": "src/render/villagerClipPose.test.ts:384",
+   "defect": "\"at 25-120 Hz\" but `dt = 1/120 + r() * (1/25)` reaches ≈0.0483 s, about 20.7 Hz"
+  },
+  {
+   "id": "U31",
+   "from": [
+    "A110",
+    "A118",
+    "B82"
+   ],
+   "file": "src/render/villagerFigureBody.ts:184",
+   "defect": "GltfPerson.geometry doc says \"no morphs\", but bakePose keeps the live hand morphs, gltfPerson scales them and gltfFigureGeometry names targets from the body"
+  },
+  {
+   "id": "U32",
+   "from": [
+    "A111",
+    "A119",
+    "B83"
+   ],
+   "file": "src/render/villagerFigureBody.ts:581",
+   "defect": "gltfFigureGeometry's `_radial: number` parameter is never read, yet callers/tests must pass a dummy (…, null, 8)"
+  },
+  {
+   "id": "U33",
+   "from": [
+    "A112",
+    "A120"
+   ],
+   "file": "src/render/villagerGarmentMask.ts:10",
+   "defect": "Header says vertices are pushed by VILLAGER_ASSET.garmentMaskPush, but the only caller passes garmentMaskPush * person.frame.scale (villagerFigureBody.ts:593)"
+  },
+  {
+   "id": "U34",
+   "from": [
+    "A113",
+    "A121"
+   ],
+   "file": "src/render/villagerRig.ts:5",
+   "defect": "Header names the figure component \"scenes/place/gltfFigure.tsx\" while villagerFigureBody.ts and the tests use scenes/place/skinnedFigure.tsx; whether gltfFigure.tsx still exists needs checking"
+  },
+  {
+   "id": "U35",
+   "from": [
+    "A114",
+    "A122",
+    "B86"
+   ],
+   "file": "src/render/villagerRig.ts:25",
+   "defect": "clipTime doc \"for a phase (0 … 1) or a time in seconds\" but the body only wraps/clamps t against clip.duration, never converting a phase"
+  },
+  {
+   "id": "U36",
+   "from": [
+    "A115",
+    "A123",
+    "B84"
+   ],
+   "file": "src/render/villagerKneelGround.test.tsx:5",
+   "defect": "Header says the figure \"gets up and walks off\", but the stage only moves the root while t < 2 and kneelRun's doc says \"kneel 3 s, stand 1.5 s\""
+  },
+  {
+   "id": "U37",
+   "from": [
+    "A116",
+    "A124"
+   ],
+   "file": "src/render/villagerPenetrationReport.test.ts:3",
+   "defect": "Header claims numbers \"never worse than main's report\", but the all-pose comparison is it.skip (pending 1334); only the build pose is gated"
+  },
+  {
+   "id": "U38",
+   "from": [
+    "A117",
+    "A125"
+   ],
+   "file": "src/render/villagerRuntimePose.test.tsx:448",
+   "defect": "Orphaned \"the chaser strides at its sprint…\" comment sits above the hip-height block; the stride (feet spread) check is at l.458-459"
+  },
+  {
+   "id": "U39",
+   "from": [
+    "A126",
+    "A128",
+    "B90"
+   ],
+   "file": "src/scenes/actorLabelSource.ts:160",
+   "defect": "drawnHeadTop doc gives the top as \"centre + r·rowY/|rowY|\", but the code and the inline comment at :171-172 compute centre + r·L·u (y = e13 + r·len); the doc drops L"
+  },
+  {
+   "id": "U40",
+   "from": [
+    "A281",
+    "B157"
+   ],
+   "file": "src/scenes/actorLabelSource.ts:168",
+   "defect": "drawnHeadTop's JSDoc (lines 152-166) now binds to the inserted `export const ANCHOR_HEAD_RADIUS = 0.16`; the function at line 173 lost its doc"
+  },
+  {
+   "id": "U41",
+   "from": [
+    "A127",
+    "A129"
+   ],
+   "file": "src/scenes/place/CookShelter.tsx:13",
+   "defect": "\"Corner posts … around the stone ring … the same numbers the head-clearance sweep reads (work-order 349)\" no longer holds once `postR` is an overridable prop widened for the fishers' grill"
+  },
+  {
+   "id": "U42",
+   "from": [
+    "A130",
+    "A133"
+   ],
+   "file": "src/scenes/place/PlaceLife.tsx:1606",
+   "defect": "The Goats JSDoc is orphaned onto the inserted `GOAT_STEER_SPEED` const (which has its own doc); `function Goats` is undocumented"
+  },
+  {
+   "id": "U43",
+   "from": [
+    "A131",
+    "A134"
+   ],
+   "file": "src/scenes/place/PlaceLife.tsx:3384",
+   "defect": "\"a fill wins over everything\" is wrong now that `if (taking !== null && spareAt)` is tested before `else if (filling !== null)`"
+  },
+  {
+   "id": "U44",
+   "from": [
+    "A132",
+    "A135",
+    "B93"
+   ],
+   "file": "src/scenes/place/PlaceLife.tsx:2979",
+   "defect": "\"how far it has walked (the bob)\" is stale; the walked-driven bob was replaced by `g.position.set(me.x, groundHeight(me.x, me.z), me.z)` with the stride carrying the rise and fall"
+  },
+  {
+   "id": "U45",
+   "from": [
+    "A136",
+    "A139"
+   ],
+   "file": "src/scenes/place/PlaceScene.tsx:1213",
+   "defect": "FirePit comment cites \"the two branches of fireRainFactor\", but the code calls `shelteredFireRainFactor(rain, sheltered)` and fireRainFactor is no longer imported"
+  },
+  {
+   "id": "U46",
+   "from": [
+    "A137",
+    "A140"
+   ],
+   "file": "src/scenes/place/PlaceScene.tsx:2394",
+   "defect": "GizaAmbient \"a person steps with the turn\" but the person bob was removed and nothing (no gait prop, only rotation and ground-height writes) makes a figure step"
+  },
+  {
+   "id": "U47",
+   "from": [
+    "A138",
+    "A141"
+   ],
+   "file": "src/scenes/place/PlaceScene.tsx:2205",
+   "defect": "`__placeRiver` dev-hook comment says \"where its foam stands\", but `flecks` now carries every flotsam kind (foam/leaf/grass/twig with `kind`) plus the drift fields"
+  },
+  {
+   "id": "U48",
+   "from": [
+    "A142",
+    "A149"
+   ],
+   "file": "src/scenes/place/RiverFishery.tsx:249",
+   "defect": "The RiverFishery component's JSDoc (\"THE FISHERMEN AT A RIVERSIDE VILLAGE … One component for the boat and the fire\") is orphaned above FisheryFireEnv's own JSDoc; the component is undocumented"
+  },
+  {
+   "id": "U49",
+   "from": [
+    "A143",
+    "A150"
+   ],
+   "file": "src/scenes/place/RiverFishery.tsx:233",
+   "defect": "basketFishSpot doc \"Where fish `i` of `n` lies … and its yaw\" names a nonexistent parameter `n` and omits the returned roll"
+  },
+  {
+   "id": "U50",
+   "from": [
+    "A144",
+    "A151",
+    "B99"
+   ],
+   "file": "src/scenes/place/RiverFishery.tsx:934",
+   "defect": "\"THE SMOKING RACK: four posts, two rails and slats, the fish across them\" but no slat mesh exists in the `fish-rack` group and the fish are \"Hung head down from the rails by the tail\""
+  },
+  {
+   "id": "U51",
+   "from": [
+    "A145",
+    "A152",
+    "B101"
+   ],
+   "file": "src/scenes/place/adultWork.ts:134",
+   "defect": "standSpot doc \"the spot … this errand's carrier works from\" contradicts the new tableSpot doc (carrier waits on standSpot, takes and sets the jar at tableSpot)"
+  },
+  {
+   "id": "U52",
+   "from": [
+    "A146",
+    "A153"
+   ],
+   "file": "src/scenes/place/adultWork.ts:144",
+   "defect": "`dug` doc \"Seconds this worker has dug in the current bout\" but the take phase (`t.dug += dt … t.dug >= seconds * TAKE_GRAB`) and the fill reuse it as their clock"
+  },
+  {
+   "id": "U53",
+   "from": [
+    "A147",
+    "A154"
+   ],
+   "file": "src/scenes/place/adultWork.ts:215",
+   "defect": "`task.phase === 'take'` / `task.situation === 'water-back'` in the standSpot arrival branch are unreachable: the preceding tableSpot line returns first and every cast carrier has tableSpot"
+  },
+  {
+   "id": "U54",
+   "from": [
+    "A148",
+    "A155"
+   ],
+   "file": "src/scenes/place/adultWork.ts:792",
+   "defect": "Comment says the report's aim is the water just set down (readyWord), yet pendingWord is still built with aim { sender.x, y: 1, sender.z } from the replaced work-order-1087 design"
+  },
+  {
+   "id": "U55",
+   "from": [
+    "A156",
+    "A162",
+    "B108"
+   ],
+   "file": "src/scenes/place/bankGame.ts:6",
+   "defect": "Header says RIVER is called \"once the listener has heard ROCK; before that the cycle opens silently\", but hasHeard/rockKnown were removed and openCycle always calls RIVER (B108 also covers the line-9 direction claim below)"
+  },
+  {
+   "id": "U56",
+   "from": [
+    "A157",
+    "A163"
+   ],
+   "file": "src/scenes/place/bankGame.ts:9",
+   "defect": "Header says \"once ROCK is known the direction is announced\", but the rock-only run path and `rockOnly` were removed; every run is announced and assertRoundSound requires `s.direction !== null`"
+  },
+  {
+   "id": "U57",
+   "from": [
+    "A158",
+    "A164",
+    "B106"
+   ],
+   "file": "src/scenes/place/bankGame.test.ts:1077",
+   "defect": "\"THE LONG-RUN SPEECH ALARM (point 589)\" JSDoc is orphaned above the inserted `describe('a play session is a series of cycles…')` instead of the silence-watch describe it documents"
+  },
+  {
+   "id": "U58",
+   "from": [
+    "A159",
+    "A165",
+    "B109"
+   ],
+   "file": "src/scenes/place/boundary.ts:39",
+   "defect": "\"Four kilobytes of lookup\" (and the retained \"1024, not the historical 256\") no longer hold: BOUNDARY_LUT_SIZE is 4096 floats, a 16 KB Float32Array"
+  },
+  {
+   "id": "U59",
+   "from": [
+    "A160",
+    "A166"
+   ],
+   "file": "src/scenes/place/boundary.ts:157",
+   "defect": "\"Both fades stay < π/2\" in lobeRadius, although only one fade exists (BANK_FADE_ANGLE); `plateau` is a plateau angle, not a fade"
+  },
+  {
+   "id": "U60",
+   "from": [
+    "A161",
+    "A167"
+   ],
+   "file": "src/scenes/place/boundary.ts:227",
+   "defect": "groundDiscShift doc says the disc \"moves out by exactly that excess\", but the body eases it by `ramp(0, BANK_DISC_SHIFT_EASE_ANGLE, delta)` near the normal and returns `Math.max(eased, riverEdge)` across the plateau"
+  },
+  {
+   "id": "U61",
+   "from": [
+    "A168",
+    "A177"
+   ],
+   "file": "src/scenes/place/figureIdentity.ts:9",
+   "defect": "`build` doc \"−1 slight .. +1 stout\" but `Math.round((u(16) - 0.5) * 2) * 0.6` yields only −0.6, 0 or +0.6"
+  },
+  {
+   "id": "U62",
+   "from": [
+    "A169",
+    "A178",
+    "B110"
+   ],
+   "file": "src/scenes/place/fishBaskets.ts:131",
+   "defect": "basketRingViolation doc claims \"ids 0 and 1\" and \"at most two on the bank\", but the code checks only `a.id === b.id`, has no bank-count check, and also rejects both baskets at 'fire'"
+  },
+  {
+   "id": "U63",
+   "from": [
+    "A170",
+    "A179",
+    "B111"
+   ],
+   "file": "src/scenes/place/fishFire.test.ts:292",
+   "defect": "Footprint comment \"the board 0.5 m\" but the table uses `['board', s.board, 0.45]`"
+  },
+  {
+   "id": "U64",
+   "from": [
+    "A171",
+    "A180",
+    "B113"
+   ],
+   "file": "src/scenes/place/fisheryColliders.ts:31",
+   "defect": "Grill-post doc promises \"their radius at the foot and their height\", but FISHERY_PROPS has only grillPostOffset and grillPostR, no height field"
+  },
+  {
+   "id": "U65",
+   "from": [
+    "A172",
+    "A181",
+    "B114"
+   ],
+   "file": "src/scenes/place/fisheryColliders.ts:67",
+   "defect": "SHELTER_POST_RADIUS doc \"(the drawn foot plus the stand-off)\" but the collider adds the margin again: `r: SHELTER_POST_RADIUS + m` with `m = cfg.colliderMargin`"
+  },
+  {
+   "id": "U66",
+   "from": [
+    "A173",
+    "A182"
+   ],
+   "file": "src/scenes/place/fisheryColliders.test.ts:33",
+   "defect": "Title \"riverside villages of both kinds: roofed and open fires\" but only the roofed kind's existence is asserted"
+  },
+  {
+   "id": "U67",
+   "from": [
+    "A174",
+    "A183"
+   ],
+   "file": "src/scenes/place/fisheryBasketClearance.test.tsx:7",
+   "defect": "Header \"no part of the head is inside the basket\" over the swap bend, yet the carrier test allows 2 mm (`expect(worst).toBeLessThan(0.002)`)"
+  },
+  {
+   "id": "U68",
+   "from": [
+    "A175",
+    "A184"
+   ],
+   "file": "src/scenes/place/fisheryBasketClearance.test.tsx:165",
+   "defect": "\"never into the ground, and his hands on its rim\" but only `at.y >= 0` is asserted; no hands-on-rim check exists"
+  },
+  {
+   "id": "U69",
+   "from": [
+    "A176",
+    "A185"
+   ],
+   "file": "src/scenes/place/digSiteProps.test.ts:39",
+   "defect": "KNOWN_UNROUTABLE_PITS note says \"the working day below measures them beside its baskets\", but the working day runs only seed 42, never mandinka@7 or sidama@1337"
+  },
+  {
+   "id": "U70",
+   "from": [
+    "A186",
+    "A191",
+    "B116"
+   ],
+   "file": "src/scenes/place/gltfClipLayers.test.ts:152",
+   "defect": "Leftover debug `console.log(\"WORST\", worst);` jammed before the expect in the arm-handover test"
+  },
+  {
+   "id": "U71",
+   "from": [
+    "A187",
+    "A192",
+    "B117"
+   ],
+   "file": "src/scenes/place/gltfClipLayers.test.ts:621",
+   "defect": "Unconditional `console.log(\\`worst per-stance slide …\\`)` whose accumulator `worstAll` feeds no assertion, printed every run (possibly a deliberate measurement print)"
+  },
+  {
+   "id": "U72",
+   "from": [
+    "A188",
+    "A193"
+   ],
+   "file": "src/scenes/place/gltfClipLayers.ts:53",
+   "defect": "ClipLayers doc \"Seconds into the dig clip (a loop), and the carry-idle clip\" omits that `idleT` also clocks the idle standing base (`clipPoseAt(…, idle, c.idleT % idle.duration …)`)"
+  },
+  {
+   "id": "U73",
+   "from": [
+    "A189",
+    "A194"
+   ],
+   "file": "src/scenes/place/layout.waterPath.test.ts:174",
+   "defect": "gatedSeeds history says \"These two are what a sweep … still routes through a wall\", then lists three seeds (661, 673, 762) for 1245, drops 673 unaccounted, and the list is now [10, 762] by another criterion"
+  },
+  {
+   "id": "U74",
+   "from": [
+    "A190",
+    "A195"
+   ],
+   "file": "src/scenes/place/layout.ts:363",
+   "defect": "WATER_PATH_HEAD_OUTER_RADII \"tried only once the inner ladder has failed with and without compound gates\", yet the new `findHead` wrapper (used by the loom re-search) goes inner → outer → wide with no gate step"
+  },
+  {
+   "id": "U75",
+   "from": [
+    "A196",
+    "A208"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:129",
+   "defect": "villageAdultStations doc says only \"The well and its water-carrier drop out\", but the centre pounder now also drops out via villagePoundsAtCentre"
+  },
+  {
+   "id": "U76",
+   "from": [
+    "A197",
+    "A209"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:331",
+   "defect": "`near` option doc \"Never bought with a floor\" is contradicted by the openInReach pick, returned before the `here.fabric < MIN_FABRIC` gate"
+  },
+  {
+   "id": "U77",
+   "from": [
+    "A198",
+    "A210",
+    "B121"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:334",
+   "defect": "`reach` doc \"taken only when no floor-keeping ground is in reach, and then the nearest one is. Never bought with a floor\" is wrong: `if (picked.openInReach) return picked.openInReach` (fabric floor given up) runs before `picked.nearest`"
+  },
+  {
+   "id": "U78",
+   "from": [
+    "A199",
+    "A211",
+    "B122"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:414",
+   "defect": "\"Two picks are kept … only … the openness floor give[s] way\" is stale: picked now holds seven or eight candidates (best, both, near, inReach, nearInReach, openInReach, nearest) and the fabric floor gives way for reach"
+  },
+  {
+   "id": "U79",
+   "from": [
+    "A200",
+    "A212",
+    "B124"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:420",
+   "defect": "\"no floor is ever given up for either\" contradicts line 437 \"the FABRIC floor gives way before the call does\" and the REACH_OPENNESS doc"
+  },
+  {
+   "id": "U80",
+   "from": [
+    "A201",
+    "A213",
+    "B125"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:458",
+   "defect": "Return-order comment omits the openInReach step and claims \"each among the grounds that keep every floor\", though openInReach candidates need not meet MIN_FABRIC"
+  },
+  {
+   "id": "U81",
+   "from": [
+    "A202",
+    "A214",
+    "B126"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:466",
+   "defect": "`if (picked.both) return picked.both` is unreachable: without reach a non-null both is returned via `preferred`, with reach every both-floor candidate also sets `picked.nearest`, returned first"
+  },
+  {
+   "id": "U82",
+   "from": [
+    "A203",
+    "A215",
+    "B120"
+   ],
+   "file": "src/scenes/place/lifeSpots.test.ts:105",
+   "defect": "\"Two stations fewer, and nothing else moved\" sits above `expect(rock).toHaveLength(other.length - 3)`; the filter also removes centrePounder"
+  },
+  {
+   "id": "U83",
+   "from": [
+    "A204",
+    "A216"
+   ],
+   "file": "src/scenes/place/loom.test.ts:146",
+   "defect": "Comment opens \"Seed 4: …\" then says seed 4 no longer needs a household to give way, while the code uses `sharedLayout('bambara-village', 8)`"
+  },
+  {
+   "id": "U84",
+   "from": [
+    "A205",
+    "A217",
+    "B127"
+   ],
+   "file": "src/scenes/place/loom.ts:87",
+   "defect": "\"Every settlement lays a loom\" contradicted by weaving being parked: `loom.placed` is false and loomParked.test.ts asserts no village lays a loom"
+  },
+  {
+   "id": "U85",
+   "from": [
+    "A206",
+    "A218"
+   ],
+   "file": "src/scenes/place/mortarPounding.ts:3",
+   "defect": "Header says \"`Pounder` in PlaceLife.tsx\", but Pounder is its own module (placeDump.test.tsx imports './Pounder')"
+  },
+  {
+   "id": "U86",
+   "from": [
+    "A207",
+    "A219"
+   ],
+   "file": "src/scenes/place/observerRoom.test.ts:96",
+   "defect": "\"the laid loom is above\" is false in the shipped config, where every layout.loom is null (weaving parked), so the `if (l.loom)` block adds nothing"
+  },
+  {
+   "id": "U87",
+   "from": [
+    "A220",
+    "B129"
+   ],
+   "file": "src/scenes/place/placeFigure.tsx:162",
+   "defect": "`const legGroup = useRef<THREE.Group>(null)` is assigned via `<group ref={legGroup}>` and never read; leg access goes through legPivots.current"
+  },
+  {
+   "id": "U88",
+   "from": [
+    "A222",
+    "B130"
+   ],
+   "file": "src/scenes/place/riverBank.ts:180",
+   "defect": "Stage prose says each rock sits \"a good 20 deg inside the edge\", but BANK_VIEW_STANDOFF = 0.8 puts each rock ≈32° off the sightline inside the 36.7° half-frame, about 4.7° of margin"
+  },
+  {
+   "id": "U89",
+   "from": [
+    "A224",
+    "A231",
+    "B134"
+   ],
+   "file": "src/scenes/place/skinnedFigure.tsx:237",
+   "defect": "Thigh `rotation.order = 'YXZ'` assignments (and their comment at 235-236) are always overridden by poseLegs' `rotation.set(…, 'YZX')`"
+  },
+  {
+   "id": "U90",
+   "from": [
+    "A225",
+    "A232"
+   ],
+   "file": "src/scenes/place/skinnedFigure.tsx:290",
+   "defect": "\"What the figure measured of its own walk, and its transitions in progress.\" is the JSDoc of the exported SkinnedFigure component, not of a walk record"
+  },
+  {
+   "id": "U91",
+   "from": [
+    "A226",
+    "A233",
+    "B133"
+   ],
+   "file": "src/scenes/place/skinnedFigure.tsx:176",
+   "defect": "`Rig.head` is returned by buildRig but never read; the anchor is already attached via `bones.head.add(head)`"
+  },
+  {
+   "id": "U92",
+   "from": [
+    "A227",
+    "A234",
+    "B132"
+   ],
+   "file": "src/scenes/place/skinnedFigure.tsx:172",
+   "defect": "`Rig.layers` is returned by buildRig but no rig consumer reads it; the layers are used only inside buildRig"
+  },
+  {
+   "id": "U93",
+   "from": [
+    "A228",
+    "A235"
+   ],
+   "file": "src/scenes/place/skinnedFigure.tsx:630",
+   "defect": "\"the free arm on the load's side\" while steadyArm picks left-if-free-else-right (`!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1`) and consults no load side"
+  },
+  {
+   "id": "U94",
+   "from": [
+    "A229",
+    "A236"
+   ],
+   "file": "src/scenes/place/speechChannel.ts:81",
+   "defect": "speakOverhead doc \"Replaces … and sweeps out labels\" on every call is contradicted by the new `if (atoms.length === 0) return`"
+  },
+  {
+   "id": "U95",
+   "from": [
+    "A230",
+    "A237"
+   ],
+   "file": "src/scenes/place/skinnedFigureHeadProp.test.tsx:54",
+   "defect": "\"primitive-built skeleton first\" for `look(16, null)`, which mounts the code-built skinned body (`createSkeleton(p)`), not the primitive figure of placeFigure.tsx"
+  },
+  {
+   "id": "U96",
+   "from": [
+    "A238",
+    "A247"
+   ],
+   "file": "src/scenes/place/tagShuffle.bankRound.test.ts:156",
+   "defect": "\"Work-order 1047 … a readable slump at the end\" misattributes the slump; 1047 made the squat that work-order 1239's slump replaced (per `caughtSlumpPose` doc)"
+  },
+  {
+   "id": "U97",
+   "from": [
+    "A239",
+    "A248"
+   ],
+   "file": "src/scenes/place/tagShuffle.test.ts:314",
+   "defect": "Comment still names \"seed 3 (0.37 m), the lowest-numbered layout … in which the two crowds really do meet\" while the code uses seed 4 and the appended text says seed 4 is the first"
+  },
+  {
+   "id": "U98",
+   "from": [
+    "A240",
+    "A249",
+    "B135"
+   ],
+   "file": "src/scenes/place/tagShuffle.test.ts:400",
+   "defect": "\"the bar only asks for over a second of contact\" but `expect(touching).toBeGreaterThan(50)` at 60 Hz pair-frames is about 0.83-0.85 s"
+  },
+  {
+   "id": "U99",
+   "from": [
+    "A241",
+    "A250"
+   ],
+   "file": "src/scenes/place/tagShuffle.wedgeGate.test.ts:172",
+   "defect": "Loop comment says clear-yard \"refused nearly every re-pen — 1.5 … where the wall-band rule produces 25.5\", contradicted by the new note \"the two rules re-pen alike (0 refusals, 28.6 vs 24.0)\""
+  },
+  {
+   "id": "U100",
+   "from": [
+    "A242",
+    "A251"
+   ],
+   "file": "src/scenes/place/tagShuffle.wedgeGate.test.ts:140",
+   "defect": "Seed-history prose (\"a re-pen the strict rule refuses — the very contrast this case is built on\", \"22 seeds retain every comparison\") is orphaned now that `refusedByClearYard` and the rescue comparison were removed"
+  },
+  {
+   "id": "U101",
+   "from": [
+    "A243",
+    "A252",
+    "B140"
+   ],
+   "file": "src/scenes/place/villagerCanoe.test.ts:237",
+   "defect": "\"A 49 m lane instead of 20 m (item 9)\" directly above `expect(span).toBe(48)` (−1 to 47 m)"
+  },
+  {
+   "id": "U102",
+   "from": [
+    "A244",
+    "A253"
+   ],
+   "file": "src/scenes/place/taskWalkerLoad.test.ts:164",
+   "defect": "Test named \"leaves the walking pose untouched when the hands are free\" asserts the pose is reset to REST_POSE, lean 0, reach deleted"
+  },
+  {
+   "id": "U103",
+   "from": [
+    "A245",
+    "A254"
+   ],
+   "file": "src/scenes/place/tagGame.ts:568",
+   "defect": "`c.edgeEase = !c.held` guard is redundant: the next line `if (c.held) c.edgeEase = false` always clears it"
+  },
+  {
+   "id": "U104",
+   "from": [
+    "A246",
+    "A255"
+   ],
+   "file": "src/scenes/place/tagGame.ts:1449",
+   "defect": "grabAim doc \"The arm points straight at the target point … as close to it as an arm of that length can\" no longer holds for the new `level` path (added elevation offset, `reach = Math.min(level.reachMax, …)`)"
+  },
+  {
+   "id": "U105",
+   "from": [
+    "A256",
+    "B141"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:617",
+   "defect": "netFloats' JSDoc (\"`count` floats … Empty while the net is folded\") is attached to `netHand`, which returns one BankPoint; netFloats (line 632) has no doc and takes its count from cfg.netFloats, not a `count` parameter"
+  },
+  {
+   "id": "U106",
+   "from": [
+    "A274",
+    "B147"
+   ],
+   "file": "src/scenes/travel/Wildlife.tsx:4662",
+   "defect": "Crossing-branch comment still says point 312's swim-out goes \"to the nearest bank\", but swim-out now uses swimOutBank → safeBankTarget, which passes over a threatened near bank"
+  },
+  {
+   "id": "U107",
+   "from": [
+    "A278",
+    "B155"
+   ],
+   "file": "src/ui/Hud.tsx:387",
+   "defect": "Prompt comment says the enter hint is anchored \"a little below the screen centre, see .prompt-enter\", but the inline `top: enterHintTopFraction()` now follows the traveller and can lie above centre"
+  },
+  {
+   "id": "U108",
+   "from": [
+    "A280",
+    "B154"
+   ],
+   "file": "src/ui/DebugMenu.test.tsx:269",
+   "defect": "\"its nineteen controls\" but EXPECTED_CONTROLS lists 23 'debug.bank*' entries after this diff added bankVisitOpensAtBank"
+  },
+  {
+   "id": "U109",
+   "from": [
+    "A282",
+    "B158"
+   ],
+   "file": "src/scenes/place/SpeechLabels.tsx:71",
+   "defect": "NoteFollower's JSDoc (lines 63-70) now sits over `let anchorSphere: THREE.SphereGeometry | null = null`; `function NoteFollower` only stands at line 77"
+  },
+  {
+   "id": "U110",
+   "from": [
+    "A1"
+   ],
+   "file": "design.md:412",
+   "defect": "[p01] stale-doc · The new fishery text places the start of the net lane downstream, but the code starts it upstream of the bank normal · evidence: \"from about 1 to 47 m downstream of the normal\" contradicts src/config/balance.ts `laneStart: -1` (negative s is upstream: the same text puts the children's stretch \"about 28 m upstream\", which the code centres at s = -28), so the lane starts about 1 m upstream."
+  },
+  {
+   "id": "U111",
+   "from": [
+    "A3"
+   ],
+   "file": "docs/1308-merged-plan.md:208",
+   "defect": "[p01] md-audit · Open question 1 calls itself a U4 variant, but the Round 4 note says it never belonged to U4 · evidence: \"1. U4 variant not in the plan: should `--commit <N> --text-stdin` write the `done <N> --none` card\" vs line 276 \"open question 1 (`--commit --text-stdin` writes the card itself) is unaffected because it was never part of U4\"."
+  },
+  {
+   "id": "U112",
+   "from": [
+    "A4"
+   ],
+   "file": "CLAUDE.md:40",
+   "defect": "[p01] md-audit · §4 still refers to this file's build order, but the retitled file no longer calls itself one · evidence: \"A requested design change updates `design.md`, this file where it changes the build order\" while the title changed from \"Build Order: POC ...\" to \"...: session rules\" and §1 now says \"this file = build and verification policy\"."
+  },
+  {
+   "id": "U113",
+   "from": [
+    "A5"
+   ],
+   "file": "docs/acceptance-evidence.md:278",
+   "defect": "[p02] stale-doc · The new fishery evidence paragraph places the start of the net lane downstream, but the code starts it upstream · evidence: \"the fishermen's lane runs from about 1 to 47 m downstream\" contradicts src/config/balance.ts `laneStart: -1` (negative s = upstream; the children's stretch \"about 28 m upstream\" is s = -28), so the lane starts about 1 m upstream."
+  },
+  {
+   "id": "U114",
+   "from": [
+    "A6"
+   ],
+   "file": "docs/acceptance-evidence.md:269",
+   "defect": "[p02] stale-doc · After the suite rename, \"the same suite\" now points at polish-speech.mjs, but the 1065 shot is taken in another suite · evidence: \"The same suite reads the SCENE GRAPH ... (`1065-tapping-child-at-its-rock`)\" follows the changed line \"`scripts/verify/polish-speech.mjs` proves what the picture owes\", yet `1065-tapping` appears only in scripts/verify/polish-children.mjs (0 hits in polish-speech.mjs)."
+  },
+  {
+   "id": "U115",
+   "from": [
+    "A7"
+   ],
+   "file": "docs/1455-step2-merged-plan.md:33",
+   "defect": "[p02] stale-doc · The plan says the charge file charges the shutter-timing signatures to 1456, but at the new revision that file has no 1456 charge · evidence: \"`scripts/render-verify-charges.mjs` already charges the steady polish-villagers shutter-timing signatures to 1456 and 1292\" while commit 19709a86e \"Strike the shutter-timing charges now both checks pass on both backends\" removed them inside this range (grep of \"1456\" in render-verify-charges.mjs finds nothing, and 1456 is ticked in docs/tasks-archive.md); line 133, \"Known signatures (charged to 1456, ...\", repeats the claim."
+  },
+  {
+   "id": "U116",
+   "from": [
+    "A9"
+   ],
+   "file": "docs/1455-step2-merged-plan.md:16",
+   "defect": "[p02] md-audit · The verdict's break-even rate contradicts both its own cost figures and the §4.3 worst case · evidence: \"stays below ~10 % (a false red costs 20–30 min against 5–12 min saved per pair)\" — those figures give at least 5/30 ≈ 17 %, and line 123 states \"the worst-case break-even of ~17 % (5 min saved per pair against a 30 min false red)\"."
+  },
+  {
+   "id": "U117",
+   "from": [
+    "A10"
+   ],
+   "file": "docs/1455-step2-merged-plan.md:32",
+   "defect": "[p02] md-audit · The host memory figures do not agree with each other or with the 1452 record · evidence: \"Host: 15.9 GB; 85 % ≈ 13.2 GiB\": 85 % of 15.9 is 13.5, and 13.2 GiB is 85 % of the 15.5 GiB that docs/1452-step5-measurement.md records (\"10.3 GiB of 15.5 GiB\")."
+  },
+  {
+   "id": "U118",
+   "from": [
+    "A11"
+   ],
+   "file": "docs/analysis_de/lesson-mechanisms.md:209",
+   "defect": "[p03] stale-doc · Row 3.308 books result 1 (\"existing enforcer extended by point 1281\"), but point 1281 created that guard from scratch as an explicit freeze exception, i.e. result 2 (new enforcer) under the register's own legend. · evidence: \"| 3.308 | Die Problemmeldung als Freigabe | 1 | Bestehender Durchsetzer, durch Punkt 1281 erweitert: `scripts/request-approval-guard-core.mjs`\" is wrong because scripts/request-approval-guard.mjs says \"This guard is a deliberate exception to the infrastructure freeze of 01.09.2026, by that user order of 03.10.2026\", and the file was first added in range by 08930190a \"Add a guard that blocks request deposits without the user's approval\" (merged as feat/1281-request-approval-guard); the legend defines \"**2** | Ein **neuer** Durchsetzer\"."
+  },
+  {
+   "id": "U119",
+   "from": [
+    "A12"
+   ],
+   "file": "docs/communication-poc-spec.md:331",
+   "defect": "[p04] stale-doc · The new dugout section describes one fisherman who calls his own heading once per leg shortly after setting off, but the code has two men, and the net man says each direction word to the paddler at the lane's ends. · evidence: \"A local fisherman paddles a dugout … ONE body working against the current and then riding it. Once per leg, shortly after he is under way, he CALLS the word of his heading\" is wrong because src/scenes/place/villagerCanoe.ts says \"two men work a drift net from one dugout … One is the PADDLER, aft; the other the NET MAN, forward\" and \"callDown: at the upstream end the net man says DOWNSTREAM to the paddler\" / \"callUp: the net man, back aboard, says UPSTREAM to the paddler\"."
+  },
+  {
+   "id": "U120",
+   "from": [
+    "A13"
+   ],
+   "file": "docs/communication-poc-spec.md:306",
+   "defect": "[p04] stale-doc · The newly added exception says the dugout call has no addressee, but the code gives every dugout word an addressee and treats an unaddressed boatman's call as the rejected faux pas. · evidence: \"The one exception is the fisherman's direction call from his dugout: a call, not speech (user 29.09.2026), it needs no addressee; his heading is the act it names.\" is wrong because villagerCanoe.ts says \"EVERY WORD HAS AN ADDRESSEE AND A CONSEQUENCE (user 30.09.2026: a boatman commenting on his own work is the rejected faux pas). Both direction words come from the net man and are said to the paddler\"."
+  },
+  {
+   "id": "U121",
+   "from": [
+    "A15"
+   ],
+   "file": "docs/criticality-review.md:48",
+   "defect": "[p04] stale-doc · The doc still says the guard blocks the turn end, but the guard is switched off and its hook path exits silently. · evidence: \"`criticality-review-guard-core.test.mjs`, fail-open) blocks the turn end when a point tagged HIGH is ticked without an **answered** review\" is wrong because scripts/criticality-review-guard.mjs opens with \"Stop hook (work-order point 298), SWITCHED OFF (see below): it once refused a HIGH-criticality tick … today the hook path exits silently and `--status` reports the same debt.\""
+  },
+  {
+   "id": "U122",
+   "from": [
+    "A16"
+   ],
+   "file": "docs/document-cut-757.md:119",
+   "defect": "[p04] md-audit · The updated row gives a word count below the word ceiling but still reports no headroom. · evidence: \"| `CLAUDE.md` | 197 lines / 1,327 words / 10,027 B | 197 / 1,328 | none |\": 1,327 against a ceiling of 1,328 (doc-budget-core.mjs \"maxWords: 1328\") leaves one word, not \"none\"."
+  },
+  {
+   "id": "U123",
+   "from": [
+    "A17"
+   ],
+   "file": "docs/handover-architecture.md:298",
+   "defect": "[p04] stale-doc · The rename turned a historical quote into a false claim about the current code: author-delegate.mjs does not spawn `codex`; it spawns the runtime's binary. · evidence: \"`scripts/author-delegate.mjs` spawns `codex` like this: … const child = spawn('codex', args, {\" is wrong because scripts/author-delegate.mjs:371 reads \"const child = spawn(runtime.bin, args, {\"."
+  },
+  {
+   "id": "U124",
+   "from": [
+    "A18"
+   ],
+   "file": "docs/handover-architecture.md:241",
+   "defect": "[p04] stale-doc · Ordered-work step 5 calls itself unbuilt and says its files do not exist, but both exist. · evidence: \"with `npx vitest run scripts/batch-dispatch-core.test.mjs` (… neither file exists yet — this step is unbuilt)\" is wrong because scripts/batch-dispatch-core.test.mjs and scripts/batch-dispatch.mjs both exist at 54b326987."
+  },
+  {
+   "id": "U125",
+   "from": [
+    "A19"
+   ],
+   "file": "docs/handover-architecture.md:245",
+   "defect": "[p04] stale-doc · Ordered-work step 6 calls itself unbuilt and says its files do not exist, but both exist. · evidence: \"with `npx vitest run scripts/batch-checkpoint-core.test.mjs` (… neither file exists yet — this step is unbuilt)\" is wrong because scripts/batch-checkpoint-core.test.mjs and scripts/batch-checkpoint.mjs both exist at 54b326987."
+  },
+  {
+   "id": "U126",
+   "from": [
+    "A20"
+   ],
+   "file": "docs/handover-architecture.md:261",
+   "defect": "[p04] stale-doc · Ordered-work step 10 calls its core test unbuilt, but that test exists (it was added 26.08.2026). · evidence: \"Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs` (unbuilt)\" is wrong because scripts/batch-board-core.test.mjs exists at 54b326987 (added 2df53ee21), beside scripts/batch-board-core.mjs."
+  },
+  {
+   "id": "U127",
+   "from": [
+    "A21"
+   ],
+   "file": "docs/handover-architecture.md:265",
+   "defect": "[p04] stale-doc · Ordered-work step 11 says its test file does not exist and the step is unbuilt, but the file and its module exist. · evidence: \"with `npx vitest run scripts/batch-metrics-core.test.mjs` (… the file does not exist yet — this step is unbuilt)\" is wrong because scripts/batch-metrics-core.test.mjs and scripts/batch-metrics.mjs both exist at 54b326987."
+  },
+  {
+   "id": "U128",
+   "from": [
+    "A22"
+   ],
+   "file": "docs/lane-routing.md:46",
+   "defect": "[p05] stale-doc · At `main-only` the doc says the review goes to a main-chain reviewer, but the code sends a switched-off review down the `crossUnavailable` chain, which starts at the scarce lane; line 82 of the same doc says this too. · evidence: \"`cross-review.mjs` then sends nothing at all and hands the review to a main-chain reviewer that authored none of the range\" is wrong because cross-review.mjs builds the switched-off hand-over with `decideReview({ outcome: … OUTCOME.SWITCHED_OFF … })`, whose failure path uses `reviewChain('crossUnavailable', scarceState)`, and `REVIEW_CHAINS.crossUnavailable` is \"['scarce', 'main', 'main-fallback']\" (\"starts at the scarce lane, the second-opinion model\")."
+  },
+  {
+   "id": "U129",
+   "from": [
+    "A23"
+   ],
+   "file": "docs/lane-routing.md:241",
+   "defect": "[p05] md-audit · The receipt paragraph says a re-run overwrites the per-point receipt, but the same doc (and the code) now has the author log appended to. · evidence: \"the receipt file is per point and a re-run overwrites it\" contradicts line 141 \"appends to `local/<point>-<lane>-author.log`\" and line 234 \"(then `.claude/author-<N>.log`, now `local/<point>-<lane>-author.log`)\"; scripts/author-delegate.mjs opens it with \"openSync(log, 'a+')\" and prints \"(append)\"."
+  },
+  {
+   "id": "U130",
+   "from": [
+    "A24"
+   ],
+   "file": "docs/lane-routing.md:252",
+   "defect": "[p05] stale-doc · The doc says the session-start policy line repeats the command in exactly these words, but the hook prints a different command line. · evidence: \"`node scripts/author-delegate.mjs --point <N>` in the point's own worktree, which the session-start policy line now says in those words\" is wrong because scripts/batch-resume-hook.mjs:326 prints \"node scripts/author-delegate.mjs --lane cross --point <N> in its worktree\"."
+  },
+  {
+   "id": "U131",
+   "from": [
+    "A27"
+   ],
+   "file": "docs/research/natural-villager-motion.md:268",
+   "defect": "[p06] stale-doc · The defect section states the teleport threshold as 6 person units/s at figureWalk.ts:441, but the code now has 10 (raised by point 1343, as the concept doc itself records) and the check sits at figureWalk.ts:494. · evidence: \"treats a ground speed above `VILLAGER_MOTION.teleportSpeed` = 6 person units/s\" while src/config/balance.ts:2595 has \"teleportSpeed: 10,\" and the concept says \"exceeded the walk's teleport speed (6), freezing its legs at full run; raised to 10.\""
+  },
+  {
+   "id": "U132",
+   "from": [
+    "A28"
+   ],
+   "file": "scripts/verify/README.md:796",
+   "defect": "[p07] stale-doc · The README lists `probeSilhouetteFooting` among the helpers \"two themes share\", but only polish-panorama imports or calls it. · evidence: \"the helpers two themes share (`check`, `nextFrames`, `stepUntil`, `goToPlace`, `probeSilhouetteFooting`)\" while the only importer is polish-panorama.mjs:12 (\"import { section, check, probeSilhouetteFooting, page, … } from './_polish.mjs'\") and no other theme file names it, so it is not shared by two themes."
+  },
+  {
+   "id": "U133",
+   "from": [
+    "A29"
+   ],
+   "file": "scripts/verify/_polish.mjs:26",
+   "defect": "[p07] dead-code · `sections`, `browser` and `errors` are exported but no module imports them; they are only used inside _polish.mjs. · evidence: \"export const sections = sectionGate()\", \"export const browser = await launchVerifyBrowser()\" (:113), \"export const errors = []\" (:123), while the five theme files import only from { BASE, OUT, section, check, probeSilhouetteFooting, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn }, so these three exports have no importer."
+  },
+  {
+   "id": "U134",
+   "from": [
+    "A30"
+   ],
+   "file": "scripts/verify/carriedJar.mjs:127",
+   "defect": "[p07] dead-code · `PIXEL_CHANGE_THRESHOLD` is exported but nobody imports it; it only serves as the local default of `countChangedPixels`. · evidence: \"export const PIXEL_CHANGE_THRESHOLD = 36\" — `git grep -w PIXEL_CHANGE_THRESHOLD` finds it only in carriedJar.mjs (polish-villagers.mjs imports \"probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar\", and the test imports \"countChangedPixels, judgeCarriedJar, MIN_JAR_PIXELS\")."
+  },
+  {
+   "id": "U135",
+   "from": [
+    "A31"
+   ],
+   "file": "scripts/verify/baseline-classify-core.mjs:477",
+   "defect": "[p07] stale-comment · The comment around the changed attribution lines still places the baseline-lane exemption in polish.mjs, which this range split up and deleted; the only consumer is now polish-villagers.mjs. · evidence: \"excavation picture in polish.mjs, which needs a durable dig record\" while scripts/verify/polish.mjs no longer exists at 54b326987 and `onBaselineLane` is read only at polish-villagers.mjs:3629 (\"const baselineLane = onBaselineLane(process.env)\")."
+  },
+  {
+   "id": "U136",
+   "from": [
+    "A32"
+   ],
+   "file": "scripts/verify/enrichments.mjs:975",
+   "defect": "[p08] stale-comment · The injured-figure block, in a hunk this range edited, cites acceptance criterion §7.1.35, but CLAUDE.md §7.1 stops at 32 (health and afflictions is criterion 22). · evidence: \"(§7.1.35, design.md §6). __player.wounds mirrors the toggled wound meshes.\" while CLAUDE.md §7.1's last item is \"32. **Render pipeline upgrades.**\" and it has \"22. **Health and afflictions.**\" — no criterion 35 exists."
+  },
+  {
+   "id": "U137",
+   "from": [
+    "A33"
+   ],
+   "file": "scripts/verify/frameSubject.test.mjs:5",
+   "defect": "[p08] stale-comment · The file header, inside the changed import hunk, still says the file runs \"a `polish.mjs` sampler block\", but polish.mjs was split and deleted in this range and the test no longer mentions any polish file. · evidence: \"code here — a function Playwright serializes into the page, or a `polish.mjs` sampler block\" while scripts/verify/polish.mjs does not exist at 54b326987 and line 5 is the file's only \"polish\" mention."
+  },
+  {
+   "id": "U138",
+   "from": [
+    "A35"
+   ],
+   "file": "scripts/verify/ladder-core.test.mjs:399",
+   "defect": "[p08] stale-comment · A search-and-replace turned a dated historical measurement about polish.mjs into one about polish-villagers.mjs, a file that did not exist when the ladder was built (point 1086; the split came with point 1129). · evidence: \"Measured the first time the ladder was used in anger: switching to `main` and back rewrote polish-villagers.mjs … refused the covering run of the point that built the ladder\" while the README dates the ladder \"(point 1086)\" and the split \"`polish` is split by THEME (point 1129)\"."
+  },
+  {
+   "id": "U139",
+   "from": [
+    "A37"
+   ],
+   "file": "scripts/verify/polish-children.mjs:1254",
+   "defect": "[p10] stale-comment · The section intro says the arrival hold is lengthened \"for the tap photograph\", but the code lengthens it only for the later arrival-contact observation and its own frame · evidence: \"It also lengthens the tap pause (below) and, for the tap photograph, the arrival hold\" while the tap photograph '1065-tapping-child-at-its-rock' is driven by `b.tapPauseSeconds = 9` (line 1283), and `arrivalHoldSeconds = 9` is set at line 2294 under \"ARRIVAL CONTACT (work-order 1106) ... Lengthen only the contact observation\" for frame '1106-arriving-runner-hand-on-the-far-stone'."
+  },
+  {
+   "id": "U140",
+   "from": [
+    "A38"
+   ],
+   "file": "scripts/verify/polish-panorama.mjs:1",
+   "defect": "[p11] stale-comment · The file header enumerates the suite's themes but omits three sections added after the split (Giza figures, detailed animal models, skyline species scale) · evidence: \"the Giza skyline over Cairo, panorama wildlife and its footing, port skylines, the travel panorama capture, the Sphinx and the walkable Giza site (design.md §2.5/§4.4)\" while the file also declares `section('giza-figures')` (1331), `section('animal-models')` (1417) and `section('skyline-species-scale')` (1646), none of which the header names."
+  },
+  {
+   "id": "U141",
+   "from": [
+    "A39"
+   ],
+   "file": "scripts/verify/polish-panorama.mjs:740",
+   "defect": "[p11] stale-comment · The point-96 note lists bambara and swahili among the settlements a whole run visits before this leave, but in this split suite no earlier section visits either (and Timbuktu, which is visited, is not named) · evidence: \"in a whole run this leave happens AFTER several settlement visits (maasai, bambara, swahili, pedi or sidama, capetown and cairo among them\" while the only places entered before line 735 are cairo (20), maasai-village (115, 665), pedi/sidama/capetown (639), capetown (674) and timbuktu (697); 'bambara' and 'swahili' occur nowhere before line 1488."
+  },
+  {
+   "id": "U142",
+   "from": [
+    "A42"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:2",
+   "defect": "[p13] stale-comment · The header lists the file's themes but leaves out the `speech-distance-scale` section (line 859). · evidence: \"the hypothesis over the speaker, whose a note is, guessing a meaning, the Ctrl labels, the chief at his drummer and the given artefact\" Seven sections exist and only six are named, so the near/far note sizing (point 1271) is missing."
+  },
+  {
+   "id": "U143",
+   "from": [
+    "A43"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:422",
+   "defect": "[p13] stale-comment · The shutter-retry rationale describes a ray cast at a walking child's chest, but `__speechProbeSight` (lines 82-102) now aims at the figure's drawn head and uses the chest only as a fallback. · evidence: \"a single ray at a walking child's chest can slip past it to the ground behind (measured 1.58@ground-disc)\" Lines 86-89 say this very miss was fixed by aiming at the head: \"a ray at the head hit it at 0.98. The chest stays the fallback\"."
+  },
+  {
+   "id": "U144",
+   "from": [
+    "A44"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:589",
+   "defect": "[p13] stale-comment · The comment says the leaving function `isOutsidePlace` decides the stand here, but the code calls a different function, `insidePlace(layout, x, z, 1)`. · evidence: \"putting the player there LEAVES the place (`isOutsidePlace`) ... the function that decides leaving decides it here\" Line 594 is `if (!insidePlace(layout, x, z, 1)) return null`, and boundary.ts documents `insidePlace` as \"what the inhabitants walk by\", with a 1 m margin."
+  },
+  {
+   "id": "U145",
+   "from": [
+    "A46"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:1344",
+   "defect": "[p13] stale-comment · The comment gives the traveller's eye height as 1.6 m, but the game's first-person camera height is EYE_HEIGHT = 1.5. · evidence: \"The traveller's eye stands 1.6 m over the ground he stands on.\" src/scenes/place/roofClearance.ts:35 has `export const EYE_HEIGHT = 1.5` (\"First-person camera height in metres\"), and PlaceScene uses it."
+  },
+  {
+   "id": "U146",
+   "from": [
+    "A47"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:3",
+   "defect": "[p14] stale-comment · The file header's theme list stops at the errands and the mortar, but the suite also runs six more sections. · evidence: \"the well, the stations, the loom, the errands and the mortar (design.md §19.10)\" is wrong because the file goes on to `section('water-jar-carried')` (3723), `section('water-stand-table')` (3966), `section('steadying-palm')` (4263), `section('villager-dress')` (4743), `section('village-walk')` (5261) and `section('figure-micro')` (6117), and the header names none of them."
+  },
+  {
+   "id": "U147",
+   "from": [
+    "A51"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:825",
+   "defect": "[p14] stale-comment · The bootOn helper points to \"the suite's own boot, above\", but no boot remains in this file since the split. · evidence: \"// A fresh game on `seed` (the suite's own boot, above, with the seed named).\" is wrong because the header (4-5) says \"the boot and the shared helpers live in ./_polish.mjs\", and that goto/localStorage.clear boot sits in _polish.mjs lines 129-130, not above this section."
+  },
+  {
+   "id": "U148",
+   "from": [
+    "A52"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:3611",
+   "defect": "[p14] stale-comment · The excavation-picture comment names seed 12 and a 6.38 m site gap, but the staging it describes uses seed 1691 and requires sites 9-14 m apart. · evidence: \"Seed 12 puts a store pit and patch 6.38 m apart with an open standing view\" is wrong because the block stages `DIG_PICTURE`, which digSitePicture.mjs defines as \"{ placeId: 'bambara-village', seed: 1691 }\", and `digPictureView` rejects any span outside \"DIG_PICTURE_SPAN = { min: 9, max: 14 }\", which 6.38 m fails."
+  },
+  {
+   "id": "U149",
+   "from": [
+    "A53"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:5264",
+   "defect": "[p14] dead-code · The village-walk section imports appendFileSync from node:fs a second time, although the module already imports it statically. · evidence: \"const { appendFileSync } = await import('node:fs')\" is dead because line 12 already has \"import { appendFileSync, mkdirSync } from 'node:fs'\" (used at 4244 and 4751), so this dynamic import only shadows the same binding."
+  },
+  {
+   "id": "U150",
+   "from": [
+    "A54"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:6258",
+   "defect": "[p14] stale-comment · A comment about choosing a flank stand is left above the walkerBox helper instead of above the standAt it describes. · evidence: \"// Stand at a flank that holds the legs in the picture and is not pushed off.\" is followed at once by \"// The walker's screen box (CSS px) from its projected joints, padded.\" and `const walkerBox`, while the flank-standing code (`const standAt = async (flanks = [1, -1])`) only starts at 6283."
+  },
+  {
+   "id": "U151",
+   "from": [
+    "A56"
+   ],
+   "file": "scripts/verify/run-wait-core.test.mjs:189",
+   "defect": "[p15] stale-comment · The comment still prices the full pass at the pre-split 2536.0 s although the polish row was removed from the plan. · evidence: \"// 2536.0 s (full pass + preview) + the render-only WebGPU pass.\" while line 180 of the same file now asserts the single pass is \"(2536.0 - SUITE_RUNTIME_S.polish)\" = 2195.1 s, since the five polish theme suites are in UNMEASURED_SUITES."
+  },
+  {
+   "id": "U152",
+   "from": [
+    "A57"
+   ],
+   "file": "scripts/verify/run-wait-core.test.mjs:335",
+   "defect": "[p15] stale-comment · The comment states a plan figure the code no longer produces. · evidence: \"// The plan says ~81 min; the band says 115–121.\" but with polish replaced by the unmeasured POLISH_THEME_SUITES, planRun({ argv: ['large'] }) at 54b326987 yields about 69.4 min."
+  },
+  {
+   "id": "U153",
+   "from": [
+    "A58"
+   ],
+   "file": "scripts/verify/run-wait-core.mjs:140",
+   "defect": "[p15] stale-comment · The SEPTEMBER_BANDS doc gives, in the present tense, plan figures the split invalidated. · evidence: \"the plan it produces for a both-backend LARGE is 80 min 48 s ... and for a whole `polish` pass 5 min 41 s\" but the plan now leaves out polish's 340.9 s (about 69.4 min for a LARGE), and no `polish` suite is planned any more (\"no suite of that name runs any more\", same file)."
+  },
+  {
+   "id": "U154",
+   "from": [
+    "A60"
+   ],
+   "file": "src/communication/speechLabel.ts:26",
+   "defect": "[p16] stale-comment · The GROWN_FIGURE_HEIGHT doc still says a speaker is measured from its actor record, but the diff moved the anchor to the drawn head. · evidence: \"Only a FALLBACK: a speaker is measured from its own record\" while speechLabelHeight's new doc says the anchor is \"the top of that speaker's own drawn head ... (`drawnHeadRise`, falling back to the actor record)\"."
+  },
+  {
+   "id": "U155",
+   "from": [
+    "A65"
+   ],
+   "file": "src/config/balance.ts:3013",
+   "defect": "[p17] dead-code · VILLAGER_GLTF.standSpeed is added but nothing in src or scripts reads it. · evidence: \"standSpeed: 0.08,\" — `git grep standSpeed 54b326987` finds only this line and a docs/four-eyes brief, so its doc \"Ground speed ... below which the figure stands\" describes no behavior."
+  },
+  {
+   "id": "U156",
+   "from": [
+    "A68"
+   ],
+   "file": "src/render/faunaUngulates.ts:385",
+   "defect": "[p18] dead-code · buildUngulateParts is exported, but no other file imports it; only this module's own species builders call it. · evidence: \"export function buildUngulateParts(s: UngulateSpec, radial = DEFAULT_FAUNA_BODY_SEGMENTS)\" `git grep -lw buildUngulateParts 54b326987` lists only src/render/faunaUngulates.ts."
+  },
+  {
+   "id": "U157",
+   "from": [
+    "A69"
+   ],
+   "file": "src/render/faunaUngulates.ts:392",
+   "defect": "[p18] dead-code · buildUngulate is exported, but no other file imports it; only this module's own species builders call it. · evidence: \"export function buildUngulate(s: UngulateSpec, radial = DEFAULT_FAUNA_BODY_SEGMENTS): THREE.BufferGeometry {\" `git grep -lw buildUngulate 54b326987` lists only src/render/faunaUngulates.ts."
+  },
+  {
+   "id": "U158",
+   "from": [
+    "A71"
+   ],
+   "file": "src/render/figureWalk.ts:584",
+   "defect": "[p19] dead-code · PrimitiveLayout.groupScale is always the constant [1, 1, 1], and no production code reads it; only a test checks that it is uniform. · evidence: \"groupScale: [number, number, number]\" / \"groupScale: [1, 1, 1],\" `git grep -lw groupScale 54b326987 -- src` lists only figureWalk.ts and figureWalk.test.ts; placeFigure.tsx, which consumes primitiveLayout, never reads the field."
+  },
+  {
+   "id": "U159",
+   "from": [
+    "A74"
+   ],
+   "file": "src/render/figureWalk.ts:85",
+   "defect": "[p19] dead-code · footCycle is exported, but no other file imports it. · evidence: \"export function footCycle(psi: number)\" `git grep -lw footCycle 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "U160",
+   "from": [
+    "A75"
+   ],
+   "file": "src/render/figureWalk.ts:93",
+   "defect": "[p19] dead-code · ageFactor is exported, but no other file imports it. · evidence: \"export function ageFactor(age: AgeGroup): number {\" `git grep -lw ageFactor 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "U161",
+   "from": [
+    "A76"
+   ],
+   "file": "src/render/figureWalk.ts:118",
+   "defect": "[p19] dead-code · rephase is exported, but no other file imports it. · evidence: \"export function rephase(phase: number, from: number, to: number): number {\" `git grep -lw rephase 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "U162",
+   "from": [
+    "A77"
+   ],
+   "file": "src/render/figureWalk.ts:142",
+   "defect": "[p19] dead-code · freePlant is exported, but no other file imports it. · evidence: \"export const freePlant = (): FootPlant =>\" `git grep -lw freePlant 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "U163",
+   "from": [
+    "A78"
+   ],
+   "file": "src/render/figureWalk.ts:167",
+   "defect": "[p19] dead-code · plantFoot is exported, but no other file imports it; only stepWalk in the same file calls it. · evidence: \"export function plantFoot(\" `git grep -lw plantFoot 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "U164",
+   "from": [
+    "A79"
+   ],
+   "file": "src/render/figureWalk.ts:379",
+   "defect": "[p19] dead-code · HEAD_TOP_AXIS is exported, but no other file imports it. · evidence: \"export const HEAD_TOP_AXIS = 0.06\" `git grep -lw HEAD_TOP_AXIS 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "U165",
+   "from": [
+    "A80"
+   ],
+   "file": "src/render/figureWalk.ts:568",
+   "defect": "[p19] dead-code · PRIMITIVE_KNEEL is exported, but no other file imports it. · evidence: \"export const PRIMITIVE_KNEEL = { width: 0.55, height: 0.55 * 0.75 } as const\" `git grep -lw PRIMITIVE_KNEEL 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "U166",
+   "from": [
+    "A81"
+   ],
+   "file": "src/render/figureRig.ts:217",
+   "defect": "[p19] dead-code · SQUASH_BLEND is exported, but no other file imports it. · evidence: \"export const SQUASH_BLEND = 0.08\" `git grep -lw SQUASH_BLEND 54b326987` lists only src/render/figureRig.ts."
+  },
+  {
+   "id": "U167",
+   "from": [
+    "A82"
+   ],
+   "file": "src/render/figureRig.ts:237",
+   "defect": "[p19] dead-code · PALM_NORMAL is exported, but no other file imports it; only palmNormal in the same file reads it. · evidence: \"export const PALM_NORMAL = {\" `git grep -lw PALM_NORMAL 54b326987` lists only src/render/figureRig.ts."
+  },
+  {
+   "id": "U168",
+   "from": [
+    "A86"
+   ],
+   "file": "src/render/renderSupport.ts:58",
+   "defect": "[p20] dead-code · probeRenderSupport is never called by game code; App.tsx uses renderSupportNow and hasWebgpuAdapter directly, so only renderSupport.test.ts imports it. · evidence: \"export async function probeRenderSupport(env: RenderSupportEnv = browserEnv()): Promise<boolean> {\" `git grep -n renderSupport 54b326987 -- src` shows App.tsx importing only \"{ hasWebgpuAdapter, renderSupportNow }\"."
+  },
+  {
+   "id": "U169",
+   "from": [
+    "A87"
+   ],
+   "file": "src/render/placeRiver.ts:133",
+   "defect": "[p20] dead-code · RIVER_FLOOR_SINK is exported, but no other file imports it. · evidence: \"export const RIVER_FLOOR_SINK = 0.05\" `git grep RIVER_FLOOR_SINK 54b326987` finds it only in src/render/placeRiver.ts."
+  },
+  {
+   "id": "U170",
+   "from": [
+    "A88"
+   ],
+   "file": "src/render/placeRiver.ts:265",
+   "defect": "[p20] dead-code · FOAM_PATCH_FRAY is exported, but no other file imports it. · evidence: \"export const FOAM_PATCH_FRAY = 0.3\" `git grep FOAM_PATCH_FRAY 54b326987` finds it only in src/render/placeRiver.ts."
+  },
+  {
+   "id": "U171",
+   "from": [
+    "A89"
+   ],
+   "file": "src/render/placeRiver.ts:422",
+   "defect": "[p20] dead-code · buildLeafGeometry is exported, but no other file imports it; only buildFlotsamGeometry in the same file calls it. · evidence: \"export function buildLeafGeometry(): THREE.BufferGeometry {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "U172",
+   "from": [
+    "A90"
+   ],
+   "file": "src/render/placeRiver.ts:432",
+   "defect": "[p20] dead-code · buildGrassTuftGeometry is exported, but no other file imports it; only buildFlotsamGeometry calls it. · evidence: \"export function buildGrassTuftGeometry(): THREE.BufferGeometry {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "U173",
+   "from": [
+    "A91"
+   ],
+   "file": "src/render/placeRiver.ts:451",
+   "defect": "[p20] dead-code · buildTwigGeometry is exported, but no other file imports it; only buildFlotsamGeometry calls it. · evidence: \"export function buildTwigGeometry(): THREE.BufferGeometry {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "U174",
+   "from": [
+    "A92"
+   ],
+   "file": "src/render/villagerAsset.ts:90",
+   "defect": "[p20] dead-code · boneOfNode is exported, but no other file imports it. · evidence: \"export const boneOfNode = (node: string): string =>\" `git grep -lw <name> 54b326987` lists only its own file; it is used only inside villagerFromGltf."
+  },
+  {
+   "id": "U175",
+   "from": [
+    "A93"
+   ],
+   "file": "src/render/villagerAsset.ts:111",
+   "defect": "[p20] dead-code · villagerFromGltf is exported, but no other file imports it; only parseVillager in the same file calls it. · evidence: \"export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THREE.AnimationClip[] }): VillagerAsset {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "U176",
+   "from": [
+    "A94"
+   ],
+   "file": "src/render/villagerClipPose.ts:1089",
+   "defect": "[p21] dead-code · shovelTip is exported but called nowhere, neither by another file under src or scripts (test files included) nor inside its own file. · evidence: \"export function shovelTip(\" is its only occurrence; `git grep -lw shovelTip 54b326987 -- src scripts` lists only src/render/villagerClipPose.ts."
+  },
+  {
+   "id": "U177",
+   "from": [
+    "A95"
+   ],
+   "file": "src/render/villagerClipPose.ts:47",
+   "defect": "[p21] dead-code · HeldFoot is exported but imported by no other file; it is used only inside its own file. · evidence: \"export type HeldFoot = Record<Contact, ...>\" is referenced only by \"const freeFoot = (): HeldFoot\" and \"held: [HeldFoot, HeldFoot]\" in the same file; `git grep -lw HeldFoot` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "U178",
+   "from": [
+    "A96"
+   ],
+   "file": "src/render/villagerClipPose.ts:77",
+   "defect": "[p21] dead-code · LiftOff is exported but imported by no file; it is used only inside its own file (balance.ts only names it in a comment). · evidence: \"export interface LiftOff {\" with uses only in \"lift: [LiftOff, LiftOff]\" and \"const freeLift = (): LiftOff\"; the other hit is the comment \"(villagerClipPose.ts `LiftOff`)\" in src/config/balance.ts."
+  },
+  {
+   "id": "U179",
+   "from": [
+    "A97"
+   ],
+   "file": "src/render/villagerClipPose.ts:107",
+   "defect": "[p21] dead-code · PLANT_TOUCH is exported, but outside its own file only its own test reads it. · evidence: \"export const PLANT_TOUCH = 0.02\"; `git grep -lw PLANT_TOUCH` lists only villagerClipPose.ts and villagerClipPose.test.ts."
+  },
+  {
+   "id": "U180",
+   "from": [
+    "A98"
+   ],
+   "file": "src/render/villagerClipPose.ts:139",
+   "defect": "[p21] dead-code · stanceOf is exported, but besides its own file (blendGait) only its own test imports it. · evidence: \"export function stanceOf(clip: VillagerClip, side: 'L' | 'R')\"; `git grep -lw stanceOf` lists only villagerClipPose.ts and villagerClipPose.test.ts."
+  },
+  {
+   "id": "U181",
+   "from": [
+    "A99"
+   ],
+   "file": "src/render/villagerClipPose.ts:177",
+   "defect": "[p21] dead-code · stanceSync is exported but used only inside its own file. · evidence: \"export function stanceSync(phase: number, ...)\" is called only in \"samplePhase(p.clip, stanceSync(phase, b, e), frame, ...)\" in the same file; `git grep -lw stanceSync` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "U182",
+   "from": [
+    "A100"
+   ],
+   "file": "src/render/villagerClipPose.ts:265",
+   "defect": "[p21] dead-code · heelOff is exported, but besides its own file only its own test imports it (balance.ts only names it in comments). · evidence: \"export function heelOff(frame: PersonFrame, ...)\"; importers are only villagerClipPose.test.ts, and balance.ts has just \"(villagerClipPose.ts `heelOff`)\" in doc comments."
+  },
+  {
+   "id": "U183",
+   "from": [
+    "A101"
+   ],
+   "file": "src/render/villagerClipPose.ts:426",
+   "defect": "[p21] dead-code · gaitFootGround is exported, but besides its own file (clipGaitPose) only its own test imports it (balance.ts only names it in a comment). · evidence: \"export function gaitFootGround(asset: VillagerAsset, ...)\"; importers are only villagerClipPose.test.ts, and balance.ts has just \"(villagerClipPose.ts `gaitFootGround`)\"."
+  },
+  {
+   "id": "U184",
+   "from": [
+    "A102"
+   ],
+   "file": "src/render/villagerClipPose.ts:922",
+   "defect": "[p21] dead-code · kneePole is exported but used only inside its own file. · evidence: \"export function kneePole(hip: THREE.Vector3, ...)\" is called only by \"kneePole(hip, knee, ankle, straight, _kp)\" in kneeTurn; `git grep -lw kneePole` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "U185",
+   "from": [
+    "A103"
+   ],
+   "file": "src/render/villagerClipPose.ts:954",
+   "defect": "[p21] dead-code · kneeTurn is exported, but besides its own file (correctLeg) only its own test imports it. · evidence: \"export function kneeTurn(\"; `git grep -lw kneeTurn` lists only villagerClipPose.ts and villagerClipPose.test.ts."
+  },
+  {
+   "id": "U186",
+   "from": [
+    "A104"
+   ],
+   "file": "src/render/villagerClipPose.ts:999",
+   "defect": "[p21] dead-code · correctLeg is exported but used only inside its own file. · evidence: \"export function correctLeg(\" is called only in \"if (far || fw > 0 || tw > 0) correctLeg(asset, frame.rest0, out, world, ...)\" in the same file; `git grep -lw correctLeg` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "U187",
+   "from": [
+    "A105"
+   ],
+   "file": "src/render/villagerClipPose.ts:106",
+   "defect": "[p21] stale-comment · PLANT_TOUCH's doc calls it the height up to which a contact still carries, but a held contact carries up to G.plantLetGo (2) times that height; PLANT_TOUCH is only the height at which a contact takes hold. · evidence: \"/** How far a contact may lie above the ground and still carry (person units). */\" vs \"const letGo = G.plantLetGo * touch\", \"if (!body || y >= letGo) { held[k] = null\" (plantLetGo: 2), the in-code note \"and over a band above the touch height, so its share of the hold fades over frames\", and \"if (_yHold[k] < touch && !held[k]) held[k] = ...\"."
+  },
+  {
+   "id": "U188",
+   "from": [
+    "A108"
+   ],
+   "file": "src/render/villagerClipPose.test.ts:208",
+   "defect": "[p21] stale-comment · The comment gives the slide bound as 0.004 person units, but walkStraight measures the slide in figure units (person units times f.scale). · evidence: \"0.004 person units per frame everywhere\" vs walkStraight's \"down[s + k] = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)\" feeding \"slide = Math.max(slide, now[key].distanceTo(last[key]))\", checked by \"expect(r.slide, where).toBeLessThan(0.004)\"."
+  },
+  {
+   "id": "U189",
+   "from": [
+    "A221"
+   ],
+   "file": "src/scenes/place/riverBank.test.ts:243",
+   "defect": "[p31] stale-comment · The new comment credits the asymmetric shore reach to a downstream-only widening that `riverBank.ts` now says was undone. · evidence: \"(work-order 1237: the downstream side runs on with the widened lobe)\" `riverBank.ts` `BANK_PLATEAU_ANGLE` now says \"THE BANK IS SYMMETRIC (work-order 1245) … Work-order 1237 had widened only the DOWNSTREAM side … Both sides now carry the same plateau\"."
+  },
+  {
+   "id": "U190",
+   "from": [
+    "A223"
+   ],
+   "file": "src/scenes/place/rackWorkerSteady.test.tsx:32",
+   "defect": "[p31] stale-comment · `visitAt`'s doc says the visit ends standing again, but its last branch returns the `back` phase, which is the walk back to the mortar. · evidence: \"standing (arrived), taking, eating, standing again\" The code returns `{ phase: 'back', … }`, and `poundingPair.test.ts` names that phase \"walk back\" in its cycle \"pound, settle, walk, take, eat, walk back, pound\"."
+  },
+  {
+   "id": "U191",
+   "from": [
+    "A257"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:533",
+   "defect": "[p34] dead-code · The `'silent'` branch of advanceWord can only run under tests: the only game caller of stepCanoe (RiverFishery.tsx) has a `say` that answers only 'said' or 'held'. · evidence: \"if (answer === 'silent') { w.state = 'passed'\" vs RiverFishery.tsx \"if (!floor) return 'said'; return floor.request({...}) ? 'said' : 'held'\"; the CanoeView doc itself notes \"The scene no longer answers `silent`\"."
+  },
+  {
+   "id": "U192",
+   "from": [
+    "A258"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:49",
+   "defect": "[p34] dead-code · CANOE_PHASES is imported only by its own test (villagerCanoe.test.ts); no game code uses it. · evidence: \"export const CANOE_PHASES: readonly CanoePhase[] = ['up', 'callDown', ...]\" — git grep -lw CANOE_PHASES finds only villagerCanoe.ts and villagerCanoe.test.ts."
+  },
+  {
+   "id": "U193",
+   "from": [
+    "A259"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:90",
+   "defect": "[p34] dead-code · CANOE_PADDLER_AFT is exported but used only inside its own file. · evidence: \"export const CANOE_PADDLER_AFT = 1.6\" — git grep -lw CANOE_PADDLER_AFT finds only villagerCanoe.ts (used in seatMen)."
+  },
+  {
+   "id": "U194",
+   "from": [
+    "A260"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:126",
+   "defect": "[p34] dead-code · lanePoint is exported but used only inside its own file and by its own test. · evidence: \"export function lanePoint(lane: CanoeLane, s: number): BankPoint\" — outside villagerCanoe.ts only villagerCanoe.test.ts references it."
+  },
+  {
+   "id": "U195",
+   "from": [
+    "A261"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:131",
+   "defect": "[p34] dead-code · segmentGap is exported but used only inside its own file; the one other hit is an unrelated local function of the same name in a test. · evidence: \"export function segmentGap(a: BankPoint, ...\" vs fisheryGutting.test.tsx \"const segmentGap = (p0: THREE.Vector3, ...\" (its own definition, no import)."
+  },
+  {
+   "id": "U196",
+   "from": [
+    "A262"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:155",
+   "defect": "[p34] dead-code · canoeRangeGap is exported but outside its own file only tests use it (villagerCanoe.test.ts, fishFire.test.ts); no game code imports it. · evidence: \"export function canoeRangeGap(lane: CanoeLane, c: BankPoint, d: BankPoint = c): number\" — git grep -lw canoeRangeGap finds villagerCanoe.ts, villagerCanoe.test.ts, fishFire.test.ts only."
+  },
+  {
+   "id": "U197",
+   "from": [
+    "A263"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:165",
+   "defect": "[p34] dead-code · canoeStretchGap is used only by its own test. · evidence: \"export function canoeStretchGap(lane: CanoeLane, rocks: ...)\" — git grep -lw canoeStretchGap finds only villagerCanoe.ts and villagerCanoe.test.ts."
+  },
+  {
+   "id": "U198",
+   "from": [
+    "A264"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:175",
+   "defect": "[p34] dead-code · wrapAngle is exported but used only inside its own file; scripts/verify/stanceSlip.mjs defines its own. · evidence: \"export function wrapAngle(a: number): number\" vs stanceSlip.mjs \"const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a))\"."
+  },
+  {
+   "id": "U199",
+   "from": [
+    "A265"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:45",
+   "defect": "[p34] dead-code · The exported types CanoePhase and CanoeWord are imported only by test files (villagerCanoe.test.ts; fishFire.test.ts for CanoeWord); no game code imports them. · evidence: \"export type CanoePhase = ...\" / \"export type CanoeWord = 'UPSTREAM' | 'DOWNSTREAM'\" — the only non-defining git grep hits are villagerCanoe.test.ts and fishFire.test.ts."
+  },
+  {
+   "id": "U200",
+   "from": [
+    "A266"
+   ],
+   "file": "src/scenes/place/villagerCanoe.ts:54",
+   "defect": "[p34] dead-code · The exported types NetManAction, CanoeMan, CanoeWordState and CanoeView are used only inside their own file. · evidence: \"export type NetManAction\", \"export interface CanoeMan\" (189), \"export interface CanoeWordState\" (206), \"export interface CanoeView\" (251) — git grep -lw finds each only in villagerCanoe.ts."
+  },
+  {
+   "id": "U201",
+   "from": [
+    "A267"
+   ],
+   "file": "src/scenes/place/waterStand.ts:17",
+   "defect": "[p34] dead-code · The exported interface StandPoint is used only inside its own file. · evidence: \"export interface StandPoint {\" — git grep -lw StandPoint finds only waterStand.ts."
+  },
+  {
+   "id": "U202",
+   "from": [
+    "A268"
+   ],
+   "file": "src/scenes/place/waterStand.ts:24",
+   "defect": "[p34] dead-code · STAND_PLANK_TOP is exported but outside its own file only a test (adultWork.test.ts) reads it; no game code imports it. · evidence: \"export const STAND_PLANK_TOP = 0.385\" — git grep -lw finds waterStand.ts and adultWork.test.ts only."
+  },
+  {
+   "id": "U203",
+   "from": [
+    "A269"
+   ],
+   "file": "src/scenes/place/waterStand.ts:83",
+   "defect": "[p34] dead-code · TAKE_REACHED and takeEnvelope are exported but used only inside their own file and by their own test. · evidence: \"export const TAKE_REACHED = 0.3\", \"export function takeEnvelope(progress: number)\" (95) — git grep -lw finds only waterStand.ts and waterStand.test.ts."
+  },
+  {
+   "id": "U204",
+   "from": [
+    "A270"
+   ],
+   "file": "src/scenes/travel/TravelScene.tsx:2544",
+   "defect": "[p34] stale-comment · The comment still promises a walking bob, but the walk bounce was removed: on foot the figure's lift is now 0 and the body walks by its gait. · evidence: \"// Face the movement direction; bob gently while walking.\" vs \"inner.current.position.y = pose.figureY\" with travellerPose's \"On foot the body walks by itself ... : 0\" (the old \"moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0\" is deleted)."
+  },
+  {
+   "id": "U205",
+   "from": [
+    "A271"
+   ],
+   "file": "src/scenes/travel/TravelScene.tsx:2644",
+   "defect": "[p34] dead-code · wasWounds is still recorded and compared in the change gate, but the gate's body no longer does anything wound-related (the wound marks moved to a per-frame update below), so the wound term only re-sets boat/carry visibility. · evidence: \"|| wasWounds.current !== wounds) { ... wasWounds.current = wounds; if (boat.current) boat.current.visible = canoeing; if (carry.current) carry.current.visible = carrying }\" under \"// Wounds show on the figure, scaling with severity\", while the marks are set after it: \"// Every frame, not on the flip\"."
+  },
+  {
+   "id": "U206",
+   "from": [
+    "A272"
+   ],
+   "file": "src/scenes/place/wedgeCarve.test.ts:144",
+   "defect": "[p34] stale-comment · The describe title and the guard message call seed 5 the reporting/reported village, but the comment just above says seed 5 is a stand-in chosen because the reported seed no longer has a pinch. · evidence: \"describe('buildWedgeCarve in the quarter the reporting village places today (seed 5)'\" and \"throw new Error('the reported village carries no children`s quarter')\" (154) vs \"Point 1282 moved the quarter of the reported seed 2972259115 ... The bambara plan with the most carved ground among seeds 1-15 stands in.\""
+  },
+  {
+   "id": "U207",
+   "from": [
+    "A273"
+   ],
+   "file": "src/scenes/travel/Wildlife.tsx:408",
+   "defect": "[p35] stale-comment · The rewritten chaseSwim doc says the field holds where the calf was first seen on the water, but for the hunted calf chaseFleeMove stores the pre-step (entry-bank) spot. · evidence: \"holding the spot where it was first seen on the water: for the hunted calf, landing across the water from that spot ends the chase\" contradicts line 2313-2316 \"Entering the water notes the entry bank spot ... a.chaseSwim = { x: fromX, z: fromZ }\" (fromX/fromZ is the position before the step into the water)"
+  },
+  {
+   "id": "U208",
+   "from": [
+    "A275"
+   ],
+   "file": "src/scenes/travel/youngKill.test.ts:34",
+   "defect": "[p36] stale-comment · The test constant claims to mirror Wildlife's CARCASS_DISSOLVE_SECONDS but carries a different value. · evidence: \"const CARCASS_SECONDS = 10 // the predator's feed on the dead young (Wildlife CARCASS_DISSOLVE_SECONDS)\" is wrong because src/scenes/travel/Wildlife.tsx:921 has \"const CARCASS_DISSOLVE_SECONDS = 9\" (and calfShieldContact.test.ts mirrors it as 9)"
+  },
+  {
+   "id": "U209",
+   "from": [
+    "A276"
+   ],
+   "file": "src/scenes/travel/wildlifeBehavior.ts:474",
+   "defect": "[p36] dead-code · nearestBankTarget has no production caller left: this change moved both of its Wildlife.tsx call sites to safeBankTarget, so only tests and a doc comment still reference it. · evidence: the diff removes \"nearestBankTarget,\" from Wildlife.tsx's import list and repo-wide grep finds it only in wildlifeBehavior.test.ts, waterEdgeFlee.test.ts and the safeBankTarget doc (\"this is exactly nearestBankTarget\")"
+  },
+  {
+   "id": "U210",
+   "from": [
+    "A277"
+   ],
+   "file": "design.md:655",
+   "defect": "[p36] stale-doc · §19.5 still says an animal on water heads for the nearest bank, but the new swim-out deliberately picks the nearest bank clear of any threat ring, which can be a farther bank. · evidence: design.md \"An animal that comes to rest on water makes for the nearest bank and leaves it\" vs safeBankTarget doc \"the NEAREST bank whose landing lies outside every threat's ring. The plain nearest bank sent an animal ... straight back to the bank the traveller stood on\""
+  },
+  {
+   "id": "U211",
+   "from": [
+    "A279"
+   ],
+   "file": "design.md:816",
+   "defect": "[p37] stale-doc · §21.1 still says Esc closes the F6 report, but StateDump.tsx now has Esc in a description field that holds text only leave the field and keep the report open. · evidence: design.md \"Esc or F6 closes it leaving focus on no control (§17.5)\" vs StateDump.tsx \"if (e.key === 'Escape' && description !== '') { ... e.currentTarget.blur() }\" and its header \"Esc only leaves the field ... the next Esc closes\""
+  },
+  {
+   "id": "U212",
+   "from": [
+    "B2"
+   ],
+   "file": "docs/1308-merged-plan.md:69",
+   "defect": "[p01] md-audit · U1's prescribed failure behavior contradicts the cross-cutting failure rule · evidence: \"injected throw in `berlinStamp` -> exit 0\" conflicts with \"Nothing exits 0 after a failed sub-step.\""
+  },
+  {
+   "id": "U213",
+   "from": [
+    "B3"
+   ],
+   "file": "docs/1452-throughput-inventory.md:53",
+   "defect": "[p01] md-audit · The reported median waiting time is inconsistent with the table · evidence: \"**0** (8.5 among the 10 that waited\" accompanies 20 rows containing ten zero waits and a smallest positive wait of 0.15 h, giving a median of 0.075 h."
+  },
+  {
+   "id": "U214",
+   "from": [
+    "B4"
+   ],
+   "file": "docs/1452-throughput-inventory.md:88",
+   "defect": "[p01] md-audit · The reported owner-lock union exceeds the declared measurement window · evidence: \"Owner lock held | 70.81\" cannot fit within the stated \"70.5 h\" window."
+  },
+  {
+   "id": "U215",
+   "from": [
+    "B5"
+   ],
+   "file": "docs/1455-step1-eval-a.md:68",
+   "defect": "[p01] md-audit · C1 references a test that does not measure the required pair peaks · evidence: \"T1 measured the pair peak ≤ 80 % over ≥ 5 pairs\" conflicts with \"T1 Solo memory profiles\" specifying one solo run per configuration."
+  },
+  {
+   "id": "U216",
+   "from": [
+    "B6"
+   ],
+   "file": "docs/1455-step1-eval-a.md:134",
+   "defect": "[p01] md-audit · The confidence bound incorrectly treats an allowed failure as zero failures · evidence: \"At most 1 attributed red\" followed by \"≥ 60 runs, bound ≈ 5 %\" gives approximately 7.7 %, rather than 5 %, for one red in 60 runs at the stated 95 % confidence."
+  },
+  {
+   "id": "U217",
+   "from": [
+    "B7"
+   ],
+   "file": "docs/1455-step1-eval-b.md:3",
+   "defect": "[p02] md-audit · The document contradicts itself about the evaluator’s inputs · evidence: \"B saw the three docs, README, _server.mjs and run-all.mjs only\" conflicts with B2’s \"the named implementation files and raw verify logs are not visible here\"."
+  },
+  {
+   "id": "U218",
+   "from": [
+    "B9"
+   ],
+   "file": "docs/1455-step2-merged-plan.md:189",
+   "defect": "[p02] md-audit · The plan gives conflicting descriptions of load reporting with off mode · evidence: \"off drops the recorded label that marks a pair member\" conflicts with §2’s \"`--on-load=off` still reports the load\"."
+  },
+  {
+   "id": "U219",
+   "from": [
+    "B10"
+   ],
+   "file": "docs/1455-step4-log.md:29",
+   "defect": "[p02] md-audit · The log restarts after watcher loss although the approved protocol makes the resulting sampler failure a stopping breach · evidence: \"Restarted 14:37 detached from the session\" contradicts plan §4.1’s \"pair counts as a failed sampler (stop, as a breach)\" and §4.4’s mandatory \"no failed sampler\"."
+  },
+  {
+   "id": "U220",
+   "from": [
+    "B11"
+   ],
+   "file": "docs/analysis_de/lesson-mechanisms.md:102",
+   "defect": "[p03] md-audit · The board-structure description still counts four sections, contradicting the updated runbook’s five-section structure · evidence: \"die vier Abschnitte in ihrer Reihenfolge\" versus \"Its five-section structure\" in docs/batch-owner-runbook.md."
+  },
+  {
+   "id": "U221",
+   "from": [
+    "B12"
+   ],
+   "file": "docs/command-index.md:12",
+   "defect": "[p03] md-audit · The ask-lane usage contains an unevaluated JavaScript expression instead of the documented choices for --kind · evidence: \"--kind <' + KINDS.join('\\|') + '>\" leaves source-generation text in the command synopsis."
+  },
+  {
+   "id": "U222",
+   "from": [
+    "B13"
+   ],
+   "file": "docs/command-index.md:169",
+   "defect": "[p03] md-audit · The cut-account-attest usage includes an orphaned JavaScript object fragment · evidence: \"usage: verbatim(usage), kind: verbatim(kind), earliest: verbatim(earliest) }\" is source text presented as command usage."
+  },
+  {
+   "id": "U223",
+   "from": [
+    "B14"
+   ],
+   "file": "docs/command-index.md:239",
+   "defect": "[p03] md-audit · The help-core usage contains an orphaned fragment of its source commentary · evidence: \"usage:` strings. This module only harvests and\" ends mid-sentence and supplies no usage."
+  },
+  {
+   "id": "U224",
+   "from": [
+    "B15"
+   ],
+   "file": "docs/command-index.md:256",
+   "defect": "[p03] md-audit · The measure-context-cost usage contains an orphaned JavaScript expression · evidence: \"usage: foldUsage(usages) }\" is an expression with a closing brace, not a command synopsis."
+  },
+  {
+   "id": "U225",
+   "from": [
+    "B16"
+   ],
+   "file": "docs/command-index.md:260",
+   "defect": "[p03] md-audit · The measure-task-cost-core usage contains an orphaned source fragment · evidence: \"usage: u }\" supplies neither a command nor module usage."
+  },
+  {
+   "id": "U226",
+   "from": [
+    "B18"
+   ],
+   "file": "docs/context-cut-list-1209.md:3",
+   "defect": "[p04] md-audit · The input description contradicts the table about whether all hook texts and firing conditions were supplied · evidence: \"every hook text with its firing condition\" conflicts with U168's \"without a body or predicate in the inputs\" and U164's \"identities and bodies not supplied\"."
+  },
+  {
+   "id": "U227",
+   "from": [
+    "B19"
+   ],
+   "file": "docs/maximum-qa.md:12",
+   "defect": "[p05] md-audit · The recommended cross-lane audit command omits the override required by the documented default routing. · evidence: \"scripts/ask-lane.mjs --lane cross --kind audit\"; docs/lane-routing.md says audit stays on main at `default` and \"the command refuses (exit 3) unless `--anyway` is given\", so the documented invocation cannot supply the promised pass."
+  },
+  {
+   "id": "U228",
+   "from": [
+    "B20"
+   ],
+   "file": "docs/model-lanes-inventory-1393.md:23",
+   "defect": "[p05] md-audit · I1 misclassifies display-name, tuning and runtime variables as model IDs. · evidence: \"Other model ids: `ASTRA_REASONING_EFFORT`, `ASTRA_MODEL_NAME` (second copy of the display name), `CODEX_BIN`, `CODEX_HOME`\"; the display-name annotation and I4's identification of `CODEX_HOME` as the CLI's environment variable contradict that classification."
+  },
+  {
+   "id": "U229",
+   "from": [
+    "B21"
+   ],
+   "file": "docs/model-lanes-merge-1393.md:41",
+   "defect": "[p05] md-audit · The merge record attributes an `alternate` role proposal to half B that half B never makes. · evidence: \"Role keys `main`, `cross`, `scarce` (B's `alternate` not used)\"; B2 explicitly proposes \"three stable lane roles, main, cross, and scarce\", and B9 keeps the fallback within main."
+  },
+  {
+   "id": "U230",
+   "from": [
+    "B23"
+   ],
+   "file": "docs/peoples-1890.md:2412",
+   "defect": "[p06] md-audit · The implementation overview retains an obsolete six-people dress-table count · evidence: \"the live dress table — six peoples\" — the added §8.3 says “The everyday dress of all 22 peoples now reaches the game through one table”."
+  },
+  {
+   "id": "U231",
+   "from": [
+    "B25"
+   ],
+   "file": "scripts/verify/_polish.mjs:182",
+   "defect": "[p07] stale-comment · The pipeline-wait comment promises to withhold an unsettled shot, but `frame()` ignores the failure result and invokes the shutter. · evidence: \"not a shot taken anyway\" contradicts `await awaitPlaceDrawn(name)` followed unconditionally by `return shutter(name, decl, extra)`."
+  },
+  {
+   "id": "U232",
+   "from": [
+    "B26"
+   ],
+   "file": "scripts/verify/communication.mjs:559",
+   "defect": "[p07] dead-code · `loomFrames()` is unreachable under the explicitly stated shipped-route conditions. · evidence: \"the shipped village lays no loom and this route changes no balance\" makes its sole guarded call, `if (loom) await loomFrames(loom)`, inactive."
+  },
+  {
+   "id": "U233",
+   "from": [
+    "B27"
+   ],
+   "file": "scripts/verify/README.md:800",
+   "defect": "[p07] md-audit · The categorical requirement for every multi-suite run contradicts the document’s explicit exceptions. · evidence: \"need `--no-ladder \\\"<why>\\\"` as any multi-suite run does\" conflicts with \"unless the command explicitly names `small` or `large`\" in the development-run rules."
+  },
+  {
+   "id": "U234",
+   "from": [
+    "B30"
+   ],
+   "file": "scripts/verify/polish-children.mjs:2428",
+   "defect": "[p10] stale-comment · The stated broadside preference is reversed by the scoring formula · evidence: \"Broadside to the pair first\" contradicts \"-Math.abs(Math.sin(a - base)) * 2\" with ascending sorting: `base` is already perpendicular to the pair, so otherwise equal candidates parallel to the pair receive the preferred lower score."
+  },
+  {
+   "id": "U235",
+   "from": [
+    "B31"
+   ],
+   "file": "scripts/verify/polish-panorama.mjs:481",
+   "defect": "[p11] dead-code · The goat-staging result contains unused `from` and `to` properties · evidence: \"return { from, to, axis: { x: dx, z: dz } }\"; subsequent code uses only the result’s truthiness and `axis`, never these two properties."
+  },
+  {
+   "id": "U236",
+   "from": [
+    "B32"
+   ],
+   "file": "scripts/verify/polish-panorama.mjs:866",
+   "defect": "[p11] stale-comment · The polling comment implies the east probe waits until its window ends, but it can exit early · evidence: \"window ends (east must stay under a tenth of west)\" contradicts the shared helper’s unconditional \"if (best > 200) break\", which also applies to the east probe."
+  },
+  {
+   "id": "U237",
+   "from": [
+    "B35"
+   ],
+   "file": "scripts/verify/polish-settlement.mjs:1439",
+   "defect": "[p12] dead-code · The non-array and null picker-result branches are unreachable. · evidence: \"Array.isArray(picked) ? picked : picked ? [picked] : []\" — both eavesCase call sites supply callbacks that always return arrays through .filter(...).map(...), including when the layout is absent."
+  },
+  {
+   "id": "U238",
+   "from": [
+    "B36"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:532",
+   "defect": "[p13] dead-code · The speech-owner setup returns a figure count that nobody consumes. · evidence: \"return at.length\" belongs to a bare \"await page.evaluate(() => {\" whose result is neither assigned nor tested."
+  },
+  {
+   "id": "U239",
+   "from": [
+    "B37"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:574",
+   "defect": "[p13] dead-code · aimPair computes an unused height property for each figure. · evidence: \"h: Math.max(0.4, Math.hypot(e[4], e[5], e[6]))\" is returned in pos, but every consumer uses only its coordinates or truthiness."
+  },
+  {
+   "id": "U240",
+   "from": [
+    "B38"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:603",
+   "defect": "[p13] stale-comment · The owner sight-probe comment incorrectly promises rejection of every obstruction before the head. · evidence: \"0 when anything stands in front of the head at ANY of those heights\" contradicts \"if (ratio < 0.85) return 0\"; an obstruction at ratio 0.90 survives and satisfies clear’s 0.85–1.15 band."
+  },
+  {
+   "id": "U241",
+   "from": [
+    "B39"
+   ],
+   "file": "scripts/verify/polish-speech.mjs:729",
+   "defect": "[p13] stale-comment · stage does not ensure its readings come from one frame as documented. · evidence: \"read on ONE aimed frame\" contradicts \"sight: await seen(pair), ...(await read()), crowns: await crowns(pair)\", which performs three separate page evaluations between which animation frames can run."
+  },
+  {
+   "id": "U242",
+   "from": [
+    "B44"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:2324",
+   "defect": "[p14] stale-comment · The coverage explanation calls a begun return leg a completed round trip · evidence: \"WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP\" contradicts its explanation that water-back counts when \"the full leg home has begun, not necessarily ended\", which is the counter assigned to roundTrips."
+  },
+  {
+   "id": "U243",
+   "from": [
+    "B45"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:2644",
+   "defect": "[p14] stale-comment · The fill-shot explanation still says overlap is judged after exposure · evidence: \"the line is read again after the exposure\" contradicts the current sequence \"await freezeLife(true)\", \"spoiled = lineOverlapFrom(...)\", then \"await frame(...)\"; the later read measures drift instead."
+  },
+  {
+   "id": "U244",
+   "from": [
+    "B46"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:3014",
+   "defect": "[p14] stale-comment · The return-shot explanation incorrectly restricts candidate bearings to inward positions · evidence: \"only bearings no further from the settlement's middle than he stands are tried\" contradicts the placement code allowing a non-inward candidate when it remains inside the boundary margin."
+  },
+  {
+   "id": "U245",
+   "from": [
+    "B47"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:3287",
+   "defect": "[p14] stale-comment · The foam-shot explanation incorrectly says its camera position remains the seam-reading position · evidence: \"The camera pose is left exactly as it was — the seam reading below stands at this same spot\" contradicts \"await standAt(river, 0)\" for the foam photograph and the subsequent \"await standAt(river, bankAlong)\" restoring the seam standpoint."
+  },
+  {
+   "id": "U246",
+   "from": [
+    "B48"
+   ],
+   "file": "scripts/verify/run-wait.mjs:27",
+   "defect": "[p15] stale-comment · The documented default marker fails to recognize a completion line after other log output · evidence: \"marker `^exit `\" and \"new RegExp(flagValue(args, '--done') ?? LOG_WAIT_DONE_PATTERN)\" — the CLI omits the multiline flag, so the attached fixture \"work\\nexit 0\\n\" cannot match."
+  },
+  {
+   "id": "U247",
+   "from": [
+    "B49"
+   ],
+   "file": "scripts/verify/run-wait-core.mjs:734",
+   "defect": "[p15] stale-comment · The stall comment promises detection after no log growth, but same-size writes can postpone it indefinitely · evidence: \"no log growth for this long is reported\" versus \"else if (Number.isFinite(log.mtimeMs) && log.mtimeMs > lastWriteAt)\" — that branch resets lastWriteAt despite unchanged size."
+  },
+  {
+   "id": "U248",
+   "from": [
+    "B50"
+   ],
+   "file": "scripts/verify/run-logged.mjs:648",
+   "defect": "[p15] stale-comment · The comment claims both backends are covered even when only one pinned backend was evaluated · evidence: \"Both backends stand\" versus \"return verifyGl === null || verifyGl === undefined ? ['webgl', 'webgpu'] : [selectBackend(verifyGl)]\" — a pinned request can reach this branch with one covered backend and no missing backend."
+  },
+  {
+   "id": "U249",
+   "from": [
+    "B57"
+   ],
+   "file": "src/render/faunaMarkings.ts:175",
+   "defect": "[p18] stale-comment · Silhouette markings do not preserve the mean haze tint for zebras · evidence: \"while the mean tone stays\" contradicts stripes mixing factors 1 and \"stripeDark: 0.12\" before multiplying the tint without any compensating brightening."
+  },
+  {
+   "id": "U250",
+   "from": [
+    "B58"
+   ],
+   "file": "src/render/figureBody.ts:234",
+   "defect": "[p18] stale-comment · The skeleton’s hips root is above the origin when its inverses are taken · evidence: \"while the root is still at the origin\" contradicts `b.position.copy(j[name])`, with the hips joint defined as `v(0, p.hipY)`."
+  },
+  {
+   "id": "U251",
+   "from": [
+    "B60"
+   ],
+   "file": "src/render/figureRig.test.ts:102",
+   "defect": "[p19] stale-comment · The test title promises no deep bend under a steadied head load, but the test explicitly permits one. · evidence: \"but never under a steadied head load\" contradicts \"expect(searchDeepBend({ ...base, wants: false, lean: 0.2, steadying: true })).toBe(true)\"."
+  },
+  {
+   "id": "U252",
+   "from": [
+    "B61"
+   ],
+   "file": "src/render/figureRig.ts:80",
+   "defect": "[p19] stale-comment · An unreachable target inside the arm’s inner limit produces a folded arm rather than an arm pointing straight at it. · evidence: \"out of reach, the arm points straight at it\" contradicts the inner-limit return’s opposing directions, \"upper: longUpper ? dir.clone() : dir.clone().negate(), fore: longUpper ? dir.clone().negate() : dir.clone()\"."
+  },
+  {
+   "id": "U253",
+   "from": [
+    "B62"
+   ],
+   "file": "src/render/figureRig.ts:131",
+   "defect": "[p19] stale-comment · The documented exclusions for posed reaches and steadied loads apply only to the wants branch. · evidence: \"but not for a pose's own reach and not under a steadied head load\" contradicts \"return o.lean > 0 || o.grab || (o.wants && !o.posedReach && !o.steadying)\", whose first two alternatives bypass both exclusions."
+  },
+  {
+   "id": "U254",
+   "from": [
+    "B64"
+   ],
+   "file": "src/render/figureWalk.ts:58",
+   "defect": "[p19] stale-comment · A target inside the leg’s inner reach limit produces a folded leg rather than one pointing straight at the target. · evidence: \"Out of reach the leg points straight at the target\" contradicts the lower distance clamp \"Math.abs(a - b) + 1e-6\" followed by \"const shin = Math.PI - beta\", which folds the knee near the inner limit."
+  },
+  {
+   "id": "U255",
+   "from": [
+    "B66"
+   ],
+   "file": "src/render/figureWalk.ts:496",
+   "defect": "[p19] stale-comment · The walk-distance calculation can advance backward despite the comment’s claim. · evidence: \"never backward\" contradicts \"walked = ahead + Math.sign(ahead || 1) * (aside + turned * M.turnStep)\", which returns a negative distance when ahead is negative."
+  },
+  {
+   "id": "U256",
+   "from": [
+    "B70"
+   ],
+   "file": "src/render/placeRiver.ts:421",
+   "defect": "[p20] stale-comment · The leaf geometry is 0.55 units wide rather than the documented one unit · evidence: \"1 long (z) and 1 wide (x)\" contradicts the quadratic curves with x control coordinates `0.55` and `-0.55`, whose extrema are ±0.275."
+  },
+  {
+   "id": "U257",
+   "from": [
+    "B72"
+   ],
+   "file": "src/render/villagerBody.ts:77",
+   "defect": "[p20] stale-comment · bakeMorphs promises complete mutable-data isolation but shallow-copies userData, preserving references to nested values other than targetNames · evidence: \"Shares nothing mutable with the source\" contradicts `g.userData = { ...src.userData, targetNames: liveNames }`."
+  },
+  {
+   "id": "U258",
+   "from": [
+    "B73"
+   ],
+   "file": "src/render/villagerClipPose.test.ts:140",
+   "defect": "[p21] stale-comment · The helper overstates its sub-frame sample count by one · evidence: \"each frame interval that many times from a copy\" conflicts with \"for (let j = 1; j < probes && keys.length; j++)\", which takes only probes − 1 such samples."
+  },
+  {
+   "id": "U259",
+   "from": [
+    "B76"
+   ],
+   "file": "src/render/villagerClipPose.ts:62",
+   "defect": "[p21] stale-comment · flatYaw remains populated during toe release after the foot stops lying flat · evidence: \"null while it does not\" conflicts with \"_flat[i] <= 0 && !g.held[i].tip && g.lift[i].toes <= 0\", which requires the tip hold and toe-release share to end before clearing the heading."
+  },
+  {
+   "id": "U260",
+   "from": [
+    "B77"
+   ],
+   "file": "src/render/villagerClipPose.ts:135",
+   "defect": "[p21] stale-comment · stanceOf can bridge disconnected support spans despite documenting continuous support · evidence: \"the last lift of the continuous support\" conflicts with \"a <= last[1] + 1e-6 || a - last[0] < 0.1\", whose second condition merges a later span across a gap."
+  },
+  {
+   "id": "U261",
+   "from": [
+    "B78"
+   ],
+   "file": "src/render/villagerClipPose.ts:262",
+   "defect": "[p21] stale-comment · heelOff can return out even when the direction from hip to pivot is defined · evidence: \"'out' only where no direction to the pivot is defined\" conflicts with \"else return 'out'\" after projecting u perpendicular to the already normalized pivot axis, which also rejects a zero projection with positive circle radius."
+  },
+  {
+   "id": "U262",
+   "from": [
+    "B80"
+   ],
+   "file": "src/render/villagerClipPose.ts:996",
+   "defect": "[p21] stale-comment · correctLeg changes a fully straight leg even when its ankle already equals the target · evidence: \"An ankle on its target leaves every local as it was\" conflicts with \"Math.min(a + b - 1e-5, ... H.distanceTo(target))\", which shortens the requested reach below that straight leg's existing length before computing its knee turn."
+  },
+  {
+   "id": "U263",
+   "from": [
+    "B81"
+   ],
+   "file": "src/render/villagerFigureBody.ts:12",
+   "defect": "[p22] stale-comment · The file constructs a scene graph despite claiming otherwise · evidence: \"Pure: plain geometry and arrays, no scene graph\" contradicts createGltfSkeleton’s \"new THREE.Bone()\" and \"list[p].add(list[i])\"."
+  },
+  {
+   "id": "U264",
+   "from": [
+    "B85"
+   ],
+   "file": "src/render/villagerPenetrationReport.test.ts:168",
+   "defect": "[p22] dead-code · The full-motion regression test’s assertions never execute because the test is skipped · evidence: \"it.skip('no garment, column and clip is worse than on main, in the build pose or any other'\" disables both its report comparison and markdown assertion."
+  },
+  {
+   "id": "U265",
+   "from": [
+    "B87"
+   ],
+   "file": "src/render/villagerRig.ts:67",
+   "defect": "[p22] stale-comment · Normalized weighted quaternion summation is not exact spherical interpolation for two unequally weighted poses · evidence: \"exact for two poses\" contradicts the component summation followed by \"const l = Math.hypot(x, y, z, w) || 1\"; identity and a 180° rotation weighted 3:1 yield approximately 36.87°, rather than 45°."
+  },
+  {
+   "id": "U266",
+   "from": [
+    "B88"
+   ],
+   "file": "src/render/villagerRig.ts:239",
+   "defect": "[p22] stale-comment · The sprint cannot start with a heel strike when its heel never touches the ground · evidence: \"All three clips start at the left heel strike (phase 0)\" contradicts villagerRig.test.ts’s \"sprint: on the balls of the feet throughout, the heel never touches\", which asserts both heel heights exceed 0.025 in every sampled frame."
+  },
+  {
+   "id": "U267",
+   "from": [
+    "B89"
+   ],
+   "file": "src/render/waterAppearance.ts:13",
+   "defect": "[p22] stale-comment · The introductory distance-only shading claim overlooks the panorama’s separate fine-detail suppression · evidence: \"In the shading nothing distinguishes near from far but DISTANCE\" contradicts \"The panorama passes 0 where its heightfield leaves the water plane\" and the fine field’s \".mul(float(fineWeight as never))\", which suppresses detail independently of distance."
+  },
+  {
+   "id": "U268",
+   "from": [
+    "B91"
+   ],
+   "file": "src/scenes/actorLabelSource.ts:257",
+   "defect": "[p23] stale-comment · A < 0 alone does not establish that the ellipsoid lies in front of the camera. · evidence: \"A < 0 exactly when the whole ellipsoid lies in front of the eye\" contradicts `A = dot(lb, lb) - cz * cz`, which also holds for an ellipsoid wholly behind the eye; the implementation separately requires `cz < 0`."
+  },
+  {
+   "id": "U269",
+   "from": [
+    "B92"
+   ],
+   "file": "src/scenes/place/PlaceLife.tsx:1926",
+   "defect": "[p24] stale-comment · Porters turn while continuing along their routes, contradicting “on the spot” · evidence: “Turned about at the route's end on the spot” but position follows the time-driven route independently of the eased yaw."
+  },
+  {
+   "id": "U270",
+   "from": [
+    "B94"
+   ],
+   "file": "src/scenes/place/PlaceLife.tsx:3438",
+   "defect": "[p24] stale-comment · Adjacent comments give incompatible descriptions of the dig clock during fades · evidence: “clock running on while it fades” contradicts “it advances only while the hole deepens, so it freezes through a hold or a fade”."
+  },
+  {
+   "id": "U271",
+   "from": [
+    "B95"
+   ],
+   "file": "src/scenes/place/PlaceScene.tsx:2785",
+   "defect": "[p25] dead-code · The `behindName` null branch is unreachable · evidence: \"behindName: behind === undefined ? undefined : behind ? behind.object.name || 'mesh' : null,\" — `behind` comes from `hits.find(...)` or explicit `undefined`; after excluding `undefined`, it is always a truthy intersection object."
+  },
+  {
+   "id": "U272",
+   "from": [
+    "B96"
+   ],
+   "file": "src/scenes/place/RiverFishery.tsx:89",
+   "defect": "[p26] stale-comment · HULL_FLOOR_Y no longer specifies the fish height above water · evidence: \"The hull fish lie this high over the hull's water line\" contradicts their additional parent translation \"[0, CANOE_FREEBOARD - HULL_FLOOR_Y + 0.02, 0]\", which cancels that height before adding each fish's offset."
+  },
+  {
+   "id": "U273",
+   "from": [
+    "B97"
+   ],
+   "file": "src/scenes/place/RiverFishery.tsx:97",
+   "defect": "[p26] stale-comment · FISH_IN_NET_SECONDS controls the initial vertical lift rather than how long fish remain hanging · evidence: \"How long a fish hangs in the net\" contradicts \"if (canoe.phase === 'haul' && came !== undefined)\", which keeps the hanging placement throughout hauling even after the constant's interval expires."
+  },
+  {
+   "id": "U274",
+   "from": [
+    "B98"
+   ],
+   "file": "src/scenes/place/RiverFishery.tsx:369",
+   "defect": "[p26] stale-comment · The freeze comment promises stationary crew poses although the net man's pose can continue animating · evidence: \"The dugout and its crew hold still under the dev life freeze\" contradicts the unconditional \"gesture.current = advanceGesture(gesture.current, dt)\" and payout animation \"0.15 * Math.sin(t * 5)\" outside the stepCanoe freeze gate."
+  },
+  {
+   "id": "U275",
+   "from": [
+    "B100"
+   ],
+   "file": "src/scenes/place/SpeechLabels.tsx:239",
+   "defect": "[p26] stale-comment · figureScreen measures feet from the anchor origin rather than projected foot geometry · evidence: \"DRAWN head top and feet on screen, measured on the projected geometry itself\" contradicts \"const v = anchor.getWorldPosition(new THREE.Vector3()).project(camera)\" followed by \"const feet = v.z > 1 ? null : toScreen(v)\"."
+  },
+  {
+   "id": "U276",
+   "from": [
+    "B102"
+   ],
+   "file": "src/scenes/place/animalSpots.figures.test.ts:5",
+   "defect": "[p26] stale-comment · The opening comment claims zero overlap although the test explicitly permits and documents overlap · evidence: \"no goat stands inside anything\" contradicts \"maasai-village at worst -0.039 m\" and the assertion \"toBeGreaterThan(-0.05)\" for pinched samples."
+  },
+  {
+   "id": "U277",
+   "from": [
+    "B103"
+   ],
+   "file": "src/scenes/place/animalSpots.figures.test.ts:132",
+   "defect": "[p26] stale-comment · The simulation comment repeats a zero-overlap guarantee contradicted by its documented results · evidence: \"not one frame in which a goat stands inside a collider or a figure\" contradicts \"maasai-village at worst -0.039 m\" and the accepted pinched-overlap bound \"toBeGreaterThan(-0.05)\"."
+  },
+  {
+   "id": "U278",
+   "from": [
+    "B104"
+   ],
+   "file": "src/scenes/place/animalSpots.ts:121",
+   "defect": "[p27] stale-comment · The claim that a warmed pool eliminates frame allocations overlooks the helper closure created on every call · evidence: \"a frame allocates nothing once the pool has grown\" conflicts with the per-call function expression \"const circle = (x: number, z: number, r: number) => {\"."
+  },
+  {
+   "id": "U279",
+   "from": [
+    "B105"
+   ],
+   "file": "src/scenes/place/backdropRiver.ts:83",
+   "defect": "[p27] stale-comment · The bisection comment promises exact land exclusion although the fill boundary retains the dry upper bound · evidence: \"so no land between two samples is drawn as water\" contradicts \"far = dry\" and \"out < far\", which include dry points between the actual shore and the finite-resolution upper bound."
+  },
+  {
+   "id": "U280",
+   "from": [
+    "B107"
+   ],
+   "file": "src/scenes/place/bankGame.test.ts:1377",
+   "defect": "[p27] dead-code · The audible expectation's true alternative is unreachable under the parameter table · evidence: \"audible ? 'touch' : null\" receives only \"audible: false\" from both supplied cases."
+  },
+  {
+   "id": "U281",
+   "from": [
+    "B112"
+   ],
+   "file": "src/scenes/place/fishFire.ts:209",
+   "defect": "[p28] stale-comment · The initializer documentation refers to a nonexistent `gutLeft` input · evidence: \"with `gutLeft` fish still to gut\" contradicts the implementation, which obtains that count through \"const gutOf = b?.fish ?? 0\"."
+  },
+  {
+   "id": "U282",
+   "from": [
+    "B115"
+   ],
+   "file": "src/scenes/place/fisheryPoses.ts:36",
+   "defect": "[p28] stale-comment · `ownPose` is documented as copying the supplied pose but discards its extra pose fields · evidence: \"starting as a copy of `from`\" versus \"return { left: { ...from.left }, right: { ...from.right }, lean: from.lean, turn: from.turn }\" omits fields such as the `reach` returned by `carrierGutPose`."
+  },
+  {
+   "id": "U283",
+   "from": [
+    "B118"
+   ],
+   "file": "src/scenes/place/gltfClipLayers.ts:69",
+   "defect": "[p29] stale-comment · The `settleW` comment incorrectly describes square-weight decay for landed feet. · evidence: \"the miss kept as the square of the weight's share\" contradicts \"const k = shares[i] >= 1 ? restep : keep\", which gives landed feet the separate smoothstep-based `restep` ratio."
+  },
+  {
+   "id": "U284",
+   "from": [
+    "B119"
+   ],
+   "file": "src/scenes/place/layout.waterPath.test.ts:100",
+   "defect": "[p29] stale-comment · The water-path introduction still locates the carriers’ speech at the path head. · evidence: \"a head in the village where both carriers speak\" contradicts the added assertion commentary, \"BOTH RIVER WORDS FALL ON THE STAND'S WORK RING\"."
+  },
+  {
+   "id": "U285",
+   "from": [
+    "B123"
+   ],
+   "file": "src/scenes/place/lifeSpots.ts:415",
+   "defect": "[p30] stale-comment · Meeting both floors no longer guarantees precedence over candidates that miss a floor. · evidence: \"that meets BOTH floors wins\" contradicts returning picked.openInReach before picked.nearest, allowing an in-reach ground below MIN_FABRIC to beat a ground meeting both floors outside reach."
+  },
+  {
+   "id": "U286",
+   "from": [
+    "B128"
+   ],
+   "file": "src/scenes/place/mortarPounding.ts:156",
+   "defect": "[p30] stale-comment · The drift comment promises no drift inside the bowl, but the calculation starts increasing drift immediately above impact height. · evidence: \"none in the bowl\" contradicts \"(footY - bottom) / (top - bottom)\", where bottom is impactFootY(cfg), below the rim."
+  },
+  {
+   "id": "U287",
+   "from": [
+    "B131"
+   ],
+   "file": "src/scenes/place/skinnedFigure.tsx:1",
+   "defect": "[p32] stale-comment · The header describes the figure as code-built although buildRig also selects the glTF body. · evidence: \"The settlement's villager on the code-built skinned body\" contradicts the geometry branch \"? cachedGltfFigure(asset, person, layers, key, skin, paint === skin ? null : paint, look.radial)\"."
+  },
+  {
+   "id": "U288",
+   "from": [
+    "B136"
+   ],
+   "file": "src/scenes/place/taskWalkerLoad.test.ts:61",
+   "defect": "[p33] dead-code · The simulation records a mode in every Frame that no test reads. · evidence: \"frames.push({ mode, phase, base: placed.base, planned: placed.planned, hands, hold: h.hold, down: h.down })\" stores `Frame.mode`, but every consumer of this private simulation leaves that field unused."
+  },
+  {
+   "id": "U289",
+   "from": [
+    "B137"
+   ],
+   "file": "src/scenes/place/taskWalkerStop.ts:2",
+   "defect": "[p33] stale-comment · The opening comment incorrectly places removal of the load in the standing phase. · evidence: \"it takes the load off its head with both hands while standing\" contradicts `loadHandling` keeping `down: 0` throughout `take`; lowering starts in `work`, when `workStop` commands kneeling."
+  },
+  {
+   "id": "U290",
+   "from": [
+    "B138"
+   ],
+   "file": "src/scenes/place/useColdCloaks.ts:42",
+   "defect": "[p33] stale-comment · The comment gives incompatible counts of peoples with seasonal dress. · evidence: \"fifteen of the game's twenty-two peoples\" receive everyday dress, leaving seven, whereas the same comment says \"the six dressed peoples\"."
+  },
+  {
+   "id": "U291",
+   "from": [
+    "B139"
+   ],
+   "file": "src/scenes/place/villagerCanoe.test.ts:190",
+   "defect": "[p33] dead-code · The private replay records Sample fields t, s and yaw that none of its consumers reads. · evidence: \"t,\", \"s: state.s,\" and \"yaw: state.yaw,\" populate fields unused by every consumer of `states` in the complete attached file."
+  },
+  {
+   "id": "U292",
+   "from": [
+    "B142"
+   ],
+   "file": "src/scenes/place/waterStand.ts:54",
+   "defect": "[p34] stale-comment · The documented empty-stand fallback selects the first jar slot rather than the row’s middle. · evidence: \"with none, the row's middle\" contradicts `const slot = Math.max(0, Math.min(balance.waterStandCapacity, count) - 1)`, which selects slot 0 for zero jars; `standJarLocal` positions that slot off-centre whenever capacity exceeds one."
+  },
+  {
+   "id": "U293",
+   "from": [
+    "B143"
+   ],
+   "file": "src/scenes/place/waterStand.ts:63",
+   "defect": "[p34] stale-comment · `tableSpot` can return an unchecked point closer than the documented distance from the centre. · evidence: \"`reach` from the centre\" and \"Off standable ground, null\" contradict `if (d <= reach) return { x: from.x, z: from.z }`, which preserves closer coordinates and bypasses `standable`."
+  },
+  {
+   "id": "U294",
+   "from": [
+    "B144"
+   ],
+   "file": "src/scenes/travel/Wildlife.tsx:2336",
+   "defect": "[p35] stale-comment · The swim-out comment guarantees clearance that the bank picker does not guarantee. · evidence: \"never lands inside the ring it fled\" contradicts the added test returning `safeBankTarget(0, 0, pond, 10, [{ x: 0, z: -3, r: 20 }])`, whose entire search radius lies inside the threat ring."
+  },
+  {
+   "id": "U295",
+   "from": [
+    "B145"
+   ],
+   "file": "src/scenes/travel/Wildlife.tsx:2736",
+   "defect": "[p35] stale-comment · The calf swim-out comment incorrectly promises a bank outside the threat ring. · evidence: \"bank clear of what it fled\" contradicts the added all-banks-threatened test, which requires `safeBankTarget` to return a threatened bank."
+  },
+  {
+   "id": "U296",
+   "from": [
+    "B146"
+   ],
+   "file": "src/scenes/travel/Wildlife.tsx:3499",
+   "defect": "[p35] stale-comment · The water-exit comment incorrectly describes every selected bank as clear of the threat. · evidence: \"The nearest bank clear of what it fled\" contradicts the added test demonstrating that `safeBankTarget` returns a bank even when every reachable bank is threatened."
+  },
+  {
+   "id": "U297",
+   "from": [
+    "B148"
+   ],
+   "file": "src/scenes/travel/calfShieldContact.test.ts:279",
+   "defect": "[p35] dead-code · The aftermath simulator's timer-expiry alternative can never determine feed completion. · evidence: \"hunt.dissolve <= 0 || hunt.timer <= 0\" follows initialization to nine dissolve seconds and thirty timer seconds with identical decrements, so dissolution always ends feeding before the timer expires."
+  },
+  {
+   "id": "U298",
+   "from": [
+    "B149"
+   ],
+   "file": "src/scenes/travel/followCamera.ts:5",
+   "defect": "[p35] stale-comment · The camera header incorrectly promises identical moving-target lag at every frame rate. · evidence: \"the lag is the same at any frame rate\" contradicts the accompanying test's explicit remaining difference from \"sampling of a moving target once per frame (~7 %)\"."
+  },
+  {
+   "id": "U299",
+   "from": [
+    "B150"
+   ],
+   "file": "src/systems/appearance.ts:86",
+   "defect": "[p36] stale-comment · DressSource’s documentation omits the separate Giza source now supported by the table · evidence: \"a section of docs/peoples-1890.md, or a guess\" contradicts GIZA’s section source \"giza-1890 §4.1: ${why}\" used by CAST_DRESS."
+  },
+  {
+   "id": "U300",
+   "from": [
+    "B151"
+   ],
+   "file": "src/systems/appearance.ts:151",
+   "defect": "[p36] stale-comment · The childBeads comment incorrectly claims every child wears waist beads · evidence: \"a child is never drawn without — a string of beads at the waist\" contradicts the Zulu male child cell, which contains only a loinFlap."
+  },
+  {
+   "id": "U301",
+   "from": [
+    "B152"
+   ],
+   "file": "src/systems/appearance.ts:666",
+   "defect": "[p36] stale-comment · The fallback dress is no longer uniformly a plain wrap · evidence: \"A settlement without a people (the ports): a plain wrap in the village cloth\" contradicts NO_PEOPLE’s male youth shirt and male adult robe."
+  },
+  {
+   "id": "U302",
+   "from": [
+    "B153"
+   ],
+   "file": "src/systems/placeDump.ts:140",
+   "defect": "[p36] stale-comment · rounded’s comment promises deeper processing than the implementation performs · evidence: \"Rounds every number of a plain value, deeply; drops functions\" contradicts \"depth > 6\", which returns deeper objects unchanged, retaining their unrounded numbers and function fields."
+  },
+  {
+   "id": "U303",
+   "from": [
+    "B156"
+   ],
+   "file": "src/ui/StateDump.test.tsx:5",
+   "defect": "[p37] stale-comment · The test header promises that Escape never discards typed text although closing and reopening the report clears the draft. · evidence: \"never discards typed text\" conflicts with the new test's \"the next Esc closes\" and StateDump's opening effect calling \"setDescription('')\"."
+  },
+  {
+   "id": "U304",
+   "from": [
+    "B159"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:3768",
+   "defect": "[p14] dead-code · `standReading` returns an unused capacity field · evidence: \"capacity: e.standCapacity\" no caller reads capacity; they consume only shown and count."
+  },
+  {
+   "id": "U305",
+   "from": [
+    "B160"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:3802",
+   "defect": "[p14] dead-code · `photographJar` adds unused pixel-count metadata to its result · evidence: \"best = { verdict, probe, tried, changed }\" its caller reads verdict, probe and tried, but never changed."
+  },
+  {
+   "id": "U306",
+   "from": [
+    "B161"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:4003",
+   "defect": "[p14] dead-code · The water-stand recorder carries an unused flag · evidence: \"cleared: false\" the flag is never read or updated, and the returned recorder’s consumer never accesses it."
+  },
+  {
+   "id": "U307",
+   "from": [
+    "B162"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:4156",
+   "defect": "[p14] dead-code · `target` contains unreachable carrier and inhabitant lookup branches · evidence: \"else scene.traverse\" and \"if (kind === 'man')\" cannot execute because its sole invocation is `target('jar')`."
+  },
+  {
+   "id": "U308",
+   "from": [
+    "B163"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:4385",
+   "defect": "[p14] dead-code · `handPixels` returns rectangle metadata that nobody consumes · evidence: \"return { changed: countChangedPixels(shown.data, hidden.data, shown.info.channels), rect }\" the caller reads changed and spreads rect into best, whose rect is also never read."
+  },
+  {
+   "id": "U309",
+   "from": [
+    "B164"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:4607",
+   "defect": "[p14] dead-code · Both pounding-staging results include an unused people count · evidence: \"people: people.length\" neither successful nor failed staging consumers read this returned field."
+  },
+  {
+   "id": "U310",
+   "from": [
+    "B165"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:5135",
+   "defect": "[p14] stale-comment · The cost-probe description understates the runs performed for medium and high · evidence: \"each once with the primitive figure\" and \"once with the skinned body\" describe two runs, whereas runs contains primitive, code-built skinned and glTF skinned cases for each level."
+  },
+  {
+   "id": "U311",
+   "from": [
+    "B166"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:6121",
+   "defect": "[p14] dead-code · `stageOne` accepts an unused village argument · evidence: \"const stageOne = (village, who, d)\" village is never referenced in the function or passed into its page evaluation."
+  },
+  {
+   "id": "U312",
+   "from": [
+    "B167"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:6138",
+   "defect": "[p14] dead-code · `stageOne` returns unused yaw metadata · evidence: \"return { cx, cz, yaw }\" its caller uses only the result’s presence, cx and cz."
+  },
+  {
+   "id": "U313",
+   "from": [
+    "B169"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:6211",
+   "defect": "[p14] stale-comment · `flankView` no longer returns the measurements its comment describes · evidence: \"thigh swing and whether the hips and head project into the picture\" conflicts with its coordinate-only return `{ x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }`."
+  },
+  {
+   "id": "U314",
+   "from": [
+    "B170"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:6222",
+   "defect": "[p14] dead-code · `flankView` returns unused walker coordinates · evidence: \"gx: g.position.x, gz: g.position.z\" its sole caller reads only want.x and want.z."
+  },
+  {
+   "id": "U315",
+   "from": [
+    "B171"
+   ],
+   "file": "scripts/verify/polish-villagers.mjs:6295",
+   "defect": "[p14] dead-code · Successful `standAt` results propagate unused distance and visibility metadata · evidence: \"if (p.inView) return { flank, dist, ...p }\" downstream consumers read flank, thighL, thighR and at, but never the returned dist, inView or why."
+  }
+ ]
+}

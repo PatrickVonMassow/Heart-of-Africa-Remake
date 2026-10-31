@@ -1,30 +1,27 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@2f245cec
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@740d83c2
 //
-// The user pays two vendors, and authoring is the largest single item of the
-// spend, so it is split across both rather than sitting on one. It does NOT all
-// move: CLAUDE.md §6 names three lanes with different jobs, and the cut between
-// them is decided HERE, from the point's own text, rather than by whoever
-// happens to be dispatching. The SPLIT is the standing policy; how full each
-// pool happens to be on a given day is not a reason this file knows about
-// (cross-vendor audit 17.08.2026 — the header used to argue from one day's
-// quota reading, which then outlived it). An UNREACHABLE lane is different from
-// a full one: where the OpenAI volume is spent, authoring goes to Opus 5.5 rather
-// than waiting for the vendor (user 23.09.2026; point 1194 measures and lifts it).
-// That fallback is decided in astra-share-core.mjs (`effectiveRoute`), not here.
+// CLAUDE.md §6 names three lanes as role records (scripts/model-lanes.mjs): the main
+// chain authors by routing default and runs the batch, the cross-vendor lane reviews,
+// and the scarce lane authors tagged points and router escalations. This file is the
+// CUT: from the point's own text it names the lane a point belongs to when the share
+// switch (lane-routing-core.mjs) lets the cross lane author at all — only at
+// `prefer-cross`; at `default` and `main-only` scripts/author-delegate.mjs keeps a
+// cross-cut point in the main chain unless `--anyway`. How full each pool is on a
+// given day is not a reason this file knows about (cross-vendor audit 17.08.2026). An
+// UNREACHABLE cross lane authors on the main chain rather than waiting (user
+// 23.09.2026; point 1194), decided in lane-routing-core.mjs (`effectiveRoute`).
 //
-//   astra  GPT-6 Astra authors the points, and Claude then reviews, runs the
-//          suites, judges the picture and lands. Since 18.08.2026 that includes
-//          the HARD and CRITICAL ones — difficult, complex, error-prone or
-//          tagged HIGH criticality goes STRAIGHT here, where it used to be held
-//          back for Opus.
-//   opus   Opus 5.5 keeps what only the main lane can honestly finish: a point
-//          whose VERIFICATION is the work (a picture judged on both backends is
-//          the main session's job, so authoring it elsewhere buys nothing) —
-//          and only while nothing marks that point hard, because the user's
-//          18.08. ruling outranks this lane, not the other way round.
-//   fable  Fable is the escalation described by CLAUDE.md §6 when the shared
-//          switch admits it. A point's tag, a caller override and the automatic
-//          boundary all consult that same decision.
+//   cross  The cut's lane for the points the cross lane may author once the share
+//          switch admits it — since 18.08.2026 including the HARD and CRITICAL ones
+//          (difficult, complex, error-prone or tagged HIGH criticality). Where it
+//          authors, the main chain reviews, runs the suites, judges the picture and
+//          lands.
+//   main   A point whose VERIFICATION is the work (a picture judged on both
+//          backends is the main session's job, so authoring it elsewhere buys
+//          nothing) — and only while nothing marks that point hard.
+//   scarce The §6 escalation for tagged points and a reached review-round threshold,
+//          when the shared switch admits it. A point's tag, a caller override and
+//          the automatic boundary all consult that same decision.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -32,25 +29,22 @@
 // where it answers wrongly, the fix is a case in its test file, not a habit.
 //
 // The reasons travel with the verdict so a dispatcher can see WHY and override
-// with a tag in the point itself; author-astra.mjs refuses a run whose point
+// with a tag in the point itself; author-delegate.mjs refuses a run whose point
 // routes to another lane unless `--anyway` is given. Side-effect free; the work-order reading belongs to
-// scripts/author-astra.mjs. Pinned by author-routing-core.test.mjs.
+// scripts/author-delegate.mjs. Pinned by author-routing-core.test.mjs.
 
-import { ASTRA_MODEL, FABLE_MODEL, OPUS_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
+import { CROSS, MAIN, SCARCE, lane, laneByFamily } from './model-lanes.mjs'
+import { laneIsOn, laneRefusalReason, requireState } from './lane-switch-core.mjs'
 
-/** The authoring lanes, in report order. */
-export const LANES = Object.freeze(['astra', 'fable', 'opus'])
+/** The authoring lanes (lane roles), in report order. */
+export const AUTHOR_LANES = Object.freeze(['cross', 'scarce', 'main'])
 
-/** Who each lane is, for the report a dispatcher reads. The Fable name is DERIVED
- * from the switch, so a version bump moves one constant and not a scattered set. */
-export const LANE_MODEL = Object.freeze({
-  astra: ASTRA_MODEL,
-  fable: FABLE_MODEL,
-  opus: OPUS_MODEL,
-})
+/** Who each lane is, for the report a dispatcher reads — DERIVED from the lane records,
+ * so a version bump moves one record and not a scattered set. */
+export const LANE_MODEL = Object.freeze(Object.fromEntries(AUTHOR_LANES.map((role) => [role, lane(role).displayName])))
 
 /**
- * User decision 31.08.2026: Fable escalation begins at this many FRESH
+ * User decision 31.08.2026: scarce-lane escalation begins at this many FRESH
  * unsuccessful review rounds (repeats excluded, `authorRoundHistory().freshRounds`), and TEN IS THE STANDING DEFAULT — not a shortage measure.
  *
  * It was raised once before and fell back to five when the volume shortage that
@@ -62,10 +56,13 @@ export const LANE_MODEL = Object.freeze({
  * it. An emergency may raise this FURTHER for a while; when it ends the value
  * returns here, to ten, and never to five.
  */
-export const FABLE_ESCALATION_ROUNDS = 10
+export const SCARCE_ESCALATION_ROUNDS = 10
 
-/** The last Astra/Opus round pauses for a spec reading before Fable may take it. */
-export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
+/** The words prose names the scarce lane by: its role and its family words. */
+export const SCARCE_LANE_WORDS = Object.freeze([SCARCE.role, ...SCARCE.familyWords])
+
+/** The last cross/main round pauses for a spec reading before the scarce lane may take it. */
+export const SPEC_EXAMINATION_ROUND = SCARCE_ESCALATION_ROUNDS - 1
 
 /**
  * The hostile-tester stances used to make successive re-authoring commissions
@@ -81,7 +78,7 @@ export const AUTHORING_FRAMINGS = Object.freeze([
 /** The two outcomes a completed examination may record. */
 export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
 
-/** A pre-dispatch receipt written by author-astra for a round governed by this mechanism. */
+/** A pre-dispatch receipt written by author-delegate for a round governed by this mechanism. */
 export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
 
 const isUnsuccessfulReview = (record, wanted) => {
@@ -102,14 +99,14 @@ const isExaminationRecord = (record, wanted) =>
   record?.completed !== false &&
   String(record?.evidence ?? '').trim().length >= 10
 
-/** The examiner is always the other vendor and never the scarce Fable pool. */
+/** The examiner is always the other vendor and never the scarce lane. */
 export function specExaminerFor(history = {}, fallbackAuthor = '') {
   const rounds = Array.isArray(history?.rounds) ? history.rounds : []
   const author = [...rounds].reverse().find((round) => round.authoredBy)?.authoredBy || String(fallbackAuthor)
-  if (/\b(?:astra|sol)\b/i.test(author)) {
-    return { vendor: 'claude', model: OPUS_MODEL, route: 'claude-read', author }
+  if (laneByFamily(author)?.role === CROSS.role) {
+    return { role: MAIN.role, model: MAIN.displayName, route: 'main-read', author }
   }
-  return { vendor: 'astra', model: ASTRA_MODEL, route: 'ask-astra', author }
+  return { role: CROSS.role, model: CROSS.displayName, route: 'ask-lane', author }
 }
 
 /**
@@ -130,7 +127,7 @@ export function unsuccessfulReviewRounds(records = [], point = '') {
  * Outcomes of authoring rounds zero and one carry no framing. Every later fresh
  * attempt must name one and must differ from the preceding fresh attempt. A
  * missing or repeated framing remains visible as a repeat, but does not buy
- * progress toward the scarce Fable lane.
+ * progress toward the scarce lane.
  */
 export function authorRoundHistory(records = [], point = '') {
   const wanted = Number(point)
@@ -198,9 +195,7 @@ export function authorRoundHistory(records = [], point = '') {
       .find((record) => {
         if (!isExaminationRecord(record, wanted)) return false
         if (!expectedExaminer.author) return true
-        return expectedExaminer.route === 'claude-read'
-          ? /\bopus\b/i.test(String(record?.model))
-          : /\b(?:astra|sol)\b/i.test(String(record?.model))
+        return laneByFamily(String(record?.model ?? ''))?.role === expectedExaminer.role
       }) ?? null
   return { unsuccessfulRounds: rounds.length, freshRounds, rounds, examination }
 }
@@ -213,7 +208,7 @@ function nextAuthoringFraming(previous = '') {
 
 /**
  * What happens after the history just read: an authoring commission or the one
- * spec examination immediately before the automatic Fable threshold.
+ * spec examination immediately before the automatic scarce-lane threshold.
  * `escalationRounds` is injectable only so the test can prove every boundary
  * moves with the exported constant instead of hiding a round-number literal.
  */
@@ -221,7 +216,7 @@ export function nextAuthoringStep({
   records = [],
   point = '',
   reworkRounds,
-  escalationRounds = FABLE_ESCALATION_ROUNDS,
+  escalationRounds = SCARCE_ESCALATION_ROUNDS,
 } = {}) {
   const history = authorRoundHistory(records, point)
   const examinationRound = escalationRounds - 1
@@ -289,7 +284,7 @@ export function formatAuthorRoundHistory(history = {}) {
  * error-prone subjects, which a spec names when it is one.
  *
  * Deliberately SHORT, and it stayed short when the lane it feeds REVERSED (user
- * 18.08.2026). A hit no longer holds work back for Opus; it now OVERRIDES the
+ * 18.08.2026). A hit no longer holds work back for the main lane; it now OVERRIDES the
  * verification lane below, which is the one thing that still costs something to
  * get wrong. So a term that merely sounds weighty ("careful", "important") is
  * still not on the list: it would pull picture points out of the main session
@@ -320,25 +315,25 @@ export const HARD_MARKERS = Object.freeze([
  * and saves little — which is why this lane exists at all.
  *
  * IT IS THE LAST WORD ONLY WHERE NOTHING MARKS THE POINT HARD (user
- * 18.08.2026). A hard or HIGH-criticality picture point is Astra's: the branch
+ * 18.08.2026). A hard or HIGH-criticality picture point is the cross lane's: the branch
  * above returns before this one, and the test file pins that order. What is left
  * here is the ordinary picture point.
  *
  * THEY ERR TOWARDS MATCHING, deliberately (cross-vendor review of point 667,
  * P1): a mechanical rename that merely mentions WebGPU is routed here and costs
- * the Astra lane one point. The point's own `Author lane:` tag is the cheap way
+ * the cross lane one point. The point's own `Author lane:` tag is the cheap way
  * back.
  *
  * AND THE SUSPICION THAT IT READS BOILERPLATE WAS MEASURED AND IS WRONG (point
  * 1077, 09.09.2026). Every player-visible point writes a Test line naming
  * screenshots and both backends, so this list looked as though it were routing
- * the whole game on house boilerplate: all 99 Opus-lane points of that day were
- * Opus for this reason and no other, and none carried `Author lane: opus`. But
+ * the whole game on house boilerplate: all 99 main-lane points of that day were
+ * main for this reason and no other, and none carried a main-lane tag. But
  * cut the standing tail off every point — Test, Refs:, Bundle:, Criticality:,
  * Author lane: — and 97 of those 99 still name a marker in the point's OWN
  * prose. The obvious narrowing would move TWO points, so it was decided against
  * rather than forgotten, and the tag handles those two. Numbers, the rest of the
- * reasoning and the reopening condition: docs/astra-routing.md, "Routed and not
+ * reasoning and the reopening condition: docs/lane-routing.md, "Routed and not
  * commissioned".
  */
 export const VERIFICATION_MARKERS = Object.freeze([
@@ -357,7 +352,8 @@ export const VERIFICATION_MARKERS = Object.freeze([
 ])
 
 /**
- * An explicit lane tag in the point's own text: `Author lane: astra`.
+ * An explicit lane tag in the point's own text: `Author lane: cross` (a role, or a lane's
+ * family word as older tags spell it).
  *
  * The escape hatch, and the reason the rules below may stay simple. A spec that
  * knows better than the markers says so once, in the work order where it is
@@ -365,7 +361,7 @@ export const VERIFICATION_MARKERS = Object.freeze([
  *
  * A TAG IS A LINE OF ITS OWN, not a phrase inside a sentence (cross-vendor
  * review of point 667, P1). Skipping only a quote character immediately in front
- * of it left `"use Author lane: astra for this example"` operative — and a
+ * of it left `"use Author lane: cross for this example"` operative — and a
  * document that DESCRIBES this convention would route the points that quote it.
  * Requiring the line to begin with the tag is both simpler and stricter than
  * chasing quotation, and it is how the tag is meant to be written anyway.
@@ -415,12 +411,17 @@ export function laneTagIn(body) {
     if (fence) continue
     // A list marker or blockquote may precede it; a quote character may not. The
     // line must also END there (second cross-vendor round): without the closing
-    // anchor, `Author lane: astra is the example spelling` was still an operative
+    // anchor, `Author lane: cross is the example spelling` was still an operative
     // tag, which is the same sentence-inside-a-document case one round on.
-    // `sol` is the OpenAI lane's RETIRED spelling (point 1061), still read so an
+    // A tag names a role, or — as the work order's older tags do — a lane's family word
+    // (current or retired, point 1061), resolved through the lane records so an
     // operator's older tag routes to the lane it means instead of being dropped.
-    const m = /^[\s>*-]*author lane:\s*(astra|sol|fable|opus)\s*[.;,)`'"]*\s*$/i.exec(line)
-    if (m) found = m[1].toLowerCase() === 'sol' ? 'astra' : m[1].toLowerCase()
+    const m = /^[\s>*-]*author lane:\s*([a-z]+)\s*[.;,)`'"]*\s*$/i.exec(line)
+    if (m) {
+      const word = m[1].toLowerCase()
+      const role = AUTHOR_LANES.includes(word) ? word : laneByFamily(word)?.role
+      if (role && AUTHOR_LANES.includes(role)) found = role
+    }
   }
   return found
 }
@@ -447,20 +448,28 @@ function hits(markers, text) {
 /**
  * THE DECISION. PURE.
  *
- * Inputs — optional except `fableState`, which `requireState` demands:
+ * Inputs — optional except `scarceState`, which `requireState` demands:
  *   body         the point's text out of the work order
  *   criticality  its tag, as `criticalityOf` reads it ('low' | 'med' | 'high')
  *   reworkRounds fresh unsuccessful review rounds (`authorRoundHistory().freshRounds`)
  *   override     a lane the caller insists on, beating even the tag
- *   fableState   the Fable switch state
+ *   scarceState  the scarce lane's switch state
+ *   venue        where Claude-lane authoring starts (`authoringVenue().venue`)
  *
  * Returns { lane, model, refused, why, signals } — `why` is the ordered list of
  * reasons, first the deciding one. An unknown switch throws rather than choosing
- * a direction; an unavailable explicitly requested Fable lane is a refusal.
+ * a direction; an unavailable explicitly requested scarce lane is a refusal.
  */
-export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0, override = '', fableState } = {}) {
-  const state = requireState(fableState)
-  const fableOn = fableIsOn(state)
+export function authorLaneFor({
+  body = '',
+  criticality = null,
+  reworkRounds = 0,
+  override = '',
+  scarceState,
+  venue = 'local',
+} = {}) {
+  const state = requireState(scarceState)
+  const scarceOn = laneIsOn(state)
   const text = String(body ?? '')
   const tag = laneTagIn(text)
   const hard = hits(HARD_MARKERS, text)
@@ -470,9 +479,9 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
   // A CLOSED ESCALATION SAYS SO WHERE IT WOULD HAVE FIRED. Silently routing
   // such a point onward would read as "the threshold was never reached".
   const withheld =
-    !fableOn && rounds >= FABLE_ESCALATION_ROUNDS
+    !scarceOn && rounds >= SCARCE_ESCALATION_ROUNDS
       ? `${rounds} unsuccessful review rounds would have reached the §6 escalation threshold of ` +
-        `${FABLE_ESCALATION_ROUNDS}, but ${fableRefusalReason(state)}`
+        `${SCARCE_ESCALATION_ROUNDS}, but ${laneRefusalReason(state)}`
       : ''
   const decide = (lane, reason) => ({
     lane,
@@ -481,54 +490,60 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
     why: withheld ? [reason, withheld] : [reason],
     signals,
   })
-  const refuseFable = (reason) => ({
+  const refuseScarce = (reason) => ({
     lane: '',
     model: '',
     refused: true,
-    why: [reason, fableRefusalReason(state)],
+    why: [reason, laneRefusalReason(state)],
     signals,
   })
 
-  if (LANES.includes(String(override).toLowerCase())) {
-    const lane = String(override).toLowerCase()
-    if (lane === 'fable' && !fableOn) return refuseFable(`the caller asked for the ${override} lane explicitly`)
-    return decide(lane, `the caller asked for the ${override} lane explicitly`)
+  if (AUTHOR_LANES.includes(String(override).toLowerCase())) {
+    const role = String(override).toLowerCase()
+    if (role === 'scarce' && !scarceOn) return refuseScarce(`the caller asked for the ${override} lane explicitly`)
+    return decide(role, `the caller asked for the ${override} lane explicitly`)
   }
-  // A FABLE TAG IS AN OPERATOR DECISION, not an automatic signal. It therefore
+  // A SCARCE TAG IS AN OPERATOR DECISION, not an automatic signal. It therefore
   // remains immediate while tags naming the ordinary lanes yield once the
   // recorded escalation boundary has actually been reached.
-  if (tag === 'fable') {
-    return fableOn
-      ? decide(tag, 'the point itself carries `Author lane: fable`')
-      : refuseFable('the point itself carries `Author lane: fable`')
+  if (tag === 'scarce') {
+    return scarceOn
+      ? decide(tag, 'the point itself carries a scarce-lane `Author lane:` tag')
+      : refuseScarce('the point itself carries a scarce-lane `Author lane:` tag')
   }
-  if (fableOn && rounds >= FABLE_ESCALATION_ROUNDS) {
+  if (scarceOn && rounds >= SCARCE_ESCALATION_ROUNDS) {
     return decide(
-      'fable',
-      `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
+      'scarce',
+      `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${SCARCE_ESCALATION_ROUNDS}`,
     )
   }
-  if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
-  // A HARD OR CRITICAL POINT GOES STRAIGHT TO ASTRA (user 18.08.2026). It used to
-  // be held back for Opus — and before that routed to Fable — and it now takes
-  // the direct route, ABOVE the verification lane: the user was asked which of
-  // the two wins and answered that these go to Astra as well. The picture is still
+  if (tag) return decide(tag, `the point itself carries a ${tag}-lane \`Author lane:\` tag`)
+  // A HARD OR CRITICAL POINT GOES STRAIGHT TO THE CROSS LANE (user 18.08.2026). It used
+  // to be held back for the main lane — and before that routed to the scarce lane — and
+  // it now takes the direct route, ABOVE the verification lane: the user was asked which
+  // of the two wins and answered that these go to the cross lane as well. The picture is still
   // judged here whoever authored it, so only the AUTHORING moves.
   if (criticality === 'high') {
-    return decide('astra', 'the point is tagged HIGH criticality — hard and critical work goes straight to Astra')
+    return decide('cross', 'the point is tagged HIGH criticality — hard and critical work goes straight to the cross lane')
   }
   if (hard.length) {
-    return decide('astra', `the spec names it a hard case (${hard.join(', ')}) — hard cases go straight to Astra`)
+    return decide('cross', `the spec names it a hard case (${hard.join(', ')}) — hard cases go straight to the cross lane`)
   }
   if (verification.length) {
-    return decide('opus', `its VERIFICATION is the work (${verification.join(', ')}) — the main session judges that anyway`)
+    return decide('main', `its VERIFICATION is the work (${verification.join(', ')}) — the main session judges that anyway`)
   }
-  return decide('astra', 'mechanical or mid-difficulty, and nothing marks it otherwise')
+  // CLOUD AUTHORING IS MAIN-LANE AUTHORING (user 24.10.2026): while the switch routes
+  // Claude authoring to the cloud, the unmarked mid-difficulty work goes there instead
+  // of to the local cross lane — independent of the free credits (user 29.10.2026).
+  if (venue === 'cloud') {
+    return decide('main', 'mechanical or mid-difficulty, and nothing marks it otherwise — routed to the main lane while the cloud switch is on')
+  }
+  return decide('cross', 'mechanical or mid-difficulty, and nothing marks it otherwise')
 }
 
 /** One line per point, for the dispatcher's report. PURE. */
 export function formatLaneLine({ number = '', lane = '', why = [] } = {}) {
-  return `  ${String(number).padStart(4)}  ${String(lane).padEnd(5)}  ${why[0] ?? ''}`
+  return `  ${String(number).padStart(4)}  ${String(lane).padEnd(6)}  ${why[0] ?? ''}`
 }
 
 /**
@@ -540,7 +555,7 @@ export function formatLaneLine({ number = '', lane = '', why = [] } = {}) {
  */
 export function formatLaneReport(rows = []) {
   const list = Array.isArray(rows) ? rows : []
-  const reportLanes = [...LANES, 'blocked']
+  const reportLanes = [...AUTHOR_LANES, 'blocked']
   const counts = reportLanes
     .map((lane) => `${lane} ${list.filter((r) => (lane === 'blocked' ? r.refused : r.lane === lane)).length}`)
     .join(' · ')

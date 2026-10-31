@@ -245,14 +245,6 @@ const SPLAT = /(^|\s)@\w/
 /** Does the command spell a marker once quotes, escapes and `$` are ignored? */
 const mentionsMarker = (command) => MARKERS.some((m) => looseView(command).includes(m))
 
-/** A `*`/`?`/`[…]` glob as an anchored regex (a bracket class reads as one character). */
-const globRegex = (glob) =>
-  new RegExp(`^${glob.replace(/\[[^\]]*\]?\]/g, '?').replace(/[.+^$()|[\]\\{}]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`)
-
-/** Could this glob word match the script's basename or the flag? */
-const globHitsMarker = (word) =>
-  /[*?[]/.test(word) && (globRegex(word.split('/').pop()).test('finding.mjs') || globRegex(word.split('=')[0]).test(REQUEST_FLAG))
-
 /**
  * Could a shell that re-reads this text assemble a marker? True when it spells
  * one loosely, holds a substitution, variable, positional or special
@@ -278,23 +270,15 @@ function expandsToMarker(text) {
 }
 
 /**
- * Could this command deposit a request? True when its loose view spells
- * `finding.mjs` or `--request`. A canonical command also counts when one of
- * its words could expand to a marker once a shell re-reads it (`bash -c
- * 'node scripts/fin*.mjs …'`). A non-canonical one counts when it holds any
- * character outside PLAIN (sound by construction; accepted over-block for
- * quotes, pipes and the like in a chat session), or a `*`/`?` glob anywhere
- * but in one plain `ls` line whose globs cannot match a marker — a matched
- * filename may carry a whole command for eval, bash and the like.
+ * Could this command deposit a request? True exactly when it MENTIONS
+ * `finding.mjs` or `--request` once quotes, backslashes and `$` are ignored.
+ * A command without either word passes untouched — a plain write or redirect
+ * (`mkdir -p docs/probes && printf '…' > file`) is no deposit (22.10.2026: the
+ * former expansion-paranoid pre-gate refused every quote, redirect and operator
+ * in a chat session, which left a cloud clone unable to write a file).
  */
-export function isPossibleDeposit(command, shell = 'bash') {
-  const src = String(command ?? '')
-  if (mentionsMarker(src)) return true
-  const plain = PLAIN.test(src) && !src.includes('\n')
-  // one plain ls line in either shell: its globs only list, unless they could match a marker
-  if (plain && src.trim().split(/ +/)[0] === 'ls') return src.split(/ +/).some(globHitsMarker) || SPLAT.test(src)
-  if (isCanonical(src, shell)) return tokenize(src, shell).some(couldExpandToMarker)
-  return !PLAIN.test(src) || /[*?]/.test(src) || SPLAT.test(src)
+export function isPossibleDeposit(command) {
+  return mentionsMarker(String(command ?? ''))
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
@@ -343,7 +327,7 @@ export function isCanonical(command, shell = 'bash') {
 }
 
 const NON_CANONICAL =
-  'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored, or holds a quote, $, escape, operator or other character an expansion could use) ' +
+  'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored) ' +
   'but is not one plain line, so its deposit cannot be read reliably. Issue the deposit as ONE plain line: ' +
   'node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> --approved "<user words>" ' +
   '- started by node itself (no eval, bash -c, env or xargs), no newline, heredoc, redirection, pipe, chaining, substitution, variable or quote-split word - and write the ' +

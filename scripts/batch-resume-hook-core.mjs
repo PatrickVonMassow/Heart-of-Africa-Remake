@@ -27,6 +27,7 @@
 import { CLAIM_BY } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 import { humanText } from './request-approval-guard-core.mjs'
+import { usageSynopsis } from './cli-usage.mjs'
 
 const OWNER_OWNERSHIP = new Set(['acquired-spawn', 'acquired', 'mine'])
 
@@ -268,6 +269,18 @@ export function standDownMessage({
 }
 
 /**
+ * CONVERT THE LAUNCHER'S RESERVATION AT SESSION START. `convert` is the
+ * singleton's convertPendingSpawn (injected so a test drives the hook's own
+ * path). Only this session's claude process identity is offered: the
+ * reservation converts solely for the pid it names, never on the launcher's
+ * authorization marker (23.10.2026: a /clear in a chat window took the batch).
+ */
+export function sessionStartConversion({ sessionId, lock = null, sessionProcess = null, convert } = {}) {
+  if (!lock || lock.kind !== 'pending-spawn') return false
+  return convert(sessionId, { findAncestorFn: () => sessionProcess }) === true
+}
+
+/**
  * DOES A SPAWNED SUCCESSOR PROVE ITS LAUNCH WITHOUT ITS RESERVATION? PURE.
  *
  * The launcher writes one spawn token to the one-shot authorization marker
@@ -385,14 +398,15 @@ export function transcriptShowsPerson(text) {
  * must not hand the batch to the window a person is talking to unasked (user
  * 31.08.2026). The invitations of `sessionStartOwnership` apply here too: a lock
  * this session already holds, or a claim it made itself. Without one, only a
- * session NOT demonstrably interactive acquires — the launcher's worker and any
- * other unattended session, exactly as before. `interactive` null (unreadable)
- * is unproven and keeps the never-ownerless path.
+ * session demonstrably unattended acquires — a read transcript holding no person,
+ * as the launcher's worker carries. `interactive` null (empty or unreadable, as a
+ * chat window right after /clear) is unproven and takes nothing: the launcher's
+ * worker, not that window, is the successor (finding 21.10.2026).
  */
 export function turnEndOwnership({ heldHere = false, claimMine = false, interactive = null } = {}) {
   if (heldHere) return { mayAcquire: true, invitation: 'held' }
   if (claimMine) return { mayAcquire: true, invitation: 'claim' }
-  if (interactive === true) return { mayAcquire: false, invitation: null }
+  if (interactive !== false) return { mayAcquire: false, invitation: null }
   return { mayAcquire: true, invitation: 'unattended' }
 }
 
@@ -422,4 +436,58 @@ export function freeLockDeclinedLine({ sessionId = '' } = {}) {
     `own the batch; answer the user normally. If the user wants the batch here, they say "${BATCH_START_WORD}"; ` +
     `only then take it with \`node scripts/batch-claim.mjs --take --session ${sessionId}\`.`
   )
+}
+
+/**
+ * One line over the agent worktrees `git worktree list --porcelain` names (the
+ * main checkout excluded), or '' when there are none or the text is unreadable.
+ */
+export function worktreeSummaryLine(porcelain = '', mainRoot = '') {
+  const trees = []
+  for (const block of String(porcelain ?? '').split(/\n\s*\n/)) {
+    const path = /^worktree (.+)$/m.exec(block)?.[1]?.trim()
+    if (!path || path === mainRoot) continue
+    const branch = /^branch refs\/heads\/(.+)$/m.exec(block)?.[1]?.trim() ?? (/^detached$/m.test(block) ? 'detached' : '?')
+    trees.push(`${path} [${branch}]`)
+  }
+  return trees.length ? `Worktrees (${trees.length}): ${trees.join(', ')}` : ''
+}
+
+/**
+ * The SessionStart command synopsis: the usage lines (scripts/cli-usage.mjs)
+ * plus the worktree line, at most 15 lines. A throwing `synopsis` omits the
+ * synopsis — the caller reports that on stderr — and the resume text stands.
+ */
+export function commandSynopsisText({ synopsis, worktreeLine = '' } = {}) {
+  const lines = [...synopsis(), ...(worktreeLine ? [worktreeLine] : [])].slice(0, 15)
+  return lines.join('\n')
+}
+
+/**
+ * The command synopsis appended to the start text, so the first call carries the
+ * syntax instead of a `--help` round-trip. Every failure omits only its own part:
+ * a git error drops the worktree line, a usage error drops the synopsis (stderr
+ * line via `say`), and the resume text is printed either way. `git` is the
+ * caller's execFileSync; nothing here runs without it.
+ */
+export function commandSynopsis({ synopsis = usageSynopsis, git = null, root = '', say = console.error } = {}) {
+  let worktreeLine = ''
+  try {
+    const porcelain = git('git', ['worktree', 'list', '--porcelain'], {
+      windowsHide: true,
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    worktreeLine = worktreeSummaryLine(porcelain, root)
+  } catch {
+    /* git unreadable — the worktree line is omitted */
+  }
+  try {
+    return `\n${commandSynopsisText({ synopsis, worktreeLine })}`
+  } catch (e) {
+    say(`[batch-resume] command synopsis omitted: ${(e && e.message) || e}`)
+    return ''
+  }
 }

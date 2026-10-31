@@ -445,12 +445,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "847": {
-      "at": "2026-08-23T00:30:42.022Z",
-      "why": "Es ist ein Wächter, der weniger misst als sein eigener Satz — kein Produktverhalten, keine verlorene Arbeit, und die Anleitung nutzt heute keinen der vier Wege; es kann hinter der Veröffentlichung stehen.",
-      "origin": "machine",
-      "place": "last"
-    },
     "849": {
       "at": "2026-08-23T03:41:54.860Z",
       "why": "Low criticality, no product behaviour: a noisy alert costs gate time but blocks nothing, so last is right.",
@@ -1370,10 +1364,10 @@
       "place": "last"
     },
     "1202": {
-      "at": "2026-09-23T21:38:02.542Z",
-      "why": "fehlendes Beweisbild, kein Spielerschaden; hinter die offenen Dorfleben-Punkte",
-      "origin": "machine",
-      "place": "last"
+      "at": "2026-10-27T23:33:27.676Z",
+      "why": "user 27.10.2026: after 1308, before 1347 — known red on main that keeps suites red",
+      "origin": "user",
+      "place": "ahead"
     },
     "1203": {
       "at": "2026-09-24T02:38:25.192Z",
@@ -1615,12 +1609,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1333": {
-      "at": "2026-10-08T21:05:41.599Z",
-      "why": "moved directly after 1330: same village-errands suite, pre-existing red on main",
-      "origin": "machine",
-      "place": "last"
-    },
     "1361": {
       "at": "2026-10-16T08:31:35.821Z",
       "why": "Blocks only non-owner head sessions' Stop; the owner batch is unaffected, so behind the hygiene points already queued is right",
@@ -1657,18 +1645,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1388": {
-      "at": "2026-10-19T15:26:45.204Z",
-      "why": "placed where the user's order of 19.10.2026 puts it",
-      "origin": "machine",
-      "place": "last"
-    },
-    "1393": {
-      "at": "2026-10-19T20:07:03.299Z",
-      "why": "User order 19.10.2026: directly before point 1347, four eyes",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1395": {
       "at": "2026-10-20T04:06:12.822Z",
       "why": "Belongs with point 1383 (point/reach step on the same arm), which stands directly before it at the end of the work order",
@@ -1684,6 +1660,150 @@
     "1397": {
       "at": "2026-10-20T14:57:23.592Z",
       "why": "WebGL-2-only village-walk red; worked with 1396 on the same walk",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1422": {
+      "at": "2026-10-22T11:43:58.228Z",
+      "why": "Villager gait finding from the 1402 capture; belongs at the end with the other Dorfleben rig points, after 1397",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1423": {
+      "at": "2026-10-22T11:43:58.345Z",
+      "why": "Villager gait finding from the 1402 capture; belongs at the end with the other Dorfleben rig points, after 1397",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1425": {
+      "at": "2026-10-22T20:27:32.014Z",
+      "why": "finding from the 1404 capture, not a user order; it belongs behind the other villager-rig findings 1422/1423 that already stand last",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1427": {
+      "at": "2026-10-23T06:52:56.453Z",
+      "why": "low criticality, rare crowd case; behind the user-reported Dorfleben points",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1428": {
+      "at": "2026-10-23T08:18:42.030Z",
+      "why": "finding present on main, not a user order; behind the user-reported Dorfleben points",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1434": {
+      "at": "2026-10-23T16:20:39.419Z",
+      "why": "follows 1427/1428 on the same children files; unowned WebGL-2 reds, not user-ranked",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1435": {
+      "at": "2026-10-23T17:26:42.446Z",
+      "why": "WebGL-2-only follow-up split from the landed 1405; may wait until the next LARGE (CLAUDE.md 7.2), so it stays behind the user-report points",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1447": {
+      "at": "2026-10-25T06:49:14.530Z",
+      "why": "1446's fresh-page staging unblocks the suite; the leak fix is real player impact but not blocking, so it waits behind the open front of the queue",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1449": {
+      "at": "2026-10-26T04:13:03.990Z",
+      "why": "a suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the guard honest meanwhile",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1453": {
+      "at": "2026-10-27T03:31:31.622Z",
+      "why": "low-criticality test-hook crash with no player impact; last in the order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1457": {
+      "at": "2026-10-27T23:20:16.318Z",
+      "why": "steering refinement split from 1081 (medium, no blockade, gate charged); stays behind the user-ordered points, 1458 after 1457",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1458": {
+      "at": "2026-10-27T23:20:16.429Z",
+      "why": "steering refinement split from 1081 (medium, no blockade, gate charged); stays behind the user-ordered points, 1458 after 1457",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1460": {
+      "at": "2026-10-28T05:42:05.460Z",
+      "why": "verification debt with no product effect; last is right until a quiet machine is free",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1463": {
+      "at": "2026-10-28T17:15:50.227Z",
+      "why": "User order 28.10.2026: directly after the v0.3.1 release point",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1466": {
+      "at": "2026-10-29T07:41:42.233Z",
+      "why": "low criticality, WebGL-2 whole-suite-only red, charged; no release blocker, so it waits behind the ranked work",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1467": {
+      "at": "2026-10-29T19:06:31.715Z",
+      "why": "test-infra defect, no player impact; Testinfrastruktur bundle order is fine",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1468": {
+      "at": "2026-10-30T06:00:03.888Z",
+      "why": "test-only load/bound flake charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1469": {
+      "at": "2026-10-30T06:00:04.005Z",
+      "why": "test-only load/bound flake charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1470": {
+      "at": "2026-10-30T06:21:48.366Z",
+      "why": "test-only acquisition red charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1471": {
+      "at": "2026-10-30T06:21:48.474Z",
+      "why": "test-only acquisition red charged in the 1462 closing run; last in order is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1472": {
+      "at": "2026-10-30T12:52:24.227Z",
+      "why": "closing-LARGE red charged after the v0.3.1 cut; post-release work, no point ahead of it depends on it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1473": {
+      "at": "2026-10-30T12:52:24.361Z",
+      "why": "closing-LARGE red, already placed in the Dorfleben bundle column; post-release, nothing ahead depends on it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1474": {
+      "at": "2026-10-30T17:03:29.305Z",
+      "why": "amendment to 1463; it rides with 1463 and needs no earlier slot",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1476": {
+      "at": "2026-10-31T13:31:41.747Z",
+      "why": "A standing red on adult-errands runs, no earlier dependency; last in Dorfleben is fine",
       "origin": "machine",
       "place": "last"
     }
@@ -1715,7 +1835,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-20T14:57:23.600Z",
+    "at": "2026-10-31T13:31:41.756Z",
     "points": [
       184,
       200,
@@ -1817,7 +1937,6 @@
       564,
       565,
       567,
-      568,
       570,
       574,
       591,
@@ -1846,7 +1965,6 @@
       637,
       638,
       639,
-      642,
       643,
       646,
       647,
@@ -1936,7 +2054,6 @@
       841,
       842,
       845,
-      847,
       849,
       850,
       851,
@@ -1964,7 +2081,6 @@
       898,
       899,
       900,
-      901,
       904,
       905,
       906,
@@ -2145,15 +2261,11 @@
       1291,
       1292,
       1296,
-      1297,
       1300,
       1301,
       1304,
-      1308,
       1309,
-      1318,
       1328,
-      1333,
       1340,
       1341,
       1344,
@@ -2166,11 +2278,39 @@
       1382,
       1383,
       1385,
-      1388,
-      1393,
       1395,
       1396,
-      1397
+      1397,
+      1398,
+      1399,
+      1400,
+      1422,
+      1423,
+      1425,
+      1427,
+      1428,
+      1434,
+      1435,
+      1436,
+      1447,
+      1449,
+      1453,
+      1454,
+      1457,
+      1458,
+      1460,
+      1461,
+      1463,
+      1466,
+      1467,
+      1468,
+      1469,
+      1470,
+      1471,
+      1472,
+      1473,
+      1474,
+      1476
     ]
   }
 }

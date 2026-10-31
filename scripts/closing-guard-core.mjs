@@ -276,7 +276,7 @@ export function landingTickNumber(command) {
   if (!seg || /\s--dry\b/.test(seg)) return null
   const after = seg.slice(seg.indexOf(LANDING_SCRIPT) + LANDING_SCRIPT.length)
   // A quoted value is not a place to read a point number from: `--model
-  // "Claude Opus 5"` must never be mistaken for point 5.
+  // "Some Model 5"` must never be mistaken for point 5.
   const m = after.replace(/"[^"]*"|'[^']*'/g, ' ').match(/(?:^|\s)(\d+)(?=\s|$)/)
   return m ? Number(m[1]) : null
 }
@@ -389,7 +389,7 @@ export function tickClaim({ toolName, toolInput, tasksText } = {}) {
 // POSITION is checked.
 //
 // WHAT "AFTER" CAN HONESTLY BE CHECKED AGAINST (four-eyes reviews 11.08.2026,
-// GPT-5.6 Sol, two rounds). A commit's own DATE is the wrong clock: the state is
+// two rounds). A commit's own DATE is the wrong clock: the state is
 // keyed to the commit being tagged and the steps are recorded after that commit
 // exists, so a regression naming the very state it tested would read as "too
 // old", while any unrelated newer commit would read as fine. What CAN be judged,

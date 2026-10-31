@@ -45,8 +45,9 @@ which is why the guard's refusal says *correct the point, not the ledger*.
 ## What enforces it
 
 `scripts/criticality-review-guard.mjs` (Stop hook, pure core +
-`criticality-review-guard-core.test.mjs`, fail-open) blocks the turn end when a
-point tagged HIGH is ticked without an **answered** review by a different model
+`criticality-review-guard-core.test.mjs`, fail-open) is SWITCHED OFF: its hook path
+exits silently, and `--status` reports the debt it once blocked the turn end for: a
+point tagged HIGH ticked without an **answered** review by a different model
 (or, for files no vendor can review, the verified-unavailability receipt below).
 
 It stands down for a paused batch, for a session that does not own the batch
@@ -59,7 +60,7 @@ ticked before the gate existed owe nothing.
 
 ### Answered, not merely recorded
 
-Measured 30.07.2026: a delegated agent spawned its Fable-5 reviewer in the
+Measured 30.07.2026: a delegated agent spawned its the scarce lane reviewer in the
 background and then stopped. The review landed in the parent session minutes
 later with verdict `do-not-merge` and two blockers — one of which would have
 reddened main's unit gate the moment the branch merged. **The branch looked

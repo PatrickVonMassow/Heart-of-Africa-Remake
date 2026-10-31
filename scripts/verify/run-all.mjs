@@ -40,6 +40,7 @@ import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './s
 import { isSectionName, sectionTag } from '../section-tag-core.mjs'
 import { readFileSync } from 'node:fs'
 import { EXIT_NOT_HELD, formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
+import { laneSkips } from './load-proof-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
@@ -99,7 +100,7 @@ const wantBaseline = wantsBaseline({ baseline, env: process.env })
 // documents `node scripts/verify/run-all.mjs <suite>` as an ordinary command
 // and that path answered to nothing — the refusal the point owes was absent
 // from the very command the house uses, and the LARGE run of 11.09.2026 was
-// started through it (four-eyes review, GPT-6 Astra, pass 3/4).
+// started through it (four-eyes review, pass 3/4).
 //
 // ASKED ONCE PER RUN. A parent that already asked sets the marker, so a waiver
 // granted above — `--no-ladder "<why>"`, which run-logged consumes and does not
@@ -248,6 +249,8 @@ const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 
  *  of its own: `RETRY_ENV` is written BLANK so a stale export in the calling
  *  shell cannot stamp this first attempt SUSPECT, and a HAND retry of the
  *  smallest affected check stays the diagnosis (CLAUDE.md §7.2). */
+/** Lane skips (point 642), summed over every suite this pass ran. */
+const laneSkipRows = []
 function runSuite(name, baseUrl) {
   const before = readRenderState()?.runs
   const previous = new Set((Array.isArray(before) ? before : []).map(runIdentity))
@@ -298,6 +301,12 @@ function runSuite(name, baseUrl) {
   for (const line of out.split('\n')) {
     if (line.includes('[NON-PREDICTIVE')) console.log(`NON-PREDICTIVE  ${name.padEnd(12)} ${line.trim()}`)
     else if (/^NOT-COVERING\s{2,}/.test(line)) console.log(`NOT-COVERING  ${name.padEnd(12)} ${line.trim().slice('NOT-COVERING'.length).trim()}`)
+  }
+  // A LANE SKIP MUST BE SEEN AND COUNTED (point 642): a check the lane could not
+  // answer did not run, so the both-backend rule must not count it as covered.
+  for (const u of laneSkips(out)) {
+    console.log(`UNMEASURED  ${name.padEnd(12)} ${u.name} — ${u.reason}`)
+    laneSkipRows.push({ suite: name, ...u })
   }
   if (!ok) {
     for (const line of out.split('\n')) if (/^FAIL\s{2,}\S|^ERR:/.test(line)) console.log('      ' + line)
@@ -740,6 +749,9 @@ const charges = [...chargedPoints].sort((a, b) => a - b)
 // pinned by run-all.test.mjs, so it stays.
 console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run` +
   (charges.length ? ` — reds charged to open points ${charges.join(', ')}` : ''))
+if (laneSkipRows.length) {
+  console.log(`lane skips: ${laneSkipRows.length} check(s) UNMEASURED — they did not run and are not coverage on this backend`)
+}
 // The stages that are not suites and can arrive here red — lint and the
 // preview's own build (a failed build, unit or GPU preflight exits earlier) —
 // are unresolved by construction: no charge ledger names them.

@@ -138,6 +138,7 @@ export function activeVerificationLease(
 export function emergencyDecision({
   now = Date.now(), report = {}, workablePoints = [], paused = false, veto = null,
   state = {}, thresholdMs = EMERGENCY_THRESHOLD_MS, cooldownMs = EMERGENCY_COOLDOWN_MS,
+  ownerSince = null,
 } = {}) {
   if (paused) return { action: 'stand-down', reason: 'batch-paused', strike: false }
   if (activeVeto(veto, now)) {
@@ -146,10 +147,13 @@ export function emergencyDecision({
   if (!Array.isArray(workablePoints) || workablePoints.length === 0) {
     return { action: 'stand-down', reason: 'no-workable-points', strike: false }
   }
-  const progressAt = latestProgressAt(report)
-  if (!Number.isFinite(progressAt)) {
+  const measuredAt = latestProgressAt(report)
+  if (!Number.isFinite(measuredAt)) {
     return { action: 'observe', reason: 'no-bounded-evidence-window', strike: false }
   }
+  // The stall belongs to the CURRENT owner (point 1445): dead time before its
+  // lock acquisition is its predecessor's, never a reason to strike it.
+  const progressAt = Number.isFinite(ownerSince) && ownerSince <= now ? Math.max(measuredAt, ownerSince) : measuredAt
   const stalledMs = Math.max(0, now - progressAt)
   if (stalledMs < thresholdMs) {
     return { action: 'observe', reason: 'progress-within-threshold', strike: false, progressAt, stalledMs }

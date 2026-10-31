@@ -37,13 +37,24 @@ export function digSiteFurniture(kind: DigSite['kind'], progress?: DigSiteProgre
   }
 }
 
-export const DIG_BASKETS = [{ x: 0.75, z: -1.65, radius: 0.32 }, { x: 1.4, z: -1.65, radius: 0.32 }] as const
+/** The grain baskets beside a store pit; `radius` is the drawn outer extent
+ *  (the top hoop, 0.338 m). */
+export const DIG_BASKETS = [{ x: 0.75, z: -1.65, radius: 0.34 }, { x: 1.4, z: -1.65, radius: 0.34 }] as const
 export const DIG_STORE_COVER = { x: 0.95, z: -2.3, radius: 0.65 } as const
-export const DIG_SEEDLING_TRAY = { x: 0.7, z: -1.55, radius: 0.49 } as const
+/** The seedling tray: `hx`/`hz` are its drawn half extents. */
+export const DIG_SEEDLING_TRAY = { x: 0.7, z: -1.55, radius: 0.49, hx: 0.425, hz: 0.225 } as const
+/** The three posts laid beside a post hole, along the site's local x. */
+export const DIG_POSTS = { x: 0.6, z: -1.6, step: 0.22, count: 3, length: 1.8, radius: 0.1 } as const
+const POSTS_X0 = DIG_POSTS.x - DIG_POSTS.length / 2
+const POSTS_X1 = DIG_POSTS.x + (DIG_POSTS.count - 1) * DIG_POSTS.step + DIG_POSTS.length / 2
+/** The laid posts' drawn extent as one box (site-local centre, half extents). */
+export const DIG_POSTS_BOX = { x: (POSTS_X0 + POSTS_X1) / 2, z: DIG_POSTS.z, hx: (POSTS_X1 - POSTS_X0) / 2, hz: DIG_POSTS.radius } as const
 
-/** Full prop extents reserved by placement, without making them colliders. */
+/** Full prop extents reserved by placement. The set-down props among them are
+ *  also solid (`digFurnitureColliders`); the store cover lies flat and is
+ *  walked over. */
 export function digFurnitureFootprints(kind: DigSite['kind']): readonly { x: number; z: number; radius: number }[] {
   if (kind === 'pit') return [...DIG_BASKETS, DIG_STORE_COVER]
   if (kind === 'patch') return [DIG_SEEDLING_TRAY]
-  return [{ x: 0.82, z: -1.6, radius: 1.15 }]
+  return [{ x: DIG_POSTS_BOX.x, z: DIG_POSTS_BOX.z, radius: 1.15 }]
 }

@@ -122,12 +122,9 @@ describe('the canoe lane (work-order 1245 items 9 and 10)', () => {
 })
 
 interface Sample {
-  t: number
   phase: CanoePhase
-  s: number
   x: number
   z: number
-  yaw: number
   paddler: PaddlerAction
   net: number
   inHull: number
@@ -187,12 +184,9 @@ function run(
     if (state.phase !== before) phases.push({ phase: state.phase, t })
     if (!actions.length || actions[actions.length - 1].action !== state.paddlerAction) actions.push({ t, action: state.paddlerAction })
     states.push({
-      t,
       phase: state.phase,
-      s: state.s,
       x: state.x,
       z: state.z,
-      yaw: state.yaw,
       paddler: state.paddlerAction,
       net: state.net,
       inHull: state.inHull,
@@ -234,7 +228,7 @@ describe('the drift-net cycle (work-order 1245 item 1)', () => {
     }
     for (const call of [...lengths.get('callDown')!, ...lengths.get('callUp')!]) expect(call).toBeCloseTo(OBEY, 0)
     for (const launch of lengths.get('launch')!) expect(launch).toBeCloseTo(cfg.launchSeconds, 0)
-    // A 49 m lane instead of 20 m (item 9), at regionally plausible paces.
+    // A 48 m lane instead of 20 m (item 9), at regionally plausible paces.
     expect(span).toBe(48)
     expect(cfg.upstreamSpeed).toBeCloseTo(0.8, 9)
     expect(cfg.downstreamSpeed).toBeCloseTo(1.5, 9)

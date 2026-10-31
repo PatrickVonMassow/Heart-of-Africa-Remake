@@ -7,9 +7,9 @@ not need it and must not act on it.
 
 ## Dispatch and landing
 
-- Keep at most three non-overlapping, worktree-isolated authoring lanes busy
-  while independent work exists. `commission-guard` enforces the cap and the
-  explanation owed for a free slot. The owner retains picture judgment, serial
+- At most three non-overlapping, worktree-isolated authoring lanes may be open
+  (`commission-guard` enforces the cap; a free slot owes no explanation);
+  how many are filled follows "Throughput with cloud authoring". The owner retains picture judgment, serial
   landing/deploy, and board publication.
 - Generate an author's spec with `node scripts/point-brief.mjs <N>`; named
   sections may be read on demand, an ambiguous or insufficient brief is
@@ -18,15 +18,22 @@ not need it and must not act on it.
   Y, collect status or log facts) uses `subagent_type: "Explore"`; authoring,
   review, suites, and anything that writes, commits, or verifies keep their
   current agent types, and the model policy is unchanged.
+- A cloud authoring delegate (cloud switch ON) runs build, lint, and Vitest
+  on its branch and hands over the pushed sha, the three gate results, and
+  open issues. Local acceptance of that branch then runs only what needs the
+  quiet machine: the covering browser tier suites (`scripts/verify/tiers.mjs`),
+  the picture check (both backends when `isBackendSensitivePath` applies),
+  review, and landing; the local tier run stays mandatory and cloud green is
+  never browser-suite evidence. A cloud unit result that a later local run
+  contradicts is filed as a finding.
 - Land with `node scripts/land-point.mjs <N> --model <m>`. It drives the no-ff
   merge, fast gate, work-order tick/archive commit, push, board publish, and
   worktree cleanup, stopping on the first failed step. The post-merge gate is
   mandatory even after a clean merge.
 - Schedule a heavy run onto a quiet machine. A whole `polish` pass and a full
-  LARGE are 55 and 119 measured minutes (`docs/picture-check-cost.md` §7), and
-  load alone moves a suite by about a fifth, so an expensive run started while a
-  second author is building buys a slower run and a redder one. This is
-  scheduling, not construction: no guard enforces it, and `--plan` printing the
+  LARGE are 55 and 119 measured minutes (`docs/picture-check-cost.md` §7); a
+  CPU gate beside a suite slowed it by 12 % and a second suite by 1.5–3.5 %
+  (`docs/1452-step5-measurement.md`). This is scheduling, not construction: no guard enforces it, and `--plan` printing the
   observed band is the whole of its machinery.
 - Await a background build log with `node scripts/verify/run-wait.mjs
   --await-log <log>` (as a background call), never an `until grep` loop. A
@@ -35,6 +42,132 @@ not need it and must not act on it.
   independently picture-checked improvement lands before asking whether it is
   aesthetically good enough. Use a branch preview only when the user's eyes are
   required to establish that the change is safe to land.
+
+## Throughput with cloud authoring
+
+Plan of point 1444 (six eyes: blind halves main chain / cross lane, merge scarce
+lane, break check cross lane; record `docs/four-eyes/1444-*`). Practice only — no guard
+enforces it; it replaces the user order of 23.10.2026 it refines.
+
+**Baseline.** 25 distinct points landed between the 1409 merge (21.10.2026 19:02Z)
+and the 1297 merge (25.10.2026 22:05Z): 99.0 h, **3.96 h per landed point**, 3.42 h
+without the 13.6 h host-down stretch of 24./25.10. Losses parallelism does not cure:
+host down 13.6 h, suite repeats about 8 h, hung WebGPU runs about 4 h. Only one cloud
+author ever ran (1440: submission to merge 1.3 h).
+
+**After 1443 alone.** 1443 drained the pool (1414, 1432, 1333, 1297 merged 25.10.2026
+11:53Z–22:05Z; closed 22:27Z). From the first free slot (1333 merge, 21:10Z) to
+26.10.2026 00:30 local, no cloud author was commissioned and no batch-daemon ran: the
+old mode has no step that commissions while a point is accepted, so a free pool does
+not by itself overlap anything. The goal is therefore not met by 1443 alone, and a
+further old-mode cycle is not run first — it would spend at least 48 h to measure a
+mode with no overlap step. The measured cycle
+below compares the new mode against the pre-1443 3.42 h.
+
+**Bounds** (provisional; changed only by the measured cycle below):
+
+- Cloud authors submitted or running: at most **1**, counted from submission — a
+  cloud session has no branch until it pushes, so `commission-guard` cannot see it;
+  `batch-in-flight --status` (its declaration) is what is checked. Reason: 1 is the
+  smallest bound that overlaps authoring with acceptance at all; it carries no
+  capacity claim, and every branch that waited over a day needed post-sync rework.
+  A higher bound needs a measured cycle showing both acceptance standing idle for
+  want of a ready successor and no finished branch waiting over a day; it then
+  changes this number and the switch-over condition together.
+- Finished branches waiting for acceptance: at most **1**. `POOL_CAP` 3 stays the
+  branch ceiling, never a target; a free slot owes no explanation (the point-427
+  `--slots-free` demand is switched off).
+- Local heavy jobs: **1**. While a browser suite, unit gate or picture check runs,
+  start no other local agent, browser or Vitest run (a running local author is
+  checkpointed first); cloud authoring continues. Measured 27.10.2026 on a
+  known-green section against its quiet median of 13m 27s
+  (`docs/1452-step5-measurement.md`):
+  - M1 ACCEPTED: one cross-vendor review may run beside one browser suite —
+    loaded 13m 10s–13m 19s, 0 added reds in 3 runs, peak memory 64.8 % against
+    the 85 % budget. It covers only the owner session's remote review call; a
+    review that spawns a local model, subagent, browser or Vitest run is a heavy job.
+  - M2 REJECTED: no build/lint/unit gate beside a browser suite — 15m 01s and
+    15m 07s (+12 %), and the unit layer itself 564 s against 517 s quiet.
+  - M3 REJECTED: one browser suite at a time — 4 of 4 overlapped runs slower
+    (+1.5 to +3.5 %), 0 reds, peaks 73–75 %. Point 1455 traded that slowdown
+    for wall clock and tested it (`docs/1455-step4-log.md`): FAILED at its first
+    pair — adult-errands WebGL 2 ‖ villager-dress WebGPU reached 85.5 %. The
+    bound stays at 1.
+- `POOL_CAP` and `DAEMON_POOL_CAP` stay at 3: no measurement supports a change.
+- The cloud switch stays on until the user orders it off, independent of the free
+  credits and their expiry (user 29.10.2026).
+- `batch-daemon` stays off while these bounds hold: its refill fills to
+  `DAEMON_POOL_CAP` 3 and has no lower setting on its command line (measured
+  26.10.2026). Starting it first needs that cap set to the bound.
+
+**Switch-over.** From the first point after 1444: when a local acceptance window
+opens, `batch-in-flight --status` shows fewer submitted or running cloud authors than
+the bound and no finished branch waits, commission the next ready, file-disjoint queue point through
+`author-delegate`/cloud-switch, declare it, and continue the acceptance. The
+existing `independentOpenPoints` decides disjointness; the successor is adopted at
+the boundary as today. A commission counts only on a `commission-guard --status`
+verdict without an unread notice: an allow printed beside one establishes nothing. Picture-fix loops stay local (`author-routing-core`).
+
+**Acceptance discipline (kept).** Gate a branch only after its author declares it
+final, on its exact pushed SHA; rerun only the checks a later commit invalidates.
+Spend suite waits on lightweight work: the owner's cross-vendor review of the next
+finished branch's final SHA (M1) or preparing the next acceptance. Before the author
+declares a branch final and before the expensive gates start, sync `main` into it and
+fold in the known fixes. Send a fix to ONE destination (the cloud session or one local
+agent) with every known finding in that request, after reading the point's cloud
+session log (`local/<N>-fix-send.log`, its run log).
+After **one** repeat of an unchanged SHA, section, backend and failure signature,
+diagnose before running it again; a relevant commit or a recorded changed condition
+(an environment repair) reopens it. A red already charged to an open point with
+`main` unchanged in that section reuses the recorded `main` run.
+
+**Manageable.** The in-flight declaration is one record that a new `--waiting-on`
+replaces, so each declaration names every concurrent job: its text says what runs
+where and why (`"cloud author 1450 (session <id>); local suite polish-villagers for
+1449"`), and each job adds its evidence (`--branch`, `--worktree`, `--log`, `--pid`).
+`node scripts/batch-in-flight.mjs --status` then prints that text and all items in
+one output; a job missing from it is the owner's defect, not a gap in the command.
+
+**Simplified.** Routine retrospective, guide-attest and queue-rank refreshes go into
+one bookkeeping commit per boundary; a user-order publication receipt keeps its own
+required timing and is never deferred into that commit. A wait declaration uses the suite's measured
+duration (`run-wait --plan`), not the 45-minute default.
+
+**Kept unchanged.** Pool cap and `commission-guard`, cloud-switch ON, lane routing
+`default`, single owner and serial landing, boundary and ownership fence,
+`run-wait` (a `running/-` hang is STALLED and diagnosed), `land-point.mjs`, local
+tier suites, both-backend picture check, cross-vendor review. Cloud green never
+stands in for a browser suite.
+
+**Rejected without new data** (`docs/four-eyes/1452-union-r1.json`; re-propose only
+with a measurement that answers the reason):
+- U5, two local suites or a CPU gate beside a suite: measured slower (M2, M3 above);
+  a local author beside a suite stays unmeasured and matters only once the user
+  turns the cloud switch off.
+- U7, more cloud authors: acceptance, not authoring, is the bottleneck; no idle
+  acceptance for want of a ready successor was measured.
+- U9, stale branches and the bare branch count as slot criterion: no slot is
+  blocked (`open []`, parks drop out) and no `branches-open` refusal met idle
+  acceptance; another criterion would be new machinery.
+- U10, pulling points forward past the front: a finished pulled-forward branch
+  would block the front point under the one-waiting-branch bound; no measured idle
+  slot with a wholly colliding front.
+- U11, covering browser suites on the second backend only on
+  `isBackendSensitivePath`: its false-negative rate is unmeasured, so suites keep
+  their current backend lanes. The picture-check rule above (both backends when
+  `isBackendSensitivePath` applies, one otherwise; CLAUDE.md §6) is unchanged.
+
+**Open.** U2, a per-suite STALLED cut-off in `run-wait` from its `--plan` duration,
+needs its false-stall rate measured per suite, section and backend under the
+permitted load before any activation.
+
+**Measured cycle.** After 1444 lands, `batch-standstill-report.mjs` over the next
+five landed points or 48 h, whichever is later — this is also the post-1443
+baseline, since the drained pool is what first allows the one cloud author. Record
+per point where each delegation ran, cloud sessions active during acceptance,
+waiting branches and repeats. Success: below 3.42 h per landed point without
+host-down time; otherwise name the class that absorbed the gain. One cycle is an
+observation, not proof.
 
 ## Boundary, lease, claims, and wake-up
 
@@ -126,13 +259,21 @@ The first historical run and the reproducible 21 August/four-day fixtures are in
 
 ## Authoring and four eyes
 
-`scripts/author-routing-core.mjs` owns the routing cut. GPT-6 Astra authors the
-hard, complex, error-prone, and high-criticality points; Opus 5.5 authors work
-whose verification is itself the task. Fable 5.1 authors tagged points and automatic
-review-round escalations through `scripts/author-fable.mjs`, as `CLAUDE.md` §6 states. Review is cross-vendor through
-`scripts/review-astra.mjs` for Claude-authored work and Claude for Astra-authored
-work. Serving fallback order is Opus 5.5, Fable 5.1, then Opus 4.8; a different
-serving model pauses the batch.
+`scripts/author-routing-core.mjs` owns the routing cut; the lanes are role
+records in `scripts/model-lanes.mjs`, the only place naming models. At the
+`default` routing the main chain authors; the scarce lane authors tagged points
+and automatic review-round escalations through
+`scripts/author-delegate.mjs --lane scarce`, as `CLAUDE.md` §6 states. Review is
+cross-vendor through `scripts/cross-review.mjs`: a lane of another vendor than
+every author of the range. Serving fallback order is the main chain, the scarce
+lane (when switched on), then the main fallback; a different serving model
+pauses the batch.
+
+**After a lane rename lands** (scripts or state files renamed, as on the
+generic-lane change): a running batch daemon is restarted before the next
+point starts, because it keeps invoking the script names its loaded code holds
+(a stopped daemon stays stopped while "Throughput with cloud authoring" keeps it
+off), and the memory entries naming old commands are updated in the same handoff.
 
 For blind-parallel work, each input entry carries an id. The third model merges
 by meaning through `scripts/blind-merge.mjs`, and every input is counted exactly
@@ -161,9 +302,14 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
 ## Board and owner-only operating hooks
 
 - Drain waiting findings (`node scripts/finding.mjs --drain` lists them from the
-  memory carrier) into the work order, then run
-  `node scripts/finding.mjs --drained "<title>"`. Queue waiting user requests
-  (`--requests`) with `--show`, a verbatim append and `--queued`; `--blocked`
+  memory carrier) into the work order, commit and push main, then run
+  `node scripts/finding.mjs --drained "<title>" --point <N>` (or `--why` for a
+  backlog/duplicate drain). Queue waiting user requests (`--requests`) in this
+  order: `--show`, a verbatim append, `--appending "<title>" --point <N>`,
+  commit, push main, and only then `--queued` — it proves point N on
+  origin/main and refuses otherwise. `node scripts/carrier-reconcile.mjs`
+  re-checks every tick against TASKS.md + archive (doctor, session start and
+  land-point run it); a RED there is a possibly lost user order. `--blocked`
   is only for one that cannot be carried out. A deferral leaves it pending:
   past the watermark, no `--blocked` and no decision card — `--commit
   --context` hands it on in the carrier and the successor queues it.

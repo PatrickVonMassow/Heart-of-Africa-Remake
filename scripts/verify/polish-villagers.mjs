@@ -1,6 +1,8 @@
 // Headless polish verification, theme polish-villagers: the adults of a village:
 // gestures, the canoe and its fishermen, the mute shore scene, no wedged adult, the
-// well, the stations, the loom, the errands and the mortar (design.md §19.10).
+// well, the stations, the loom, the errands, the carried jar, the water stand,
+// the steadying palm, the mortar, dress, the village walk and figure
+// micro-structure (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { waitForSceneBuilt, assertBackend, VERIFY_GL } from './_browser.mjs'
@@ -10,8 +12,10 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { BASE, OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, OUT, section, check, unmeasured, waitForMoment, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
+import { standOrderMoment } from './standOrder.mjs'
+import { rimSeamPoints } from './rimSeam.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
@@ -225,16 +229,18 @@ if (section('villager-gestures')) {
 
 // THE FISHERMEN BESIDE THE CHILDREN'S BANK GAME (work-order 1237, rebuilt by
 // 1245). Two men work a drift net from their dugout; the net man's words go to
-// the paddler, the catch goes in a woven basket to their own fire. Three
+// the paddler, the catch goes in a woven basket to their own fire. Five
 // standing places, each judged by the rendered projection:
-//  - the boat's, s = +36 m on the waterline looking out toward the landing:
+//  - the lane's upstream end, for the DOWNSTREAM word;
+//  - the boat's, s = +49 m, 2.4 m off the waterline looking out toward the landing:
 //    the haul and then the UPSTREAM word over the net man's head are in frame,
 //    no child and no play rock is;
 //  - behind the UPSTREAM play rock, looking downstream along the moved stretch:
 //    the children's game is in frame, and the boat's words cannot be heard
 //    there (the stand lies beyond the CALL reach of every place they fall);
 //  - inland of the fishers' fire: the carrier, the griller and the smoking rack
-//    with its fish are in frame.
+//    with its fish are in frame;
+//  - the pounding pair by the fishers' fire.
 // Spectator-time knobs only, put back afterwards: the roam is shortened as the
 // children-bank-game section does, the reading is held long enough for a
 // headless shutter, and ROCK is marked heard — the direction words follow the
@@ -341,10 +347,8 @@ if (section('villager-canoe')) {
       const boat = await page.evaluate(() => {
         const c = window.__placeCanoe()
         const L = c.lane
-        // A few paces upstream of where the haul happens (s = +47, 7 m out):
-        // close enough that the float line and the fish read at their size.
-        // The net is set on the hull's shore side and trails upstream behind
-        // it, so the stand is upstream too, looking out between the two.
+        // Near where the haul happens (s = +47, 7 m out): close enough that
+        // the float line and the fish read at their size.
         // Waded out ankle-to-knee deep, about 5 m from the hull's shore side and
         // a little DOWNSTREAM of it: the float line trails upstream, so the
         // floats still out lie beyond the hull rather than under the lens.
@@ -439,31 +443,49 @@ if (section('villager-canoe')) {
         .catch(() => false)
       check('at the landing the net man steps ashore to unload', ashore)
       if (ashore && atBoat) {
-        const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
-        await standAt(boat.stand, nm)
         const squatting = () => page.evaluate(() => {
           const c = window.__placeCanoe()
           return c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3
         })
-        const before = await squatting()
-        const one = await page.evaluate(() => {
-          const c = window.__placeCanoe()
-          let named = 0
-          let visible = 0
-          window.__placeScene.traverse((o) => {
-            if (!o.name.startsWith('village-canoe-netman')) return
-            named++
-            if (o.visible) visible++
+        // HELD FROM A SQUATTING FRAME THROUGH THE SHUTTER (point 1456): the
+        // positioning and the shutter's readiness wait ran seconds under load
+        // while he finished unloading, so a reading before them judged a pose
+        // the picture never showed. Life is frozen in the very frame that
+        // reads him squatting, before either, so the readings are the pose in
+        // the picture; the thaw runs whatever the capture does.
+        const before = await page
+          .waitForFunction(() => {
+            const c = window.__placeCanoe()
+            if (!(c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3)) return false
+            window.__placeFreezeLife(true)
+            return true
+          }, null, { timeout: 30000, polling: 'raf' })
+          .then(() => true)
+          .catch(() => false)
+        let after = false
+        try {
+          const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
+          await standAt(boat.stand, nm)
+          const one = await page.evaluate(() => {
+            const c = window.__placeCanoe()
+            let named = 0
+            let visible = 0
+            window.__placeScene.traverse((o) => {
+              if (!o.name.startsWith('village-canoe-netman')) return
+              named++
+              if (o.visible) visible++
+            })
+            return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
           })
-          return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
-        })
-        check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
-        await frame('1387-netman-ashore-unloading', {
-          local: { x: nm.x, y: 0.5, z: nm.z },
-          label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
-        })
-        // The squat held from the positioning through the shutter (GPT-6 Astra review).
-        const after = await squatting()
+          check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
+          await frame('1387-netman-ashore-unloading', {
+            local: { x: nm.x, y: 0.5, z: nm.z },
+            label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
+          })
+          after = await squatting()
+        } finally {
+          await page.evaluate(() => window.__placeFreezeLife(false))
+        }
         check('he was still squatting ashore, unloading, before and after the shutter', before && after, JSON.stringify({ before, after }))
       }
       // The net man's word to the paddler once the basket is set down, and the
@@ -804,7 +826,7 @@ if (section('mute-shore-scene')) {
   const REPORT_SEED = 2425147265
   const shore = page
   const shoreFrame = frame
-  // A fresh game on `seed` (the suite's own boot, above, with the seed named).
+  // A fresh game on `seed` (the boot of ./_polish.mjs, with the seed named).
   const bootOn = async (seed) => {
     const url = new URL(BASE)
     if (seed !== null) url.searchParams.set('seed', String(seed))
@@ -1619,7 +1641,7 @@ if (section('village-loom')) {
       // The shuttle AND both her hands, in world space: the pixel difference
       // below says that something in the crop changed, and a growing cloth or
       // a thrown shuttle would change it over arms that never moved — which is
-      // the reported defect (GPT-6 Astra review, pass 4).
+      // the reported defect (cross-vendor review, pass 4).
       const shuttleAndHands = () => {
         const m = window.__placeScene.getObjectByName('village-loom-shuttle')
         m.updateWorldMatrix(true, false)
@@ -1697,7 +1719,7 @@ if (section('village-loom')) {
         const s = window.__placeLayout.loom
         return Math.hypot(s.tend.downstream.x - s.seat.x, s.tend.downstream.z - s.seat.z)
       })
-      // PART-WAY, AND WALKING OUT (GPT-6 Astra review, two rounds): a helper
+      // PART-WAY, AND WALKING OUT (cross-vendor review, two rounds): a helper
       // parked at his stand, standing beyond it, or on his way BACK is not a
       // body carrying the word she said. He faces the way he walks (0 toward
       // downstream, π toward upstream) and turns to the warp when he stands
@@ -1944,6 +1966,8 @@ if (section('adult-errands')) {
     e.intervalSeconds = 0.8
     e.dwellSeconds = 1
     e.digSeconds = 3
+    // the shipped pace, for the moving capture and the gait census (point 1404)
+    window.__errandShippedPace = e.pace
     e.pace = 6
     // Keep the measured ten-adult standalone setup. How many errands this
     // window then sees is no longer left to luck: it casts them itself and
@@ -1976,6 +2000,139 @@ if (section('adult-errands')) {
       !!geography.waterHead && !!geography.waterFoot,
       JSON.stringify({ head: geography.waterHead, foot: geography.waterFoot }),
     )
+    // A NEW HEADING IS TURNED TO, NEVER SNAPPED (point 1404): over five seconds
+    // of errands, words and digging, no adult's body swings further in one
+    // drawn frame than its fastest turn (walking or on the spot) allows for
+    // that frame's own dt. Measured INSIDE the game frame (`turnWorst`): a
+    // requestAnimationFrame sampler beside it can see two game frames in one
+    // of its own after a hitch and read a bounded turn as a snap.
+    // Measured before the fix: 1.2-2.9 rad in one frame.
+    await page.evaluate(() => window.__placeErrands().resetTurnWorst())
+    // 300 drawn frames (about five seconds at 60 fps), counted, not timed
+    await page.evaluate(() => new Promise((done) => {
+      let n = 0
+      const tick = () => (++n >= 300 ? done() : requestAnimationFrame(tick))
+      requestAnimationFrame(tick)
+    }))
+    const swings = await page.evaluate(() => ({ worst: window.__placeErrands().turnWorst }))
+    check(
+      'no village adult swings round to a new heading in one frame — it turns (point 1404)',
+      swings.worst.over <= 1e-6,
+      JSON.stringify(swings),
+    )
+    // The capture and the census below run at the SHIPPED errand pace: at this
+    // window's calibrated 6 m/s every errand adult is rightly drawn in a sprint,
+    // and that sprint was the mid-air flight of the first capture (frame-jump
+    // telemetry, 23.10.2026: worst jump exactly 6.0 m/s, no shove, no escape).
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = window.__errandShippedPace })
+    // THE MOVING CAPTURE the point is judged by (point 1404): one walking adult
+    // whose heading is far off its next way, four frames about 0.3 s apart, the
+    // camera FOLLOWING that one body (4 m off its first flank, re-placed per
+    // frame) so the turner is the figure in the middle of every frame — its yaw,
+    // way heading and drawn gait ride in each frame's label.
+    const turner = await page
+      .waitForFunction(() => {
+        const vs = window.__placeErrands().villagers
+        const i = vs.findIndex((v) => v.work && !v.work.arrived && Math.abs(Math.atan2(Math.sin(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw), Math.cos(Math.atan2(v.work.x - v.x, v.work.z - v.z) - v.yaw))) > 0.8)
+        return i >= 0 ? { i } : false
+      }, null, { timeout: 60000, polling: 50 })
+      .then((h) => h.jsonValue())
+      .then((r) => r.i)
+      .catch(() => null)
+    check('an errand adult is caught facing away from its next way, to film its turn (point 1404)', turner !== null)
+    if (turner !== null) {
+      const side0 = await page.evaluate((i) => window.__placeErrands().villagers[i].yaw + Math.PI / 2, turner)
+      const follow = ({ i, side }) => {
+        const v = window.__placeErrands().villagers[i]
+        const p = window.__placePlayer
+        p.x = v.x + Math.sin(side) * 4
+        p.z = v.z + Math.cos(side) * 4
+        p.yaw = side
+        p.pitch = -0.15
+      }
+      // Frame 1 once showed only water (23.10.2026, both backends): the first
+      // view of this spot stalls the shutter while the turner walks on out of
+      // it. Village life is held still from the camera placement to the
+      // exposure, as for the fill shot (point 1108).
+      await page.evaluate(follow, { i: turner, side: side0 })
+      await nextFrames(8)
+      for (const k of [1, 2, 3, 4]) {
+        await page.evaluate(follow, { i: turner, side: side0 })
+        await nextFrames(2)
+        await freezeLife(true)
+        await page.evaluate(follow, { i: turner, side: side0 })
+        const at = await page.evaluate((i) => {
+          const v = window.__placeErrands().villagers[i]
+          const way = v.work ? Math.atan2(v.work.x - v.x, v.work.z - v.z) : null
+          return { x: v.x, z: v.z, yaw: v.yaw, way, gait: v.drawn.gait, speed: v.drawn.speed }
+        }, turner)
+        const deg = (a) => (a === null ? 'n/a' : Math.round((a * 180) / Math.PI))
+        const g = at.gait ? `walk ${at.gait.walk.toFixed(2)} jog ${at.gait.jog.toFixed(2)} sprint ${at.gait.sprint.toFixed(2)}` : 'no gait'
+        const label = `moving capture ${k}/4: errand adult #${turner} (frame centre, camera following 4 m off its first flank) turning toward its next way — yaw ${deg(at.yaw)} deg, way ${deg(at.way)} deg, ${g}`
+        console.log(label)
+        try {
+          await frame(`1404-errand-turn-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, {
+            local: { x: at.x, y: 0.9, z: at.z },
+            label,
+          })
+        } finally {
+          await freezeLife(false)
+        }
+        if (k === 4) break
+        // the next frame once the turner has walked on about 0.35 m (≈0.3 s);
+        // a turner standing still makes four frames of one instant, not a moving capture
+        const walked = await page
+          .waitForFunction(({ i, x, z }) => {
+            const v = window.__placeErrands().villagers[i]
+            return Math.hypot(v.x - x, v.z - z) > 0.35
+          }, { i: turner, x: at.x, z: at.z }, { timeout: 5000, polling: 'raf' })
+          .then(() => true)
+          .catch(() => false)
+        check(`the filmed errand adult walks on between moving-capture frames ${k} and ${k + 1} (point 1404)`, walked)
+        if (!walked) break
+      }
+    }
+    // NO VILLAGE ADULT FLIES (point 1404 oddity, frame 1 of 23.10.2026: a woman
+    // drawn near horizontal in mid-air, legs splayed). The drawn gait of every
+    // errand adult over ~10 s: an errand walks; a sprint share means the body's
+    // measured ground speed jumped (a snap, an escape) and the clip flies.
+    const flight = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let worst = { sprint: 0, jog: 0, speed: 0, who: null }
+          let frames = 0
+          const seen = new Set()
+          let adults = 0
+          const t0 = performance.now()
+          let last = null
+          let lastT = t0
+          const tick = () => {
+            frames++
+            const now = performance.now()
+            const dt = Math.max(1e-3, (now - lastT) / 1000)
+            lastT = now
+            const vs = window.__placeErrands().villagers
+            adults = vs.length
+            const p = window.__placePlayer
+            vs.forEach((v, i) => {
+              const g = v.drawn.gait
+              if (g) seen.add(i)
+              // what the body really did since the last sample, for the cause
+              const was = last?.[i]
+              const move = was ? Math.hypot(v.x - was.x, v.z - was.z) / dt : null
+              const spin = was ? Math.abs(Math.atan2(Math.sin(v.yaw - was.yaw), Math.cos(v.yaw - was.yaw))) / dt : null
+              if (g && (g.sprint > worst.sprint || (g.sprint === worst.sprint && g.jog > worst.jog)))
+                worst = { sprint: g.sprint, jog: g.jog, speed: v.drawn.speed, move, spin, dt, who: i, x: v.x, z: v.z, player: Math.hypot(p.x - v.x, p.z - v.z), work: v.work?.phase ?? null, arrived: v.work?.arrived ?? null }
+            })
+            last = vs.map((v) => ({ x: v.x, z: v.z, yaw: v.yaw }))
+            if (performance.now() - t0 < 10000) requestAnimationFrame(tick)
+            else resolve({ ...worst, frames, adults, gaitSeen: seen.size })
+          }
+          requestAnimationFrame(tick)
+        }),
+    )
+    check('no village adult on an errand is drawn in a sprint (point 1404 flight oddity)', flight.adults > 0 && flight.gaitSeen === flight.adults && flight.sprint < 0.5, JSON.stringify(flight))
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
 
     // WHAT THE SCENE ACTUALLY CARRIES OUT, aggregated across the window rather
     // than read off the last sample: a situation that is staged and cleared
@@ -2024,7 +2181,7 @@ if (section('adult-errands')) {
     // THE UTTERANCE ALREADY STANDING WHEN THE WINDOW OPENS IS NOT ONE OF OURS.
     // `last` survives its own moment, so the first sample would otherwise be
     // counted as a fresh word and measured at a speaker who has since walked on
-    // (GPT-5.6 Sol, confirming round). It is read once, before the loop, and
+    // (cross-vendor review, confirming round). It is read once, before the loop, and
     // becomes the thing every later sample is compared against.
     const first = await page.evaluate(() => window.__placeErrands())
     let seen = first.last
@@ -2053,7 +2210,7 @@ if (section('adult-errands')) {
       // THE POPULATION IS THE GAME'S OWN STATEMENT THAT THE BOUT HAS BEGUN —
       // phase and arrival — NOT `digging`. `digging` already carries the rim
       // test, so a reading taken over it could never fail: the very body that
-      // would prove the defect is the one it drops (GPT-6 Astra, cross-vendor
+      // would prove the defect is the one it drops (cross-vendor
       // round). Read over the bout instead, both halves are real: the village
       // brings BOTH men to the rim, and the stroke therefore plays.
       const atPit = new Map()
@@ -2077,7 +2234,7 @@ if (section('adult-errands')) {
         if (pair.length !== 2) continue
         pairsSeen++
         const site = now.geography.digSites[siteIndex]
-        // ACROSS THE HOLE, MEASURED AS SUCH (GPT-6 Astra, cross-vendor round).
+        // ACROSS THE HOLE, MEASURED AS SUCH (cross-vendor round).
         // A midpoint reading proves nothing: both bodies are already inside
         // `rimLimit`, so their middle always is too — two men side by side on
         // one arc pass it. What must hold is that the site lies BETWEEN them:
@@ -2106,7 +2263,7 @@ if (section('adult-errands')) {
       // measured a man who had walked on: a correct carrier says RIVER at the
       // head of the path and then goes down to the water, which failed the check
       // though nothing was wrong, while a word really spoken at the bank slipped
-      // through as soon as its speaker walked away (GPT-5.6 Sol, first
+      // through as soon as its speaker walked away (cross-vendor review, first
       // cross-vendor round, D1).
       const last = now.last
       const key = last ? `${last.id}/${last.concept}/${last.speaker}` : null
@@ -2117,7 +2274,7 @@ if (section('adult-errands')) {
         if (who) {
           // AGAINST THE CHILDREN THEMSELVES, first. The stage says where they
           // belong; a child on the speaker's side of a rock is nearer him than
-          // the rock is, and it is the child who hears (GPT-5.6 Sol, confirming
+          // the rock is, and it is the child who hears (cross-vendor review, confirming
           // round). The stage points stay as a floor for the moment when the
           // children are elsewhere entirely.
           const kids = await page.evaluate(() => window.__placeTag?.()?.children ?? [])
@@ -2167,8 +2324,8 @@ if (section('adult-errands')) {
     // exactly the state twelve green climbs used to report as green on
     // 09.09.2026.
     const errandsCast = staged['water-out'] ?? 0
-    // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
-    // (GPT-6 Astra, cross-vendor round): the game stages 'water-back' at the
+    // WHAT THE JAR ASSERTION NEEDS IS A FILLED TRIP TURNED FOR HOME, not a casting
+    // (cross-vendor round): the game stages 'water-back' at the
     // moment the fill ends and the carrier turns for home, so it counts the
     // trips that had an empty leg and filled — the full leg home has begun,
     // not necessarily ended. ONE is the honest
@@ -2184,7 +2341,7 @@ if (section('adult-errands')) {
       errandsCast > 0,
       `${errandsCast} water errand(s) cast over 240 samples, ${roundTrips} of them turned for home`,
     )
-    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (GPT-6 Astra,
+    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (cross-vendor review,
     // cross-vendor round). Bundled into the jar assertion it inherited the water
     // errand's sample count, so a broken digging animation in a window with few
     // errands would have read NOT-COVERING instead of red — and the DIG
@@ -2204,7 +2361,7 @@ if (section('adult-errands')) {
     // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
     // the staging, digging and carrying checks are satisfied by animation alone,
     // and the earshot check passed EXPLICITLY when nobody spoke at all — so a
-    // broken speech path would have gone green (GPT-5.6 Sol, first cross-vendor
+    // broken speech path would have gone green (first cross-vendor
     // round, D2).
     check(
       'and both adult words are really spoken — RIVER and DIG',
@@ -2487,7 +2644,7 @@ if (section('adult-errands')) {
       // he is pinned: the others keep walking their errands through the search
       // and the settling frames, and in a full pass, with the errands well on,
       // a line clear when chosen came back with two cones over him while the
-      // suite stayed green. So the line is read again after the exposure, from
+      // suite stayed green. So the line is read again at the shutter, from
       // where the lens actually stands — a bearing is a request the ground's
       // collision may move — and a spoiled frame is taken again from a bearing
       // chosen afresh; only a search that runs out reds.
@@ -2675,60 +2832,28 @@ if (section('adult-errands')) {
     // the water errand comes round a third as often, and the very wait that was
     // widened is the one that times out. A green that needed a retry covers
     // nothing (CLAUDE.md §7.2).
+    // The old 180 s at 60 fps, and never less than 180 s; the hang guard lets a
+    // lane down to 20 fps answer. OPEN: frames figure is an estimate, calibrate
+    // against the lane rate the run header prints.
+    const MOMENT_BUDGET = { frames: 10800, minMs: 180000, wallCapMs: 540000 }
     const holdStill = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 0.5 })
     const letThemWalk = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
     await page.evaluate(() => {
       window.__errandWatch = { seen: {} }
     })
-    const order = await page
-      .waitForFunction(
-        () => {
-          const e = window.__placeErrands()
-          const v = e.villagers
-          const stand = e.geography.waterStand
-          if (!stand) return null
-          // WHAT WAS ACTUALLY SEEN, so a miss says why rather than only that.
-          const w = window.__errandWatch
-          for (const p of v) if (p.work) w.seen[`${p.work.situation}:${p.work.phase}`] = (w.seen[`${p.work.situation}:${p.work.phase}`] ?? 0) + 1
-          // How near the returning carrier ever gets to the stand, and whether
-          // the errand ever counts him as arrived there.
-          for (const p of v) {
-            if (p.work?.situation !== 'water-back') continue
-            const d = Math.hypot(p.x - stand.x, p.z - stand.z)
-            w.back = Math.min(w.back ?? Infinity, d)
-            if (p.work.arrived) w.backArrived = (w.backArrived ?? 0) + 1
-            w.backGoal = Math.hypot(p.work.x - stand.x, p.work.z - stand.z)
-          }
-          // THE MOMENT IS THE WORD, NOT A DISTANCE. Waiting for the carrier to be
-          // within so many metres of the stand chased a window whose width
-          // depends on the errand's pace; the errand itself says when the order
-          // fell. `last` carries the utterance and its age, so this waits for a
-          // RIVER that has just been spoken on the outward leg — the sender is
-          // its speaker and is still standing there, the carrier is the man
-          // walking off with the empty jar.
-          const said = e.last
-          if (!said || said.id !== 'water-out' || said.age > 2.5) return null
-          const sender = said.speaker
-          if (!v[sender]) return null
-          for (let i = 0; i < v.length; i++) {
-            if (i === sender || v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
-            const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
-            return {
-              stand,
-              carrier: { who: i, x: v[i].x, z: v[i].z },
-              sender: { who: sender, x: v[sender].x, z: v[sender].z },
-              gap,
-            }
-          }
-          return null
-        },
-        null,
-        { timeout: 180000 },
-      )
-      .then((handle) => handle.jsonValue())
-      .catch(() => null)
+    // LOAD-PROOF (point 642): a STATE check — the errand produces the moment or
+    // it does not — whose wait was a 180 s wall budget, so a slow lane saw fewer
+    // errands and reddened. The wait now counts rendered frames (MOMENT_BUDGET);
+    // a lane that cannot deliver them before the hang guard is UNMEASURED.
+    const orderWait = await waitForMoment(standOrderMoment, MOMENT_BUDGET)
+    const order = orderWait.value
     const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {} })
-    check(
+    if (orderWait.wallCapped) {
+      unmeasured(
+        'the order at the stand can be photographed: a sender still there and a carrier already going',
+        `lane delivered ${orderWait.frames} of ${MOMENT_BUDGET.frames} frames before the ${MOMENT_BUDGET.wallCapMs / 1000} s hang guard — it cannot answer whether the errand produces the moment`,
+      )
+    } else check(
       'the order at the stand can be photographed: a sender still there and a carrier already going',
       // AND THE SENDER IS AT THE STAND. Both utterances falling inside the
       // village, at the stand, is the half of the spec that replaced a word
@@ -2740,7 +2865,7 @@ if (section('adult-errands')) {
       order
         ? `carrier ${order.gap.toFixed(1)} m off the stand, ` +
           `sender ${Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z).toFixed(1)} m`
-        : `no order in 180 s — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
+        : `no order in ${orderWait.frames} frames — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
           `returning carrier got to ${watched.back != null ? `${watched.back.toFixed(2)} m` : 'never seen'} of the stand, ` +
           `arrived-samples ${watched.backArrived ?? 0}, his goal sits ${watched.backGoal != null ? `${watched.backGoal.toFixed(2)} m` : '?'} from it`,
     )
@@ -2810,8 +2935,7 @@ if (section('adult-errands')) {
     }
     await letThemWalk()
 
-    const returning = await page
-      .waitForFunction(
+    const returnWait = await waitForMoment(
         () => {
           const e = window.__placeErrands()
           const v = e.villagers
@@ -2838,19 +2962,24 @@ if (section('adult-errands')) {
           }
           return null
         },
-        null,
-        // THREE MINUTES, as for the fill: ONE water errand runs at a time, and
-        // its return leg within 15 m of the stand is a short share of a round
-        // trip the DIG pairs' window otherwise fills.
-        { timeout: 180000 },
+        // THREE MINUTES' worth, as for the fill: ONE water errand runs at a
+        // time, and its return leg within 15 m of the stand is a short share of a
+        // round trip the DIG pairs' window otherwise fills.
+        MOMENT_BUDGET,
       )
-      .then((handle) => handle.jsonValue())
-      .catch(() => null)
-    check(
-      'the return walk can be photographed: a carrier under a full jar',
-      returning != null,
-      returning ? `villager ${returning.who}` : 'no carrier walked back within 180 s',
-    )
+    const returning = returnWait.value
+    if (returnWait.wallCapped) {
+      unmeasured(
+        'the return walk can be photographed: a carrier under a full jar',
+        `lane delivered ${returnWait.frames} of ${MOMENT_BUDGET.frames} frames before the ${MOMENT_BUDGET.wallCapMs / 1000} s hang guard`,
+      )
+    } else {
+      check(
+        'the return walk can be photographed: a carrier under a full jar',
+        returning != null,
+        returning ? `villager ${returning.who}` : `no carrier walked back within ${returnWait.frames} frames`,
+      )
+    }
     if (returning) await holdStill()
     if (returning) {
       // Side-on and close, a little above the jar rather than below it: the water
@@ -2858,8 +2987,9 @@ if (section('adult-errands')) {
       // the lens drops toward the jar's own height.
       // NEVER ON THE WATER SIDE: a lens there lies outside the walkable region
       // and the leave check tears the scene down. So only bearings no further
-      // from the settlement's middle than he stands are tried (the river lies
-      // outward; a proxy, not the bank normal), SIDE-ON first: he walks
+      // from the settlement's middle than he stands, or well inside its own
+      // edge, are tried (the river lies outward; a proxy, not the bank normal),
+      // SIDE-ON first: he walks
       // inland, so a lens along his path is one he walks into — the frame came
       // back filled by the shadowed flank of his own cone.
       // JUDGED AT THE SHUTTER (work-order 1108): a fence panel in the near
@@ -3130,8 +3260,8 @@ if (section('adult-errands')) {
       // failed. Nothing short of the real projection settles it, so this asks the
       // place camera itself, with the SAME matrix math the shutter judges a
       // `local` subject with (scripts/verify/frameSubject.mjs), and keeps the
-      // fleck that sits well inside the picture. The camera pose is left exactly
-      // as it was — the seam reading below stands at this same spot.
+      // fleck that sits well inside the picture; the probe itself does not move
+      // the camera.
       //
       // OFF THE FOAM (red of 01.10.2026, every WebGPU pass): `river.bank` is the
       // middle of the children's stretch, ~28 m upstream since 0bd2d2992, while
@@ -3232,12 +3362,21 @@ if (section('adult-errands')) {
         !!aim,
         aim ? `patch ${aim.index} at ${aim.x.toFixed(1)}, ${aim.z.toFixed(1)}` : 'no patch in the picture now and 6 m downstream',
       )
+      // THE AIM IS TAKEN AGAIN AT THE SHUTTER (point 1456): the readiness wait
+      // inside the shutter ran long enough under load for the first patch to
+      // ride 13 m, past its lead. The camera stands still, so the patch chosen
+      // right before the exposure is the one the picture holds.
+      let atShutter = null
       const shot = await frame('482-village-river-bank', {
         local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
         label: 'the river bank, with the foam riding the current',
+      }, {
+        beforeCapture: async () => {
+          atShutter = await page.evaluate(aimRead, { lead: AIM_LEAD_M, span: 40 })
+        },
       })
       if (aim && shot) {
-        const after = await page.evaluate(aimRead, { index: aim.index, drift: aim.drift })
+        const after = atShutter ? await page.evaluate(aimRead, { index: atShutter.index, drift: atShutter.drift }) : null
         // The drift phase only grows, so a drift within the validated lead means
         // the patch rode a straight stretch whose both ends were checked inside
         // the (convex) frustum, without wrapping upstream: it was in the picture
@@ -3246,8 +3385,10 @@ if (section('adult-errands')) {
         check(
           'the river-bank frame: the foam it was aimed at is still in the picture after the shutter',
           !!after && after.inPicture && withinLead,
-          after
-            ? `drifted ${after.driftedM.toFixed(2)} m (lead ${AIM_LEAD_M} m)` +
+          !atShutter
+            ? 'no patch in the picture and 6 m downstream at the shutter'
+            : after
+            ? `patch ${atShutter.index}: drifted ${after.driftedM.toFixed(2)} m (lead ${AIM_LEAD_M} m)` +
                 (after.ndc ? `, ndc ${after.ndc.x.toFixed(2)}, ${after.ndc.y.toFixed(2)}` : ', out of the picture')
             : 'no reading',
         )
@@ -3280,7 +3421,20 @@ if (section('adult-errands')) {
       // Measured on this machine: 49 with the panorama shaded as it was, 1–4 as
       // it is now.
       const RIM_STEP_LIMIT = 12
-      const seam = await page.evaluate((r) => {
+      // Drift phases in metres: twelve over 44 m, wider than the streaks (STREAK_ALONG).
+      const RIM_PHASES = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44]
+      // The strips are chosen from the blockers read HERE and judged on pictures
+      // taken later; a speech label that walks into a strip between the two reads
+      // a villager as a seam, and how far it walks depends on the frame rate. So
+      // village life is held still from this read through the last capture
+      // (point 642) — the water keeps moving, which is what the three captures
+      // are for.
+      await page.evaluate(() => window.__placeFreezeLife?.(true))
+      // The lines are aimed at the handover itself — the drawn surface's far
+      // edge — along the camera's own forward line (scripts/verify/rimSeam.mjs).
+      const camAt = await page.evaluate(() => ({ x: window.__placeCamera.position.x, z: window.__placeCamera.position.z }))
+      const lines = river.reach > 0 ? rimSeamPoints(river, camAt) : null
+      const seam = await page.evaluate(({ lines }) => {
         const cam = window.__placeCamera
         const apply = (e, v) => [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
         const project = (x, y, z) => {
@@ -3290,18 +3444,16 @@ if (section('adult-errands')) {
           if (!(w > 0)) return null
           return { x: ((clip[0] / w) * 0.5 + 0.5) * window.innerWidth, y: (0.5 - (clip[1] / w) * 0.5) * window.innerHeight }
         }
-        const out = (dist, y) => project(r.normal.x * dist, y, r.normal.z * dist)
-        const radius = window.__placeLayout?.radius
-        if (!(radius > 0)) return null
+        if (!lines) return null
         // The handover zone, bounded by geometry rather than guessed: from the
-        // ground disc's edge (where the panorama's surface has climbed back to
-        // the ground plane) down to the backdrop's inner rim at the water's own
-        // level (where that surface first breaks the drawn sheet). Plus the line
-        // three metres out from the waterline, where the shore froth ends — the
-        // near band stops there rather than measuring froth.
-        const top = out(radius + 14, 0)
-        const bottom = out(radius + 12, -0.25)
-        const froth = out(r.distance + 3, -0.25)
+        // drawn surface's far edge (where the panorama's water takes over) out
+        // across the panorama's tucked rim. Plus the line three metres out from
+        // the waterline, where the shore froth ends — the near band stops there
+        // rather than measuring froth.
+        const far = project(lines.far.x, lines.far.y, lines.far.z)
+        const top = project(lines.top.x, lines.top.y, lines.top.z)
+        const bottom = project(lines.bottom.x, lines.bottom.y, lines.bottom.z)
+        const froth = project(lines.froth.x, lines.froth.y, lines.froth.z)
         // Everything on screen that is NOT the picture.
         const blockers = []
         for (const el of document.body.querySelectorAll('*')) {
@@ -3313,24 +3465,44 @@ if (section('adult-errands')) {
           if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity) === 0) continue
           blockers.push({ x0: b.left, x1: b.right, y0: b.top, y1: b.bottom })
         }
-        return { top, bottom, froth, blockers, w: window.innerWidth }
-      }, river)
-      if (!seam || !seam.top || !seam.bottom || !seam.froth) {
+        return { far, top, bottom, froth, blockers, w: window.innerWidth }
+      }, { lines })
+      if (!seam || !seam.far || !seam.top || !seam.bottom || !seam.froth) {
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
         check('the river’s rim is in the picture to measure (work-order 525)', false, JSON.stringify(seam))
       } else {
         const MARGIN = 6 // clearance kept from the handover zone
         const HALF = 6 // strip half-width, in CSS pixels
         const pick = (xs, at) => xs.slice().sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * at))]
         const readings = []
-        for (let pass = 0; pass < 3; pass++) {
+        // The near band carries the drifting streaks, the far sheet their mean
+        // (waterAppearance.ts), so one capture's step follows the pattern's phase:
+        // measured 0.2-16/255 across pinned drift phases, sign included. Compare
+        // the phase MEAN instead: pin the drift to RIM_PHASES spread over the
+        // streaks and average each band across them (work-order 568).
+        for (let pass = 0; pass < RIM_PHASES.length; pass++) {
+          await page.evaluate(async (d) => {
+            const m = await import('/src/render/waterAppearance.ts')
+            m.riverDrift.value = d
+          }, RIM_PHASES[pass])
+          await nextFrames(2)
           const shot = await capturePixels(page, 'river rim colour step')
           const { data, info } = await sharp(shot).raw().toBuffer({ resolveWithObject: true })
           const scale = info.width / seam.w
           const yTop = Math.round(seam.top.y * scale)
           const yBottom = Math.round(seam.bottom.y * scale)
-          const depth = Math.max(12, Math.min(140, Math.round(seam.froth.y * scale) - yBottom - MARGIN))
-          const y0 = Math.max(0, yTop - MARGIN - depth)
-          const y1 = Math.min(info.height - 1, yBottom + MARGIN + depth)
+          // Each band spans its own rows: the near one out to the froth line, the
+          // far one the same metres of water past the zone (rimSeam.mjs), which
+          // the horizon compresses into fewer rows.
+          // Neither band crosses its projected bound (froth line, far shore) or
+          // the frame edge; a band squeezed below BAND_ROWS_MIN VISIBLE rows fails
+          // the reading instead of being stretched into froth or shore.
+          const depth = Math.min(140, Math.round(seam.froth.y * scale) - MARGIN - (yBottom + MARGIN))
+          const farDepth = Math.min(140, yTop - MARGIN - Math.round(seam.far.y * scale))
+          const y0 = Math.max(0, yTop - MARGIN - Math.max(0, farDepth))
+          const y1 = Math.min(info.height - 1, yBottom + MARGIN + Math.max(0, depth))
+          const farRows = yTop - MARGIN - y0 + 1
+          const nearRows = y1 - (yBottom + MARGIN) + 1
           const strips = []
           for (let i = 1; i <= 14; i++) {
             const cx = (i / 15) * seam.w
@@ -3361,32 +3533,56 @@ if (section('adult-errands')) {
           const near = band(yBottom + MARGIN, y1)
           const zone = band(yTop, yBottom)
           const worst = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])))
+          // Per-run inputs the seed does not pin (work-order 568): one JSON line
+          // per capture, so a green and a red run can be compared.
+          if (process.env.RIM_INPUTS_DUMP) {
+            const inputs = await page.evaluate(() => {
+              const cam = window.__placeCamera
+              const fog = window.__placeScene?.fog
+              const { fireBlaze, ...season } = window.__placeSeason?.() ?? {}
+              return {
+                day: window.__game.getState().day,
+                season,
+                fog: fog ? { color: fog.color?.getHexString?.(), near: fog.near, far: fog.far } : null,
+                cam: { p: cam.position.toArray().map((v) => +v.toFixed(3)), q: cam.quaternion.toArray().map((v) => +v.toFixed(4)) },
+                vp: [window.innerWidth, window.innerHeight, window.devicePixelRatio],
+                t: performance.now(),
+                drift: window.__placeRiver?.()?.drift,
+              }
+            })
+            appendFileSync(process.env.RIM_INPUTS_DUMP, JSON.stringify({ gl: VERIFY_GL ?? 'webgpu', pass, inputs, seam, y: [y0, yTop, yBottom, y1], strips, far, near, zone, step: worst(far, near) }) + '\n')
+          }
           readings.push({
             strips: strips.length,
+            farRows,
+            nearRows,
             far,
             near,
             zone,
             step: worst(far, near),
             zoneStep: worst(zone, [0, 1, 2].map((i) => (far[i] + near[i]) / 2)),
           })
-          await nextFrames(20)
         }
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
         const say = (c) => c.map((v) => v.toFixed(0)).join('/')
         const mid = readings[1]
-        const step = pick(readings.map((r) => r.step), 0.5)
-        const zoneStep = pick(readings.map((r) => r.zoneStep), 0.5)
-        const enough = readings.every((r) => r.strips >= 6)
+        const mean = (key) => [0, 1, 2].map((i) => readings.reduce((a, r) => a + r[key][i], 0) / readings.length)
+        const avg = { far: mean('far'), near: mean('near'), zone: mean('zone') }
+        const step = Math.max(...[0, 1, 2].map((i) => Math.abs(avg.far[i] - avg.near[i])))
+        const zoneStep = Math.max(...[0, 1, 2].map((i) => Math.abs(avg.zone[i] - (avg.far[i] + avg.near[i]) / 2)))
+        const BAND_ROWS_MIN = 4
+        const enough = readings.every((r) => r.strips >= 6 && r.farRows >= BAND_ROWS_MIN && r.nearRows >= BAND_ROWS_MIN)
         check(
           `the water beyond the plate’s rim is the SAME water as the water at the bank (≤ ${RIM_STEP_LIMIT}/255 per channel)`,
           enough && step <= RIM_STEP_LIMIT,
-          `middle capture: ${mid.strips} clear strips · far ${say(mid.far)} against near ${say(mid.near)} — median step ${step.toFixed(1)} ` +
-            `(${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
+          `middle capture: ${mid.strips} clear strips · far/near band ${mid.farRows}/${mid.nearRows} rows (≥ ${BAND_ROWS_MIN}) · far ${say(avg.far)} against near ${say(avg.near)} over ${readings.length} drift phases — mean step ${step.toFixed(1)} ` +
+            `(per phase ${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
         )
         check(
           'and the handover zone itself carries neither band’s edge — no line at the rim',
           enough && zoneStep <= RIM_STEP_LIMIT,
-          `middle capture: rim zone ${say(mid.zone)} against the water either side — median step ${zoneStep.toFixed(1)} ` +
-            `(${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
+          `rim zone ${say(avg.zone)} against the water either side over ${readings.length} drift phases — mean step ${zoneStep.toFixed(1)} ` +
+            `(per phase ${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
         )
       }
     }
@@ -3444,8 +3640,8 @@ if (section('adult-errands')) {
   }
 
   // The shared excavation picture has its own measured composition, within the
-  // same adult-errands run. Seed 12 puts a store pit and patch 6.38 m apart with
-  // an open standing view (the layout unit test pins both the view and crossing).
+  // same adult-errands run. DIG_PICTURE's seed puts a store pit and patch 9-14 m
+  // apart with an open standing view (the layout unit test pins both the view and crossing).
   //
   // IT ASKS THE BUILD WHETHER IT CAN BE PHOTOGRAPHED AT ALL. The baseline
   // classifier (run by hand since point 1135) runs THIS suite file against the
@@ -3459,7 +3655,7 @@ if (section('adult-errands')) {
   // ONLY THE BASELINE LANE MAY STAND THE BLOCK DOWN. The exemption exists for
   // the PRE-change app, which has no durable dig record; on the candidate the
   // same missing capability IS the regression this block is here to catch, and
-  // a silent SKIP would report it as green (GPT-6 Astra, cross-vendor review of
+  // a silent SKIP would report it as green (cross-vendor review of
   // 23495d5, 14.09.2026). `baseline-classify.mjs` sets the marker when it spawns
   // the suite inside the baseline checkout, and nothing else sets it.
   const baselineLane = onBaselineLane(process.env)
@@ -3602,7 +3798,7 @@ if (section('water-jar-carried')) {
     let shown = 0
     window.__placeScene.traverse((o) => { if (o.name === 'stand-jar' && o.visible) shown++ })
     const e = window.__placeErrands()
-    return { shown, count: e.standJars, capacity: e.standCapacity }
+    return { shown, count: e.standJars }
   })
   // A lens beside the jar, on the first bearing the ground accepts and from
   // which the jar's pixels are really there.
@@ -3636,7 +3832,7 @@ if (section('water-jar-carried')) {
       if (!probe.rect) continue
       const changed = await jarPixels(who, name, probe.rect)
       const verdict = judgeCarriedJar(probe, changed)
-      best = { verdict, probe, tried, changed }
+      best = { verdict, probe, tried }
       if (verdict.ok) {
         await frame(shotName(`1376-water-carrier-${phase}-${body}`), {
           local: probe.center,
@@ -3772,9 +3968,10 @@ if (section('water-jar-carried')) {
         }, who, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null)
         await nextFrames(2)
         const after = await standReading()
-        // His stand spot is JOIN_STAND_OFF (2.4 m) from the stand's centre; half a
-        // metre over that plus his arrival reach still means "at the stand".
-        const atStand = !!flip && !flip.early && flip.carry === 'none' && flip.count === 1 && flip.gap <= 2.4 + flip.reach + 0.5
+        // He sets it down AT THE TABLE (work-order 1405): his table spot is
+        // `waterStandReach` from the stand's centre, plus his arrival reach.
+        const tableReach = await page.evaluate(() => window.__balance.waterStandReach + window.__balance.waterStandTableArrivalRadius)
+        const atStand = !!flip && !flip.early && flip.carry === 'none' && flip.count === 1 && flip.gap <= tableReach + 0.05
         check(`water jar (${body} body): the stand gains his jar only when he sets it down`,
           before === 0 && atStand && after.shown === after.count && after.count === 1,
           `${before} → ${after.count} set down, ${after.shown} shown; ` +
@@ -3787,6 +3984,296 @@ if (section('water-jar-carried')) {
   if (live) {
     await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
     await freezeLife(false)
+  }
+}
+
+// THE CARRIER AT THE TABLE (work-order 1405). The user saw the water carrier
+// set his jar down standing far off the stand, his report's hand not on the
+// water, and the next empty jar appear in his hand from nothing. One whole
+// errand is RECORDED frame by frame in the page (live, nothing frozen): where
+// he stands at the set-down, where the empty jar is drawn on every frame from
+// the order to his leaving the stand, and the drawn pointing arm's line against
+// the water in the jar he set down. Then a second errand is held at the take
+// and at the report for the picture.
+if (section('water-stand-table')) {
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.villagerCount = 10
+  })
+  await goToPlace('bambara-village')
+  const live = await page.evaluate(() => !!window.__placeErrands?.().geography.waterStand)
+  check('water stand table: the Bambara village has its water stand', live)
+  if (live) {
+    // The player a few metres off the stand on its landward side, inside the
+    // hearing radius, so the report's gesture is made at all.
+    const standView = () => page.evaluate(() => {
+      const g = window.__placeErrands().geography
+      const s = g.waterStand
+      const f = g.waterFoot ?? { x: s.x + 1, z: s.z }
+      const d = Math.hypot(f.x - s.x, f.z - s.z) || 1
+      const p = window.__placePlayer
+      p.x = s.x - ((f.x - s.x) / d) * 4.5
+      p.z = s.z - ((f.z - s.z) / d) * 4.5
+      p.yaw = Math.atan2(-(s.x - p.x), -(s.z - p.z))
+      p.pitch = -0.28
+      return { x: s.x, z: s.z }
+    })
+    const stand = await standView()
+    const recorded = await page.evaluate(() => new Promise((resolve) => {
+      const scene = window.__placeScene
+      const spare = scene.getObjectByName('stand-jar-empty')
+      const rows = []
+      scene.traverse((o) => { if (o.name === 'stand-jar') rows.push(o) })
+      const wp = (o) => { o.updateWorldMatrix(true, false); const e = o.matrixWorld.elements; return { x: e[12], y: e[13], z: e[14] } }
+      const shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true }
+      const rec = { who: null, samples: [], started: performance.now(), castAt: 0 }
+      let hand = null
+      let inh = null
+      const tick = () => {
+        const now = performance.now()
+        if (now - rec.started > 240000) return resolve({ ...rec, timeout: true })
+        const e = window.__placeErrands()
+        const vs = e.villagers
+        if (rec.who == null) {
+          const k = vs.findIndex((v) => v.work?.situation === 'water-out' && v.work.phase === 'wait')
+          if (k >= 0) {
+            rec.who = k
+            // One older jar stays, so the report must find the NEW jar, not slot 0.
+            window.__placeClearStand(1)
+            scene.traverse((o) => { if (o.name === 'carried-jar-empty' && o.userData.villager === k) hand = o })
+            for (let p = hand; p && !inh; p = p.parent) if (p.name === 'inhabitant') inh = p
+          } else if (!vs.some((v) => v.work?.situation?.startsWith('water')) && now - rec.castAt > 2000) {
+            rec.castAt = now
+            window.__placeCastErrand('water-out')
+          }
+          return requestAnimationFrame(tick)
+        }
+        const v = vs[rec.who]
+        const arm = (s) => {
+          const up = inh?.getObjectByName(`bone-upperArm.${s === 'left' ? 'L' : 'R'}`)
+          const tip = inh?.getObjectByName(s === 'left' ? 'hand-left' : 'hand-right')
+          return up && tip ? { shoulder: wp(up), hand: wp(tip) } : null
+        }
+        const newest = e.standJars > 0 ? rows[Math.min(rows.length, e.standJars) - 1] : null
+        rec.samples.push({
+          t: now, x: v.x, z: v.z, yaw: v.yaw, phase: v.work?.phase ?? null, situation: rec.endAt ? 'ended' : v.work?.situation ?? null,
+          arrived: v.work?.arrived ?? null, taking: v.work?.taking ?? null, carry: v.carry, jars: e.standJars,
+          spare: spare && shown(spare) ? wp(spare) : null,
+          hand: hand && shown(hand) ? wp(hand) : null,
+          gesture: v.gesture, arms: v.gesture?.kind || v.work?.taking != null ? { left: arm('left'), right: arm('right') } : null,
+          water: newest ? (() => { const p = wp(newest); return { x: p.x, y: p.y + 0.16, z: p.z } })() : null,
+        })
+        // On past the errand's end while his report's gesture still runs.
+        if (v.work?.situation !== 'water-back' && rec.samples.some((s) => s.situation === 'water-back')) rec.endAt ??= now
+        if (rec.endAt && now - rec.endAt > 3000) return resolve(rec)
+        if (!v.work && rec.samples.length > 30 && !rec.samples.some((s) => s.situation)) return resolve({ ...rec, lost: true })
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    }))
+    const S = recorded.samples
+    check('water stand table: one whole water errand was recorded', !!recorded.who || recorded.who === 0 ? !recorded.timeout && !recorded.lost : false,
+      `villager ${recorded.who}, ${S.length} frames${recorded.timeout ? ', timed out' : ''}${recorded.lost ? ', errand lost before the return' : ''}`)
+    const reach = await page.evaluate(() => window.__balance.waterStandReach + window.__balance.waterStandTableArrivalRadius)
+    const gap = (s) => Math.hypot(s.x - stand.x, s.z - stand.z)
+    // (a) The set-down: the frame the stand gains his jar.
+    const down = S.findIndex((s, k) => k > 0 && s.jars > S[k - 1].jars)
+    check('water stand table: he sets the full jar down standing at the table',
+      down > 0 && gap(S[down]) <= reach + 0.05 && S[down].jars === 2,
+      down > 0 ? `${gap(S[down]).toFixed(2)} m from the stand's centre at the set-down (table reach ${reach.toFixed(2)} m; the old waiting ring is 2.4 m); stand ${S[down - 1].jars} -> ${S[down].jars} jars (one older jar kept)` : 'no set-down seen')
+    // (c) The empty jar: drawn exactly once on every frame from the order until
+    // he walks off with it, and never jumping — a pop is a move faster than any
+    // hand moves it (the headless frames are slow, so it is judged as a speed),
+    // and above all no gap where it leaves the plank for his hand.
+    const order = S.findIndex((s) => s.phase === 'take')
+    const off = S.findIndex((s, k) => k > order && s.phase === 'fetch')
+    // On through his first walking frames: a jar that jumps or vanishes as he
+    // sets off is the same defect.
+    let walkEnd = off
+    while (off > 0 && walkEnd < S.length && walkEnd < off + 30 && S[walkEnd].phase === 'fetch') walkEnd++
+    // The take is judged at a hand's pace; his first steps at a carry walk's,
+    // whose arm swing alone reaches about 4.5 m/s at these frames with no
+    // turn (measured 23.10.2026, frame 255) — a pop from the plank is a
+    // jump of a jar's distance, well past either bound.
+    let worst = { speed: 0, k: -1 }
+    let walkWorst = { speed: 0, k: -1 }
+    let swap = null
+    let both = 0
+    let none = 0
+    let prev = null
+    for (let k = Math.max(0, order); k >= 0 && k < (off > 0 ? walkEnd : S.length); k++) {
+      const s = S[k]
+      if (s.spare && s.hand) both++
+      const at = s.hand ?? s.spare
+      if (!at) { none++; continue }
+      if (prev) {
+        const j = Math.hypot(at.x - prev.x, at.y - prev.y, at.z - prev.z)
+        const speed = j / Math.max(1e-3, (s.t - prev.t) / 1000)
+        const into = s.phase === 'fetch' ? walkWorst : worst
+        if (speed > into.speed) Object.assign(into, { speed, k, from: s.hand ? 'hand' : 'plank', jump: j, dt: s.t - prev.t, turn: Math.abs(s.yaw - S[k - 1].yaw), walk: Math.hypot(s.x - S[k - 1].x, s.z - S[k - 1].z), phase: s.phase, gesture: s.gesture?.kind ?? null })
+        if (s.hand && !prev.hand) swap = j
+      }
+      prev = { ...at, t: s.t, hand: !!s.hand }
+    }
+    const taking = S.filter((s) => s.taking != null)
+    const lifted = taking.reduce((m, s) => (s.spare && S[order].spare ? Math.max(m, Math.hypot(s.spare.x - S[order].spare.x, s.spare.y - S[order].spare.y, s.spare.z - S[order].spare.z)) : m), 0)
+    check('water stand table: the empty jar is taken up from the plank, never appearing from nothing',
+      order >= 0 && off > order && taking.length > 5 && both === 0 && none === 0 && swap !== null && swap <= 0.05 && worst.speed <= 4 && walkWorst.speed <= 6 && lifted > 0.1 && !!S[order].spare,
+      `order at frame ${order}, off the stand at ${off}, walking checked to ${walkEnd}; ${taking.length} take frames; jar lifted ${lifted.toFixed(2)} m off the plank before it is in his hand; ` +
+        `plank-to-hand gap ${swap == null ? 'never' : `${swap.toFixed(3)} m`}; fastest take move ${worst.speed.toFixed(2)} m/s (frame ${worst.k}, ${worst.from ?? '-'}, ${worst.jump?.toFixed(3) ?? '-'} m in ${worst.dt?.toFixed(0) ?? '-'} ms, body turned ${worst.turn?.toFixed(3) ?? '-'} rad and moved ${worst.walk?.toFixed(3) ?? '-'} m, phase ${worst.phase ?? '-'}, gesture ${worst.gesture ?? 'none'}); fastest in his first steps ${walkWorst.speed.toFixed(2)} m/s (frame ${walkWorst.k}, ${walkWorst.jump?.toFixed(3) ?? '-'} m in ${walkWorst.dt?.toFixed(0) ?? '-'} ms, body turned ${walkWorst.turn?.toFixed(3) ?? '-'} rad); ${both} frames with two jars, ${none} with none`)
+    // (b) The report's pointing arm, held: its drawn line from the shoulder
+    // through the hand against the water in the jar he set down.
+    const held = S.filter((s) => (s.situation === 'water-back' || s.situation === 'ended') && s.gesture?.kind === 'indicate' && s.gesture.t > 1.75 &&
+      s.gesture.t < s.gesture.duration - 0.4 && s.arms && s.water && down > 0 && Math.hypot(s.x - S[down].x, s.z - S[down].z) < 0.1)
+    const misses = held.map((s) => {
+      const a = s.arms[s.gesture.side ?? 'left']
+      if (!a) return null
+      const d = [a.hand.x - a.shoulder.x, a.hand.y - a.shoulder.y, a.hand.z - a.shoulder.z]
+      const n = Math.hypot(...d)
+      const u = d.map((c) => c / n)
+      const w = [s.water.x - a.shoulder.x, s.water.y - a.shoulder.y, s.water.z - a.shoulder.z]
+      const along = w[0] * u[0] + w[1] * u[1] + w[2] * u[2]
+      return { off: Math.hypot(w[0] - along * u[0], w[1] - along * u[1], w[2] - along * u[2]), along, reach: Math.hypot(...w) }
+    }).filter(Boolean)
+    const worstMiss = misses.reduce((m, x) => (x.off > m.off ? x : m), { off: 0 })
+    check('water stand table: his report points at the water he set down',
+      misses.length > 5 && worstMiss.off <= 0.1 && misses.every((m) => m.along > 0),
+      `${misses.length} held frames; the arm's line passes the jar's water at most ${worstMiss.off.toFixed(3)} m off (${worstMiss.reach?.toFixed(2) ?? '?'} m out)`)
+    // THE PICTURES: a second errand held at the take, with the empty jar between
+    // plank and hand, and at the report, with his arm out at the jar set down.
+    // Life is frozen in the frame the moment is seen, so the shot is that moment.
+    const holdAt = (moment) => page.waitForFunction((moment) => {
+      const e = window.__placeErrands()
+      const vs = e.villagers
+      const k = vs.findIndex((v) => moment === 'take'
+        ? v.work?.taking != null && v.work.taking > 0.42 && v.work.taking < 0.58
+        : v.work?.situation === 'water-back' && v.carry === 'none' && v.gesture?.kind === 'indicate' && v.gesture.t > 1.7 && v.gesture.t < 2.1)
+      if (k >= 0) {
+        window.__placeFreezeLife(true)
+        return { who: k, x: vs[k].x, z: vs[k].z }
+      }
+      if (!vs.some((v) => v.work?.situation?.startsWith('water'))) {
+        const now = performance.now()
+        if (!(window.__standCastAt > now - 2000)) {
+          window.__standCastAt = now
+          window.__placeCastErrand('water-out')
+        }
+      }
+      return null
+    }, moment, { timeout: 240000, polling: 'raf' }).then((h) => h.jsonValue()).catch(() => null)
+    for (const [moment, label] of [
+      ['take', 'the water carrier at the stand taking the empty jar up from the plank into his hand'],
+      ['report', 'the water carrier at the stand pointing at the water in the jar he has just set down'],
+    ]) {
+      await standView()
+      const at = await holdAt(moment)
+      check(`water stand table: the ${moment} is reached for its picture`, !!at, at ? `villager ${at.who}` : 'not within 240 s')
+      if (!at) continue
+      // The lens off to the side of the line from him to the stand, so his arm
+      // and the plank are both seen in profile — on the first side and distance
+      // from which he (and at the take, the jar in flight) is really what the
+      // lens sees: their pixels change when only they are hidden. Another
+      // villager walking between lens and table would otherwise fill the frame.
+      const target = (kind) => page.evaluate(([kind, who]) => {
+        const scene = window.__placeScene
+        let o = null
+        if (kind === 'jar') o = scene.getObjectByName('stand-jar-empty')
+        else scene.traverse((q) => { if (!o && q.name === 'carried-jar-empty' && q.userData.villager === who) o = q })
+        if (kind === 'man') while (o && o.name !== 'inhabitant') o = o.parent
+        return !!o
+      }, [kind, at.who])
+      const rectOf = (kind) => page.evaluate(([kind, who]) => {
+        const scene = window.__placeScene
+        const cam = window.__placeCamera
+        let o = null
+        if (kind === 'jar') o = scene.getObjectByName('stand-jar-empty')
+        else scene.traverse((q) => { if (!o && q.name === 'carried-jar-empty' && q.userData.villager === who) o = q })
+        if (kind === 'man') while (o && o.name !== 'inhabitant') o = o.parent
+        if (!o || !cam) return null
+        scene.updateMatrixWorld(true)
+        const r = document.querySelector('canvas').getBoundingClientRect()
+        const ap = (e, v) => [0, 1, 2, 3].map((k) => e[k] * v[0] + e[k + 4] * v[1] + e[k + 8] * v[2] + e[k + 12] * v[3])
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+        o.traverse((m) => {
+          if (!m.isMesh || !m.geometry) return
+          if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
+          const b = m.geometry.boundingBox
+          for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+            const c = ap(cam.projectionMatrix.elements, ap(cam.matrixWorldInverse.elements, ap(m.matrixWorld.elements, [x, y, z, 1])))
+            if (!(c[3] > 0)) continue
+            const px = r.left + ((c[0] / c[3] + 1) / 2) * r.width
+            const py = r.top + ((1 - c[1] / c[3]) / 2) * r.height
+            x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px); y1 = Math.max(y1, py)
+          }
+        })
+        x0 = Math.max(r.left, Math.floor(x0)); y0 = Math.max(r.top, Math.floor(y0))
+        x1 = Math.min(r.right, Math.ceil(x1)); y1 = Math.min(r.bottom, Math.ceil(y1))
+        return x1 > x0 + 2 && y1 > y0 + 2 ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : null
+      }, [kind, at.who])
+      const showOf = (kind, on) => page.evaluate(([kind, who, on]) => {
+        const scene = window.__placeScene
+        let o = null
+        if (kind === 'jar') o = scene.getObjectByName('stand-jar-empty')
+        else scene.traverse((q) => { if (!o && q.name === 'carried-jar-empty' && q.userData.villager === who) o = q })
+        if (kind === 'man') while (o && o.name !== 'inhabitant') o = o.parent
+        if (o) o.visible = on
+      }, [kind, at.who, on])
+      const share = async (kind) => {
+        const rect = await rectOf(kind)
+        if (!rect) return 0
+        const raw = async () => {
+          const { data, info } = await sharp(await capturePixels(page, `${kind} ${moment}`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
+          return { data, channels: info.channels }
+        }
+        await nextFrames(3)
+        const shown = await raw()
+        await showOf(kind, false)
+        await nextFrames(3)
+        const hidden = await raw()
+        await showOf(kind, true)
+        await nextFrames(2)
+        return countChangedPixels(shown.data, hidden.data, shown.channels) / (rect.width * rect.height)
+      }
+      let subject = null
+      let seen = null
+      const tries = []
+      for (const dist of [2.8, 3.6]) for (const side of [1, -1]) {
+        if (seen) break
+        subject = await page.evaluate(([at, stand, dist, side]) => {
+          const dx = stand.x - at.x
+          const dz = stand.z - at.z
+          const d = Math.hypot(dx, dz) || 1
+          const mid = { x: (at.x + stand.x) / 2, z: (at.z + stand.z) / 2 }
+          const p = window.__placePlayer
+          p.x = mid.x - side * (dz / d) * dist
+          p.z = mid.z + side * (dx / d) * dist
+          p.yaw = Math.atan2(-(mid.x - p.x), -(mid.z - p.z))
+          p.pitch = Math.atan2(0.75 - 1.6, dist)
+          return { x: mid.x, y: 0.75, z: mid.z }
+        }, [at, stand, dist, side])
+        await nextFrames(4)
+        await awaitPlaceDrawn(`water stand ${moment}`)
+        const man = await share('man')
+        const jar = moment === 'take' && await target('jar') ? await share('jar') : 1
+        tries.push(`${dist}/${side}: man ${(man * 100).toFixed(0)} %, jar ${(jar * 100).toFixed(0)} %`)
+        // His box is loose about a leaning, reaching body (12 % measured unobstructed
+        // from every side at the take); a body in front of him leaves next to none.
+        if (man >= 0.08 && jar >= 0.3) seen = { dist, side, man, jar }
+      }
+      check(`water stand table: the ${moment} is photographed with him${moment === 'take' ? ' and the jar' : ''} in plain view`,
+        !!seen, seen ? `lens ${seen.dist} m off, side ${seen.side}: ${(seen.man * 100).toFixed(0)} % of his box and ${(seen.jar * 100).toFixed(0)} % of the jar's are his own pixels` : `no lens sees him unobstructed (${tries.join('; ')})`)
+      if (seen) await frame(shotName(`1405-water-carrier-${moment}`), { local: subject, label })
+      await page.evaluate(() => window.__placeFreezeLife(false))
+    }
+    // A diagnostic dump only when asked for (no tracked file is written).
+    if (process.env.WATER_STAND_DUMP) appendFileSync(process.env.WATER_STAND_DUMP, JSON.stringify({ stand, reach, down: S[down], misses, held, worst, take: S.slice(Math.max(0, order - 2), order + 120) }) + '\n')
   }
 }
 
@@ -3927,7 +4414,7 @@ if (section('steadying-palm')) {
       const hidden = await sharp(await capturePixels(page, `${name} hidden`, { clip: rect })).raw().toBuffer({ resolveWithObject: true })
       await setShown(true)
       await nextFrames(6)
-      return { changed: countChangedPixels(shown.data, hidden.data, shown.info.channels), rect }
+      return { changed: countChangedPixels(shown.data, hidden.data, shown.info.channels) }
     }
     const VIEWS = [
       { view: 'side', label: `close on the water carrier walking back under the full jar, side-on: his steadying ${arm.toUpperCase()} hand on the jar, palm to it`, out: 1, ahead: 0.5 },
@@ -4150,9 +4637,9 @@ if (section('village-pounding')) {
             p.z = z
             p.yaw = Math.atan2(m.x - x, m.z - z) + Math.PI
             p.pitch = standOff < 5 ? -0.18 : -0.08
-            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2), at: standOff }, people: people.length }
+            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2), at: standOff } }
           }
-          return { probe, stand: null, people: people.length, why }
+          return { probe, stand: null, why }
         }, { standOffs: shot.stand, maxOff: MAX_OFF_SQUARE })
         if (!staged.stand && attempt < SEARCHES) {
           refused.push(`${attempt}: ${staged.why.join(', ')}`)
@@ -4491,24 +4978,75 @@ if (section('villager-dress')) {
       return { figures: row.children.length, skinned, heads, gltf, meshes: [...meshes].sort() }
     })
 
-  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
-  // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
-  // bytes, its parse, each distinct person's build, and every main-thread
-  // block (long task) from entering the first village until it is drawn.
-  await page.evaluate(() => {
-    window.__dressLongTasks = []
-    try {
-      new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
-        type: 'longtask',
+  // THE GPU LOAD the run has built up (point 1446): the renderer's tracked
+  // memory and its cached pipelines, read on entering the section and in every
+  // village, so a run that loses Chrome's GPU process shows what grew before it.
+  const gpuLoad = (where) =>
+    page
+      .evaluate(() => {
+        const r = window.__renderer
+        const m = r?.info?.memory ?? {}
+        const mb = (b) => (b == null ? null : Math.round(b / 1e5) / 10)
+        return {
+          pipelines: r?._pipelines?.caches?.size ?? null,
+          programs: m.programs ?? null,
+          geometries: m.geometries ?? null,
+          textures: m.textures ?? null,
+          texturesMB: mb(m.texturesSize),
+          attributesMB: mb(m.attributesSize),
+          totalMB: mb(m.total),
+          renderTargets: m.renderTargets ?? null,
+          heapMB: performance.memory ? mb(performance.memory.usedJSHeapSize) : null,
+        }
       })
-    } catch {
-      window.__dressLongTasks = null
-    }
-  })
+      .then((load) => record('gpu-load', { where, ...load }))
+      // Diagnostics only: an unreadable load never stops the checks.
+      .catch((e) => record('gpu-load', { where, unavailable: String(e?.message ?? e).slice(0, 200) }))
+  await gpuLoad('section start')
+  // A FRESH PAGE, AND AGAIN EVERY FEW VILLAGES (point 1446). Every village
+  // visit leaves its pipelines and heap behind (measured: ~40 pipelines and
+  // ~0.6 GB of Chrome's GPU process per village), so after the sections before
+  // this one the full run lost the GPU process around the 16th village. A
+  // reload frees that load; every check below runs as before. Calibratable:
+  // DRESS_REBOOT_EVERY villages per page.
+  const REBOOT_EVERY = Number(process.env.DRESS_REBOOT_EVERY ?? 8)
+  const freshPage = async () => {
+    await page.goto(BASE)
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    await page.waitForFunction(() => window.__game && window.__balance && window.__renderer, null, { timeout: 90000 })
+    await assertBackend(page)
+    await nextFrames(30)
+    await page.evaluate(() => {
+      window.__balance.randomEventsEnabled = false
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
+    // bytes, its parse, each distinct person's build, and every main-thread
+    // block (long task) from entering the first village until it is drawn.
+    await page.evaluate(() => {
+      window.__dressLongTasks = []
+      try {
+        new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
+          type: 'longtask',
+        })
+      } catch {
+        window.__dressLongTasks = null
+      }
+    })
+  }
+  await freshPage()
+  await gpuLoad('fresh page')
   let loadRecorded = false
-  for (const people of PEOPLES) {
+  for (const [n, people] of PEOPLES.entries()) {
+    if (n > 0 && n % REBOOT_EVERY === 0) {
+      await freshPage()
+      await gpuLoad('fresh page')
+    }
     await goToPlace(villageOf(people))
     await awaitGltfBody(people)
+    await gpuLoad(villageOf(people))
     if (!loadRecorded) {
       loadRecorded = true
       await nextFrames(10)
@@ -4627,66 +5165,101 @@ if (section('villager-dress')) {
   await page.evaluate(() => window.__dressLineup(null))
 
   // THE COST PER VILLAGE (graphics-detail-levels.md): the same village, the
-  // same view, on each level, each once with the primitive figure (the
-  // "before": `figureBodySegments` forced to 0 in the dev server's live preset
-  // table) and once with the skinned body — so the difference is the figures'.
+  // same view, on each level; medium and high each once with the primitive
+  // figure (the "before": `figureBodySegments` forced to 0 in the dev server's
+  // live preset table), once with the code-built skinned body and once with the
+  // glTF one — so the difference is the figures'.
   // Draw calls and triangles from the renderer's per-frame counters; the frame
   // time is the median of 60 rendered frames (a shared, software-rendered
   // machine: compare the levels, not the absolute milliseconds).
-  for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
-    await goToPlace(villageOf(people))
+  // Every wait below is frame-driven; a page whose frames stop never answers.
+  // A wall-clock cap per step turns that into a red naming village and level
+  // (calibratable: DRESS_STEP_MS).
+  const STEP_MS = Number(process.env.DRESS_STEP_MS ?? 120_000)
+  const within = async (what, run) => {
+    let timer
+    const started = Date.now()
+    try {
+      return await Promise.race([
+        run(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`cost probe stuck: ${what} (no answer within ${STEP_MS / 1000} s)`)), STEP_MS)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+      const ms = Date.now() - started
+      if (ms > 10_000) console.log(`  villager-dress cost step ${what}: ${Math.round(ms / 100) / 10} s`)
+    }
+  }
+  costProbe: for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
     const row = {}
-    // `code`: the glTF body switched off (`figureGltfBody` false) — point
-    // 1293's code-built body, the "before" of the glTF body.
-    const runs = [['low', null], ['medium', 0], ['medium', null, 'code'], ['medium', null], ['high', 0], ['high', null, 'code'], ['high', null]]
-    for (const [level, force, body] of runs) {
-      await page.evaluate(
-        async ({ l, force, code }) => {
-          const q = await import('/src/config/quality.ts')
-          window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
-          for (const k of ['medium', 'high']) {
-            q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
-            q.QUALITY_PRESETS[k].figureGltfBody = !code
-          }
-          // through another level, so every figure re-reads the table
-          window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
-          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
-          window.__ui.getState().setDetailLevel(l)
-        },
-        { l: level, force, code: body === 'code' },
-      )
-      const name = force === 0 ? `${level}-primitive` : body === 'code' ? `${level}-code` : level
-      await nextFrames(10)
-      await awaitPlaceDrawn(`${people} ${name}`)
-      if (level !== 'low' && force == null && body !== 'code') await awaitGltfBody(`${people} ${name}`)
-      row[name] = await page.evaluate(
-        () =>
-          new Promise((resolve) => {
-            const times = []
-            const calls = []
-            const tris = []
-            let last = performance.now()
-            const tick = (t) => {
-              times.push(t - last)
-              last = t
-              const r = window.__renderer?.info?.render
-              calls.push(r?.drawCalls ?? 0)
-              tris.push(r?.triangles ?? 0)
-              if (times.length < 61) return requestAnimationFrame(tick)
-              const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
-              let figures = 0
-              let skinned = 0
-              let gltf = 0
-              window.__placeScene.traverse((o) => {
-                if (o.name === 'inhabitant') figures++
-                if (o.isSkinnedMesh) skinned++
-                if (o.isSkinnedMesh && o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
-              })
-              resolve({ figures, skinned, gltf, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+    let step = `${people} enter`
+    try {
+      await within(step, () => goToPlace(villageOf(people)))
+      // `code`: the glTF body switched off (`figureGltfBody` false) — point
+      // 1293's code-built body, the "before" of the glTF body.
+      const runs = [['low', null], ['medium', 0], ['medium', null, 'code'], ['medium', null], ['high', 0], ['high', null, 'code'], ['high', null]]
+      for (const [level, force, body] of runs) {
+        const name = force === 0 ? `${level}-primitive` : body === 'code' ? `${level}-code` : level
+        step = `${people} ${name} switch`
+        await within(step, () => page.evaluate(
+          async ({ l, force, code }) => {
+            const q = await import('/src/config/quality.ts')
+            window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
+            for (const k of ['medium', 'high']) {
+              q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
+              q.QUALITY_PRESETS[k].figureGltfBody = !code
             }
-            requestAnimationFrame(tick)
-          }),
-      )
+            // through another level, so every figure re-reads the table
+            window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+            window.__ui.getState().setDetailLevel(l)
+          },
+          { l: level, force, code: body === 'code' },
+        ))
+        step = `${people} ${name} settle`
+        await within(step, async () => {
+          await nextFrames(10)
+          await awaitPlaceDrawn(`${people} ${name}`)
+        })
+        step = `${people} ${name} glTF body`
+        if (level !== 'low' && force == null && body !== 'code') await within(step, () => awaitGltfBody(`${people} ${name}`))
+        step = `${people} ${name} 61-frame sample`
+        row[name] = await within(step, () => page.evaluate(
+          () =>
+            new Promise((resolve) => {
+              const times = []
+              const calls = []
+              const tris = []
+              let last = performance.now()
+              const tick = (t) => {
+                times.push(t - last)
+                last = t
+                const r = window.__renderer?.info?.render
+                calls.push(r?.drawCalls ?? 0)
+                tris.push(r?.triangles ?? 0)
+                if (times.length < 61) return requestAnimationFrame(tick)
+                const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
+                let figures = 0
+                let skinned = 0
+                let gltf = 0
+                window.__placeScene.traverse((o) => {
+                  if (o.name === 'inhabitant') figures++
+                  if (o.isSkinnedMesh) skinned++
+                  if (o.isSkinnedMesh && o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
+                })
+                resolve({ figures, skinned, gltf, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+              }
+              requestAnimationFrame(tick)
+            }),
+        ))
+      }
+    } catch (e) {
+        // the page may be wedged: record what was read, name the step, stop the probe
+        record('cost', { village: `${people}-village`, row, stuck: step })
+        check(`${people}: the cost probe answers at every step`, false, String(e?.message ?? e))
+        break costProbe
     }
     record('cost', { village: `${people}-village`, row })
     check(
@@ -4721,7 +5294,6 @@ if (section('villager-dress')) {
 if (section('village-walk')) {
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   // The measured numbers, also into a file when asked (a passing check prints no detail).
-  const { appendFileSync } = await import('node:fs')
   const report = (line) => {
     console.log(line)
     if (process.env.VILLAGE_WALK_REPORT) appendFileSync(process.env.VILLAGE_WALK_REPORT, `${VERIFY_GL ?? 'webgpu'} ${line.trim()}\n`)
@@ -5370,6 +5942,125 @@ if (section('village-walk')) {
     }
   }
 
+  // The head load in the hands (work-order "the task walker takes its head
+  // load off with its hands"): caught going down with the load between head
+  // and ground, kneeling with it standing on the ground, and rising with it
+  // between ground and head again — visible in every caught frame. The
+  // timeline and the grip are pinned in src/scenes/place/taskWalkerLoad.test.ts.
+  const loadPhase = (phase) => stepUntil((phase) => {
+    const g = window.__placeScene.getObjectByName('village-task-walker')
+    const load = g?.getObjectByName('task-walker-load')
+    const k = g?.getObjectByName('inhabitant')?.userData.walk?.kneel
+    if (!g?.visible || !load || typeof k !== 'number') return false
+    const prev = window.__loadPhaseKneel ?? k
+    window.__loadPhaseKneel = k
+    const V = g.position.constructor
+    g.updateWorldMatrix(true, true)
+    const h = load.getWorldPosition(new V()).y - g.position.y
+    const head = g.getObjectByName('figure-head').getWorldPosition(new V()).y - g.position.y
+    let shown = true
+    for (let o = load; o; o = o.parent) if (!o.visible) shown = false
+    if (!shown) return false
+    // caught by the load's own travel: the kneel (0.6 s) ends long before the
+    // lowering (1.4 s) has brought the load clear of the head
+    const prevH = window.__loadPhaseH ?? h
+    window.__loadPhaseH = h
+    const between = h > 0.2 && h < head - 0.3
+    if (phase === 'down') return k > 0.2 && h < prevH - 1e-4 && between
+    if (phase === 'ground') return k > 0.97 && h < 0.08
+    return k < prev && h > prevH + 1e-4 && between
+  }, phase, phase === 'down' ? 9000 : 2400)
+  // Gripping from either side, in the load's own horizontal frame: each palm
+  // reaches out to a face (at least 0.6 of the half-extent from the centre on
+  // that axis, and that axis is its nearest face within 0.15), and the two faces
+  // are opposite. The box clamp alone reads zero gaps for palms collapsed into
+  // the middle or both on one face.
+  const opposingGrip = (palms, half) => {
+    const reach = palms.map(([x, z]) => [x / half[0], z / half[1]])
+    const k = [0, 1].find((a) => {
+      const [p, q] = reach.map((r) => r[a])
+      return Math.sign(p) !== Math.sign(q) && reach.every((r) => Math.abs(r[a]) >= 0.6 && Math.abs(r[a]) >= Math.abs(r[1 - a]) - 0.15)
+    })
+    return { reach: reach.map((r) => r.map((v) => +v.toFixed(2))), ok: k !== undefined }
+  }
+  for (const [what, palms, half, want] of [
+    ['two palms on one face', [[0.5, -0.4], [0.5, 0.4]], [0.5, 0.5], false],
+    ['two palms on one long face of a narrow load', [[0.2, -0.4], [0.2, 0.4]], [0.2, 0.5], false],
+    ["two palms collapsed into the load's middle", [[0.05, 0], [-0.05, 0]], [0.5, 0.5], false],
+    ['two palms on one side of the centre', [[0.05, 0.05], [0.5, 0.5]], [0.5, 0.5], false],
+    ['two palms on opposite faces', [[-0.5, 0.05], [0.5, -0.05]], [0.5, 0.5], true],
+    ['two palms on opposite short faces of a narrow load', [[0.02, -0.5], [-0.02, 0.5]], [0.2, 0.5], true],
+  ]) check(`head load: the grip check ${want ? 'accepts' : 'rejects'} ${what}`, opposingGrip(palms, half).ok === want, '')
+  for (const [phase, name, label] of [
+    ['down', '1432-village-load-set-down', 'the task walker kneeling down, its head load held in both hands on the way from its head to the ground'],
+    ['ground', '1432-village-load-on-ground', 'the task walker kneeling at its work, its head load standing on the ground beside it'],
+    ['up', '1432-village-load-pick-up', 'the task walker rising, its head load lifted in both hands on the way from the ground to its head'],
+  ]) {
+    const caught = await loadPhase(phase)
+    check(`head load: the task walker was caught ${phase === 'down' ? 'setting its load down' : phase === 'ground' ? 'kneeling with its load on the ground' : 'picking its load up'}, the load visible`, caught, '')
+    if (!caught) continue
+    await freezeLife(true)
+    try {
+      if (phase !== 'ground') {
+        // the drawn palms on the load, measured on the rig rather than the plan
+        const gaps = await page.evaluate(() => {
+          const g = window.__placeScene.getObjectByName('village-task-walker')
+          const load = g.getObjectByName('task-walker-load')
+          const V = g.position.constructor
+          g.updateWorldMatrix(true, true)
+          const lo = new V(Infinity, Infinity, Infinity)
+          const hi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(o.matrixWorld)
+              lo.min(c)
+              hi.max(c)
+            }
+          })
+          const palms = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n).getWorldPosition(new V()))
+          // the load's box in its own frame, the palms relative to its centre
+          const toLoad = load.matrixWorld.clone().invert()
+          const llo = new V(Infinity, Infinity, Infinity)
+          const lhi = new V(-Infinity, -Infinity, -Infinity)
+          load.traverse((o) => {
+            if (!o.geometry) return
+            const m = toLoad.clone().multiply(o.matrixWorld)
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const c = new V(x, y, z).applyMatrix4(m)
+              llo.min(c)
+              lhi.max(c)
+            }
+          })
+          const mid = new V().addVectors(llo, lhi).multiplyScalar(0.5)
+          return {
+            gaps: palms.map((p) => +new V().copy(p).clamp(lo, hi).distanceTo(p).toFixed(3)),
+            local: palms.map((p) => {
+              const q = p.clone().applyMatrix4(toLoad).sub(mid)
+              return [q.x, q.z]
+            }),
+            half: [(lhi.x - llo.x) / 2, (lhi.z - llo.z) / 2],
+          }
+        })
+        const grip = opposingGrip(gaps.local, gaps.half)
+        check(`head load (${phase}): both drawn hands are on the load (gaps ${gaps.gaps.join(', ')} m ≤ 0.1)`, gaps.gaps.every((d) => d <= 0.1), '')
+        check(`head load (${phase}): the hands hold it on opposite faces (reach per half-extent ${JSON.stringify(grip.reach)})`, grip.ok, '')
+      }
+      const at = await page.evaluate(() => {
+        const g = window.__placeScene.getObjectByName('village-task-walker')
+        return { x: g.position.x, z: g.position.z }
+      })
+      const seen = await sideOn(null, 2.6, -0.16)
+      check(`head load (${phase}): the camera found a free spot side-on to the task walker`, !!seen, seen ? '' : JSON.stringify(sideOnMisses))
+      if (seen) await frame(shot(name), { local: { x: at.x, y: 0.5, z: at.z }, label })
+    } finally {
+      await freezeLife(false)
+    }
+  }
+
   // THE LOW PRESET keeps the primitive figure, and items 1 and 5 hold for it
   // too: feet (the cone's base) on the ground, kneeling folded, never squashed
   // or popped, and up again before the first step.
@@ -5460,7 +6151,7 @@ if (section('figure-micro')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   // One villager `d` ahead of the player with a clear sight line to its hips
   // and chest, on the first of 16 bearings that has one.
-  const stageOne = (village, who, d) =>
+  const stageOne = (who, d) =>
     page.evaluate(
       ({ who, d }) => {
         const p = window.__placePlayer
@@ -5477,7 +6168,7 @@ if (section('figure-micro')) {
           p.yaw = yaw
           p.pitch = -0.12
           window.__dressLineup({ x: cx, z: cz, yaw, only: [who] })
-          return { cx, cz, yaw }
+          return { cx, cz }
         }
         return null
       },
@@ -5489,7 +6180,7 @@ if (section('figure-micro')) {
   ]) {
     await goToPlace(village)
     await page.evaluate(() => window.__placeFreezeLife?.(true))
-    const at = await stageOne(village, who, 1.25)
+    const at = await stageOne(who, 1.25)
     check(`figure micro-structure: ${village} ${who} staged close with a clear view`, !!at, 'no clear bearing at 1.25 m')
     if (!at) continue
     await nextFrames(4)
@@ -5518,7 +6209,7 @@ if (section('figure-micro')) {
   }
 
   // THE WALK-CYCLE PAIR: one walker, frozen at two phases of its stride with
-  // the camera at the same offset from it, so the weave can be compared on the
+  // the camera on the same flank of it, so the weave can be compared on the
   // limb from frame to frame.
   await goToPlace('hausa-village')
   // Every walker out on the walk, on the glTF body.
@@ -5548,7 +6239,7 @@ if (section('figure-micro')) {
   check('figure micro-structure: a villager is out walking on the glTF body', who !== null, 'no skinned walker out in 600 frames')
   if (who !== null) {
     // The camera at the walker's flank, `dist` off, looking at it; returns the
-    // thigh swing and whether the hips and head project into the picture.
+    // stand it set.
     const flankView = (i, flank, dist) =>
       page.evaluate(
         ({ i, flank, dist }) => {
@@ -5559,7 +6250,7 @@ if (section('figure-micro')) {
           p.z = g.position.z + Math.cos(side) * dist
           p.yaw = side
           p.pitch = -0.3
-          return { x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }
+          return { x: p.x, z: p.z }
         },
         { i, flank, dist },
       )
@@ -5596,7 +6287,6 @@ if (section('figure-micro')) {
         }
         return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView: why === null, why, at: { x: g.position.x, z: g.position.z } }
       }, i)
-    // Stand at a flank that holds the legs in the picture and is not pushed off.
     // The walker's screen box (CSS px) from its projected joints, padded.
     const walkerBox = (i) =>
       page.evaluate((i) => {
@@ -5621,6 +6311,7 @@ if (section('figure-micro')) {
       }, i)
     const pair = []
     const misses = []
+    // Stand at a flank that holds the legs in the picture and is not pushed off.
     const standAt = async (flanks = [1, -1]) => {
       for (const flank of flanks) {
         for (const dist of [1.6, 1.9, 1.3, 2.3, 2.8]) {

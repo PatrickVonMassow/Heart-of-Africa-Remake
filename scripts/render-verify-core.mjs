@@ -108,6 +108,8 @@ export const NON_RENDER_VERIFY = new Set([
   'edgeBandReading.mjs', // crop measurements and failure details; the polish-* suites captures the frames
   'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; the polish-* suites drives the browser
   'errandShutter.mjs', // the fill shot's line test over positions; polish-villagers.mjs reads them
+  'standOrder.mjs', // the stand-order moment over errand state; polish-villagers.mjs drives the page
+  'rimSeam.mjs', // the river-rim band lines on the camera's forward line; polish-villagers.mjs projects them
   'fixedWaits.mjs',
   'footingSeries.mjs', // the slope-footing verdict; the polish-* suites hands it the samples
   'frameSubject-core.mjs',
@@ -118,6 +120,7 @@ export const NON_RENDER_VERIFY = new Set([
   'ladder.mjs', // the ladder's git/ledger/source reads; it opens no page
   'launch-args-core.mjs', // the launcher's PLATFORM policy; _browser.mjs opens the browser
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
+  'load-proof-core.mjs', // the two-kinds gate and lane-skip decision (point 642); _polish.mjs drives the page
   'machine-load-core.mjs',
   'machine-load.mjs',
   'red-ownership-core.mjs', // whether a red holds, read off the charge ledger; it draws nothing
@@ -318,7 +321,7 @@ export function wasDetailCut(red) {
   const hasOwnMark = red != null && Object.hasOwn(red, 'detailCut')
   if (hasOwnMark && red.detailCut === true) return true
   // ONLY A LITERAL `false` PROVES THE OTHER DIRECTION (cross-vendor review,
-  // GPT-5.6 Sol, do-not-merge on ae9a500c). Treating any present value as
+  // do-not-merge on ae9a500c). Treating any present value as
   // "not cut" let a malformed durable record — `detailCut: null` in a
   // hand-edited or half-written state file — walk past the length inference and
   // answer a signature belonging to a different red. A field nobody can read is
@@ -341,7 +344,7 @@ export function wasDetailCut(red) {
  * still match if the text went on — and every one of them was refused with a
  * counterexample, the last being `/^(?=A{200}$)|^A{200}.$/`, which asserts the
  * end in one alternative and swallows the probe character in the other
- * (cross-vendor review, GPT-5.6 Sol). The lesson is the one the section-tag
+ * (cross-vendor review). The lesson is the one the section-tag
  * reader (section-tag-core.mjs) learned: recovering intent from TEXT
  * proves SYNTAX, not PROVENANCE. A regex cannot be interrogated about what its
  * author meant, and no finite probe closes a pattern written to defeat it.
@@ -416,7 +419,7 @@ export function chargeFor(red, options) {
       // instead of being guessed into an owner.
       //
       // AND A SIGNATURE MAY NOT READ THE END OF A MEASUREMENT THE RECORD CUT
-      // OFF (cross-vendor review, GPT-5.6 Sol, do-not-merge on 3e6ffd2). The
+      // OFF (cross-vendor review, do-not-merge on 3e6ffd2). The
       // record keeps the first MAX_RED_DETAIL_LEN characters, and a `detailMatch`
       // anchored at both ends therefore matches `<cut>` out of `<cut><more>` —
       // satisfying a signature written for a DIFFERENT, genuinely shorter red,
@@ -425,7 +428,7 @@ export function chargeFor(red, options) {
       // nothing ended. Same shape as the section tag and the same answer: the
       // reader does not guess, it refuses, and the red stays loudly uncharged.
       //
-      // AND THE ENTRY DECIDES, NOT THE READER (cross-vendor review, GPT-5.6 Sol,
+      // AND THE ENTRY DECIDES, NOT THE READER (cross-vendor review,
       // three refusals). An entry whose signature reads only the FRONT of the
       // measurement declares `detailReadsPrefix` and keeps charging; every other
       // one is refused here. Refusing ALL of them instead would withdraw the
@@ -514,7 +517,7 @@ export function chargeReds(reds, options) {
     // bound took something or the text simply ended there. So the field is
     // written whenever it settles that question — `true` when the bound cut, and
     // `false` for the one uncut length that would otherwise be misread (see
-    // `wasDetailCut`; cross-vendor review, GPT-5.6 Sol, do-not-merge on
+    // `wasDetailCut`; cross-vendor review, do-not-merge on
     // b3e5200e, which named the false positive). Everywhere else it stays
     // absent, so an ordinary record keeps the shape it always had.
     if (printed.length > MAX_RED_DETAIL_LEN) stored.detailCut = true

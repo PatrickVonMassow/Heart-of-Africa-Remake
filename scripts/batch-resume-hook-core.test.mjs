@@ -15,9 +15,13 @@ import {
   standDownKind,
   standDownMessage,
   uninvitedSessionMessage,
+  commandSynopsis,
+  worktreeSummaryLine,
 } from './batch-resume-hook-core.mjs'
+import { usageSynopsis } from './cli-usage.mjs'
 import { CLAIM_BY, responderClaim } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
+import { MAIN, SCARCE } from './model-lanes.mjs'
 
 const now = 1_700_000_000_000
 const watcherClaim = (responderPid) =>
@@ -322,10 +326,10 @@ describe('the open-point headline (point 440)', () => {
     expect(hook).not.toContain("open point(s): ${nums}")
   })
 
-  it('derives the serving chain from the Fable switch instead of spelling one inline', () => {
+  it('derives the serving chain from the scarce-lane switch instead of spelling one inline', () => {
     const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
-    expect(hook).toContain('servingPolicyLine(fableState)')
-    expect(hook).not.toContain("'Fable 5, then Opus 4.8")
+    expect(hook).toContain('servingPolicyLine(scarceState)')
+    expect(hook).not.toContain(`'${SCARCE.retired[0]}, then ${MAIN.fallback.displayName}`)
   })
 
   it('orients every owning successor through the child-output measurement', () => {
@@ -416,5 +420,43 @@ describe('SessionStart ownership needs an invitation (user 03.09.2026)', () => {
     expect(consumesLaunchAuthorization({ ownership: 'none', invitation: first.invitation })).toBe(false)
     const successor = sessionStartOwnership({ converted: false, heldHere: false, spawnProof: spawnTokenProof({ auth, lastSpawn, ancestorPid: 4242 }), auth })
     expect(successor).toEqual({ invitation: 'spawn-token', mayAcquire: true, unproven: false })
+  })
+})
+
+describe('commandSynopsis — the SessionStart syntax block', () => {
+  const porcelain =
+    'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\n' +
+    'worktree /repo/.claude/worktrees/a\nHEAD def\nbranch refs/heads/feat/1-x\n\n' +
+    'worktree /repo/.claude/worktrees/b\nHEAD 012\ndetached\n'
+
+  it('equals the usage synopsis plus one worktree line, at most 15 lines', () => {
+    const text = commandSynopsis({ git: () => porcelain, root: '/repo', say: () => {} })
+    const lines = text.slice(1).split('\n')
+    expect(text.startsWith('\n')).toBe(true)
+    expect(lines.slice(0, -1)).toEqual(usageSynopsis())
+    expect(lines.at(-1)).toBe('Worktrees (2): /repo/.claude/worktrees/a [feat/1-x], /repo/.claude/worktrees/b [detached]')
+    expect(lines.length).toBeLessThanOrEqual(15)
+  })
+
+  it('a failing git omits only the worktree line', () => {
+    const text = commandSynopsis({ git: () => { throw new Error('no git') }, root: '/repo', say: () => {} })
+    expect(text.slice(1).split('\n')).toEqual(usageSynopsis())
+  })
+
+  it('a throwing usage generator omits the synopsis and says so on the error channel', () => {
+    const said = []
+    const text = commandSynopsis({
+      synopsis: () => { throw new Error('broken usage') },
+      git: () => porcelain,
+      root: '/repo',
+      say: (line) => said.push(line),
+    })
+    expect(text).toBe('')
+    expect(said).toEqual(['[batch-resume] command synopsis omitted: broken usage'])
+  })
+
+  it('no agent worktree, no worktree line', () => {
+    expect(worktreeSummaryLine('worktree /repo\nbranch refs/heads/main\n', '/repo')).toBe('')
+    expect(worktreeSummaryLine(null, '/repo')).toBe('')
   })
 })

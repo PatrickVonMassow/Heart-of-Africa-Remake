@@ -95,6 +95,14 @@ interface BalanceConfig {
   waterStandCapacity: number
   /** Arrival tolerance at the separate working spots beside the water stand. */
   waterStandArrivalRadius: number
+  /** How far from the water stand's centre the carrier stands while he takes
+   *  the empty jar up and sets the full one down: at the table's edge. */
+  waterStandReach: number
+  /** Arrival tolerance at that table spot: tight, so he stands at the plank. */
+  waterStandTableArrivalRadius: number
+  /** Seconds the carrier takes to reach for the empty jar on the stand, lift
+   *  it into his hand and straighten up again. */
+  waterJarTakeSeconds: number
   /** Arrival tolerance at the fill spot in the river (work-order 1117), so the
    *  carrier dips ankle-deep rather than from the dry edge. */
   bankFillArrivalRadius: number
@@ -867,6 +875,9 @@ interface BalanceConfig {
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
       turnRate: number
+      /** Largest angle (rad) between a running child's body and its way
+       *  before it sets off: past it, it turns on the spot first. */
+      setOffTurn: number
       /** Seconds the freshly caught child stands before it chases (work-order
        *  1176); never longer than `immunitySeconds`. */
       caughtPauseSeconds: number
@@ -938,6 +949,8 @@ interface BalanceConfig {
       dodgeReach: number
       /** How fast a roaming child's heading drifts (rad/s). */
       roamTurn: number
+      /** How near a playmate ahead bends a roaming child's walk away (m). */
+      roamGap: number
       /** How long the climber may make no progress toward the boulder before giving up. */
       roamGoalSeconds: number
       /** How far outside the boulder's own collider the climber stops before it
@@ -1042,6 +1055,12 @@ interface BalanceConfig {
       stepSeconds: number
       liftSeconds: number
       fillSecondsPerFish: number
+      /** The net man's hands ashore: their height over the ground (m) while he
+       *  holds the basket at the bow, its rim in his hands; and his trunk's lean
+       *  added at the bottom of a bend (rad). At the bottom his hands are at the
+       *  rim of the basket standing on the ground. */
+      basketHoldHeight: number
+      netManBendLean: number
       /** The longest a word waits for the settlement's floor before the boat
        *  goes on unspoken (the floor then forgets it). */
       wordWaitSeconds: number
@@ -1370,6 +1389,14 @@ export const balance: BalanceConfig = {
   // Calibratable: stop within 0.3 m of the assigned spot. The generic 1.1 m
   // tolerance let a waiting carrier occupy the sender's approach lane.
   waterStandArrivalRadius: 0.3,
+  // Calibratable: the stand's solid body (0.6 m) plus a walker's radius (0.3 m)
+  // plus a little, so the carrier stands at the table's edge, not 2.4 m off it.
+  waterStandReach: 0.95,
+  // Calibratable: the generic 0.3 m stopped him 1.2 m off the stand's centre,
+  // three quarters of a metre short of the plank.
+  waterStandTableArrivalRadius: 0.1,
+  // Calibratable: long enough to read as reaching, lifting and straightening.
+  waterJarTakeSeconds: 1.6,
   // Calibratable (work-order 1117): the fill spot lies only ~0.5 m past the
   // waterline, so the generic 1.1 m let the carrier dip from dry ground.
   bankFillArrivalRadius: 0.2,
@@ -1806,6 +1833,11 @@ export const balance: BalanceConfig = {
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
       turnRate: 3.6,
+      // Calibratable estimate: a running child turns on the spot until its body
+      // is within a quarter turn of its way, so it never sprints off sideways or
+      // backwards. 45° made children near a waypoint stop for single frames
+      // over and over, which slowed the bank round's gather to its backstop.
+      setOffTurn: Math.PI / 2,
       // Work-order 1176, calibratable estimates. The caught child's beat of
       // frustration; the tag-back window (1.4 s) covers it plus a first step.
       caughtPauseSeconds: 0.7,
@@ -1895,6 +1927,9 @@ export const balance: BalanceConfig = {
       // A quarter turn a second at the most: a wander that reads as wandering
       // rather than as a figure being blown about.
       roamTurn: 1.4,
+      // Calibratable estimate: about two body lengths, so the bend — turned at
+      // `turnRate` — is done before the two bodies meet.
+      roamGap: 1.6,
       // A reachable stone keeps resetting this watch as the climber gets
       // closer. Thirty seconds without gaining any ground toward it means a
       // hut, pocket or other collider has made the approach impossible.
@@ -2063,8 +2098,8 @@ export const balance: BalanceConfig = {
       errandSeconds: 375,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
-      // without shortening the straight line, and a fifteenth of the backstop
-      // above, which on its own held a blocked villager for twenty staged
+      // without shortening the straight line, and about a nineteenth of the
+      // backstop above, which on its own held a blocked villager for twenty staged
       // errands and left the village silent for minutes (point 586).
       stallSeconds: 20,
       pace: 1.25, // an unhurried working walk
@@ -2078,36 +2113,19 @@ export const balance: BalanceConfig = {
       // at 8.5 all 900 measured did, with the fill spot still walkable.
       waterFootBeyond: 8.5,
     },
-    // THE LOOM (work-order 1157). Calibratable starting values (CLAUDE.md §2),
-    // each stated against what it has to hold:
-    //  - 3.2 m of warp either side of the seat makes a 6.4 m stretch. It has to
-    //    be long enough that a helper WALKING to one end reads as a direction
-    //    rather than a step aside, and short enough to fit the room a village
-    //    has left between its huts; the water path's own head sweep works with
-    //    the same order of distance.
-    //  - The helper works at 2.4 m, well inside the stake, so he stands ON the
-    //    warp and not past its end.
-    //  - One pass takes 2.6 s: slow enough to follow the shuttle across by eye,
-    //    quick enough that half a minute of watching shows real progress.
-    //  - 0.11 m of strip per pass fills a 3.2 m side in about 29 passes — 75 s,
-    //    so a player who watches sees the cloth grow and, staying longer, sees
-    //    it taken off and the warp bare again.
-    //  - A named tending every 18 s is "a few times a minute" (item 8): often
-    //    enough to catch in passing, rare enough that the speech labels do not
-    //    become noise beside the children's.
     // THE VILLAGER'S DUGOUT (work-order 1237). Calibratable starting values
     // (educated guess, CLAUDE.md §2), after the Niger's Bozo/Somono river
     // fishermen of the 1890s: a small fishing pirogue of about 5.5 m, paddled
     // kneeling. It makes about 1.3 m/s through the water; against a dry-season
     // current of about 0.5 m/s that is 0.8 m/s over the ground, kept close in
     // where the current is weakest, while the run back rides the current at
-    // about 1.5 m/s with steering strokes only. The lane lies 7 m out between
-    // s = +27 and +47 m, so it keeps 20 m from the children's stretch (10 m
-    // hearing zone + 10 m hearing radius) and no standing place hears the
-    // SPOKEN words of both; the call carries at the call register (34 m).
+    // about 1.5 m/s with steering strokes only. The lane (block below) keeps
+    // 20 m from the children's stretch (10 m hearing zone + 10 m hearing
+    // radius), so no standing place hears the SPOKEN words of both; the call
+    // carries at the call register (34 m).
     // THE FISHERMEN (work-order 1237, rebuilt by 1245). Calibratable starting
-    // values (educated guess, CLAUDE.md §2). The lane runs 7 m out from s = −2
-    // to s = +47 (49 m), 20 m clear of the children's stretch (centre −28, down
+    // values (educated guess, CLAUDE.md §2). The lane runs 7 m out from s = −1
+    // to s = +47 (48 m), 20 m clear of the children's stretch (centre −28, down
     // to −17.5) and of the water work (−46.5). Paces: a dugout paddled against
     // the Niger's current near the bank, and carried by it. One round comes to
     // about 139 s (61 s up, 33 s down, the rest turning, hauling, landing and
@@ -2126,6 +2144,10 @@ export const balance: BalanceConfig = {
       stepSeconds: 1.5,
       liftSeconds: 0.8,
       fillSecondsPerFish: 0.9,
+      // Estimates, calibratable: the basket held about knee to thigh high, and
+      // a moderate forward lean, so his head stays above the rim.
+      basketHoldHeight: 0.55,
+      netManBendLean: 0.15,
       // Well inside the floor's own 240 s hold, so a held word is let go by
       // the boat rather than forced out by the floor.
       wordWaitSeconds: 12,
@@ -2186,6 +2208,23 @@ export const balance: BalanceConfig = {
       colliderMargin: 0.15, // calibratable
       figureBodyR: 0.28, // calibratable
     },
+    // THE LOOM (work-order 1157). Calibratable starting values (CLAUDE.md §2),
+    // each stated against what it has to hold:
+    //  - 3.2 m of warp either side of the seat makes a 6.4 m stretch. It has to
+    //    be long enough that a helper WALKING to one end reads as a direction
+    //    rather than a step aside, and short enough to fit the room a village
+    //    has left between its huts; the water path's own head sweep works with
+    //    the same order of distance.
+    //  - The helper works at 2.4 m, well inside the stake, so he stands ON the
+    //    warp and not past its end.
+    //  - One pass takes 2.6 s: slow enough to follow the shuttle across by eye,
+    //    quick enough that half a minute of watching shows real progress.
+    //  - 0.11 m of strip per pass fills a 3.2 m side in about 29 passes — 75 s,
+    //    so a player who watches sees the cloth grow and, staying longer, sees
+    //    it taken off and the warp bare again.
+    //  - A named tending every 18 s is "a few times a minute" (item 8): often
+    //    enough to catch in passing, rare enough that the speech labels do not
+    //    become noise beside the children's.
     loom: {
       placed: false, // weaving parked (user 29.09.2026); true re-enables the station
       warpHalf: 3.2,
@@ -2603,6 +2642,43 @@ export const VILLAGER_MOTION = {
 } as const
 
 /**
+ * The village task walker's head load taken down and put back BY HAND
+ * (src/scenes/place/taskWalkerLoad.ts): seconds of each step of its stop and
+ * where the load stands while it works. Every value is a CALIBRATABLE educated
+ * guess, read off no picture yet.
+ */
+export const TASK_LOAD_HANDLING = {
+  /** Standing at the target, both hands go up and grip the load on the head. */
+  takeSeconds: 0.45,
+  /** The load brought down to the ground while the walker kneels down. */
+  lowerSeconds: 1.4,
+  /** The hands let go of the set-down load (and of the load back on the head). */
+  releaseSeconds: 0.35,
+  /** Before rising, the hands go down to the load on the ground and grip it. */
+  gripSeconds: 0.45,
+  /** The load lifted onto the head while the walker rises (never shorter than the kneel). */
+  liftSeconds: 1.4,
+  /** Where the load stands while the walker works, in its own frame (m):
+   *  `side` to its left (+x), `forward` in front of its knees. */
+  ground: { side: 0.32, forward: 0.34 },
+  /** The palms' gap off the load's side (m). */
+  gripClearance: 0.03,
+  /** How much faster the load moves out from the body than down, so the
+   *  path clears the shoulder instead of cutting through it. */
+  outFirst: 1.6,
+  /** The share of the way down (and up) over which the load passes from where
+   *  it rests into the moving hands, so a grip or release never pulls it
+   *  toward hands that stand still. */
+  handOver: 0.15,
+  /** The trunk's lean (rad) toward a load at the ground. */
+  groundLean: 0.4,
+  /** How fast each hand's aim corrects the gap between where it was aimed and
+   *  where it was drawn (1/s), and the largest correction (m). */
+  aimCorrectRate: 6,
+  aimCorrectMax: 0.35,
+} as const
+
+/**
  * The villager's glTF body as the asset pipeline builds it (work-order "glTF
  * villager body"; scripts/villager/build.mjs reads this block). BUILD-time values:
  * a change takes effect when the pipeline is re-run and the .glb committed.
@@ -2839,6 +2915,23 @@ export const VILLAGER_GLTF = {
    *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their
    *  cadence. Calibratable. */
   jogStride: { exponent: 0.8, min: 0.4, max: 1.08 },
+  /** Share of walk the runs keep blended in (villagerRig.ts `gaitWeights`):
+   *  the shipped jog clip has each foot down only ~11 % of its cycle, so a
+   *  pure jog spends ~3/4 of it with both feet off the ground and reads as
+   *  floating at a child's tag pace; the walk's stance lengthens the blended
+   *  stance by construction. Faded out towards the jog over the `runWalkFade`
+   *  per unit of leg below `runWalkUntil`, so a dash is the pure sprint.
+   *  Measured 27.10.2026 against the binding no-slide and walk → jog → sprint
+   *  continuity tests: a share above 0.6 slides a planted foot at 3.5–5.5 per
+   *  unit of leg, a full share at the sprint band's lower edge sinks it, and a
+   *  fade narrower than 1.2 jumps the joints. Calibratable. */
+  runWalkShare: 0.6,
+  runWalkUntil: 8.15,
+  runWalkFade: 1.2,
+  /** Bounds on a running child's flight (the run reads grounded): the share
+   *  of the gait cycle with both feet off the ground, and the lowest sole
+   *  contact's highest point over it (m, world). Calibratable. */
+  runFlight: { airborneMax: 0.4, apexMax: 0.06 },
   /** Body safety net (design.md clothing rule): no vertex of the chest front
    *  or of a child's pelvis midline may peak sharper than this — its offset above
    *  its neighbours' mean along the normal, over their mean edge length. The
@@ -2859,6 +2952,10 @@ export const VILLAGER_GLTF = {
    *  fades back onto the clip's own foot (a shoved or turned foot eases home
    *  in its swing, never jumps). Calibratable. */
   plantFadeCycle: 0.15,
+  /** Share of the gait cycle over which a rolling foot's leg blends from
+   *  the pose drawn on one pivot into the next pivot's, or off its toes into
+   *  the clip's swing (villagerClipPose.ts `LiftOff`). Calibratable. */
+  liftOffBlendCycle: 0.15,
   /** How high (multiples of the touch height) a held sole contact rises
    *  before it lets go; its share of the foot's hold fades from 0.6 touch up
    *  to here. A heel rolling off over a planted ball carries its own miss,
@@ -2889,6 +2986,14 @@ export const VILLAGER_GLTF = {
   /** Share of a rolling foot's pitch its toes lift their tip by while the
    *  foot rolls over its ball (villagerClipPose.ts `heelOff`). Calibratable. */
   toeLift: 0.3,
+  /** Share of the gait cycle over which the toes, lying flat at toe-off,
+   *  let go of the ground at the fastest (villagerClipPose.ts). Calibratable. */
+  toeReleaseCycle: 0.1,
+  /** How far (rad) short of leg and foot in one line a rolling foot's
+   *  pitch levels off, eased in over twice that, so the roll tends to that
+   *  line without its pitch snapping onto it (villagerClipPose.ts `heelOff`).
+   *  Calibratable. */
+  rollSoftPitch: 0.3,
   /** Share of the cycle over which the walk eases a sole contact onto the
    *  ground after its authored touch and off it before its authored lift
    *  (the retargeted clip lifts its trailing ball and toe early).
@@ -2929,8 +3034,6 @@ export const VILLAGER_GLTF = {
   settleRestep: 0.45,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
-  /** Ground speed (figure units / s) below which the figure stands. */
-  standSpeed: 0.08,
   /** Where the hair is painted on the glTF head, as shares of chin → crown
    *  (brow, and the nape behind the ears) and of the head's depth back → front
    *  (what counts as behind). The body carries no hair mesh. Calibratable. */

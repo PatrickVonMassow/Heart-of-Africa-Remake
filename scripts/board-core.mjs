@@ -346,6 +346,8 @@ details:not(.sect)[open]>summary::after{content:"▾"}
 .body hr.split{border:0;border-top:1px solid var(--rule,#cdbf9c);margin:10px 0 6px}
 .body .status-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin-bottom:2px}
 .body .desc-missing{font-style:italic;color:var(--warn,#a85f28)}
+.body .dist-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin:8px 0 2px}
+.body .dist{font-size:.85em;color:var(--soft,#7c6c4d)}
 </style>`
 
 const criticalityBadge = (level) =>
@@ -1810,7 +1812,7 @@ const FILLER_WORDS = new Set([
  * Does this title say only what STAGE the work is in (point 655)?
  *
  * THE RULE, and why it is not simply "begins with a stage word" (four-eyes
- * review, GPT-5.6 Sol, 12.08.2026): the title is stripped of its number prefix,
+ * review, 12.08.2026): the title is stripped of its number prefix,
  * of every stage word and of the FILLER above — and if NOTHING is left, it named
  * no subject. "Abschlussarbeiten zum gerade beendeten Punkt" leaves nothing and
  * is refused; "Vorbereitung der Karten", "Cleanup parser for Windows" and
@@ -2914,7 +2916,7 @@ export function setCardDescription(html, point, text) {
   if (words > DESCRIPTION_WORD_LIMIT) {
     throw new Error(
       `board: a description is 1-3 sentences on what the point delivers — ${words} words is over ` +
-        `${DESCRIPTION_WORD_LIMIT}; progress belongs in the status (board.mjs status)`,
+        `${DESCRIPTION_WORD_LIMIT}; progress belongs in the status (node scripts/board.mjs status <point> "<text>")`,
     )
   }
   const key = describedSection(html, point)

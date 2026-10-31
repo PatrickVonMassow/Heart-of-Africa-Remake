@@ -1,6 +1,6 @@
 // LAND A FINISHED POINT — the whole chain, one command (point 594).
 //
-//   node scripts/land-point.mjs 594 --model "Claude Opus 5.5"   land it
+//   node scripts/land-point.mjs 594 --model "<trailer name>"   land it
 //   node scripts/land-point.mjs 594 --dry      print the plan, touch nothing
 //   node scripts/land-point.mjs 594 --model "…" --serial   force the gate serial (--parallel: parallel)
 //   node scripts/land-point.mjs 594 --model "…" --branch feat/594-x   name the branch yourself
@@ -33,9 +33,11 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
+import { lostPoints } from './carrier-reconcile-core.mjs'
+import { ALIASES_PATH, runReconcile, showAtRevision } from './carrier-reconcile.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentLaneState } from './lane-switch.mjs'
 import {
   branchDeletionBlocker,
   formatCleanupNotes,
@@ -613,6 +615,89 @@ export function deleteLandedBranch({ branch, blocked = '', recheck = null, git: 
  * could not be answered, which reads as PRESENT and blocks the remote deletion,
  * like every other unproven fact in this cleanup.
  */
+/**
+ * Points the merge dropped: in the pre-merge union of TASKS.md + archive, absent
+ * from the merged one (21.10.2026). PURE given its texts.
+ */
+export function postMergeLoss({ preMerge, tasksText = '', archiveText = '' } = {}) {
+  return lostPoints({
+    beforeTasks: preMerge?.tasks ?? '',
+    beforeArchive: preMerge?.archive ?? '',
+    afterTasks: tasksText,
+    afterArchive: archiveText,
+  })
+}
+
+/**
+ * THE POST-MERGE GATE (21.10.2026, hardened after review 22.10.2026). Decides
+ * whether the merged work order may go on to the gate, the tick and the push.
+ *
+ * The BASELINE is durable: the pre-merge texts of THIS run AND origin/main —
+ * a retry after a rejected merge sees "already merged" locally, so only the
+ * published work order still holds what the merge dropped. Blocked when
+ *   - any point of either baseline is missing from the merged union, or
+ *   - pushing the merged work order would turn a carrier tick red that is not
+ *     red today, or the reconciliation cannot run (fail closed).
+ * On a block the merge THIS run made is rolled back (`reset --keep`), so local
+ * main never carries a rejected merge into the next attempt.
+ */
+export function postMergeGate({ preMerge, root = REPO_ROOT, carrierPaths = null, reconcile = runReconcile, gitRun = null } = {}) {
+  // A work order and its archive run to megabytes: the default 1 MB buffer would
+  // fail the read, and a failed read must never pass for an empty baseline.
+  const raw = gitRun ?? ((args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }))
+  const run = (args) => String(raw(args)).trim()
+  const read = (p) => (existsSync(join(root, p)) ? readFileSync(join(root, p), 'utf8') : '')
+  const after = { tasks: read('TASKS.md'), archive: read('docs/tasks-archive.md'), aliases: read(ALIASES_PATH) }
+  let baseline
+  try {
+    baseline = { tasks: showAtRevision(raw, 'origin/main', 'TASKS.md'), archive: showAtRevision(raw, 'origin/main', 'docs/tasks-archive.md') }
+  } catch (e) {
+    const why = `${(e && (e.stderr || e.message)) || e}`.trim().split('\n')[0]
+    return { blocked: true, lost: [], introduced: [], rolledBack: rollBack(), message: `post-merge reconciliation: the origin/main baseline could not be read (${why}) — refusing to land blind` }
+  }
+  const lost = [
+    ...new Set([
+      ...postMergeLoss({ preMerge, tasksText: after.tasks, archiveText: after.archive }),
+      ...postMergeLoss({ preMerge: baseline, tasksText: after.tasks, archiveText: after.archive }),
+    ]),
+  ].sort((a, b) => a - b)
+  const today = reconcile({ root, carrierPaths })
+  const pushed = reconcile({ root, carrierPaths, override: after })
+  const redToday = new Set((today.result?.red ?? []).map((r) => `${r.source}|${r.point}`))
+  const introduced = (pushed.result?.red ?? []).filter((r) => !redToday.has(`${r.source}|${r.point}`)).map((r) => r.point)
+  const unrunnable = !today.ran || !pushed.ran
+  const reasons = []
+  if (lost.length) reasons.push(`the merge drops point(s) ${lost.join(', ')} from the work order`)
+  if (introduced.length) reasons.push(`pushing it would leave queued user order(s) ${[...new Set(introduced)].join(', ')} unproven`)
+  if (unrunnable) reasons.push(`the carrier reconciliation could not run (${today.error ?? pushed.error})`)
+  if (!reasons.length) return { blocked: false, lost, introduced, rolledBack: false, message: '' }
+  return { blocked: true, lost, introduced, rolledBack: rollBack(), message: `post-merge reconciliation: ${reasons.join('; ')}` }
+
+  /** Undo the merge THIS run made, so local main never carries a rejected merge. */
+  function rollBack() {
+    try {
+      const head = run(['rev-parse', 'HEAD'])
+      const parent = run(['rev-parse', '-q', '--verify', 'HEAD^1'])
+      if (preMerge?.sha && head !== preMerge.sha && parent === preMerge.sha) {
+        run(['reset', '--keep', preMerge.sha])
+        return true
+      }
+    } catch {
+      /* not rolled back: the repair text says how */
+    }
+    return false
+  }
+}
+
+/** Print the carrier reconciliation as a RED FINDING when it is not green; never throws. */
+export function reportCarrierReconciliation(when, { run = runReconcile, say = (l) => console.error(l) } = {}) {
+  const outcome = run({ root: REPO_ROOT, fetch: false })
+  if (outcome.ok) return outcome
+  say(`land-point (${when}): RED FINDING — carrier reconciliation is not green:`)
+  for (const line of outcome.lines) say(`  ${line}`)
+  return outcome
+}
+
 export function localBranchExists(branch, { cwd = REPO_ROOT } = {}) {
   try {
     git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -641,6 +726,70 @@ function boardDecision(postTickTasks) {
     fingerprint: openFingerprintOfTasks(postTickTasks),
     state: readJson(STATE_FILE),
   })
+}
+
+/** The closing card's reason: the duties a landed point still owes. */
+export const closingCardReason = (number) =>
+  `Punkt ${number} ist gelandet; offen sind das Aufräumen von Branch und Worktree und die Batch-Grenze.`
+
+/** The single command that writes the closing card by hand — named by a failed write. */
+export const closingCardCommand = (number) => `node scripts/board.mjs closing ${number} "${closingCardReason(number)}"`
+
+/**
+ * THE CLOSING CARD, WRITTEN BY THE LANDING (point 1308, U6 b). The tick has
+ * closed the point, so the now-section owes the reader "this point's closing
+ * duties are running" — the card `board.mjs closing` writes and the boundary's
+ * `done <N> --none` later replaces. Writing it here, before the publish, saves
+ * the session the call the board gate would otherwise demand next.
+ *
+ * NEVER STOPS THE CHAIN: a refused or failing write is reported (`ok: false`,
+ * the manual command in `detail`) and the publish runs with today's derived
+ * card, exactly as it did before this step existed. `run` is the seam a test
+ * drives instead of the real board.
+ */
+export function writeClosingCard({ number, run = sh } = {}) {
+  try {
+    run('node', [join('scripts', 'board.mjs'), 'closing', String(number), closingCardReason(number)], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 15000,
+      killSignal: 'SIGKILL',
+    })
+    return { ok: true, detail: `closing card for ${number} written` }
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `closing card NOT written (${childWords(e)}) — write it by hand: ${closingCardCommand(number)}`,
+    }
+  }
+}
+
+/** The audit the session would otherwise run by hand after a landing. */
+export const SYNCED_COMMAND = 'node scripts/dashboard-guard.mjs --synced .batch-dashboard.html'
+
+/**
+ * THE LANDING REVIEWS ITS OWN HEAD MOVE (point 1308, U8). The tick commit moves
+ * HEAD, and dashboard-guard then reports the board OUT OF DATE until a
+ * `--synced` names the new HEAD — a refusal the next turn paid for every time.
+ * The landing runs that audit itself, after the publish (board-publish already
+ * rotated the archive), so the reviewed HEAD is the tick commit. `--prepped` is
+ * NOT run: it records a judgment only the session can make.
+ *
+ * NEVER STOPS THE CHAIN: a refusal comes back with dashboard-guard's own words
+ * unchanged, and the landing reports it red as a last step — the landing itself
+ * is complete, which is today's state after a landing. `run` is the test seam.
+ */
+export function attestLandedBoard({ run = sh } = {}) {
+  try {
+    const out = run('node', [join('scripts', 'dashboard-guard.mjs'), '--synced', '.batch-dashboard.html'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 15000,
+      killSignal: 'SIGKILL',
+    })
+    return { ok: true, detail: String(out ?? '').trim().split('\n')[0] || 'board reviewed at the tick commit' }
+  } catch (e) {
+    const why = e?.code === 'ETIMEDOUT' ? 'timed out after 15 s' : childWords(e)
+    return { ok: false, detail: `${why} — do it the old way: ${SYNCED_COMMAND}` }
+  }
 }
 
 /**
@@ -819,7 +968,7 @@ async function main(argv) {
       if (e.repair) console.error(`  repair: ${e.repair}`)
       return 2
     }
-    const fableState = currentFableState()
+    const fableState = currentLaneState()
     if (!fableState.ok) {
       console.error(`land-point: ${fableState.problem}`)
       return 2
@@ -828,7 +977,7 @@ async function main(argv) {
     if (trailers.block) {
       console.error(
         `land-point: --model "${model}" is not an allowed authoring model (CLAUDE.md §6).\n` +
-          `  The serving chain is derived by node scripts/fable-switch.mjs --status; name the model actually running this landing.`,
+          `  The serving chain is derived by node scripts/lane-switch.mjs --status; name the model actually running this landing.`,
       )
       return 2
     }
@@ -926,6 +1075,14 @@ async function main(argv) {
     return folded.continue
   }
 
+  // The work order BEFORE the merge: the post-merge reconciliation compares the
+  // merged union of TASKS.md + archive against it (21.10.2026).
+  const preMerge = { tasks: readIf(TASKS), archive: readIf(ARCHIVE), sha: '' }
+  try {
+    preMerge.sha = git(['rev-parse', 'HEAD']).trim()
+  } catch {
+    /* reported through the repair text as unknown */
+  }
   try {
     // 1. MERGE. --no-ff always (see MERGE_ARGS in the core for why).
     try {
@@ -967,6 +1124,23 @@ async function main(argv) {
       throw error
     }
 
+    // 1b. POST-MERGE RECONCILIATION (21.10.2026). A stale branch copy of TASKS.md
+    // or a bad conflict resolution can drop points main gained; nothing is pushed
+    // yet, so this is where the loss is still free to stop. The carrier's ticks are
+    // checked too — a red there is printed as a finding, the landing's own loss blocks.
+    const verdictAfterMerge = postMergeGate({ preMerge })
+    if (verdictAfterMerge.blocked) {
+      error = new LandingError(verdictAfterMerge.message, {
+        step: 'gate',
+        repair: verdictAfterMerge.rolledBack
+          ? `nothing was pushed and local main is back on ${preMerge.sha.slice(0, 12)} — bring ${branch} up to date with main WITHOUT deleting those points, then re-run`
+          : `nothing was pushed — reset local main to origin/main (git reset --keep origin/main), bring ${branch} up to date WITHOUT deleting those points, then re-run`,
+      })
+      step('gate', VERDICT.failed, verdictAfterMerge.message)
+      throw error
+    }
+    reportCarrierReconciliation('post-merge')
+
     // 2. FAST GATE.
     const gateSteps = ['build', 'lint', 'unit', ...(audit.run ? ['audit'] : [])]
     const gateResults = await runGate(gateSteps, gate.mode)
@@ -995,6 +1169,7 @@ async function main(argv) {
     const accepted = transitionAccepted({
       before: evaluateTasksArchive({ tasksText, archiveText }),
       after: evaluateTasksArchive({ tasksText: moved.tasks, archiveText: moved.archive }),
+      lost: lostPoints({ beforeTasks: tasksText, beforeArchive: archiveText, afterTasks: moved.tasks, afterArchive: moved.archive }),
     })
     if (accepted.preexisting?.length) {
       console.error(
@@ -1042,6 +1217,7 @@ async function main(argv) {
     try {
       git(['push', 'origin', 'main'], { stdio: ['ignore', 'pipe', 'pipe'] })
       step('push', VERDICT.ok, 'tick committed, main pushed')
+      reportCarrierReconciliation('after push')
       if (batchId) {
         const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'bookkeeping', evidence: { at: Date.now(), complete: true, commitSha: git(['rev-parse', 'HEAD']) } })
         if (!recorded.ok) throw new Error(`landing journal refused bookkeeping evidence: ${recorded.reason}`)
@@ -1085,7 +1261,15 @@ async function main(argv) {
     }
     const settleNote = settled.settled ? ' (now-card settled first)' : ''
 
-    // 6b. BOARD PUBLISH (rider b: skipped when nothing changed). Re-decided here
+    // 6b. THE CLOSING CARD (point 1308, U6 b) — written before the publish so
+    // the page goes out naming this point's closing duties. A failed write
+    // changes nothing of today's chain: the publish runs with the derived card,
+    // the cleanup runs, and only then is the missing card reported red as the
+    // last step, its repair the one manual command.
+    const closing = writeClosingCard({ number })
+    const closingNote = closing.ok ? `; ${closing.detail}` : ''
+
+    // 6c. BOARD PUBLISH (rider b: skipped when nothing changed). Re-decided here
     // against the state as it now stands on disk: the plan's decision was taken
     // against the same POST-tick work order, but the board file and the recorded
     // publish state may have moved since — a publish is cheap, a stale page is
@@ -1094,7 +1278,7 @@ async function main(argv) {
     if (board.run) {
       try {
         sh('node', [join('scripts', 'board-publish.mjs')], { stdio: ['ignore', 'pipe', 'pipe'] })
-        step('board', VERDICT.ok, `${board.reason}${settleNote}`)
+        step('board', VERDICT.ok, `${board.reason}${settleNote}${closingNote}`)
       } catch (e) {
         error = new LandingError('the board publish failed', {
           step: 'board',
@@ -1107,7 +1291,7 @@ async function main(argv) {
         throw error
       }
     } else {
-      step('board', VERDICT.skipped, `${board.reason}${settleNote}`)
+      step('board', VERDICT.skipped, `${board.reason}${settleNote}${closingNote}`)
     }
     if (batchId) {
       const boardHash = createHash('sha256').update(readIf(BOARD_FILE)).digest('hex')
@@ -1223,6 +1407,22 @@ async function main(argv) {
         cleanup.remove.length - refused.length > 0 ? ` + ${cleanup.remove.length - refused.length} worktree(s)` : ''
       }${kept ? `, ${kept} kept on purpose` : ''}`,
     )
+    // 8. THE BOARD AUDIT (point 1308, U8) — the tick moved HEAD, so the landing
+    // records the review of the board it published. Last, so a refusal costs
+    // nothing of today's chain.
+    const attested = attestLandedBoard()
+    if (attested.ok) step('synced', VERDICT.ok, attested.detail)
+    else step('synced', VERDICT.failed, attested.detail)
+    if (!closing.ok || !attested.ok) {
+      if (!closing.ok) step('closing', VERDICT.failed, closing.detail)
+      error = new LandingError('the point landed and was cleaned up, but the board bookkeeping is behind', {
+        step: closing.ok ? 'synced' : 'closing',
+        // The card written by hand publishes the board again (board.mjs does), so
+        // the review recorded above covers the old board: attest after it too.
+        repair: closing.ok ? SYNCED_COMMAND : `${closingCardCommand(number)}, then ${SYNCED_COMMAND}`,
+      })
+      throw error
+    }
   } catch (e) {
     if (!(e instanceof LandingError)) {
       error = new LandingError(`${(e && e.message) || e}`, { step: 'unknown' })
@@ -1241,8 +1441,8 @@ async function main(argv) {
     (error
       ? '\nDONE BY THIS COMMAND: only the steps marked OK above.\n'
       : '\nDONE BY THIS COMMAND: the merge, the gate, the tick, the archive move, the tick\n' +
-        'COMMIT and the push of main, the now-card settlement, the board publish and the\n' +
-        'branch/worktree cleanup.\n') +
+        'COMMIT and the push of main, the now-card settlement, the closing card, the board\n' +
+        'publish, the branch/worktree cleanup and the board audit (--synced at the tick).\n') +
       'NOT DONE: the picture verification on both backends (it belongs BEFORE the merge,\n' +
       'on the branch), and the point boundary — two-phase (point 675):\n' +
       `  node scripts/batch-boundary.mjs --prepare ${number}   (then its bookkeeping)\n` +

@@ -11,7 +11,7 @@ import { gaitBodyLift, legSwingAngle } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
-import { approach, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
+import { approach, leanedHipY, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
 import { VILLAGER_MOTION } from '../../config/balance'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
@@ -163,7 +163,6 @@ function PrimitiveFigure({
   const crown = useRef<THREE.Group>(null)
   const armMeshes = useRef<Array<THREE.Object3D | null>>([])
   const handEnds = useRef<Array<THREE.Object3D | null>>([])
-  const legGroup = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
   // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
@@ -238,6 +237,8 @@ function PrimitiveFigure({
     // Dev: the kneel the village-walk verification reads (as the skinned
     // walk's) — every frame, since a render replaces the group's userData.
     if (import.meta.env.DEV && outer.current) outer.current.userData.kneel = kneelK.current
+    // The kneel the bug-report dump reads, in every build (placeDumpRead.ts).
+    if (outer.current) outer.current.userData.dumpKneel = kneelK.current
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
       gesture.current = advanceGesture(gesture.current, dt)
@@ -260,6 +261,11 @@ function PrimitiveFigure({
     // and a stretch. The head is a smooth sphere, so its counter-rotation is
     // invisible; only its roundness survives. `turn` needs no answer — a rotation
     // about y commutes with a scale along y.
+    // A forward lean while kneeling (setting a load down) would tip the cone's
+    // rim into the ground; the hip rises by just that much.
+    if (trunk.current && shape.current) {
+      trunk.current.position.y = leanedHipY(shape.current.hipY, trunkRadius(shape.current), trunk.current.rotation.x)
+    }
     if (head.current) {
       const squash = squat?.current ?? 1
       const flattened = squash > 0.01 && Math.abs(squash - 1) > 1e-4
@@ -297,7 +303,7 @@ function PrimitiveFigure({
         {/* The trunk pivots at the hip so a lean or a shake carries the arms and
             the head with it, and the legs (below) stay planted. The cone is a
             unit one laid out to the trunk's proportions. */}
-        <group ref={trunk} position={[0, hipY, 0]}>
+        <group ref={trunk} name="figure-trunk" position={[0, hipY, 0]}>
           <mesh ref={cone} position={[0, trunkH * 0.5, 0]} scale={[trunkRadius(lay), trunkH, trunkRadius(lay)]} castShadow>
             <coneGeometry args={[1, 1, TESSELLATION.figureBody]} />
             <meshStandardMaterial color={cloth} roughness={0.95} />
@@ -378,7 +384,7 @@ function PrimitiveFigure({
             silhouettes already use, so a faster child steps faster and a stopped
             one stands still — never a wall-clock bob. */}
         {withLegs && (
-          <group ref={legGroup}>
+          <group>
             {[0, 1].map((i) => (
               <group
                 key={i}

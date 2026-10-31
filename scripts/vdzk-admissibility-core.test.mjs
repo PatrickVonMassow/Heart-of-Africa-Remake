@@ -22,11 +22,11 @@ describe('the typed authority', () => {
     expect(userOwnedCategory('This concerns the content of design.md.')).toBe('')
   })
 
-  // BOTH HALVES OF ONE DEFECT (cross-vendor review, GPT-5.6 Sol, 28.08.2026): a
+  // BOTH HALVES OF ONE DEFECT (cross-vendor review, 28.08.2026): a
   // card that merely QUOTES the label as content granted itself the authority it
   // was quoting, and the renderer then deleted that quoted line out of the card,
   // so the user read a question with one of its own options missing.
-  // THE FIRST LINE IS THE HARDER HALF (second cross-vendor round, GPT-5.6 Sol):
+  // THE FIRST LINE IS THE HARDER HALF (second cross-vendor round):
   // a quotation that OPENS the body used to satisfy the anchor, because the tag
   // was closed by any whitespace — so the card gained authority and lost its own
   // opening words to the stripper.
@@ -39,7 +39,7 @@ describe('the typed authority', () => {
     expect(withoutCategoryLine(quoting)).toBe(quoting)
   })
 
-  // THIRD ROUND (GPT-5.6 Sol): a leading `\s*` re-opened the same door for an
+  // THIRD ROUND (cross-vendor review): a leading `\s*` re-opened the same door for an
   // INDENTED quotation and for one sitting under a blank line, and the interior
   // gaps could span newlines. The tag stands at column zero after one
   // normalisation, and every gap inside it is horizontal.

@@ -77,7 +77,8 @@ export function gestureArmEuler(a: ArmPose, out = new THREE.Euler()): THREE.Eule
  * Two-bone IK: from shoulder `s` toward target `t` with an upper arm `a` and a
  * forearm `b`, the elbow bent toward `pole`. Returns the upper-arm and forearm
  * DIRECTIONS (unit, same space as the inputs) and whether `t` was in reach;
- * out of reach, the arm points straight at it.
+ * beyond reach the arm points straight at it, inside the inner limit it folds
+ * flat.
  */
 export function solveTwoBone(
   s: THREE.Vector3,
@@ -115,14 +116,56 @@ export function solveTwoBone(
   return { upper, fore, reached: true }
 }
 
+/** Whether `t` is a contact a forward lean should make up: out of `reach` of
+ *  the shoulder at `s`, but by no more than `CONTACT_LEAN_REACH`, and in front
+ *  of `pivot`. Asked apart from `contactLean` because a body that bends over
+ *  several segments may reach what the one-pivot lean cannot. */
+export function contactWantsLean(s: THREE.Vector3, t: THREE.Vector3, reach: number, pivot: THREE.Vector3, forward: THREE.Vector3): boolean {
+  const d = s.distanceTo(t)
+  if (d <= reach) return false
+  if (d - reach > CONTACT_LEAN_REACH) return false
+  return t.clone().sub(pivot).dot(forward) > 0
+}
+
+/** Whether the glTF trunk's distributed bend is searched for a contact lean:
+ *  when the one-pivot lean found one, for a lunging grab, or when a contact
+ *  wants a lean the one pivot cannot make up — that last case not for a pose's
+ *  own reach and not under a steadied head load, which a deep bend would tip
+ *  off. */
+export function searchDeepBend(o: { lean: number; wants: boolean; posedReach: boolean; grab: boolean; steadying: boolean }): boolean {
+  return o.lean > 0 || o.grab || (o.wants && !o.posedReach && !o.steadying)
+}
+
+/** Whether a figure's contacts are held by its pose's reach: an arm reaching
+ *  now, or a released reach still easing back into the clips (`releasing`
+ *  holds that arm's reach until its solve has faded out). */
+export function holdsPosedReach(reach: boolean, releasing: readonly (number | null)[]): boolean {
+  return reach || releasing.some((r) => r !== null)
+}
+
+/** The least of `leans` whose `shortfall` (m, ≤ 0 when every contact is in
+ *  reach) is met; failing that, with `nearest` the one that comes closest, so
+ *  a contact the bend cannot fully make up is still brought as near as it
+ *  goes, and without it none (0). */
+export function leastLean(leans: readonly number[], shortfall: (l: number) => number, nearest = true): number {
+  let best = 0
+  let bestShort = shortfall(0)
+  for (const l of leans) {
+    const s = shortfall(l)
+    if (s <= 0) return l
+    if (nearest && s < bestShort) {
+      best = l
+      bestShort = s
+    }
+  }
+  return best
+}
+
 /** The extra forward chest lean (rad) that brings `t` within `reach` of a
  *  shoulder at `s` when the chest pivots about `pivot`; 0 when it already is
  *  or when the target is not a reachable contact in front (see the limits). */
 export function contactLean(s: THREE.Vector3, t: THREE.Vector3, reach: number, pivot: THREE.Vector3, forward: THREE.Vector3): number {
-  const d = s.distanceTo(t)
-  if (d <= reach) return 0
-  if (d - reach > CONTACT_LEAN_REACH) return 0
-  if (t.clone().sub(pivot).dot(forward) <= 0) return 0
+  if (!contactWantsLean(s, t, reach, pivot, forward)) return 0
   const axis = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize()
   const q = new THREE.Quaternion()
   const p = new THREE.Vector3()
@@ -208,7 +251,7 @@ const _palmD = new THREE.Vector3()
 const _palmQ = new THREE.Quaternion()
 
 /**
- * The roll (rad, in (−π, π]) that turns a hand's palm toward `toward`: a turn
+ * The roll (rad, in (center − π, center + π]) that turns a hand's palm toward `toward`: a turn
  * about the hand bone's own axis (local +y; the bone hangs along −y), so the
  * hand stays where the arm solve put it and only rolls. `parentWorld` is the
  * orientation of the hand's parent (the forearm) and `toward` a direction,

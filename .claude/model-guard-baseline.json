@@ -1,4 +1,4 @@
 {
-  "since": "2026-08-23T06:48:15.000Z",
-  "note": "advanced past c54e4615 with the user's confirmation of 23.08.2026 (chat, 09:53): the commit carries the ALLOWED pair Opus 5 (author) + GPT-5.6 Sol (cross-vendor reviewer); the guard read the two trailers as one concatenated string because git log %(trailers:...,separator=,) treats the comma as an option delimiter, so the values arrive unseparated. Point 854 (pulled forward) fixes the parsing. Previous baseline: 2026-08-07T03:56:00.000Z"
+  "since": "2026-10-27T11:18:13.000Z",
+  "note": "Opus 5.5 verified c6a6fcf (Claude Fable 5.1, committed 11:18:12Z): the scarce lane switch is ON since 2026-08-31 in the owner checkout; a cloud clone carries no lane-switch state and judged it off. since sits one second past it because the guard judges commits at/after since"
 }

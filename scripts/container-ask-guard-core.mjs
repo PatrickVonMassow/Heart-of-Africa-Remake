@@ -101,7 +101,7 @@ export const REQUEST_PATTERNS = [
   // Second person plus an action, in ANY conjugation. This list held only the
   // infinitives (`ausführen|auszuführen|ausgeführt werden`), so every conjugated
   // demand walked straight past it — "wenn du `npm run build` ausführst", "wenn
-  // du `node scripts/board-publish.mjs` startest" (four-eyes review, Fable 5,
+  // du `node scripts/board-publish.mjs` startest" (four-eyes review,
   // 04.08.2026). The forms below are second-person verb endings, so the "du"
   // in front of them is being told to do something, not being pointed at a fact.
   {
@@ -140,7 +140,7 @@ export const REQUEST_PATTERNS = [
   // project writes it constantly — "Die Tafel zeigt die Ergebnisse der
   // LARGE-Regression", "Das Board zeigt jetzt den Fehler aus `npm run build`",
   // "The dashboard will show the results of `npm run test:large`" all blocked
-  // (four-eyes review, Fable 5, 04.08.2026). A report cue cannot rescue them —
+  // (four-eyes review, 04.08.2026). A report cue cannot rescue them —
   // cues are clause-local by design, so an "Ich habe publiziert;" one clause
   // earlier does not reach. Every real hand-over keeps the direction word.
   {
@@ -166,7 +166,7 @@ export const SECOND_PERSON_PATTERNS = [
 /**
  * The clause NEGATES its own demand: "du musst nichts weiter tun", "you need to
  * do nothing here", "darum brauchst du dich nicht zu kümmern". Found by the
- * four-eyes review (Fable 5, 04.08.2026) as the guard's most expensive false
+ * four-eyes review (04.08.2026) as the guard's most expensive false
  * alarm, because it is exactly the sentence this guard's own remedy asks for —
  * the report that the session did the work itself. The reassurance and the
  * report usually sit in DIFFERENT clauses ("…, ich habe es bereits ausgeführt"),
@@ -183,7 +183,7 @@ export const NEGATION_CUES = [
  * DONE rather than denying a demand — "you should be all set", "damit ist alles
  * erledigt". It reads as an obligation modal ("you should …", "du solltest …"),
  * its report sits in the previous clause, and it carries nothing the negation
- * list above can see, so it blocked falsely (four-eyes review, Fable 5,
+ * list above can see, so it blocked falsely (four-eyes review,
  * 04.08.2026). Widening the REPORT cue to the neighbouring clause would have
  * caught it too — and would also have cleared "Ich habe alles gebaut, bitte
  * führe `npm run test:large` aus", which is the hand-over this guard exists for.
@@ -199,7 +199,7 @@ export const REASSURANCE_CUES = [
  * obligation only because of the modal). An IMPERATIVE is never a reassurance —
  * "Führe `npm run build` aus und dann ist alles erledigt" tells him to run it and
  * then merely promises the reward, and the unrestricted exemption cleared it
- * (four-eyes review, Fable 5, 04.08.2026). Note it is the CLAUSE separator that
+ * (four-eyes review, 04.08.2026). Note it is the CLAUSE separator that
  * used to save the comma variant: "Führe … aus, dann ist alles erledigt" splits
  * the promise off and blocked either way, so the exemption's reach depended on
  * punctuation alone.
@@ -222,7 +222,7 @@ export const REPORT_CUES = [
   // CASE-SENSITIVE on purpose, and capital `I` is the point: the first version
   // listed only the lowercase forms and carried no `i` flag, so the one spelling
   // real English uses never matched and this cue was dead (four-eyes review,
-  // Fable 5, 04.08.2026). The flag itself is NOT the fix — with it, `\bi\b`
+  // 04.08.2026). The flag itself is NOT the fix — with it, `\bi\b`
   // matches the `i` in "führe `npm i` aus" and in a `-i` flag, and a hand-over
   // would clear itself on its own command. English capitalises the pronoun; the
   // contractions are allowed either case because a lowercase "i've" is only ever

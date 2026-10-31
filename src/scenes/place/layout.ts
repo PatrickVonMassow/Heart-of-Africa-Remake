@@ -36,7 +36,7 @@ import { fisheryStaticColliders } from './fisheryColliders'
 import { fireHasCookShelter } from '../../systems/cookShelter'
 import { canoeLane } from './villagerCanoe'
 import { balance } from '../../config/balance'
-import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
+import { digFurnitureColliders, digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
 import { JOIN_STAND_OFF, WORK_ARRIVE_RADIUS } from './adultWork'
 import { chiefBesideDrummerSpot } from './chiefWalk'
@@ -360,9 +360,10 @@ export const WATER_PATH_HEAD_RADIUS = 15
 const WATER_PATH_HEAD_INNER_RADII = [
   15, 14.5, 15.5, 14, 16, 13.5, 16.5, 13, 17, 12.5, 17.5, 12, 18, 11.5, 18.5, 11, 19, 19.5, 20, 20.5, 21,
 ] as const
-/** The OUTER rungs (work-order 1245), tried only once the inner ladder has
- *  failed with and without compound gates, so no layout that found its head
- *  before moves: since the water path lands beyond the children's stretch,
+/** The OUTER rungs (work-order 1245), tried in the first search only once the
+ *  inner ladder has failed with and without compound gates (a later re-search,
+ *  `findHead`, goes inner → outer → wide with no gate step), so no layout that
+ *  found its head before moves: since the water path lands beyond the children's stretch,
  *  ~28 m upstream, the walk from the inner rungs is long enough that a dense
  *  plan left 4 of 3000 river layouts without any clear straight lane. */
 const WATER_PATH_HEAD_OUTER_RADII = [21.5, 22, 22.5, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27] as const
@@ -2637,8 +2638,11 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // villagers dig — a store pit (or, where no compound gives it room, a post
   // hole) and a patch turned over. They are
   // placed like every other loose object (free ground, off the lanes, seeded by
-  // the same generator) and they carry NO collider: a shallow pit is walked
-  // over. The pair works from safe places on the rim.
+  // the same generator) and the pit carries NO collider: a shallow pit is walked
+  // over. The props set down beside it (baskets, tray, laid posts) are solid
+  // (point 1418): they go into the collider set once the site is placed, off
+  // the lanes, the way out and the pounding pair's walks, and the pair works
+  // from rim places clear of them.
   //
   // THEY LEAVE THE MIDDLE (work-order 688). The first placement swept the whole
   // open ground from 5 m out, which put men digging on the village square beside
@@ -2717,9 +2721,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
             const at = digLocalToWorld(site, prop.x, prop.z)
             return Math.hypot(at.x, at.z) + prop.radius >= radius - 0.5
               || !standingClear(colliders, at.x, at.z, prop.radius)
+              || onPairWalk(at.x, at.z, prop.radius)
+              || onLane(at.x, at.z, prop.radius)
+              || onWayOut(wayOut, radius, at.x, at.z, prop.radius)
           })) continue
-          if (!standable(x, z) || !digStandingPlaces(site, standable)) continue
+          const props = digFurnitureColliders(site)
+          const rimStandable = (px: number, pz: number) =>
+            standable(px, pz) && standingClear(props, px, pz, WALKER_RADIUS)
+          if (!standable(x, z) || !digStandingPlaces(site, rimStandable)) continue
           digSites.push(site)
+          colliders.push(...props)
           return true
         }
       }

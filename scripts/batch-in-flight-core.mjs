@@ -981,7 +981,7 @@ export const RESPAWN_GRACE_MS = 30 * 60 * 1000
 
 /**
  * How long a FRESH LOG may keep an agent alive whose git output could be measured
- * and has stood still (four-eyes review, Fable 5, 30.07.2026, finding 4).
+ * and has stood still (four-eyes review, 30.07.2026, finding 4).
  *
  * A fresh log is genuine evidence that something is happening, so it refuses the
  * respawn — but it must not refuse it FOREVER: an agent wedged in a printing loop
@@ -1209,10 +1209,14 @@ export function successorAgentOrientation({ declaration = null, sid = '', agentC
 // So the mechanism that already judges the wait also asks the lower bound — and it
 // must not become a nag, which is why every state in which the empty slots are
 // genuinely unusable answers "no reason needed" on its own.
+//
+// SWITCHED OFF (point 1452, 26.10.2026): the runbook makes POOL_CAP a ceiling, never
+// a target, and the demand fired on every boundary with a free slot, answered only by
+// boilerplate. `slotReasonDecision` still reports the free slots and candidates but
+// never demands a reason; the cap itself and `commission-guard` stay.
 
 /** The pool cap: at most three open feat/* branches (point 712) and three
- *  concurrent agents — and since point 427 also a TARGET while independent work
- *  is queued. */
+ *  concurrent agents. A ceiling only; the point-427 target is switched off. */
 export const POOL_CAP = 3
 
 /**
@@ -1252,8 +1256,8 @@ export function filesNamedIn(text) {
 /**
  * The OPEN points of the work order with the files each names. PURE.
  *
- * A point's block runs from its `- [ ] N.` line to the next checkbox line, which is
- * how the work order is written; DEFERRED points are excluded exactly as
+ * A point's block runs from its `- [ ] N.` line to the next column-0 checkbox line
+ * (`[ ]`, `[x]` or `[X]`, numbered or not), which is how the work order is written; DEFERRED points are excluded exactly as
  * `openPointStatus` excludes them, since a deferred point is not commissionable.
  *
  * A point WAITING ON THE USER (point 450) is carried but FLAGGED, not dropped:
@@ -1266,11 +1270,11 @@ export function openPointSpecs(tasksText = '') {
   const out = []
   let current = null
   for (const line of String(tasksText ?? '').split('\n')) {
-    const head = line.match(/^- \[( |x)\] (\d+)\./)
-    if (head) {
+    if (/^- \[[ xX]\]/.test(line)) {
       if (current) out.push(current)
+      const head = line.match(/^- \[( |x|X)\] (\d+)\./)
       current =
-        head[1] === ' ' && !/\bDEFERRED\b/.test(line)
+        head && head[1] === ' ' && !/\bDEFERRED\b/.test(line)
           ? { point: Number(head[2]), text: line, gated: Boolean(parseGateLine(line)?.gated) }
           : null
       continue
@@ -1392,7 +1396,8 @@ export function slotReasonDecision({
     return no(gatedOnly ? 'queue-user-gated' : 'queue-overlaps')
   }
   if (String(reason ?? '').trim()) return no('reason-given')
-  return { ...no('idle-slots'), needsReason: true }
+  // Reported, no longer demanded (point 1452: the cap is a ceiling, not a target).
+  return no('idle-slots')
 }
 
 /**
@@ -1790,10 +1795,10 @@ function gitBranchCreates(seg) {
 function segmentTarget(seg) {
   const none = { points: [], refs: [], how: 'none' }
   const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
-  // An authoring run IS the commissioning of a point, whichever vendor runs it —
+  // An authoring run IS the commissioning of a point, whichever lane runs it —
   // unless it is one of the read-only legs, which produce no work at all.
   if (!/--routing\b|--dry-run\b/.test(seg)) {
-    const authored = uniq([...seg.matchAll(/author-(?:astra|sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    const authored = uniq([...seg.matchAll(/author-delegate\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
     if (authored.length) return { points: authored, refs: [], how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {
@@ -1851,7 +1856,7 @@ function segmentTarget(seg) {
  * Switching to an existing branch, pushing one, landing one — none of them
  * CREATES anything, and none is recognised here.
  *
- * A READ-ONLY RUN OPENS NOTHING either: `author-astra.mjs --routing` answers which
+ * A READ-ONLY RUN OPENS NOTHING either: `author-delegate.mjs --routing` answers which
  * lane owns a point and every author command's `--dry-run` prints the prompt it
  * would send. Refusing those would deny the very question a session asks BEFORE
  * it commissions.

@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers, POLICY_NEUTRAL } from './model-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
+import { CROSS, MAIN, SCARCE, trailerFor } from './model-lanes.mjs'
 import {
   closingRunRecords,
   AUDIT_TRIGGER_FILES,
@@ -37,13 +38,16 @@ import {
 
 // ---------------------------------------------------------------------------
 describe('the chain itself', () => {
-  it('runs the seven steps in the order the guards need', () => {
+  it('runs the eight steps in the order the guards need', () => {
     // The gate is AFTER the merge (two points that auto-merge cleanly can still
-    // break together) and the cleanup is LAST (a branch deleted before the tick
-    // is one nobody can go back to when the tick fails).
-    expect(STEP_IDS).toEqual(['merge', 'gate', 'tick', 'archive', 'push', 'board', 'cleanup'])
+    // break together) and the cleanup comes after the push (a branch deleted
+    // before the tick is one nobody can go back to when the tick fails). Only
+    // the board audit follows it (point 1308, U8): it deletes nothing, and a
+    // refusal there must not cost the cleanup.
+    expect(STEP_IDS).toEqual(['merge', 'gate', 'tick', 'archive', 'push', 'board', 'cleanup', 'synced'])
     expect(STEP_IDS.indexOf('gate')).toBeGreaterThan(STEP_IDS.indexOf('merge'))
-    expect(STEP_IDS.indexOf('cleanup')).toBe(STEP_IDS.length - 1)
+    expect(STEP_IDS.indexOf('cleanup')).toBeGreaterThan(STEP_IDS.indexOf('push'))
+    expect(STEP_IDS.indexOf('synced')).toBe(STEP_IDS.length - 1)
   })
 
   it('makes the work DURABLE before it deletes anything', () => {
@@ -81,9 +85,14 @@ describe('the chain itself', () => {
 // ---------------------------------------------------------------------------
 describe('the tick commit message', () => {
   it('carries a co-author trailer naming the model it was given', () => {
-    const msg = tickCommitMessage({ number: 594, model: 'Claude Opus 5' })
-    expect(msg).toMatch(/^Co-Authored-By: Claude Opus 5 <noreply@anthropic\.com>$/m)
+    const msg = tickCommitMessage({ number: 594, model: MAIN.trailerName })
+    expect(msg.split('\n')).toContain(`Co-Authored-By: ${trailerFor('main')}`)
     expect(evaluateCommitTrailers(msg).block).toBe(false)
+  })
+
+  it('takes the trailer address from the vendor of the model it was given', () => {
+    const msg = tickCommitMessage({ number: 594, model: CROSS.trailerName })
+    expect(msg.split('\n')).toContain(`Co-Authored-By: ${trailerFor('cross')}`)
   })
 
   it('REFUSES to invent a model when none is given', () => {
@@ -103,13 +112,13 @@ describe('the tick commit message', () => {
   })
 
   it('accepts every model the policy allows', () => {
-    for (const m of ['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8']) {
+    for (const m of [MAIN.trailerName, SCARCE.trailerName, MAIN.fallback.trailerName]) {
       expect(evaluateCommitTrailers(tickCommitMessage({ number: 1, model: m }), POLICY_NEUTRAL).block).toBe(false)
     }
   })
 
   it('names no point number in the subject, per the commit convention', () => {
-    const subject = tickCommitMessage({ number: 594, model: 'Claude Opus 5' }).split('\n')[0]
+    const subject = tickCommitMessage({ number: 594, model: MAIN.trailerName }).split('\n')[0]
     expect(subject).not.toMatch(/594|\bPoint\b/)
   })
 })

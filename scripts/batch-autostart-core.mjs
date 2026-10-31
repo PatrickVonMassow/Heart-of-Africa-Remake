@@ -42,14 +42,15 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
+import { servingFallbackModelId } from './lane-switch-core.mjs'
+import { MAIN } from './model-lanes.mjs'
 import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
-/** Model policy (CLAUDE.md §6). rule:model-policy@2f245cec
- *  The session starts on OPUS_MODEL_ID (scripts/fable-switch-core.mjs). Its one CLI fallback is the next member of the
- *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
+/** Model policy (CLAUDE.md §6). rule:model-policy@740d83c2
+ *  The session starts on the main lane's model id (scripts/model-lanes.mjs). Its one CLI fallback is the next member of the
+ *  chain reported by scripts/lane-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
-export const SPAWN_MODEL = OPUS_MODEL_ID
+export const SPAWN_MODEL = MAIN.modelId
 
 /**
  * ONE TURN, SEVERAL CALLS (point 593) — the German rendering of the paragraph the
@@ -1494,7 +1495,7 @@ export function announceSpawn({ quota = null } = {}) {
  * which took the whole spawn with it and made the first failure permanent: the pid
  * file is only written after a spawn that never happened. Measured 12.08.2026 —
  * the top-up had not run once since the container came up, and the allowance for
- * api.openai.com aged out twice under it.
+ * the cross vendor's API host aged out twice under it.
  *
  * A LIVE PID IS NOT PROOF OF OUR CHILD either: after pid reuse an unrelated
  * long-lived process would suppress the top-up for as long as IT lives. So the
@@ -1586,6 +1587,14 @@ export function staleEtaLogLine({ overdue, tickMin = ETA_OVERDUE_ALERT_MIN } = {
 // broken by more than a tick WHILE the batch stands still is the owner's own
 // admission, and it is what the reader on the phone can see.
 
+/** The stall clock starts at the later of the last progress and the current
+ *  owner's lock acquisition (point 1445); an acquisition in the future or an
+ *  unreadable one leaves the progress boundary alone. */
+export function stallClockStart(progressAt, ownerSince, now = Date.now()) {
+  if (!Number.isFinite(ownerSince) || ownerSince > Number(now)) return progressAt
+  return Math.max(progressAt, ownerSince)
+}
+
 /**
  * MAY THE OWNER KEEP THE BATCH? PURE, TOTAL.
  *
@@ -1597,6 +1606,9 @@ export function staleEtaLogLine({ overdue, tickMin = ETA_OVERDUE_ALERT_MIN } = {
  * @param {number} input.thresholdMs the soft bar
  * @param {number} input.hardDeadlineMs the bar nothing may extend
  * @param {number} input.tickMin one launcher interval, in minutes
+ * @param {number|null} input.ownerSince when the CURRENT owner acquired the lock
+ *   (point 1445): the stall clock never starts before it, so a fresh owner
+ *   does not inherit its dead predecessor's standstill
  * @returns {{keeps: boolean, reason: string, stalledMs: number|null, witnesses: string[]}}
  */
 export function ownerKeepsBatch({
@@ -1607,6 +1619,7 @@ export function ownerKeepsBatch({
   thresholdMs,
   hardDeadlineMs,
   tickMin = ETA_OVERDUE_ALERT_MIN,
+  ownerSince = null,
 } = {}) {
   // NO MEASUREMENT IS NOT A VERDICT. A launcher that cannot read the repository's
   // own history must not start taking batches away on that ignorance; the lease
@@ -1614,7 +1627,7 @@ export function ownerKeepsBatch({
   if (!Number.isFinite(progressAt) || !Number.isFinite(thresholdMs) || !Number.isFinite(hardDeadlineMs)) {
     return { keeps: true, reason: 'no-progress-measurement', stalledMs: null, witnesses: [] }
   }
-  const stalledMs = Math.max(0, Number(now) - progressAt)
+  const stalledMs = Math.max(0, Number(now) - stallClockStart(progressAt, ownerSince, now))
   const witnesses = []
   if (typeof etaMinutesPast === 'number' && Number.isFinite(etaMinutesPast) && etaMinutesPast > tickMin) {
     witnesses.push(`the published now-card promise is ${Math.round(etaMinutesPast)} min past`)

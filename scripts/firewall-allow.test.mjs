@@ -126,7 +126,7 @@ describe('the default top-up set', () => {
   })
   it("keeps the REVIEWER's hosts topped up — by EXACT address, not by /24", () => {
     // 11.08.2026: a container restart left chatgpt.com's boot-resolved addresses
-    // stale, so every Sol review was handed to one of our own models instead —
+    // stale, so every cross-lane review was handed to one of our own models instead —
     // the four-eyes rule kept running while quietly losing the cross-vendor
     // decorrelation it exists for. A silent loss of the reviewer is the failure
     // this entry prevents, which is why it belongs in the RE-APPLIED list and not

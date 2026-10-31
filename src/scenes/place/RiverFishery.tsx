@@ -41,12 +41,12 @@ import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryM
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
 import { rainAmount } from '../../systems/season'
-import { blendPose, carrierWalkPose, copyPose, netFishRotation, ownPose, placeNetMan, reachPose } from './fisheryPoses'
+import { CARRIER_BASKET_Y, carrierPose, carrierWalkPose, copyPose, GUT_FISH_SCALE, holdGutFish, netFishRotation, netManAshore, netManBasketAt, ownPose, placeNetMan, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
 import { BANK_WATER_DROP, type PlaceRiverBank } from './riverBank'
-import { basketRingViolation, type BasketRing, type FishBasket } from './fishBaskets'
+import { basketRingViolation, FISH_BASKET, type BasketRing, type FishBasket } from './fishBaskets'
 import {
   createFishFire,
   createFisheryRing,
@@ -76,6 +76,8 @@ import { devAssert } from '../../systems/devAssert'
 import { isLifeFrozen } from './lifeFreeze'
 import { Pounder } from './Pounder'
 import { FisheryNetMan } from './FisheryNetMan'
+import { figureSnapshot, objectSnapshot, shownInScene, usePlaceDumpProvider } from './placeDumpRead'
+import type { PlaceFigureSnapshot, PlaceObjectSnapshot } from '../../systems/placeDump'
 
 /** The speech-label id of the net man's words (the dugout's, as before). */
 export const CANOE_SPEAKER_ID = 'village-canoe'
@@ -84,15 +86,17 @@ const CANOE_SEAT_Y = 0.1
 /** The hull's own rise over the water and its depth under the gunwale. */
 const CANOE_FREEBOARD = 0.18
 const CANOE_DEPTH = 0.28
-/** The hull fish lie this high over the hull's water line. */
+/** The hull fish's base height in their own group, whose offset cancels it:
+ *  the fish lie 2 cm over the freeboard plus their own heap offsets. */
 const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
-const BASKET_R = 0.26
-const BASKET_H = 0.34
+const BASKET_R = FISH_BASKET.radius
+const BASKET_H = FISH_BASKET.height
 /** The rope's own axis and a scratch direction for orienting it. */
 const ROPE_UP = new THREE.Vector3(0, 1, 0)
 const ROPE_DIR = new THREE.Vector3()
-/** How long a fish hangs in the net at the gunwale as it comes up. */
+/** How long a fish takes to sink from its lift in the net at the gunwale as
+ *  it comes up; it hangs there for the rest of the haul. */
 const FISH_IN_NET_SECONDS = 1.4
 
 // --- Poses -------------------------------------------------------------------
@@ -228,7 +232,7 @@ function WovenBasket({ name, fishRef, fishGeometry, fishMaterial }: {
   )
 }
 
-/** Where fish `i` of `n` lies in a basket's heap (local), and its yaw. */
+/** Where fish `i` lies in a basket's heap (local), and its yaw and roll. */
 function basketFishSpot(i: number): { x: number; y: number; z: number; yaw: number; roll: number } {
   const a = i * 2.4
   const r = 0.07 + 0.05 * (i % 3)
@@ -244,10 +248,6 @@ function fishLength(i: number): number {
 
 // --- The dugout ----------------------------------------------------------------
 
-/**
- * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the
- * boat and the fire, because the two baskets pass between them every round.
- */
 /** What the fishers' fire needs of its settlement (point 1275): the thatch
  *  its cook-shelter is roofed with, the place's live wetness and its people. */
 export interface FisheryFireEnv {
@@ -259,6 +259,10 @@ export interface FisheryFireEnv {
 /** The fishers' fire's light at full flame, before the rain damps it. */
 const FISH_FIRE_LIGHT = 6
 
+/**
+ * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the
+ * boat and the fire, because the two baskets pass between them every round.
+ */
 export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverBank; cloth: readonly string[]; seed: number; fireEnv?: FisheryFireEnv }) {
   const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
@@ -331,8 +335,8 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
   // villagers", from point 350) — never a second, kneeling figure swapped in.
   const carrierDown = useRef(false)
   const carrierKneelK = useRef(0)
-  const carrierCutPose = useRef<FigurePose>({ ...REST_POSE })
   const gutFish = useRef<THREE.Mesh>(null)
+  const grillerG = useRef<THREE.Group>(null)
   const grillerPose = useRef<FigurePose | null>({ ...REST_POSE })
   const grillerLimbs = useRef<FigureLimbs | null>(null)
   const boardFish = useRef<Array<THREE.Mesh | null>>([])
@@ -364,7 +368,10 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     const t = clock.elapsedTime
     const nm = canoe.netMan
     const sources = () => [{ x: nm.x, z: nm.z, register: 'call' as const }]
-    const said = stepCanoe(
+    // The dugout's state holds still under the dev life freeze too (no step),
+    // so its place and phase at a proof frame's shutter are those in the
+    // picture; the gesture clock and the pay-out arm swing still run.
+    const said = isLifeFrozen() ? null : stepCanoe(
       canoe,
       lane,
       ring,
@@ -450,7 +457,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
       applyFigurePose(netLimbs.current, np)
     } else if (np) {
       const holding = ring.baskets.some((b) => b.at === 'netman')
-      copyPose(np, holding && nm.reach < 0.05 ? { left: armAim(0.25, -0.55), right: armAim(-0.25, -0.55), lean: 0.12, turn: 0 } : reachPose(0, nm.reach))
+      copyPose(np, netManAshore(nm.reach, holding).pose)
       applyFigurePose(netLimbs.current, np)
     }
 
@@ -550,22 +557,21 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     if (carrierWalk.current) {
       carrierWalk.current.position.set(c.x, groundHeight(c.x, c.z), c.z)
       carrierWalk.current.rotation.y = c.yaw
-      // A basket on his head rests on his crown and rides its bob.
+      // A basket on his head rests on his crown, rides its bob and tilts with it.
       for (const b of ring.baskets) {
         const g = b.at === 'carrier' ? basketGroups.current[b.id] : null
-        if (g && !kneeling && crownIn(carrierWalk.current, g.parent, g.position)) g.rotation.set(0, c.yaw, 0)
+        if (g && !kneeling) crownIn(carrierWalk.current, g.parent, g.position, g.quaternion)
       }
     }
     const cw = carrierWalkPoseRef.current
     if (cw) {
-      const cut = Math.sin(t * 7)
-      copyPose(carrierCutPose.current, { left: armAim(0.25, -0.75 + 0.18 * cut), right: armAim(-0.2, -0.7), lean: 0.35, turn: 0 })
-      blendPose(cw, carrierWalkPose(c.phase, c.clock, fireCfg.liftSeconds), carrierCutPose.current, carrierKneelK.current)
+      carrierPose(cw, carrierWalkPose(c.phase, c.clock, fireCfg.liftSeconds), carrierKneelK.current, t)
       applyFigurePose(carrierWalkLimbs.current, cw)
     }
     if (gutFish.current) {
       const basket = ring.baskets.find((b) => b.at === 'fire')
       gutFish.current.visible = kneeling && !!basket && basket.fish > 0 && c.clock > fireCfg.liftSeconds
+      if (gutFish.current.visible && carrierWalk.current) holdGutFish(gutFish.current, carrierWalk.current)
     }
     boardFish.current.forEach((m, i) => {
       if (m) m.visible = i < fire.board
@@ -630,6 +636,75 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
       // At the mortar `Pounder`'s standing bodies hold their places.
       b.active = away
     })
+  })
+
+  // THE FISHERY'S RUNTIME FOR THE BUG-REPORT DUMP (placeDump.ts), in every
+  // build: the dugout and its clock, the two men, the carrier, the griller and
+  // both baskets with who holds them — what a report about this vignette
+  // needs and what otherwise lives only in these refs. The pounding pair
+  // reports itself (`Pounder`, as `fishery-pounders`).
+  usePlaceDumpProvider('fishery', () => {
+    const nm = canoe.netMan
+    const c = fire.carrier
+    const g = fire.griller
+    const figs: PlaceFigureSnapshot[] = []
+    const objects: PlaceObjectSnapshot[] = []
+    if (paddlerG.current) {
+      figs.push(figureSnapshot(paddlerG.current, {
+        id: 'fishery/paddler', role: 'canoe-paddler', phase: canoe.phase, action: canoe.paddlerAction,
+        lean: paddlerPose.current?.lean ?? null, extra: { stroke: canoe.stroke },
+      }))
+    }
+    if (netMan.current) {
+      figs.push(figureSnapshot(netMan.current, {
+        id: 'fishery/netman', role: 'net-man', phase: canoe.phase, action: nm.action,
+        lean: netPose.current?.lean ?? null, squat: netSquat.current,
+        extra: { inBoat: nm.inBoat, reach: nm.reach, kneels: netKneels.current },
+      }))
+    }
+    if (carrierWalk.current) {
+      figs.push(figureSnapshot(carrierWalk.current, {
+        id: 'fishery/carrier', role: 'fish-carrier', phase: c.phase, action: carrierDown.current ? 'kneel' : c.phase === 'toBank' || c.phase === 'toFire' ? 'walk' : 'stand',
+        lean: carrierWalkPoseRef.current?.lean ?? null,
+        extra: { clock: c.clock, kneelArms: carrierKneelK.current, walked: c.walked, gutOf: c.gutOf, gutted: c.gutted, waiting: c.waiting },
+      }))
+    }
+    if (grillerG.current) {
+      figs.push(figureSnapshot(grillerG.current, {
+        id: 'fishery/griller', role: 'fish-griller', phase: g.action, action: g.action,
+        lean: grillerPose.current?.lean ?? null, extra: { clock: g.clock, slot: g.slot },
+      }))
+    }
+    const holderOf = { netman: 'fishery/netman', carrier: 'fishery/carrier', bank: 'bank', fire: 'fire' } as const
+    for (const b of ring.baskets) {
+      const node = basketGroups.current[b.id]
+      if (!node) continue
+      objects.push(objectSnapshot(node, { id: `fishery/basket/${b.id}`, kind: 'fish-basket', holder: holderOf[b.at], extra: { at: b.at, fish: b.fish } }))
+    }
+    if (gutFish.current && shownInScene(gutFish.current)) {
+      objects.push(objectSnapshot(gutFish.current, { id: 'fishery/gutting-fish', kind: 'fish', holder: 'fishery/carrier' }))
+    }
+    return {
+      kind: 'river-fishery',
+      state: {
+        canoe: {
+          phase: canoe.phase, clock: canoe.clock, s: canoe.s, x: canoe.x, z: canoe.z, yaw: canoe.yaw,
+          net: canoe.net, catch: canoe.catch, landed: canoe.landed, inHull: canoe.inHull,
+          word: canoe.word ? { ...canoe.word } : null, calls: canoe.calls, lastCall: canoe.lastCall,
+          basketWait: canoe.basketWait, rounds: canoe.rounds,
+        },
+        fire: {
+          board: fire.board, grill: fire.grill.length, rack: fire.rack.length, storage: fire.storage,
+          smoked: fire.smoked, eaten: fire.eaten, sheltered: fireRain.current.sheltered, rainFactor: fireRain.current.rainFactor,
+        },
+        sites: {
+          fire: sites.fire, rack: sites.rack, board: sites.board, storage: sites.storage,
+          fireBasket: sites.fireBasket, basketSpot: sites.basketSpot, duoMortar: sites.duoMortar,
+        },
+      },
+      figures: figs,
+      objects,
+    }
   })
 
   // Dev hooks for the headless verification (CLAUDE.md §7.2).
@@ -859,7 +934,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
             grill, its forked posts and the kneeling griller stand beneath it. */}
         {sheltered && fireEnv && <CookShelter thatchMat={fireEnv.thatchMat} postR={fireCfg.shelterPostR} />}
       </group>
-      {/* THE SMOKING RACK: four posts, two rails and slats, the fish across them. */}
+      {/* THE SMOKING RACK: four posts and two rails, the fish hung from them. */}
       {/* Turned so its rails run along the bank: seen from the village, the fish
           hang side by side. */}
       <group name="fish-rack" position={[sites.rack.x, rackY, sites.rack.z]} rotation={[0, along + Math.PI / 2, 0]}>
@@ -959,16 +1034,16 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
           gait={carrierGait}
           kneeling={carrierDown}
           handProp={
-            <mesh ref={gutFish} geometry={fishGeometry} material={materials.fresh} rotation={[0, 0, Math.PI / 2]} scale={0.3} visible={false} />
+            <mesh ref={gutFish} geometry={fishGeometry} material={materials.fresh} scale={GUT_FISH_SCALE} visible={false} />
           }
         />
       </group>
       {/* THE GRILLER, kneeling at the fire. */}
-      <group name="fish-griller" position={[sites.griller.x, groundHeight(sites.griller.x, sites.griller.z), sites.griller.z]} rotation={[0, sites.griller.yaw, 0]}>
+      <group ref={grillerG} name="fish-griller" position={[sites.griller.x, groundHeight(sites.griller.x, sites.griller.z), sites.griller.z]} rotation={[0, sites.griller.yaw, 0]}>
         <Figure cloth={clothOf(3)} kneel pose={grillerPose} limbs={grillerLimbs} />
       </group>
       {/* THE POUNDING PAIR at the village's one mortar outside the middle (point 1282). */}
-      <Pounder x={sites.duoMortar.x} z={sites.duoMortar.z} yaw={sites.duoYaw} cloth={[clothOf(4), clothOf(0)]} duo={fire.duo} />
+      <Pounder x={sites.duoMortar.x} z={sites.duoMortar.z} yaw={sites.duoYaw} cloth={[clothOf(4), clothOf(0)]} duo={fire.duo} dumpId="fishery-pounders" />
     </>
   )
 }
@@ -1012,15 +1087,14 @@ function placeBasket(
       break
     }
     case 'netman': {
-      const nm = canoe.netMan
-      const x = nm.x + Math.sin(nm.yaw) * 0.45
-      const z = nm.z + Math.cos(nm.yaw) * 0.45
-      g.position.set(x, groundHeight(nm.x, nm.z) + 0.55 - 0.45 * nm.reach, z)
+      // Hanging from his hands by its rim, never at a height of its own.
+      const at = netManBasketAt(canoe.netMan, groundHeight)
+      g.position.set(at.x, at.y, at.z)
       break
     }
     case 'carrier': {
       const c = fire.carrier
-      g.position.set(c.x, groundHeight(c.x, c.z) + 1.36, c.z)
+      g.position.set(c.x, groundHeight(c.x, c.z) + CARRIER_BASKET_Y, c.z)
       g.rotation.set(0, c.yaw, 0)
       break
     }

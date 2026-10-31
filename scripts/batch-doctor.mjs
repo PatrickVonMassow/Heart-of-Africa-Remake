@@ -2,7 +2,9 @@
 // OWNER verifies the repo was not corrupted by the concurrent writes, and
 // remediates — willing to THROW AWAY suspect work (recoverably: rescue branch +
 // named stash) rather than leave a corrupted tree. Every detection and every
-// action is appended to .claude/doctor.log for human audit.
+// action is appended to .claude/doctor.log for human audit. The work-order files
+// (PROTECTED_PATHS) are never stashed: they are secured on a pushed
+// rescue/doctor-<time>-<pid> branch, and the run alerts (21.10.2026).
 //
 // Usage:
 //   node scripts/batch-doctor.mjs            # diagnose + safe fixes; exit 2 if --repair is needed
@@ -13,10 +15,13 @@
 // Exit codes: 0 = consistent, fully remediated, or gate inconclusive under load;
 // 1 = gate failed / alert-level findings remain / not a usable checkout;
 // 2 = repairs planned but not executed (run with --repair).
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
+import { carrierEntry } from './findings-core.mjs'
+import { carrierPath } from './findings-paths.mjs'
+import { runReconcile } from './carrier-reconcile.mjs'
 import { WAIT_LEASE_PATH } from './wait-lease-core.mjs'
 import { liveRecordPaths } from './verify/run-record.mjs'
 import {
@@ -24,6 +29,7 @@ import {
   declaredRunAlive,
   parsePorcelainZ,
   needsRepair,
+  repairActionAllowed,
   GATE_COMMANDS,
   judgeGateRun,
   gateKey,
@@ -43,6 +49,7 @@ import {
   pruneWorktrees,
   quarantineStash,
   rescueAndReset,
+  rescueProtectedCommit,
   removeOrphanWorktrees,
   republishBoard,
   restoreTasksFromHead,
@@ -79,7 +86,11 @@ const CHECKOUT_ROOT = REPO_ROOT
 // must not override that cwd or leak onwards into the nested fast-gate suite.
 const REPOSITORY_ENV = withoutGitLocalEnvironment()
 const LOG = join(REPO, '.claude', 'doctor.log')
-const repair = process.argv.includes('--repair')
+// Switch-off for a closing LARGE (point 1462, user decision 29.10.2026): while
+// local/doctor-repair-off exists, --repair runs read-only, so no repair can
+// stash the tree or kill the running regression. Point 1467 owns the real fix.
+const REPAIR_SWITCHED_OFF = existsSync(join(REPO, 'local', 'doctor-repair-off'))
+const repair = process.argv.includes('--repair') && !REPAIR_SWITCHED_OFF
 const gate = process.argv.includes('--gate')
 
 const log = (m) => {
@@ -105,6 +116,7 @@ const git = (args, opts = {}) =>
 // --- Gather the state ----------------------------------------------------------
 
 log(`doctor run starting (repair=${repair}, gate=${gate})`)
+if (REPAIR_SWITCHED_OFF) log('repair SWITCHED OFF by local/doctor-repair-off — repair-level actions are only reported')
 
 let branch = ''
 try {
@@ -152,11 +164,14 @@ try {
 }
 const verificationWriterLive = liveVerifyRun || declaredVerifyRun
 let dirtyFiles = []
+let statusReadable = true
 try {
   // Raw -z output: untrimmed status columns, unquoted paths, renames as two fields.
   dirtyFiles = parsePorcelainZ(git(['status', '--porcelain=v1', '-z'], { raw: true })).filter((f) => f !== WAIT_LEASE_PATH)
-} catch {
-  /* unreadable status */
+} catch (e) {
+  // FAIL CLOSED: an unreadable status is an UNKNOWN dirty set, never an empty one.
+  statusReadable = false
+  log(`ALERT: git status could not be read (${(e && e.message) || e}) — no destructive repair runs this time`)
 }
 
 let conflictMarkers = false
@@ -290,15 +305,43 @@ const plan = planRemediation({
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')
 for (const a of plan) log(`planned [${a.level}] ${a.action}: ${a.reason}`)
 
-let alertsRemain = false
+let alertsRemain = !statusReadable
+// FAIL CLOSED (21.10.2026): until the protected work-order files are secured on
+// a pushed rescue branch, no action that could overwrite them runs.
+let protectedSecured = !plan.some((a) => a.action === 'rescue-protected-commit')
+let protectedRescued = false
 for (const a of plan) {
   if (a.level === 'alert') {
     alertsRemain = true
+    if (a.action === 'alert-protected-paths') log(`ALERT: ${a.reason}`)
     continue
   }
   if (a.level === 'repair' && !repair) continue
+  const gateVerdict = repairActionAllowed({ action: a.action, statusReadable, protectedSecured })
+  if (!gateVerdict.allowed) {
+    log(`REFUSED ${a.action}: ${gateVerdict.reason} — the tree stays as it is; fix by hand`)
+    alertsRemain = true
+    continue
+  }
   try {
-    if (a.action === 'abort-merge') {
+    if (a.action === 'rescue-protected-commit') {
+      protectedRescued = true
+      const r = rescueProtectedCommit({ repo: REPO, paths: a.targets ?? [] })
+      const where = `${r.branch}${r.reused ? ' (same bytes as an earlier rescue — reused)' : ''}`
+      if (r.pushed) {
+        protectedSecured = true
+        log(`EXECUTED rescue-protected-commit: ${r.files.join(', ')} committed to "${where}" @${r.commit.slice(0, 12)} and pushed — NOT stashed, still in the working tree`)
+      } else {
+        log(`FAILED rescue-protected-commit push: "${where}" exists only locally (${r.pushError ?? 'no push'}) — nothing that could overwrite ${r.files.join(', ')} runs`)
+      }
+      alertsRemain = true
+      fileDoctorFinding(
+        `batch-doctor secured unattributed work-order changes on ${r.branch}`,
+        `${r.files.join(', ')} were dirty during a repair window (parallel session, divergence or a torn merge) and may carry user orders. ` +
+          `They were NOT stashed: committed to ${r.branch} @${r.commit.slice(0, 12)} (${r.pushed ? 'pushed' : 'NOT pushed'}) and left in the working tree. ` +
+          'Compare with main (git diff main ' + r.branch + ' -- TASKS.md), carry genuine content in, commit and push.',
+      )
+    } else if (a.action === 'abort-merge') {
       git(['merge', '--abort'])
       log('EXECUTED abort-merge: half-done merge aborted, pre-merge state restored')
     } else if (a.action === 'quarantine-stash') {
@@ -426,14 +469,28 @@ function liveAgentWorktrees() {
   }
 }
 
+// --- Carrier reconciliation (21.10.2026) ----------------------------------------
+// EVERY run, read-only and clean-tree runs included: each carrier tick must name
+// a point origin/main holds. A mismatch — or a reconciliation that cannot run —
+// is a RED finding and the verdict can never be "consistent".
+const reconciled = runReconcile({ root: REPO, fetch: false })
+for (const line of reconciled.lines) log(line)
+const reconcileRed = !reconciled.ok
+
 // --- Verdict -------------------------------------------------------------------
 
 const pendingRepair = needsRepair(plan) && !repair
-const measurementClean = gate && !pendingRepair && !gateFailed && !gateInconclusive && !alertsRemain
+const measurementClean = gate && !pendingRepair && !gateFailed && !gateInconclusive && !alertsRemain && !reconcileRed
 if (gate) recordGateMeasurement(measurementClean)
-if (!pendingRepair && !gateFailed) {
+// A RESCUE KEEPS THE ALERT ALIVE (21.10.2026): the run that quarantined five
+// user orders also marked the triggering alert handled, so the run two seconds
+// later read CONSISTENT. Until the protected files are committed by a person,
+// every run sees the incident again.
+if (!pendingRepair && !gateFailed && statusReadable && !protectedRescued && !plan.some((a) => a.action === 'alert-protected-paths')) {
   markAlertHandled()
   log('parallel alert marked handled')
+} else if (protectedRescued || plan.some((a) => a.action === 'alert-protected-paths')) {
+  log('parallel alert kept UNHANDLED: unattributed work-order changes are rescued, not resolved')
 }
 // THE DEMAND IS SATISFIED BY A STATE, NOT BY A TURN (point 431, second half).
 // The hook fired this gate every turn while the other session merely existed,
@@ -441,15 +498,19 @@ if (!pendingRepair && !gateFailed) {
 // THESE sessions; recording the pair holds the demand until one of them moves.
 // Only a run that actually ran the gate to a judgeable green may record it —
 // `shouldRecordSatisfaction` decides, so an inconclusive red cannot buy a pass.
-if (shouldRecordSatisfaction({ gateRan: gate, broken: gateFailed, inconclusive: gateInconclusive, pendingRepair })) {
+if (shouldRecordSatisfaction({ gateRan: gate, broken: gateFailed, inconclusive: gateInconclusive, pendingRepair, alertsRemain, reconcileRed })) {
   recordGateSatisfied()
 }
 if (pendingRepair) {
   log('VERDICT: repairs planned but NOT executed — rerun with --repair to execute them (all actions are logged)')
   process.exit(2)
 }
-if (gateFailed || alertsRemain) {
-  log('VERDICT: findings remain (gate failure or alert-level issues) — fix before continuing the batch')
+if (gateFailed || alertsRemain || reconcileRed) {
+  log(
+    reconcileRed
+      ? 'VERDICT: RED — the carrier reconciliation found ticked user orders that are not proven on origin/main (see above); fix before continuing the batch'
+      : 'VERDICT: findings remain (gate failure or alert-level issues) — fix before continuing the batch',
+  )
   process.exit(1)
 }
 if (gateInconclusive) {
@@ -458,6 +519,21 @@ if (gateInconclusive) {
 }
 log('VERDICT: consistent — the batch may continue')
 process.exit(0)
+
+/** File the rescue as a carrier finding: the owner's inbox that a Stop guard holds it to. */
+function fileDoctorFinding(title, detail) {
+  try {
+    const path = carrierPath()
+    mkdirSync(dirname(path), { recursive: true })
+    const entry = carrierEntry({ at: new Date().toISOString(), session: 'batch-doctor', title, detail })
+    const text = existsSync(path) ? readFileSync(path, 'utf8') : ''
+    const gap = text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n'
+    writeFileSync(path, `${gap}${entry}\n\n`, { flag: 'a' })
+    log(`finding filed in the carrier: ${title}`)
+  } catch (e) {
+    log(`warn: the rescue could not be filed in the carrier (${e && e.message}) — this log line is the record`)
+  }
+}
 
 function recordGateSatisfied() {
   try {

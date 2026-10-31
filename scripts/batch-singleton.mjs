@@ -160,6 +160,20 @@ const FENCE_MUTEX_WAIT_MS = 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
+/** The derived start time DRIFTS against the recorded one, growing with process
+ *  age (measured 04.08.2026: ~3 s at 30 min in the WSL2 container). The fixed 2 s
+ *  declared a live 1.1 h owner "pid-reused" on 26.10.2026 and autostart took over
+ *  beside it (point 1452). Owner liveness therefore widens the tolerance by this
+ *  share of the recorded process age; a reused pid still differs by far more. */
+export const PID_START_DRIFT_SHARE = 0.01
+
+/** The start-time tolerance for the lock's owner at `now`. PURE. Without a
+ *  usable `now` it is the fixed tolerance. */
+export function ownerStartTolerance(lock, now) {
+  const age =
+    Number.isFinite(now) && typeof lock?.pidStartedAt === 'number' ? Math.max(0, now - lock.pidStartedAt) : 0
+  return PID_START_TOLERANCE_MS + age * PID_START_DRIFT_SHARE
+}
 /** How closely a live process's start time must match the moment the launcher
  *  recorded spawning it before it counts as THAT spawn (point 402, four-eyes
  *  finding 1.3). Windows recycles pids aggressively, and `lastPid` persists
@@ -325,7 +339,7 @@ export function assessOwner(lock, {
     paused,
     idleWindowMs,
     leaseMs,
-    corroboration: pidCorroboration(lock, probe),
+    corroboration: pidCorroboration(lock, probe, { now }),
   })
   if (v.settled) {
     const { settled: _settled, owns, ...decision } = v
@@ -348,7 +362,7 @@ export function assessOwner(lock, {
   if (
     typeof lock.pidStartedAt === 'number' &&
     typeof probe.startedAt === 'number' &&
-    Math.abs(probe.startedAt - lock.pidStartedAt) > PID_START_TOLERANCE_MS
+    Math.abs(probe.startedAt - lock.pidStartedAt) > ownerStartTolerance(lock, now)
   ) {
     // A pid exists but it is a DIFFERENT process (pid reuse) → owner dead.
     return { alive: false, reason: 'pid-reused' }
@@ -460,14 +474,14 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
  *     requires the declared work to be advancing, so leniency here cannot on its
  *     own keep a wedged owner alive.
  */
-export function pidCorroboration(lock, probe) {
+export function pidCorroboration(lock, probe, { now } = {}) {
   const pid = lock && typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
   if (pid === null) return { pid: null, identifiable: false, live: false }
   if (!probe || probe.exists !== true) return { pid, identifiable: true, live: false }
   if (
     typeof lock.pidStartedAt === 'number' &&
     typeof probe.startedAt === 'number' &&
-    Math.abs(probe.startedAt - lock.pidStartedAt) > PID_START_TOLERANCE_MS
+    Math.abs(probe.startedAt - lock.pidStartedAt) > ownerStartTolerance(lock, now)
   ) {
     return { pid, identifiable: true, live: false }
   }
@@ -2347,9 +2361,10 @@ export function touchHandover(sessionId, opts = {}) {
 /**
  * Convert a launcher 'pending-spawn' lock to this (just-spawned) session.
  * Succeeds only when the lock is pending AND names this session's claude
- * process (spawnedPid == our claude ancestor) or the caller vouches for a fresh
- * one-shot authorization (`opts.authorized`). Atomic via the same reap mutex.
- * Returns true on success.
+ * process (spawnedPid == our claude ancestor). The launcher's authorization
+ * marker is no substitute: it is readable by every window, so a /clear in an
+ * unrelated chat converted the successor's reservation (23.10.2026). Atomic via
+ * the same reap mutex. Returns true on success.
  */
 export function convertPendingSpawn(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
@@ -2361,7 +2376,7 @@ export function convertPendingSpawn(sessionId, opts = {}) {
     ? { pid: opts.pid, startedAt: opts.pidStartedAt ?? null }
     : (opts.findAncestorFn ?? findClaudeAncestor)()
   const pidMatches = anc && typeof lock.spawnedPid === 'number' && anc.pid === lock.spawnedPid
-  if (!pidMatches && !opts.authorized) return false
+  if (!pidMatches) return false
   if (!enterReapMutex(mutexPath)) return false
   try {
     const recheck = readOwnerLock(lockPath)

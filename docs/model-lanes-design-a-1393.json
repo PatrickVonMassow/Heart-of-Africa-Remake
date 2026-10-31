@@ -1,0 +1,135 @@
+{
+ "model": "Claude Opus 5.5",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "`scripts/model-lanes.mjs` holds a frozen `LANES` array; one record per lane:"
+  },
+  {
+   "id": "A2",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "The same module holds the vendor table and the non-lane recognisers: `VENDORS`"
+  },
+  {
+   "id": "A3",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Helpers exported beside the data, all pure: `lane(role)` (throws on unknown role),"
+  },
+  {
+   "id": "A4",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Constants named by role, derived from records, for the few consumers that want a"
+  },
+  {
+   "id": "A5",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Scripts (with their `-core`, `-cli.test`, `-core.test` and other test siblings):"
+  },
+  {
+   "id": "A6",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Identifiers: codex-runtime functions are named by what they do for a runtime,"
+  },
+  {
+   "id": "A7",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Environment variables: `ASTRA_SHARE_FILE` → `LANE_ROUTING_FILE`, `FABLE_SWITCH_FILE`"
+  },
+  {
+   "id": "A8",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Routing setting values: `claude-only | default | prefer-astra` become"
+  },
+  {
+   "id": "A9",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Landed trailers keep verifying through `retired`: the cross lane record carries"
+  },
+  {
+   "id": "A10",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Self-review ban treats the cross lane's three names as ONE identity: `sameModel`"
+  },
+  {
+   "id": "A11",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Persisted values are read through retired maps and written in the new spelling:"
+  },
+  {
+   "id": "A12",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "No compatibility shim scripts under old names. `.claude/settings.json` names"
+  },
+  {
+   "id": "A13",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "One predicate: `reviewIdentityProblem(reviewer, commit)` compares"
+  },
+  {
+   "id": "A14",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Fallback chains are role lists in data: `REVIEW_CHAINS = { crossUnavailable:"
+  },
+  {
+   "id": "A15",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "CLAUDE.md §6 speaks of roles only: main chain, cross-vendor reviewer, scarce lane,"
+  },
+  {
+   "id": "A16",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Commit trailers keep real model names, produced by `trailerFor(role)`; the"
+  },
+  {
+   "id": "A17",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Tests import lane data: `lane('cross').trailerName`, `trailerFor('main')`,"
+  },
+  {
+   "id": "A18",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Operational docs follow the rename (`astra-routing.md` → `lane-routing.md`,"
+  },
+  {
+   "id": "A19",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Comments: current-state comments in touched files are rewritten to roles"
+  },
+  {
+   "id": "A20",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "The verifiable \"no consumer names a concrete model\" is a unit test,"
+  },
+  {
+   "id": "A21",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "(1) add `model-lanes.mjs` + its test with the new cross lane; make"
+  },
+  {
+   "id": "A22",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "A running daemon or batch on `main` invokes old script names until restarted"
+  },
+  {
+   "id": "A23",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Ledger compatibility: every persisted string that changes spelling (settings,"
+  },
+  {
+   "id": "A24",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "The cross lane's new id is not proven by a unit test; reachability still depends on"
+  },
+  {
+   "id": "A25",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Size: ~240 files touched; a merge conflict with concurrent `main` work is"
+  },
+  {
+   "id": "A26",
+   "file": "scripts/model-lanes.mjs and consumers",
+   "defect": "Memory entries naming old scripts (`MEMORY.md`, `fable-sparingly.md`,"
+  }
+ ]
+}

@@ -6,6 +6,8 @@
 // suites a WebGPU pass must skip — are plain data transformations and live
 // here, where the Vitest layer pins them (scripts/verify/tiers.test.mjs).
 // run-all.mjs imports them; keep scripts/verify/README.md in lockstep.
+import { isMainModule } from '../is-main.mjs'
+import { USAGE } from '../cli-usage.mjs'
 
 /**
  * The THEME suites `polish` was split into (point 1129). One suite per theme, so
@@ -180,3 +182,14 @@ export function planBackends({ isLargeEquivalent, verifyGl, ranBoth = false }) {
     { backend: 'webgpu', skipPreflight: true, webglOnlyCovered: true },
   ]
 }
+
+/** The map and how to run it — printed when this module is started directly:
+ *  the shared usage entry (scripts/cli-usage.mjs) plus the live suite lists. */
+export const TIERS_USAGE = [
+  USAGE.tiers,
+  `       SMALL: ${SMALL_SUITES.join(', ')}`,
+  `       LARGE: ${DEV_SUITES.join(', ')}`,
+  `       WebGL-2-only (routed there): ${WEBGL_ONLY_SUITES.join(', ')}`,
+].join('\n')
+
+if (isMainModule(import.meta.url)) console.log(TIERS_USAGE)

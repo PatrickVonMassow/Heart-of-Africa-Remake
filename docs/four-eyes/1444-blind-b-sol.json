@@ -1,0 +1,85 @@
+{
+  "model": "GPT-6.1 Sol",
+  "entries": [
+    {
+      "id": "B1",
+      "file": "docs/batch-owner-runbook.md",
+      "defect": "Measure at least one complete post-1443 cycle under the existing mode before changing it, recording cloud concurrency during local acceptance and hours per uniquely closed point; the attachment contains zero such cycles, so close as a recorded finding if 1443 alone already meets the goal."
+    },
+    {
+      "id": "B2",
+      "file": "procedure",
+      "defect": "Start any needed changed-mode trial with at most 1 submitted/running cloud author, including sessions whose branch is not visible yet, subject to the existing branch cap; 1440 is the only directly evidenced cloud author and reached merge 77.62 minutes after submission, while higher sustainable concurrency is not measurable."
+    },
+    {
+      "id": "B3",
+      "file": "docs/batch-owner-runbook.md",
+      "defect": "Limit local heavy jobs to 1 and other local agents to 0 throughout browser, unit-gate and picture windows, draining or checkpointing existing local workloads first; outside those windows allow at most 1 local author alongside cloud work when files and slots permit, treating this as a trial because overlapping browser records and the documented approximately 20% slowdown do not establish a higher safe bound."
+    },
+    {
+      "id": "B4",
+      "file": "scripts/commission-guard.mjs",
+      "defect": "KEEP: POOL_CAP 3 as the open-branch ceiling and existing LAND/PARK remedies; the measured five-branch obstruction belongs to 1443, and no evidence supports raising the ceiling."
+    },
+    {
+      "id": "B5",
+      "file": "scripts/batch-in-flight-core.mjs",
+      "defect": "Replace unconditional pressure to fill all 3 lanes with acceptance-paced refill: permit at most 1 completed successor waiting for acceptance, and allow unused slots while that successor exists or quietness prevents local work; the cap currently doubles as a target although successful acceptance throughput is unmeasured."
+    },
+    {
+      "id": "B6",
+      "file": "commission-guard / independentOpenPoints",
+      "defect": "KEEP: queue admission, recorded per-point overrides and worktree/file isolation; choose only ready points with checked prerequisites and compare their files against every occupied lane, because the attachment supplies neither a disjoint candidate inventory nor evidence that path-name matching alone is sufficient."
+    },
+    {
+      "id": "B7",
+      "file": "cloud-switch / lane-routing",
+      "defect": "KEEP: cloud-switch ON and lane-routing default for the initial measurement; one real cloud submission succeeded under the available setup, while vendor-role routing is not execution locality and no measured result supports changing both together."
+    },
+    {
+      "id": "B8",
+      "file": "docs/batch-owner-runbook.md / scripts/land-point.mjs",
+      "defect": "KEEP: final-author acceptance, exact pushed-SHA build/lint/Vitest receipts, covering local browser tiers, required backend picture checks, cross-vendor review and mandatory post-merge landing gate; repeat pre-acceptance work only when its evidence is missing or invalidated, since cloud green is not browser evidence and 91 completed local commands exited nonzero."
+    },
+    {
+      "id": "B9",
+      "file": "procedure",
+      "defect": "After 1 diagnostic repeat of an unchanged SHA/backend/failure signature, stop identical retries until diagnosis, a relevant change or a documented changed condition supplies a reason; 1405 consumed 158.4 recorded minutes across 27 completed runs, without evidence that blind repetition improved acceptance."
+    },
+    {
+      "id": "B10",
+      "file": "run-wait / batch-in-flight / boundary procedure",
+      "defect": "KEEP run-wait and STALLED/TIMEOUT diagnosis, but transfer command, SHA, backend, process identity and progress-backed lease together across boundaries and renew leases from observed progress; forty-five-minute declarations coexist with approximately ninety-minute declared runs and documented 119-minute work."
+    },
+    {
+      "id": "B11",
+      "file": "scripts/batch-in-flight.mjs --status",
+      "defect": "Use 1 existing status command as the short inventory of cloud session IDs, local agents, suites, point, purpose, stage and owner; extend only its existing declaration/reporting fields if necessary, because its actual output and cloud visibility are absent from the attachment."
+    },
+    {
+      "id": "B12",
+      "file": "docs/batch-owner-runbook.md",
+      "defect": "Coalesce routine retrospective, guide-attestation and queue-rank maintenance into 1 coherent boundary bookkeeping commit/push when their requirements permit, preserving required user-order publication receipts; eight main-push log files in 82 minutes identify repeated publication but not its avoidable duration."
+    },
+    {
+      "id": "B13",
+      "file": "ownership fence / batch-boundary / queued launcher deadline fix",
+      "defect": "KEEP 1 owner, serial landing, point-boundary sessions, adoption and context handover; reconcile every transferred job before refill and leave the already-queued launcher deadline repair in its own point, since seven live-owner deadline messages establish a risk but not proven duplicate writers."
+    },
+    {
+      "id": "B14",
+      "file": "docs/batch-owner-runbook.md",
+      "defect": "Merge, approve and record the measured bounds and an explicit successor-adoption switch-over, replacing superseded dispatch text; run the next points in that mode and record at least 1 complete post-landing cycle against the post-1443 baseline, reporting shorter hours per unique closure or the measured reason it failed."
+    },
+    {
+      "id": "B15",
+      "file": "cloud-switch / procedure",
+      "defect": "Commission only bounded successors that available local acceptance can plausibly land, retain at most 1 completed waiting successor, and revisit the switch by 05.11.2026 08:59 MEZ; the expiry is known but remaining credit, acceptance capacity and a numeric spending budget are not measurable."
+    },
+    {
+      "id": "B16",
+      "file": "changed decision logic / Vitest",
+      "defect": "Add Vitest coverage in the same change for any modified refill or admission decisions, including cap 3, one-ready-successor backpressure, unknown evidence and boundary adoption; keep scheduling changes procedural where possible because the infrastructure freeze favors simplifying existing mechanisms."
+    }
+  ]
+}

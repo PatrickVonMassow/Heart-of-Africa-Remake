@@ -877,6 +877,25 @@ export function isClosingSetPath(p) {
   return CLOSING_SET_FILES.has(parts[parts.length - 1])
 }
 
+/**
+ * THE GIT HALF OF ENDING WORK (point 1308, U6): fetching, deleting a merged
+ * branch and removing a clean worktree are what `branch-hygiene-guard` demands
+ * after a landing, and were denied as "work" by the very rule that demanded them.
+ * Each form is ANCHORED and complete. `git fetch` takes no refspec and no force
+ * flag (`git fetch --force origin main:saved-work` force-updates a local ref);
+ * `git branch -d` takes one plain name (git itself refuses an unmerged one, and
+ * `-D`/`-f` never match); `git worktree remove` takes one path and no option (git
+ * refuses a dirty tree). Both names are limited to plain path characters, so
+ * brace expansion (`{--force,x}`), globs, quotes and variables cannot smuggle an
+ * option in (Sol review of 28df442). Substitution and redirection stay excluded
+ * by `OPAQUE_SEGMENT_RE` before these are consulted.
+ */
+const CLOSING_GIT_SEGMENT_RES = [
+  /^git fetch(?: (?:origin|--prune|-p|--all))*$/,
+  /^git branch -d [A-Za-z0-9._/][A-Za-z0-9._/-]*$/,
+  /^git worktree remove [A-Za-z0-9._/][A-Za-z0-9._/-]*$/,
+]
+
 // Command substitution or file redirection makes a segment opaque (see
 // `isClosingSetCommand`).
 const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
@@ -961,7 +980,7 @@ export function isOutputPagerSegment(segment) {
  * chain is the session carrying on, whatever else rides along with it.
  *
  * The SEPARATOR set errs toward splitting. A single `&` was once missing from it
- * (four-eyes review, Fable 5): `node scripts/board.mjs & npm test` then parsed
+ * (four-eyes review): `node scripts/board.mjs & npm test` then parsed
  * as ONE segment whose head matched a closing script, so the handover survived
  * real work — the dangerous direction, because a kept handover plus a long
  * enough silence lets a successor spawn beside a working session. A lone `&` is
@@ -989,6 +1008,10 @@ export function isClosingSetCommand(command) {
     // would hide whatever follows it; after a sequencing operator it is an
     // independent command; and on its own it is not a closing line at all.
     if (separator === '|' && i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
+    if (CLOSING_GIT_SEGMENT_RES.some((re) => re.test(seg))) {
+      sawClosing = true
+      continue
+    }
     const head = seg.match(/^(?:node|npx\s+node)\s+(?:"[^"]*"|'[^']*'|\S+)/i)
     if (!head || !CLOSING_SCRIPT_RE.test(head[0])) return false
     sawClosing = true
@@ -1139,7 +1162,8 @@ export function boundaryRequestDrainLine({ cause = BOUNDARY_CAUSES.POINT } = {})
         '`finding.mjs --blocked`, no decision card. `--commit --context` leaves them in the carrier, and ' +
         'the successor queues them.'
     : `${head} are drained now: \`finding.mjs --show "<title>"\`, append it VERBATIM to TASKS.md, ` +
-        '`finding.mjs --queued "<title>" --point <N>`; `--commit` refuses while one waits. `--blocked` is ' +
+        '`finding.mjs --appending "<title>" --point <N>`, commit, push main, THEN ' +
+        '`finding.mjs --queued "<title>" --point <N>` (proven on origin/main); `--commit` refuses while one waits. `--blocked "<title>" --why "<reason>"` is ' +
         'only for a request that cannot be carried out — a deferral leaves it pending (past the watermark ' +
         'take the `--context` boundary instead).'
 }

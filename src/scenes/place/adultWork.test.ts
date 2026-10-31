@@ -32,6 +32,8 @@ import { instructionDelay, utteranceSeconds } from '../../communication/speaking
 import { balance } from '../../config/balance'
 import { DIG_CYCLE_SECONDS, digPose } from '../../render/gesture'
 import { resetDevAsserts } from '../../systems/devAssert'
+import { JAR_HEIGHT } from './fillJar'
+import { newestJarWater, STAND_PLANK_TOP, TAKE_GRAB } from './waterStand'
 
 const CFG: AdultWorkConfig = {
   intervalSeconds: 1,
@@ -238,7 +240,8 @@ describe('RIVER is ordered and reported at the village water stand', () => {
     // The carrier is still at the stand while the order plays (work-order 1184).
     expect(state.tasks[1]).toMatchObject({ phase: 'wait', carry: 'none' })
     pastHold(state, v, 'RIVER')
-    expect(state.tasks[1]).toMatchObject({ phase: 'fetch', carry: 'emptyJar' })
+    // He steps up to the table for the empty jar first (work-order 1405).
+    expect(state.tasks[1]).toMatchObject({ phase: 'take', carry: 'none', arrived: false })
   })
 
   it('finishes the return walk before delivering, even while the report is held', () => {
@@ -268,16 +271,17 @@ describe('RIVER is ordered and reported at the village water stand', () => {
       expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(4)
       expect(Math.hypot(word.at.x - FILL.x, word.at.z - FILL.z)).toBeGreaterThan(4)
     }
-    // THE ORDER points at the water; THE REPORT is addressed to the man who
-    // gave it, never at the ground.
+    // THE ORDER points at the river; THE REPORT points at the water just set
+    // down on the stand (work-order 1405).
     for (const word of river.filter((w) => w.id === 'water-out')) {
       expect({ x: word.aim.x, z: word.aim.z }).toEqual(FOOT)
     }
     expect(river.some((w) => w.id === 'water-back')).toBe(true)
     for (const word of river.filter((w) => w.id === 'water-back')) {
       expect(Math.hypot(word.aim.x - FOOT.x, word.aim.z - FOOT.z)).toBeGreaterThan(4)
-      // Addressed at a person's height, not at the ground a place sits on.
-      expect(word.aim.y).toBe(1)
+      // At the jar's mouth on the plank, not at a person or at the ground.
+      expect(Math.hypot(word.aim.x - STAND.x, word.aim.z - STAND.z)).toBeLessThan(0.5)
+      expect(word.aim.y).toBeCloseTo(STAND_PLANK_TOP + JAR_HEIGHT, 6)
     }
   })
 
@@ -494,6 +498,77 @@ describe('the water carrier dips his jar at the water (work-order 1087)', () => 
       const was = leg.get(f.i) ?? 'start'
       expect(NEXT[was], `villager ${f.i} went ${was} -> ${f.phase} at frame ${f.f}`).toContain(f.phase)
       leg.set(f.i, f.phase)
+    }
+  })
+})
+
+describe('the water carrier works AT the table (work-order 1405)', () => {
+  /** One whole errand, frame by frame: every frame's carrier task and place. */
+  function errandFrames() {
+    const v = view(6)
+    const state = createAdultWork(6, CFG)
+    const frames: Array<{ i: number; phase: string; carry: string; x: number; z: number; jars: number; arrived: boolean; dug: number; spot: { x: number; z: number } | null }> = []
+    // Each word with the stand count and the speaker's spot of its own frame.
+    const words: Array<{ word: SpokenWord; jars: number; spot: { x: number; z: number } | null }> = []
+    const dt = 1 / 60
+    for (let f = 0; f < 240 * 60; f++) {
+      walkFrame(state, v, dt)
+      const spots = state.tasks.map((t) => t?.standSpot ?? null)
+      const word = stepAdultWork(state, v, dt, CFG, () => 0.5)
+      if (word) words.push({ word, jars: state.standJars, spot: spots[word.speaker] ?? null })
+      state.tasks.forEach((t, i) => {
+        if (t?.role === 'partner' && t.situation.startsWith('water')) {
+          frames.push({ i, phase: t.phase, carry: t.carry, x: v.villagers[i].x, z: v.villagers[i].z, jars: state.standJars, arrived: t.arrived, dug: t.dug, spot: t.standSpot })
+        }
+      })
+    }
+    return { frames, words, state }
+  }
+  const fromStand = (p: { x: number; z: number }) => Math.hypot(p.x - STAND.x, p.z - STAND.z)
+  const atTable = balance.waterStandReach + balance.waterStandTableArrivalRadius + 1e-6
+
+  it('sets the full jar down standing at the table, not on the 2.4 m ring', () => {
+    const { frames } = errandFrames()
+    const downs = frames.filter((f, k) => k > 0 && f.jars > frames[k - 1].jars)
+    expect(downs.length).toBeGreaterThan(0)
+    for (const d of downs) expect(fromStand(d)).toBeLessThanOrEqual(atTable)
+    expect(atTable).toBeLessThan(JOIN_STAND_OFF - 1)
+  })
+
+  it('takes the empty jar up at the table, partway through a visible take', () => {
+    const { frames } = errandFrames()
+    const taking = frames.filter((f) => f.phase === 'take' && f.arrived)
+    expect(taking.length).toBeGreaterThan(0)
+    for (const f of taking) {
+      expect(fromStand(f)).toBeLessThanOrEqual(atTable)
+      // Empty-handed while he reaches, the jar in his hand from the grab on.
+      expect(f.carry).toBe(f.dug >= balance.waterJarTakeSeconds * TAKE_GRAB - 1e-9 ? 'emptyJar' : 'none')
+    }
+    // The jar is never in his hand before he has reached the table for it.
+    for (const f of frames.filter((f) => f.phase === 'wait' || (f.phase === 'take' && !f.arrived))) expect(f.carry).toBe('none')
+    // And EACH take runs its configured length before he sets off.
+    const runs: number[] = []
+    const open = new Map<number, number>()
+    for (const f of frames) {
+      if (f.phase === 'take' && f.arrived) open.set(f.i, (open.get(f.i) ?? 0) + 1)
+      else if (open.has(f.i)) {
+        runs.push(open.get(f.i)!)
+        open.delete(f.i)
+      }
+    }
+    expect(runs.length).toBeGreaterThan(0)
+    for (const n of runs) expect(n).toBeGreaterThanOrEqual(Math.floor(balance.waterJarTakeSeconds * 60) - 1)
+  })
+
+  it('points the report at the water in the jar just set down', () => {
+    const { words, frames } = errandFrames()
+    const reports = words.filter((w) => w.word.id === 'water-back')
+    expect(reports.length).toBeGreaterThan(0)
+    expect(frames.length).toBeGreaterThan(0)
+    for (const { word, jars, spot } of reports) {
+      // The stand's front faces the carrier's own spot, where the jars are drawn.
+      expect(spot).not.toBeNull()
+      expect(word.aim).toEqual(newestJarWater(STAND, spot, jars))
     }
   })
 })

@@ -1,37 +1,35 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@2f245cec
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@740d83c2
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work.
 // The Co-Authored-By field in `git log` is the mechanical record of which MODEL
 // authored a commit. A reviewer uses the distinct Reviewed-By key and therefore
 // never enters this author record. This module only decides — no I/O; the
 // gathering and blocking live in the fail-open wrapper scripts/model-guard.mjs.
 //
-// Model policy (users 25.07.2026 / 13.08.2026 / 18.08.2026): ONLY Opus 5 (the serving
-// session, and the author of the points whose verification is the work and
-// that nothing marks hard — a hard one is Astra's), Opus 4.8 (fallback when Opus
-// 5 is unavailable), GPT-6 Astra (the OpenAI authoring lane, point 667, which
-// since 18.08.2026 takes the hard and critical points too), and Fable (the newest
-// released version, which is what FABLE_MODEL names -- point 1041) when
-// admitted by the shared Fable switch may run the batch. Every other
-// model — Sonnet and Haiku included — is a policy breach: the batch must stop
-// rather than run on it. Hence an ALLOWLIST, not a Haiku blocklist: an unknown
-// future model name fails closed. The list names the FAMILIES those models
-// belong to, not pinned versions — deliberately, see the note at `ALLOWED` —
-// so `Opus 99` would pass; what the tripwire is bought against is the silent
-// swap to another family, not a point release inside an allowed one.
+// Model policy (users 25.07.2026 / 13.08.2026 / 18.08.2026): ONLY the lanes of
+// scripts/model-lanes.mjs may run the batch — the main chain (and its fallback
+// model), the cross-vendor lane, and the scarce lane while the shared lane switch
+// admits it. Every other model — Sonnet and Haiku included — is a policy breach:
+// the batch must stop rather than run on it. Hence an ALLOWLIST, not a Haiku
+// blocklist: an unknown future model name fails closed. The list names the lane
+// FAMILIES, not pinned versions — deliberately, see the note at `ALLOWED` — so a
+// point release inside a lane's family passes; what the tripwire is bought
+// against is the silent swap to another family.
 //
-// THE OPENAI LANE AUTHORS UNDER A ROLE SWAP (point 667). Where it authors, CLAUDE reviews,
-// runs the suites, judges the picture and lands — so the change is still seen by
-// two vendors and no model reviews its own work. Admitting that lane as an author is
-// therefore the ONE thing that loosens here; everything else is TIGHTENED in the
-// same breath (see MODEL_FAMILY_WORD, MODEL_VENDOR_ADDRESS, namesNonClaudeModel): a trailer naming a NON-Claude model used to
-// pass this guard unread, because "no Claude token" was taken for "no model
-// evidence". A degraded session stamping `GPT-4o mini` walked straight through.
+// THE CROSS LANE AUTHORS UNDER A ROLE SWAP (point 667). Where it authors, the main
+// chain reviews, runs the suites, judges the picture and lands — so the change is
+// still seen by two vendors and no model reviews its own work. Admitting that lane
+// as an author is therefore the ONE thing that loosens here; everything else is
+// TIGHTENED in the same breath (see MODEL_FAMILY_WORD, MODEL_VENDOR_ADDRESS,
+// namesUnprefixedModel): a trailer naming a model without the main vendor's prefix
+// word used to pass this guard unread, because "no prefix token" was taken for "no
+// model evidence". A degraded session stamping some other versioned model walked
+// straight through.
 
 // AN UNNAMED AUTHOR IS NOT A FORBIDDEN ONE (point 397, observed 28.07.2026 and
 // again on 29.07.2026): commits carrying the bare `Co-Authored-By: Claude
-// <noreply@anthropic.com>` — the trailer with no model name at all — failed the
+// <main-vendor address>` — the trailer with no model name at all — failed the
 // allowlist exactly as a Haiku trailer does and demanded the full breach ritual,
-// though every session live in that window was Opus 5. The guard is not softened:
+// though every session live in that window was the main chain. The guard is not softened:
 // a bare trailer is no proof of compliance either. It is SPLIT, because the two
 // states have different answers — a forbidden model stops the batch, an
 // unidentified one is LOOKED UP in the local transcripts and then resolved.
@@ -41,7 +39,7 @@
 // docs/rule-corpus-audit.md). `ALLOWED` used to be searched inside the whole
 // trailer, so any line merely CONTAINING "opus" or "fable" passed the guard
 // whose entire purpose is to catch a silently degraded session — a
-// `Claude Haiku 4.5 (opus mode)` or a `Claude Sonnet 5 / Claude Opus 5` walked
+// `Claude Haiku 4.5 (<main family> mode)` or a `Claude Sonnet 5 / <main lane>` walked
 // straight through. The name is therefore parsed out first and matched WHOLE,
 // and a trailer claiming more than one model is a finding rather than a pass on
 // its first allowed name: ONE TRAILER names exactly one model.
@@ -50,72 +48,121 @@
 // Reducing them to one string is what once raised a breach on an allowed pair.
 // A cross-vendor reviewer is not an author and uses Reviewed-By (point 982).
 
-import {
-  ASTRA_MODEL,
-  CLAUDE_MODEL,
-  FABLE_MODEL,
-  OPUS_FALLBACK_MODEL,
-  OPUS_MODEL,
-  fableIsOn,
-  fableRefusalReason,
-} from './fable-switch-core.mjs'
+import { laneIsOn, laneRefusalReason } from './lane-switch-core.mjs'
+import { FOREIGN_FAMILY_WORDS, LANES, MAIN, VENDORS, laneFamilyWords, trailerFor } from './model-lanes.mjs'
+
+const escapeRegExp = (word) => String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const alternation = (words) => words.map(escapeRegExp).join('|')
+
+/** The versioned vendor markers (`gpt-` style): a model word only with a digit attached. */
+const VERSIONED_MARKERS = Object.values(VENDORS).flatMap((vendor) => vendor.versionedMarkers)
+/** Every bare model word: lane families, vendor marker words, foreign families. */
+const BARE_MODEL_WORDS = [
+  ...new Set([...laneFamilyWords(), ...Object.values(VENDORS).flatMap((vendor) => vendor.markerWords), ...FOREIGN_FAMILY_WORDS]),
+]
+
+/** The anchored pattern of one lane: its vendor's optional versioned marker, then a
+ *  family word, then version digits only. */
+function lanePattern(record) {
+  const markers = VENDORS[record.vendor].versionedMarkers
+  const prefix = markers.length ? `(?:(?:${alternation(markers)})[\\s.\\d]*)?` : ''
+  return new RegExp(`^${prefix}(?:${alternation(record.familyWords)})[\\s.\\d]*$`, 'i')
+}
 
 /** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
  *  matched against the name PARSED out of a trailer (`modelNamesIn`) — anchored,
  *  so an allowed name carrying any addition is no longer allowed by accident.
- *  Everything after the family name must be version digits: the policy names the
- *  model FAMILIES (Opus, Astra; Fable separately, in the switch-gated
- *  FABLE_ALLOWED below), and a pinned version would redden the whole
- *  batch the day the harness serves a point release or writes the raw model id
- *  (`claude-opus-5[1m]`, 14 commits on 29.07.2026, which normalises to `opus 5`).
+ *  Everything after the family word must be version digits: the policy names the
+ *  lane FAMILIES (the scarce lane separately, in the switch-gated SCARCE_ALLOWED
+ *  below), and a pinned version would redden the whole batch the day the harness
+ *  serves a point release or writes the raw model id (14 commits on 29.07.2026
+ *  carried the `[1m]` id spelling, which normalises to the family plus version).
  *
- *  The OpenAI lane demands its own word: `gpt` alone is NOT an author here, so
- *  a session degraded to some other GPT is a breach exactly as Haiku is. The lane
- *  is GPT-6 Astra since 05.09.2026 (point 1061); `sol` stays admitted because the
- *  guard judges PAST commits against this same list, and the 5.6 Sol trailers
- *  those commits carry must keep verifying. */
-export const ALLOWED = Object.freeze([
-  /^opus[\s.\d]*$/i, //                   the standing Anthropic lane: Opus 5 / 4.8
-  /^(gpt[\s.\d]*)?(?:astra|sol)[\s.\d]*$/i, // the OpenAI lane: GPT-6 Astra, and the retired GPT-5.6 Sol
-])
+ *  A lane whose vendor has a versioned marker demands its own family word too: the
+ *  marker alone is NOT an author here, so a session degraded to some other model of
+ *  that vendor is a breach exactly as Haiku is. Every family word of a lane stays
+ *  admitted, retired ones included, because the guard judges PAST commits against
+ *  this same list and the trailers those commits carry must keep verifying. */
+export const ALLOWED = Object.freeze(LANES.filter((record) => !record.scarce).map(lanePattern))
 
-const FABLE_ALLOWED = /^fable[\s.\d]*$/i
+/** The switch-gated lanes' patterns. */
+const SCARCE_ALLOWED = Object.freeze(LANES.filter((record) => record.scarce).map(lanePattern))
+const namesScarceLane = (name) => SCARCE_ALLOWED.some((pattern) => pattern.test(String(name ?? '').trim()))
 
 /** Explicit opt-out from switch policy for pure parsing fixtures and historic-log tests. */
 export const POLICY_NEUTRAL = Symbol('model-policy-neutral')
 
 /**
- * The Fable policy that governed one historical commit.
+ * The scarce-lane policy that governed one historical commit.
  *
  * The state record describes the latest transition: at `changedAt` its recorded
  * direction took effect, and before that instant the opposite direction was in
  * force. Commit-message callers deliberately do not use this function — a new
  * commit is always judged against the policy in force now.
  */
-export function fableStateAtCommit(commitWhen, fableState) {
-  if (fableState === undefined || fableState === POLICY_NEUTRAL) return fableState
-  const currentIsOn = fableIsOn(fableState) // validates the complete state; an unreadable policy never grandfathers history
+export function laneStateAtCommit(commitWhen, scarceState) {
+  if (scarceState === undefined || scarceState === POLICY_NEUTRAL) return scarceState
+  const currentIsOn = laneIsOn(scarceState) // validates the complete state; an unreadable policy never grandfathers history
   const when = Number(commitWhen)
   if (!Number.isFinite(when)) throw new Error('the commit timestamp is invalid')
-  if (when >= fableState.changedAt) return fableState
-  return { ...fableState, state: currentIsOn ? 'off' : 'on' }
+  if (when >= scarceState.changedAt) return scarceState
+  return { ...scarceState, state: currentIsOn ? 'off' : 'on' }
+}
+
+/**
+ * The scarce-lane state the turn-end tripwire judges with (22.10.2026). A switch
+ * state that was never RECORDED — the untracked state file is missing, as in a
+ * fresh cloud clone — no longer refuses the turn end: that looped a cloud
+ * session through repeated stop refusals. It is judged as OFF instead (so a
+ * scarce-lane commit still trips) and reported as a notice. Any other unusable
+ * state (garbled, unreadable) still refuses; a recorded state passes unchanged.
+ * Returns `{ scarceState, refuse, notice }` with '' for the unused texts.
+ */
+export function turnEndScarceState(scarceState) {
+  if (scarceState?.ok) return { scarceState, refuse: '', notice: '' }
+  if (scarceState?.absent === true) {
+    return {
+      scarceState: {
+        ok: true,
+        role: scarceState.role,
+        state: 'off',
+        reason: 'no recorded switch state in this checkout; judged as off',
+        setBy: 'model-guard',
+        changedAt: 1, // earlier than every commit, so no history flips to on
+        problem: '',
+      },
+      refuse: '',
+      notice: `model-guard notice: ${scarceState.problem} Until it is recorded the scarce lane is judged OFF.`,
+    }
+  }
+  return { scarceState, refuse: `SERVING-MODEL TRIPWIRE: ${scarceState?.problem || 'the lane switch state is unusable.'}`, notice: '' }
 }
 
 /** Missing switch policy fails closed; policy-neutral parsing must say so at the call site. */
-const admitsFable = (fableState) =>
-  fableState === POLICY_NEUTRAL || (fableState !== undefined && fableIsOn(fableState))
+const admitsScarce = (scarceState) =>
+  scarceState === POLICY_NEUTRAL || (scarceState !== undefined && laneIsOn(scarceState))
 
 /** May this PARSED model name author a commit here? */
-export function isAllowedModelName(name, fableState) {
+export function isAllowedModelName(name, scarceState) {
   const value = String(name ?? '').trim()
   return (
     value !== '' &&
-    (ALLOWED.some((pattern) => pattern.test(value)) || (admitsFable(fableState) && FABLE_ALLOWED.test(value)))
+    (ALLOWED.some((pattern) => pattern.test(value)) || (admitsScarce(scarceState) && namesScarceLane(value)))
   )
 }
 
-/** Any Claude co-author trailer (human co-authors are not model evidence). */
-const CLAUDE_TRAILER = /\bclaude\b/i
+/** The prefix words of the lanes' own trailer names — the vendor marker words that
+ *  stand in front of a family word ("Claude …"). Each one opens a claim, and a trailer
+ *  carrying one is model evidence (human co-authors are not). */
+const TRAILER_PREFIX_WORDS = [
+  ...new Set(
+    LANES.flatMap((record) => [record.trailerName, record.fallback?.trailerName ?? '', ...record.retired])
+      .flatMap((name) => String(name).toLowerCase().split(/[^a-z]+/))
+      .filter((word) => Object.values(VENDORS).some((vendor) => vendor.markerWords.includes(word))),
+  ),
+]
+const PREFIX_WORD = new RegExp(`\\b(?:${alternation(TRAILER_PREFIX_WORDS)})\\b`, 'i')
+const PREFIX_SPLIT = new RegExp(`\\b(?:${alternation(TRAILER_PREFIX_WORDS)})\\b`, 'gi')
 
 /**
  * The family word of any model this project would recognise — the LLM vendors'
@@ -126,45 +173,57 @@ const CLAUDE_TRAILER = /\bclaude\b/i
  * `Gemini 2.5 Pro <x@y>` carries no "Claude" token, so before this it produced
  * no model evidence and was waved through as a human co-author — inside the very
  * guard whose purpose is to catch a session that silently degraded. Every name
- * here becomes evidence the ALLOWLIST then judges, and only Opus, Astra (with the
- * retired Sol), and Fable while the switch admits it survive that.
+ * here becomes evidence the ALLOWLIST then judges, and only the lanes' families (retired
+ * names included), the scarce one while the switch admits it, survive that.
  */
-const MODEL_FAMILY_WORD =
-  /\b(claude|opus|fable|sonnet|haiku|astra|sol|codex|gemini|grok|llama|mistral|qwen|deepseek|o\d(?:-\w+)?)\b|gpt/i
+const MODEL_FAMILY_WORD = new RegExp(
+  `\\b(${alternation(BARE_MODEL_WORDS)}|o\\d(?:-\\w+)?)\\b${VERSIONED_MARKERS.length ? `|${alternation(VERSIONED_MARKERS)}` : ''}`,
+  'i',
+)
 
 /**
  * The addresses the two vendors' MODELS commit under. A trailer carrying one is
  * model evidence WHATEVER it calls itself, which is what catches the family this
- * list has never heard of — `OpenAI o3 <noreply@openai.com>`.
+ * list has never heard of — `<Vendor> o3 <noreply@<cross vendor>.com>`.
  *
  * THE LOCAL PART IS PART OF THE TEST (third cross-vendor round). Any address at
  * the vendor's domain used to qualify, so a HUMAN who works there —
- * `Alice <alice@openai.com>` — was read as a model and then refused as one
+ * `Alice <alice@<cross vendor>.com>` — was read as a model and then refused as one
  * outside the allowlist. Only the no-reply/bot forms our harnesses actually
  * write count.
  *
  * The local part is matched WHOLE, not as a prefix (fourth round): `botany@` and
  * `assistant-professor@` are people, and a prefix test called them robots.
  *
- * THE DOMAIN ENDS AT `.com` (Sol review of a4975b0): `\b` alone let
- * `assistant@openai.com.evil` qualify, so a human at a look-alike domain was
+ * THE DOMAIN ENDS AT `.com` (cross-vendor review of a4975b0): `\b` alone let
+ * `assistant@<cross vendor>.com.evil` qualify, so a human at a look-alike domain was
  * read as a model and refused as one. Nothing our harnesses write continues
  * after the TLD, so any word character, dot or hyphen behind it disqualifies.
  */
-const MODEL_VENDOR_ADDRESS = /(?:^|[\s<"'(])(?:noreply|no-reply|bot|assistant)@(?:anthropic|openai)\.com(?![\w.-])/i
+const VENDOR_ADDRESS_DOMAINS = Object.values(VENDORS).map((vendor) => vendor.trailerAddress.split('@')[1])
+const MODEL_VENDOR_ADDRESS = new RegExp(
+  `(?:^|[\\s<"'(])(?:noreply|no-reply|bot|assistant)@(?:${alternation(VENDOR_ADDRESS_DOMAINS)})(?![\\w.-])`,
+  'i',
+)
 
 /** A family word with a VERSION ATTACHED TO IT — `Haiku 4.5`, `llama-3`,
- *  `GPT-5.6 Sol`, `o3`. A digit merely somewhere in the line is not a version:
+ *  `<marker>-<version> <cross family>`, `o3`. A digit merely somewhere in the line is not a version:
  *  it made `Sol Smith 2nd` a model (third cross-vendor round). */
-const FAMILY_WITH_VERSION =
-  /\b(?:claude|opus|fable|sonnet|haiku|astra|sol|codex|gemini|grok|llama|mistral|qwen|deepseek)[\s.\-_]*\d|gpt[\s.\-_]*\d|\bo\d(?:-\w+)?\b/i
+const FAMILY_WITH_VERSION = new RegExp(
+  [
+    `\\b(?:${alternation(BARE_MODEL_WORDS)})[\\s.\\-_]*\\d`,
+    ...(VERSIONED_MARKERS.length ? [`(?:${alternation(VERSIONED_MARKERS)})[\\s.\\-_]*\\d`] : []),
+    '\\bo\\d(?:-\\w+)?\\b',
+  ].join('|'),
+  'i',
+)
 
 /**
  * Does a NON-Claude trailer name a model rather than a person?
  *
  * A family word alone is not enough in both directions, and the second
  * cross-vendor round found each: `Sol Smith <s@example.com>` is a human this
- * guard would have reddened, while `OpenAI o3 <noreply@openai.com>` is a model
+ * guard would have reddened, while `<Vendor> o3 <noreply@<cross vendor>.com>` is a model
  * no word list will contain. So a non-Claude trailer counts as a model when it
  * carries a VENDOR ADDRESS, or when its family word is followed by a VERSION —
  * which every model designation in this project's history is, and which a human
@@ -176,11 +235,11 @@ const FAMILY_WITH_VERSION =
  * recognised at all. The Claude branch below is unchanged and needs none of
  * this — the word is in every trailer our own harness writes.
  */
-function namesNonClaudeModel(cleaned, raw = cleaned) {
+function namesUnprefixedModel(cleaned, raw = cleaned) {
   const text = String(cleaned ?? '')
   if (MODEL_VENDOR_ADDRESS.test(String(raw ?? ''))) return true
   if (!MODEL_FAMILY_WORD.test(text)) return false
-  // A version ATTACHED to the family word: `Haiku 4.5`, `GPT-5.6 Sol`, `llama-3`.
+  // A version ATTACHED to the family word: `Haiku 4.5`, the cross lane's versioned name, `llama-3`.
   return FAMILY_WITH_VERSION.test(text)
 }
 
@@ -201,21 +260,21 @@ function bareName(segment) {
 /**
  * The model names a single co-author trailer CLAIMS, with the address, the
  * parenthesised/bracketed suffixes and the non-model words stripped, and the
- * model-id spelling (`claude-opus-5[1m]`) normalised to the written one
- * (`opus 5`). Each "Claude" token opens one claim, so
- * `Claude Sonnet 5 / Claude Opus 5` reads as the two names it is rather than as
+ * model-id spelling (`<prefix>-<family>-<version>[1m]`) normalised to the written one
+ * (`<family> <version>`). Each "Claude" token opens one claim, so
+ * `Claude Sonnet 5 / <main lane trailer>` reads as the two names it is rather than as
  * one string an allowlist search can be fooled by.
  * Empty means the trailer names no model at all.
  *
- * A trailer that names a model WITHOUT the word "Claude" — the OpenAI lane's
- * `GPT-5.6 Sol`, or a degraded session's bare `Haiku 4.5` — has no token to
+ * A trailer that names a model WITHOUT the word "Claude" — the cross lane's
+ * versioned name, or a degraded session's bare `Haiku 4.5` — has no token to
  * split on, so the whole cleaned line is the one name it claims, unless symbols
  * or `and`/`und` join several segments that each name a model (see below).
  *
  * WHAT STANDS BEFORE THE FIRST "Claude" IS A CLAIM TOO (cross-vendor review of
- * point 667, P0). The split used to DISCARD it, so `GPT-4o mini / Claude Opus 5`
- * — and, for the whole life of this guard, `Sonnet 5 / Claude Opus 5` — read as
- * the single allowed name `Opus 5` and passed. That is precisely the smuggling
+ * point 667, P0). The split used to DISCARD it, so `<other versioned model> / <main lane trailer>`
+ * — and, for the whole life of this guard, `Sonnet 5 / <main lane trailer>` — read as
+ * the single allowed main-lane name and passed. That is precisely the smuggling
  * shape point 527 closed for names AFTER the first token, left open in front of
  * it because every test wrote the forbidden model second.
  */
@@ -223,17 +282,17 @@ export function modelNamesIn(trailer) {
   const raw = String(trailer ?? '')
   // A SUFFIX IS DROPPED ONLY WHERE IT NAMES NO MODEL (second cross-vendor round).
   // The strip exists for `(1M context)` and `[1m]`, and it took the claim with
-  // it: `Claude Opus 5 (Haiku 4.5)` and `Claude Opus 5 [Sonnet 5]` were reduced
-  // to the allowed `Opus 5` before anything judged them, while a plausible
-  // `GPT-5.6 (Sol)` lost the very word that identifies it.
+  // it: `<main lane> (Haiku 4.5)` and `<main lane> [Sonnet 5]` were reduced
+  // to the allowed main-lane name before anything judged them, while a plausible
+  // `<marker>-<version> (<cross family>)` lost the very word that identifies it.
   const dropEmpty = (_, inner) => (MODEL_FAMILY_WORD.test(inner) ? ` ${inner} ` : ' ')
   const cleaned = raw
     .replace(/<[^>]*>/g, ' ')
     .replace(/\(([^)]*)\)/g, dropEmpty)
     .replace(/\[([^\]]*)\]/g, dropEmpty)
     .replace(/\bco-authored-by:/gi, ' ')
-  if (CLAUDE_TRAILER.test(cleaned)) {
-    const parts = cleaned.split(/\bclaude\b/gi)
+  if (PREFIX_WORD.test(cleaned)) {
+    const parts = cleaned.split(PREFIX_SPLIT)
     const names = parts.slice(1).map(bareName).filter(Boolean)
     const head = bareName(parts[0])
     // Only a head that NAMES something counts: the ordinary trailer's head is
@@ -241,21 +300,21 @@ export function modelNamesIn(trailer) {
     if (head && MODEL_FAMILY_WORD.test(head)) names.unshift(head)
     return names
   }
-  if (namesNonClaudeModel(cleaned, raw)) {
-    // SEVERAL NON-CLAUDE CLAIMS IN ONE TRAILER (Sol review of a4975b0): with no
-    // "Claude" token to split on, `GPT-5.6 Sol / GPT-5.6 Sol` collapsed into one
+  if (namesUnprefixedModel(cleaned, raw)) {
+    // SEVERAL NON-CLAUDE CLAIMS IN ONE TRAILER (cross-vendor review of a4975b0): with no
+    // "Claude" token to split on, `<cross lane> / <cross lane>` collapsed into one
     // composite name and took the FORBIDDEN path instead of the documented
     // several-names-is-unidentified one. Only segments that name a model ON
     // THEIR OWN count as claims, and only when MORE THAN ONE does is the line
     // read as several — a lone model beside filler words stays the single
     // composite name that fails the allowlist LOUD, so the smuggling shape of
-    // point 527 (`GPT-5.6 Sol / Haiku`) cannot pass as its allowed half.
-    // The separators are symbols AND the textual conjunctions (Sol's confirming
-    // pass): `GPT-5.6 Sol and GPT-5.6 Sol` is the same two claims as with `/`.
+    // point 527 (`<cross lane> / Haiku`) cannot pass as its allowed half.
+    // The separators are symbols AND the textual conjunctions (the confirming
+    // pass): `<cross lane> and <cross lane>` is the same two claims as with `/`.
     const claims = cleaned
       .split(/[/&+]|\b(?:and|und)\b/i)
       .map(bareName)
-      .filter((segment) => segment && namesNonClaudeModel(segment))
+      .filter((segment) => segment && namesUnprefixedModel(segment))
     if (claims.length > 1) return claims
     const name = bareName(cleaned)
     return name ? [name] : []
@@ -288,16 +347,16 @@ export const CLASSES = Object.freeze(['forbidden', 'unidentified', 'allowed'])
  * 'allowed'      exactly one name, and it is on the allowlist (or the trailer
  *                carries no model evidence at all, as a human co-author)
  */
-export function judgeTrailer(trailer, fableState) {
+export function judgeTrailer(trailer, scarceState) {
   const names = modelNamesIn(trailer)
   if (!names.length) {
     // A trailer that IS model evidence but names nothing readable — the bare
     // `Claude <…>` — is unidentified; anything else is a human co-author.
     const text = String(trailer ?? '')
-    const isModel = CLAUDE_TRAILER.test(text) || MODEL_VENDOR_ADDRESS.test(text)
+    const isModel = PREFIX_WORD.test(text) || MODEL_VENDOR_ADDRESS.test(text)
     return { verdict: isModel ? 'unidentified' : 'allowed', names }
   }
-  if (names.some((name) => !isAllowedModelName(name, fableState))) return { verdict: 'forbidden', names }
+  if (names.some((name) => !isAllowedModelName(name, scarceState))) return { verdict: 'forbidden', names }
   return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
 }
 
@@ -310,8 +369,8 @@ export function judgeTrailer(trailer, fableState) {
  * point 527: every version of it let an UNCLOSED bracket swallow the separator
  * and MERGE the next co-author into an allowed trailer, because the suffix
  * strip then carried the forbidden name away with it —
- * `Claude Opus 5 (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 (1M
- * context) <c@x>` read as plain `Opus 5`. Splitting unconditionally errs toward
+ * `<main lane> (1M context <a@x>,Claude Haiku 4.5 <b@x>,<main lane> (1M
+ * context) <c@x>` read as the plain main-lane name. Splitting unconditionally errs toward
  * MORE parts, which is the safe direction for a tripwire: every part is judged
  * on its own: a half cut out of a suffix that names a model outside the list
  * fails LOUD, and a half that names nothing is no model evidence, so no cut
@@ -329,10 +388,10 @@ export function splitTrailerField(field) {
  * WORST verdict wins, so one forbidden co-author flags the commit even next to
  * an allowed one, and one bare trailer beside a named one is still unidentified.
  */
-export function classifyTrailer(trailerField, fableState) {
+export function classifyTrailer(trailerField, scarceState) {
   let worst = 'allowed'
   for (const part of splitTrailerField(trailerField)) {
-    const { verdict } = judgeTrailer(part, fableState)
+    const { verdict } = judgeTrailer(part, scarceState)
     if (verdict === 'forbidden') return 'forbidden'
     if (verdict === 'unidentified' && worst === 'allowed') worst = 'unidentified'
   }
@@ -342,8 +401,8 @@ export function classifyTrailer(trailerField, fableState) {
 /** True when a commit's trailer field NAMES any recognised model outside the
  *  allowlist. A trailer naming nothing is not a breach — it is unidentified
  *  (`classifyTrailer`), which has its own, resolvable path. */
-export function isPolicyBreach(trailerField, fableState) {
-  return classifyTrailer(trailerField, fableState) === 'forbidden'
+export function isPolicyBreach(trailerField, scarceState) {
+  return classifyTrailer(trailerField, scarceState) === 'forbidden'
 }
 
 // ---------------------------------------------------------------------------
@@ -359,14 +418,29 @@ export function isPolicyBreach(trailerField, fableState) {
 // does NOT stand down for a paused batch or a session that owns no lock: a
 // subagent is exactly whose commits this is for, and a commit is not batch work.
 
+/**
+ * The models that may author now, in remedy order: the main lane, the scarce lane while
+ * the switch admits it, the main fallback, then the other lanes. `{ name, trailer }`.
+ */
+function authoringModels(scarceState) {
+  const entry = (record, fallback = false) => ({
+    name: fallback ? record.fallback.displayName : record.displayName,
+    trailer: trailerFor(record.role, { fallback }),
+  })
+  return [
+    entry(MAIN),
+    ...(admitsScarce(scarceState) ? LANES.filter((record) => record.scarce).map((record) => entry(record)) : []),
+    ...(MAIN.fallback ? [entry(MAIN, true)] : []),
+    ...LANES.filter((record) => record !== MAIN && !record.scarce).map((record) => entry(record)),
+  ]
+}
+
+/** Names as one phrase: `a, b and c`. */
+const phraseOf = (names) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names.join(''))
+
 /** The trailers a commit may carry, generated from the switch for every remedy. */
-export function allowedTrailers(fableState) {
-  return Object.freeze([
-    `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
-    ...(admitsFable(fableState) ? [`Co-Authored-By: Claude ${FABLE_MODEL} <noreply@anthropic.com>`] : []),
-    `Co-Authored-By: Claude ${OPUS_FALLBACK_MODEL} <noreply@anthropic.com>`,
-    `Co-Authored-By: ${ASTRA_MODEL} <noreply@openai.com>`,
-  ])
+export function allowedTrailers(scarceState) {
+  return Object.freeze(authoringModels(scarceState).map(({ trailer }) => `Co-Authored-By: ${trailer}`))
 }
 
 /**
@@ -375,15 +449,13 @@ export function allowedTrailers(fableState) {
  * reader would still ingest the latter; it wins over ledger-only identity
  * because the commit keeps its local provenance without conflating roles.
  */
-export function allowedReviewerTrailers(fableState) {
-  return Object.freeze(allowedTrailers(fableState).map((trailer) => trailer.replace(/^Co-Authored-By:/, 'Reviewed-By:')))
+export function allowedReviewerTrailers(scarceState) {
+  return Object.freeze(allowedTrailers(scarceState).map((trailer) => trailer.replace(/^Co-Authored-By:/, 'Reviewed-By:')))
 }
 
 /** The authoring lanes in one phrase, generated for the same refusal surface. */
-function allowedModelsPhrase(fableState) {
-  return admitsFable(fableState)
-    ? `${OPUS_MODEL}, ${OPUS_FALLBACK_MODEL}, ${FABLE_MODEL} and ${ASTRA_MODEL}`
-    : `${OPUS_MODEL}, ${OPUS_FALLBACK_MODEL} and ${ASTRA_MODEL}`
+function allowedModelsPhrase(scarceState) {
+  return phraseOf(authoringModels(scarceState).map(({ name }) => name))
 }
 
 /** The `Co-Authored-By` values in a commit message, git's comment lines dropped
@@ -429,7 +501,7 @@ function undocumentedReviewerTrailers(message) {
     if (line.startsWith('#')) continue
     const m = /^[ \t]*([a-z][a-z-]*review[a-z-]*|review[a-z-]*):[ \t]*(.+?)[ \t]*$/i.exec(line)
     if (!m || /^reviewed-by$/i.test(m[1])) continue
-    if (modelNamesIn(m[2]).length || CLAUDE_TRAILER.test(m[2]) || MODEL_VENDOR_ADDRESS.test(m[2])) {
+    if (modelNamesIn(m[2]).length || PREFIX_WORD.test(m[2]) || MODEL_VENDOR_ADDRESS.test(m[2])) {
       out.push({ key: m[1], value: m[2] })
     }
   }
@@ -450,12 +522,12 @@ function undocumentedReviewerTrailers(message) {
  * allowedReviewerTrailers, allowedModelsPhrase }. A malformed trailer never
  * throws; an invalid switch state does, resolved before the fail-open boundary.
  */
-export function evaluateCommitTrailers(message, fableState) {
+export function evaluateCommitTrailers(message, scarceState) {
   // Resolve before the fail-open parsing boundary: an unknown switch is a missing
   // policy, not a malformed trailer that may be ignored.
-  const trailers = allowedTrailers(fableState)
-  const phrase = allowedModelsPhrase(fableState)
-  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? fableRefusalReason(fableState) : ''
+  const trailers = allowedTrailers(scarceState)
+  const phrase = allowedModelsPhrase(scarceState)
+  const switchRefusal = scarceState !== undefined && !admitsScarce(scarceState) ? laneRefusalReason(scarceState) : ''
   const findings = []
   try {
     for (const [role, values] of [
@@ -464,7 +536,7 @@ export function evaluateCommitTrailers(message, fableState) {
     ]) {
       for (const trailer of values) {
         for (const part of splitTrailerField(trailer)) {
-          const { verdict, names } = judgeTrailer(part, fableState)
+          const { verdict, names } = judgeTrailer(part, scarceState)
           if (verdict === 'unidentified' && names.length > 1) {
             findings.push({
               rule: role === 'author' ? 'multiple-model-trailer' : 'multiple-model-reviewer-trailer',
@@ -478,11 +550,11 @@ export function evaluateCommitTrailers(message, fableState) {
               detail: `names no model — it cannot identify the commit's ${role}`,
             })
           } else if (verdict === 'forbidden') {
-            const fableDetail = names.some((name) => FABLE_ALLOWED.test(name)) && switchRefusal ? `; ${switchRefusal}` : ''
+            const scarceDetail = names.some(namesScarceLane) && switchRefusal ? `; ${switchRefusal}` : ''
             findings.push({
               rule: role === 'author' ? 'forbidden-model-trailer' : 'forbidden-model-reviewer-trailer',
               trailer,
-              detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only ${phrase} may ${role === 'author' ? 'author' : 'review'} here${fableDetail})`,
+              detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only ${phrase} may ${role === 'author' ? 'author' : 'review'} here${scarceDetail})`,
             })
           }
         }
@@ -502,7 +574,7 @@ export function evaluateCommitTrailers(message, fableState) {
     block: findings.length > 0,
     findings,
     allowedTrailers: trailers,
-    allowedReviewerTrailers: allowedReviewerTrailers(fableState),
+    allowedReviewerTrailers: allowedReviewerTrailers(scarceState),
     allowedModelsPhrase: phrase,
   }
 }
@@ -546,16 +618,16 @@ export function parseLogLine(line) {
 }
 
 /** Commits at/after sinceMs whose trailer field falls into `wanted`. */
-function findCommitsClassified(logText, sinceMs, wanted, fableState) {
+function findCommitsClassified(logText, sinceMs, wanted, scarceState) {
   // Validate once even for an empty/malformed log: an invalid policy throws
-  // here. A missing one (undefined) admits no Fable, so it fails closed per
+  // here. A missing one (undefined) admits no scarce lane, so it fails closed per
   // commit rather than making the whole history look compliant.
-  fableStateAtCommit(sinceMs, fableState)
+  laneStateAtCommit(sinceMs, scarceState)
   const hits = []
   for (const line of String(logText ?? '').split(/\r?\n/)) {
     const c = parseLogLine(line)
     if (!c || c.when < sinceMs) continue
-    const policyAtCommit = fableStateAtCommit(c.when, fableState)
+    const policyAtCommit = laneStateAtCommit(c.when, scarceState)
     if (classifyTrailer(c.trailers, policyAtCommit) === wanted) {
       hits.push({ sha: c.sha, when: c.when, trailer: c.trailers.trim() })
     }
@@ -564,14 +636,14 @@ function findCommitsClassified(logText, sinceMs, wanted, fableState) {
 }
 
 /** Commits at/after sinceMs authored by a model NAMED outside the allowlist. */
-export function findForbiddenCommits(logText, sinceMs, fableState) {
-  return findCommitsClassified(logText, sinceMs, 'forbidden', fableState)
+export function findForbiddenCommits(logText, sinceMs, scarceState) {
+  return findCommitsClassified(logText, sinceMs, 'forbidden', scarceState)
 }
 
 /** Commits at/after sinceMs whose model trailer names no single model: none,
  *  several allowed ones, or a nameless vendor-address trailer. */
-export function findUnidentifiedCommits(logText, sinceMs, fableState) {
-  return findCommitsClassified(logText, sinceMs, 'unidentified', fableState)
+export function findUnidentifiedCommits(logText, sinceMs, scarceState) {
+  return findCommitsClassified(logText, sinceMs, 'unidentified', scarceState)
 }
 
 // ---------------------------------------------------------------------------
@@ -586,7 +658,9 @@ const TRANSCRIPT_HINT = [
   '',
   '    ~/.claude/projects/<repo-slug>/<session>.jsonl',
   '    ~/.claude/projects/<repo-slug>/<session>/subagents/agent-*.jsonl   (delegated work)',
-  `    ~/.codex/sessions/<yyyy>/…                                        (the ${ASTRA_MODEL} lane)`,
+  ...LANES.filter((record) => record.runtime === 'codex').map(
+    (record) => `    ~/.codex/sessions/<yyyy>/…                                        (the ${record.displayName} lane)`,
+  ),
 ]
 
 /** The prefix git's history-rewriting tools park the pre-rewrite commits under. */
@@ -622,25 +696,25 @@ function backupRefNotice(backupRefs) {
 
 const shaList = (hits) => (hits ?? []).map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
 
-/** Explain why a forbidden Fable trailer is history or a present emergency. */
-function fableTimingNotices(hits, fableState) {
-  if (fableState === undefined || fableState === POLICY_NEUTRAL) return []
-  const current = fableIsOn(fableState) ? 'ON' : 'OFF'
-  const changedAt = Number(fableState.changedAt)
+/** Explain why a forbidden scarce-lane trailer is history or a present emergency. */
+function scarceTimingNotices(hits, scarceState) {
+  if (scarceState === undefined || scarceState === POLICY_NEUTRAL) return []
+  const current = laneIsOn(scarceState) ? 'ON' : 'OFF'
+  const changedAt = Number(scarceState.changedAt)
   return (hits ?? []).flatMap((hit) => {
-    const namesFable = modelNamesIn(hit?.trailer).some((name) => FABLE_ALLOWED.test(name))
-    if (!namesFable || !Number.isFinite(hit?.when)) return []
+    const namesScarce = modelNamesIn(hit?.trailer).some(namesScarceLane)
+    if (!namesScarce || !Number.isFinite(hit?.when)) return []
     const commitAt = new Date(hit.when).toISOString()
     const switchAt = new Date(changedAt).toISOString()
     if (hit.when >= changedAt) {
       return [
-        `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, after the Fable switch changed to ${current} ` +
+        `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, after the lane switch changed to ${current} ` +
           `at ${switchAt}; it is judged under that post-switch ${current} policy.`,
       ]
     }
     const previous = current === 'ON' ? 'OFF' : 'ON'
     return [
-      `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, before the Fable switch changed to ${current} ` +
+      `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, before the lane switch changed to ${current} ` +
         `at ${switchAt}; it is historical and is judged under the previous ${previous} policy.`,
     ]
   })
@@ -651,18 +725,19 @@ function fableTimingNotices(hits, fableState) {
  *  `alsoUnidentified` are the unnamed commits found in the same window: they are
  *  NAMED here rather than dropped, because advancing the baseline past the
  *  forbidden ones would otherwise clear them unseen (four-eyes review). */
-export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified = [], fableState } = {}) {
+export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified = [], scarceState } = {}) {
   const unnamed = (alsoUnidentified ?? []).filter(Boolean)
-  const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? ` ${fableRefusalReason(fableState)}` : ''
+  const switchRefusal = scarceState !== undefined && !admitsScarce(scarceState) ? ` ${laneRefusalReason(scarceState)}` : ''
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
-      `outside the allowlist in force at each commit's own time (${OPUS_MODEL}, ${OPUS_FALLBACK_MODEL} and ${ASTRA_MODEL} ` +
-      `may author throughout; ${FABLE_MODEL} may author only while its recorded policy is ON; Sonnet and Haiku ` +
+      `outside the allowlist in force at each commit's own time (${phraseOf(authoringModels(undefined).map(({ name }) => name))} ` +
+      `may author throughout; ${phraseOf(LANES.filter((record) => record.scarce).map((record) => record.displayName))} ` +
+      'may author only while its recorded policy is ON; Sonnet and Haiku ' +
       `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work. ` +
       'The tripwire records a handoff to the next allowed lane of the serving chain. Only that fresh lane, ' +
       'after transcript metadata proves which model answered and it re-reads every trailer, may advance ' +
       '.claude/model-guard-baseline.json past these commits; an unreachable chain probes on a clock.',
-    ...fableTimingNotices(hits, fableState),
+    ...scarceTimingNotices(hits, scarceState),
     ...(unnamed.length
       ? [
           '',
@@ -677,8 +752,8 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
 
 /** The RESOLVABLE block: the trailer names no single model, so nobody knows yet what
  *  authored it. Look it up, then take the path the answer dictates. */
-export function formatUnidentifiedReason(hits, { backupRefs = [], fableState } = {}) {
-  const phrase = allowedModelsPhrase(fableState).replace(/, /g, ' / ').replace(/ and /, ' / ')
+export function formatUnidentifiedReason(hits, { backupRefs = [], scarceState } = {}) {
+  const phrase = allowedModelsPhrase(scarceState).replace(/, /g, ' / ').replace(/ and /, ' / ')
   return [
     `UNIDENTIFIED AUTHOR: commit(s) ${shaList(hits)} carry a model co-author trailer that names NO ` +
       'SINGLE model — no model at all, or several at once — so they cannot show WHICH model wrote ' +
@@ -693,7 +768,7 @@ export function formatUnidentifiedReason(hits, { backupRefs = [], fableState } =
     '    forbidden case: record the trusted-lane handoff; only that lane may advance the baseline.',
     '',
     'Then stop it recurring: write your own model into the trailer, one of —',
-    ...allowedTrailers(fableState).map((t) => `    ${t}`),
+    ...allowedTrailers(scarceState).map((t) => `    ${t}`),
     ...backupRefNotice(backupRefs),
   ].join('\n')
 }

@@ -31,7 +31,7 @@ const confirmationStored = confirmation
 const legacyProse = 'push the version tag; safe prepared state: the build is verified locally and no tag is pushed'
 
 describe('classifyConfirmationReason — the TYPED form is exact', () => {
-  // THE STRUCTURAL ANSWER TO THREE ROUNDS OF COUNTEREXAMPLES (GPT-5.6 Sol,
+  // THE STRUCTURAL ANSWER TO THREE ROUNDS OF COUNTEREXAMPLES (cross-vendor review,
   // 23.08.2026). Every one of them was an advisory question whose words happened
   // to name an outward act, and each widening produced the next. A typed
   // confirmation now SELECTS its act, so no sentence can be mistaken for one.
@@ -133,7 +133,7 @@ describe('parseGateLine — one work-order line', () => {
   })
 
   // A LEGACY MARKER OWES MIGRATION AND DOES NOT GATE (fourth cross-vendor
-  // round, GPT-5.6 Sol, 23.08.2026). Gating on the prose heuristic's verdict put
+  // round,  23.08.2026). Gating on the prose heuristic's verdict put
   // that heuristic, and every false positive three rounds found in it, back on
   // the live path of every queue and pool reader.
   it('never gates on an untyped marker, whatever its reason says', () => {
@@ -188,8 +188,8 @@ describe('parseGateLine — one work-order line', () => {
     expect(parseGateLine('- [ ] 470. HARDEN THE AWAITING-CONFIRMATION PARSER.')).toMatchObject({ gated: false })
   })
 
-  // A HEADLINE ENDING IN THE BARE WORD IS PROSE (cross-vendor review, GPT-5.6
-  // Sol, 23.08.2026): it parsed as state, and the next rewrite deleted it.
+  // A HEADLINE ENDING IN THE BARE WORD IS PROSE (cross-vendor review,
+  // 23.08.2026): it parsed as state, and the next rewrite deleted it.
   it('needs the brackets before a typed marker is state at all', () => {
     for (const line of [
       '- [ ] 9. RENAME THE MARKER TO SELF-DECIDED',
@@ -450,7 +450,7 @@ describe('advisory decision record and legacy migration', () => {
     expect([...gatedPoints(migrated.text)]).toEqual([1])
   })
 
-  // EVERY MARKER, NOT ONLY THE STATE (cross-vendor review, GPT-5.6 Sol,
+  // EVERY MARKER, NOT ONLY THE STATE (cross-vendor review,
   // 23.08.2026): a legacy gate hidden behind a later answer was silently left
   // in place, and two in a row collapsed into one verdict.
   it('reports a legacy marker standing before a later answer, and each of several', () => {
