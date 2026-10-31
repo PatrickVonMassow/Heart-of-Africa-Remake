@@ -45,3 +45,9 @@ The shipped body grows from 3001 to about 13300 vertices (20766 → about 27000 
 Tests, in addition to revision 9's:
 - Pipeline selftest on a toy mesh: subdivision conformity (no hanging vertex, winding kept, one to three split edges); exact hung bake of cut vertices at the morph corners; snap of a forced edge (no vertex inserted, end scalar at c).
 - Vitest on the committed asset: in the hung adult man and woman (`gltfPerson`), every cut vertex lies within 1 mm of its parent point on the reference surface. The reference corners are vertices of the shipped body (the cut appends after them). The pipeline writes each cut vertex's parent reference triangle and barycentrics to verification/villager-body/split-parents.json, which the test reads.
+
+## 5. Amendment 31.10.2026: midpoints on the source surface
+
+Section 2 let a band midpoint take the mean of its edge's positions, morph deltas and weights. Two defects came from it. A mean of the ends' weights blends the far joints of a long edge into the midpoint: a mid-shin midpoint took about a quarter thigh weight from the knee end, and in the held kneel it sank 33–46 mm under the ground (src/render/villagerKneelGround.test.tsx red on the branch, main −21…−7 mm). A midpoint on the flat chord also leaves the band faceted against the smooth coarse shading around it, which is the hard-edged, lighter back rectangle of 1347-accept-trousers-cross-r-man-rear-*-3m, still visible after the band subdivision.
+
+So a midpoint is now taken as build_body takes a decimated vertex (body.py `on_surface`): the chord midpoint is mapped onto the MakeHuman surface, keeping the mean of its ends' offsets, and its position, morph deltas and weights are read there. The cut and its refit are unchanged. The reference is still the subdivided, uncut body.

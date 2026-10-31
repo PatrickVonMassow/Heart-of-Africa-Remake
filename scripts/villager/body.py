@@ -509,7 +509,26 @@ def split_edges(st, edges):
             out_uv.append(np.array([x[1] for x in t]))
     st['tris'] = np.array(out_t, int)
     st['tri_uv'] = np.array(out_uv)
-    return len(keys)
+    return keys
+
+
+def on_surface(body, st, n1, keys, mh):
+    """The midpoints n1.. of the edges `keys` (split_edges order) onto the
+    MakeHuman surface: nearest full-mesh point of the chord midpoint plus the
+    ends' mean offset; position, morph deltas and weights read there, as
+    build_body reads them for a decimated vertex; body['map'] extended."""
+    idx, bary, off = body['map']
+    a = np.array([k[0] for k in keys])
+    b = np.array([k[1] for k in keys])
+    ids = np.arange(n1, n1 + len(keys))
+    i2, b2, _o = surface_map(mh, body['basis_full'], st['pos'][ids])
+    o2 = 0.5 * (off[a] + off[b])
+    pos = apply_map(body['basis_full'], i2, b2, o2)
+    st['pos'][ids] = pos
+    for m, d in body['deltas_full'].items():
+        st['morph_pos'][m][ids] = apply_map(body['basis_full'] + d, i2, b2, o2) - pos
+    st['W'][ids] = (body['Wfull'][i2] * b2[:, :, None]).sum(1)
+    body['map'] = (np.concatenate([idx, i2]), np.concatenate([bary, b2]), np.concatenate([off, o2]))
 
 
 def subdivide(body, cuts, split, mh=None):
@@ -518,7 +537,15 @@ def subdivide(body, cuts, split, mh=None):
     height interval, if it has one) while longer than `lmax` and its
     Σ|ΔW| · length above `tau`, round after round. The cut vertices then sit
     on short edges, where a four-bone vertex can follow the surface; the
-    subdivided, uncut body is the cut's reference (body['split'])."""
+    subdivided, uncut body is the cut's reference (body['split']).
+
+    With the MakeHuman mesh `mh`, each midpoint is then taken as build_body
+    takes a decimated vertex: mapped onto the full mesh's surface (its ends'
+    mean offset kept), its position, morph deltas and weights read there. A
+    mean of its ends' weights would blend the far joints of a long edge into
+    the midpoint (a mid-shin vertex a quarter on the thigh sinks under the
+    knelt shin), and a midpoint on the flat chord leaves the band faceted
+    against the smooth coarse shading round it."""
     st = {k: body[k] for k in ('pos', 'tris', 'tri_uv', 'W', 'morph_pos')}
     n0 = len(st['pos'])
     for _ in range(split['rounds']):
@@ -541,14 +568,15 @@ def subdivide(body, cuts, split, mh=None):
         e = e[(ln > split['lmax']) & (ln * dw > split['tau'])]
         if not len(e):
             break
-        split_edges(st, {(int(x), int(y)) for x, y in e})
+        n1 = len(st['pos'])
+        keys = split_edges(st, {(int(x), int(y)) for x, y in e})
+        if mh is not None:
+            on_surface(body, st, n1, keys, mh)
     for k in st:
         body[k] = st[k]
     ids = np.arange(n0, len(body['pos']))
-    if mh is not None and len(ids):
-        idx, bary, off = body['map']
-        i2, b2, o2 = surface_map(mh, body['basis_full'], body['pos'][ids])
-        body['map'] = (np.concatenate([idx, i2]), np.concatenate([bary, b2]), np.concatenate([off, o2]))
+    if mh is None and len(ids):
+        assert 'map' not in body, 'a mapped body subdivides with its MakeHuman mesh'
     print(f'[body] band subdivision: {n0} -> {len(body["pos"])} vertices, {len(body["tris"])} triangles')
     return body
 
