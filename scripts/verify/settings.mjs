@@ -263,18 +263,28 @@ if (section('head-bob')) {
   })
   await page.waitForTimeout(120)
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
-  const bobSamples = []
-  let footSurface = null
-  for (let i = 0; i < 20; i++) {
-    await page.waitForTimeout(100)
-    const s = await page.evaluate(() => {
-      const p = window.__placePlayer; p.x = 0; p.z = 0 // pin to centre
-      return { y: window.__walkFeel?.cameraY ?? null, foot: window.__walkFeel?.lastFootstepSurface ?? null }
-    })
-    if (s.y !== null) bobSamples.push(s.y)
-    if (s.foot) footSurface = s.foot
-    if (footSurface && bobSamples.length >= 8) break
-  }
+  // Sampled once per RENDERED frame (point 642): a 20×100 ms wall window held
+  // too few frames on a slow lane for a stride to land, and read no footstep.
+  // Done once a footstep has fired and 60 frames (about a stride) were seen;
+  // the wall timeout is only the hang guard.
+  const walk = await page
+    .waitForFunction(
+      () => {
+        const w = (window.__bobWalk ??= { ys: [], foot: null })
+        const p = window.__placePlayer; p.x = 0; p.z = 0 // pin to centre
+        const y = window.__walkFeel?.cameraY ?? null
+        if (y !== null) w.ys.push(y)
+        w.foot = w.foot ?? window.__walkFeel?.lastFootstepSurface ?? null
+        return w.foot && w.ys.length >= 60 ? w : null
+      },
+      null,
+      { polling: 'raf', timeout: 30000 },
+    )
+    .then((h) => h.jsonValue())
+    .catch(() => page.evaluate(() => window.__bobWalk ?? { ys: [], foot: null }))
+  await page.evaluate(() => { delete window.__bobWalk })
+  const bobSamples = walk.ys
+  const footSurface = walk.foot
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
   const bobDev = bobSamples.length ? Math.max(...bobSamples.map((y) => Math.abs(y - 1.5))) : 0
   check(
@@ -533,12 +543,23 @@ if (section('lion-feeding')) {
         preyOnSide: h.prey.current?.rotation.z,
         stainRadius: h.stain.r,
         mode: h.state.mode,
+        frames: window.__wildlife?.frames?.() ?? null,
+        now: performance.now(),
       }
     })
     pitches.push(s.headPitch ?? 0)
     // Keep the frame with the head most clearly lowered (the sine peak).
     if (!feedA || (s.headPitch ?? 0) > (feedA.headPitch ?? 0)) feedA = s
-    await page.waitForTimeout(300)
+    // The bob is posed per RENDERED frame (point 642): a wall-only gap could span
+    // no frame on a loaded lane and read the same pose twice. Each gap holds at
+    // least 3 drawn frames and the old 300 ms spacing.
+    await page
+      .waitForFunction(
+        ({ f0, t0 }) => (f0 == null || (window.__wildlife?.frames?.() ?? f0) >= f0 + 3) && performance.now() - t0 >= 300,
+        { f0: s.frames, t0: s.now },
+        { polling: 'raf', timeout: 15000 },
+      )
+      .catch(() => {})
   }
   const pitchSwing = Math.max(...pitches) - Math.min(...pitches)
   check('feeding: lion and carcass visible', feedA.lionVisible === true && feedA.preyVisible === true, '')
@@ -1268,8 +1289,12 @@ if (section('render-leak-watch')) {
     // The other half: a REAL leak must be caught. forceLeak() allocates render
     // targets and initialises them (which is what three counts) without ever
     // disposing them — exactly the shape of the point-276 pipeline-rebuild leak.
-    const rtBefore = await page.evaluate(() => window.__renderer.info.memory.renderTargets)
-    const rtAfter = await page.evaluate(() => window.__renderLeak.forceLeak(6))
+    // Both counts in ONE evaluation (point 642): a frame between two round trips may
+    // dispose an unrelated target and shift the baseline.
+    const { rtBefore, rtAfter } = await page.evaluate(() => {
+      const rtBefore = window.__renderer.info.memory.renderTargets
+      return { rtBefore, rtAfter: window.__renderLeak.forceLeak(6) }
+    })
     check('the forced leak really raises the render-target count', rtAfter >= rtBefore + 6,
       `${rtBefore} -> ${rtAfter}`)
     await transition((v) => window.__ui.getState().setTraaEnabled(v), false)
