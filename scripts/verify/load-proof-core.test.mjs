@@ -1,6 +1,6 @@
 // The two kinds of browser check (point 642): the lane-skip decision of a TIMING
 // check, and the gate that keeps a STATE check from comparing two round trips.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { laneSkipVerdict, timingVerdict, findSplitComparisons, laneSkips, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
@@ -212,35 +212,51 @@ describe('laneFpsProbe — one hitch does not stand for the lane', () => {
     expect(fps).toBeCloseTo(23.6, 0)
     expect(laneSkipVerdict({ needFps: 20, measuredFps: fps }).skip).toBe(false)
   })
-  it('answers by its own deadline when the frame clock stops delivering', async () => {
-    let n = 0
-    globalThis.requestAnimationFrame = (cb) => { if (n < 3) { const at = 16 * n++; queueMicrotask(() => cb(at)) } }
-    try {
-      const fps = await laneFpsProbe(20, 50)
-      expect(fps).toBeLessThanOrEqual(40)
-      expect(fps).toBeGreaterThan(30)
-    } finally { delete globalThis.requestAnimationFrame }
-    globalThis.requestAnimationFrame = () => {}
-    try {
-      const fps = await laneFpsProbe(20, 50)
-      expect(fps).toBe(0)
-      expect(laneSkipVerdict({ needFps: 10, measuredFps: fps }).skip).toBe(true)
-    } finally { delete globalThis.requestAnimationFrame }
-  })
-  it('divides by the wall time that passed when the deadline timer fires late', async () => {
-    let n = 0
-    globalThis.requestAnimationFrame = (cb) => { if (n < 3) { const at = 16 * n++; queueMicrotask(() => cb(at)) } }
-    const realSetTimeout = globalThis.setTimeout
-    globalThis.setTimeout = (cb, ms) => realSetTimeout(cb, ms * 4)
-    try {
-      // 2 intervals over ~200 ms of wall time, not over the nominal 50 ms cap (40 fps).
-      const fps = await laneFpsProbe(20, 50)
-      expect(fps).toBeLessThanOrEqual(10.5)
-      expect(fps).toBeGreaterThan(5)
-    } finally {
-      globalThis.setTimeout = realSetTimeout
+  // The deadline tests run on a faked timer AND a faked performance clock, so the
+  // wall time the probe divides by is exactly what the test advances, never real
+  // scheduling on a loaded host.
+  const onFakeClock = async (body) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+    try { return await body() } finally {
+      vi.useRealTimers()
       delete globalThis.requestAnimationFrame
     }
+  }
+  const threeFramesThenStop = () => {
+    let n = 0
+    globalThis.requestAnimationFrame = (cb) => { if (n < 3) { const at = 16 * n++; queueMicrotask(() => cb(at)) } }
+  }
+  it('answers by its own deadline when the frame clock stops delivering', async () => {
+    await onFakeClock(async () => {
+      threeFramesThenStop()
+      const probe = laneFpsProbe(20, 50)
+      await vi.advanceTimersByTimeAsync(50)
+      // 2 intervals over the 50 ms deadline.
+      expect(await probe).toBe(40)
+    })
+    await onFakeClock(async () => {
+      globalThis.requestAnimationFrame = () => {}
+      const probe = laneFpsProbe(20, 50)
+      await vi.advanceTimersByTimeAsync(50)
+      const fps = await probe
+      expect(fps).toBe(0)
+      expect(laneSkipVerdict({ needFps: 10, measuredFps: fps }).skip).toBe(true)
+    })
+  })
+  it('divides by the wall time that passed when the deadline timer fires late', async () => {
+    await onFakeClock(async () => {
+      threeFramesThenStop()
+      const fakeSetTimeout = globalThis.setTimeout
+      globalThis.setTimeout = (cb, ms) => fakeSetTimeout(cb, ms * 4)
+      try {
+        const probe = laneFpsProbe(20, 50)
+        await vi.advanceTimersByTimeAsync(200)
+        // 2 intervals over the 200 ms that passed, not over the nominal 50 ms cap (40 fps).
+        expect(await probe).toBe(10)
+      } finally {
+        globalThis.setTimeout = fakeSetTimeout
+      }
+    })
   })
 })
 
