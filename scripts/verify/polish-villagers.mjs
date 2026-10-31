@@ -3521,6 +3521,24 @@ if (section('adult-errands')) {
           const near = band(yBottom + MARGIN, y1)
           const zone = band(yTop, yBottom)
           const worst = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])))
+          // Per-run inputs the seed does not pin (work-order 568): one JSON line
+          // per capture, so a green and a red run can be compared.
+          if (process.env.RIM_INPUTS_DUMP) {
+            const inputs = await page.evaluate(() => {
+              const cam = window.__placeCamera
+              const fog = window.__placeScene?.fog
+              const { fireBlaze, ...season } = window.__placeSeason?.() ?? {}
+              return {
+                day: window.__game.getState().day,
+                season,
+                fog: fog ? { color: fog.color?.getHexString?.(), near: fog.near, far: fog.far } : null,
+                cam: { p: cam.position.toArray().map((v) => +v.toFixed(3)), q: cam.quaternion.toArray().map((v) => +v.toFixed(4)) },
+                vp: [window.innerWidth, window.innerHeight, window.devicePixelRatio],
+                t: performance.now(),
+              }
+            })
+            appendFileSync(process.env.RIM_INPUTS_DUMP, JSON.stringify({ gl: VERIFY_GL ?? 'webgpu', pass, inputs, seam, y: [y0, yTop, yBottom, y1], strips, far, near, zone, step: worst(far, near) }) + '\n')
+          }
           readings.push({
             strips: strips.length,
             farRows,
