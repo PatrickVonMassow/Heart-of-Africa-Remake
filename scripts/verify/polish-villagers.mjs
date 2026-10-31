@@ -3483,8 +3483,10 @@ if (section('adult-errands')) {
           // far one the same metres of water past the zone (rimSeam.mjs), which
           // the horizon compresses into fewer rows.
           const depth = Math.max(12, Math.min(140, Math.round(seam.froth.y * scale) - yBottom - MARGIN))
-          const farDepth = Math.max(12, Math.min(140, yTop - MARGIN - Math.round(seam.far.y * scale)))
-          const y0 = Math.max(0, yTop - MARGIN - farDepth)
+          // The far band never crosses its projected bound into the far shore; a
+          // band the horizon squeezes below FAR_ROWS_MIN rows fails the reading.
+          const farDepth = Math.min(140, yTop - MARGIN - Math.round(seam.far.y * scale))
+          const y0 = Math.max(0, yTop - MARGIN - Math.max(0, farDepth))
           const y1 = Math.min(info.height - 1, yBottom + MARGIN + depth)
           const strips = []
           for (let i = 1; i <= 14; i++) {
@@ -3518,6 +3520,7 @@ if (section('adult-errands')) {
           const worst = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])))
           readings.push({
             strips: strips.length,
+            farRows: farDepth,
             far,
             near,
             zone,
@@ -3531,11 +3534,12 @@ if (section('adult-errands')) {
         const mid = readings[1]
         const step = pick(readings.map((r) => r.step), 0.5)
         const zoneStep = pick(readings.map((r) => r.zoneStep), 0.5)
-        const enough = readings.every((r) => r.strips >= 6)
+        const FAR_ROWS_MIN = 4
+        const enough = readings.every((r) => r.strips >= 6 && r.farRows >= FAR_ROWS_MIN)
         check(
           `the water beyond the plate’s rim is the SAME water as the water at the bank (≤ ${RIM_STEP_LIMIT}/255 per channel)`,
           enough && step <= RIM_STEP_LIMIT,
-          `middle capture: ${mid.strips} clear strips · far ${say(mid.far)} against near ${say(mid.near)} — median step ${step.toFixed(1)} ` +
+          `middle capture: ${mid.strips} clear strips · far band ${mid.farRows} rows (≥ ${FAR_ROWS_MIN}) · far ${say(mid.far)} against near ${say(mid.near)} — median step ${step.toFixed(1)} ` +
             `(${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
         )
         check(
