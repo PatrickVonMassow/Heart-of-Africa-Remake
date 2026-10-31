@@ -352,6 +352,44 @@ def _point_tri(p, a, b, c):
     return np.minimum(d, np.minimum(seg(a, b), np.minimum(seg(b, c), seg(c, a))))
 
 
+def split_vertex_worst(body, clips, cfg):
+    """Per inserted vertex its worst distance to the reference (part (a) of
+    `split_regression`) through every frame of the gated export clips (all
+    but SPLIT_GATE_EXEMPT) at every body corner: what the gate judges, for
+    body.py's snap fallback."""
+    import gamepath as GP
+    from penetration import CORNERS
+    from sheets import corner_weights
+    sp = body['split']
+    n0 = sp['n0']
+    ids = np.arange(n0, len(body['pos']))
+    tris0 = np.asarray(sp['tris0'])
+    i0, w0 = top4(sp['W0'])
+    i1, w1 = top4(body['W'])
+    names = [c for c in EXPORT_CLIPS if c not in SPLIT_GATE_EXEMPT]
+    worst = np.zeros(len(ids))
+    for c in CORNERS:
+        w = corner_weights(*c)
+        p0 = sp['pos0'].copy()
+        p1 = body['pos'].copy()
+        j = body['joints'].copy()
+        for m, x in w.items():
+            if x:
+                p0 += x * body['morph_pos'][m][:n0]
+                p1 += x * body['morph_pos'][m]
+                j += x * body['joint_deltas'][m]
+        person = GP.Person(j)
+        b0 = person.bake(p0, i0, w0)
+        b1 = person.bake(p1[ids], i1[ids], w1[ids])
+        for _cn, _f, k, q, hips in GP.poses(clips, names, cfg):
+            wr, wp = person.pose(q, hips, k)
+            v0 = person.skin(b0, i0, w0, wr, wp)
+            v1 = person.skin(b1, i1[ids], w1[ids], wr, wp)
+            tgt = np.einsum('kj,kji->ki', sp['bary'], v0[tris0[sp['parent']]])
+            np.maximum(worst, np.linalg.norm(v1 - tgt, axis=1), out=worst)
+    return worst
+
+
 def split_regression(body, clips, cfg, log=print):
     """The pre-split's clip-frame regression (body.py `presplit`): through every
     exported clip frame at every body corner along the game's path, (a) every

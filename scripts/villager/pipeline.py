@@ -153,7 +153,7 @@ def main():
     # each cache keyed on its inputs (sources, config, its own code, the keys
     # of the steps it reads): a cache built from other inputs is rebuilt
     keys = CK.step_keys(cfg)
-    body = cached(a.work, 'body', lambda: B.build_body(mh, cfg), force='body' in steps, key=keys['body'])
+    body = cached(a.work, 'body', lambda: B.build_body(mh, cfg, src=a.src), force='body' in steps, key=keys['body'])
     have = lambda n: n in steps or os.path.exists(os.path.join(a.work, n + '.pkl'))  # noqa: E731
     clips = None
     if have('clips') and any(s in steps for s in ('clips', 'export', 'sheets', 'penetration', 'garments', 'runtime')):

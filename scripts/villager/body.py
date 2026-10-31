@@ -301,7 +301,9 @@ def top4(W):
     return idx, w
 
 
-def build_body(mh, cfg):
+def build_body(mh, cfg, src=None):
+    """The villager body; with the sources `src` the shell pre-split's snap
+    fallback also judges the cut over the gated export clips (`presplit`)."""
     shapes = cfg['VILLAGER_ASSET']['handShapes']
     C = corner_shapes(mh, cfg)
     basis, deltas = morph_deltas(C)
@@ -342,7 +344,15 @@ def build_body(mh, cfg):
     split = cfg['VILLAGER_ASSET']['bodySplit']
     subdivide(body, SHL.cuts(L), split, mh=mh)
     body['region'] = region_scalars(body['pos'], body.pop('Wr'))
-    presplit(body, SHL.cuts(L), mh=mh, split=split)
+    judge = None
+    if src is not None:
+        # the clips read the joints, the palms and the foot and shin rest
+        # mesh, which the cut leaves as they are
+        import clips as CL
+        import fit as F
+        clips = CL.build_clips(src, body, cfg)
+        judge = lambda cut: F.split_vertex_worst(cut, clips, cfg)  # noqa: E731
+    presplit(body, SHL.cuts(L), mh=mh, split=split, judge=judge)
     body['region_bits'] = SHL.region_words(body['region'], L)
     return body
 
@@ -760,35 +770,55 @@ def snaps(st, ids, resid, cuts, region, limit):
     return out
 
 
-def presplit(body, cuts, mh=None, refit_weights=True, split=None):
+def presplit(body, cuts, mh=None, refit_weights=True, split=None, judge=None):
     """Cut `body` in place along `cuts` ([(scalar, value, (lo, hi) or None)],
     in order); inserted vertices take the refit (`refit`) and, with `mh`,
     their surface map; a vertex the refit cannot follow within
-    split['snapLimit'] is snapped (`snaps`) and the cut redone. Records
+    split['snapLimit'], over the refit poses or by `judge` (a cut body →
+    per inserted vertex its worst distance), is snapped (`snaps`) and the cut
+    redone. Records
     body['split'] (the reference: the body before the cut) for the
     regression."""
     split = split or {}
     reach = split.get('reach')
     n0 = len(body['pos'])
-    st, ids, resid = _cut(body, cuts, refit_weights, reach)
-    snapped = snaps(st, ids, resid, cuts, body['region'], split['snapLimit']) if 'snapLimit' in split else {}
-    if snapped:
-        body['region'] = {k: v.copy() for k, v in body['region'].items()}
-        for (key, v), c in snapped.items():
-            body['region'][key][v] = c
-        print(f'[body] snapped {len(snapped)} cut edges to their nearer end')
-        st, ids, resid = _cut(body, cuts, refit_weights, reach)
     tris0 = body['tris']
     W0 = {'pos': body['pos'], 'W': body['W']}
+
+    def record(st, ids, resid, snapped):
+        return {'n0': n0, 'tris0': tris0, 'pos0': W0['pos'], 'W0': W0['W'], 'parent': st['vparent'][ids],
+                'bary': st['vbary'][ids], 'edge': st['vedge'][ids], 'torig': st['torig'],
+                'resid': resid, 'snapped': snapped}
+
+    st, ids, resid = _cut(body, cuts, refit_weights, reach)
+    snapped = {}
+    # the refit poses turn one bone at a time; `judge` (the gated export
+    # clips, fit.split_vertex_worst) also sees the clips' combined turns,
+    # which the gate measures. A snap moves its neighbours' cut vertices, so
+    # the clips judge again until no new edge snaps.
+    for _ in range(4 if judge else 1):
+        if 'snapLimit' not in split:
+            break
+        worst = resid
+        if judge and len(ids):
+            cut = {**body, **{k: st[k] for k in ('pos', 'tris', 'W', 'morph_pos')}, 'split': record(st, ids, resid, 0)}
+            worst = np.maximum(resid, judge(cut))
+        new = {k: c for k, c in snaps(st, ids, worst, cuts, body['region'], split['snapLimit']).items() if k not in snapped}
+        if not new:
+            break
+        snapped.update(new)
+        body['region'] = {k: v.copy() for k, v in body['region'].items()}
+        for (key, v), c in new.items():
+            body['region'][key][v] = c
+        print(f'[body] snapped {len(new)} cut edges to their nearer end ({len(snapped)} in all)')
+        st, ids, resid = _cut(body, cuts, refit_weights, reach)
     for k in ('pos', 'tris', 'tri_uv', 'W', 'morph_pos', 'region'):
         body[k] = st[k]
     if mh is not None and len(ids):
         idx, bary, off = body['map']
         i2, b2, o2 = surface_map(mh, body['basis_full'], body['pos'][ids])
         body['map'] = (np.concatenate([idx, i2]), np.concatenate([bary, b2]), np.concatenate([off, o2]))
-    body['split'] = {'n0': n0, 'tris0': tris0, 'pos0': W0['pos'], 'W0': W0['W'], 'parent': st['vparent'][ids],
-                     'bary': st['vbary'][ids], 'edge': st['vedge'][ids], 'torig': st['torig'],
-                     'resid': resid, 'snapped': len(snapped)}
+    body['split'] = record(st, ids, resid, len(snapped))
     return body
 
 
@@ -886,6 +916,11 @@ def selftest_split():
     presplit(body, [('y', 0.5, None)], split={'snapLimit': -1.0})
     assert len(body['pos']) == 4 and body['split']['snapped'] == 2, (len(body['pos']), body['split']['snapped'])
     assert body['region']['y'][0] == 0.5 and body['region']['y'][1] == 0.5 and np.allclose(body['pos'][:2, 1], 0)
+    # the judge snaps what the refit poses leave within the limit
+    body = _toy_body()
+    presplit(body, [('y', 0.5, None)], split={'snapLimit': 0.5},
+             judge=lambda cut: np.ones(len(cut['pos']) - cut['split']['n0']))
+    assert len(body['pos']) == 4 and body['split']['snapped'] == 2, (len(body['pos']), body['split']['snapped'])
     # band subdivision: every band edge ends at most lmax long, conforming
     body = _toy_body()
     subdivide(body, [('y', 0.5, None)], {'rounds': 8, 'band': {'y': 0.1, 'arm': 0.1}, 'lmax': 0.3, 'tau': 0.0})
