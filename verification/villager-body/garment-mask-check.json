@@ -27,33 +27,33 @@
   "g-hairBag-crown",
   "g-limbRings-limbs"
  ],
- "vertices": 13331,
- "triangles": 26658,
+ "vertices": 11825,
+ "triangles": 23646,
  "sets": [
   {
    "worn": [
     "g-loinFlap-waist"
    ],
    "hidden": 0,
-   "covered": 60,
-   "drawnTriangles": 26658,
+   "covered": 53,
+   "drawnTriangles": 23646,
    "coveredIds": [
     1047,
     2516,
-    4299,
-    4302,
-    4787,
-    4789,
-    5735,
-    5736,
-    5737,
-    6033,
-    6034,
-    6035,
-    6036,
-    7842,
-    7844,
-    7846
+    4273,
+    4276,
+    4717,
+    4719,
+    5573,
+    5574,
+    5575,
+    5793,
+    5794,
+    5795,
+    7298,
+    7302,
+    7587,
+    7593
    ]
   },
   {
@@ -61,25 +61,25 @@
     "g-girdleTails-waist"
    ],
    "hidden": 0,
-   "covered": 157,
-   "drawnTriangles": 26658,
+   "covered": 127,
+   "drawnTriangles": 23646,
    "coveredIds": [
     1047,
     1049,
     2516,
     2518,
     3414,
-    3833,
     3834,
-    4299,
-    4300,
-    4301,
-    4302,
-    4303,
-    4310,
-    4786,
-    4787,
-    4788
+    4273,
+    4274,
+    4275,
+    4276,
+    4277,
+    4284,
+    4716,
+    4717,
+    4718,
+    4719
    ]
   },
   {
@@ -87,34 +87,34 @@
     "g-apron-waist"
    ],
    "hidden": 0,
-   "covered": 292,
-   "drawnTriangles": 26658,
+   "covered": 241,
+   "drawnTriangles": 23646,
    "coveredIds": [
     1047,
-    1048,
     1049,
     2516,
     2517,
     2518,
-    3333,
     3413,
     3414,
     3415,
     3416,
-    3780,
     3833,
     3834,
     3835,
-    3836
+    3836,
+    4273,
+    4274,
+    4275
    ]
   },
   {
    "worn": [
     "g-skirtShort-waist"
    ],
-   "hidden": 683,
-   "covered": 1882,
-   "drawnTriangles": 25472,
+   "hidden": 735,
+   "covered": 1927,
+   "drawnTriangles": 22370,
    "coveredIds": [
     1047,
     1048,
@@ -138,9 +138,9 @@
    "worn": [
     "g-skirtKnee-waist"
    ],
-   "hidden": 725,
-   "covered": 1951,
-   "drawnTriangles": 25365,
+   "hidden": 757,
+   "covered": 1910,
+   "drawnTriangles": 22293,
    "coveredIds": [
     1047,
     1048,
@@ -164,9 +164,9 @@
    "worn": [
     "g-wrapLong-waist"
    ],
-   "hidden": 763,
-   "covered": 1994,
-   "drawnTriangles": 25286,
+   "hidden": 801,
+   "covered": 1975,
+   "drawnTriangles": 22194,
    "coveredIds": [
     1047,
     1048,
@@ -190,11 +190,10 @@
    "worn": [
     "g-wrapLong-chest"
    ],
-   "hidden": 3602,
-   "covered": 4521,
-   "drawnTriangles": 19601,
+   "hidden": 3513,
+   "covered": 4428,
+   "drawnTriangles": 16779,
    "coveredIds": [
-    546,
     589,
     621,
     622,
@@ -204,6 +203,7 @@
     626,
     627,
     628,
+    629,
     630,
     631,
     632,
@@ -216,9 +216,9 @@
    "worn": [
     "g-shirt-chest"
    ],
-   "hidden": 4911,
-   "covered": 7025,
-   "drawnTriangles": 17295,
+   "hidden": 4293,
+   "covered": 6570,
+   "drawnTriangles": 15457,
    "coveredIds": [
     318,
     335,
@@ -242,9 +242,9 @@
    "worn": [
     "g-robe-chest"
    ],
-   "hidden": 4931,
-   "covered": 7006,
-   "drawnTriangles": 17253,
+   "hidden": 4599,
+   "covered": 6465,
+   "drawnTriangles": 14888,
    "coveredIds": [
     318,
     335,
@@ -268,9 +268,9 @@
    "worn": [
     "g-toga-leftShoulder"
    ],
-   "hidden": 3636,
-   "covered": 5367,
-   "drawnTriangles": 19623,
+   "hidden": 3604,
+   "covered": 5183,
+   "drawnTriangles": 16661,
    "coveredIds": [
     533,
     534,
@@ -282,23 +282,22 @@
     570,
     571,
     574,
+    576,
     577,
     578,
     579,
     587,
-    589,
-    625
+    589
    ]
   },
   {
    "worn": [
     "g-toga-rightShoulder"
    ],
-   "hidden": 3614,
-   "covered": 5309,
-   "drawnTriangles": 19701,
+   "hidden": 3623,
+   "covered": 5139,
+   "drawnTriangles": 16662,
    "coveredIds": [
-    383,
     509,
     510,
     511,
@@ -313,21 +312,24 @@
     520,
     521,
     522,
-    523
+    523,
+    524
    ]
   },
   {
    "worn": [
     "g-cloak-bothShoulders"
    ],
-   "hidden": 6191,
-   "covered": 8311,
-   "drawnTriangles": 14743,
+   "hidden": 5562,
+   "covered": 7825,
+   "drawnTriangles": 12964,
    "coveredIds": [
     318,
     319,
+    321,
     335,
     336,
+    382,
     383,
     508,
     509,
@@ -337,23 +339,24 @@
     513,
     514,
     515,
-    516,
-    517,
-    518
+    516
    ]
   },
   {
    "worn": [
     "g-cloak-chest"
    ],
-   "hidden": 6524,
-   "covered": 8303,
-   "drawnTriangles": 14039,
+   "hidden": 5873,
+   "covered": 7752,
+   "drawnTriangles": 12310,
    "coveredIds": [
+    316,
     318,
     319,
+    321,
     335,
     336,
+    382,
     383,
     508,
     509,
@@ -362,24 +365,24 @@
     512,
     513,
     514,
-    515,
-    516,
-    517,
-    518
+    515
    ]
   },
   {
    "worn": [
     "g-cape-chest"
    ],
-   "hidden": 2789,
-   "covered": 5629,
-   "drawnTriangles": 21510,
+   "hidden": 2203,
+   "covered": 5049,
+   "drawnTriangles": 19643,
    "coveredIds": [
+    316,
     318,
     319,
+    321,
     335,
     336,
+    382,
     383,
     508,
     509,
@@ -388,19 +391,16 @@
     512,
     513,
     514,
-    515,
-    516,
-    517,
-    518
+    515
    ]
   },
   {
    "worn": [
     "g-cape-leftShoulder"
    ],
-   "hidden": 1442,
-   "covered": 4414,
-   "drawnTriangles": 24047,
+   "hidden": 1054,
+   "covered": 3808,
+   "drawnTriangles": 21786,
    "coveredIds": [
     335,
     527,
@@ -410,11 +410,11 @@
     534,
     535,
     536,
+    544,
     545,
     546,
     549,
     550,
-    561,
     567,
     568,
     569
@@ -424,10 +424,11 @@
    "worn": [
     "g-cape-rightShoulder"
    ],
-   "hidden": 1326,
-   "covered": 4370,
-   "drawnTriangles": 24226,
+   "hidden": 1085,
+   "covered": 3804,
+   "drawnTriangles": 21695,
    "coveredIds": [
+    335,
     383,
     508,
     509,
@@ -442,8 +443,7 @@
     518,
     519,
     520,
-    521,
-    522
+    521
    ]
   },
   {
@@ -452,18 +452,21 @@
    ],
    "hidden": 0,
    "covered": 0,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": []
   },
   {
    "worn": [
     "g-hood-overHead"
    ],
-   "hidden": 2067,
-   "covered": 5436,
-   "drawnTriangles": 22882,
+   "hidden": 2131,
+   "covered": 4737,
+   "drawnTriangles": 19722,
    "coveredIds": [
+    0,
+    1,
     2,
+    3,
     4,
     5,
     6,
@@ -473,12 +476,9 @@
     10,
     11,
     12,
+    13,
     14,
-    16,
-    17,
-    18,
-    19,
-    20
+    15
    ]
   },
   {
@@ -487,7 +487,7 @@
    ],
    "hidden": 0,
    "covered": 6,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": [
     349,
     350,
@@ -503,7 +503,7 @@
    ],
    "hidden": 0,
    "covered": 76,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": [
     63,
     82,
@@ -529,7 +529,7 @@
    ],
    "hidden": 0,
    "covered": 99,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": [
     63,
     75,
@@ -553,9 +553,9 @@
    "worn": [
     "g-veil-face"
    ],
-   "hidden": 141,
-   "covered": 1735,
-   "drawnTriangles": 26541,
+   "hidden": 128,
+   "covered": 1766,
+   "drawnTriangles": 23558,
    "coveredIds": [
     0,
     1,
@@ -581,7 +581,7 @@
    ],
    "hidden": 0,
    "covered": 0,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": []
   },
   {
@@ -590,7 +590,7 @@
    ],
    "hidden": 0,
    "covered": 0,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": []
   },
   {
@@ -599,7 +599,7 @@
    ],
    "hidden": 0,
    "covered": 0,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": []
   },
   {
@@ -608,7 +608,7 @@
    ],
    "hidden": 0,
    "covered": 0,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": []
   },
   {
@@ -616,9 +616,9 @@
     "g-robe-chest",
     "g-turban-aroundHead"
    ],
-   "hidden": 4931,
-   "covered": 7012,
-   "drawnTriangles": 17253,
+   "hidden": 4599,
+   "covered": 6471,
+   "drawnTriangles": 14888,
    "coveredIds": [
     318,
     335,
@@ -643,9 +643,9 @@
     "g-wrapLong-chest",
     "g-headband-aroundHead"
    ],
-   "hidden": 3602,
-   "covered": 4620,
-   "drawnTriangles": 19601,
+   "hidden": 3513,
+   "covered": 4527,
+   "drawnTriangles": 16779,
    "coveredIds": [
     63,
     75,
@@ -670,14 +670,17 @@
     "g-shirt-chest",
     "g-cloak-chest"
    ],
-   "hidden": 7309,
-   "covered": 8451,
-   "drawnTriangles": 12350,
+   "hidden": 6651,
+   "covered": 7948,
+   "drawnTriangles": 10633,
    "coveredIds": [
+    316,
     318,
     319,
+    321,
     335,
     336,
+    382,
     383,
     508,
     509,
@@ -686,10 +689,7 @@
     512,
     513,
     514,
-    515,
-    516,
-    517,
-    518
+    515
    ]
   },
   {
@@ -698,14 +698,17 @@
     "g-cape-chest",
     "g-limbRings-limbs"
    ],
-   "hidden": 3514,
-   "covered": 7580,
-   "drawnTriangles": 20217,
+   "hidden": 2960,
+   "covered": 6959,
+   "drawnTriangles": 18290,
    "coveredIds": [
+    316,
     318,
     319,
+    321,
     335,
     336,
+    382,
     383,
     508,
     509,
@@ -714,17 +717,14 @@
     512,
     513,
     514,
-    515,
-    516,
-    517,
-    518
+    515
    ]
   },
   {
    "worn": [],
    "hidden": 0,
    "covered": 0,
-   "drawnTriangles": 26658,
+   "drawnTriangles": 23646,
    "coveredIds": []
   }
  ]
