@@ -11,7 +11,7 @@ import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { sectionGate } from './sections.mjs'
-import { laneSkipVerdict, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
+import { timingVerdict, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
 import { fileURLToPath } from 'node:url'
 
 // The seed is applied by the launcher (verify-seed.mjs), so this is the plain URL.
@@ -40,18 +40,22 @@ export const unmeasured = (name, reason) => {
   console.log(`UNMEASURED  ${name} — ${reason}${sections.tag()}`)
   unmeasuredChecks.push({ name, reason })
 }
-// A TIMING check declares the frame rate it needs; below it the lane cannot
-// answer and the check is reported UNMEASURED with the measured rate. On a lane
-// that meets it the identical check runs. The rate is re-measured at the check:
-// the boot reading can include a multi-second build hitch. Returns the skip
-// reason (null when the check ran), so checks built on the same measurement
-// can report UNMEASURED with it instead of asserting on a partial reading.
+// A TIMING check declares the frame rate it needs and is judged after it ran
+// (timingVerdict): a success is PASS on any lane; a failure below the declared
+// rate is UNMEASURED with the measured rate, a failure at or above it is red.
+// The rate is measured at the check, and only for a failure: the boot reading
+// can include a multi-second build hitch. Returns the UNMEASURED reason (null
+// otherwise), so checks built on the same measurement can report UNMEASURED
+// with it instead of asserting on a partial reading.
 export const checkTiming = async (name, needFps, ok, detail) => {
-  const fps = await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
-  const v = laneSkipVerdict({ needFps, measuredFps: fps })
-  if (v.skip) unmeasured(name, v.reason)
-  else check(name, ok, detail)
-  return v.skip ? v.reason : null
+  const fps = ok ? null : await page.evaluate(laneFpsProbe, 2000).catch(() => laneFps)
+  const v = timingVerdict({ ok, needFps, measuredFps: fps })
+  if (v.verdict === 'unmeasured') {
+    unmeasured(name, v.reason)
+    return v.reason
+  }
+  check(name, ok, detail)
+  return null
 }
 export const check = (name, ok, detail, coverage = null) => {
   // The section tag goes AFTER the ' — ' separator: the check's NAME is its

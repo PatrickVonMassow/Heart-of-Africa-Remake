@@ -130,8 +130,9 @@ if (section('settlement-season')) {
   const settle = async (label) => {
     const r = await waitForReadingStable(page, () => window.__placeSeason(), { settleMs: 500, samples: 3, requireChange: true, timeout: 60000 })
     // A TIMING check (point 642): a 60 s settle deadline over a per-frame lerp.
-    // It declares the rate it needs and is UNMEASURED below it (the software
-    // lane read it after 60176 ms). OPEN: 10 fps is an estimate, calibrate.
+    // It declares the rate it needs; a settle that fails below it is UNMEASURED
+    // (the software lane read it after 60176 ms), one that succeeds passes on any
+    // lane. OPEN: 10 fps is an estimate, calibrate.
     const skip = await checkTiming(`the ${label} settlement season reading settles before it is read`, 10, r.settled, `after ${r.waitedMs} ms`)
     if (skip && !seasonSkip) seasonSkip = `built on the ${label} season reading, which did not settle: ${skip}`
     return r.value
