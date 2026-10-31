@@ -14,6 +14,7 @@ import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, OUT, section, check, unmeasured, waitForMoment, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
+import { standOrderMoment } from './standOrder.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
@@ -2843,55 +2844,7 @@ if (section('adult-errands')) {
     // it does not — whose wait was a 180 s wall budget, so a slow lane saw fewer
     // errands and reddened. The wait now counts rendered frames (MOMENT_BUDGET);
     // a lane that cannot deliver them before the hang guard is UNMEASURED.
-    const orderWait = await waitForMoment(
-        () => {
-          const e = window.__placeErrands()
-          const v = e.villagers
-          const stand = e.geography.waterStand
-          if (!stand) return null
-          // WHAT WAS ACTUALLY SEEN, so a miss says why rather than only that.
-          const w = window.__errandWatch
-          for (const p of v) if (p.work) w.seen[`${p.work.situation}:${p.work.phase}`] = (w.seen[`${p.work.situation}:${p.work.phase}`] ?? 0) + 1
-          // How near the returning carrier ever gets to the stand, and whether
-          // the errand ever counts him as arrived there.
-          for (const p of v) {
-            if (p.work?.situation !== 'water-back') continue
-            const d = Math.hypot(p.x - stand.x, p.z - stand.z)
-            w.back = Math.min(w.back ?? Infinity, d)
-            if (p.work.arrived) w.backArrived = (w.backArrived ?? 0) + 1
-            w.backGoal = Math.hypot(p.work.x - stand.x, p.work.z - stand.z)
-          }
-          // THE MOMENT IS THE WORD, NOT A DISTANCE. Waiting for the carrier to be
-          // within so many metres of the stand chased a window whose width
-          // depends on the errand's pace; the errand itself says when the order
-          // fell. `last` carries the utterance and its age, so this waits for a
-          // RIVER that has just been spoken on the outward leg — the sender is
-          // its speaker and is still standing there, the carrier is the man
-          // walking off with the empty jar.
-          // NO AGE BOUND (point 642): since work-orders 1184/1405 the carrier
-          // waits out the RIVER instruction delay (word + 2.5 s) and then takes
-          // the jar up at the table, so a word at most 2.5 s old never met a
-          // carrier with the jar. The order binds sender and carrier instead:
-          // the sender's word is the last one, he is still on the errand, and
-          // the carrier is HIS partner.
-          const said = e.last
-          if (!said || said.id !== 'water-out') return null
-          const sender = said.speaker
-          if (!v[sender] || v[sender].work?.situation !== 'water-out') return null
-          for (let i = 0; i < v.length; i++) {
-            if (i === sender || v[i].work?.situation !== 'water-out' || v[i].work.partner !== sender || v[i].carry !== 'emptyJar') continue
-            const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
-            return {
-              stand,
-              carrier: { who: i, x: v[i].x, z: v[i].z },
-              sender: { who: sender, x: v[sender].x, z: v[sender].z },
-              gap,
-            }
-          }
-          return null
-        },
-        MOMENT_BUDGET,
-      )
+    const orderWait = await waitForMoment(standOrderMoment, MOMENT_BUDGET)
     const order = orderWait.value
     const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {} })
     if (orderWait.wallCapped) {
