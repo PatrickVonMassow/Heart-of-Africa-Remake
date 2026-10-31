@@ -35321,3 +35321,34 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   while the lane that meets it runs the same check for real.
   Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
   door point 640 closes from the other side.
+
+- [x] 568. The polish water-sameness check rotates its verdict (measured 09.08.2026 by
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
+  launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
+  plate's rim is the SAME water as the water at the bank (≤ 12/255)" — went RED on the
+  first run with samples 13.8, 12.1 and 19.3 straddling the limit, and fully GREEN on a
+  second run at the IDENTICAL commit and the IDENTICAL seed (164 PASS, 0 FAIL). The seed
+  work is not the cause: `polish` was seeded 42 before and after, so the world it walked
+  was the same both times. What rotates therefore sits BELOW the layout — the water
+  shading itself, or the moment the sample is taken.
+  WHY IT MATTERS BEYOND THE FLAKE: point 549 pinned the seed precisely so a red could be
+  believed. A check that still rotates on a fixed world is the next layer of the same
+  problem, and it sits on the everyday gate where it costs a rerun every time.
+  FINAL STATE: the cause is IDENTIFIED before anything is tuned — the two candidates are
+  a genuine frame-timing dependence (the sample taken before the water material has
+  settled, in which case the check polls on the app's own clock rather than a fixed
+  wait) and a real shading seam at the plate rim that only sometimes exceeds the
+  tolerance (in which case it is a PRODUCT defect and the check is right to fire). The
+  tolerance is NOT widened to make the red go away until it is established which of the
+  two it is; if it is the product, the water fix comes first and the check stays.
+  SAME FAMILY AS POINT 200 (carried 20.08.2026 from the 10.08.2026 four-eyes work-order
+  analysis, not a fresh finding): points 336 and 570 already name 200's rotating-staging
+  family and this check is the third member of it. The ten-run reading below belongs to the
+  same quiet-machine round rather than a separate one.
+  VERIFIABLE: the check runs ten times on the pinned seed with the same verdict every
+  time, and whichever cause was found is named in the commit message with its evidence.
+  Criticality: medium — it does not itself hide a product defect, but it may BE one, and
+  it erodes the trust in a red that point 549 was built to restore.
+  EVIDENCE 31.10.2026 (WebGPU, main c07148b15, branch feat/568-rim-water-seam created, no commits yet): the check no longer ROTATES — every recorded run in local/ since at least 24.09.2026 is FAIL (steps 16-29, outliers 88 and 124 on 30.10). This run: far 9/89/102 against near 31/82/94, median step 22.3 (18.8, 22.3, 29.0); the rim-zone check 12.4. The three captures with the projected lines drawn in (temporary RIM_DEBUG save of each capturePixels shot plus seam JSON, not committed) show no hard line, but a SOFT, REAL tone step at the handover: below the projected bottom line (out(radius+12, -0.25), y=585 of 900) the water turns greyer and warmer (red channel up ~20) than the saturated teal above. Leading reading: a PRODUCT difference between the drawn surface and the panorama sheet, not frame timing — both read the same colour from src/render/waterAppearance.ts, so the step must come from what differs after it (drawn mesh: relief-bumped normal, 0.94->1 opacity over the bed, own lighting/fog path; panorama: opaque). Measurement caveat for the next author: the projected top/bottom/froth points land far off-screen horizontally (x 4175-5311 on a 1440 frame), because out() goes along the river normal from the place centre, not from the camera, and the froth line (y=529) projects ABOVE the bottom line, so the near band collapses to its 12-row floor. Next step: toggle the candidates in the running scene (relief off, opacity 1, fog) and read the step after each; fix the product side first, then re-aim the band lines from the camera's own ray, then the ten-run reading.
+  EVIDENCE 31.10.2026, later (WebGPU, branch at 7f3711469 = re-aimed bands b7cd7d443, far band bounded before the far shore 8304569dd/63f774186, both bands counted in VISIBLE rows and stopped at froth/frame edge 7f3711469 after two cross-lane review findings): the verdict ROTATES AGAIN, on a fixed commit and seed. Section runs of adult-errands: 63f774186 green (steps 6.0, 7.3), then red 14.4 (far 8/88/101 against near 0/74/91, far band 26 rows); 7f3711469 green, then red 17.3 (17.3, 16.8, 18.6; far/near band 27/103 rows, far 12/93/104 against near 0/76/92). Inside one run the three captures agree; between runs the step jumps from ~6-7 to ~14-17, and in every red the NEAR band is the darker one (red channel 0 against 8-12). The band geometry is therefore no longer the cause (103 visible near rows, no floor stretch). Leading reading: a per-RUN input below the seeded layout — time of day/sun, weather or cloud shadow, or water-animation phase at entry — that the seed does not pin (scripts/verify/_polish.mjs sets no time of day, clock or weather anywhere, goToPlace included). Next step: record those inputs beside the three captures (the check already prints its detail on PASS — scripts/verify/_polish.mjs check() — but the run-all log keeps only FAIL lines, so read the suite's raw stdout for green runs), find the one that differs between a green and a red run, then decide product seam versus unpinned staging per the final state; the ten-run reading follows that.
