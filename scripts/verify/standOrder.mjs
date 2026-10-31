@@ -43,10 +43,12 @@ export function standOrderMoment() {
     w.backGoal = Math.hypot(p.work.x - stand.x, p.work.z - stand.z)
   }
   // A fresh word: a different utterance than last poll, or the same one
-  // younger again (spoken anew).
+  // younger again (spoken anew). A word already standing at the first poll was
+  // spoken before the watch began, so it belongs to no errand it saw start.
   const said = e.last
   const prev = w.word
-  if (said && (!prev || prev.id !== said.id || prev.speaker !== said.speaker || said.age < prev.age)) w.wordAt = w.poll
+  if (said && w.poll === 1) w.wordAt = 0
+  else if (said && (!prev || prev.id !== said.id || prev.speaker !== said.speaker || said.age < prev.age)) w.wordAt = w.poll
   w.word = said ? { id: said.id, speaker: said.speaker, age: said.age } : null
   if (!said || said.id !== 'water-out') return null
   const sender = said.speaker
