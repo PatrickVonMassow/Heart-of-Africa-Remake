@@ -8,7 +8,7 @@ const camera = { x: 37.1, z: -28 }
 describe('rimSeamPoints', () => {
   it('puts the lines on the camera’s own forward line, not the place centre’s', () => {
     const p = rimSeamPoints(river, camera)
-    for (const pt of [p.top, p.bottom, p.froth]) expect(pt.z).toBeCloseTo(-28)
+    for (const pt of [p.far, p.top, p.bottom, p.froth]) expect(pt.z).toBeCloseTo(-28)
   })
 
   it('aims the bottom line at the drawn surface’s far edge, the top past the rim zone', () => {
@@ -19,8 +19,15 @@ describe('rimSeamPoints', () => {
     expect(p.bottom.y).toBe(WATER_Y)
   })
 
+  it('gives the far band the near band’s width in metres, so it stops short of the far shore', () => {
+    const p = rimSeamPoints(river, camera)
+    expect(p.far.x - p.top.x).toBeCloseTo(p.bottom.x - p.froth.x)
+    expect(p.far.x).toBeCloseTo(51.2 + RIM_ZONE_M + 7)
+  })
+
   it('keeps the near band between froth and edge, nearer than the far band', () => {
     const p = rimSeamPoints(river, camera)
+    expect(p.top.x).toBeLessThan(p.far.x)
     expect(p.froth.x).toBeLessThan(p.bottom.x)
     expect(p.bottom.x).toBeLessThan(p.top.x)
   })

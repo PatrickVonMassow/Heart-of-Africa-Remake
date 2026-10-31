@@ -25,7 +25,9 @@ export const WATER_Y = -0.25
  * World points of the three band lines, on the camera's forward line.
  * @param river `{ normal, downstream, distance, reach }` from `__placeRiver()`
  * @param camera the camera position `{ x, z }`
- * @returns `{ top, bottom, froth }` — top: the far side of the handover zone;
+ * @returns `{ far, top, bottom, froth }` — far: where the far band stops, as
+ *   many metres past the zone as the near band spans, so it stays on the
+ *   river short of its far shore; top: the far side of the handover zone;
  *   bottom: the drawn surface's far edge; froth: where the shore froth ends.
  */
 export function rimSeamPoints(river, camera) {
@@ -34,5 +36,10 @@ export function rimSeamPoints(river, camera) {
   const along = camera.x * downstream.x + camera.z * downstream.z
   const at = (out, y) => ({ x: normal.x * out + downstream.x * along, y, z: normal.z * out + downstream.z * along })
   const edge = distance + reach
-  return { top: at(edge + RIM_ZONE_M, WATER_Y), bottom: at(edge, WATER_Y), froth: at(distance + FROTH_REACH_M, WATER_Y) }
+  const span = reach - FROTH_REACH_M
+  return {
+    far: at(edge + RIM_ZONE_M + span, WATER_Y),
+    top: at(edge + RIM_ZONE_M, WATER_Y),
+    bottom: at(edge, WATER_Y), froth: at(distance + FROTH_REACH_M, WATER_Y),
+  }
 }

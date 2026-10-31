@@ -3448,6 +3448,7 @@ if (section('adult-errands')) {
         // across the panorama's tucked rim. Plus the line three metres out from
         // the waterline, where the shore froth ends — the near band stops there
         // rather than measuring froth.
+        const far = project(lines.far.x, lines.far.y, lines.far.z)
         const top = project(lines.top.x, lines.top.y, lines.top.z)
         const bottom = project(lines.bottom.x, lines.bottom.y, lines.bottom.z)
         const froth = project(lines.froth.x, lines.froth.y, lines.froth.z)
@@ -3462,9 +3463,9 @@ if (section('adult-errands')) {
           if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity) === 0) continue
           blockers.push({ x0: b.left, x1: b.right, y0: b.top, y1: b.bottom })
         }
-        return { top, bottom, froth, blockers, w: window.innerWidth }
+        return { far, top, bottom, froth, blockers, w: window.innerWidth }
       }, { lines })
-      if (!seam || !seam.top || !seam.bottom || !seam.froth) {
+      if (!seam || !seam.far || !seam.top || !seam.bottom || !seam.froth) {
         await page.evaluate(() => window.__placeFreezeLife?.(false))
         check('the river’s rim is in the picture to measure (work-order 525)', false, JSON.stringify(seam))
       } else {
@@ -3478,8 +3479,12 @@ if (section('adult-errands')) {
           const scale = info.width / seam.w
           const yTop = Math.round(seam.top.y * scale)
           const yBottom = Math.round(seam.bottom.y * scale)
+          // Each band spans its own rows: the near one out to the froth line, the
+          // far one the same metres of water past the zone (rimSeam.mjs), which
+          // the horizon compresses into fewer rows.
           const depth = Math.max(12, Math.min(140, Math.round(seam.froth.y * scale) - yBottom - MARGIN))
-          const y0 = Math.max(0, yTop - MARGIN - depth)
+          const farDepth = Math.max(12, Math.min(140, yTop - MARGIN - Math.round(seam.far.y * scale)))
+          const y0 = Math.max(0, yTop - MARGIN - farDepth)
           const y1 = Math.min(info.height - 1, yBottom + MARGIN + depth)
           const strips = []
           for (let i = 1; i <= 14; i++) {
