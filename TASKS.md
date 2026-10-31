@@ -112,25 +112,6 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try. Point 1419 (cloud session_019XD8Qts48RxNzEfjXP9wSR, 27.10.2026) does not meet item 2 either: owner commits after the handover (capture subject fix, review fix) changed the tree, so build, lint and test:unit ran again before the merge; acceptance log local/1419-land.log.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 1202. The dig picture's camera stand lies inside the settlement.
-  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
-  PROBLEM, measured 23.09.2026 while repairing point 1198: `digPictureView` (scripts/verify/
-  digSitePicture.mjs) puts the stand for fixture `bambara-village` seed 58 at x 12.0, z 30.6
-  (r 32.9 m), past the settlement boundary, so `isOutsidePlace` fires on the first frame,
-  PlaceScene leaves the place, and `polish --section=adult-errands` reads `the spoil crossing
-  starts on flat ground — {"error":"no patch dig site","place":null}`; frame
-  `1056-two-excavations-walkable-spoil` is never taken. `src/scenes/place/digPicture.test.ts`
-  stays green because it never asks for the stand to be inside. A seed search over 0-799 with
-  that extra condition found no seed on either side of the pair: the far side is outside, the
-  near side fails `standingClear` on the sight lines (636 of 1600 probes).
-  FINAL STATE: the fixture test asserts `isOutsidePlace(layout, view.x, view.z) === false`, a
-  composition (seed, stand side, or a stand-off rule) passes it with every existing condition,
-  and `polish --section=adult-errands` takes frame 1056 on WebGPU and WebGL 2 with no red but
-  those charged to point 568.
-  Criticality: medium — a picture proof of the dig spoil is missing on every run.
-  Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
-  Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
-  Bundle: Dorfleben
 - [ ] 1461. Cloud author clones judge the scarce lane OFF and stop on the serving-model tripwire
   Queue position: directly after point 1308 (owner 28.10.2026: reproducible blockade of the cloud authoring flow the cloud switch makes the default).
   Final state: a cloud-session clone of this repository, which carries no local lane-switch state, no longer stops a delegated Opus 5.5 author on the serving-model tripwire for admitted Fable 5.1 trailers on main; the owner checkout's tripwire keeps refusing a commit naming Fable 5.1 while the recorded switch is OFF. Narrowest fix under the CLAUDE.md §2 infrastructure freeze (e.g. the tripwire stands down for a session that does not hold the batch lock, as every other session guard already does per the house facts), no new guard.
