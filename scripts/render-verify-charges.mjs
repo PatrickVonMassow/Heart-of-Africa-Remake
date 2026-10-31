@@ -895,7 +895,7 @@ export const RED_CHARGES = [
       'though the same measured failure then reads as unowned.',
   },
   {
-    point: 568,
+    point: 1476,
     suite: 'polish-villagers',
     backend: 'webgpu',
     featureLevel: 'compatibility',
@@ -909,7 +909,7 @@ export const RED_CHARGES = [
       'is taken too early or the rim seam is real.',
   },
   {
-    point: 568,
+    point: 1476,
     suite: 'polish-villagers',
     backend: 'webgl',
     kind: 'check',
@@ -923,7 +923,7 @@ export const RED_CHARGES = [
       '568 owns — whether the sample is taken too early or the rim seam is real.',
   },
   {
-    point: 568,
+    point: 1476,
     suite: 'polish-villagers',
     backend: 'webgl',
     kind: 'check',
@@ -935,7 +935,7 @@ export const RED_CHARGES = [
       'which must establish whether the sample is taken too early or the rim seam is real.',
   },
   {
-    point: 568,
+    point: 1476,
     suite: 'polish-villagers',
     backend: 'webgpu',
     featureLevel: 'compatibility',

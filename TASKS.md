@@ -15955,3 +15955,12 @@ to land than a mechanism that needs a review.
   3. Result (question 4) also gives, for every infrastructure entry in docs/backlog.md, a verdict "obsolete: yes/no" with reason; obsolete entries are closed in docs/backlog.md with the reason "obsolete by infrastructure simplification"; a non-obsolete entry that shows a real defect of the remaining infrastructure is named in the plan so the user can decide on it.
   No new mechanism.
   Bundle: Session- & Repo-Hygiene (amendment to 1463, rides with it).
+- [ ] 1476. The rim water checks stay red after point 568 landed
+  Source: owner 31.10.2026, landing point 1202. Point 568 landed (fb3132a95, phase-mean judging of the drifting streaks) and was ticked, but its four entries in scripts/render-verify-charges.mjs stayed, so the shipped-ledger unit test (`charges only points the work order still holds OPEN`) went red on main and stopped the 1202 landing gate.
+  MEASURED 31.10.2026 at 9025afa7b (568 merged): `npm test -- polish-villagers --section=adult-errands` red on WebGPU AND WebGL 2, both rim checks — "the water beyond the plate's rim is the SAME water" (far 14/95/106 against near 31/85/95) and "the handover zone itself carries neither band's edge" (rim zone 8/87/100, median step 14.8: 9.5, 14.8, 21.3). Log: local/verify-logs/2026-10-31T12-34-50-156-polish-villagers.log.
+  The four charges move from 568 to this point so the reds keep an owner.
+  FINAL STATE: the per-run input behind the rim step named in 568's last evidence is fixed in the product or the check, both rim checks pass on WebGPU and WebGL 2 in three consecutive adult-errands section runs, and the four charges for this point are deleted.
+  Test: `polish-villagers --section=adult-errands` on both backends; Vitest scripts/render-verify-core.test.mjs.
+  Refs: archived point 568, scripts/render-verify-charges.mjs.
+  Criticality: medium — a standing red on every adult-errands run.
+  Bundle: Dorfleben
