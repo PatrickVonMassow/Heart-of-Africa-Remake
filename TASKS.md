@@ -15943,5 +15943,6 @@ to land than a mechanism that needs a review.
   FINAL STATE: the per-run input behind the rim step named in 568's last evidence is fixed in the product or the check, both rim checks pass on WebGPU and WebGL 2 in three consecutive adult-errands section runs, and the four charges for this point are deleted.
   Test: `polish-villagers --section=adult-errands` on both backends; Vitest scripts/render-verify-core.test.mjs.
   Refs: archived point 568, scripts/render-verify-charges.mjs.
+  Charged 31.10.2026 (findings carrier, polish-villagers --section=adult-errands, WebGPU, 5f6679479, 1 of 10 runs): the jar-mouth check rotates — 'the jar's mouth is tipped under the water surface — mouth at 0.097 m, surface at -0.25 m (hand 0.107, feet 0, ground -0.348)'; not in the classified baseline. It blocks the same three-green proof, so it is named and fixed or charged here.
   Criticality: medium — a standing red on every adult-errands run.
   Bundle: Dorfleben
