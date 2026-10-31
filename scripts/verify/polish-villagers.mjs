@@ -15,6 +15,7 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, OUT, section, check, unmeasured, waitForMoment, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
 import { standOrderMoment } from './standOrder.mjs'
+import { rimSeamPoints } from './rimSeam.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
@@ -3427,7 +3428,11 @@ if (section('adult-errands')) {
       // (point 642) — the water keeps moving, which is what the three captures
       // are for.
       await page.evaluate(() => window.__placeFreezeLife?.(true))
-      const seam = await page.evaluate((r) => {
+      // The lines are aimed at the handover itself — the drawn surface's far
+      // edge — along the camera's own forward line (scripts/verify/rimSeam.mjs).
+      const camAt = await page.evaluate(() => ({ x: window.__placeCamera.position.x, z: window.__placeCamera.position.z }))
+      const lines = river.reach > 0 ? rimSeamPoints(river, camAt) : null
+      const seam = await page.evaluate(({ lines }) => {
         const cam = window.__placeCamera
         const apply = (e, v) => [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
         const project = (x, y, z) => {
@@ -3437,18 +3442,15 @@ if (section('adult-errands')) {
           if (!(w > 0)) return null
           return { x: ((clip[0] / w) * 0.5 + 0.5) * window.innerWidth, y: (0.5 - (clip[1] / w) * 0.5) * window.innerHeight }
         }
-        const out = (dist, y) => project(r.normal.x * dist, y, r.normal.z * dist)
-        const radius = window.__placeLayout?.radius
-        if (!(radius > 0)) return null
+        if (!lines) return null
         // The handover zone, bounded by geometry rather than guessed: from the
-        // ground disc's edge (where the panorama's surface has climbed back to
-        // the ground plane) down to the backdrop's inner rim at the water's own
-        // level (where that surface first breaks the drawn sheet). Plus the line
-        // three metres out from the waterline, where the shore froth ends — the
-        // near band stops there rather than measuring froth.
-        const top = out(radius + 14, 0)
-        const bottom = out(radius + 12, -0.25)
-        const froth = out(r.distance + 3, -0.25)
+        // drawn surface's far edge (where the panorama's water takes over) out
+        // across the panorama's tucked rim. Plus the line three metres out from
+        // the waterline, where the shore froth ends — the near band stops there
+        // rather than measuring froth.
+        const top = project(lines.top.x, lines.top.y, lines.top.z)
+        const bottom = project(lines.bottom.x, lines.bottom.y, lines.bottom.z)
+        const froth = project(lines.froth.x, lines.froth.y, lines.froth.z)
         // Everything on screen that is NOT the picture.
         const blockers = []
         for (const el of document.body.querySelectorAll('*')) {
@@ -3461,7 +3463,7 @@ if (section('adult-errands')) {
           blockers.push({ x0: b.left, x1: b.right, y0: b.top, y1: b.bottom })
         }
         return { top, bottom, froth, blockers, w: window.innerWidth }
-      }, river)
+      }, { lines })
       if (!seam || !seam.top || !seam.bottom || !seam.froth) {
         await page.evaluate(() => window.__placeFreezeLife?.(false))
         check('the river’s rim is in the picture to measure (work-order 525)', false, JSON.stringify(seam))

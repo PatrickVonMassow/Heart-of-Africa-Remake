@@ -109,6 +109,7 @@ export const NON_RENDER_VERIFY = new Set([
   'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; the polish-* suites drives the browser
   'errandShutter.mjs', // the fill shot's line test over positions; polish-villagers.mjs reads them
   'standOrder.mjs', // the stand-order moment over errand state; polish-villagers.mjs drives the page
+  'rimSeam.mjs', // the river-rim band lines on the camera's forward line; polish-villagers.mjs projects them
   'fixedWaits.mjs',
   'footingSeries.mjs', // the slope-footing verdict; the polish-* suites hands it the samples
   'frameSubject-core.mjs',
