@@ -35372,3 +35372,10 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
   Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
   Bundle: Dorfleben
+
+- [x] 1461. Cloud author clones judge the scarce lane OFF and stop on the serving-model tripwire
+  Queue position: directly after point 1308 (owner 28.10.2026: reproducible blockade of the cloud authoring flow the cloud switch makes the default).
+  Final state: a cloud-session clone of this repository, which carries no local lane-switch state, no longer stops a delegated Opus 5.5 author on the serving-model tripwire for admitted Fable 5.1 trailers on main; the owner checkout's tripwire keeps refusing a commit naming Fable 5.1 while the recorded switch is OFF. Narrowest fix under the CLAUDE.md §2 infrastructure freeze (e.g. the tripwire stands down for a session that does not hold the batch lock, as every other session guard already does per the house facts), no new guard.
+  Evidence (28.10.2026, owner 9c5950f8): cloud authors for 1308 (session_019XD8QvphJSWxogsH5cmKJf) and 642 (session_019XD8Qtdz4X4qrvHCwnZwbr) ended their sessions on "SERVING-MODEL TRIPWIRE: commit(s) 813efab, ffdeaa0, 873a1b5, 3bb62f1 … Fable 5.1 … refused because the recorded lane switch is OFF … no recorded switch state in this checkout; judged as off" (scripts/model-guard-core.mjs:129), nine Stop refusals each, after one commit (1308) and two commits (642); the owner checkout reads scarce ON (user 31.08.2026). Both were told by message to continue.
+  Verifiable: a test of the tripwire decision: no switch state plus no batch lock held → no stop; switch OFF in the owner session → today's refusal.
+  Bundle: Session- & Repo-Hygiene.
