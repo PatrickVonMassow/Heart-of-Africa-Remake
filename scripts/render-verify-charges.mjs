@@ -361,29 +361,6 @@ export const RED_CHARGES = [
       + 'whether the player or the injected window.__pad is hit, and the charge dies with it.',
   },
   {
-    point: 642,
-    suite: 'polish-settlement',
-    kind: 'check',
-    match: /^the (dry|wet) settlement season reading settles before it is read/i,
-    // NO detailMatch, deliberately. The check has exactly ONE failing mode —
-    // `waitForReadingStable` returning unsettled, which happens only when its
-    // 60 s window runs out — so the name alone is already as narrow as a
-    // measurement would make it. And a SUSPECT record carries its first
-    // attempt's reds by NAME only, with no measurement at all, so a
-    // detail-scoped entry could never own the very record this red arrives in.
-    why:
-      'THE SETTLE DEADLINE POINT 642 NAMES BY NAME. That point lists this very check — '
-      + '"polish\'s ... dry settlement-season settle (read after 60176 ms)" — among the checks '
-      + 'whose subject is a wall-clock budget and which therefore have to DECLARE the throughput '
-      + 'they need and SKIP below it, rather than red on a lane that cannot deliver frames fast '
-      + 'enough. Measured again 06.09.2026 in the webgpu polish run at 19:15:15Z ("after 60276 '
-      + 'ms"), on a host whose quiet the run itself could not verify, and the retry read it '
-      + 'clean. Nothing in the change under it touches the settlement season: the same run was '
-      + 'taken for point 1058, whose whole diff is the speech-hypothesis section of this suite. '
-      + 'It is charged, not excused — 642 owns making the check say what it needs — and the '
-      + 'charge dies with that point.',
-  },
-  {
     point: 1043,
     suite: 'polish-speech',
     kind: 'check',
@@ -666,7 +643,8 @@ export const RED_CHARGES = [
   {
     // RE-POINTED 20.08.2026: point 506 was folded into 642, and a charge to a ticked point
     // expires. 642 carries 506's mechanism, so it owns this red now.
-    point: 642,
+    // RE-POINTED 31.10.2026: 642 landed; 725 owns the release-frame measurement for this check.
+    point: 725,
     suite: 'polish-panorama',
     backend: 'webgpu',
     featureLevel: 'compatibility',
@@ -1860,33 +1838,6 @@ export const RED_CHARGES = [
       + 'with 565.',
   },
   {
-    point: 642,
-    suite: 'polish-settlement',
-    backend: 'webgl',
-    kind: 'check',
-    // NO detailMatch. The printed measurement is one lit-minus-shadow number per
-    // ring stone, and the ledger's rule keeps measured numbers out of a signature —
-    // there is no wording left to narrow on once the numbers are out. The scope
-    // is therefore the check, the suite and the WebGL 2 lane, which is exactly
-    // the case point 642 already names in its own text.
-    match: /^fire shadows ON: the ground behind a ring stone is measurably darker than beside it/i,
-    why:
-      'THE CASE POINT 642 NAMES BY NAME: "the goat\'s planted foot and \'fire shadows ON\' both red '
-      + 'on WebGL 2 at 00:34, taken while a WebGPU polish run and two building agents shared the '
-      + 'machine, and both green on the same commit at 05:50 on a quiet one". MEASURED AGAIN '
-      + '17.09.2026 on feat/1140-cursor-mode-lock c8c11373b, VERIFY_GL=webgl, log '
-      + '.claude/worktrees/point-1140/local/verify-logs/2026-09-17T10-40-42-933-docs-i18n-flow-'
-      + 'collision-polish-settings-enrichments.log: lit-minus-shadow per stone [1.3, -1.3, 0] — two '
-      + 'of three stones read at or above zero and one reads negative — on a run whose own quiet-'
-      + 'machine check printed MACHINE NOT QUIET (busy), and the runner\'s section retry passed '
-      + 'clean (2 pass, 0 fail) minutes later on the same commit. The sibling WebGL 2 pass of the '
-      + 'same hour reddened a DIFFERENT load-sensitive polish check (children-motion) and likewise '
-      + 'passed its retry, which is the signature of load rather than of a shadow defect. Point 1140 '
-      + 'touches the HUD, the keyboard map and the settlement pointer lock and no light, shadow or '
-      + 'campfire code at all. 642 owns classifying this check as state or timing; the charge dies '
-      + 'with it.',
-  },
-  {
     point: 1187,
     backend: 'webgl',
     suite: 'polish-villagers',
@@ -1930,17 +1881,6 @@ export const RED_CHARGES = [
       + 'hausa-village plan seed 1838110026, one of the seeds point 1197 names as still firing '
       + 'loom-unseen-from-plaza. Pure layout, so no backend is excluded. The charge dies with point 1197.',
   })),
-  {
-    point: 642,
-    suite: 'polish-villagers',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^the order at the stand can be photographed: a sender still there and a carrier already going\b/i,
-    why:
-      'MEASURED 24.09.2026 on feat/1176 f69e1c300, webgl/polish: the moment-catcher point 642 '
-      + 'names as its fourth case (15.09.2026) found no order inside its 180 s window; the branch '
-      + 'does not touch the water errand. The charge dies with point 642.',
-  },
   {
     point: 1203,
     suite: 'voice',
@@ -2067,22 +2007,6 @@ export const RED_CHARGES = [
       + 'section alone green on the same head; point 1270 owns the pair staging. The same signature on webgpu '
       + 'in the whole-suite run 2026-10-29T03-48-21-257 (tails false), the section alone green on webgpu at 97ecef7d0 '
       + '(point 1465), so the charge holds on both backends. The charge dies with point 1270.',
-  },
-  {
-    point: 642,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^the order at the stand can be photographed: a sender still there and a carrier already going\b/i,
-    detailMatch: /^no order in 180 s/i,
-    detailReadsPrefix: true,
-    why:
-      'MEASURED 18.10.2026 on main f698cd920, webgpu full polish-villagers: the moment-catcher point 642 '
-      + 'names as its fourth case found no order inside its 180 s window (charged before on 24.09.2026, '
-      + 'struck after one green pass). AND IT READS THE FRONT OF A MEASUREMENT THE RECORD CUT '
-      + '(detailReadsPrefix): the detail is cut at the 200-character bound inside the phase list '
-      + '(25.10.2026, feat/1333 a2ed3ff3d webgpu, uncharged as cut), and what the bound removes is the '
-      + 'tail of the phase list and the carrier distance; the signature "no order in 180 s" sits at '
-      + 'the front, clear of the bound. The charge dies with point 642.',
   },
   {
     point: 1449,
