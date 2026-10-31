@@ -341,7 +341,7 @@ def build_body(mh, cfg):
     L = landmarks(jbasis, cfg['VILLAGER_ASSET']['stature'])
     split = cfg['VILLAGER_ASSET']['bodySplit']
     subdivide(body, SHL.cuts(L), split, mh=mh)
-    body['region'] = region_scalars(body['pos'], body['W'])
+    body['region'] = region_scalars(body['pos'], body.pop('Wr'))
     presplit(body, SHL.cuts(L), mh=mh, split=split)
     body['region_bits'] = SHL.region_words(body['region'], L)
     return body
@@ -483,6 +483,8 @@ def split_edges(st, edges):
     half = lambda x: 0.5 * (x[a] + x[b])  # noqa: E731
     st['pos'] = np.concatenate([st['pos'], half(st['pos'])])
     st['W'] = np.concatenate([st['W'], half(st['W'])])
+    if 'Wr' in st:
+        st['Wr'] = np.concatenate([st['Wr'], half(st['Wr'])])
     st['morph_pos'] = {m: np.concatenate([v, half(v)]) for m, v in st['morph_pos'].items()}
     out_t, out_uv = [], []
     for f, tv in enumerate(st['tris']):
@@ -513,20 +515,14 @@ def split_edges(st, edges):
 
 
 def on_surface(body, st, n1, keys, mh):
-    """The midpoints n1.. of the edges `keys` (split_edges order) onto the
-    MakeHuman surface: nearest full-mesh point of the chord midpoint plus the
-    ends' mean offset; position, morph deltas and weights read there, as
-    build_body reads them for a decimated vertex; body['map'] extended."""
+    """The skin weights of the midpoints n1.. of the edges `keys` (split_edges
+    order) read off the MakeHuman surface at their nearest full-mesh point, as
+    build_body reads a decimated vertex's; position and morph deltas stay the
+    ends' means (the band's surface is the coarse body's); body['map']
+    extended."""
     idx, bary, off = body['map']
-    a = np.array([k[0] for k in keys])
-    b = np.array([k[1] for k in keys])
     ids = np.arange(n1, n1 + len(keys))
-    i2, b2, _o = surface_map(mh, body['basis_full'], st['pos'][ids])
-    o2 = 0.5 * (off[a] + off[b])
-    pos = apply_map(body['basis_full'], i2, b2, o2)
-    st['pos'][ids] = pos
-    for m, d in body['deltas_full'].items():
-        st['morph_pos'][m][ids] = apply_map(body['basis_full'] + d, i2, b2, o2) - pos
+    i2, b2, o2 = surface_map(mh, body['basis_full'], st['pos'][ids])
     st['W'][ids] = (body['Wfull'][i2] * b2[:, :, None]).sum(1)
     body['map'] = (np.concatenate([idx, i2]), np.concatenate([bary, b2]), np.concatenate([off, o2]))
 
@@ -539,17 +535,17 @@ def subdivide(body, cuts, split, mh=None):
     on short edges, where a four-bone vertex can follow the surface; the
     subdivided, uncut body is the cut's reference (body['split']).
 
-    With the MakeHuman mesh `mh`, each midpoint is then taken as build_body
-    takes a decimated vertex: mapped onto the full mesh's surface (its ends'
-    mean offset kept), its position, morph deltas and weights read there. A
-    mean of its ends' weights would blend the far joints of a long edge into
-    the midpoint (a mid-shin vertex a quarter on the thigh sinks under the
-    knelt shin), and a midpoint on the flat chord leaves the band faceted
-    against the smooth coarse shading round it."""
+    With the MakeHuman mesh `mh`, each midpoint's skin weights are read off
+    the full mesh's surface (`on_surface`): a mean of its ends' weights blends
+    the far joints of a long edge into it (a mid-shin vertex a quarter on the
+    thigh sinks under the knelt shin)."""
     st = {k: body[k] for k in ('pos', 'tris', 'tri_uv', 'W', 'morph_pos')}
+    # the shell regions stay classified on the ends' mean weights, as before
+    # the surface weights; only the skin reads those
+    st['Wr'] = body['W'].copy()
     n0 = len(st['pos'])
     for _ in range(split['rounds']):
-        reg = region_scalars(st['pos'], st['W'])
+        reg = region_scalars(st['pos'], st['Wr'])
         tr = st['tris']
         band = np.zeros(len(tr), bool)
         for key, c, within in cuts:
