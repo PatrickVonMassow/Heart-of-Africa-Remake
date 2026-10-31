@@ -11,10 +11,10 @@
 //    A before/after pair with an action between the reads is a different shape and
 //    is not refused.
 // 2. A TIMING check (a rate, a frame budget, a settle deadline) is load-sensitive by
-//    nature. It DECLARES the throughput it needs and `laneSkipVerdict` decides, from
-//    the lane's measured frame rate, whether the lane can answer it. Below the
-//    declared figure the check is reported UNMEASURED with the measured rate, never
-//    red and never silently green; at or above it the identical check runs.
+//    nature. It DECLARES the throughput it needs, runs, and `timingVerdict` judges
+//    the result: a success is PASS on any lane (a success under load is still
+//    evidence); a failure below the declared rate is UNMEASURED with the measured
+//    rate, never red; a failure at or above it, or on an unmeasured lane, is FAIL.
 import ts from 'typescript'
 
 /**
@@ -32,6 +32,18 @@ export function laneSkipVerdict({ needFps, measuredFps }) {
     skip: true,
     reason: `lane delivers ${measuredFps.toFixed(1)} fps, the check needs ${needFps} fps — this lane cannot answer it`,
   }
+}
+
+/**
+ * The verdict of a timing check that has RUN: `ok` is its result. A success is
+ * 'pass' whatever the lane rate; only a failure on a lane below `needFps` is
+ * 'unmeasured' (the lane could not answer), and a failure on a lane that meets
+ * the rate or whose rate is unknown is 'fail'. `reason` is set for 'unmeasured'.
+ */
+export function timingVerdict({ ok, needFps, measuredFps }) {
+  const lane = laneSkipVerdict({ needFps, measuredFps })
+  if (ok) return { verdict: 'pass', reason: null }
+  return lane.skip ? { verdict: 'unmeasured', reason: lane.reason } : { verdict: 'fail', reason: null }
 }
 
 /** Did a wait end on its wall budget? Only Playwright's TimeoutError is a lane

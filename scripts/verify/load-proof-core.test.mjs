@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { laneSkipVerdict, findSplitComparisons, laneSkips, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
+import { laneSkipVerdict, timingVerdict, findSplitComparisons, laneSkips, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
 import { REPO_ROOT } from '../repo-paths.mjs'
 
 describe('laneSkipVerdict — a timing check declares the throughput it needs', () => {
@@ -24,6 +24,33 @@ describe('laneSkipVerdict — a timing check declares the throughput it needs', 
   it('refuses a check that declares no positive throughput', () => {
     expect(() => laneSkipVerdict({ needFps: 0, measuredFps: 30 })).toThrow(/needFps/)
     expect(() => laneSkipVerdict({ measuredFps: 30 })).toThrow(/needFps/)
+  })
+})
+
+describe('timingVerdict — a timing check is judged after it ran', () => {
+  it('passes a success on a lane below the declared rate: a success under load is evidence', () => {
+    expect(timingVerdict({ ok: true, needFps: 10, measuredFps: 9.1 })).toEqual({ verdict: 'pass', reason: null })
+  })
+  it('passes a success on a lane that meets the rate', () => {
+    expect(timingVerdict({ ok: true, needFps: 10, measuredFps: 58 })).toEqual({ verdict: 'pass', reason: null })
+  })
+  it('reports a failure below the declared rate UNMEASURED with the measured rate', () => {
+    const v = timingVerdict({ ok: false, needFps: 10, measuredFps: 9.1 })
+    expect(v.verdict).toBe('unmeasured')
+    expect(v.reason).toMatch(/9\.1 fps/)
+    expect(v.reason).toMatch(/needs 10 fps/)
+  })
+  it('keeps a failure at or above the declared rate FAIL', () => {
+    expect(timingVerdict({ ok: false, needFps: 10, measuredFps: 10 })).toEqual({ verdict: 'fail', reason: null })
+    expect(timingVerdict({ ok: false, needFps: 10, measuredFps: 58 })).toEqual({ verdict: 'fail', reason: null })
+  })
+  it('keeps a failure on an unmeasurable lane FAIL and passes a success there', () => {
+    expect(timingVerdict({ ok: false, needFps: 10, measuredFps: null }).verdict).toBe('fail')
+    expect(timingVerdict({ ok: false, needFps: 10, measuredFps: Number.NaN }).verdict).toBe('fail')
+    expect(timingVerdict({ ok: true, needFps: 10, measuredFps: null }).verdict).toBe('pass')
+  })
+  it('refuses a check that declares no positive throughput, whatever the result', () => {
+    expect(() => timingVerdict({ ok: true, needFps: 0, measuredFps: 30 })).toThrow(/needFps/)
   })
 })
 
