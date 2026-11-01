@@ -97,7 +97,7 @@ def form(name):
 
 def garment_names(garments):
     """The masked garments in bit order (the pipeline's garment order)."""
-    names = [n for n in garments['meshes'] if n.startswith('g-')]
+    names = G.cloth_names(garments['meshes'])
     if len(names) > BITS:
         raise ValueError(f'{len(names)} garments: the cover mask holds {BITS}')
     return names
@@ -436,6 +436,10 @@ def masks(body, garments, cfg, clips=None, log=print):
             if c.any():
                 cls[b] = c
         inner[n] = to_bits(cls, len(gv[n]))
+    # a shell (shells.py) is the body's own surface: hidden and pushed by its
+    # sources' body mask, no mask entry of its own and no bit
+    for n in G.shell_names(garments['meshes']):
+        inner[n] = np.zeros((0, 4), np.uint16)
     return {'garments': names, 'body': to_bits(body_cls, len(bv)), 'inner': inner}
 
 
@@ -500,7 +504,7 @@ def inner_corners(body, garments, cfg, mk, log=print):
                 log(f'mask: {n} under {o} at every body corner: {int(((c == 1) & (k == 2)).sum())} hidden points pushed instead')
             cls[b] = k
         inner[n] = to_bits(cls, len(m))
-    return {**mk, 'inner': inner}
+    return {**mk, 'inner': {**mk['inner'], **inner}}
 
 
 # ---- the mask over every pose ------------------------------------------------------
@@ -740,7 +744,9 @@ def check(out, mk, body, outfits):
     per worn set its covered vertices and drawn triangles."""
     import json
     import os
-    sets = [[n] for n in mk['garments']] + [list(o) for o in outfits]
+    # shells carry no mask bit (shells.py): the body's mask is decoded with
+    # the legacy garments of each outfit
+    sets = [[n] for n in mk['garments']] + [[n for n in o if n in mk['garments']] for o in outfits]
     rows = []
     for worn in sets:
         hide, push = decode(mk['body'], mk['garments'], worn)

@@ -38,7 +38,8 @@ def node_name(b):
     return b.replace('.', '_')
 
 
-def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=True, extra_attrs=None, extras=None, cover=None, compact=False):
+def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=True, extra_attrs=None, extras=None, cover=None, compact=False,
+                     region=None):
     """`compact` (the garments): weights as normalized unsigned shorts, morph
     deltas as normalized shorts with those under GARMENT_MORPH_EPS left out
     — the game reads no file normal of a garment (it recomputes them after
@@ -59,6 +60,10 @@ def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=T
     if cover is not None:
         # the garment cover mask (mask.py): hide lo, hide hi, push lo, push hi
         attrs['_COVER'] = w.accessor(np.asarray(cover, np.uint16), U16, 'VEC4', target=34962)
+    if region is not None:
+        # the shell regions' words (shells.py): bits 0-15, bits 16-31, 0, 0
+        r = np.asarray(region, np.uint32)
+        attrs['_REGION'] = w.accessor(np.stack([r & 0xFFFF, r >> 16, 0 * r, 0 * r], 1).astype(np.uint16), U16, 'VEC4', target=34962)
     targets = []
     for m in MORPHS:
         d = morphs[m]
@@ -112,8 +117,14 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
     w.j['skins'].append(skin)
     roots = [bone_nodes['hips']]
     add_skinned_mesh(w, 'body', body['pos'], body['tris'], body['W'], body['morph_pos'], 0, roots, extras={'part': 'skin'},
-                     cover=None if mask is None else mask['body'])
+                     cover=None if mask is None else mask['body'], region=body.get('region_bits'))
+    shells = {}
     for name, g in (garments or {}).get('meshes', {}).items():
+        if g.get('part') == 'shell':
+            # a shell garment ships as its recipe (shells.py): the game builds
+            # it on the drawn body from the region words, rows, rank and base
+            shells[name] = g
+            continue
         # the infant's head in a baby sling (garments.py babySling: uv v ≥ 2),
         # painted in the infant's skin by the game
         infant = np.asarray(g['uv'])[:, 1] >= 2 if (g.get('extras') or {}).get('form') == 'babySling' else None
@@ -147,10 +158,33 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
         meta['garments'] = garments.get('meta', {})
     if mask is not None:
         meta['garmentMask'] = {'garments': list(mask['garments'])}
+    if shells:
+        order = sorted(shells, key=lambda n: shells[n]['bit'])
+        meta['shells'] = {
+            'step': float(cfg['VILLAGER_ASSET']['garmentShellStep']),
+            'bits': order,
+            'garments': {n: {'bit': int(shells[n]['bit']), 'rank': int(shells[n]['rank']), 'base': float(shells[n]['base']),
+                             'rows': [[int(v) for v in loop] for loop in shells[n]['rows']]} for n in order},
+        }
     w.j['scenes'][0]['nodes'] = roots
     w.j['scenes'][0]['extras'] = {'villager': meta}
     w.write(path)
     print(f'export: {path} — {len(w.bin) / 1024:.0f} KiB binary, {len(w.j["meshes"])} meshes, {len(w.j["animations"])} clips')
+    if shells:
+        check_shells(w.j, len(body['pos']), list(shells))
+
+
+def check_shells(j, nbody, names):
+    """The written file holds every shell as extras, the body's _REGION of the
+    body's vertex count, and no shell mesh (round-8 B1)."""
+    meta = j['scenes'][0]['extras']['villager']['shells']
+    assert sorted(meta['garments']) == sorted(names), meta['garments'].keys()
+    assert meta['bits'] == sorted(names, key=lambda n: meta['garments'][n]['bit'])
+    meshes = {m['name']: m for m in j['meshes']}
+    assert not set(names) & set(meshes), set(names) & set(meshes)
+    acc = j['accessors'][meshes['body']['primitives'][0]['attributes']['_REGION']]
+    assert acc['count'] == nbody, (acc['count'], nbody)
+    print(f'export: {len(names)} shells as extras, _REGION on {nbody} body vertices')
 
 
 def tool_hold(body):

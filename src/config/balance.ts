@@ -2717,6 +2717,23 @@ export const VILLAGER_ASSET = {
   buildWeight: 0.3,
   /** Triangles of the decimated body (hands, feet and face kept finer). */
   bodyTriangles: 6000,
+  /** The shell regions' body pre-split (scripts/villager/body.py,
+   *  docs/garment-merge-r10-1347.md), figure units. Before the cut, edges in a
+   *  band of ±band round every cut level are halved while longer than lmax and
+   *  their Σ|Δweight| · length exceeds tau, so a cut vertex bends with a fine
+   *  surface; reach (degrees) is how far the weight refit turns each bone (about
+   *  what the clips turn it); a cut vertex the refit leaves more than snapLimit
+   *  off is snapped to its edge's nearer end; the split regression fails the
+   *  build above gateLimit outside the kneel clips. Calibratable. */
+  bodySplit: {
+    band: { y: 0.05, arm: 0.1 },
+    lmax: 0.015,
+    tau: 0.002,
+    rounds: 8,
+    reach: { spine: 25, spine1: 25, chest: 25, hips: 25, neck: 25, head: 25, shoulder: 20, thigh: 60, shin: 90, foot: 40, toe: 30, upperArm: 60, forearm: 60, hand: 40 },
+    snapLimit: 0.0014,
+    gateLimit: 0.003,
+  },
   /** How far a garment vertex may lie inside the body in any frame of any clip
    *  at any morph extreme (figure units, ≈ 4 mm) — the penetration report's
    *  tolerance. */
@@ -2738,6 +2755,14 @@ export const VILLAGER_ASSET = {
    *  normal while the covering garment is worn (render/villagerGarmentMask.ts;
    *  figure units, ≈ 5 mm). Calibratable. */
   garmentMaskPush: 0.004,
+  /** A shell garment's offset off the skin (scripts/villager/shells.py, render/
+   *  villagerShell.ts): base + rank × step along the body normal, figure units
+   *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
+  garmentShellBase: 0.003,
+  garmentShellStep: 0.003,
+  /** Per shell mesh name, a base that replaces garmentShellBase; empty since
+   *  the breast cloth returned to its hull-tube builder. Calibratable. */
+  garmentShellBaseOverride: {} as Record<string, number>,
   /** How far a body or inner-garment vertex's skin weights may differ from
    *  the covering cloth's (L1: 0 alike, 2 disjoint) and it still counts as
    *  covered: a hand hanging inside a skirt's outline swings out of it and is

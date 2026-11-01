@@ -1,0 +1,370 @@
+{
+ "mergedBy": "Fable 5.1",
+ "entries": [
+  {
+   "id": "U1",
+   "from": [
+    "A1",
+    "B1"
+   ],
+   "defect": "Diagnosis: A's four mechanisms (two-leg hull tubes, union-of-poses inflation, nearest-point weight transfer, pose-independent mask); the trouser cause stays a hypothesis tested by the in-game walking shot, as B could not see clips/rig/pose files."
+  },
+  {
+   "id": "U2",
+   "from": [
+    "A2",
+    "B2",
+    "B3",
+    "B6",
+    "B8"
+   ],
+   "defect": "Tight garments are shells copied from the drawn body's region, iso-line cut, offset along the normal, in rest pose; the region replaces its body faces; connected seat, joined sleeves and rimmed cuffs/necklines follow from the body region."
+  },
+  {
+   "id": "U3",
+   "from": [
+    "A3",
+    "B4",
+    "B48"
+   ],
+   "defect": "A shell vertex takes exactly the body's four bone weights and morph deltas at its source point, so construction and runtime deform identically for every sex/age/build combination; no transfer, smoothing or unposing."
+  },
+  {
+   "id": "U4",
+   "from": [
+    "A4"
+   ],
+   "defect": "Hull fill only where the region is weighted >= 0.9 to one trunk bone; up to ~1 cm ease on convex parts tapering at creases; a rim strip at every open edge."
+  },
+  {
+   "id": "U5",
+   "from": [
+    "A5",
+    "B5"
+   ],
+   "defect": "Trousers become one connected shell (hips below the girdle, thighs, knees, shins to mid-shin); the suspected cause of report (1) is the weight transfer, verified only by the in-game walking shot."
+  },
+  {
+   "id": "U6",
+   "from": [
+    "A6"
+   ],
+   "defect": "Breast cloth and chest-wrap top: shell band with hull fill between chestTop and under the bust; removes the flange and the sternum gape; bra-like reading is a picture residual."
+  },
+  {
+   "id": "U7",
+   "from": [
+    "A7",
+    "B7",
+    "B10",
+    "B16"
+   ],
+   "defect": "Shirt, robe, toga and chest-wrap trunk with upper arms as one shell (diagonal top edge for togas and the left-shoulder cape); every hem below the girdle is a driven skirt welded to the shell's bottom ring."
+  },
+  {
+   "id": "U8",
+   "from": [
+    "A8",
+    "B12",
+    "B42",
+    "B43",
+    "B44"
+   ],
+   "defect": "Neck ring, waist beads, girdle band and the covering chest beads become thin shell bands with exact weights; chest beads stay an opaque covering shell for Zulu youth and Mongo women; girdle tails hang on the columns; limb rings are excluded (U35)."
+  },
+  {
+   "id": "U9",
+   "from": [
+    "A9",
+    "B13",
+    "B14"
+   ],
+   "defect": "Everything hanging free below the crotch is a cone of columns from the girdle ring round the hips' hull with millimetre ease and no per-pose inflation, never an envelope round both legs; no gathers; the cone inherits the ring's morph deltas so a child's skirt fits the child."
+  },
+  {
+   "id": "U10",
+   "from": [
+    "A10",
+    "B17",
+    "B24"
+   ],
+   "defect": "12 column bones x 2 segments parented to hips; skirt vertices weighted only to hips and two nearest columns, skinned once; skirt_weights blurring and shin/foot transfer removed."
+  },
+  {
+   "id": "U11",
+   "from": [
+    "A11",
+    "B19",
+    "B20",
+    "B25",
+    "B57"
+   ],
+   "defect": "One stateless driver per frame after clip blend, stride warp, lean and IK (order per A's reading of villagerClipPose.ts): columns cleared from bone-line thigh/shin envelopes by leg radius plus worn inner shell offsets plus ease, lower segment blended to gravity; pivots from the morphed ring; TS in game, Python mirror, round trip; same at every quality level and backend; normals from the same skinning."
+  },
+  {
+   "id": "U12",
+   "from": [
+    "A12",
+    "B11"
+   ],
+   "defect": "Short skirt, loin flap and apron hang as panels on the driven columns from a fitted band; fix for report (2)."
+  },
+  {
+   "id": "U13",
+   "from": [
+    "A13"
+   ],
+   "defect": "One explicit offset rank per form replaces the slot table, corrected: 0 neck ring/chest beads, 1 loin-flap band/girdle band/breast cloth/veil, 2 apron/trousers/skirts/waist wrap, 3 waist beads, 4 shirt/robe/toga/chest wrap, 5 hood, 6 cape/cloak; ~3 mm base + 3 mm per rank, calibratable."
+  },
+  {
+   "id": "U14",
+   "from": [
+    "A14"
+   ],
+   "defect": "Hood (rank 5) under cloak (rank 6) for outfits #83/#85/#87; one-garment-per-slot is dropped."
+  },
+  {
+   "id": "U15",
+   "from": [
+    "A15",
+    "B33",
+    "B34",
+    "B35"
+   ],
+   "defect": "The mask becomes exact face sets: body and inner-shell faces inside a higher-rank shell's region are cut per face, nothing is hidden under a driven panel, the hide-bit union and the inward push are removed."
+  },
+  {
+   "id": "U16",
+   "from": [
+    "A16",
+    "B27",
+    "B28",
+    "B30"
+   ],
+   "defect": "Cloaks (both shoulders, chest): rank-6 shoulder yoke shell plus back and two front panels open at the sides, upper part a ruled surface on chest/spine past the bust, lower part on the columns; arms swing in the open side, nothing hidden."
+  },
+  {
+   "id": "U17",
+   "from": [
+    "A17"
+   ],
+   "defect": "Cape-chest: rank-6 shell over shoulders and upper arms to above the elbow with a dropped hem lip."
+  },
+  {
+   "id": "U18",
+   "from": [
+    "A18",
+    "B29"
+   ],
+   "defect": "Cape-rightShoulder: diagonal sash shell from the shoulder to the opposite hip plus a short back panel on chest/spine; removes the waist loop and the forearm through the sash."
+  },
+  {
+   "id": "U19",
+   "from": [
+    "A19"
+   ],
+   "defect": "Cape-leftShoulder uses the toga builder at knee length."
+  },
+  {
+   "id": "U20",
+   "from": [
+    "A20",
+    "B39"
+   ],
+   "defect": "Hood: rigid head part as today; shoulder part a rank-5 shell blending head through neck into body weights, cut exactly over the robe/toga shell."
+  },
+  {
+   "id": "U21",
+   "from": [
+    "A21",
+    "B40",
+    "B41"
+   ],
+   "defect": "Veil: rank-1 shell over the lower face and whole neck continuing ~4 cm under the robe/shirt collar or cloak yoke; the uniform dark head at 3 m is re-checked after the rebuild as colour and material."
+  },
+  {
+   "id": "U22",
+   "from": [
+    "A22"
+   ],
+   "defect": "Baby sling stays rigid, moved to mid-back on spine1 against the cloak's back panel."
+  },
+  {
+   "id": "U23",
+   "from": [
+    "A23",
+    "B46"
+   ],
+   "defect": "Turban, cap, headband, head ring, topknot, hair bag, hair cap and eyes stay as built; the hood rows in acceptance cover their interaction."
+  },
+  {
+   "id": "U24",
+   "from": [
+    "A24",
+    "B64"
+   ],
+   "defect": "Residuals judged by picture: inherited skinning pinch, shell self-intersection in creases, hems entering the ground, column-corner creases, thigh-top contact in dig, lifted child flaps, tighter trousers (OPEN), bra-like breast cloth (OPEN), seam and faceting on child bands, dark marks as shading."
+  },
+  {
+   "id": "U25",
+   "from": [
+    "A25",
+    "B59",
+    "B60",
+    "B62"
+   ],
+   "defect": "Remove the sweep builders, weight transfer, smoothing, skirt_weights, push_out, unskin, armholes, OUTER/SKIRTS, all of fit.py, mask.py's volume/motion/decision/push classes, garmentPush, the slot table and the asset values only they read; each step deletes the branch it makes dead, no selectable legacy path."
+  },
+  {
+   "id": "U26",
+   "from": [
+    "A26",
+    "B63"
+   ],
+   "defect": "Keep body, mhbody, rig, clips, gltfio, export (plus column bones), gamepath (plus driver mirror), sheets/inventory applying the driver, the rigid head builders, and penetration.py as information on the driven pose."
+  },
+  {
+   "id": "U27",
+   "from": [
+    "A27",
+    "B56",
+    "B58"
+   ],
+   "defect": "Cost: closed-form pipeline, one merged geometry and one draw call per figure, ~24 extra bones and ~24 vector ops per figure per frame; build time, draw count and crowd frame time measured on both backends after cutover rather than assumed."
+  },
+  {
+   "id": "U28",
+   "from": [
+    "A28"
+   ],
+   "defect": "Rank offsets, column count, skirt ease and the leg-radius factor live in src/config/balance.ts marked calibratable."
+  },
+  {
+   "id": "U29",
+   "from": [
+    "A29",
+    "B36",
+    "B37",
+    "B38",
+    "B52"
+   ],
+   "defect": "No generated combination is restricted; seasonal inner garments and children's hip coverage are kept by rank and columns; the \u00a719.15 open-outer rule stays in the generator; build error only for same-rank garments with overlapping regions."
+  },
+  {
+   "id": "U30",
+   "from": [
+    "A30"
+   ],
+   "defect": "Order: penetration gate off; shells (trousers, breast cloth, bands, veil); column rig with child hip cloths; trunk shells with driven hems; cloaks/capes/hood/sling/limb rings; final removals, balance values, docs and after pictures."
+  },
+  {
+   "id": "U31",
+   "from": [
+    "A31",
+    "B51",
+    "B65",
+    "B66",
+    "B67",
+    "B69"
+   ],
+   "defect": "Acceptance is the picture: outfits forced into reproducible in-game scenes, side-on at 3 m and 7 m on both backends, walking/running trouser wearers, children in short skirt/loin flap/apron, robe/toga/wrap wearers in walk/sprint/kneel/dig, Tuareg rows, the 158 generator outfits' motion sheets, before/after recorded in the inventory doc."
+  },
+  {
+   "id": "U32",
+   "from": [
+    "B68"
+   ],
+   "defect": "After the rebuild, trace mesh ownership and transforms for whatever remains of the bambara [C] detached pieces and the Hausa spots before attributing them to a garment."
+  },
+  {
+   "id": "U33",
+   "from": [
+    "B61"
+   ],
+   "defect": "Remove the pipeline's penetration-over-tolerance exception and stale gate text first; reports stay diagnostics, structural failures stay errors."
+  },
+  {
+   "id": "U34",
+   "from": [
+    "B49",
+    "B50"
+   ],
+   "defect": "Export column bones, ranks and region face sets in the glb extras; pivots derived at runtime from the morphed girdle ring so joint adjustment and garment deformation share one contract; no versioned schema since asset and consumer ship together."
+  },
+  {
+   "id": "U35",
+   "from": [
+    "B45"
+   ],
+   "defect": "Limb rings are rigid tori on the forearm and shin segments, oriented on the limb axis and sized per body, replacing A8's copied-weight band for this form."
+  },
+  {
+   "id": "U36",
+   "from": [
+    "B70"
+   ],
+   "defect": "Update the design-reference implementation record to the final wearing arrangements, including the waist-bead layer decision, inventing no garments."
+  },
+  {
+   "id": "U37",
+   "from": [
+    "B18",
+    "B21",
+    "B22",
+    "B23",
+    "B26"
+   ],
+   "defect": "REJECTED: a runtime cloth control-mesh solver with swept contacts, ground gathering, self-contact and posed initialisation is a system absent from the design; the stateless driven rig covers the inventory defects without it."
+  },
+  {
+   "id": "U38",
+   "from": [
+    "B53"
+   ],
+   "defect": "REJECTED: moot, the driver has no per-person cloth state beyond the bone matrices already held per figure."
+  },
+  {
+   "id": "U39",
+   "from": [
+    "B54",
+    "B55"
+   ],
+   "defect": "REJECTED: control-vertex and triangle budgets belong to the rejected solver; shell density follows the body and skirt density today's skirts."
+  },
+  {
+   "id": "U40",
+   "from": [
+    "B9"
+   ],
+   "defect": "REJECTED: a separately fitted tensioned breast panel needs a control mesh; the hull-filled shell band removes the flange and its look is judged in the picture."
+  },
+  {
+   "id": "U41",
+   "from": [
+    "B15"
+   ],
+   "defect": "REJECTED: the inventory shows no missing overlap edge on wraps, only tears, holes and a sternum gape, all removed by the cone columns and shell top."
+  },
+  {
+   "id": "U42",
+   "from": [
+    "B31"
+   ],
+   "defect": "REJECTED: a per-pair directed layering graph is not needed once four ranks are corrected; every co-worn pair in the 158 outfits orders by rank with region overlap."
+  },
+  {
+   "id": "U43",
+   "from": [
+    "B32"
+   ],
+   "defect": "REJECTED: moot, the fit is removed and cuts derive from per-garment region face sets at runtime, not from pair tables."
+  },
+  {
+   "id": "U44",
+   "from": [
+    "B47"
+   ],
+   "defect": "REJECTED: a pouch, straps and identifiable infant exceed the inventory's one sling defect, which the rigid move to mid-back on spine1 removes."
+  }
+ ]
+}

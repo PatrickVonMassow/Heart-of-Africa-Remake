@@ -1,0 +1,8 @@
+# Stage-1 garment plan — break check round 8 (GPT-6 Astra, cross-vendor)
+
+Checked docs/garment-merge-r7-1347.md (stage 1 only) against the attached code (villagerFigureBody, villagerGarmentMask, figureDress, villagerAsset, villagerBody, villagerRig, scripts/villager/export.py). Answered in 248 s.
+
+VERDICT: OBJECTIONS
+B1 | docs/garment-merge-r7-1347.md | (repeat) The round-7 B6 answer preserves shell recipes for pipeline readers but then prescribes filtering them out before export; `meshes` is their only specified store, and `meta` gains only `kind`, leaving export.py without the faces, rows, ranks and offsets needed for runtime shell extras. Preserve the recipes through the export boundary and skip only mesh emission, or explicitly pass a separate shell payload.
+B2 | docs/garment-merge-r7-1347.md | The collar selftests reject the boundary the builder deliberately creates: contour vertices are assigned arm = 0.2 and retained by the ≤ 0.2 predicate, but the inherited arm-corner assertion forbids arm ≥ 0.2; inheriting the zero-arm assertion also rejects valid shoulder blends. This makes valid collar construction fail verification. Allow contour equality, reject arm > 0.2, and keep the all-zero assertion specific to the waist band.
+B3 | docs/garment-merge-r7-1347.md | (repeat) The round-7 B5 response still suppresses its named inner-thigh contacts: both legs belong to the trousers region, so a shell vertex penetrating the opposite thigh fails the requirement that its nearest triangle be outside that region; the source-fan row does not detect that contact either. Exclude only the source’s local surface neighbourhood, rather than the entire garment region, so opposing-leg intersections are reported and their frames reach picture inspection.
