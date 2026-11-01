@@ -237,7 +237,7 @@ OUTFITS = [
     ('male', 'elder', ('g-trousers-waist', 'g-shirt-chest', 'g-cloak-chest')),
     ('female', 'youth', ('g-skirtKnee-waist', 'g-cape-chest', 'g-limbRings-limbs')),
     # every shell garment at once (shells.py): their seams over one another
-    ('female', 'adult', ('g-trousers-waist', 'g-breastCloth-chest', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist')),
+    ('female', 'adult', ('g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist')),
 ]
 
 

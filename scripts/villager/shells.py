@@ -23,7 +23,6 @@ ARM_LEVEL = 0.2
 # name, rank, region (lo, hi) as functions of the landmarks (garments.landmarks)
 SHELLS = (
     ('g-trousers-waist', 2, lambda L: (hem(L), L['girdle'])),
-    ('g-breastCloth-chest', 1, lambda L: (L['waist'] - 0.01 * L['H'], L['chestTop'])),
     ('g-neckBeads-neck', 1, lambda L: (L['neck'] - 0.008 * L['H'], L['neck'] + 0.002 * L['H'])),
     ('g-neckBeads-chest', 2, lambda L: (L['chestTop'] - 0.06 * L['H'], L['neck'] - 0.008 * L['H'])),
     ('g-waistBeads-waist', 3, lambda L: (L['hip'] + 0.013 * L['H'], L['hip'] + 0.027 * L['H'])),
@@ -94,7 +93,7 @@ def boundary_loops(tris, faces):
 
 
 def recipes(body, L, cfg):
-    """The five shell entries of garments['meshes'] (no geometry: a recipe)."""
+    """The four shell entries of garments['meshes'] (no geometry: a recipe)."""
     a = cfg['VILLAGER_ASSET']
     fm = face_masks(body['region_bits'], body['tris'])
     out = {}
@@ -366,16 +365,15 @@ def check_seams(tris, fmask, shells, worn, g, scale=1.0, step=0.0):
     return bad
 
 
-SEAM_OUTFITS = (('g-waistBeads-waist', 'g-trousers-waist'), ('g-breastCloth-chest', 'g-neckBeads-chest'),
-                ('g-neckBeads-neck', 'g-neckBeads-chest'), tuple(NAMES))
+SEAM_OUTFITS = (('g-waistBeads-waist', 'g-trousers-waist'), ('g-neckBeads-neck', 'g-neckBeads-chest'), tuple(NAMES))
 
 
 def selftest_body(body, garments, cfg, log=print):
     """The stage-1 checks on the real body: the region predicates
-    (`check_regions`); for beads over trousers, breast cloth with the chest
-    collar, both collars and all five, the per-edge seam contract
-    (`check_seams`: every seam edge face adjacency derives carries exactly one
-    rim quad at the right offsets, none off a seam). Raises on any failure.
+    (`check_regions`); for beads over trousers, both collars and all four,
+    the per-edge seam contract (`check_seams`: every seam edge face adjacency
+    derives carries exactly one rim quad at the right offsets, none off a
+    seam). Raises on any failure.
     Loops whose far surface changes along them (the rims step at a junction,
     closed per edge) are returned as information."""
     meshes = garments['meshes']

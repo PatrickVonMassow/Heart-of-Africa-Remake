@@ -397,7 +397,7 @@ async function play(s: Subject) {
 /** A forced shell layer (the round trip reads geometry, never its colour). */
 const shellLayer = (name: string): DressLayer => {
   const [, form, wear] = name.split('-')
-  const slot = form === 'trousers' ? 'hip' : form === 'breastCloth' ? 'torso' : 'ornament'
+  const slot = form === 'trousers' ? 'hip' : 'ornament'
   return { slot, form, wear, material: 'cotton', colour: '#888888', colour2: null, pattern: 'plain', source: { guess: 'round trip' } } as DressLayer
 }
 
@@ -405,8 +405,8 @@ const shellLayer = (name: string): DressLayer => {
  *  composed rest body (morphs, hang, scale, stylisePeaks) with its normals and
  *  scale, and every worn shell as the game builds it, for the seam outfits. */
 const SHELL_OUTFITS: Array<{ sex: Sex; age: AgeGroup; worn: string[] }> = [
-  { sex: 'female', age: 'adult', worn: ['g-trousers-waist', 'g-breastCloth-chest', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist'] },
-  { sex: 'female', age: 'adult', worn: ['g-breastCloth-chest', 'g-neckBeads-chest'] },
+  { sex: 'female', age: 'adult', worn: ['g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist'] },
+  { sex: 'female', age: 'adult', worn: ['g-neckBeads-neck', 'g-neckBeads-chest'] },
   { sex: 'male', age: 'child', worn: ['g-waistBeads-waist', 'g-trousers-waist'] },
 ]
 

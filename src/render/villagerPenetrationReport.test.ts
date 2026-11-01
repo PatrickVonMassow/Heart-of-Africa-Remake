@@ -40,7 +40,7 @@ const main = JSON.parse(readFileSync(resolve(dir, 'penetration-report-main.json'
 const md = readFileSync(resolve(dir, 'penetration-report.md'), 'utf8')
 // the garments migrated to shells: measured in their own rows, main's legacy
 // rows of them not compared (penetration.py compare)
-const MIGRATED = ['g-breastCloth-chest', 'g-neckBeads-chest', 'g-neckBeads-neck', 'g-trousers-waist', 'g-waistBeads-waist']
+const MIGRATED = ['g-neckBeads-chest', 'g-neckBeads-neck', 'g-trousers-waist', 'g-waistBeads-waist']
 const legacyOf = <T,>(r: Record<string, T>) => Object.keys(r).filter((n) => !MIGRATED.includes(n)).sort()
 
 // the build-pose layering residuals named in docs/backlog.md (point 1346):

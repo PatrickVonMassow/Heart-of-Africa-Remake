@@ -22,7 +22,7 @@ beforeAll(async () => {
   asset = await parseVillager(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
 })
 
-const SHELLS = ['g-trousers-waist', 'g-breastCloth-chest', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist']
+const SHELLS = ['g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist']
 const base = PEOPLE_DRESS.hausa.male.adult[0]
 const layer = (name: string): DressLayer => {
   const [, form, wear] = name.split('-')
@@ -35,7 +35,7 @@ const bodyPart = (person: GltfPerson, worn: string[]) =>
   applyGarmentMask(tidy(paint(person.geometry.clone(), '#5c3317')), person.cover, asset.garmentMask, worn, VILLAGER_ASSET.garmentMaskPush * person.frame.scale)
 
 describe('the shell garments in the file', () => {
-  it('ships the five shells as recipes in bit order, no mesh, and a region word per body vertex carrying each row', () => {
+  it('ships the four shells as recipes in bit order, no mesh, and a region word per body vertex carrying each row', () => {
     expect(asset.shells).not.toBeNull()
     const set = asset.shells!
     expect([...set.bits].sort()).toEqual([...SHELLS].sort())
@@ -110,7 +110,7 @@ describe('a worn shell on the drawn body', () => {
         const k = `${Math.min(a, c)}|${Math.max(a, c)}`
         faces.set(k, [...(faces.get(k) ?? []), f])
       }
-    for (const worn of [['g-waistBeads-waist', 'g-trousers-waist'], ['g-neckBeads-neck', 'g-neckBeads-chest'], ['g-breastCloth-chest', 'g-neckBeads-chest'], SHELLS]) {
+    for (const worn of [['g-waistBeads-waist', 'g-trousers-waist'], ['g-neckBeads-neck', 'g-neckBeads-chest'], SHELLS]) {
       const label = worn.join('+')
       // the surface on top of a face: its highest-rank worn shell, else the skin
       const top = (f: number) => {

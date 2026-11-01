@@ -2760,9 +2760,9 @@ export const VILLAGER_ASSET = {
    *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
   garmentShellBase: 0.003,
   garmentShellStep: 0.003,
-  /** Per shell mesh name, a base that replaces garmentShellBase (the breast
-   *  cloth's named response raises its own). Calibratable. */
-  garmentShellBaseOverride: { 'g-breastCloth-chest': 0.006 } as Record<string, number>,
+  /** Per shell mesh name, a base that replaces garmentShellBase; empty since
+   *  the breast cloth returned to its hull-tube builder. Calibratable. */
+  garmentShellBaseOverride: {} as Record<string, number>,
   /** How far a body or inner-garment vertex's skin weights may differ from
    *  the covering cloth's (L1: 0 alike, 2 disjoint) and it still counts as
    *  covered: a hand hanging inside a skirt's outline swings out of it and is
