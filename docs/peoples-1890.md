@@ -2409,13 +2409,13 @@ and the Congo* vol. 2 (1908) · Ward, *Five Years with the Congo Cannibals* (189
 
 ## 8. Research → game: where the implementation record lives, and the loom (TASKS point 158)
 
-The implementation record (the live dress table — six peoples, drivers, gates,
+The implementation record (the live seasonal dress table — six peoples, drivers, gates,
 sources — and its notes) is kept current in `docs/design-reference.md` §19.15;
 design.md §19.15 is the pointer to it. It left this document on the user's
 decision (17.07.2026), first for design.md and since 27.07.2026 (point 367) for
 design-reference.md: it documents the game design, not the research. This
-document remains the underlying research; only the loom, the canoe and the
-villager dress table (§8.3) stay here.
+document remains the underlying research; only the loom, the canoe, the
+villager dress table and the figure notes (§8.1–§8.7) stay here.
 
 ### 8.1 The weaver's loom: what the sources carry, and what the game adapts
 
@@ -2494,8 +2494,9 @@ The station, its words and its tests stay in the game, and
 
 ### 8.2 The villager's dugout canoe (point 1237)
 
-At a riverside village a local fisherman paddles a dugout beside the children's
-bank game, as a second UPSTREAM/DOWNSTREAM picture. The regional reference is
+At a riverside village two men work a drift net from one dugout, downstream of
+the children's bank game, as a second UPSTREAM/DOWNSTREAM picture: the net man
+forward calls the direction, the paddler aft answers it with his stroke. The regional reference is
 the Niger's specialist river people of 1890, the Bozo fishermen and the Somono
 boatmen, whose dugout pirogues worked the river beside the Bambara farming
 villages; the Bambara village keeps its own speaker lect. **Provenance
@@ -2504,11 +2505,12 @@ from a source; a web search the same day did not confirm the Somono in Park's
 *Travels* (1799). Treat the Bozo/Somono attribution as a working assumption
 until a PERIOD source is read. Adapted, and marked as
 such: a small fishing pirogue of about 5.5 m paddled kneeling with a single
-blade, a conical basket trap at the waterline, and paces chosen as an educated
-guess (about 1.3 m/s through the water against a dry-season current of about
-0.5 m/s). **IMPLEMENTATION.** `src/scenes/place/villagerCanoe.ts` lays the lane
-and runs the cycle; `VillagerCanoe` in `src/scenes/place/PlaceLife.tsx` draws
-it; every value is in `balance.villageLife.canoe`.
+blade, a drift net worked from the bow, and paces chosen as an educated guess
+(0.8 m/s upstream, 1.5 m/s downstream). The bank beside the lane carries the
+fishery: baskets, the fishers' fire, a griller, a smoking rack and a pounding
+pair. **IMPLEMENTATION.** `src/scenes/place/villagerCanoe.ts` lays the lane and
+runs the cycle; `RiverFishery` in `src/scenes/place/RiverFishery.tsx` draws it;
+every value is in `balance.villageLife.canoe`.
 
 ### 8.3 The villager dress table: people × sex × age × season × year (work-order 1293)
 
@@ -2583,6 +2585,12 @@ rank from 1894 (`VILLAGER_DRESS.bagandaCottonFrom`; §2.5: the protectorate
 favoured cotton — rank-gated because Astra B44 finds no population-wide
 replacement).
 
+*Office* — the Bambara and Mandinka village chief wears a white boubou of finer
+cotton in place of the everyday torso garment (`CHIEF_ROBE`; Park 1799 finer
+cloth, the Bamana boubou of Ségou per Soleillet — summaries only). Open: no
+record of a chief's dress of office for the other peoples; their chief wears
+his people's dress at the rank cloth.
+
 Sources of the own search: [Met, Belt (umutsha)](https://www.metmuseum.org/art/collection/search/314793);
 [Khumalo 2000, Isicoco as a symbol of Ubudoda](https://phambo.wiser.org.za/files/seminars/Khumalo2000.pdf);
 [Nkumane 2001, The traditional dress of Zulu women](https://datalib.usask.ca/iportal/2007.10.17/IKC-2001/IKC-2001-Nkumane.pdf);
@@ -2602,9 +2610,17 @@ at a fixed height read as neither. The walk, the kneel and the stride values
 are educated guesses in the same block; a period source naming a people's
 carrying posture would replace the guess for that people.
 
+At its stop a task walker grips the load with both hands, lowers it while
+kneeling and stands it on the ground beside it, then grips it again and lifts it
+back onto the head while rising; the load is never hidden. Timings and the
+ground spot are guesses in `TASK_LOAD_HANDLING`.
+
 ### 8.5 The villager's body (work-order "glTF villager body")
 
-On the medium and high presets the villagers stand on a CC0 MakeHuman base body
+On the medium and high presets the villagers — and on the same body at
+villager stature the village chief, the Giza plateau's guides and tourists
+(dress in `docs/giza-1890.md` §4.1) and the bird's-eye traveller — stand on a
+CC0 MakeHuman base body
 (`scripts/villager/`, sources and licences in `sources.json`), built headless in
 a pinned Blender (`node scripts/blender.mjs`) into `villager.glb` with morph
 targets for age, sex and build and a bust from MakeHuman's cup targets; the

@@ -1,7 +1,7 @@
 # 1308 — Merged plan (third model: Fable 5.1)
 
 Inputs: analysis A (Opus 5.5, A1–A10), analysis B (GPT-6.1 Sol, blind, B1–B6, truncated corpus).
-Union: `local/1308-union.json` (12 entries, 8 kept, 4 rejected). Every claim below was checked
+Union: `local/1308-union.json` (12 entries, 8 kept, 4 rejected; U4 dropped in round 4, 7 kept). Every claim below was checked
 against the code on 28.10.2026 (hook inventory `.claude/settings.json`, scripts, tests); B could not
 see the hook inventory, so its hook claims were verified here.
 
@@ -10,7 +10,8 @@ see the hook inventory, so its hook claims were verified here.
 - Fail direction stays as today: a new sub-step that throws, exits non-zero or times out prints one
   loud line (`<step> FAILED: <error> — do it the old way: <exact single command>`) on stderr and in
   the command output, exits non-zero, and leaves a state that exists today (every prefix of a merged
-  chain is a state the old single commands could leave). Nothing exits 0 after a failed sub-step.
+  chain is a state the old single commands could leave). Nothing exits 0 after a failed sub-step
+  of a merged command; a PostToolUse hook duty fails soft instead (U1).
 - No new guards, no new hook entries, no new Stop-hook self-repair: every kept entry is a merged
   command path, a PostToolUse context line, a text change or a narrowed classifier. A's killswitch
   (`.claude/self-repair-off`) is therefore unnecessary and dropped (nothing repairs inside a Stop hook).
@@ -205,7 +206,7 @@ Expected combined saving: 14–19 % rt (U4 dropped, round 4; overlaps U2/U8), si
 
 ## Open questions for the final check
 
-1. U4 variant not in the plan: should `--commit <N> --text-stdin` write the `done <N> --none` card
+1. Variant not in the plan (never part of U4): should `--commit <N> --text-stdin` write the `done <N> --none` card
    itself (same `board.mjs` transition) and then read it back for the proof? It saves one call per
    boundary but touches the two-phase intent of Sol's review of 4e93933.
 2. U7: the retro design lists process TASKS points as source (4) ("process work = process history").

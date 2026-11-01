@@ -16,10 +16,10 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 mkdirSync(OUT, { recursive: true })
 
-// SECTIONS (points 566/595). Three blocks that share only the boot and the step
+// SECTIONS (points 566/595). Four blocks that share only the boot and the step
 // out into travel: the first frame after the scene switch (the point-489 blank
 // picture), the communication errand (its frames, digs and hand-over checks),
-// and the landmark frames.
+// the landmark frames and the follow camera.
 // Re-shooting one landmark used to replay the whole errand, dig included;
 // `--section=landmark-frames` is that repair loop. The names are read out of
 // THIS FILE by scripts/verify/sections.mjs, so an unknown one is refused with
@@ -397,6 +397,12 @@ if (section('communication-errand')) {
         const g = window.__game.getState()
         g.setToast(null)
         g.setJournalOpen(false)
+        // The errand's hand-over starts the drums on the WALL clock; on a slow
+        // host their display opened by itself over the inventory mid-block
+        // (closing run 29.10.2026). Settle them before the click.
+        const ui = window.__ui.getState()
+        ui.clearDrumMessage()
+        ui.setDialog(null)
         window.__toastLog = []
         window.__toastUnsub =
           window.__toastUnsub ??
@@ -409,6 +415,12 @@ if (section('communication-errand')) {
       // different causes — he was never brought there, or the click itself
       // moved him — and only the pair of readings tells them apart.
       const before = await at()
+      // A dialog standing over the inventory turns the click into a bare
+      // Playwright timeout; name the dialog instead.
+      const blocking = await page.evaluate(() => window.__ui.getState().dialog ?? null)
+      if (blocking) {
+        throw new Error(`a dialog stands over the inventory before the click: ${JSON.stringify(blocking)}`)
+      }
       await page.locator('[data-form="rock-relief"]').click()
       const after = await at()
       return page.evaluate(

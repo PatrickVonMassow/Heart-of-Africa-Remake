@@ -7,8 +7,8 @@
 // `asset.garmentMask[k]`. While a figure wears a garment, a body triangle whose
 // three corners it hides is not drawn, and every vertex it covers that is
 // still drawn (near an opening, or a hidden corner of a drawn triangle) is
-// pushed VILLAGER_ASSET.garmentMaskPush inward along its normal in the vertex
-// shader (`garmentPushPosition`). No per-pose correction.
+// pushed VILLAGER_ASSET.garmentMaskPush (times the person's scale) inward
+// along its normal in the vertex shader (`garmentPushPosition`). No per-pose correction.
 //
 // Pure apart from the TSL node: mask and worn garments in, index and push out.
 

@@ -418,7 +418,11 @@ export async function capturePixels(page, site, { clip, locator, timeout = CAPTU
   }
 }
 
-/** Bind the shutter to a page and an output directory: `shot(name, declaration)`. */
+/**
+ * Bind the shutter to a page and an output directory: `shot(name, declaration)`.
+ * A call may add its own `beforeCapture` (or other capture options) as a third
+ * argument — a reading taken there is the state at the shutter.
+ */
 export function frameShutter(page, outDir, opts = {}) {
-  return (name, decl) => captureFrame(page, outDir, name, decl, opts)
+  return (name, decl, extra = {}) => captureFrame(page, outDir, name, decl, { ...opts, ...extra })
 }

@@ -28,7 +28,7 @@ export const FISHERY_PROPS = {
   stoneRing: 0.85,
   stoneR: 0.15,
   /** The grill's two forked posts: their offset from the hearth's middle along
-   *  the fire's local z, their radius at the foot and their height. */
+   *  the fire's local z, and their radius at the foot. */
   grillPostOffset: 0.95,
   grillPostR: 0.035,
   /** The smoking rack's posts (local ±x, ±z), and its rails' length along x. */
@@ -64,7 +64,7 @@ export function fisheryShelterPosts(
   ].map(([lx, lz]) => ({ x: sites.fire.x + cos * lx + sin * lz, z: sites.fire.z - sin * lx + cos * lz }))
 }
 
-/** The radius of one cook-shelter post's collider (the drawn foot plus the stand-off). */
+/** One cook-shelter post's drawn foot radius; its collider adds the stand-off margin. */
 export const SHELTER_POST_RADIUS = 0.1
 
 /**

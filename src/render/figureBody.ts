@@ -231,8 +231,8 @@ export function boneSegments(p: BodyProportions): Record<BoneName, [THREE.Vector
 
 /**
  * A skeleton of `BONE_NAMES` in bind pose, the root (hips) unparented. Its
- * inverses are taken here, while the root is still at the origin, so a mesh
- * bound to it may then be placed anywhere.
+ * inverses are taken here, in the bind pose before anything places it, so a
+ * mesh bound to it may then be placed anywhere.
  */
 export function createSkeleton(p: BodyProportions): { skeleton: THREE.Skeleton; bones: Record<BoneName, THREE.Bone> } {
   const j = jointPositions(p)
@@ -358,7 +358,7 @@ export function paint(
 
 /** Keep only the attributes the figure material reads, so parts merge. */
 export function tidy(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  const g = geo.index ? geo : geo
+  const g = geo
   for (const name of Object.keys(g.attributes)) {
     if (!['position', 'normal', 'uv', 'color', 'skinIndex', 'skinWeight', SURFACE_ATTRIBUTE, SECOND_COLOUR_ATTRIBUTE].includes(name)) {
       g.deleteAttribute(name)

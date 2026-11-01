@@ -2,7 +2,8 @@
 // the top-most modal with the description field focused, the complete-state
 // JSON and the report/state/copy/close controls; the typed description reaches
 // the assembled archive; opening releases the pointer lock; Esc closes without
-// leaving focus on a control but never discards typed text; the F6
+// leaving focus on a control, Esc in a field holding text only leaves the
+// field and keeps the text; the F6
 // default is prevented (F5 was abandoned — the browser reloads before
 // preventDefault can run).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'

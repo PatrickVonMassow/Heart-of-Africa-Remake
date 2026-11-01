@@ -1,0 +1,1415 @@
+{
+ "model": "Opus 5.5",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "design.md:412",
+   "defect": "[p01] stale-doc · The new fishery text places the start of the net lane downstream, but the code starts it upstream of the bank normal · evidence: \"from about 1 to 47 m downstream of the normal\" contradicts src/config/balance.ts `laneStart: -1` (negative s is upstream: the same text puts the children's stretch \"about 28 m upstream\", which the code centres at s = -28), so the lane starts about 1 m upstream."
+  },
+  {
+   "id": "A2",
+   "file": "docs/1308-merged-plan.md:4",
+   "defect": "[p01] md-audit · The header's entry count still includes the dropped U4 · evidence: \"(12 entries, 8 kept, 4 rejected)\" while Round 4 says \"U4 leaves the plan\" and the implementation order and Round 5 list only seven kept entries (\"U3, U1, U6, U2, U8, U5, U7\"), so it is 7 kept + 4 rejected + 1 dropped."
+  },
+  {
+   "id": "A3",
+   "file": "docs/1308-merged-plan.md:208",
+   "defect": "[p01] md-audit · Open question 1 calls itself a U4 variant, but the Round 4 note says it never belonged to U4 · evidence: \"1. U4 variant not in the plan: should `--commit <N> --text-stdin` write the `done <N> --none` card\" vs line 276 \"open question 1 (`--commit --text-stdin` writes the card itself) is unaffected because it was never part of U4\"."
+  },
+  {
+   "id": "A4",
+   "file": "CLAUDE.md:40",
+   "defect": "[p01] md-audit · §4 still refers to this file's build order, but the retitled file no longer calls itself one · evidence: \"A requested design change updates `design.md`, this file where it changes the build order\" while the title changed from \"Build Order: POC ...\" to \"...: session rules\" and §1 now says \"this file = build and verification policy\"."
+  },
+  {
+   "id": "A5",
+   "file": "docs/acceptance-evidence.md:278",
+   "defect": "[p02] stale-doc · The new fishery evidence paragraph places the start of the net lane downstream, but the code starts it upstream · evidence: \"the fishermen's lane runs from about 1 to 47 m downstream\" contradicts src/config/balance.ts `laneStart: -1` (negative s = upstream; the children's stretch \"about 28 m upstream\" is s = -28), so the lane starts about 1 m upstream."
+  },
+  {
+   "id": "A6",
+   "file": "docs/acceptance-evidence.md:269",
+   "defect": "[p02] stale-doc · After the suite rename, \"the same suite\" now points at polish-speech.mjs, but the 1065 shot is taken in another suite · evidence: \"The same suite reads the SCENE GRAPH ... (`1065-tapping-child-at-its-rock`)\" follows the changed line \"`scripts/verify/polish-speech.mjs` proves what the picture owes\", yet `1065-tapping` appears only in scripts/verify/polish-children.mjs (0 hits in polish-speech.mjs)."
+  },
+  {
+   "id": "A7",
+   "file": "docs/1455-step2-merged-plan.md:33",
+   "defect": "[p02] stale-doc · The plan says the charge file charges the shutter-timing signatures to 1456, but at the new revision that file has no 1456 charge · evidence: \"`scripts/render-verify-charges.mjs` already charges the steady polish-villagers shutter-timing signatures to 1456 and 1292\" while commit 19709a86e \"Strike the shutter-timing charges now both checks pass on both backends\" removed them inside this range (grep of \"1456\" in render-verify-charges.mjs finds nothing, and 1456 is ticked in docs/tasks-archive.md); line 133, \"Known signatures (charged to 1456, ...\", repeats the claim."
+  },
+  {
+   "id": "A8",
+   "file": "docs/1455-step2-merged-plan.md:180",
+   "defect": "[p02] md-audit · The disagreement table still calls A's 9.5 % per-run bound binding, after §4.3 withdrew it · evidence: \"A's statistical floor (30 green member runs → 9.5 % bound) is the binding number\" vs line 126 \"The 9.5 % per-run figure of the halves assumed independent member runs and is withdrawn\" (replaced by the per-pair 13.9 % bound, F7)."
+  },
+  {
+   "id": "A9",
+   "file": "docs/1455-step2-merged-plan.md:16",
+   "defect": "[p02] md-audit · The verdict's break-even rate contradicts both its own cost figures and the §4.3 worst case · evidence: \"stays below ~10 % (a false red costs 20–30 min against 5–12 min saved per pair)\" — those figures give at least 5/30 ≈ 17 %, and line 123 states \"the worst-case break-even of ~17 % (5 min saved per pair against a 30 min false red)\"."
+  },
+  {
+   "id": "A10",
+   "file": "docs/1455-step2-merged-plan.md:32",
+   "defect": "[p02] md-audit · The host memory figures do not agree with each other or with the 1452 record · evidence: \"Host: 15.9 GB; 85 % ≈ 13.2 GiB\": 85 % of 15.9 is 13.5, and 13.2 GiB is 85 % of the 15.5 GiB that docs/1452-step5-measurement.md records (\"10.3 GiB of 15.5 GiB\")."
+  },
+  {
+   "id": "A11",
+   "file": "docs/analysis_de/lesson-mechanisms.md:209",
+   "defect": "[p03] stale-doc · Row 3.308 books result 1 (\"existing enforcer extended by point 1281\"), but point 1281 created that guard from scratch as an explicit freeze exception, i.e. result 2 (new enforcer) under the register's own legend. · evidence: \"| 3.308 | Die Problemmeldung als Freigabe | 1 | Bestehender Durchsetzer, durch Punkt 1281 erweitert: `scripts/request-approval-guard-core.mjs`\" is wrong because scripts/request-approval-guard.mjs says \"This guard is a deliberate exception to the infrastructure freeze of 01.09.2026, by that user order of 03.10.2026\", and the file was first added in range by 08930190a \"Add a guard that blocks request deposits without the user's approval\" (merged as feat/1281-request-approval-guard); the legend defines \"**2** | Ein **neuer** Durchsetzer\"."
+  },
+  {
+   "id": "A12",
+   "file": "docs/communication-poc-spec.md:331",
+   "defect": "[p04] stale-doc · The new dugout section describes one fisherman who calls his own heading once per leg shortly after setting off, but the code has two men, and the net man says each direction word to the paddler at the lane's ends. · evidence: \"A local fisherman paddles a dugout … ONE body working against the current and then riding it. Once per leg, shortly after he is under way, he CALLS the word of his heading\" is wrong because src/scenes/place/villagerCanoe.ts says \"two men work a drift net from one dugout … One is the PADDLER, aft; the other the NET MAN, forward\" and \"callDown: at the upstream end the net man says DOWNSTREAM to the paddler\" / \"callUp: the net man, back aboard, says UPSTREAM to the paddler\"."
+  },
+  {
+   "id": "A13",
+   "file": "docs/communication-poc-spec.md:306",
+   "defect": "[p04] stale-doc · The newly added exception says the dugout call has no addressee, but the code gives every dugout word an addressee and treats an unaddressed boatman's call as the rejected faux pas. · evidence: \"The one exception is the fisherman's direction call from his dugout: a call, not speech (user 29.09.2026), it needs no addressee; his heading is the act it names.\" is wrong because villagerCanoe.ts says \"EVERY WORD HAS AN ADDRESSEE AND A CONSEQUENCE (user 30.09.2026: a boatman commenting on his own work is the rejected faux pas). Both direction words come from the net man and are said to the paddler\"."
+  },
+  {
+   "id": "A14",
+   "file": "docs/communication-poc-spec.md:338",
+   "defect": "[p04] md-audit · The dugout section contrasts its direction words with the bank's, which supposedly wait for ROCK, but the same diff removed that wait from the bank game, so the document contradicts itself. · evidence: \"Unlike the bank's, these direction words do not wait for the listener's first ROCK\" contradicts line 224 of the same file: \"Every cycle calls RIVER and announces its directions whatever the player has heard\" (the old \"Until ROCK has been heard, a round omits the RIVER call and the direction announcement\" was deleted)."
+  },
+  {
+   "id": "A15",
+   "file": "docs/criticality-review.md:48",
+   "defect": "[p04] stale-doc · The doc still says the guard blocks the turn end, but the guard is switched off and its hook path exits silently. · evidence: \"`criticality-review-guard-core.test.mjs`, fail-open) blocks the turn end when a point tagged HIGH is ticked without an **answered** review\" is wrong because scripts/criticality-review-guard.mjs opens with \"Stop hook (work-order point 298), SWITCHED OFF (see below): it once refused a HIGH-criticality tick … today the hook path exits silently and `--status` reports the same debt.\""
+  },
+  {
+   "id": "A16",
+   "file": "docs/document-cut-757.md:119",
+   "defect": "[p04] md-audit · The updated row gives a word count below the word ceiling but still reports no headroom. · evidence: \"| `CLAUDE.md` | 197 lines / 1,327 words / 10,027 B | 197 / 1,328 | none |\": 1,327 against a ceiling of 1,328 (doc-budget-core.mjs \"maxWords: 1328\") leaves one word, not \"none\"."
+  },
+  {
+   "id": "A17",
+   "file": "docs/handover-architecture.md:298",
+   "defect": "[p04] stale-doc · The rename turned a historical quote into a false claim about the current code: author-delegate.mjs does not spawn `codex`; it spawns the runtime's binary. · evidence: \"`scripts/author-delegate.mjs` spawns `codex` like this: … const child = spawn('codex', args, {\" is wrong because scripts/author-delegate.mjs:371 reads \"const child = spawn(runtime.bin, args, {\"."
+  },
+  {
+   "id": "A18",
+   "file": "docs/handover-architecture.md:241",
+   "defect": "[p04] stale-doc · Ordered-work step 5 calls itself unbuilt and says its files do not exist, but both exist. · evidence: \"with `npx vitest run scripts/batch-dispatch-core.test.mjs` (… neither file exists yet — this step is unbuilt)\" is wrong because scripts/batch-dispatch-core.test.mjs and scripts/batch-dispatch.mjs both exist at 54b326987."
+  },
+  {
+   "id": "A19",
+   "file": "docs/handover-architecture.md:245",
+   "defect": "[p04] stale-doc · Ordered-work step 6 calls itself unbuilt and says its files do not exist, but both exist. · evidence: \"with `npx vitest run scripts/batch-checkpoint-core.test.mjs` (… neither file exists yet — this step is unbuilt)\" is wrong because scripts/batch-checkpoint-core.test.mjs and scripts/batch-checkpoint.mjs both exist at 54b326987."
+  },
+  {
+   "id": "A20",
+   "file": "docs/handover-architecture.md:261",
+   "defect": "[p04] stale-doc · Ordered-work step 10 calls its core test unbuilt, but that test exists (it was added 26.08.2026). · evidence: \"Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs` (unbuilt)\" is wrong because scripts/batch-board-core.test.mjs exists at 54b326987 (added 2df53ee21), beside scripts/batch-board-core.mjs."
+  },
+  {
+   "id": "A21",
+   "file": "docs/handover-architecture.md:265",
+   "defect": "[p04] stale-doc · Ordered-work step 11 says its test file does not exist and the step is unbuilt, but the file and its module exist. · evidence: \"with `npx vitest run scripts/batch-metrics-core.test.mjs` (… the file does not exist yet — this step is unbuilt)\" is wrong because scripts/batch-metrics-core.test.mjs and scripts/batch-metrics.mjs both exist at 54b326987."
+  },
+  {
+   "id": "A22",
+   "file": "docs/lane-routing.md:46",
+   "defect": "[p05] stale-doc · At `main-only` the doc says the review goes to a main-chain reviewer, but the code sends a switched-off review down the `crossUnavailable` chain, which starts at the scarce lane; line 82 of the same doc says this too. · evidence: \"`cross-review.mjs` then sends nothing at all and hands the review to a main-chain reviewer that authored none of the range\" is wrong because cross-review.mjs builds the switched-off hand-over with `decideReview({ outcome: … OUTCOME.SWITCHED_OFF … })`, whose failure path uses `reviewChain('crossUnavailable', scarceState)`, and `REVIEW_CHAINS.crossUnavailable` is \"['scarce', 'main', 'main-fallback']\" (\"starts at the scarce lane, the second-opinion model\")."
+  },
+  {
+   "id": "A23",
+   "file": "docs/lane-routing.md:241",
+   "defect": "[p05] md-audit · The receipt paragraph says a re-run overwrites the per-point receipt, but the same doc (and the code) now has the author log appended to. · evidence: \"the receipt file is per point and a re-run overwrites it\" contradicts line 141 \"appends to `local/<point>-<lane>-author.log`\" and line 234 \"(then `.claude/author-<N>.log`, now `local/<point>-<lane>-author.log`)\"; scripts/author-delegate.mjs opens it with \"openSync(log, 'a+')\" and prints \"(append)\"."
+  },
+  {
+   "id": "A24",
+   "file": "docs/lane-routing.md:252",
+   "defect": "[p05] stale-doc · The doc says the session-start policy line repeats the command in exactly these words, but the hook prints a different command line. · evidence: \"`node scripts/author-delegate.mjs --point <N>` in the point's own worktree, which the session-start policy line now says in those words\" is wrong because scripts/batch-resume-hook.mjs:326 prints \"node scripts/author-delegate.mjs --lane cross --point <N> in its worktree\"."
+  },
+  {
+   "id": "A25",
+   "file": "docs/natural-villager-motion-concept.md:380",
+   "defect": "[p06] md-audit · Step 20 points to a source table in this document's §5, but §5 is \"Rejected items and refuted claims\" and holds no source table (the source table is §4 of the research document). · evidence: \"plus §1 of this document as the measured diagnosis, with the source table of §5 below\" while line 405 reads \"## 5. Rejected items and refuted claims\" — the referenced table does not exist there."
+  },
+  {
+   "id": "A26",
+   "file": "docs/peoples-1890.md:2417",
+   "defect": "[p06] md-audit · The §8 intro was amended to list what stays in this document but omits the §8.4–§8.7 sections the same diff adds under it. · evidence: \"only the loom, the canoe and the villager dress table (§8.3) stay here.\" while the file also holds \"### 8.4 Head loads and the walk\", \"### 8.5 The villager's body\", \"### 8.6 Covered upper body and hip layer\" and \"### 8.7 Cloth, hide and skin micro-structure on the figures\" — the \"only\" list contradicts the section's own contents."
+  },
+  {
+   "id": "A27",
+   "file": "docs/research/natural-villager-motion.md:268",
+   "defect": "[p06] stale-doc · The defect section states the teleport threshold as 6 person units/s at figureWalk.ts:441, but the code now has 10 (raised by point 1343, as the concept doc itself records) and the check sits at figureWalk.ts:494. · evidence: \"treats a ground speed above `VILLAGER_MOTION.teleportSpeed` = 6 person units/s\" while src/config/balance.ts:2595 has \"teleportSpeed: 10,\" and the concept says \"exceeded the walk's teleport speed (6), freezing its legs at full run; raised to 10.\""
+  },
+  {
+   "id": "A28",
+   "file": "scripts/verify/README.md:796",
+   "defect": "[p07] stale-doc · The README lists `probeSilhouetteFooting` among the helpers \"two themes share\", but only polish-panorama imports or calls it. · evidence: \"the helpers two themes share (`check`, `nextFrames`, `stepUntil`, `goToPlace`, `probeSilhouetteFooting`)\" while the only importer is polish-panorama.mjs:12 (\"import { section, check, probeSilhouetteFooting, page, … } from './_polish.mjs'\") and no other theme file names it, so it is not shared by two themes."
+  },
+  {
+   "id": "A29",
+   "file": "scripts/verify/_polish.mjs:26",
+   "defect": "[p07] dead-code · `sections`, `browser` and `errors` are exported but no module imports them; they are only used inside _polish.mjs. · evidence: \"export const sections = sectionGate()\", \"export const browser = await launchVerifyBrowser()\" (:113), \"export const errors = []\" (:123), while the five theme files import only from { BASE, OUT, section, check, probeSilhouetteFooting, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn }, so these three exports have no importer."
+  },
+  {
+   "id": "A30",
+   "file": "scripts/verify/carriedJar.mjs:127",
+   "defect": "[p07] dead-code · `PIXEL_CHANGE_THRESHOLD` is exported but nobody imports it; it only serves as the local default of `countChangedPixels`. · evidence: \"export const PIXEL_CHANGE_THRESHOLD = 36\" — `git grep -w PIXEL_CHANGE_THRESHOLD` finds it only in carriedJar.mjs (polish-villagers.mjs imports \"probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar\", and the test imports \"countChangedPixels, judgeCarriedJar, MIN_JAR_PIXELS\")."
+  },
+  {
+   "id": "A31",
+   "file": "scripts/verify/baseline-classify-core.mjs:477",
+   "defect": "[p07] stale-comment · The comment around the changed attribution lines still places the baseline-lane exemption in polish.mjs, which this range split up and deleted; the only consumer is now polish-villagers.mjs. · evidence: \"excavation picture in polish.mjs, which needs a durable dig record\" while scripts/verify/polish.mjs no longer exists at 54b326987 and `onBaselineLane` is read only at polish-villagers.mjs:3629 (\"const baselineLane = onBaselineLane(process.env)\")."
+  },
+  {
+   "id": "A32",
+   "file": "scripts/verify/enrichments.mjs:975",
+   "defect": "[p08] stale-comment · The injured-figure block, in a hunk this range edited, cites acceptance criterion §7.1.35, but CLAUDE.md §7.1 stops at 32 (health and afflictions is criterion 22). · evidence: \"(§7.1.35, design.md §6). __player.wounds mirrors the toggled wound meshes.\" while CLAUDE.md §7.1's last item is \"32. **Render pipeline upgrades.**\" and it has \"22. **Health and afflictions.**\" — no criterion 35 exists."
+  },
+  {
+   "id": "A33",
+   "file": "scripts/verify/frameSubject.test.mjs:5",
+   "defect": "[p08] stale-comment · The file header, inside the changed import hunk, still says the file runs \"a `polish.mjs` sampler block\", but polish.mjs was split and deleted in this range and the test no longer mentions any polish file. · evidence: \"code here — a function Playwright serializes into the page, or a `polish.mjs` sampler block\" while scripts/verify/polish.mjs does not exist at 54b326987 and line 5 is the file's only \"polish\" mention."
+  },
+  {
+   "id": "A34",
+   "file": "scripts/verify/ladder-core.test.mjs:350",
+   "defect": "[p08] stale-comment · The comment says `src/scenes/place/` reaches three suites, but the MAP fixture this diff rewrote now maps it to seven (collision, the five polish-* themes, settings). · evidence: \"`src/scenes/place/` reaches three suites and no section in particular\" while the fixture reads \"`src/scenes/place/` → collision, polish-panorama, polish-speech, polish-settlement, polish-children, polish-villagers, settings\"."
+  },
+  {
+   "id": "A35",
+   "file": "scripts/verify/ladder-core.test.mjs:399",
+   "defect": "[p08] stale-comment · A search-and-replace turned a dated historical measurement about polish.mjs into one about polish-villagers.mjs, a file that did not exist when the ladder was built (point 1086; the split came with point 1129). · evidence: \"Measured the first time the ladder was used in anger: switching to `main` and back rewrote polish-villagers.mjs … refused the covering run of the point that built the ladder\" while the README dates the ladder \"(point 1086)\" and the split \"`polish` is split by THEME (point 1129)\"."
+  },
+  {
+   "id": "A36",
+   "file": "scripts/verify/polish-children.mjs:753",
+   "defect": "[p10] stale-comment · The comment points at a rule \"this file\" states at `nextFrames`, but since the split nextFrames and its frame-counting rule live in ./_polish.mjs and are only imported here · evidence: \"Settle in DRAWN FRAMES, not on the wall clock (the rule this file states at `nextFrames`)\" while line 10 reads `import { section, check, page, frame, nextFrames, ... } from './_polish.mjs'` and the rule text (\"Advance the scene by RENDERED frames ...\") sits above `export const nextFrames` in _polish.mjs:144-151; no such statement exists in polish-children.mjs."
+  },
+  {
+   "id": "A37",
+   "file": "scripts/verify/polish-children.mjs:1254",
+   "defect": "[p10] stale-comment · The section intro says the arrival hold is lengthened \"for the tap photograph\", but the code lengthens it only for the later arrival-contact observation and its own frame · evidence: \"It also lengthens the tap pause (below) and, for the tap photograph, the arrival hold\" while the tap photograph '1065-tapping-child-at-its-rock' is driven by `b.tapPauseSeconds = 9` (line 1283), and `arrivalHoldSeconds = 9` is set at line 2294 under \"ARRIVAL CONTACT (work-order 1106) ... Lengthen only the contact observation\" for frame '1106-arriving-runner-hand-on-the-far-stone'."
+  },
+  {
+   "id": "A38",
+   "file": "scripts/verify/polish-panorama.mjs:1",
+   "defect": "[p11] stale-comment · The file header enumerates the suite's themes but omits three sections added after the split (Giza figures, detailed animal models, skyline species scale) · evidence: \"the Giza skyline over Cairo, panorama wildlife and its footing, port skylines, the travel panorama capture, the Sphinx and the walkable Giza site (design.md §2.5/§4.4)\" while the file also declares `section('giza-figures')` (1331), `section('animal-models')` (1417) and `section('skyline-species-scale')` (1646), none of which the header names."
+  },
+  {
+   "id": "A39",
+   "file": "scripts/verify/polish-panorama.mjs:740",
+   "defect": "[p11] stale-comment · The point-96 note lists bambara and swahili among the settlements a whole run visits before this leave, but in this split suite no earlier section visits either (and Timbuktu, which is visited, is not named) · evidence: \"in a whole run this leave happens AFTER several settlement visits (maasai, bambara, swahili, pedi or sidama, capetown and cairo among them\" while the only places entered before line 735 are cairo (20), maasai-village (115, 665), pedi/sidama/capetown (639), capetown (674) and timbuktu (697); 'bambara' and 'swahili' occur nowhere before line 1488."
+  },
+  {
+   "id": "A40",
+   "file": "scripts/verify/polish-panorama.mjs:1427",
+   "defect": "[p11] stale-comment · A duplicated comment about trying the region's settlements in turn sits above `standpoints`, which evaluates one place only; the same text is repeated where the settlement loop actually is · evidence: lines 1427-1430 \"Two walkers can share a bearing in one settlement for the whole run, so the aim tries the region's settlements in turn (east first: ...) and takes the first where the named one stands clear — else the clearest seen.\" precede `const standpoints = (sp) => page.evaluate(...)` (1435), while the STAGES loop it describes is at 1488 under the near-identical comment at 1485-1487, and no \"else the clearest seen\" fallback exists (`if (!aimed) continue`, 1506)."
+  },
+  {
+   "id": "A41",
+   "file": "scripts/verify/polish-settlement.mjs:208",
+   "defect": "[p12] stale-comment · The comment points to a capture section \"below\" in this suite, but this file has no capture section; after the split, `travel-panorama-capture` lives in scripts/verify/polish-panorama.mjs:735. · evidence: \"as a whole run always has; the capture section below stages its own\" The only sections after line 208 are settlement-fabric, cold-weather-dress, campfire-shadows, settlement-edge, stone-step and roof-clearance."
+  },
+  {
+   "id": "A42",
+   "file": "scripts/verify/polish-speech.mjs:2",
+   "defect": "[p13] stale-comment · The header lists the file's themes but leaves out the `speech-distance-scale` section (line 859). · evidence: \"the hypothesis over the speaker, whose a note is, guessing a meaning, the Ctrl labels, the chief at his drummer and the given artefact\" Seven sections exist and only six are named, so the near/far note sizing (point 1271) is missing."
+  },
+  {
+   "id": "A43",
+   "file": "scripts/verify/polish-speech.mjs:422",
+   "defect": "[p13] stale-comment · The shutter-retry rationale describes a ray cast at a walking child's chest, but `__speechProbeSight` (lines 82-102) now aims at the figure's drawn head and uses the chest only as a fallback. · evidence: \"a single ray at a walking child's chest can slip past it to the ground behind (measured 1.58@ground-disc)\" Lines 86-89 say this very miss was fixed by aiming at the head: \"a ray at the head hit it at 0.98. The chest stays the fallback\"."
+  },
+  {
+   "id": "A44",
+   "file": "scripts/verify/polish-speech.mjs:589",
+   "defect": "[p13] stale-comment · The comment says the leaving function `isOutsidePlace` decides the stand here, but the code calls a different function, `insidePlace(layout, x, z, 1)`. · evidence: \"putting the player there LEAVES the place (`isOutsidePlace`) ... the function that decides leaving decides it here\" Line 594 is `if (!insidePlace(layout, x, z, 1)) return null`, and boundary.ts documents `insidePlace` as \"what the inhabitants walk by\", with a 1 m margin."
+  },
+  {
+   "id": "A45",
+   "file": "scripts/verify/polish-speech.mjs:947",
+   "defect": "[p13] stale-comment · The comment says the sight check requires the first surface hit to be the figure itself, but `seen` (lines 949-974) only checks a distance-ratio band. · evidence: \"the first surface along each sight line is the figure itself (the speech-owner instrument)\" The code uses `ratio < 0.85` / `clear = r >= 0.85 && r <= 1.15` and never checks object identity, which is the ratio-band approach lines 59-63 reject (\"a distance band in turn accepted a wall half a metre in front of the head\")."
+  },
+  {
+   "id": "A46",
+   "file": "scripts/verify/polish-speech.mjs:1344",
+   "defect": "[p13] stale-comment · The comment gives the traveller's eye height as 1.6 m, but the game's first-person camera height is EYE_HEIGHT = 1.5. · evidence: \"The traveller's eye stands 1.6 m over the ground he stands on.\" src/scenes/place/roofClearance.ts:35 has `export const EYE_HEIGHT = 1.5` (\"First-person camera height in metres\"), and PlaceScene uses it."
+  },
+  {
+   "id": "A47",
+   "file": "scripts/verify/polish-villagers.mjs:3",
+   "defect": "[p14] stale-comment · The file header's theme list stops at the errands and the mortar, but the suite also runs six more sections. · evidence: \"the well, the stations, the loom, the errands and the mortar (design.md §19.10)\" is wrong because the file goes on to `section('water-jar-carried')` (3723), `section('water-stand-table')` (3966), `section('steadying-palm')` (4263), `section('villager-dress')` (4743), `section('village-walk')` (5261) and `section('figure-micro')` (6117), and the header names none of them."
+  },
+  {
+   "id": "A48",
+   "file": "scripts/verify/polish-villagers.mjs:229",
+   "defect": "[p14] stale-comment · The villager-canoe header still counts three standing places, but the section now has five numbered stagings. · evidence: \"Three standing places, each judged by the rendered projection:\" is wrong because the code below is split into \"--- 0. The DOWNSTREAM word at the lane's upstream end\" (304), \"--- 1.\" (340), \"--- 2.\" (528), \"--- 3.\" (608) and \"--- 4. The pounding pair by the fishers' fire (point 1282)\" (664), and the header lists only three of them."
+  },
+  {
+   "id": "A49",
+   "file": "scripts/verify/polish-villagers.mjs:230",
+   "defect": "[p14] stale-comment · The header gives the boat stand's position as s = +36 m on the waterline, but the code puts it at s = 49, 2.4 m beyond the waterline. · evidence: \"the boat's, s = +36 m on the waterline looking out toward the landing\" is wrong because the code (351-352) says \"const s = 49\" and \"stand = { x: L.nx * (L.waterline + 2.4) + L.fx * s, ...\""
+  },
+  {
+   "id": "A50",
+   "file": "scripts/verify/polish-villagers.mjs:346",
+   "defect": "[p14] stale-comment · The boat-stand comment says the stand is upstream of the haul, then says downstream in the next sentence, and the code puts it downstream. · evidence: \"so the stand is upstream too, looking out between the two\" (after \"A few paces upstream of where the haul happens\") is wrong because the following lines (348-350) say \"a little DOWNSTREAM of it\", and the code puts the stand at \"const s = 49\" with the look at \"L.fx * 46\"; in src/scenes/place/villagerCanoe.ts `fx` is \"DOWNSTREAM along it\", so the stand is downstream."
+  },
+  {
+   "id": "A51",
+   "file": "scripts/verify/polish-villagers.mjs:825",
+   "defect": "[p14] stale-comment · The bootOn helper points to \"the suite's own boot, above\", but no boot remains in this file since the split. · evidence: \"// A fresh game on `seed` (the suite's own boot, above, with the seed named).\" is wrong because the header (4-5) says \"the boot and the shared helpers live in ./_polish.mjs\", and that goto/localStorage.clear boot sits in _polish.mjs lines 129-130, not above this section."
+  },
+  {
+   "id": "A52",
+   "file": "scripts/verify/polish-villagers.mjs:3611",
+   "defect": "[p14] stale-comment · The excavation-picture comment names seed 12 and a 6.38 m site gap, but the staging it describes uses seed 1691 and requires sites 9-14 m apart. · evidence: \"Seed 12 puts a store pit and patch 6.38 m apart with an open standing view\" is wrong because the block stages `DIG_PICTURE`, which digSitePicture.mjs defines as \"{ placeId: 'bambara-village', seed: 1691 }\", and `digPictureView` rejects any span outside \"DIG_PICTURE_SPAN = { min: 9, max: 14 }\", which 6.38 m fails."
+  },
+  {
+   "id": "A53",
+   "file": "scripts/verify/polish-villagers.mjs:5264",
+   "defect": "[p14] dead-code · The village-walk section imports appendFileSync from node:fs a second time, although the module already imports it statically. · evidence: \"const { appendFileSync } = await import('node:fs')\" is dead because line 12 already has \"import { appendFileSync, mkdirSync } from 'node:fs'\" (used at 4244 and 4751), so this dynamic import only shadows the same binding."
+  },
+  {
+   "id": "A54",
+   "file": "scripts/verify/polish-villagers.mjs:6258",
+   "defect": "[p14] stale-comment · A comment about choosing a flank stand is left above the walkerBox helper instead of above the standAt it describes. · evidence: \"// Stand at a flank that holds the legs in the picture and is not pushed off.\" is followed at once by \"// The walker's screen box (CSS px) from its projected joints, padded.\" and `const walkerBox`, while the flank-standing code (`const standAt = async (flanks = [1, -1])`) only starts at 6283."
+  },
+  {
+   "id": "A55",
+   "file": "scripts/verify/polish-villagers.mjs:6180",
+   "defect": "[p14] stale-comment · The walk-cycle pair comment promises the camera at the same offset in both frames, but frame B searches all distances again and only the flank has to match. · evidence: \"frozen at two phases of its stride with the camera at the same offset from it\" is wrong because frame B is staged with \"b = await standAt([a.flank])\", which loops \"for (const dist of [1.6, 1.9, 1.3, 2.3, 2.8])\" again, and the check requires only \"b.flank === a.flank\", never the same `dist`."
+  },
+  {
+   "id": "A56",
+   "file": "scripts/verify/run-wait-core.test.mjs:189",
+   "defect": "[p15] stale-comment · The comment still prices the full pass at the pre-split 2536.0 s although the polish row was removed from the plan. · evidence: \"// 2536.0 s (full pass + preview) + the render-only WebGPU pass.\" while line 180 of the same file now asserts the single pass is \"(2536.0 - SUITE_RUNTIME_S.polish)\" = 2195.1 s, since the five polish theme suites are in UNMEASURED_SUITES."
+  },
+  {
+   "id": "A57",
+   "file": "scripts/verify/run-wait-core.test.mjs:335",
+   "defect": "[p15] stale-comment · The comment states a plan figure the code no longer produces. · evidence: \"// The plan says ~81 min; the band says 115–121.\" but with polish replaced by the unmeasured POLISH_THEME_SUITES, planRun({ argv: ['large'] }) at 54b326987 yields about 69.4 min."
+  },
+  {
+   "id": "A58",
+   "file": "scripts/verify/run-wait-core.mjs:140",
+   "defect": "[p15] stale-comment · The SEPTEMBER_BANDS doc gives, in the present tense, plan figures the split invalidated. · evidence: \"the plan it produces for a both-backend LARGE is 80 min 48 s ... and for a whole `polish` pass 5 min 41 s\" but the plan now leaves out polish's 340.9 s (about 69.4 min for a LARGE), and no `polish` suite is planned any more (\"no suite of that name runs any more\", same file)."
+  },
+  {
+   "id": "A59",
+   "file": "scripts/verify/world.mjs:19",
+   "defect": "[p16] stale-comment · The SECTIONS header still counts three blocks, but the diff adds a fourth section. · evidence: \"Three blocks that share only the boot ... the first frame ..., the communication errand ..., and the landmark frames.\" while the file now also has \"if (section('follow-camera')) {\" (point 1286)."
+  },
+  {
+   "id": "A60",
+   "file": "src/communication/speechLabel.ts:26",
+   "defect": "[p16] stale-comment · The GROWN_FIGURE_HEIGHT doc still says a speaker is measured from its actor record, but the diff moved the anchor to the drawn head. · evidence: \"Only a FALLBACK: a speaker is measured from its own record\" while speechLabelHeight's new doc says the anchor is \"the top of that speaker's own drawn head ... (`drawnHeadRise`, falling back to the actor record)\"."
+  },
+  {
+   "id": "A61",
+   "file": "src/config/balance.ts:2101",
+   "defect": "[p17] stale-comment · The stallSeconds rationale still calls 20 s \"a fifteenth of the backstop above\", but the diff raised that backstop from 300 to 375 s. · evidence: \"twenty seconds is ... a fifteenth of the backstop above\" next to \"errandSeconds: 375,\" (line 2098); 20 s is a fifteenth of the old 300, about a nineteenth of 375."
+  },
+  {
+   "id": "A62",
+   "file": "src/config/balance.ts:2116",
+   "defect": "[p17] stale-comment · The loom's rationale block got separated from `loom:` and now sits directly above the new `canoe` block. · evidence: \"// THE LOOM (work-order 1157). Calibratable starting values ... 3.2 m of warp either side of the seat\" is followed by the dugout/fishermen comments, \"canoe: {\" (line 2150) and \"fishFire: {\" before \"loom: {\" (line 2228)."
+  },
+  {
+   "id": "A63",
+   "file": "src/config/balance.ts:2140",
+   "defect": "[p17] stale-comment · The first dugout block puts the lane where the second block and the value say it no longer is. · evidence: \"The lane lies 7 m out between s = +27 and +47 m\" while the next block says the lane, \"rebuilt by 1245\", \"runs 7 m out from s = −2 to s = +47\" and the value is \"laneStart: -1\"."
+  },
+  {
+   "id": "A64",
+   "file": "src/config/balance.ts:2144",
+   "defect": "[p17] stale-comment · The fishermen comment gives a lane start and length that do not match the configured value. · evidence: \"The lane runs 7 m out from s = −2 to s = +47 (49 m)\" but the value is \"laneStart: -1,\" (line 2152), so the lane is 48 m."
+  },
+  {
+   "id": "A65",
+   "file": "src/config/balance.ts:3013",
+   "defect": "[p17] dead-code · VILLAGER_GLTF.standSpeed is added but nothing in src or scripts reads it. · evidence: \"standSpeed: 0.08,\" — `git grep standSpeed 54b326987` finds only this line and a docs/four-eyes brief, so its doc \"Ground speed ... below which the figure stands\" describes no behavior."
+  },
+  {
+   "id": "A66",
+   "file": "src/render/fauna.ts:524",
+   "defect": "[p18] stale-comment · The buildQuadruped doc still lists zebra, antelope and goat as users of the shared body plan, but those three moved to the swept-tube builder in faunaUngulates.ts. · evidence: \"/** Shared quadruped body plan (zebra, antelope, goat, wildebeest, warthog,\" the diff deletes ZEBRA_SPEC/ANTELOPE_SPEC/GOAT_SPEC and their `buildQuadruped(...)` callers; buildZebra/buildAntelope/buildGoat now call `buildUngulate(ZEBRA|ANTELOPE|GOAT, radial)` (faunaUngulates.ts), and buildQuadruped is only called for wildebeest, warthog, lion, the cats and hyena."
+  },
+  {
+   "id": "A67",
+   "file": "src/render/figureBody.ts:361",
+   "defect": "[p18] dead-code · The conditional in tidy() has the same value on both arms, so the `geo.index` test does nothing. · evidence: \"const g = geo.index ? geo : geo\" both branches yield `geo`, so the test is a no-op."
+  },
+  {
+   "id": "A68",
+   "file": "src/render/faunaUngulates.ts:385",
+   "defect": "[p18] dead-code · buildUngulateParts is exported, but no other file imports it; only this module's own species builders call it. · evidence: \"export function buildUngulateParts(s: UngulateSpec, radial = DEFAULT_FAUNA_BODY_SEGMENTS)\" `git grep -lw buildUngulateParts 54b326987` lists only src/render/faunaUngulates.ts."
+  },
+  {
+   "id": "A69",
+   "file": "src/render/faunaUngulates.ts:392",
+   "defect": "[p18] dead-code · buildUngulate is exported, but no other file imports it; only this module's own species builders call it. · evidence: \"export function buildUngulate(s: UngulateSpec, radial = DEFAULT_FAUNA_BODY_SEGMENTS): THREE.BufferGeometry {\" `git grep -lw buildUngulate 54b326987` lists only src/render/faunaUngulates.ts."
+  },
+  {
+   "id": "A70",
+   "file": "src/render/figureWalk.ts:131",
+   "defect": "[p19] stale-comment · An orphaned doc comment for FootPhase sits right above the separate FootPlant doc, so the FootPhase interface at line 248 has no doc and this block documents nothing. · evidence: \"/** A foot's place in the walk: the gait's fore/aft target (hip frame), its lift, whether it carries the body, and its swing progress (0 → 1). */\" is followed straight away by \"/** One foot's hold on the ground ... */ export interface FootPlant\"; the fields it describes (z, lift, stance, swing) belong to `export interface FootPhase` at line 248."
+  },
+  {
+   "id": "A71",
+   "file": "src/render/figureWalk.ts:584",
+   "defect": "[p19] dead-code · PrimitiveLayout.groupScale is always the constant [1, 1, 1], and no production code reads it; only a test checks that it is uniform. · evidence: \"groupScale: [number, number, number]\" / \"groupScale: [1, 1, 1],\" `git grep -lw groupScale 54b326987 -- src` lists only figureWalk.ts and figureWalk.test.ts; placeFigure.tsx, which consumes primitiveLayout, never reads the field."
+  },
+  {
+   "id": "A72",
+   "file": "src/render/figureRig.ts:252",
+   "defect": "[p19] stale-comment · The palmRollAngle doc gives the result range as (−π, π], but the function returns a roll within half a turn of `center`, and callers pass a center of ±2.5. · evidence: \"The roll (rad, in (−π, π]) that turns a hand's palm toward `toward`\" vs \"return center + a - turn * Math.ceil((a - Math.PI) / turn)\", which lies in (center − π, center + π]; palmRollCenter gives \"-side * PALM_ROLL_CENTER\" = ∓2.5, so the result can reach about ±5.6."
+  },
+  {
+   "id": "A73",
+   "file": "src/render/fishMesh.ts:16",
+   "defect": "[p19] stale-comment · The geometry doc puts the head at +0.5 with the fish centred on the origin, but the built fish runs from the tail tip at z −0.58 to the head at z +0.42. · evidence: \"The fish, length 1 along +Z (head at +0.5), centred on the origin.\" vs \"profile.push(new THREE.Vector2(Math.max(0.004, r), 0.42 - t * 0.84))\" (head end at +0.42 once rotated onto Z) and \"const tip = -0.58\" for the tail."
+  },
+  {
+   "id": "A74",
+   "file": "src/render/figureWalk.ts:85",
+   "defect": "[p19] dead-code · footCycle is exported, but no other file imports it. · evidence: \"export function footCycle(psi: number)\" `git grep -lw footCycle 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "A75",
+   "file": "src/render/figureWalk.ts:93",
+   "defect": "[p19] dead-code · ageFactor is exported, but no other file imports it. · evidence: \"export function ageFactor(age: AgeGroup): number {\" `git grep -lw ageFactor 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "A76",
+   "file": "src/render/figureWalk.ts:118",
+   "defect": "[p19] dead-code · rephase is exported, but no other file imports it. · evidence: \"export function rephase(phase: number, from: number, to: number): number {\" `git grep -lw rephase 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "A77",
+   "file": "src/render/figureWalk.ts:142",
+   "defect": "[p19] dead-code · freePlant is exported, but no other file imports it. · evidence: \"export const freePlant = (): FootPlant =>\" `git grep -lw freePlant 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "A78",
+   "file": "src/render/figureWalk.ts:167",
+   "defect": "[p19] dead-code · plantFoot is exported, but no other file imports it; only stepWalk in the same file calls it. · evidence: \"export function plantFoot(\" `git grep -lw plantFoot 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "A79",
+   "file": "src/render/figureWalk.ts:379",
+   "defect": "[p19] dead-code · HEAD_TOP_AXIS is exported, but no other file imports it. · evidence: \"export const HEAD_TOP_AXIS = 0.06\" `git grep -lw HEAD_TOP_AXIS 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "A80",
+   "file": "src/render/figureWalk.ts:568",
+   "defect": "[p19] dead-code · PRIMITIVE_KNEEL is exported, but no other file imports it. · evidence: \"export const PRIMITIVE_KNEEL = { width: 0.55, height: 0.55 * 0.75 } as const\" `git grep -lw PRIMITIVE_KNEEL 54b326987` lists only src/render/figureWalk.ts."
+  },
+  {
+   "id": "A81",
+   "file": "src/render/figureRig.ts:217",
+   "defect": "[p19] dead-code · SQUASH_BLEND is exported, but no other file imports it. · evidence: \"export const SQUASH_BLEND = 0.08\" `git grep -lw SQUASH_BLEND 54b326987` lists only src/render/figureRig.ts."
+  },
+  {
+   "id": "A82",
+   "file": "src/render/figureRig.ts:237",
+   "defect": "[p19] dead-code · PALM_NORMAL is exported, but no other file imports it; only palmNormal in the same file reads it. · evidence: \"export const PALM_NORMAL = {\" `git grep -lw PALM_NORMAL 54b326987` lists only src/render/figureRig.ts."
+  },
+  {
+   "id": "A83",
+   "file": "src/render/gesture.ts:173",
+   "defect": "[p20] stale-comment · copyPoseExtras' doc says it carries \"the hand shapes\", but it copies six optional parts, most of which are not hand shapes. · evidence: \"/** Carry the pose's optional parts (the hand shapes) from `from` onto\" while the body assigns pointHand, shoulders, gaze, reach, elbow and body; only pointHand is a hand shape."
+  },
+  {
+   "id": "A84",
+   "file": "src/render/placeRiver.ts:349",
+   "defect": "[p20] stale-comment · flotsamKinds' doc says index 0 is always foam wherever foam has a share, but the largest-deficit walk gives index 0 to whichever kind has the largest share. · evidence: \"Index 0 is always foam (the reading the oldest checks were written against) wherever foam has a share.\" vs \"const d = share(k) * (i + 1) - given[k]; if (d > deficit + 1e-9) { ... best = k }\": at i = 0 the deficit is the share itself, so a mix like { foam: 0.1, leaf: 0.9 } starts with 'leaf'."
+  },
+  {
+   "id": "A85",
+   "file": "src/render/villagerBody.ts:5",
+   "defect": "[p20] stale-comment · The header says only the closing hands stay live morph targets, but LIVE_MORPHS also keeps the pointing and relaxed hand shapes live. · evidence: \"only the closing hands stay live morph targets on the GPU\" vs \"export const LIVE_MORPHS = ['grip.L', 'grip.R', 'point.L', 'point.R', 'relax.L', 'relax.R'] as const\" (its own doc: \"closed round a tool, pointing, relaxed\")."
+  },
+  {
+   "id": "A86",
+   "file": "src/render/renderSupport.ts:58",
+   "defect": "[p20] dead-code · probeRenderSupport is never called by game code; App.tsx uses renderSupportNow and hasWebgpuAdapter directly, so only renderSupport.test.ts imports it. · evidence: \"export async function probeRenderSupport(env: RenderSupportEnv = browserEnv()): Promise<boolean> {\" `git grep -n renderSupport 54b326987 -- src` shows App.tsx importing only \"{ hasWebgpuAdapter, renderSupportNow }\"."
+  },
+  {
+   "id": "A87",
+   "file": "src/render/placeRiver.ts:133",
+   "defect": "[p20] dead-code · RIVER_FLOOR_SINK is exported, but no other file imports it. · evidence: \"export const RIVER_FLOOR_SINK = 0.05\" `git grep RIVER_FLOOR_SINK 54b326987` finds it only in src/render/placeRiver.ts."
+  },
+  {
+   "id": "A88",
+   "file": "src/render/placeRiver.ts:265",
+   "defect": "[p20] dead-code · FOAM_PATCH_FRAY is exported, but no other file imports it. · evidence: \"export const FOAM_PATCH_FRAY = 0.3\" `git grep FOAM_PATCH_FRAY 54b326987` finds it only in src/render/placeRiver.ts."
+  },
+  {
+   "id": "A89",
+   "file": "src/render/placeRiver.ts:422",
+   "defect": "[p20] dead-code · buildLeafGeometry is exported, but no other file imports it; only buildFlotsamGeometry in the same file calls it. · evidence: \"export function buildLeafGeometry(): THREE.BufferGeometry {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "A90",
+   "file": "src/render/placeRiver.ts:432",
+   "defect": "[p20] dead-code · buildGrassTuftGeometry is exported, but no other file imports it; only buildFlotsamGeometry calls it. · evidence: \"export function buildGrassTuftGeometry(): THREE.BufferGeometry {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "A91",
+   "file": "src/render/placeRiver.ts:451",
+   "defect": "[p20] dead-code · buildTwigGeometry is exported, but no other file imports it; only buildFlotsamGeometry calls it. · evidence: \"export function buildTwigGeometry(): THREE.BufferGeometry {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "A92",
+   "file": "src/render/villagerAsset.ts:90",
+   "defect": "[p20] dead-code · boneOfNode is exported, but no other file imports it. · evidence: \"export const boneOfNode = (node: string): string =>\" `git grep -lw <name> 54b326987` lists only its own file; it is used only inside villagerFromGltf."
+  },
+  {
+   "id": "A93",
+   "file": "src/render/villagerAsset.ts:111",
+   "defect": "[p20] dead-code · villagerFromGltf is exported, but no other file imports it; only parseVillager in the same file calls it. · evidence: \"export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THREE.AnimationClip[] }): VillagerAsset {\" `git grep -lw <name> 54b326987` lists only its own file."
+  },
+  {
+   "id": "A94",
+   "file": "src/render/villagerClipPose.ts:1089",
+   "defect": "[p21] dead-code · shovelTip is exported but called nowhere, neither by another file under src or scripts (test files included) nor inside its own file. · evidence: \"export function shovelTip(\" is its only occurrence; `git grep -lw shovelTip 54b326987 -- src scripts` lists only src/render/villagerClipPose.ts."
+  },
+  {
+   "id": "A95",
+   "file": "src/render/villagerClipPose.ts:47",
+   "defect": "[p21] dead-code · HeldFoot is exported but imported by no other file; it is used only inside its own file. · evidence: \"export type HeldFoot = Record<Contact, ...>\" is referenced only by \"const freeFoot = (): HeldFoot\" and \"held: [HeldFoot, HeldFoot]\" in the same file; `git grep -lw HeldFoot` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "A96",
+   "file": "src/render/villagerClipPose.ts:77",
+   "defect": "[p21] dead-code · LiftOff is exported but imported by no file; it is used only inside its own file (balance.ts only names it in a comment). · evidence: \"export interface LiftOff {\" with uses only in \"lift: [LiftOff, LiftOff]\" and \"const freeLift = (): LiftOff\"; the other hit is the comment \"(villagerClipPose.ts `LiftOff`)\" in src/config/balance.ts."
+  },
+  {
+   "id": "A97",
+   "file": "src/render/villagerClipPose.ts:107",
+   "defect": "[p21] dead-code · PLANT_TOUCH is exported, but outside its own file only its own test reads it. · evidence: \"export const PLANT_TOUCH = 0.02\"; `git grep -lw PLANT_TOUCH` lists only villagerClipPose.ts and villagerClipPose.test.ts."
+  },
+  {
+   "id": "A98",
+   "file": "src/render/villagerClipPose.ts:139",
+   "defect": "[p21] dead-code · stanceOf is exported, but besides its own file (blendGait) only its own test imports it. · evidence: \"export function stanceOf(clip: VillagerClip, side: 'L' | 'R')\"; `git grep -lw stanceOf` lists only villagerClipPose.ts and villagerClipPose.test.ts."
+  },
+  {
+   "id": "A99",
+   "file": "src/render/villagerClipPose.ts:177",
+   "defect": "[p21] dead-code · stanceSync is exported but used only inside its own file. · evidence: \"export function stanceSync(phase: number, ...)\" is called only in \"samplePhase(p.clip, stanceSync(phase, b, e), frame, ...)\" in the same file; `git grep -lw stanceSync` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "A100",
+   "file": "src/render/villagerClipPose.ts:265",
+   "defect": "[p21] dead-code · heelOff is exported, but besides its own file only its own test imports it (balance.ts only names it in comments). · evidence: \"export function heelOff(frame: PersonFrame, ...)\"; importers are only villagerClipPose.test.ts, and balance.ts has just \"(villagerClipPose.ts `heelOff`)\" in doc comments."
+  },
+  {
+   "id": "A101",
+   "file": "src/render/villagerClipPose.ts:426",
+   "defect": "[p21] dead-code · gaitFootGround is exported, but besides its own file (clipGaitPose) only its own test imports it (balance.ts only names it in a comment). · evidence: \"export function gaitFootGround(asset: VillagerAsset, ...)\"; importers are only villagerClipPose.test.ts, and balance.ts has just \"(villagerClipPose.ts `gaitFootGround`)\"."
+  },
+  {
+   "id": "A102",
+   "file": "src/render/villagerClipPose.ts:922",
+   "defect": "[p21] dead-code · kneePole is exported but used only inside its own file. · evidence: \"export function kneePole(hip: THREE.Vector3, ...)\" is called only by \"kneePole(hip, knee, ankle, straight, _kp)\" in kneeTurn; `git grep -lw kneePole` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "A103",
+   "file": "src/render/villagerClipPose.ts:954",
+   "defect": "[p21] dead-code · kneeTurn is exported, but besides its own file (correctLeg) only its own test imports it. · evidence: \"export function kneeTurn(\"; `git grep -lw kneeTurn` lists only villagerClipPose.ts and villagerClipPose.test.ts."
+  },
+  {
+   "id": "A104",
+   "file": "src/render/villagerClipPose.ts:999",
+   "defect": "[p21] dead-code · correctLeg is exported but used only inside its own file. · evidence: \"export function correctLeg(\" is called only in \"if (far || fw > 0 || tw > 0) correctLeg(asset, frame.rest0, out, world, ...)\" in the same file; `git grep -lw correctLeg` lists only villagerClipPose.ts."
+  },
+  {
+   "id": "A105",
+   "file": "src/render/villagerClipPose.ts:106",
+   "defect": "[p21] stale-comment · PLANT_TOUCH's doc calls it the height up to which a contact still carries, but a held contact carries up to G.plantLetGo (2) times that height; PLANT_TOUCH is only the height at which a contact takes hold. · evidence: \"/** How far a contact may lie above the ground and still carry (person units). */\" vs \"const letGo = G.plantLetGo * touch\", \"if (!body || y >= letGo) { held[k] = null\" (plantLetGo: 2), the in-code note \"and over a band above the touch height, so its share of the hold fades over frames\", and \"if (_yHold[k] < touch && !held[k]) held[k] = ...\"."
+  },
+  {
+   "id": "A106",
+   "file": "src/render/villagerClipPose.ts:496",
+   "defect": "[p21] stale-comment · clipGaitPose's doc says walk and sprint are blended by the sprint share, but the pose blends three clips (walk, jog, sprint) by the three gait weights. · evidence: \"walk and sprint blended by the sprint share\" vs blendGait's \"{ clip: walkClip, ..., w: w.walk }, { clip: asset.clips.jog, ..., w: w.jog }, { clip: asset.clips.sprint, ..., w: w.sprint }\" with `gait` from gaitAt passed as the weights."
+  },
+  {
+   "id": "A107",
+   "file": "src/render/villagerClipPose.test.ts:384",
+   "defect": "[p21] stale-comment · The comment gives the random frame rate as 25-120 Hz, but the dt formula reaches down to about 20.7 Hz. · evidence: \"at 25-120 Hz\" vs \"const dt = 1 / 120 + r() * (1 / 25)\": at r() → 1 dt is 1/120 + 1/25 ≈ 0.0483 s, about 20.7 Hz, not 25 Hz."
+  },
+  {
+   "id": "A108",
+   "file": "src/render/villagerClipPose.test.ts:208",
+   "defect": "[p21] stale-comment · The comment gives the slide bound as 0.004 person units, but walkStraight measures the slide in figure units (person units times f.scale). · evidence: \"0.004 person units per frame everywhere\" vs walkStraight's \"down[s + k] = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)\" feeding \"slide = Math.max(slide, now[key].distanceTo(last[key]))\", checked by \"expect(r.slide, where).toBeLessThan(0.004)\"."
+  },
+  {
+   "id": "A109",
+   "file": "src/render/villagerClipPose.test.ts:152",
+   "defect": "[p21] stale-comment · The comment says `downs` counts, per foot, the frames with a contact down, but the code adds one for every contact down in a frame. · evidence: \"per foot, frames with a contact down\" vs \"for (const key of keys) { const s = key[0] as 'L' | 'R'; downs[s]++\", where keys are per contact (\"down[s + k]\" for heel/ball/tip)."
+  },
+  {
+   "id": "A110",
+   "file": "src/render/villagerFigureBody.ts:184",
+   "defect": "[p22] stale-comment · The `GltfPerson.geometry` doc says the body has no morphs, but the code gives it morph targets. · evidence: \"/** Skinned to the asset's bone order, no morphs, normals of its own. */\" is wrong because `bakePose` keeps the live hand morphs (`g.morphAttributes = live.length ? { position: live } : {}`), `gltfPerson` then runs `scaleMorphs(g, s)` on them, and `gltfFigureGeometry` copies the morph names from `parts[0]` (the body)."
+  },
+  {
+   "id": "A111",
+   "file": "src/render/villagerFigureBody.ts:581",
+   "defect": "[p22] dead-code · The `_radial` parameter of `gltfFigureGeometry` is never read, yet every caller still has to pass it. · evidence: \"  _radial: number,\" is unused in the function body, and the tests have to supply a throwaway value: \"gltfFigureGeometry(asset, person, [], '#6b4a33', null, 8)\"."
+  },
+  {
+   "id": "A112",
+   "file": "src/render/villagerGarmentMask.ts:10",
+   "defect": "[p22] stale-comment · The header gives the push as the bare constant, but the only caller multiplies it by the person's scale. · evidence: \"pushed VILLAGER_ASSET.garmentMaskPush inward along its normal\" while villagerFigureBody.ts:593 passes \"const depth = VILLAGER_ASSET.garmentMaskPush * person.frame.scale\", and `scale` is stature/(crown−sole), which is not 1 in general."
+  },
+  {
+   "id": "A113",
+   "file": "src/render/villagerRig.ts:5",
+   "defect": "[p22] stale-comment · The header names the figure component as `scenes/place/gltfFigure.tsx`, but every other new file in this part names `skinnedFigure.tsx`. · evidence: \"The figure (scenes/place/gltfFigure.tsx) writes the result onto its bones\" against villagerFigureBody.ts:3 \"scenes/place/skinnedFigure.tsx\" and the tests' \"import { SkinnedFigure } from '../scenes/place/skinnedFigure'\". The material does not show whether gltfFigure.tsx still exists, so this one needs that file checked."
+  },
+  {
+   "id": "A114",
+   "file": "src/render/villagerRig.ts:25",
+   "defect": "[p22] stale-comment · `clipTime` claims to accept a phase (0…1), but it only wraps or clamps seconds against `clip.duration` and never converts a phase. · evidence: \"/** Clip time for a phase (0 … 1) or a time in seconds: loops wrap, the rest clamp. */\" while the body is \"return ((t % d) + d) % d\" / \"Math.min(Math.max(t, 0), clip.duration)\", so a phase of 0.5 would be read as 0.5 s."
+  },
+  {
+   "id": "A115",
+   "file": "src/render/villagerKneelGround.test.tsx:5",
+   "defect": "[p22] stale-comment · The header says the figure gets up and walks off, but after the kneel the stage never moves the root again. · evidence: \"holds, gets up and walks off\" while the stage only moves it in \"if (t < 2) root.position.z += 1.2 * dt\", and `kneelRun`'s own doc says \"kneel 3 s, stand 1.5 s\"."
+  },
+  {
+   "id": "A116",
+   "file": "src/render/villagerPenetrationReport.test.ts:3",
+   "defect": "[p22] stale-comment · The header says the report is never worse than main's, but the full comparison against main is skipped and only the build pose is gated. · evidence: \"its numbers are never worse than main's report measured by the same step\" against \"it.skip('no garment, column and clip is worse than on main, in the build pose or any other'\" and \"point 1332 is gated against main in the build pose only\"."
+  },
+  {
+   "id": "A117",
+   "file": "src/render/villagerRuntimePose.test.tsx:448",
+   "defect": "[p22] stale-comment · An orphaned comment about the chaser's stride sits above the hip-height block it does not describe; the stride check comes ten lines later. · evidence: \"// the chaser strides at its sprint (its legs froze above the old teleport speed)\" is followed immediately by \"// the child chaser at 3.4 u/s and the caught child stay at a child's standing height\", the `hipsOf` expects, and only then \"const feet = by('chaser')…\" (l.458)."
+  },
+  {
+   "id": "A118",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "[p22] :184 stale-comment — GltfPerson.geometry doc says \"no morphs\" but bakePose keeps the live hand morphs, gltfPerson scales them (scaleMorphs) and gltfFigureGeometry names merged targets from the body"
+  },
+  {
+   "id": "A119",
+   "file": "src/render/villagerFigureBody.ts",
+   "defect": "[p22] :581 dead-code — gltfFigureGeometry's `_radial: number` parameter is never read; callers/tests must pass a dummy (…, null, 8)"
+  },
+  {
+   "id": "A120",
+   "file": "src/render/villagerGarmentMask.ts",
+   "defect": "[p22] :10 stale-comment — header says covered vertices are pushed VILLAGER_ASSET.garmentMaskPush, but the caller passes garmentMaskPush * person.frame.scale (villagerFigureBody.ts:593)"
+  },
+  {
+   "id": "A121",
+   "file": "src/render/villagerRig.ts",
+   "defect": "[p22] :5 stale-comment — header names the figure \"scenes/place/gltfFigure.tsx\" while villagerFigureBody.ts header and all tests use scenes/place/skinnedFigure.tsx (SkinnedFigure); confirm gltfFigure.tsx is gone"
+  },
+  {
+   "id": "A122",
+   "file": "src/render/villagerRig.ts",
+   "defect": "[p22] :25 stale-comment — clipTime doc \"for a phase (0 … 1) or a time in seconds\" but the code only wraps/clamps seconds against clip.duration, no phase conversion"
+  },
+  {
+   "id": "A123",
+   "file": "src/render/villagerKneelGround.test.tsx",
+   "defect": "[p22] :5 stale-comment — header says the figure \"gets up and walks off\" but the stage only moves the root while t < 2 (kneelRun doc: \"stand 1.5 s\")"
+  },
+  {
+   "id": "A124",
+   "file": "src/render/villagerPenetrationReport.test.ts",
+   "defect": "[p22] :3 stale-comment — header claims numbers \"never worse than main's report\", but the all-pose comparison is it.skip (pending point 1334); only the build pose is gated"
+  },
+  {
+   "id": "A125",
+   "file": "src/render/villagerRuntimePose.test.tsx",
+   "defect": "[p22] :448 stale-comment — orphaned \"the chaser strides at its sprint…\" comment sits above the hip-height block; its stride (feet spread) check is at l.458–459"
+  },
+  {
+   "id": "A126",
+   "file": "src/scenes/actorLabelSource.ts:160",
+   "defect": "[p23] stale-comment · The doc comment for `drawnHeadTop` places the head's top at the wrong point, and the code and the inline comment below it disagree with it. · evidence: \"That top point lies at centre + r·rowY/|rowY| in world space\" — the code returns `e[12] + r * (e[0] * ux + e[4] * uy + e[8] * uz)` and `e[13] + r * len`, which is centre + r·L·u with u = rowY/|rowY|. The inline comment at :171-172 says the same (\"the top point is centre + r·L·u\"). The doc's formula leaves out L: its y component would be r·e5/len, but the code returns r·len."
+  },
+  {
+   "id": "A127",
+   "file": "src/scenes/place/CookShelter.tsx:13",
+   "defect": "[p23] stale-comment · The post-placement comment says the posts use the same numbers the head-clearance sweep reads, but the same file lets callers override the post square. · evidence: \"Corner posts a comfortable margin around the stone ring … the same numbers the head-clearance sweep reads (work-order 349)\" — the component takes `postR = COOK_SHELTER.postR` as an overridable prop. The doc at :10 says \"`postR` widens the post square for the fishers' grill and griller\". For the fishers' shelter, the post square and the roof radius (`postR * COOK_SHELTER.capSpread`) are therefore neither the sweep's numbers nor placed around a stone ring."
+  },
+  {
+   "id": "A128",
+   "file": "src/scenes/actorLabelSource.ts",
+   "defect": "[p23] :160 stale-comment — drawnHeadTop doc says the top point is \"centre + r·rowY/|rowY|\", but the code (and the inline comment at :171-172) computes centre + r·L·u (x = e12 + r·(e0·ux+e4·uy+e8·uz), y = e13 + r·len); the doc formula drops L."
+  },
+  {
+   "id": "A129",
+   "file": "src/scenes/place/CookShelter.tsx",
+   "defect": "[p23] :13 stale-comment — \"Corner posts … around the stone ring … the same numbers the head-clearance sweep reads (work-order 349)\" no longer holds once `postR` is an overridable prop widened for the fishers' grill and griller (:10, :12); their posts and roof radius are not the sweep's COOK_SHELTER.postR."
+  },
+  {
+   "id": "A130",
+   "file": "src/scenes/place/PlaceLife.tsx:1606",
+   "defect": "[p24] stale-comment · The Goats JSDoc is now orphaned: the new `GOAT_STEER_SPEED` constant and its own JSDoc were inserted between it and `function Goats`. · evidence: \"silhouettes, which walk real relief, carry that half. */\" is followed by \"/** Walking pace of a DEV-steered goat (m/s), a calm grazing walk. */ const GOAT_STEER_SPEED = 0.8\", so the Goats description now sits on a const it does not describe, and `function Goats` has no doc comment."
+  },
+  {
+   "id": "A131",
+   "file": "src/scenes/place/PlaceLife.tsx:3384",
+   "defect": "[p24] stale-comment · The precedence comment says the fill wins over everything, but the new take branch is tested before the fill. · evidence: \"The pose: a fill wins over everything, then digging, then the gesture\" while the code reads \"if (taking !== null && spareAt) { … } else if (filling !== null) {\", so the take outranks the fill."
+  },
+  {
+   "id": "A132",
+   "file": "src/scenes/place/PlaceLife.tsx:2979",
+   "defect": "[p24] stale-comment · The per-villager state comment still says `walked` drives \"the bob\", but the diff removed the bob. · evidence: \"how far it has walked (the bob)\" while the position line changed from \"groundHeight(me.x, me.z) + Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05\" to \"g.position.set(me.x, groundHeight(me.x, me.z), me.z)\" with \"On the ground: the body's own stride carries the rise and fall.\""
+  },
+  {
+   "id": "A133",
+   "file": "src/scenes/place/PlaceLife.tsx:1606",
+   "defect": "[p24] stale-comment · the Goats JSDoc is orphaned onto the newly inserted `GOAT_STEER_SPEED` const (\"/** Walking pace of a DEV-steered goat …\") and no longer precedes `function Goats`"
+  },
+  {
+   "id": "A134",
+   "file": "src/scenes/place/PlaceLife.tsx:3384",
+   "defect": "[p24] stale-comment · \"The pose: a fill wins over everything\" is wrong now that the new `if (taking !== null && spareAt)` take branch is checked before `else if (filling !== null)`"
+  },
+  {
+   "id": "A135",
+   "file": "src/scenes/place/PlaceLife.tsx:2979",
+   "defect": "[p24] stale-comment · \"how far it has walked (the bob)\" is stale; the walking bob off `state.walked` was removed (\"On the ground: the body's own stride carries the rise and fall\")"
+  },
+  {
+   "id": "A136",
+   "file": "src/scenes/place/PlaceScene.tsx:1213",
+   "defect": "[p25] stale-comment · The FirePit frame comment still names `fireRainFactor` as the function whose two branches it describes, but the diff replaced that call with `shelteredFireRainFactor` and removed `fireRainFactor` from the import list. · evidence: \"is beaten down by rain (point 256, the two branches of fireRainFactor).\" next to \"const rainFactor = shelteredFireRainFactor(rain, sheltered)\". The code no longer calls `fireRainFactor`, and the file no longer imports it."
+  },
+  {
+   "id": "A137",
+   "file": "src/scenes/place/PlaceScene.tsx:2394",
+   "defect": "[p25] stale-comment · The GizaAmbient frame comment says a person steps with the turn, but the diff removed the person bob, and nothing in the frame or the `<Figure>` props drives a step or gait. · evidence: \"// Each stands and looks slowly around; a person steps with the turn.\" followed only by \"g.rotation.y = …\" and \"g.position.y = groundHeight(a.x, a.z)\". The `person` branch was deleted, and `<Figure … role={a.role} headProp={hat} />` gets no `gait` prop, so no stepping is drawn."
+  },
+  {
+   "id": "A138",
+   "file": "src/scenes/place/PlaceScene.tsx:2205",
+   "defect": "[p25] stale-comment · The `__placeRiver` dev-hook comment says the hook reports where the foam stands, but `flecks` now holds every flotsam kind (foam, leaf, grass, twig, each tagged with `kind`), and the hook also reports drift values. · evidence: \"where its foam stands right now\" vs \"const counts: Record<FlotsamKind, number> = { foam: 0, leaf: 0, grass: 0, twig: 0 }\" and \"now.push({ kind: f.kind, ...p })\". The reported `flecks` are no longer only foam."
+  },
+  {
+   "id": "A139",
+   "file": "src/scenes/place/PlaceScene.tsx",
+   "defect": "[p25] :1213 stale-comment — FirePit comment cites \"the two branches of fireRainFactor\", but the code now calls `shelteredFireRainFactor(rain, sheltered)` and `fireRainFactor` is no longer imported"
+  },
+  {
+   "id": "A140",
+   "file": "src/scenes/place/PlaceScene.tsx",
+   "defect": "[p25] :2394 stale-comment — GizaAmbient \"a person steps with the turn\", but the person bob was removed and nothing (no gait prop, only rotation/ground-height writes) makes a figure step"
+  },
+  {
+   "id": "A141",
+   "file": "src/scenes/place/PlaceScene.tsx",
+   "defect": "[p25] :2205 stale-comment — `__placeRiver` dev-hook comment says \"where its foam stands\", but `flecks` now carries every flotsam kind (foam/leaf/grass/twig with `kind`) plus the drift fields"
+  },
+  {
+   "id": "A142",
+   "file": "src/scenes/place/RiverFishery.tsx:249",
+   "defect": "[p26] stale-comment · The doc block for the `RiverFishery` component is orphaned: it sits right above a second JSDoc and attaches to `FisheryFireEnv`, while the component itself comes after `FISH_FIRE_LIGHT` with no doc · evidence: \"/** * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the boat and the fire … */ /** What the fishers' fire needs of its settlement (point 1275) … export interface FisheryFireEnv\" a component description now documents an interface."
+  },
+  {
+   "id": "A143",
+   "file": "src/scenes/place/RiverFishery.tsx:233",
+   "defect": "[p26] stale-comment · The `basketFishSpot` doc names a parameter `n` that does not exist, and it lists only a yaw while the function also returns a roll · evidence: \"/** Where fish `i` of `n` lies in a basket's heap (local), and its yaw. */ function basketFishSpot(i: number): { …; yaw: number; roll: number }\" the signature has only `i`."
+  },
+  {
+   "id": "A144",
+   "file": "src/scenes/place/RiverFishery.tsx:934",
+   "defect": "[p26] stale-comment · The smoking-rack comment promises slats, but the group draws only four posts, two rails, the hung fish and a ground disc · evidence: \"{/* THE SMOKING RACK: four posts, two rails and slats, the fish across them. */}\" no slat mesh exists in the `fish-rack` group, and the fish are \"Hung head down from the rails by the tail\", not laid across slats."
+  },
+  {
+   "id": "A145",
+   "file": "src/scenes/place/adultWork.ts:134",
+   "defect": "[p26] stale-comment · The `standSpot` doc still says the carrier works from this spot, but per the new `tableSpot` doc the carrier only waits there and works at the table · evidence: \"The spot BESIDE the water stand this errand's carrier works from … He stands next to it, as one does at a table.\" vs \"he waits for the order on his `standSpot`, then steps up here to take the empty jar and comes back here to set the full one down\" two docs contradict each other."
+  },
+  {
+   "id": "A146",
+   "file": "src/scenes/place/adultWork.ts:144",
+   "defect": "[p26] stale-comment · The `dug` doc says it counts digging seconds, but the new take phase reuses it as the jar-take clock (as the fill does) · evidence: \"/** Seconds this worker has dug in the current bout. */\" vs \"} else if (t.arrived && t.phase === 'take') { t.dug += dt … if (t.carry === 'none' && t.dug >= seconds * TAKE_GRAB)\" the field is not only dig time."
+  },
+  {
+   "id": "A147",
+   "file": "src/scenes/place/adultWork.ts:215",
+   "defect": "[p26] dead-code · The `'take'` and `'water-back'` clauses of the standSpot branch can never be reached, because the line above already returns for both whenever `tableSpot` is set, and the only carrier task ever cast always gets `tableSpot: atTable` (the cast `continue`s without one) · evidence: \"if (task.tableSpot && (task.phase === 'take' || task.situation === 'water-back')) return …\" then \"if (task.standSpot && (… || task.phase === 'take' || task.situation === 'water-back'))\" the sender never enters 'take' or 'water-back'."
+  },
+  {
+   "id": "A148",
+   "file": "src/scenes/place/adultWork.ts:792",
+   "defect": "[p26] stale-comment · The new comment says the report's aim is the water just set down, read in readyWord, but the very next lines still build `pendingWord` aimed at the sender at person height, which is the replaced work-order-1087 design · evidence: \"its aim is the water just set down, read when the word falls (readyWord)\" vs \"t.pendingWord = { id: 'water-back', concept: 'RIVER', speaker: i, aim: { x: sender.x, y: 1, z: sender.z } }\" while readyWord now returns `aim: newestJarWater(...)`."
+  },
+  {
+   "id": "A149",
+   "file": "src/scenes/place/RiverFishery.tsx",
+   "defect": "[p26] :249 stale-comment — the RiverFishery component's JSDoc (\"THE FISHERMEN AT A RIVERSIDE VILLAGE … One component for the boat and the fire\") is orphaned above the FisheryFireEnv interface's own JSDoc; the component itself is undocumented"
+  },
+  {
+   "id": "A150",
+   "file": "src/scenes/place/RiverFishery.tsx",
+   "defect": "[p26] :233 stale-comment — basketFishSpot doc \"Where fish `i` of `n` lies … and its yaw\" names a nonexistent parameter `n` and omits the returned roll"
+  },
+  {
+   "id": "A151",
+   "file": "src/scenes/place/RiverFishery.tsx",
+   "defect": "[p26] :934 stale-comment — \"THE SMOKING RACK: four posts, two rails and slats, the fish across them\" but no slats are drawn and the fish hang head down from the rails"
+  },
+  {
+   "id": "A152",
+   "file": "src/scenes/place/adultWork.ts",
+   "defect": "[p26] :134 stale-comment — standSpot doc \"the spot … this errand's carrier works from\" contradicts the new tableSpot doc (carrier only waits on standSpot, works at tableSpot)"
+  },
+  {
+   "id": "A153",
+   "file": "src/scenes/place/adultWork.ts",
+   "defect": "[p26] :144 stale-comment — `dug` doc \"Seconds this worker has dug in the current bout\" but the take phase (and fill) reuse it as their clock"
+  },
+  {
+   "id": "A154",
+   "file": "src/scenes/place/adultWork.ts",
+   "defect": "[p26] :215 dead-code — `task.phase === 'take'` / `task.situation === 'water-back'` in the standSpot arrival branch are unreachable: the preceding tableSpot line returns first, and every cast carrier has tableSpot"
+  },
+  {
+   "id": "A155",
+   "file": "src/scenes/place/adultWork.ts",
+   "defect": "[p26] :792 stale-comment — the comment says the report aim is the water read in readyWord, yet pendingWord is still built with aim {sender.x, y:1, sender.z} from the replaced address-the-sender design"
+  },
+  {
+   "id": "A156",
+   "file": "src/scenes/place/bankGame.ts:6",
+   "defect": "[p27] stale-comment · The header still says the RIVER call waits until the listener has heard ROCK, but the listener gate was removed. · evidence: \"calls RIVER (once the listener has heard ROCK; before that the cycle opens silently)\" — `openCycle` now runs `if (caller >= 0) { say(s, { concept: 'RIVER', … }) }`. `hasHeard`/`rockKnown` are deleted, and the test \"calls RIVER in every cycle and announces every run, with nothing heard\" asserts the opposite."
+  },
+  {
+   "id": "A157",
+   "file": "src/scenes/place/bankGame.ts:9",
+   "defect": "[p27] stale-comment · The header still makes the direction announcement conditional on ROCK being known. · evidence: \"once ROCK is known the direction is announced before each one\" — the rock-only branch (`if (world.hasHeard && !world.hasHeard('ROCK'))`) and `rockOnly` were removed. Every run is now announced, and `assertRoundSound` requires `s.direction !== null` for every run."
+  },
+  {
+   "id": "A158",
+   "file": "src/scenes/place/bankGame.test.ts:1077",
+   "defect": "[p27] stale-comment · The JSDoc block for the speech-alarm suite now sits above the wrong describe. · evidence: \"THE LONG-RUN SPEECH ALARM (point 589), which moved here with the words…\" — the new `describe('a play session is a series of cycles before the children scatter', …)` was inserted between this comment and the `describe('the round is watched for going silent (point 589)', …)` it documents."
+  },
+  {
+   "id": "A159",
+   "file": "src/scenes/place/boundary.ts:39",
+   "defect": "[p27] stale-comment · The memory figure no longer matches the lookup size. · evidence: \"Four kilobytes of lookup buy the angular resolution back.\" — the same comment now says \"4096 since work-order 1252\" and `BOUNDARY_LUT_SIZE = 4096`. A `Float32Array` of 4096 entries is 16 KB, not 4 KB (the 4 KB figure was for 1024 entries)."
+  },
+  {
+   "id": "A160",
+   "file": "src/scenes/place/boundary.ts:157",
+   "defect": "[p27] stale-comment · The comment talks about two fades, but only one exists. · evidence: \"Both fades stay < π/2, so cos stays well above zero past the early return.\" — the function has a single fade (`const fade = BANK_FADE_ANGLE`); `plateau` is the plateau angle, not a fade. The previous text, \"BANK_FADE_ANGLE < π/2\", was correct."
+  },
+  {
+   "id": "A161",
+   "file": "src/scenes/place/boundary.ts:227",
+   "defect": "[p27] stale-comment · The doc says the disc shift is \"exactly\" the boundary's excess, but the body neither returns that excess as-is nor stops there. · evidence: \"there the disc moves out by exactly that excess\" — the code eases the excess by `ramp(0, BANK_DISC_SHIFT_EASE_ANGLE, delta)` near the bank normal. Across the plateau it returns `Math.max(eased, riverEdge)`, so the shift is less than the excess near the normal and can be more under the river edge."
+  },
+  {
+   "id": "A162",
+   "file": "src/scenes/place/bankGame.ts:6",
+   "defect": "[p27] stale-comment: the header says RIVER is called \"once the listener has heard ROCK; before that the cycle opens silently\", but `hasHeard`/`rockKnown` were removed and `openCycle` always calls RIVER."
+  },
+  {
+   "id": "A163",
+   "file": "src/scenes/place/bankGame.ts:9",
+   "defect": "[p27] stale-comment: the header says \"once ROCK is known the direction is announced\", but the rock-only run path and `rockOnly` were removed, so every run is now announced (enforced by `assertRoundSound`)."
+  },
+  {
+   "id": "A164",
+   "file": "src/scenes/place/bankGame.test.ts:1077",
+   "defect": "[p27] stale-comment: the \"THE LONG-RUN SPEECH ALARM (point 589)\" JSDoc is now orphaned above the newly inserted `describe('a play session is a series of cycles…')` instead of the silence-watch describe it documents."
+  },
+  {
+   "id": "A165",
+   "file": "src/scenes/place/boundary.ts:39",
+   "defect": "[p27] stale-comment: \"Four kilobytes of lookup\" no longer holds, because `BOUNDARY_LUT_SIZE` is now 4096 floats (16 KB)."
+  },
+  {
+   "id": "A166",
+   "file": "src/scenes/place/boundary.ts:157",
+   "defect": "[p27] stale-comment: \"Both fades stay < π/2\" in `lobeRadius`, although only one fade exists (`BANK_FADE_ANGLE`); `plateau` is not a fade."
+  },
+  {
+   "id": "A167",
+   "file": "src/scenes/place/boundary.ts:227",
+   "defect": "[p27] stale-comment: the `groundDiscShift` doc says the disc \"moves out by exactly that excess\", but the body eases it near the bank normal and raises it to `riverEdge` across the plateau."
+  },
+  {
+   "id": "A168",
+   "file": "src/scenes/place/figureIdentity.ts:9",
+   "defect": "[p28] stale-comment · The `build` range doc says −1..+1, but the code only ever yields −0.6, 0 or +0.6 · evidence: \"/** −1 slight .. +1 stout. */\" vs \"build: Math.round((u(16) - 0.5) * 2) * 0.6\": round() of a value in [−1, 1) gives only −1, 0 or 1, and ×0.6 means ±1 is never reached"
+  },
+  {
+   "id": "A169",
+   "file": "src/scenes/place/fishBaskets.ts:131",
+   "defect": "[p28] stale-comment · The `basketRingViolation` doc lists checks the body does not make · evidence: \"exactly two baskets, ids 0 and 1, … and at most two on the bank\" vs \"if (a.id === b.id) return 'two baskets share an id'\": nothing checks the ids are 0 and 1, there is no bank-count check, and the body also rejects both baskets 'fire', which the doc does not mention"
+  },
+  {
+   "id": "A170",
+   "file": "src/scenes/place/fishFire.test.ts:292",
+   "defect": "[p28] stale-comment · The footprint comment gives the board 0.5 m, but the table below uses 0.45 · evidence: \"the board 0.5 m, storage 0.3 m\" vs \"['board', s.board, 0.45],\""
+  },
+  {
+   "id": "A171",
+   "file": "src/scenes/place/fisheryColliders.ts:31",
+   "defect": "[p28] stale-comment · The grill-post doc names a height that `FISHERY_PROPS` does not have · evidence: \"their radius at the foot and their height. */\" is followed only by \"grillPostOffset: 0.95, grillPostR: 0.035,\", with no height field"
+  },
+  {
+   "id": "A172",
+   "file": "src/scenes/place/fisheryColliders.ts:67",
+   "defect": "[p28] stale-comment · `SHELTER_POST_RADIUS` is documented as already including the stand-off, yet the collider adds the margin again · evidence: \"(the drawn foot plus the stand-off)\" vs \"r: SHELTER_POST_RADIUS + m\" (line 94): if the stand-off were included, `+ m` would count it twice; since `+ m` is added, the constant is only the drawn foot"
+  },
+  {
+   "id": "A173",
+   "file": "src/scenes/place/fisheryColliders.test.ts:33",
+   "defect": "[p28] stale-comment · The test title promises riverside villages of both kinds, but only the roofed kind is asserted · evidence: \"'there are riverside villages of both kinds: roofed and open fires'\" asserts only \"RIVER_VILLAGES.some((p) => fireHasCookShelter(p.peopleId))\" and \"length).toBeGreaterThan(0)\": nothing checks that an open-fire village exists"
+  },
+  {
+   "id": "A174",
+   "file": "src/scenes/place/fisheryBasketClearance.test.tsx:7",
+   "defect": "[p28] stale-comment · The header says no part of the head is inside the basket during the carrier's swap, but that test allows 2 mm of penetration · evidence: \"over the carrier's swap bend, no part of the head is inside the basket\" vs \"never more than 2 mm into the head … expect(worst).toBeLessThan(0.002)\""
+  },
+  {
+   "id": "A175",
+   "file": "src/scenes/place/fisheryBasketClearance.test.tsx:165",
+   "defect": "[p28] stale-comment · The comment claims a hands-on-rim check that the code does not perform · evidence: \"// never into the ground, and his hands on its rim\" is followed only by \"expect(at.y).toBeGreaterThanOrEqual(0)\", with no assertion on the hands"
+  },
+  {
+   "id": "A176",
+   "file": "src/scenes/place/digSiteProps.test.ts:39",
+   "defect": "[p28] stale-comment · The OPEN note says the working day measures walkers beside the unroutable pits' baskets, but the working day runs only seed 42 · evidence: \"(the working day below measures them beside its baskets)\" vs \"const seed = 42\": the listed exceptions ['mandinka-village', 7] and ['sidama-village', 1337] are never simulated"
+  },
+  {
+   "id": "A177",
+   "file": "src/scenes/place/figureIdentity.ts:9",
+   "defect": "[p28] stale-comment · build doc \"−1 slight .. +1 stout\" but `Math.round((u(16)-0.5)*2)*0.6` yields only −0.6/0/+0.6"
+  },
+  {
+   "id": "A178",
+   "file": "src/scenes/place/fishBaskets.ts:131",
+   "defect": "[p28] stale-comment · basketRingViolation doc claims \"ids 0 and 1\" and \"at most two on the bank\", but code checks only distinct ids, has no bank check, and also rejects both-at-'fire'"
+  },
+  {
+   "id": "A179",
+   "file": "src/scenes/place/fishFire.test.ts:292",
+   "defect": "[p28] stale-comment · footprint comment \"the board 0.5 m\" but table uses `['board', s.board, 0.45]`"
+  },
+  {
+   "id": "A180",
+   "file": "src/scenes/place/fisheryColliders.ts:31",
+   "defect": "[p28] stale-comment · grill-post doc mentions \"and their height\" but FISHERY_PROPS has only grillPostOffset/grillPostR, no height field"
+  },
+  {
+   "id": "A181",
+   "file": "src/scenes/place/fisheryColliders.ts:67",
+   "defect": "[p28] stale-comment · SHELTER_POST_RADIUS doc \"(the drawn foot plus the stand-off)\" but collider adds margin again: `SHELTER_POST_RADIUS + m`"
+  },
+  {
+   "id": "A182",
+   "file": "src/scenes/place/fisheryColliders.test.ts:33",
+   "defect": "[p28] stale-comment · title \"riverside villages of both kinds: roofed and open fires\" but only roofed existence is asserted"
+  },
+  {
+   "id": "A183",
+   "file": "src/scenes/place/fisheryBasketClearance.test.tsx:7",
+   "defect": "[p28] stale-comment · header \"no part of the head is inside the basket\" over the swap bend, yet the carrier test allows 2 mm (`worst < 0.002`)"
+  },
+  {
+   "id": "A184",
+   "file": "src/scenes/place/fisheryBasketClearance.test.tsx:165",
+   "defect": "[p28] stale-comment · \"never into the ground, and his hands on its rim\" but only `at.y >= 0` is asserted, no hands-on-rim check"
+  },
+  {
+   "id": "A185",
+   "file": "src/scenes/place/digSiteProps.test.ts:39",
+   "defect": "[p28] stale-comment · KNOWN_UNROUTABLE_PITS note says \"the working day below measures them beside its baskets\" but the working day runs only seed 42, never mandinka@7 or sidama@1337"
+  },
+  {
+   "id": "A186",
+   "file": "src/scenes/place/gltfClipLayers.test.ts:152",
+   "defect": "[p29] dead-code · A leftover debug print sits in front of the assertion. · evidence: \"console.log(\\\"WORST\\\", worst); expect(worst).toBeLessThan(0.2)\" The bare \"WORST\" label, jammed onto the same line as the expect, is debugging output left behind after tuning the threshold. Every test run prints it."
+  },
+  {
+   "id": "A187",
+   "file": "src/scenes/place/gltfClipLayers.test.ts:621",
+   "defect": "[p29] dead-code · An unconditional console print at the end of a test fires on every run. · evidence: \"console.log(`worst per-stance slide under drift and turn: ${worstAll.toFixed(4)} m`)\" `worstAll` feeds no assertion. It is computed only for this print, so it is measurement or debug output, not part of the test. This one may be a deliberate measurement print, so it is lower confidence than finding 1."
+  },
+  {
+   "id": "A188",
+   "file": "src/scenes/place/gltfClipLayers.ts:53",
+   "defect": "[p29] stale-comment · The field doc says `idleT` clocks only the carry-idle clip, but it also drives the idle standing base. · evidence: \"/** Seconds into the dig clip (a loop), and the carry-idle clip. */ … idleT\" vs \"clipPoseAt(asset, f, idle, c.idleT % idle.duration, c.pose)\" The standing-base idle layer (step 8) runs on the same `idleT` clock, and the comment omits it."
+  },
+  {
+   "id": "A189",
+   "file": "src/scenes/place/layout.waterPath.test.ts:174",
+   "defect": "[p29] stale-comment · The gatedSeeds history contradicts itself and loses a seed. · evidence: \"These two are what a sweep of the first 2000 seeds still routes through a wall. Re-picked by work-order 1245: … 661, 673 and 762 still route through a wall. Re-picked by point 1272 …: 661 found a way round; 3 needs a gate.\" Two problems: (a) \"These two\" refers to the 1173 sweep result, yet the next sentence names three still-gated seeds and the list is now [10, 762], chosen by a different criterion (\"first seed that crosses\"); (b) seed 673 is named as still gated and then dropped without any account."
+  },
+  {
+   "id": "A190",
+   "file": "src/scenes/place/layout.ts:363",
+   "defect": "[p29] stale-comment · The outer rungs are said to be tried only after the inner ladder fails with and without compound gates, but the new `findHead` wrapper tries them right after the inner ladder with no gate step. · evidence: \"tried only once the inner ladder has failed with and without compound gates\" vs \"findHead = (solids, reject) => findHeadHere(solids, WATER_PATH_HEAD_INNER_RADII, reject) ?? findHeadHere(solids, WATER_PATH_HEAD_OUTER_RADII, reject) ?? …\" The loom re-search calls `findHead([...colliders, ...stationBodies], …)`, which reaches the outer rungs without ever trying the gate rebuild."
+  },
+  {
+   "id": "A191",
+   "file": "src/scenes/place/gltfClipLayers.test.ts:152",
+   "defect": "[p29] dead-code: leftover debug `console.log(\"WORST\", worst);` jammed before the expect in the arm-handover test"
+  },
+  {
+   "id": "A192",
+   "file": "src/scenes/place/gltfClipLayers.test.ts:621",
+   "defect": "[p29] dead-code (lower confidence): unconditional `console.log(\\`worst per-stance slide …\\`)` whose `worstAll` feeds no assertion, printed every run"
+  },
+  {
+   "id": "A193",
+   "file": "src/scenes/place/gltfClipLayers.ts:53",
+   "defect": "[p29] stale-comment: ClipLayers doc \"Seconds into the dig clip (a loop), and the carry-idle clip\" omits that `idleT` also clocks the idle standing base (`clipPoseAt(…, idle, c.idleT % idle.duration …)`)"
+  },
+  {
+   "id": "A194",
+   "file": "src/scenes/place/layout.waterPath.test.ts:174",
+   "defect": "[p29] stale-comment: gatedSeeds history says \"These two are what a sweep … still routes through a wall\", then lists three seeds (661, 673, 762) for 1245, drops 673 unaccounted, and the list is now [10, 762] by another criterion"
+  },
+  {
+   "id": "A195",
+   "file": "src/scenes/place/layout.ts:363",
+   "defect": "[p29] stale-comment: WATER_PATH_HEAD_OUTER_RADII \"tried only once the inner ladder has failed with and without compound gates\", yet the new `findHead` wrapper (used by the loom re-search) goes inner → outer → wide with no gate step"
+  },
+  {
+   "id": "A196",
+   "file": "src/scenes/place/lifeSpots.ts:129",
+   "defect": "[p30] stale-comment · The doc of `villageAdultStations` names only the well as dropping out, but the pounder now drops out too. · evidence: \"The well and its water-carrier drop out where `villageHasWell` says no.\" The body now has `...(villagePoundsAtCentre(placeId) ? [VILLAGE_SPOTS.pounder] : [])`, so the centre pounder also leaves riverside villages."
+  },
+  {
+   "id": "A197",
+   "file": "src/scenes/place/lifeSpots.ts:331",
+   "defect": "[p30] stale-comment · The `near` option promises it never costs a floor, but the reach path can give up the fabric floor. · evidence: \"Never bought with a floor.\" The function can return `picked.openInReach`, which is picked before the `here.fabric < MIN_FABRIC` gate (\"the FABRIC floor gives way before the call does\")."
+  },
+  {
+   "id": "A198",
+   "file": "src/scenes/place/lifeSpots.ts:334",
+   "defect": "[p30] stale-comment · The `reach` option doc says only floor-keeping grounds are taken and the nearest follows, but a fabric-floor-breaking `openInReach` ground is returned before `picked.nearest`. · evidence: \"taken only when no floor-keeping ground is in reach, and then the nearest one is. Never bought with a floor.\" Line 464 runs `if (picked.openInReach) return picked.openInReach` before line 465 `if (picked.nearest)`."
+  },
+  {
+   "id": "A199",
+   "file": "src/scenes/place/lifeSpots.ts:414",
+   "defect": "[p30] stale-comment · The Rank-1 comment still describes two picks and says only the openness floor ever gives way. The object now holds eight picks, and the fabric floor gives way for reach. · evidence: \"Two picks are kept, and the order between them is the rule … only where the settlement offers no such ground does the openness floor give way\" This contradicts the new `openInReach` pick, which ignores `MIN_FABRIC` (lines 437-442)."
+  },
+  {
+   "id": "A200",
+   "file": "src/scenes/place/lifeSpots.ts:420",
+   "defect": "[p30] md-audit/stale-comment · The comment says no floor is ever given up for near or reach, but the code a few lines below gives one up. · evidence: \"no floor is ever given up for either.\" Line 437 says \"In reach of the stage's stand, the FABRIC floor gives way before the call does\", and `REACH_OPENNESS` is documented as \"where it gives up the fabric floor\"."
+  },
+  {
+   "id": "A201",
+   "file": "src/scenes/place/lifeSpots.ts:458",
+   "defect": "[p30] stale-comment · The return-order comment leaves out the `openInReach` step and claims every candidate keeps every floor. · evidence: \"else in reach; else the nearest to the stand — each among the grounds that keep every floor.\" The returns at 462-465 include `picked.openInReach`, which breaks `MIN_FABRIC`."
+  },
+  {
+   "id": "A202",
+   "file": "src/scenes/place/lifeSpots.ts:466",
+   "defect": "[p30] dead-code · `if (picked.both) return picked.both` can never return. · evidence: \"if (picked.both) return picked.both\" With no `reach`, a non-null `both` makes `preferred = picked.near ?? picked.both` non-null, and line 460 returns it. With `reach`, every candidate that sets `both` also sets `picked.nearest` (since `rim < Infinity`), and line 465 returns first."
+  },
+  {
+   "id": "A203",
+   "file": "src/scenes/place/lifeSpots.test.ts:105",
+   "defect": "[p30] stale-comment · The comment says two stations fewer, but the assertion right after it expects three. · evidence: \"Two stations fewer, and nothing else moved\" sits above \"expect(rock).toHaveLength(other.length - 3)\", and the filter also removes `centrePounder`."
+  },
+  {
+   "id": "A204",
+   "file": "src/scenes/place/loom.test.ts:146",
+   "defect": "[p30] stale-comment · The comment opens by naming seed 4 as the case under test, then says seed 4 no longer applies, while the code uses seed 8. · evidence: \"// Seed 4: since work-order 1245 moved the children's stage upstream…\" followed by \"seed 4 no longer needs a household to give way, 8 is the first Bambara plan that does.\" and `sharedLayout('bambara-village', 8)`."
+  },
+  {
+   "id": "A205",
+   "file": "src/scenes/place/loom.ts:87",
+   "defect": "[p30] stale-comment · The comment says every settlement lays a loom, but weaving is now parked and no village lays one. · evidence: \"Every settlement lays a loom\" while loomParked.test.ts asserts \"no village lays a loom, a warp or a weaver\" and `expect(balance.villageLife.loom.placed).toBe(false)`."
+  },
+  {
+   "id": "A206",
+   "file": "src/scenes/place/mortarPounding.ts:3",
+   "defect": "[p30] stale-comment · The header places `Pounder` in PlaceLife.tsx, but it is its own module. · evidence: \"the scene (`Pounder` in PlaceLife.tsx) only draws the numbers\" while placeDump.test.tsx does `const { Pounder } = await import('./Pounder')`."
+  },
+  {
+   "id": "A207",
+   "file": "src/scenes/place/observerRoom.test.ts:96",
+   "defect": "[p30] stale-comment · The comment says the laid loom is covered above, but in the shipped config no loom is laid, so the `if (l.loom)` block adds nothing. · evidence: \"The loom's reservation is left out: the laid loom is above.\" loomParked.test.ts asserts `expect(layout.loom, id).toBeNull()` for every village."
+  },
+  {
+   "id": "A208",
+   "file": "src/scenes/place/lifeSpots.ts",
+   "defect": "[p30] :129 stale-comment — villageAdultStations doc says only \"The well and its water-carrier drop out\", but the centre pounder now also drops out via villagePoundsAtCentre"
+  },
+  {
+   "id": "A209",
+   "file": "src/scenes/place/lifeSpots.ts",
+   "defect": "[p30] :331 stale-comment — `near` option doc \"Never bought with a floor\" is contradicted by the openInReach pick, which gives up the MIN_FABRIC floor"
+  },
+  {
+   "id": "A210",
+   "file": "src/scenes/place/lifeSpots.ts",
+   "defect": "[p30] :334 stale-comment — `reach` doc \"taken only when no floor-keeping ground is in reach, and then the nearest one is\" is wrong: openInReach (fabric floor dropped) is returned before picked.nearest"
+  },
+  {
+   "id": "A211",
+   "file": "src/scenes/place/lifeSpots.ts",
+   "defect": "[p30] :414 stale-comment — \"Two picks are kept … only … the openness floor give[s] way\" is stale: eight picks now, and the fabric floor gives way for reach"
+  },
+  {
+   "id": "A212",
+   "file": "src/scenes/place/lifeSpots.ts",
+   "defect": "[p30] :420 md-audit/stale-comment — \"no floor is ever given up for either\" contradicts line 437 \"the FABRIC floor gives way before the call does\" and the REACH_OPENNESS doc"
+  },
+  {
+   "id": "A213",
+   "file": "src/scenes/place/lifeSpots.ts",
+   "defect": "[p30] :458 stale-comment — return-order comment omits the openInReach step and claims \"each among the grounds that keep every floor\""
+  },
+  {
+   "id": "A214",
+   "file": "src/scenes/place/lifeSpots.ts",
+   "defect": "[p30] :466 dead-code — `if (picked.both) return picked.both` is unreachable: a non-null `both` is always returned via `preferred` (no reach) or via `picked.nearest` (reach)"
+  },
+  {
+   "id": "A215",
+   "file": "src/scenes/place/lifeSpots.test.ts",
+   "defect": "[p30] :105 stale-comment — \"Two stations fewer\" over an assertion of `other.length - 3`"
+  },
+  {
+   "id": "A216",
+   "file": "src/scenes/place/loom.test.ts",
+   "defect": "[p30] :146 stale-comment — comment opens \"Seed 4: …\" and later says seed 4 no longer applies, while the code uses seed 8"
+  },
+  {
+   "id": "A217",
+   "file": "src/scenes/place/loom.ts",
+   "defect": "[p30] :87 stale-comment — \"Every settlement lays a loom\" contradicted by weaving being parked (`loom.placed` false; loomParked.test asserts no village lays a loom)"
+  },
+  {
+   "id": "A218",
+   "file": "src/scenes/place/mortarPounding.ts",
+   "defect": "[p30] :3 stale-comment — header says \"`Pounder` in PlaceLife.tsx\", but Pounder is imported from './Pounder'"
+  },
+  {
+   "id": "A219",
+   "file": "src/scenes/place/observerRoom.test.ts",
+   "defect": "[p30] :96 stale-comment — \"the laid loom is above\" is false in the shipped config, where every layout.loom is null (weaving parked)"
+  },
+  {
+   "id": "A220",
+   "file": "src/scenes/place/placeFigure.tsx:162",
+   "defect": "[p31] dead-code · The `legGroup` ref is created and attached to the legs' group but is never read anywhere in the component. · evidence: \"const legGroup = useRef<THREE.Group>(null)\" Its only other use is `<group ref={legGroup}>`; every leg access goes through `legPivots.current`, so the ref is written and never consumed."
+  },
+  {
+   "id": "A221",
+   "file": "src/scenes/place/riverBank.test.ts:243",
+   "defect": "[p31] stale-comment · The new comment credits the asymmetric shore reach to a downstream-only widening that `riverBank.ts` now says was undone. · evidence: \"(work-order 1237: the downstream side runs on with the widened lobe)\" `riverBank.ts` `BANK_PLATEAU_ANGLE` now says \"THE BANK IS SYMMETRIC (work-order 1245) … Work-order 1237 had widened only the DOWNSTREAM side … Both sides now carry the same plateau\"."
+  },
+  {
+   "id": "A222",
+   "file": "src/scenes/place/riverBank.ts:180",
+   "defect": "[p31] stale-comment · The stage prose still says each rock sits a good 20° inside the frame edge, but the new standoff constant puts each rock about 4.7° inside it. · evidence: \"the whole stretch fits with either rock a good 20 deg inside the edge for a spectator standing back from the line\" The new `BANK_VIEW_STANDOFF` doc says \"at 0.8 each rock lies 32° off the line of sight, inside the 36.7° half-frame\", which leaves about 4.7° of margin, not 20°."
+  },
+  {
+   "id": "A223",
+   "file": "src/scenes/place/rackWorkerSteady.test.tsx:32",
+   "defect": "[p31] stale-comment · `visitAt`'s doc says the visit ends standing again, but its last branch returns the `back` phase, which is the walk back to the mortar. · evidence: \"standing (arrived), taking, eating, standing again\" The code returns `{ phase: 'back', … }`, and `poundingPair.test.ts` names that phase \"walk back\" in its cycle \"pound, settle, walk, take, eat, walk back, pound\"."
+  },
+  {
+   "id": "A224",
+   "file": "src/scenes/place/skinnedFigure.tsx:237",
+   "defect": "[p32] dead-code · The `'YXZ'` rotation order set on both thighs in `buildRig` (lines 237–238) never takes effect, and its comment at 235–236 describes an order the body does not use. · evidence: `bones['thigh.L'].rotation.order = 'YXZ'` / `bones['thigh.R'].rotation.order = 'YXZ'`, but every frame `poseLegs` writes `b[\\`thigh.${s}\\`].rotation.set(legsNow[i].thigh, -yaw, roll, 'YZX')`, and `Euler.set` with an order argument replaces the order. The skeleton starts unrotated, so the YXZ order is overwritten before it could matter."
+  },
+  {
+   "id": "A225",
+   "file": "src/scenes/place/skinnedFigure.tsx:290",
+   "defect": "[p32] stale-comment · The JSDoc above the exported component describes a walk-motion record, not the component. · evidence: `/** What the figure measured of its own walk, and its transitions in progress. */` directly precedes `export function SkinnedFigure({ look, cloth, … })`. This is a component that takes props and returns JSX; it is not a measured walk or a set of transitions in progress."
+  },
+  {
+   "id": "A226",
+   "file": "src/scenes/place/skinnedFigure.tsx:176",
+   "defect": "[p32] dead-code · `Rig.head` is built and returned but never read. · evidence: `head: THREE.Object3D` is returned from `buildRig`, yet the component reads only `rig.p/.bones/.meshes/.skeleton/.crown/.hands/.gltf`. There is no `rig.head` anywhere; the anchor already lives on `bones.head` via `bones.head.add(head)`."
+  },
+  {
+   "id": "A227",
+   "file": "src/scenes/place/skinnedFigure.tsx:172",
+   "defect": "[p32] dead-code · `Rig.layers` is stored but never read. · evidence: `layers: DressLayer[]` is returned by `buildRig`, and no `rig.layers` read exists in the file; the layers are used only inside `buildRig` to build the geometry."
+  },
+  {
+   "id": "A228",
+   "file": "src/scenes/place/skinnedFigure.tsx:630",
+   "defect": "[p32] stale-comment · The comment says the steadying arm is chosen by the load's side, but the code chooses by which arm is free, left first. · evidence: `// THE STEADYING HAND on a head load: the free arm on the load's side.` vs `(!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1)`. The load sits centred on the crown and no side of it is consulted."
+  },
+  {
+   "id": "A229",
+   "file": "src/scenes/place/speechChannel.ts:81",
+   "defect": "[p32] stale-comment · The speakOverhead doc still promises a replace-and-sweep on every call, but the new early return skips both for an empty phrase. · evidence: `Replaces whatever that speaker was saying, and sweeps out labels whose time has run out` vs the new `if (atoms.length === 0) return` with its comment `Nothing said, nothing changed: not the labels…`."
+  },
+  {
+   "id": "A230",
+   "file": "src/scenes/place/skinnedFigureHeadProp.test.tsx:54",
+   "defect": "[p32] stale-comment · The test calls the first rig a \"primitive-built skeleton\", but `look(16, null)` mounts the code-built skinned body. · evidence: `// primitive-built skeleton first, then the glTF arriving` vs skinnedFigure.tsx's header, where \"primitive figure\" means placeFigure.tsx (the low preset) and the `villager: null` path is `createSkeleton(p)`, the code-built body."
+  },
+  {
+   "id": "A231",
+   "file": "src/scenes/place/skinnedFigure.tsx:237",
+   "defect": "[p32] dead-code: the thigh `rotation.order = 'YXZ'` assignments (and their comment at 235) are always overridden by poseLegs' `rotation.set(..., 'YZX')`"
+  },
+  {
+   "id": "A232",
+   "file": "src/scenes/place/skinnedFigure.tsx:290",
+   "defect": "[p32] stale-comment: \"What the figure measured of its own walk, and its transitions in progress.\" is the JSDoc of the SkinnedFigure component, not of a walk record"
+  },
+  {
+   "id": "A233",
+   "file": "src/scenes/place/skinnedFigure.tsx:176",
+   "defect": "[p32] dead-code: `Rig.head` is returned by buildRig but never read (anchor already on bones.head)"
+  },
+  {
+   "id": "A234",
+   "file": "src/scenes/place/skinnedFigure.tsx:172",
+   "defect": "[p32] dead-code: `Rig.layers` is returned by buildRig but never read"
+  },
+  {
+   "id": "A235",
+   "file": "src/scenes/place/skinnedFigure.tsx:630",
+   "defect": "[p32] stale-comment: \"the free arm on the load's side\" while steadyArm picks left-if-free-else-right and ignores any load side"
+  },
+  {
+   "id": "A236",
+   "file": "src/scenes/place/speechChannel.ts:81",
+   "defect": "[p32] stale-comment: the speakOverhead doc \"Replaces … and sweeps out labels\" is contradicted by the new `if (atoms.length === 0) return`"
+  },
+  {
+   "id": "A237",
+   "file": "src/scenes/place/skinnedFigureHeadProp.test.tsx:54",
+   "defect": "[p32] stale-comment: \"primitive-built skeleton first\" for `look(16, null)`, which is the code-built skinned body, not the primitive figure"
+  },
+  {
+   "id": "A238",
+   "file": "src/scenes/place/tagShuffle.bankRound.test.ts:156",
+   "defect": "[p33] stale-comment · The rewritten history credits work-order 1047 with the slump, but the slump came later and replaced 1047's squat. · evidence: \"Work-order 1047 made the round watchable instead — … a held tap before each run and a readable slump at the end\" vs tagGame.ts `caughtSlumpPose` doc \"A CAUGHT CHILD'S SLUMP (work-order 1239) … It replaced a squat (y-squash 0.66, 0.85 rad fold, arms crossed)\" · the slump belongs to 1239, so \"crouch\" was the true word for 1047."
+  },
+  {
+   "id": "A239",
+   "file": "src/scenes/place/tagShuffle.test.ts:314",
+   "defect": "[p33] stale-comment · The comment still names seed 3 as the second witness and the first layout where the crowds meet, but the code now uses seed 4 and the appended sentence says seed 4 is the first. · evidence: \"The two seeds here are the reported layout (4.08 m) and seed 3 (0.37 m), the lowest-numbered layout of that sweep in which the two crowds really do meet\" vs \"seed 4 is the first where the two crowds meet (0.37 m)\" and `['bambara-village', 4]` · the comment contradicts both the code and itself."
+  },
+  {
+   "id": "A240",
+   "file": "src/scenes/place/tagShuffle.test.ts:400",
+   "defect": "[p33] stale-comment · The new bar is described as more than a second of contact, but it is under one second. · evidence: \"so the bar only asks for over a second of contact\" with `expect(touching).toBeGreaterThan(50)` at 1/60 s frames · 50 pair-frames is 0.83 s, not over a second."
+  },
+  {
+   "id": "A241",
+   "file": "src/scenes/place/tagShuffle.wedgeGate.test.ts:172",
+   "defect": "[p33] stale-comment · The loop comment still says the clear-yard rule refuses nearly every re-pen (1.5 vs 25.5 rescues). The case that measured this was deleted, and the new note says the two rules now re-pen alike. · evidence: \"it refused nearly every re-pen — 1.5 rescues a child-minute where the wall-band rule produces 25.5\" vs \"the two rules re-pen alike (0 refusals, 28.6 vs 24.0 rescues a child-minute over 130 s)\" · the claim is contradicted in the same file."
+  },
+  {
+   "id": "A242",
+   "file": "src/scenes/place/tagShuffle.wedgeGate.test.ts:140",
+   "defect": "[p33] stale-comment · The seed-history prose still picks seeds for \"a re-pen the strict rule refuses — the very contrast this case is built on\", and the NINTH move says seeds \"retain every comparison\". Both are orphaned because that contrast and its assertions (`refusedByClearYard`, corrected vs stricter rescues) were removed. · evidence: \"seed 24 no longer produces a single re-pen the strict rule refuses — the very contrast this case is built on\" / \"22 seeds retain every comparison; 12 is taken\" vs removed `expect(evidence.refusedByClearYard).toBeGreaterThan(0)` · the selection criterion no longer exists."
+  },
+  {
+   "id": "A243",
+   "file": "src/scenes/place/villagerCanoe.test.ts:237",
+   "defect": "[p33] stale-comment · The comment gives the lane as 49 m, but the very next assertion pins it at 48 m. · evidence: \"// A 49 m lane instead of 20 m (item 9)\" then `expect(span).toBe(48)` (laneStart −1 to laneEnd 47) · 47 − (−1) = 48."
+  },
+  {
+   "id": "A244",
+   "file": "src/scenes/place/taskWalkerLoad.test.ts:164",
+   "defect": "[p33] stale-comment · The test name says the walking pose is left untouched, but the test asserts that the pose is overwritten (arms reset to rest, lean zeroed, reach deleted). · evidence: \"it('leaves the walking pose untouched when the hands are free'\" with pose `{ pitch: 1, … lean: 0.3 … reach: { left: 0.5 } }` then `expect(pose.left).toEqual(REST_POSE.left)` / `expect(pose.lean).toBe(0)` / `expect(pose.reach).toBeUndefined()` · the name states the opposite of what is checked."
+  },
+  {
+   "id": "A245",
+   "file": "src/scenes/place/tagGame.ts:568",
+   "defect": "[p33] dead-code · The `!c.held` guard in this assignment can never take effect, because the next unconditional line clears `edgeEase` for any held child anyway. · evidence: \"c.edgeEase = !c.held\" followed by \"if (c.held) c.edgeEase = false\" · the conditional part is redundant."
+  },
+  {
+   "id": "A246",
+   "file": "src/scenes/place/tagGame.ts:1449",
+   "defect": "[p33] stale-comment · The `grabAim` doc says the arm points straight at the target and the hand comes as close as the arm's length allows. The new `level` path adds an elevation offset and caps `reach` short of the quarry's surface. · evidence: \"The arm points straight at the target point, which puts the hand as close to it as an arm of that length can\" vs `elevation: … + (level?.elevation ?? 0)` and `reach = Math.min(level.reachMax, …)` · this no longer holds for a level grab."
+  },
+  {
+   "id": "A247",
+   "file": "src/scenes/place/tagShuffle.bankRound.test.ts",
+   "defect": "[p33] :156 stale-comment — \"Work-order 1047 … a readable slump at the end\" misattributes the slump; 1047 made the squat that work-order 1239's slump replaced (per `caughtSlumpPose` doc)"
+  },
+  {
+   "id": "A248",
+   "file": "src/scenes/place/tagShuffle.test.ts",
+   "defect": "[p33] :314 stale-comment — comment still names \"seed 3 (0.37 m), the lowest-numbered layout … in which the two crowds really do meet\" while the code uses seed 4 and the appended text says seed 4 is the first"
+  },
+  {
+   "id": "A249",
+   "file": "src/scenes/place/tagShuffle.test.ts",
+   "defect": "[p33] :400 stale-comment — \"the bar only asks for over a second of contact\" but `touching > 50` pair-frames at 60 fps is 0.83 s"
+  },
+  {
+   "id": "A250",
+   "file": "src/scenes/place/tagShuffle.wedgeGate.test.ts",
+   "defect": "[p33] :172 stale-comment — loop comment says clear-yard \"refused nearly every re-pen — 1.5 … where the wall-band rule produces 25.5\", contradicted by the new note \"the two rules re-pen alike (0 refusals, 28.6 vs 24.0)\""
+  },
+  {
+   "id": "A251",
+   "file": "src/scenes/place/tagShuffle.wedgeGate.test.ts",
+   "defect": "[p33] :140 stale-comment — seed-history prose (\"a re-pen the strict rule refuses — the very contrast this case is built on\", \"22 seeds retain every comparison\") is orphaned now that the refusal/rescue comparison was removed"
+  },
+  {
+   "id": "A252",
+   "file": "src/scenes/place/villagerCanoe.test.ts",
+   "defect": "[p33] :237 stale-comment — \"A 49 m lane instead of 20 m\" directly above `expect(span).toBe(48)` (−1 to 47 m)"
+  },
+  {
+   "id": "A253",
+   "file": "src/scenes/place/taskWalkerLoad.test.ts",
+   "defect": "[p33] :164 stale-comment — test named \"leaves the walking pose untouched when the hands are free\" asserts the pose is reset to REST_POSE, lean 0, reach deleted"
+  },
+  {
+   "id": "A254",
+   "file": "src/scenes/place/tagGame.ts",
+   "defect": "[p33] :568 dead-code — `c.edgeEase = !c.held` guard is redundant, since the next line `if (c.held) c.edgeEase = false` always clears it"
+  },
+  {
+   "id": "A255",
+   "file": "src/scenes/place/tagGame.ts",
+   "defect": "[p33] :1449 stale-comment — grabAim doc \"The arm points straight at the target point … as close to it as an arm of that length can\" no longer holds for the new `level` path (added elevation offset, reach capped short of the surface)"
+  },
+  {
+   "id": "A256",
+   "file": "src/scenes/place/villagerCanoe.ts:617",
+   "defect": "[p34] stale-comment · netFloats' doc block is orphaned above netHand's own doc, so it documents neither function, and it names a `count` parameter that netFloats does not take. · evidence: \"/** The drift net's float line, as the picture draws it: `count` floats from the ... Empty while the net is folded. */\" is immediately followed by \"/** Where the net's headline leaves the hull ... */ export function netHand(\", while \"export function netFloats(state: ..., lane: ..., cfg: CanoeConfig = ...)\" (line 632) has no doc and takes its float count from \"cfg.netFloats\"."
+  },
+  {
+   "id": "A257",
+   "file": "src/scenes/place/villagerCanoe.ts:533",
+   "defect": "[p34] dead-code · The `'silent'` branch of advanceWord can only run under tests: the only game caller of stepCanoe (RiverFishery.tsx) has a `say` that answers only 'said' or 'held'. · evidence: \"if (answer === 'silent') { w.state = 'passed'\" vs RiverFishery.tsx \"if (!floor) return 'said'; return floor.request({...}) ? 'said' : 'held'\"; the CanoeView doc itself notes \"The scene no longer answers `silent`\"."
+  },
+  {
+   "id": "A258",
+   "file": "src/scenes/place/villagerCanoe.ts:49",
+   "defect": "[p34] dead-code · CANOE_PHASES is imported only by its own test (villagerCanoe.test.ts); no game code uses it. · evidence: \"export const CANOE_PHASES: readonly CanoePhase[] = ['up', 'callDown', ...]\" — git grep -lw CANOE_PHASES finds only villagerCanoe.ts and villagerCanoe.test.ts."
+  },
+  {
+   "id": "A259",
+   "file": "src/scenes/place/villagerCanoe.ts:90",
+   "defect": "[p34] dead-code · CANOE_PADDLER_AFT is exported but used only inside its own file. · evidence: \"export const CANOE_PADDLER_AFT = 1.6\" — git grep -lw CANOE_PADDLER_AFT finds only villagerCanoe.ts (used in seatMen)."
+  },
+  {
+   "id": "A260",
+   "file": "src/scenes/place/villagerCanoe.ts:126",
+   "defect": "[p34] dead-code · lanePoint is exported but used only inside its own file and by its own test. · evidence: \"export function lanePoint(lane: CanoeLane, s: number): BankPoint\" — outside villagerCanoe.ts only villagerCanoe.test.ts references it."
+  },
+  {
+   "id": "A261",
+   "file": "src/scenes/place/villagerCanoe.ts:131",
+   "defect": "[p34] dead-code · segmentGap is exported but used only inside its own file; the one other hit is an unrelated local function of the same name in a test. · evidence: \"export function segmentGap(a: BankPoint, ...\" vs fisheryGutting.test.tsx \"const segmentGap = (p0: THREE.Vector3, ...\" (its own definition, no import)."
+  },
+  {
+   "id": "A262",
+   "file": "src/scenes/place/villagerCanoe.ts:155",
+   "defect": "[p34] dead-code · canoeRangeGap is exported but outside its own file only tests use it (villagerCanoe.test.ts, fishFire.test.ts); no game code imports it. · evidence: \"export function canoeRangeGap(lane: CanoeLane, c: BankPoint, d: BankPoint = c): number\" — git grep -lw canoeRangeGap finds villagerCanoe.ts, villagerCanoe.test.ts, fishFire.test.ts only."
+  },
+  {
+   "id": "A263",
+   "file": "src/scenes/place/villagerCanoe.ts:165",
+   "defect": "[p34] dead-code · canoeStretchGap is used only by its own test. · evidence: \"export function canoeStretchGap(lane: CanoeLane, rocks: ...)\" — git grep -lw canoeStretchGap finds only villagerCanoe.ts and villagerCanoe.test.ts."
+  },
+  {
+   "id": "A264",
+   "file": "src/scenes/place/villagerCanoe.ts:175",
+   "defect": "[p34] dead-code · wrapAngle is exported but used only inside its own file; scripts/verify/stanceSlip.mjs defines its own. · evidence: \"export function wrapAngle(a: number): number\" vs stanceSlip.mjs \"const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a))\"."
+  },
+  {
+   "id": "A265",
+   "file": "src/scenes/place/villagerCanoe.ts:45",
+   "defect": "[p34] dead-code · The exported types CanoePhase and CanoeWord are imported only by test files (villagerCanoe.test.ts; fishFire.test.ts for CanoeWord); no game code imports them. · evidence: \"export type CanoePhase = ...\" / \"export type CanoeWord = 'UPSTREAM' | 'DOWNSTREAM'\" — the only non-defining git grep hits are villagerCanoe.test.ts and fishFire.test.ts."
+  },
+  {
+   "id": "A266",
+   "file": "src/scenes/place/villagerCanoe.ts:54",
+   "defect": "[p34] dead-code · The exported types NetManAction, CanoeMan, CanoeWordState and CanoeView are used only inside their own file. · evidence: \"export type NetManAction\", \"export interface CanoeMan\" (189), \"export interface CanoeWordState\" (206), \"export interface CanoeView\" (251) — git grep -lw finds each only in villagerCanoe.ts."
+  },
+  {
+   "id": "A267",
+   "file": "src/scenes/place/waterStand.ts:17",
+   "defect": "[p34] dead-code · The exported interface StandPoint is used only inside its own file. · evidence: \"export interface StandPoint {\" — git grep -lw StandPoint finds only waterStand.ts."
+  },
+  {
+   "id": "A268",
+   "file": "src/scenes/place/waterStand.ts:24",
+   "defect": "[p34] dead-code · STAND_PLANK_TOP is exported but outside its own file only a test (adultWork.test.ts) reads it; no game code imports it. · evidence: \"export const STAND_PLANK_TOP = 0.385\" — git grep -lw finds waterStand.ts and adultWork.test.ts only."
+  },
+  {
+   "id": "A269",
+   "file": "src/scenes/place/waterStand.ts:83",
+   "defect": "[p34] dead-code · TAKE_REACHED and takeEnvelope are exported but used only inside their own file and by their own test. · evidence: \"export const TAKE_REACHED = 0.3\", \"export function takeEnvelope(progress: number)\" (95) — git grep -lw finds only waterStand.ts and waterStand.test.ts."
+  },
+  {
+   "id": "A270",
+   "file": "src/scenes/travel/TravelScene.tsx:2544",
+   "defect": "[p34] stale-comment · The comment still promises a walking bob, but the walk bounce was removed: on foot the figure's lift is now 0 and the body walks by its gait. · evidence: \"// Face the movement direction; bob gently while walking.\" vs \"inner.current.position.y = pose.figureY\" with travellerPose's \"On foot the body walks by itself ... : 0\" (the old \"moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0\" is deleted)."
+  },
+  {
+   "id": "A271",
+   "file": "src/scenes/travel/TravelScene.tsx:2644",
+   "defect": "[p34] dead-code · wasWounds is still recorded and compared in the change gate, but the gate's body no longer does anything wound-related (the wound marks moved to a per-frame update below), so the wound term only re-sets boat/carry visibility. · evidence: \"|| wasWounds.current !== wounds) { ... wasWounds.current = wounds; if (boat.current) boat.current.visible = canoeing; if (carry.current) carry.current.visible = carrying }\" under \"// Wounds show on the figure, scaling with severity\", while the marks are set after it: \"// Every frame, not on the flip\"."
+  },
+  {
+   "id": "A272",
+   "file": "src/scenes/place/wedgeCarve.test.ts:144",
+   "defect": "[p34] stale-comment · The describe title and the guard message call seed 5 the reporting/reported village, but the comment just above says seed 5 is a stand-in chosen because the reported seed no longer has a pinch. · evidence: \"describe('buildWedgeCarve in the quarter the reporting village places today (seed 5)'\" and \"throw new Error('the reported village carries no children`s quarter')\" (154) vs \"Point 1282 moved the quarter of the reported seed 2972259115 ... The bambara plan with the most carved ground among seeds 1-15 stands in.\""
+  },
+  {
+   "id": "A273",
+   "file": "src/scenes/travel/Wildlife.tsx:408",
+   "defect": "[p35] stale-comment · The rewritten chaseSwim doc says the field holds where the calf was first seen on the water, but for the hunted calf chaseFleeMove stores the pre-step (entry-bank) spot. · evidence: \"holding the spot where it was first seen on the water: for the hunted calf, landing across the water from that spot ends the chase\" contradicts line 2313-2316 \"Entering the water notes the entry bank spot ... a.chaseSwim = { x: fromX, z: fromZ }\" (fromX/fromZ is the position before the step into the water)"
+  },
+  {
+   "id": "A274",
+   "file": "src/scenes/travel/Wildlife.tsx:4662",
+   "defect": "[p35] stale-comment · The crossing branch comment still describes the point-312 swim-out as going to the nearest bank, which this diff replaced with the threat-clear bank. · evidence: \"A swim for a bank (point 192's crossing, and point 312's swim-out to the nearest bank)\" is wrong because the swim-out now targets swimOutBank → safeBankTarget, and the diff itself (line 3499) says \"the plain nearest one was often the traveller's own\""
+  },
+  {
+   "id": "A275",
+   "file": "src/scenes/travel/youngKill.test.ts:34",
+   "defect": "[p36] stale-comment · The test constant claims to mirror Wildlife's CARCASS_DISSOLVE_SECONDS but carries a different value. · evidence: \"const CARCASS_SECONDS = 10 // the predator's feed on the dead young (Wildlife CARCASS_DISSOLVE_SECONDS)\" is wrong because src/scenes/travel/Wildlife.tsx:921 has \"const CARCASS_DISSOLVE_SECONDS = 9\" (and calfShieldContact.test.ts mirrors it as 9)"
+  },
+  {
+   "id": "A276",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:474",
+   "defect": "[p36] dead-code · nearestBankTarget has no production caller left: this change moved both of its Wildlife.tsx call sites to safeBankTarget, so only tests and a doc comment still reference it. · evidence: the diff removes \"nearestBankTarget,\" from Wildlife.tsx's import list and repo-wide grep finds it only in wildlifeBehavior.test.ts, waterEdgeFlee.test.ts and the safeBankTarget doc (\"this is exactly nearestBankTarget\")"
+  },
+  {
+   "id": "A277",
+   "file": "design.md:655",
+   "defect": "[p36] stale-doc · §19.5 still says an animal on water heads for the nearest bank, but the new swim-out deliberately picks the nearest bank clear of any threat ring, which can be a farther bank. · evidence: design.md \"An animal that comes to rest on water makes for the nearest bank and leaves it\" vs safeBankTarget doc \"the NEAREST bank whose landing lies outside every threat's ring. The plain nearest bank sent an animal ... straight back to the bank the traveller stood on\""
+  },
+  {
+   "id": "A278",
+   "file": "src/ui/Hud.tsx:387",
+   "defect": "[p37] stale-comment · The Prompt comment still says the enter hint is anchored by the .prompt-enter CSS rule a little below the screen centre, but the diff now places it with an inline top computed relative to the traveller. · evidence: \"The settlement enter hint gets its own anchor (a little below the screen centre, see .prompt-enter in index.css)\" vs the new \"const style = enterHint ? { top: `${(enterHintTopFraction() * 100).toFixed(2)}%` } : undefined\", which always overrides index.css \"top: 60%\", and enterHintPlacement.ts, which anchors \"a little below the traveller's figure\""
+  },
+  {
+   "id": "A279",
+   "file": "design.md:816",
+   "defect": "[p37] stale-doc · §21.1 still says Esc closes the F6 report, but StateDump.tsx now has Esc in a description field that holds text only leave the field and keep the report open. · evidence: design.md \"Esc or F6 closes it leaving focus on no control (§17.5)\" vs StateDump.tsx \"if (e.key === 'Escape' && description !== '') { ... e.currentTarget.blur() }\" and its header \"Esc only leaves the field ... the next Esc closes\""
+  },
+  {
+   "id": "A280",
+   "file": "src/ui/DebugMenu.test.tsx:269",
+   "defect": "[p37] stale-comment · The comment gives the bank game's control count as nineteen, but the settlement group lists 23 bank controls after this diff, which added debug.bankVisitOpensAtBank. · evidence: \"one from each family its nineteen controls fall into\" vs EXPECTED_CONTROLS, which names 23 'debug.bank*' entries (22 BANK_GAME_FIELDS rows plus the new bankVisitOpensAtBank check)"
+  },
+  {
+   "id": "A281",
+   "file": "src/scenes/actorLabelSource.ts:168",
+   "defect": "[p38] stale-comment · drawnHeadTop's doc block now documents ANCHOR_HEAD_RADIUS instead of the function, because the new constant and headRadius were inserted between the block and the function. · evidence: \"* Where the TOP of the drawn head under `root` stands relative to root's own\" (line 152, block closes at 166) is followed by \"/** The radius a geometry-less head anchor stands for\" and \"export const ANCHOR_HEAD_RADIUS = 0.16\", with \"export function drawnHeadTop\" only at line 173 — the JSDoc binds to the next declaration, so drawnHeadTop lost its documentation."
+  },
+  {
+   "id": "A282",
+   "file": "src/scenes/place/SpeechLabels.tsx:71",
+   "defect": "[p38] stale-comment · NoteFollower's doc block now sits over `let anchorSphere`, because anchorSphere/anchorHeadSphere were inserted between the block and the component. · evidence: \"* Stands one note on its speaker's head each frame. Its own component, drawn\" (line 63, closes at 70) is followed by \"let anchorSphere: THREE.SphereGeometry | null = null\" at 71, while \"function NoteFollower({\" stands at 77."
+  }
+ ]
+}

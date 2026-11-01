@@ -1,6 +1,7 @@
-// The settlement's villager on the code-built skinned body, dressed from the
-// appearance table (work-order "villager dress"; medium and high presets — the
-// low preset keeps the primitive figure of placeFigure.tsx).
+// The settlement's villager on a skinned body (code-built, or the glTF body
+// once its asset is loaded), dressed from the appearance table (work-order
+// "villager dress"; medium and high presets — the low preset keeps the
+// primitive figure of placeFigure.tsx).
 //
 // It takes exactly the primitive figure's props and publishes the same pivots
 // (`limbs`), so no vignette changes how it poses a person: the pivots are an
@@ -169,11 +170,9 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
 /** The figure's whole scene graph, built once per identity and look. */
 interface Rig {
   p: BodyProportions
-  layers: DressLayer[]
   meshes: THREE.SkinnedMesh[]
   bones: Record<BoneName, THREE.Bone>
   skeleton: THREE.Skeleton
-  head: THREE.Object3D
   /** The top of the drawn head, on the head bone: where a head load rests. */
   crown: THREE.Object3D
   hands: [THREE.Object3D, THREE.Object3D]
@@ -181,11 +180,12 @@ interface Rig {
   gltf: { asset: VillagerAsset; person: GltfPerson } | null
 }
 
-function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string, office?: 'chief'): Rig {
+function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string, office?: 'chief', dress?: readonly DressLayer[]): Rig {
   const asset = look.villager
   const person = asset ? cachedPerson(asset, id) : null
   const p = person ? person.p : bodyProportions(id.sex, id.age, id.build)
-  const layers = appearanceFor({
+  // `dress`: the dev lineup's forced outfit (dressLineup.tsx), never set in play
+  const layers = dress ? dress.map((l) => ({ ...l })) : appearanceFor({
     peopleId: look.peopleId,
     sex: id.sex,
     age: id.age,
@@ -232,10 +232,6 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   const headAt = bones.head.getWorldPosition(new THREE.Vector3())
   crown.position.set(0, figureCrownOffset(p, geo, skeleton.bones.indexOf(bones.head), headAt), 0)
   bones.head.add(crown)
-  // The thighs turn against the pelvis's walking yaw before they swing, so the
-  // stride stays in the line of travel.
-  bones['thigh.L'].rotation.order = 'YXZ'
-  bones['thigh.R'].rotation.order = 'YXZ'
   const hand = (side: 'L' | 'R', name: string) => {
     const o = new THREE.Object3D()
     o.name = name
@@ -245,11 +241,9 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   }
   return {
     p,
-    layers,
     meshes,
     bones,
     skeleton,
-    head,
     crown,
     hands: [hand('L', 'hand-left'), hand('R', 'hand-right')],
     gltf: asset && person ? { asset, person } : null,
@@ -287,7 +281,8 @@ const _rf = new THREE.Vector3()
 
 type ArmAngles = { pitch: number; yaw: number; roll: number }
 
-/** What the figure measured of its own walk, and its transitions in progress. */
+/** The villager on the skinned body (code-built or glTF): the primitive
+ *  figure's props, posed through its virtual pivots (see the file header). */
 export function SkinnedFigure({
   look,
   cloth,
@@ -311,6 +306,8 @@ export function SkinnedFigure({
   office,
   permanentLabel,
   ownedByPlayer,
+  dress,
+  build,
 }: {
   look: FigureLook
   cloth: string
@@ -344,11 +341,18 @@ export function SkinnedFigure({
   permanentLabel?: boolean
   /** The player's own figure (the bird's-eye traveller): never named by the Ctrl layer. */
   ownedByPlayer?: boolean
+  /** DEV lineup only (dressLineup.tsx): a forced outfit in place of `appearanceFor`. */
+  dress?: readonly DressLayer[]
+  /** DEV lineup only: a forced build (−1 slight .. +1 stout). */
+  build?: number
 }) {
   const ownKey = useId()
   const key = identityKey ?? ownKey
-  const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
-  const rig = useMemo(() => buildRig(id, look, cloth, skin, office), [id, look, cloth, skin, office])
+  const id = useMemo(() => {
+    const own = figureIdentity(key, scale, sex, age)
+    return build === undefined ? own : { ...own, build }
+  }, [key, scale, sex, age, build])
+  const rig = useMemo(() => buildRig(id, look, cloth, skin, office, dress), [id, look, cloth, skin, office, dress])
   // The skeleton (and its bone texture) is this figure's own; the geometry is
   // shared through the caches, its GPU side held while any figure draws it.
   useEffect(() => {
@@ -627,7 +631,7 @@ export function SkinnedFigure({
       chestYaw = gltf ? 0 : walk.chestYaw
       writeTrunk(0, hipYaw, chestYaw)
       b.hips.updateWorldMatrix(false, true)
-      // THE STEADYING HAND on a head load: the free arm on the load's side.
+      // THE STEADYING HAND on a head load: the first free arm, left before right.
       const loadShown = rig.crown.children.some((c) => c.visible)
       const steadyArm = headSteady && loadShown && m.kneel < 0.5 ? (!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1) : -1
       // THE ARMS THE CODE GESTURES WITH (and every arm's fallback): the pose's
@@ -883,6 +887,12 @@ export function SkinnedFigure({
         g.userData.walk = m
         const f = rig.gltf?.person.frame
         g.userData.gait = f ? gaitWeights(m.speed / f.scale, f.legScale) : null
+        // the clips' clocks, for the dress lineup's frozen clip time
+        const cl = rig.gltf?.asset.clips
+        g.userData.clipClock =
+          cl && clips
+            ? { gait: clips.gait.phase, idle: cl.idle ? (clips.idleT % cl.idle.duration) / cl.idle.duration : 0, dig: clips.dig, weight: m.weight, speed: m.speed }
+            : null
       }
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
       // The kneel the bug-report dump reads, in every build (placeDumpRead.ts).

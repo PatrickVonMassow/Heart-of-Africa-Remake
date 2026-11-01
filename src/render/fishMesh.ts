@@ -13,7 +13,7 @@ export const FISH_DEPTH = 0.26
 export const FISH_WIDTH = 0.12
 
 /**
- * The fish, length 1 along +Z (head at +0.5), centred on the origin. Plain
+ * The fish, length 1 along +Z, from the tail tip at −0.58 to the head at +0.42. Plain
  * position/normal attributes only, so the parts merge cleanly.
  */
 export function buildFishGeometry(): THREE.BufferGeometry {

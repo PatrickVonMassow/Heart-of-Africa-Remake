@@ -83,7 +83,8 @@ export type DressWear =
   | 'limbs'
   | 'skin'
 
-/** Where a layer comes from: a section of docs/peoples-1890.md, or a guess. */
+/** Where a layer comes from: a section of docs/peoples-1890.md or
+ *  docs/giza-1890.md, or a guess. */
 export type DressSource = { section: string } | { guess: string }
 
 export interface DressLayer {
@@ -148,7 +149,7 @@ function layer(
   return { slot, form, material, colour, colour2, pattern, wear, source }
 }
 
-/** The bare minimum a child is never drawn without — a string of beads at the
+/** The bare minimum most children are drawn with — a string of beads at the
  *  waist. The record is silent on children for most of the roster (§8.3). */
 const childBeads = (why: string) =>
   layer('ornament', 'waistBeads', 'beads', C.beadWhite, 'waist', G(why), 'beadwork', C.beadRed)
@@ -663,7 +664,9 @@ export const PEOPLE_DRESS: Record<string, PeopleDress> = {
   }),
 }
 
-/** A settlement without a people (the ports): a plain wrap in the village cloth. */
+/** A settlement without a people (the ports): plain cotton in the village
+ *  cloth — loin flap or skirt for a child, shirt or robe for a man, a long wrap
+ *  for a woman. */
 const NO_PEOPLE: PeopleDress = people({
   male: {
     child: [layer('hip', 'loinFlap', 'cotton', 'cloth', 'waist', G('port town: no people recorded'))],

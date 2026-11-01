@@ -206,8 +206,8 @@ export interface FishFireState {
 }
 
 /**
- * The fire as it starts: the carrier at the fire with `gutLeft` fish still to
- * gut out of his basket, due back at the bank `untilFull` seconds from now (the
+ * The fire as it starts: the carrier at the fire with the fish of the basket
+ * he sets down there still to gut, due back at the bank `untilFull` seconds from now (the
  * boat's first full basket); the rack filled and two fish on the grill.
  */
 export function createFishFire(

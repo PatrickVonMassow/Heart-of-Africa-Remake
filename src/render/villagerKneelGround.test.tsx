@@ -1,8 +1,8 @@
 // @vitest-environment node
 // THE glTF VILLAGER'S KNEEL STAYS ON THE GROUND: SkinnedFigure mounted through
 // react-three-fiber's reconciler (as villagerRuntimePose.test.tsx does) walks,
-// stops and kneels (`kneeling`, the task walker's way, PlaceLife.tsx), holds,
-// gets up and walks off. Every few frames the skinned body is drawn on the CPU
+// stops and kneels (`kneeling`, the task walker's way, PlaceLife.tsx), holds
+// and gets up. Every few frames the skinned body is drawn on the CPU
 // (morphs and skinning) and its lowest vertices are read against the ground
 // the figure stands on: in the held kneel the shins lie on it, and through
 // both transitions some part of the body touches it — the figure never hangs

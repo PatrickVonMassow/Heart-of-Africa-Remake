@@ -1,0 +1,7 @@
+You are the THIRD model of a blind-parallel four-eyes stage (closing cleanup for release v0.3.1, point 1462). You wrote neither list.
+Attached: A.lines (282 entries, Opus 5.5) and B.lines (171 entries, GPT-6.1 Sol), one entry per line "<id> | <file> | <defect>" — two independent audits of the same diff for dead-code / stale-comment / stale-doc / md-audit findings; each defect line starts with its part id [pNN].
+Task: merge BY MEANING. Read both lists in full. Two or more entries FOLD when they name the same defect (same place, same wrong claim) — across A and B, and also inside one list if it repeats itself. Entries that are merely about the same file but different defects do NOT fold. Do not drop or judge anything as invalid; that is decided later.
+Decorrelated framing: reconstruct folds from the evidence and file:line of each entry; do not reuse either list's ordering or categories as your structure.
+OUTPUT: list ONLY the folds (every entry you do not name stays a single union entry by itself, unchanged). One line per fold, nothing else:
+B<n> | <file:line> | from <id>+<id>[+<id>…] · <one line: the merged finding, keeping the strongest evidence of the members>
+Number B1, B2, … (the B prefix is only the answer format; it does not mean list B) Every id may appear in at most one fold. If there are no folds, write (none).

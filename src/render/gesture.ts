@@ -170,7 +170,8 @@ export interface ShoulderPose {
  *  frame (glTF body; the right arm's mirrors x): out, down and back. */
 export const ELBOW_DEFAULT: readonly [number, number, number] = [0.5, -0.4, -1]
 
-/** Carry the pose's optional parts (the hand shapes) from `from` onto
+/** Carry the pose's optional parts (hand shape, shoulders, gaze, reach, elbow
+ *  and body) from `from` onto
  *  `into`, for a caller that copies the arms, lean and turn field by field. */
 export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
   into.pointHand = from.pointHand

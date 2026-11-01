@@ -4,6 +4,7 @@ import { buildLayout } from './layout'
 import { setupGeodata } from '../../test/geodata'
 import { standingClear } from './collision'
 import { EYE_HEIGHT } from './roofClearance'
+import { isOutsidePlace } from './boundary'
 import { digFurnitureFootprints } from './digSiteAppearance'
 import { digFurnitureColliders, digLocalToWorld, spoilOffset, placeGroundHeight } from './placeGround'
 // @ts-expect-error The verification driver is plain JS, also loaded by Node.
@@ -16,6 +17,8 @@ it('keeps the picture fixture walkable, distinct, and in a standing camera proje
   const view = digPictureView(l.digSites)
   expect(view).not.toBeNull()
   expect(standingClear(l.colliders, view.x, view.z, 0.4)).toBe(true)
+  // A stand past the boundary leaves the place on the first frame (point 1202).
+  expect(isOutsidePlace(l, view.x, view.z)).toBe(false)
   const camera = new PerspectiveCamera(50, 1440 / 900, 0.1, 2000)
   camera.position.set(view.x, EYE_HEIGHT, view.z)
   camera.rotation.set(view.pitch, view.yaw, 0, 'YXZ')

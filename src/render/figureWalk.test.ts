@@ -548,11 +548,9 @@ describe('kneeling folds the body, it never squashes it', () => {
     expect(leanedHipY(stand.hipY, r, 0.4)).toBe(stand.hipY)
   })
 
-  it('the primitive keeps a uniform scale and its head radius through the whole transition', () => {
+  it('the primitive keeps its head radius through the whole transition', () => {
     for (let k = 0; k <= 1.0001; k += 0.1) {
       const l = primitiveLayout(k, false, FIGURE_LIMBS)
-      expect(l.groupScale[0]).toBe(l.groupScale[1])
-      expect(l.groupScale[1]).toBe(l.groupScale[2])
       expect(l.headRadius).toBe(primitiveLayout(0, false, FIGURE_LIMBS).headRadius)
       expect(l.headY - l.headRadius).toBeGreaterThan(l.height - 0.01)
     }

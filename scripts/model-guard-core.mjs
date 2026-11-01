@@ -138,6 +138,18 @@ export function turnEndScarceState(scarceState) {
   return { scarceState, refuse: `SERVING-MODEL TRIPWIRE: ${scarceState?.problem || 'the lane switch state is unusable.'}`, notice: '' }
 }
 
+/**
+ * Does the turn-end tripwire stand down (point 1461, 28.10.2026)? A cloud clone
+ * carries no recorded switch state and no batch lock: judging its main history
+ * as scarce-OFF stopped delegated main-chain authors on admitted scarce-lane
+ * trailers. Such a session runs no batch, so the tripwire stands down there, as
+ * the other session guards do; the lock holder still judges an absent state as
+ * OFF, and a recorded state is judged as before.
+ */
+export function cloneStandsDown(scarceState, ownsBatchLock) {
+  return scarceState?.absent === true && ownsBatchLock !== true
+}
+
 /** Missing switch policy fails closed; policy-neutral parsing must say so at the call site. */
 const admitsScarce = (scarceState) =>
   scarceState === POLICY_NEUTRAL || (scarceState !== undefined && laneIsOn(scarceState))

@@ -266,8 +266,8 @@ note against that figure's own head (`146-speech-hypothesis-label`), and section
 `speech-guess` the E invitation and the opened dialog
 (`148-speech-guess-invitation`, `149-speech-guess-dialog`).
 
-AND THAT THE TEACHING HAND TOUCHES WHAT IT NAMES (work-order 1065). The same
-suite reads the SCENE GRAPH rather than the module: the tapping child's drawn
+AND THAT THE TEACHING HAND TOUCHES WHAT IT NAMES (work-order 1065).
+`scripts/verify/polish-children.mjs` reads the SCENE GRAPH rather than the module: the tapping child's drawn
 hand against the instanced stone's own flank at that height and bearing
 (`1065-tapping-child-at-its-rock`). The tap pause is held at a shutter length for
 that shot — the same code path at a longer configured value — and put back
@@ -275,7 +275,7 @@ afterwards.
 
 THE FISHERMEN AND THE MOVED STRETCH (work-order 1245). The bank is walkable
 to the water about ±45 m of the bank normal, the children's stretch lies about
-28 m upstream and the fishermen's lane runs from about 1 to 47 m downstream,
+28 m upstream and the fishermen's lane runs from about 1 m upstream to 47 m downstream,
 20 m clear of the stretch and of the water work. Pure Vitest:
 `src/scenes/place/bankLobe.test.ts` (symmetric plateau; the extent check —
 plate, shore, water, routing and backdrop rim reach the upstream plateau end on

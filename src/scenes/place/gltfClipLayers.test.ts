@@ -149,7 +149,7 @@ describe('the clip layers on the glTF figure', () => {
     expect(f.c.arms).toEqual([1, 1])
     // the carry walk's own swing turns an arm bone by up to ~0.15 rad a frame
     // with no handover at all; a snap to the code's pose turned it by ~3 rad
-    console.log("WORST", worst); expect(worst).toBeLessThan(0.2)
+    expect(worst).toBeLessThan(0.2)
   })
 
   it('the shovel grip follows the arm pose: once the dig has the arm, it grips at the dig\'s grip while the carry still fades', () => {
@@ -587,7 +587,6 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // and its turn onto the turning body's, heel and ball swept round the
     // held ankle (cross-vendor reviews of the planted-soles walk, 20.10.2026)
     const restY = settle({ cut: 0.5, start: true })[0].feet[0][0].y
-    let worstAll = 0
     for (const [drift, turn] of [0, 1.5, -1.5].flatMap((turn) => [0.3, -0.3, 0].map((drift) => [drift, turn]))) {
       if (!drift && !turn) continue
       for (let cut = 1; cut < 1.4; cut += 0.1) {
@@ -611,14 +610,12 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
             }
           }
         }
-        worstAll = Math.max(worstAll, worst)
         const where = `drift ${drift} m/s, turning ${turn} rad/s, stop at ${cut.toFixed(1)} s`
         // what the stand's spot or turn still has to make up is stepped over, lifted
         expect(worstFrame, where).toBeLessThan(0.002)
         expect(worst, where).toBeLessThanOrEqual(0.04)
       }
     }
-    console.log(`worst per-stance slide under drift and turn: ${worstAll.toFixed(4)} m`)
   })
 
   it('the step shares: the first foot over the first half of the way to the stand, the other over the second', () => {

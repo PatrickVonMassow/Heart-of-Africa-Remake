@@ -10,9 +10,9 @@ import { COOK_SHELTER } from './roofClearance'
  * `postR` widens the post square for the fishers' grill and griller.
  */
 export function CookShelter({ thatchMat, postR = COOK_SHELTER.postR }: { thatchMat: THREE.Material; postR?: number }) {
-  // Corner posts a comfortable margin around the stone ring, and an eave
-  // height clear of a standing figure and the flame — the same numbers the
-  // head-clearance sweep reads (work-order 349).
+  // Corner posts at `postR` (by default a comfortable margin around the stone
+  // ring), and an eave height clear of a standing figure and the flame — the
+  // same numbers, per site, the head-clearance sweep reads (work-order 349).
   const { postH } = COOK_SHELTER
   const posts: Array<[number, number]> = [
     [postR, postR],

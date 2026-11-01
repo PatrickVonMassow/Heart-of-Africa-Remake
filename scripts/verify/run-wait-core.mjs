@@ -137,9 +137,9 @@ const FRAME_TABLE_MEASURED = '09.08.2026'
  * WHY THIS SITS BESIDE `SUITE_RUNTIME_S` AND NOT INSIDE IT (point 1083): the
  * per-suite table is the 09.08.2026 baseline the runner PLANS from, and it stays
  * exactly what it measured. What it cannot say is what the assembled run costs
- * end to end — the plan it produces for a both-backend LARGE is 80 min 48 s
- * against a real 115.3–120.9, and for a whole `polish` pass 5 min 41 s against
- * 9.9–61.5. With the plan a third to two thirds short, a 62-minute `polish` run
+ * end to end — when the bands were measured, the plan it produced for a
+ * both-backend LARGE was 80 min 48 s against a real 115.3–120.9, and for a whole
+ * `polish` pass (split since) 5 min 41 s against 9.9–61.5. With the plan a third to two thirds short, a 62-minute `polish` run
  * and a fifth two-hour LARGE never read as out of band. So the observed band is
  * PRINTED under the planned expectation, and the reader compares; `waitPlan`
  * also lets a band's high end choose foreground or background and the timeout.
@@ -731,7 +731,8 @@ export function formatReceipt(receipt) {
  *  (14.10.2026) ran ~4 h. */
 export const LOG_WAIT_TIMEOUT_MS = 6 * 60 * 60_000
 
-/** Default stall threshold: no log growth for this long is reported. Calibratable
+/** Default stall threshold: no log write (growth or a newer mtime) for this long
+ *  is reported. Calibratable
  *  guess — short enough that a hang surfaces in under an hour, long enough that
  *  a slow build step that writes nothing for minutes is not called stalled. */
 export const LOG_WAIT_STALL_MS = 30 * 60_000

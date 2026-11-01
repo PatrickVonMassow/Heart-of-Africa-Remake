@@ -30,7 +30,7 @@ const SEEDS = [7, 42, 1337]
 const same = (a: Collider, b: Collider) => JSON.stringify(a) === JSON.stringify(b)
 
 describe('the fishers\' scene in the collision set (point 1275)', () => {
-  it('there are riverside villages of both kinds: roofed and open fires', () => {
+  it('there are riverside villages, roofed fires among them', () => {
     expect(RIVER_VILLAGES.some((p) => fireHasCookShelter(p.peopleId))).toBe(true)
     expect(RIVER_VILLAGES.length).toBeGreaterThan(0)
   })

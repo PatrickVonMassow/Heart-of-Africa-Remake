@@ -102,9 +102,10 @@ describe('the well leaves the communication village (point 1092)', () => {
     expect(carriesWaterCarrier(rock)).toBe(false)
     expect(carriesWell(other)).toBe(true)
     expect(carriesWaterCarrier(other)).toBe(true)
-    // Two stations fewer, and nothing else moved: the children's quarter gains
-    // the room, the other vignettes stay where they stood. (The riverside
-    // village's pounding pair works by the fishers' fire, point 1282.)
+    // Three stations fewer — well, water-carrier and, since the riverside
+    // village's pounding pair works by the fishers' fire (point 1282), the
+    // centre pounder — and nothing else moved: the children's quarter gains
+    // the room, the other vignettes stay where they stood.
     const centrePounder = (s: readonly [number, number]) => s[0] === VILLAGE_SPOTS.pounder[0] && s[1] === VILLAGE_SPOTS.pounder[1]
     expect(rock).toHaveLength(other.length - 3)
     expect(other.filter((s) => !carriesWell([s]) && !carriesWaterCarrier([s]) && !centrePounder(s))).toEqual(rock)

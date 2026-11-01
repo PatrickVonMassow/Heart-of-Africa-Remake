@@ -97,9 +97,10 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
 })
 
 // THE WATER PATH (work-order 688). The adults teach RIVER by fetching water, so
-// there has to be a path to fetch it along: a head in the village where both
-// carriers speak, a foot at the river where neither does, and a walk between the
-// two that crosses neither a building nor the children's running lane.
+// there has to be a path to fetch it along: a head in the village by the water
+// stand, on whose work ring both RIVER words fall, a foot at the river where
+// neither does, and a walk between the two that crosses neither a building nor
+// the children's running lane.
 describe('the village water path (work-order 688)', () => {
   const random = mulberry32(1045)
   const waterSeeds = [...new Set([
@@ -168,13 +169,14 @@ describe('the village water path (work-order 688)', () => {
   // branch is exercised rather than merely present. Re-picked by point 1173:
   // the settlement grew, the carriers' lane more often finds a way round the
   // compounds, and the four seeds that used to need a gate stopped needing one —
-  // which made every case below pass while testing nothing. These two are what
+  // which made every case below pass while testing nothing. Those were what
   // a sweep of the first 2000 seeds still routes through a wall. Re-picked by
   // work-order 1245: with the water path moved upstream, 330 finds its lane on
   // the outer head rungs instead; 661, 673 and 762 still route through a wall.
   // Re-picked by point 1272 (market hut moved): 661 found a way round; 3 needs a gate.
   // Re-picked by point 1282 (the centre mortar went to the river): 3 found a
   // way round; 10 is the first seed that crosses a compound opening again.
+  // Now 10 and 762 (when 673 dropped out went unrecorded).
   const gatedSeeds = [10, 762]
 
   it.each(gatedSeeds)('seed %i: gate rebuilding preserves village props and exactly two settled rock colliders', (seed) => {

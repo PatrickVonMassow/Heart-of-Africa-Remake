@@ -4,9 +4,10 @@
 // basket, which stood at a height of its own while he crouched and leaned to the
 // hull. Over the whole hand-over at the landing — step ashore, bend to take the
 // empty basket, hold it at the bow while it fills, bend to set it down, step
-// back aboard — and over the carrier's swap bend, no part of the head is inside
-// the basket: on the drawn (glTF) body, measured on its head vertices, and on the
-// low preset's primitive figure.
+// back aboard — no part of the head is inside the basket, and over the
+// carrier's swap bend the basket rests on the crown at most 2 mm in, measured on
+// the drawn (glTF) body's head vertices. The net-man case also samples the low
+// preset's primitive figure.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { act, useRef } from 'react'
@@ -162,7 +163,7 @@ describe('the basket the net man holds at the landing', () => {
       if (!frame.holding) continue
       checked++
       const at = netManBasketAt(frame.nm, flat)
-      // never into the ground, and his hands on its rim
+      // never into the ground
       expect(at.y).toBeGreaterThanOrEqual(0)
       outer.updateWorldMatrix(true, true)
       for (const i of headVerts) {

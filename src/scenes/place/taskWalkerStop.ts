@@ -1,6 +1,6 @@
 // The task walker's stop at its work (work-order "walking villagers", from
-// point 350): it takes the load off its head with both hands while standing,
-// kneels and sets it down beside it, works, grips it again, rises with it onto
+// point 350): it takes hold of the load on its head with both hands while
+// standing, lowers it as it kneels and sets it down beside it, works, grips it again, rises with it onto
 // its head and lets go — and gets up ON THE SPOT: every step runs to its end
 // before the first step home, so it never rises while it moves off.
 

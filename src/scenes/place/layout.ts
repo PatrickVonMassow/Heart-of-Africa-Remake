@@ -360,9 +360,10 @@ export const WATER_PATH_HEAD_RADIUS = 15
 const WATER_PATH_HEAD_INNER_RADII = [
   15, 14.5, 15.5, 14, 16, 13.5, 16.5, 13, 17, 12.5, 17.5, 12, 18, 11.5, 18.5, 11, 19, 19.5, 20, 20.5, 21,
 ] as const
-/** The OUTER rungs (work-order 1245), tried only once the inner ladder has
- *  failed with and without compound gates, so no layout that found its head
- *  before moves: since the water path lands beyond the children's stretch,
+/** The OUTER rungs (work-order 1245), tried in the first search only once the
+ *  inner ladder has failed with and without compound gates (a later re-search,
+ *  `findHead`, goes inner → outer → wide with no gate step), so no layout that
+ *  found its head before moves: since the water path lands beyond the children's stretch,
  *  ~28 m upstream, the walk from the inner rungs is long enough that a dense
  *  plan left 4 of 3000 river layouts without any clear straight lane. */
 const WATER_PATH_HEAD_OUTER_RADII = [21.5, 22, 22.5, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27] as const

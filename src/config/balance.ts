@@ -2098,8 +2098,8 @@ export const balance: BalanceConfig = {
       errandSeconds: 375,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
-      // without shortening the straight line, and a fifteenth of the backstop
-      // above, which on its own held a blocked villager for twenty staged
+      // without shortening the straight line, and about a nineteenth of the
+      // backstop above, which on its own held a blocked villager for twenty staged
       // errands and left the village silent for minutes (point 586).
       stallSeconds: 20,
       pace: 1.25, // an unhurried working walk
@@ -2113,36 +2113,19 @@ export const balance: BalanceConfig = {
       // at 8.5 all 900 measured did, with the fill spot still walkable.
       waterFootBeyond: 8.5,
     },
-    // THE LOOM (work-order 1157). Calibratable starting values (CLAUDE.md §2),
-    // each stated against what it has to hold:
-    //  - 3.2 m of warp either side of the seat makes a 6.4 m stretch. It has to
-    //    be long enough that a helper WALKING to one end reads as a direction
-    //    rather than a step aside, and short enough to fit the room a village
-    //    has left between its huts; the water path's own head sweep works with
-    //    the same order of distance.
-    //  - The helper works at 2.4 m, well inside the stake, so he stands ON the
-    //    warp and not past its end.
-    //  - One pass takes 2.6 s: slow enough to follow the shuttle across by eye,
-    //    quick enough that half a minute of watching shows real progress.
-    //  - 0.11 m of strip per pass fills a 3.2 m side in about 29 passes — 75 s,
-    //    so a player who watches sees the cloth grow and, staying longer, sees
-    //    it taken off and the warp bare again.
-    //  - A named tending every 18 s is "a few times a minute" (item 8): often
-    //    enough to catch in passing, rare enough that the speech labels do not
-    //    become noise beside the children's.
     // THE VILLAGER'S DUGOUT (work-order 1237). Calibratable starting values
     // (educated guess, CLAUDE.md §2), after the Niger's Bozo/Somono river
     // fishermen of the 1890s: a small fishing pirogue of about 5.5 m, paddled
     // kneeling. It makes about 1.3 m/s through the water; against a dry-season
     // current of about 0.5 m/s that is 0.8 m/s over the ground, kept close in
     // where the current is weakest, while the run back rides the current at
-    // about 1.5 m/s with steering strokes only. The lane lies 7 m out between
-    // s = +27 and +47 m, so it keeps 20 m from the children's stretch (10 m
-    // hearing zone + 10 m hearing radius) and no standing place hears the
-    // SPOKEN words of both; the call carries at the call register (34 m).
+    // about 1.5 m/s with steering strokes only. The lane (block below) keeps
+    // 20 m from the children's stretch (10 m hearing zone + 10 m hearing
+    // radius), so no standing place hears the SPOKEN words of both; the call
+    // carries at the call register (34 m).
     // THE FISHERMEN (work-order 1237, rebuilt by 1245). Calibratable starting
-    // values (educated guess, CLAUDE.md §2). The lane runs 7 m out from s = −2
-    // to s = +47 (49 m), 20 m clear of the children's stretch (centre −28, down
+    // values (educated guess, CLAUDE.md §2). The lane runs 7 m out from s = −1
+    // to s = +47 (48 m), 20 m clear of the children's stretch (centre −28, down
     // to −17.5) and of the water work (−46.5). Paces: a dugout paddled against
     // the Niger's current near the bank, and carried by it. One round comes to
     // about 139 s (61 s up, 33 s down, the rest turning, hauling, landing and
@@ -2225,6 +2208,23 @@ export const balance: BalanceConfig = {
       colliderMargin: 0.15, // calibratable
       figureBodyR: 0.28, // calibratable
     },
+    // THE LOOM (work-order 1157). Calibratable starting values (CLAUDE.md §2),
+    // each stated against what it has to hold:
+    //  - 3.2 m of warp either side of the seat makes a 6.4 m stretch. It has to
+    //    be long enough that a helper WALKING to one end reads as a direction
+    //    rather than a step aside, and short enough to fit the room a village
+    //    has left between its huts; the water path's own head sweep works with
+    //    the same order of distance.
+    //  - The helper works at 2.4 m, well inside the stake, so he stands ON the
+    //    warp and not past its end.
+    //  - One pass takes 2.6 s: slow enough to follow the shuttle across by eye,
+    //    quick enough that half a minute of watching shows real progress.
+    //  - 0.11 m of strip per pass fills a 3.2 m side in about 29 passes — 75 s,
+    //    so a player who watches sees the cloth grow and, staying longer, sees
+    //    it taken off and the warp bare again.
+    //  - A named tending every 18 s is "a few times a minute" (item 8): often
+    //    enough to catch in passing, rare enough that the speech labels do not
+    //    become noise beside the children's.
     loom: {
       placed: false, // weaving parked (user 29.09.2026); true re-enables the station
       warpHalf: 3.2,
@@ -2717,6 +2717,23 @@ export const VILLAGER_ASSET = {
   buildWeight: 0.3,
   /** Triangles of the decimated body (hands, feet and face kept finer). */
   bodyTriangles: 6000,
+  /** The shell regions' body pre-split (scripts/villager/body.py,
+   *  docs/garment-merge-r10-1347.md), figure units. Before the cut, edges in a
+   *  band of ±band round every cut level are halved while longer than lmax and
+   *  their Σ|Δweight| · length exceeds tau, so a cut vertex bends with a fine
+   *  surface; reach (degrees) is how far the weight refit turns each bone (about
+   *  what the clips turn it); a cut vertex the refit leaves more than snapLimit
+   *  off is snapped to its edge's nearer end; the split regression fails the
+   *  build above gateLimit outside the kneel clips. Calibratable. */
+  bodySplit: {
+    band: { y: 0.05, arm: 0.1 },
+    lmax: 0.015,
+    tau: 0.002,
+    rounds: 8,
+    reach: { spine: 25, spine1: 25, chest: 25, hips: 25, neck: 25, head: 25, shoulder: 20, thigh: 60, shin: 90, foot: 40, toe: 30, upperArm: 60, forearm: 60, hand: 40 },
+    snapLimit: 0.0014,
+    gateLimit: 0.003,
+  },
   /** How far a garment vertex may lie inside the body in any frame of any clip
    *  at any morph extreme (figure units, ≈ 4 mm) — the penetration report's
    *  tolerance. */
@@ -2738,6 +2755,14 @@ export const VILLAGER_ASSET = {
    *  normal while the covering garment is worn (render/villagerGarmentMask.ts;
    *  figure units, ≈ 5 mm). Calibratable. */
   garmentMaskPush: 0.004,
+  /** A shell garment's offset off the skin (scripts/villager/shells.py, render/
+   *  villagerShell.ts): base + rank × step along the body normal, figure units
+   *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
+  garmentShellBase: 0.003,
+  garmentShellStep: 0.003,
+  /** Per shell mesh name, a base that replaces garmentShellBase; empty since
+   *  the breast cloth returned to its hull-tube builder. Calibratable. */
+  garmentShellBaseOverride: {} as Record<string, number>,
   /** How far a body or inner-garment vertex's skin weights may differ from
    *  the covering cloth's (L1: 0 alike, 2 disjoint) and it still counts as
    *  covered: a hand hanging inside a skirt's outline swings out of it and is
@@ -3024,8 +3049,6 @@ export const VILLAGER_GLTF = {
   settleRestep: 0.45,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
-  /** Ground speed (figure units / s) below which the figure stands. */
-  standSpeed: 0.08,
   /** Where the hair is painted on the glTF head, as shares of chin → crown
    *  (brow, and the nape behind the ears) and of the head's depth back → front
    *  (what counts as behind). The body carries no hair mesh. Calibratable. */

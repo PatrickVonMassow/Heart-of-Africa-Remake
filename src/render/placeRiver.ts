@@ -346,8 +346,8 @@ export interface RiverFleck {
 /**
  * Deterministic kind sequence for `count` items over the share `mix`: a
  * largest-deficit walk, so the kinds interleave along the current and every
- * count gets its shares to within one item. Index 0 is always foam (the reading
- * the oldest checks were written against) wherever foam has a share.
+ * count gets its shares to within one item. Index 0 is the kind of the largest
+ * share, a tie going to the earlier kind of FLOTSAM_KINDS (foam first).
  */
 export function flotsamKinds(count: number, mix: Record<FlotsamKind, number>): FlotsamKind[] {
   const total = FLOTSAM_KINDS.reduce((a, k) => a + Math.max(0, mix[k]), 0)
@@ -418,7 +418,7 @@ export function flotsamScale(kind: FlotsamKind, size: number): [number, number, 
  *  ripple (±0.03 m) so the surface never swallows it. */
 export const FLOTSAM_FLOAT: Record<FlotsamKind, number> = { foam: 0.035, leaf: 0.04, grass: 0.04, twig: 0.045 }
 
-/** A unit leaf lying flat: a pointed oval, 1 long (z) and 1 wide (x). */
+/** A unit leaf lying flat: a pointed oval, 1 long (z) and about 0.55 wide (x). */
 export function buildLeafGeometry(): THREE.BufferGeometry {
   const shape = new THREE.Shape()
   shape.moveTo(0, -0.5)

@@ -31,6 +31,7 @@ import { labelPresentation } from '../../communication/speechTarget'
 import { speechBubbleScale } from '../../communication/speechBubbleScale'
 import { balance } from '../../config/balance'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
+import { ANCHOR_HEAD_RADIUS } from '../actorLabelSource'
 import {
   clearSpeechLabels,
   pruneSpeechLabels,
@@ -57,6 +58,12 @@ const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,calc(-100% - var(--speech-t
 
 /** The calibrated tip gap as a CSS length. */
 const tipGap = () => `${Math.max(0, balance.communication.labelTipGap.px)}px`
+
+let anchorSphere: THREE.SphereGeometry | null = null
+/** The head sphere a geometry-less `figure-head` anchor stands for (dev hook only). */
+function anchorHeadSphere(): THREE.SphereGeometry {
+  return (anchorSphere ??= new THREE.SphereGeometry(ANCHOR_HEAD_RADIUS, 24, 16))
+}
 
 /**
  * Stands one note on its speaker's head each frame. Its own component, drawn
@@ -236,8 +243,9 @@ export function SpeechLabels() {
         const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
         return label && speechTipWorld(label, WORLD, camera) ? WORLD.toArray() : null
       },
-      // The speaker's DRAWN head top and feet on screen, measured on the
-      // projected geometry itself (point 1276): every vertex of the visible
+      // The speaker's DRAWN head top on screen, measured on the projected
+      // geometry itself, and its feet as the anchor's projected origin
+      // (point 1276): every vertex of the visible
       // head mesh goes through the camera, and the head's top on screen is the
       // smallest screen y among them — the silhouette's upper edge under any
       // perspective and pitch, not a projected world-up offset of its centre.
@@ -257,7 +265,8 @@ export function SpeechLabels() {
         const feet = v.z > 1 ? null : toScreen(v)
         if (!head) return { feet, headTop: null }
         const mesh = head as THREE.Mesh
-        const pos = mesh.geometry.getAttribute('position')
+        // The skinned figure's head is a bare anchor; its sphere stands in.
+        const pos = (mesh.geometry ?? anchorHeadSphere()).getAttribute('position')
         let top: { x: number; y: number } | null = null
         let left = Infinity
         let right = -Infinity

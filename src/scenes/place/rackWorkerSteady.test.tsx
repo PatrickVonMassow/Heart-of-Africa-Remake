@@ -30,7 +30,7 @@ beforeAll(async () => {
 })
 
 /** The pair's state at second `t` of a visit: standing (arrived), taking,
- *  eating, standing again — what `stepPoundingDuo` hands `Pounder`. */
+ *  eating, then the walk back — what `stepPoundingDuo` hands `Pounder`. */
 function visitAt(t: number, cfg = balance.villageLife.fishFire): Pick<PoundingDuo, 'phase' | 'clock' | 'women'> {
   const stand = 0.5
   const woman = (fish: number) => ({ fish }) as PoundingDuo['women'][number]

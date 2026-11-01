@@ -86,7 +86,11 @@ const CHECKOUT_ROOT = REPO_ROOT
 // must not override that cwd or leak onwards into the nested fast-gate suite.
 const REPOSITORY_ENV = withoutGitLocalEnvironment()
 const LOG = join(REPO, '.claude', 'doctor.log')
-const repair = process.argv.includes('--repair')
+// Switch-off for a closing LARGE (point 1462, user decision 29.10.2026): while
+// local/doctor-repair-off exists, --repair runs read-only, so no repair can
+// stash the tree or kill the running regression. Point 1467 owns the real fix.
+const REPAIR_SWITCHED_OFF = existsSync(join(REPO, 'local', 'doctor-repair-off'))
+const repair = process.argv.includes('--repair') && !REPAIR_SWITCHED_OFF
 const gate = process.argv.includes('--gate')
 
 const log = (m) => {
@@ -112,6 +116,7 @@ const git = (args, opts = {}) =>
 // --- Gather the state ----------------------------------------------------------
 
 log(`doctor run starting (repair=${repair}, gate=${gate})`)
+if (REPAIR_SWITCHED_OFF) log('repair SWITCHED OFF by local/doctor-repair-off — repair-level actions are only reported')
 
 let branch = ''
 try {

@@ -43,8 +43,8 @@ sweeps are costly; a blind audit half at `default` uses the existing `--anyway`.
 `prefer-cross` hands every
 read-only kind to the cross lane. `main-only` is the escape hatch for the other
 direction — when the cross lane's allowance is the short one — and it stops the review
-path too: `cross-review.mjs` then sends nothing at all and hands the review to a
-main-chain reviewer that authored none of the range, with **no verdict**, which is
+path too: `cross-review.mjs` then sends nothing at all and hands the review down the
+`crossUnavailable` chain (scarce lane first, then main) to a reviewer that authored none of the range, with **no verdict**, which is
 the honest state (the cross lane has not seen the change).
 
 The setting lives in the **main checkout's** `.claude/lane-routing.json` (the legacy file of the old routing command is read
@@ -238,7 +238,7 @@ Those rows say one thing together: **the REVIEW half of the lane runs and the
 AUTHORING half is barely called.** the cross lane read fourteen ranges in three days and
 was commissioned for exactly one point, while 280 stood routed to it. The claim
 is about the recorded COMMISSIONS, not about the cross lane's total contribution: the
-receipt file is per point and a re-run overwrites it, and unlanded work leaves
+receipt file is per point and a re-run then overwrote it (it is appended to now), and unlanded work leaves
 no trailer at all, so both counts are floors.
 
 **So no lever that only changes the CUT can move the load.** Reordering the queue
@@ -249,8 +249,8 @@ written here anyway. The two readings around it are 271/103 over 374 open points
 on 08.09. and 280/99 over 379 today — five points entered the queue in between,
 so the nine-point difference is NOT the tagging's effect and neither reading is
 the other's before/after. What is left is not a lever but a command:
-`node scripts/author-delegate.mjs --point <N>` in the point's own worktree, which
-the session-start policy line now says in those words. **The proof owed is one
+`node scripts/author-delegate.mjs --lane cross --point <N>` in the point's own worktree, which
+the session-start policy line now names. **The proof owed is one
 point authored by the cross lane end to end, and it is owed by point 1072** — the next
 cross-lane point in work-order order, and a communication point, which is the
 mechanic the 08.09. tagging was about.

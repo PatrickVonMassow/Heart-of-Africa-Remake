@@ -1,0 +1,312 @@
+[
+ {
+  "id": "U6",
+  "decision": "rewritten",
+  "reason": "Comment now says src/scenes/place/ reaches seven suites, matching the MAP fixture."
+ },
+ {
+  "id": "U7",
+  "decision": "rewritten",
+  "reason": "Comment now points at the nextFrames rule in ./_polish.mjs, where it lives since the split."
+ },
+ {
+  "id": "U8",
+  "decision": "rewritten",
+  "reason": "Comment now says a species with no clear stand gets no shot, matching the sep filter and the `if (!aimed) continue` skip."
+ },
+ {
+  "id": "U9",
+  "decision": "rewritten",
+  "reason": "Comment now names the travel-panorama capture in polish-panorama.mjs instead of a section this file lacks."
+ },
+ {
+  "id": "U10",
+  "decision": "rewritten",
+  "reason": "Comment now describes the 0.85–1.15 distance-ratio test `seen` actually makes, not an identity check."
+ },
+ {
+  "id": "U11",
+  "decision": "rewritten",
+  "reason": "Header now counts five standing places and lists the upstream-end and pounding-pair stands."
+ },
+ {
+  "id": "U12",
+  "decision": "rewritten",
+  "reason": "Header now gives the boat stand as s = +49 m, 2.4 m off the waterline, as the code sets it."
+ },
+ {
+  "id": "U13",
+  "decision": "rewritten",
+  "reason": "Dropped the contradictory 'stand is upstream too' paragraph; the remaining note matches s = 49 against the haul at 47."
+ },
+ {
+  "id": "U14",
+  "decision": "rewritten",
+  "reason": "Comment now promises the same flank, which is what `standAt([a.flank])` and the flank check guarantee."
+ },
+ {
+  "id": "U15",
+  "decision": "rewritten",
+  "reason": "SECTIONS header now counts four blocks including follow-camera."
+ },
+ {
+  "id": "U132",
+  "decision": "rewritten",
+  "reason": "README now lists probeSilhouetteFooting apart from the shared helpers, since only polish-panorama uses it."
+ },
+ {
+  "id": "U133",
+  "decision": "removed",
+  "reason": "Dropped the export keyword from sections, browser and errors; grep finds no importer in scripts, tests included."
+ },
+ {
+  "id": "U134",
+  "decision": "removed",
+  "reason": "Dropped the export of PIXEL_CHANGE_THRESHOLD; grep finds no importer, it stays as countChangedPixels' default."
+ },
+ {
+  "id": "U135",
+  "decision": "rewritten",
+  "reason": "Comment now names polish-villagers.mjs, the only reader of onBaselineLane, instead of the deleted polish.mjs."
+ },
+ {
+  "id": "U136",
+  "decision": "rewritten",
+  "reason": "Criterion reference corrected from §7.1.35 to §7.1.22 (Health and afflictions)."
+ },
+ {
+  "id": "U137",
+  "decision": "rewritten",
+  "reason": "Header now says a polish-suite sampler block instead of the deleted polish.mjs."
+ },
+ {
+  "id": "U138",
+  "decision": "rewritten",
+  "reason": "The dated measurement now says 'the polish suite file' instead of the later polish-villagers.mjs name."
+ },
+ {
+  "id": "U139",
+  "decision": "rewritten",
+  "reason": "Comment now ties the lengthened arrival hold to the arrival-contact frame, where the code sets it."
+ },
+ {
+  "id": "U140",
+  "decision": "rewritten",
+  "reason": "Header now also names the Giza figures, the animal models and the skyline species scale sections."
+ },
+ {
+  "id": "U141",
+  "decision": "rewritten",
+  "reason": "Settlement list now names the places this split suite really enters before the leave (cairo, maasai, pedi or sidama, capetown, timbuktu)."
+ },
+ {
+  "id": "U142",
+  "decision": "rewritten",
+  "reason": "Header now names the near/far note scale section."
+ },
+ {
+  "id": "U143",
+  "decision": "rewritten",
+  "reason": "Retry rationale no longer claims the probe aims at the chest; it keeps the measured miss as history."
+ },
+ {
+  "id": "U144",
+  "decision": "rewritten",
+  "reason": "Comment now names `insidePlace` with its 1 m margin as the deciding function."
+ },
+ {
+  "id": "U145",
+  "decision": "backlog",
+  "reason": "Comment matches the code's 1.6 m, but the staging disagrees with EYE_HEIGHT 1.5; backlog line handed to the owner because aligning it changes the staged pose."
+ },
+ {
+  "id": "U146",
+  "decision": "rewritten",
+  "reason": "Header now lists the six later sections (carried jar to figure micro-structure)."
+ },
+ {
+  "id": "U147",
+  "decision": "rewritten",
+  "reason": "bootOn comment now names the boot in ./_polish.mjs."
+ },
+ {
+  "id": "U148",
+  "decision": "rewritten",
+  "reason": "Comment now refers to DIG_PICTURE's seed and the 9-14 m span instead of seed 12 and 6.38 m."
+ },
+ {
+  "id": "U149",
+  "decision": "removed",
+  "reason": "Deleted the redundant dynamic import of appendFileSync; the static import at the top supplies the same binding."
+ },
+ {
+  "id": "U150",
+  "decision": "rewritten",
+  "reason": "Moved the flank-stand comment from above walkerBox to above standAt."
+ },
+ {
+  "id": "U151",
+  "decision": "rewritten",
+  "reason": "Comment now says the full pass is 2536.0 s less the split polish row, as the asserted figure computes."
+ },
+ {
+  "id": "U152",
+  "decision": "rewritten",
+  "reason": "Plan figure updated to ~69 min, measured with planRun({ argv: ['large'] }) on this branch (69.4 min)."
+ },
+ {
+  "id": "U153",
+  "decision": "rewritten",
+  "reason": "SEPTEMBER_BANDS doc now gives the plan figures in the past tense as measurement-time values and notes polish was split."
+ },
+ {
+  "id": "U231",
+  "decision": "rewritten",
+  "reason": "Comment now says an unsettled set is a red check while the shot is still taken, as frame() does."
+ },
+ {
+  "id": "U232",
+  "decision": "kept",
+  "reason": "loomFrames is deliberately parked behind the loom guard per the user decision of 29.09.2026 cited in the comment and runs again if weaving returns."
+ },
+ {
+  "id": "U233",
+  "decision": "kept",
+  "reason": "No contradiction: running the five polish themes by name is a multi-suite run that is neither `small` nor `large`, so the --no-ladder rule applies."
+ },
+ {
+  "id": "U234",
+  "decision": "backlog",
+  "reason": "Real comment/score mismatch, but fixing the score changes the staged frame; backlog line handed to the owner."
+ },
+ {
+  "id": "U235",
+  "decision": "removed",
+  "reason": "Dropped the unused from/to fields from the goat-staging result; callers read only truthiness and axis."
+ },
+ {
+  "id": "U236",
+  "decision": "kept",
+  "reason": "The comment describes the loop; an east probe breaking early above 200 px is already a failing reading, so nothing is mis-stated in effect."
+ },
+ {
+  "id": "U237",
+  "decision": "kept",
+  "reason": "The Array.isArray normalisation is a one-expression guard in a shared helper; removing it narrows the helper contract for no gain."
+ },
+ {
+  "id": "U238",
+  "decision": "removed",
+  "reason": "Deleted the unconsumed `return at.length` from the speech-owner setup evaluate."
+ },
+ {
+  "id": "U239",
+  "decision": "removed",
+  "reason": "Dropped the unused h field from aimPair's per-figure result."
+ },
+ {
+  "id": "U240",
+  "decision": "rewritten",
+  "reason": "Comment now says a hit short of 0.85 counts as an obstruction, matching `ratio < 0.85`."
+ },
+ {
+  "id": "U241",
+  "decision": "rewritten",
+  "reason": "Comment now says one aimed pose, since the readings are three separate page evaluations."
+ },
+ {
+  "id": "U242",
+  "decision": "rewritten",
+  "reason": "Heading now says a filled trip turned for home, matching the water-back counter it explains."
+ },
+ {
+  "id": "U243",
+  "decision": "rewritten",
+  "reason": "Comment now says the line is read again at the shutter, matching freeze-read-expose."
+ },
+ {
+  "id": "U244",
+  "decision": "rewritten",
+  "reason": "Comment now admits the non-inward bearings well inside the settlement edge that the placement code accepts."
+ },
+ {
+  "id": "U245",
+  "decision": "rewritten",
+  "reason": "Comment no longer claims the pose stays the seam-reading spot; it says only that the fleck probe does not move the camera."
+ },
+ {
+  "id": "U246",
+  "decision": "kept",
+  "reason": "findDoneLine tests the pattern line by line, so `^exit ` matches a completion line after other output without the m flag."
+ },
+ {
+  "id": "U247",
+  "decision": "rewritten",
+  "reason": "Stall doc now says no log write (growth or a newer mtime), matching the mtime branch."
+ },
+ {
+  "id": "U248",
+  "decision": "rewritten",
+  "reason": "Comment and log line now say every requested backend is covered, which also fits a pinned single-backend request."
+ },
+ {
+  "id": "U304",
+  "decision": "removed",
+  "reason": "Dropped the unread capacity field from standReading's result."
+ },
+ {
+  "id": "U305",
+  "decision": "removed",
+  "reason": "Dropped the unread changed field from photographJar's best result."
+ },
+ {
+  "id": "U306",
+  "decision": "removed",
+  "reason": "Dropped the never-read cleared flag from the water-stand recorder."
+ },
+ {
+  "id": "U307",
+  "decision": "kept",
+  "reason": "target deliberately mirrors rectOf's lookup so both find the same object; trimming it to the single 'jar' call would make the twins diverge."
+ },
+ {
+  "id": "U308",
+  "decision": "removed",
+  "reason": "Dropped the unread rect from handPixels' result."
+ },
+ {
+  "id": "U309",
+  "decision": "removed",
+  "reason": "Dropped the unread people count from both pounding-staging results."
+ },
+ {
+  "id": "U310",
+  "decision": "rewritten",
+  "reason": "Cost-probe comment now lists the primitive, code-built skinned and glTF runs per level."
+ },
+ {
+  "id": "U311",
+  "decision": "removed",
+  "reason": "Dropped stageOne's unused village parameter and updated its one call."
+ },
+ {
+  "id": "U312",
+  "decision": "removed",
+  "reason": "Dropped the unused yaw from stageOne's result."
+ },
+ {
+  "id": "U313",
+  "decision": "rewritten",
+  "reason": "flankView comment now says it returns the stand it set."
+ },
+ {
+  "id": "U314",
+  "decision": "removed",
+  "reason": "Dropped the unused gx/gz walker coordinates from flankView's result."
+ },
+ {
+  "id": "U315",
+  "decision": "kept",
+  "reason": "inView and why come from the pose() spread standAt shares with its miss log; stripping them saves nothing and dist is a harmless diagnostic."
+ }
+]

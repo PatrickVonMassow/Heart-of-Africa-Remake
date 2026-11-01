@@ -137,8 +137,8 @@ describe('the gait feet\'s ground height', () => {
 
 describe('the clip gait on the ground', () => {
   /** Walk a person straight ahead at `speed` and record each planted foot's
-   *  world slide. `probes` > 1 also samples each frame interval that many
-   *  times from a copy of the frame's gait state (nothing drawn, the state
+   *  world slide. `probes` > 1 also samples each frame interval at probes − 1
+   *  sub-frame instants from a copy of the frame's gait state (nothing drawn, the state
    *  carried on unchanged) and measures every contact down at the frame
    *  against itself at those sub-frame instants. */
   function walkStraight(person: GltfPerson, speed: number, hold = true, seconds = 4, dt = 1 / 60, probes = 1) {
@@ -149,7 +149,7 @@ describe('the clip gait on the ground', () => {
     const f = person.frame
     let slide = 0
     let lowest = Infinity
-    // per foot, frames with a contact down, contacts measured down on two
+    // per foot, contacts down (heel, ball and tip each count), contacts measured down on two
     // frames running, and contacts measured down at a frame and at one of its
     // sub-frame probes (a floating foot has none; a run's stance at the bands
     // can touch at most one 30 Hz frame running, so there it lands without a
@@ -205,7 +205,7 @@ describe('the clip gait on the ground', () => {
 
   it('with the hold, a planted foot does not slide across the whole speed ramp: every body, both cross-fades, 30/60/120 Hz', () => {
     // natural-villager-motion step 5: the walk ↔ jog ↔ sprint bands are no
-    // longer exempt — 0.004 person units per frame everywhere
+    // longer exempt — 0.004 figure units per frame everywhere
     const bodies = [
       ...SEXES.flatMap((sex) => AGE_GROUPS.map((age) => gltfPerson(asset, sex, age, 0))),
       gltfPerson(asset, 'male', 'adult', -1),
@@ -381,7 +381,7 @@ describe('the clip gait on the ground', () => {
           const world = newWorld(n)
           let z = 0
           let speed = 1.45 * per
-          // a dip into the jog of random onset, length and pace, at 25-120 Hz
+          // a dip into the jog of random onset, length and pace, at about 20-120 Hz
           const from = 1 + r() * 1.5
           const span = 0.15 + r() * 0.8
           const jog = 1.9 + r() * 0.8

@@ -384,8 +384,9 @@ function Prompt() {
   const prompt = useUi((s) => s.prompt)
   const dialog = useUi((s) => s.dialog)
   const touchActive = useUi((s) => s.touchActive)
-  // The settlement enter hint gets its own anchor (a little below the screen
-  // centre, see .prompt-enter in index.css). ui.enterPlaceId is set ONLY by the
+  // The settlement enter hint gets its own anchor (a little below the
+  // traveller's figure, `enterHintTopFraction`; .prompt-enter in index.css
+  // carries the rest). ui.enterPlaceId is set ONLY by the
   // bird's-eye scene while the traveller stands in an enter radius, and cleared
   // when that scene unmounts — so it is exactly the "Space to enter <name>"
   // case, and never a camp, door or elder prompt.

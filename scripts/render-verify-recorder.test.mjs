@@ -777,8 +777,8 @@ describe('tapOutput — observe-only', () => {
     const record = run.exit(0)
     expect(record.droppedLines).toBe(1)
     expect(record.truncated).toBe(true)
-    expect(runVerdict(record, { openPoints: [642] }).status).toBe('incomplete')
-    expect(runVerdict(record, { openPoints: [642] }).covers).toBe(false)
+    expect(runVerdict(record, { openPoints: [725] }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints: [725] }).covers).toBe(false)
   })
 
   // A line WITHIN the per-line budget that brings nothing new costs nothing,
@@ -1028,7 +1028,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     })
     const pointOf = (needle) => reds.find((r) => r.name.includes(needle))?.point
     expect(reds.length).toBe(3)
-    expect(pointOf('settlement walker (goat)')).toBe(642)
+    expect(pointOf('settlement walker (goat)')).toBe(725)
     // The leak was point 546's until it was fixed; with the point ticked its
     // ledger entry expired, so the same line now charges to nobody.
     expect(pointOf('render-resource-leak')).toBeNull()
@@ -1153,7 +1153,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     const line = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     const lane = { backend: 'webgpu', featureLevel: 'compatibility' }
     expect(chargeReds(failedChecks(line), { suite: 'flow', ...lane }).map((r) => r.point)).toEqual([null])
-    expect(chargeReds(failedChecks(line), { suite: 'polish-panorama', ...lane }).map((r) => r.point)).toEqual([642])
+    expect(chargeReds(failedChecks(line), { suite: 'polish-panorama', ...lane }).map((r) => r.point)).toEqual([725])
     // Nor outside the LANE it was taken on: the entry rests on the measured
     // compatibility adapter, so the core one the player runs stays red.
     expect(chargeReds(failedChecks(line), { suite: 'polish-panorama', backend: 'webgpu', featureLevel: 'core' }).map((r) => r.point)).toEqual([null])
@@ -1161,7 +1161,7 @@ describe('the captured lines charge the way the guard reads them', () => {
 })
 
 describe('the armed recorder — the REAL wiring, not a stand-in', () => {
-  const openPoints = [642]
+  const openPoints = [725]
 
   it('records a red run with its charged reds, and the run then accounts', async () => {
     const run = await armed('polish-panorama', 'compatibility')
@@ -1170,7 +1170,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(record.exit).toBe(1)
     expect(record.crashed).toBe(false)
     expect(record.featureLevel).toBe('compatibility')
-    expect(record.reds.map((r) => r.point)).toEqual([642])
+    expect(record.reds.map((r) => r.point)).toEqual([725])
     expect(runVerdict(record, { openPoints }).status).toBe('accounted')
   })
 
@@ -1434,8 +1434,8 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(record.droppedLines).toBe(7)
     expect(record.truncated).toBe(true)
     expect(isIncompleteRecording(record)).toBe(true)
-    expect(runVerdict(record, { openPoints: [642] }).status).toBe('incomplete')
-    expect(runVerdict(record, { openPoints: [642] }).covers).toBe(false)
+    expect(runVerdict(record, { openPoints: [725] }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints: [725] }).covers).toBe(false)
   })
 
   // A LOST RECORDING OUTRANKS AN ACCOUNTED-FOR RUN (review finding, 28.08.2026,
@@ -1454,7 +1454,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     const record = run.exit(1)
     expect(record.truncated).toBe(true)
     expect(record.droppedLines).toBe(1)
-    expect(record.reds.map((r) => r.point)).toEqual([642])
+    expect(record.reds.map((r) => r.point)).toEqual([725])
     // Charged throughout, this record would read ACCOUNTED FOR and COVER its
     // backend. The lines the cap ate are exactly the ones nobody could charge.
     expect(runVerdict({ ...record, truncated: undefined, droppedLines: undefined }, { openPoints })).toMatchObject({
@@ -1506,7 +1506,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
       droppedLines: record.droppedLines,
       evidence: 'local/verify-logs/ holds the whole run; the flood was the dev server',
     }
-    const open = unexplainedRuns([record], 0, { openPoints: [642], incompleteClosures: [closure] })
+    const open = unexplainedRuns([record], 0, { openPoints: [725], incompleteClosures: [closure] })
     expect(open).toHaveLength(1)
     expect(open[0].status).toBe('red')
     expect(open[0].reds.length).toBeGreaterThan(1)
@@ -1523,7 +1523,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(record.truncated).toBe(true)
     expect(record.reds ?? []).toEqual([])
     // Unsigned it blocks as an incomplete recording…
-    expect(unexplainedRuns([record], 0, { openPoints: [642] }).map((u) => u.status)).toEqual(['incomplete'])
+    expect(unexplainedRuns([record], 0, { openPoints: [725] }).map((u) => u.status)).toEqual(['incomplete'])
     // …and the signature that names THIS record closes it, leaving nothing.
     const closure = {
       run: runIdentity(record),
@@ -1533,7 +1533,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
       droppedLines: record.droppedLines,
       evidence: 'local/verify-logs/ holds the whole run; the line was one enormous page error',
     }
-    expect(unexplainedRuns([record], 0, { openPoints: [642], incompleteClosures: [closure] })).toEqual([])
+    expect(unexplainedRuns([record], 0, { openPoints: [725], incompleteClosures: [closure] })).toEqual([])
   })
 
   // And the other half of that rule, unchanged: a genuinely green run prints no

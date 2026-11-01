@@ -2,7 +2,8 @@
 // "Das Tier hat keine Kollisionsabfrage": a goat walked through posts, villagers
 // and the traveller, because only the static layout and the herd itself were in
 // the set it resolved against. Pinned here: the figures enter that set, and over
-// a simulated stretch of village life no goat stands inside anything.
+// a simulated stretch of village life no goat stands inside anything, save a
+// few centimetres while two figures pinch it from both sides.
 
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
@@ -130,7 +131,7 @@ describe('stepAnimal among live figures (point 1419)', () => {
 // The verifiable of the point: a simulated stretch of village life — the herd
 // grazing on its wobble while villagers walk straight through its grazing
 // ground and the traveller crosses it — and not one frame in which a goat
-// stands inside a collider or a figure.
+// stands inside a collider, or inside a figure beyond the pinch bound below.
 describe('a herd among walking figures in real villages (point 1419)', () => {
   it.each(['hausa-village', 'maasai-village', 'tuareg-village'] as const)('%s: no goat inside anything for 90 s', (id) => {
     const layout = buildLayout(id, 42)

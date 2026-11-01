@@ -1,7 +1,7 @@
 // Headless polish verification, theme polish-speech: speech and exchange inside a
-// settlement: the hypothesis over the speaker, whose a note is, guessing a meaning,
-// the Ctrl labels, the chief at his drummer and the given artefact (design.md
-// §13.4/§17.8/§6).
+// settlement: the hypothesis over the speaker, whose a note is, the near/far
+// note scale, guessing a meaning, the Ctrl labels, the chief at his drummer and
+// the given artefact (design.md §13.4/§17.8/§6).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { waitForStable, waitForSceneBuilt } from './_browser.mjs'
@@ -212,10 +212,20 @@ if (section('speech-hypothesis')) {
         figure.updateWorldMatrix(true, false)
         const e = figure.matrixWorld.elements
         const cam = window.__placeCamera
-        // The chest at THIS figure's own scale, not a flat metre: a metre above
+        // The chest at THIS figure's own size, not a flat metre: a metre above
         // a child's feet is over its head, and once the note rides close over
-        // that head (point 582) the two would read as one point.
-        const chest = Math.max(0.4, Math.hypot(e[4], e[5], e[6]))
+        // that head (point 582) the two would read as one point. The DRAWN head
+        // sets it, as for the aim above: measured 29.10.2026, a figure at group
+        // scale 1 carried its head 0.78 m up, so the scale's metre stood over
+        // its crown and every frame read "above its own note".
+        let head = null
+        figure.traverseVisible((o) => {
+          if (!head && o.name === 'figure-head') head = o
+        })
+        if (head) head.updateWorldMatrix(true, false)
+        const chest = head
+          ? 0.75 * (head.matrixWorld.elements[13] - e[13])
+          : Math.max(0.4, Math.hypot(e[4], e[5], e[6]))
         const v = new (Object.getPrototypeOf(cam.position).constructor)(e[12], e[13] + chest, e[14])
         v.project(cam)
         const r = el.getBoundingClientRect()
@@ -419,8 +429,8 @@ if (section('speech-hypothesis')) {
         // a hut between the lens and the head while the note, never depth-tested,
         // still floats in the frame. The nearer range is tried when the first is
         // blocked, as at the selection, and the pair a few times over: a single
-        // ray at a walking child's chest can slip past it to the ground behind
-        // (measured 1.58@ground-disc), which is a missed probe, not a clear view.
+        // ray can still slip past a moving figure to the ground behind (a chest
+        // ray once read 1.58@ground-disc), which is a missed probe, not a clear view.
         // Whatever pose passes is the pose shot; none passing is red below.
         const ranges = [speakerBack, ...STAND_BACKS.filter((b) => b !== speakerBack)]
         const sights = []
@@ -529,7 +539,6 @@ if (section('speech-owner')) {
       return { x: e[12], z: e[14] }
     })
     window.__speechOwnerStart = at
-    return at.length
   })
   // The figures WALK, and a pair that drifts apart between the choice and the
   // shutter puts one note off the frame edge (measured: the notes at -165 and
@@ -571,7 +580,7 @@ if (section('speech-owner')) {
         const pos = [figs[a], figs[b]].map((f) => {
           f.updateWorldMatrix(true, false)
           const e = f.matrixWorld.elements
-          return { x: e[12], y: e[13], z: e[14], h: Math.max(0.4, Math.hypot(e[4], e[5], e[6])) }
+          return { x: e[12], y: e[13], z: e[14] }
         })
         const mid = { x: (pos[0].x + pos[1].x) / 2, z: (pos[0].z + pos[1].z) / 2 }
         // Look across the pair (perpendicular to the line joining them), from
@@ -588,7 +597,7 @@ if (section('speech-owner')) {
         // A stand beyond the settlement's edge is no stand: putting the player
         // there LEAVES the place (`isOutsidePlace`), and a pair on the bank
         // lobe — the fishermen at the waterline — offers exactly that. The
-        // pair is skipped; the function that decides leaving decides it here.
+        // pair is skipped; the same boundary, 1 m in (`insidePlace`), decides it here.
         const x = mid.x - px * back
         const z = mid.z - pz * back
         if (!insidePlace(layout, x, z, 1)) return null
@@ -600,8 +609,8 @@ if (section('speech-owner')) {
       },
       { a: pair.a, b: pair.b, back },
     )
-  // Per figure: the best head-height reading, or 0 when anything stands in
-  // front of the head at ANY of those heights (a post half across the face is
+  // Per figure: the best head-height reading, or 0 when anything stands clearly
+  // in front of the head (ratio under 0.85) at ANY of those heights (a post half across the face is
   // an occluder even if one ray gets past it). A last reading, -1, is the roof
   // test: a camera under the drum shelter frames beams and posts, not faces.
   const seen = (pair) =>
@@ -726,7 +735,7 @@ if (section('speech-owner')) {
       })
     }, pair)
   const clear = (ratios) => ratios.every((r) => r !== null && r >= 0.85 && r <= 1.15)
-  // Everything the picture must show, read on ONE aimed frame: both speakers
+  // Everything the picture must show, read on ONE aimed pose: both speakers
   // unobstructed, both tails on screen and on their own anchors, the older
   // note receded and neither the guess target.
   const stage = async (pair) => {
@@ -944,8 +953,8 @@ if (section('speech-distance-scale')) {
       },
       { near: pair.near, far: pair.far, back: pair.back, side: pair.side },
     )
-  // Both heads in plain sight: the first surface along each sight line is the
-  // figure itself (the speech-owner instrument), and no roof over the camera.
+  // Both heads in plain sight: the first surface along each sight line lies at
+  // the figure's distance (ratio 0.85–1.15), and no roof over the camera.
   const seen = (pair) =>
     page.evaluate(
       ({ near, far }) => {

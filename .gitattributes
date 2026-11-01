@@ -10,3 +10,8 @@
 
 # Binary assets: never touch.
 *.png binary
+
+# The pipeline's machine-written penetration measurement: regenerated whole by
+# scripts/villager/build.mjs, too large for a review round; its readable
+# twin penetration-report.md carries the same verdicts and is reviewed.
+verification/villager-body/penetration-report.json -diff

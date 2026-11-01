@@ -43,7 +43,10 @@ import {
   type GestureState,
 } from './gesture'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { garmentMeshName, gltfLayerGeometry, gltfPerson } from './villagerFigureBody'
+import { garmentMeshName, gltfLayerGeometry, gltfPerson, gltfShellParts, isShellLayer } from './villagerFigureBody'
+import { tidy } from './figureBody'
+import { applyGarmentMask } from './villagerGarmentMask'
+import type { DressLayer } from '../systems/appearance'
 import { figureIdentity } from '../scenes/place/figureIdentity'
 import type { FigureLook, FigureWork } from '../scenes/place/placeFigureContext'
 import { easeDigWeight, mixDigPose } from '../scenes/place/shovelHold'
@@ -318,7 +321,7 @@ async function play(s: Subject) {
   }
   const person = gltfPerson(asset, id.sex, id.age, id.build)
   const garments = appearanceFor({ peopleId: s.peopleId, sex: id.sex, age: id.age, drivers: look.drivers, year: look.year, cloth: PALETTE[0], palette: PALETTE, pick: id.pick })
-    .filter((l) => gltfLayerGeometry(asset, person, l))
+    .filter((l) => isShellLayer(asset, l) || gltfLayerGeometry(asset, person, l))
     .map(garmentMeshName)
   const caller: Caller = {
     root: new THREE.Group(),
@@ -391,6 +394,40 @@ async function play(s: Subject) {
   }
 }
 
+/** A forced shell layer (the round trip reads geometry, never its colour). */
+const shellLayer = (name: string): DressLayer => {
+  const [, form, wear] = name.split('-')
+  const slot = form === 'trousers' ? 'hip' : 'ornament'
+  return { slot, form, wear, material: 'cotton', colour: '#888888', colour2: null, pattern: 'plain', source: { guess: 'round trip' } } as DressLayer
+}
+
+/** The shells' round trip (scripts/villager/gamepath.py shell_round_trip): the
+ *  composed rest body (morphs, hang, scale, stylisePeaks) with its normals and
+ *  scale, and every worn shell as the game builds it, for the seam outfits. */
+const SHELL_OUTFITS: Array<{ sex: Sex; age: AgeGroup; worn: string[] }> = [
+  { sex: 'female', age: 'adult', worn: ['g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist'] },
+  { sex: 'female', age: 'adult', worn: ['g-neckBeads-neck', 'g-neckBeads-chest'] },
+  { sex: 'male', age: 'child', worn: ['g-waistBeads-waist', 'g-trousers-waist'] },
+]
+
+function shellRoundTrip() {
+  if (!asset.shells) return []
+  return SHELL_OUTFITS.map((o) => {
+    const person = gltfPerson(asset, o.sex, o.age, 0)
+    const bodyPart = applyGarmentMask(tidy(person.geometry.clone()), person.cover, asset.garmentMask, [], 0)
+    const parts = gltfShellParts(asset, person, o.worn.map(shellLayer), bodyPart, [])
+    const flat = (a: THREE.BufferAttribute) => Array.from(a.array as ArrayLike<number>)
+    return {
+      ...o,
+      scale: person.frame.scale,
+      body: { pos: flat(person.geometry.getAttribute('position') as THREE.BufferAttribute), normal: flat(person.geometry.getAttribute('normal') as THREE.BufferAttribute) },
+      shells: Object.fromEntries(
+        parts.map((p) => [garmentMeshName(p.l), { pos: flat(p.geometry.getAttribute('position') as THREE.BufferAttribute), src: Array.from(p.built.src), index: Array.from(p.built.index), rim: Array.from(p.built.rim) }]),
+      ),
+    }
+  })
+}
+
 describe('the runtime-pose exporter', () => {
   it('records all eight subjects through the game\'s own figure, and the export is complete', async () => {
     const out: Awaited<ReturnType<typeof play>>[] = []
@@ -445,7 +482,6 @@ describe('the runtime-pose exporter', () => {
     }
     const before = by('caught').frames.find((f) => f.t < 0.4)!
     expect(face(before.world[bone('head')]).y).toBeGreaterThan(-Math.sin(0.15))
-    // the chaser strides at its sprint (its legs froze above the old teleport speed)
     // the child chaser at 3.4 u/s and the caught child stay at a child's
     // standing height: no squat (their hips sat at 0.50-0.65 of it in the
     // frozen walk and the CROUCH_MAX fallback). The reference is the caught
@@ -455,6 +491,7 @@ describe('the runtime-pose exporter', () => {
     const childStanding = (id: string) => ((at(caughtStanding.world[bone('hips')]).y - caughtStanding.root.p[1]) * by(id).person.scale) / by('caught').person.scale
     expect(Math.min(...hipsOf('chaser')) / childStanding('chaser')).toBeGreaterThan(0.75)
     expect(Math.min(...hipsOf('caught')) / childStanding('caught')).toBeGreaterThan(0.95)
+    // the chaser strides at its sprint (its legs froze above the old teleport speed)
     const feet = by('chaser').frames.map((fr) => at(fr.world[bone('foot.L')]).z - fr.root.p[2])
     expect(Math.max(...feet) - Math.min(...feet)).toBeGreaterThan(0.05)
     // (where the bearing turns slowly: the gaze is damped, 0.18 s)
@@ -467,7 +504,7 @@ describe('the runtime-pose exporter', () => {
     const path = process.env.VILLAGER_RUNTIME_POSES
     if (path) {
       mkdirSync(dirname(path), { recursive: true })
-      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out }))
+      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out, shells: shellRoundTrip() }))
     }
   }, 120_000)
 })

@@ -238,11 +238,11 @@ survives a crash.
 
 5. Add bounded dispatch and backpressure.
 
-   Implement explicit queue authorization, dependency checks, global three-lane acquisition, review-backlog ceiling and underutilization reason intervals in `scripts/batch-dispatch.mjs`. Automatic refill must not create or broaden work. Verify ordering, six-worker split-brain prevention, backlog throttling and reason accounting with `npx vitest run scripts/batch-dispatch-core.test.mjs` (the union's `scripts/__tests__/batch-dispatch.test.mjs`, translated; neither file exists yet — this step is unbuilt).
+   Implement explicit queue authorization, dependency checks, global three-lane acquisition, review-backlog ceiling and underutilization reason intervals in `scripts/batch-dispatch.mjs`. Automatic refill must not create or broaden work. Verify ordering, six-worker split-brain prevention, backlog throttling and reason accounting with `npx vitest run scripts/batch-dispatch-core.test.mjs` (the union's `scripts/__tests__/batch-dispatch.test.mjs`, translated; both files now exist).
 
 6. Add the checkpoint barrier.
 
-   Implement checkpoint request IDs, committed-and-pushed acknowledgments and bounded timeout handling in `scripts/batch-checkpoint.mjs`. A timeout must identify the non-transferable job and offer wait, cancel or drain—not silently continue. Verify clean checkpoint, push failure, timeout, duplicate request and late acknowledgment with `npx vitest run scripts/batch-checkpoint-core.test.mjs` (the union's `scripts/__tests__/batch-checkpoint.test.mjs`, translated; neither file exists yet — this step is unbuilt).
+   Implement checkpoint request IDs, committed-and-pushed acknowledgments and bounded timeout handling in `scripts/batch-checkpoint.mjs`. A timeout must identify the non-transferable job and offer wait, cancel or drain—not silently continue. Verify clean checkpoint, push failure, timeout, duplicate request and late acknowledgment with `npx vitest run scripts/batch-checkpoint-core.test.mjs` (the union's `scripts/__tests__/batch-checkpoint.test.mjs`, translated; both files now exist).
 
 7. Add two-phase boundary handling.
 
@@ -258,11 +258,11 @@ survives a crash.
 
 10. Project state and alerts into the board.
 
-    Implement `scripts/batch-board.mjs` to show every lane, heartbeat age, ETA, coordinator epoch, backlog, boundary state and red mismatches. Alerts cover stalled workers, missing successor readiness, marker deletion and rejected old-epoch mutations. Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs` (unbuilt), then the rendered page with `npm test -- docs` — the only existing suite that reads a shipped document — plus a NEW suite `scripts/verify/board.mjs` that this step creates and runs as `npm test -- board` if it adds page behaviour a document check cannot see. This repository has no Playwright test runner and no `tests/` directory, so the union's `tests/progress-board-batch.spec.ts` and `tests/batch-handover.spec.ts` name no file here: they are replaced by those two, not created.
+    Implement `scripts/batch-board.mjs` to show every lane, heartbeat age, ETA, coordinator epoch, backlog, boundary state and red mismatches. Alerts cover stalled workers, missing successor readiness, marker deletion and rejected old-epoch mutations. Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs`, then the rendered page with `npm test -- docs` — the only existing suite that reads a shipped document — plus a NEW suite `scripts/verify/board.mjs` that this step creates and runs as `npm test -- board` if it adds page behaviour a document check cannot see. This repository has no Playwright test runner and no `tests/` directory, so the union's `tests/progress-board-batch.spec.ts` and `tests/batch-handover.spec.ts` name no file here: they are replaced by those two, not created.
 
 11. Implement unbiased metrics.
 
-    Derive metrics exclusively from durable events and independently sampled session context. Preserve `scripts/measure-context-cost.mjs` for full-day median context and points/day; make `scripts/batch-metrics.mjs` report utilization, exclusions, checkpoint wait, successor latency, carried workers, landing duration and safety incidents. Backlog-pressure time must be reported separately rather than erased from the denominator. Verify calculations with `npx vitest run scripts/batch-metrics-core.test.mjs` (the union's `scripts/__tests__/batch-metrics.test.mjs`, translated; the file does not exist yet — this step is unbuilt).
+    Derive metrics exclusively from durable events and independently sampled session context. Preserve `scripts/measure-context-cost.mjs` for full-day median context and points/day; make `scripts/batch-metrics.mjs` report utilization, exclusions, checkpoint wait, successor latency, carried workers, landing duration and safety incidents. Backlog-pressure time must be reported separately rather than erased from the denominator. Verify calculations with `npx vitest run scripts/batch-metrics-core.test.mjs` (the union's `scripts/__tests__/batch-metrics.test.mjs`, translated; the file and `scripts/batch-metrics.mjs` now exist).
 
 12. Run staged failure trials.
 
@@ -295,7 +295,7 @@ measurement is named.
 #### 1. How the daemon escapes the session that starts it
 
 This is the defect that killed the run of 21.08.2026, so it is stated against the code that failed
-and against a drill that reproduces it. `scripts/author-delegate.mjs` spawns `codex` like this:
+and against a drill that reproduces it. `scripts/author-delegate.mjs` then spawned `codex` like this (today `spawn(runtime.bin, args, {…})`):
 
 ```js
 const child = spawn('codex', args, {

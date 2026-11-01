@@ -27,6 +27,7 @@ import {
   reviewerTrailers,
   splitTrailerField,
   turnEndScarceState,
+  cloneStandsDown,
 } from './model-guard-core.mjs'
 import { RECENT_LOG_FORMAT } from './model-guard.mjs'
 import { readState, writeState } from './lane-switch-core.mjs'
@@ -865,6 +866,17 @@ describe('turn end with an absent switch state (cloud clone, 22.10.2026)', () =>
   it('a scarce-lane or out-of-chain commit still trips under the absent state', () => {
     const { scarceState } = turnEndScarceState(absent)
     expect(findForbiddenCommits(log, T0, scarceState).map((h) => h.sha)).toEqual(['aaaaaaa', 'bbbbbbb'])
+  })
+
+  it('stands down in a clone without a switch state and without the batch lock (point 1461)', () => {
+    expect(cloneStandsDown(absent, false)).toBe(true)
+    expect(cloneStandsDown(absent, undefined)).toBe(true)
+  })
+
+  it('keeps judging for the lock holder and for any recorded state', () => {
+    expect(cloneStandsDown(absent, true)).toBe(false)
+    expect(cloneStandsDown(SCARCE_OFF, false)).toBe(false)
+    expect(cloneStandsDown(SCARCE_OFF, true)).toBe(false)
   })
 
   it('a recorded OFF still trips a scarce-lane commit, exactly as before', () => {

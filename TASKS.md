@@ -77,6 +77,31 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1463. Drastic zero-based simplification of the whole infrastructure, analysed six-eyes with final cross-vendor check
+  Source: User order 28.10.2026 in chat session cf715472: "Wie wäre es mit einer gründlichen Analyse, die feststellt, ob wir nicht drastische Vereinfachungen der gesamten Infrastruktur durchführen können, durch die auch ganz viele der noch offenen Infra-Punkte obsolet würden?" and "Ja, drastisch bedeutet, auch ganze Säulen ersatzlos zu streichen und zahlreiche noch offene Infra-Punkte zu löschen. Reihe einen solchen Punkt vorne in der Queue ein - wie du sagst, mit sechs Augen und Nachkontrolle." Limits on new points were rejected as symptom treatment; the cause is the infrastructure's own complexity. Wording approved by the user: "ja, beide so einreichen".
+  Final state: the repository's infrastructure (scripts/ outside the game's verify suites, hooks in .claude/settings.json, guards, lanes, locks, ledgers, board, daemon, launcher, their docs) is drastically simplified from a zero base, and every open infrastructure point made obsolete by it is deleted from the work order.
+
+  Measured 28.10.2026: infrastructure ~326k lines against ~167k in src/; 93 guard files, 100 hook entries; of 82 points landed 14.-28.10. only 33 touched src/; the open queue grew 451 -> 467, with 133 "Session- & Repo-Hygiene", 41 "Testinfrastruktur", 33 "Modell & Wächter", 19 "Chat & Tafel" points. The 01.09.2026 freeze did not stop the growth: mechanisms that block each other keep producing "real blockades", each a regular fix.
+
+  SCOPE (user decision 28.10.2026): "drastic" includes deleting whole pillars without replacement (e.g. lane routing, batch lock, board, daemon) and deleting numerous open infrastructure points.
+
+  ANALYSIS QUESTIONS:
+   1. Zero base: what minimum does the game need to be built, verified and landed safely (build, lint, unit tests, browser suites on both backends, picture check, cross-vendor review, landing)? Everything beyond it must justify its existence.
+   2. Inventory of every mechanism: the incident it was built for and whether that risk still exists; its cost (lines, refusals in the session transcripts, points it caused); which other mechanisms it collides with.
+   3. Cause count over closed and open infrastructure points: how many arose from interaction between mechanisms rather than from a game problem.
+   4. Result: a delete/replace list (standard tools such as GitHub CI and branch protection instead of own guards where that fits), for every open infrastructure point the verdict "obsolete: yes/no" with reason, and a teardown order in which the game stays buildable, testable and landable after every step.
+
+  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
+   1. Analysis A (main chain, Opus 5.5) and analysis B (cross-vendor lane) run BLIND and in parallel from identical raw material (scripts/, .claude/settings.json, hooks, tests, docs, TASKS.md, docs/tasks-archive.md, session transcripts). B receives only the analysis questions above, not A's work.
+   2. A third, distinct model (Fable 5.1 if node scripts/lane-switch.mjs --lane scarce --status permits, else Opus 4.8) checks both and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
+   3. The merged plan goes to the model of the other vendor than the merger for a final check: does every step keep the game buildable and every remaining safety duty covered? Objections are fixed and re-checked.
+   4. The approved plan, with its list of points to delete, is presented to the user; deletion of mechanisms and points starts only after the user approves it. Other points continue meanwhile.
+   5. Implementation follows the approved plan in small landable steps with the usual cross-vendor code review. Deleted points move to docs/tasks-archive.md with the reason "obsolete by infrastructure simplification", not to docs/backlog.md.
+
+  Infrastructure-freeze fit: a deletion/simplification (CLAUDE.md §2); this point adds no mechanism.
+  Queue position: at the very top of the open work order, directly after the v0.3.1 release point (user order 28.10.2026).
+  Bundle: Session- & Repo-Hygiene.
+  Criticality: high — touches every batch mechanism.
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
@@ -87,185 +112,6 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try. Point 1419 (cloud session_019XD8Qts48RxNzEfjXP9wSR, 27.10.2026) does not meet item 2 either: owner commits after the handover (capture subject fix, review fix) changed the tree, so build, lint and test:unit ran again before the merge; acceptance log local/1419-land.log.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
-  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
-  11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
-  nicht mehr vor der 0.3 passieren, aber möglichst bald danach"). The rebuild that replaced
-  wall-clock waits with waiting on the app's own state was applied CASE BY CASE, never swept:
-  measured 11.08.2026, the bird's-eye half of the Ctrl-label check had taken the one-moment
-  snapshot on 08.08., the settlement half never did, and the same defect reappeared there
-  three days later. Nothing forbids the pattern, so the next one will appear again.
-  THE TWO KINDS MUST BE SEPARATED, because "no test may fail from load" is only half
-  achievable and pretending otherwise would produce a green that means nothing:
-  1. A STATE check — does this exist, is it drawn there, does the label read that — CAN be
-     made load-proof, and must be: poll on the app's own frames or state until the answer is
-     stable, read every side of a comparison in ONE evaluation, never compare two separate
-     round trips. Sweep every `scripts/verify/*.mjs` for the pattern and fix each site.
-  2. A TIMING check — frame budget, animation smoothness, how long a step takes — is
-     load-sensitive BY NATURE. It is not made load-proof; it is RECOGNISED: under load its
-     verdict does not count as evidence (the runner already prints exactly that) and it is
-     reported as UNMEASURED rather than red, so a loaded machine can never manufacture a
-     failure nor hide one.
-  3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
-     assembled from two separate `page.evaluate` calls. The agent that found this case left
-     the gate undone on purpose and asked for the decision — this point is the decision.
-  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
-  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
-  WebGPU `polish` run and two building agents shared the machine, and both green on the same
-  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
-  on its own retry. Each must come out of the sweep classified — repaired as a state check,
-  or declared timing and reported UNMEASURED under load.
-  A FOURTH CASE, measured 15.09.2026 on `polish`, is the sharpest of them because BOTH
-  sides of the comparison flutter: `the order at the stand can be photographed` waits up to
-  180 s for the LAST utterance in the village to be a water word at most 2.5 s old while a
-  second man is already walking off with the empty jar. It went red twice out of two on the
-  candidate of point 1056 and, on the untouched baseline of the same commit and the same
-  backend, its sibling `the return walk can be photographed` went red once out of two — same
-  section, same cause, no carrier moment inside the window. The check's own comment names
-  the reason: the window's width depends on the errand's pace, and the suite runs that pace
-  at six times normal. It is a moment-catcher, not a state check, and the sweep must decide
-  which of the two kinds it is. Point 1056 was verified past it: its branch does not touch
-  the water errand at all.
-  THE INVENTORY THE SWEEP STARTS FROM IS ALREADY COUNTED (carried over from point 200 on
-  20.08.2026, which measured it as Pillar-2 group E): 26 wall-clock/radius sites — 20 in
-  `enrichments`, plus `polish` 270, `settings` 183/277, `flow` 242, `voice` 56, `touch` 75 — and
-  the two patterns are named per site: a render-loop behaviour polled on the SIM clock
-  (`__pollSim`/`__sleepSim`/`simTime`) or on the check's OWN condition rather than on a fixed wall
-  wait, and "in view / beyond the ring" judged by `__camera.onScreen`/ndc projection rather than by
-  an assumed radius — a check that TESTS a radius feature keeps its radius and says so. Some of the
-  26 were fixed case by case since 21.07., which is the very drift this point exists to end: each
-  site is verified against HEAD before it is touched, each touched suite is run after its change
-  (both backends for the WebGPU-lane suites, `touch`/`voice` WebGL only), and the sweep's report
-  states how many of the 26 were already closed and by what. The fixed 1500 ms wait of point 521
-  is a member of this list and is fixed there.
-  A LANE THAT CANNOT ANSWER A CHECK SAYS SO, WITH ITS MEASURED RATE (folded in from point 506 on
-  20.08.2026). That point's four reds were taken on a SOFTWARE WebGPU lane drawing roughly one
-  frame per second, and that premise is dead here: `node scripts/verify/backend-lane-check.mjs`,
-  re-measured 20.08.2026, shows BOTH lanes hardware-backed on a real GPU, WebGPU running in
-  COMPATIBILITY mode rather than core. The mechanism survives it intact, and it is how kind 2 above
-  gets reported in practice:
-  - the run MEASURES the lane's delivered frame rate once, from the running page, and prints it in
-    the run header, so every verdict below NAMES the lane it was taken on instead of assuming one;
-  - a check whose subject is a RATE or a wall-clock budget (stance intervals per walk, a settle
-    deadline, a fixed-frame benchmark route) DECLARES the throughput it needs; below that figure it
-    SKIPS, naming the measured rate and that the lane cannot answer it, and it never reds and never
-    passes silently. That is the measured-nothing signature this removes: a check reporting a rule
-    as broken while its own reading says the rule held (`"ok":true` beside `anyMoved:false`) reads
-    as a product defect and is the worst red there is;
-  - NO product threshold moves for it — on a lane that meets the throughput the identical check
-    runs unchanged and must still fail on a real regression;
-  - the skips are COUNTED in the run summary, so a lane that skips half a suite can never be
-    mistaken for a green both-backend verification: what the §7.2 both-backend rule counts is what
-    actually RAN.
-  The checks that failed this way while the lane WAS software name the class the declaration has
-  to cover: `polish`'s goat planted foot (1 usable stance interval where it needs 3) and its dry
-  settlement-season settle (read after 60176 ms), `settings`' footstep surface class, the
-  fixed-frame `benchmark` route (`waitForFunction: Timeout 300000ms exceeded`), and `collision`'s
-  door transition and unstuck window. A lane can also HANG instead of skipping — 27 minutes with
-  no frame written, killed by hand — and while it does, a figure or settlement point has no second
-  backend at all: that merge owes a loud deferral, never a silent single-backend picture.
-
-  THE GOAT PLANTED FOOT IS NOT CLASSIFIED HERE (20.08.2026). Point 725 holds a cross-vendor
-  review verdict that the release frame really does teleport the foot and that `judgeStanceSlip`
-  excludes exactly that frame, so the check may be measuring around a defect rather than
-  suffering a slow lane. That point owns the measurement which decides between the two, and it
-  is taken on the hardware lane. This sweep may give that check a throughput declaration only
-  once the measurement has come back "no jump" — a skip laid over a real defect is the one
-  outcome this mechanism must never produce. The other named cases are unaffected and are
-  classified as specified.
-
-  VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
-  with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
-  passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
-  repaired state check that previously skewed.
-  A Vitest case pins the pure skip decision — needed against measured throughput — in both
-  directions, including that a lane which meets the throughput never skips.
-  Live, in the surviving lanes' terms: a run on a lane that cannot meet a check's declared
-  throughput ends GREEN with exactly that check reported as a lane skip naming the measured rate,
-  while the lane that meets it runs the same check for real.
-  Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
-  door point 640 closes from the other side.
-
-- [ ] 568. The polish water-sameness check rotates its verdict (measured 09.08.2026 by
-  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
-  the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
-  launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
-  plate's rim is the SAME water as the water at the bank (≤ 12/255)" — went RED on the
-  first run with samples 13.8, 12.1 and 19.3 straddling the limit, and fully GREEN on a
-  second run at the IDENTICAL commit and the IDENTICAL seed (164 PASS, 0 FAIL). The seed
-  work is not the cause: `polish` was seeded 42 before and after, so the world it walked
-  was the same both times. What rotates therefore sits BELOW the layout — the water
-  shading itself, or the moment the sample is taken.
-  WHY IT MATTERS BEYOND THE FLAKE: point 549 pinned the seed precisely so a red could be
-  believed. A check that still rotates on a fixed world is the next layer of the same
-  problem, and it sits on the everyday gate where it costs a rerun every time.
-  FINAL STATE: the cause is IDENTIFIED before anything is tuned — the two candidates are
-  a genuine frame-timing dependence (the sample taken before the water material has
-  settled, in which case the check polls on the app's own clock rather than a fixed
-  wait) and a real shading seam at the plate rim that only sometimes exceeds the
-  tolerance (in which case it is a PRODUCT defect and the check is right to fire). The
-  tolerance is NOT widened to make the red go away until it is established which of the
-  two it is; if it is the product, the water fix comes first and the check stays.
-  SAME FAMILY AS POINT 200 (carried 20.08.2026 from the 10.08.2026 four-eyes work-order
-  analysis, not a fresh finding): points 336 and 570 already name 200's rotating-staging
-  family and this check is the third member of it. The ten-run reading below belongs to the
-  same quiet-machine round rather than a separate one.
-  VERIFIABLE: the check runs ten times on the pinned seed with the same verdict every
-  time, and whichever cause was found is named in the commit message with its evidence.
-  Criticality: medium — it does not itself hide a product defect, but it may BE one, and
-  it erodes the trust in a red that point 549 was built to restore.
-
-- [ ] 1456. Two intermittent polish-villagers shutter-timing reds owned by no point
-  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
-  Final state: `npm test -- polish-villagers --section=villager-canoe` and the adult-errands river-bank block are green on both backends on a quiet machine, or each red is charged to its owning open point with the cause named: "he was still squatting ashore, unloading, before and after the shutter" (measured `{before:true,after:false}`) and "the river-bank frame: the foam it was aimed at is still in the picture after the shutter" (drifted 13.22 m at lead 6 m). The check reads the pose and the aim from the shutter frame itself.
-  Observed problem: WebGPU 9bb6e1736 and 1e681ce07 (26.10.2026), WebGL 2 30a5b55f5 (27.10.2026, under load); WebGL 2 main f57fa3250 clean on 26.10. Shutter-timing verdicts on unrelated heads; recorded in docs/backlog.md as a finding of 27.10.2026, filed now because the render-verify guard blocks on them (four unaccounted runs).
-  Criticality: low — check timing, no player impact measured; it blocks the green of `polish-villagers`.
-  Source: render-verify guard 27.10.2026 (a red closes only when fixed, charged or filed, CLAUDE.md §7.2).
-  Bundle: Dorfleben.
-- [ ] 1202. The dig picture's camera stand lies inside the settlement.
-  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
-  PROBLEM, measured 23.09.2026 while repairing point 1198: `digPictureView` (scripts/verify/
-  digSitePicture.mjs) puts the stand for fixture `bambara-village` seed 58 at x 12.0, z 30.6
-  (r 32.9 m), past the settlement boundary, so `isOutsidePlace` fires on the first frame,
-  PlaceScene leaves the place, and `polish --section=adult-errands` reads `the spoil crossing
-  starts on flat ground — {"error":"no patch dig site","place":null}`; frame
-  `1056-two-excavations-walkable-spoil` is never taken. `src/scenes/place/digPicture.test.ts`
-  stays green because it never asks for the stand to be inside. A seed search over 0-799 with
-  that extra condition found no seed on either side of the pair: the far side is outside, the
-  near side fails `standingClear` on the sight lines (636 of 1600 probes).
-  FINAL STATE: the fixture test asserts `isOutsidePlace(layout, view.x, view.z) === false`, a
-  composition (seed, stand side, or a stand-off rule) passes it with every existing condition,
-  and `polish --section=adult-errands` takes frame 1056 on WebGPU and WebGL 2 with no red but
-  those charged to point 568.
-  Criticality: medium — a picture proof of the dig spoil is missing on every run.
-  Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
-  Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
-  Bundle: Dorfleben
-- [ ] 1461. Cloud author clones judge the scarce lane OFF and stop on the serving-model tripwire
-  Queue position: directly after point 1308 (owner 28.10.2026: reproducible blockade of the cloud authoring flow the cloud switch makes the default).
-  Final state: a cloud-session clone of this repository, which carries no local lane-switch state, no longer stops a delegated Opus 5.5 author on the serving-model tripwire for admitted Fable 5.1 trailers on main; the owner checkout's tripwire keeps refusing a commit naming Fable 5.1 while the recorded switch is OFF. Narrowest fix under the CLAUDE.md §2 infrastructure freeze (e.g. the tripwire stands down for a session that does not hold the batch lock, as every other session guard already does per the house facts), no new guard.
-  Evidence (28.10.2026, owner 9c5950f8): cloud authors for 1308 (session_019XD8QvphJSWxogsH5cmKJf) and 642 (session_019XD8Qtdz4X4qrvHCwnZwbr) ended their sessions on "SERVING-MODEL TRIPWIRE: commit(s) 813efab, ffdeaa0, 873a1b5, 3bb62f1 … Fable 5.1 … refused because the recorded lane switch is OFF … no recorded switch state in this checkout; judged as off" (scripts/model-guard-core.mjs:129), nine Stop refusals each, after one commit (1308) and two commits (642); the owner checkout reads scarce ON (user 31.08.2026). Both were told by message to continue.
-  Verifiable: a test of the tripwire decision: no switch state plus no batch lock held → no stop; switch OFF in the owner session → today's refusal.
-  Bundle: Session- & Repo-Hygiene.
-- [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
-  Queue position: directly after point 1330 (user order 12.10.2026).
-  Source: user 12.10.2026 (chat), after two bug reports from the current production build eab3d6b (backup local/ClippingBeimLaufen.zip: a walking villager's swing leg leaves its trouser leg behind, bare thigh and knee; local/WindelLook.zip: a child's hip cloth stands off the body all round like a diaper). User: "Ich vermute, dass das nur eines von vielen Symptomen ist, das bestätigt, dass der bisherige Ansatz verkehrt war. Jetzt genau das zu beheben würde vermutlich nur ein Symptom flicken." Order: "Reihe den Neubau als mit 6-Augen-Prinzip für die Analyse als neuen Punkt nach 1330 ein." Both reports are filed as findings in the carrier and are charged to this point, not fixed singly.
-  Background (measured 12.10.2026): scripts/villager/garments.py sweeps each garment round the convex hull of the body section (below the crotch torso and legs together), adds ease, flare and push_out(0.007), and then guesses each cloth vertex's skin weights from the nearest body surface; sleeves got a one-off own-limb rule, trouser legs did not. Concave body regions therefore get standing-off cloth, limb tubes can bind to the wrong limb, and every anti-penetration correction pushes cloth further out. Since 05.10.2026 about 187 main commits and points 1312, 1314, 1329, 1331, 1332, 1336, 1338, 1337, 1334, 1335, 1339, 1315 worked on garment clipping against a numeric 0.003 penetration gate; point 1339 ended that chase. An independent GPT-6 Astra diagnosis (12.10.2026) named the root cause as a wrong problem statement: a general geometric zero-penetration problem instead of visibly convincing game clothing.
-  Procedure - six eyes with additional final check (user order), BEFORE any change is implemented:
-  1. Inventory by picture: render every outfit the shipped villager.glb can wear (outfit generator, both sexes, all ages) walking, running, kneeling and digging at the game's normal camera distances (port city and village), plus the two user reports' situations; list every visible defect per garment/pose. This inventory is the shared raw material of step 2.
-  2. Model A (Claude lane) and model B (GPT-6 Astra) analyse BLIND and in parallel from identical inputs: the inventory, the current pipeline code, design.md dress rules (points 1293/1313 clothing rules and the 1339 outfit rule), and this goal. B gets no candidate solution, no proposer interpretation, and no point-brief of a point text containing them. Each proposes a garment construction for tight garments (trousers, shirts, sleeves, breast and hip cloths, bands) and for loose ones (robes, togas, capes, cloaks, wraps, skirts), with expected defects, cost and migration.
-  3. A third, distinct model checks both and merges them through scripts/blind-merge.mjs, resolving disagreements with reasons, not by union.
-  4. A model of the OTHER vendor than the merger checks the merged plan for "does this break anything". Only an approved plan is implemented; objections are fixed and re-checked first. The approved plan is shown to the user before implementation (solutions need user approval).
-  5. Implementation gets the usual cross-vendor code review.
-  Direction to weigh (not a closed list): tight garments as a thin offset shell of the body skin carrying the skin's own weights unchanged, so they follow every limb and cannot stand off; the 1329/1336 mask hides the covered body; loose garments as few checked templates with deliberate weights, optional helper bones or corrective shapes, and outfit combinations restricted where layering cannot work; procedural variation stays in colour, pattern and proportion.
-  Scope (split 21.10.2026, owner decision under the standing split rule): this point delivers the six-eyes procedure above and stage 1 of the approved staged plan (docs/garment-merge-r9-1347.md): the penetration gate removed (report information only), the before-picture inventory, the outfit enumeration and rank table, the body pre-split along the shell regions, and trousers, breastCloth, neckBeads-neck, neckBeads-chest and waistBeads rebuilt as offset shells of the body skin carrying its weights. Stages 3, 4 and 5 are points 1398, 1399 and 1400.
-  Final state: the five stage-1 shell garments look dressed at 3 m and 7 m in a port city and a village on both backends in the plan's forced-outfit acceptance rows (walk, run, kneel/dig, idle; leg-crossing frames): no limb leaves its trouser leg (the user's swing-leg report re-shot clean), no shell stands visibly off the body, no seam flickers or fights in colour; their old hull-tube construction is removed for these five garments.
-  Verifiable: the six-eyes record (two blind analyses, merge record, final-check verdict per round); the before-picture inventory and the stage-1 acceptance rows, Playwright `polish-villagers --section=garment-acceptance` on both backends, picture-checked; pipeline selftests and Vitest for the shell builder and the outfit generator; cross-vendor review record. Per point 1339 no numeric penetration threshold is an acceptance gate.
-  Open points touched: 1341 (pipeline garment surface, head cover, frame cost) and 1346 (stale penetration baseline) are probably absorbed or obsoleted by points 1398-1400; they are removed only on the user's decision. 1342's "penetration gate green" acceptance is to be aligned with 1339 by the same decision.
-  Criticality: high - every villager on medium/high presets, visible at first glance in normal play.
-  Charged 21.10.2026 (findings carrier, 1347 acceptance frame 1347-accept-trousers-cross-r-man-rear-cairo-3m, WebGPU, 17c892af5): a lighter, rougher hard-edged rectangle on the bare adult male back from the shoulder blades to the waist, visible at 3 m, with only trousers worn. Compare with main before classifying: if main shows it, file it as its own body-skin point; if not, fix it here.
-  Charged 21.10.2026 (CI run 39618569779 on e4edd6979, reproduced locally; main passes): src/render/villagerKneelGround.test.tsx is red on the branch for all three figures - in the held kneel the shins sink 0.033-0.046 figure units below the ground (SHIN_REST 0.03; main measures -0.021 to -0.007), so the rebuilt villager.glb lowers the knelt shins. Repair before landing; the CI job reported success despite the failed file, so the green conclusion covers nothing.
-  Bundle: Dorfleben.
 - [ ] 1454. Fresh runner's top pace still floats: re-author the villager jog clip with a longer stance
   Queue position: directly after point 1347 (owner decision 28.10.2026, Opus 5.5, for veto: a clip change refits the garments, so the branch lands only on the rebuilt garment construction); earlier: directly after point 1420.
   Source: split from point 1420 on 27.10.2026 (owner decision under the standing split rule; user words on 1420: "Die Kinder sind beim Laufen so lange in der Luft.").
@@ -279,6 +125,8 @@ put it is the mistake this line exists to stop.
   CI charge (28.10.2026): run 40626999014 on feat/1454-jog-stance 06a3327 failed in shard-2/unit — the known no-slide red above (7.65 per leg, 0.004008 vs 0.004), reproduced locally; it closes with this point.
   Evidence 28.10.2026 (local author, Opus 5.5, branch head 246b51a49): jog restance with a low flight (clips.py `flight` 0.7) plus a runtime stance-foot grounding (VILLAGER_GLTF.runGround, commit 66e4b7a9d, own commit for veto) replace the walk share completely; villagerClipPose + villagerRig 47/47 green, airborne 0.25-0.33 and apex <= 5.24 cm at 1.70/3.40/3.81 m/s, worst slide at 7.65 per leg 0.00306 (was 0.004008). Measured cause: basis-body clips retargeted onto child proportions lift the stance foot (girl 3.3 cm), which no clip-only stance length fixes. Blocker: the full build (b030b8595, 7.25 MB) refits the garments because tailor() takes the clips as input; test:unit is then red 4 of 18273 in villagerFigureBody.test.ts (female child -1 morph follow 1.185 vs 1.157, already red at 06a332708) and villagerPenetrationReport.test.ts (one new build-pose row g-robe-chest under g-cape-chest 0.0061, female adult right upper arm); main's glb passes both. A refit retry is deterministic (~4.5 h) and buys nothing; point 1347 stage 1 rebuilds that construction and removes the penetration gate (point 1339), so the branch is rebuilt on its result. Still owed then: full build, covering browser suites, fresh-runner picture check, cross-vendor review.
   CI charge (28.10.2026, owner): run 40670490523 on feat/1454-jog-stance 246b51a, first attempt red in fast (1) — src/render/villagerPenetrationReport.test.ts:222 "g-robe-chest: inner build upperArm.R g-cape-chest: expected false to be true"; the run's later attempt concluded success, which is SUSPECT and covers nothing. The rebuilt villager.glb or its refreshed penetration reports are the suspects; reproduce with npx vitest run src/render/villagerPenetrationReport.test.ts on the branch before landing.
+  Build stopped (28.10.2026 20:14, owner Opus 5.5): an orphaned full build (scripts/villager/build.mjs, ppid 1, 4 h old, step sheets,penetration) was stopped so the v0.3.1 closing runs on a quiet machine; the worktree keeps its partial uncommitted output (villager.glb, verification/villager-body PNGs) — discard it and rebuild from the branch head bc2b576db.
+  CI charge (29.10.2026, owner): run 40713828399 on feat/1454-jog-stance bc2b576 red in shard-1/2 unit — villagerFigureBody.test.ts:671 (female child stance 1.185 vs < 1.157) and villagerPenetrationReport.test.ts:164/180/222 (g-robe-chest inner build); the garment refit commit's reds. The cloud fixer session_019XD8QtpttouGtwzgDvF3j4 stopped on the clone tripwire (point 1461) without a push; it closes with this point.
 - [ ] 1398. Villager garments stage 3: skirts, loin flap, apron and girdle tails on driven column bones
   Queue position: directly after point 1347.
   Source: split from point 1347 on 21.10.2026 (owner decision under the standing split rule): point 1347 delivered stage 1 of the approved staged garment plan (docs/garment-merge-r9-1347.md, user decision on the board "Kleidungsplan stufenweise prüfen"); its user goal (user 12.10.2026: a walking villager's swing leg leaves its trouser leg behind; a child's hip cloth stands off the body like a diaper) is finished by this point and its siblings.
@@ -15812,6 +15660,7 @@ to land than a mechanism that needs a review.
   Bundle: Dorfleben.
   Further source: user bug report hoa-state-2026-10-21-3318564123 (2).zip (21:05:18Z), user words: "Warum bückt er sich, wenn er zum Häuptlingshütte zeit und warum zeigt seine Hand nicht geradeaus, sondern leicht nach unten." The man in dark blue points toward the chief's hut in a crouch with his arm slightly below horizontal - consistent with the measured release phase (arm pitch -1.71 to -1.50 while the crouch fires).
   Additional check: after the fix, the pointing hand aims level at the target while the gesture is held (not only at release); if it does not, split a separate point for the aim.
+  Owned browser checks (charged by point 1465, 29.10.2026, bisected to the 1295 glTF merge 2eb4f1384; trace: hand 0.65 -> 0.82 -> 0.34 squat -> rest within a second): polish-speech --section=chief-to-drummer "the drummer's arm is raised in the pointing frame (point 1272)" and "the man and his word offer their keys at the same time (point 1139)" green on both backends; strike both charges in scripts/render-verify-charges.mjs.
 
 - [ ] 1396. Two walking villagers stand inside each other at the village centre
   Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
@@ -15882,16 +15731,12 @@ to land than a mechanism that needs a review.
   Observed problem: `polish-villagers --section=villager-dress` on feat/1446 6e1622764, 25.10.2026 05:51-05:58 UTC, 22 villages visited in turn (`gpu-load` rows in local/verify-measure/villager-dress.jsonl): pipelines 64 -> 993 (~40 per village, never falling), JS heap 286 -> 1709 MB, renderer-tracked textures 56 -> 156; Chrome's `--type=gpu-process` RSS 0.4 -> 9.7 GB at ~1.35 GB per minute (host has 15 GB). In the full suite the earlier sections add to it and the GPU process was lost around the 16th village (point 1446). A player who travels village to village grows the same load without bound.
   Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
   Bundle: Session- & Repo-Hygiene.
-- [ ] 1448. Villager canoe: the third hauled fish is hidden behind an unnamed box
-  Final state: `polish-villagers --section=villager-canoe` is green on WebGPU again: "at least three unhidden fish are in the frame, each at least 25 px long" passes, or the cause is named and fixed — either a product occlusion (an unnamed `BoxGeometry` mesh sits between the boat's standing place and a fish in the hull: name it and decide whether it belongs there) or a fixture cause (the boat view or the fish ray). Its charge in scripts/render-verify-charges.mjs dies with this point.
-  Observed problem: red twice on 25.10.2026, WebGPU, section run alone: on main 6bd82b3ae and on feat/1414 9469159b5 (log local/verify-logs/2026-10-25T10-34-34-903-polish-villagers.log); two fish seen (72-84 px), the third (62-64 px) has the camera ray hit `BoxGeometry` first. Not caused by 1414 (its change is ashore only; the red stands on main).
-  Source: picture check of the 1414 landing, 25.10.2026.
-  Bundle: Dorfleben.
 - [ ] 1449. Two unowned calf-in-river reds in the enrichments suite on WebGPU
   Final state: `npm test -- enrichments --section=calf-crossing-flee` and `--section=calf-shield-river` are green on WebGPU on a quiet machine, or each red is charged to its owning open point with the cause named: "the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in" (measured `fallIn: true` at t 5.05 s, `chaseSwim: false`, `bouted: false`) and "a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up (calf-in-water)" (measured: parent killed in the water at frame 34, the lion feeds and leaves, the calf alive on the savanna bank — the shield-ahead swim never staged). The stale charge of "every predator fits the region and period" to point 1013 is removed (it passed). The WebGL 2 run of both sections is recorded.
   Observed problem: full enrichments run on WebGPU, 26.10.2026 03:21-03:42, main 64bed6b45, machine quiet UNVERIFIED: 314 pass, 5 fail; three charged (938, 1236 twice), these two owned by no open point. Both stem from the calf-shield-river work landed with point 1297. Log: local/enrichments-webgpu-run.log.
   Source: findings carrier 26.10.2026 02:43 (enrichments run); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
   Bundle: Tierverhalten.
+  Evidence 30.10.2026 23:44 (feat/642 724533d16, WebGPU, quiet unverified): `--section=calf-crossing-flee` ran the shy-ring flee check GREEN; its one red there is charged to 1236. One pass, not yet the final state.
 - [ ] 1453. polish-speech speech-distance-scale crashes in the figureScreen test hook
   Final state: `npm test -- polish-speech --section=speech-distance-scale` runs to its 9 frames and is green on WebGPU on a quiet machine, or each remaining red is charged to its owning open point with the cause named. `figureScreen` (src/scenes/place/SpeechLabels.tsx) finds the figure's head geometry for the current figure build instead of assuming the first visible `figure-head` is a Mesh; a Vitest case pins the lookup.
   Observed problem: quiet WebGPU run 27.10.2026 02:54Z on main 9044a6684: RED after 53 s, 0/9 frames, `page.evaluate: TypeError: Cannot read properties of undefined (reading 'getAttribute') at figureScreen (SpeechLabels.tsx:261)`. The head found carries no geometry (likely a Group since a figure/garment rebuild). The suite last ran 03.10.2026, so the break went unseen for over three weeks. Log: local/verify-logs/2026-10-27T02-54-43-744-polish-speech.log.
@@ -15934,3 +15779,158 @@ to land than a mechanism that needs a review.
   Criticality: low — verification debt; blocks the render-verify Stop guard. Needs a quiet machine.
   Bundle: Session- & Repo-Hygiene.
   Source: findings carrier 28.10.2026 04:10 'Enrichments covering run owed on both backends'.
+
+- [ ] 1466. Ctrl actor labels fuse over most frames in a whole polish-speech run on WebGL 2
+  Source: measured 29.10.2026 07:29 by point 1465 on feat/1465-polish-speech-webgpu-reds 56d0a9ae6,
+  whole `polish-speech` on WebGL 2 (log `local/verify-logs/2026-10-29T06-29-04-941-polish-speech.log`).
+  THE RED. "no two Ctrl labels fuse in the village crowd (point 628)": 50/90 frames held a pair fused
+  beyond 6 px (allowed 13), 22 at the 18 px unreadable bar, deepest 19 px ["Child"×"Child" 30×19 px],
+  16-19 labels in the sample. A SUSTAINED fusion, not the single-frame shape point 1010's charge owns.
+  `--section=ctrl-actor-labels` alone was green on WebGL 2 on the same head minutes later (9/0), which
+  does not close it; the WebGPU whole run of the same head had no such red.
+  Final state:
+  - The cause is measured: what the preceding sections leave behind (children's run state, crowd
+    density, camera) that makes two child labels sit in each other over half the sample; a real
+    label-placement defect is fixed in the labels, a staging leftover in the suite, no check weakened.
+  - Whole `polish-speech` on WebGL 2 shows the check green; the charge in
+    scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low - WebGL 2 only, whole-suite only; a player may see two child Ctrl labels overlap.
+
+- [ ] 1467. batch-doctor quarantine-stash aborts a live LARGE run
+  Source: findings carrier 29.10.2026 19:04. At 19:02 `batch-doctor --repair` stashed the owner's
+  uncommitted `.claude/closing-state.json` while the second closing LARGE on bcf9224ed was in its
+  unit stage; the repository-integrity teardown failed with "own index changed" and the LARGE
+  aborted red after 8m41s although all 18367 unit tests passed
+  (`local/verify-logs/2026-10-29T18-54-19-533-large.log`). The doctor had seen the live run (it kept
+  `verification/` out of the stash) and stashed anyway.
+  Final state:
+  - While a verify run is live, the doctor performs no index-mutating repair; it reports the dirty
+    file instead. `.claude/closing-state.json` is not treated as an unattributable concurrent edit.
+  Tests: a Vitest case in the doctor's test file for the live-run case.
+  Bundle: Testinfrastruktur.
+  Criticality: medium - a false red costs a full LARGE (2-3 h) and can stall a closing.
+
+- [ ] 1468. Traveller head-height check at low detail reads just above its bound
+  Source: findings carrier 30.10.2026 02:06. `enrichments --section=traveller-figure` on WebGL 2:
+  "Traveller (low): his head stands at villager height" red on 54b326987 (28.10.2026 LARGE, headRise
+  1.352 m) and a48606517 (30.10.2026, `local/verify-logs/2026-10-30T01-42-54-258-touch-enrichments.log`,
+  1.356 m) against the bound 0.95 < headRise < 1.35; green in the 29.10.2026 LARGE on 8e0b36861.
+  Not caused by the 1462 cleanup (red before it).
+  Final state:
+  - The cause is measured: whether the primitive (low) traveller figure stands too tall or the
+    reading samples a pose-dependent head height; the figure or the bound is corrected with that
+    reason, no check weakened without it.
+  - The check is green on WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - 6 mm over the bound at the low graphics level; hardly visible to a player.
+
+- [ ] 1469. Load-sensitive waits in touch virtual-stick and the enrichments river-mouth hygiene step
+  Source: findings carrier 30.10.2026 01:40/02:06. In the closing LARGE on a48606517
+  (`local/verify-logs/2026-10-29T22-40-04-498-large.log`, WebGL 2, UNDER LOAD) touch "lifting the
+  stick stops the walk — settled" was red and enrichments crashed at the river-mouth state-hygiene
+  `page.waitForFunction` (scripts/verify/enrichments.mjs:1245, 30 s timeout). Both were green alone on a
+  quiet machine 30.10.2026 03:05 (`local/verify-logs/2026-10-30T01-42-54-258-touch-enrichments.log`).
+  Final state:
+  - The touch settle wait (150 ms settle, then 200 ms drift < 0.1 m) cannot read a stalled frame as
+    "settled" or a resumed one as drift; the river-mouth return wait waits on the jump completing
+    with a cause-naming failure instead of a bare timeout.
+  - Both suites are green in a whole LARGE on WebGL 2; the touch charge is struck.
+  Tests: the existing Playwright checks.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-only; a false red costs a full LARGE.
+
+- [ ] 1470. Caught-child frame of the bank game finds no shot inside its window in a whole run
+  Source: v0.3.1 closing LARGE on d6fe67e7c, WebGL 2 (`local/verify-logs/2026-10-30T02-55-25-354-large.log`,
+  30.10.2026): polish-children `children-bank-game` "a caught child was photographed standing slumped
+  clear of the run, 10-14 m off (work-order 1239)" red — "no caught child could be photographed inside
+  the window" (caughtMoments 568, alone 160, outside 3840, crowded 10720, collider 800). The same
+  acquisition red was filed once before from a WebGPU run (archived, 19.10.2026) and closed by a quiet
+  re-run; it recurs inside a whole LARGE.
+  Final state:
+  - The cause is measured: whether the window or the standpoint search misses caught moments that exist
+    (568 seen, none shot), or the scene offers none clear of the run; the acquisition is fixed with that
+    reason, no check weakened without it.
+  - The check is green in a whole polish-children run on WebGL 2 and WebGPU; its charge in
+    scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-frame acquisition; no player impact shown.
+
+- [ ] 1471. Moving capture of the turning errand adult reads it walking on between frames 1 and 2
+  Source: v0.3.1 closing LARGE on d6fe67e7c, WebGL 2 (`local/verify-logs/2026-10-30T02-55-25-354-large.log`,
+  30.10.2026): polish-villagers `adult-errands` "the filmed errand adult walks on between moving-capture
+  frames 1 and 2 (point 1404)" red with no detail printed; not red in the earlier closing LARGE runs.
+  Final state:
+  - The check prints what it measured (positions/yaw of frames 1 and 2) and the cause is named: the
+    adult standing still across the freeze, or the freeze holding life still between the two exposures.
+  - The capture or the check is corrected with that reason; green in a whole polish-villagers run on
+    WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: the existing Playwright check.
+  Bundle: Testinfrastruktur.
+  Criticality: low - test-only; a false red costs a full LARGE.
+
+- [ ] 1472. Continuous route's downstream step finds no route from a water standpoint near Bandiagara
+  Source: v0.3.1 closing LARGE on aed84aa2f, WebGPU (`local/verify-logs/2026-10-30T06-59-46-060-large.log`,
+  30.10.2026): communication `continuous-route` "continuous route at 8-downstream-destination: No
+  traversable route" — the traveller stood at lat 14.5628 / lon -3.8854 on terrain "water" (target
+  x -34, z -141, toast "Discovered: Bandiagara"). The section alone on the same head (09:58 run) passed
+  step 8, so it does not reproduce on every run.
+  Final state:
+  - The cause is measured: how the traveller came to stand on a water cell at the step-8 start (route
+    overshoot, river crossing, spawn) and whether a player can reach the same state.
+  - If a player can: the route or the movement keeps the traveller off untraversable water, with a unit
+    test; otherwise the test's standpoint is corrected with that reason. Green in a whole communication
+    run on WebGL 2 and WebGPU; its charge in scripts/render-verify-charges.mjs is struck.
+  Tests: Vitest for a movement/route fix; the existing Playwright step.
+  Bundle: Testinfrastruktur.
+  Criticality: medium - possibly a player stuck on water; until measured, a false red costs a full LARGE.
+
+- [ ] 1473. Bambara errand adult lost in the water-back walk during the continuous route
+  Source: communication `continuous-route` alone on aed84aa2f, WebGPU (`local/verify-logs/
+  2026-10-30T09-58-38-857-communication.log`, 30.10.2026), step 9-fit-and-journal: the dev invariant
+  `[ASSERT] adult-atom-lost — bambara-village: water-back pair 2/3/walk: forced after 239.96s; overrun
+  situation water-out pair 3/2 (speaker blocked)`. Not seen in the closing LARGE runs.
+  Final state:
+  - The cause is measured: why pair 2/3's water-back walk never completes while pair 3/2's water-out
+    overruns with a blocked speaker (a mutual block between the two pairs or a lost goal).
+  - The errand completes or releases inside its bound with that reason fixed, with a unit test; the
+    assert stays loud. Green in a whole communication run on both backends; its charge is struck.
+  Tests: Vitest for the errand scheduler; the existing Playwright step.
+  Bundle: Dorfleben.
+  Criticality: medium - a villager stuck on an errand is player-visible.
+
+- [ ] 1474. Backlog-Befunde zur Infrastruktur in die Analyse und das Obsolet-Urteil von 1463 einbeziehen
+  Amendment to point 1463 (zero-based infrastructure simplification) — user remark 29.10.2026: "Schaut sich 1463 auch die ganzen Befunde an, die von Problemen angelegt wurden? Ich denke, die sollten berücksichtigt werden. Viele Probleme mit der aktuellen Infrastruktur sind ja wegen des Infra-Freezes nur dort festgehalten."
+  Measured 29.10.2026: 1463's raw material names "docs" only generically and its verdict list covers only open TASKS.md points. Under the infrastructure freeze (CLAUDE.md §2) many infrastructure findings were filed only in docs/backlog.md (109 sections; about 22 by title alone are about guards, hooks, lanes, batch, board, launcher, daemon, doctor, review, push or gate). Findings carried through the findings carrier landed in TASKS.md and are already covered.
+  Change to 1463:
+  1. Raw material for analyses A and B names docs/backlog.md explicitly, plus the closed entries of the findings carrier (memory/findings-carrier.md) as a record of incidents.
+  2. Analysis question 2 (inventory: the incident each mechanism was built for, its cost, its collisions) and question 3 (cause count) also count the backlog findings, not only work-order points.
+  3. Result (question 4) also gives, for every infrastructure entry in docs/backlog.md, a verdict "obsolete: yes/no" with reason; obsolete entries are closed in docs/backlog.md with the reason "obsolete by infrastructure simplification"; a non-obsolete entry that shows a real defect of the remaining infrastructure is named in the plan so the user can decide on it.
+  No new mechanism.
+  Bundle: Session- & Repo-Hygiene (amendment to 1463, rides with it).
+- [ ] 1476. The rim water checks stay red after point 568 landed
+  Source: owner 31.10.2026, landing point 1202. Point 568 landed (fb3132a95, phase-mean judging of the drifting streaks) and was ticked, but its four entries in scripts/render-verify-charges.mjs stayed, so the shipped-ledger unit test (`charges only points the work order still holds OPEN`) went red on main and stopped the 1202 landing gate.
+  MEASURED 31.10.2026 at 9025afa7b (568 merged): `npm test -- polish-villagers --section=adult-errands` red on WebGPU AND WebGL 2, both rim checks — "the water beyond the plate's rim is the SAME water" (far 14/95/106 against near 31/85/95) and "the handover zone itself carries neither band's edge" (rim zone 8/87/100, median step 14.8: 9.5, 14.8, 21.3). Log: local/verify-logs/2026-10-31T12-34-50-156-polish-villagers.log.
+  The four charges move from 568 to this point so the reds keep an owner.
+  FINAL STATE: the per-run input behind the rim step named in 568's last evidence is fixed in the product or the check, both rim checks pass on WebGPU and WebGL 2 in three consecutive adult-errands section runs, and the four charges for this point are deleted.
+  Test: `polish-villagers --section=adult-errands` on both backends; Vitest scripts/render-verify-core.test.mjs.
+  Refs: archived point 568, scripts/render-verify-charges.mjs.
+  Charged 31.10.2026 (findings carrier, polish-villagers --section=adult-errands, WebGPU, 5f6679479, 1 of 10 runs): the jar-mouth check rotates — 'the jar's mouth is tipped under the water surface — mouth at 0.097 m, surface at -0.25 m (hand 0.107, feet 0, ground -0.348)'; not in the classified baseline. It blocks the same three-green proof, so it is named and fixed or charged here.
+  Criticality: medium — a standing red on every adult-errands run.
+  Bundle: Dorfleben
+- [ ] 1477. The breast cloth renders as a narrow band under the bust instead of covering chest to waist
+  Source: owner bisect for point 1347, 01.11.2026: the forced outfit breastCloth-chest + skirtKnee-waist on an adult woman of stout build, walk at clip time 0.02, front at 3 m in hausa-village, WebGPU, shows only a narrow band under the bust; upper bust and belly stay bare. Reproduced with main's villager.glb, villagerFigureBody.ts and balance.ts (only the dev lineup harness of feat/1347-garment-rebuild added), so the defect is on main, not on the 1347 branch. Frames: local/bisect-1347/verification/1347-accept-breastcloth-walk-stout-front-hausa-village-3m.png (main asset) and the 1347 branch frame of the same name.
+  Expected: the legacy hull-tube builder (scripts/villager/garments.py, `form == 'breastCloth'`) spans chestTop to waist − 0.01 H, so the cloth should cover the bust down to the waist.
+  FINAL STATE: a woman wearing the breast cloth shows it covering the bust down to the waist at 3 m and 7 m in a village and a port city on both backends; the cause (cover mask, pre-split body, runtime TSL correction or the builder) is named in the commit.
+  Test: Vitest for the cause's layer; picture check of the forced breast-cloth rows on both backends (the garment-acceptance lineup once point 1347 has landed it, otherwise a village close-up of a woman wearing it).
+  Criticality: high - visible on every woman wearing the breast cloth in normal play.
+  Bundle: Dorfleben.
+- [ ] 1478. Villager far shoulder reads as a square slab behind the back in walk and run side views
+  Source: owner picture check for point 1347, 01.11.2026 (findings carrier): in the side and rear-3/4 views of walking and running men and children (garment-acceptance rows trousers-run-man-side, trousers-run-man-rear34, trousers-walk-man-rear34, trousers-walk-child-rear34, waistbeads-over-trousers-walk-side, cairo 3 m) a dark, hard-cornered slab stands behind the far shoulder. Reproduced with main's villager.glb, villagerFigureBody.ts and balance.ts in local/bisect-1347 (WebGPU), identical on WebGL 2: main's own body state, not a garment.
+  FINAL STATE: the far shoulder and upper arm of a walking or running villager read as a rounded shoulder at 3 m in side and rear-3/4 views on both backends; the cause (body mesh silhouette, skin weights at the shoulder, or the swing pose) is named in the commit.
+  Test: Vitest for the cause's layer; picture check of the named garment-acceptance rows on both backends.
+  Criticality: medium - visible on most walking villagers seen from the side at close range.
+  Bundle: Dorfleben.

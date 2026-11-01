@@ -5,6 +5,8 @@
 //   node scripts/villager/build.mjs fetch --pin   (re)write the sha256 of every source
 //   node scripts/villager/build.mjs sheets     render the Blender frame sheets
 //   node scripts/villager/build.mjs runtime    the round trip of the runtime-pose export
+//   node scripts/villager/build.mjs inventory [--out <dir>]   every generated outfit through
+//                                              walk/run/kneel/dig as grid sheets (inventory.py)
 //
 // The steps sheets, penetration and runtime first export the game's own
 // composed poses (src/render/villagerRuntimePose.test.tsx, run by Vitest) and
@@ -110,11 +112,39 @@ export function exportRuntimePoses(path) {
 
 const RUNTIME_STEPS = ['sheets', 'penetration', 'runtime']
 
+/** Every garment combination the outfit generator (src/systems/appearance.ts
+ *  `appearanceFor`) produces, over every people, sex, age, office, year, rank,
+ *  season and per-figure pick, with the contexts that produce it. */
+export async function outfitCombos() {
+  const out = await build({
+    stdin: { contents: `export * from './src/systems/appearance.ts'`, resolveDir: repo, loader: 'ts' },
+    bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
+    define: { 'import.meta.env.DEV': 'false' },
+  })
+  const A = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)
+  const peoples = [...Object.keys(A.PEOPLE_DRESS), ...Object.keys(A.CAST_DRESS), null]
+  const palette = ['#111111', '#222222', '#333333']
+  const combos = new Map()
+  for (const peopleId of peoples) for (const sex of A.SEXES) for (const age of A.AGE_GROUPS)
+    for (const office of [undefined, 'chief']) for (const year of [1890, 1895]) for (const cloth of palette.slice(0, 2))
+      for (const cold of [0, 1]) for (const pick of [0.01, 0.3, 0.5, 0.7, 0.99]) {
+        const layers = A.appearanceFor({ peopleId, sex, age, office, year, cloth, palette, pick, drivers: { coldness: cold, harmattan: cold, karif: cold } })
+        const garments = layers.filter((l) => l.form !== 'bodyPaint').map((l) => `g-${l.form}-${l.wear}`)
+        const key = `${sex}|${age}|${garments.join(',')}`
+        if (!combos.has(key)) combos.set(key, { sex, age, garments, peoples: new Set(), contexts: new Set() })
+        const c = combos.get(key)
+        c.peoples.add(peopleId ?? 'none')
+        c.contexts.add([peopleId ?? 'none', office, cold && 'cold', year > 1890 && '1895', cloth === palette[0] && 'rank'].filter(Boolean).join('/'))
+      }
+  return [...combos.values()].map((c) => ({ ...c, peoples: [...c.peoples].sort(), contexts: [...c.contexts].sort() }))
+}
+
 async function main() {
   const [cmd = 'all', ...rest] = process.argv.slice(2)
   const src = await fetchSources({ pin: cmd === 'fetch' && rest.includes('--pin') })
   if (cmd === 'fetch') return 0
   const cfg = await pipelineConfig()
+  if (cmd === 'inventory') return inventory(cfg, rest)
   const work = join(mainRoot(repo), 'local', 'villager-build')
   mkdirSync(work, { recursive: true })
   // per invocation: a build in another worktree must not swap our balance values
@@ -142,6 +172,23 @@ async function main() {
     if (existsSync(p)) console.log(`${f}: ${(statSync(p).size / 1024).toFixed(1)} KiB`)
   }
   return 0
+}
+
+async function inventory(cfg, rest) {
+  const work = join(mainRoot(repo), 'local', 'villager-build')
+  const at = rest.indexOf('--out')
+  const outDir = at >= 0 ? resolve(rest[at + 1]) : join(repo, 'verification')
+  const extra = at >= 0 ? rest.filter((_, k) => k !== at && k !== at + 1) : rest
+  const cfgPath = join(work, `config-${process.pid}.json`)
+  const outfitsPath = join(work, `outfits-${process.pid}.json`)
+  writeFileSync(cfgPath, JSON.stringify(cfg, null, 1))
+  writeFileSync(outfitsPath, JSON.stringify({ outfits: await outfitCombos() }, null, 1))
+  try {
+    return runBlender([join(here, 'inventory.py'), '--config', cfgPath, '--work', work, '--outfits', outfitsPath, '--out', outDir, ...extra])
+  } finally {
+    rmSync(cfgPath, { force: true })
+    rmSync(outfitsPath, { force: true })
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

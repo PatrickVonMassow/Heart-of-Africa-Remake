@@ -36,7 +36,7 @@ export interface ColdDress extends SeasonalDress {
 
 /**
  * The seasonal dress this settlement's inhabitants wear today, or null for the
- * everyday dress — which is the answer for fifteen of the game's twenty-two
+ * everyday dress — which is the answer for sixteen of the game's twenty-two
  * peoples, on the evidence (see systems/dress.ts).
  *
  * All three drivers are read, because the six dressed peoples do not share one:

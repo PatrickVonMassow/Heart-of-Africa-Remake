@@ -240,7 +240,7 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
   it('the drawn ground reaches every walkable point — plate inland, shore at the water', () => {
     const discEdge = layout.radius + GROUND_DISC_OVERHANG
     // The drawn shore strip's reach up- and downstream, as PlaceScene builds it
-    // (work-order 1237: the downstream side runs on with the widened lobe).
+    // (work-order 1237; symmetric since 1245).
     const reach = bankDrawnReach(layout, discEdge)
     for (let j = 0; j < 720; j++) {
       const angle = (j / 720) * Math.PI * 2

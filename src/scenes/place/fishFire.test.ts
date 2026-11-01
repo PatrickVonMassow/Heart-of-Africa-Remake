@@ -289,7 +289,7 @@ describe('nothing at the fire stands inside anything else (work-order 1245)', ()
     const lane = canoeLane(bank)
     const s = fisherySites(bank, lane)
     // Footprints: a figure 0.3 m, a basket 0.26 m, the hearth with its stones
-    // 1.0 m, the rack 0.6 m round its middle, the board 0.5 m, storage 0.3 m.
+    // 1.0 m, the rack 0.6 m round its middle, the board 0.45 m, storage 0.3 m.
     const bodies: Array<[string, { x: number; z: number }, number]> = [
       ['carrierAtFire', s.carrierAtFire, 0.3],
       ['griller', s.griller, 0.3],

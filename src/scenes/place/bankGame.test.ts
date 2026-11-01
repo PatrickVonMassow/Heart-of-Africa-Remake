@@ -1074,13 +1074,6 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 })
 
-/**
- * THE LONG-RUN SPEECH ALARM (point 589), which moved here with the words. It
- * used to watch the situation catalogue, and the five-word rebuild deleted that
- * catalogue and left the alarm — and its debug slider — watching a producer that
- * could no longer produce anything at all. The bank round is what speaks now, so
- * the window is judged against the round's own longest legitimate quiet spell.
- */
 describe('a play session is a series of cycles before the children scatter', () => {
   /** Fast phases, and nobody ever caught: every cycle ends on the
    *  one-run-per-child backstop. */
@@ -1209,6 +1202,13 @@ describe('a play session is a series of cycles before the children scatter', () 
   })
 })
 
+/**
+ * THE LONG-RUN SPEECH ALARM (point 589), which moved here with the words. It
+ * used to watch the situation catalogue, and the five-word rebuild deleted that
+ * catalogue and left the alarm — and its debug slider — watching a producer that
+ * could no longer produce anything at all. The bank round is what speaks now, so
+ * the window is judged against the round's own longest legitimate quiet spell.
+ */
 describe('the round is watched for going silent (point 589)', () => {
   beforeEach(() => {
     resetDevAsserts()
