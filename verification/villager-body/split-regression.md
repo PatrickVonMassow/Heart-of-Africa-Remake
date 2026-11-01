@@ -27,5 +27,5 @@ shells.selftest_body raises unless every seam edge face adjacency derives carrie
 
 - g-neckBeads-neck+g-neckBeads-chest: g-neckBeads-neck loop 1 (181 vertices) sees ['g-neckBeads-chest', 'skin']
 - g-neckBeads-neck+g-neckBeads-chest: g-neckBeads-chest loop 1 (506 vertices) sees ['g-neckBeads-neck', 'skin']
-- g-trousers-waist+g-breastCloth-chest+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist: g-neckBeads-neck loop 1 (181 vertices) sees ['g-neckBeads-chest', 'skin']
-- g-trousers-waist+g-breastCloth-chest+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist: g-neckBeads-chest loop 1 (506 vertices) sees ['g-neckBeads-neck', 'skin']
+- g-trousers-waist+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist: g-neckBeads-neck loop 1 (181 vertices) sees ['g-neckBeads-chest', 'skin']
+- g-trousers-waist+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist: g-neckBeads-chest loop 1 (506 vertices) sees ['g-neckBeads-neck', 'skin']
