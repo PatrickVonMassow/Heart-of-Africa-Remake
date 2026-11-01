@@ -565,7 +565,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
     const staleGot = step.decide({ files: stale })
     expect(staleGot.block).toBe(!!staleExpected)
     expect(staleGot.reason).toBe(staleExpected || '')
-  })
+  }, 60_000) // reads the whole rule corpus twice; 20 s timed out on shared CI runners
 
   it('registers every guard whose wrapper exports a gather step', () => {
     expect(Object.keys(byId).sort()).toEqual([...EXPECTED_GUARD_IDS].sort())

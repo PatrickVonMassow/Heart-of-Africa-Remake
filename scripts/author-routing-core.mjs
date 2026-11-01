@@ -35,7 +35,6 @@
 
 import { CROSS, MAIN, SCARCE, lane, laneByFamily } from './model-lanes.mjs'
 import { laneIsOn, laneRefusalReason, requireState } from './lane-switch-core.mjs'
-import { CREDIT_EXPIRY, CREDIT_EXPIRY_LABEL } from './cloud-switch-core.mjs'
 
 /** The authoring lanes (lane roles), in report order. */
 export const AUTHOR_LANES = Object.freeze(['cross', 'scarce', 'main'])
@@ -456,7 +455,6 @@ function hits(markers, text) {
  *   override     a lane the caller insists on, beating even the tag
  *   scarceState  the scarce lane's switch state
  *   venue        where Claude-lane authoring starts (`authoringVenue().venue`)
- *   now          the clock the cloud-credit expiry is read against
  *
  * Returns { lane, model, refused, why, signals } — `why` is the ordered list of
  * reasons, first the deciding one. An unknown switch throws rather than choosing
@@ -469,7 +467,6 @@ export function authorLaneFor({
   override = '',
   scarceState,
   venue = 'local',
-  now = Date.now(),
 } = {}) {
   const state = requireState(scarceState)
   const scarceOn = laneIsOn(state)
@@ -535,14 +532,11 @@ export function authorLaneFor({
   if (verification.length) {
     return decide('main', `its VERIFICATION is the work (${verification.join(', ')}) — the main session judges that anyway`)
   }
-  // THE CLOUD CREDIT ONLY PAYS FOR MAIN-LANE AUTHORING (user 24.10.2026): while the
-  // switch routes Claude authoring to the cloud and the credit lasts, the unmarked
-  // mid-difficulty work goes there instead of to the local cross lane.
-  if (venue === 'cloud' && now < Date.parse(CREDIT_EXPIRY)) {
-    return decide(
-      'main',
-      `mechanical or mid-difficulty, and nothing marks it otherwise — routed to the main lane while the cloud credit lasts (expires ${CREDIT_EXPIRY_LABEL})`,
-    )
+  // CLOUD AUTHORING IS MAIN-LANE AUTHORING (user 24.10.2026): while the switch routes
+  // Claude authoring to the cloud, the unmarked mid-difficulty work goes there instead
+  // of to the local cross lane — independent of the free credits (user 29.10.2026).
+  if (venue === 'cloud') {
+    return decide('main', 'mechanical or mid-difficulty, and nothing marks it otherwise — routed to the main lane while the cloud switch is on')
   }
   return decide('cross', 'mechanical or mid-difficulty, and nothing marks it otherwise')
 }

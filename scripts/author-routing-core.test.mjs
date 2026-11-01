@@ -23,7 +23,6 @@ import {
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
-import { CREDIT_EXPIRY } from './cloud-switch-core.mjs'
 import { readState, writeState } from './lane-switch-core.mjs'
 import { CROSS, MAIN, VENDORS, trailerFor } from './model-lanes.mjs'
 
@@ -505,25 +504,23 @@ describe('formatLaneReport', () => {
   })
 })
 
-describe('authorLaneFor — the cloud credit (user 24.10.2026)', () => {
+describe('authorLaneFor — the cloud venue (user 24.10.2026, no credit expiry since 29.10.2026)', () => {
   const MID = 'The board card says "stand" for a point nobody is working on. Say what it is.'
-  const before = Date.parse(CREDIT_EXPIRY) - 1
-  const after = Date.parse(CREDIT_EXPIRY)
 
-  it('routes unmarked mid-difficulty work to the main lane while the cloud venue is on and the credit lasts', () => {
-    const d = decision({ body: MID, venue: 'cloud', now: before })
+  it('routes unmarked mid-difficulty work to the main lane while the cloud venue is on, past the old credit expiry too', () => {
+    const d = decision({ body: MID, venue: 'cloud' })
     expect(d).toMatchObject({ lane: 'main', model: MAIN.displayName })
-    expect(d.why[0]).toMatch(/cloud credit/)
+    expect(d.why[0]).toMatch(/cloud switch is on/)
+    expect(lane(MID, { venue: 'cloud', now: Date.parse('2026-11-06T00:00:00Z') })).toBe('main')
   })
 
-  it('leaves the routing unchanged with the switch off or unusable, and after the expiry', () => {
-    expect(lane(MID, { venue: 'local', now: before })).toBe('cross')
-    expect(lane(MID, { now: before })).toBe('cross')
-    expect(lane(MID, { venue: 'cloud', now: after })).toBe('cross')
+  it('leaves the routing unchanged with the switch off or unusable', () => {
+    expect(lane(MID, { venue: 'local' })).toBe('cross')
+    expect(lane(MID)).toBe('cross')
   })
 
   it('keeps tags, HIGH criticality, hard cases and the scarce escalation where they were', () => {
-    const cloud = { venue: 'cloud', now: before }
+    const cloud = { venue: 'cloud' }
     expect(lane('Fix it.\nAuthor lane: cross', cloud)).toBe('cross')
     expect(lane(MID, { ...cloud, criticality: 'high' })).toBe('cross')
     expect(lane('A complex rebuild of the launcher.', cloud)).toBe('cross')

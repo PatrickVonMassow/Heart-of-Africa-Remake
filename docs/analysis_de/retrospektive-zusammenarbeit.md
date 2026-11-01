@@ -1750,7 +1750,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 30.10.2026, 07:46 · Quellen-Fingerprint: `884f19675ff6…`
+Zuletzt aktualisiert: Sonntag, 01.11.2026, 00:58 · Quellen-Fingerprint: `fb84eca58f30…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1821,6 +1821,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A retrospective about a context overshoot changes nothing — a fresh session never reads it; only an in-loop brake or an indexed memory does | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Never put work on another point's board card; work that needs a card gets its own TASKS point | 1 | niedrig | dashboard-card-topic-guard.mjs, decision-card-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| pgrep -f / pkill -f with a pattern from the same command line matches and kills the calling shell | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A `pgrep -f` wait loop matches its own shell command line, so it never exits — anchor on the process, not the pattern | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1867,10 +1868,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 109 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 182 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
+Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 182 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
 
-<!-- RETRO-FINGERPRINT: 884f19675ff65ae7387c22428abdefc5e1ccbd2ee99223929988455983da0eb7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-30T06:46:13.900Z -->
+<!-- RETRO-FINGERPRINT: fb84eca58f3015a96ff641689e30a0cb104c62eeaa8de119abec1e55851340f5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-31T23:58:06.457Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

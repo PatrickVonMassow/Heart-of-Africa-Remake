@@ -11,6 +11,7 @@ import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { sectionGate } from './sections.mjs'
+import { timingVerdict, laneFpsProbe, isWallCap } from './load-proof-core.mjs'
 import { fileURLToPath } from 'node:url'
 
 // The seed is applied by the launcher (verify-seed.mjs), so this is the plain URL.
@@ -32,6 +33,32 @@ let failures = 0
 // minimum (work-order 1136): `{ subjects, minimum, what }`. Below the minimum
 // the line reads NOT-COVERING instead of green — the check saw too little to
 // answer, which is neither a defect nor an all-clear.
+// UNMEASURED (point 642): a check the lane could not answer — neither red nor
+// green, counted and named again beside the verdict.
+const unmeasuredChecks = []
+export const unmeasured = (name, reason) => {
+  console.log(`UNMEASURED  ${name} — ${reason}${sections.tag()}`)
+  unmeasuredChecks.push({ name, reason })
+}
+// A TIMING check declares the frame rate it needs and is judged after it ran
+// (timingVerdict): a success is PASS on any lane; a failure below the declared
+// rate is UNMEASURED with the measured rate, a failure at or above it is red.
+// The rate is measured at the check, and only for a failure: the boot reading
+// can include a multi-second build hitch. Returns the UNMEASURED reason (null
+// otherwise), so checks built on the same measurement can report UNMEASURED
+// with it instead of asserting on a partial reading.
+export const checkTiming = async (name, needFps, ok, detail) => {
+  // A probe that fails leaves the rate unmeasured (null), never the boot reading:
+  // a failure is UNMEASURED only on a rate measured now, else it stays red.
+  const fps = ok ? null : await page.evaluate(laneFpsProbe, 2000).catch(() => null)
+  const v = timingVerdict({ ok, needFps, measuredFps: fps })
+  if (v.verdict === 'unmeasured') {
+    unmeasured(name, v.reason)
+    return v.reason
+  }
+  check(name, ok, detail)
+  return null
+}
 export const check = (name, ok, detail, coverage = null) => {
   // The section tag goes AFTER the ' — ' separator: the check's NAME is its
   // identity for the red ledger and the baseline classifier and must not change.
@@ -133,6 +160,11 @@ await page.waitForFunction(() => window.__game && window.__balance, null, { time
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
 await page.waitForTimeout(4000)
+// THE LANE'S MEASURED RATE (point 642), taken once from the running page and
+// printed in the header, so every timing verdict below names the lane it was
+// taken on. `checkTiming` and `waitForMoment` judge against it.
+export const laneFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
+console.log(`lane rate: ${laneFps != null ? laneFps.toFixed(1) : 'unmeasured'} fps delivered — timing verdicts below were taken on this lane`)
 await page.evaluate(() => {
   window.__balance.randomEventsEnabled = false
   window.__game.getState().setJournalOpen(false)
@@ -168,6 +200,35 @@ export const stepUntil = async (ready, arg = null, capFrames = 240) => {
     if (await page.evaluate(ready, arg)) return true
   }
   return false
+}
+
+/** Wait for a moment the app produces (point 642). The predicate runs once per
+ *  rendered frame; the budget is `frames` rendered frames AND at least `minMs`,
+ *  so a fast lane waits no less than a wall budget did and a slow lane gets the
+ *  same number of chances. `wallCapped` says the hang guard ended the wait first:
+ *  the lane could not deliver the budget, and the caller reports UNMEASURED. Any
+ *  other rejection (the predicate threw) is re-thrown, never wall-capped. */
+export const waitForMoment = async (predicate, { frames, minMs, wallCapMs }) => {
+  await page.evaluate((src) => {
+    window.__moment = { n: 0, t0: performance.now(), fn: new Function('return (' + src + ')')() }
+  }, predicate.toString())
+  return page
+    .waitForFunction(
+      ({ budget, min }) => {
+        const m = window.__moment
+        m.n++
+        const v = m.fn()
+        if (v) return { value: v, frames: m.n }
+        return m.n >= budget && performance.now() - m.t0 >= min ? { value: null, frames: m.n } : null
+      },
+      { budget: frames, min: minMs },
+      { timeout: wallCapMs, polling: 'raf' },
+    )
+    .then((h) => h.jsonValue())
+    .catch(async (err) => {
+      if (!isWallCap(err)) throw err
+      return { value: null, frames: await page.evaluate(() => window.__moment?.n ?? 0).catch(() => 0), wallCapped: true }
+    })
 }
 
 /**
@@ -244,6 +305,8 @@ export async function finishPolishSuite() {
     )
   }
 
+  for (const u of unmeasuredChecks) console.log(`UNMEASURED  ${u.name} — ${u.reason}`)
+  if (unmeasuredChecks.length) console.log(`unmeasured checks: ${unmeasuredChecks.length} (they did not run; not both-backend coverage)`)
   console.log('console errors:', errors.length)
   for (const e of errors) console.log('ERR:', e.slice(0, 300))
   // Said again where the verdict is read: a green one-section run is not a green

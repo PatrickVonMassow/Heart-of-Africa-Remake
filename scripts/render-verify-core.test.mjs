@@ -2977,13 +2977,6 @@ describe('the shipped charge ledger', () => {
         'order at frame 47, off the stand at 84, walking checked to 114; 27 take frames; jar lifted ' +
         '0.28 m off the plank before it is in his hand; plank-to-hand gap 0.009 m; fastest take move ' +
         '2.44 m/s (frame 81, hand, 0.134 m in 55 ms, body turned 0.000 rad and moved 0.000 m, phase take, gesture none)',
-      // The real text, from local/verify-logs/2026-10-25T16-55-07-991-polish-villagers.log.
-      '642/polish-villagers/undefined':
-        'no order in 180 s — phases seen: water-out:send×3997, water-out:fill×816, dig-second:site×3462, ' +
-        'dig-first:invite×2054, dig-second:dig×1200, water-back:walk×1506, dig-first:site×4124, ' +
-        'dig-first:dig×1334, dig-second:invite×1622, water-out:wait×350, water-out:take×217, ' +
-        'water-out:fetch×1108; returning carrier got to 0.95 m of the stand, arrived-samples 372, ' +
-        'his goal sits 0.95 m from it',
     }
     expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`).sort()).toEqual(
       Object.keys(measuredFor).sort(),
@@ -3091,7 +3084,7 @@ describe('the shipped charge ledger', () => {
 
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
-    expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
+    expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(725)
     // THE LANE MUST BE THE ONLY THING THAT DIFFERS (cross-vendor review,
     // 30.08.2026): without the level this observation was null for TWO
     // reasons at once — the next case already proves a missing level alone does

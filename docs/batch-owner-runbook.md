@@ -60,8 +60,8 @@ author ever ran (1440: submission to merge 1.3 h).
 26.10.2026 00:30 local, no cloud author was commissioned and no batch-daemon ran: the
 old mode has no step that commissions while a point is accepted, so a free pool does
 not by itself overlap anything. The goal is therefore not met by 1443 alone, and a
-further old-mode cycle is not run first — it would spend at least 48 h of the credit
-that expires 05.11.2026 to measure a mode with no overlap step. The measured cycle
+further old-mode cycle is not run first — it would spend at least 48 h to measure a
+mode with no overlap step. The measured cycle
 below compares the new mode against the pre-1443 3.42 h.
 
 **Bounds** (provisional; changed only by the measured cycle below):
@@ -94,8 +94,8 @@ below compares the new mode against the pre-1443 3.42 h.
     pair — adult-errands WebGL 2 ‖ villager-dress WebGPU reached 85.5 %. The
     bound stays at 1.
 - `POOL_CAP` and `DAEMON_POOL_CAP` stay at 3: no measurement supports a change.
-- Credit (expires 05.11.2026): commission only what local acceptance can land
-  before then.
+- The cloud switch stays on until the user orders it off, independent of the free
+  credits and their expiry (user 29.10.2026).
 - `batch-daemon` stays off while these bounds hold: its refill fills to
   `DAEMON_POOL_CAP` 3 and has no lower setting on its command line (measured
   26.10.2026). Starting it first needs that cap set to the bound.
@@ -142,8 +142,8 @@ stands in for a browser suite.
 **Rejected without new data** (`docs/four-eyes/1452-union-r1.json`; re-propose only
 with a measurement that answers the reason):
 - U5, two local suites or a CPU gate beside a suite: measured slower (M2, M3 above);
-  a local author beside a suite stays unmeasured and matters only after the cloud
-  credit ends.
+  a local author beside a suite stays unmeasured and matters only once the user
+  turns the cloud switch off.
 - U7, more cloud authors: acceptance, not authoring, is the bottleneck; no idle
   acceptance for want of a ready successor was measured.
 - U9, stale branches and the bare branch count as slot criterion: no slot is

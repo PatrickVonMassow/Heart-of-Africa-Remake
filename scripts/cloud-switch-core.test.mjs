@@ -149,13 +149,9 @@ describe('the routing read', () => {
 })
 
 describe('status and marker', () => {
-  it('names the credit expiry, and flags it once passed', () => {
-    expect(statusReport(readState(null), { now: NOW })).toMatch(/05\.11\.2026 08:59 MEZ — revisit/)
-    expect(
-      statusReport(readState(null), {
-        now: Date.parse('2026-11-06T00:00:00Z'),
-      }),
-    ).toMatch(/EXPIRED/)
+  it('names no credit expiry and no revisit prompt (user 29.10.2026)', () => {
+    const report = statusReport(readState(null))
+    expect(report).not.toMatch(/credit|expire|revisit/i)
   })
 
   it('parses the cloud marker file', () => {

@@ -35211,3 +35211,171 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
    - large-regression is satisfied by the first LARGE on 8e0b36861 (WebGL 2 local/verify-logs/2026-10-29T08-48-49-743-large.log, WebGPU local/verify-logs/2026-10-29T11-43-28-797-large.log, all reds charged); regression-after-cleanup needs ONE LARGE on both backends on the final release commit.
    - Order (reviewed by GPT-6.1 Sol 29.10.2026 21:02): a. write and commit every doc closing step that may change files, then code AND doc freeze until the tag; b. switch off batch-doctor's index-mutating repair for the run (point 1467 stays open) and keep the machine quiet; c. start the LARGE on that commit as its own process with a durable log and receipt, WebGPU right after WebGL 2 when WebGL 2 holds only charged reds; d. afterwards only record closing-guard steps (no commit), then tag v0.3.1 + poc and verify the Pages deploy.
   Bundle: unbundled (release).
+
+- [x] 1475. Cloud switch stays on until the user's explicit order: remove the 05.11. expiry prompt and the runbook's credit-bound commissioning limit
+  Source: User order 29.10.2026 (verbatim): "Dann nimm das automatische Ausschalten am 05.11. wieder raus. Lasse den Cloud-Schalter so lange eingeschaltet, bis ich ausdrücklich dazu auffordere, ihn auszuschalten - unabgängig vom Gratis-Volumen." Approved: "freigegeben". Reason: one cloud author beside local acceptance measured about 20 % faster (3.12 → 2.53 h per landed point, docs/1452-throughput-inventory.md); the user accepts the extra plan-volume overhead and watches the volume personally. Without this change, the switch's EXPIRED notice and the runbook's "commission only … before then" bound would stop cloud commissioning on 05.11.2026 against the user's order. Spec cut from a48606517.
+  The cloud switch stays ON until the user explicitly orders it OFF, independent of the free cloud credits and their 05.11.2026 expiry.
+  Final state:
+  - `scripts/cloud-switch-core.mjs`: the credit-expiry line in `--status` no longer says "EXPIRED: revisit the switch now" (or any revisit prompt); either drop the expiry line or state it as information only ("free credits expire …; switch stays as set until the user orders otherwise"). `CREDIT_EXPIRY`/its comment adjusted accordingly; `scripts/cloud-switch-core.test.mjs` updated to match.
+  - `docs/batch-owner-runbook.md` ("Throughput with cloud authoring", Bounds): remove "Credit (expires 05.11.2026): commission only what local acceptance can land before then." and the expiry-driven wording in the "After 1443 alone" paragraph where it reads as a stop rule; cloud commissioning continues after 05.11.
+  - Any other repo text tying the switch's ON state to the credit expiry (grep `05.11`, `CREDIT_EXPIRY`, `credit` in scripts/ and docs/) is aligned the same way.
+  - No change to the switch state itself, to the bounds (1 cloud author, 1 waiting branch, 1 local heavy job), or to the probe requirement for `--on`.
+  Bundle: Session- & Repo-Hygiene.
+  Criticality: medium - without it cloud commissioning stops on 05.11.2026 against the user's order.
+
+- [x] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
+  nicht mehr vor der 0.3 passieren, aber möglichst bald danach"). The rebuild that replaced
+  wall-clock waits with waiting on the app's own state was applied CASE BY CASE, never swept:
+  measured 11.08.2026, the bird's-eye half of the Ctrl-label check had taken the one-moment
+  snapshot on 08.08., the settlement half never did, and the same defect reappeared there
+  three days later. Nothing forbids the pattern, so the next one will appear again.
+  THE TWO KINDS MUST BE SEPARATED, because "no test may fail from load" is only half
+  achievable and pretending otherwise would produce a green that means nothing:
+  1. A STATE check — does this exist, is it drawn there, does the label read that — CAN be
+     made load-proof, and must be: poll on the app's own frames or state until the answer is
+     stable, read every side of a comparison in ONE evaluation, never compare two separate
+     round trips. Sweep every `scripts/verify/*.mjs` for the pattern and fix each site.
+  2. A TIMING check — frame budget, animation smoothness, how long a step takes — is
+     load-sensitive BY NATURE. It is not made load-proof; it is RECOGNISED: under load its
+     verdict does not count as evidence (the runner already prints exactly that) and it is
+     reported as UNMEASURED rather than red, so a loaded machine can never manufacture a
+     failure nor hide one.
+  3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
+     assembled from two separate `page.evaluate` calls. The agent that found this case left
+     the gate undone on purpose and asked for the decision — this point is the decision.
+  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
+  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
+  WebGPU `polish` run and two building agents shared the machine, and both green on the same
+  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
+  on its own retry. Each must come out of the sweep classified — repaired as a state check,
+  or declared timing and reported UNMEASURED under load.
+  A FOURTH CASE, measured 15.09.2026 on `polish`, is the sharpest of them because BOTH
+  sides of the comparison flutter: `the order at the stand can be photographed` waits up to
+  180 s for the LAST utterance in the village to be a water word at most 2.5 s old while a
+  second man is already walking off with the empty jar. It went red twice out of two on the
+  candidate of point 1056 and, on the untouched baseline of the same commit and the same
+  backend, its sibling `the return walk can be photographed` went red once out of two — same
+  section, same cause, no carrier moment inside the window. The check's own comment names
+  the reason: the window's width depends on the errand's pace, and the suite runs that pace
+  at six times normal. It is a moment-catcher, not a state check, and the sweep must decide
+  which of the two kinds it is. Point 1056 was verified past it: its branch does not touch
+  the water errand at all.
+  THE INVENTORY THE SWEEP STARTS FROM IS ALREADY COUNTED (carried over from point 200 on
+  20.08.2026, which measured it as Pillar-2 group E): 26 wall-clock/radius sites — 20 in
+  `enrichments`, plus `polish` 270, `settings` 183/277, `flow` 242, `voice` 56, `touch` 75 — and
+  the two patterns are named per site: a render-loop behaviour polled on the SIM clock
+  (`__pollSim`/`__sleepSim`/`simTime`) or on the check's OWN condition rather than on a fixed wall
+  wait, and "in view / beyond the ring" judged by `__camera.onScreen`/ndc projection rather than by
+  an assumed radius — a check that TESTS a radius feature keeps its radius and says so. Some of the
+  26 were fixed case by case since 21.07., which is the very drift this point exists to end: each
+  site is verified against HEAD before it is touched, each touched suite is run after its change
+  (both backends for the WebGPU-lane suites, `touch`/`voice` WebGL only), and the sweep's report
+  states how many of the 26 were already closed and by what. The fixed 1500 ms wait of point 521
+  is a member of this list and is fixed there.
+  A LANE THAT CANNOT ANSWER A CHECK SAYS SO, WITH ITS MEASURED RATE (folded in from point 506 on
+  20.08.2026). That point's four reds were taken on a SOFTWARE WebGPU lane drawing roughly one
+  frame per second, and that premise is dead here: `node scripts/verify/backend-lane-check.mjs`,
+  re-measured 20.08.2026, shows BOTH lanes hardware-backed on a real GPU, WebGPU running in
+  COMPATIBILITY mode rather than core. The mechanism survives it intact, and it is how kind 2 above
+  gets reported in practice:
+  - the run MEASURES the lane's delivered frame rate once, from the running page, and prints it in
+    the run header, so every verdict below NAMES the lane it was taken on instead of assuming one;
+  - a check whose subject is a RATE or a wall-clock budget (stance intervals per walk, a settle
+    deadline, a fixed-frame benchmark route) DECLARES the throughput it needs; below that figure it
+    SKIPS, naming the measured rate and that the lane cannot answer it, and it never reds and never
+    passes silently. That is the measured-nothing signature this removes: a check reporting a rule
+    as broken while its own reading says the rule held (`"ok":true` beside `anyMoved:false`) reads
+    as a product defect and is the worst red there is;
+  - NO product threshold moves for it — on a lane that meets the throughput the identical check
+    runs unchanged and must still fail on a real regression;
+  - the skips are COUNTED in the run summary, so a lane that skips half a suite can never be
+    mistaken for a green both-backend verification: what the §7.2 both-backend rule counts is what
+    actually RAN.
+  The checks that failed this way while the lane WAS software name the class the declaration has
+  to cover: `polish`'s goat planted foot (1 usable stance interval where it needs 3) and its dry
+  settlement-season settle (read after 60176 ms), `settings`' footstep surface class, the
+  fixed-frame `benchmark` route (`waitForFunction: Timeout 300000ms exceeded`), and `collision`'s
+  door transition and unstuck window. A lane can also HANG instead of skipping — 27 minutes with
+  no frame written, killed by hand — and while it does, a figure or settlement point has no second
+  backend at all: that merge owes a loud deferral, never a silent single-backend picture.
+
+  THE GOAT PLANTED FOOT IS NOT CLASSIFIED HERE (20.08.2026). Point 725 holds a cross-vendor
+  review verdict that the release frame really does teleport the foot and that `judgeStanceSlip`
+  excludes exactly that frame, so the check may be measuring around a defect rather than
+  suffering a slow lane. That point owns the measurement which decides between the two, and it
+  is taken on the hardware lane. This sweep may give that check a throughput declaration only
+  once the measurement has come back "no jump" — a skip laid over a real defect is the one
+  outcome this mechanism must never produce. The other named cases are unaffected and are
+  classified as specified.
+
+  VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
+  with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
+  passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
+  repaired state check that previously skewed.
+  A Vitest case pins the pure skip decision — needed against measured throughput — in both
+  directions, including that a lane which meets the throughput never skips.
+  Live, in the surviving lanes' terms: a run on a lane that cannot meet a check's declared
+  throughput ends GREEN with exactly that check reported as a lane skip naming the measured rate,
+  while the lane that meets it runs the same check for real.
+  Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
+  door point 640 closes from the other side.
+
+- [x] 568. The polish water-sameness check rotates its verdict (measured 09.08.2026 by
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
+  launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
+  plate's rim is the SAME water as the water at the bank (≤ 12/255)" — went RED on the
+  first run with samples 13.8, 12.1 and 19.3 straddling the limit, and fully GREEN on a
+  second run at the IDENTICAL commit and the IDENTICAL seed (164 PASS, 0 FAIL). The seed
+  work is not the cause: `polish` was seeded 42 before and after, so the world it walked
+  was the same both times. What rotates therefore sits BELOW the layout — the water
+  shading itself, or the moment the sample is taken.
+  WHY IT MATTERS BEYOND THE FLAKE: point 549 pinned the seed precisely so a red could be
+  believed. A check that still rotates on a fixed world is the next layer of the same
+  problem, and it sits on the everyday gate where it costs a rerun every time.
+  FINAL STATE: the cause is IDENTIFIED before anything is tuned — the two candidates are
+  a genuine frame-timing dependence (the sample taken before the water material has
+  settled, in which case the check polls on the app's own clock rather than a fixed
+  wait) and a real shading seam at the plate rim that only sometimes exceeds the
+  tolerance (in which case it is a PRODUCT defect and the check is right to fire). The
+  tolerance is NOT widened to make the red go away until it is established which of the
+  two it is; if it is the product, the water fix comes first and the check stays.
+  SAME FAMILY AS POINT 200 (carried 20.08.2026 from the 10.08.2026 four-eyes work-order
+  analysis, not a fresh finding): points 336 and 570 already name 200's rotating-staging
+  family and this check is the third member of it. The ten-run reading below belongs to the
+  same quiet-machine round rather than a separate one.
+  VERIFIABLE: the check runs ten times on the pinned seed with the same verdict every
+  time, and whichever cause was found is named in the commit message with its evidence.
+  Criticality: medium — it does not itself hide a product defect, but it may BE one, and
+  it erodes the trust in a red that point 549 was built to restore.
+  EVIDENCE 31.10.2026 (WebGPU, main c07148b15, branch feat/568-rim-water-seam created, no commits yet): the check no longer ROTATES — every recorded run in local/ since at least 24.09.2026 is FAIL (steps 16-29, outliers 88 and 124 on 30.10). This run: far 9/89/102 against near 31/82/94, median step 22.3 (18.8, 22.3, 29.0); the rim-zone check 12.4. The three captures with the projected lines drawn in (temporary RIM_DEBUG save of each capturePixels shot plus seam JSON, not committed) show no hard line, but a SOFT, REAL tone step at the handover: below the projected bottom line (out(radius+12, -0.25), y=585 of 900) the water turns greyer and warmer (red channel up ~20) than the saturated teal above. Leading reading: a PRODUCT difference between the drawn surface and the panorama sheet, not frame timing — both read the same colour from src/render/waterAppearance.ts, so the step must come from what differs after it (drawn mesh: relief-bumped normal, 0.94->1 opacity over the bed, own lighting/fog path; panorama: opaque). Measurement caveat for the next author: the projected top/bottom/froth points land far off-screen horizontally (x 4175-5311 on a 1440 frame), because out() goes along the river normal from the place centre, not from the camera, and the froth line (y=529) projects ABOVE the bottom line, so the near band collapses to its 12-row floor. Next step: toggle the candidates in the running scene (relief off, opacity 1, fog) and read the step after each; fix the product side first, then re-aim the band lines from the camera's own ray, then the ten-run reading.
+  EVIDENCE 31.10.2026, later (WebGPU, branch at 7f3711469 = re-aimed bands b7cd7d443, far band bounded before the far shore 8304569dd/63f774186, both bands counted in VISIBLE rows and stopped at froth/frame edge 7f3711469 after two cross-lane review findings): the verdict ROTATES AGAIN, on a fixed commit and seed. Section runs of adult-errands: 63f774186 green (steps 6.0, 7.3), then red 14.4 (far 8/88/101 against near 0/74/91, far band 26 rows); 7f3711469 green, then red 17.3 (17.3, 16.8, 18.6; far/near band 27/103 rows, far 12/93/104 against near 0/76/92). Inside one run the three captures agree; between runs the step jumps from ~6-7 to ~14-17, and in every red the NEAR band is the darker one (red channel 0 against 8-12). The band geometry is therefore no longer the cause (103 visible near rows, no floor stretch). Leading reading: a per-RUN input below the seeded layout — time of day/sun, weather or cloud shadow, or water-animation phase at entry — that the seed does not pin (scripts/verify/_polish.mjs sets no time of day, clock or weather anywhere, goToPlace included). Next step: record those inputs beside the three captures (the check already prints its detail on PASS — scripts/verify/_polish.mjs check() — but the run-all log keeps only FAIL lines, so read the suite's raw stdout for green runs), find the one that differs between a green and a red run, then decide product seam versus unpinned staging per the final state; the ten-run reading follows that.
+
+- [x] 1202. The dig picture's camera stand lies inside the settlement.
+  Queue position: after point 1308, before point 1347 (user 27.10.2026: known reds on main that keep suites red)
+  PROBLEM, measured 23.09.2026 while repairing point 1198: `digPictureView` (scripts/verify/
+  digSitePicture.mjs) puts the stand for fixture `bambara-village` seed 58 at x 12.0, z 30.6
+  (r 32.9 m), past the settlement boundary, so `isOutsidePlace` fires on the first frame,
+  PlaceScene leaves the place, and `polish --section=adult-errands` reads `the spoil crossing
+  starts on flat ground — {"error":"no patch dig site","place":null}`; frame
+  `1056-two-excavations-walkable-spoil` is never taken. `src/scenes/place/digPicture.test.ts`
+  stays green because it never asks for the stand to be inside. A seed search over 0-799 with
+  that extra condition found no seed on either side of the pair: the far side is outside, the
+  near side fails `standingClear` on the sight lines (636 of 1600 probes).
+  FINAL STATE: the fixture test asserts `isOutsidePlace(layout, view.x, view.z) === false`, a
+  composition (seed, stand side, or a stand-off rule) passes it with every existing condition,
+  and `polish --section=adult-errands` takes frame 1056 on WebGPU and WebGL 2 with no red but
+  those charged to point 568.
+  Criticality: medium — a picture proof of the dig spoil is missing on every run.
+  Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
+  Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
+  Bundle: Dorfleben
+
+- [x] 1461. Cloud author clones judge the scarce lane OFF and stop on the serving-model tripwire
+  Queue position: directly after point 1308 (owner 28.10.2026: reproducible blockade of the cloud authoring flow the cloud switch makes the default).
+  Final state: a cloud-session clone of this repository, which carries no local lane-switch state, no longer stops a delegated Opus 5.5 author on the serving-model tripwire for admitted Fable 5.1 trailers on main; the owner checkout's tripwire keeps refusing a commit naming Fable 5.1 while the recorded switch is OFF. Narrowest fix under the CLAUDE.md §2 infrastructure freeze (e.g. the tripwire stands down for a session that does not hold the batch lock, as every other session guard already does per the house facts), no new guard.
+  Evidence (28.10.2026, owner 9c5950f8): cloud authors for 1308 (session_019XD8QvphJSWxogsH5cmKJf) and 642 (session_019XD8Qtdz4X4qrvHCwnZwbr) ended their sessions on "SERVING-MODEL TRIPWIRE: commit(s) 813efab, ffdeaa0, 873a1b5, 3bb62f1 … Fable 5.1 … refused because the recorded lane switch is OFF … no recorded switch state in this checkout; judged as off" (scripts/model-guard-core.mjs:129), nine Stop refusals each, after one commit (1308) and two commits (642); the owner checkout reads scarce ON (user 31.08.2026). Both were told by message to continue.
+  Verifiable: a test of the tripwire decision: no switch state plus no batch lock held → no stop; switch OFF in the owner session → today's refusal.
+  Bundle: Session- & Repo-Hygiene.

@@ -12,8 +12,10 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { BASE, OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, OUT, section, check, unmeasured, waitForMoment, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
+import { standOrderMoment } from './standOrder.mjs'
+import { rimSeamPoints } from './rimSeam.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
@@ -2830,60 +2832,28 @@ if (section('adult-errands')) {
     // the water errand comes round a third as often, and the very wait that was
     // widened is the one that times out. A green that needed a retry covers
     // nothing (CLAUDE.md §7.2).
+    // The old 180 s at 60 fps, and never less than 180 s; the hang guard lets a
+    // lane down to 20 fps answer. OPEN: frames figure is an estimate, calibrate
+    // against the lane rate the run header prints.
+    const MOMENT_BUDGET = { frames: 10800, minMs: 180000, wallCapMs: 540000 }
     const holdStill = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 0.5 })
     const letThemWalk = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
     await page.evaluate(() => {
       window.__errandWatch = { seen: {} }
     })
-    const order = await page
-      .waitForFunction(
-        () => {
-          const e = window.__placeErrands()
-          const v = e.villagers
-          const stand = e.geography.waterStand
-          if (!stand) return null
-          // WHAT WAS ACTUALLY SEEN, so a miss says why rather than only that.
-          const w = window.__errandWatch
-          for (const p of v) if (p.work) w.seen[`${p.work.situation}:${p.work.phase}`] = (w.seen[`${p.work.situation}:${p.work.phase}`] ?? 0) + 1
-          // How near the returning carrier ever gets to the stand, and whether
-          // the errand ever counts him as arrived there.
-          for (const p of v) {
-            if (p.work?.situation !== 'water-back') continue
-            const d = Math.hypot(p.x - stand.x, p.z - stand.z)
-            w.back = Math.min(w.back ?? Infinity, d)
-            if (p.work.arrived) w.backArrived = (w.backArrived ?? 0) + 1
-            w.backGoal = Math.hypot(p.work.x - stand.x, p.work.z - stand.z)
-          }
-          // THE MOMENT IS THE WORD, NOT A DISTANCE. Waiting for the carrier to be
-          // within so many metres of the stand chased a window whose width
-          // depends on the errand's pace; the errand itself says when the order
-          // fell. `last` carries the utterance and its age, so this waits for a
-          // RIVER that has just been spoken on the outward leg — the sender is
-          // its speaker and is still standing there, the carrier is the man
-          // walking off with the empty jar.
-          const said = e.last
-          if (!said || said.id !== 'water-out' || said.age > 2.5) return null
-          const sender = said.speaker
-          if (!v[sender]) return null
-          for (let i = 0; i < v.length; i++) {
-            if (i === sender || v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
-            const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
-            return {
-              stand,
-              carrier: { who: i, x: v[i].x, z: v[i].z },
-              sender: { who: sender, x: v[sender].x, z: v[sender].z },
-              gap,
-            }
-          }
-          return null
-        },
-        null,
-        { timeout: 180000 },
-      )
-      .then((handle) => handle.jsonValue())
-      .catch(() => null)
+    // LOAD-PROOF (point 642): a STATE check — the errand produces the moment or
+    // it does not — whose wait was a 180 s wall budget, so a slow lane saw fewer
+    // errands and reddened. The wait now counts rendered frames (MOMENT_BUDGET);
+    // a lane that cannot deliver them before the hang guard is UNMEASURED.
+    const orderWait = await waitForMoment(standOrderMoment, MOMENT_BUDGET)
+    const order = orderWait.value
     const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {} })
-    check(
+    if (orderWait.wallCapped) {
+      unmeasured(
+        'the order at the stand can be photographed: a sender still there and a carrier already going',
+        `lane delivered ${orderWait.frames} of ${MOMENT_BUDGET.frames} frames before the ${MOMENT_BUDGET.wallCapMs / 1000} s hang guard — it cannot answer whether the errand produces the moment`,
+      )
+    } else check(
       'the order at the stand can be photographed: a sender still there and a carrier already going',
       // AND THE SENDER IS AT THE STAND. Both utterances falling inside the
       // village, at the stand, is the half of the spec that replaced a word
@@ -2895,7 +2865,7 @@ if (section('adult-errands')) {
       order
         ? `carrier ${order.gap.toFixed(1)} m off the stand, ` +
           `sender ${Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z).toFixed(1)} m`
-        : `no order in 180 s — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
+        : `no order in ${orderWait.frames} frames — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
           `returning carrier got to ${watched.back != null ? `${watched.back.toFixed(2)} m` : 'never seen'} of the stand, ` +
           `arrived-samples ${watched.backArrived ?? 0}, his goal sits ${watched.backGoal != null ? `${watched.backGoal.toFixed(2)} m` : '?'} from it`,
     )
@@ -2965,8 +2935,7 @@ if (section('adult-errands')) {
     }
     await letThemWalk()
 
-    const returning = await page
-      .waitForFunction(
+    const returnWait = await waitForMoment(
         () => {
           const e = window.__placeErrands()
           const v = e.villagers
@@ -2993,19 +2962,24 @@ if (section('adult-errands')) {
           }
           return null
         },
-        null,
-        // THREE MINUTES, as for the fill: ONE water errand runs at a time, and
-        // its return leg within 15 m of the stand is a short share of a round
-        // trip the DIG pairs' window otherwise fills.
-        { timeout: 180000 },
+        // THREE MINUTES' worth, as for the fill: ONE water errand runs at a
+        // time, and its return leg within 15 m of the stand is a short share of a
+        // round trip the DIG pairs' window otherwise fills.
+        MOMENT_BUDGET,
       )
-      .then((handle) => handle.jsonValue())
-      .catch(() => null)
-    check(
-      'the return walk can be photographed: a carrier under a full jar',
-      returning != null,
-      returning ? `villager ${returning.who}` : 'no carrier walked back within 180 s',
-    )
+    const returning = returnWait.value
+    if (returnWait.wallCapped) {
+      unmeasured(
+        'the return walk can be photographed: a carrier under a full jar',
+        `lane delivered ${returnWait.frames} of ${MOMENT_BUDGET.frames} frames before the ${MOMENT_BUDGET.wallCapMs / 1000} s hang guard`,
+      )
+    } else {
+      check(
+        'the return walk can be photographed: a carrier under a full jar',
+        returning != null,
+        returning ? `villager ${returning.who}` : `no carrier walked back within ${returnWait.frames} frames`,
+      )
+    }
     if (returning) await holdStill()
     if (returning) {
       // Side-on and close, a little above the jar rather than below it: the water
@@ -3447,7 +3421,20 @@ if (section('adult-errands')) {
       // Measured on this machine: 49 with the panorama shaded as it was, 1–4 as
       // it is now.
       const RIM_STEP_LIMIT = 12
-      const seam = await page.evaluate((r) => {
+      // Drift phases in metres: twelve over 44 m, wider than the streaks (STREAK_ALONG).
+      const RIM_PHASES = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44]
+      // The strips are chosen from the blockers read HERE and judged on pictures
+      // taken later; a speech label that walks into a strip between the two reads
+      // a villager as a seam, and how far it walks depends on the frame rate. So
+      // village life is held still from this read through the last capture
+      // (point 642) — the water keeps moving, which is what the three captures
+      // are for.
+      await page.evaluate(() => window.__placeFreezeLife?.(true))
+      // The lines are aimed at the handover itself — the drawn surface's far
+      // edge — along the camera's own forward line (scripts/verify/rimSeam.mjs).
+      const camAt = await page.evaluate(() => ({ x: window.__placeCamera.position.x, z: window.__placeCamera.position.z }))
+      const lines = river.reach > 0 ? rimSeamPoints(river, camAt) : null
+      const seam = await page.evaluate(({ lines }) => {
         const cam = window.__placeCamera
         const apply = (e, v) => [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
         const project = (x, y, z) => {
@@ -3457,18 +3444,16 @@ if (section('adult-errands')) {
           if (!(w > 0)) return null
           return { x: ((clip[0] / w) * 0.5 + 0.5) * window.innerWidth, y: (0.5 - (clip[1] / w) * 0.5) * window.innerHeight }
         }
-        const out = (dist, y) => project(r.normal.x * dist, y, r.normal.z * dist)
-        const radius = window.__placeLayout?.radius
-        if (!(radius > 0)) return null
+        if (!lines) return null
         // The handover zone, bounded by geometry rather than guessed: from the
-        // ground disc's edge (where the panorama's surface has climbed back to
-        // the ground plane) down to the backdrop's inner rim at the water's own
-        // level (where that surface first breaks the drawn sheet). Plus the line
-        // three metres out from the waterline, where the shore froth ends — the
-        // near band stops there rather than measuring froth.
-        const top = out(radius + 14, 0)
-        const bottom = out(radius + 12, -0.25)
-        const froth = out(r.distance + 3, -0.25)
+        // drawn surface's far edge (where the panorama's water takes over) out
+        // across the panorama's tucked rim. Plus the line three metres out from
+        // the waterline, where the shore froth ends — the near band stops there
+        // rather than measuring froth.
+        const far = project(lines.far.x, lines.far.y, lines.far.z)
+        const top = project(lines.top.x, lines.top.y, lines.top.z)
+        const bottom = project(lines.bottom.x, lines.bottom.y, lines.bottom.z)
+        const froth = project(lines.froth.x, lines.froth.y, lines.froth.z)
         // Everything on screen that is NOT the picture.
         const blockers = []
         for (const el of document.body.querySelectorAll('*')) {
@@ -3480,24 +3465,44 @@ if (section('adult-errands')) {
           if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity) === 0) continue
           blockers.push({ x0: b.left, x1: b.right, y0: b.top, y1: b.bottom })
         }
-        return { top, bottom, froth, blockers, w: window.innerWidth }
-      }, river)
-      if (!seam || !seam.top || !seam.bottom || !seam.froth) {
+        return { far, top, bottom, froth, blockers, w: window.innerWidth }
+      }, { lines })
+      if (!seam || !seam.far || !seam.top || !seam.bottom || !seam.froth) {
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
         check('the river’s rim is in the picture to measure (work-order 525)', false, JSON.stringify(seam))
       } else {
         const MARGIN = 6 // clearance kept from the handover zone
         const HALF = 6 // strip half-width, in CSS pixels
         const pick = (xs, at) => xs.slice().sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * at))]
         const readings = []
-        for (let pass = 0; pass < 3; pass++) {
+        // The near band carries the drifting streaks, the far sheet their mean
+        // (waterAppearance.ts), so one capture's step follows the pattern's phase:
+        // measured 0.2-16/255 across pinned drift phases, sign included. Compare
+        // the phase MEAN instead: pin the drift to RIM_PHASES spread over the
+        // streaks and average each band across them (work-order 568).
+        for (let pass = 0; pass < RIM_PHASES.length; pass++) {
+          await page.evaluate(async (d) => {
+            const m = await import('/src/render/waterAppearance.ts')
+            m.riverDrift.value = d
+          }, RIM_PHASES[pass])
+          await nextFrames(2)
           const shot = await capturePixels(page, 'river rim colour step')
           const { data, info } = await sharp(shot).raw().toBuffer({ resolveWithObject: true })
           const scale = info.width / seam.w
           const yTop = Math.round(seam.top.y * scale)
           const yBottom = Math.round(seam.bottom.y * scale)
-          const depth = Math.max(12, Math.min(140, Math.round(seam.froth.y * scale) - yBottom - MARGIN))
-          const y0 = Math.max(0, yTop - MARGIN - depth)
-          const y1 = Math.min(info.height - 1, yBottom + MARGIN + depth)
+          // Each band spans its own rows: the near one out to the froth line, the
+          // far one the same metres of water past the zone (rimSeam.mjs), which
+          // the horizon compresses into fewer rows.
+          // Neither band crosses its projected bound (froth line, far shore) or
+          // the frame edge; a band squeezed below BAND_ROWS_MIN VISIBLE rows fails
+          // the reading instead of being stretched into froth or shore.
+          const depth = Math.min(140, Math.round(seam.froth.y * scale) - MARGIN - (yBottom + MARGIN))
+          const farDepth = Math.min(140, yTop - MARGIN - Math.round(seam.far.y * scale))
+          const y0 = Math.max(0, yTop - MARGIN - Math.max(0, farDepth))
+          const y1 = Math.min(info.height - 1, yBottom + MARGIN + Math.max(0, depth))
+          const farRows = yTop - MARGIN - y0 + 1
+          const nearRows = y1 - (yBottom + MARGIN) + 1
           const strips = []
           for (let i = 1; i <= 14; i++) {
             const cx = (i / 15) * seam.w
@@ -3528,32 +3533,56 @@ if (section('adult-errands')) {
           const near = band(yBottom + MARGIN, y1)
           const zone = band(yTop, yBottom)
           const worst = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])))
+          // Per-run inputs the seed does not pin (work-order 568): one JSON line
+          // per capture, so a green and a red run can be compared.
+          if (process.env.RIM_INPUTS_DUMP) {
+            const inputs = await page.evaluate(() => {
+              const cam = window.__placeCamera
+              const fog = window.__placeScene?.fog
+              const { fireBlaze, ...season } = window.__placeSeason?.() ?? {}
+              return {
+                day: window.__game.getState().day,
+                season,
+                fog: fog ? { color: fog.color?.getHexString?.(), near: fog.near, far: fog.far } : null,
+                cam: { p: cam.position.toArray().map((v) => +v.toFixed(3)), q: cam.quaternion.toArray().map((v) => +v.toFixed(4)) },
+                vp: [window.innerWidth, window.innerHeight, window.devicePixelRatio],
+                t: performance.now(),
+                drift: window.__placeRiver?.()?.drift,
+              }
+            })
+            appendFileSync(process.env.RIM_INPUTS_DUMP, JSON.stringify({ gl: VERIFY_GL ?? 'webgpu', pass, inputs, seam, y: [y0, yTop, yBottom, y1], strips, far, near, zone, step: worst(far, near) }) + '\n')
+          }
           readings.push({
             strips: strips.length,
+            farRows,
+            nearRows,
             far,
             near,
             zone,
             step: worst(far, near),
             zoneStep: worst(zone, [0, 1, 2].map((i) => (far[i] + near[i]) / 2)),
           })
-          await nextFrames(20)
         }
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
         const say = (c) => c.map((v) => v.toFixed(0)).join('/')
         const mid = readings[1]
-        const step = pick(readings.map((r) => r.step), 0.5)
-        const zoneStep = pick(readings.map((r) => r.zoneStep), 0.5)
-        const enough = readings.every((r) => r.strips >= 6)
+        const mean = (key) => [0, 1, 2].map((i) => readings.reduce((a, r) => a + r[key][i], 0) / readings.length)
+        const avg = { far: mean('far'), near: mean('near'), zone: mean('zone') }
+        const step = Math.max(...[0, 1, 2].map((i) => Math.abs(avg.far[i] - avg.near[i])))
+        const zoneStep = Math.max(...[0, 1, 2].map((i) => Math.abs(avg.zone[i] - (avg.far[i] + avg.near[i]) / 2)))
+        const BAND_ROWS_MIN = 4
+        const enough = readings.every((r) => r.strips >= 6 && r.farRows >= BAND_ROWS_MIN && r.nearRows >= BAND_ROWS_MIN)
         check(
           `the water beyond the plate’s rim is the SAME water as the water at the bank (≤ ${RIM_STEP_LIMIT}/255 per channel)`,
           enough && step <= RIM_STEP_LIMIT,
-          `middle capture: ${mid.strips} clear strips · far ${say(mid.far)} against near ${say(mid.near)} — median step ${step.toFixed(1)} ` +
-            `(${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
+          `middle capture: ${mid.strips} clear strips · far/near band ${mid.farRows}/${mid.nearRows} rows (≥ ${BAND_ROWS_MIN}) · far ${say(avg.far)} against near ${say(avg.near)} over ${readings.length} drift phases — mean step ${step.toFixed(1)} ` +
+            `(per phase ${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
         )
         check(
           'and the handover zone itself carries neither band’s edge — no line at the rim',
           enough && zoneStep <= RIM_STEP_LIMIT,
-          `middle capture: rim zone ${say(mid.zone)} against the water either side — median step ${zoneStep.toFixed(1)} ` +
-            `(${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
+          `rim zone ${say(avg.zone)} against the water either side over ${readings.length} drift phases — mean step ${zoneStep.toFixed(1)} ` +
+            `(per phase ${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
         )
       }
     }

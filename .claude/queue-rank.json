@@ -1363,12 +1363,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1202": {
-      "at": "2026-10-27T23:33:27.676Z",
-      "why": "user 27.10.2026: after 1308, before 1347 — known red on main that keeps suites red",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1203": {
       "at": "2026-09-24T02:38:25.192Z",
       "why": "low-criticality test-infrastructure noise with no player impact; last is right",
@@ -1801,15 +1795,41 @@
       "origin": "machine",
       "place": "last"
     },
-    "1475": {
-      "at": "2026-10-30T18:32:16.206Z",
-      "why": "user order 29.10.2026; must land before the 05.11.2026 credit expiry",
-      "origin": "user",
-      "place": "ahead"
+    "1476": {
+      "at": "2026-10-31T13:31:41.747Z",
+      "why": "A standing red on adult-errands runs, no earlier dependency; last in Dorfleben is fine",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-10-30T17:03:29.316Z",
+    "at": "2026-10-31T23:56:06.985Z",
     "points": [
       184,
       200,
@@ -1911,7 +1931,6 @@
       564,
       565,
       567,
-      568,
       570,
       574,
       591,
@@ -1940,7 +1959,6 @@
       637,
       638,
       639,
-      642,
       643,
       646,
       647,
@@ -2200,7 +2218,6 @@
       1189,
       1192,
       1197,
-      1202,
       1203,
       1205,
       1214,
@@ -2275,7 +2292,6 @@
       1457,
       1458,
       1460,
-      1461,
       1463,
       1466,
       1467,
@@ -2285,33 +2301,8 @@
       1471,
       1472,
       1473,
-      1474
+      1474,
+      1476
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

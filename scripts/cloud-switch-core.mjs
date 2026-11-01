@@ -9,9 +9,6 @@
 
 const SWITCH_COMMAND = 'node scripts/cloud-switch.mjs'
 export const STATE_FILE_NAME = 'cloud-switch.json'
-// The free cloud credits the switch exists to use (user 28.09.2026); revisit the switch then.
-export const CREDIT_EXPIRY = '2026-11-05T07:59:00Z'
-export const CREDIT_EXPIRY_LABEL = '05.11.2026 08:59 MEZ'
 const MAX_TIMESTAMP = 8.64e15
 
 const repair = () =>
@@ -213,16 +210,16 @@ export function venueInstruction(route) {
   return `CLOUD SWITCH OFF: authoring delegations run in local worktrees.${route.notice ? ` ${route.notice}.` : ''}`
 }
 
-export function statusReport(value, { now = Date.now() } = {}) {
+// The switch stays as set until the user orders otherwise, independent of the free
+// cloud credits (user 29.10.2026), so the status names no expiry.
+export function statusReport(value) {
   if (!value?.ok) return `cloud-switch: UNUSABLE — ${value?.problem}`
   const route = authoringVenue(value)
   const verdict = probeVerdict(value.probe)
-  const expired = now >= Date.parse(CREDIT_EXPIRY)
   const lines = [
     `cloud-switch: ${value.state.toUpperCase()} — authoring delegations run ${route.venue === 'cloud' ? 'in the CLOUD' : 'LOCALLY'}`,
     `  reason   : ${value.reason}${value.setBy ? ` (set by ${value.setBy}${value.changedAt ? `, ${new Date(value.changedAt).toISOString()}` : ''})` : ''}`,
     `  probe    : ${verdict.offMachine ? 'PASSED' : 'NOT PASSED'} — ${verdict.why}`,
-    `  credits  : expire ${CREDIT_EXPIRY_LABEL}${expired ? ' — EXPIRED: revisit the switch now' : ' — revisit the switch then'}`,
   ]
   if (route.notice) lines.push(`  notice   : ${route.notice}`)
   return lines.join('\n')
