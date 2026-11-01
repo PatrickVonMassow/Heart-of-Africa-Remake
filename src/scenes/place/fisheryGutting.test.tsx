@@ -235,5 +235,6 @@ describe('the carrier gutting at the fire', () => {
     expect((strokeMax - strokeMin) * GUT_FISH_SCALE).toBeGreaterThan(0.08)
     expect(strokeMax).toBeLessThan(0.42)
     expect(farFromBelly).toBeLessThan(0.12)
-  }, 60000)
+    // the split body (~13k vertices) takes 50-70 s per case on a CI runner
+  }, 180_000)
 })
