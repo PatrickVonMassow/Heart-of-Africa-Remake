@@ -15928,3 +15928,9 @@ to land than a mechanism that needs a review.
   Test: Vitest for the cause's layer; picture check of the forced breast-cloth rows on both backends (the garment-acceptance lineup once point 1347 has landed it, otherwise a village close-up of a woman wearing it).
   Criticality: high - visible on every woman wearing the breast cloth in normal play.
   Bundle: Dorfleben.
+- [ ] 1478. Villager far shoulder reads as a square slab behind the back in walk and run side views
+  Source: owner picture check for point 1347, 01.11.2026 (findings carrier): in the side and rear-3/4 views of walking and running men and children (garment-acceptance rows trousers-run-man-side, trousers-run-man-rear34, trousers-walk-man-rear34, trousers-walk-child-rear34, waistbeads-over-trousers-walk-side, cairo 3 m) a dark, hard-cornered slab stands behind the far shoulder. Reproduced with main's villager.glb, villagerFigureBody.ts and balance.ts in local/bisect-1347 (WebGPU), identical on WebGL 2: main's own body state, not a garment.
+  FINAL STATE: the far shoulder and upper arm of a walking or running villager read as a rounded shoulder at 3 m in side and rear-3/4 views on both backends; the cause (body mesh silhouette, skin weights at the shoulder, or the swing pose) is named in the commit.
+  Test: Vitest for the cause's layer; picture check of the named garment-acceptance rows on both backends.
+  Criticality: medium - visible on most walking villagers seen from the side at close range.
+  Bundle: Dorfleben.
