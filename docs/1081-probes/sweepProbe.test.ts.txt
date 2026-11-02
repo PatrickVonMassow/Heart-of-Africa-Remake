@@ -1,0 +1,16 @@
+import { it } from 'vitest'
+import { appendFileSync } from 'node:fs'
+import { village, frame, sample, resample, CADENCES, type Track } from './tagShuffleHarness'
+import { shuffleWindows } from '../../../scripts/verify/childMotionMetric.mjs'
+const PAIRS: Array<[string, number]> = (process.env.PAIRS ?? '').split(',').filter(Boolean).map((s) => { const [a, b] = s.split(':'); return [a, Number(b)] })
+it('sweep', () => {
+  for (const [id, seed] of PAIRS) {
+    const v = village(id, seed, undefined, { adultsAmongTheChildren: true })
+    const paths: Track[][] = v.children.map(() => [])
+    for (let t = 0; t < 60; t += 1 / 60) { frame(v, 1 / 60); sample(v, paths) }
+    const n = shuffleWindows(paths)
+    const row: any = { id, seed, round: v.bank ? 'bank' : 'tag', native: n.worstShare, worst: n.worst ? [n.worst.child, +n.worst.clock.toFixed(2)] : null, nudges: v.children.reduce((s: number, c: any) => s + c.nudges, 0) }
+    for (const [name, step] of CADENCES) row[name] = shuffleWindows(resample(paths, step, 4242)).worstShare
+    appendFileSync(process.env.OUT!, JSON.stringify(row) + '\n')
+  }
+}, 3600000)
