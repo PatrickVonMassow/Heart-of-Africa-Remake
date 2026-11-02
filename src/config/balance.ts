@@ -2904,6 +2904,15 @@ export const VILLAGER_ASSET = {
  * educated guesses, read off the frame sheets.
  */
 export const VILLAGER_GLTF = {
+  /** The shoulder (clavicle) bone's turn a gait clip keeps, as a share of the
+   *  retargeted source's (0: the body file's rest), per clip; the upper arm
+   *  keeps its world turn, so the swing is unchanged. Measured 02.11.2026: the
+   *  source clips turn the shoulder 30–38° throughout the cycle, carrying the
+   *  upper-arm joint 6–7.5 cm back and 2 cm up against the chest; the cap
+   *  skinned to the upper arm went with it and stood behind the back as a
+   *  hard-cornered slab in side and rear-3/4 views. A clip left out keeps its
+   *  shoulders. Calibratable. */
+  clipShoulderKeep: { walk: 0, jog: 0, sprint: 0, carry: 0 } as Readonly<Record<string, number>>,
   /** How much of the adult man's build morph a build of ±1 gets, by age. */
   buildByAge: { child: 0.5, youth: 0.8, adult: 1, elder: 0.9 },
   /** The walk turns into the jog around this ground speed, per unit of leg
