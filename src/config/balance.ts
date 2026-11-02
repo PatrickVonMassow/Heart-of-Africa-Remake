@@ -2834,6 +2834,22 @@ export const VILLAGER_ASSET = {
     sprint: { hipsTilt: 0.0, chestTilt: 0.19, chestTwist: 0.37 },
     idle: { square: true, chestTilt: 0.105 },
   },
+  /** A run's stance lengthened (scripts/villager/clips.py `restance`): the
+   *  source jog keeps each foot down ~11 % of its cycle, so a running child
+   *  floats. One smooth retiming plays each stance at 1 − `slow` of its pace
+   *  and each flight faster; the hips' rise over their lowest is scaled by
+   *  `bounce` (a quicker flight at the old height reads as low gravity), and
+   *  a foot the lower hips put under the ground carries there. `flight`
+   *  (optional, 1 when absent): the share of the lower foot's height kept
+   *  where both feet are off the ground — the trailing heel kicks less high
+   *  and the landing foot reaches down sooner (measured 28.10.2026: the jog's
+   *  lowest foot rose ~10 cm at mid-flight, a child's flight apex 6.1–6.2 cm
+   *  over runFlight.apexMax; 0.7 keeps it at 5.2 cm). Calibratable against
+   *  VILLAGER_GLTF.runFlight. */
+  gaitStance: {
+    jog: { slow: 0.75, bounce: 0.2, flight: 0.7 },
+    sprint: { slow: 0.7, bounce: 0.3 },
+  } as Record<string, { slow: number; bounce: number; flight?: number }>,
   /** The widest loop seam the clip pipeline closes (rad, the worst bone's
    *  turn between a loop's last frame and its first once cut where they meet
    *  best): beyond it the loop is refused, never smeared over its cycle
@@ -2915,19 +2931,18 @@ export const VILLAGER_GLTF = {
    *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their
    *  cadence. Calibratable. */
   jogStride: { exponent: 0.8, min: 0.4, max: 1.08 },
-  /** Share of walk the runs keep blended in (villagerRig.ts `gaitWeights`):
-   *  the shipped jog clip has each foot down only ~11 % of its cycle, so a
-   *  pure jog spends ~3/4 of it with both feet off the ground and reads as
-   *  floating at a child's tag pace; the walk's stance lengthens the blended
-   *  stance by construction. Faded out towards the jog over the `runWalkFade`
-   *  per unit of leg below `runWalkUntil`, so a dash is the pure sprint.
-   *  Measured 27.10.2026 against the binding no-slide and walk → jog → sprint
-   *  continuity tests: a share above 0.6 slides a planted foot at 3.5–5.5 per
-   *  unit of leg, a full share at the sprint band's lower edge sinks it, and a
-   *  fade narrower than 1.2 jumps the joints. Calibratable. */
-  runWalkShare: 0.6,
-  runWalkUntil: 8.15,
-  runWalkFade: 1.2,
+  /** The sprint's stride rule, same meaning: its stance lengthened
+   *  (VILLAGER_ASSET.gaitStance) lowers its natural speed, and a stride grown
+   *  past `max` would carry the planted foot beyond the leg's reach.
+   *  Calibratable. */
+  sprintStride: { exponent: 0.5, min: 0.75, max: 1.0 },
+  /** The runs' stance foot grounded on every build (villagerClipPose.ts
+   *  clipGaitPose): through its blended stance the ankle is lowered by the
+   *  foot's lowest contact, eased in over `easeIn` of the stance after the
+   *  landing and out over `easeOut` before the lift. Replaces the walk share
+   *  the runs kept blended in (point 1420), whose stretched stride slid the
+   *  planted foot at a fresh runner's dash. Calibratable. */
+  runGround: { easeIn: 0.05, easeOut: 0.15 },
   /** Bounds on a running child's flight (the run reads grounded): the share
    *  of the gait cycle with both feet off the ground, and the lowest sole
    *  contact's highest point over it (m, world). Calibratable. */

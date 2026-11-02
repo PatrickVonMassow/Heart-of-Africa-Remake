@@ -11,6 +11,7 @@ take the source's hip travel scaled by the hip heights.
 
 The walk, sprint and idle are then restyled (`restyle`, VILLAGER_ASSET.clipStyle):
 the source's hunched walk and diving sprint straightened, the idle squared.
+The jog's stance is lengthened (`restance`, VILLAGER_ASSET.gaitStance).
 
 Each clip is then put on the ground with the villager's own feet (heel, ball and
 toe-tip contact points, scripts/villager/rig.py FK), its natural ground speed is
@@ -519,6 +520,108 @@ def restyle(c, name, joints, style):
     return after
 
 
+def restance(c, joints, cp, s):
+    """A run's stance lengthened (VILLAGER_ASSET.gaitStance): the source jog
+    keeps each foot down ~11 % of its cycle and reads as floating. The whole
+    clip is retimed by one smooth warp that plays each foot's stance, at its
+    middle, at 1 − `slow` of the source's pace and the flights faster;
+    the hips' rise over their lowest is scaled by `bounce` (a flight played
+    faster with the same height reads as low gravity), and a foot the lower
+    hips put under the ground is bent back onto it (its world turn kept), so
+    it carries there; both feet are kept low through the flight by `flight`
+    (see below). Expects the clip grounded and started at the left landing."""
+    from sheets import sample
+    from toolclips import two_bone
+    n = len(c['times'])
+    an = analyse_gait(c, joints, cp)
+    sup = contact_intervals(an, n)
+    centres = []
+    for side in ('L', 'R'):
+        spans = [x for k in ('heel', 'ball', 'tip') for x in sup[side][k]]
+        a = min(x[0] for x in spans)
+        centres.append(0.5 * (a + max(x[1] for x in spans if x[0] - a < 0.5)))
+    # the source's pace through its cycle: 1 − slow at each stance's middle
+    # (each foot's own: the source sprint lands its right foot off the half
+    # cycle), rising as cos² to 1 half a step away
+    grid = np.linspace(0, 1, 2001)
+    pace = np.ones_like(grid)
+    for m in centres:
+        d = (grid - m + 0.5) % 1 - 0.5
+        pace -= s['slow'] * np.where(np.abs(d) < 0.25, np.cos(2 * np.pi * d) ** 2, 0.0)
+    took = np.concatenate([[0], np.cumsum(0.5 * (1 / pace[1:] + 1 / pace[:-1]) * np.diff(grid))])
+    phi = np.interp(np.linspace(0, 1, n) * took[-1], took, grid)
+    Q = np.zeros_like(c['q'])
+    P = np.zeros_like(c['hips'])
+    for k, p in enumerate(phi):
+        Q[k], P[k] = sample(c, (p % 1) * c['duration'])
+    Q[-1], P[-1] = Q[0], P[0]
+    low = P[:, 1].min()
+    P[:, 1] = low + s['bounce'] * (P[:, 1] - low)
+    for f in range(n):
+        q, h = Q[f], P[f]
+        fp = foot_points(joints, q, h, cp)
+        for side in ('L', 'R'):
+            under = min(fp[side][k][1] for k in ('heel', 'ball', 'tip'))
+            if under < 0:
+                wr, wp = rig.fk(joints, q, h)
+                t = wp[SK.INDEX['foot.' + side]].copy()
+                t[1] -= under
+                pole = wp[SK.INDEX['shin.' + side]] - wp[SK.INDEX['thigh.' + side]]
+                two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, pole, wr[SK.INDEX['foot.' + side]], 'foot.' + side)
+    # the carrying foot swept back at one pace: its ankle moved evenly over the
+    # hips from where it touches down to where it lifts (the clamp above catches
+    # the swing still reaching forward, then slows, so it would stand on the
+    # ground at an uneven pace and the runtime hold would drag the leg)
+    for side in ('L', 'R'):
+        fi = SK.INDEX['foot.' + side]
+        low = np.array([min(p[1] for k, p in foot_points(joints, Q[f], P[f], cp)[side].items() if k != 'knee') for f in range(n - 1)])
+        down = low < 0.02
+        if down.all() or not down.any():
+            continue
+        m = n - 1
+        start = next(f for f in range(m) if down[f] and not down[f - 1])
+        span = 1
+        while down[(start + span) % m]:
+            span += 1
+        ends = [rig.fk(joints, Q[f % m], P[f % m]) for f in (start, start + span - 1)]
+        rel = [wp[fi] - wp[SK.INDEX['hips']] for _wr, wp in ends]
+        for k in range(1, span - 1):
+            f = (start + k) % m
+            q, h = Q[f], P[f]
+            wr, wp = rig.fk(joints, q, h)
+            t = wp[fi].copy()
+            a = k / (span - 1)
+            t[[0, 2]] = (wp[SK.INDEX['hips']] + rel[0] * (1 - a) + rel[1] * a)[[0, 2]]
+            pole = wp[SK.INDEX['shin.' + side]] - wp[SK.INDEX['thigh.' + side]]
+            two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, pole, wr[fi], 'foot.' + side)
+    # a low flight: where both feet are off the ground, both are lowered by
+    # 1 − `flight` of the lower one's height (the trailing heel kicks less
+    # high, the landing foot reaches down sooner), each foot's world turn
+    # kept. The lower foot's height is continuous and ~0 in stance, so the
+    # stance is untouched and no foot is put under the ground.
+    keep = s.get('flight', 1.0)
+    if keep < 1.0:
+        for f in range(n - 1):
+            q, h = Q[f], P[f]
+            fp = foot_points(joints, q, h, cp)
+            lows = [min(fp[side][k][1] for k in ('heel', 'ball', 'tip')) for side in ('L', 'R')]
+            dy = (1.0 - keep) * max(0.0, min(lows))
+            if dy <= 1e-6:
+                continue
+            for side in ('L', 'R'):
+                wr, wp = rig.fk(joints, q, h)
+                fi = SK.INDEX['foot.' + side]
+                t = wp[fi].copy()
+                t[1] -= dy
+                pole = wp[SK.INDEX['shin.' + side]] - wp[SK.INDEX['thigh.' + side]]
+                two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, t, pole, wr[fi], 'foot.' + side)
+    Q[-1], P[-1] = Q[0], P[0]
+    for f in range(1, n):
+        flip = (Q[f] * Q[f - 1]).sum(1) < 0
+        Q[f, flip] *= -1
+    c['q'], c['hips'] = Q, P
+
+
 def slice_clip(c, t0, t1, name):
     """A part of a clip, from t0 to t1, resampled at FPS (a hold when t0 = t1)."""
     from sheets import sample
@@ -574,6 +677,11 @@ def build_clips(src_dir, body, cfg, only=None, style=True):
             ground(c, joints, cp, per_frame=(name != 'sprint' and name != 'jog'))
             an = analyse_gait(c, joints, cp)
             c['phase0'] = rotate_to_contact(c, an)
+            stance = cfg['VILLAGER_ASSET'].get('gaitStance', {}).get(name)
+            if stance:
+                restance(c, joints, cp, stance)
+                ground(c, joints, cp, per_frame=False)
+                rotate_to_contact(c, analyse_gait(c, joints, cp))
             an = analyse_gait(c, joints, cp)
             c['speed'] = an['speed']
             c['heights'] = an['heights']

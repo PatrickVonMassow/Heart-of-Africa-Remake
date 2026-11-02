@@ -286,7 +286,8 @@ def tailor(src_dir, mh, body, clips, cfg):
     import garments as G
     style = cfg['VILLAGER_ASSET']['clipStyle']
     trunk = {c: {k: v for k, v in s.items() if k in ('chestTilt', 'chestTwist')} for c, s in style.items()}
-    plain = CL.build_clips(src_dir, body, cfg, style=trunk) if style else clips
+    source = {**cfg, 'VILLAGER_ASSET': {k: v for k, v in cfg['VILLAGER_ASSET'].items() if k != 'gaitStance'}}
+    plain = CL.build_clips(src_dir, body, source, style=trunk) if style else clips
     # the legacy garments are built, fitted and settled on the body as it was
     # before the shell pre-split, so a garment not migrated stays as it was;
     # the shell recipes are read off the cut body they are drawn on

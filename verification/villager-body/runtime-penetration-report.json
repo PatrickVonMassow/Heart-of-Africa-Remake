@@ -356,14 +356,14 @@
   "run": {
    "g-robe-chest": {
     "cloth": {
-     "value": 0.03795779657771099,
-     "at": "run t 1.73 s (male adult build -0.6)",
+     "value": 0.037515746990611075,
+     "at": "run t 2.04 s (male adult build -0.6)",
      "over": 10,
-     "part": "shin.L"
+     "part": "shin.R"
     },
     "shown": {
-     "value": 0.03320048749446869,
-     "at": "run t 1.66 s (male adult build -0.6)",
+     "value": 0.03328697010874748,
+     "at": "run t 1.97 s (male adult build -0.6)",
      "over": 10,
      "part": "thigh.R"
     },
@@ -374,9 +374,9 @@
      "part": null
     },
     "cut": {
-     "value": 0.022612880915403366,
-     "at": "run t 1.66 s (male adult build -0.6)",
-     "over": 1,
+     "value": 0.02683863416314125,
+     "at": "run t 1.97 s (male adult build -0.6)",
+     "over": 2,
      "part": "thigh.R"
     },
     "inner": {
@@ -397,81 +397,81 @@
     },
     "cases": {
      "cloth run shin.L None": {
-      "value": 0.03795779657771099,
-      "at": "run t 1.73 s (male adult build -0.6)",
-      "over": 10
-     },
-     "cloth run shin.R None": {
-      "value": 0.03743118853234586,
+      "value": 0.03725737037158995,
       "at": "run t 2.12 s (male adult build -0.6)",
       "over": 10
      },
+     "cloth run shin.R None": {
+      "value": 0.037515746990611075,
+      "at": "run t 2.04 s (male adult build -0.6)",
+      "over": 10
+     },
      "cloth run thigh.L None": {
-      "value": 0.03788687792119589,
+      "value": 0.03580825709453071,
       "at": "run t 1.81 s (male adult build -0.6)",
-      "over": 7
+      "over": 8
+     },
+     "cloth run thigh.R None": {
+      "value": 0.03624700367021631,
+      "at": "run t 1.58 s (male adult build -0.6)",
+      "over": 9
      },
      "cloth run upperArm.L None": {
-      "value": 0.028062887489795685,
-      "at": "run t 1.97 s (male adult build -0.6)",
+      "value": 0.030880140140652657,
+      "at": "run t 1.66 s (male adult build -0.6)",
       "over": 10
      },
      "cloth run upperArm.R None": {
-      "value": 0.02805754542350769,
-      "at": "run t 1.66 s (male adult build -0.6)",
+      "value": 0.029562320715767757,
+      "at": "run t 2.04 s (male adult build -0.6)",
       "over": 10
      },
      "shown run thigh.R None": {
-      "value": 0.03320048749446869,
-      "at": "run t 1.66 s (male adult build -0.6)",
-      "over": 8
+      "value": 0.03328697010874748,
+      "at": "run t 1.97 s (male adult build -0.6)",
+      "over": 7
      },
      "shown run upperArm.L None": {
-      "value": 0.012857210822403431,
-      "at": "run t 1.97 s (male adult build -0.6)",
+      "value": 0.012843592092394829,
+      "at": "run t 1.66 s (male adult build -0.6)",
       "over": 10
      },
      "shown run upperArm.R None": {
-      "value": 0.013140272349119186,
-      "at": "run t 1.58 s (male adult build -0.6)",
+      "value": 0.013245287351310253,
+      "at": "run t 2.12 s (male adult build -0.6)",
       "over": 10
      },
      "cloth run chest None": {
-      "value": 0.007402707821397288,
-      "at": "run t 1.66 s (male adult build -0.6)",
-      "over": 4
-     },
-     "cloth run thigh.R None": {
-      "value": 0.035572149083261236,
+      "value": 0.019381918013095856,
       "at": "run t 2.04 s (male adult build -0.6)",
-      "over": 9
-     },
-     "shown run shin.R None": {
-      "value": 0.01990552805364132,
-      "at": "run t 1.66 s (male adult build -0.6)",
-      "over": 3
-     },
-     "cut run shin.R None": {
-      "value": 0.021239429712295532,
-      "at": "run t 1.66 s (male adult build -0.6)",
-      "over": 1
-     },
-     "cut run thigh.R None": {
-      "value": 0.022612880915403366,
-      "at": "run t 1.66 s (male adult build -0.6)",
-      "over": 1
+      "over": 5
      },
      "shown run thigh.L None": {
-      "value": 0.004117373842746019,
+      "value": 0.007164538372308016,
+      "at": "run t 1.58 s (male adult build -0.6)",
+      "over": 1
+     },
+     "shown run shin.R None": {
+      "value": 0.023636600002646446,
+      "at": "run t 2.04 s (male adult build -0.6)",
+      "over": 3
+     },
+     "cut run thigh.R None": {
+      "value": 0.02683863416314125,
       "at": "run t 1.97 s (male adult build -0.6)",
+      "over": 2
+     },
+     "cut run shin.R None": {
+      "value": 0.02336837165057659,
+      "at": "run t 2.04 s (male adult build -0.6)",
       "over": 1
      }
     },
     "clips": {
-     "cloth run": 0.03795779657771099,
-     "shown run": 0.03320048749446869,
+     "cloth run": 0.037515746990611075,
+     "shown run": 0.03328697010874748,
      "hole run": 0.0,
-     "cut run": 0.022612880915403366
+     "cut run": 0.02683863416314125
     }
    },
    "g-cap-crown": {
@@ -956,27 +956,27 @@
   "chaser": {
    "g-shirt-chest": {
     "cloth": {
-     "value": 0.0898035317659378,
-     "at": "chaser t 2.30 s (male child build +0.0)",
+     "value": 0.0889524519443512,
+     "at": "chaser t 2.00 s (male child build +0.0)",
      "over": 12,
      "part": "thigh.L"
     },
     "shown": {
-     "value": 0.09912000596523285,
-     "at": "chaser t 2.15 s (male child build +0.0)",
-     "over": 11,
+     "value": 0.0820465236902237,
+     "at": "chaser t 0.95 s (male child build +0.0)",
+     "over": 12,
      "part": "thigh.R"
     },
     "hole": {
-     "value": 0.03033590316772461,
-     "at": "chaser t 1.55 s (male child build +0.0)",
-     "over": 6,
+     "value": 0.030437195673584938,
+     "at": "chaser t 2.00 s (male child build +0.0)",
+     "over": 3,
      "part": "thigh.R"
     },
     "cut": {
-     "value": 0.03641248866915703,
-     "at": "chaser t 2.15 s (male child build +0.0)",
-     "over": 2,
+     "value": 0.028517359867691994,
+     "at": "chaser t 0.95 s (male child build +0.0)",
+     "over": 1,
      "part": "hips"
     },
     "inner": {
@@ -997,91 +997,86 @@
     },
     "cases": {
      "cloth chaser chest None": {
-      "value": 0.007040092549033202,
+      "value": 0.01180287777168006,
       "at": "chaser t 2.00 s (male child build +0.0)",
-      "over": 4
+      "over": 5
      },
      "cloth chaser thigh.L None": {
-      "value": 0.0898035317659378,
-      "at": "chaser t 2.30 s (male child build +0.0)",
+      "value": 0.0889524519443512,
+      "at": "chaser t 2.00 s (male child build +0.0)",
       "over": 10
      },
      "cloth chaser thigh.R None": {
-      "value": 0.05401111766695976,
-      "at": "chaser t 2.15 s (male child build +0.0)",
-      "over": 10
+      "value": 0.055891670286655426,
+      "at": "chaser t 0.95 s (male child build +0.0)",
+      "over": 11
      },
      "cloth chaser upperArm.R None": {
-      "value": 0.028571072633960335,
-      "at": "chaser t 2.15 s (male child build +0.0)",
+      "value": 0.03039668309888556,
+      "at": "chaser t 0.95 s (male child build +0.0)",
       "over": 12
      },
      "shown chaser thigh.L None": {
-      "value": 0.014231383800506592,
-      "at": "chaser t 0.80 s (male child build +0.0)",
-      "over": 4
-     },
-     "shown chaser upperArm.R None": {
-      "value": 0.009242922067642212,
-      "at": "chaser t 1.70 s (male child build +0.0)",
-      "over": 11
-     },
-     "cloth chaser upperArm.L None": {
-      "value": 0.03127684220046194,
-      "at": "chaser t 2.45 s (male child build +0.0)",
-      "over": 11
+      "value": 0.012525873258709908,
+      "at": "chaser t 2.00 s (male child build +0.0)",
+      "over": 5
      },
      "shown chaser thigh.R None": {
-      "value": 0.09912000596523285,
-      "at": "chaser t 2.15 s (male child build +0.0)",
-      "over": 6
+      "value": 0.0820465236902237,
+      "at": "chaser t 0.95 s (male child build +0.0)",
+      "over": 8
+     },
+     "cloth chaser upperArm.L None": {
+      "value": 0.030752125608827025,
+      "at": "chaser t 1.70 s (male child build +0.0)",
+      "over": 10
+     },
+     "shown chaser upperArm.R None": {
+      "value": 0.010772091336548328,
+      "at": "chaser t 1.40 s (male child build +0.0)",
+      "over": 10
      },
      "hole chaser thigh.L None": {
-      "value": 0.017862558364868164,
-      "at": "chaser t 2.15 s (male child build +0.0)",
-      "over": 3
+      "value": 0.0173556599766016,
+      "at": "chaser t 0.95 s (male child build +0.0)",
+      "over": 1
      },
      "cut chaser hips None": {
-      "value": 0.03641248866915703,
-      "at": "chaser t 2.15 s (male child build +0.0)",
-      "over": 2
+      "value": 0.028517359867691994,
+      "at": "chaser t 0.95 s (male child build +0.0)",
+      "over": 1
      },
      "cut chaser thigh.R None": {
-      "value": 0.022042665630578995,
-      "at": "chaser t 2.15 s (male child build +0.0)",
+      "value": 0.022633707150816917,
+      "at": "chaser t 0.95 s (male child build +0.0)",
+      "over": 1
+     },
+     "cloth chaser shin.L None": {
+      "value": 0.03645710142716834,
+      "at": "chaser t 2.30 s (male child build +0.0)",
+      "over": 4
+     },
+     "cloth chaser shin.R None": {
+      "value": 0.03646251678480461,
+      "at": "chaser t 1.70 s (male child build +0.0)",
+      "over": 4
+     },
+     "hole chaser thigh.R None": {
+      "value": 0.030437195673584938,
+      "at": "chaser t 2.00 s (male child build +0.0)",
       "over": 2
      },
      "hole chaser hips None": {
-      "value": 0.025148501619696617,
-      "at": "chaser t 1.70 s (male child build +0.0)",
-      "over": 3
-     },
-     "hole chaser thigh.R None": {
-      "value": 0.03033590316772461,
-      "at": "chaser t 1.55 s (male child build +0.0)",
-      "over": 3
-     },
-     "cloth chaser shin.R None": {
-      "value": 0.015291862495749911,
-      "at": "chaser t 1.25 s (male child build +0.0)",
-      "over": 1
-     },
-     "cloth chaser hand.R None": {
-      "value": 0.004129312767468481,
-      "at": "chaser t 1.70 s (male child build +0.0)",
-      "over": 2
-     },
-     "cloth chaser shin.L None": {
-      "value": 0.01894860350860844,
-      "at": "chaser t 1.85 s (male child build +0.0)",
+      "value": 0.015863381326198578,
+      "at": "chaser t 2.00 s (male child build +0.0)",
       "over": 1
      }
     },
     "clips": {
-     "cloth chaser": 0.0898035317659378,
-     "shown chaser": 0.09912000596523285,
-     "hole chaser": 0.03033590316772461,
-     "cut chaser": 0.03641248866915703
+     "cloth chaser": 0.0889524519443512,
+     "shown chaser": 0.0820465236902237,
+     "hole chaser": 0.030437195673584938,
+     "cut chaser": 0.028517359867691994
     }
    }
   },

@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="460" viewBox="0 0 720 460" font-family="sans-serif" font-size="12">
 <rect width="720" height="460" fill="#fcfcfb"/>
-<text x="120" y="22" font-size="15" fill="#0b0b0b">sprint: support and knee over the cycle (0.67 s, 6.01 units/s)</text>
-<text x="120" y="40" fill="#52514e">contact fraction left 10%, right 10%; loop seam 0.011 rad</text>
+<text x="120" y="22" font-size="15" fill="#0b0b0b">sprint: support and knee over the cycle (0.67 s, 3.48 units/s)</text>
+<text x="120" y="40" fill="#52514e">contact fraction left 25%, right 20%; loop seam 0.011 rad</text>
 <text x="112" y="69" text-anchor="end" fill="#52514e">left heel</text>
 <rect x="120" y="58" width="576" height="14" fill="#e4e3df" rx="2"/>
 <text x="112" y="87" text-anchor="end" fill="#52514e">left ball</text>
 <rect x="120" y="76" width="576" height="14" fill="#e4e3df" rx="2"/>
-<rect x="120.0" y="76" width="57.6" height="14" fill="#2a78d6" rx="2"/>
+<rect x="120.0" y="76" width="144.0" height="14" fill="#2a78d6" rx="2"/>
 <text x="112" y="105" text-anchor="end" fill="#52514e">left tip</text>
 <rect x="120" y="94" width="576" height="14" fill="#e4e3df" rx="2"/>
-<rect x="120.0" y="94" width="57.6" height="14" fill="#2a78d6" rx="2"/>
+<rect x="148.8" y="94" width="115.2" height="14" fill="#2a78d6" rx="2"/>
 <text x="112" y="123" text-anchor="end" fill="#52514e">right heel</text>
 <rect x="120" y="112" width="576" height="14" fill="#e4e3df" rx="2"/>
 <text x="112" y="141" text-anchor="end" fill="#52514e">right ball</text>
 <rect x="120" y="130" width="576" height="14" fill="#e4e3df" rx="2"/>
-<rect x="465.6" y="130" width="28.8" height="14" fill="#eb6834" rx="2"/>
+<rect x="465.6" y="130" width="86.4" height="14" fill="#eb6834" rx="2"/>
 <text x="112" y="159" text-anchor="end" fill="#52514e">right tip</text>
 <rect x="120" y="148" width="576" height="14" fill="#e4e3df" rx="2"/>
-<rect x="436.8" y="148" width="57.6" height="14" fill="#eb6834" rx="2"/>
+<rect x="465.6" y="148" width="115.2" height="14" fill="#eb6834" rx="2"/>
 <line x1="120" x2="696" y1="404.0" y2="404.0" stroke="#e4e3df"/>
 <text x="112" y="408.0" text-anchor="end" fill="#52514e">0°</text>
 <line x1="120" x2="696" y1="354.0" y2="354.0" stroke="#e4e3df"/>
@@ -29,10 +29,10 @@
 <line x1="120" x2="696" y1="204.0" y2="204.0" stroke="#e4e3df"/>
 <text x="112" y="208.0" text-anchor="end" fill="#52514e">120°</text>
 <text x="112" y="194" text-anchor="end" fill="#0b0b0b">knee bend</text>
-<polyline points="120.0,316.8 148.8,324.8 177.6,353.7 206.4,369.5 235.2,356.3 264.0,326.6 292.8,297.2 321.6,269.6 350.4,241.9 379.2,217.6 408.0,204.5 436.8,209.2 465.6,232.8 494.4,270.3 523.2,312.9 552.0,351.1 580.8,377.2 609.6,385.2 638.4,373.8 667.2,341.3 696.0,316.8" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
-<text x="696" y="310.8" text-anchor="end" fill="#0b0b0b">left</text>
-<polyline points="120.0,235.6 148.8,224.8 177.6,228.0 206.4,246.2 235.2,275.9 264.0,310.2 292.8,340.9 321.6,358.4 350.4,355.8 379.2,335.0 408.0,311.1 436.8,305.4 465.6,329.8 494.4,364.6 523.2,377.2 552.0,362.5 580.8,337.1 609.6,310.9 638.4,283.6 667.2,256.8 696.0,235.6" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
-<text x="696" y="229.6" text-anchor="end" fill="#0b0b0b">right</text>
+<polyline points="120.0,335.7 148.8,316.9 177.6,314.8 206.4,323.1 235.2,346.1 264.0,360.5 292.8,364.6 321.6,333.7 350.4,282.3 379.2,234.4 408.0,208.8 436.8,207.3 465.6,216.0 494.4,229.5 523.2,248.4 552.0,271.5 580.8,304.9 609.6,348.7 638.4,381.6 667.2,369.8 696.0,335.7" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+<text x="696" y="329.7" text-anchor="end" fill="#0b0b0b">left</text>
+<polyline points="120.0,252.0 148.8,235.6 177.6,229.0 206.4,225.4 235.2,227.2 264.0,235.8 292.8,257.2 321.6,302.0 350.4,350.3 379.2,349.3 408.0,318.8 436.8,307.7 465.6,312.5 494.4,319.2 523.2,339.2 552.0,365.0 580.8,374.8 609.6,363.5 638.4,323.0 667.2,280.3 696.0,252.0" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+<text x="696" y="246.0" text-anchor="end" fill="#0b0b0b">right</text>
 <text x="120.0" y="422" text-anchor="middle" fill="#52514e">0</text>
 <text x="264.0" y="422" text-anchor="middle" fill="#52514e">0.25</text>
 <text x="408.0" y="422" text-anchor="middle" fill="#52514e">0.5</text>

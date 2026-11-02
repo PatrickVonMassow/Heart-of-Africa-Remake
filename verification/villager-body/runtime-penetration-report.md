@@ -31,7 +31,7 @@ male adult, build -0.6, figure scale 1; 10 frames 1.50–2.20 s.
 | Garment | Cloth | where | frames over (of 10) | Shown | where | frames over (of 10) | Hole | where | frames over (of 10) | Cut | where | frames over (of 10) | Inner | where | frames over (of 10) | Inner hole | where | frames over (of 10) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `g-cap-crown` | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
-| `g-robe-chest` | 0.0380 ✗ | run t 1.73 s (male adult build -0.6) — shin.L | 10 | 0.0332 ✗ | run t 1.66 s (male adult build -0.6) — thigh.R | 10 | 0.0000 | — | 0 | 0.0226 ✗ | run t 1.66 s (male adult build -0.6) — thigh.R | 1 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-robe-chest` | 0.0375 ✗ | run t 2.04 s (male adult build -0.6) — shin.R | 10 | 0.0333 ✗ | run t 1.97 s (male adult build -0.6) — thigh.R | 10 | 0.0000 | — | 0 | 0.0268 ✗ | run t 1.97 s (male adult build -0.6) — thigh.R | 2 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 1 of 2 worn garments within tolerance in every frame.
 
@@ -73,7 +73,7 @@ male child, build +0.0, figure scale 0.55; 12 frames 0.80–2.45 s.
 
 | Garment | Cloth | where | frames over (of 12) | Shown | where | frames over (of 12) | Hole | where | frames over (of 12) | Cut | where | frames over (of 12) | Inner | where | frames over (of 12) | Inner hole | where | frames over (of 12) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `g-shirt-chest` | 0.0898 ✗ | chaser t 2.30 s (male child build +0.0) — thigh.L | 12 | 0.0991 ✗ | chaser t 2.15 s (male child build +0.0) — thigh.R | 11 | 0.0303 ✗ | chaser t 1.55 s (male child build +0.0) — thigh.R | 6 | 0.0364 ✗ | chaser t 2.15 s (male child build +0.0) — hips | 2 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+| `g-shirt-chest` | 0.0890 ✗ | chaser t 2.00 s (male child build +0.0) — thigh.L | 12 | 0.0820 ✗ | chaser t 0.95 s (male child build +0.0) — thigh.R | 12 | 0.0304 ✗ | chaser t 2.00 s (male child build +0.0) — thigh.R | 3 | 0.0285 ✗ | chaser t 0.95 s (male child build +0.0) — hips | 1 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 0 of 1 worn garments within tolerance in every frame.
 
