@@ -35458,3 +35458,17 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Sub-step 1 state (02.11.2026, 20:10): WebGPU compare done - no visible garment difference against main (largest diffs: a moved camera spot at 2 FPS, pose phase, background walkers; local/1398-diff-webgpu.tsv). Main's WebGL 2 baseline run at ef891f1f0: 149 frames saved in local/1398-main-frames-webgl, one red (garment acceptance, hausa-village trousers-run-child front34 7 m: no clear camera spot) - a staging red on main, charge it if the branch shows it too. The branch WebGL 2 run (log local/1398-pic-webgl-point-1398.log) was running at handover; next: compare its frames with main's, then land via land-point.
   Sub-step 1 state (02.11.2026, 20:28): branch WebGL 2 garment-acceptance run GREEN at 978b1b2c6 (150 frames, log local/verify-logs/2026-11-02T19-09-51-679-polish-villagers.log; main's camera-spot red did not recur). Picture verdict on both backends: the subject's garments match main (WebGPU checked across the diff list, WebGL 2 by the dig and run close-ups); remaining differences are pose phase, camera timing and background walkers. CI on main green. Next: land via land-point (the render-verify guard still wants a full covering polish-villagers run per backend, or the section-only scope charged).
   Split (02.11.2026, owner, standing split rule): this point lands sub-step 1 of the plan's section 7 only; sub-steps 2 to 7, the original final state, the carried items and the removal of the legacy builders move to point 1480.
+
+- [x] 1081. Name, from a trace, why a child in a crowded tag round walks a metre and gets nowhere
+  Final state: the cause of the crowded construction's episodes (`tagShuffle.test.ts`, "and
+  holds when the adults walk through the children's own ground") is named from a trace, not
+  guessed, and recorded in `docs/1081-steering-trace.md` with its probes under
+  `docs/1081-probes/`. The sweep covers the tag-round villages (maasai, hausa, swahili, zulu,
+  san, tuareg × seeds 1–10, 99) at every cadence and states whether the planted adults, static
+  edges or playmates turn the child back on itself. The steering fixes and the crowded case's
+  multi-settlement sample are points 1457 and 1458, split off because no single steering change
+  converged over the 66-pair sweep.
+  Test: none beyond the recorded probes — the deliverable is the traced cause; the Vitest
+  coverage arrives with 1458.
+  Refs: src/scenes/place/tagGame.ts (`moveChild`, `evadeHeading`), docs/1081-steering-trace.md.
+  Bundle: Dorfleben.
