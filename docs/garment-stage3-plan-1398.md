@@ -1,6 +1,6 @@
-# Villager garments stage 3 — plan against the current code (point 1398, revision 3)
+# Villager garments stage 3 — plan against the current code (point 1398, revision 4)
 
-Stage plan for skirtShort, skirtKnee, loinFlap, apron and girdleTails on driven column bones. Revision 2 answered GPT-6.1 Sol's check 1 (docs/four-eyes/1398-plan-check-1-sol.md, B1 to B26); section 9 maps every finding to the section that answers it. Revision 3 answers check 2 (docs/four-eyes/1398-plan-check-2-sol.md): the seven findings still open there (B8, B12, B14, B15, B17, B18, B19) and the new C1 to C6. Section 10 maps them. Where revision 3 changes a mechanism, the section text below is the current one, and section 9's rows for those ids point to it. Written against `main` at 84a3665a0, merged up to the current `origin/main`; nothing under `scripts/villager` or the garment runtime changed in between.
+Stage plan for skirtShort, skirtKnee, loinFlap, apron and girdleTails on driven column bones. Revision 2 answered GPT-6.1 Sol's check 1 (docs/four-eyes/1398-plan-check-1-sol.md, B1 to B26); section 9 maps every finding to the section that answers it. Revision 3 answers check 2 (docs/four-eyes/1398-plan-check-2-sol.md): the seven findings still open there (B8, B12, B14, B15, B17, B18, B19) and the new C1 to C6. Section 10 maps them. Revision 4 answers check 3 (docs/four-eyes/1398-plan-check-3-sol.md): B14, B17, B19/C3 and the new N1; section 11 maps them. Where revision 3 or 4 changes a mechanism, the section text below is the current one, and section 9's rows for those ids point to it. Written against `main` at 84a3665a0, merged up to the current `origin/main`; nothing under `scripts/villager` or the garment runtime changed in between.
 
 Owner decision on X1 (02.11.2026): the `.driven` cloak variant is allowed inside point 1398 as the terminal fallback step of section 3.11.
 
@@ -129,7 +129,7 @@ Each of the five gets a waist band shell (section 3.12). Its bottom loop of body
 
 A Vitest compares the driver's composed matrices against `updateMatrixWorld` on the same pose.
 
-**Variables.** Each segment has an outward tilt angle θ in its column's radial plane about the hips frame. θ ∈ [0, θmax], θmax = 80°, extended to θground = 110° only by the ground fallback (section 3.7). There is no bone scale anywhere in the driver: column bones carry rotation and, for `col.U`, translation, never scale (C4, C5). The upper segments are solved first, then the lower ones; a lower segment hangs from its solved knee point.
+**Variables.** Each segment has an outward tilt angle θ in its column's radial plane about the hips frame: a rotation about the column's tangential axis tk = rk × up (section 3.15), so that a positive θ moves a hanging segment outward. θ ∈ [0, θmax], θmax = 80°, extended to θground = 110° only by the ground fallback (section 3.7). There is no bone scale anywhere in the driver: column bones carry rotation and, for `col.U`, translation, never scale (C4, C5). The upper segments are solved first, then the lower ones; a lower segment hangs from its solved knee point.
 
 **Candidate search per segment.**
 
@@ -140,7 +140,7 @@ A Vitest compares the driver's composed matrices against `updateMatrixWorld` on 
    - the ground at every row the segment carries (section 3.7);
    - the chord target to both neighbours' current solutions;
    - the neighbour tilt difference ≤ 60°;
-   - θ ≤ θmax.
+   - θ ≤ θmax, or θ ≤ θground while the ground fallback holds that segment (section 3.7, N1).
    - During repair rounds, also the skinned triangles the segment carries (section 3.6, B17).
 3. Choice with continuity (B18, C2). The state per segment is a continuous angle θs (a real number, not a sample index).
    - **Relaxed angle.** Each frame: θrel = θg + (θs − θg) · exp(−dt / τ), where θg is the gravity target (0 for the upper segment, revision 2's gravity blend for the lower) and τ = 0.25 s.
@@ -157,7 +157,7 @@ A Vitest compares the driver's composed matrices against `updateMatrixWorld` on 
 - ground;
 - chords;
 - the neighbour limit;
-- θmax.
+- θmax, or θground for a segment the ground fallback holds (N1).
 
 Repair rounds (B17):
 
@@ -165,7 +165,7 @@ Repair rounds (B17):
 2. If a round would choose the same angle again for a segment whose triangles still hit, the two columns owning the worst hit are searched jointly instead. Each angle takes the 9 coarse samples, giving 81 pairs, scored on the triangles of both columns plus all constraints of both segments.
 3. A changed upper segment re-solves its lower segment.
 
-This repeats at most three rounds. Every candidate respects θmax and the neighbour limit by construction, and no unconditional increment exists. Where the ground is the violated constraint after the third round, the ground fallback applies (section 3.7). Anything else is counted in a DEV counter and in the mirror's report row.
+This repeats at most three rounds. Every candidate respects θmax (θground under the ground fallback) and the neighbour limit by construction, and no unconditional increment exists. Where the ground is the violated constraint after the third round, the ground fallback applies (section 3.7). Anything else is counted in a DEV counter and in the mirror's report row.
 
 **State and determinism (B18).**
 
@@ -196,7 +196,13 @@ Each response is followed by the moving-sequence acceptance of section 5 on both
 
 - **Samples.** On the basis body the builder freezes a set of pelvis samples: every body vertex with `arm` ≤ 0.2 between the crotch − 0.02 H and the highest junction height, thinned to at most 240 by farthest-point selection.
 - **Skinning.** Each frame the driver skins these samples on the CPU with their actual four weights, so spine, hips and thigh influence are all in.
-- **Profile.** In the hips frame, each sample gives (height, angle, radius from the hips axis). The pelvis profile Rp(k, y) is the largest sample radius within column k's angular window (± half the column spacing) and a height window of ±0.01 H about y. It is linearly interpolated between neighbouring columns for points between columns.
+- **Profile.** In the hips frame, each sample gives (height, angle, radius from the hips axis). The profile is a table of bins, frozen with the samples so no bin can be empty at run time (check 3 B14):
+  - **Bins.** Per column k, height bins 0.02 H tall from the crotch − 0.02 H up to the highest junction height. The builder assigns each sample to its bin by its rest angle (column k's window, ± half the column spacing) and rest height, and freezes that membership.
+  - **Value.** Each frame, a bin's value is the largest skinned radius of its members.
+  - **Internal holes.** A bin with no member gets a frozen donor at build time: the nearest non-empty bin of the same column by height (the lower one on a tie); if the whole column is empty, both neighbouring columns' bins at that height, taking the larger value. The builder asserts that every bin has members or a donor.
+  - **Query.** Rp(k, y) interpolates linearly between the two bin centres around y and between neighbouring columns for points between columns.
+  - **Above the sampled range.** For y above the top bin's centre (a panel lifted by the 110° fallback, section 3.7) Rp(k, y) is the top bin's value. The band covers the body there, and the top bin is the widest point the panel can meet.
+  - **Below the crotch − 0.02 H.** The profile is not consulted; the thigh capsules carry the legs (below).
 - **Constraint.** A panel point at height y and angle a that lies above the crotch must have radius ≥ Rp(a, y) + C, with C the cloth clearance of section 3.9 at its row. The constraint enters:
   - the candidate scoring at the segment's stations (section 3.4);
   - the skinned-triangle check, on each triangle vertex and each triangle's centroid (section 3.6);
@@ -231,7 +237,7 @@ Named response for a sample outside: raise that bone's capsule margin to contain
 
 - Coverage: every panel vertex of the worn form is skinned on the CPU with its exact four weights, including rows 1 to 3 and the knee blend.
 - Tests: every panel triangle (panel boundaries included) whose bounding sphere meets a capsule's expanded bound is tested exactly, as the closest point between the capsule segment and the triangle. Each triangle is also tested against the pelvis profile (section 3.5) and the ground.
-- Scoring in the repair (B17): a triangle hit is not only a trigger. In the repair rounds of section 3.4, every candidate of a segment re-skins the vertices weighted to that segment's bone and runs the same triangle tests on the triangles they touch. A candidate with a hit is infeasible.
+- Scoring in the repair (B17): a triangle hit is not only a trigger. In the repair rounds of section 3.4, every candidate of a segment re-skins every panel vertex with a nonzero weight on that segment's bone or on any of its descendants and runs the same triangle tests on the triangles they touch (check 3 B17). For an upper segment `col.U.k` that set includes the vertices weighted only to `col.L.k`, which the trial moves through inheritance: the trial carries `col.L.k` at its current local rotation, so the trial geometry and its score are those the frame would draw. A candidate with a hit is infeasible.
   - Among infeasible candidates, the score is the summed penetration depth of those triangles, so the repair cannot return the solution that produced the hit.
   - The joint two-column search of section 3.4 uses the same score.
 - Report: what remains after the third round is counted in the DEV counter and in the mirror's report.
@@ -253,7 +259,7 @@ The ground constraint applies to every row a segment carries: the row point must
 The fallback, used when the best candidate of a segment still leaves a skinned row below 2 mm:
 
 - The segment's θ may go beyond θmax, up to θground = 110°, so the segment swings outward and up about its own top pivot.
-- Candidates run in 2.5° steps over (θmax, θground]. Each is evaluated on the actual skinned rows: every panel vertex weighted to that segment's bone is skinned on the CPU with its four weights, and the lowest one decides (C4). The smallest θ whose lowest skinned vertex is at 2 mm or more is chosen. For an upper segment, the lower segment is then re-solved from the new knee point.
+- Candidates run in 2.5° steps over (θmax, θground]. Each is evaluated on the actual skinned rows: every panel vertex with a nonzero weight on that segment's bone or any of its descendants (for `col.U.k` this includes `col.L.k`, carried at its current local rotation) is skinned on the CPU with its four weights, and the lowest one decides (C4, check 3 B17). The smallest θ whose lowest skinned vertex is at 2 mm or more is chosen. For an upper segment, the lower segment is then re-solved from the new knee point.
 - A kneeling figure's knee pivot lies a few centimetres above the ground. A lower segment lifted towards horizontal therefore lays the hem out flat around the knee, which reads as cloth spread on the ground.
 - Every triangle of the affected columns is then re-checked (section 3.6), with neighbour limits relaxed only between two fallback segments.
 - **Residual.** If even 110° leaves vertices below ground (the top pivot itself below 2 mm), the residual is counted and judged in the low-camera kneel and dig pictures. The pictures decide whether it reads as cloth on the ground; no numeric gate applies.
@@ -459,7 +465,7 @@ Wraps do not co-occur with the five.
 
 The radial-only solve is the prototype. If the walk or run moving sequences of any form show the panel flaring sideways where cloth would swing forward or back, the fallback is implemented within point 1398, before the stage closes:
 
-- **Axes (C3).** For column k let rk be its rest radial direction (horizontal, outward from the hips axis), tk = up × rk the tangential direction, and uk the hips up axis.
+- **Axes (C3).** For column k let rk be its rest radial direction (horizontal, outward from the hips axis), uk the hips up axis, and tk = rk × uk the tangential direction. With right-handed rotations, Rot(tk, θ) turns the downward direction −uk towards +rk: a positive θ swings the segment outward (revision 3's tk = up × rk swung it inward; check 3 B19). Example: rk = +X, uk = +Y gives tk = +Z, and θ = 30° turns (0, −1, 0) into (0.5, −0.866, 0).
   - θ (section 3.4) is the rotation about tk. It swings the segment in the plane of rk and uk: in and out.
   - The fallback adds ψ, a rotation about rk. It swings the segment in the plane of tk and uk: sideways along the ring.
   - rk and tk are orthogonal, so the two rotations are independent. Together they reach any swing direction, forward or back for every column.
@@ -524,13 +530,16 @@ It is not filed as a follow-up.
 - The four-influence reduction stays within 1 mm.
 - Driver:
   - determinism under replay;
-  - θ within [0, θmax];
+  - θ within [0, θmax] for a segment the ground fallback does not hold, and within [0, θground] for one it holds, with both bounds reached in a test (N1);
+  - the sign of θ: a positive θ increases the outward displacement of a hanging segment's tip, for θ and under the sagittal fallback (B19);
+  - candidate scoring of an upper segment against a triangle whose vertices are weighted only to its lower segment: the trial that moves it into a capsule is infeasible (B17);
   - the neighbour limit;
   - final-evaluation completeness;
   - the bounded repair;
   - the ground fallback;
   - continuity (|Δθ| per frame within the rate limit except when only a larger step is feasible).
 - Containment on the rendered surface over the pose and morph domain (section 3.5).
+- Pelvis profile bins (B14): a sample set with an internal empty bin takes its donor's value, and a query above the top bin returns the top bin's value; the builder rejects a profile with a bin that has neither members nor a donor.
 - clearworn with and without the beads.
 - `effectiveWorn` applied consistently.
 - No co-worn driven pair (E5).
@@ -671,3 +680,14 @@ Yardstick, restated: believable clothing in the picture at 3 m and 7 m on both b
 Both follow point 1339: no numeric penetration threshold is an acceptance gate.
 
 No finding of check 2 contradicts the current code. Every change in this revision is a plan-text change. The material Sol marked as truncated (penetration.py `shell_rows`, the runtime, export and cache files) is unchanged on `main` since revision 2.
+
+## 11. Answers to check 3 (docs/four-eyes/1398-plan-check-3-sol.md)
+
+Check 3 resolved B8, B12/C1, B15/C4, C5, B18/C2 and C6. The four open ids are answered as plan-text changes; no code changed.
+
+| Id | Kind | Answer | Section |
+| --- | --- | --- | --- |
+| B14 | BLOCKING | The pelvis profile is a table of 0.02 H bins per column with membership frozen at build time, so no bin is empty at run time. An internal empty bin takes a frozen donor (nearest bin of the same column, else the larger of the neighbouring columns). Above the top bin the top bin's value applies; below the crotch − 0.02 H the capsules alone apply. A Vitest covers a hole, a query above the range and the builder's rejection of an undonored bin. | 3.5, 5 |
+| B17 | BLOCKING | A candidate re-skins every vertex weighted to its segment's bone or any descendant; for `col.U.k` that includes vertices weighted only to `col.L.k`, carried at its current local rotation. The ground fallback uses the same set. A Vitest scores an upper trial against a lower-only triangle. | 3.6, 3.7, 5 |
+| B19 / C3 | BLOCKING | tk = rk × uk, so Rot(tk, θ) turns −uk towards +rk and a positive θ swings outward; worked example rk = +X, uk = +Y, θ = 30° → (0.5, −0.866, 0). Section 3.4 names the same axis. A Vitest asserts that positive θ increases outward displacement. | 3.4, 3.15, 5 |
+| N1 | BLOCKING | The bound is conditional: θ ∈ [0, θmax] without the ground fallback, θ ∈ [0, θground] while it holds the segment. The candidate constraint, the final evaluation, the repair rule and the Vitest all state it so, and the Vitest reaches both bounds. | 3.4, 5 |
