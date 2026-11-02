@@ -9222,6 +9222,8 @@ to land than a mechanism that needs a review.
   timeout; each one spent a launcher successor as a repair path with nothing to repair.
   Again on `main` 02.11.2026 at the landing of point 1398: run 41522159050 (6bf31d1), shard fast (1)
   with 319/319 files and 9997 tests passed, 0 failed, exit 1 from one `onTaskUpdate` timeout.
+  The next main push repeated it: run 41526217975 (1b99454), same counts and signature; two main
+  reds in a row make this a real blockade for every turn end after a main push (finding 02.11.2026).
   Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
   a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
