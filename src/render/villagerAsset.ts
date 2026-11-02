@@ -13,6 +13,7 @@
 import * as THREE from 'three/webgpu'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { ShellSet } from './villagerShell'
+import { VILLAGER_GLTF } from '../config/balance'
 
 export type VillagerClipKind = 'gait' | 'loop' | 'once' | 'hold'
 
@@ -179,6 +180,8 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
       else if (prop === 'position' && i === 0) hips = t.values as Float32Array
     }
     clips[a.name] = { name: a.name, kind: m.kind, duration: m.duration, speed: m.speed ?? 0, times, rot, hips, tool: m.tool, grip: m.grip, contacts: m.contacts, strike: m.strike }
+    const keep = VILLAGER_GLTF.clipShoulderKeep[a.name]
+    if (keep !== undefined) restClipShoulders(clips[a.name], bones, parents, keep)
   }
   const cp = (s: 'L' | 'R'): ContactPoints => ({
     heel: v3(meta.contactPoints[s].heel),
@@ -268,3 +271,34 @@ export function loadVillagerAsset(): Promise<VillagerAsset> {
 
 /** The loaded asset, or null while it is still on its way. */
 export const villagerAsset = (): VillagerAsset | null => loaded
+
+const _qs = new THREE.Quaternion()
+const _qk = new THREE.Quaternion()
+const _qu = new THREE.Quaternion()
+const _id = new THREE.Quaternion()
+
+/**
+ * A clip's shoulder (clavicle) turns brought toward the file's rest: each
+ * frame's shoulder rotation kept to `keep` of itself (0: the rest), and every
+ * child of the shoulder given the turn the shoulder no longer makes, so the
+ * upper arm keeps its world rotation and only its joint moves back to the
+ * body's own shoulder (VILLAGER_GLTF.clipShoulderKeep). Works on a copy of the
+ * tracks, never on the loader's arrays.
+ */
+export function restClipShoulders(clip: VillagerClip, bones: readonly string[], parents: readonly number[], keep: number): void {
+  for (const s of ['L', 'R']) {
+    const sh = bones.indexOf(`shoulder.${s}`)
+    if (sh < 0 || clip.rot[sh].length === 0) continue
+    const kids = parents.flatMap((p, i) => (p === sh && clip.rot[i].length > 0 ? [i] : []))
+    const rs = (clip.rot[sh] = Float32Array.from(clip.rot[sh]))
+    const rk = kids.map((k) => (clip.rot[k] = Float32Array.from(clip.rot[k])))
+    for (let f = 0; f * 4 < rs.length; f++) {
+      _qs.fromArray(rs, f * 4)
+      _qk.copy(_id).slerp(_qs, keep)
+      // the child's local turn carries the removed part: k⁻¹ · s · c
+      _qu.copy(_qk).invert().multiply(_qs)
+      for (const r of rk) _qs.fromArray(r, f * 4).premultiply(_qu).normalize().toArray(r, f * 4)
+      _qk.toArray(rs, f * 4)
+    }
+  }
+}
