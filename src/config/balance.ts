@@ -2801,6 +2801,8 @@ export const VILLAGER_ASSET = {
       pelvisArm: 0.2,
       /** A frame step above this (s) re-enters solving from the gravity solution. */
       resetDt: 0.25,
+      /** A figure moved farther than this in one frame (world units) was placed, not walked: reset. */
+      teleport: 1,
     },
   },
   /** Per shell mesh name, a base that replaces garmentShellBase; empty since

@@ -610,6 +610,24 @@ export class ColumnDriver {
     this.fresh = true
   }
 
+  private frame = -1
+  private snap: { theta: Float64Array; held: Uint8Array; fresh: boolean; counters: DriverCounters } | null = null
+
+  /** One game frame, identified by `frame`: a second call in the same frame (the caller
+   *  retargets after the figure's own frame) re-solves from the state before that frame. */
+  stepFrame(bones: readonly THREE.Object3D[], dt: number, frame: number): void {
+    if (frame === this.frame && this.snap) {
+      this.theta.set(this.snap.theta)
+      this.held.set(this.snap.held)
+      this.fresh = this.snap.fresh
+      Object.assign(this.counters, this.snap.counters)
+    } else {
+      this.frame = frame
+      this.snap = { theta: Float64Array.from(this.theta), held: Uint8Array.from(this.held), fresh: this.fresh, counters: { ...this.counters } }
+    }
+    this.step(bones, dt)
+  }
+
   /** One frame: read the posed bones, solve, write the column locals. */
   step(bones: readonly THREE.Object3D[], dt: number): void {
     this.solve(bones, dt)

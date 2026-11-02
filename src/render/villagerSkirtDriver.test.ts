@@ -13,7 +13,7 @@ import { VILLAGER_ASSET } from '../config/balance'
 import { applyClipLayers, clipLayers, stepClipLayers } from '../scenes/place/gltfClipLayers'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { ColumnDriver, columnRig, composeFigureMatrices, PelvisProfile, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
+import { carriesColumnWeight, ColumnDriver, columnRig, composeFigureMatrices, PelvisProfile, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
 import { ROUND_TRIP_SEQUENCES, runSequence } from './villagerSkirtDriverSequences'
 
 const CFG = VILLAGER_ASSET.drivenGarments.driver
@@ -339,6 +339,35 @@ describe('the column driver', () => {
     d.reset()
     d.step(toyBones(rig), 1 / 60)
     expect(d.theta[0]).toBe(0)
+  })
+})
+
+describe('the driver in the figure', () => {
+  it('runs only for a body carrying column weight: none does before the driven builder', () => {
+    const person = gltfPerson(asset, 'female', 'adult', 0)
+    expect(carriesColumnWeight(asset, person.geometry)).toBe(false)
+    for (const [name, g] of Object.entries(asset.geometries)) expect(carriesColumnWeight(asset, g), name).toBe(false)
+    const g = person.geometry.clone()
+    const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
+    const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute
+    si.setX(0, asset.bones.indexOf('col.L.3'))
+    sw.setX(0, 0.5)
+    expect(carriesColumnWeight(asset, g)).toBe(true)
+  })
+
+  it('re-solves a second retarget in one frame from the state before that frame', () => {
+    const rig = toyRig(4, legCapsule)
+    const once = new ColumnDriver(rig)
+    const twice = new ColumnDriver(rig)
+    for (let f = 0; f < 30; f++) {
+      const thigh: V3 = [0.1 + 0.003 * f, 0, 0]
+      once.stepFrame(toyBones(rig, [0, 1, 0], thigh), 1 / 60, f)
+      // the figure's own frame on a stale pose, then the caller's retarget on the final one
+      twice.stepFrame(toyBones(rig, [0, 1, 0], [0.1, 0, 0]), 1 / 60, f)
+      twice.stepFrame(toyBones(rig, [0, 1, 0], thigh), 1 / 60, f)
+    }
+    expect(Array.from(twice.theta)).toEqual(Array.from(once.theta))
+    expect(twice.counters).toEqual(once.counters)
   })
 })
 
