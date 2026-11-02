@@ -9228,6 +9228,10 @@ to land than a mechanism that needs a review.
   VERIFIABLE: pure tests over the verdict function — a summary with a named failure blocks at any
   load; a no-failure non-zero exit yields "not judged" at any load, high or low; and the measured
   load appears in the verdict text in every case.
+  REPRODUCED ON CI 02.11.2026 (run 41383325806, feat/1454-jog-stance 823d9ef): the gate job read
+  `CI gate FAILED: shard-1/unit` while shard 1's summary named 318/318 files and 9990 tests
+  passed, 0 failed — exit 1 from one `onTaskUpdate` timeout. The CI gate therefore needs the
+  same not-judged verdict; the launcher handed it on as a RED repair path with nothing to repair.
   Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
   a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
