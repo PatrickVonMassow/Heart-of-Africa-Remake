@@ -154,15 +154,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium - player-visible at Giza and in the whole travel view, both backends.
   Bundle: Dorfleben.
 
-- [ ] 1340. Tag catcher's hands at chest height and on the caught child at the catch frame
-  Amended 19.10.2026 from point 1343's author: concept step 15 removes the catcher's forward chest-height hands, so that half of this final state is obsolete; the catch-frame hand on the caught child stays here (flaky: red on 3 WebGPU runs, 0.45 m catch distance at lean cap 0.12 rad).
-  Queue position: after point 1333; point 1343 reworks the port-city chaser pose (point 1316's item 7) — if 1343 lands with `polish-children --section=tag-catch` green on both backends, this point closes with that run as evidence.
-  Source: findings carrier 12.10.2026 02:47Z: polish-children --section=tag-catch (Cairo) is red on main 8a477d931 and on feat/1315 alike. WebGPU: "the catcher's two hands are held forward at chest height, read off the drawn pivots" fails (hand y 0.889/0.895); WebGL 2 on feat/1315: "at the catch frame the catcher's drawn hand is ON the caught child" fails. Not in the classified baseline. Logs: local/1315-main-port-webgpu.log, local/1315-port-webgl.log.
-  Final state: in the port-city tag game the catcher's drawn hands are held forward at chest height while chasing and one drawn hand is on the caught child at the catch frame, on both backends.
-  Verifiable: `polish-children --section=tag-catch` green on both backends; the catch frame picture-checked.
-  Criticality: medium - a standing red in the children suite; visible in every port city's tag game.
-  Bundle: Dorfleben.
-
 - [ ] 1344. Children's hand contacts in polish-children: runner hands at its sides, bank-tap hand on the flank, arriving runner's hand on the far stone
   Queue position: directly after point 1340 (same suite and the same children's pose write).
   Source: findings carrier 12.10.2026 04:48Z: full WebGPU polish-children run 06:19 on main 06c727d21 red with three checks not in the classified baseline and owned by no point — tag-catch "while a runner's hands hang at its sides"; children-bank-game "the tapping hand stays within 5 mm of the flank over the whole hold" (22 cm off); arriving runner "DRAWN hand stays within 5 mm of the far stone, including the word frame" (24.6 cm off). Machine quietness of that run is unverified; the WebGL 2 full run is still owed.
