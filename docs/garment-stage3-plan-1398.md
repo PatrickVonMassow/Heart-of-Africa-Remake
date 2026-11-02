@@ -1,6 +1,6 @@
-# Villager garments stage 3 — plan against the current code (point 1398, revision 4)
+# Villager garments stage 3 — plan against the current code (point 1398, revision 5)
 
-Stage plan for skirtShort, skirtKnee, loinFlap, apron and girdleTails on driven column bones. Revision 2 answered GPT-6.1 Sol's check 1 (docs/four-eyes/1398-plan-check-1-sol.md, B1 to B26); section 9 maps every finding to the section that answers it. Revision 3 answers check 2 (docs/four-eyes/1398-plan-check-2-sol.md): the seven findings still open there (B8, B12, B14, B15, B17, B18, B19) and the new C1 to C6. Section 10 maps them. Revision 4 answers check 3 (docs/four-eyes/1398-plan-check-3-sol.md): B14, B17, B19/C3 and the new N1; section 11 maps them. Where revision 3 or 4 changes a mechanism, the section text below is the current one, and section 9's rows for those ids point to it. Written against `main` at 84a3665a0, merged up to the current `origin/main`; nothing under `scripts/villager` or the garment runtime changed in between.
+Stage plan for skirtShort, skirtKnee, loinFlap, apron and girdleTails on driven column bones. Revision 2 answered GPT-6.1 Sol's check 1 (docs/four-eyes/1398-plan-check-1-sol.md, B1 to B26); section 9 maps every finding to the section that answers it. Revision 3 answers check 2 (docs/four-eyes/1398-plan-check-2-sol.md): the seven findings still open there (B8, B12, B14, B15, B17, B18, B19) and the new C1 to C6. Section 10 maps them. Revision 4 answers check 3 (docs/four-eyes/1398-plan-check-3-sol.md): B14, B17, B19/C3 and the new N1; section 11 maps them. Revision 5 answers check 4 (docs/four-eyes/1398-plan-check-4-sol.md): B14 and the new N2, also in section 11. Where revision 3, 4 or 5 changes a mechanism, the section text below is the current one, and section 9's rows for those ids point to it. Written against `main` at 84a3665a0, merged up to the current `origin/main`; nothing under `scripts/villager` or the garment runtime changed in between.
 
 Owner decision on X1 (02.11.2026): the `.driven` cloak variant is allowed inside point 1398 as the terminal fallback step of section 3.11.
 
@@ -196,13 +196,12 @@ Each response is followed by the moving-sequence acceptance of section 5 on both
 
 - **Samples.** On the basis body the builder freezes a set of pelvis samples: every body vertex with `arm` ≤ 0.2 between the crotch − 0.02 H and the highest junction height, thinned to at most 240 by farthest-point selection.
 - **Skinning.** Each frame the driver skins these samples on the CPU with their actual four weights, so spine, hips and thigh influence are all in.
-- **Profile.** In the hips frame, each sample gives (height, angle, radius from the hips axis). The profile is a table of bins, frozen with the samples so no bin can be empty at run time (check 3 B14):
-  - **Bins.** Per column k, height bins 0.02 H tall from the crotch − 0.02 H up to the highest junction height. The builder assigns each sample to its bin by its rest angle (column k's window, ± half the column spacing) and rest height, and freezes that membership.
-  - **Value.** Each frame, a bin's value is the largest skinned radius of its members.
-  - **Internal holes.** A bin with no member gets a frozen donor at build time: the nearest non-empty bin of the same column by height (the lower one on a tie); if the whole column is empty, both neighbouring columns' bins at that height, taking the larger value. The builder asserts that every bin has members or a donor.
-  - **Query.** Rp(k, y) interpolates linearly between the two bin centres around y and between neighbouring columns for points between columns.
-  - **Above the sampled range.** For y above the top bin's centre (a panel lifted by the 110° fallback, section 3.7) Rp(k, y) is the top bin's value. The band covers the body there, and the top bin is the widest point the panel can meet.
-  - **Below the crotch − 0.02 H.** The profile is not consulted; the thigh capsules carry the legs (below).
+- **Profile.** In the hips frame, each sample gives (height, angle, radius from the hips axis). The profile is a table of bins rebuilt every frame from the samples' POSED locations, so a sample always counts where it is drawn (check 4 N2):
+  - **Bins.** Per column k, height bins 0.02 H tall from the crotch − 0.02 H up to the highest junction height. Each frame every skinned sample is assigned to the bin of its posed angle (column k's window, ± half the column spacing) and posed height. A sample above the top bin or below the bottom bin is assigned to that end bin of its column.
+  - **Value.** A bin's value is the largest posed radius among the samples assigned to it in that frame.
+  - **Empty bins (check 3 B14, check 4 B14).** A bin no sample reached this frame takes the value of the nearest POPULATED bin, searched only among bins that received a sample this frame, so the rule cannot cycle: first the same column by height distance (the lower one on a tie); if the whole column is empty, the populated bins of every other column, ranked by angular distance and then by height distance, taking the larger value on a tie. The builder asserts at least 30 samples, so a populated bin always exists.
+  - **Query.** Rp(k, y) interpolates linearly between the two bin centres around y and between neighbouring columns for points between columns. For y above the top bin's centre (a panel lifted by the 110° fallback, section 3.7) Rp(k, y) is the top bin's value; the band covers the body there, and the top bin is the widest point the panel can meet.
+- **Below the crotch − 0.02 H.** The profile is not consulted; the thigh capsules carry the legs (below).
 - **Constraint.** A panel point at height y and angle a that lies above the crotch must have radius ≥ Rp(a, y) + C, with C the cloth clearance of section 3.9 at its row. The constraint enters:
   - the candidate scoring at the segment's stations (section 3.4);
   - the skinned-triangle check, on each triangle vertex and each triangle's centroid (section 3.6);
@@ -539,7 +538,7 @@ It is not filed as a follow-up.
   - the ground fallback;
   - continuity (|Δθ| per frame within the rate limit except when only a larger step is feasible).
 - Containment on the rendered surface over the pose and morph domain (section 3.5).
-- Pelvis profile bins (B14): a sample set with an internal empty bin takes its donor's value, and a query above the top bin returns the top bin's value; the builder rejects a profile with a bin that has neither members nor a donor.
+- Pelvis profile bins (B14, N2): a sample posed across a bin boundary counts in the bin of its posed location and no longer in its rest bin; an internal empty bin takes the nearest populated bin of its column; two adjacent wholly empty columns both resolve to populated bins of other columns (no cycle); a query above the top bin returns the top bin's value.
 - clearworn with and without the beads.
 - `effectiveWorn` applied consistently.
 - No co-worn driven pair (E5).
@@ -687,7 +686,7 @@ Check 3 resolved B8, B12/C1, B15/C4, C5, B18/C2 and C6. The four open ids are an
 
 | Id | Kind | Answer | Section |
 | --- | --- | --- | --- |
-| B14 | BLOCKING | The pelvis profile is a table of 0.02 H bins per column with membership frozen at build time, so no bin is empty at run time. An internal empty bin takes a frozen donor (nearest bin of the same column, else the larger of the neighbouring columns). Above the top bin the top bin's value applies; below the crotch − 0.02 H the capsules alone apply. A Vitest covers a hole, a query above the range and the builder's rejection of an undonored bin. | 3.5, 5 |
+| B14 / N2 | BLOCKING | Revision 5: the pelvis profile is a table of 0.02 H bins per column, rebuilt every frame from the samples' posed angle and height (N2), so a sample counts where it is drawn. An empty bin takes the nearest bin that received a sample this frame, same column first, then other columns by angular distance; donors are only populated bins, so no cycle exists (B14). Above the top bin the top bin's value applies; below the crotch − 0.02 H the capsules alone apply. A Vitest covers a sample crossing a bin boundary, an internal hole, two adjacent empty columns and a query above the range. | 3.5, 5 |
 | B17 | BLOCKING | A candidate re-skins every vertex weighted to its segment's bone or any descendant; for `col.U.k` that includes vertices weighted only to `col.L.k`, carried at its current local rotation. The ground fallback uses the same set. A Vitest scores an upper trial against a lower-only triangle. | 3.6, 3.7, 5 |
 | B19 / C3 | BLOCKING | tk = rk × uk, so Rot(tk, θ) turns −uk towards +rk and a positive θ swings outward; worked example rk = +X, uk = +Y, θ = 30° → (0.5, −0.866, 0). Section 3.4 names the same axis. A Vitest asserts that positive θ increases outward displacement. | 3.4, 3.15, 5 |
 | N1 | BLOCKING | The bound is conditional: θ ∈ [0, θmax] without the ground fallback, θ ∈ [0, θground] while it holds the segment. The candidate constraint, the final evaluation, the repair rule and the Vitest all state it so, and the Vitest reaches both bounds. | 3.4, 5 |
