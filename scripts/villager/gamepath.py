@@ -845,7 +845,7 @@ class ColumnDriver:
         self.hold = [0] * (2 * self.n)
         self.cur = [0.0] * (2 * self.n)
         self.violation = [0.0] * (2 * self.n)
-        self.counters = {'frames': 0, 'residual': 0, 'groundFallback': 0, 'repairs': 0, 'jointSearches': 0}
+        self.counters = {'frames': 0, 'residual': 0, 'groundFallback': 0, 'repairs': 0, 'jointSearches': 0, 'rateBreaks': 0}
         self.fresh = True
         self.dt = 0.0
         self.rated = True
@@ -1152,6 +1152,8 @@ class ColumnDriver:
                 clamped = prev + _sign(chosen - prev) * lim
                 if feasible(clamped) or not feasible(chosen):
                     chosen = clamped
+                else:
+                    self.counters['rateBreaks'] += 1
         return chosen
 
     # ----- final evaluation, repair, ground fallback -----
@@ -1288,7 +1290,7 @@ def column_round_trip(rt, tol=RUNTIME_TOLERANCE, log=print):
         for fi, f in enumerate(sq['frames']):
             got = d.step(f['bones'], f['dt'])
             for j, i in enumerate(cols):
-                want = f['bones_out'][i]
+                want = f['bones'][i]
                 for key in ('p', 's'):
                     e = max(abs(x - y) for x, y in zip(got[j][key], want[key]))
                     if not math.isfinite(e):
@@ -1306,3 +1308,151 @@ def column_round_trip(rt, tol=RUNTIME_TOLERANCE, log=print):
     if bad or not all(worst[k] <= tol for k in ('p', 'q', 's')):
         raise RuntimeError(f'column round trip FAILED: {bad or worst}')
     return worst
+
+
+def toy_column_rig(n=4, capsules=(), form=None, head_r=0.15):
+    """A toy rig for the driver's selftests: hips at (0, 1, 0), one thigh bone
+    at (0.1, 1, 0) carrying the given capsules [(a, b, radius)], n columns of
+    two 0.4-long segments hanging from the girdle (radius head_r, y 1.05), a
+    ring of pelvis samples. Bones: hips, thigh, n uppers, n lowers."""
+    rest = [0.0, 1.0, 0.0, 0.1, 1.0, 0.0]
+    upper = list(range(2, 2 + n))
+    lower = list(range(2 + n, 2 + 2 * n))
+    parents = [-1, 0] + [0] * n + upper
+    radial, tangent, head_off = [], [], []
+    heads = []
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        r = [math.cos(a), 0.0, math.sin(a)]
+        radial.append(r)
+        tangent.append(_norm(_cross(r, [0.0, 1.0, 0.0])))
+        h = [head_r * r[0], 1.05, head_r * r[2]]
+        heads.append(h)
+        head_off.append(_sub(h, [0.0, 1.0, 0.0]))
+    for h in heads:
+        rest += h
+    for h in heads:
+        rest += [h[0], h[1] - 0.4, h[2]]
+    pos, idx, w = [], [], []
+    for y in (0.95, 1.0, 1.05):
+        for j in range(16):
+            a = 2 * math.pi * j / 16
+            pos += [0.1 * math.cos(a), y, 0.1 * math.sin(a)]
+            idx += [0, 0, 0, 0]
+            w += [1.0, 0.0, 0.0, 0.0]
+    return {
+        'bones': 2 + 2 * n, 'order': list(range(2 + 2 * n)), 'parents': parents, 'rest': rest, 'hips': 0,
+        'upper': upper, 'lower': lower, 'radial': radial, 'tangent': tangent, 'headOffset': head_off,
+        'upperOffset': [[0.0, -0.4, 0.0]] * n, 'lowerOffset': [[0.0, -0.4, 0.0]] * n,
+        'capsules': [{'bone': 1, 'a': list(a), 'b': list(b), 'radius': r} for a, b, r in capsules],
+        'pelvis': {'pos': pos, 'idx': idx, 'w': w}, 'profile': {'bottom': 0.9, 'top': 1.1, 'bin': 0.05},
+        'crotch': 0.92, 'clearance': 0.006, 'ground': 0.002, 'form': form,
+    }
+
+
+def toy_column_bones(rig, hips=(0.0, 1.0, 0.0), thigh=(0.1, 0.0, 0.0)):
+    """The toy rig's bone locals: hips and thigh as given, the columns at rest."""
+    out = [{'p': list(hips), 'q': [0.0, 0.0, 0.0, 1.0], 's': [1.0, 1.0, 1.0]},
+           {'p': list(thigh), 'q': [0.0, 0.0, 0.0, 1.0], 's': [1.0, 1.0, 1.0]}]
+    while len(out) < rig['bones']:
+        out.append({'p': [0.0, 0.0, 0.0], 'q': [0.0, 0.0, 0.0, 1.0], 's': [1.0, 1.0, 1.0]})
+    return out
+
+
+TOY_DRIVER_CONFIG = {
+    'thetaMax': 80, 'thetaGround': 110, 'coarseStep': 10, 'refine': [5, 2.5], 'bisect': 0.25, 'groundStep': 2.5,
+    'tau': 0.25, 'omegaMax': 400, 'neighbourLimit': 60, 'repairRounds': 3, 'stations': [1 / 3, 2 / 3, 1],
+    'groundClearance': 0.002, 'clearance': 0.006, 'gravityBlend': 1, 'crotch': 0.03, 'pelvisBin': 0.02,
+    'pelvisSamples': 240, 'pelvisArm': 0.2, 'resetDt': 0.25,
+}
+
+
+def selftest_column_driver():
+    """The mirror's solve on toy capsules (plan section 5): the continuous
+    relaxation, determinism, the reset, the rate limit and its feasible break,
+    the lift-outward ground fallback on the carried rows, the bounded repair
+    with triangle scoring (an upper's trial carrying its lower), the joint
+    two-column search, and no column scale."""
+    cfg = TOY_DRIVER_CONFIG
+    dt = 1 / 60
+    # relaxation: a free hem released at 30° follows θg + (θs − θg)·e^(−t/τ), never sticking to a sample
+    rig = toy_column_rig()
+    d = ColumnDriver(rig, cfg)
+    d.step(toy_column_bones(rig), dt)
+    assert all(abs(x) < 1e-12 for x in d.theta), d.theta
+    d.theta[0] = 30 * _DEG
+    for f in range(1, 91):
+        d.step(toy_column_bones(rig), dt)
+        want = 30 * _DEG * math.exp(-f * dt / cfg['tau'])
+        assert abs(d.theta[0] - want) < 1e-9, (f, d.theta[0], want)
+    assert d.theta[0] < 0.5 * _DEG
+    # reset: a step above resetDt re-enters from the gravity solution
+    d.theta[0] = 30 * _DEG
+    d.step(toy_column_bones(rig), 1.0)
+    assert d.theta[0] == 0.0
+    # a leg capsule inside column 0 pushes it outward; θ stays in [0, θmax]; locals carry no scale
+    caps = [([0.1, 1.0, 0.0], [0.1, 0.5, 0.0], 0.04)]
+    rig = toy_column_rig(capsules=caps)
+    seq = [toy_column_bones(rig, thigh=(0.1 + 0.002 * f, 0.0, 0.0)) for f in range(40)]
+
+    def run(r, frames, step_dt=dt):
+        dd = ColumnDriver(r, cfg)
+        trace = []
+        for b in frames:
+            loc = dd.step(b, step_dt)
+            assert all(x['s'] == [1.0, 1.0, 1.0] for x in loc)
+            trace.append(list(dd.theta))
+        return dd, trace
+    d1, t1 = run(rig, seq)
+    d2, t2 = run(rig, seq)
+    assert t1 == t2 and d1.counters == d2.counters, 'the mirror is not deterministic'
+    assert t1[-1][0] > 5 * _DEG, t1[-1]
+    assert all(0 <= x <= cfg['thetaMax'] * _DEG + 1e-12 for tr in t1 for x in tr)
+    lim = cfg['omegaMax'] * _DEG * dt
+    breaks = sum(1 for a, b in zip(t1, t1[1:]) for x, y in zip(a, b) if abs(y - x) > lim + 1e-12)
+    assert breaks == d1.counters['rateBreaks'], (breaks, d1.counters)
+    # a capsule that jumps onto the column: only the larger step is feasible
+    jump = [toy_column_bones(rig, thigh=(-0.5, 0.0, 0.0))] * 3 + [toy_column_bones(rig, thigh=(0.1, 0.0, 0.0))] * 3
+    dj, tj = run(rig, jump)
+    assert dj.counters['rateBreaks'] >= 1, dj.counters
+    assert any(abs(y - x) > lim + 1e-12 for x, y in zip(tj[2], tj[3])), (tj[2], tj[3])
+    # ground fallback: hips so low the tips reach under the ground; lifted past θmax, carried rows clear
+    rig = toy_column_rig()
+    dg = ColumnDriver(rig, cfg)
+    dg.step(toy_column_bones(rig, hips=(0.0, 0.05, 0.0)), dt)
+    assert dg.counters['groundFallback'] > 0
+    assert any(x > cfg['thetaMax'] * _DEG for x in dg.theta) and all(x <= cfg['thetaGround'] * _DEG + 1e-12 for x in dg.theta)
+    for s in range(2 * dg.n):
+        assert dg._lowest_row(s, dg.cur[s]) >= rig['ground'] - 1e-12 or dg.cur[s] >= cfg['thetaGround'] * _DEG - 1e-12
+    # triangle scoring: a triangle weighted only to col.L.0; an upper trial that swings it into a capsule is infeasible
+    n = 4
+    tri_form = {'anchors': None, 'clearance': 0.006, 'top': 1.1,
+                'panel': {'pos': [0.15, 0.4, -0.05, 0.15, 0.4, 0.05, 0.15, 0.3, 0.0], 'idx': [2 + n, 0, 0, 0] * 3,
+                          'w': [1.0, 0.0, 0.0, 0.0] * 3, 'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3}}
+    rig = toy_column_rig(n=n, capsules=[([0.6, 0.51, -0.2], [0.6, 0.51, 0.2], 0.03)], form=tri_form)
+    rig['form']['anchors'] = [{'a': h, 'ia': [0, 0, 0, 0], 'wa': [1, 0, 0, 0], 'b': h, 'ib': [0, 0, 0, 0], 'wb': [1, 0, 0, 0], 't': 0.0}
+                              for h in (_at(rig['rest'], u) for u in rig['upper'])]
+    dt_ = ColumnDriver(rig, cfg)
+    dt_.step(toy_column_bones(rig), dt)
+    clear = dt_._evaluate(0, 0.0, dt_.cur, True)
+    hit = dt_._evaluate(0, 40 * _DEG, dt_.cur, True)
+    plain = dt_._evaluate(0, 40 * _DEG, dt_.cur, False)
+    assert clear[2] == 0 and hit[2] > 0 and hit[0] > 0 and plain[2] == 0, (clear, hit, plain)
+    # bounded repair and the joint search: a capsule through the triangle; rate-limited steps repeat an angle
+    rig['capsules'] = [{'bone': 1, 'a': [0.13, 0.35, -0.3], 'b': [0.13, 0.35, 0.3], 'radius': 0.02}]
+    dr = ColumnDriver(rig, cfg)
+    dr.step(toy_column_bones(rig, thigh=(-0.5, 0.0, 0.0)), dt)
+    before = dr._triangle_depth(n, dr.cur)
+    dr.step(toy_column_bones(rig), 1e-3)
+    assert dr.counters['repairs'] >= 1, dr.counters
+    assert dr.counters['repairs'] <= 2 * cfg['repairRounds']
+    assert before == 0.0
+    # no single segment clears an enclosing capsule: the rate-limited search repeats its
+    # angle with the triangle still hit, so the two columns are searched jointly, still bounded
+    rig['capsules'] = [{'bone': 1, 'a': [0.15, 0.35, -0.01], 'b': [0.15, 0.35, 0.01], 'radius': 1.0}]
+    dj2 = ColumnDriver(rig, cfg)
+    dj2.step(toy_column_bones(rig, thigh=(-5.0, 0.0, 0.0)), dt)
+    dj2.step(toy_column_bones(rig), 1e-3)
+    assert dj2.counters['jointSearches'] >= 1, dj2.counters
+    assert dj2.counters['repairs'] <= 2 * cfg['repairRounds'] and dj2.counters['residual'] > 0, dj2.counters
+    print('column driver selftest: ok')

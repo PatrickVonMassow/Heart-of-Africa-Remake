@@ -550,6 +550,8 @@ export interface DriverCounters {
   groundFallback: number
   repairs: number
   jointSearches: number
+  /** Steps past the rate limit because only the larger step was feasible. */
+  rateBreaks: number
 }
 
 /** The posed frame the solve reads: everything that does not depend on a column angle. */
@@ -573,7 +575,7 @@ export class ColumnDriver {
   /** The continuous state: per segment its tilt θs (rad), and whether the ground fallback holds it. */
   readonly theta: Float64Array
   readonly held: Uint8Array
-  readonly counters: DriverCounters = { frames: 0, residual: 0, groundFallback: 0, repairs: 0, jointSearches: 0 }
+  readonly counters: DriverCounters = { frames: 0, residual: 0, groundFallback: 0, repairs: 0, jointSearches: 0, rateBreaks: 0 }
   /** The last frame's final violations per segment (≤ 0 satisfied), for tests and the report. */
   readonly violation: Float64Array
   private fresh = true
@@ -747,6 +749,11 @@ export class ColumnDriver {
   }
 
   // ----- constraints -----
+
+  /** Segment s evaluated at θ against the current solution of this frame (tests, the report). */
+  evaluateSegment(s: number, theta: number, triangles = true): { worst: number; ground: number; tri: number } {
+    return this.evaluate(s, theta, this.cur, triangles)
+  }
 
   /** Worst deficit of segment s at θ (≤ 0: every constraint met), the others at `th`. */
   private evaluate(s: number, theta: number, th: Float64Array, triangles: boolean): { worst: number; ground: number; tri: number } {
@@ -938,6 +945,7 @@ export class ColumnDriver {
       if (Math.abs(chosen - prev) > lim) {
         const clamped = prev + Math.sign(chosen - prev) * lim
         if (feasible(clamped) || !feasible(chosen)) chosen = clamped
+        else this.counters.rateBreaks++
       }
     }
     return chosen
