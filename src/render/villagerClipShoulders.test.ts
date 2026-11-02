@@ -145,4 +145,37 @@ describe('the gait clips keep the shoulders at the body’s own place', () => {
     // the loader's arrays are never written
     expect(turned.rot[at('shoulder.L')]).not.toBe(restored.rot[at('shoulder.L')])
   })
+
+  it('between keys the arm keeps its world rotation too, under a varying shoulder turn that does not commute with the arm', () => {
+    const rest = asset.rest
+    const clip = asset.clips.walk
+    const n = clip.times.length
+    // a shoulder turn that wanders 25–45° per key around changing axes, the child taking it out at each key
+    const turned: VillagerClip = { ...clip, rot: clip.rot.map((r) => Float32Array.from(r)) }
+    const q = new THREE.Quaternion()
+    const a = new THREE.Quaternion()
+    for (const s of ['L', 'R']) {
+      const sh = at(`shoulder.${s}`)
+      const ua = at(`upperArm.${s}`)
+      for (let f = 0; f < n; f++) {
+        const u = (2 * Math.PI * f) / n
+        q.setFromEuler(new THREE.Euler(0.4 + 0.25 * Math.sin(u), 0.3 * Math.cos(2 * u), -0.35 + 0.2 * Math.sin(3 * u)))
+        a.fromArray(turned.rot[sh], f * 4).multiply(q).toArray(turned.rot[sh], f * 4)
+        a.fromArray(turned.rot[ua], f * 4).premultiply(q.clone().invert()).toArray(turned.rot[ua], f * 4)
+      }
+    }
+    const restored = { ...turned, rot: turned.rot.slice() }
+    restClipShoulders(restored, asset.bones, asset.parents, 0)
+    const before = newWorld(asset.bones.length)
+    const after = newWorld(asset.bones.length)
+    let worst = 0
+    for (let f = 0; f < n - 1; f++) {
+      const phase = (clip.times[f] + 0.5 * (clip.times[f + 1] - clip.times[f])) / clip.duration
+      posed(turned, rest, phase, before)
+      posed(restored, rest, phase, after)
+      for (const s of ['L', 'R']) for (const b of [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`]) worst = Math.max(worst, before.q[at(b)].angleTo(after.q[at(b)]))
+    }
+    // measured 02.11.2026: 0.08° at worst, against 0.5° allowed
+    expect(worst).toBeLessThan((0.5 * Math.PI) / 180)
+  })
 })

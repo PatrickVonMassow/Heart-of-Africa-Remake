@@ -283,13 +283,16 @@ const _id = new THREE.Quaternion()
  * child of the shoulder given the turn the shoulder no longer makes, so the
  * upper arm keeps its world rotation and only its joint moves back to the
  * body's own shoulder (VILLAGER_GLTF.clipShoulderKeep). Works on a copy of the
- * tracks, never on the loader's arrays.
+ * tracks, never on the loader's arrays. Every track keys on the clip's one
+ * `times` (sampleClip reads them so); a child track of another length is left
+ * untouched rather than paired by index. Between keys the slerped product
+ * departs slightly from the product of the slerps (bounded in the test).
  */
 export function restClipShoulders(clip: VillagerClip, bones: readonly string[], parents: readonly number[], keep: number): void {
   for (const s of ['L', 'R']) {
     const sh = bones.indexOf(`shoulder.${s}`)
     if (sh < 0 || clip.rot[sh].length === 0) continue
-    const kids = parents.flatMap((p, i) => (p === sh && clip.rot[i].length > 0 ? [i] : []))
+    const kids = parents.flatMap((p, i) => (p === sh && clip.rot[i].length === clip.rot[sh].length ? [i] : []))
     const rs = (clip.rot[sh] = Float32Array.from(clip.rot[sh]))
     const rk = kids.map((k) => (clip.rot[k] = Float32Array.from(clip.rot[k])))
     for (let f = 0; f * 4 < rs.length; f++) {
