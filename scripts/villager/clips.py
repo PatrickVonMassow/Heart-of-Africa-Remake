@@ -116,7 +116,7 @@ def reference(src, joints, palm):
     """W_s(ref) for every villager bone: the source bone turned so that its
     direction AND twist match the villager's rest (the trunk is upright in both)."""
     ref = {}
-    for b in SK.NAMES:
+    for b in SK.JOINT_NAMES:
         k = src.slot[b]
         w = src.rest_wr[k]
         if b in SK.LIMBS:
@@ -138,13 +138,15 @@ def retarget(src, anim, joints, ref):
     tgt_hip = joints[SK.INDEX['hips'], :3]
     scale = tgt_hip[1] / src_hip_y
     Q = np.zeros((nf, len(SK.NAMES), 4))
+    # the column bones: identity rows, no source (the driver owns them)
+    Q[:, SK.COLUMN_INDEX, 3] = 1
     P = np.zeros((nf, 3))
     for f, t in enumerate(times):
         wt, wr = src.pose(anim, t)
         W = {}
-        for b in SK.NAMES:
+        for b in SK.JOINT_NAMES:
             W[b] = qnorm(qmul(wr[src.slot[b]], qinv(ref[b])))
-        for b in SK.NAMES:
+        for b in SK.JOINT_NAMES:
             p = SK.PARENT[b]
             Q[f, SK.INDEX[b]] = W[b] if p is None else qnorm(qmul(qinv(W[p]), W[b]))
         P[f] = tgt_hip + (wt[hips_k] - src.rest_wt[hips_k]) * scale

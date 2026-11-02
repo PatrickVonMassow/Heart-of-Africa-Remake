@@ -97,6 +97,20 @@ describe('the villager pipeline cache keys', () => {
     expect(keys()).toEqual(base)
   })
 
+  it('a skeleton edit (the column bones live there) moves the body, clips and garments keys', () => {
+    const base = keys()
+    appendFileSync(join(dir, 'skeleton.py'), '\nCOLUMN_COUNT = 12\n')
+    const moved = keys()
+    for (const k of ['body', 'clips', 'garments']) expect(moved[k]).not.toBe(base[k])
+  })
+
+  it('the driven garments\' config (capsule margins) moves every key', () => {
+    const base = keys()
+    writeFileSync(join(dir, 'config.json'), JSON.stringify({ VILLAGER_ASSET: { a: 1, drivenGarments: { capsuleMargin: { thigh: 0.005 } } }, VILLAGER_GLTF: { b: 2 }, FIGURE_STATURE: 1 }))
+    const moved = keys()
+    for (const k of ['body', 'clips', 'garments']) expect(moved[k]).not.toBe(base[k])
+  })
+
   it('a garment-code edit moves only the garments key', () => {
     const base = keys()
     appendFileSync(join(dir, 'fit.py'), '\n# edited\n')

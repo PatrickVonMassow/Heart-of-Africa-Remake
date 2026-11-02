@@ -82,7 +82,8 @@ def write_clip(w, name, clip, bone_nodes):
     times = clip['times'].astype(np.float32)
     inp = w.accessor(times[:, None], FLOAT, 'SCALAR', minmax=True)
     samplers, channels = [], []
-    for b in SK.NAMES:
+    # no channel for a column bone: the driver owns them (identity rows in the clip)
+    for b in SK.JOINT_NAMES:
         q = clip['q'][:, SK.INDEX[b]].astype(np.float32)
         samplers.append({'input': inp, 'output': w.accessor(q, FLOAT, 'VEC4'), 'interpolation': 'LINEAR'})
         channels.append({'sampler': len(samplers) - 1, 'target': {'node': bone_nodes[b], 'path': 'rotation'}})
@@ -154,6 +155,7 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
         'stature': cfg['VILLAGER_ASSET']['stature'],
         'toolHold': tool_hold(body),
     }
+    meta['columns'] = columns_meta(cfg)
     if garments:
         meta['garments'] = garments.get('meta', {})
     if mask is not None:
@@ -185,6 +187,20 @@ def check_shells(j, nbody, names):
     acc = j['accessors'][meshes['body']['primitives'][0]['attributes']['_REGION']]
     assert acc['count'] == nbody, (acc['count'], nbody)
     print(f'export: {len(names)} shells as extras, _REGION on {nbody} body vertices')
+
+
+def columns_meta(cfg):
+    """extras.villager.columns: the column bones (stage-3 plan section 3.1) —
+    count, segments per column, their angles about the hips axis and the
+    capsule margin table (VILLAGER_ASSET.drivenGarments.capsuleMargin)."""
+    margin = cfg['VILLAGER_ASSET']['drivenGarments']['capsuleMargin']
+    return {
+        'count': SK.COLUMN_COUNT,
+        'segments': SK.COLUMN_SEGMENTS,
+        'angles': [float(a) for a in SK.column_angles()],
+        'bones': {'upper': [f'col.U.{k}' for k in range(SK.COLUMN_COUNT)], 'lower': [f'col.L.{k}' for k in range(SK.COLUMN_COUNT)]},
+        'capsules': {f'{b}.{s}': float(margin[b]) for b in ('thigh', 'shin', 'foot', 'toe') for s in 'LR'},
+    }
 
 
 def tool_hold(body):

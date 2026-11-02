@@ -67,7 +67,49 @@ export function hungHeads(asset: VillagerAsset, rest: Float32Array, world: THREE
     out[i * 3 + 1] = out[p * 3 + 1] + off.y
     out[i * 3 + 2] = out[p * 3 + 2] + off.z
   }
+  return hangColumns(asset, out)
+}
+
+const meanY = (asset: VillagerAsset, heads: Float32Array, bone: string) =>
+  0.5 * (heads[asset.bones.indexOf(`${bone}.L`) * 3 + 1] + heads[asset.bones.indexOf(`${bone}.R`) * 3 + 1])
+
+/**
+ * The column bones' runtime knee pivots (stage-3 plan section 3.2, owner
+ * decision G1/G2): each `col.L` head at the mean hung `shin` height, x and z
+ * kept; the upper heads stay at the file's reference (girdle iso-line, on
+ * `hips`). Mutates and returns `heads` (scripts/villager/gamepath.py hang_columns).
+ */
+export function hangColumns(asset: VillagerAsset, heads: Float32Array): Float32Array {
+  if (!asset.columns) return heads
+  const knee = meanY(asset, heads, 'shin')
+  for (const n of asset.columns.bones.lower) heads[asset.bones.indexOf(n) * 3 + 1] = knee
+  return heads
+}
+
+/** Per column its ankle pivot (columns × 3, the frame of `heads`): below the
+ *  knee pivot at the mean `foot` height; null without columns. */
+export function columnAnkles(asset: VillagerAsset, heads: Float32Array): Float32Array | null {
+  if (!asset.columns) return null
+  const ankle = meanY(asset, heads, 'foot')
+  const lower = asset.columns.bones.lower
+  const out = new Float32Array(lower.length * 3)
+  lower.forEach((n, k) => {
+    const i = asset.bones.indexOf(n)
+    out.set([heads[i * 3], ankle, heads[i * 3 + 2]], k * 3)
+  })
   return out
+}
+
+/** DEV: the column pivots stand at the hung landmarks of this person. */
+function assertColumnPivots(asset: VillagerAsset, rest: Float32Array, ankles: Float32Array | null): void {
+  if (!asset.columns || !ankles) return
+  const knee = meanY(asset, rest, 'shin')
+  const ankle = meanY(asset, rest, 'foot')
+  asset.columns.bones.lower.forEach((n, k) => {
+    const dk = Math.abs(rest[asset.bones.indexOf(n) * 3 + 1] - knee)
+    const da = Math.abs(ankles[k * 3 + 1] - ankle)
+    if (dk >= 1e-4 || da >= 1e-4) throw new Error(`column pivot off its hung landmark: ${n} knee ${dk}, ankle ${da}`)
+  })
 }
 
 /** Skin a geometry from `rest` onto the same skeleton turned by `world` with
@@ -198,6 +240,9 @@ export interface GltfPerson {
   cover: Uint16Array | null
   /** Per body vertex its shell region word (render/villagerShell.ts), or null. */
   region: Uint32Array | null
+  /** Per column bone its ankle pivot on the drawn body (columns × 3, the
+   *  frame of `rest`; `columnAnkles`), or null without columns. */
+  columnAnkles: Float32Array | null
 }
 
 /** A person's skeleton before the hang and the transform onto the drawn one:
@@ -255,6 +300,8 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     rest[i * 3 + 1] = (heads[i * 3 + 1] - sole) * s
     rest[i * 3 + 2] = heads[i * 3 + 2] * s
   }
+  const ankles = columnAnkles(asset, rest)
+  if (import.meta.env.DEV) assertColumnPivots(asset, rest, ankles)
   restBounds(g)
   const p = measureProportions(asset, g, dom, rest, p0)
   const cov = asset.geometries.body.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
@@ -267,6 +314,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0), influences: w },
     cover: cov ? Uint16Array.from(cov.array as ArrayLike<number>) : null,
     region: reg ? regionWords(reg.array as ArrayLike<number>) : null,
+    columnAnkles: ankles,
   }
 }
 

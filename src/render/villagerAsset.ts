@@ -87,11 +87,40 @@ export interface VillagerAsset {
   garmentMask: string[]
   /** The shell garments' recipes (render/villagerShell.ts), or null without any. */
   shells: ShellSet | null
+  /** The driven garments' column bones (scripts/villager/skeleton.py), or null without any. */
+  columns: ColumnSet | null
+}
+
+/** extras.villager.columns (scripts/villager/export.py `columns_meta`): the
+ *  column bones the driven garments hang on; no clip writes them. */
+export interface ColumnSet {
+  count: number
+  segments: number
+  /** Per column its angle about the hips axis (rad; 0 the front, toward +x). */
+  angles: number[]
+  /** Per column the upper (`col.U.k`, on `hips`) and lower (`col.L.k`) bone names. */
+  bones: { upper: string[]; lower: string[] }
+  /** Per leg bone the capsule margin (figure units). */
+  capsules: Record<string, number>
+}
+
+/** A column bone: the driver's own, never a clip's (stage-3 plan section 3.1). */
+export const isColumnBone = (name: string): boolean => /^col\.[UL]\.\d+$/.test(name)
+
+const _clipBones = new WeakMap<readonly string[], string[]>()
+/** The bones a clip writes: every bone but the columns, in the asset's order. */
+export function clipBones(asset: Pick<VillagerAsset, 'bones'>): string[] {
+  let out = _clipBones.get(asset.bones)
+  if (!out) _clipBones.set(asset.bones, (out = asset.bones.filter((b) => !isColumnBone(b))))
+  return out
 }
 
 /** The bone name a glTF node carries ('.' is reserved by three's
  *  PropertyBinding, so the file writes 'upperArm_L'). */
-export const boneOfNode = (node: string): string => node.replace(/_(L|R)$/, '.$1')
+export const boneOfNode = (node: string): string => {
+  const col = /^col_([UL])_(\d+)$/.exec(node)
+  return col ? `col.${col[1]}.${col[2]}` : node.replace(/_(L|R)$/, '.$1')
+}
 
 const v3 = (a: unknown): THREE.Vector3 => {
   const [x, y, z] = (a as number[]) ?? [0, 0, 0]
@@ -110,6 +139,7 @@ interface Meta {
   stature: number
   garmentMask?: { garments: string[] }
   shells?: ShellSet
+  columns?: ColumnSet
 }
 
 /** Turn a parsed glTF into the villager asset. */
@@ -209,6 +239,7 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     stature: meta.stature,
     garmentMask: meta.garmentMask?.garments ?? [],
     shells: meta.shells ?? null,
+    columns: meta.columns ?? null,
   }
 }
 

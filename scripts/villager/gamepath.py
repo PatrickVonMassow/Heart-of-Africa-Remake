@@ -46,7 +46,17 @@ def hung_heads(h, hang):
     for i in rig.ORDER:
         p = rig.PARENT_IDX[i]
         out[i] = h[i] if p < 0 else out[p] + qmat(hang[p]) @ (h[i] - h[p])
-    return out
+    return hang_columns(out)
+
+
+def hang_columns(heads):
+    """villagerFigureBody.ts hangColumns: the column bones' knee pivots
+    (`col.L` heads) at the mean hung `shin` height (stage-3 plan section 3.2)."""
+    knee = 0.5 * (heads[I['shin.L'], 1] + heads[I['shin.R'], 1])
+    for n in SK.COLUMN_NAMES:
+        if n.startswith('col.L.'):
+            heads[I[n], 1] = knee
+    return heads
 
 
 def bake(verts, jidx, jw, h, heads, hang):

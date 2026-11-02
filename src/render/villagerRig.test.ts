@@ -9,7 +9,7 @@ import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
-import { parseVillager, type VillagerAsset } from './villagerAsset'
+import { isColumnBone, parseVillager, type VillagerAsset } from './villagerAsset'
 import { legScale, morphInfluences, restHeads } from './villagerBody'
 import {
   contactPoints,
@@ -42,8 +42,8 @@ describe('the glTF villager asset', () => {
     expect(asset.parents[asset.bones.indexOf('foot.L')]).toBe(asset.bones.indexOf('shin.L'))
   })
 
-  it('has a three-segment spine over a short pelvis: 22 bones, hips → spine → spine1 → chest → neck', () => {
-    expect(asset.bones).toHaveLength(22)
+  it('has a three-segment spine over a short pelvis: 22 joint bones, hips → spine → spine1 → chest → neck', () => {
+    expect(asset.bones.filter((b) => !isColumnBone(b))).toHaveLength(22)
     const parent = (b: string) => asset.bones[asset.parents[asset.bones.indexOf(b)]]
     expect(asset.parents[asset.bones.indexOf('hips')]).toBe(-1)
     expect(parent('spine')).toBe('hips')

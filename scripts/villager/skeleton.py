@@ -11,6 +11,13 @@ The trunk is three segments over a short pelvis (natural-villager-motion
 concept step 2): `hips` (pelvis → lumbar), `spine` (MakeHuman spine_01),
 `spine1` (spine_02) and `chest` (spine_03), each with its own pivot, so a lean
 spread over them curves the back instead of folding it at one joint.
+
+After those 22 come the column bones of the driven garments (stage-3 plan,
+docs/garment-stage3-plan-1398.md section 3.1): a computed-head kind whose heads
+come from the body's surface, not from a MakeHuman joint (body.py
+`column_joints`). Twelve columns about the hips axis, each an upper segment
+`col.U.k` (parent `hips`, girdle to knee pivot) and a lower one `col.L.k`
+(parent `col.U.k`, knee pivot to ankle pivot). No clip writes them.
 """
 
 # name, parent, MakeHuman joint group of the head, joint group (or None) of the tail
@@ -38,9 +45,27 @@ BONES = [
     ('toe.L', 'foot.L', 'joint-l-foot-1', 'joint-l-toe-2-4'),
     ('toe.R', 'foot.R', 'joint-r-foot-1', 'joint-r-toe-2-4'),
 ]
+# The MakeHuman-joint bones: the ones the clips retarget and write.
+JOINT_NAMES = [b[0] for b in BONES]
+
+COLUMN_COUNT = 12
+COLUMN_SEGMENTS = 2
+# computed-head kind: no MakeHuman joint group (body.py column_joints)
+COLUMN_BONES = ([(f'col.U.{k}', 'hips', None, None) for k in range(COLUMN_COUNT)]
+                + [(f'col.L.{k}', f'col.U.{k}', None, None) for k in range(COLUMN_COUNT)])
+COLUMN_NAMES = [b[0] for b in COLUMN_BONES]
+BONES = BONES + COLUMN_BONES
 NAMES = [b[0] for b in BONES]
 PARENT = {b[0]: b[1] for b in BONES}
 INDEX = {n: i for i, n in enumerate(NAMES)}
+COLUMN_INDEX = [INDEX[n] for n in COLUMN_NAMES]
+
+
+def column_angles():
+    """The columns' angles about the hips axis (rad): k = 0 the front (+z),
+    turning toward +x, as garments.angles(COLUMN_COUNT)."""
+    import math
+    return [2 * math.pi * k / COLUMN_COUNT for k in range(COLUMN_COUNT)]
 
 
 def topo_order():
@@ -95,4 +120,4 @@ UAL2 = {
 # Bones whose rest DIRECTION is aligned before retargeting (limbs: the source
 # stands in a T-pose, the villager in MakeHuman's A-pose); the trunk keeps its
 # rest orientation (both stand upright, facing +z).
-LIMBS = {n for n in NAMES if n.split('.')[0] in ('shoulder', 'upperArm', 'forearm', 'hand', 'thigh', 'shin', 'foot', 'toe')}
+LIMBS = {n for n in JOINT_NAMES if n.split('.')[0] in ('shoulder', 'upperArm', 'forearm', 'hand', 'thigh', 'shin', 'foot', 'toe')}
