@@ -2766,6 +2766,42 @@ export const VILLAGER_ASSET = {
    *  Placeholder until the containment test calibrates it. Calibratable. */
   drivenGarments: {
     capsuleMargin: { thigh: 0.004, shin: 0.004, foot: 0.004, toe: 0.004 },
+    /** The column driver (render/villagerSkirtDriver.ts, plan sections 3.4 to
+     *  3.7; mirrored by scripts/villager/gamepath.py). Angles in degrees,
+     *  lengths in pipeline figure units (× the person's scale at run time),
+     *  heights relative to the stature H. Calibratable placeholders. */
+    driver: {
+      /** Outward tilt bound; the ground fallback alone may reach thetaGround. */
+      thetaMax: 80,
+      thetaGround: 110,
+      /** Coarse sample step, the two refinements about the best sample, the bisection resolution. */
+      coarseStep: 10,
+      refine: [5, 2.5],
+      bisect: 0.25,
+      /** The ground fallback's candidate step over (thetaMax, thetaGround]. */
+      groundStep: 2.5,
+      /** Relaxation time constant toward the gravity target (s) and the rate limit (°/s). */
+      tau: 0.25,
+      omegaMax: 400,
+      /** Largest tilt difference between neighbouring columns. */
+      neighbourLimit: 60,
+      repairRounds: 3,
+      /** Stations along a segment, as fractions from its top pivot. */
+      stations: [1 / 3, 2 / 3, 1],
+      /** Lowest row height over the ground plane. */
+      groundClearance: 0.002,
+      /** Cloth clearance while no driven form supplies its own (the rank-1 band offset). */
+      clearance: 0.006,
+      /** Share of the world-down tilt a lower segment hangs toward (revision 2's gravity blend). */
+      gravityBlend: 1,
+      /** Pelvis profile: crotch below the hips joint, bin height, sample cap and arm-weight cap. */
+      crotch: 0.03,
+      pelvisBin: 0.02,
+      pelvisSamples: 240,
+      pelvisArm: 0.2,
+      /** A frame step above this (s) re-enters solving from the gravity solution. */
+      resetDt: 0.25,
+    },
   },
   /** Per shell mesh name, a base that replaces garmentShellBase; empty since
    *  the breast cloth returned to its hull-tube builder. Calibratable. */
