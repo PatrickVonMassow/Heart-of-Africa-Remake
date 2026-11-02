@@ -1171,12 +1171,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1081": {
-      "at": "2026-09-09T01:31:59.563Z",
-      "why": "Maschinell abgelegt beim Verifizieren von 1080, mittlere Kritikalitaet und ohne Blockade: die Episode steht schon im versandten Stand, also hinter die Auslieferung.",
-      "origin": "machine",
-      "place": "last"
-    },
     "1084": {
       "at": "2026-09-09T19:43:44.479Z",
       "why": "Der Wächter-Defekt kostet nur Rechenzeit und ist mit Nachmessen zu umgehen; er wartet hinter der Spielarbeit.",
@@ -1841,7 +1835,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-02T21:56:00.709Z",
+    "at": "2026-11-02T23:07:18.858Z",
     "points": [
       184,
       200,
@@ -2197,7 +2191,6 @@
       1074,
       1078,
       1079,
-      1081,
       1084,
       1095,
       1096,
