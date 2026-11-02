@@ -94,6 +94,7 @@ function callGuard(toolName, toolInput = {}, {
       HOA_CONTEXT_FENCE_MODE: '',
       HOA_CONTEXT_TRIGGER_TOKENS: '',
       HOA_CONTEXT_REFUSAL_TOKENS: '',
+      CLAUDE_CODE_REMOTE: '',
       ...env,
     },
     input: JSON.stringify({
@@ -205,6 +206,12 @@ describe('context-fence-guard, ARMED (spawned)', () => {
     expect(out.permissionDecisionReason).toContain('434440')
     expect(out.permissionDecisionReason).toContain('CONTEXT CEILING')
     expect(out.permissionDecisionReason).toContain('context-fence-override.mjs')
+  })
+
+  it('a cloud session (CLAUDE_CODE_REMOTE) is not bound: the same owner start passes', () => {
+    const r = callGuard('Agent', { prompt: 'build point 701' }, { env: { ...ARMED, CLAUDE_CODE_REMOTE: 'true' } })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout.trim()).toBe('')
   })
 
   it('the deny REPEATS — it is a fence, not a once-per-turn nudge', () => {

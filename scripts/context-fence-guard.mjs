@@ -270,6 +270,10 @@ try {
   }
   if (!payload) process.exit(0)
   if (existsSync(PAUSE)) process.exit(0)
+  // A cloud session (CLAUDE_CODE_REMOTE) is a commissioned delegate in its own
+  // clone: it takes no boundary and no launcher can succeed it, so the fence
+  // stands down there (it refused the point-1398 plan write on 02.11.2026).
+  if (process.env.CLAUDE_CODE_REMOTE === 'true') process.exit(0)
   const sid = payload.session_id || ''
   if (!sid) process.exit(0)
   const lock = readOwnerLock()
