@@ -117,6 +117,7 @@ put it is the mistake this line exists to stop.
   FINAL STATE: the far shoulder and upper arm of a walking or running villager read as a rounded shoulder at 3 m in side and rear-3/4 views on both backends; the cause (body mesh silhouette, skin weights at the shoulder, or the swing pose) is named in the commit.
   Test: Vitest for the cause's layer; picture check of the named garment-acceptance rows on both backends.
   Criticality: medium - visible on most walking villagers seen from the side at close range.
+  Split 02.11.2026 (owner picture check of dd4538115, both backends, garment-acceptance cairo 3 m): the clip cause is fixed — side views and the run rear-3/4 view show a rounded shoulder, the slab behind the back is gone. The walk rear-3/4 rows (man, child) keep a flatter but still corner-topped far shoulder with the clip shoulder turn already at 0, so a different cause; moved to point 1479.
   Bundle: Dorfleben.
 - [ ] 1398. Villager garments stage 3: skirts, loin flap, apron and girdle tails on driven column bones
   Queue position: directly after point 1347.
@@ -15923,4 +15924,10 @@ to land than a mechanism that needs a review.
   FINAL STATE: a woman wearing the breast cloth shows it covering the bust down to the waist at 3 m and 7 m in a village and a port city on both backends; the cause (cover mask, pre-split body, runtime TSL correction or the builder) is named in the commit.
   Test: Vitest for the cause's layer; picture check of the forced breast-cloth rows on both backends (the garment-acceptance lineup once point 1347 has landed it, otherwise a village close-up of a woman wearing it).
   Criticality: high - visible on every woman wearing the breast cloth in normal play.
+  Bundle: Dorfleben.
+- [ ] 1479. Villager far shoulder keeps a flat, corner-topped outline in walk rear-3/4 views
+  Source: split from point 1478, owner picture check 02.11.2026 of feat/1478-shoulder-slab dd4538115 (garment-acceptance, cairo, 3 m, WebGPU and WebGL 2 identical): rows trousers-walk-man-rear34 and trousers-walk-child-rear34 show the far shoulder with a flat top edge and a near-right-angled outer corner. Frames: local/1478-after/1347-accept-trousers-walk-{man,child}-rear34-cairo-3m{,-webgl2}.png; before-frames local/1478-before/. The gait clips' shoulder turn is already 0 (VILLAGER_GLTF.clipShoulderKeep), so the clip swing is not the cause.
+  FINAL STATE: the far shoulder of a walking man and child reads as a rounded shoulder at 3 m in rear-3/4 views on both backends; the cause (body mesh silhouette at the shoulder cap, skin weights, or shading) is named in the commit.
+  Test: Vitest for the cause's layer; picture check of the two named garment-acceptance rows on both backends.
+  Criticality: low - a corner on the far shoulder outline at close range from behind.
   Bundle: Dorfleben.
