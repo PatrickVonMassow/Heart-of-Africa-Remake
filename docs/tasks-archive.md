@@ -35432,3 +35432,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Criticality: medium - visible on most walking villagers seen from the side at close range.
   Split 02.11.2026 (owner picture check of dd4538115, both backends, garment-acceptance cairo 3 m): the clip cause is fixed — side views and the run rear-3/4 view show a rounded shoulder, the slab behind the back is gone. The walk rear-3/4 rows (man, child) keep a flatter but still corner-topped far shoulder with the clip shoulder turn already at 0, so a different cause; moved to point 1479.
   Bundle: Dorfleben.
+
+- [x] 1340. Tag catcher's hands at chest height and on the caught child at the catch frame
+  Amended 19.10.2026 from point 1343's author: concept step 15 removes the catcher's forward chest-height hands, so that half of this final state is obsolete; the catch-frame hand on the caught child stays here (flaky: red on 3 WebGPU runs, 0.45 m catch distance at lean cap 0.12 rad).
+  Queue position: after point 1333; point 1343 reworks the port-city chaser pose (point 1316's item 7) — if 1343 lands with `polish-children --section=tag-catch` green on both backends, this point closes with that run as evidence.
+  Source: findings carrier 12.10.2026 02:47Z: polish-children --section=tag-catch (Cairo) is red on main 8a477d931 and on feat/1315 alike. WebGPU: "the catcher's two hands are held forward at chest height, read off the drawn pivots" fails (hand y 0.889/0.895); WebGL 2 on feat/1315: "at the catch frame the catcher's drawn hand is ON the caught child" fails. Not in the classified baseline. Logs: local/1315-main-port-webgpu.log, local/1315-port-webgl.log.
+  Final state: in the port-city tag game the catcher's drawn hands are held forward at chest height while chasing and one drawn hand is on the caught child at the catch frame, on both backends.
+  Verifiable: `polish-children --section=tag-catch` green on both backends; the catch frame picture-checked.
+  Criticality: medium - a standing red in the children suite; visible in every port city's tag game.
+  Bundle: Dorfleben.

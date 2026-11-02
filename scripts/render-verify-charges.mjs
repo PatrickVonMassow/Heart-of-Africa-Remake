@@ -185,13 +185,6 @@ export const RED_CHARGES = [
     why: 'Full WebGPU polish-villagers runs on feat/1415 d3201e61c, 26.10.2026 (logs 05-21 crashed run, 06-39-00-663): red only in the long full run, green on the merge-base and in three --section=figure-micro runs. Charged to the full-run load point until it measures them. The charge dies with it.',
   },
   {
-    point: 1340,
-    suite: 'polish-children',
-    kind: 'check',
-    match: /at the catch frame the catcher's drawn hand is ON the caught child/i,
-    why: 'Covering WebGPU run on main after point 1343 landed, 19.10.2026: hand 3.2 cm off the trunk at a 3.2 cm hand radius. Point 1340 keeps the catch-frame hand on the caught child (amended 19.10.2026); the charge dies with it.',
-  },
-  {
     point: 1434,
     suite: 'polish-children',
     kind: 'check',

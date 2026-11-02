@@ -122,6 +122,7 @@ put it is the mistake this line exists to stop.
   Verifiable: plan and break-check record; forced-outfit acceptance rows per form in `polish-villagers`, both backends, picture-checked, the WindelLook situation re-shot; pipeline selftests and Vitest; cross-vendor review record.
   Bundle: Dorfleben.
   Criticality: high - every villager wearing these forms, visible at first glance.
+  Blocked sub-step 1 (02.11.2026, owner): the cloud author (session_019XD8Qtk1iMyLVJax3Tpz1J) stopped before any change because the pinned Blender 3.4.1 (Debian) cannot be installed in the Ubuntu cloud container (deb.debian.org 403) and the pipeline rebuild needs bpy, so sub-step 1 is authored in the LOCAL worktree, not as a cloud session. It also reported two plan gaps to settle in docs/garment-stage3-plan-1398.md before re-commissioning: (1) the 3.2 per-form rest contract needs 3.3 column anchors and 3.8 driven heads that exist only from sub-step 3, so state whether sub-step 1 delivers only the reference-head fallback; (2) without a carried form F, say whether the upper runtime pivots use the reference heads.
 - [ ] 1399. Villager garments stage 4: shirt, robe, togas and wraps as trunk shells with driven hems
   Queue position: directly after point 1398.
   Source: split from point 1347 on 21.10.2026 (owner decision under the standing split rule): point 1347 delivered stage 1 of the approved staged garment plan (docs/garment-merge-r9-1347.md, user decision on the board "Kleidungsplan stufenweise prüfen"); its user goal (user 12.10.2026: a walking villager's swing leg leaves its trouser leg behind; a child's hip cloth stands off the body like a diaper) is finished by this point and its siblings.
@@ -151,15 +152,6 @@ put it is the mistake this line exists to stop.
   Final state: Western tourists at Giza (men: jacket, long trousers, shoes, pith helmet; women: long skirt, long sleeves, shoes, hat) and the bird's-eye traveller (khaki jacket and trousers, boots, pith helmet, backpack) are dressed period-correct for 1890 per docs/giza-1890.md with garments from the rebuilt construction of point 1347; the dragoman's tarboosh is drawn; wound marks, swim, canoe and drag stay readable from above.
   Verifiable: Vitest on the Giza cast and traveller look (garment ids present per role); per backend one picture of the Giza tourists close up and one of the traveller from above, picture-checked.
   Criticality: medium - player-visible at Giza and in the whole travel view, both backends.
-  Bundle: Dorfleben.
-
-- [ ] 1340. Tag catcher's hands at chest height and on the caught child at the catch frame
-  Amended 19.10.2026 from point 1343's author: concept step 15 removes the catcher's forward chest-height hands, so that half of this final state is obsolete; the catch-frame hand on the caught child stays here (flaky: red on 3 WebGPU runs, 0.45 m catch distance at lean cap 0.12 rad).
-  Queue position: after point 1333; point 1343 reworks the port-city chaser pose (point 1316's item 7) — if 1343 lands with `polish-children --section=tag-catch` green on both backends, this point closes with that run as evidence.
-  Source: findings carrier 12.10.2026 02:47Z: polish-children --section=tag-catch (Cairo) is red on main 8a477d931 and on feat/1315 alike. WebGPU: "the catcher's two hands are held forward at chest height, read off the drawn pivots" fails (hand y 0.889/0.895); WebGL 2 on feat/1315: "at the catch frame the catcher's drawn hand is ON the caught child" fails. Not in the classified baseline. Logs: local/1315-main-port-webgpu.log, local/1315-port-webgl.log.
-  Final state: in the port-city tag game the catcher's drawn hands are held forward at chest height while chasing and one drawn hand is on the caught child at the catch frame, on both backends.
-  Verifiable: `polish-children --section=tag-catch` green on both backends; the catch frame picture-checked.
-  Criticality: medium - a standing red in the children suite; visible in every port city's tag game.
   Bundle: Dorfleben.
 
 - [ ] 1344. Children's hand contacts in polish-children: runner hands at its sides, bank-tap hand on the flank, arriving runner's hand on the far stone
