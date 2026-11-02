@@ -4,6 +4,8 @@ Stage plan for skirtShort, skirtKnee, loinFlap, apron and girdleTails on driven 
 
 Owner decision on X1 (02.11.2026): the `.driven` cloak variant is allowed inside point 1398 as the terminal fallback step of section 3.11.
 
+Owner decision on the two sub-step-1 gaps the cloud author reported (02.11.2026): (G1) sub-step 1 delivers only the reference-head fallback of section 3.1 and the knee and ankle runtime pivots from the hung `shin` and `foot` heights with their DEV assertion; the per-form rest contract of section 3.2 (heads from F's column anchors, `extras.villager.driven[F].heads`, the 1e-4 rest-equality Vitest and the anchor-against-junction assertion) lands in sub-step 3, where anchors (3.3) and driven heads (3.8) first exist. (G2) A figure without a driven form F keeps the upper runtime pivots at the reference heads (girdle iso-line, offset zero, parented to `hips`); only the knee and ankle pivots are recomputed after `hungHeads`.
+
 Sources: docs/garment-merge-r9-1347.md section 3 (the stage-3 list); the definitions it inherits from revision 2 ("Loose garments", round-2 B2 to B9) and revision 3 (the deferrals B2 to B7, B9, B10, B18 to B20, with their round-3 objections in docs/garment-check-3-1347.md); docs/garment-merge-r10-1347.md (the amended pre-split, which landed).
 
 Procedure (point 1398): this plan goes to the cross-vendor break check until approved, then to the user, then to implementation. No file under `src/` changes before that.
@@ -604,9 +606,9 @@ The final state of point 1398 is met when every row reads dressed on both backen
 
 Each sub-step is a commit series on `feat/1398-…`. It lands only with the cheap gate (tsc, lint, build, test:unit, the covering suite) and, where the picture moves, the both-backend picture of its rows, still and moving. The owner may split the later sub-steps into their own points under the standing split rule.
 
-1. **Column bones** (sections 3.1, 3.2): skeleton, body, clips, export, asset, clip-layer exclusion, per-form rest contract, runtime pivots with DEV assertion, cache keys, pipeline rebuild. Picture: unchanged idle, walk and dig against main on both backends (R5).
+1. **Column bones** (sections 3.1, 3.2 as limited by owner decision G1/G2): skeleton, body, clips, export, asset, clip-layer exclusion, reference heads, knee and ankle runtime pivots with DEV assertion, cache keys, pipeline rebuild. Picture: unchanged idle, walk and dig against main on both backends (R5).
 2. **Driver** (sections 3.4 to 3.7): TypeScript driver with frames, state and final evaluation; the Python mirror; capsules and containment Vitest; round trip with no driven garment worn (columns posed, unweighted). No picture change.
-3. **Driven builder with loinFlap and girdleTails** (sections 3.3, 3.8 to 3.10, 3.12, 3.13 for two forms): mesh identity, bands, panels, junction, clearance, removal of their legacy branch. Pictures: their rows, WindelLook, the loin flap over the beads, the arm rows.
+3. **Driven builder with loinFlap and girdleTails** (sections 3.2 per-form rest contract, 3.3, 3.8 to 3.10, 3.12, 3.13 for two forms): mesh identity, bands, panels, junction, clearance, removal of their legacy branch. Pictures: their rows, WindelLook, the loin flap over the beads, the arm rows.
 4. **Apron.** Pictures: its rows, the apron over the beads, the arm rows.
 5. **skirtShort and skirtKnee.** Pictures: their rows, the 1380 framing, the arm rows.
 6. **Routing** (section 3.11): the outer-garment combinations, outfit-specific ease, then omission (robe) or joint migration (cloak) where reached.
