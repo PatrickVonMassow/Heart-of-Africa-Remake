@@ -1,0 +1,33 @@
+import { it } from 'vitest'
+import { village, frame } from './tagShuffleHarness'
+const EPS = (process.env.EPS ?? '').split(',').filter(Boolean)
+const deg = (a: number) => Math.round(((Math.atan2(Math.sin(a), Math.cos(a))) * 180) / Math.PI)
+it('class', () => {
+  for (const ep of EPS) {
+    const [ID, SEED, CHILD, TC] = ep.split(':')
+    const v = village(ID, Number(SEED), undefined, { adultsAmongTheChildren: true })
+    const k = Number(CHILD), t0 = Number(TC), t1 = Number(TC) + 1.0
+    let rec: any = null
+    ;(globalThis as any).__t1081 = (c: any, desired: number, steer: number, heading: number, moved: boolean) => { if (c === v.children[k]) rec = { mx: c.x, mz: c.z, desired, steer, heading, moved } }
+    let push = 0, held = 0, rel = 0, jump = 0, jumpAt = 0, minKid = 9, pushers = new Set<number>(), lastDes = NaN, lastEdge = 0, defl = 0, roles = new Set<string>()
+    for (let t = 0; t < t1; t += 1 / 60) {
+      rec = null
+      frame(v, 1 / 60)
+      if (t < t0) continue
+      const c: any = v.children[k], g: any = v.game
+      roles.add(g.chaser === k ? 'CH' : c.evading ? 'EV' : 'RT')
+      if (c.held) held++
+      if (lastEdge > 0 && c.edgeFor === 0) rel++
+      lastEdge = c.edgeFor
+      if (rec) {
+        const p = Math.hypot(c.x - rec.mx, c.z - rec.mz); push += p
+        if (Number.isFinite(lastDes)) { const j = Math.abs(deg(rec.desired - lastDes)); if (j > jump) { jump = j; jumpAt = g.clock } }
+        lastDes = rec.desired
+        if (Math.abs(deg(rec.heading - rec.steer)) > 18) defl++
+        if (p > 0.005) v.children.forEach((o: any, j: number) => { if (o !== c && Math.hypot(o.x - c.x, o.z - c.z) < 0.3) pushers.add(j) })
+      }
+      for (const o of v.children) if (o !== c) minKid = Math.min(minKid, Math.hypot(o.x - c.x, o.z - c.z))
+    }
+    console.log(`${ep} roles=${[...roles]} push=${push.toFixed(2)} pushers=${[...pushers]} held=${held} rel=${rel} defl=${defl} jump=${jump}@${jumpAt.toFixed(2)} minKid=${minKid.toFixed(2)}`)
+  }
+}, 600000)

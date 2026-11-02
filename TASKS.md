@@ -198,20 +198,6 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
 
-- [ ] 1081. Name, from a trace, why a child in a crowded tag round walks a metre and gets nowhere
-  Final state: the cause of the crowded construction's episodes (`tagShuffle.test.ts`, "and
-  holds when the adults walk through the children's own ground") is named from a trace, not
-  guessed, and recorded in `docs/1081-steering-trace.md` with its probes under
-  `docs/1081-probes/`. The sweep covers the tag-round villages (maasai, hausa, swahili, zulu,
-  san, tuareg × seeds 1–10, 99) at every cadence and states whether the planted adults, static
-  edges or playmates turn the child back on itself. The steering fixes and the crowded case's
-  multi-settlement sample are points 1457 and 1458, split off because no single steering change
-  converged over the 66-pair sweep.
-  Test: none beyond the recorded probes — the deliverable is the traced cause; the Vitest
-  coverage arrives with 1458.
-  Refs: src/scenes/place/tagGame.ts (`moveChild`, `evadeHeading`), docs/1081-steering-trace.md.
-  Bundle: Dorfleben.
-
 - [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
   (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
   polish`, log `local/verify-logs/2026-09-07T05-44-35-994-polish.log`).

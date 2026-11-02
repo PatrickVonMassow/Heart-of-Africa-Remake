@@ -1,0 +1,31 @@
+import { it } from 'vitest'
+import { village, frame } from './tagShuffleHarness'
+const [ID, SEED, CHILD, T0, T1] = (process.env.EP ?? 'swahili-village:5:2:30.0:32.8').split(':')
+it('trace', () => {
+  const v = village(ID, Number(SEED), undefined, { adultsAmongTheChildren: true })
+  const k = Number(CHILD)
+  const adults = [...v.others.standing, ...v.others.porters, ...v.others.walkers]
+  let rec: any = null
+  ;(globalThis as any).__t1081 = (c: any, desired: number, steer: number, heading: number, moved: boolean, bl: any, len: number, look: number, stopAt: any, world: any) => {
+    if (c === v.children[k]) {
+      const st = [] as string[]
+      for (const d of [len, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.4]) { const x = c.x + Math.sin(desired) * d, z = c.z + Math.cos(desired) * d; st.push(world.blocked(x, z) ? 'W' : bl(x, z) ? 'O' : '.') }
+      rec = { desired, steer, heading, moved, probe: st.join(''), len: len.toFixed(3), look: look.toFixed(2), stop: stopAt ? 'S' : '' }
+    }
+  }
+  const deg = (a: number) => ((a * 180) / Math.PI).toFixed(0).padStart(5)
+  let t = 0
+  const prev = new Map<any, [number, number]>()
+  for (; t < Number(T1); t += 1 / 60) {
+    rec = null
+    for (const a of adults) prev.set(a, [a.x, a.z])
+    frame(v, 1 / 60)
+    if (t < Number(T0)) continue
+    const c: any = v.children[k]
+    const g: any = v.game
+    const near = adults.map((a: any) => ({ d: Math.hypot(a.x - c.x, a.z - c.z), mv: Math.hypot(a.x - prev.get(a)![0], a.z - prev.get(a)![1]) * 60, b: (Math.atan2(a.x - c.x, a.z - c.z) * 180) / Math.PI }))
+      .sort((p, q) => p.d - q.d).slice(0, 2)
+    const role = g.chaser === k ? 'CH' : c.evading ? 'EV' : '--'
+    console.log(`${g.clock.toFixed(2)} ${role} x=${c.x.toFixed(2)} z=${c.z.toFixed(2)} w=${c.walked.toFixed(2)} des=${rec ? deg(rec.desired) : '  -  '} st=${rec ? deg(rec.steer) : '  -  '} hd=${rec ? deg(rec.heading) : '  -  '} mv=${rec?.moved ? 1 : 0} side=${c.edgeSide} edge=${c.edgeFor.toFixed(2)} ease=${c.edgeEase ? 1 : 0} held=${c.held ? 1 : 0} nud=${c.nudges} pr=${rec?.probe} len=${rec?.len} look=${rec?.look}${rec?.stop} | ${near.map((n) => `${n.d.toFixed(2)}m@${n.b.toFixed(0)} v${n.mv.toFixed(2)}`).join(' ')}`)
+  }
+}, 600000)

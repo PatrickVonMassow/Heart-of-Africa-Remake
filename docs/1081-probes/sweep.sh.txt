@@ -1,0 +1,13 @@
+#!/bin/bash
+# usage: sweep.sh OUTFILE [pairs...]; default 66 tag pairs, 4 shards
+cd /home/user/Heart-of-Africa-Remake
+OUT=$1; : > $OUT
+ALL=()
+for v in maasai hausa swahili zulu san tuareg; do for s in 1 2 3 4 5 6 7 8 9 10 99; do ALL+=("$v-village:$s"); done; done
+shift; [ $# -gt 0 ] && ALL=("$@")
+N=4
+for k in $(seq 0 $((N-1))); do
+  P=""; for i in "${!ALL[@]}"; do [ $((i % N)) -eq $k ] && P="$P,${ALL[$i]}"; done
+  PAIRS=${P#,} OUT=$OUT npx vitest run src/scenes/place/zz1081sweep.test.ts > $OUT.log$k 2>&1 &
+done
+wait
