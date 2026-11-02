@@ -9226,6 +9226,9 @@ to land than a mechanism that needs a review.
   `CI gate FAILED: shard-1/unit` while shard 1's summary named 318/318 files and 9990 tests
   passed, 0 failed — exit 1 from one `onTaskUpdate` timeout. The CI gate therefore needs the
   same not-judged verdict; the launcher handed it on as a RED repair path with nothing to repair.
+  Repeated on `main` the same day: runs 41393581230 (a7eff02), 41409116847 (0edc5af) and
+  41413354701 (dc4c2fe), each shard fast (1) with 318/318 files passed and one `onTaskUpdate`
+  timeout; each one spent a launcher successor as a repair path with nothing to repair.
   Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
   a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
