@@ -890,7 +890,10 @@ class ColumnDriver:
                 self.cur[s] = self._search(s, False)
         self._final_evaluation()
         self.counters['frames'] += 1
+        lim = cfg['omegaMax'] * _DEG * self.dt
         for s in range(2 * self.n):
+            if self.rated and abs(self.cur[s] - self.theta[s]) > lim + 1e-12:
+                self.counters['rateBreaks'] += 1
             self.theta[s] = self.cur[s]
             self.held[s] = 1 if self.hold[s] and self.cur[s] > cfg['thetaMax'] * _DEG + 1e-9 else 0
         return self.theta
@@ -1152,8 +1155,6 @@ class ColumnDriver:
                 clamped = prev + _sign(chosen - prev) * lim
                 if feasible(clamped) or not feasible(chosen):
                     chosen = clamped
-                else:
-                    self.counters['rateBreaks'] += 1
         return chosen
 
     # ----- final evaluation, repair, ground fallback -----

@@ -550,7 +550,7 @@ export interface DriverCounters {
   groundFallback: number
   repairs: number
   jointSearches: number
-  /** Steps past the rate limit because only the larger step was feasible. */
+  /** Final steps past the rate limit (only a larger step feasible, a repair, the joint search or the ground fallback). */
   rateBreaks: number
 }
 
@@ -640,7 +640,9 @@ export class ColumnDriver {
     }
     this.finalEvaluation()
     this.counters.frames++
+    const lim = cfg.omegaMax * DEG * this.dt
     for (let s = 0; s < 2 * this.n; s++) {
+      if (this.rated && Math.abs(this.cur[s] - this.theta[s]) > lim + 1e-12) this.counters.rateBreaks++
       this.theta[s] = this.cur[s]
       this.held[s] = this.hold[s] && this.cur[s] > cfg.thetaMax * DEG + 1e-9 ? 1 : 0
     }
@@ -945,7 +947,6 @@ export class ColumnDriver {
       if (Math.abs(chosen - prev) > lim) {
         const clamped = prev + Math.sign(chosen - prev) * lim
         if (feasible(clamped) || !feasible(chosen)) chosen = clamped
-        else this.counters.rateBreaks++
       }
     }
     return chosen
