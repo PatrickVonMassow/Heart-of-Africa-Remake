@@ -46,7 +46,8 @@ function toyRig(n = 4, capsules: Array<[V3, V3, number]> = [], form: DrivenFormR
     const a = (2 * Math.PI * k) / n
     const r: V3 = [Math.cos(a), 0, Math.sin(a)]
     radial.push(r)
-    tangent.push(norm([r[1] * 0 - r[2] * 1, r[2] * 0 - r[0] * 0, r[0] * 1 - r[1] * 0]))
+    // rk × up, up = (0, 1, 0)
+    tangent.push(norm([-r[2], 0, r[0]]))
     const h: V3 = [0.15 * r[0], 1.05, 0.15 * r[2]]
     heads.push(h)
     headOffset.push([h[0], h[1] - 1, h[2]])

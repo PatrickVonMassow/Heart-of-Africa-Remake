@@ -752,6 +752,26 @@ export class ColumnDriver {
 
   // ----- constraints -----
 
+  /** The posed obstacles of a frame (the containment test): the eight capsules, and whether a
+   *  figure-frame point lies inside the skinned pelvis profile (from its bottom up; above the top
+   *  bin the top bin's value holds, section 3.5). */
+  obstacles(bones: readonly THREE.Object3D[]): { capsules: Array<{ a: V3; b: V3; radius: number }>; inProfile: (p: V3) => boolean; profileExcess: (p: V3) => number } {
+    const P = this.pose(bones)
+    const rig = this.rig
+    const hipsAt = at(rig.rest, rig.hips)
+    return {
+      capsules: P.capsules,
+      inProfile: (p: V3) => {
+        const h = this.hipsLocal(p, P.hipsInv, hipsAt)
+        return h.y >= rig.profile.bottom && h.r <= P.profile.query(h.a, h.y)
+      },
+      profileExcess: (p: V3) => {
+        const h = this.hipsLocal(p, P.hipsInv, hipsAt)
+        return h.y >= rig.profile.bottom ? h.r - P.profile.query(h.a, h.y) : Infinity
+      },
+    }
+  }
+
   /** Segment s evaluated at θ against the current solution of this frame (tests, the report). */
   evaluateSegment(s: number, theta: number, triangles = true): { worst: number; ground: number; tri: number } {
     return this.evaluate(s, theta, this.cur, triangles)
