@@ -57,11 +57,45 @@ def corner_shapes(mh, cfg):
 
 
 def joints_of(mh, v):
-    """Head and tail of every villager bone for a shape."""
+    """Head and tail of every MakeHuman-joint bone for a shape."""
     j = {}
     for name, _parent, head, tail in SK.BONES:
-        j[name] = (mh.centroid(v, head), mh.centroid(v, tail))
+        if head is not None:
+            j[name] = (mh.centroid(v, head), mh.centroid(v, tail))
     return j
+
+
+COLUMN_SLAB = 0.012
+
+
+def column_joints(mh, v, j, arm, H):
+    """The column bones' form-neutral reference heads for a shape (stage-3
+    plan section 3.1): the upper heads on the girdle iso-line (offset zero,
+    the trunk's section outline without the arms) at the twelve angles about
+    the hips axis, the knee pivots below them at the mean `shin` height, the
+    ankle pivots at the mean `foot` height. A worn driven form replaces them
+    (section 3.2, a later step); they only keep a skeleton without one defined."""
+    from garments import angles, hull2d, landmarks, ray_hull
+    jrows = np.array([[*j[n][0], *j[n][1]] for n in SK.JOINT_NAMES] + [[0.0] * 6] * len(SK.COLUMN_NAMES))
+    y = landmarks(jrows, H)['girdle']
+    m = np.zeros(len(v), bool)
+    m[mh.groups['body']] = True
+    m &= arm < 0.3
+    pts = v[m & (np.abs(v[:, 1] - y) < COLUMN_SLAB)][:, [0, 2]]
+    if len(pts) < 3:
+        pts = v[m & (np.abs(v[:, 1] - y) < 3 * COLUMN_SLAB)][:, [0, 2]]
+    hull = hull2d(pts)
+    hips = j['hips'][0]
+    c = np.array([hips[0], hips[2]])
+    knee = 0.5 * (j['shin.L'][0][1] + j['shin.R'][0][1])
+    ankle = 0.5 * (j['foot.L'][0][1] + j['foot.R'][0][1])
+    out = {}
+    for k, d in enumerate(angles(SK.COLUMN_COUNT)):
+        x, z = c + d * ray_hull(hull, c, d)
+        top, mid, low = np.array([x, y, z]), np.array([x, knee, z]), np.array([x, ankle, z])
+        out[f'col.U.{k}'] = (top, mid)
+        out[f'col.L.{k}'] = (mid, low)
+    return out
 
 
 def morph_deltas(C):
@@ -310,7 +344,12 @@ def build_body(mh, cfg):
         h, side = m.split('.')
         deltas[m] = hand_shape(mh, basis, raw, side, shapes[h]) - basis
     # Joints per corner → per morph.
-    J = {k: joints_of(mh, v) for k, v in C.items()}
+    arm = Wfull[:, [SK.INDEX[n] for n in ARM_BONES]].sum(1)
+    H = cfg['VILLAGER_ASSET']['stature']
+    J = {}
+    for k, v in C.items():
+        J[k] = joints_of(mh, v)
+        J[k].update(column_joints(mh, v, J[k], arm, H))
     jarr = {k: np.array([[*J[k][n][0], *J[k][n][1]] for n in SK.NAMES]) for k in C}
     jbasis, jdel = morph_deltas(jarr)
     for m in HAND_MORPHS:

@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { balance, VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../config/balance'
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
-import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
+import { isColumnBone, parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
 import { clipGaitPose, clipPoseAt, gaitFootGround, heelOff, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, gaitAt, gaitWeights, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
@@ -82,6 +82,8 @@ describe('a clip pose on the hung skeleton', () => {
     toHung(asset, f, pose, local, hips)
     const drawn = hungJoints(child, local, hips)
     for (let i = 0; i < n; i++) {
+      // The columns hang at their reference heads on the drawn body, not the clip's (villagerColumnBones.test.ts).
+      if (isColumnBone(asset.bones[i])) continue
       const want = world.p[i].clone().setY(world.p[i].y - f.sole).multiplyScalar(f.scale)
       expect(drawn[i].distanceTo(want)).toBeLessThan(1e-4)
     }

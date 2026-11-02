@@ -19,7 +19,7 @@
 
 import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF as G, VILLAGER_POSE } from '../../config/balance'
-import type { VillagerAsset } from '../../render/villagerAsset'
+import { clipBones, type VillagerAsset } from '../../render/villagerAsset'
 import { LIVE_MORPHS, type LiveMorph } from '../../render/villagerBody'
 import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
@@ -235,7 +235,8 @@ export function applyClipLayers(
   if (c.dig > 0) {
     clipPoseAt(asset, f, asset.clips.dig, c.digT % asset.clips.dig.duration, c.pose)
     toHung(asset, f, c.pose, c.local, c.hips)
-    blendInto(asset, bones, asset.bones, c.local, c.dig)
+    // every bone a clip writes: the column bones stay the driver's
+    blendInto(asset, bones, clipBones(asset), c.local, c.dig)
     blendHips(bones, c.hips, c.dig)
   }
 }

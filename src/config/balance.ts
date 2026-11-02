@@ -2760,6 +2760,13 @@ export const VILLAGER_ASSET = {
    *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
   garmentShellBase: 0.003,
   garmentShellStep: 0.003,
+  /** The driven garments' column bones (docs/garment-stage3-plan-1398.md
+   *  section 3.5): per leg bone the margin added to its body capsule's
+   *  radius, figure units (≈ 5 mm), exported to extras.villager.columns.
+   *  Placeholder until the containment test calibrates it. Calibratable. */
+  drivenGarments: {
+    capsuleMargin: { thigh: 0.004, shin: 0.004, foot: 0.004, toe: 0.004 },
+  },
   /** Per shell mesh name, a base that replaces garmentShellBase; empty since
    *  the breast cloth returned to its hull-tube builder. Calibratable. */
   garmentShellBaseOverride: {} as Record<string, number>,
