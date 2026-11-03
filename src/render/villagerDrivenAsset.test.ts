@@ -39,7 +39,7 @@ function skinned(skeleton: THREE.Skeleton, pos: number[], idx: number[], w: numb
     for (let c = 0; c < 4; c++) {
       const wt = w[v * 4 + c]
       if (!wt) continue
-      m.fromArray(skeleton.boneMatrices, idx[v * 4 + c] * 16)
+      m.fromArray(skeleton.boneMatrices!, idx[v * 4 + c] * 16)
       acc.addScaledVector(p.set(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]).applyMatrix4(m), wt)
     }
     out.push(acc.x, acc.y, acc.z)
@@ -104,7 +104,7 @@ describe('the driven garments in the file', () => {
         const plain = gltfFigureGeometry(asset, person, [], '#5c3317', null, 0)
         const panelCount = gltfLayerGeometry(asset, person, layers[0])!.getAttribute('position').count
         expect(geo.getAttribute('position').count).toBeGreaterThan(plain.getAttribute('position').count + panelCount)
-        // the driver standing at rest keeps the panel within a band offset of its built shape
+        // the driver standing at rest: its anchors move no column head off row 0
         const driver = new ColumnDriver(columnRig(asset, { ...person, rest: dv!.rest, columnAnkles: dv!.columnAnkles }, dv!.form))
         driver.stepFrame(skeleton.bones, 1 / 30, 1)
         for (const b of skeleton.bones) expect(b.scale.toArray()).toEqual([1, 1, 1])

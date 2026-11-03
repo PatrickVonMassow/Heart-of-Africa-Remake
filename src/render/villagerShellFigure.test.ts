@@ -23,6 +23,8 @@ beforeAll(async () => {
 })
 
 const SHELLS = ['g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist']
+// the driven forms' waist bands (scripts/villager/driven.py), shells too
+const BANDS = ['g-loinFlap-waist.band', 'g-girdleTails-waist.band']
 const base = PEOPLE_DRESS.hausa.male.adult[0]
 const layer = (name: string): DressLayer => {
   const [, form, wear] = name.split('-')
@@ -35,12 +37,12 @@ const bodyPart = (person: GltfPerson, worn: string[]) =>
   applyGarmentMask(tidy(paint(person.geometry.clone(), '#5c3317')), person.cover, asset.garmentMask, worn, VILLAGER_ASSET.garmentMaskPush * person.frame.scale)
 
 describe('the shell garments in the file', () => {
-  it('ships the four shells as recipes in bit order, no mesh, and a region word per body vertex carrying each row', () => {
+  it('ships the four shells and the two driven bands as recipes in bit order, no mesh, and a region word per body vertex carrying each row', () => {
     expect(asset.shells).not.toBeNull()
     const set = asset.shells!
-    expect([...set.bits].sort()).toEqual([...SHELLS].sort())
+    expect([...set.bits].sort()).toEqual([...SHELLS, ...BANDS].sort())
     set.bits.forEach((n, k) => expect(set.garments[n].bit).toBe(k))
-    for (const n of SHELLS) expect(asset.geometries[n]).toBeUndefined()
+    for (const n of [...SHELLS, ...BANDS]) expect(asset.geometries[n]).toBeUndefined()
     expect(set.step).toBeCloseTo(VILLAGER_ASSET.garmentShellStep)
     const person = gltfPerson(asset, 'female', 'adult')
     expect(person.region!.length).toBe(person.geometry.getAttribute('position').count)

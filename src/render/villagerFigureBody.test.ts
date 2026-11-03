@@ -28,6 +28,7 @@ import {
   gltfFigureGeometry,
   gltfGarment,
   gltfPerson,
+  drivenLayers,
   gltfShellParts,
   isShellLayer,
 } from './villagerFigureBody'
@@ -627,8 +628,11 @@ describe('the pipeline garments on the glTF body', () => {
   }
 
   it('the file holds a garment for every form and wear the outfit generator puts on a figure', () => {
-    // a shell garment ships as a recipe (render/villagerShell.ts), not a mesh
-    const missing = [...generated().entries()].filter(([n, l]) => l.form !== 'bodyPaint' && asset.parts[n] !== 'garment' && !asset.shells?.garments[n]).map(([n]) => n)
+    // a shell garment ships as a recipe (render/villagerShell.ts), not a mesh;
+    // a driven one as its panel mesh beside its band recipe (scripts/villager/driven.py)
+    const missing = [...generated().entries()]
+      .filter(([n, l]) => l.form !== 'bodyPaint' && asset.parts[n] !== 'garment' && !(asset.parts[n] === 'driven' && asset.shells?.garments[`${n}.band`]) && !asset.shells?.garments[n])
+      .map(([n]) => n)
     expect(missing).toEqual([])
     // every garment the file ships is in the cover mask's order
     const shipped = Object.keys(asset.parts).filter((n) => asset.parts[n] === 'garment')
@@ -645,7 +649,8 @@ describe('the pipeline garments on the glTF body', () => {
         // the shells: built on the body (render/villagerShell.ts)
         const worn = garments.map(garmentMeshName)
         const body = applyGarmentMask(tidy(person.geometry.clone()), person.cover, asset.garmentMask, worn, 0)
-        const shells = gltfShellParts(asset, person, layers.filter((l) => isShellLayer(asset, l)), body, worn)
+        const bands = drivenLayers(asset, layers).map(({ l, rec }) => ({ l, name: rec.band }))
+        const shells = gltfShellParts(asset, person, layers.filter((l) => isShellLayer(asset, l)), body, worn, bands)
         const want = garments.reduce(
           (t, l) => t + asset.geometries[garmentMeshName(l)].getAttribute('position').count,
           person.geometry.getAttribute('position').count + shells.reduce((t, p) => t + p.built.src.length, 0),
