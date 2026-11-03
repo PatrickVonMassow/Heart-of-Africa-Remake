@@ -60,3 +60,33 @@ describe('batch-doctor CLI entry', () => {
     expect(runGate()).toMatch(/VERDICT:/)
   })
 })
+
+// Point 1481: the doctor's repairs stand down outside the owner's tree. The
+// read-only diagnosis logs the discriminator, so these cases run without --repair.
+const runDiagnosis = (env = {}, args = []) => {
+  try {
+    return execFileSync('node', [CLI, ...args], {
+      encoding: 'utf8',
+      cwd: sandbox,
+      env: { ...process.env, CLAUDE_CODE_REMOTE: '', CLAUDE_SESSION_ID: '', HOA_REPO_ROOT: sandbox, ...env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+  } catch (error) {
+    return `${error.stdout ?? ''}${error.stderr ?? ''}`
+  }
+}
+
+describe("batch-doctor CLI: the owner's tree", () => {
+  it('a cloud clone is not the owner tree', () => {
+    expect(runDiagnosis({ CLAUDE_CODE_REMOTE: 'true' })).toMatch(/ownerTree=false/)
+  })
+
+  it('conflicting session assertions are not the owner tree', () => {
+    expect(runDiagnosis({ CLAUDE_SESSION_ID: 'env-session' }, ['--session', 'argv-session'])).toMatch(/ownerTree=false/)
+  })
+
+  it('a local call without a session id stays the owner tree', () => {
+    expect(runDiagnosis()).toMatch(/ownerTree=true/)
+  })
+})

@@ -224,8 +224,13 @@ if (rawAlert && !alert) {
 }
 const parallelDetected = parallelNow.length > 0 || !!alert
 // The owner's tree: not a cloud clone (CLAUDE_CODE_REMOTE, as in the context
-// fence) and not a session another live owner holds the batch lock against.
-const ownerTree = process.env.CLAUDE_CODE_REMOTE !== 'true' && !(activeSessionId && heldByOtherLiveOwner(activeSessionId))
+// fence), no conflicting session assertion, and not a session another live owner
+// holds the batch lock against. No id at all stays the owner's: the launcher, the
+// emergency path and the progress guard's own instruction call without one.
+const ownerTree =
+  process.env.CLAUDE_CODE_REMOTE !== 'true' &&
+  sessionAssertionAgrees &&
+  !(activeSessionId && heldByOtherLiveOwner(activeSessionId))
 const parallelSids = [...new Set([...parallelNow.map((p) => p.sid), ...alertOthers])]
 
 // --- THE TORN STATES A KILL LEAVES BEHIND (point 443) ---------------------------

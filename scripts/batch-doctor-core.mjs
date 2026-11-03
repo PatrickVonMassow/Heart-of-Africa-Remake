@@ -90,7 +90,7 @@ export function planRemediation(state) {
   // OUTSIDE THE OWNER'S TREE THE TREE IS NOT OURS (03.11.2026: a cloud author's
   // clone was emptied twice by quarantine stashes). A cloud clone or a session
   // that does not hold the batch lock gets neither the stash nor the hard reset
-  // that the stash exists to protect against; the divergence is only reported.
+  // that the stash exists to protect against, nor a merge abort; both are only reported.
   const ownerTree = state.ownerTree !== false
   const quarantine = quarantineScope(state.dirtyFiles, { verificationWriterLive: state.verificationWriterLive })
   const diverged = div.ahead > 0 && div.behind > 0
@@ -120,7 +120,13 @@ export function planRemediation(state) {
     })
   }
 
-  if (state.mergeInProgress) {
+  if (state.mergeInProgress && !ownerTree) {
+    plan.push({
+      action: 'alert-merge-outside-owner-tree',
+      level: 'alert',
+      reason: "A merge is half done (MERGE_HEAD exists), but this checkout is not the batch owner's tree — its resolutions are not aborted here.",
+    })
+  } else if (state.mergeInProgress) {
     plan.push({
       action: 'abort-merge',
       level: 'repair',

@@ -146,6 +146,12 @@ describe("outside the owner's tree the doctor neither stashes nor resets", () =>
     expect(actions).toContain('alert-reset-outside-owner-tree')
   })
 
+  it('a half-done merge outside the owner tree is reported, not aborted', () => {
+    const actions = planRemediation({ ...incident, mergeInProgress: true, ownerTree: false }).map((a) => a.action)
+    expect(actions).not.toContain('abort-merge')
+    expect(actions).toContain('alert-merge-outside-owner-tree')
+  })
+
   it('a dirty non-owner tree in a parallel window is left alone', () => {
     expect(planRemediation({ ...clean, dirtyFiles: ['src/x.ts'], parallelDetected: true, ownerTree: false })).toEqual([])
   })
