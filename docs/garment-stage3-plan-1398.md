@@ -2,6 +2,8 @@
 
 Stage plan for skirtShort, skirtKnee, loinFlap, apron and girdleTails on driven column bones. Revision 2 answered GPT-6.1 Sol's check 1 (docs/four-eyes/1398-plan-check-1-sol.md, B1 to B26); section 9 maps every finding to the section that answers it. Revision 3 answers check 2 (docs/four-eyes/1398-plan-check-2-sol.md): the seven findings still open there (B8, B12, B14, B15, B17, B18, B19) and the new C1 to C6. Section 10 maps them. Revision 4 answers check 3 (docs/four-eyes/1398-plan-check-3-sol.md): B14, B17, B19/C3 and the new N1; section 11 maps them. Revision 5 answers check 4 (docs/four-eyes/1398-plan-check-4-sol.md): B14 and the new N2, also in section 11. Where revision 3, 4 or 5 changes a mechanism, the section text below is the current one, and section 9's rows for those ids point to it. Written against `main` at 84a3665a0, merged up to the current `origin/main`; nothing under `scripts/villager` or the garment runtime changed in between.
 
+Owner decision on sections 3.5/3.6 (03.11.2026, point 1482; full text local/1482-decision-3.5.md): (1) the thigh capsules constrain a panel point only below the pelvis profile bottom (crotch − 0.02 H) in posed hips-frame height, at or above it the profile alone governs, the capsule radius rule unchanged; (2) the containment test also asserts that rendered pelvis and leg surface at or above the profile bottom lies in the profile alone; (3) a panel triangle with two exempt vertices skips the centroid's profile test. Sections 3.5 and 3.6 state the rules.
+
 Owner decision on X1 (02.11.2026): the `.driven` cloak variant is allowed inside point 1398 as the terminal fallback step of section 3.11.
 
 Owner decision on the two sub-step-1 gaps the cloud author reported (02.11.2026): (G1) sub-step 1 delivers only the reference-head fallback of section 3.1 and the knee and ankle runtime pivots from the hung `shin` and `foot` heights with their DEV assertion; the per-form rest contract of section 3.2 (heads from F's column anchors, `extras.villager.driven[F].heads`, the 1e-4 rest-equality Vitest and the anchor-against-junction assertion) lands in sub-step 3, where anchors (3.3) and driven heads (3.8) first exist. (G2) A figure without a driven form F keeps the upper runtime pivots at the reference heads (girdle iso-line, offset zero, parented to `hips`); only the knee and ankle pivots are recomputed after `hungHeads`.
@@ -204,9 +206,10 @@ Each response is followed by the moving-sequence acceptance of section 5 on both
   - **Empty bins (check 3 B14, check 4 B14).** A bin no sample reached this frame takes the value of the nearest POPULATED bin, searched only among bins that received a sample this frame, so the rule cannot cycle: first the same column by height distance (the lower one on a tie); if the whole column is empty, the populated bins of every other column, ranked by angular distance and then by height distance, taking the larger value on a tie. The builder asserts at least 30 samples, so a populated bin always exists.
   - **Query.** Rp(k, y) interpolates linearly between the two bin centres around y and between neighbouring columns for points between columns. For y above the top bin's centre (a panel lifted by the 110° fallback, section 3.7) Rp(k, y) is the top bin's value; the band covers the body there, and the top bin is the widest point the panel can meet.
 - **Below the crotch − 0.02 H.** The profile is not consulted; the thigh capsules carry the legs (below).
-- **Constraint.** A panel point at height y and angle a that lies above the crotch must have radius ≥ Rp(a, y) + C, with C the cloth clearance of section 3.9 at its row. The constraint enters:
+- **Division (owner decision 03.11.2026).** The profile bottom divides the two envelopes by a panel point's POSED height in the hips frame: below it only the capsules constrain the point, at or above it only the profile. A skinned triangle meets the capsules when its lowest vertex lies below the profile bottom. The capsule radius rule is unchanged.
+- **Constraint.** A panel point at height y and angle a that lies at or above the profile bottom must have radius ≥ Rp(a, y) + C, with C the cloth clearance of section 3.9 at its row. The constraint enters:
   - the candidate scoring at the segment's stations (section 3.4);
-  - the skinned-triangle check, on each triangle vertex and each triangle's centroid (section 3.6);
+  - the skinned-triangle check, on each triangle vertex and each triangle's centroid, except the centroid of a triangle with two exempt vertices (section 3.6);
   - the repair rounds.
 - **Below the crotch.** The thigh capsules carry the legs. The containment test below checks that the union of capsules and pelvis profile contains the rendered pelvis and leg surface.
 - **Exemptions.** Only the band and row 0 are exempt, because they lie on the skin by construction. Rows 1 to 3 and every panel triangle are tested against the profile and the capsules. A hit directly below the junction is repaired like any other (section 3.4).
@@ -215,7 +218,7 @@ Each response is followed by the moving-sequence acceptance of section 5 on both
 **Containment on the rendered surface (B13).** A Vitest checks containment on the rendered body surface:
 
 - **Surface samples.** Every vertex of every leg and pelvis triangle, plus a barycentric grid inside each triangle at most 1 cm apart.
-- **Containing set.** Each sample must lie in the union of the eight capsules and the skinned pelvis profile.
+- **Containing set.** Each sample must lie in the union of the eight capsules and the skinned pelvis profile; a sample whose posed hips-frame height lies at or above the profile bottom must lie in the profile alone (owner decision 03.11.2026).
 - **Pose domain.** Taken through `applyClipLayers` + `poseShoulders` + `leanTrunk`:
   - walk, jog and sprint at three speeds each, with stride warp;
   - walk↔jog and stand↔walk blends at weights 0.25, 0.5 and 0.75;
@@ -237,7 +240,7 @@ Named response for a sample outside: raise that bone's capsule margin to contain
 **Skinned-triangle check (B17).** The chord target does not cover triangle interiors, so the final evaluation of section 3.4 checks the actual skinned triangles:
 
 - Coverage: every panel vertex of the worn form is skinned on the CPU with its exact four weights, including rows 1 to 3 and the knee blend.
-- Tests: every panel triangle (panel boundaries included) whose bounding sphere meets a capsule's expanded bound is tested exactly, as the closest point between the capsule segment and the triangle. Each triangle is also tested against the pelvis profile (section 3.5) and the ground.
+- Tests: every panel triangle (panel boundaries included) that reaches below the profile bottom and whose bounding sphere meets a capsule's expanded bound is tested exactly, as the closest point between the capsule segment and the triangle. Each triangle is also tested against the pelvis profile (section 3.5) and the ground; a triangle with two exempt vertices (band or row 0) is not tested at its centroid against the profile, its third vertex still is (owner decision 03.11.2026).
 - Scoring in the repair (B17): a triangle hit is not only a trigger. In the repair rounds of section 3.4, every candidate of a segment re-skins every panel vertex with a nonzero weight on that segment's bone or on any of its descendants and runs the same triangle tests on the triangles they touch (check 3 B17). For an upper segment `col.U.k` that set includes the vertices weighted only to `col.L.k`, which the trial moves through inheritance: the trial carries `col.L.k` at its current local rotation, so the trial geometry and its score are those the frame would draw. A candidate with a hit is infeasible.
   - Among infeasible candidates, the score is the summed penetration depth of those triangles, so the repair cannot return the solution that produced the hit.
   - The joint two-column search of section 3.4 uses the same score.
