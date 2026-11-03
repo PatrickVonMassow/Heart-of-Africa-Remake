@@ -1750,7 +1750,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 03.11.2026, 20:41 · Quellen-Fingerprint: `5e525d932b47…`
+Zuletzt aktualisiert: Dienstag, 03.11.2026, 21:07 · Quellen-Fingerprint: `c795a5c01fed…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1870,8 +1870,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 184 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: 5e525d932b47ee7fc0e8c95689f9be27af597618139c43588b57d18c37d7d07e -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-03T19:41:03.972Z -->
+<!-- RETRO-FINGERPRINT: c795a5c01fed3117de6cf76e019abe2db2818a3a6cd6092b22d09c89e33e2089 -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-03T20:07:40.079Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8275,3 +8275,23 @@ Jede war für sich klein, und jede hätte als neue Freigabe falsch gegriffen. Di
 Hälften: Ein Wächter trennt „Zustand fehlt" ausdrücklich von „Zustand verbietet", und eine
 Lockerung wird reviewt wie neuer Code, weil sie dieselbe Angriffsfläche hat. Der Befund liegt
 nicht blockierend in `docs/backlog.md` (Befund vom 23.10.2026).
+
+### 3.307 Die grüne Ampel über einem abgebrochenen Abschluss-Job
+
+Am 03.11.2026 ging die CI von `main` zweimal auf Rot, obwohl beide Test-Shards grün waren
+(Lauf 41680804084, 17:28:46 bis 17:33:46; Lauf 41692582189, 18:38:00 bis 18:43:02). Der
+`gate`-Job, der die beiden Shards zu einem Urteil zusammenführt, brach bei seinem Checkout ab.
+Das Zeitlimit von fünf Minuten war abgelaufen, bevor er überhaupt etwas prüfen konnte. Auf den
+`feat/`-Zweigen blieb derselbe Abbruch unsichtbar, weil `continue-on-error` ihn verschluckte.
+Erst die Zeitstempel verrieten den Grund: Jeder Lauf endete auf die Sekunde fünf Minuten nach
+seinem Start. Punkt 803 checkt seitdem nur noch `scripts/` aus (sparse checkout) und gibt dem
+Job 15 Minuten.
+
+Am selben Abend kam der umgekehrte Fall hinzu. Die CI meldete den Zweig von 1482 bei c9e7022dd
+grün, aber derselbe Containment-Test war lokal und in der Cloud rot. Der Befund liegt am Punkt.
+Beide Fälle haben dieselbe Ursache: Eine Ampel fasst Jobs zusammen und sagt nicht, ob jeder
+Job das getan hat, wofür er da ist.
+
+**Lehre:** Ein Abschluss-Job wird an Zeitstempeln und an seinem Inhalt geprüft, nicht an
+seiner Farbe. Ein Lauf, der genau beim Zeitlimit endet, ist ein abgebrochener Lauf und kein
+Urteil. Und ein grünes CI-Ergebnis ersetzt keinen lokal gemessenen roten Test.
