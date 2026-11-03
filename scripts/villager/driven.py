@@ -174,9 +174,10 @@ def hull_at(pos, keep, y):
     return hull2d(pos[sel][:, [0, 2]])
 
 
-def build_at(form, fz, pos, normals, joints, H, keep, off, ease, flare):
+def build_at(form, fz, pos, normals, joints, H, full, keep, off, ease, flare):
     """Panel positions (fz['count'] x 3) and the 24 column heads at one
-    corner's rest body `pos` (normals, joints, stature H)."""
+    corner's rest body `pos` (normals, joints, stature H); the hull from the
+    full-resolution body `full` where `keep` (the trunk and legs, no arms)."""
     from garments import landmarks, ray_hull
     L = landmarks(joints, H)
     hips = joints[SK.INDEX['hips']]
@@ -202,12 +203,18 @@ def build_at(form, fz, pos, normals, joints, H, keep, off, ease, flare):
                 y = row0[i, 1] + s * (hem - row0[i, 1])
                 key = round(float(y), 9)
                 if key not in hulls:
-                    hulls[key] = hull_at(pos, keep, y)
+                    hulls[key] = hull_at(full, keep, y)
+                # the direction is the source's angle about the hips axis; the ray
+                # starts at the section's own centre (as garments.Body.ring): below
+                # the crotch a slight body's legs can lie behind the hips axis, and
+                # a ray from the axis would then miss the hull
                 d = row0[i, [0, 2]] - c
                 d = d / np.linalg.norm(d)
                 a = math.atan2(d[0], d[1])
-                rad = ray_hull(hulls[key], c, d) + off + ease * H + flare * hips_y * s * s * (0.45 + 0.55 * abs(math.sin(a)))
-                out[k] = (c[0] + d[0] * rad, y, c[1] + d[1] * rad)
+                h = hulls[key]
+                ch = h.mean(0)
+                rad = ray_hull(h, ch, d) + off + ease * H + flare * hips_y * s * s * (0.45 + 0.55 * abs(math.sin(a)))
+                out[k] = (ch[0] + d[0] * rad, y, ch[1] + d[1] * rad)
     heads = np.zeros((2 * SK.COLUMN_COUNT, 3))
     knee = 0.5 * (joints[SK.INDEX['shin.L'], 1] + joints[SK.INDEX['shin.R'], 1])
     for k, (i, t) in enumerate(fz['anchors']):
@@ -269,22 +276,31 @@ def corner_body(body, w):
     return pos, joints
 
 
+def full_body(body, w):
+    """The full-resolution body at the morph weights `w` (additive, as the corners)."""
+    full = body['basis_full'].copy()
+    for m, x in w.items():
+        if x:
+            full = full + x * body['deltas_full'][m]
+    return full
+
+
 def stature(cfg, sex, age):
     a = cfg['VILLAGER_ASSET']
     return a['stature'] * a['statureFactor'][age][sex]
 
 
-def build(body, band, form, cfg, log=print):
+def build(body, band, form, cfg, keep, log=print):
     """The driven garment of `form` on the cut body (the shells' body):
     garments['meshes'] entry with pos (basis), tris, uv, W, morph_pos and its
-    record `driven` (extras.villager.driven[form], section 3.12)."""
+    record `driven` (extras.villager.driven[form], section 3.12). `keep`:
+    per full-resolution vertex, on the body and off the arms (the hull's set)."""
     from body import morph_deltas, vertex_normals
     from shells import offset
     A = cfg['VILLAGER_ASSET']
     D = A['drivenGarments']
     fc = D['forms'][form]
     off = offset(band, A['garmentShellStep'])
-    keep = body['region']['arm'] < 0.3
     tris = np.asarray(body['tris'])
     loop = junction(band, body['pos'])
     if len(loop) < D['minLoopVertices']:
@@ -302,8 +318,8 @@ def build(body, band, form, cfg, log=print):
     for key in CORNERS:
         sex, age, b = key
         pos, joints = corner_body(body, corner_weights(sex, age, b))
-        shapes[key], heads[key], info[key] = build_at(form, fz, pos, vertex_normals(pos, tris), joints, stature(cfg, sex, age), keep,
-                                                      off, fc['ease'], fc['flare'])
+        shapes[key], heads[key], info[key] = build_at(form, fz, pos, vertex_normals(pos, tris), joints, stature(cfg, sex, age),
+                                                      full_body(body, corner_weights(sex, age, b)), keep, off, fc['ease'], fc['flare'])
     basis, deltas = morph_deltas(shapes)
     hbasis, hdeltas = morph_deltas(heads)
     from body import MORPHS
@@ -337,7 +353,7 @@ def build(body, band, form, cfg, log=print):
         'intervals': {p['name']: [info[('male', 'adult', 0)]['yj'], h] for p, h in zip(fz['panels'], hems)},
     }
     check(form, fz, g, shapes, heads, info, body, band, cfg, off, log)
-    additive_report(body, form, cfg, fz, g, off, log)
+    additive_report(body, form, cfg, fz, g, off, keep, log)
     log(f'[driven] {panel_name(form)}: {fz["count"]} vertices, {len(fz["tris"])} triangles, loop {len(loop)}, '
         + ', '.join(f'{p["name"]} {len(p["members"])} wide x {p["rows"]} rows' for p in fz['panels']))
     return g
@@ -432,12 +448,11 @@ def check(form, fz, g, shapes, heads, info, body, band, cfg, off, log=print):
     log(f'[driven] {form}: checks ok (loop {n}, edge step {math.degrees(step):.1f} deg)')
 
 
-def additive_report(body, form, cfg, fz, g, off, log=print):
+def additive_report(body, form, cfg, fz, g, off, keep, log=print):
     """Section 3.8: the glTF deltas applied additively against a direct
     rebuild at builds -1, 0 and +1 per sex and age group (information)."""
     from body import vertex_normals
     fc = cfg['VILLAGER_ASSET']['drivenGarments']['forms'][form]
-    keep = body['region']['arm'] < 0.3
     tris = np.asarray(body['tris'])
     worst = (0.0, None)
     for sex in ('male', 'female'):
@@ -445,7 +460,8 @@ def additive_report(body, form, cfg, fz, g, off, log=print):
             for b in (-1.0, 0.0, 1.0):
                 w = corner_weights(sex, age, b)
                 pos, joints = corner_body(body, w)
-                direct = build_at(form, fz, pos, vertex_normals(pos, tris), joints, stature(cfg, sex, age), keep, off, fc['ease'], fc['flare'])[0]
+                direct = build_at(form, fz, pos, vertex_normals(pos, tris), joints, stature(cfg, sex, age), full_body(body, w), keep, off,
+                                  fc['ease'], fc['flare'])[0]
                 add = g['pos'] + sum(x * g['morph_pos'][m] for m, x in w.items())
                 d = float(np.abs(add - direct).max())
                 if d > worst[0]:

@@ -1067,7 +1067,7 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
             band = DR.band_name(form)
             meshes[band] = shell[band]
             meta[band] = {'form': form, 'wear': wear, 'kind': 'shell', 'of': name}
-            g = DR.build(body if shell_body is None else shell_body, shell[band], form, cfg)
+            g = DR.build(body if shell_body is None else shell_body, shell[band], form, cfg, B.mask_body & (B.arm < 0.3))
             meshes[name] = g
             meta[name] = {'form': form, 'wear': wear, 'kind': 'driven', 'band': band}
             print(f'garment {name:28s} driven: {len(g["pos"]):5d} verts {len(g["tris"]):5d} tris, band {band}')
