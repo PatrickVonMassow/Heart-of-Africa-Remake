@@ -194,6 +194,8 @@ Each response is followed by the moving-sequence acceptance of section 5 on both
 
 ### 3.5 Envelopes (B12, B13, B14, check-3 B5)
 
+**Revision line (owner decisions 03.11.2026, point 1482).** 12:15: (1) a thigh capsule constrains a panel point only where its posed hips-frame height lies below the pelvis profile bottom (crotch − 0.02 H); above it the profile governs; the capsule radius rule is unchanged. (2) Containment additionally asserts that rendered samples at or above the profile bottom lie in the profile alone; a red there stops and reports. (3) A panel triangle with two exempt (band/row-0) vertices skips the centroid check (section 3.6). 13:56 refinement: (1′) at or above the bottom a panel point (candidate scoring, skinned-triangle check, repair rounds) is tested against the profile and against every thigh capsule whose closest axis parameter t (0 hip end, 1 knee end, clamped) is ≥ 0.5; a triangle's part above the bottom is clipped at the axis midpoint and measured against the knee half; below the bottom all capsules as before. (2′) The profile-alone assertion covers pelvis-band samples and thigh samples whose dominant thigh capsule gives t < 0.5; knee-half thigh and all shin, foot and toe samples above the bottom are checked against the union. Implemented in `src/render/villagerSkirtDriver.ts` and `scripts/villager/gamepath.py` together.
+
 **Body-only capsules (B12).** Eight capsules per person: both thighs, both shins, both feet, both toes. Each is the segment from the bone's head to its tail (the toe tip for toes). The radius covers the drawn body vertices with weight above 0.1 on the bone, measured to that segment (endpoints included), at rest after the hang, plus the bone's margin from `extras.villager.columns.capsules`. No cloth or shell thickness is added; cloth clearance enters once, in section 3.9.
 
 **Pelvis as a skinned profile, not a capsule (B14).** There is no pelvis capsule and no assumption that the pelvis is hips-rigid.
@@ -231,6 +233,8 @@ Each response is followed by the moving-sequence acceptance of section 5 on both
 Named response for a sample outside: raise that bone's capsule margin to contain it plus 2 mm. The margin lives in `VILLAGER_ASSET.drivenGarments.capsuleMargin` (balance config), which the pipeline exports to `extras.villager.columns.capsules`. Runtime and the Python mirror read the same exported table, so an expansion reaches both.
 
 ### 3.6 Chord target and verification on skinned triangles (B16, B17, check-3 B4)
+
+**Revision line (owner decisions 03.11.2026, point 1482).** The skinned-triangle check follows section 3.5's revision line: the capsule term covers a triangle's part below the profile bottom (all capsules) and its part above it against the thigh capsules' knee halves (rule 1′); the profile term applies at or above the bottom; a triangle with two exempt vertices skips the centroid's profile test (rule 3).
 
 **Clearance target.** The target per column against a capsule is sqrt(C² + (c/2)²):
 
