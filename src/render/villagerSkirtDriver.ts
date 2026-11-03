@@ -89,7 +89,7 @@ export function kneeHalfDistance(tris: readonly V3[][], a: V3, b: V3): number {
   const ab = sub(b, a)
   let best = Infinity
   for (const t of tris) {
-    for (const [p, q, r] of clipBelow(t, t.map((x) => -dot(sub(x, mid), ab)), 0)) best = Math.min(best, segmentTriangle(mid, b, p, q, r))
+    for (const [p, q, r] of clipBelow(t, t.map((x) => -dot(sub(x, mid), ab)), 0, true)) best = Math.min(best, segmentTriangle(mid, b, p, q, r))
   }
   return best
 }
@@ -159,15 +159,17 @@ export function pointTriangle(p: V3, a: V3, b: V3, c: V3): V3 {
 
 /**
  * The part of triangle `pts` whose height `h` (affine over the triangle, given
- * at its corners) lies below `bottom`, as 0, 1 or 2 triangles.
+ * at its corners) lies below `bottom` (or at it, `inclusive`), as 0, 1 or 2
+ * triangles. The inclusive side keeps a triangle lying wholly at the height.
  */
-export function clipBelow(pts: readonly V3[], h: readonly number[], bottom: number): V3[][] {
+export function clipBelow(pts: readonly V3[], h: readonly number[], bottom: number, inclusive = false): V3[][] {
   const poly: V3[] = []
+  const inside = (x: number) => (inclusive ? x <= bottom : x < bottom)
   for (let i = 0; i < 3; i++) {
     const j = (i + 1) % 3
-    const inI = h[i] < bottom
+    const inI = inside(h[i])
     if (inI) poly.push(pts[i])
-    if (inI !== h[j] < bottom) {
+    if (inI !== inside(h[j])) {
       const u = (bottom - h[i]) / (h[j] - h[i])
       poly.push([0, 1, 2].map((e) => pts[i][e] + (pts[j][e] - pts[i][e]) * u) as V3)
     }
@@ -998,7 +1000,7 @@ export class ColumnDriver {
       // capsule's hip end above the bottom, where the profile alone governs)
       // (rule 1': the part above it meets the thigh capsules' knee halves, kneeHalfDistance)
       const below = clipBelow([a, b, c], [hv[0].y, hv[1].y, hv[2].y], rig.profile.bottom)
-      const aboveTris = clipBelow([a, b, c], [-hv[0].y, -hv[1].y, -hv[2].y], -rig.profile.bottom)
+      const aboveTris = clipBelow([a, b, c], [-hv[0].y, -hv[1].y, -hv[2].y], -rig.profile.bottom, true)
       P.capsules.forEach((cap, i) => {
         const knee = i < THIGH_CAPSULES && aboveTris.length > 0
         if (!below.length && !knee) return

@@ -543,6 +543,15 @@ describe('the triangle below the profile bottom (section 3.5)', () => {
     expect(segmentTriangle(p, q, tri[0], tri[1], tri[2])).toBe(0)
     expect(Math.min(...two.map((t) => segmentTriangle(p, q, t[0], t[1], t[2])))).toBeCloseTo(0.4, 12)
   })
+  it('keeps a triangle lying wholly at the height on the inclusive side, so no capsule check skips it', () => {
+    // the driver's split at the profile bottom: strictly below, and at or above (negated heights, inclusive)
+    expect(clipBelow(tri, [0.5, 0.5, 0.5], 0.5)).toEqual([])
+    expect(clipBelow(tri, [-0.5, -0.5, -0.5], -0.5, true)).toEqual([tri])
+    // the knee-half clip: a triangle lying wholly in the plane through the axis midpoint
+    const a: V3 = [0.25, 0.25, 1]
+    const b: V3 = [0.25, 0.25, -1]
+    expect(kneeHalfDistance([tri], a, b)).toBe(0)
+  })
 })
 
 describe("the knee half of a thigh capsule above the profile bottom (section 3.5, rule 1')", () => {
