@@ -698,15 +698,19 @@ def col_point_triangle(p, a, b, c):
     return _add(a, _add(_mul(ab, vb * den), _mul(ac, vc * den)))
 
 
-def col_clip_below(pts, h, bottom):
-    """The part of triangle pts whose height h (affine, given at its corners) lies below bottom: 0-2 triangles."""
+def col_clip_below(pts, h, bottom, inclusive=False):
+    """The part of triangle pts whose height h (affine, given at its corners) lies below bottom
+    (or at it, inclusive): 0-2 triangles. The inclusive side keeps a triangle lying wholly at the height."""
     poly = []
+
+    def inside(x):
+        return x <= bottom if inclusive else x < bottom
     for i in range(3):
         j = (i + 1) % 3
-        in_i = h[i] < bottom
+        in_i = inside(h[i])
         if in_i:
             poly.append(tuple(pts[i]))
-        if in_i != (h[j] < bottom):
+        if in_i != inside(h[j]):
             u = (bottom - h[i]) / (h[j] - h[i])
             poly.append(tuple(pts[i][e] + (pts[j][e] - pts[i][e]) * u for e in range(3)))
     return [(poly[0], poly[i], poly[i + 1]) for i in range(1, len(poly) - 1)]
@@ -720,7 +724,7 @@ def col_knee_half_distance(tris, a, b):
     ab = _sub(b, a)
     best = math.inf
     for t in tris:
-        for p, q, r in col_clip_below(t, [-_dot(_sub(x, mid), ab) for x in t], 0.0):
+        for p, q, r in col_clip_below(t, [-_dot(_sub(x, mid), ab) for x in t], 0.0, True):
             best = min(best, col_segment_triangle(mid, b, p, q, r))
     return best
 
@@ -1127,7 +1131,7 @@ class ColumnDriver:
             # the triangle clipped at that height (as villagerSkirtDriver.ts)
             # (rule 1': the part above it meets the thigh capsules' knee halves)
             below = col_clip_below((a, b, c), [h[1] for h in hv], rig['profile']['bottom'])
-            above_tris = col_clip_below((a, b, c), [-h[1] for h in hv], -rig['profile']['bottom'])
+            above_tris = col_clip_below((a, b, c), [-h[1] for h in hv], -rig['profile']['bottom'], True)
             for i, (ca, cb, radius) in enumerate(P['capsules']):
                 knee = i < THIGH_CAPSULES and bool(above_tris)
                 if not below and not knee:
@@ -1542,6 +1546,13 @@ def selftest_column_knee_half():
     assert col_knee_half_distance([((0.3, -1, 0.2), (0.3, 1, 0.2), (0.3, 0, 0.8))], a, b) == math.inf
     assert abs(col_knee_half_distance([((0.3, -1, 1.2), (0.3, 1, 1.2), (0.3, 0, 1.8))], a, b) - 0.3) < 1e-12
     assert abs(col_knee_half_distance([((0.1, 0, 0.2), (0.5, -1, 1.8), (0.5, 1, 1.8))], a, b) - 0.3) < 1e-12
+    # equality: a triangle lying wholly in the midpoint plane stays in the knee half (t = 0.5)
+    assert abs(col_knee_half_distance([((0.3, -1, 1.0), (0.3, 1, 1.0), (-0.3, 0, 1.0))], a, b)) < 1e-12
+    # equality: a triangle lying wholly at the profile bottom is not below it, and stays on the
+    # driver's upper side (negated heights, inclusive), so no capsule check skips it
+    tri = ((0.0, 0.5, 0.0), (1.0, 0.5, 0.0), (0.0, 0.5, 1.0))
+    assert col_clip_below(tri, [0.5, 0.5, 0.5], 0.5) == []
+    assert col_clip_below(tri, [-0.5, -0.5, -0.5], -0.5, True) == [tri]
     print('column knee-half selftest: ok')
 
 
