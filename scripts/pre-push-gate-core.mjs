@@ -222,7 +222,7 @@ function retryOutcomeNotice(step, ok, { unavailable = false } = {}) {
  * push's short steps. Without a `readLoad` seam no retry is paid: a red blocks
  * at once. `onNotice` prints — the retry must be visible.
  */
-export function runGate(steps, run, { readLoad, onNotice } = {}) {
+export function runGate(steps, run, { readLoad, onNotice, inspectUnit } = {}) {
   const say = typeof onNotice === 'function' ? onNotice : () => {}
   const ask = (when, step) => {
     if (typeof readLoad !== 'function') return null
@@ -246,14 +246,40 @@ export function runGate(steps, run, { readLoad, onNotice } = {}) {
       results.push({ step, ok: true, unavailable: true })
       continue
     }
+    // The unit step is judged by its own summary where the wrapper can read it
+    // (`inspectUnit`): a named failure blocks at any load, a run naming none is
+    // NOT JUDGED and re-run once at any load, and the load is named every time.
+    // An unreadable summary falls through to the load rule below.
+    const unitSeam = step === 'unit' && typeof inspectUnit === 'function'
+    const attempt = () => ({ ...(inspectUnit() ?? {}), ok: false })
     if (outcome === true) {
-      results.push({ step, ok: true })
+      if (unitSeam) {
+        const v = unitAttemptsVerdict([{ ok: true, totals: inspectUnit()?.totals }], { load: opening })
+        results.push({ step, ok: true, unitLine: `pre-push gate: ${v.line}` })
+      } else results.push({ step, ok: true })
       continue
     }
-
     // Red. Was the machine quiet enough for that to mean anything? The reading
     // taken now is combined with the one from before the long steps.
     const load = worseLoad(opening, ask('red', step))
+    if (unitSeam) {
+      const first = attempt()
+      const v1 = unitAttemptsVerdict([first], { load: load ?? undefined })
+      if (v1.kind === UNIT_RUN.red) {
+        results.push({ step, ok: false, loadLevel: load?.level, unitLine: `pre-push gate: ${v1.line}` })
+        break
+      }
+      if (v1.rerun) {
+        say(`pre-push gate: ${v1.line}`)
+        const second = run(step, GATE_COMMANDS[step], { attempt: 2 })
+        const v2 = unitAttemptsVerdict([first, second === true ? { ...inspectUnit(), ok: true } : attempt()], { load: load ?? undefined })
+        results.push({ step, ok: v2.ok, notJudged: true, loadLevel: load?.level, unitLine: `pre-push gate: ${v2.line}` })
+        if (!v2.ok) break
+        continue
+      }
+      say(`pre-push gate: ${v1.line}`)
+    }
+
     if (!load || !shouldRetryAfterRed(load.level)) {
       results.push({ step, ok: false, ...(load ? { loadLevel: load.level } : {}) })
       break
@@ -794,11 +820,14 @@ export function decide(results, fileCount) {
   const unavailable = list.filter((r) => r && r.unavailable).map((r) => r.step)
   const retried = list.filter((r) => r && r.retried).map((r) => r.step)
   const count = fileCount && typeof fileCount === 'object' ? fileCount : null
+  const unitLines = list.map((r) => r?.unitLine).filter((l) => typeof l === 'string' && l)
   return {
     blocked: failed.length > 0 || count?.blocked === true,
     failed,
     unavailable,
     retried,
+    // Only where the unit seam judged a run, so the shape is otherwise unchanged.
+    ...(unitLines.length ? { unitLines } : {}),
     // Omitted entirely when no count was taken, so a caller that never asks for
     // one sees exactly the verdict shape it always saw.
     ...(count ? { fileCount: count } : {}),
@@ -806,7 +835,7 @@ export function decide(results, fileCount) {
 }
 
 /** The message the developer sees — it must say what to run, not only what broke. */
-export function formatVerdict({ blocked, failed, unavailable = [], retried = [], fileCount = null } = {}, { reason } = {}) {
+export function formatVerdict({ blocked, failed, unavailable = [], retried = [], fileCount = null, unitLines = [] } = {}, { reason } = {}) {
   // Every list is taken defensively: this runs inside the wrapper's try, and the
   // wrapper fails OPEN on a throw — a formatting error here would turn a BLOCKED
   // push into an allowed one, which is the one direction the gate must never move.
@@ -819,7 +848,11 @@ export function formatVerdict({ blocked, failed, unavailable = [], retried = [],
   const redo = redone.length ? ` — ${redone.join(', ')} was re-run once after a red on a machine not verified quiet` : ''
   // Both numbers lead the verdict whenever a count was taken (point 404), so the
   // size of the evidence base is visible even where it does not yet block.
-  const lead = fileCount && typeof fileCount.line === 'string' && fileCount.line ? [fileCount.line] : []
+  // The unit step's own verdict (summary + measured load) leads as well.
+  const lead = [
+    ...(Array.isArray(unitLines) ? unitLines : []),
+    ...(fileCount && typeof fileCount.line === 'string' && fileCount.line ? [fileCount.line] : []),
+  ]
   if (!blocked) return [...lead, `pre-push gate: green (${reason ?? 'gate passed'})${note}${redo}`].join('\n')
   // Blocked by the count ALONE: its own line already carries the whole message,
   // and a second "the fast gate is red: " with nothing after it would be a lie.

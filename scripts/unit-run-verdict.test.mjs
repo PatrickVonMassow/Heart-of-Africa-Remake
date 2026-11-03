@@ -2,7 +2,10 @@
 // at any load; a named failure is red at any load; the load is always named.
 import { describe, it, expect } from 'vitest'
 import {
+  decide,
   formatLoad,
+  formatVerdict,
+  runGate,
   parseUnitTotals,
   runnerErrorSignature,
   unitAttemptsVerdict,
@@ -99,5 +102,54 @@ describe('runnerErrorSignature', () => {
   })
   it('null where none is found', () => {
     expect(runnerErrorSignature('all good')).toBeNull()
+  })
+})
+
+describe('runGate — the local push gate applies the same rule at any load', () => {
+  const totalsFor = { passed, failed }
+  const gate = (outcomes, kinds, level) => {
+    const calls = []
+    let i = 0
+    let last = kinds[0]
+    const results = runGate(['unit'], (step) => {
+      calls.push(step)
+      last = kinds[i]
+      return outcomes[i++]
+    }, {
+      readLoad: () => ({ level, reasons: [`probe says ${level}`] }),
+      inspectUnit: () => ({ totals: last === 'unreadable' ? parseUnitTotals('') : totalsFor[last], signature: SIG }),
+    })
+    const verdict = decide(results, null)
+    return { calls, results, verdict, text: formatVerdict(verdict, { reason: 'main' }) }
+  }
+  for (const level of ['quiet', 'loaded']) {
+    it(`a named failure blocks with no re-run (${level})`, () => {
+      const r = gate([false], ['failed'], level)
+      expect(r.calls).toHaveLength(1)
+      expect(r.verdict.blocked).toBe(true)
+      expect(r.text).toContain(`machine ${level}`)
+    })
+    it(`not judged, then green → pushes, load named (${level})`, () => {
+      const r = gate([false, true], ['passed', 'passed'], level)
+      expect(r.calls).toHaveLength(2)
+      expect(r.verdict.blocked).toBe(false)
+      expect(r.text).toContain('NOT JUDGED')
+      expect(r.text).toContain(`machine ${level}`)
+    })
+    it(`not judged twice blocks, naming the signature (${level})`, () => {
+      const r = gate([false, false], ['passed', 'passed'], level)
+      expect(r.verdict.blocked).toBe(true)
+      expect(r.text).toContain('NOT JUDGED TWICE')
+      expect(r.text).toContain(SIG)
+      expect(r.text).toContain(`machine ${level}`)
+    })
+    it(`a green unit names the load too (${level})`, () => {
+      expect(gate([true], ['passed'], level).text).toContain(`machine ${level}`)
+    })
+  }
+  it('an unreadable red keeps the load rule: blocks at once on a quiet machine', () => {
+    const r = gate([false], ['unreadable'], 'quiet')
+    expect(r.calls).toHaveLength(1)
+    expect(r.verdict.blocked).toBe(true)
   })
 })

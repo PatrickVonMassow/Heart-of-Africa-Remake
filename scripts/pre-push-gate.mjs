@@ -56,6 +56,7 @@ import {
   parseUnitTotals,
   parsePushInput,
   runGate,
+  runnerErrorSignature,
   testFileBaseline,
   testFileRoots,
   withTestFileBaseline,
@@ -297,7 +298,12 @@ try {
       if (step === 'audit' && run.status === 3) return UNAVAILABLE
       return run.status === 0
     },
-    { readLoad: readLoadLevel, onNotice: (line) => console.log(line) },
+    {
+      readLoad: readLoadLevel,
+      onNotice: (line) => console.log(line),
+      // The unit step is judged by its own summary (not judged ≠ red).
+      inspectUnit: () => ({ totals: parseUnitTotals(unitOutput), signature: runnerErrorSignature(unitOutput) }),
+    },
   )
 
   // How large the evidence base actually was — against the CHECKOUT first and
