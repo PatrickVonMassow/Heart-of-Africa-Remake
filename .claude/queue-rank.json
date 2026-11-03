@@ -1812,6 +1812,12 @@
       "why": "a guard data-risk fix in Session- & Repo-Hygiene; it blocks no point and nobody follows the wrong order now that it is filed",
       "origin": "machine",
       "place": "last"
+    },
+    "1484": {
+      "at": "2026-11-03T13:07:55.414Z",
+      "why": "infra hygiene behind the active garment point; it blocks no point while agent checks fetch by hand",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1841,7 +1847,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-03T04:36:52.840Z",
+    "at": "2026-11-03T13:07:55.427Z",
     "points": [
       184,
       200,
@@ -2313,7 +2319,8 @@
       1477,
       1479,
       1482,
-      1483
+      1483,
+      1484
     ]
   }
 }
