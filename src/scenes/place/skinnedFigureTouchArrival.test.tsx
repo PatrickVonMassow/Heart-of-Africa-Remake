@@ -6,6 +6,7 @@
 // wait for that hand-over, or its hand swings in from the side for a third
 // of a second while the word is already falling (polish-children,
 // children-bank-game: 38 cm off the stone in the word frame, 24 cm 0.08 s on).
+// The contact's crouch, eased at VILLAGER_MOTION.crouchRate, is the same lag.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { act, useRef } from 'react'
@@ -53,7 +54,7 @@ const CONTACT_BAR = 0.005
  * the owner's frame callback, after the figure's own, its pose carried
  * through `bankFigurePose` and applied in that same frame.
  */
-async function handTrace(kind: GestureKind) {
+async function handTrace(kind: GestureKind, elevation = -0.45) {
   const look: FigureLook = {
     peopleId: 'swahili',
     drivers: { coldness: 0, harmattan: 0, karif: 0 },
@@ -71,7 +72,7 @@ async function handTrace(kind: GestureKind) {
     const gesture = useRef<GestureState>(restGesture())
     useFrame((_, dt) => {
       gesture.current = advanceGesture(gesture.current, dt)
-      if (frame === REST_FRAMES) gesture.current = startGesture(kind, { bearing: 0.35, elevation: -0.45, duration: 4 })
+      if (frame === REST_FRAMES) gesture.current = startGesture(kind, { bearing: 0.35, elevation, duration: 4 })
       const drawn = bankFigurePose(false, gesturePose(gesture.current), 0, cfg)
       const p = pose.current!
       p.left = drawn.left
@@ -92,31 +93,35 @@ async function handTrace(kind: GestureKind) {
   await root.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
   await act(async () => root.render(<Stage />))
   const trace: THREE.Vector3[] = []
+  const crouch: number[] = []
   for (frame = 0; frame < REST_FRAMES + HOLD_FRAMES; frame++) {
     act(() => advance((frame + 1) / 60))
     if (frame < REST_FRAMES) continue
     group.updateMatrixWorld(true)
     const anchor = group.getObjectByName('hand-left')!
     trace.push(group.worldToLocal(anchor.getWorldPosition(new THREE.Vector3())))
+    crouch.push((group.getObjectByName('inhabitant')!.userData.walk as { crouch: number }).crouch)
   }
   await act(async () => root.unmount())
-  return trace
+  return { trace, crouch }
 }
 
 describe('a touch on the glTF body', () => {
   it('has its hand where it rests in the very frame it begins, and holds it there', async () => {
-    const trace = await handTrace('touch')
+    const { trace, crouch } = await handTrace('touch')
     // the hand once the touch has stood a whole second: where it rests
     const settled = trace[trace.length - 1]
     const off = trace.map((h) => h.distanceTo(settled))
     expect(off[0]).toBeLessThan(CONTACT_BAR)
     expect(Math.max(...off)).toBeLessThan(CONTACT_BAR)
+    // the child's body crouches for the primitive's hand, and does so at once
+    expect(crouch[0]).toBeGreaterThan(0.3)
   }, 60_000)
 
   it('while a point, which grows out of rest, still hands the arm over from the clips', async () => {
     // the hand-over is kept for every gesture that eases in itself: the first
     // frame of a point stands near the clip's hanging arm, not at its aim
-    const trace = await handTrace('point')
+    const { trace } = await handTrace('point')
     const settled = trace[trace.length - 1]
     expect(trace[0].distanceTo(settled)).toBeGreaterThan(0.05)
   }, 60_000)

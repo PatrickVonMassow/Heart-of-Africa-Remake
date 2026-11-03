@@ -1623,6 +1623,8 @@ export function bankFigurePose(
   slumpCfg: CaughtSlumpConfig = VILLAGER_POSE.caughtSlump,
 ): FigurePose {
   const free: FigurePose = { left: shown.left, right: shown.right, lean: runLean + shown.lean, turn: shown.turn }
+  // the tap's touch keeps naming its arm (FigurePose.arrive)
+  if (shown.arrive) free.arrive = shown.arrive
   const pose = slumped ? caughtSlumpPose(cfg) : free
   if (slump <= 0) return pose
   return { ...pose, body: mixPose(free, caughtBodyPose(slumpCfg), smooth01(slump)) }

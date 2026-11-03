@@ -491,6 +491,9 @@ export function SkinnedFigure({
         return !armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, rest)
       })
       const contact = contactArm[0] || contactArm[1]
+      // the contacts that stand at their pose from the first frame (a touch)
+      const arrives = [0, 1].map((i) => contactArm[i] && !!(i === 0 ? extras?.arrive?.left : extras?.arrive?.right))
+      const arriving = arrives[0] || arrives[1]
       const standHip = (c: number) => dims.ankle + legExtent(dims, dims.flex + c)
       // THE TRUNK. On the code-built body the code writes it: the pose's lean
       // and turn at the hips, the elder's stoop at the chest. On the glTF body
@@ -665,6 +668,10 @@ export function SkinnedFigure({
           const moved = !v || !at || Math.max(Math.abs(v.rotation.x - at.pitch), Math.abs(v.rotation.y - at.yaw), Math.abs(v.rotation.z - at.roll)) > 1e-3
           if (i === steadyArm || (clips.arms[i] >= 1 && moved)) releasing.current[i] = null
         }
+        // An arm the pose stands at its contact from the first frame (a touch,
+        // FigurePose.arrive) is the code's at once: eased over the transition
+        // its hand swung in from the clips' arm while the word was falling.
+        for (const i of [0, 1] as const) if (arrives[i]) clips.arms[i] = 0
         applyClipLayers(gltf.asset, gltf.person, gb, clips, m, free)
         takeTrunkBase(gb, trunkBase)
         digShare = clips.dig
@@ -700,6 +707,12 @@ export function SkinnedFigure({
         m.crouchTarget = crouchTarget(m.speed, contactCrouch(tryAt))
         // the tries leave the body as it was
         b.hips.position.y = hipY
+        // a contact that stands from its first frame (FigurePose.arrive) is
+        // crouched for at once too, not over the crouch rate
+        if (arriving && m.crouch !== m.crouchTarget) {
+          m.crouch = m.crouchTarget
+          poseLegs()
+        }
         writeTrunk(0, hipYaw, chestYaw)
         b.hips.updateWorldMatrix(false, true)
       } else {
