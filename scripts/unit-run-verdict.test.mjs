@@ -150,11 +150,15 @@ describe('runGate — the local push gate applies the same rule at any load', ()
       expect(gate([true], ['passed'], level).text).toContain(`machine ${level}`)
     })
   }
-  it('an unreadable red keeps the load rule: blocks at once on a quiet machine', () => {
-    const r = gate([false], ['unreadable'], 'quiet')
-    expect(r.calls).toHaveLength(1)
-    expect(r.verdict.blocked).toBe(true)
-  })
+  for (const level of ['quiet', 'busy', 'unknown']) {
+    it(`an unreadable red blocks at once, no load retry (${level})`, () => {
+      const r = gate([false, true], ['unreadable', 'passed'], level)
+      expect(r.calls).toHaveLength(1)
+      expect(r.verdict.blocked).toBe(true)
+      expect(r.text).toContain('could not be read')
+      expect(r.text).toContain(`machine ${level}`)
+    })
+  }
 })
 
 describe('the LARGE runner and CI judge the unit stage by the same verdict', () => {

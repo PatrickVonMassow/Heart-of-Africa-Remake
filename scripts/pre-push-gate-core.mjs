@@ -247,37 +247,33 @@ export function runGate(steps, run, { readLoad, onNotice, inspectUnit } = {}) {
       continue
     }
     // The unit step is judged by its own summary where the wrapper can read it
-    // (`inspectUnit`): a named failure blocks at any load, a run naming none is
-    // NOT JUDGED and re-run once at any load, and the load is named every time.
-    // An unreadable summary falls through to the load rule below.
+    // (`inspectUnit`), at any load: a named failure blocks — even beside exit 0 —
+    // an unreadable summary blocks, a run naming no failure is NOT JUDGED and
+    // re-run once, and the measured load is named in the verdict every time.
     const unitSeam = step === 'unit' && typeof inspectUnit === 'function'
-    const attempt = () => ({ ...(inspectUnit() ?? {}), ok: false })
-    if (outcome === true) {
-      if (unitSeam) {
-        const v = unitAttemptsVerdict([{ ok: true, totals: inspectUnit()?.totals }], { load: opening })
-        results.push({ step, ok: true, unitLine: `pre-push gate: ${v.line}` })
-      } else results.push({ step, ok: true })
+    const attempt = (ok) => ({ ...(inspectUnit() ?? {}), ok })
+    if (outcome === true && !unitSeam) {
+      results.push({ step, ok: true })
       continue
     }
-    // Red. Was the machine quiet enough for that to mean anything? The reading
-    // taken now is combined with the one from before the long steps.
-    const load = worseLoad(opening, ask('red', step))
+    // Red (or a unit green still to be read). Was the machine quiet enough for a
+    // red to mean anything? The reading is combined with the opening one.
+    const load = outcome === true ? opening : worseLoad(opening, ask('red', step))
     if (unitSeam) {
-      const first = attempt()
-      const v1 = unitAttemptsVerdict([first], { load: load ?? undefined })
-      if (v1.kind === UNIT_RUN.red) {
-        results.push({ step, ok: false, loadLevel: load?.level, unitLine: `pre-push gate: ${v1.line}` })
-        break
-      }
-      if (v1.rerun) {
-        say(`pre-push gate: ${v1.line}`)
-        const second = run(step, GATE_COMMANDS[step], { attempt: 2 })
-        const v2 = unitAttemptsVerdict([first, second === true ? { ...inspectUnit(), ok: true } : attempt()], { load: load ?? undefined })
-        results.push({ step, ok: v2.ok, notJudged: true, loadLevel: load?.level, unitLine: `pre-push gate: ${v2.line}` })
-        if (!v2.ok) break
+      const at = { load: load ?? undefined }
+      const first = attempt(outcome === true)
+      const v1 = unitAttemptsVerdict([first], at)
+      if (!v1.rerun) {
+        results.push({ step, ok: v1.ok, loadLevel: load?.level, unitLine: `pre-push gate: ${v1.line}` })
+        if (!v1.ok) break
         continue
       }
       say(`pre-push gate: ${v1.line}`)
+      const second = run(step, GATE_COMMANDS[step], { attempt: 2 })
+      const v2 = unitAttemptsVerdict([first, attempt(second === true)], at)
+      results.push({ step, ok: v2.ok, notJudged: true, loadLevel: load?.level, unitLine: `pre-push gate: ${v2.line}` })
+      if (!v2.ok) break
+      continue
     }
 
     if (!load || !shouldRetryAfterRed(load.level)) {
