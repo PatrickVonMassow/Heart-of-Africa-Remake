@@ -1022,9 +1022,10 @@ export class ColumnDriver {
       }
       ev = all()
     }
-    // the ground fallback where the ground is the violated constraint
+    // the ground fallback where the ground is the violated constraint: at a station, or at a
+    // carried panel vertex (whose ground depth the triangle score holds, not `ground`)
     for (let s = 0; s < S; s++) {
-      if (ev[s].ground > 0) {
+      if (ev[s].ground > 0 || this.lowestRow(s, this.cur[s]) < this.rig.ground) {
         this.groundFallback(s)
         if (s < this.n) this.cur[this.n + s] = this.search(this.n + s, true)
       }

@@ -228,6 +228,44 @@ describe('the column driver', () => {
     expect(Math.hypot(lower[0] - ankle.x, lower[1] - ankle.y, lower[2] - ankle.z)).toBeLessThan(1e-9)
   })
 
+  /** Hips so low the lowers must lift; a hem vertex below the ankle pivots, one of them blended
+   *  half and half across columns 0 and 1; the columns' incoming locals hang straight. */
+  const lowHem = () => {
+    const n = 4
+    const form: DrivenFormRig = {
+      anchors: [],
+      clearance: 0.006,
+      top: 1.1,
+      panel: { pos: [0.075, 0.25, 0.075, 0.15, 0.25, 0, 0, 0.25, 0.15], idx: [2 + n, 3 + n, 0, 0, 2 + n, 0, 0, 0, 3 + n, 0, 0, 0], w: [0.5, 0.5, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], index: [0, 1, 2], exempt: [0, 0, 0], clearance: [0.006, 0.006, 0.006] },
+    }
+    const rig = toyRig(n, [], form)
+    form.anchors = rig.upper.map((u) => ({ a: [rig.rest[u * 3], rig.rest[u * 3 + 1], rig.rest[u * 3 + 2]] as V3, ia: [0, 0, 0, 0], wa: [1, 0, 0, 0], b: [0, 0, 0] as V3, ib: [0, 0, 0, 0], wb: [0, 0, 0, 0], t: 0 }))
+    const bones = toyBones(rig, [0, 0.12, 0])
+    rig.upper.forEach((u, k) => bones[u].position.set(...rig.headOffset[k]))
+    rig.lower.forEach((l, k) => bones[l].position.set(...rig.upperOffset[k]))
+    const d = new ColumnDriver(rig)
+    d.step(bones, 1 / 60)
+    rig.parents.forEach((p, i) => p >= 0 && bones[p].add(bones[i]))
+    bones[0].updateMatrixWorld(true)
+    const drawn = [0, 1, 2].map((v) => {
+      let y = 0
+      for (let c = 0; c < 4; c++) {
+        const w = form.panel.w[v * 4 + c]
+        if (!w) continue
+        const i = form.panel.idx[v * 4 + c]
+        y += new THREE.Vector3(form.panel.pos[v * 3] - rig.rest[i * 3], form.panel.pos[v * 3 + 1] - rig.rest[i * 3 + 1], form.panel.pos[v * 3 + 2] - rig.rest[i * 3 + 2]).applyMatrix4(bones[i].matrixWorld).y * w
+      }
+      return y
+    })
+    return { d, rig, drawn }
+  }
+
+  it('lifts a segment whose carried panel vertex is below the ground while its stations are not', () => {
+    const { d, rig, drawn } = lowHem()
+    expect(d.counters.groundFallback).toBeGreaterThan(0)
+    expect(Math.min(...drawn)).toBeGreaterThanOrEqual(rig.ground - 1e-9)
+  })
+
   it('scores an upper trial on the triangles its lower carries: swinging them into a capsule is infeasible (B17)', () => {
     const n = 4
     const form: DrivenFormRig = {

@@ -1181,8 +1181,9 @@ class ColumnDriver:
                 if s < n and self.cur[s] != before:
                     self.cur[n + s] = self._search(n + s, True)
             ev = all_()
+        # a station below ground, or a carried panel vertex (its depth is in the triangle score)
         for s in range(S):
-            if ev[s][1] > 0:
+            if ev[s][1] > 0 or self._lowest_row(s, self.cur[s]) < self.rig['ground']:
                 self._ground_fallback(s)
                 if s < n:
                     self.cur[n + s] = self._search(n + s, True)
@@ -1479,3 +1480,39 @@ def selftest_column_scale():
     lo = d._stations(4, d.theta[4], d.theta)[-1]
     assert _len(_sub(up, knee)) < 1e-9 and _len(_sub(lo, ankle)) < 1e-9, (up, knee, lo, ankle)
     print('column scale selftest: ok')
+
+
+def _toy_low_hem():
+    """Hips so low the lowers must lift; a hem vertex below the ankle pivots, one blended
+    half and half across columns 0 and 1; the columns' incoming locals hang straight.
+    Returns the driver, the rig and the drawn heights of the three hem vertices."""
+    n = 4
+    form = {'anchors': None, 'clearance': 0.006, 'top': 1.1,
+            'panel': {'pos': [0.075, 0.25, 0.075, 0.15, 0.25, 0.0, 0.0, 0.25, 0.15],
+                      'idx': [2 + n, 3 + n, 0, 0, 2 + n, 0, 0, 0, 3 + n, 0, 0, 0],
+                      'w': [0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+                      'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3}}
+    rig = toy_column_rig(n=n, form=form)
+    form['anchors'] = [{'a': _at(rig['rest'], u), 'ia': [0, 0, 0, 0], 'wa': [1, 0, 0, 0], 'b': [0.0, 0.0, 0.0],
+                        'ib': [0, 0, 0, 0], 'wb': [0, 0, 0, 0], 't': 0.0} for u in rig['upper']]
+    bones = toy_column_bones(rig, hips=(0.0, 0.12, 0.0))
+    for k, u in enumerate(rig['upper']):
+        bones[u]['p'] = list(rig['headOffset'][k])
+    for k, lo in enumerate(rig['lower']):
+        bones[lo]['p'] = list(rig['upperOffset'][k])
+    d = ColumnDriver(rig, TOY_DRIVER_CONFIG)
+    loc = d.step(bones, 1 / 60)
+    for j, i in enumerate(rig['upper'] + rig['lower']):
+        bones[i] = loc[j]
+    M = d.compose(bones)
+    p = form['panel']
+    drawn = [_skin_point(_at(p['pos'], v), p['idx'], p['w'], v * 4, M, rig['rest'])[1] for v in range(3)]
+    return d, rig, drawn
+
+
+def selftest_column_ground_panel():
+    """A carried panel vertex below the ground with its stations above lifts the segment."""
+    d, rig, drawn = _toy_low_hem()
+    assert d.counters['groundFallback'] > 0 and min(drawn) >= rig['ground'] - 1e-9, (d.counters, drawn)
+    print('column ground-panel selftest: ok')
+
