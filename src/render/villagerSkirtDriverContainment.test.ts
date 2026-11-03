@@ -7,16 +7,19 @@
 // warp, the stand↔walk blend, carry, dig, a start and a stop) and the builds
 // −1, 0 and +1 of every sex and age group. Named response for a sample
 // outside: raise that bone's capsule margin (VILLAGER_ASSET.drivenGarments).
-// The leg surface is asserted; the pelvis band is measured and printed.
-// OPEN: the pelvis band exceeds the profile by up to ~7 mm at the waist top
-// (≤ 240 thinned samples, linear between columns, both as the plan states);
-// the plan names no response for a profile shortfall. Not covered here: the
+// The leg surface is asserted strictly; the pelvis band within
+// VILLAGER_ASSET.drivenGarments.driver.pelvisBandTolerance × the person's scale,
+// a regression guard and no acceptance threshold (point 1339; owner decision
+// 03.11.2026). OPEN: the pelvis band exceeds the profile by up to ~7 mm at the
+// waist top (≤ 240 thinned samples, linear between columns, both as the plan
+// states); the plan names no response for a profile shortfall. Not covered here: the
 // kneel (posed by SkinnedFigure, not the clip layers) and the ten morph
 // corners (gltfPerson takes sex, age and build only).
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { VILLAGER_ASSET } from '../config/balance'
 import { applyClipLayers, clipLayers, stepClipLayers } from '../scenes/place/gltfClipLayers'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
@@ -162,7 +165,9 @@ describe('containment of the rendered legs and pelvis', () => {
                   if (!(best > 0)) continue
                   const where = `${sex} ${age} ${build} ${mo.id}, rest y ${[a, b, cc].map((v) => pos.getY(v).toFixed(3)).join('/')}`
                   if (!legTri([a, b, cc])) {
-                    if (best > band.d) Object.assign(band, { d: best, where })
+                    // judged relative to this person's scale (the tolerance is in pipeline units)
+                    const rel = best / person.frame.scale
+                    if (rel > band.d) Object.assign(band, { d: rel, where })
                   } else if (best > (worst[bone]?.d ?? 0)) worst[bone] = { d: best, where }
                 }
               }
@@ -171,8 +176,9 @@ describe('containment of the rendered legs and pelvis', () => {
         }
       }
     }
-    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; pelvis band worst outside: ${band.d.toFixed(4)} (${band.where})`)
+    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; pelvis band worst outside: ${band.d.toFixed(4)} × scale (${band.where})`)
     expect(samples).toBeGreaterThan(1e6)
     expect(worst).toEqual({})
+    expect(band.d, `pelvis band outside the profile: ${band.where}`).toBeLessThanOrEqual(VILLAGER_ASSET.drivenGarments.driver.pelvisBandTolerance)
   }, 600_000)
 })

@@ -2799,6 +2799,9 @@ export const VILLAGER_ASSET = {
       pelvisBin: 0.02,
       pelvisSamples: 240,
       pelvisArm: 0.2,
+      /** The containment test's guard on the pelvis band outside the skinned profile (× the
+       *  person's scale): a regression guard, no acceptance threshold (point 1339). Calibratable. */
+      pelvisBandTolerance: 0.007,
       /** A frame step above this (s) re-enters solving from the gravity solution. */
       resetDt: 0.25,
       /** A figure moved farther than this in one frame (world units) was placed, not walked: reset. */
