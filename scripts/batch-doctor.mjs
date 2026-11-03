@@ -496,7 +496,11 @@ if (gate) recordGateMeasurement(measurementClean)
 // user orders also marked the triggering alert handled, so the run two seconds
 // later read CONSISTENT. Until the protected files are committed by a person,
 // every run sees the incident again.
-if (!pendingRepair && !gateFailed && statusReadable && !protectedRescued && !plan.some((a) => a.action === 'alert-protected-paths')) {
+// Outside the owner's tree nothing was repaired, so the owner's next run must
+// still see the alert (point 1481).
+if (!ownerTree) {
+  log("parallel alert left as it is: this checkout is not the owner's tree")
+} else if (!pendingRepair && !gateFailed && statusReadable && !protectedRescued && !plan.some((a) => a.action === 'alert-protected-paths')) {
   markAlertHandled()
   log('parallel alert marked handled')
 } else if (protectedRescued || plan.some((a) => a.action === 'alert-protected-paths')) {

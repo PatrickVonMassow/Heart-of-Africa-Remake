@@ -78,8 +78,11 @@ const runDiagnosis = (env = {}, args = []) => {
 }
 
 describe("batch-doctor CLI: the owner's tree", () => {
-  it('a cloud clone is not the owner tree', () => {
-    expect(runDiagnosis({ CLAUDE_CODE_REMOTE: 'true' })).toMatch(/ownerTree=false/)
+  it('a cloud clone is not the owner tree, and leaves the parallel alert for the owner', () => {
+    const out = runDiagnosis({ CLAUDE_CODE_REMOTE: 'true' })
+    expect(out).toMatch(/ownerTree=false/)
+    expect(out).toMatch(/parallel alert left as it is/)
+    expect(out).not.toMatch(/parallel alert marked handled/)
   })
 
   it('conflicting session assertions are not the owner tree', () => {
@@ -87,6 +90,8 @@ describe("batch-doctor CLI: the owner's tree", () => {
   })
 
   it('a local call without a session id stays the owner tree', () => {
-    expect(runDiagnosis()).toMatch(/ownerTree=true/)
+    const out = runDiagnosis()
+    expect(out).toMatch(/ownerTree=true/)
+    expect(out).toMatch(/parallel alert marked handled/)
   })
 })
