@@ -15907,7 +15907,8 @@ to land than a mechanism that needs a review.
   FINAL STATE: the far shoulder of a walking man and child reads as a rounded shoulder at 3 m in rear-3/4 views on both backends; the cause (body mesh silhouette at the shoulder cap, skin weights, or shading) is named in the commit.
   Test: Vitest for the cause's layer; picture check of the two named garment-acceptance rows on both backends.
   Criticality: low - a corner on the far shoulder outline at close range from behind.
-  Bundle: Dorfleben.- [ ] 1483. Branch-hygiene guard tells us to delete a remote branch that still carries unmerged commits
+  Bundle: Dorfleben.
+- [ ] 1483. Branch-hygiene guard tells us to delete a remote branch that still carries unmerged commits
   Source: Stop hook 03.11.2026 05:16 (owner session): branch-hygiene-guard listed origin/feat/1344-children-hand-contacts as "bereits in origin/main enthalten" with `git push origin --delete`, but `git cherry origin/main origin/feat/1344-children-hand-contacts` shows 2 unmerged commits (33671ebad, 43fd6e0d3) of open point 1344; only the stale local branch (c5dd0003a) was merged. Following the instruction deletes real work.
   FINAL STATE: the guard judges every remote branch by its own tip against origin/main and never lists a branch with unmerged commits for deletion.
   Test: Vitest for the guard core with a local branch merged and its remote ahead by one commit.
