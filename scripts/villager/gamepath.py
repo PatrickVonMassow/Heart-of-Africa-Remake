@@ -1298,6 +1298,9 @@ def column_round_trip(rt, tol=RUNTIME_TOLERANCE, log=print):
     worst = {'p': 0.0, 'q': 0.0, 's': 0.0, 'frames': 0}
     bad = []
     for sq in seqs:
+        if not sq.get('frames'):
+            bad.append(f"{sq.get('id')}: no frames (an empty replay recomputes nothing)")
+            continue
         d = ColumnDriver(sq['rig'], sq['config'])
         cols = sq['rig']['upper'] + sq['rig']['lower']
         for fi, f in enumerate(sq['frames']):
@@ -1573,3 +1576,14 @@ def selftest_column_round_trip_finite():
         bad['columns'][0]['frames'][3]['bones'][col][key][comp] = float('nan')
         _round_trip_fails(bad, f'a NaN in {key}[{comp}]')
     print('column round trip finite selftest: ok')
+
+
+def selftest_column_round_trip_nonempty():
+    """A sequence without frames is no evidence: the round trip refuses it."""
+    import copy
+    rt = _toy_column_export()
+    bad = copy.deepcopy(rt)
+    bad['columns'][0]['frames'] = []
+    bad['columns'][0]['counters'] = {k: 0 for k in bad['columns'][0]['counters']}
+    _round_trip_fails(bad, 'a sequence without frames')
+    print('column round trip nonempty selftest: ok')
