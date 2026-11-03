@@ -25,7 +25,7 @@ import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { approach } from './figureWalk'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { ColumnDriver, columnRig, pointSegment } from './villagerSkirtDriver'
+import { ColumnDriver, columnRig, pointSegment, segmentParam } from './villagerSkirtDriver'
 
 type V3 = [number, number, number]
 const LEG = ['thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
@@ -178,24 +178,29 @@ describe('containment of the rendered legs and pelvis', () => {
                   if (ob.inProfile(p)) continue
                   const pe = ob.profileExcess(p)
                   if (pe !== Infinity && pe > 0) {
-                    // at or above the profile bottom: the profile alone answers
+                    // at or above the profile bottom (rule 2'): band samples and hip-half thigh samples
+                    // (dominant thigh capsule t < 0.5) are answered by the profile alone; knee-half
+                    // thigh, shin, foot and toe samples fall through to the union below
                     const where = `${sex} ${age} ${build} ${mo.id} f${f} w${ms.weight.toFixed(2)} v${ms.speed.toFixed(2)}, rest y ${[a, b, cc].map((v) => pos.getY(v).toFixed(3)).join('/')}`
                     if (!legTri([a, b, cc])) {
                       const rel = pe / person.frame.scale
                       if (rel > band.d) Object.assign(band, { d: rel, where })
-                    } else {
-                      let lb = -1
-                      let lw = 0
-                      for (let k = 0; k < 4; k++) {
-                        if (legSet.has(si.getComponent(a, k)) && sw.getComponent(a, k) > lw) {
-                          lw = sw.getComponent(a, k)
-                          lb = si.getComponent(a, k)
-                        }
-                      }
-                      const bone = asset.bones[lb] ?? 'leg'
-                      if (pe > (above[bone]?.d ?? 0)) above[bone] = { d: pe, where }
+                      continue
                     }
-                    continue
+                    let lb = -1
+                    let lw = 0
+                    for (let k = 0; k < 4; k++) {
+                      if (legSet.has(si.getComponent(a, k)) && sw.getComponent(a, k) > lw) {
+                        lw = sw.getComponent(a, k)
+                        lb = si.getComponent(a, k)
+                      }
+                    }
+                    const bone = asset.bones[lb] ?? 'leg'
+                    const ci = bone.startsWith('thigh.') ? rig.capsules.findIndex((cap) => cap.bone === lb) : -1
+                    if (ci >= 0 && segmentParam(p, ob.capsules[ci].a, ob.capsules[ci].b) < 0.5) {
+                      if (pe > (above[bone]?.d ?? 0)) above[bone] = { d: pe, where }
+                      continue
+                    }
                   }
                   let best = Infinity
                   let bone = ''
@@ -224,7 +229,7 @@ describe('containment of the rendered legs and pelvis', () => {
         }
       }
     }
-    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; legs above the profile bottom outside the profile: ${JSON.stringify(above)}; pelvis band worst outside: ${band.d.toFixed(4)} × scale (${band.where})`)
+    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; hip-half thigh samples above the profile bottom outside the profile (rule 2'): ${JSON.stringify(above)}; pelvis band worst outside: ${band.d.toFixed(4)} × scale (${band.where})`)
     expect(samples).toBeGreaterThan(1e6)
     expect(worst).toEqual({})
     expect(above).toEqual({})
