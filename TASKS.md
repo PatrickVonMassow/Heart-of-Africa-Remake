@@ -15913,4 +15913,4 @@ to land than a mechanism that needs a review.
   FINAL STATE: the doctor's quarantine-stash repair stands down outside the owner's main tree (a cloud clone or a session that does not hold the batch lock), like the other session guards; the owner's main tree keeps its current repair.
   Test: Vitest/node test of the doctor's repair plan for a non-owner clone (no quarantine planned) and for the owner's main tree (unchanged).
   Criticality: high - silent loss of a delegate's uncommitted work.
-  Bundle: Session- & Repo-Hygiene.
+  Bundle: Testinfrastruktur.
