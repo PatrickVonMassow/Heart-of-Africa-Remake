@@ -687,6 +687,20 @@ def col_point_triangle(p, a, b, c):
     return _add(a, _add(_mul(ab, vb * den), _mul(ac, vc * den)))
 
 
+def col_clip_below(pts, h, bottom):
+    """The part of triangle pts whose height h (affine, given at its corners) lies below bottom: 0-2 triangles."""
+    poly = []
+    for i in range(3):
+        j = (i + 1) % 3
+        in_i = h[i] < bottom
+        if in_i:
+            poly.append(tuple(pts[i]))
+        if in_i != (h[j] < bottom):
+            u = (bottom - h[i]) / (h[j] - h[i])
+            poly.append(tuple(pts[i][e] + (pts[j][e] - pts[i][e]) * u for e in range(3)))
+    return [(poly[0], poly[i], poly[i + 1]) for i in range(1, len(poly) - 1)]
+
+
 def col_segment_triangle(p, q, a, b, c):
     e1 = _sub(b, a)
     e2 = _sub(c, a)
@@ -1082,14 +1096,16 @@ class ColumnDriver:
             centre = _mul(_add(_add(a, b), c), 1 / 3)
             rad = max(_len(_sub(a, centre)), _len(_sub(b, centre)), _len(_sub(c, centre)))
             hv = [self._hips_local(x, P['hipsInv'], hips_at) for x in (a, b, c)]
-            # the capsules constrain only a triangle reaching below the profile bottom (section 3.5)
-            if min(h[1] for h in hv) < rig['profile']['bottom']:
+            # the capsules constrain only the part of a triangle below the profile bottom (section 3.5):
+            # the triangle clipped at that height (as villagerSkirtDriver.ts)
+            below = col_clip_below((a, b, c), [h[1] for h in hv], rig['profile']['bottom'])
+            if below:
                 for ca, cb, radius in P['capsules']:
                     mid = _mul(_add(ca, cb), 0.5)
                     bound = _len(_sub(cb, ca)) / 2 + radius + C
                     if _len(_sub(mid, centre)) > bound + rad:
                         continue
-                    d = radius + C - col_segment_triangle(ca, cb, a, b, c)
+                    d = radius + C - min(col_segment_triangle(ca, cb, p, q, r) for p, q, r in below)
                     if d > 0:
                         depth += d
             # a triangle with two exempt vertices skips the centroid's profile test (section 3.6)

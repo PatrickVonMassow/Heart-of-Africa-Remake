@@ -13,7 +13,7 @@ import { VILLAGER_ASSET } from '../config/balance'
 import { applyClipLayers, clipLayers, stepClipLayers } from '../scenes/place/gltfClipLayers'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { carriesColumnWeight, ColumnDriver, columnRig, composeFigureMatrices, PelvisProfile, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
+import { carriesColumnWeight, clipBelow, ColumnDriver, columnRig, composeFigureMatrices, PelvisProfile, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
 import { ROUND_TRIP_SEQUENCES, runSequence } from './villagerSkirtDriverSequences'
 
 const CFG = VILLAGER_ASSET.drivenGarments.driver
@@ -513,5 +513,34 @@ describe('the segment–triangle distance', () => {
     expect(segmentTriangle([0.2, 0.2, -1], [0.2, 0.2, 1], a, b, c)).toBe(0)
     expect(segmentTriangle([0.2, 0.2, 0.5], [0.2, 0.2, 1], a, b, c)).toBeCloseTo(0.5, 12)
     expect(segmentTriangle([2, -1, 0.3], [2, 1, 0.3], a, b, c)).toBeCloseTo(Math.hypot(1, 0.3), 12)
+  })
+})
+
+describe('the triangle below the profile bottom (section 3.5)', () => {
+  const tri: V3[] = [
+    [0, 0, 0],
+    [1, 0, 0],
+    [0, 1, 0],
+  ]
+  const area = (t: V3[]) => Math.abs((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[2][0] - t[0][0]) * (t[1][1] - t[0][1])) / 2
+  it('keeps a triangle wholly below, drops one wholly above', () => {
+    expect(clipBelow(tri, [0, 0, 0], 1)).toEqual([tri])
+    expect(clipBelow(tri, [1, 1, 2], 1)).toEqual([])
+  })
+  it('clips a straddling triangle to its part below the height (the hips-frame y here)', () => {
+    const h = tri.map((p) => p[1])
+    // one corner above: a quad below, as two triangles of area 1/2 - 1/8
+    const two = clipBelow(tri, h, 0.5)
+    expect(two).toHaveLength(2)
+    expect(two.reduce((s, t) => s + area(t), 0)).toBeCloseTo(0.375, 12)
+    // two corners above: one triangle below
+    const one = clipBelow(tri, [1, 1, 0], 0.5)
+    expect(one).toHaveLength(1)
+    expect(area(one[0])).toBeCloseTo(0.125, 12)
+    // a segment touching only the part above meets nothing below
+    const p: V3 = [0, 0.9, -1]
+    const q: V3 = [0, 0.9, 1]
+    expect(segmentTriangle(p, q, tri[0], tri[1], tri[2])).toBe(0)
+    expect(Math.min(...two.map((t) => segmentTriangle(p, q, t[0], t[1], t[2])))).toBeCloseTo(0.4, 12)
   })
 })

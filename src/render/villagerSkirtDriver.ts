@@ -131,6 +131,26 @@ export function pointTriangle(p: V3, a: V3, b: V3, c: V3): V3 {
   return add(a, add(mul(ab, vb * den), mul(ac, vc * den)))
 }
 
+/**
+ * The part of triangle `pts` whose height `h` (affine over the triangle, given
+ * at its corners) lies below `bottom`, as 0, 1 or 2 triangles.
+ */
+export function clipBelow(pts: readonly V3[], h: readonly number[], bottom: number): V3[][] {
+  const poly: V3[] = []
+  for (let i = 0; i < 3; i++) {
+    const j = (i + 1) % 3
+    const inI = h[i] < bottom
+    if (inI) poly.push(pts[i])
+    if (inI !== h[j] < bottom) {
+      const u = (bottom - h[i]) / (h[j] - h[i])
+      poly.push([0, 1, 2].map((e) => pts[i][e] + (pts[j][e] - pts[i][e]) * u) as V3)
+    }
+  }
+  const out: V3[][] = []
+  for (let i = 1; i + 1 < poly.length; i++) out.push([poly[0], poly[i], poly[i + 1]])
+  return out
+}
+
 /** Closest distance between the segment pq and the triangle abc (0 where they cross). */
 export function segmentTriangle(p: V3, q: V3, a: V3, b: V3, c: V3): number {
   // crossing (Möller–Trumbore on the segment)
@@ -947,13 +967,16 @@ export class ColumnDriver {
       const centre = mul(add(add(a, b), c), 1 / 3)
       const rad = Math.max(len(sub(a, centre)), len(sub(b, centre)), len(sub(c, centre)))
       const hv = [a, b, c].map((p) => this.hipsLocal(p, P.hipsInv, hipsAt))
-      // the capsules constrain only a triangle reaching below the profile bottom (section 3.5)
-      if (Math.min(hv[0].y, hv[1].y, hv[2].y) < rig.profile.bottom) {
+      // the capsules constrain only the part of a triangle below the profile bottom (section 3.5):
+      // the triangle clipped at that height (a straddling triangle's upper part met the thigh
+      // capsule's hip end above the bottom, where the profile alone governs)
+      const below = clipBelow([a, b, c], [hv[0].y, hv[1].y, hv[2].y], rig.profile.bottom)
+      if (below.length) {
         for (const cap of P.capsules) {
           const mid = mul(add(cap.a, cap.b), 0.5)
           const bound = len(sub(cap.b, cap.a)) / 2 + cap.radius + C
           if (len(sub(mid, centre)) > bound + rad) continue
-          const d = cap.radius + C - segmentTriangle(cap.a, cap.b, a, b, c)
+          const d = cap.radius + C - Math.min(...below.map(([p, q, r]) => segmentTriangle(cap.a, cap.b, p, q, r)))
           if (d > 0) depth += d
         }
       }
