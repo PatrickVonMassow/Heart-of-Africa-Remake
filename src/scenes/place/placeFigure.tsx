@@ -399,7 +399,7 @@ function PrimitiveFigure({
                   uppers.current[i] = el
                 }}
               >
-                <mesh position={[0, -upper * 0.5, 0]} scale={[1, upper, 1]} castShadow>
+                <mesh name="figure-arm" position={[0, -upper * 0.5, 0]} scale={[1, upper, 1]} castShadow>
                   <cylinderGeometry args={[L.armRadius[0], elbowR, 1, segments]} />
                   <meshStandardMaterial color={skin} roughness={0.88} />
                 </mesh>
@@ -409,7 +409,7 @@ function PrimitiveFigure({
                     fores.current[i] = el
                   }}
                 >
-                  <mesh position={[0, -upper * 0.5, 0]} scale={[1, upper, 1]} castShadow>
+                  <mesh name="figure-arm" position={[0, -upper * 0.5, 0]} scale={[1, upper, 1]} castShadow>
                     <cylinderGeometry args={[elbowR, L.armRadius[1], 1, segments]} />
                     <meshStandardMaterial color={skin} roughness={0.88} />
                   </mesh>
@@ -443,7 +443,7 @@ function PrimitiveFigure({
                   legPivots.current[i] = el
                 }}
               >
-                <mesh position={[0, -L.hipY * 0.5, 0]} castShadow>
+                <mesh name="figure-leg" position={[0, -L.hipY * 0.5, 0]} castShadow>
                   <cylinderGeometry args={[L.legRadius[0], L.legRadius[1], L.hipY, segments]} />
                   <meshStandardMaterial color={skin} roughness={0.88} />
                 </mesh>

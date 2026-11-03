@@ -5791,24 +5791,28 @@ if (section('village-walk')) {
           }
           const sc = fig.getWorldScale(new V())
           const head = fig.getObjectByName('figure-head')
-          // The primitive's lowest drawn point of its BODY — the cone's base and
-          // the legs, what it stands or kneels on — over the ground it stands
-          // on (the group rides the ground); arms and head load left out.
+          // The primitive's lowest drawn points over the ground it stands on
+          // (the group rides the ground), part by part (work-order 1301): its
+          // BODY (trunk cone, the wrap's lower part), its LEGS, and its HANDS
+          // — every transformed vertex, since a box corner of a tilted leg
+          // lies outside the leg. The arms between and a head load left out.
           let lowest = null
+          let lowestLegs = null
+          let lowestHands = null
           if (!mesh) {
             fig.updateWorldMatrix(true, true)
             const ground = g.getWorldPosition(new V()).y
-            const skip = new Set(['hand-left', 'hand-right'].map((n) => fig.getObjectByName(n)?.parent?.parent).filter(Boolean))
-            skip.add(fig.getObjectByName('figure-crown'))
+            const crown = fig.getObjectByName('figure-crown')
+            const v = new V()
             fig.traverse((o) => {
-              if (!o.isMesh || !o.visible) return
-              for (let a = o.parent; a; a = a.parent) if (skip.has(a)) return
-              o.geometry.computeBoundingBox()
-              const b = o.geometry.boundingBox
-              for (const cx of [b.min.x, b.max.x]) for (const cy of [b.min.y, b.max.y]) for (const cz of [b.min.z, b.max.z]) {
-                const y = o.localToWorld(new V(cx, cy, cz)).y - ground
-                lowest = lowest === null ? y : Math.min(lowest, y)
-              }
+              if (!o.isMesh || !o.visible || o.name === 'figure-arm') return
+              for (let a = o.parent; a; a = a.parent) if (a === crown) return
+              const pos = o.geometry.attributes.position
+              let low = Infinity
+              for (let n = 0; n < pos.count; n++) low = Math.min(low, v.fromBufferAttribute(pos, n).applyMatrix4(o.matrixWorld).y - ground)
+              if (o.name === 'figure-leg') lowestLegs = lowestLegs === null ? low : Math.min(lowestLegs, low)
+              else if (o.name === 'hand-left' || o.name === 'hand-right') lowestHands = lowestHands === null ? low : Math.min(lowestHands, low)
+              else lowest = lowest === null ? low : Math.min(lowest, low)
             })
           }
           const hs = head?.getWorldScale(new V())
@@ -5821,6 +5825,8 @@ if (section('village-walk')) {
             skinned: !!mesh,
             uniform: Math.abs(sc.x - sc.y) < 1e-6 && Math.abs(sc.y - sc.z) < 1e-6,
             lowest,
+            lowestLegs,
+            lowestHands,
             headRound: !hs || (Math.abs(hs.x - hs.y) < 1e-3 && Math.abs(hs.y - hs.z) < 1e-3),
           })
           const r = out[out.length - 1]
@@ -5879,6 +5885,12 @@ if (section('village-walk')) {
       skinned: [...new Set(out.map((r) => r.skinned))],
       kRead: out.every((r) => r.k !== null),
       worstLowest: out.some((r) => r.lowest !== null) ? +Math.max(...out.filter((r) => r.lowest !== null).map((r) => Math.abs(r.lowest))).toFixed(4) : null,
+      // Legs and hands may lift off the ground (a raised hand, a leg in the
+      // air); only sinking below it counts: the deepest point under it (0 above).
+      sunkLegs: out.some((r) => r.lowestLegs !== null) ? +Math.max(0, ...out.filter((r) => r.lowestLegs !== null).map((r) => -r.lowestLegs)).toFixed(4) : null,
+      sunkHands: out.some((r) => r.lowestHands !== null) ? +Math.max(0, ...out.filter((r) => r.lowestHands !== null).map((r) => -r.lowestHands)).toFixed(4) : null,
+      legsSeen: out.filter((r) => r.lowestLegs !== null).length,
+      kneelingHandsSeen: out.filter((r) => r.lowestHands !== null && r.k === 1).length,
       drop,
     }
   }
@@ -6072,6 +6084,8 @@ if (section('village-walk')) {
     let skinnedFigures = 0
     let kneeling = 0
     const bad = []
+    const parts = { legs: { seen: 0, low: Infinity }, hands: { seen: 0, low: Infinity } }
+    const sunk = []
     window.__placeScene.traverse((o) => {
       if (o.name !== 'inhabitant' || !o.visible) return
       figures++
@@ -6080,16 +6094,44 @@ if (section('village-walk')) {
       if (skinned) skinnedFigures++
       const head = o.getObjectByName('figure-head')
       if (!head) return
-      const local = o.worldToLocal(head.getWorldPosition(new V()))
-      if (local.y > 0.8) return // standing
+      // Kneeling by the figure's own kneel (work-order 1301: a kneeling
+      // primitive keeps its trunk height, so its head no longer tells).
+      const k = o.userData.dumpKneel
+      if (typeof k === 'number' ? k < 0.5 : o.worldToLocal(head.getWorldPosition(new V())).y > 0.8) return // standing
       kneeling++
       const s = o.getWorldScale(new V())
       if (Math.abs(s.x - s.y) > 1e-6 || Math.abs(s.y - s.z) > 1e-6 || Math.abs(s.x - s.z) > 1e-6) bad.push({ s: [s.x, s.y, s.z] })
+      // Its legs and hands over the ground under it (work-order 1301): every
+      // transformed vertex, against the ground the figure's group stands on.
+      if (skinned) return
+      o.updateWorldMatrix(true, true)
+      const ground = o.getWorldPosition(new V()).y
+      const v = new V()
+      o.traverse((m) => {
+        if (!m.isMesh || !m.visible) return
+        const part = m.name === 'figure-leg' ? 'legs' : m.name === 'hand-left' || m.name === 'hand-right' ? 'hands' : null
+        if (!part) return
+        const pos = m.geometry.attributes.position
+        let low = Infinity
+        for (let n = 0; n < pos.count; n++) low = Math.min(low, v.fromBufferAttribute(pos, n).applyMatrix4(m.matrixWorld).y - ground)
+        parts[part].seen++
+        if (low < parts[part].low) parts[part].low = low
+        if (low < -0.02) sunk.push({ part, name: m.name, low: +low.toFixed(4), at: [+ground.toFixed(2)] })
+      })
     })
-    return { figures, skinnedFigures, kneeling, bad }
+    for (const p of Object.values(parts)) p.low = p.seen ? +p.low.toFixed(4) : null
+    return { figures, skinnedFigures, kneeling, bad, parts, sunk: sunk.slice(0, 8) }
   })
   check('low preset: every villager drawn is the primitive figure (no skinned body)', census.figures > 0 && census.skinnedFigures === 0, JSON.stringify(census))
   check('low preset: every kneeling primitive figure keeps a uniform scale', census.kneeling > 0 && census.bad.length === 0, JSON.stringify(census))
+  // Work-order 1301: every kneeling primitive in the village at once — the
+  // weavers, the grillers, the task walker — its hands (at their work or at
+  // rest) and any drawn legs over the ground under it, not only its body.
+  report(`  low-preset kneelers ${JSON.stringify({ kneeling: census.kneeling, parts: census.parts, sunk: census.sunk })}`)
+  check(`low preset: no kneeling primitive’s drawn hand sinks into the ground (≤ ${FOOT_TOL.toFixed(3)} m, transformed hand geometry)`,
+    census.parts.hands.seen > 0 && census.parts.hands.low >= -FOOT_TOL, JSON.stringify(census.parts))
+  check(`low preset: no kneeling primitive’s drawn leg sinks into the ground (≤ ${FOOT_TOL.toFixed(3)} m; ${census.parts.legs.seen} legs drawn)`,
+    census.parts.legs.seen === 0 || census.parts.legs.low >= -FOOT_TOL, JSON.stringify(census.parts))
   // Grounding of the walking primitives, every frame for a while: the lowest
   // drawn point of each walker's body over the ground under it. Sampling runs
   // on past 60 frames until 30 walking samples exist (a single walker can
@@ -6109,11 +6151,10 @@ if (section('village-walk')) {
         let skinned = false
         g.updateWorldMatrix(true, true)
         // The body it stands on (cone base, legs): arms and head load left out.
-        const skip = new Set(['hand-left', 'hand-right'].map((n) => g.getObjectByName(n)?.parent?.parent).filter(Boolean))
-        skip.add(g.getObjectByName('figure-crown'))
+        const skip = new Set([g.getObjectByName('figure-crown')].filter(Boolean))
         g.traverse((o) => {
           if (o.isSkinnedMesh) skinned = true
-          if (!o.isMesh || !o.visible) return
+          if (!o.isMesh || !o.visible || o.name === 'figure-arm' || o.name === 'hand-left' || o.name === 'hand-right') return
           for (let a = o.parent; a; a = a.parent) if (skip.has(a)) return
           o.geometry.computeBoundingBox()
           const b = o.geometry.boundingBox
@@ -6136,6 +6177,39 @@ if (section('village-walk')) {
   check('low preset kneel: the observed task walker is the primitive figure', lowKneel.skinned.length === 1 && lowKneel.skinned[0] === false, JSON.stringify(lowKneel))
   kneelChecks('low preset kneel', lowKneel)
   check(`low preset kneel: the primitive stays on the ground through the kneel (≤ ${FOOT_TOL.toFixed(3)} m)`, lowKneel.worstLowest !== null && lowKneel.worstLowest <= FOOT_TOL, JSON.stringify(lowKneel))
+  // Work-order 1301: the folded legs and the hands, not only the body — no
+  // leg rim or half cylinder, and no resting hand, below the ground.
+  // (The task walker wears its wrap to the ground and draws no legs; a legged
+  // kneeler's fold is pinned exactly in figureWalk.test.ts.)
+  check(`low preset kneel: no drawn leg sinks into the ground through the kneel (≤ ${FOOT_TOL.toFixed(3)} m; ${lowKneel.legsSeen} frames with legs)`,
+    lowKneel.legsSeen === 0 || (lowKneel.sunkLegs !== null && lowKneel.sunkLegs <= FOOT_TOL), JSON.stringify(lowKneel))
+  check(`low preset kneel: no drawn hand sinks into the ground, kneeling included (≤ ${FOOT_TOL.toFixed(3)} m, transformed hand geometry)`,
+    lowKneel.kneelingHandsSeen > 0 && lowKneel.sunkHands !== null && lowKneel.sunkHands <= FOOT_TOL, JSON.stringify(lowKneel))
+  // The low-preset kneel as a picture (work-order 1301): the task walker held
+  // at full kneel, side-on — trunk at its standing height, arms full length
+  // bent at the elbow, hands and wrap on the ground, nothing through it.
+  const lowKnelt = await stepUntil(() => {
+    const g = window.__placeScene.getObjectByName('village-task-walker')
+    return !!g?.visible && g.getObjectByName('inhabitant')?.userData.kneel === 1
+  }, null, 7200)
+  check('low preset kneel: the task walker was caught at full kneel', lowKnelt, '')
+  if (lowKnelt) {
+    await freezeLife(true)
+    try {
+      const at = await page.evaluate(() => {
+        const g = window.__placeScene.getObjectByName('village-task-walker')
+        return { x: g.position.x, z: g.position.z }
+      })
+      const seen = await sideOn(null, 2.6, -0.16)
+      check('low preset kneel: the camera found a free spot side-on to the kneeling task walker', !!seen, seen ? '' : JSON.stringify(sideOnMisses))
+      if (seen) await frame(shot('1301-village-kneel-low'), {
+        local: { x: at.x, y: 0.4, z: at.z },
+        label: 'low preset: the Zulu task walker kneeling at its work, side-on — the primitive figure at full kneel, arms full length and bent at the elbow, hands and wrap on the ground, nothing sunk into it',
+      })
+    } finally {
+      await freezeLife(false)
+    }
+  }
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
