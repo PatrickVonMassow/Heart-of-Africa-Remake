@@ -412,10 +412,10 @@ describe('the column driver', () => {
 })
 
 describe('the driver in the figure', () => {
-  it('runs only for a body carrying column weight: none does before the driven builder', () => {
+  it('runs only for a body carrying column weight: a driven panel does, nothing else', () => {
     const person = gltfPerson(asset, 'female', 'adult', 0)
     expect(carriesColumnWeight(asset, person.geometry)).toBe(false)
-    for (const [name, g] of Object.entries(asset.geometries)) expect(carriesColumnWeight(asset, g), name).toBe(false)
+    for (const [name, g] of Object.entries(asset.geometries)) expect(carriesColumnWeight(asset, g), name).toBe(asset.parts[name] === 'driven')
     const g = person.geometry.clone()
     const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
     const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute

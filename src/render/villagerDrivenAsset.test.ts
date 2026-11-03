@@ -1,3 +1,4 @@
+// @vitest-environment node
 // The driven loin flap and girdle tails in the shipped file (stage-3 plan
 // sections 3.2, 3.3 and 3.12, scripts/villager/driven.py): mesh identity,
 // the per-form rest contract (zero tilt reproduces the built panel), row 0

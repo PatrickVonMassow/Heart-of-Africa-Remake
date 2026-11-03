@@ -766,7 +766,8 @@ export function gltfFigureGeometry(
     if (rec) {
       const panel = finishDrivenPanel(asset, person, rec, g.clone(), shells.map(garmentMeshName))
       if (import.meta.env.DEV) assertRowZero(rec, panel, shellParts.find((s) => s.name === rec.band))
-      parts.push(panel)
+      // no cover entry (mask.py): hides nothing, hidden by nothing — a zero push so the parts merge
+      parts.push(applyGarmentMask(panel, null, asset.garmentMask, [], depth))
       continue
     }
     const over = drawn.filter((o) => garmentLayer(o.l) > garmentLayer(l)).map((o) => garmentMeshName(o.l))
