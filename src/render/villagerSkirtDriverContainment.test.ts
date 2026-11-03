@@ -23,7 +23,7 @@ import { VILLAGER_ASSET, VILLAGER_MOTION } from '../config/balance'
 import { applyClipLayers, clipLayers, stepClipLayers } from '../scenes/place/gltfClipLayers'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { approach } from './figureWalk'
+import { approach, legDims, phasePerDistance, rephase, strideReach, walkPose } from './figureWalk'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
 import { ColumnDriver, columnRig, pointSegment, segmentParam } from './villagerSkirtDriver'
 
@@ -116,20 +116,36 @@ describe('containment of the rendered legs and pelvis', () => {
           const skinned = new Float64Array(pos.count * 3)
           const mats = skeleton.boneMatrices!
           // the game's motion state (figureWalk.stepWalk): smoothed ground speed and walk weight, carried across motions
-          const ms = { speed: 0, weight: 0 }
+          // ...and its stride (figureWalk.stepWalk: reach and phase, no kneel, no crouch, free plants)
+          const ms = { speed: 0, weight: 0, reach: 0, phase: 0 }
+          const dims = legDims(person.p)
           const smooth = 1 - Math.exp(-dt / VILLAGER_MOTION.speedSmoothing)
           for (const mo of MOTIONS) {
             let tail = mo.ramp ? RAMP_TAIL : 0
             for (let f = 0; mo.ramp ? tail > 0 && f < 600 : f < mo.settle + mo.sample; f++) {
               ms.speed += (mo.speed - ms.speed) * smooth
-              ms.weight = approach(ms.weight, Math.abs(ms.speed) > VILLAGER_MOTION.moveSpeed ? 1 : 0, VILLAGER_MOTION.walkFadeRate, dt)
+              const moving = Math.abs(ms.speed) > VILLAGER_MOTION.moveSpeed
+              const placed = ms.reach * ms.weight
+              ms.weight = approach(ms.weight, moving ? 1 : 0, VILLAGER_MOTION.walkFadeRate, dt)
+              if (moving) ms.reach = strideReach(dims, ms.speed, age)
+              ms.phase = rephase(ms.phase, placed, ms.reach * ms.weight)
+              ms.phase += mo.speed * dt * phasePerDistance(Math.max(ms.reach * ms.weight, ms.reach * 0.3))
               if (mo.ramp && ms.weight === mo.weight && Math.abs(ms.speed - mo.speed) <= 0.01 * Math.max(1, mo.speed)) tail--
               stepClipLayers(asset, person, c, mo.speed * dt, ms.speed, { x: 0, z: (z += mo.speed * dt), yaw: 0, unit: 1 }, mo.work, dt)
-              // the code-built stance first, as the figure writes it before the layers (a stand↔walk
-              // ramp takes the code's legs; left unwritten, it would take the last frame's output)
-              for (const nm of [...LEG, 'hips']) bones[nm].quaternion.identity()
+              // the code-built legs first, as the figure's poseLegs writes them before the layers (a
+              // stand↔walk ramp takes the code's legs; left unwritten, it would take the last frame's output)
+              const walk = walkPose(dims, ms.phase, ms.reach, ms.weight, age, 0)
               const h = asset.bones.indexOf('hips')
-              bones.hips.position.set(person.rest[h * 3], person.rest[h * 3 + 1], person.rest[h * 3 + 2])
+              bones.hips.position.set(person.rest[h * 3], walk.hipHeight, person.rest[h * 3 + 2])
+              bones.hips.rotation.set(0, walk.hipYaw, 0)
+              ;(['L', 'R'] as const).forEach((sd, i) => {
+                const roll = walk.legs[i].roll ?? 0
+                bones[`thigh.${sd}`].rotation.set(walk.legs[i].thigh, -walk.hipYaw, roll, 'YZX')
+                bones[`shin.${sd}`].rotation.set(walk.legs[i].shin, 0, 0)
+                bones[`foot.${sd}`].rotation.set(walk.legs[i].foot, 0, -roll)
+              })
+              bones['toe.L'].quaternion.identity()
+              bones['toe.R'].quaternion.identity()
               applyClipLayers(asset, person, bones, c, { speed: ms.speed, weight: ms.weight, kneel: 0 }, [true, true])
               if (f < mo.settle) continue
               skeleton.bones[asset.parents.indexOf(-1)].updateMatrixWorld(true)
