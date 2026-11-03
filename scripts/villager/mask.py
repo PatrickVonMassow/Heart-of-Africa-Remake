@@ -440,6 +440,10 @@ def masks(body, garments, cfg, clips=None, log=print):
     # sources' body mask, no mask entry of its own and no bit
     for n in G.shell_names(garments['meshes']):
         inner[n] = np.zeros((0, 4), np.uint16)
+    # a driven panel (driven.py) hides nothing and is hidden by nothing: no
+    # bit, an empty entry (stage-3 plan section 3.12)
+    for n in G.driven_names(garments['meshes']):
+        inner[n] = np.zeros((0, 4), np.uint16)
     return {'garments': names, 'body': to_bits(body_cls, len(bv)), 'inner': inner}
 
 

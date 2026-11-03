@@ -135,7 +135,7 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
         # painted in the infant's skin by the game
         infant = np.asarray(g['uv'])[:, 1] >= 2 if (g.get('extras') or {}).get('form') == 'babySling' else None
         add_skinned_mesh(w, name, g['pos'], g['tris'], g['W'], g['morph_pos'], 0, roots, extras={'part': g.get('part', 'garment'), **g.get('extras', {})},
-                         cover=None if mask is None else mask['inner'].get(name),
+                         cover=None if mask is None or g.get('part') == 'driven' else mask['inner'].get(name),
                          extra_attrs=None if infant is None else {'_INFANT': infant.astype(np.float32)}, normals=False, compact=True)
     clip_meta = {}
     for name, c in (clips or {}).get('clips', {}).items():
