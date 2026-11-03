@@ -35479,3 +35479,13 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Test: Vitest/node test of the doctor's repair plan for a non-owner clone (no quarantine planned) and for the owner's main tree (unchanged).
   Criticality: high - silent loss of a delegate's uncommitted work.
   Bundle: Testinfrastruktur.
+
+- [x] 1480. Villager garments stage 3, sub-step 2: the column driver
+  Queue position: directly after point 1398.
+  Source: split from point 1398 on 02.11.2026 (owner decision under the standing split rule); narrowed on 03.11.2026 under the same rule: this point lands sub-step 2 (the column driver, TS and Python mirror) of docs/garment-stage3-plan-1398.md section 7; sub-steps 3 to 7 and the carried user goal moved to point 1482.
+  Spec: docs/garment-stage3-plan-1398.md (revision 5) sections 3.2 to 3.16 as far as they concern the driver, and section 7 item 2.
+  Procedure: implementation gets the usual cross-vendor code review; per point 1339 no numeric penetration threshold is an acceptance gate.
+  Final state: the column driver runs for every body carrying column weight, its Python mirror round-trips the same poses, and the village picture is unchanged or better on both backends.
+  Verifiable: driver and containment Vitest, Python selftest and column round trip, polish-villagers village-walk section on both backends picture-checked, cross-vendor review record.
+  Bundle: Dorfleben.
+  Criticality: high - foundation of every driven skirt, loin flap, apron and girdle tail.
