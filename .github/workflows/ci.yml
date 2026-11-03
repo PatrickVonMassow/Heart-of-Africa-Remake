@@ -174,11 +174,19 @@ jobs:
     needs: fast
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # MEASURED 03.11.2026: the full checkout alone ran past the old 5-minute
+    # ceiling (run 41692582189: 18:38:00 -> cancelled 18:43:02; run 41680804084:
+    # 17:28:46 -> 17:33:46), so main went red with both shards green. The
+    # checkout is now sparse (the verdict's import closure lives in scripts/),
+    # and 15 minutes is headroom above the measured five.
+    timeout-minutes: 15
     steps:
       - id: checkout
         uses: actions/checkout@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        with:
+          sparse-checkout: scripts
+          filter: blob:none
       - id: node
         uses: actions/setup-node@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
