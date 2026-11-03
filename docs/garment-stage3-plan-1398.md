@@ -692,6 +692,22 @@ Each sub-step is a commit series on `feat/1398-…`. It lands only with the chea
 6. **Routing** (section 3.11): the outer-garment combinations, outfit-specific ease, then omission (robe) or joint migration (cloak) where reached.
 7. **penetration.py rows** (section 3.14) with the repaired row two; reports refreshed; the sagittal fallback (3.15) and arm capsules (3.16) if their pictures required them; the final picture pass over all stage-3 rows on both backends; the review record.
 
+### Hand-over (author r3, 03.11.2026)
+
+Tree: branch head after merging `origin/main` into `25bb797`. Gates on that tree: `typecheck:test` green; `build` green; `lint` green (one warning in the untouched `scripts/verify/polish-villagers.mjs`); `test:unit` 4 red of 18546 (18524 passed, 18 skipped), plus 2 vitest-worker RPC timeouts (environment load):
+
+- `villagerSkirtDriverContainment`: legs miss thigh.L 0.0139 m, thigh.R 0.0138 m, profile 0.0315 m, pelvis band 0.027 × scale. The thigh margin raise of the 22:19 decision needs an asset rebuild (runtime reads `asset.columns.capsules` from `export.py`; no Blender in the cloud). Test-side, a thigh margin of 0.0241 m plus a profile margin of 0.0335 m make it green.
+- `villagerKneelGround` male elder: about 100 s against 60 s (was 313 s).
+- `scripts/batch-doctor-protected.test.mjs` (2 cases): red on `main` too, environment.
+
+Tasks:
+
+1. Decisions 1 to 4 implemented in driver, mirror and containment test (`d81b6f2`). Plan sections 3.2 to 3.6 are restated, and 3.5.x is resolved (`25bb797`). Stop condition reached: the thigh margin needs a rebuild, and the profile margin of 0.0335 m (held at 0, `// OPEN:` in `balance.ts`) lifts every column to 70 to 80° at rest. The back columns 5 to 7 still tilt 58 to 80° at rest, driven by row-0/row-1 profile triangle hits below the band. Options are in section 3.5.y. Covered by `villagerSkirtDriver.test.ts` (variant U, cloth stations) and the mirror selftests.
+2. All-rows standstill check (review finding 8): not started. It would be red while the back columns tilt.
+3. Low 1 m camera row and 16-frame moving strip (review finding 1): not started, because of the stop in task 1.
+
+Open for the owner: rebuild with thigh margin 0.020 or 0.0241; the profile margin against the flare it causes; the response to the row-1 hits (3.5.y); the author's choices for columns without stations (no stations, no chord; bone-line fallback without a worn form).
+
 ## 8. Open questions for the break check
 
 - Q1: Is the per-figure continuity state (section 3.4) with reset rules acceptable as the driver's only state, given that the rest of the pose pipeline keeps comparable per-figure gait state (`ClipGait`)?
