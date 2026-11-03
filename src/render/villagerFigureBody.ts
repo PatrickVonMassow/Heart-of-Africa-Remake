@@ -809,6 +809,8 @@ export function finishDrivenPanel(asset: VillagerAsset, person: GltfPerson, rec:
   attachRowZero(panel, rec, body)
   const yj = junctionHeight(rec, body)
   applyClearance(panel, rec, yj, clearanceIncrements(asset, rec, shells, body, yj), hipsHead(asset, person.rest))
+  // row 0 and the clearance moved vertices: the built normals no longer match the drawn surface
+  panel.computeVertexNormals()
   return panel
 }
 

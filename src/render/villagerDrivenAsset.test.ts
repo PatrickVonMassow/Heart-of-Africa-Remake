@@ -10,7 +10,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { PEOPLE_DRESS, type DressLayer } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { anchorPoints, offsetPoint } from './villagerDriven'
-import { createGltfSkeleton, drivenFigure, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, isShellLayer } from './villagerFigureBody'
+import { createGltfSkeleton, drivenFigure, finishDrivenPanel, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, isShellLayer } from './villagerFigureBody'
 import { carriesColumnWeight, ColumnDriver, columnRig } from './villagerSkirtDriver'
 
 let asset: VillagerAsset
@@ -117,4 +117,38 @@ describe('the driven garments in the file', () => {
         // row 0 rides the body alone: untouched by any column
         expect(moved).toBeLessThan(1e-5)
       })
+
+  it('the finished panel carries the normals of its moved surface (row 0 and the clearance move vertices)', () => {
+    for (const form of FORMS) {
+      for (const [sex, age] of PEOPLE) {
+        const person = gltfPerson(asset, sex, age, 0)
+        const rec = asset.driven[form]
+        const g = finishDrivenPanel(asset, person, rec, gltfLayerGeometry(asset, person, layer(form))!.clone(), [])
+        const pos = g.getAttribute('position')
+        const nor = g.getAttribute('normal')
+        const idx = g.getIndex()!
+        // the area-weighted face normals round each vertex, from the finished positions
+        const acc = Array.from({ length: pos.count }, () => new THREE.Vector3())
+        const a = new THREE.Vector3()
+        const b = new THREE.Vector3()
+        const c = new THREE.Vector3()
+        for (let t = 0; t < idx.count / 3; t++) {
+          const ids = [idx.getX(t * 3), idx.getX(t * 3 + 1), idx.getX(t * 3 + 2)]
+          a.fromBufferAttribute(pos, ids[0])
+          b.fromBufferAttribute(pos, ids[1])
+          c.fromBufferAttribute(pos, ids[2])
+          const f = c.clone().sub(b).cross(a.clone().sub(b))
+          for (const v of ids) acc[v].add(f)
+        }
+        let worst = 0
+        const n = new THREE.Vector3()
+        acc.forEach((m, v) => {
+          if (m.lengthSq() < 1e-20) return
+          n.fromBufferAttribute(nor, v)
+          worst = Math.max(worst, n.angleTo(m.normalize()))
+        })
+        expect(worst, `${form} ${sex} ${age}`).toBeLessThan(1e-3)
+      }
+    }
+  })
 })
