@@ -1089,11 +1089,13 @@ export class ColumnDriver {
     const panel = this.rig.form?.panel
     if (panel && this.carried[s].vertices.length) {
       const P = this.posed!
+      // every column at this frame's trial angles: a vertex blended across columns sees its neighbours as drawn
       const mats = new Map<number, number[]>()
-      const k = s % this.n
-      const m = this.columnMatrices(k, trial)
-      mats.set(this.rig.upper[k], m.U)
-      mats.set(this.rig.lower[k], m.L)
+      for (let k = 0; k < this.n; k++) {
+        const m = this.columnMatrices(k, trial)
+        mats.set(this.rig.upper[k], m.U)
+        mats.set(this.rig.lower[k], m.L)
+      }
       let low = Infinity
       for (const v of this.carried[s].vertices) low = Math.min(low, skinPoint(at(panel.pos, v), panel.idx, panel.w, v * 4, P.M, this.rig.rest, (i) => mats.get(i) ?? null)[1])
       return low

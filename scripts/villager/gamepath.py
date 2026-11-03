@@ -1246,9 +1246,12 @@ class ColumnDriver:
         form = self.rig.get('form')
         if form and self.carried[s]['vertices']:
             panel = form['panel']
-            k = s % n
-            U, L = self._column_matrices(k, trial)
-            mats = {self.rig['upper'][k]: U, self.rig['lower'][k]: L}
+            # every column at the trial angles: a vertex blended across columns sees its neighbours as drawn
+            mats = {}
+            for k in range(n):
+                U, L = self._column_matrices(k, trial)
+                mats[self.rig['upper'][k]] = U
+                mats[self.rig['lower'][k]] = L
             return min(_skin_point(_at(panel['pos'], v), panel['idx'], panel['w'], v * 4, self.P['M'], self.rig['rest'], mats.get)[1]
                        for v in self.carried[s]['vertices'])
         low = min(p[1] for p in self._stations(s, theta, trial))
@@ -1516,3 +1519,10 @@ def selftest_column_ground_panel():
     assert d.counters['groundFallback'] > 0 and min(drawn) >= rig['ground'] - 1e-9, (d.counters, drawn)
     print('column ground-panel selftest: ok')
 
+
+def selftest_column_ground_blend():
+    """The fallback measures the hem as drawn, every column at its solved angle: no lift to θground
+    for a vertex blended across columns that a smaller lift clears."""
+    d, rig, drawn = _toy_low_hem()
+    assert max(d.theta) < TOY_DRIVER_CONFIG['thetaGround'] * _DEG - 1e-9 and min(drawn) >= rig['ground'] - 1e-9, (d.theta, drawn)
+    print('column ground-blend selftest: ok')

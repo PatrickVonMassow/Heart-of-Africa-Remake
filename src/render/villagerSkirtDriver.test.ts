@@ -266,6 +266,13 @@ describe('the column driver', () => {
     expect(Math.min(...drawn)).toBeGreaterThanOrEqual(rig.ground - 1e-9)
   })
 
+  it('measures the fallback on the hem as drawn, every column at its solved angle: no lift past what it needs', () => {
+    const { d, rig, drawn } = lowHem()
+    // a vertex blended across columns judged against stale neighbours overshoots to θground
+    expect(Math.max(...d.theta)).toBeLessThan(CFG.thetaGround * DEG - 1e-9)
+    expect(Math.min(...drawn)).toBeGreaterThanOrEqual(rig.ground - 1e-9)
+  })
+
   it('scores an upper trial on the triangles its lower carries: swinging them into a capsule is infeasible (B17)', () => {
     const n = 4
     const form: DrivenFormRig = {

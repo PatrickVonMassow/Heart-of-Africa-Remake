@@ -135,6 +135,7 @@ def main():
     GP.selftest_column_driver()
     GP.selftest_column_scale()
     GP.selftest_column_ground_panel()
+    GP.selftest_column_ground_blend()
     import sheets as SH
     SH.selftest_hand_layout()
     if 'garments' in steps or 'selftest' in steps:
