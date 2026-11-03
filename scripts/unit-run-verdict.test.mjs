@@ -48,6 +48,10 @@ describe('unitRunVerdict — the summary decides, the load is evidence', () => {
       expect(u.line).toContain(formatLoad(load))
     })
   }
+  it('exit 0 beside a named failure is RED, not green', () => {
+    const v = unitRunVerdict({ ok: true, totals: failed, load: { level: 'quiet' } })
+    expect(v).toMatchObject({ kind: UNIT_RUN.red, blocks: true, rerun: false })
+  })
   it('formatLoad names the measured level and its reasons', () => {
     expect(formatLoad({ level: 'busy', reasons: ['cpu 0.8'] })).toBe('machine busy (cpu 0.8)')
     expect(formatLoad(undefined)).toBe('machine load not measured')
@@ -90,6 +94,13 @@ describe('unitAttemptsVerdict — the CI / gate / LARGE decision, fail-closed', 
     expect(v.line).toContain('NOT JUDGED TWICE')
     expect(v.line).toContain(SIG)
     expect(v.line).toContain('machine quiet')
+  })
+  it('exit 0 beside a named failure is red at once (the CI wrapper exits by this ok)', () => {
+    expect(unitAttemptsVerdict([{ ok: true, totals: failed }], { load })).toMatchObject({ ok: false, rerun: false, kind: 'red' })
+  })
+  it('not judged, then a re-run with exit 0 but a named failure → red', () => {
+    const v = unitAttemptsVerdict([notJudged, { ok: true, totals: failed }], { load })
+    expect(v).toMatchObject({ ok: false, rerun: false, kind: 'red' })
   })
   it('no attempt at all is red', () => {
     expect(unitAttemptsVerdict([], {})).toMatchObject({ ok: false, rerun: false })
@@ -146,6 +157,17 @@ describe('runGate — the local push gate applies the same rule at any load', ()
       expect(r.text).toContain(SIG)
       expect(r.text).toContain(`machine ${level}`)
     })
+    it(`exit 0 beside a named failure blocks (${level})`, () => {
+      const r = gate([true], ['failed'], level)
+      expect(r.calls).toHaveLength(1)
+      expect(r.verdict.blocked).toBe(true)
+      expect(r.text).toContain(`machine ${level}`)
+    })
+    it(`not judged, then exit 0 beside a named failure blocks (${level})`, () => {
+      const r = gate([false, true], ['passed', 'failed'], level)
+      expect(r.calls).toHaveLength(2)
+      expect(r.verdict.blocked).toBe(true)
+    })
     it(`a green unit names the load too (${level})`, () => {
       expect(gate([true], ['passed'], level).text).toContain(`machine ${level}`)
     })
@@ -173,6 +195,9 @@ describe('the LARGE runner and CI judge the unit stage by the same verdict', () 
   it('the CI shard wrapper loops on the same verdict and exits by it', () => {
     const src = read('scripts/ci-unit-shard.mjs')
     expect(src).toContain('unitAttemptsVerdict(attempts)')
+    // ok and the parsed summary both reach the verdict, so exit 0 beside a named
+    // failure is judged red (tested on unitAttemptsVerdict above).
+    expect(src).toContain('attempts.push({ ok: out.ok, totals: parseUnitTotals(out)')
     expect(src).toContain('if (!v.rerun) break')
     expect(src).toContain('process.exit(v.ok ? 0 : 1)')
   })

@@ -557,8 +557,9 @@ export function runnerErrorSignature(output) {
 /**
  * Classify ONE unit run from its exit status and its own summary. Pure.
  *
- *   green       exit 0.
- *   red         the summary names a failing file or test — blocks at any load.
+ *   green       exit 0 and no named failure.
+ *   red         the summary names a failing file or test — blocks at any load,
+ *               even beside exit 0.
  *   not-judged  a complete summary naming NO failure beside a non-zero exit
  *               (looksLikeRunnerFailure) — re-run once, at any load.
  *   unreadable  non-zero exit and no readable summary — fail-closed: red.
@@ -569,11 +570,13 @@ export function unitRunVerdict({ ok, totals, load, signature } = {}) {
   const t = totals ?? {}
   const ran = formatUnitTotals(t)
   const at = formatLoad(load)
-  if (ok === true) {
-    return { kind: UNIT_RUN.green, blocks: false, rerun: false, line: `unit GREEN — ${ran}; ${at}.` }
-  }
+  // Named failures are read BEFORE the exit status: exit 0 beside a summary
+  // naming a failure is a contradiction, and a contradiction is red.
   const failedFiles = countOrNull(t.failedFiles) ?? 0
   const failedTests = countOrNull(t.failedTests) ?? 0
+  if (ok === true && failedFiles === 0 && failedTests === 0) {
+    return { kind: UNIT_RUN.green, blocks: false, rerun: false, line: `unit GREEN — ${ran}; ${at}.` }
+  }
   if (failedFiles > 0 || failedTests > 0) {
     return {
       kind: UNIT_RUN.red, blocks: true, rerun: false,
