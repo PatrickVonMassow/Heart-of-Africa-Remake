@@ -1061,8 +1061,15 @@ export class ColumnDriver {
       }
     }
     this.cur.set(save)
-    this.cur[s] = best.a
-    this.cur[partner] = best.b
+    // no feasible pair: the rate limit holds, as in the single search (only a feasible larger step may break it)
+    const limited = (th: number, seg: number) => {
+      if (best.w <= 0 || !this.rated) return th
+      const prev = this.theta[seg]
+      const lim = cfg.omegaMax * DEG * this.dt
+      return Math.abs(th - prev) > lim ? prev + Math.sign(th - prev) * lim : th
+    }
+    this.cur[s] = limited(best.a, s)
+    this.cur[partner] = limited(best.b, partner)
   }
 
   /** Lift segment s outward past θmax in ground steps until its lowest carried row clears the ground. */

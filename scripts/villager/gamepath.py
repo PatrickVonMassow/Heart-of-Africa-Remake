@@ -1221,8 +1221,16 @@ class ColumnDriver:
                 if better:
                     best = (a, b, w, dd)
         self.cur = save
-        self.cur[s] = best[0]
-        self.cur[partner] = best[1]
+
+        # no feasible pair: the rate limit holds, as in the single search
+        def limited(th, seg):
+            if best[2] <= 0 or not self.rated:
+                return th
+            prev = self.theta[seg]
+            lim = cfg['omegaMax'] * _DEG * self.dt
+            return prev + _sign(th - prev) * lim if abs(th - prev) > lim else th
+        self.cur[s] = limited(best[0], s)
+        self.cur[partner] = limited(best[1], partner)
 
     def _ground_fallback(self, s):
         cfg = self.cfg
@@ -1459,6 +1467,8 @@ def selftest_column_driver():
     dj2.step(toy_column_bones(rig, thigh=(-5.0, 0.0, 0.0)), dt)
     dj2.step(toy_column_bones(rig), 1e-3)
     assert dj2.counters['jointSearches'] >= 1, dj2.counters
+    # no feasible pair: the joint search keeps the rate limit
+    assert dj2.counters['rateBreaks'] == 0, dj2.counters
     assert dj2.counters['repairs'] <= 2 * cfg['repairRounds'] and dj2.counters['residual'] > 0, dj2.counters
     print('column driver selftest: ok')
 

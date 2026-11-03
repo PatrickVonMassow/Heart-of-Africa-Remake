@@ -320,6 +320,8 @@ describe('the column driver', () => {
     j.step(toyBones(rig, [0, 1, 0], [-5, 0, 0]), 1 / 60)
     j.step(toyBones(rig), 1e-3)
     expect(j.counters.jointSearches).toBeGreaterThanOrEqual(1)
+    // no feasible pair: the joint search keeps the rate limit like any search
+    expect(j.counters.rateBreaks).toBe(0)
     expect(j.counters.residual).toBeGreaterThan(0)
     expect(Array.from(j.violation).some((v) => v > 0)).toBe(true)
   })
