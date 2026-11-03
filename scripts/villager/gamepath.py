@@ -1304,12 +1304,13 @@ def column_round_trip(rt, tol=RUNTIME_TOLERANCE, log=print):
             got = d.step(f['bones'], f['dt'])
             for j, i in enumerate(cols):
                 want = f['bones'][i]
+                # every component finite before any max: max() can drop a NaN that follows a number
+                comps = [x for key in ('p', 'q', 's') for x in list(got[j][key]) + list(want[key])]
+                if len(comps) != 20 or not all(isinstance(x, (int, float)) and math.isfinite(x) for x in comps):
+                    bad.append(f"{sq['id']} frame {fi} bone {i}: a nonfinite or missing component")
+                    continue
                 for key in ('p', 's'):
-                    e = max(abs(x - y) for x, y in zip(got[j][key], want[key]))
-                    if not math.isfinite(e):
-                        bad.append(f"{sq['id']} frame {fi}: nonfinite {key}")
-                        e = math.inf
-                    worst[key] = max(worst[key], e)
+                    worst[key] = max(worst[key], max(abs(x - y) for x, y in zip(got[j][key], want[key])))
                 # q and −q are one rotation
                 e = min(max(abs(x - y) for x, y in zip(got[j]['q'], want['q'])), max(abs(x + y) for x, y in zip(got[j]['q'], want['q'])))
                 worst['q'] = max(worst['q'], e)
@@ -1536,3 +1537,39 @@ def selftest_column_ground_blend():
     d, rig, drawn = _toy_low_hem()
     assert max(d.theta) < TOY_DRIVER_CONFIG['thetaGround'] * _DEG - 1e-9 and min(drawn) >= rig['ground'] - 1e-9, (d.theta, drawn)
     print('column ground-blend selftest: ok')
+
+
+def _toy_column_export():
+    """A faithful toy column export: the mirror's own replay of a short sequence, as the game writes it."""
+    import copy
+    rig = toy_column_rig(capsules=[([0.1, 1.0, 0.0], [0.1, 0.5, 0.0], 0.04)])
+    d = ColumnDriver(rig, TOY_DRIVER_CONFIG)
+    frames = []
+    for f in range(6):
+        bones = toy_column_bones(rig, thigh=(0.1 + 0.004 * f, 0.0, 0.0))
+        loc = d.step(bones, 1 / 60)
+        for j, i in enumerate(rig['upper'] + rig['lower']):
+            bones[i] = loc[j]
+        frames.append({'dt': 1 / 60, 'bones': copy.deepcopy(bones)})
+    return {'columns': [{'id': 'toy', 'rig': rig, 'config': TOY_DRIVER_CONFIG, 'counters': dict(d.counters), 'frames': frames}]}
+
+
+def _round_trip_fails(rt, why):
+    try:
+        column_round_trip(rt, log=lambda *_a: None)
+    except RuntimeError:
+        return
+    raise AssertionError(f'column round trip passed {why}')
+
+
+def selftest_column_round_trip_finite():
+    """A faithful export passes; a NaN in any translation, rotation or scale component fails."""
+    import copy
+    rt = _toy_column_export()
+    column_round_trip(rt, log=lambda *_a: None)
+    col = rt['columns'][0]['rig']['upper'][0]
+    for key, comp in (('p', 1), ('q', 2), ('s', 1)):
+        bad = copy.deepcopy(rt)
+        bad['columns'][0]['frames'][3]['bones'][col][key][comp] = float('nan')
+        _round_trip_fails(bad, f'a NaN in {key}[{comp}]')
+    print('column round trip finite selftest: ok')
