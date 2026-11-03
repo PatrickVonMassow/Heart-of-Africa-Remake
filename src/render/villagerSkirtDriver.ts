@@ -12,7 +12,7 @@ import { topoOrder, type VillagerAsset } from './villagerAsset'
 import type { GltfPerson } from './villagerFigureBody'
 
 export type DriverConfig = typeof VILLAGER_ASSET.drivenGarments.driver
-type V3 = [number, number, number]
+export type V3 = [number, number, number]
 
 const DEG = Math.PI / 180
 const ARM_BONES = ['upperArm.L', 'forearm.L', 'hand.L', 'upperArm.R', 'forearm.R', 'hand.R']

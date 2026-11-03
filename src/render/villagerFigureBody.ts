@@ -20,10 +20,23 @@ import { fibreOf, INFANT_SKIN, surfaceOf } from './figureDress'
 import { FIGURE_FIBRE } from './materials'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import type { VillagerAsset } from './villagerAsset'
+import type { DrivenRecord, VillagerAsset } from './villagerAsset'
 import { bakeMorphs, legScale, morphInfluences, restBounds, restHeads, stylisePeaks } from './villagerBody'
 import { topoOrder } from './villagerAsset'
 import { applyGarmentMask, COVER_ATTRIBUTE, decodeCover, GARMENT_PUSH_ATTRIBUTE, wornBits } from './villagerGarmentMask'
+import {
+  anchorPoints,
+  applyClearance,
+  attachRowZero,
+  clearanceIncrements,
+  drivenFormRig,
+  drivenRecordOf,
+  drivenRestHeads,
+  hipsHead,
+  junctionHeight,
+  type DrivenBody,
+} from './villagerDriven'
+import type { DrivenFormRig } from './villagerSkirtDriver'
 import { buildShells, cutBodyIndex, faceMasks, REGION_ATTRIBUTE, regionWords, shellBits, type BuiltShell } from './villagerShell'
 
 const DOWN = new THREE.Vector3(0, -1, 0)
@@ -613,7 +626,9 @@ export function shellGeometry(person: GltfPerson, body: THREE.BufferGeometry, bu
 export function gltfGarment(asset: VillagerAsset, person: GltfPerson, l: DressLayer): THREE.BufferGeometry | null {
   const name = garmentMeshName(l)
   const src = asset.geometries[name]
-  if (!src || asset.parts[name] !== 'garment') return null
+  // a driven panel (scripts/villager/driven.py) bakes as a garment; its row 0
+  // and clearance are finished with the figure (gltfFigureGeometry)
+  if (!src || (asset.parts[name] !== 'garment' && asset.parts[name] !== 'driven')) return null
   const { rest0, hang, sole, scale, influences } = person.frame
   const g = bakePose(bakeMorphs(src, influences), rest0, hungHeads(asset, rest0, hang), hang)
   // The hands' shapes move the body's hands only: a garment carries zero
@@ -686,19 +701,21 @@ export function gltfShellParts(
   shells: readonly DressLayer[],
   bodyPart: THREE.BufferGeometry,
   worn: readonly string[],
-): Array<{ l: DressLayer; built: BuiltShell; geometry: THREE.BufferGeometry }> {
-  if (!shells.length || !asset.shells || !person.region) return []
+  bands: ReadonlyArray<{ l: DressLayer; name: string }> = [],
+): Array<{ l: DressLayer; name: string; built: BuiltShell; geometry: THREE.BufferGeometry }> {
+  const entries = [...shells.map((l) => ({ l, name: garmentMeshName(l) })), ...bands]
+  if (!entries.length || !asset.shells || !person.region) return []
   const index = person.geometry.getIndex()!.array as ArrayLike<number>
   const fmask = faceMasks(index, person.region)
-  const names = shells.map(garmentMeshName)
+  const names = entries.map((e) => e.name)
   const hidden = person.cover ? decodeCover(person.cover, wornBits(asset.garmentMask, worn)).hidden : null
   const cut = cutBodyIndex(index, fmask, shellBits(asset.shells, names), hidden)
   const count = bodyPart.getAttribute('position').count
   bodyPart.setIndex(new THREE.BufferAttribute(count < 65536 ? Uint16Array.from(cut) : Uint32Array.from(cut), 1))
   const built = buildShells(index, count, fmask, asset.shells, names, person.frame.scale, hidden)
-  return shells.flatMap((l) => {
-    const b = built[garmentMeshName(l)]
-    return b && b.index.length ? [{ l, built: b, geometry: shellGeometry(person, bodyPart, b, l) }] : []
+  return entries.flatMap(({ l, name }) => {
+    const b = built[name]
+    return b && b.index.length ? [{ l, name, built: b, geometry: shellGeometry(person, bodyPart, b, l) }] : []
   })
 }
 
@@ -732,6 +749,8 @@ export function gltfFigureGeometry(
   const depth = VILLAGER_ASSET.garmentMaskPush * person.frame.scale
   // shells (render/villagerShell.ts) are built here from the body; the rest go through layerOf
   const shells = layers.filter((l) => isShellLayer(asset, l) && person.region)
+  // a driven form draws its band as a shell and its panel through layerOf (stage-3 plan 3.12)
+  const bands = person.region ? drivenLayers(asset, layers).map(({ l, rec }) => ({ l, name: rec.band })) : []
   const drawn = layers.flatMap((l) => {
     if (isShellLayer(asset, l)) return []
     const g = layerOf(l)
@@ -740,8 +759,16 @@ export function gltfFigureGeometry(
   const worn = drawn.map(({ l }) => garmentMeshName(l))
   const bodyPart = applyGarmentMask(tidy(body), person.cover, asset.garmentMask, worn, depth)
   const parts = [bodyPart]
-  for (const s of gltfShellParts(asset, person, shells, bodyPart, worn)) parts.push(s.geometry)
+  const shellParts = gltfShellParts(asset, person, shells, bodyPart, worn, bands)
+  for (const s of shellParts) parts.push(s.geometry)
   for (const { l, g } of drawn) {
+    const rec = drivenRecordOf(asset, garmentMeshName(l))
+    if (rec) {
+      const panel = finishDrivenPanel(asset, person, rec, g.clone(), shells.map(garmentMeshName))
+      if (import.meta.env.DEV) assertRowZero(rec, panel, shellParts.find((s) => s.name === rec.band))
+      parts.push(panel)
+      continue
+    }
     const over = drawn.filter((o) => garmentLayer(o.l) > garmentLayer(l)).map((o) => garmentMeshName(o.l))
     const cov = asset.geometries[garmentMeshName(l)]?.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
     parts.push(applyGarmentMask(g.clone(), cov ? (cov.array as ArrayLike<number>) : null, asset.garmentMask, over, depth))
@@ -757,4 +784,88 @@ export function gltfFigureGeometry(
   ;(g.morphAttributes.position ?? []).forEach((m, k) => (m.name = named[k]?.name ?? m.name))
   restBounds(g)
   return g
+}
+
+// ---- driven garments (stage-3 plan sections 3.2, 3.3, 3.9; render/villagerDriven.ts) ----
+
+/** The worn driven layers of an outfit and their records (at most one, E5). */
+export function drivenLayers(asset: VillagerAsset, layers: readonly DressLayer[]): Array<{ l: DressLayer; rec: DrivenRecord }> {
+  return layers.flatMap((l) => {
+    const rec = isPaint(l) ? null : drivenRecordOf(asset, garmentMeshName(l))
+    return rec ? [{ l, rec }] : []
+  })
+}
+
+const drivenBody = (person: GltfPerson): DrivenBody => ({ geometry: person.geometry, rest: person.rest, region: person.region, scale: person.frame.scale })
+
+/**
+ * A baked panel (gltfGarment) finished on the person: row 0 from the band's
+ * recipe function with its sources' skin, rows ≥ 1 opened over the worn
+ * shells below the junction (`shells`, mesh names). Mutates and returns `panel`.
+ */
+export function finishDrivenPanel(asset: VillagerAsset, person: GltfPerson, rec: DrivenRecord, panel: THREE.BufferGeometry, shells: readonly string[]): THREE.BufferGeometry {
+  const body = drivenBody(person)
+  attachRowZero(panel, rec, body)
+  const yj = junctionHeight(rec, body)
+  applyClearance(panel, rec, yj, clearanceIncrements(asset, rec, shells, body, yj), hipsHead(asset, person.rest))
+  return panel
+}
+
+/** DEV: where the band is drawn, its full-offset row and the panel's row 0 agree within 1e-6 (section 3.3, B5). */
+function assertRowZero(rec: DrivenRecord, panel: THREE.BufferGeometry, band: { built: BuiltShell; geometry: THREE.BufferGeometry } | undefined): void {
+  if (!band) return
+  const top = Math.max(...band.built.off)
+  const at = new Map<number, number>()
+  band.built.src.forEach((s, k) => {
+    if (Math.abs(band.built.off[k] - top) < 1e-9) at.set(s, k)
+  })
+  const bp = band.geometry.getAttribute('position')
+  const pp = panel.getAttribute('position')
+  rec.src.forEach((s, k) => {
+    const b = s < 0 ? undefined : at.get(s)
+    if (b === undefined) return
+    const d = Math.hypot(bp.getX(b) - pp.getX(k), bp.getY(b) - pp.getY(k), bp.getZ(b) - pp.getZ(k))
+    if (d > 1e-6) console.error(`[villager] ${rec.panel}: row 0 vertex ${k} off its drawn band by ${d.toExponential(2)}`)
+  })
+}
+
+/** What a figure wearing a driven form needs before its skeleton is made: the per-form rest, the ankle pivots and the driver's form data. */
+export interface DrivenFigure {
+  rec: DrivenRecord
+  rest: Float32Array
+  columnAnkles: Float32Array | null
+  form: DrivenFormRig
+}
+
+/**
+ * The per-form rest of a person wearing a driven form (section 3.2): the
+ * column heads on the form's hung anchors, the knee and ankle pivots below
+ * them, and the finished panel as the driver's form data; null without a
+ * worn driven form. `layerOf` as in gltfFigureGeometry.
+ */
+export function drivenFigure(
+  asset: VillagerAsset,
+  person: GltfPerson,
+  layers: readonly DressLayer[],
+  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => gltfLayerGeometry(asset, person, l),
+): DrivenFigure | null {
+  const worn = drivenLayers(asset, layers)
+  if (!worn.length || !asset.columns || !person.region) return null
+  const { l, rec } = worn[0]
+  const g = layerOf(l)
+  if (!g) return null
+  const shells = layers.filter((x) => isShellLayer(asset, x)).map(garmentMeshName)
+  const panel = finishDrivenPanel(asset, person, rec, g.clone(), shells)
+  const body = drivenBody(person)
+  const rest = drivenRestHeads(asset, rec, body)
+  const ankles = columnAnkles(asset, rest)
+  if (import.meta.env.DEV) {
+    assertColumnPivots(asset, rest, ankles)
+    anchorPoints(rec, body).forEach((a, k) => {
+      const u = asset.bones.indexOf(asset.columns!.bones.upper[k])
+      const d = Math.hypot(rest[u * 3] - a[0], rest[u * 3 + 1] - a[1], rest[u * 3 + 2] - a[2])
+      if (d > 1e-4) console.error(`[villager] ${rec.panel}: column ${k} head off its anchor by ${d.toExponential(2)}`)
+    })
+  }
+  return { rec, rest, columnAnkles: ankles, form: drivenFormRig(rec, panel, { ...body, rest }) }
 }

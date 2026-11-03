@@ -89,6 +89,29 @@ export interface VillagerAsset {
   shells: ShellSet | null
   /** The driven garments' column bones (scripts/villager/skeleton.py), or null without any. */
   columns: ColumnSet | null
+  /** Per driven form its record (scripts/villager/driven.py), keyed by form; empty without any. */
+  driven: Record<string, DrivenRecord>
+}
+
+/** extras.villager.driven[form] (scripts/villager/driven.py, stage-3 plan
+ *  section 3.12): a driven garment's panel mesh and its band shell. */
+export interface DrivenRecord {
+  form: string
+  /** The panel's mesh name (the garment's `g-<form>-<wear>`) and its band's shell name. */
+  panel: string
+  band: string
+  /** Per panel vertex: its junction source body vertex on row 0, else −1; its row. */
+  src: number[]
+  row: number[]
+  panels: Record<string, { rows: number; base: number; width: number }>
+  /** Per column its anchor on the junction offset row: body vertices a, b and t. */
+  anchors: Array<[number, number, number]>
+  /** The 24 column heads from the corner solve: basis and per-morph deltas (heads × 3). */
+  heads: { basis: number[]; deltas: Record<string, number[]> }
+  /** The band offset (figure units, × the person's scale at run time), ease and flare. */
+  offset: number
+  ease: number
+  flare: number
 }
 
 /** extras.villager.columns (scripts/villager/export.py `columns_meta`): the
@@ -140,6 +163,7 @@ interface Meta {
   garmentMask?: { garments: string[] }
   shells?: ShellSet
   columns?: ColumnSet
+  driven?: Record<string, DrivenRecord>
 }
 
 /** Turn a parsed glTF into the villager asset. */
@@ -240,6 +264,7 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     garmentMask: meta.garmentMask?.garments ?? [],
     shells: meta.shells ?? null,
     columns: meta.columns ?? null,
+    driven: meta.driven ?? {},
   }
 }
 

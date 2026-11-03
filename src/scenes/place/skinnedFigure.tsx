@@ -26,7 +26,7 @@ import {
 import type { VillagerAsset } from '../../render/villagerAsset'
 import { carriesColumnWeight, ColumnDriver, columnRig } from '../../render/villagerSkirtDriver'
 import { restBounds } from '../../render/villagerBody'
-import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
+import { createGltfSkeleton, drivenFigure, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
@@ -201,9 +201,11 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   })
   const key = `${id.sex}|${id.age}|${id.build}`
   const paint = skinTone(layers, skin)
+  // a worn driven form moves the column rest heads onto its anchors (stage-3 plan 3.2)
+  const driven = asset && person ? drivenFigure(asset, person, layers, (l) => cachedGltfLayer(asset, person, l, key, look.radial)) : null
   const { skeleton, bones } =
     asset && person
-      ? (createGltfSkeleton(asset, person.rest) as { skeleton: THREE.Skeleton; bones: Record<BoneName, THREE.Bone> })
+      ? (createGltfSkeleton(asset, driven ? driven.rest : person.rest) as { skeleton: THREE.Skeleton; bones: Record<BoneName, THREE.Bone> })
       : createSkeleton(p)
   const bound = new THREE.Sphere(new THREE.Vector3(0, p.stature * 0.5, 0), p.stature * 0.85)
   const mesh = (geo: THREE.BufferGeometry, material: THREE.Material, name: string) => {
@@ -251,7 +253,10 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     hands: [hand('L', 'hand-left'), hand('R', 'hand-right')],
     gltf: asset && person ? { asset, person } : null,
     // a new rig (a changed form among them) starts its driver from the gravity solution
-    driver: asset && person && carriesColumnWeight(asset, geo) ? new ColumnDriver(columnRig(asset, person)) : null,
+    driver:
+      asset && person && carriesColumnWeight(asset, geo)
+        ? new ColumnDriver(columnRig(asset, driven ? { ...person, rest: driven.rest, columnAnkles: driven.columnAnkles } : person, driven?.form ?? null))
+        : null,
   }
 }
 
