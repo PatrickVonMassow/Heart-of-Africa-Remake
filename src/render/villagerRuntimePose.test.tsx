@@ -43,6 +43,7 @@ import {
   type GestureState,
 } from './gesture'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
+import { ROUND_TRIP_SEQUENCES, runSequence } from './villagerSkirtDriverSequences'
 import { garmentMeshName, gltfLayerGeometry, gltfPerson, gltfShellParts, isShellLayer } from './villagerFigureBody'
 import { tidy } from './figureBody'
 import { applyGarmentMask } from './villagerGarmentMask'
@@ -428,6 +429,19 @@ function shellRoundTrip() {
   })
 }
 
+/** The column driver's round trip (scripts/villager/gamepath.py column_round_trip):
+ *  per fixed-dt sequence the rig and config the game solved with, and every
+ *  frame's dt and bone locals (the columns as the driver wrote them). No driven
+ *  garment is worn: the columns are posed, unweighted. */
+function columnRoundTrip() {
+  if (!asset.columns) return []
+  return ROUND_TRIP_SEQUENCES.map((s) => {
+    const frames: Array<{ dt: number; bones: Array<ReturnType<typeof trs>> }> = []
+    const d = runSequence(asset, s, (f) => frames.push({ dt: f.dt, bones: f.bones.map(trs) }))
+    return { id: s.id, rig: d.rig, config: d.cfg, counters: { ...d.counters }, frames }
+  })
+}
+
 describe('the runtime-pose exporter', () => {
   it('records all eight subjects through the game\'s own figure, and the export is complete', async () => {
     const out: Awaited<ReturnType<typeof play>>[] = []
@@ -504,7 +518,7 @@ describe('the runtime-pose exporter', () => {
     const path = process.env.VILLAGER_RUNTIME_POSES
     if (path) {
       mkdirSync(dirname(path), { recursive: true })
-      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out, shells: shellRoundTrip() }))
+      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out, shells: shellRoundTrip(), columns: columnRoundTrip() }))
     }
   }, 120_000)
 })
