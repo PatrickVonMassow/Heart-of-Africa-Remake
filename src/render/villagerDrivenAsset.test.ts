@@ -10,7 +10,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { PEOPLE_DRESS, type DressLayer } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { anchorPoints, offsetPoint } from './villagerDriven'
-import { createGltfSkeleton, drivenFigure, finishDrivenPanel, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, isShellLayer } from './villagerFigureBody'
+import { applyGarmentMask } from './villagerGarmentMask'
+import { createGltfSkeleton, drivenFigure, finishDrivenPanel, gltfFigureGeometry, gltfShellParts, gltfLayerGeometry, gltfPerson, isShellLayer } from './villagerFigureBody'
 import { carriesColumnWeight, ColumnDriver, columnRig } from './villagerSkirtDriver'
 
 let asset: VillagerAsset
@@ -86,6 +87,24 @@ describe('the driven garments in the file', () => {
           expect(Math.abs(dv!.rest[l * 3] - a[0])).toBeLessThan(1e-4)
           expect(Math.abs(dv!.rest[l * 3 + 1] - person.rest[l * 3 + 1])).toBeLessThan(1e-6)
         })
+        // row 0 on the band as the figure draws it: its full-offset row, from the built shell geometry
+        const band = gltfShellParts(asset, person, [], applyGarmentMask(person.geometry.clone(), person.cover, asset.garmentMask, [rec.panel], 0), [rec.panel], [{ l: layers[0], name: rec.band }]).find((x) => x.name === rec.band)
+        expect(band, rec.band).toBeDefined()
+        const top = Math.max(...band!.built.off)
+        const drawnAt = new Map<number, number>()
+        band!.built.src.forEach((s, k) => {
+          if (Math.abs(band!.built.off[k] - top) < 1e-9) drawnAt.set(s, k)
+        })
+        const bp = band!.geometry.getAttribute('position')
+        let met = 0
+        rec.src.forEach((s, k) => {
+          const b = s < 0 ? undefined : drawnAt.get(s)
+          if (b === undefined) return
+          met++
+          const d = Math.hypot(bp.getX(b) - dv!.form.panel.pos[k * 3], bp.getY(b) - dv!.form.panel.pos[k * 3 + 1], bp.getZ(b) - dv!.form.panel.pos[k * 3 + 2])
+          expect(d, `row-0 vertex ${k}`).toBeLessThan(1e-6)
+        })
+        expect(met).toBe(rec.src.filter((s) => s >= 0).length)
         // row 0 from the recipe function
         const P = dv!.form.panel.pos
         rec.src.forEach((s, k) => {
