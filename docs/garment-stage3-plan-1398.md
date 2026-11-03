@@ -232,6 +232,65 @@ Each response is followed by the moving-sequence acceptance of section 5 on both
 
 Named response for a sample outside: raise that bone's capsule margin to contain it plus 2 mm. The margin lives in `VILLAGER_ASSET.drivenGarments.capsuleMargin` (balance config), which the pipeline exports to `extras.villager.columns.capsules`. Runtime and the Python mirror read the same exported table, so an expansion reaches both.
 
+### 3.5.x Open decision (author r2, 03.11.2026)
+
+Status: the owner decision of 20:56 (rule 1″) is implemented literally in `src/render/villagerSkirtDriver.ts`, `scripts/villager/gamepath.py` and `src/render/villagerSkirtDriverContainment.test.ts` (commit 8f94173). The containment test stays red under it, and the 80° tilt at a standstill survives it. Both need a plan decision; nothing below is implemented.
+
+**Author's reading of rule 1″ (to confirm).** The decision names thigh capsules only. The shin, foot and toe capsules apply the same test in their own bones' rest frames. For points near those bones that means "always active", because their whole rest geometry lies below the profile bottom. The posed hips-frame test survives only for the profile. The alternative reading, keeping the posed hips-frame test for shin, foot and toe, would retain the test the decision says it replaces.
+
+**Where the literal rule leaves containment red** (one full run, 178,920,021 samples):
+
+- 783,706 samples lie in no envelope. They lie below the profile bottom in the posed hips frame, so the profile does not apply, and at or above it in BOTH thigh rest frames, by up to 0.115 m, so no thigh capsule applies.
+- All of them are crotch and inner-thigh samples in sprint and jog. Their rest heights lie within about 2 cm of the bottom, and their skin weights blend both thighs and the hips. With one thigh forward and one back, the blended posed point maps above the bottom in each thigh's rest frame.
+- Worst distance to the nearest ACTIVE envelope, by bone:
+
+| Bone | Distance | Figure, motion, frame | Rest heights of the triangle |
+| --- | --- | --- | --- |
+| foot.R | 0.577 m | male adult 0, sprint 5.8, f21 (w 1.00, v 5.76) | 0.676 / 0.683 / 0.662 |
+| foot.L | 0.527 m | male adult 1, sprint 5.8, f21 (w 1.00, v 5.76) | 0.669 / 0.649 / 0.651 |
+| shin.R | 0.304 m | male adult 1, sprint 4.2, f25 (w 1.00, v 4.18) | 0.663 / 0.651 / 0.609 |
+| shin.L | 0.301 m | male adult 1, sprint 5.8, f20 (w 1.00, v 5.76) | 0.676 / 0.667 / 0.638 |
+| thigh.R | 0.101 m | female elder 1, sprint 5.0, f22 (w 1.00, v 4.97) | 0.573 / 0.599 / 0.591 |
+| thigh.L | 0.101 m | male adult 1, sprint 5.8, f21 (w 1.00, v 5.76) | 0.625 / 0.658 / 0.671 |
+| profile | 0.031 m | female adult −1, start ramp, f1 (w 0.17, v 0.27) | 0.582 / 0.608 / 0.600 |
+
+  Male adult profile bottom: 0.658. Pelvis band: 0.511 × scale (male youth −1, sprint 4.2, f24).
+
+- **Measured variants** (same run, test-side only):
+
+| Variant | Legs outside (worst) | Profile | Pelvis band | Verdict |
+| --- | --- | --- | --- | --- |
+| U: a capsule is active below the bottom in its rest frame OR in the posed hips frame | thigh.R 0.011 m (female adult 0, sprint 4.2, f25); thigh.L 0.002 m (male elder −1, jog 2.8, f20) | 0.031 m | 0.018 × scale (female child 1, jog 2.2, f21) | not green |
+| P: the profile extended below its bottom (bottom-bin value) wherever no thigh capsule is active | thigh.L / thigh.R 0.101 m | 0.031 m | 0.081 × scale | not green |
+
+**80° tilt at a standstill: cause.** Measured with the driver stepped once at the rest pose, 12 columns, on loinFlap and girdleTails for the male adult, female child and male elder.
+
+- The upper segments settle at θ up to 80° (male adult loinFlap: 1, 10, 19, 28, 38, 80, 78, 34, 29, 27, 18, 10°). Columns 5 to 7 are at the back (radial −60° to −120°).
+- At θ = 0 the station constraints alone are violated by 0.05 to 0.24 m, while the side columns' skinned panel triangles are clear (triangle depth 0.000 for segments 2 to 4 and 8 to 10).
+- **First cause.** Section 3.2 puts the stations on the bone line straight below the waist anchor. At the back and sides that line runs through the buttock and hip, 2 to 3 cm from the thigh axis. Station 1 and 2 terms are equal along the segment: 0.110 m on the male adult's side column, against capsule radius plus clearance 0.133. The built panel lies outside the body on the hull. The driver therefore lifts the bone line out of the body and swings the cloth 15 to 31 cm off.
+- **Second cause.** The thigh capsule radius includes drawn vertices above the profile bottom (buttock and hip), and those set it:
+
+| Figure | Radius from all vertices | Radius from vertices below the bottom |
+| --- | --- | --- |
+| male adult | 0.123 m | 0.085 m |
+| male elder | 0.124 m | 0.086 m |
+| female adult | 0.105 m | 0.079 m |
+| female child | 0.118 m | 0.105 m |
+
+  Using the below-bottom radius alone reduces the side columns by 6 to 10°; the back columns stay at 70 to 80°.
+- **Consequences.** The elder kneel test runs 313 s against its 60 s limit (repair rounds and joint searches every frame). The all-rows standstill check of review finding 8 would be red.
+
+**Proposed decisions, with reasons.**
+
+1. **Stations on the cloth (recommended).** Section 3.4 and 3.6 stations become the column's own skinned panel points at three row fractions under the trial angle, instead of points on the bone line.
+   - It measures what the picture shows, and removes the cause that holds the back columns at 80°.
+   - It needs no asset or pipeline rebuild.
+   - The gamepath.py mirror changes the same way.
+   - Not chosen: rest pivots on the cloth (section 3.2) needs a pipeline and asset rebuild, and a straight bone line between rows still cuts the buttock bulge. Dropping the station capsule term and relying on the triangle check alone moves triangle cost into every candidate.
+2. **Thigh capsule radius from drawn vertices below the profile bottom only.** Above the bottom the profile already governs, so those vertices only inflate the capsule along its whole length. This changes the "capsule radius rule is unchanged" clause, hence needs the owner.
+3. **Containment of the crotch blend region.** Adopt variant U for capsules (rest frame OR posed hips frame below the bottom). It closes the no-envelope hole (0.58 m down to 0.011 m), but it reintroduces the posed hips-frame test the decision replaced, so it needs the owner. The remaining 0.011 m thigh miss would then take the plan's named response, a capsule margin raise. The 0.031 m profile shortfall at the start ramp needs a named response the plan does not have (section 3.5 OPEN on the pelvis band).
+4. **Shin, foot and toe.** Confirm the rest-frame reading above, or state the alternative.
+
 ### 3.6 Chord target and verification on skinned triangles (B16, B17, check-3 B4)
 
 **Revision line (owner decisions 03.11.2026, point 1482).** The skinned-triangle check follows section 3.5's revision line: each capsule term covers the triangle's part below the profile bottom in that capsule bone's rest frame (rule 1″); the profile term applies at or above the bottom in the posed hips frame; a triangle with two exempt vertices skips the centroid's profile test (rule 3).
