@@ -106,6 +106,11 @@ describe('containment of the rendered legs and pelvis', () => {
           for (const mo of MOTIONS) {
             for (let f = 0; f < mo.settle + mo.sample; f++) {
               stepClipLayers(asset, person, c, mo.speed * dt, mo.speed, { x: 0, z: (z += mo.speed * dt), yaw: 0, unit: 1 }, mo.work, dt)
+              // the code-built stance first, as the figure writes it before the layers (a stand↔walk
+              // blend takes the code's legs; left unwritten, it would take the last frame's output)
+              for (const nm of [...LEG, 'hips']) bones[nm].quaternion.identity()
+              const h = asset.bones.indexOf('hips')
+              bones.hips.position.set(person.rest[h * 3], person.rest[h * 3 + 1], person.rest[h * 3 + 2])
               applyClipLayers(asset, person, bones, c, { speed: mo.speed, weight: mo.weight, kneel: 0 }, [true, true])
               if (f < mo.settle) continue
               skeleton.bones[asset.parents.indexOf(-1)].updateMatrixWorld(true)
