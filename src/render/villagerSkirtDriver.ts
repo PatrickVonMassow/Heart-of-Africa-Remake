@@ -421,8 +421,11 @@ export class PelvisProfile {
   readonly bottom: number
   readonly top: number
   readonly bin: number
+  /** The columns sorted by wrapped angle about the circle (the angles are fixed). */
+  private readonly order: ReadonlyArray<{ c: number; k: number }>
   constructor(angles: readonly number[], bottom: number, top: number, bin: number) {
     this.angles = angles
+    this.order = angles.map((c, k) => ({ c: wrap(c), k })).sort((p, q) => p.c - q.c)
     this.bottom = bottom
     this.top = top
     this.bin = bin
@@ -505,7 +508,7 @@ export class PelvisProfile {
     let k1 = 0
     let f = 0
     const n = this.columns
-    const order = this.angles.map((c, k) => ({ c: wrap(c), k })).sort((p, q) => p.c - q.c)
+    const order = this.order
     const aw = wrap(a)
     for (let i = 0; i < n; i++) {
       const p = order[i]
@@ -587,7 +590,7 @@ export class ColumnDriver {
   private posed: Posed | null = null
   private dt = 0
   private rated = true
-  private readonly carried: Array<{ vertices: number[]; triangles: number[] }>
+  private readonly carried: Array<{ vertices: number[]; triangles: number[]; columns: number[] }>
 
   readonly rig: ColumnRig
   readonly cfg: DriverConfig
@@ -741,8 +744,13 @@ export class ColumnDriver {
 
   /** A figure-frame point as (angle, rest-frame height, radius) in the hips frame. */
   private hipsLocal(p: V3, hipsInv: THREE.Matrix4, hipsAt: V3): { a: number; y: number; r: number } {
-    const q = new THREE.Vector3(...p).applyMatrix4(hipsInv)
-    return { a: Math.atan2(q.z, q.x), y: q.y + hipsAt[1], r: Math.hypot(q.x, q.z) }
+    // Vector3.applyMatrix4 without the allocation
+    const e = hipsInv.elements
+    const w = 1 / (e[3] * p[0] + e[7] * p[1] + e[11] * p[2] + e[15])
+    const x = (e[0] * p[0] + e[4] * p[1] + e[8] * p[2] + e[12]) * w
+    const y = (e[1] * p[0] + e[5] * p[1] + e[9] * p[2] + e[13]) * w
+    const z = (e[2] * p[0] + e[6] * p[1] + e[10] * p[2] + e[14]) * w
+    return { a: Math.atan2(z, x), y: y + hipsAt[1], r: Math.hypot(x, z) }
   }
 
   // ----- segment geometry -----
@@ -866,9 +874,9 @@ export class ColumnDriver {
   }
 
   /** The panel vertices and triangles each segment carries (nonzero weight on its bone or a descendant). */
-  private carriedSets(): Array<{ vertices: number[]; triangles: number[] }> {
+  private carriedSets(): Array<{ vertices: number[]; triangles: number[]; columns: number[] }> {
     const rig = this.rig
-    const out = Array.from({ length: 2 * this.n }, () => ({ vertices: [] as number[], triangles: [] as number[] }))
+    const out = Array.from({ length: 2 * this.n }, () => ({ vertices: [] as number[], triangles: [] as number[], columns: [] as number[] }))
     const panel = rig.form?.panel
     if (!panel) return out
     const owner = new Map<number, number[]>()
@@ -889,6 +897,19 @@ export class ColumnDriver {
       for (let t = 0; t < panel.index.length / 3; t++) {
         if ([0, 1, 2].some((j) => set.has(panel.index[t * 3 + j]))) out[s].triangles.push(t)
       }
+      // the columns whose bones those triangles' vertices weigh (the only matrices triangleDepth reads)
+      const cols = new Set<number>()
+      for (const t of out[s].triangles) {
+        for (let j = 0; j < 3; j++) {
+          const v = panel.index[t * 3 + j]
+          for (let c = 0; c < 4; c++) {
+            if (!(panel.w[v * 4 + c] > 0)) continue
+            const k = owner.get(panel.idx[v * 4 + c])?.[0]
+            if (k !== undefined) cols.add(k)
+          }
+        }
+      }
+      out[s].columns = [...cols].sort((a, b) => a - b)
     })
     return out
   }
@@ -901,7 +922,7 @@ export class ColumnDriver {
     const P = this.posed!
     const rig = this.rig
     const mats = new Map<number, number[]>()
-    for (let k = 0; k < this.n; k++) {
+    for (const k of set.columns) {
       const m = this.columnMatrices(k, th)
       mats.set(rig.upper[k], m.U)
       mats.set(rig.lower[k], m.L)
