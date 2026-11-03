@@ -6767,7 +6767,11 @@ if (section('garment-inventory') && process.env.VERIFY_SECTION === 'garment-inve
 // the clip time it freezes life at), then framed from the row's views at 3 m
 // and 7 m in one village and one port city. No check judges the cloth: the
 // checks only prove each frame was staged with its forced figure in its pose.
-if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acceptance') {
+// The same staging serves `--section=garment-driven` (opt-in too): the rows of
+// the driven loin flap and girdle tails (docs/garment-stage3-plan-1398.md
+// section 5, sub-step 3), their frames named 1482-driven-*.
+const GARMENT_DRIVEN = section('garment-driven') && process.env.VERIFY_SECTION === 'garment-driven'
+if (GARMENT_DRIVEN || (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acceptance')) {
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   await assertBackend(page)
   const PLACES = (process.env.GARMENT_PLACES ?? 'hausa-village,cairo').split(',')
@@ -6827,6 +6831,33 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
   for (const over of ['loinFlap', 'apron'])
     ROWS.push({ slug: `waistbeads-under-${over.toLowerCase()}-walk`, text: `waist beads under ${over === 'apron' ? 'an apron' : 'a loin flap'}, walk, young woman`, fig: { ...YOUNG_WOMAN, garments: ['waistBeads-waist', `${over}-waist`], clip: 'walk', at: STRIDE }, views: ['side'] })
   ROWS.push({ slug: 'waistbeads-over-trousers-walk', text: 'waist beads over trousers, walk, adult man, judged at the waist seam', fig: { ...MAN, garments: ['waistBeads-waist', 'trousers-waist'], clip: 'walk', at: STRIDE }, views: ['side', 'front34'] })
+  if (GARMENT_DRIVEN) {
+    // Stage 3, sub-step 3: loin flap and girdle tails on the column driver.
+    // Judged for a hem standing off the body, a leg passing through the cloth,
+    // a back face showing, the band reading as a torus, a corner crease.
+    // OPEN: kneel down/hold/up, carry, carryIdle and the shoulder pose need
+    // clips the dev lineup does not stage yet (dressLineupSpec LineupClip);
+    // the low 1 m camera and the 16-frame moving strips likewise.
+    ROWS.length = 0
+    const FORM_TEXT = { loinFlap: 'loin flap', girdleTails: 'girdle tails' }
+    for (const form of ['loinFlap', 'girdleTails'])
+      for (const [who, w, whoText] of [['man', MAN, 'adult man'], ['woman', WOMAN, 'adult woman'], ['girl', GIRL, 'girl (child)'], ['boy', BOY, 'boy (child)']]) {
+        const g = [`${form}-waist`]
+        const f = form.toLowerCase()
+        for (const [tag, at, what] of [['stride', STRIDE, 'the stride'], ['cross-l', 'cross-L', 'the left leg crossing'], ['cross-r', 'cross-R', 'the right leg crossing']])
+          ROWS.push({ slug: `${f}-walk-${tag}-${who}`, text: `driven ${FORM_TEXT[form]}, walk at ${what}, ${whoText}`, fig: { ...w, garments: g, clip: 'walk', at }, views: ['side', 'front34'] })
+        ROWS.push({ slug: `${f}-run-${who}`, text: `driven ${FORM_TEXT[form]}, run at the stride, ${whoText}`, fig: { ...w, garments: g, clip: 'run', at: STRIDE }, views: ['side'] })
+        ROWS.push({ slug: `${f}-dig-${who}`, text: `driven ${FORM_TEXT[form]}, dig at mid-stroke, ${whoText}, judged at the hem and at the hands and forearms (arm row)`, fig: { ...w, garments: g, clip: 'dig', at: 0.5 }, views: ['side', 'rear34', 'front34'] })
+        ROWS.push({ slug: `${f}-idle-${who}`, text: `driven ${FORM_TEXT[form]}, idle, ${whoText}, judged at the hands and forearms (arm row)`, fig: { ...w, garments: g, clip: 'idle', at: 0.25 }, views: ['front34'] })
+      }
+    // the loin flap over the waist beads (the panel opens over them, section 3.9)
+    for (const [who, w, whoText] of [['woman', YOUNG_WOMAN, 'young woman'], ['girl', GIRL, 'girl (child)']])
+      ROWS.push({ slug: `loinflap-over-waistbeads-walk-${who}`, text: `driven loin flap over the waist beads, walk, ${whoText}, judged where the panel passes over the beads`, fig: { ...w, garments: ['waistBeads-waist', 'loinFlap-waist'], clip: 'walk', at: STRIDE }, views: ['side', 'front34'] })
+    // the WindelLook situation re-shot: a child's hip cloth standing off the body all round
+    for (const [who, w, whoText] of [['girl', GIRL, 'girl'], ['boy', BOY, 'boy']])
+      for (const [clip, at] of [['idle', 0.25], ['walk', STRIDE]])
+        ROWS.push({ slug: `windellook-${clip}-${who}`, text: `WindelLook re-shot: driven loin flap on a ${whoText} (child), ${clip}, judged for cloth standing off the body all round`, fig: { ...w, garments: ['loinFlap-waist'], clip, at }, views: ['side', 'rear34', 'front34'], dists: [3] })
+  }
 
   // A straight track the figure walks along: `lead` behind the anchor to 3 m
   // past it, every sight line along it at hip and chest height clear, and the
@@ -6949,7 +6980,7 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
               continue
             }
             await nextFrames(3)
-            const name = `1347-accept-${row.slug}-${view}-${place}-${dist}m`
+            const name = `${GARMENT_DRIVEN ? '1482-driven' : '1347-accept'}-${row.slug}-${view}-${place}-${dist}m`
             await frame(shot(name), {
               local: { x: fig.x, y: fig.y + 0.85 * scale, z: fig.z },
               label: `${place}: acceptance row — ${row.text}; forced outfit ${row.fig.garments.join(' + ')}, ${pose}, ${VIEW_TEXT[view]}${cam.side < 0 ? ' (other flank)' : ''}${cam.turn ? ` (turned ${cam.turn} rad for a clear line)` : ''} from ${dist} m`,
