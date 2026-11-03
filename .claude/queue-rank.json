@@ -289,12 +289,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "803": {
-      "at": "2026-08-21T02:07:14.003Z",
-      "why": "Bleibt hinten: Die Sperre löst sich, sobald der Agent fertig ist und erneut gepusht wird — heute genau so gemessen — also kostet sie einen Wiederholungslauf, nicht einen Punkt Vorrang.",
-      "origin": "machine",
-      "place": "last"
-    },
     "804": {
       "at": "2026-08-21T05:01:34.649Z",
       "why": "Medium, no product defect and nothing blocked: the four-eyes gate reports less than it knows but still reports, so it waits behind the release like every other machine-filed medium.",
@@ -1847,7 +1841,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-03T13:07:55.427Z",
+    "at": "2026-11-03T19:18:40.338Z",
     "points": [
       184,
       200,
@@ -2039,7 +2033,6 @@
       798,
       799,
       802,
-      803,
       804,
       806,
       807,
