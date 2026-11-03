@@ -622,15 +622,15 @@ def col_point_segment(p, a, b):
     return _len(_sub(p, _add(a, _mul(ab, t))))
 
 
-def col_segment_param(p, a, b):
-    """The closest axis parameter of p on segment ab, clamped to [0, 1] (as villagerSkirtDriver.ts segmentParam)."""
-    ab = _sub(b, a)
-    l2 = _dot(ab, ab)
-    return min(1.0, max(0.0, _dot(_sub(p, a), ab) / l2)) if l2 > 0 else 0.0
+def col_rest_height(ry, p):
+    """A posed point's height in a capsule bone's REST frame (as villagerSkirtDriver.ts restHeight)."""
+    return ry[0] * p[0] + ry[1] * p[1] + ry[2] * p[2] + ry[3]
 
 
-# the first two capsules are the thigh capsules (section 3.5, rule 1')
-THIGH_CAPSULES = 2
+def col_rest_height_row(m, rest_y):
+    """inverse(posed bone matrix)'s y row plus the bone's rest y (as villagerSkirtDriver.ts restHeightRow)."""
+    e = _inverse(m)
+    return (e[1], e[5], e[9], e[13] + rest_y)
 
 
 def col_segment_segment(p1, q1, p2, q2):
@@ -714,19 +714,6 @@ def col_clip_below(pts, h, bottom, inclusive=False):
             u = (bottom - h[i]) / (h[j] - h[i])
             poly.append(tuple(pts[i][e] + (pts[j][e] - pts[i][e]) * u for e in range(3)))
     return [(poly[0], poly[i], poly[i + 1]) for i in range(1, len(poly) - 1)]
-
-
-def col_knee_half_distance(tris, a, b):
-    """The knee-half capsule test above the profile bottom (section 3.5, rule 1'; as
-    villagerSkirtDriver.ts kneeHalfDistance): the part of each triangle whose closest axis
-    parameter on ab is >= 0.5, and its distance to the knee half of the axis."""
-    mid = _mul(_add(a, b), 0.5)
-    ab = _sub(b, a)
-    best = math.inf
-    for t in tris:
-        for p, q, r in col_clip_below(t, [-_dot(_sub(x, mid), ab) for x in t], 0.0, True):
-            best = min(best, col_segment_triangle(mid, b, p, q, r))
-    return best
 
 
 def col_segment_triangle(p, q, a, b, c):
@@ -974,7 +961,8 @@ class ColumnDriver:
         for c in rig['capsules']:
             m = M[c['bone']]
             r = _at(rig['rest'], c['bone'])
-            caps.append((_xform(m, _sub(c['a'], r)), _xform(m, _sub(c['b'], r)), c['radius']))
+            # the capsule constrains a point only below the profile bottom in its bone's rest frame (section 3.5)
+            caps.append((_xform(m, _sub(c['a'], r)), _xform(m, _sub(c['b'], r)), c['radius'], col_rest_height_row(m, r[1])))
         angles = [math.atan2(r[2], r[0]) for r in rig['radial']]
         pr = rig['profile']
         profile = PelvisProfile(angles, pr['bottom'], pr['top'], pr['bin'])
@@ -1036,11 +1024,11 @@ class ColumnDriver:
         for j, p in enumerate(st):
             chord = max(_len(_sub(p, nst[0][j])), _len(_sub(p, nst[1][j])))
             ha, hy, hr = self._hips_local(p, P['hipsInv'], hips_at)
-            # below the profile bottom the thigh capsules govern, at or above it the profile alone (section 3.5)
-            # (rule 1': at or above it also the thigh capsules whose closest axis parameter is >= 0.5)
+            # the profile at or above its bottom in the hips frame; a capsule below the profile bottom
+            # in its own bone's rest frame (section 3.5)
             above = hy >= rig['profile']['bottom']
-            for i, (a, b, radius) in enumerate(P['capsules']):
-                if above and (i >= THIGH_CAPSULES or col_segment_param(p, a, b) < 0.5):
+            for a, b, radius, ry in P['capsules']:
+                if col_rest_height(ry, p) >= rig['profile']['bottom']:
                     continue
                 C = radius + rig['clearance']
                 target = math.sqrt(C * C + (chord / 2) * (chord / 2))
@@ -1127,22 +1115,17 @@ class ColumnDriver:
             centre = _mul(_add(_add(a, b), c), 1 / 3)
             rad = max(_len(_sub(a, centre)), _len(_sub(b, centre)), _len(_sub(c, centre)))
             hv = [self._hips_local(x, P['hipsInv'], hips_at) for x in (a, b, c)]
-            # the capsules constrain only the part of a triangle below the profile bottom (section 3.5):
-            # the triangle clipped at that height (as villagerSkirtDriver.ts)
-            # (rule 1': the part above it meets the thigh capsules' knee halves)
-            below = col_clip_below((a, b, c), [h[1] for h in hv], rig['profile']['bottom'])
-            above_tris = col_clip_below((a, b, c), [-h[1] for h in hv], -rig['profile']['bottom'], True)
-            for i, (ca, cb, radius) in enumerate(P['capsules']):
-                knee = i < THIGH_CAPSULES and bool(above_tris)
-                if not below and not knee:
-                    continue
+            # a capsule meets only the part of a triangle below the profile bottom in its bone's rest
+            # frame (section 3.5; as villagerSkirtDriver.ts)
+            for ca, cb, radius, ry in P['capsules']:
                 mid = _mul(_add(ca, cb), 0.5)
                 bound = _len(_sub(cb, ca)) / 2 + radius + C
                 if _len(_sub(mid, centre)) > bound + rad:
                     continue
-                dist = min((col_segment_triangle(ca, cb, p, q, r) for p, q, r in below), default=math.inf)
-                if knee:
-                    dist = min(dist, col_knee_half_distance(above_tris, ca, cb))
+                below = col_clip_below((a, b, c), [col_rest_height(ry, x) for x in (a, b, c)], rig['profile']['bottom'])
+                if not below:
+                    continue
+                dist = min(col_segment_triangle(ca, cb, p, q, r) for p, q, r in below)
                 d = radius + C - dist
                 if d > 0:
                     depth += d
@@ -1538,22 +1521,19 @@ def selftest_column_driver():
     print('column driver selftest: ok')
 
 
-def selftest_column_knee_half():
-    """Rule 1' (section 3.5): the knee-half capsule test ignores the hip half and clips a
-    straddling triangle at the axis midpoint (the cases of villagerSkirtDriver.test.ts)."""
-    a, b = (0.0, 0.0, 0.0), (0.0, 0.0, 2.0)
-    assert abs(col_segment_param((1.0, 0.0, 1.5), a, b) - 0.75) < 1e-12
-    assert col_knee_half_distance([((0.3, -1, 0.2), (0.3, 1, 0.2), (0.3, 0, 0.8))], a, b) == math.inf
-    assert abs(col_knee_half_distance([((0.3, -1, 1.2), (0.3, 1, 1.2), (0.3, 0, 1.8))], a, b) - 0.3) < 1e-12
-    assert abs(col_knee_half_distance([((0.1, 0, 0.2), (0.5, -1, 1.8), (0.5, 1, 1.8))], a, b) - 0.3) < 1e-12
-    # equality: a triangle lying wholly in the midpoint plane stays in the knee half (t = 0.5)
-    assert abs(col_knee_half_distance([((0.3, -1, 1.0), (0.3, 1, 1.0), (-0.3, 0, 1.0))], a, b)) < 1e-12
-    # equality: a triangle lying wholly at the profile bottom is not below it, and stays on the
-    # driver's upper side (negated heights, inclusive), so no capsule check skips it
+def selftest_column_rest_frame():
+    """Section 3.5 (owner decision 03.11.2026 20:56): a capsule constrains a point below the
+    profile bottom in its bone's REST frame; the row inverts the posed bone matrix (the cases
+    of villagerSkirtDriver.test.ts)."""
+    # a bone resting at (0, 1, 0), posed rotated 90 degrees about z (its rest -y points to +x) and lifted by 0.5
+    m = [0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.5, 0.0, 1.0]
+    ry = col_rest_height_row(m, 1.0)
+    # the bone's rest point 0.4 below its head now lies at (0.4, 1.5, 0): posed high, rest-frame height 0.6
+    assert abs(col_rest_height(ry, (0.4, 1.5, 0.0)) - 0.6) < 1e-12
+    # equality: a triangle lying wholly at the profile bottom is not below it, so no capsule meets it
     tri = ((0.0, 0.5, 0.0), (1.0, 0.5, 0.0), (0.0, 0.5, 1.0))
     assert col_clip_below(tri, [0.5, 0.5, 0.5], 0.5) == []
-    assert col_clip_below(tri, [-0.5, -0.5, -0.5], -0.5, True) == [tri]
-    print('column knee-half selftest: ok')
+    print('column rest-frame selftest: ok')
 
 
 def selftest_column_scale():

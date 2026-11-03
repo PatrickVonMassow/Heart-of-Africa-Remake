@@ -2,7 +2,9 @@
 // Containment on the rendered surface (docs/garment-stage3-plan-1398.md
 // section 3.5, B13): every vertex of every leg and pelvis triangle, plus a
 // barycentric grid at most 1 cm apart inside each, lies in the union of the
-// eight body-only capsules and the skinned pelvis profile, over the clip
+// eight body-only capsules and the skinned pelvis profile (a capsule holds a
+// sample only below the profile bottom in its bone's rest frame, the profile
+// only at or above it in the posed hips frame; owner decision 03.11.2026), over the clip
 // domain the game draws (walk, jog and sprint at three speeds with stride
 // warp, carry, dig, and the game's start and stop ramps frame by frame) and the builds
 // −1, 0 and +1 of every sex and age group. Named response for a sample
@@ -25,7 +27,7 @@ import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { approach, legDims, phasePerDistance, rephase, strideReach, walkPose } from './figureWalk'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { ColumnDriver, columnRig, pointSegment, segmentParam } from './villagerSkirtDriver'
+import { ColumnDriver, columnRig, pointSegment, restHeight } from './villagerSkirtDriver'
 
 type V3 = [number, number, number]
 const LEG = ['thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
@@ -67,8 +69,6 @@ describe('containment of the rendered legs and pelvis', () => {
   it('holds the legs in the union of the leg capsules and the skinned pelvis profile', () => {
     const worst: Record<string, { d: number; where: string }> = {}
     const band: { d: number; where: string } = { d: 0, where: '' }
-    // at or above the profile bottom the profile ALONE must hold the surface (owner decision 03.11.2026)
-    const above: Record<string, { d: number; where: string }> = {}
     let samples = 0
     for (const sex of SEXES) {
       for (const age of AGE_GROUPS) {
@@ -178,9 +178,10 @@ describe('containment of the rendered legs and pelvis', () => {
                 const cc = tris[t * 3 + 2]
                 // a capsule is convex: three corners inside one capsule hold the whole triangle
                 const corner = (v: number): V3 => [skinned[v * 3], skinned[v * 3 + 1], skinned[v * 3 + 2]]
-                // the hips-frame height is affine, so three corners below the profile bottom hold the interior there too
-                const below = [a, b, cc].every((v) => ob.profileExcess(corner(v)) === Infinity)
-                if (below && ob.capsules.some((cap) => [a, b, cc].every((v) => pointSegment(corner(v), cap.a, cap.b) <= cap.radius))) {
+                // the rest-frame height is affine, so three corners below the profile bottom in the
+                // capsule bone's rest frame hold the interior there too
+                const holds = (cap: (typeof ob.capsules)[number], p: V3) => restHeight(cap.ry, p) < rig.profile.bottom && pointSegment(p, cap.a, cap.b) <= cap.radius
+                if (ob.capsules.some((cap) => [a, b, cc].every((v) => holds(cap, corner(v))))) {
                   samples += weights[t].length / 2
                   continue
                 }
@@ -193,43 +194,11 @@ describe('containment of the rendered legs and pelvis', () => {
                   samples++
                   if (ob.inProfile(p)) continue
                   const pe = ob.profileExcess(p)
-                  if (pe !== Infinity && pe > 0) {
-                    // at or above the profile bottom (rule 2'): band samples and hip-half thigh samples
-                    // (dominant thigh capsule t < 0.5) are answered by the profile alone; knee-half
-                    // thigh, shin, foot and toe samples fall through to the union below
-                    const where = `${sex} ${age} ${build} ${mo.id} f${f} w${ms.weight.toFixed(2)} v${ms.speed.toFixed(2)}, rest y ${[a, b, cc].map((v) => pos.getY(v).toFixed(3)).join('/')}`
-                    if (!legTri([a, b, cc])) {
-                      const rel = pe / person.frame.scale
-                      if (rel > band.d) Object.assign(band, { d: rel, where })
-                      continue
-                    }
-                    // the dominant leg bone of this sample: its corners' leg weights, interpolated
-                    const lwt = new Map<number, number>()
-                    ;[a, b, cc].forEach((v, j) => {
-                      const bw = [s, u, vv][j]
-                      for (let k = 0; k < 4; k++) {
-                        const bi = si.getComponent(v, k)
-                        if (legSet.has(bi)) lwt.set(bi, (lwt.get(bi) ?? 0) + sw.getComponent(v, k) * bw)
-                      }
-                    })
-                    let lb = -1
-                    let lw = 0
-                    for (const [bi, wt] of [...lwt].sort((p, q) => p[0] - q[0])) {
-                      if (wt > lw) {
-                        lw = wt
-                        lb = bi
-                      }
-                    }
-                    const bone = asset.bones[lb] ?? 'leg'
-                    const ci = bone.startsWith('thigh.') ? rig.capsules.findIndex((cap) => cap.bone === lb) : -1
-                    if (ci >= 0 && segmentParam(p, ob.capsules[ci].a, ob.capsules[ci].b) < 0.5) {
-                      if (pe > (above[bone]?.d ?? 0)) above[bone] = { d: pe, where }
-                      continue
-                    }
-                  }
                   let best = Infinity
-                  let bone = ''
+                  // no envelope at all: below the hips-frame bottom yet at or above it in every capsule's rest frame
+                  let bone = 'no envelope'
                   for (const cap of ob.capsules) {
+                    if (restHeight(cap.ry, p) >= rig.profile.bottom) continue
                     const d = pointSegment(p, cap.a, cap.b) - cap.radius
                     if (d < best) {
                       best = d
@@ -254,10 +223,9 @@ describe('containment of the rendered legs and pelvis', () => {
         }
       }
     }
-    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; hip-half thigh samples above the profile bottom outside the profile (rule 2'): ${JSON.stringify(above)}; pelvis band worst outside: ${band.d.toFixed(4)} × scale (${band.where})`)
+    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; pelvis band worst outside: ${band.d.toFixed(4)} × scale (${band.where})`)
     expect(samples).toBeGreaterThan(1e6)
     expect(worst).toEqual({})
-    expect(above).toEqual({})
     expect(band.d, `pelvis band outside the profile: ${band.where}`).toBeLessThanOrEqual(VILLAGER_ASSET.drivenGarments.driver.pelvisBandTolerance)
   }, 600_000)
 })

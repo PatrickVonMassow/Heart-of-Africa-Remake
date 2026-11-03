@@ -13,7 +13,7 @@ import { VILLAGER_ASSET } from '../config/balance'
 import { applyClipLayers, clipLayers, stepClipLayers } from '../scenes/place/gltfClipLayers'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { carriesColumnWeight, clipBelow, ColumnDriver, columnRig, composeFigureMatrices, kneeHalfDistance, PelvisProfile, segmentParam, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
+import { carriesColumnWeight, clipBelow, ColumnDriver, columnRig, composeFigureMatrices, PelvisProfile, restHeight, restHeightRow, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
 import { ROUND_TRIP_SEQUENCES, runSequence } from './villagerSkirtDriverSequences'
 
 const CFG = VILLAGER_ASSET.drivenGarments.driver
@@ -547,47 +547,22 @@ describe('the triangle below the profile bottom (section 3.5)', () => {
     // the driver's split at the profile bottom: strictly below, and at or above (negated heights, inclusive)
     expect(clipBelow(tri, [0.5, 0.5, 0.5], 0.5)).toEqual([])
     expect(clipBelow(tri, [-0.5, -0.5, -0.5], -0.5, true)).toEqual([tri])
-    // the knee-half clip: a triangle lying wholly in the plane through the axis midpoint
-    const a: V3 = [0.25, 0.25, 1]
-    const b: V3 = [0.25, 0.25, -1]
-    expect(kneeHalfDistance([tri], a, b)).toBe(0)
   })
 })
 
-describe("the knee half of a thigh capsule above the profile bottom (section 3.5, rule 1')", () => {
-  // a thigh axis from the hip (a, t = 0) to the knee (b, t = 1)
-  const a: V3 = [0, 0, 0]
-  const b: V3 = [0, 0, 2]
-  it('measures the closest axis parameter, clamped to [0, 1]', () => {
-    expect(segmentParam([1, 0, 0.5], a, b)).toBeCloseTo(0.25, 12)
-    expect(segmentParam([1, 0, 1.5], a, b)).toBeCloseTo(0.75, 12)
-    expect(segmentParam([0, 0, -3], a, b)).toBe(0)
-    expect(segmentParam([0, 0, 9], a, b)).toBe(1)
+describe("a capsule's rest-frame height (section 3.5, owner decision 03.11.2026 20:56)", () => {
+  // a bone resting at (0, 1, 0), posed rotated 90 degrees about z (its rest -y points to +x) and lifted by 0.5
+  const m = new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(0, 1.5, 0).elements
+  const ry = restHeightRow(m, 1)
+  it('measures a posed point in the bone rest frame, not its posed height', () => {
+    // the bone's rest point 0.4 below its head now lies at (0.4, 1.5, 0): posed high, rest-frame height 0.6
+    expect(restHeight(ry, [0.4, 1.5, 0])).toBeCloseTo(0.6, 12)
+    // the head stays at its rest height
+    expect(restHeight(ry, [0, 1.5, 0])).toBeCloseTo(1, 12)
   })
-  it('ignores a triangle wholly at the hip half and answers the whole-axis distance in the knee half', () => {
-    const hip: V3[] = [
-      [0.3, -1, 0.2],
-      [0.3, 1, 0.2],
-      [0.3, 0, 0.8],
-    ]
-    expect(kneeHalfDistance([hip], a, b)).toBe(Infinity)
-    const knee: V3[] = [
-      [0.3, -1, 1.2],
-      [0.3, 1, 1.2],
-      [0.3, 0, 1.8],
-    ]
-    expect(kneeHalfDistance([knee], a, b)).toBeCloseTo(0.3, 12)
-  })
-  it('clips a triangle straddling the axis midpoint to its knee half', () => {
-    // its hip-half corner lies closer to the axis than any knee-half point
-    const tri: V3[] = [
-      [0.1, 0, 0.2],
-      [0.5, -1, 1.8],
-      [0.5, 1, 1.8],
-    ]
-    const d = kneeHalfDistance([tri], a, b)
-    // at t = 0.5 (z = 1) the triangle's edge from the hip corner sits at x = 0.3
-    expect(d).toBeCloseTo(0.3, 12)
-    expect(segmentTriangle(a, b, tri[0], tri[1], tri[2])).toBeCloseTo(0.1, 12)
+  it('matches the inverse bone matrix at an arbitrary point', () => {
+    const p = new THREE.Vector3(0.3, -0.2, 0.7)
+    const local = p.clone().applyMatrix4(new THREE.Matrix4().fromArray(m).invert())
+    expect(restHeight(ry, [p.x, p.y, p.z])).toBeCloseTo(local.y + 1, 12)
   })
 })

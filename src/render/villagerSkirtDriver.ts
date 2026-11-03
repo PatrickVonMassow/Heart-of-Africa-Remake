@@ -27,8 +27,6 @@ const CAPSULE_BONES: Array<[string, string | null]> = [
   ['toe.L', null],
   ['toe.R', null],
 ]
-/** The first entries of CAPSULE_BONES are the thigh capsules (section 3.5, rule 1'). */
-const THIGH_CAPSULES = 2
 
 // ---------- vector helpers (plain arrays, mirrored one to one in Python) ----------
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -70,28 +68,15 @@ export function pointSegment(p: V3, a: V3, b: V3): number {
   return len(sub(p, add(a, mul(ab, t))))
 }
 
-/** The closest axis parameter of p on the segment ab, clamped to [0, 1] (0: a, the hip end of a thigh). */
-export function segmentParam(p: V3, a: V3, b: V3): number {
-  const ab = sub(b, a)
-  const l2 = dot(ab, ab)
-  return l2 > 0 ? Math.min(1, Math.max(0, dot(sub(p, a), ab) / l2)) : 0
+/** A posed point's height in a capsule bone's REST frame, from the row of that frame (section 3.5). */
+export function restHeight(ry: readonly number[], p: V3): number {
+  return ry[0] * p[0] + ry[1] * p[1] + ry[2] * p[2] + ry[3]
 }
 
-/**
- * The knee-half capsule test of a triangle part at or above the profile bottom
- * (section 3.5, rule 1'): the part of each triangle whose closest axis parameter
- * on ab is >= 0.5 (the half-space beyond the axis midpoint), and its distance to
- * the knee half of the axis, which there equals the distance to the whole axis.
- * Infinity where no part lies in that half.
- */
-export function kneeHalfDistance(tris: readonly V3[][], a: V3, b: V3): number {
-  const mid = mul(add(a, b), 0.5)
-  const ab = sub(b, a)
-  let best = Infinity
-  for (const t of tris) {
-    for (const [p, q, r] of clipBelow(t, t.map((x) => -dot(sub(x, mid), ab)), 0, true)) best = Math.min(best, segmentTriangle(mid, b, p, q, r))
-  }
-  return best
+/** The rest-frame height row of a bone: inverse(posed bone matrix)'s y row plus the bone's rest y. */
+export function restHeightRow(m: ArrayLike<number>, restY: number): [number, number, number, number] {
+  const e = new THREE.Matrix4().fromArray(Array.from(m)).invert().elements
+  return [e[1], e[5], e[9], e[13] + restY]
 }
 
 /** Closest distance between the segments p1q1 and p2q2 (Ericson 5.1.9). */
@@ -616,7 +601,9 @@ interface Posed {
   head: V3[]
   radial: V3[]
   tangent: V3[]
-  capsules: Array<{ a: V3; b: V3; radius: number }>
+  /** ry: the capsule bone's rest-frame height row (restHeight); the capsule constrains a point
+   *  only below the profile bottom in that frame (section 3.5, owner decision 03.11.2026 20:56). */
+  capsules: Array<{ a: V3; b: V3; radius: number; ry: [number, number, number, number] }>
   profile: PelvisProfile
   gravity: number[]
 }
@@ -770,7 +757,7 @@ export class ColumnDriver {
     const capsules = rig.capsules.map((c) => {
       const m = sliceMat(M, c.bone)
       const r = at(rig.rest, c.bone)
-      return { a: xform(m, sub(c.a, r)), b: xform(m, sub(c.b, r)), radius: c.radius }
+      return { a: xform(m, sub(c.a, r)), b: xform(m, sub(c.b, r)), radius: c.radius, ry: restHeightRow(m, r[1]) }
     })
     const angles = rig.radial.map((r) => Math.atan2(r[2], r[0]))
     const profile = new PelvisProfile(angles, rig.profile.bottom, rig.profile.top, rig.profile.bin)
@@ -833,7 +820,7 @@ export class ColumnDriver {
   /** The posed obstacles of a frame (the containment test): the eight capsules, and whether a
    *  figure-frame point lies inside the skinned pelvis profile (from its bottom up; above the top
    *  bin the top bin's value holds, section 3.5). */
-  obstacles(bones: readonly THREE.Object3D[]): { capsules: Array<{ a: V3; b: V3; radius: number }>; inProfile: (p: V3) => boolean; profileExcess: (p: V3) => number } {
+  obstacles(bones: readonly THREE.Object3D[]): { capsules: Posed['capsules']; inProfile: (p: V3) => boolean; profileExcess: (p: V3) => number } {
     const P = this.pose(bones)
     const rig = this.rig
     const hipsAt = at(rig.rest, rig.hips)
@@ -879,11 +866,11 @@ export class ColumnDriver {
     st.forEach((p, j) => {
       const chord = Math.max(len(sub(p, nst[0][j])), len(sub(p, nst[1][j])))
       const h = this.hipsLocal(p, P.hipsInv, hipsAt)
-      // below the profile bottom the thigh capsules govern, at or above it the profile alone (section 3.5)
-      // (rule 1': at or above it also the thigh capsules whose closest axis parameter is >= 0.5, the knee half)
+      // the profile at or above its bottom in the hips frame; a capsule below the profile bottom
+      // in its own bone's rest frame (section 3.5)
       const above = h.y >= rig.profile.bottom
-      P.capsules.forEach((c, i) => {
-        if (above && (i >= THIGH_CAPSULES || segmentParam(p, c.a, c.b) < 0.5)) return
+      P.capsules.forEach((c) => {
+        if (restHeight(c.ry, p) >= rig.profile.bottom) return
         const C = c.radius + rig.clearance
         const target = Math.sqrt(C * C + (chord / 2) * (chord / 2))
         worst = Math.max(worst, target - pointSegment(p, c.a, c.b))
@@ -995,20 +982,15 @@ export class ColumnDriver {
       const centre = mul(add(add(a, b), c), 1 / 3)
       const rad = Math.max(len(sub(a, centre)), len(sub(b, centre)), len(sub(c, centre)))
       const hv = [a, b, c].map((p) => this.hipsLocal(p, P.hipsInv, hipsAt))
-      // the capsules constrain only the part of a triangle below the profile bottom (section 3.5):
-      // the triangle clipped at that height (a straddling triangle's upper part met the thigh
-      // capsule's hip end above the bottom, where the profile alone governs)
-      // (rule 1': the part above it meets the thigh capsules' knee halves, kneeHalfDistance)
-      const below = clipBelow([a, b, c], [hv[0].y, hv[1].y, hv[2].y], rig.profile.bottom)
-      const aboveTris = clipBelow([a, b, c], [-hv[0].y, -hv[1].y, -hv[2].y], -rig.profile.bottom, true)
-      P.capsules.forEach((cap, i) => {
-        const knee = i < THIGH_CAPSULES && aboveTris.length > 0
-        if (!below.length && !knee) return
+      // a capsule meets only the part of a triangle below the profile bottom in its bone's rest
+      // frame (section 3.5): the triangle clipped there (that height is affine in the posed point)
+      P.capsules.forEach((cap) => {
         const mid = mul(add(cap.a, cap.b), 0.5)
         const bound = len(sub(cap.b, cap.a)) / 2 + cap.radius + C
         if (len(sub(mid, centre)) > bound + rad) return
-        let dist = Math.min(...below.map(([p, q, r]) => segmentTriangle(cap.a, cap.b, p, q, r)))
-        if (knee) dist = Math.min(dist, kneeHalfDistance(aboveTris, cap.a, cap.b))
+        const below = clipBelow([a, b, c], [a, b, c].map((p) => restHeight(cap.ry, p)), rig.profile.bottom)
+        if (!below.length) return
+        const dist = Math.min(...below.map(([p, q, r]) => segmentTriangle(cap.a, cap.b, p, q, r)))
         const d = cap.radius + C - dist
         if (d > 0) depth += d
       })
