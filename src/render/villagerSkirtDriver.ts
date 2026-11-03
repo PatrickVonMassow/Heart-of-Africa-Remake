@@ -608,6 +608,8 @@ export class ColumnDriver {
    *  (figure creation, teleport or placement, a changed form, re-entry after a skip). */
   reset(): void {
     this.fresh = true
+    // a replay later in the same frame restores this snapshot: it keeps the reset
+    if (this.snap) this.snap.fresh = true
   }
 
   private frame = -1

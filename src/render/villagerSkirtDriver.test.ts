@@ -377,6 +377,18 @@ describe('the driver in the figure', () => {
     expect(carriesColumnWeight(asset, g)).toBe(true)
   })
 
+  it('keeps a reset made between two retargets of one frame', () => {
+    const rig = toyRig()
+    const d = new ColumnDriver(rig)
+    for (let f = 0; f < 3; f++) d.stepFrame(toyBones(rig), 1 / 60, f)
+    d.theta[0] = 30 * DEG
+    d.stepFrame(toyBones(rig), 1 / 60, 3)
+    expect(d.theta[0]).toBeGreaterThan(20 * DEG)
+    d.reset()
+    d.stepFrame(toyBones(rig), 1 / 60, 3)
+    expect(d.theta[0]).toBe(0)
+  })
+
   it('re-solves a second retarget in one frame from the state before that frame', () => {
     const rig = toyRig(4, legCapsule)
     const once = new ColumnDriver(rig)
