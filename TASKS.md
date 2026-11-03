@@ -15908,9 +15908,3 @@ to land than a mechanism that needs a review.
   Test: Vitest for the cause's layer; picture check of the two named garment-acceptance rows on both backends.
   Criticality: low - a corner on the far shoulder outline at close range from behind.
   Bundle: Dorfleben.
-- [ ] 1481. The batch doctor's quarantine stash takes a cloud delegate's uncommitted work
-  Source: owner adoption of point 1480, 03.11.2026: the cloud author session_019XD8QtgnFJ2MnF6mRfKYvf (branch claude/garment-stage3-driver-etjpbx) found its working tree emptied twice by `doctor-quarantine-*` stashes (2026-11-02T22:59:41Z and 23:14:46Z) written by scripts/batch-doctor.mjs in its own clone; it noticed and popped them both times. An author that does not notice loses its work silently.
-  FINAL STATE: the doctor's quarantine-stash repair stands down outside the owner's main tree (a cloud clone or a session that does not hold the batch lock), like the other session guards; the owner's main tree keeps its current repair.
-  Test: Vitest/node test of the doctor's repair plan for a non-owner clone (no quarantine planned) and for the owner's main tree (unchanged).
-  Criticality: high - silent loss of a delegate's uncommitted work.
-  Bundle: Testinfrastruktur.
