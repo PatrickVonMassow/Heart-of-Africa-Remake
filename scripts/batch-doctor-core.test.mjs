@@ -130,6 +130,33 @@ describe('planRemediation', () => {
   })
 })
 
+describe("outside the owner's tree the doctor neither stashes nor resets", () => {
+  const incident = {
+    ...clean,
+    dirtyFiles: ['src/x.ts'],
+    divergence: { ahead: 1, behind: 4 },
+    parallelDetected: true,
+    conflictMarkers: false,
+  }
+
+  it('a cloud clone or non-owner session plans no quarantine and no hard reset, only an alert', () => {
+    const actions = planRemediation({ ...incident, ownerTree: false }).map((a) => a.action)
+    expect(actions).not.toContain('quarantine-stash')
+    expect(actions).not.toContain('rescue-and-reset')
+    expect(actions).toContain('alert-reset-outside-owner-tree')
+  })
+
+  it('a dirty non-owner tree in a parallel window is left alone', () => {
+    expect(planRemediation({ ...clean, dirtyFiles: ['src/x.ts'], parallelDetected: true, ownerTree: false })).toEqual([])
+  })
+
+  it("the owner's main tree keeps its repair, explicitly and by default", () => {
+    for (const state of [{ ...incident, ownerTree: true }, incident]) {
+      expect(planRemediation(state).map((a) => a.action)).toEqual(['quarantine-stash', 'rescue-and-reset'])
+    }
+  })
+})
+
 // ---------------------------------------------------------------------------
 // THE GATE MUST NOT BLAME THE CODE FOR THE LOAD (point 431)
 // ---------------------------------------------------------------------------

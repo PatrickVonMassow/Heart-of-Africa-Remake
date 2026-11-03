@@ -58,6 +58,7 @@ import {
 } from './batch-doctor-states.mjs'
 import {
   readOwnerLock,
+  heldByOtherLiveOwner,
   detectParallel,
   readUnhandledAlert,
   markAlertHandled,
@@ -222,6 +223,9 @@ if (rawAlert && !alert) {
   log(`parallel alert IGNORED: it names only this session (${readerSid || 'unknown'}) — an alert that cannot name another session is not evidence of one`)
 }
 const parallelDetected = parallelNow.length > 0 || !!alert
+// The owner's tree: not a cloud clone (CLAUDE_CODE_REMOTE, as in the context
+// fence) and not a session another live owner holds the batch lock against.
+const ownerTree = process.env.CLAUDE_CODE_REMOTE !== 'true' && !(activeSessionId && heldByOtherLiveOwner(activeSessionId))
 const parallelSids = [...new Set([...parallelNow.map((p) => p.sid), ...alertOthers])]
 
 // --- THE TORN STATES A KILL LEAVES BEHIND (point 443) ---------------------------
@@ -266,7 +270,7 @@ const privateBatchLock = privateBatchLockPath && existsSync(privateBatchLockPath
 log(
   `state: branch=${branch} mergeInProgress=${mergeInProgress} dirty=${dirtyFiles.length} ` +
     `conflictMarkers=${conflictMarkers} divergence=+${divergence.ahead}/-${divergence.behind} ` +
-    `tasksParses=${tasksParses} parallelNow=${parallelNow.length} unhandledAlert=${alert ? 'yes' : 'no'}`,
+    `tasksParses=${tasksParses} parallelNow=${parallelNow.length} unhandledAlert=${alert ? 'yes' : 'no'} ownerTree=${ownerTree}`,
 )
 log(
   `torn states: gitLocks=${staleGitLocks.length} worktreePrune=${!!worktrees.pruneNeeded} ` +
@@ -300,6 +304,7 @@ const plan = planRemediation({
   ownerAlive,
   privateBatchLock,
   tornOwnerSession: tornOwnerSession.torn ? tornOwnerSession : null,
+  ownerTree,
 })
 
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')
