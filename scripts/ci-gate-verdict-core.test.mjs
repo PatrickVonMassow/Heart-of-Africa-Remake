@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { REPO_ROOT } from './repo-paths.mjs'
 
 import {
   NOT_RUN,
@@ -251,12 +252,36 @@ describe('the workflow that arms it', () => {
       .toEqual(ids)
   })
 
+  it('the gate checks out only scripts/, with a ceiling above the measured checkout', () => {
+    const gate = WORKFLOW.split('  gate:\n')[1]
+    const checkout = gate.split('- id: checkout')[1].split('- id: node')[0]
+    expect(checkout).toContain('sparse-checkout: scripts')
+    expect(checkout).toContain('filter: blob:none')
+    // The full checkout measured five minutes (runs 41680804084, 41692582189).
+    expect(Number(/timeout-minutes: (\d+)/.exec(gate)[1])).toBeGreaterThanOrEqual(5 + 1)
+    // The verdict's whole import closure must live inside the sparse cone.
+    const seen = new Set()
+    const walk = (rel) => {
+      if (seen.has(rel)) return
+      seen.add(rel)
+      const src = readFileSync(resolve(REPO_ROOT, rel), 'utf8')
+      expect(src).not.toMatch(/\bimport\(|\brequire\(/)
+      for (const [, spec] of src.matchAll(/from '([^']+)'/g)) {
+        if (spec.startsWith('node:')) continue
+        expect(spec.startsWith('./')).toBe(true)
+        walk(`scripts/${spec.slice(2)}`)
+      }
+    }
+    walk('scripts/ci-gate-verdict.mjs')
+    expect([...seen].every((f) => f.startsWith('scripts/') && !f.slice(8).includes('/'))).toBe(true)
+  })
+
   it('runs both shards without fail-fast, at the unchanged job ceiling', () => {
     const fast = WORKFLOW.split('  fast:\n')[1].split('  gate:\n')[0]
     expect(fast).toContain('fail-fast: false')
     expect(fast).toContain('shard: [1, 2]')
-    expect(fast).toContain('timeout-minutes: 25')
-    expect(fast).toContain('npm run test:unit -- --shard=${{ matrix.shard }}/2')
+    expect(fast).toContain('timeout-minutes: 40')
+    expect(fast).toContain('run: node scripts/ci-unit-shard.mjs -- --shard=${{ matrix.shard }}/2')
     expect(fast).toMatch(/id: outcomes[\s\S]*?if: always\(\)/)
     for (const shard of [1, 2]) {
       expect(fast).toContain(`shard_${shard}: \${{ steps.outcomes.outputs.shard_${shard} }}`)

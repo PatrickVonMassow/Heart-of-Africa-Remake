@@ -222,7 +222,7 @@ function retryOutcomeNotice(step, ok, { unavailable = false } = {}) {
  * push's short steps. Without a `readLoad` seam no retry is paid: a red blocks
  * at once. `onNotice` prints — the retry must be visible.
  */
-export function runGate(steps, run, { readLoad, onNotice } = {}) {
+export function runGate(steps, run, { readLoad, onNotice, inspectUnit } = {}) {
   const say = typeof onNotice === 'function' ? onNotice : () => {}
   const ask = (when, step) => {
     if (typeof readLoad !== 'function') return null
@@ -246,14 +246,36 @@ export function runGate(steps, run, { readLoad, onNotice } = {}) {
       results.push({ step, ok: true, unavailable: true })
       continue
     }
-    if (outcome === true) {
+    // The unit step is judged by its own summary where the wrapper can read it
+    // (`inspectUnit`), at any load: a named failure blocks — even beside exit 0 —
+    // an unreadable summary blocks, a run naming no failure is NOT JUDGED and
+    // re-run once, and the measured load is named in the verdict every time.
+    const unitSeam = step === 'unit' && typeof inspectUnit === 'function'
+    const attempt = (ok) => ({ ...(inspectUnit() ?? {}), ok })
+    if (outcome === true && !unitSeam) {
       results.push({ step, ok: true })
       continue
     }
+    // Red (or a unit green still to be read). Was the machine quiet enough for a
+    // red to mean anything? The reading is combined with the opening one.
+    const load = outcome === true ? opening : worseLoad(opening, ask('red', step))
+    if (unitSeam) {
+      const at = { load: load ?? undefined }
+      const first = attempt(outcome === true)
+      const v1 = unitAttemptsVerdict([first], at)
+      if (!v1.rerun) {
+        results.push({ step, ok: v1.ok, loadLevel: load?.level, unitLine: `pre-push gate: ${v1.line}` })
+        if (!v1.ok) break
+        continue
+      }
+      say(`pre-push gate: ${v1.line}`)
+      const second = run(step, GATE_COMMANDS[step], { attempt: 2 })
+      const v2 = unitAttemptsVerdict([first, attempt(second === true)], at)
+      results.push({ step, ok: v2.ok, notJudged: true, loadLevel: load?.level, unitLine: `pre-push gate: ${v2.line}` })
+      if (!v2.ok) break
+      continue
+    }
 
-    // Red. Was the machine quiet enough for that to mean anything? The reading
-    // taken now is combined with the one from before the long steps.
-    const load = worseLoad(opening, ask('red', step))
     if (!load || !shouldRetryAfterRed(load.level)) {
       results.push({ step, ok: false, ...(load ? { loadLevel: load.level } : {}) })
       break
@@ -490,6 +512,130 @@ export function looksLikeRunnerFailure({ files, tests, failedFiles, failedTests 
   return countOrNull(files) !== null && countOrNull(tests) > 0 && failedFiles === 0 && failedTests === 0
 }
 
+// ---------------------------------------------------------------------------
+// A UNIT RUN THAT NAMES NO FAILING TEST HAS NOT JUDGED ANYTHING
+//
+// Measured on a quiet host (02.09.2026) and on CI (02.11.2026 onwards): vitest's
+// own summary read every file and every test passed, yet the process exited 1
+// on a `[vitest-worker]: Timeout calling "onTaskUpdate"` reporter error counted
+// as an unhandled error. Load is not the discriminator — the SUMMARY is. Such a
+// run is NOT JUDGED and earns exactly one re-run, at any load; a run naming a
+// failing test is red at once, at any load. The measured load goes into the
+// verdict text as evidence in every case, never as the condition.
+// ---------------------------------------------------------------------------
+
+/** The four things one unit run can have said. */
+export const UNIT_RUN = Object.freeze({ green: 'green', red: 'red', notJudged: 'not-judged', unreadable: 'unreadable' })
+
+/** "machine busy (cpu 0.9)" / "machine load not measured" — always a phrase. */
+export function formatLoad(load) {
+  if (!load) return 'machine load not measured'
+  const { level, why } = normaliseLoad(load)
+  return `machine ${level}${why ? ` (${why})` : ''}`
+}
+
+/**
+ * The runner's own complaint, if the output carries one — the first
+ * `[vitest-worker]: …` line, else the first `SomethingError: …` line after an
+ * "Unhandled Error" heading. Null where neither is found. Never throws.
+ */
+export function runnerErrorSignature(output) {
+  try {
+    const raw = output && typeof output === 'object' ? `${output.stdout ?? ''}${output.stderr ?? ''}` : String(output ?? '')
+    const text = raw.replace(ANSI, '')
+    const worker = /\[vitest-worker\]:[^\n]*/.exec(text)
+    if (worker) return worker[0].trim()
+    const at = text.search(/Unhandled (Error|Rejection)/i)
+    if (at < 0) return null
+    const err = /^[^\S\n]*(\w*Error: [^\n]*)$/m.exec(text.slice(at))
+    return err ? err[1].trim() : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Classify ONE unit run from its exit status and its own summary. Pure.
+ *
+ *   green       exit 0 and no named failure.
+ *   red         the summary names a failing file or test — blocks at any load,
+ *               even beside exit 0.
+ *   not-judged  a complete summary naming NO failure beside a non-zero exit
+ *               (looksLikeRunnerFailure) — re-run once, at any load.
+ *   unreadable  non-zero exit and no readable summary — fail-closed: red.
+ *
+ * `line` always names the counts and the measured load.
+ */
+export function unitRunVerdict({ ok, totals, load, signature } = {}) {
+  const t = totals ?? {}
+  const ran = formatUnitTotals(t)
+  const at = formatLoad(load)
+  // Named failures are read BEFORE the exit status: exit 0 beside a summary
+  // naming a failure is a contradiction, and a contradiction is red.
+  const failedFiles = countOrNull(t.failedFiles) ?? 0
+  const failedTests = countOrNull(t.failedTests) ?? 0
+  if (ok === true && failedFiles === 0 && failedTests === 0) {
+    return { kind: UNIT_RUN.green, blocks: false, rerun: false, line: `unit GREEN — ${ran}; ${at}.` }
+  }
+  if (failedFiles > 0 || failedTests > 0) {
+    return {
+      kind: UNIT_RUN.red, blocks: true, rerun: false,
+      line:
+        `unit RED — its summary names ${failedTests} failing test${failedTests === 1 ? '' : 's'} in ${failedFiles}` +
+        ` file${failedFiles === 1 ? '' : 's'} (${ran}); ${at}. A named failure blocks at any load.`,
+    }
+  }
+  if (looksLikeRunnerFailure(t)) {
+    return {
+      kind: UNIT_RUN.notJudged, blocks: false, rerun: true,
+      line:
+        `unit NOT JUDGED — ${ran}, its summary names NO failing test, yet the runner exited non-zero` +
+        ` (${signature || 'no runner error line found'}); ${at}. A run that names no failure judged nothing.`,
+    }
+  }
+  return {
+    kind: UNIT_RUN.unreadable, blocks: true, rerun: false,
+    line: `unit RED — the runner exited non-zero and its summary could not be read (${ran}); ${at}. Unreadable is red.`,
+  }
+}
+
+/**
+ * The verdict over the attempts of one unit stage: `[first]` or `[first, rerun]`.
+ * Pure. Answers `{ ok, rerun, kind, line }`:
+ *
+ *   · one attempt, not judged  → `rerun: true` (ask for exactly one more);
+ *   · green on either attempt  → ok (the not-judged first one is named);
+ *   · a named failure or an unreadable summary on either attempt → red;
+ *   · not judged TWICE         → red, naming the signature — fail-closed.
+ *
+ * Each attempt is `{ ok, totals, signature?, load? }`; a per-attempt load wins
+ * over the shared one.
+ */
+export function unitAttemptsVerdict(attempts, { load } = {}) {
+  const list = Array.isArray(attempts) ? attempts : []
+  if (!list.length) {
+    return { ok: false, rerun: false, kind: UNIT_RUN.unreadable, line: `unit RED — no run was recorded; ${formatLoad(load)}.` }
+  }
+  const judge = (a) => unitRunVerdict({ ...a, load: a?.load ?? load })
+  const first = judge(list[0])
+  if (first.kind !== UNIT_RUN.notJudged) return { ok: !first.blocks, rerun: false, kind: first.kind, line: first.line }
+  if (list.length === 1) return { ok: false, rerun: true, kind: first.kind, line: `${first.line} Re-running it ONCE.` }
+  const second = judge(list[1])
+  if (second.kind === UNIT_RUN.green) {
+    return { ok: true, rerun: false, kind: UNIT_RUN.green, line: `${first.line} The re-run: ${second.line}` }
+  }
+  if (second.kind === UNIT_RUN.notJudged) {
+    const sig = list[1]?.signature || list[0]?.signature || 'no runner error line found'
+    return {
+      ok: false, rerun: false, kind: UNIT_RUN.notJudged,
+      line:
+        `unit RED — NOT JUDGED TWICE: both runs named no failing test yet exited non-zero (signature: ${sig}).` +
+        ` First: ${first.line} Re-run: ${second.line} Two runs that judged nothing are red.`,
+    }
+  }
+  return { ok: false, rerun: false, kind: second.kind, line: `${first.line} The re-run: ${second.line}` }
+}
+
 /** "153 files / 4214 tests" — both numbers, always, so a shrink is visible. */
 export function formatUnitTotals({ files, tests } = {}) {
   const f = countOrNull(files)
@@ -673,11 +819,14 @@ export function decide(results, fileCount) {
   const unavailable = list.filter((r) => r && r.unavailable).map((r) => r.step)
   const retried = list.filter((r) => r && r.retried).map((r) => r.step)
   const count = fileCount && typeof fileCount === 'object' ? fileCount : null
+  const unitLines = list.map((r) => r?.unitLine).filter((l) => typeof l === 'string' && l)
   return {
     blocked: failed.length > 0 || count?.blocked === true,
     failed,
     unavailable,
     retried,
+    // Only where the unit seam judged a run, so the shape is otherwise unchanged.
+    ...(unitLines.length ? { unitLines } : {}),
     // Omitted entirely when no count was taken, so a caller that never asks for
     // one sees exactly the verdict shape it always saw.
     ...(count ? { fileCount: count } : {}),
@@ -685,7 +834,7 @@ export function decide(results, fileCount) {
 }
 
 /** The message the developer sees — it must say what to run, not only what broke. */
-export function formatVerdict({ blocked, failed, unavailable = [], retried = [], fileCount = null } = {}, { reason } = {}) {
+export function formatVerdict({ blocked, failed, unavailable = [], retried = [], fileCount = null, unitLines = [] } = {}, { reason } = {}) {
   // Every list is taken defensively: this runs inside the wrapper's try, and the
   // wrapper fails OPEN on a throw — a formatting error here would turn a BLOCKED
   // push into an allowed one, which is the one direction the gate must never move.
@@ -698,7 +847,11 @@ export function formatVerdict({ blocked, failed, unavailable = [], retried = [],
   const redo = redone.length ? ` — ${redone.join(', ')} was re-run once after a red on a machine not verified quiet` : ''
   // Both numbers lead the verdict whenever a count was taken (point 404), so the
   // size of the evidence base is visible even where it does not yet block.
-  const lead = fileCount && typeof fileCount.line === 'string' && fileCount.line ? [fileCount.line] : []
+  // The unit step's own verdict (summary + measured load) leads as well.
+  const lead = [
+    ...(Array.isArray(unitLines) ? unitLines : []),
+    ...(fileCount && typeof fileCount.line === 'string' && fileCount.line ? [fileCount.line] : []),
+  ]
   if (!blocked) return [...lead, `pre-push gate: green (${reason ?? 'gate passed'})${note}${redo}`].join('\n')
   // Blocked by the count ALONE: its own line already carries the whole message,
   // and a second "the fast gate is red: " with nothing after it would be a lie.
