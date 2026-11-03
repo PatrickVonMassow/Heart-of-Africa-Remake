@@ -187,12 +187,21 @@ describe('containment of the rendered legs and pelvis', () => {
                       if (rel > band.d) Object.assign(band, { d: rel, where })
                       continue
                     }
+                    // the dominant leg bone of this sample: its corners' leg weights, interpolated
+                    const lwt = new Map<number, number>()
+                    ;[a, b, cc].forEach((v, j) => {
+                      const bw = [s, u, vv][j]
+                      for (let k = 0; k < 4; k++) {
+                        const bi = si.getComponent(v, k)
+                        if (legSet.has(bi)) lwt.set(bi, (lwt.get(bi) ?? 0) + sw.getComponent(v, k) * bw)
+                      }
+                    })
                     let lb = -1
                     let lw = 0
-                    for (let k = 0; k < 4; k++) {
-                      if (legSet.has(si.getComponent(a, k)) && sw.getComponent(a, k) > lw) {
-                        lw = sw.getComponent(a, k)
-                        lb = si.getComponent(a, k)
+                    for (const [bi, wt] of [...lwt].sort((p, q) => p[0] - q[0])) {
+                      if (wt > lw) {
+                        lw = wt
+                        lb = bi
                       }
                     }
                     const bone = asset.bones[lb] ?? 'leg'
