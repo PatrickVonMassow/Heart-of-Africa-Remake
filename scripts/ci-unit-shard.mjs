@@ -19,7 +19,7 @@ const args = process.argv.slice(2).filter((a) => a !== '--')
 function readLoad() {
   try {
     const res = spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/verify/machine-load.mjs'), '--json'], {
-      cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024,
+      cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024, windowsHide: true,
     })
     const parsed = JSON.parse(res.stdout ?? '')
     return { level: parsed?.level, reasons: parsed?.reasons }
@@ -34,7 +34,7 @@ function runOnce() {
     let stdout = ''
     let stderr = ''
     const child = spawn(process.execPath, [resolve(REPO_ROOT, 'node_modules/vitest/vitest.mjs'), 'run', ...args], {
-      cwd: REPO_ROOT, stdio: ['inherit', 'pipe', 'pipe'],
+      cwd: REPO_ROOT, stdio: ['inherit', 'pipe', 'pipe'], windowsHide: true,
     })
     child.stdout.on('data', (c) => { stdout += c; process.stdout.write(c) })
     child.stderr.on('data', (c) => { stderr += c; process.stderr.write(c) })
