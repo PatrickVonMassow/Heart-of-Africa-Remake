@@ -2766,6 +2766,19 @@ export const VILLAGER_ASSET = {
    *  Placeholder until the containment test calibrates it. Calibratable. */
   drivenGarments: {
     capsuleMargin: { thigh: 0.004, shin: 0.004, foot: 0.004, toe: 0.004 },
+    /** The driven forms' panels (scripts/villager/driven.py, plan section 3.9):
+     *  per form the ease (× H) over the hull plus the band offset, and the hem
+     *  flare (× the hips' rest height, as the legacy tube). Calibratable
+     *  estimates; the child picture rows calibrate them. */
+    forms: {
+      loinFlap: { ease: 0.004, flare: 0.03 },
+      girdleTails: { ease: 0.004, flare: 0.03 },
+    } as Record<string, { ease: number; flare: number }>,
+    /** Largest row spacing on the basis body (× H) and the least junction loop
+     *  vertices and front-panel quads the builder accepts (section 3.10). */
+    rowSpacing: 0.03,
+    minLoopVertices: 36,
+    minFrontQuads: 4,
     /** The column driver (render/villagerSkirtDriver.ts, plan sections 3.4 to
      *  3.7; mirrored by scripts/villager/gamepath.py). Angles in degrees,
      *  lengths in pipeline figure units (× the person's scale at run time),

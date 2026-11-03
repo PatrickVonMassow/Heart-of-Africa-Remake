@@ -124,6 +124,8 @@ def main():
     MK.selftest()
     import shells as SHL
     SHL.selftest()
+    import driven as DR
+    DR.selftest()
     import body as BS
     BS.selftest_split()
     import gaitplots as GPL

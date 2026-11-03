@@ -119,4 +119,16 @@ describe('the villager pipeline cache keys', () => {
     expect(fit.clips).toBe(base.clips)
     expect(fit.garments).not.toBe(base.garments)
   })
+
+  it('a driven-builder edit moves only the garments key; a band-table edit moves the body key', () => {
+    const base = keys()
+    appendFileSync(join(dir, 'driven.py'), '\n# edited\n')
+    const driven = keys()
+    expect(driven.body).toBe(base.body)
+    expect(driven.clips).toBe(base.clips)
+    expect(driven.garments).not.toBe(base.garments)
+    writeFileSync(join(dir, 'shells.py'), readFileSync(join(dir, 'shells.py'), 'utf8').replace('BAND_LOW = 0.008', 'BAND_LOW = 0.009'))
+    const band = keys()
+    for (const k of ['body', 'clips', 'garments']) expect(band[k]).not.toBe(driven[k])
+  })
 })

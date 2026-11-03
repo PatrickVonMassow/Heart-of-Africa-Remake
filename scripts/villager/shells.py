@@ -26,7 +26,13 @@ SHELLS = (
     ('g-neckBeads-neck', 1, lambda L: (L['neck'] - 0.008 * L['H'], L['neck'] + 0.002 * L['H'])),
     ('g-neckBeads-chest', 2, lambda L: (L['chestTop'] - 0.06 * L['H'], L['neck'] - 0.008 * L['H'])),
     ('g-waistBeads-waist', 3, lambda L: (L['hip'] + 0.013 * L['H'], L['hip'] + 0.027 * L['H'])),
+    # the driven forms' waist bands (stage-3 plan section 3.12): the panel
+    # (driven.py) hangs from the band's bottom loop, the junction
+    ('g-loinFlap-waist.band', 1, lambda L: (L['girdle'] - BAND_LOW * L['H'], L['girdle'])),
+    ('g-girdleTails-waist.band', 1, lambda L: (L['girdle'] - BAND_LOW * L['H'], L['girdle'])),
 )
+# a rank-1 band's height below the girdle (section 3.12)
+BAND_LOW = 0.008
 NAMES = [n for n, _r, _f in SHELLS]
 BIT = {n: k for k, n in enumerate(NAMES)}
 RANK = {n: r for n, r, _f in SHELLS}
@@ -45,7 +51,7 @@ def cuts(L):
     """The pre-split's level sets in order: (scalar, value, height interval or None)."""
     H = L['H']
     ys = [L['girdle'], L['hip'] + 0.013 * H, L['hip'] + 0.027 * H, hem(L), L['chestTop'], L['waist'] - 0.01 * H,
-          L['chestTop'] - 0.06 * H, L['neck'] - 0.008 * H, L['neck'] + 0.002 * H]
+          L['chestTop'] - 0.06 * H, L['neck'] - 0.008 * H, L['neck'] + 0.002 * H, L['girdle'] - BAND_LOW * H]
     return [('y', y, None) for y in ys] + [('arm', ARM_LEVEL, (hem(L), L['neck'] + 0.002 * H))]
 
 
@@ -242,9 +248,9 @@ def check_regions(body, shells, log=print):
             bad.append(f'{n}: {len(off_loop)} contour corners off every boundary loop')
         if components(tris[f]) != 1:
             bad.append(f'{n}: {components(tris[f])} connected components')
-        if n in ('g-trousers-waist', 'g-waistBeads-waist') and (arm[v] != 0).any():
+        if (n in ('g-trousers-waist', 'g-waistBeads-waist') or n.endswith('.band')) and (arm[v] != 0).any():
             bad.append(f'{n}: {int((arm[v] != 0).sum())} corners with arm != 0')
-        if n in ('g-waistBeads-waist', 'g-neckBeads-neck', 'g-neckBeads-chest') and len(sh['rows']) != 2:
+        if (n in ('g-waistBeads-waist', 'g-neckBeads-neck', 'g-neckBeads-chest') or n.endswith('.band')) and len(sh['rows']) != 2:
             bad.append(f'{n}: {len(sh["rows"])} boundary loops (two expected)')
         log(f'[shells] {n}: {len(f)} faces, {len(v)} vertices, {len(sh["rows"])} loops')
     for b in bad:
@@ -365,7 +371,12 @@ def check_seams(tris, fmask, shells, worn, g, scale=1.0, step=0.0):
     return bad
 
 
-SEAM_OUTFITS = (('g-waistBeads-waist', 'g-trousers-waist'), ('g-neckBeads-neck', 'g-neckBeads-chest'), tuple(NAMES))
+BANDS = [n for n in NAMES if n.endswith('.band')]
+# no two bands are co-worn (one driven form per figure); a band against the
+# beads and against the trousers (the rim rule, section 3.12)
+SEAM_OUTFITS = (('g-waistBeads-waist', 'g-trousers-waist'), ('g-neckBeads-neck', 'g-neckBeads-chest'),
+                tuple(n for n in NAMES if n not in BANDS),
+                *((b, 'g-waistBeads-waist', 'g-neckBeads-neck') for b in BANDS), *((b, 'g-trousers-waist') for b in BANDS))
 
 
 def selftest_body(body, garments, cfg, log=print):

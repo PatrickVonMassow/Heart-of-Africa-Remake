@@ -461,15 +461,12 @@ def build_form(B, form, wear, L):
     allm = np.ones(len(B.W), bool)
     trunk = allm
     parts = []
-    if form in ('loinFlap', 'apron', 'girdleTails'):
-        long = L['knee'] + 0.02 * H if form == 'apron' else L['hip'] - (0.14 if form == 'girdleTails' else 0.10) * H
-        half = (0.075 if form == 'apron' else 0.05) * H
+    # loinFlap and girdleTails are driven garments (driven.py), built in build_garments
+    if form == 'apron':
+        long = L['knee'] + 0.02 * H
         parts.append(girdle(B, L['girdle'], 0.008 * H))
-        front = 0.75 if form == 'apron' else 0.5
-        parts.append(sweep(tube(B, L['girdle'], long, 0.009 * H, 0.03, trunk, 8), keep=lambda k, i: abs(ang(i)) <= front + 1e-6))
-        back_long = L['knee'] + 0.05 * H if form == 'girdleTails' else long
-        back = 0.9 if form == 'apron' else 0.75
-        parts.append(sweep(tube(B, L['girdle'], back_long, 0.009 * H, 0.03, trunk, 8), keep=lambda k, i: abs(ang(i)) >= np.pi - back - 1e-6))
+        parts.append(sweep(tube(B, L['girdle'], long, 0.009 * H, 0.03, trunk, 8), keep=lambda k, i: abs(ang(i)) <= 0.75 + 1e-6))
+        parts.append(sweep(tube(B, L['girdle'], long, 0.009 * H, 0.03, trunk, 8), keep=lambda k, i: abs(ang(i)) >= np.pi - 0.9 - 1e-6))
         return merge(parts), 4
     if form in ('skirtShort', 'skirtKnee', 'wrapLong'):
         top = L['chestTop'] if wear == 'chest' else L['girdle']
@@ -792,7 +789,7 @@ GARMENTS = [
 # code-built layer, and the cover mask holds at most 32 (mask.BITS).
 # The slot's ease order: an outer layer stands off the inner one.
 OUTER = {'cloak': 0.012, 'cape': 0.012, 'hood': 0.006}
-SKIRTS = {'apron', 'girdleTails', 'skirtShort', 'skirtKnee', 'wrapLong', 'shirt', 'robe', 'toga', 'cloak'}
+SKIRTS = {'apron', 'skirtShort', 'skirtKnee', 'wrapLong', 'shirt', 'robe', 'toga', 'cloak'}
 RIGID_HEAD = {'turban', 'cap', 'headband', 'headRing', 'topknot', 'hairBag'}
 # rigid on the chest bone: the infant rides it as one piece (figureDress.ts babySling)
 RIGID_CHEST = {'babySling'}
@@ -803,12 +800,17 @@ def mesh_name(form, wear):
 
 
 def cloth_names(meshes):
-    """The garments built as meshes (every `g-` entry but a shell recipe, shells.py)."""
-    return [n for n in meshes if n.startswith('g-') and meshes[n].get('part') != 'shell']
+    """The legacy garments built as meshes (every `g-` entry but a shell
+    recipe, shells.py, and a driven panel, driven.py): the cover order."""
+    return [n for n in meshes if n.startswith('g-') and meshes[n].get('part') not in ('shell', 'driven')]
 
 
 def shell_names(meshes):
     return [n for n in meshes if meshes[n].get('part') == 'shell']
+
+
+def driven_names(meshes):
+    return [n for n in meshes if meshes[n].get('part') == 'driven']
 
 
 def skirt_weights(v, W, crotch, hem):
@@ -1048,6 +1050,7 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
     meshes = {}
     meta = {}
     import shells as SHL
+    import driven as DR
     shell = SHL.recipes(body if shell_body is None else shell_body, L, cfg)
     for form, wear in GARMENTS:
         name = mesh_name(form, wear)
@@ -1057,6 +1060,17 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
             meshes[name] = shell[name]
             meta[name] = {'form': form, 'wear': wear, 'kind': 'shell'}
             print(f'garment {name:28s} shell: {len(shell[name]["faces"]):5d} body faces, {len(shell[name]["rows"])} rows')
+            continue
+        if form in DR.FORMS:
+            # a driven garment: its panels on the column bones, hung from its
+            # band (a shell) on the cut body (driven.py, stage-3 plan 3.13)
+            band = DR.band_name(form)
+            meshes[band] = shell[band]
+            meta[band] = {'form': form, 'wear': wear, 'kind': 'shell', 'of': name}
+            g = DR.build(body if shell_body is None else shell_body, shell[band], form, cfg)
+            meshes[name] = g
+            meta[name] = {'form': form, 'wear': wear, 'kind': 'driven', 'band': band}
+            print(f'garment {name:28s} driven: {len(g["pos"]):5d} verts {len(g["tris"]):5d} tris, band {band}')
             continue
         res = build_form(B, form, wear, L)
         geo, smooth = res[:2]

@@ -24,7 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STEPS = {
     'body': (('body', 'mhbody', 'skeleton', 'gltfio'), ()),
     'clips': (('clips', 'toolclips', 'skeleton', 'rig', 'gltfio'), ('body',)),
-    'garments': (('garments', 'fit', 'skeleton'), ('body', 'clips')),
+    'garments': (('garments', 'fit', 'skeleton', 'driven'), ('body', 'clips')),
 }
 
 

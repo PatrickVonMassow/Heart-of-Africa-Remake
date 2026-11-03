@@ -120,7 +120,12 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
     add_skinned_mesh(w, 'body', body['pos'], body['tris'], body['W'], body['morph_pos'], 0, roots, extras={'part': 'skin'},
                      cover=None if mask is None else mask['body'], region=body.get('region_bits'))
     shells = {}
+    driven = {}
     for name, g in (garments or {}).get('meshes', {}).items():
+        if g.get('part') == 'driven':
+            # a driven panel (driven.py): a skinned mesh on the column bones,
+            # its record (junction sources, rows, anchors, heads) as extras
+            driven[g['driven']['form']] = g['driven']
         if g.get('part') == 'shell':
             # a shell garment ships as its recipe (shells.py): the game builds
             # it on the drawn body from the region words, rows, rank and base
@@ -160,6 +165,8 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
         meta['garments'] = garments.get('meta', {})
     if mask is not None:
         meta['garmentMask'] = {'garments': list(mask['garments'])}
+    if driven:
+        meta['driven'] = driven
     if shells:
         order = sorted(shells, key=lambda n: shells[n]['bit'])
         meta['shells'] = {
