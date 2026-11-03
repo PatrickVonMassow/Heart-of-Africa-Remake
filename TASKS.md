@@ -9216,6 +9216,7 @@ to land than a mechanism that needs a review.
   a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
 
+  Status 03.11.2026 18:37 (batch session): main CI run 41680804084 (bb4294c) red again, shard fast (1) with every test passing and one `onTaskUpdate` timeout; taken out of turn as the CI repair path. Cloud-authored by session_019XD8QuQEMq4FfJHYdbQzoj (brief: local/803-cloud-brief.txt, CI step first) on branch feat/803-runner-death-not-judged; awaiting its handover. Pool slot freed by parking feat/1344-children-hand-contacts (no commit since its 03:45 cloud handover).
 - [ ] 804. Merge attribution survives only while the merged parent stays in the analysed commit set
   (found 21.08.2026 while reviewing point 784 on `main`). Point 784 taught
   `scripts/mechanism-review-range-core.mjs` to attribute a trailerless merge to the contributions it
