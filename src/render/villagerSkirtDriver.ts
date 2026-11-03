@@ -27,6 +27,8 @@ const CAPSULE_BONES: Array<[string, string | null]> = [
   ['toe.L', null],
   ['toe.R', null],
 ]
+/** The first entries of CAPSULE_BONES are the thigh capsules (section 3.5, rule 1'). */
+const THIGH_CAPSULES = 2
 
 // ---------- vector helpers (plain arrays, mirrored one to one in Python) ----------
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -66,6 +68,30 @@ export function pointSegment(p: V3, a: V3, b: V3): number {
   const l2 = dot(ab, ab)
   const t = l2 > 0 ? Math.min(1, Math.max(0, dot(sub(p, a), ab) / l2)) : 0
   return len(sub(p, add(a, mul(ab, t))))
+}
+
+/** The closest axis parameter of p on the segment ab, clamped to [0, 1] (0: a, the hip end of a thigh). */
+export function segmentParam(p: V3, a: V3, b: V3): number {
+  const ab = sub(b, a)
+  const l2 = dot(ab, ab)
+  return l2 > 0 ? Math.min(1, Math.max(0, dot(sub(p, a), ab) / l2)) : 0
+}
+
+/**
+ * The knee-half capsule test of a triangle part at or above the profile bottom
+ * (section 3.5, rule 1'): the part of each triangle whose closest axis parameter
+ * on ab is >= 0.5 (the half-space beyond the axis midpoint), and its distance to
+ * the knee half of the axis, which there equals the distance to the whole axis.
+ * Infinity where no part lies in that half.
+ */
+export function kneeHalfDistance(tris: readonly V3[][], a: V3, b: V3): number {
+  const mid = mul(add(a, b), 0.5)
+  const ab = sub(b, a)
+  let best = Infinity
+  for (const t of tris) {
+    for (const [p, q, r] of clipBelow(t, t.map((x) => -dot(sub(x, mid), ab)), 0)) best = Math.min(best, segmentTriangle(mid, b, p, q, r))
+  }
+  return best
 }
 
 /** Closest distance between the segments p1q1 and p2q2 (Ericson 5.1.9). */
@@ -852,15 +878,15 @@ export class ColumnDriver {
       const chord = Math.max(len(sub(p, nst[0][j])), len(sub(p, nst[1][j])))
       const h = this.hipsLocal(p, P.hipsInv, hipsAt)
       // below the profile bottom the thigh capsules govern, at or above it the profile alone (section 3.5)
-      if (h.y < rig.profile.bottom) {
-        for (const c of P.capsules) {
-          const C = c.radius + rig.clearance
-          const target = Math.sqrt(C * C + (chord / 2) * (chord / 2))
-          worst = Math.max(worst, target - pointSegment(p, c.a, c.b))
-        }
-      } else {
-        worst = Math.max(worst, P.profile.query(h.a, h.y) + rig.clearance - h.r)
-      }
+      // (rule 1': at or above it also the thigh capsules whose closest axis parameter is >= 0.5, the knee half)
+      const above = h.y >= rig.profile.bottom
+      P.capsules.forEach((c, i) => {
+        if (above && (i >= THIGH_CAPSULES || segmentParam(p, c.a, c.b) < 0.5)) return
+        const C = c.radius + rig.clearance
+        const target = Math.sqrt(C * C + (chord / 2) * (chord / 2))
+        worst = Math.max(worst, target - pointSegment(p, c.a, c.b))
+      })
+      if (above) worst = Math.max(worst, P.profile.query(h.a, h.y) + rig.clearance - h.r)
       const g = rig.ground - p[1]
       ground = Math.max(ground, g)
       worst = Math.max(worst, g)
@@ -970,16 +996,20 @@ export class ColumnDriver {
       // the capsules constrain only the part of a triangle below the profile bottom (section 3.5):
       // the triangle clipped at that height (a straddling triangle's upper part met the thigh
       // capsule's hip end above the bottom, where the profile alone governs)
+      // (rule 1': the part above it meets the thigh capsules' knee halves, kneeHalfDistance)
       const below = clipBelow([a, b, c], [hv[0].y, hv[1].y, hv[2].y], rig.profile.bottom)
-      if (below.length) {
-        for (const cap of P.capsules) {
-          const mid = mul(add(cap.a, cap.b), 0.5)
-          const bound = len(sub(cap.b, cap.a)) / 2 + cap.radius + C
-          if (len(sub(mid, centre)) > bound + rad) continue
-          const d = cap.radius + C - Math.min(...below.map(([p, q, r]) => segmentTriangle(cap.a, cap.b, p, q, r)))
-          if (d > 0) depth += d
-        }
-      }
+      const aboveTris = clipBelow([a, b, c], [-hv[0].y, -hv[1].y, -hv[2].y], -rig.profile.bottom)
+      P.capsules.forEach((cap, i) => {
+        const knee = i < THIGH_CAPSULES && aboveTris.length > 0
+        if (!below.length && !knee) return
+        const mid = mul(add(cap.a, cap.b), 0.5)
+        const bound = len(sub(cap.b, cap.a)) / 2 + cap.radius + C
+        if (len(sub(mid, centre)) > bound + rad) return
+        let dist = Math.min(...below.map(([p, q, r]) => segmentTriangle(cap.a, cap.b, p, q, r)))
+        if (knee) dist = Math.min(dist, kneeHalfDistance(aboveTris, cap.a, cap.b))
+        const d = cap.radius + C - dist
+        if (d > 0) depth += d
+      })
       // a triangle with two exempt vertices skips the centroid's profile test (section 3.6)
       const bandEdge = ids.filter((v) => panel.exempt[v]).length >= 2
       const pts: Array<[V3, number, { a: number; y: number; r: number }, boolean]> = ids.map((v, j) => [[a, b, c][j], panel.exempt[v], hv[j], true] as [V3, number, { a: number; y: number; r: number }, boolean])
