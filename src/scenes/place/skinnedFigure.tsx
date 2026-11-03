@@ -912,7 +912,7 @@ export function SkinnedFigure({
         const cl = rig.gltf?.asset.clips
         g.userData.clipClock =
           cl && clips
-            ? { gait: clips.gait.phase, idle: cl.idle ? (clips.idleT % cl.idle.duration) / cl.idle.duration : 0, dig: clips.dig, weight: m.weight, speed: m.speed }
+            ? { gait: clips.gait.phase, idle: cl.idle ? (clips.idleT % cl.idle.duration) / cl.idle.duration : 0, dig: clips.dig, weight: m.weight, speed: m.speed, kneel: m.kneel }
             : null
       }
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)

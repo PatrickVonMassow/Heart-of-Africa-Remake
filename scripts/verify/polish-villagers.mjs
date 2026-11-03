@@ -6835,9 +6835,8 @@ if (GARMENT_DRIVEN || (section('garment-acceptance') && process.env.VERIFY_SECTI
     // Stage 3, sub-step 3: loin flap and girdle tails on the column driver.
     // Judged for a hem standing off the body, a leg passing through the cloth,
     // a back face showing, the band reading as a torus, a corner crease.
-    // OPEN: kneel down/hold/up, carry, carryIdle and the shoulder pose need
-    // clips the dev lineup does not stage yet (dressLineupSpec LineupClip);
-    // the low 1 m camera and the 16-frame moving strips likewise.
+    // OPEN: the low 1 m camera and the 16-frame moving strips need a camera
+    // eye-height hook and a fixed-step clock the place has no dev hook for.
     ROWS.length = 0
     const FORM_TEXT = { loinFlap: 'loin flap', girdleTails: 'girdle tails' }
     for (const form of ['loinFlap', 'girdleTails'])
@@ -6849,6 +6848,13 @@ if (GARMENT_DRIVEN || (section('garment-acceptance') && process.env.VERIFY_SECTI
         ROWS.push({ slug: `${f}-run-${who}`, text: `driven ${FORM_TEXT[form]}, run at the stride, ${whoText}`, fig: { ...w, garments: g, clip: 'run', at: STRIDE }, views: ['side'] })
         ROWS.push({ slug: `${f}-dig-${who}`, text: `driven ${FORM_TEXT[form]}, dig at mid-stroke, ${whoText}, judged at the hem and at the hands and forearms (arm row)`, fig: { ...w, garments: g, clip: 'dig', at: 0.5 }, views: ['side', 'rear34', 'front34'] })
         ROWS.push({ slug: `${f}-idle-${who}`, text: `driven ${FORM_TEXT[form]}, idle, ${whoText}, judged at the hands and forearms (arm row)`, fig: { ...w, garments: g, clip: 'idle', at: 0.25 }, views: ['front34'] })
+        // the kneel transition (the game's `kneeling`): halfway down, held, halfway up
+        for (const [stage, what] of [['down', 'halfway down'], ['hold', 'held'], ['up', 'halfway up']])
+          ROWS.push({ slug: `${f}-kneel-${stage}-${who}`, text: `driven ${FORM_TEXT[form]}, kneel ${what}, ${whoText}, judged at the hem against the thighs and the ground`, fig: { ...w, garments: g, clip: 'kneel', kneel: stage, at: 0.5 }, views: ['side', 'front'] })
+        // the arm rows (section 5, B24): carrying the tool walking and standing, the shoulder pose
+        ROWS.push({ slug: `${f}-carry-${who}`, text: `driven ${FORM_TEXT[form]}, carrying the tool, walk at the stride, ${whoText}, judged at the hands and forearms`, fig: { ...w, garments: g, clip: 'carry', at: STRIDE }, views: ['front34'] })
+        ROWS.push({ slug: `${f}-carryidle-${who}`, text: `driven ${FORM_TEXT[form]}, carrying the tool standing, ${whoText}, judged at the hands and forearms`, fig: { ...w, garments: g, clip: 'carryIdle', at: 0.25 }, views: ['front34'] })
+        ROWS.push({ slug: `${f}-shoulders-${who}`, text: `driven ${FORM_TEXT[form]}, idle with the shoulder pose (the tag game's caught slump), ${whoText}, judged at the hands and forearms`, fig: { ...w, garments: g, clip: 'idle', at: 0.25, shoulders: true }, views: ['front34'] })
       }
     // the loin flap over the waist beads (the panel opens over them, section 3.9)
     for (const [who, w, whoText] of [['woman', YOUNG_WOMAN, 'young woman'], ['girl', GIRL, 'girl (child)']])
@@ -6970,7 +6976,7 @@ if (GARMENT_DRIVEN || (section('garment-acceptance') && process.env.VERIFY_SECTI
       }
       // the figure's drawn place and heading, read off its group
       const fig = { x: f0.x, y: f0.y, z: f0.z, yaw: track.yaw, meshes: f0.meshes }
-      const pose = `${row.fig.clip}${row.fig.clip === 'dig' || !f0.clock ? '' : ` held at phase ${(st.held?.phase ?? 0).toFixed(3)}`}`
+      const pose = `${row.fig.clip}${row.fig.kneel ? ` ${row.fig.kneel}` : ''}${row.fig.clip === 'dig' || !f0.clock ? '' : ` held at ${row.fig.clip === 'kneel' ? 'kneel fraction' : 'phase'} ${(st.held?.phase ?? 0).toFixed(3)}`}`
       try {
         for (const view of row.views) {
           for (const dist of row.dists ?? [3, 7]) {

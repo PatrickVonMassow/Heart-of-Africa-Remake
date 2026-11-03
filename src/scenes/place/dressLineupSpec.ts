@@ -11,7 +11,9 @@ export interface LineupGarment {
   wear: DressWear
 }
 
-export type LineupClip = 'idle' | 'walk' | 'run' | 'dig'
+/** `carry`/`carryIdle`: the walk/idle with the work tool carried (the game's
+ *  `{dig: false, tool: true}`); `kneel`: the game's kneel transition (`kneeling`). */
+export type LineupClip = 'idle' | 'walk' | 'run' | 'dig' | 'carry' | 'carryIdle' | 'kneel'
 
 /**
  * Where the clip is held when the lineup freezes life: a phase of the clip in
@@ -32,12 +34,17 @@ export interface LineupFigure {
   at?: LineupAt
   /** Head turned off the heading (rad, + to the figure's left), standing only. */
   headYaw?: number
+  /** The kneel clip's stage: going `down`, the `hold`, or getting `up`; `at` is
+   *  the kneel fraction (0 standing, 1 knelt) to freeze at going down or up. */
+  kneel?: 'down' | 'hold' | 'up'
+  /** The game's shoulder pose (the tag game's caught slump, its only source). */
+  shoulders?: boolean
 }
 
 /** Ground speed of each clip in figure units per second (scaled by the figure's
  *  own scale): the walk under the jog band, the run inside the jog
  *  (VILLAGER_GLTF.jogThreshold 1.8 ± 0.35 per unit of leg). */
-export const LINEUP_CLIP_SPEED: Record<LineupClip, number> = { idle: 0, walk: 1.2, run: 3.0, dig: 0 }
+export const LINEUP_CLIP_SPEED: Record<LineupClip, number> = { idle: 0, walk: 1.2, run: 3.0, dig: 0, carry: 1.2, carryIdle: 0, kneel: 0 }
 
 /** `'trousers-waist'` → `{form: 'trousers', wear: 'waist'}`. */
 export function parseGarment(g: LineupGarment | string): LineupGarment {

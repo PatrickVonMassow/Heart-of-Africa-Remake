@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { crossedPhase, midSwing, parseGarment, resolveOutfit } from './dressLineupSpec'
+import { crossedPhase, LINEUP_CLIP_SPEED, midSwing, parseGarment, resolveOutfit } from './dressLineupSpec'
 
 describe('dress lineup outfit override', () => {
   it('parses form-wear names', () => {
@@ -41,5 +41,13 @@ describe('dress lineup outfit override', () => {
     expect(crossedPhase(0.1, 0.2, 0.15)).toBe(true)
     expect(crossedPhase(0.1, 0.2, 0.25)).toBe(false)
     expect(crossedPhase(0.2, 0.2, 0.2)).toBe(false)
+  })
+})
+
+describe('the lineup clips', () => {
+  it('walks the carry at the walk pace and holds the carried idle and the kneel in place', () => {
+    expect(LINEUP_CLIP_SPEED.carry).toBe(LINEUP_CLIP_SPEED.walk)
+    expect(LINEUP_CLIP_SPEED.carryIdle).toBe(0)
+    expect(LINEUP_CLIP_SPEED.kneel).toBe(0)
   })
 })

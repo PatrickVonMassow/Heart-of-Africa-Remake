@@ -27,6 +27,7 @@ import { isLifeFrozen } from './lifeFreeze'
 import { usePlaceGround } from './PlaceGroundContext'
 import { FigureLookContext, type FigureWork } from './placeFigureContext'
 import { Figure } from './placeFigure'
+import { caughtBodyPose } from './tagGame'
 
 /** Left to right: children, the young, the married, the old — women first. */
 const LINEUP: ReadonlyArray<{ sex: Sex; age: AgeGroup }> = [
@@ -58,12 +59,13 @@ interface Clock {
   dig: number
   weight: number
   speed: number
+  kneel: number
 }
 
 /** The clip phase `at` names, on this asset's clips. */
 function targetPhase(asset: VillagerAsset | null, clip: LineupClip, at: LineupAt): number | null {
   if (typeof at === 'number') return at
-  const c = asset?.clips[clip === 'run' ? 'jog' : clip]
+  const c = asset?.clips[clip === 'run' ? 'jog' : clip === 'carry' ? 'walk' : clip === 'carryIdle' || clip === 'kneel' ? 'idle' : clip]
   if (!c) return null
   if (typeof at === 'object') return c.duration > 0 ? (c.times[Math.min(at.frame, c.times.length - 1)] ?? 0) / c.duration : 0
   return midSwing(stanceOf(c, at === 'cross-L' ? 'L' : 'R'))
@@ -128,12 +130,21 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
       const lead = speed > 0 ? (at.lead ?? speed * WARM_SECONDS) : 0
       const fc = cloth[i % cloth.length]
       const asset = look?.villager ?? null
-      const phase = f.at !== undefined ? targetPhase(asset, clip, f.at) : null
+      // a kneel freezes on its kneel fraction (a hold once fully down)
+      const phase = clip === 'kneel' ? (f.kneel === 'hold' || typeof f.at !== 'number' ? 1 : f.at) : f.at !== undefined ? targetPhase(asset, clip, f.at) : null
       const dig = asset?.clips.dig
       const work: RefObject<FigureWork> | undefined =
-        clip === 'dig' ? { current: { dig: true, tool: true, digT: phase !== null && dig ? phase * dig.duration : undefined } } : undefined
-      const pose: RefObject<FigurePose | null> | undefined =
-        f.headYaw !== undefined ? { current: { ...REST_POSE, gaze: { yaw: f.headYaw, pitch: 0, turn: 0 } } } : undefined
+        clip === 'dig'
+          ? { current: { dig: true, tool: true, digT: phase !== null && dig ? phase * dig.duration : undefined } }
+          : clip === 'carry' || clip === 'carryIdle'
+            ? { current: { dig: false, tool: true } }
+            : undefined
+      const pose: RefObject<FigurePose | null> | undefined = f.shoulders
+        ? { current: caughtBodyPose() }
+        : f.headYaw !== undefined
+          ? { current: { ...REST_POSE, gaze: { yaw: f.headYaw, pitch: 0, turn: 0 } } }
+          : undefined
+      const kneeling: RefObject<boolean> | undefined = clip === 'kneel' ? { current: true } : undefined
       return {
         ...f,
         scale,
@@ -146,6 +157,7 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
         phase,
         work,
         pose,
+        kneeling,
       }
     })
   }, [at, cloth, look])
@@ -169,13 +181,19 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
     const f = row[i]
     const c = clockOf(groups.current[i])
     if (!c) return
-    const moving = f.clip === 'walk' || f.clip === 'run'
-    const now = moving ? c.gait : c.idle
+    const moving = f.clip === 'walk' || f.clip === 'run' || f.clip === 'carry'
+    const kneel = f.clip === 'kneel'
+    // getting up: once fully down, the figure is told to rise
+    if (kneel && f.kneel === 'up' && c.kneel >= 1 && f.kneeling) f.kneeling.current = false
+    const now = kneel ? c.kneel : moving ? c.gait : c.idle
     const prev = r.prev[i]
     r.prev[i] = now
     const ready = f.clip === 'dig' ? c.dig >= 1 : moving ? r.elapsed >= WARM_SECONDS && c.weight >= 0.999 : r.elapsed >= 0.5
-    if (!ready) return
-    if (f.clip === 'dig' || (prev !== undefined && crossedPhase(prev, now, f.phase!))) {
+    if (!ready && !kneel) return
+    const hit = kneel
+      ? prev !== undefined && (f.kneel === 'up' ? !f.kneeling?.current && prev > f.phase! && now <= f.phase! : f.kneel === 'down' ? prev < f.phase! && now >= f.phase! : now >= 1 && r.elapsed >= 0.5)
+      : f.clip === 'dig' || (prev !== undefined && crossedPhase(prev, now, f.phase!))
+    if (hit) {
       r.frozen = true
       r.held = { index: i, phase: f.clip === 'dig' ? f.phase! : now }
       ;(window as unknown as { __placeFreezeLife?: (on: boolean) => void }).__placeFreezeLife?.(true)
@@ -195,7 +213,7 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
           position={[f.start[0], groundHeight(f.start[0], f.start[1]), f.start[1]]}
           rotation={[0, at.yaw, 0]}
         >
-          <Figure cloth={f.cloth} sex={f.sex} age={f.age} scale={f.scale} legs dress={f.dress} build={f.build} work={f.work} pose={f.pose} />
+          <Figure cloth={f.cloth} sex={f.sex} age={f.age} scale={f.scale} legs dress={f.dress} build={f.build} work={f.work} pose={f.pose} kneeling={f.kneeling} />
         </group>
       ))}
     </group>
