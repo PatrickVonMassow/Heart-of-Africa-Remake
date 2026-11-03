@@ -140,16 +140,24 @@ describe("outside the owner's tree the doctor neither stashes nor resets", () =>
   }
 
   it('a cloud clone or non-owner session plans no quarantine and no hard reset, only an alert', () => {
-    const actions = planRemediation({ ...incident, ownerTree: false }).map((a) => a.action)
-    expect(actions).not.toContain('quarantine-stash')
-    expect(actions).not.toContain('rescue-and-reset')
-    expect(actions).toContain('alert-reset-outside-owner-tree')
+    const plan = planRemediation({ ...incident, ownerTree: false })
+    expect(plan.map((a) => a.action)).toEqual(['rescue-and-reset-withheld'])
+    expect(needsRepair(plan)).toBe(false)
   })
 
-  it('a half-done merge outside the owner tree is reported, not aborted', () => {
-    const actions = planRemediation({ ...incident, mergeInProgress: true, ownerTree: false }).map((a) => a.action)
-    expect(actions).not.toContain('abort-merge')
-    expect(actions).toContain('alert-merge-outside-owner-tree')
+  it('no repair-level action survives outside the owner tree: merge abort, TASKS restore, locks', () => {
+    const plan = planRemediation({
+      ...incident,
+      mergeInProgress: true,
+      tasksParses: false,
+      tasksRecoverable: true,
+      staleGitLocks: [{ path: '.git/index.lock' }],
+      ownerTree: false,
+    })
+    expect(plan.filter((a) => a.level === 'repair')).toEqual([])
+    expect(plan.map((a) => a.action)).toEqual(
+      expect.arrayContaining(['abort-merge-withheld', 'restore-tasks-from-head-withheld', 'clear-stale-git-locks-withheld']),
+    )
   })
 
   it('a dirty non-owner tree in a parallel window is left alone', () => {
