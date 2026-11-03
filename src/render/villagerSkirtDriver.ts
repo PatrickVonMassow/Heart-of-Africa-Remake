@@ -830,13 +830,17 @@ export class ColumnDriver {
     const hipsAt = at(rig.rest, rig.hips)
     st.forEach((p, j) => {
       const chord = Math.max(len(sub(p, nst[0][j])), len(sub(p, nst[1][j])))
-      for (const c of P.capsules) {
-        const C = c.radius + rig.clearance
-        const target = Math.sqrt(C * C + (chord / 2) * (chord / 2))
-        worst = Math.max(worst, target - pointSegment(p, c.a, c.b))
-      }
       const h = this.hipsLocal(p, P.hipsInv, hipsAt)
-      if (h.y > rig.crotch) worst = Math.max(worst, P.profile.query(h.a, h.y) + rig.clearance - h.r)
+      // below the profile bottom the thigh capsules govern, at or above it the profile alone (section 3.5)
+      if (h.y < rig.profile.bottom) {
+        for (const c of P.capsules) {
+          const C = c.radius + rig.clearance
+          const target = Math.sqrt(C * C + (chord / 2) * (chord / 2))
+          worst = Math.max(worst, target - pointSegment(p, c.a, c.b))
+        }
+      } else {
+        worst = Math.max(worst, P.profile.query(h.a, h.y) + rig.clearance - h.r)
+      }
       const g = rig.ground - p[1]
       ground = Math.max(ground, g)
       worst = Math.max(worst, g)
@@ -942,19 +946,24 @@ export class ColumnDriver {
       const C = Math.max(...ids.map((v) => panel.clearance[v]))
       const centre = mul(add(add(a, b), c), 1 / 3)
       const rad = Math.max(len(sub(a, centre)), len(sub(b, centre)), len(sub(c, centre)))
-      for (const cap of P.capsules) {
-        const mid = mul(add(cap.a, cap.b), 0.5)
-        const bound = len(sub(cap.b, cap.a)) / 2 + cap.radius + C
-        if (len(sub(mid, centre)) > bound + rad) continue
-        const d = cap.radius + C - segmentTriangle(cap.a, cap.b, a, b, c)
-        if (d > 0) depth += d
+      const hv = [a, b, c].map((p) => this.hipsLocal(p, P.hipsInv, hipsAt))
+      // the capsules constrain only a triangle reaching below the profile bottom (section 3.5)
+      if (Math.min(hv[0].y, hv[1].y, hv[2].y) < rig.profile.bottom) {
+        for (const cap of P.capsules) {
+          const mid = mul(add(cap.a, cap.b), 0.5)
+          const bound = len(sub(cap.b, cap.a)) / 2 + cap.radius + C
+          if (len(sub(mid, centre)) > bound + rad) continue
+          const d = cap.radius + C - segmentTriangle(cap.a, cap.b, a, b, c)
+          if (d > 0) depth += d
+        }
       }
-      const pts: Array<[V3, number]> = ids.map((v, j) => [[a, b, c][j], panel.exempt[v]] as [V3, number])
-      pts.push([centre, 0])
-      for (const [p, ex] of pts) {
+      // a triangle with two exempt vertices skips the centroid's profile test (section 3.6)
+      const bandEdge = ids.filter((v) => panel.exempt[v]).length >= 2
+      const pts: Array<[V3, number, { a: number; y: number; r: number }, boolean]> = ids.map((v, j) => [[a, b, c][j], panel.exempt[v], hv[j], true] as [V3, number, { a: number; y: number; r: number }, boolean])
+      pts.push([centre, 0, this.hipsLocal(centre, P.hipsInv, hipsAt), !bandEdge])
+      for (const [p, ex, h, prof] of pts) {
         if (ex) continue
-        const h = this.hipsLocal(p, P.hipsInv, hipsAt)
-        if (h.y > rig.crotch) {
+        if (prof && h.y >= rig.profile.bottom) {
           const d = P.profile.query(h.a, h.y) + C - h.r
           if (d > 0) depth += d
         }

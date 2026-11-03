@@ -993,12 +993,14 @@ class ColumnDriver:
         hips_at = _at(rig['rest'], rig['hips'])
         for j, p in enumerate(st):
             chord = max(_len(_sub(p, nst[0][j])), _len(_sub(p, nst[1][j])))
-            for a, b, radius in P['capsules']:
-                C = radius + rig['clearance']
-                target = math.sqrt(C * C + (chord / 2) * (chord / 2))
-                worst = max(worst, target - col_point_segment(p, a, b))
             ha, hy, hr = self._hips_local(p, P['hipsInv'], hips_at)
-            if hy > rig['crotch']:
+            # below the profile bottom the thigh capsules govern, at or above it the profile alone (section 3.5)
+            if hy < rig['profile']['bottom']:
+                for a, b, radius in P['capsules']:
+                    C = radius + rig['clearance']
+                    target = math.sqrt(C * C + (chord / 2) * (chord / 2))
+                    worst = max(worst, target - col_point_segment(p, a, b))
+            else:
                 worst = max(worst, P['profile'].query(ha, hy) + rig['clearance'] - hr)
             g = rig['ground'] - p[1]
             ground = max(ground, g)
@@ -1079,20 +1081,25 @@ class ColumnDriver:
             C = max(panel['clearance'][v] for v in ids)
             centre = _mul(_add(_add(a, b), c), 1 / 3)
             rad = max(_len(_sub(a, centre)), _len(_sub(b, centre)), _len(_sub(c, centre)))
-            for ca, cb, radius in P['capsules']:
-                mid = _mul(_add(ca, cb), 0.5)
-                bound = _len(_sub(cb, ca)) / 2 + radius + C
-                if _len(_sub(mid, centre)) > bound + rad:
-                    continue
-                d = radius + C - col_segment_triangle(ca, cb, a, b, c)
-                if d > 0:
-                    depth += d
-            pts = [(x, panel['exempt'][v]) for x, v in zip((a, b, c), ids)] + [(centre, 0)]
-            for p, ex in pts:
+            hv = [self._hips_local(x, P['hipsInv'], hips_at) for x in (a, b, c)]
+            # the capsules constrain only a triangle reaching below the profile bottom (section 3.5)
+            if min(h[1] for h in hv) < rig['profile']['bottom']:
+                for ca, cb, radius in P['capsules']:
+                    mid = _mul(_add(ca, cb), 0.5)
+                    bound = _len(_sub(cb, ca)) / 2 + radius + C
+                    if _len(_sub(mid, centre)) > bound + rad:
+                        continue
+                    d = radius + C - col_segment_triangle(ca, cb, a, b, c)
+                    if d > 0:
+                        depth += d
+            # a triangle with two exempt vertices skips the centroid's profile test (section 3.6)
+            band_edge = sum(1 for v in ids if panel['exempt'][v]) >= 2
+            pts = [(x, panel['exempt'][v], h, True) for x, v, h in zip((a, b, c), ids, hv)]
+            pts.append((centre, 0, self._hips_local(centre, P['hipsInv'], hips_at), not band_edge))
+            for p, ex, (ha, hy, hr), prof in pts:
                 if ex:
                     continue
-                ha, hy, hr = self._hips_local(p, P['hipsInv'], hips_at)
-                if hy > rig['crotch']:
+                if prof and hy >= rig['profile']['bottom']:
                     d = P['profile'].query(ha, hy) + C - hr
                     if d > 0:
                         depth += d

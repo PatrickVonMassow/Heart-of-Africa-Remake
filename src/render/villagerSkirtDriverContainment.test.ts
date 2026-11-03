@@ -55,6 +55,8 @@ describe('containment of the rendered legs and pelvis', () => {
   it('holds the legs in the union of the leg capsules and the skinned pelvis profile', () => {
     const worst: Record<string, { d: number; where: string }> = {}
     const band: { d: number; where: string } = { d: 0, where: '' }
+    // at or above the profile bottom the profile ALONE must hold the surface (owner decision 03.11.2026)
+    const above: Record<string, { d: number; where: string }> = {}
     let samples = 0
     for (const sex of SEXES) {
       for (const age of AGE_GROUPS) {
@@ -136,7 +138,9 @@ describe('containment of the rendered legs and pelvis', () => {
                 const cc = tris[t * 3 + 2]
                 // a capsule is convex: three corners inside one capsule hold the whole triangle
                 const corner = (v: number): V3 => [skinned[v * 3], skinned[v * 3 + 1], skinned[v * 3 + 2]]
-                if (ob.capsules.some((cap) => [a, b, cc].every((v) => pointSegment(corner(v), cap.a, cap.b) <= cap.radius))) {
+                // the hips-frame height is affine, so three corners below the profile bottom hold the interior there too
+                const below = [a, b, cc].every((v) => ob.profileExcess(corner(v)) === Infinity)
+                if (below && ob.capsules.some((cap) => [a, b, cc].every((v) => pointSegment(corner(v), cap.a, cap.b) <= cap.radius))) {
                   samples += weights[t].length / 2
                   continue
                 }
@@ -148,6 +152,22 @@ describe('containment of the rendered legs and pelvis', () => {
                   const p: V3 = [0, 1, 2].map((e) => skinned[a * 3 + e] * s + skinned[b * 3 + e] * u + skinned[cc * 3 + e] * vv) as V3
                   samples++
                   if (ob.inProfile(p)) continue
+                  const pe = ob.profileExcess(p)
+                  if (pe !== Infinity && pe > 0) {
+                    // at or above the profile bottom: the profile alone answers
+                    const where = `${sex} ${age} ${build} ${mo.id}, rest y ${[a, b, cc].map((v) => pos.getY(v).toFixed(3)).join('/')}`
+                    if (!legTri([a, b, cc])) {
+                      const rel = pe / person.frame.scale
+                      if (rel > band.d) Object.assign(band, { d: rel, where })
+                    } else {
+                      let lb = -1
+                      let lw = 0
+                      for (let k = 0; k < 4; k++) if (legSet.has(si.getComponent(a, k)) && sw.getComponent(a, k) > lw) (lw = sw.getComponent(a, k)), (lb = si.getComponent(a, k))
+                      const bone = asset.bones[lb] ?? 'leg'
+                      if (pe > (above[bone]?.d ?? 0)) above[bone] = { d: pe, where }
+                    }
+                    continue
+                  }
                   let best = Infinity
                   let bone = ''
                   for (const cap of ob.capsules) {
@@ -157,7 +177,6 @@ describe('containment of the rendered legs and pelvis', () => {
                       bone = asset.bones[rig.capsules[ob.capsules.indexOf(cap)].bone]
                     }
                   }
-                  const pe = ob.profileExcess(p)
                   if (pe < best) {
                     best = pe
                     bone = 'profile'
@@ -176,9 +195,10 @@ describe('containment of the rendered legs and pelvis', () => {
         }
       }
     }
-    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; pelvis band worst outside: ${band.d.toFixed(4)} × scale (${band.where})`)
+    console.log(`containment: ${samples} samples; legs outside: ${JSON.stringify(worst)}; legs above the profile bottom outside the profile: ${JSON.stringify(above)}; pelvis band worst outside: ${band.d.toFixed(4)} × scale (${band.where})`)
     expect(samples).toBeGreaterThan(1e6)
     expect(worst).toEqual({})
+    expect(above).toEqual({})
     expect(band.d, `pelvis band outside the profile: ${band.where}`).toBeLessThanOrEqual(VILLAGER_ASSET.drivenGarments.driver.pelvisBandTolerance)
   }, 600_000)
 })
