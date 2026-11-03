@@ -15915,3 +15915,9 @@ to land than a mechanism that needs a review.
   Test: Vitest for the guard core with a local branch merged and its remote ahead by one commit.
   Criticality: high - a deletion instruction that loses pushed work (data risk, CLAUDE.md §2 intake).
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1484. Agent liveness check permits replacing a live author on an unfetched remote ref
+  Source: batch session 03.11.2026 13:53: `node scripts/batch-in-flight.mjs --agent-check --branch refs/remotes/origin/feat/1482-garment-driven-builder` printed "only a 27 min old commit ... A REPLACEMENT IS PERMITTED" from the stale local ref; origin held a 1 min old commit of the live cloud author session_019XD8QtXYcNHmCuQry2keV1. A duplicate author was started and stopped before its checkout.
+  FINAL STATE: the agent check fetches a remote branch ref before judging it (or refuses replacement and says the ref is unfetched when the fetch fails).
+  Test: Vitest for the check core with a remote ref whose fetched tip is newer than the local tracking ref.
+  Criticality: high - a possible false approval to replace a working agent (CLAUDE.md §2 intake).
+  Bundle: Session- & Repo-Hygiene.
