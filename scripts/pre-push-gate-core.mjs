@@ -490,6 +490,127 @@ export function looksLikeRunnerFailure({ files, tests, failedFiles, failedTests 
   return countOrNull(files) !== null && countOrNull(tests) > 0 && failedFiles === 0 && failedTests === 0
 }
 
+// ---------------------------------------------------------------------------
+// A UNIT RUN THAT NAMES NO FAILING TEST HAS NOT JUDGED ANYTHING
+//
+// Measured on a quiet host (02.09.2026) and on CI (02.11.2026 onwards): vitest's
+// own summary read every file and every test passed, yet the process exited 1
+// on a `[vitest-worker]: Timeout calling "onTaskUpdate"` reporter error counted
+// as an unhandled error. Load is not the discriminator — the SUMMARY is. Such a
+// run is NOT JUDGED and earns exactly one re-run, at any load; a run naming a
+// failing test is red at once, at any load. The measured load goes into the
+// verdict text as evidence in every case, never as the condition.
+// ---------------------------------------------------------------------------
+
+/** The four things one unit run can have said. */
+export const UNIT_RUN = Object.freeze({ green: 'green', red: 'red', notJudged: 'not-judged', unreadable: 'unreadable' })
+
+/** "machine busy (cpu 0.9)" / "machine load not measured" — always a phrase. */
+export function formatLoad(load) {
+  if (!load) return 'machine load not measured'
+  const { level, why } = normaliseLoad(load)
+  return `machine ${level}${why ? ` (${why})` : ''}`
+}
+
+/**
+ * The runner's own complaint, if the output carries one — the first
+ * `[vitest-worker]: …` line, else the first `SomethingError: …` line after an
+ * "Unhandled Error" heading. Null where neither is found. Never throws.
+ */
+export function runnerErrorSignature(output) {
+  try {
+    const raw = output && typeof output === 'object' ? `${output.stdout ?? ''}${output.stderr ?? ''}` : String(output ?? '')
+    const text = raw.replace(ANSI, '')
+    const worker = /\[vitest-worker\]:[^\n]*/.exec(text)
+    if (worker) return worker[0].trim()
+    const at = text.search(/Unhandled (Error|Rejection)/i)
+    if (at < 0) return null
+    const err = /^[^\S\n]*(\w*Error: [^\n]*)$/m.exec(text.slice(at))
+    return err ? err[1].trim() : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Classify ONE unit run from its exit status and its own summary. Pure.
+ *
+ *   green       exit 0.
+ *   red         the summary names a failing file or test — blocks at any load.
+ *   not-judged  a complete summary naming NO failure beside a non-zero exit
+ *               (looksLikeRunnerFailure) — re-run once, at any load.
+ *   unreadable  non-zero exit and no readable summary — fail-closed: red.
+ *
+ * `line` always names the counts and the measured load.
+ */
+export function unitRunVerdict({ ok, totals, load, signature } = {}) {
+  const t = totals ?? {}
+  const ran = formatUnitTotals(t)
+  const at = formatLoad(load)
+  if (ok === true) {
+    return { kind: UNIT_RUN.green, blocks: false, rerun: false, line: `unit GREEN — ${ran}; ${at}.` }
+  }
+  const failedFiles = countOrNull(t.failedFiles) ?? 0
+  const failedTests = countOrNull(t.failedTests) ?? 0
+  if (failedFiles > 0 || failedTests > 0) {
+    return {
+      kind: UNIT_RUN.red, blocks: true, rerun: false,
+      line:
+        `unit RED — its summary names ${failedTests} failing test${failedTests === 1 ? '' : 's'} in ${failedFiles}` +
+        ` file${failedFiles === 1 ? '' : 's'} (${ran}); ${at}. A named failure blocks at any load.`,
+    }
+  }
+  if (looksLikeRunnerFailure(t)) {
+    return {
+      kind: UNIT_RUN.notJudged, blocks: false, rerun: true,
+      line:
+        `unit NOT JUDGED — ${ran}, its summary names NO failing test, yet the runner exited non-zero` +
+        ` (${signature || 'no runner error line found'}); ${at}. A run that names no failure judged nothing.`,
+    }
+  }
+  return {
+    kind: UNIT_RUN.unreadable, blocks: true, rerun: false,
+    line: `unit RED — the runner exited non-zero and its summary could not be read (${ran}); ${at}. Unreadable is red.`,
+  }
+}
+
+/**
+ * The verdict over the attempts of one unit stage: `[first]` or `[first, rerun]`.
+ * Pure. Answers `{ ok, rerun, kind, line }`:
+ *
+ *   · one attempt, not judged  → `rerun: true` (ask for exactly one more);
+ *   · green on either attempt  → ok (the not-judged first one is named);
+ *   · a named failure or an unreadable summary on either attempt → red;
+ *   · not judged TWICE         → red, naming the signature — fail-closed.
+ *
+ * Each attempt is `{ ok, totals, signature?, load? }`; a per-attempt load wins
+ * over the shared one.
+ */
+export function unitAttemptsVerdict(attempts, { load } = {}) {
+  const list = Array.isArray(attempts) ? attempts : []
+  if (!list.length) {
+    return { ok: false, rerun: false, kind: UNIT_RUN.unreadable, line: `unit RED — no run was recorded; ${formatLoad(load)}.` }
+  }
+  const judge = (a) => unitRunVerdict({ ...a, load: a?.load ?? load })
+  const first = judge(list[0])
+  if (first.kind !== UNIT_RUN.notJudged) return { ok: !first.blocks, rerun: false, kind: first.kind, line: first.line }
+  if (list.length === 1) return { ok: false, rerun: true, kind: first.kind, line: `${first.line} Re-running it ONCE.` }
+  const second = judge(list[1])
+  if (second.kind === UNIT_RUN.green) {
+    return { ok: true, rerun: false, kind: UNIT_RUN.green, line: `${first.line} The re-run: ${second.line}` }
+  }
+  if (second.kind === UNIT_RUN.notJudged) {
+    const sig = list[1]?.signature || list[0]?.signature || 'no runner error line found'
+    return {
+      ok: false, rerun: false, kind: UNIT_RUN.notJudged,
+      line:
+        `unit RED — NOT JUDGED TWICE: both runs named no failing test yet exited non-zero (signature: ${sig}).` +
+        ` First: ${first.line} Re-run: ${second.line} Two runs that judged nothing are red.`,
+    }
+  }
+  return { ok: false, rerun: false, kind: second.kind, line: `${first.line} The re-run: ${second.line}` }
+}
+
 /** "153 files / 4214 tests" — both numbers, always, so a shrink is visible. */
 export function formatUnitTotals({ files, tests } = {}) {
   const f = countOrNull(files)

@@ -255,8 +255,8 @@ describe('the workflow that arms it', () => {
     const fast = WORKFLOW.split('  fast:\n')[1].split('  gate:\n')[0]
     expect(fast).toContain('fail-fast: false')
     expect(fast).toContain('shard: [1, 2]')
-    expect(fast).toContain('timeout-minutes: 25')
-    expect(fast).toContain('npm run test:unit -- --shard=${{ matrix.shard }}/2')
+    expect(fast).toContain('timeout-minutes: 40')
+    expect(fast).toContain('run: node scripts/ci-unit-shard.mjs -- --shard=${{ matrix.shard }}/2')
     expect(fast).toMatch(/id: outcomes[\s\S]*?if: always\(\)/)
     for (const shard of [1, 2]) {
       expect(fast).toContain(`shard_${shard}: \${{ steps.outcomes.outputs.shard_${shard} }}`)
