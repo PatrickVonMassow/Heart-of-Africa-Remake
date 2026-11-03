@@ -1,6 +1,9 @@
 // A unit run whose own summary names no failing test is NOT JUDGED, not red —
 // at any load; a named failure is red at any load; the load is always named.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { REPO_ROOT } from './repo-paths.mjs'
 import {
   decide,
   formatLoad,
@@ -151,5 +154,22 @@ describe('runGate — the local push gate applies the same rule at any load', ()
     const r = gate([false], ['unreadable'], 'quiet')
     expect(r.calls).toHaveLength(1)
     expect(r.verdict.blocked).toBe(true)
+  })
+})
+
+describe('the LARGE runner and CI judge the unit stage by the same verdict', () => {
+  const read = (p) => readFileSync(resolve(REPO_ROOT, p), 'utf8')
+  it('run-all.mjs re-runs a not-judged unit stage before skipping the browser suites', () => {
+    const src = read('scripts/verify/run-all.mjs')
+    const stage = src.slice(src.indexOf("console.log('# unit + component tests"), src.indexOf('skipping the browser suites'))
+    expect(stage).toContain('unitAttemptsVerdict(attempts')
+    expect(stage).toContain('if (!unitVerdict.rerun) break')
+    expect(stage).toContain('const unitOk = unitVerdict.ok')
+  })
+  it('the CI shard wrapper loops on the same verdict and exits by it', () => {
+    const src = read('scripts/ci-unit-shard.mjs')
+    expect(src).toContain('unitAttemptsVerdict(attempts)')
+    expect(src).toContain('if (!v.rerun) break')
+    expect(src).toContain('process.exit(v.ok ? 0 : 1)')
   })
 })
