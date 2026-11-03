@@ -130,6 +130,47 @@ describe('planRemediation', () => {
   })
 })
 
+describe("outside the owner's tree the doctor neither stashes nor resets", () => {
+  const incident = {
+    ...clean,
+    dirtyFiles: ['src/x.ts'],
+    divergence: { ahead: 1, behind: 4 },
+    parallelDetected: true,
+    conflictMarkers: false,
+  }
+
+  it('a cloud clone or non-owner session plans no quarantine and no hard reset, only an alert', () => {
+    const plan = planRemediation({ ...incident, ownerTree: false })
+    expect(plan.map((a) => a.action)).toEqual(['rescue-and-reset-withheld'])
+    expect(needsRepair(plan)).toBe(false)
+  })
+
+  it('no repair-level action survives outside the owner tree: merge abort, TASKS restore, locks', () => {
+    const plan = planRemediation({
+      ...incident,
+      mergeInProgress: true,
+      tasksParses: false,
+      tasksRecoverable: true,
+      staleGitLocks: [{ path: '.git/index.lock' }],
+      ownerTree: false,
+    })
+    expect(plan.filter((a) => a.level === 'repair')).toEqual([])
+    expect(plan.map((a) => a.action)).toEqual(
+      expect.arrayContaining(['abort-merge-withheld', 'restore-tasks-from-head-withheld', 'clear-stale-git-locks-withheld']),
+    )
+  })
+
+  it('a dirty non-owner tree in a parallel window is left alone', () => {
+    expect(planRemediation({ ...clean, dirtyFiles: ['src/x.ts'], parallelDetected: true, ownerTree: false })).toEqual([])
+  })
+
+  it("the owner's main tree keeps its repair, explicitly and by default", () => {
+    for (const state of [{ ...incident, ownerTree: true }, incident]) {
+      expect(planRemediation(state).map((a) => a.action)).toEqual(['quarantine-stash', 'rescue-and-reset'])
+    }
+  })
+})
+
 // ---------------------------------------------------------------------------
 // THE GATE MUST NOT BLAME THE CODE FOR THE LOAD (point 431)
 // ---------------------------------------------------------------------------

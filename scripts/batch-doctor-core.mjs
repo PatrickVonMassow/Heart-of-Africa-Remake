@@ -29,6 +29,7 @@ import { checkEvidence } from './batch-in-flight-core.mjs'
  *   ownerAlive,                              // a live owner forbids the process sweep
  *   privateBatchLock: { path },              // forbidden worktree-local authority
  *   tornOwnerSession: { recordedSessionId, sessionId }, // same process, wrong id
+ *   ownerTree,                               // false: cloud clone or non-owner session — no stash, repairs only reported
  *   verificationWriterLive,                  // a live run writes verification/ (see below)
  * }
  * Returns an ordered list of actions:
@@ -86,10 +87,16 @@ export function planRemediation(state) {
   // HEAD and the working tree untouched, and pushed — whenever anything below
   // could overwrite or stash them. They stay in the working tree, and the run
   // is LOUD: an alert, a non-zero exit, never "consistent".
+  // OUTSIDE THE OWNER'S TREE THE TREE IS NOT OURS (03.11.2026: a cloud author's
+  // clone was emptied twice by quarantine stashes). A cloud clone or a session
+  // that does not hold the batch lock gets no quarantine — its dirty files are its
+  // author's — and every other repair-level action is withheld as an alert below.
+  const ownerTree = state.ownerTree !== false
   const quarantine = quarantineScope(state.dirtyFiles, { verificationWriterLive: state.verificationWriterLive })
   const diverged = div.ahead > 0 && div.behind > 0
   const resetPlanned = diverged && !state.verificationWriterLive
-  const quarantinePlanned = quarantine.needed && (state.parallelDetected || state.conflictMarkers || resetPlanned)
+  const quarantinePlanned =
+    ownerTree && quarantine.needed && (state.parallelDetected || state.conflictMarkers || resetPlanned)
   const restorePlanned = !state.tasksParses && !!state.tasksRecoverable
   const protectedAtRisk =
     quarantine.protected.length > 0 && (quarantinePlanned || resetPlanned || restorePlanned || !!state.mergeInProgress || !!state.parallelDetected)
@@ -262,7 +269,17 @@ export function planRemediation(state) {
     })
   }
 
-  return plan
+  if (ownerTree) return plan
+  return plan.map((a) =>
+    a.level === 'repair'
+      ? {
+          ...a,
+          action: `${a.action}-withheld`,
+          level: 'alert',
+          reason: `Not run: this checkout is not the batch owner's tree (a cloud clone or a session without the batch lock). ${a.reason}`,
+        }
+      : a,
+  )
 }
 
 /** True when the plan requires a --repair run (any repair-level action). */

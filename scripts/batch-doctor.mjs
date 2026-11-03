@@ -58,6 +58,7 @@ import {
 } from './batch-doctor-states.mjs'
 import {
   readOwnerLock,
+  heldByOtherLiveOwner,
   detectParallel,
   readUnhandledAlert,
   markAlertHandled,
@@ -222,6 +223,14 @@ if (rawAlert && !alert) {
   log(`parallel alert IGNORED: it names only this session (${readerSid || 'unknown'}) — an alert that cannot name another session is not evidence of one`)
 }
 const parallelDetected = parallelNow.length > 0 || !!alert
+// The owner's tree: not a cloud clone (CLAUDE_CODE_REMOTE, as in the context
+// fence), no conflicting session assertion, and not a session another live owner
+// holds the batch lock against. No id at all stays the owner's: the launcher, the
+// emergency path and the progress guard's own instruction call without one.
+const ownerTree =
+  process.env.CLAUDE_CODE_REMOTE !== 'true' &&
+  sessionAssertionAgrees &&
+  !(activeSessionId && heldByOtherLiveOwner(activeSessionId))
 const parallelSids = [...new Set([...parallelNow.map((p) => p.sid), ...alertOthers])]
 
 // --- THE TORN STATES A KILL LEAVES BEHIND (point 443) ---------------------------
@@ -266,7 +275,7 @@ const privateBatchLock = privateBatchLockPath && existsSync(privateBatchLockPath
 log(
   `state: branch=${branch} mergeInProgress=${mergeInProgress} dirty=${dirtyFiles.length} ` +
     `conflictMarkers=${conflictMarkers} divergence=+${divergence.ahead}/-${divergence.behind} ` +
-    `tasksParses=${tasksParses} parallelNow=${parallelNow.length} unhandledAlert=${alert ? 'yes' : 'no'}`,
+    `tasksParses=${tasksParses} parallelNow=${parallelNow.length} unhandledAlert=${alert ? 'yes' : 'no'} ownerTree=${ownerTree}`,
 )
 log(
   `torn states: gitLocks=${staleGitLocks.length} worktreePrune=${!!worktrees.pruneNeeded} ` +
@@ -300,6 +309,7 @@ const plan = planRemediation({
   ownerAlive,
   privateBatchLock,
   tornOwnerSession: tornOwnerSession.torn ? tornOwnerSession : null,
+  ownerTree,
 })
 
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')
@@ -486,7 +496,11 @@ if (gate) recordGateMeasurement(measurementClean)
 // user orders also marked the triggering alert handled, so the run two seconds
 // later read CONSISTENT. Until the protected files are committed by a person,
 // every run sees the incident again.
-if (!pendingRepair && !gateFailed && statusReadable && !protectedRescued && !plan.some((a) => a.action === 'alert-protected-paths')) {
+// Outside the owner's tree nothing was repaired, so the owner's next run must
+// still see the alert (point 1481).
+if (!ownerTree) {
+  log("parallel alert left as it is: this checkout is not the owner's tree")
+} else if (!pendingRepair && !gateFailed && statusReadable && !protectedRescued && !plan.some((a) => a.action === 'alert-protected-paths')) {
   markAlertHandled()
   log('parallel alert marked handled')
 } else if (protectedRescued || plan.some((a) => a.action === 'alert-protected-paths')) {
