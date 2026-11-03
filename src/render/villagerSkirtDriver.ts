@@ -753,10 +753,12 @@ export class ColumnDriver {
     return add(P.head[k], this.direction(k, th[k], this.rig.upperOffset[k]))
   }
 
-  /** A rest offset turned by the hips rotation and then by θ about the column's tangent. */
+  /** A rest offset turned by θ about the column's hips-local tangent, then carried by the hips
+   *  matrix: the order the skeleton composes the written locals in (a nonuniform hips scale acts
+   *  after the column's rotation). */
   private direction(k: number, th: number, offset: V3): V3 {
     const P = this.posed!
-    return rotate(xdir(P.hipsM, offset), P.tangent[k], th)
+    return xdir(P.hipsM, rotate(offset, this.rig.tangent[k], th))
   }
 
   /** The stations of segment s at angle θ, with the given angles for the rest. */
@@ -788,6 +790,11 @@ export class ColumnDriver {
         return h.y >= rig.profile.bottom ? h.r - P.profile.query(h.a, h.y) : Infinity
       },
     }
+  }
+
+  /** Segment s's stations under this frame's solution (tests, the report). */
+  stationsOf(s: number): V3[] {
+    return this.stations(s, this.theta[s], this.theta)
   }
 
   /** Segment s evaluated at θ against the current solution of this frame (tests, the report). */

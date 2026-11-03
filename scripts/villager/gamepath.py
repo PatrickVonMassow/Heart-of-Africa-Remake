@@ -957,8 +957,8 @@ class ColumnDriver:
 
     # ----- segment geometry -----
     def _direction(self, k, th, offset):
-        P = self.P
-        return col_rotate(_xdir(P['hipsM'], offset), P['tangent'][k], th)
+        # turned in the hips frame first, then carried by the hips matrix (the skeleton's order)
+        return _xdir(self.P['hipsM'], col_rotate(offset, self.rig['tangent'][k], th))
 
     def _pivot(self, s, th):
         P = self.P
@@ -1457,3 +1457,25 @@ def selftest_column_driver():
     assert dj2.counters['jointSearches'] >= 1, dj2.counters
     assert dj2.counters['repairs'] <= 2 * cfg['repairRounds'] and dj2.counters['residual'] > 0, dj2.counters
     print('column driver selftest: ok')
+
+
+def selftest_column_scale():
+    """Stations under a nonuniform hips scale lie where the written locals draw them."""
+    rig = toy_column_rig()
+    d = ColumnDriver(rig, TOY_DRIVER_CONFIG)
+    bones = toy_column_bones(rig, thigh=(-5.0, 0.0, 0.0))
+    bones[0]['s'] = [1.0, 2.0, 1.0]
+    d.step(bones, 1 / 60)
+    d.theta = [0.0] * 8
+    d.theta[0] = 30 * _DEG
+    d.theta[4] = 50 * _DEG
+    loc = d.locals()
+    for j, i in enumerate(rig['upper'] + rig['lower']):
+        bones[i] = loc[j]
+    M = d.compose(bones)
+    knee = _xform(M[rig['upper'][0]], rig['upperOffset'][0])
+    ankle = _xform(M[rig['lower'][0]], rig['lowerOffset'][0])
+    up = d._stations(0, d.theta[0], d.theta)[-1]
+    lo = d._stations(4, d.theta[4], d.theta)[-1]
+    assert _len(_sub(up, knee)) < 1e-9 and _len(_sub(lo, ankle)) < 1e-9, (up, knee, lo, ankle)
+    print('column scale selftest: ok')

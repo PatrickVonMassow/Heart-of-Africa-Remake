@@ -133,6 +133,7 @@ def main():
     import gamepath as GP
     GP.selftest_shell_round_trip()
     GP.selftest_column_driver()
+    GP.selftest_column_scale()
     import sheets as SH
     SH.selftest_hand_layout()
     if 'garments' in steps or 'selftest' in steps:

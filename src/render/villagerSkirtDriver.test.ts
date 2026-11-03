@@ -206,6 +206,28 @@ describe('the column driver', () => {
     }
   })
 
+  it('puts its stations where the written bones draw them, under a nonuniform hips scale', () => {
+    const rig = toyRig()
+    const d = new ColumnDriver(rig)
+    const bones = toyBones(rig)
+    bones[0].scale.set(1, 2, 1)
+    bones[1].position.set(-5, 0, 0)
+    d.step(bones, 1 / 60)
+    d.theta.fill(0)
+    d.theta[0] = 30 * DEG
+    d.theta[4] = 50 * DEG
+    d.write(bones)
+    // the toy skeleton's parents: thigh and uppers on the hips, each lower on its upper
+    rig.parents.forEach((p, i) => p >= 0 && bones[p].add(bones[i]))
+    bones[0].updateMatrixWorld(true)
+    const knee = new THREE.Vector3(...rig.upperOffset[0]).applyMatrix4(bones[2].matrixWorld)
+    const ankle = new THREE.Vector3(...rig.lowerOffset[0]).applyMatrix4(bones[6].matrixWorld)
+    const upper = d.stationsOf(0).at(-1)!
+    const lower = d.stationsOf(4).at(-1)!
+    expect(Math.hypot(upper[0] - knee.x, upper[1] - knee.y, upper[2] - knee.z)).toBeLessThan(1e-9)
+    expect(Math.hypot(lower[0] - ankle.x, lower[1] - ankle.y, lower[2] - ankle.z)).toBeLessThan(1e-9)
+  })
+
   it('scores an upper trial on the triangles its lower carries: swinging them into a capsule is infeasible (B17)', () => {
     const n = 4
     const form: DrivenFormRig = {
