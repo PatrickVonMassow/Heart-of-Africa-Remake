@@ -267,8 +267,10 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
     // (work-order "walking villagers": a kneel folds them, never a squash).
     const rel = '../scenes/place/placeFigure.tsx'
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
-    expect(src.includes('L.bodyRadius * n.width * ((n.height - n.hipY) / n.height)')).toBe(true)
-    expect(src.includes('scale={[trunkRadius(lay), trunkH, trunkRadius(lay)]}')).toBe(true)
+    // Since work-order 1301 the cone keeps its standing size through a kneel:
+    // its base radius is the standing taper's at the hip (primitiveTrunkRadius).
+    expect(src.includes('const trunkR = primitiveTrunkRadius(L)')).toBe(true)
+    expect(src.includes('scale={[trunkR, lay.trunkLength, trunkR]}')).toBe(true)
     expect(src.includes('coneGeometry args={[1, 1, TESSELLATION.figureBody]}')).toBe(true)
   })
 
@@ -287,8 +289,10 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
     const figure = readFileSync(fileURLToPath(new URL(figureRel, import.meta.url)), 'utf8')
     expect(figure.includes('FIGURE_LIMBS')).toBe(true)
     expect(figure.includes('LimbDetailContext')).toBe(true)
-    expect(figure.includes('cylinderGeometry args={[L.armRadius[0], L.armRadius[1], 1, segments]}')).toBe(true)
-    expect(figure.includes('scale={[1, armLen, 1]}')).toBe(true)
+    // Upper arm and forearm, tapering through the elbow (work-order 1301).
+    expect(figure.includes('cylinderGeometry args={[L.armRadius[0], elbowR, 1, segments]}')).toBe(true)
+    expect(figure.includes('cylinderGeometry args={[elbowR, L.armRadius[1], 1, segments]}')).toBe(true)
+    expect(figure.includes('scale={[1, upper, 1]}')).toBe(true)
     const rel = '../scenes/place/PlaceLife.tsx'
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
     expect(src.includes('effectiveFigureLimbSegments')).toBe(true)

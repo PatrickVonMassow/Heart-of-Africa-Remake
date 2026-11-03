@@ -11,7 +11,17 @@ import { gaitBodyLift, legSwingAngle } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
-import { approach, leanedHipY, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
+import {
+  approach,
+  leanedHipY,
+  primitiveHandTarget,
+  primitiveLayout,
+  primitivePoseRig,
+  primitiveTrunkRadius,
+  solvePrimitiveArm,
+  type HeadLoadShape,
+  type PrimitiveLayout,
+} from '../../render/figureWalk'
 import { VILLAGER_MOTION } from '../../config/balance'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
@@ -140,20 +150,28 @@ function PrimitiveFigure({
   const cold = useContext(ColdCloaksContext)
   const segments = useContext(LimbDetailContext)
   const L = FIGURE_LIMBS
-  // KNEELING IS A FOLD OF THE PROPORTIONS, never a squash of the figure
-  // (work-order "walking villagers", from point 350): the group's scale stays
-  // uniform, the head keeps its shape, and going down or up is a transition.
+  // KNEELING IS A FOLD AT THE HIP, never a squash of the figure (work-order
+  // "walking villagers", from point 350): the group's scale stays uniform, the
+  // head keeps its shape, and going down or up is a transition. Since
+  // work-order 1301 every limb keeps its length through it: the trunk its
+  // height and taper, the shoulders their width, the arms their length.
   const kneelK = useRef(kneel ? 1 : 0)
-  const shape = useRef<PrimitiveLayout>(primitiveLayout(kneelK.current, legs, L))
-  const lay = shape.current
-  // Legs only on a standing figure — a kneeling one has folded them away.
+  // Legs only on a standing figure — a kneeling one has folded them away, and
+  // is laid out as a legless one (its wrap down to the ground).
   const withLegs = legs && !kneel
+  const legged = useRef(withLegs)
+  legged.current = withLegs
+  const shape = useRef<PrimitiveLayout>(primitiveLayout(kneelK.current, withLegs, L))
+  const lay = shape.current
   const hipY = lay.hipY
-  const trunkH = lay.height - hipY
-  // Shrinking the cone's base radius by the same factor as its height keeps the
-  // TAPER identical, so a legged figure is not a fatter one at shoulder height —
-  // and the arm clearance pinned in figures.test.ts holds for every figure.
-  const trunkRadius = (n: PrimitiveLayout) => L.bodyRadius * n.width * ((n.height - n.hipY) / n.height)
+  const trunkR = primitiveTrunkRadius(L)
+  // The wrap's lower part on a legless figure: the standing cone's own taper
+  // from the ground (bodyRadius) up to the trunk cone's base, so standing the
+  // two read as the one cone they always were.
+  // OPEN: kneeling, this part — the dress over the folded legs — is the one
+  // that lowers (to the hip's kneeling height): a cone cannot fold its wrap.
+  // Whether a legless kneeler should instead show folded thighs is a design call.
+  const baseRadius = (n: PrimitiveLayout) => (n.skirt > 0 ? L.bodyRadius : trunkR)
   const outer = useRef<THREE.Group>(null)
   const lifted = useRef<THREE.Group>(null)
   const trunk = useRef<THREE.Group>(null)
@@ -161,8 +179,9 @@ function PrimitiveFigure({
   const wrapMesh = useRef<THREE.Mesh>(null)
   const head = useRef<THREE.Mesh>(null)
   const crown = useRef<THREE.Group>(null)
-  const armMeshes = useRef<Array<THREE.Object3D | null>>([])
-  const handEnds = useRef<Array<THREE.Object3D | null>>([])
+  const skirtMesh = useRef<THREE.Mesh>(null)
+  const uppers = useRef<Array<THREE.Group | null>>([])
+  const fores = useRef<Array<THREE.Group | null>>([])
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
   // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
@@ -177,47 +196,72 @@ function PrimitiveFigure({
   const owned = !!(pose && limbs)
   // Its OWN pivots, in one object that outlives the frame — `arms.current` is a
   // stable array, only the trunk arrives later.
-  const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null })
+  // THE ARMS, BROUGHT TO THEIR HANDS (work-order 1301). A pose writes each
+  // shoulder pivot's rotation; the hand it means is where the rig the poses
+  // were tuned on puts it (`primitivePoseRig`), held on or above the ground,
+  // and the drawn arm — full length, bent at the elbow — is solved to it, as
+  // the skinned figure solves its arm to its virtual hand. Run after every
+  // write of a pose (`retarget`, through applyFigurePose) and every frame.
+  const settle = useMemo(() => {
+    const target = new THREE.Vector3()
+    const frame = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), lean: 0 }
+    return () => {
+      const t = trunk.current
+      const n = shape.current
+      if (!t) return
+      // A forward lean while kneeling (setting a load down) would tip the
+      // trunk's base rim into the ground; the hip rises by just that much.
+      t.position.y = leanedHipY(n.hipY, baseRadius(n), t.rotation.x)
+      frame.position.copy(t.position)
+      frame.quaternion.copy(t.quaternion)
+      frame.lean = t.rotation.x
+      const rig = primitivePoseRig(kneelK.current, legged.current, L)
+      const ground = -(lifted.current?.position.y ?? 0)
+      for (let i = 0; i < 2; i++) {
+        const pivot = arms.current[i]
+        const up = uppers.current[i]
+        const fore = fores.current[i]
+        if (!pivot || !up || !fore) continue
+        const side = i === 0 ? 1 : -1
+        primitiveHandTarget(pivot.quaternion, side, rig, frame, ground, L.handRadius, target)
+        solvePrimitiveArm(pivot, target, n.upperArm, side, up.quaternion, fore.quaternion)
+      }
+    }
+    // the closure reads refs only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget: settle })
   useEffect(() => {
     if (!limbs) return
-    limbs.current = { arms: arms.current, trunk: trunk.current }
+    limbs.current = { arms: arms.current, trunk: trunk.current, retarget: settle }
     return () => {
       limbs.current = null
     }
-  }, [limbs])
+  }, [limbs, settle])
 
   // Lays the figure out at a kneel fraction: every height from the proportions.
   const applyLayout = (n: PrimitiveLayout) => {
     const wrapWear = cold?.wear === 'head'
     trunk.current?.position.setY(n.hipY)
-    if (cone.current) {
-      const h = n.height - n.hipY
-      cone.current.position.y = h * 0.5
-      cone.current.scale.set(trunkRadius(n), h, trunkRadius(n))
+    cone.current?.position.setY(n.skirt + n.trunkLength * 0.5)
+    if (skirtMesh.current) {
+      skirtMesh.current.visible = n.skirt > 0
+      skirtMesh.current.position.y = n.skirt * 0.5
+      skirtMesh.current.scale.set(1, Math.max(n.skirt, 1e-6), 1)
     }
-    if (wrapMesh.current) {
-      wrapMesh.current.position.y = n.height * (wrapWear ? 0.82 : 0.66) - n.hipY
-      wrapMesh.current.scale.set(1, n.height * (wrapWear ? 1.0 : 0.68), 1)
-    }
+    // The seasonal wrap rides the shoulders, its size its own.
+    wrapMesh.current?.position.setY(n.height - (wrapWear ? 0.18 : 0.34) - n.hipY)
     head.current?.position.setY(n.headY - n.hipY)
     crown.current?.position.setY(n.headY + n.headRadius - n.hipY)
     ;[0, 1].forEach((i) => {
-      arms.current[i]?.position.set((i === 0 ? 1 : -1) * n.width * L.shoulderX, n.height * L.shoulderY - n.hipY, 0)
-      const m = armMeshes.current[i]
-      if (m) {
-        m.position.y = -n.armLength * 0.5
-        m.scale.set(1, n.armLength, 1)
-      }
-      handEnds.current[i]?.position.setY(-n.armLength)
+      arms.current[i]?.position.set((i === 0 ? 1 : -1) * n.shoulderX, n.shoulderY - n.hipY, 0)
     })
     // The legs fold back under the sinking hips, their feet kept on the ground
-    // — never hidden in one frame (no pop): a rigid leg from a hip at `hipY`
-    // reaches the ground tilted back by acos(hipY / leg), the shin laid behind.
-    const fold = Math.acos(Math.min(1, Math.max(0, n.hipY / L.hipY)))
+    // — never hidden in one frame (no pop) — and their round kept above it.
     legPivots.current.forEach((p) => {
       if (!p) return
       p.position.y = n.hipY
-      if (kneelK.current > 0 || !gait) p.rotation.x = fold
+      if (kneelK.current > 0 || !gait) p.rotation.x = n.legFold
     })
     const actor = outer.current?.userData.actor as { height: number } | undefined
     if (actor) actor.height = n.labelHeight
@@ -230,7 +274,7 @@ function PrimitiveFigure({
     const k = isLifeFrozen() ? kneelK.current : approach(kneelK.current, wanted ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
     if (k !== kneelK.current || !cone.current?.userData.laid) {
       kneelK.current = k
-      shape.current = primitiveLayout(k, legs, L)
+      shape.current = primitiveLayout(k, withLegs, L)
       applyLayout(shape.current)
       if (cone.current) cone.current.userData.laid = true
     }
@@ -261,11 +305,6 @@ function PrimitiveFigure({
     // and a stretch. The head is a smooth sphere, so its counter-rotation is
     // invisible; only its roundness survives. `turn` needs no answer — a rotation
     // about y commutes with a scale along y.
-    // A forward lean while kneeling (setting a load down) would tip the cone's
-    // rim into the ground; the hip rises by just that much.
-    if (trunk.current && shape.current) {
-      trunk.current.position.y = leanedHipY(shape.current.hipY, trunkRadius(shape.current), trunk.current.rotation.x)
-    }
     if (head.current) {
       const squash = squat?.current ?? 1
       const flattened = squash > 0.01 && Math.abs(squash - 1) > 1e-4
@@ -282,6 +321,7 @@ function PrimitiveFigure({
       // instead of hanging above it (the drop callers used to apply).
       lifted.current?.position.setY(gaitBodyLift(phase, L.hipY))
     } else if (kneelK.current > 0) lifted.current?.position.setY(0)
+    settle()
   })
   // The wrap this figure actually wears — null when the season is off, and null
   // for most figures when the record gates the garment on RANK. Barth on the
@@ -293,7 +333,8 @@ function PrimitiveFigure({
   const wrap = cold && (!cold.rankOnly || wearsByRank(cloth, cold.palette))
     ? cloakForCloth(cold.cloaks, cold.palette, cloth)
     : null
-  const armLen = lay.armLength
+  const upper = lay.upperArm
+  const elbowR = (L.armRadius[0] + L.armRadius[1]) * 0.5
   const wrapHead = !!wrap && cold!.wear === 'head'
   return (
     // Named so a speaking figure can be found in the scene graph — the overhead
@@ -304,10 +345,16 @@ function PrimitiveFigure({
             the head with it, and the legs (below) stay planted. The cone is a
             unit one laid out to the trunk's proportions. */}
         <group ref={trunk} name="figure-trunk" position={[0, hipY, 0]}>
-          <mesh ref={cone} position={[0, trunkH * 0.5, 0]} scale={[trunkRadius(lay), trunkH, trunkRadius(lay)]} castShadow>
+          <mesh ref={cone} position={[0, lay.skirt + lay.trunkLength * 0.5, 0]} scale={[trunkR, lay.trunkLength, trunkR]} castShadow>
             <coneGeometry args={[1, 1, TESSELLATION.figureBody]} />
             <meshStandardMaterial color={cloth} roughness={0.95} />
           </mesh>
+          {!withLegs && (
+            <mesh ref={skirtMesh} name="figure-skirt" position={[0, lay.skirt * 0.5, 0]} scale={[1, Math.max(lay.skirt, 1e-6), 1]} castShadow>
+              <cylinderGeometry args={[trunkR, L.bodyRadius, 1, TESSELLATION.figureBody]} />
+              <meshStandardMaterial color={cloth} roughness={0.95} />
+            </mesh>
+          )}
           {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around
               the shoulders, leaving the dress showing below. Where the record says
               the head is muffled in it (the Somali tobe in the karif), the shell
@@ -316,8 +363,8 @@ function PrimitiveFigure({
           {wrap && (
             <mesh
               ref={wrapMesh}
-              position={[0, lay.height * (wrapHead ? 0.82 : 0.66) - hipY, 0]}
-              scale={[1, lay.height * (wrapHead ? 1.0 : 0.68), 1]}
+              position={[0, lay.height - (wrapHead ? 0.18 : 0.34) - hipY, 0]}
+              scale={[1, wrapHead ? 1.0 : 0.68, 1]}
               castShadow
             >
               <coneGeometry args={[0.355, 1, TESSELLATION.figureBody]} />
@@ -344,37 +391,40 @@ function PrimitiveFigure({
               already raised, or it would spin a vertical limb about its own axis
               and move nothing (see `armDirection` in render/gesture.ts). */}
           {[0, 1].map((i) => (
-            <group
-              key={i}
-              position={[(i === 0 ? 1 : -1) * lay.width * L.shoulderX, lay.height * L.shoulderY - hipY, 0]}
-              ref={armRef[i]}
-            >
-              <mesh
-                ref={(el) => {
-                  armMeshes.current[i] = el
-                }}
-                position={[0, -armLen * 0.5, 0]}
-                scale={[1, armLen, 1]}
-                castShadow
-              >
-                <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], 1, segments]} />
-                <meshStandardMaterial color={skin} roughness={0.88} />
-              </mesh>
+            <group key={i} position={[(i === 0 ? 1 : -1) * lay.shoulderX, lay.shoulderY - hipY, 0]} ref={armRef[i]}>
+              {/* The upper arm and, from the elbow, the forearm: each hangs
+                  down its own −y and is turned by `settle` (work-order 1301). */}
               <group
                 ref={(el) => {
-                  handEnds.current[i] = el
+                  uppers.current[i] = el
                 }}
-                position={[0, -armLen, 0]}
               >
-                {/* Named so the verification can read where the hand ACTUALLY ended
-                    up, rather than re-deriving it: a touch is judged by the drawn
-                    hand meeting the drawn surface (work-order 1065). */}
-                <mesh name={i === 0 ? 'hand-left' : 'hand-right'} castShadow>
-                  <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
-                  <meshStandardMaterial color={skin} roughness={0.85} />
+                <mesh position={[0, -upper * 0.5, 0]} scale={[1, upper, 1]} castShadow>
+                  <cylinderGeometry args={[L.armRadius[0], elbowR, 1, segments]} />
+                  <meshStandardMaterial color={skin} roughness={0.88} />
                 </mesh>
-                {/* What this hand is carrying, at the hand rather than beside it. */}
-                {i === 0 && handProp}
+                <group
+                  position={[0, -upper, 0]}
+                  ref={(el) => {
+                    fores.current[i] = el
+                  }}
+                >
+                  <mesh position={[0, -upper * 0.5, 0]} scale={[1, upper, 1]} castShadow>
+                    <cylinderGeometry args={[elbowR, L.armRadius[1], 1, segments]} />
+                    <meshStandardMaterial color={skin} roughness={0.88} />
+                  </mesh>
+                  <group position={[0, -upper, 0]}>
+                    {/* Named so the verification can read where the hand ACTUALLY ended
+                        up, rather than re-deriving it: a touch is judged by the drawn
+                        hand meeting the drawn surface (work-order 1065). */}
+                    <mesh name={i === 0 ? 'hand-left' : 'hand-right'} castShadow>
+                      <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
+                      <meshStandardMaterial color={skin} roughness={0.85} />
+                    </mesh>
+                    {/* What this hand is carrying, at the hand rather than beside it. */}
+                    {i === 0 && handProp}
+                  </group>
+                </group>
               </group>
             </group>
           ))}
