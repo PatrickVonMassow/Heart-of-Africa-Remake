@@ -1806,6 +1806,12 @@
       "why": "low-criticality residual of 1478; behind the open medium/high Dorfleben points",
       "origin": "machine",
       "place": "last"
+    },
+    "1483": {
+      "at": "2026-11-03T04:36:52.830Z",
+      "why": "a guard data-risk fix in Session- & Repo-Hygiene; it blocks no point and nobody follows the wrong order now that it is filed",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1835,7 +1841,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-03T04:15:37.752Z",
+    "at": "2026-11-03T04:36:52.840Z",
     "points": [
       184,
       200,
@@ -2306,7 +2312,8 @@
       1476,
       1477,
       1479,
-      1482
+      1482,
+      1483
     ]
   }
 }
