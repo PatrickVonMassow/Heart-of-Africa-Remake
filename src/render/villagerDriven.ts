@@ -175,7 +175,7 @@ export function drivenFormRig(rec: DrivenRecord, panel: THREE.BufferGeometry, bo
     return { a: offsetPoint(rec, body, a), ia: sa.i, wa: sa.w, b: offsetPoint(rec, body, b), ib: sb.i, wb: sb.w, t }
   })
   const clear = rec.offset * body.scale
-  const p: DrivenFormRig['panel'] = { pos: [], idx: [], w: [], index: Array.from(panel.getIndex()!.array as ArrayLike<number>), exempt: [], clearance: [] }
+  const p: DrivenFormRig['panel'] = { pos: [], idx: [], w: [], index: Array.from(panel.getIndex()!.array as ArrayLike<number>), exempt: [], clearance: [], row: [] }
   for (let v = 0; v < pos.count; v++) {
     p.pos.push(pos.getX(v), pos.getY(v), pos.getZ(v))
     for (let c = 0; c < 4; c++) {
@@ -184,6 +184,7 @@ export function drivenFormRig(rec: DrivenRecord, panel: THREE.BufferGeometry, bo
     }
     p.exempt.push(rec.row[v] === 0 ? 1 : 0)
     p.clearance.push(clear)
+    p.row.push(rec.row[v])
   }
   return { anchors, panel: p, clearance: clear, top: Math.max(...anchors.map((a) => Math.max(a.a[1], a.b[1]))) }
 }

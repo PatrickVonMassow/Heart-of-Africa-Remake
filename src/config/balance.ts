@@ -2812,6 +2812,11 @@ export const VILLAGER_ASSET = {
       pelvisBin: 0.02,
       pelvisSamples: 240,
       pelvisArm: 0.2,
+      /** Added to the skinned pelvis profile's radius (plan section 3.5's named response to a
+       *  profile shortfall: the measured miss plus 2 mm). Calibratable.
+       *  OPEN: sized at 0.0335 (start-ramp miss 0.0315 + 0.002), but at that value every cloth
+       *  column stands at 70 to 80 degrees at rest; held at 0 pending the owner (plan 3.5.y). */
+      profileMargin: 0,
       /** The containment test's guard on the pelvis band outside the skinned profile (× the
        *  person's scale): a regression guard, no acceptance threshold (point 1339). Calibratable. */
       pelvisBandTolerance: 0.007,

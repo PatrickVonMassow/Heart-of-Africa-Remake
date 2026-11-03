@@ -73,6 +73,20 @@ export function restHeight(ry: readonly number[], p: V3): number {
   return ry[0] * p[0] + ry[1] * p[1] + ry[2] * p[2] + ry[3]
 }
 
+/** Whether a capsule constrains a posed point: below the profile bottom in the capsule bone's
+ *  rest frame (ry) OR in the posed hips frame (hy) (section 3.5, owner decision 03.11.2026 22:19). */
+export function capsuleActive(ry: readonly number[], hy: readonly number[], p: V3, bottom: number): boolean {
+  return restHeight(ry, p) < bottom || restHeight(hy, p) < bottom
+}
+
+/** The part of a triangle where a capsule is active (capsuleActive): below `bottom` in the rest
+ *  frame, plus the part at or above it there that lies below it in the hips frame. */
+export function clipActive(tri: readonly V3[], ry: readonly number[], hy: readonly number[], bottom: number): V3[][] {
+  const out = clipBelow(tri, tri.map((p) => restHeight(ry, p)), bottom)
+  for (const t of clipBelow(tri, tri.map((p) => -restHeight(ry, p)), -bottom, true)) out.push(...clipBelow(t, t.map((p) => restHeight(hy, p)), bottom))
+  return out
+}
+
 /** The rest-frame height row of a bone: inverse(posed bone matrix)'s y row plus the bone's rest y. */
 export function restHeightRow(m: ArrayLike<number>, restY: number): [number, number, number, number] {
   const e = new THREE.Matrix4().fromArray(Array.from(m)).invert().elements
@@ -275,8 +289,8 @@ export interface PelvisSamples {
 export interface DrivenFormRig {
   /** Per column its anchor: two rest points with their influences, interpolated at t. */
   anchors: Array<{ a: V3; ia: number[]; wa: number[]; b: V3; ib: number[]; wb: number[]; t: number }>
-  /** The panel: rest positions, influences, triangles, row-0 (exempt) flags and the cloth clearance per vertex. */
-  panel: { pos: number[]; idx: number[]; w: number[]; index: number[]; exempt: number[]; clearance: number[] }
+  /** The panel: rest positions, influences, triangles, row-0 (exempt) flags, the cloth clearance and the row per vertex. */
+  panel: { pos: number[]; idx: number[]; w: number[]; index: number[]; exempt: number[]; clearance: number[]; row: number[] }
   /** The cloth clearance at a segment's stations (figure units). */
   clearance: number
   /** The highest junction height (the pelvis profile's top). */
@@ -300,8 +314,8 @@ export interface ColumnRig {
   lowerOffset: V3[]
   capsules: Capsule[]
   pelvis: PelvisSamples
-  /** Profile: rest-frame heights of its bottom and top, bin height. */
-  profile: { bottom: number; top: number; bin: number }
+  /** Profile: rest-frame heights of its bottom and top, bin height, the margin added to its radius. */
+  profile: { bottom: number; top: number; bin: number; margin: number }
   crotch: number
   clearance: number
   ground: number
@@ -348,12 +362,20 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
   const pos = g.getAttribute('position') as THREE.BufferAttribute
   const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
   const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute
+  const H = person.p.stature
+  const crotch = hipsAt[1] - cfg.crotch * H
+  const bin = cfg.pelvisBin * H
+  const top = form ? form.top : Math.max(...upper.map((u) => rest[u * 3 + 1]))
+  const bottom = crotch - bin
   const capsules: Capsule[] = CAPSULE_BONES.map(([bone, tail]) => {
     const i = bi(bone)
     const a = at(rest, i)
     let b: V3
     const mine: V3[] = []
+    // a thigh's radius only from drawn vertices below the profile bottom: above it the profile governs (section 3.5)
+    const thigh = bone.startsWith('thigh.')
     for (let v = 0; v < pos.count; v++) {
+      if (thigh && !(pos.getY(v) < bottom)) continue
       for (let c = 0; c < 4; c++) {
         if (si.getComponent(v, c) === i && sw.getComponent(v, c) > 0.1) {
           mine.push([pos.getX(v), pos.getY(v), pos.getZ(v)])
@@ -376,11 +398,6 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
     const margin = cols.capsules[bone] ?? 0
     return { bone: i, a, b, radius: radius + margin * scale }
   })
-  const H = person.p.stature
-  const crotch = hipsAt[1] - cfg.crotch * H
-  const bin = cfg.pelvisBin * H
-  const top = form ? form.top : Math.max(...upper.map((u) => rest[u * 3 + 1]))
-  const bottom = crotch - bin
   const arm = ARM_SET(asset)
   const cand: number[] = []
   for (let v = 0; v < pos.count; v++) {
@@ -415,7 +432,7 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
     lowerOffset,
     capsules,
     pelvis,
-    profile: { bottom, top, bin },
+    profile: { bottom, top, bin, margin: cfg.profileMargin * scale },
     crotch,
     clearance: form ? form.clearance : cfg.clearance * scale,
     ground: cfg.groundClearance * scale,
@@ -456,7 +473,10 @@ export class PelvisProfile {
   readonly bin: number
   /** The columns sorted by wrapped angle about the circle (the angles are fixed). */
   private readonly order: ReadonlyArray<{ c: number; k: number }>
-  constructor(angles: readonly number[], bottom: number, top: number, bin: number) {
+  /** Added to every query (the profile margin × scale, section 3.5's named response). */
+  readonly margin: number
+  constructor(angles: readonly number[], bottom: number, top: number, bin: number, margin = 0) {
+    this.margin = margin
     this.angles = angles
     this.order = angles.map((c, k) => ({ c: wrap(c), k })).sort((p, q) => p.c - q.c)
     this.bottom = bottom
@@ -555,7 +575,7 @@ export class PelvisProfile {
         break
       }
     }
-    return (1 - f) * this.columnAt(k0, y) + f * this.columnAt(k1, y)
+    return (1 - f) * this.columnAt(k0, y) + f * this.columnAt(k1, y) + this.margin
   }
 
   private columnAt(k: number, y: number): number {
@@ -601,9 +621,11 @@ interface Posed {
   head: V3[]
   radial: V3[]
   tangent: V3[]
-  /** ry: the capsule bone's rest-frame height row (restHeight); the capsule constrains a point
-   *  only below the profile bottom in that frame (section 3.5, owner decision 03.11.2026 20:56). */
+  /** ry: the capsule bone's rest-frame height row (restHeight); a capsule constrains a point below
+   *  the profile bottom in that frame or in the hips frame (capsuleActive, section 3.5). */
   capsules: Array<{ a: V3; b: V3; radius: number; ry: [number, number, number, number] }>
+  /** The posed hips frame's height row (restHeight), the frame the profile is read in. */
+  hy: [number, number, number, number]
   profile: PelvisProfile
   gravity: number[]
 }
@@ -626,6 +648,8 @@ export class ColumnDriver {
   private dt = 0
   private rated = true
   private readonly carried: Array<{ vertices: number[]; triangles: number[]; columns: number[] }>
+  /** Per segment its stations on the cloth (clothStations); null without a worn form. */
+  private readonly cloth: Array<{ at: Array<{ v0: number; v1: number; u: number }>; columns: number[] }> | null
 
   readonly rig: ColumnRig
   readonly cfg: DriverConfig
@@ -640,6 +664,7 @@ export class ColumnDriver {
     this.violation = new Float64Array(2 * this.n)
     this.M = new Float64Array(rig.bones * 16)
     this.carried = this.carriedSets()
+    this.cloth = this.clothStations()
   }
 
   /** Back to the gravity solution, solved without the rate limit on the next frame
@@ -760,7 +785,7 @@ export class ColumnDriver {
       return { a: xform(m, sub(c.a, r)), b: xform(m, sub(c.b, r)), radius: c.radius, ry: restHeightRow(m, r[1]) }
     })
     const angles = rig.radial.map((r) => Math.atan2(r[2], r[0]))
-    const profile = new PelvisProfile(angles, rig.profile.bottom, rig.profile.top, rig.profile.bin)
+    const profile = new PelvisProfile(angles, rig.profile.bottom, rig.profile.top, rig.profile.bin, rig.profile.margin)
     const samples: Array<{ a: number; y: number; r: number }> = []
     const pv = rig.pelvis
     for (let k = 0; k < pv.pos.length / 3; k++) {
@@ -774,7 +799,7 @@ export class ColumnDriver {
       const th = Math.atan2(dot(down, r), -dot(down, up))
       return Math.min(this.cfg.thetaMax * DEG, Math.max(0, this.cfg.gravityBlend * th))
     })
-    return { M, hipsM, origin, up, hipsInv, head, radial, tangent, capsules, profile, gravity }
+    return { M, hipsM, origin, up, hipsInv, head, radial, tangent, capsules, hy: restHeightRow(hipsM, hipsAt[1]), profile, gravity }
   }
 
   /** A figure-frame point as (angle, rest-frame height, radius) in the hips frame. */
@@ -806,8 +831,26 @@ export class ColumnDriver {
     return xdir(P.hipsM, rotate(offset, this.rig.tangent[k], th))
   }
 
-  /** The stations of segment s at angle θ, with the given angles for the rest. */
+  /** The stations of segment s at angle θ, with the given angles for the rest: with a worn form
+   *  its own skinned panel points (clothStations, possibly none), else points on its bone line. */
   private stations(s: number, theta: number, th: ArrayLike<number>): V3[] {
+    if (this.cloth) {
+      const own = this.cloth[s]
+      if (!own.at.length) return []
+      const P = this.posed!
+      const rig = this.rig
+      const panel = rig.form!.panel
+      const trial = Float64Array.from(th)
+      trial[s] = theta
+      const mats = new Map<number, number[]>()
+      for (const k of own.columns) {
+        const m = this.columnMatrices(k, trial)
+        mats.set(rig.upper[k], m.U)
+        mats.set(rig.lower[k], m.L)
+      }
+      const skin = (v: number) => skinPoint(at(panel.pos, v), panel.idx, panel.w, v * 4, P.M, rig.rest, (i) => mats.get(i) ?? null)
+      return own.at.map(({ v0, v1, u }) => add(mul(skin(v0), 1 - u), mul(skin(v1), u)))
+    }
     const k = s % this.n
     const top = this.pivot(s, th)
     const off = s < this.n ? this.rig.upperOffset[k] : this.rig.lowerOffset[k]
@@ -820,12 +863,13 @@ export class ColumnDriver {
   /** The posed obstacles of a frame (the containment test): the eight capsules, and whether a
    *  figure-frame point lies inside the skinned pelvis profile (from its bottom up; above the top
    *  bin the top bin's value holds, section 3.5). */
-  obstacles(bones: readonly THREE.Object3D[]): { capsules: Posed['capsules']; inProfile: (p: V3) => boolean; profileExcess: (p: V3) => number } {
+  obstacles(bones: readonly THREE.Object3D[]): { capsules: Posed['capsules']; hy: Posed['hy']; inProfile: (p: V3) => boolean; profileExcess: (p: V3) => number } {
     const P = this.pose(bones)
     const rig = this.rig
     const hipsAt = at(rig.rest, rig.hips)
     return {
       capsules: P.capsules,
+      hy: P.hy,
       inProfile: (p: V3) => {
         const h = this.hipsLocal(p, P.hipsInv, hipsAt)
         return h.y >= rig.profile.bottom && h.r <= P.profile.query(h.a, h.y)
@@ -864,13 +908,14 @@ export class ColumnDriver {
     let ground = -Infinity
     const hipsAt = at(rig.rest, rig.hips)
     st.forEach((p, j) => {
-      const chord = Math.max(len(sub(p, nst[0][j])), len(sub(p, nst[1][j])))
+      // the chord to the farther neighbour that has cloth stations (none: no chord)
+      const chord = Math.max(0, ...nst.filter((o) => o.length).map((o) => len(sub(p, o[j]))))
       const h = this.hipsLocal(p, P.hipsInv, hipsAt)
       // the profile at or above its bottom in the hips frame; a capsule below the profile bottom
-      // in its own bone's rest frame (section 3.5)
+      // in its own bone's rest frame or in the hips frame (section 3.5)
       const above = h.y >= rig.profile.bottom
       P.capsules.forEach((c) => {
-        if (restHeight(c.ry, p) >= rig.profile.bottom) return
+        if (!capsuleActive(c.ry, P.hy, p, rig.profile.bottom)) return
         const C = c.radius + rig.clearance
         const target = Math.sqrt(C * C + (chord / 2) * (chord / 2))
         worst = Math.max(worst, target - pointSegment(p, c.a, c.b))
@@ -953,6 +998,66 @@ export class ColumnDriver {
     return out
   }
 
+  /** Per segment its stations on the cloth (section 3.4, owner decision 03.11.2026 22:19): per panel
+   *  row, the point of the row's edge that crosses the column's own rest angle (two vertices and the
+   *  angular parameter u between them); the upper owns the rows without col.L weight, the lower the
+   *  rows with it; the stations are the owned rows (from row 0 down) at the station fractions. A
+   *  segment whose column no panel crosses has no stations. */
+  private clothStations(): Array<{ at: Array<{ v0: number; v1: number; u: number }>; columns: number[] }> | null {
+    const rig = this.rig
+    const panel = rig.form?.panel
+    if (!panel) return null
+    const out = Array.from({ length: 2 * this.n }, () => ({ at: [] as Array<{ v0: number; v1: number; u: number }>, columns: [] as number[] }))
+    const hipsAt = at(rig.rest, rig.hips)
+    const column = new Map<number, number>()
+    rig.upper.forEach((u, k) => column.set(u, k))
+    rig.lower.forEach((l, k) => column.set(l, k))
+    const lowerSet = new Set(rig.lower)
+    const lowW = (v: number) => {
+      let w = 0
+      for (let c = 0; c < 4; c++) if (lowerSet.has(panel.idx[v * 4 + c])) w += panel.w[v * 4 + c]
+      return w
+    }
+    for (let k = 0; k < this.n; k++) {
+      const ang = (v: number) => {
+        const d: V3 = [panel.pos[v * 3] - hipsAt[0], 0, panel.pos[v * 3 + 2] - hipsAt[2]]
+        return Math.atan2(dot(d, rig.tangent[k]), dot(d, rig.radial[k]))
+      }
+      const rows = new Map<number, { v0: number; v1: number; u: number }>()
+      for (let t = 0; t < panel.index.length / 3; t++) {
+        for (let e = 0; e < 3; e++) {
+          const i = panel.index[t * 3 + e]
+          const j = panel.index[t * 3 + ((e + 1) % 3)]
+          const v0 = Math.min(i, j)
+          const v1 = Math.max(i, j)
+          const r = panel.row[v0]
+          if (panel.row[v1] !== r || rows.has(r)) continue
+          const a0 = ang(v0)
+          const a1 = ang(v1)
+          if (Math.abs(a0) >= Math.PI / 2 || Math.abs(a1) >= Math.PI / 2 || a0 * a1 > 0) continue
+          rows.set(r, { v0, v1, u: a0 === a1 ? 0 : a0 / (a0 - a1) })
+        }
+      }
+      for (const lower of [false, true]) {
+        const list = [...rows].filter(([, x]) => lowW(x.v0) + lowW(x.v1) > 0 === lower).sort((p, q) => p[0] - q[0])
+        if (!list.length) continue
+        const seg = out[lower ? this.n + k : k]
+        seg.at = this.cfg.stations.map((f) => list[Math.round(f * (list.length - 1))][1])
+        const cols = new Set<number>()
+        for (const { v0, v1 } of seg.at) {
+          for (const v of [v0, v1]) {
+            for (let c = 0; c < 4; c++) {
+              const kk = panel.w[v * 4 + c] > 0 ? column.get(panel.idx[v * 4 + c]) : undefined
+              if (kk !== undefined) cols.add(kk)
+            }
+          }
+        }
+        seg.columns = [...cols].sort((p, q) => p - q)
+      }
+    }
+    return out
+  }
+
   /** Summed penetration depth of the triangles segment s carries, skinned with the given angles (0: no hit). */
   private triangleDepth(s: number, th: ArrayLike<number>): number {
     const panel = this.rig.form!.panel
@@ -982,13 +1087,13 @@ export class ColumnDriver {
       const centre = mul(add(add(a, b), c), 1 / 3)
       const rad = Math.max(len(sub(a, centre)), len(sub(b, centre)), len(sub(c, centre)))
       const hv = [a, b, c].map((p) => this.hipsLocal(p, P.hipsInv, hipsAt))
-      // a capsule meets only the part of a triangle below the profile bottom in its bone's rest
-      // frame (section 3.5): the triangle clipped there (that height is affine in the posed point)
+      // a capsule meets only the part of a triangle where it is active (section 3.5): the triangle
+      // clipped at the profile bottom in its bone's rest frame and in the hips frame (both affine)
       P.capsules.forEach((cap) => {
         const mid = mul(add(cap.a, cap.b), 0.5)
         const bound = len(sub(cap.b, cap.a)) / 2 + cap.radius + C
         if (len(sub(mid, centre)) > bound + rad) return
-        const below = clipBelow([a, b, c], [a, b, c].map((p) => restHeight(cap.ry, p)), rig.profile.bottom)
+        const below = clipActive([a, b, c], cap.ry, P.hy, rig.profile.bottom)
         if (!below.length) return
         const dist = Math.min(...below.map(([p, q, r]) => segmentTriangle(cap.a, cap.b, p, q, r)))
         const d = cap.radius + C - dist

@@ -13,7 +13,7 @@ import { VILLAGER_ASSET } from '../config/balance'
 import { applyClipLayers, clipLayers, stepClipLayers } from '../scenes/place/gltfClipLayers'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { carriesColumnWeight, clipBelow, ColumnDriver, columnRig, composeFigureMatrices, PelvisProfile, restHeight, restHeightRow, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
+import { capsuleActive, carriesColumnWeight, clipActive, clipBelow, ColumnDriver, columnRig, composeFigureMatrices, PelvisProfile, restHeight, restHeightRow, segmentTriangle, type ColumnRig, type DrivenFormRig } from './villagerSkirtDriver'
 import { ROUND_TRIP_SEQUENCES, runSequence } from './villagerSkirtDriverSequences'
 
 const CFG = VILLAGER_ASSET.drivenGarments.driver
@@ -80,7 +80,7 @@ function toyRig(n = 4, capsules: Array<[V3, V3, number]> = [], form: DrivenFormR
     lowerOffset: upper.map(() => [0, -0.4, 0] as V3),
     capsules: capsules.map(([a, b, radius]) => ({ bone: 1, a, b, radius })),
     pelvis: { pos, idx, w },
-    profile: { bottom: 0.9, top: 1.1, bin: 0.05 },
+    profile: { bottom: 0.9, top: 1.1, bin: 0.05, margin: 0 },
     crotch: 0.92,
     clearance: 0.006,
     ground: 0.002,
@@ -236,7 +236,7 @@ describe('the column driver', () => {
       anchors: [],
       clearance: 0.006,
       top: 1.1,
-      panel: { pos: [0.075, 0.25, 0.075, 0.15, 0.25, 0, 0, 0.25, 0.15], idx: [2 + n, 3 + n, 0, 0, 2 + n, 0, 0, 0, 3 + n, 0, 0, 0], w: [0.5, 0.5, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], index: [0, 1, 2], exempt: [0, 0, 0], clearance: [0.006, 0.006, 0.006] },
+      panel: { pos: [0.075, 0.25, 0.075, 0.15, 0.25, 0, 0, 0.25, 0.15], idx: [2 + n, 3 + n, 0, 0, 2 + n, 0, 0, 0, 3 + n, 0, 0, 0], w: [0.5, 0.5, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], index: [0, 1, 2], exempt: [0, 0, 0], clearance: [0.006, 0.006, 0.006], row: [1, 2, 3] },
     }
     const rig = toyRig(n, [], form)
     form.anchors = rig.upper.map((u) => ({ a: [rig.rest[u * 3], rig.rest[u * 3 + 1], rig.rest[u * 3 + 2]] as V3, ia: [0, 0, 0, 0], wa: [1, 0, 0, 0], b: [0, 0, 0] as V3, ib: [0, 0, 0, 0], wb: [0, 0, 0, 0], t: 0 }))
@@ -279,7 +279,7 @@ describe('the column driver', () => {
       anchors: [],
       clearance: 0.006,
       top: 1.1,
-      panel: { pos: [0.15, 0.4, -0.05, 0.15, 0.4, 0.05, 0.15, 0.3, 0], idx: Array(3).fill([2 + n, 0, 0, 0]).flat(), w: Array(3).fill([1, 0, 0, 0]).flat(), index: [0, 1, 2], exempt: [0, 0, 0], clearance: [0.006, 0.006, 0.006] },
+      panel: { pos: [0.15, 0.4, -0.05, 0.15, 0.4, 0.05, 0.15, 0.3, 0], idx: Array(3).fill([2 + n, 0, 0, 0]).flat(), w: Array(3).fill([1, 0, 0, 0]).flat(), index: [0, 1, 2], exempt: [0, 0, 0], clearance: [0.006, 0.006, 0.006], row: [1, 2, 3] },
     }
     const rig = toyRig(n, [[[0.6, 0.51, -0.2], [0.6, 0.51, 0.2], 0.03]], form)
     form.anchors = rig.upper.map((u) => {
@@ -303,7 +303,7 @@ describe('the column driver', () => {
       anchors: [],
       clearance: 0.006,
       top: 1.1,
-      panel: { pos: [0.15, 0.4, -0.05, 0.15, 0.4, 0.05, 0.15, 0.3, 0], idx: Array(3).fill([2 + n, 0, 0, 0]).flat(), w: Array(3).fill([1, 0, 0, 0]).flat(), index: [0, 1, 2], exempt: [0, 0, 0], clearance: [0.006, 0.006, 0.006] },
+      panel: { pos: [0.15, 0.4, -0.05, 0.15, 0.4, 0.05, 0.15, 0.3, 0], idx: Array(3).fill([2 + n, 0, 0, 0]).flat(), w: Array(3).fill([1, 0, 0, 0]).flat(), index: [0, 1, 2], exempt: [0, 0, 0], clearance: [0.006, 0.006, 0.006], row: [1, 2, 3] },
     }
     const rig = toyRig(n, [[[0.13, 0.35, -0.3], [0.13, 0.35, 0.3], 0.02]], form)
     form.anchors = rig.upper.map((u) => {
@@ -564,5 +564,113 @@ describe("a capsule's rest-frame height (section 3.5, owner decision 03.11.2026 
     const p = new THREE.Vector3(0.3, -0.2, 0.7)
     const local = p.clone().applyMatrix4(new THREE.Matrix4().fromArray(m).invert())
     expect(restHeight(ry, [p.x, p.y, p.z])).toBeCloseTo(local.y + 1, 12)
+  })
+})
+
+describe('the capsule activity (section 3.5, owner decision 03.11.2026 22:19, variant U)', () => {
+  // the bone of the rest-frame block above; the hips frame here the identity at rest height 1
+  const m = new THREE.Matrix4().makeRotationZ(Math.PI / 2).setPosition(0, 1.5, 0).elements
+  const ry = restHeightRow(m, 1)
+  const hy = restHeightRow(new THREE.Matrix4().setPosition(0, 1, 0).elements, 1)
+  it('holds a point below the bottom in the rest frame OR in the hips frame', () => {
+    // rest-frame height 0.6 (below 0.9), hips height 1.5: active by the rest frame
+    expect(capsuleActive(ry, hy, [0.4, 1.5, 0], 0.9)).toBe(true)
+    // rest-frame height 1 (at or above), hips-frame height 0.8: active by the hips frame
+    expect(restHeight(ry, [0, 0.8, 0])).toBeCloseTo(1, 12)
+    expect(capsuleActive(ry, hy, [0, 0.8, 0], 0.9)).toBe(true)
+    // above the bottom in both frames: inactive
+    expect(capsuleActive(ry, hy, [-0.2, 1.5, 0], 0.9)).toBe(false)
+  })
+  it('clips a triangle to the union of both frames’ parts below the bottom', () => {
+    // identity frames: both heights are the posed y (the rest frame's offset 0)
+    const id = [0, 1, 0, 0]
+    const tri: V3[] = [
+      [0, 0, 0],
+      [1, 2, 0],
+      [0, 2, 1],
+    ]
+    const area = (ts: V3[][]) =>
+      ts.reduce((s, [a, b, c]) => {
+        const u = new THREE.Vector3(...b).sub(new THREE.Vector3(...a))
+        const v = new THREE.Vector3(...c).sub(new THREE.Vector3(...a))
+        return s + 0.5 * u.cross(v).length()
+      }, 0)
+    // a hips frame whose height is y + 0.5 holds y < 0.5, inside the rest frame's y < 1: the union is y < 1
+    expect(area(clipActive(tri, id, [0, 1, 0, 0.5], 1))).toBeCloseTo(area(clipBelow(tri, tri.map((p) => p[1]), 1)), 12)
+    // a hips frame whose height is y − 1 holds y < 2: the whole triangle
+    expect(area(clipActive(tri, id, [0, 1, 0, -1], 1))).toBeCloseTo(area([tri]), 12)
+  })
+})
+
+describe('the stations on the cloth (section 3.4, owner decision 03.11.2026 22:19)', () => {
+  /** Two panel rows at radius 0.2 round the toy hips, three vertices each at −20°, 10° and 40°
+   *  (column 0's radial at 0°), weighted to col.U.0 only; quads split as the builder splits them. */
+  const clothRig = () => {
+    const n = 4
+    const pos: number[] = []
+    const rows = [1.0, 0.9, 0.8]
+    for (const y of rows) {
+      for (const d of [-20, 10, 40]) {
+        const a = d * DEG
+        pos.push(0.2 * Math.cos(a), y, 0.2 * Math.sin(a))
+      }
+    }
+    const nv = pos.length / 3
+    const index: number[] = []
+    for (let r = 0; r < rows.length - 1; r++) {
+      for (let j = 0; j < 2; j++) {
+        const v = (rr: number, jj: number) => rr * 3 + jj
+        index.push(v(r, j), v(r + 1, j), v(r + 1, j + 1), v(r, j), v(r + 1, j + 1), v(r, j + 1))
+      }
+    }
+    const form: DrivenFormRig = {
+      anchors: [],
+      clearance: 0.006,
+      top: 1.1,
+      panel: {
+        pos,
+        idx: Array(nv).fill([2, 0, 0, 0]).flat(),
+        w: Array(nv).fill([1, 0, 0, 0]).flat(),
+        index,
+        exempt: Array(nv).fill(0),
+        clearance: Array(nv).fill(0.006),
+        row: Array.from({ length: nv }, (_, v) => Math.floor(v / 3)),
+      },
+    }
+    const rig = toyRig(n, [], form)
+    form.anchors = rig.upper.map((u) => {
+      const h: V3 = [rig.rest[u * 3], rig.rest[u * 3 + 1], rig.rest[u * 3 + 2]]
+      return { a: h, ia: [0, 0, 0, 0], wa: [1, 0, 0, 0], b: h, ib: [0, 0, 0, 0], wb: [1, 0, 0, 0], t: 0 }
+    })
+    return { rig, form }
+  }
+  it("puts a column's stations on its own skinned panel points at the row fractions; a column no panel crosses has none", () => {
+    const { rig } = clothRig()
+    const d = new ColumnDriver(rig)
+    d.step(toyBones(rig), 1 / 60)
+    const st = d.stationsOf(0)
+    // rows 0..2 at fractions 1/3, 2/3, 1: rows 1, 1 (round(2/3) = 1) and 2, at the column's own angle
+    expect(st).toHaveLength(3)
+    expect(st.map((p) => p[1])).toEqual([0.9, 0.9, 0.8].map((y) => expect.closeTo(y, 9)))
+    // on the row's edge between the −20° and 10° vertices at the angular parameter u = 2/3: on the
+    // cloth (radius about 0.2), not on the bone line (radius 0.15)
+    const at = (deg: number) => [0.2 * Math.cos(deg * DEG), 0.2 * Math.sin(deg * DEG)]
+    const want = [0, 1].map((e) => at(-20)[e] / 3 + (2 * at(10)[e]) / 3)
+    for (const p of st) {
+      expect(p[0]).toBeCloseTo(want[0], 9)
+      expect(p[2]).toBeCloseTo(want[1], 9)
+    }
+    // columns 1 to 3 and every lower segment: no panel crosses them
+    for (const s of [1, 2, 3, 4, 5, 6, 7]) expect(d.stationsOf(s)).toEqual([])
+  })
+  it('turns the stations with the trial angle (the column bone carries them)', () => {
+    const { rig } = clothRig()
+    const d = new ColumnDriver(rig)
+    d.step(toyBones(rig), 1 / 60)
+    const before = d.stationsOf(0)[2]
+    d.theta[0] = 30 * DEG
+    const after = d.stationsOf(0)[2]
+    expect(after[1]).toBeGreaterThan(before[1])
+    expect(Math.hypot(after[0], after[2])).toBeGreaterThan(Math.hypot(before[0], before[2]))
   })
 })

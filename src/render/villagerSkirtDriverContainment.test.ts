@@ -3,8 +3,9 @@
 // section 3.5, B13): every vertex of every leg and pelvis triangle, plus a
 // barycentric grid at most 1 cm apart inside each, lies in the union of the
 // eight body-only capsules and the skinned pelvis profile (a capsule holds a
-// sample only below the profile bottom in its bone's rest frame, the profile
-// only at or above it in the posed hips frame; owner decision 03.11.2026), over the clip
+// sample below the profile bottom in its bone's rest frame or in the posed hips
+// frame, the profile only at or above it in the posed hips frame; owner
+// decisions 03.11.2026 20:56 and 22:19), over the clip
 // domain the game draws (walk, jog and sprint at three speeds with stride
 // warp, carry, dig, and the game's start and stop ramps frame by frame) and the builds
 // −1, 0 and +1 of every sex and age group. Named response for a sample
@@ -27,7 +28,7 @@ import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { approach, legDims, phasePerDistance, rephase, strideReach, walkPose } from './figureWalk'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { ColumnDriver, columnRig, pointSegment, restHeight } from './villagerSkirtDriver'
+import { capsuleActive, ColumnDriver, columnRig, pointSegment, restHeight } from './villagerSkirtDriver'
 
 type V3 = [number, number, number]
 const LEG = ['thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
@@ -178,10 +179,11 @@ describe('containment of the rendered legs and pelvis', () => {
                 const cc = tris[t * 3 + 2]
                 // a capsule is convex: three corners inside one capsule hold the whole triangle
                 const corner = (v: number): V3 => [skinned[v * 3], skinned[v * 3 + 1], skinned[v * 3 + 2]]
-                // the rest-frame height is affine, so three corners below the profile bottom in the
-                // capsule bone's rest frame hold the interior there too
-                const holds = (cap: (typeof ob.capsules)[number], p: V3) => restHeight(cap.ry, p) < rig.profile.bottom && pointSegment(p, cap.a, cap.b) <= cap.radius
-                if (ob.capsules.some((cap) => [a, b, cc].every((v) => holds(cap, corner(v))))) {
+                // both heights are affine, so three corners below the profile bottom in the capsule
+                // bone's rest frame (or all three in the hips frame) hold the interior there too
+                const holds = (cap: (typeof ob.capsules)[number], p: V3) => pointSegment(p, cap.a, cap.b) <= cap.radius
+                const activeAll = (cap: (typeof ob.capsules)[number]) => [a, b, cc].every((v) => restHeight(cap.ry, corner(v)) < rig.profile.bottom) || [a, b, cc].every((v) => restHeight(ob.hy, corner(v)) < rig.profile.bottom)
+                if (ob.capsules.some((cap) => activeAll(cap) && [a, b, cc].every((v) => holds(cap, corner(v))))) {
                   samples += weights[t].length / 2
                   continue
                 }
@@ -195,10 +197,10 @@ describe('containment of the rendered legs and pelvis', () => {
                   if (ob.inProfile(p)) continue
                   const pe = ob.profileExcess(p)
                   let best = Infinity
-                  // no envelope at all: below the hips-frame bottom yet at or above it in every capsule's rest frame
+                  // no envelope at all (none expected: below the hips-frame bottom every capsule is active)
                   let bone = 'no envelope'
                   for (const cap of ob.capsules) {
-                    if (restHeight(cap.ry, p) >= rig.profile.bottom) continue
+                    if (!capsuleActive(cap.ry, ob.hy, p, rig.profile.bottom)) continue
                     const d = pointSegment(p, cap.a, cap.b) - cap.radius
                     if (d < best) {
                       best = d

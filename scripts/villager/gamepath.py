@@ -633,6 +633,20 @@ def col_rest_height_row(m, rest_y):
     return (e[1], e[5], e[9], e[13] + rest_y)
 
 
+def col_capsule_active(ry, hy, p, bottom):
+    """A capsule constrains a posed point below the profile bottom in its bone's rest frame OR in the
+    posed hips frame (section 3.5, owner decision 03.11.2026 22:19; as villagerSkirtDriver.ts capsuleActive)."""
+    return col_rest_height(ry, p) < bottom or col_rest_height(hy, p) < bottom
+
+
+def col_clip_active(tri, ry, hy, bottom):
+    """The part of a triangle where a capsule is active (as villagerSkirtDriver.ts clipActive)."""
+    out = col_clip_below(tri, [col_rest_height(ry, x) for x in tri], bottom)
+    for t in col_clip_below(tri, [-col_rest_height(ry, x) for x in tri], -bottom, True):
+        out += col_clip_below(t, [col_rest_height(hy, x) for x in t], bottom)
+    return out
+
+
 def col_segment_segment(p1, q1, p2, q2):
     """Ericson 5.1.9, as villagerSkirtDriver.ts segmentSegment."""
     d1 = _sub(q1, p1)
@@ -750,7 +764,9 @@ class PelvisProfile:
     nearest populated one (same column first, lower on a tie; else other
     columns by angle, then height, larger value on a tie)."""
 
-    def __init__(self, angles, bottom, top, bin_):
+    def __init__(self, angles, bottom, top, bin_, margin=0.0):
+        # margin: added to every query (the profile margin x scale, section 3.5)
+        self.margin = margin
         self.angles = list(angles)
         self.bottom = bottom
         self.top = top
@@ -827,7 +843,7 @@ class PelvisProfile:
                 k0, k1 = pk, qk
                 f = d / span if span > 0 else 0.0
                 break
-        return (1 - f) * self._column_at(k0, y) + f * self._column_at(k1, y)
+        return (1 - f) * self._column_at(k0, y) + f * self._column_at(k1, y) + self.margin
 
     def _column_at(self, k, y):
         nb = self.bins
@@ -880,6 +896,7 @@ class ColumnDriver:
         self.rated = True
         self.P = None
         self.carried = self._carried_sets()
+        self.cloth = self._cloth_stations()
 
     def reset(self):
         self.fresh = True
@@ -965,7 +982,7 @@ class ColumnDriver:
             caps.append((_xform(m, _sub(c['a'], r)), _xform(m, _sub(c['b'], r)), c['radius'], col_rest_height_row(m, r[1])))
         angles = [math.atan2(r[2], r[0]) for r in rig['radial']]
         pr = rig['profile']
-        profile = PelvisProfile(angles, pr['bottom'], pr['top'], pr['bin'])
+        profile = PelvisProfile(angles, pr['bottom'], pr['top'], pr['bin'], pr['margin'])
         pv = rig['pelvis']
         samples = []
         for k in range(len(pv['pos']) // 3):
@@ -978,7 +995,7 @@ class ColumnDriver:
             th = math.atan2(_dot(down, r), -_dot(down, up))
             gravity.append(min(cfg['thetaMax'] * _DEG, max(0.0, cfg['gravityBlend'] * th)))
         return {'M': M, 'hipsM': hipsM, 'up': up, 'hipsInv': hipsInv, 'head': head, 'radial': radial, 'tangent': tangent,
-                'capsules': caps, 'profile': profile, 'gravity': gravity}
+                'capsules': caps, 'hy': col_rest_height_row(hipsM, hips_at[1]), 'profile': profile, 'gravity': gravity}
 
     @staticmethod
     def _hips_local(p, hipsInv, hips_at):
@@ -998,6 +1015,24 @@ class ColumnDriver:
         return _add(P['head'][k], self._direction(k, th[k], self.rig['upperOffset'][k]))
 
     def _stations(self, s, theta, th):
+        # with a worn form the segment's own skinned panel points (_cloth_stations, possibly none)
+        if self.cloth is not None:
+            own = self.cloth[s]
+            if not own['at']:
+                return []
+            rig = self.rig
+            panel = rig['form']['panel']
+            trial = list(th)
+            trial[s] = theta
+            mats = {}
+            for k in own['columns']:
+                U, L = self._column_matrices(k, trial)
+                mats[rig['upper'][k]] = U
+                mats[rig['lower'][k]] = L
+
+            def skin(v):
+                return _skin_point(_at(panel['pos'], v), panel['idx'], panel['w'], v * 4, self.P['M'], rig['rest'], mats.get)
+            return [_add(_mul(skin(v0), 1 - u), _mul(skin(v1), u)) for v0, v1, u in own['at']]
         k = s % self.n
         top = self._pivot(s, th)
         off = self.rig['upperOffset'][k] if s < self.n else self.rig['lowerOffset'][k]
@@ -1022,13 +1057,14 @@ class ColumnDriver:
         ground = -math.inf
         hips_at = _at(rig['rest'], rig['hips'])
         for j, p in enumerate(st):
-            chord = max(_len(_sub(p, nst[0][j])), _len(_sub(p, nst[1][j])))
+            # the chord to the farther neighbour that has cloth stations (none: no chord)
+            chord = max([0.0] + [_len(_sub(p, o[j])) for o in nst if o])
             ha, hy, hr = self._hips_local(p, P['hipsInv'], hips_at)
             # the profile at or above its bottom in the hips frame; a capsule below the profile bottom
-            # in its own bone's rest frame (section 3.5)
+            # in its own bone's rest frame or in the hips frame (section 3.5)
             above = hy >= rig['profile']['bottom']
             for a, b, radius, ry in P['capsules']:
-                if col_rest_height(ry, p) >= rig['profile']['bottom']:
+                if not col_capsule_active(ry, P['hy'], p, rig['profile']['bottom']):
                     continue
                 C = radius + rig['clearance']
                 target = math.sqrt(C * C + (chord / 2) * (chord / 2))
@@ -1086,6 +1122,59 @@ class ColumnDriver:
             out[s]['triangles'] = [t for t in range(len(panel['index']) // 3) if any(panel['index'][t * 3 + j] in st for j in range(3))]
         return out
 
+    def _cloth_stations(self):
+        """Per segment its stations on the cloth (as villagerSkirtDriver.ts clothStations): per panel row
+        the point of the row's edge crossing the column's own rest angle; the upper owns the rows
+        without col.L weight, the lower the rows with it; the owned rows at the station fractions."""
+        rig = self.rig
+        form = rig.get('form')
+        if not form:
+            return None
+        panel = form['panel']
+        n = self.n
+        out = [{'at': [], 'columns': []} for _ in range(2 * n)]
+        hips_at = _at(rig['rest'], rig['hips'])
+        column = {}
+        for k in range(n):
+            column[rig['upper'][k]] = k
+            column[rig['lower'][k]] = k
+        lower_set = set(rig['lower'])
+
+        def low_w(v):
+            return sum(panel['w'][v * 4 + c] for c in range(4) if panel['idx'][v * 4 + c] in lower_set)
+        for k in range(n):
+            def ang(v, k=k):
+                d = (panel['pos'][v * 3] - hips_at[0], 0.0, panel['pos'][v * 3 + 2] - hips_at[2])
+                return math.atan2(_dot(d, rig['tangent'][k]), _dot(d, rig['radial'][k]))
+            rows = {}
+            idx = panel['index']
+            for t in range(len(idx) // 3):
+                for e in range(3):
+                    i, j = idx[t * 3 + e], idx[t * 3 + (e + 1) % 3]
+                    v0, v1 = min(i, j), max(i, j)
+                    r = panel['row'][v0]
+                    if panel['row'][v1] != r or r in rows:
+                        continue
+                    a0, a1 = ang(v0), ang(v1)
+                    if abs(a0) >= math.pi / 2 or abs(a1) >= math.pi / 2 or a0 * a1 > 0:
+                        continue
+                    rows[r] = (v0, v1, 0.0 if a0 == a1 else a0 / (a0 - a1))
+            for lower in (False, True):
+                lst = sorted((r, x) for r, x in rows.items() if (low_w(x[0]) + low_w(x[1]) > 0) == lower)
+                if not lst:
+                    continue
+                seg = out[n + k if lower else k]
+                # JS Math.round: halves up
+                seg['at'] = [lst[int(math.floor(f * (len(lst) - 1) + 0.5))][1] for f in self.cfg['stations']]
+                cols = set()
+                for v0, v1, _u in seg['at']:
+                    for v in (v0, v1):
+                        for c in range(4):
+                            if panel['w'][v * 4 + c] > 0 and panel['idx'][v * 4 + c] in column:
+                                cols.add(column[panel['idx'][v * 4 + c]])
+                seg['columns'] = sorted(cols)
+        return out
+
     def _triangle_depth(self, s, th):
         rig = self.rig
         panel = rig['form']['panel']
@@ -1115,14 +1204,14 @@ class ColumnDriver:
             centre = _mul(_add(_add(a, b), c), 1 / 3)
             rad = max(_len(_sub(a, centre)), _len(_sub(b, centre)), _len(_sub(c, centre)))
             hv = [self._hips_local(x, P['hipsInv'], hips_at) for x in (a, b, c)]
-            # a capsule meets only the part of a triangle below the profile bottom in its bone's rest
-            # frame (section 3.5; as villagerSkirtDriver.ts)
+            # a capsule meets only the part of a triangle where it is active: clipped at the profile
+            # bottom in its bone's rest frame and in the hips frame (section 3.5; as villagerSkirtDriver.ts)
             for ca, cb, radius, ry in P['capsules']:
                 mid = _mul(_add(ca, cb), 0.5)
                 bound = _len(_sub(cb, ca)) / 2 + radius + C
                 if _len(_sub(mid, centre)) > bound + rad:
                     continue
-                below = col_clip_below((a, b, c), [col_rest_height(ry, x) for x in (a, b, c)], rig['profile']['bottom'])
+                below = col_clip_active((a, b, c), ry, P['hy'], rig['profile']['bottom'])
                 if not below:
                     continue
                 dist = min(col_segment_triangle(ca, cb, p, q, r) for p, q, r in below)
@@ -1306,7 +1395,8 @@ class ColumnDriver:
                 mats[self.rig['lower'][k]] = L
             return min(_skin_point(_at(panel['pos'], v), panel['idx'], panel['w'], v * 4, self.P['M'], self.rig['rest'], mats.get)[1]
                        for v in self.carried[s]['vertices'])
-        low = min(p[1] for p in self._stations(s, theta, trial))
+        # no stations (a column no panel crosses): Infinity, as Math.min() in the game
+        low = min((p[1] for p in self._stations(s, theta, trial)), default=math.inf)
         if s < n:
             low = min([low] + [p[1] for p in self._stations(n + s, trial[n + s], trial)])
         return low
@@ -1406,7 +1496,7 @@ def toy_column_rig(n=4, capsules=(), form=None, head_r=0.15):
         'upper': upper, 'lower': lower, 'radial': radial, 'tangent': tangent, 'headOffset': head_off,
         'upperOffset': [[0.0, -0.4, 0.0]] * n, 'lowerOffset': [[0.0, -0.4, 0.0]] * n,
         'capsules': [{'bone': 1, 'a': list(a), 'b': list(b), 'radius': r} for a, b, r in capsules],
-        'pelvis': {'pos': pos, 'idx': idx, 'w': w}, 'profile': {'bottom': 0.9, 'top': 1.1, 'bin': 0.05},
+        'pelvis': {'pos': pos, 'idx': idx, 'w': w}, 'profile': {'bottom': 0.9, 'top': 1.1, 'bin': 0.05, 'margin': 0.0},
         'crotch': 0.92, 'clearance': 0.006, 'ground': 0.002, 'form': form,
     }
 
@@ -1489,7 +1579,7 @@ def selftest_column_driver():
     n = 4
     tri_form = {'anchors': None, 'clearance': 0.006, 'top': 1.1,
                 'panel': {'pos': [0.15, 0.4, -0.05, 0.15, 0.4, 0.05, 0.15, 0.3, 0.0], 'idx': [2 + n, 0, 0, 0] * 3,
-                          'w': [1.0, 0.0, 0.0, 0.0] * 3, 'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3}}
+                          'w': [1.0, 0.0, 0.0, 0.0] * 3, 'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3, 'row': [1, 2, 3]}}
     rig = toy_column_rig(n=n, capsules=[([0.6, 0.51, -0.2], [0.6, 0.51, 0.2], 0.03)], form=tri_form)
     rig['form']['anchors'] = [{'a': h, 'ia': [0, 0, 0, 0], 'wa': [1, 0, 0, 0], 'b': h, 'ib': [0, 0, 0, 0], 'wb': [1, 0, 0, 0], 't': 0.0}
                               for h in (_at(rig['rest'], u) for u in rig['upper'])]
@@ -1567,7 +1657,7 @@ def _toy_low_hem():
             'panel': {'pos': [0.075, 0.25, 0.075, 0.15, 0.25, 0.0, 0.0, 0.25, 0.15],
                       'idx': [2 + n, 3 + n, 0, 0, 2 + n, 0, 0, 0, 3 + n, 0, 0, 0],
                       'w': [0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-                      'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3}}
+                      'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3, 'row': [1, 2, 3]}}
     rig = toy_column_rig(n=n, form=form)
     form['anchors'] = [{'a': _at(rig['rest'], u), 'ia': [0, 0, 0, 0], 'wa': [1, 0, 0, 0], 'b': [0.0, 0.0, 0.0],
                         'ib': [0, 0, 0, 0], 'wb': [0, 0, 0, 0], 't': 0.0} for u in rig['upper']]
