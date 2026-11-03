@@ -122,6 +122,7 @@ put it is the mistake this line exists to stop.
   Verifiable: plan and break-check record; forced-outfit acceptance rows per form in `polish-villagers`, both backends, picture-checked, the WindelLook situation re-shot; pipeline selftests and Vitest; cross-vendor review record.
   Bundle: Dorfleben.
   Criticality: high - every villager wearing these forms, visible at first glance.
+  Status 03.11.2026 (branch at 85700efa4): CI unit red, the male elder's kneel test runs 340 s (limit 60 s). Cause measured: already while walking the elder's upper segments 5-8 sit at thetaMax 80° with a triangle residual every frame, so each frame pays ~9 joint searches; no tilt clears those triangles (likely waist-anchored top rows inside the elder's pelvis profile or a capsule) and the panel stands 80° off the body. Next: locate the offending triangles and constraint, fix the elder fit per plan sections 3.5/3.6, then re-time.
 - [ ] 1399. Villager garments stage 4: shirt, robe, togas and wraps as trunk shells with driven hems
   Queue position: directly after point 1482.
   Source: split from point 1347 on 21.10.2026 (owner decision under the standing split rule): point 1347 delivered stage 1 of the approved staged garment plan (docs/garment-merge-r9-1347.md, user decision on the board "Kleidungsplan stufenweise prüfen"); its user goal (user 12.10.2026: a walking villager's swing leg leaves its trouser leg behind; a child's hip cloth stands off the body like a diaper) is finished by this point and its siblings.
