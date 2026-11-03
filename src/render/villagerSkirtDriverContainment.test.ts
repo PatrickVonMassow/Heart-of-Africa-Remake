@@ -162,7 +162,12 @@ describe('containment of the rendered legs and pelvis', () => {
                     } else {
                       let lb = -1
                       let lw = 0
-                      for (let k = 0; k < 4; k++) if (legSet.has(si.getComponent(a, k)) && sw.getComponent(a, k) > lw) (lw = sw.getComponent(a, k)), (lb = si.getComponent(a, k))
+                      for (let k = 0; k < 4; k++) {
+                        if (legSet.has(si.getComponent(a, k)) && sw.getComponent(a, k) > lw) {
+                          lw = sw.getComponent(a, k)
+                          lb = si.getComponent(a, k)
+                        }
+                      }
                       const bone = asset.bones[lb] ?? 'leg'
                       if (pe > (above[bone]?.d ?? 0)) above[bone] = { d: pe, where }
                     }
