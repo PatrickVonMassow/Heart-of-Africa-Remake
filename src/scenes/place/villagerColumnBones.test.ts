@@ -60,10 +60,13 @@ describe('the column bones of the villager skeleton', () => {
     expect(Object.keys(c.capsules).sort()).toEqual(['foot.L', 'foot.R', 'shin.L', 'shin.R', 'thigh.L', 'thigh.R', 'toe.L', 'toe.R'])
   })
 
-  it('carry no clip channel and no skin weight', () => {
+  it('carry no clip channel, and skin weight only on the driven panels', () => {
     const cols = columnNames().map((n) => asset.bones.indexOf(n))
     for (const clip of Object.values(asset.clips)) for (const i of cols) expect(clip.rot[i]).toHaveLength(0)
+    // the driven panels hang on the column bones by construction (plan section 3.8)
+    const panels = new Set(Object.values(asset.driven).map((d) => d.panel))
     for (const [name, g] of Object.entries(asset.geometries)) {
+      if (panels.has(name)) continue
       const si = g.getAttribute('skinIndex')
       const sw = g.getAttribute('skinWeight')
       if (!si || !sw) continue
