@@ -6856,6 +6856,13 @@ if (GARMENT_DRIVEN || (section('garment-acceptance') && process.env.VERIFY_SECTI
         ROWS.push({ slug: `${f}-carryidle-${who}`, text: `driven ${FORM_TEXT[form]}, carrying the tool standing, ${whoText}, judged at the hands and forearms`, fig: { ...w, garments: g, clip: 'carryIdle', at: 0.25 }, views: ['front34'] })
         ROWS.push({ slug: `${f}-shoulders-${who}`, text: `driven ${FORM_TEXT[form]}, idle with the shoulder pose (the tag game's caught slump), ${whoText}, judged at the hands and forearms`, fig: { ...w, garments: g, clip: 'idle', at: 0.25, shoulders: true }, views: ['front34'] })
       }
+    // Point 1485: the rest standstill, judged at the back hem over the thighs
+    // (the columns the 5-degree assertion keeps off vertical), for the
+    // standstill test's three figures.
+    const ELDER = { sex: 'male', age: 'elder' }
+    for (const form of ['loinFlap', 'girdleTails'])
+      for (const [who, w, whoText] of [['man', MAN, 'adult man'], ['girl', GIRL, 'girl (child)'], ['elder', ELDER, 'elder man']])
+        ROWS.push({ slug: `${form.toLowerCase()}-rest-${who}`, text: `driven ${FORM_TEXT[form]}, idle at rest, ${whoText}, judged at the back hem over the thighs`, fig: { ...w, garments: [`${form}-waist`], clip: 'idle', at: 0.25 }, views: ['side', 'rear34'] })
     // the loin flap over the waist beads (the panel opens over them, section 3.9)
     for (const [who, w, whoText] of [['woman', YOUNG_WOMAN, 'young woman'], ['girl', GIRL, 'girl (child)']])
       ROWS.push({ slug: `loinflap-over-waistbeads-walk-${who}`, text: `driven loin flap over the waist beads, walk, ${whoText}, judged where the panel passes over the beads`, fig: { ...w, garments: ['waistBeads-waist', 'loinFlap-waist'], clip: 'walk', at: STRIDE }, views: ['side', 'front34'] })
@@ -6961,7 +6968,10 @@ if (GARMENT_DRIVEN || (section('garment-acceptance') && process.env.VERIFY_SECTI
     if (!track) continue
     let shots = 0
     const missed = []
+    // GARMENT_ROWS: a slug regex that limits the run to matching rows.
+    const ROW_FILTER = process.env.GARMENT_ROWS ? new RegExp(process.env.GARMENT_ROWS) : null
     for (const row of ROWS) {
+      if (ROW_FILTER && !ROW_FILTER.test(row.slug)) continue
       // back to the spot the track was chosen from, so it stays clear
       await page.evaluate((h) => Object.assign(window.__placePlayer, { x: h.x, z: h.z, yaw: h.yaw }), home)
       const scale = row.fig.age === 'child' ? 0.55 : 1 // CHILD_FIGURE_SCALE
