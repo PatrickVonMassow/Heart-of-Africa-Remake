@@ -400,13 +400,24 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
     return { bone: i, a, b, radius: radius + margin * scale }
   })
   const arm = ARM_SET(asset)
+  const thighs = new Set([bi('thigh.L'), bi('thigh.R')])
   const cand: number[] = []
   for (let v = 0; v < pos.count; v++) {
     const y = pos.getY(v)
-    if (y < bottom || y > top) continue
+    if (y > top) continue
     let aw = 0
-    for (let c = 0; c < 4; c++) if (arm.has(si.getComponent(v, c))) aw += sw.getComponent(v, c)
-    if (aw <= cfg.pelvisArm) cand.push(v)
+    let tw = 0
+    for (let c = 0; c < 4; c++) {
+      const w = sw.getComponent(v, c)
+      if (arm.has(si.getComponent(v, c))) aw += w
+      if (thighs.has(si.getComponent(v, c))) tw += w
+    }
+    if (aw > cfg.pelvisArm) continue
+    // below the profile bottom only the thigh vertices: posed at or above the bottom in the hips
+    // frame (a lifted thigh) they count where they are drawn, posed below it they are dropped
+    // (owner decision 04.11.2026, section 3.5)
+    if (y < bottom && !(tw > 0.1)) continue
+    cand.push(v)
   }
   const chosen = farthestPoints(cand.map((v) => [pos.getX(v), pos.getY(v), pos.getZ(v)] as V3), cfg.pelvisSamples).map((k) => cand[k])
   if (chosen.length < 30) throw new Error(`columnRig: ${chosen.length} pelvis samples, at least 30 needed`)
@@ -514,6 +525,8 @@ export class PelvisProfile {
     const filled = new Uint8Array(n)
     this.value.fill(0)
     for (const s of samples) {
+      // a sample posed below the bottom is dropped, not clamped into the bottom bin (section 3.5)
+      if (s.y < this.bottom) continue
       const i = this.column(s.a) * this.bins + this.binOf(s.y)
       if (!filled[i] || s.r > this.value[i]) this.value[i] = s.r
       filled[i] = 1

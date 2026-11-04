@@ -792,6 +792,9 @@ class PelvisProfile:
         filled = [0] * (self.columns * nb)
         self.value = [0.0] * (self.columns * nb)
         for a, y, r in samples:
+            # a sample posed below the bottom is dropped, not clamped into the bottom bin (section 3.5)
+            if y < self.bottom:
+                continue
             i = self.column(a) * nb + self.bin_of(y)
             if not filled[i] or r > self.value[i]:
                 self.value[i] = r
