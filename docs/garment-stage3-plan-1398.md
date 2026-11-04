@@ -826,6 +826,17 @@ Owner options, each by the cause it removes (none implemented): thigh margin 0.0
 
 Open: whether the back-hem cloth lies inside the drawn thigh surface itself (5–8 drawn vertices per slab, none within 45° of the hit); male girdleTails column 0 at 6.9–7.3° (profile); the `assertionHealth` red.
 
+### Hand-over (point 1485, author r5, 04.11.2026; incomplete)
+
+Branch `feat/1485-skirt-containment-calibration`, main merged (`315f5fd16`), pushed head `b842b6fe9`. Commits: `0b69d098d` (c) the joint two-column search tries each refine step (5, 2.5°) round its coarse pair, TS driver and Python mirror (`scripts/villager/gamepath.py`) identically; `b842b6fe9` (a) the tapered slab capsules reverted (one capsule per thigh, `thighSlab` removed) and (b) a thigh capsule's radius only from vertices with thigh weight above `driver.thighRadiusWeight` in `src/config/balance.ts`, calibratable.
+
+Not done (the session reached its context fence after the code steps; no suite was started past it):
+- (b) the cut 0.2 is a placeholder, NOT chosen by measurement; the next round sweeps it (0.12 upward) with `columnRig(..., cfg)` overrides.
+- No measurement: columns 0 / 5 / 6 / 7 at rest for the six standstill cases and the male elder kneel time are not recorded as "author r5" in section 3.5.z, neither with the thigh margin 0.0241 nor with 0.004 (probe-local: override `asset.columns.capsules['thigh.L'|'thigh.R']`). `villagerSkirtStandstill.test.ts` logs θ per segment and serves as the tool.
+- The r4 probe `src/render/villagerSkirtStandstillProbe.test.ts` still rebuilds slab capsules from `cfg.thighSlab` (now undefined) and its 0.1 cut; it must follow the reverted rule before it is used again.
+- Gates on `b842b6fe9` not run: typecheck:test, build, lint, test:unit — all unknown, none claimed green.
+- Stop-rule state unknown; r4 already measured the male girdleTails column 0 at 6.9-7.3° (profile), which (a)-(c) do not address, so the stop rule is likely to apply.
+
 ## 8. Open questions for the break check
 
 - Q1: Is the per-figure continuity state (section 3.4) with reset rules acceptable as the driver's only state, given that the rest of the pose pipeline keeps comparable per-figure gait state (`ClipGait`)?
