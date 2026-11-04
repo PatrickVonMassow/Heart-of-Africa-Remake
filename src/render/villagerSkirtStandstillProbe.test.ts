@@ -388,7 +388,4 @@ describe('standstill probe (diagnostic, point 1485 r4)', () => {
       }
     }
   }
-  it('is a diagnostic probe, off unless PROBE_RUN is set', () => {
-    expect(true).toBe(true)
-  })
 })
