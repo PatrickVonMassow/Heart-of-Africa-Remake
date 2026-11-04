@@ -213,7 +213,7 @@ describe('containment of the rendered legs and pelvis', () => {
                     bone = 'profile'
                   }
                   if (!(best > 0)) continue
-                  const where = `${sex} ${age} ${build} ${mo.id} f${f} w${ms.weight.toFixed(2)} v${ms.speed.toFixed(2)}, rest y ${[a, b, cc].map((v) => pos.getY(v).toFixed(3)).join('/')}`
+                  const where = `${sex} ${age} ${build} ${mo.id} f${f} w${ms.weight.toFixed(2)} v${ms.speed.toFixed(2)}, rest y ${[a, b, cc].map((v) => pos.getY(v).toFixed(3)).join('/')}, nearest ${bone}, hips-frame height above the profile bottom ${((restHeight(ob.hy, p) - rig.profile.bottom) / person.frame.scale).toFixed(4)} × scale`
                   if (!legTri([a, b, cc])) {
                     // judged relative to this person's scale (the tolerance is in pipeline units)
                     const rel = best / person.frame.scale
