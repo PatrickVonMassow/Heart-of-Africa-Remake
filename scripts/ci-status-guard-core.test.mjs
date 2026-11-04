@@ -1193,6 +1193,18 @@ describe('charged reds', () => {
     expect(chargedRunIds(null, 'feat/1342-x').size).toBe(0)
   })
 
+  it('a closed point\'s red is charged by an open point naming its branch and run', () => {
+    const merged = [
+      '- [ ] 1482. Closure point',
+      '  CI run 41813029787 (red on feat/1485-skirt-x 79643e4) is charged to this point.',
+      '- [x] 1486. Closed point',
+      '  CI run 41813029788 (red on feat/1486-y) mentioned in a closed block.',
+    ].join('\n')
+    expect([...chargedRunIds(merged, 'feat/1485-skirt-x')]).toEqual(['41813029787'])
+    expect(chargedRunIds(merged, 'feat/1486-y').size).toBe(0)
+    expect(chargedRunIds(merged, 'feat/1487-z').size).toBe(0)
+  })
+
   it('a charged red on a feature ref reports without blocking', async () => {
     const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks(tasks) })
     expect(got.decision).toBe(null)
