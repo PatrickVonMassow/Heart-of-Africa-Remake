@@ -335,7 +335,7 @@ Under stop rule 4 no further envelope rule is invented; containment and the stan
   4. Close the activation gap at its source instead of by margin, both unmeasured: (a) let the profile's sample input include body vertices below the bottom that pose at or above it in the hips frame, dropping a sample posed below the bottom instead of clamping it into the bottom bin, so the profile follows a lifted thigh and rests unchanged; (b) taper the thigh capsule per height (its hem radius, not the buttock's) to remove the residual 15–23° of columns 5 and 7. Both are section 3.5 rule changes.
   5. Pelvis band: raise `pelvisSamples` or thin per profile cell (above).
 
-**Point 1485, author r3 (04.11.2026): the four owner steps applied, measured, stop rule reached.** Commits `3f6e2b4`-ff (see the hand-over); TS and Python mirror changed identically (the drop rule in `rebuild`); the rig builder (`columnRig`) is TS-only and exported to the mirror. Worst column at the rest standstill (male adult / female child / male elder; loinFlap, girdleTails; limit 5°) and containment after each step:
+**Point 1485, author r3 (04.11.2026): the four owner steps applied, measured, stop rule reached.** Commits `28108a9a5`, `cd86da894`, `3138100fa`, `58294379b`; TS and Python mirror changed identically (the drop rule in `rebuild`); the rig builder (`columnRig`) is TS-only and exported to the mirror. Worst column at the rest standstill (male adult / female child / male elder; loinFlap, girdleTails; limit 5°) and containment after each step:
 
 1. Profile margin 0 (band inert): standstill 22 / 29 / 26°, 28 / 30 / 30° (columns 5–7 at 20–30°, column 0 of the female child 27–29°); containment profile 0.0314 m (female adult −1, start f1, 0.0610 × scale above the bottom), thigh.R 0.0129 (female adult 0, sprint 4.2 f25; hidden by the margin before), band 0.0184 × scale (unchanged).
 2. Profile follows a lifted thigh (thigh vertices as sample input, posed-below samples dropped): standstill unchanged (0 / 29 / 26°, 28 / 30 / 29°: the rule is inert at rest, as intended); containment profile 0.0701 m (male adult +1, sprint 5 f21, 0.0134 × scale above the bottom), thigh.R 0.0138, thigh.L 0.0133, band 0.0240 × scale (female youth +1, sprint 5). The 240 farthest-point samples now spread over pelvis and thighs, so the band thins.
@@ -779,6 +779,18 @@ Tasks of the r2 preface:
 4. SECOND step: no defect found, so nothing fixed; the options with measured consequences are in section 3.5.z (keep margins / profile margin 0 / both margins off with rebuild / profile samples that follow a lifted thigh and a tapered thigh capsule / more pelvis samples).
 
 Open for the owner: the decision among those options; the elder kneel's 60 s limit under full-suite load; the male elder kneel and the containment stay red until then. Rebuild not needed in this round.
+
+### Hand-over (point 1485, author r3, 04.11.2026)
+
+Branch `feat/1485-skirt-containment-calibration`, worktree `/workspace/hoa/.claude/worktrees/point-1485`, main merged at the session start (`a031469d2`). Commits: profile margin 0; the profile follows a lifted thigh (TS and Python `rebuild` drop a sample posed below the bottom); tapered thigh slab capsules (`driver.thighSlab` 0.06 H); per-cell pelvis thinning; the plan sections 3.5, 3.5.z and 3.6 and this hand-over. No asset rebuild (none of the changes needs one; the thigh margin stays 0.0241). The band `driver.profileMarginBand` is inert with the margin 0 and left in place (the driver, its mirror and the rig schema read it).
+
+Gates on the main-merged tree: `npm run typecheck:test` green; `npm run build` green; `npm run lint` 0 errors, 1 unrelated warning (`polish-villagers.mjs` `fireBlaze`); `node scripts/villager/build.mjs runtime` green (shell round trip 5 outfits, shell position 5.97e-08; column round trip 3 sequences, 190 frames, worst translation 3.33e-16, rotation 1.11e-16: the Python mirror follows the drop rule and the slab capsules; the run took 86 min because the changed driver config re-keyed the pipeline caches, the committed asset is unchanged); `npm run test:unit` NOT RUN: the session reached the context fence (CLAUDE.md §6, 122k) before it could start, so the full unit result is unknown; the covering tests ran alone (standstill, containment, male elder kneel, see above). The owner runs it once.
+
+Steps of the r3 preface, each measured in plan section 3.5.z ("author r3"): 1 profile margin 0 (`villagerSkirtStandstill.test.ts`, `villagerSkirtDriverContainment.test.ts`, both still red); 2 option 4a (same tests; standstill unchanged, as the rule intends); 3 option 4b (thigh misses closed at step 3, columns 5 and 7 unchanged, column 6 of the female child girdleTails 50°); 4 option 5 (111–117 cells, 240 samples; band 0.0473 × scale). Final: worst standstill column 22 / 29 / 26° (loinFlap) and 30 / 50 / 30° (girdleTails) against 5°; containment profile 0.0695 m, thigh 0.0152–0.0180 m, band 0.0473 × scale. Stop rule reached: no margin added, no further rule invented.
+
+Open for the owner: the remaining causes in section 3.5.z (the drop rule empties the bottom bin of a back-swung buttock; columns 5–7 unexplained by the buttock radius; column 6 regression with slabs); the male elder kneel alone 60.4 s over its 60 s limit (14 capsules instead of 8; charged to the point); per-frame cost of the slab capsules (girdleTails standstill cases 9 → 29 s).
+
+Pushed head: see the final line of `local/1485-r3-handover.md`.
 
 ## 8. Open questions for the break check
 
