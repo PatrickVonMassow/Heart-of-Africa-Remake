@@ -8,7 +8,7 @@ import type { DressLayer } from '../systems/appearance'
 import { clipLayers, applyClipLayers, stepClipLayers } from '../scenes/place/gltfClipLayers'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { createGltfSkeleton, drivenFigure, gltfPerson } from './villagerFigureBody'
-import { ColumnDriver, capsuleActive, clipActive, columnRig, pointSegment, restHeight, segmentTriangle, type V3 } from './villagerSkirtDriver'
+import { ColumnDriver, capsuleActive, capsuleRadius, capsuleRadiusOver, clipActive, columnRig, pointSegment, restHeight, sectorOf, segmentTriangle, type V3 } from './villagerSkirtDriver'
 
 type Any = any // eslint-disable-line @typescript-eslint/no-explicit-any
 const OUT = process.env.PROBE_OUT ?? '/tmp/claude-0/standstill-probe'
@@ -65,7 +65,8 @@ function capsuleOwners(person: Any, rest: number[], bottom: number, cfg: Any) {
     const b = at(rest, asset.bones.indexOf(tail))
     const ab = sub(b, a)
     const l2 = dot(ab, ab)
-    const n = Math.max(1, Math.round(Math.sqrt(l2) / (cfg.thighSlab * H)))
+    // the slab rule is reverted (r5): without `thighSlab` one capsule per thigh
+    const n = cfg.thighSlab ? Math.max(1, Math.round(Math.sqrt(l2) / (cfg.thighSlab * H))) : 1
     const best = Array.from({ length: n }, () => ({ r: -1, v: -1, t: 0 }))
     for (let v = 0; v < pos.count; v++) {
       if (!(pos.getY(v) < bottom)) continue
@@ -143,6 +144,7 @@ function trace(form: string, sex: string, age: string, slab: boolean, thighMargi
     const o = owners.find((x) => x.label.startsWith(name) && Math.abs(x.radius + marginOf(name) * scale - cp.radius) < 1e-9)
     return { label: o?.label ?? `${name}?`, own: o ?? null, i }
   })
+  for (const [ci, cp] of rig.capsules.entries()) if (cp.sectors) L.push(`  cap ${asset.bones[cp.bone]} sector radii ${cp.sectors.map(f4).join(' ')} (capsule ${ci})`)
   for (const cl of capLabel) {
     if (!cl.own) continue
     const cp = rig.capsules[cl.i]
@@ -290,7 +292,8 @@ function trace(form: string, sex: string, age: string, slab: boolean, thighMargi
         const terms: string[] = []
         P.capsules.forEach((cp: Any, ci: number) => {
           if (!capsuleActive(cp.ry, P.hy, p, bottom)) return
-          const C = cp.radius + rig.clearance
+          // the station's own sector radius, as the driver uses it (r6)
+          const C = capsuleRadius(cp, p) + rig.clearance
           const target = Math.sqrt(C * C + (chord / 2) ** 2)
           const dist = pointSegment(p, cp.a, cp.b)
           if (target - dist > -0.01) terms.push(`${capLabel[ci].label} def ${f4(target - dist)} (dist ${f4(dist)} R+C ${f4(C)} chordTarget ${f4(target)}, restH ${f4(restHeight(cp.ry, p) - bottom)} hipsH ${f4(restHeight(P.hy, p) - bottom)}; ${th === 0 ? dirRadius(ci, p) : ''})`)
@@ -323,9 +326,23 @@ function trace(form: string, sex: string, age: string, slab: boolean, thighMargi
         P.capsules.forEach((cp: Any, ci: number) => {
           const below = clipActive([a, b, cc], cp.ry, P.hy, bottom)
           if (!below.length) return
-          const dist = Math.min(...below.map(([p, q, r]) => segmentTriangle(cp.a, cp.b, p, q, r)))
-          const dep = cp.radius + C - dist
-          if (dep > 0) hits.push({ env: capLabel[ci].label, depth: dep, desc: `tri ${t} rows ${rows} dist ${f4(dist)} R ${f4(cp.radius)} C ${f4(C)} centreH ${f4(restHeight(P.hy, centre) - bottom)}`, ci, centre })
+          // per clipped piece the largest sector radius over its vertices and centroid, as the driver (r6)
+          let dep = -Infinity
+          let dist = 0
+          let R = 0
+          let secs = ''
+          for (const [p, q, r] of below) {
+            const pts = [p, q, r, mul(add(add(p, q), r), 1 / 3)]
+            const Rp = capsuleRadiusOver(cp, pts)
+            const dp = segmentTriangle(cp.a, cp.b, p, q, r)
+            if (Rp + C - dp > dep) {
+              dep = Rp + C - dp
+              dist = dp
+              R = Rp
+              secs = cp.sectors && cp.ref ? pts.map((x) => sectorOf(cp.a, cp.b, cp.ref, cp.sectors.length, x)).join('') : '-'
+            }
+          }
+          if (dep > 0) hits.push({ env: capLabel[ci].label, depth: dep, desc: `tri ${t} rows ${rows} dist ${f4(dist)} R ${f4(R)} sectors ${secs} C ${f4(C)} centreH ${f4(restHeight(P.hy, centre) - bottom)}`, ci, centre })
         })
         const free = ids.map((v) => panel.exempt[v] === 1 || panel.row[v] === 1)
         const bandEdge = free.filter(Boolean).length >= 2
