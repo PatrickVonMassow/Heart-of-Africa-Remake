@@ -1350,15 +1350,29 @@ class ColumnDriver:
             d += cfg['coarseStep']
         save = list(self.cur)
         best = (self.cur[s], self.cur[partner], math.inf, math.inf)
+
+        def try_pair(a, b, best):
+            self.cur[s] = a
+            self.cur[partner] = b
+            w = max(self._evaluate(s, a, self.cur, True)[0], self._evaluate(partner, b, self.cur, True)[0])
+            dd = abs(a - save[s]) + abs(b - save[partner])
+            better = (w <= 0 and best[2] > 0) or (w <= 0 and best[2] <= 0 and dd < best[3] - 1e-12) or (w > 0 and best[2] > 0 and w < best[2])
+            return (a, b, w, dd) if better else best
         for a in samples:
             for b in samples:
-                self.cur[s] = a
-                self.cur[partner] = b
-                w = max(self._evaluate(s, a, self.cur, True)[0], self._evaluate(partner, b, self.cur, True)[0])
-                dd = abs(a - save[s]) + abs(b - save[partner])
-                better = (w <= 0 and best[2] > 0) or (w <= 0 and best[2] <= 0 and dd < best[3] - 1e-12) or (w > 0 and best[2] > 0 and w < best[2])
-                if better:
-                    best = (a, b, w, dd)
+                best = try_pair(a, b, best)
+        # refine about the coarse pick, as the single search does: each refine step round the pair
+        ca, cb = best[0], best[1]
+        top = cfg['thetaMax'] * _DEG + 1e-12
+        for r in cfg['refine']:
+            for i in (-1, 0, 1):
+                for j in (-1, 0, 1):
+                    if i == 0 and j == 0:
+                        continue
+                    a = ca + i * r * _DEG
+                    b = cb + j * r * _DEG
+                    if 0 <= a <= top and 0 <= b <= top:
+                        best = try_pair(a, b, best)
         self.cur = save
 
         # no feasible pair: the rate limit holds, as in the single search

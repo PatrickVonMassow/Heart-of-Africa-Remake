@@ -1276,14 +1276,26 @@ export class ColumnDriver {
     for (let d = 0; d <= cfg.thetaMax + 1e-9; d += cfg.coarseStep) samples.push(d * DEG)
     let best = { a: this.cur[s], b: this.cur[partner], w: Infinity, d: Infinity }
     const save = Float64Array.from(this.cur)
-    for (const a of samples) {
-      for (const b of samples) {
-        this.cur[s] = a
-        this.cur[partner] = b
-        const w = Math.max(this.evaluate(s, a, this.cur, true).worst, this.evaluate(partner, b, this.cur, true).worst)
-        const d = Math.abs(a - save[s]) + Math.abs(b - save[partner])
-        const better = (w <= 0 && best.w > 0) || (w <= 0 && best.w <= 0 && d < best.d - 1e-12) || (w > 0 && best.w > 0 && w < best.w)
-        if (better) best = { a, b, w, d }
+    const tryPair = (a: number, b: number) => {
+      this.cur[s] = a
+      this.cur[partner] = b
+      const w = Math.max(this.evaluate(s, a, this.cur, true).worst, this.evaluate(partner, b, this.cur, true).worst)
+      const d = Math.abs(a - save[s]) + Math.abs(b - save[partner])
+      const better = (w <= 0 && best.w > 0) || (w <= 0 && best.w <= 0 && d < best.d - 1e-12) || (w > 0 && best.w > 0 && w < best.w)
+      if (better) best = { a, b, w, d }
+    }
+    for (const a of samples) for (const b of samples) tryPair(a, b)
+    // refine about the coarse pick, as the single search does: each refine step round the pair
+    const coarse = { a: best.a, b: best.b }
+    const top = cfg.thetaMax * DEG + 1e-12
+    for (const r of cfg.refine) {
+      for (const i of [-1, 0, 1]) {
+        for (const j of [-1, 0, 1]) {
+          if (i === 0 && j === 0) continue
+          const a = coarse.a + i * r * DEG
+          const b = coarse.b + j * r * DEG
+          if (a >= 0 && a <= top && b >= 0 && b <= top) tryPair(a, b)
+        }
       }
     }
     this.cur.set(save)
