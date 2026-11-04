@@ -60,9 +60,11 @@ describe('the breast cloth on a woman', () => {
         const hit = new THREE.Raycaster(new THREE.Vector3(x, h, 2), new THREE.Vector3(0, 0, -1)).intersectObject(m, false)[0]
         return hit ? 2 - hit.distance : -Infinity
       }
-      // the bust's peak: the body's most forward height over a breast, chest to shoulder
+      // the bust's peak: the unmasked, unpushed body's most forward height over
+      // a breast, chest to shoulder — the anatomy, not the mask under test
+      const bare0 = new THREE.Mesh(tidy(person.geometry.clone()), mat)
       let peak = girdle
-      for (let h = girdle; h < y('upperArm.L'); h += 0.0025 * H) if (front(0.05, h, body) > front(0.05, peak, body)) peak = h
+      for (let h = girdle; h < y('upperArm.L'); h += 0.0025 * H) if (front(0.05, h, bare0) > front(0.05, peak, bare0)) peak = h
       const bare: string[] = []
       // up to 0.02 H over the peak: the upper bust, which the hung rest's
       // forward-tilted chest bared under a top at chestTop
