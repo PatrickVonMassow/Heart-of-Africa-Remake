@@ -811,6 +811,21 @@ Open for the owner: the remaining causes in section 3.5.z (the drop rule empties
 
 Pushed head: see the final line of `local/1485-r3-handover.md`.
 
+### Hand-over (point 1485, author r4, 04.11.2026)
+
+Branch `claude/point-1485-standstill-diagnosis-pnni3v` (from `feat/1485-skirt-containment-calibration` `6c4d18318`, origin/main merged `026cc07`); diagnosis commit `25a300f` (section 3.5.z "author r4", test-only probe `src/render/villagerSkirtStandstillProbe.test.ts`, skipped unless `PROBE_RUN=1`). No value, rule or driver change. Gates on `25a300f`: typecheck:test green; build green; lint 0 errors, 1 unrelated warning (`polish-villagers.mjs` `fireBlaze`); test:unit 11 failed / 18 524 passed: the expected 8 (containment, six standstill cases, male elder kneel) plus `scripts/batch-doctor-protected.test.mjs` (2, environment red also on main per r3 of point 1482) and `scripts/assertionHealth.test.mjs` (1, cause not traced). Browser suites and picture: not run (no picture change).
+
+Causes per column (trace A slabs / B plain eight capsules, both measured):
+- Female child column 0: thigh slab 0 (= plain capsule), radius 0.1046 set by the crotch-front vertices v4320/v4322 (thigh weight 0.10–0.12, just over the 0.1 cut); deficit 0.0274, inside radius + clearance + the 0.024 thigh margin.
+- Columns 5 and 7, male adult / elder: circular thigh slabs 0–2 with radii set by vertices on the far side of the bone; deficit 0.030 = margin 0.024 + chord target 0.0048 + bare radius 0.0012.
+- Columns 5 and 7, female child: the crotch-front slab-0 radius applied round the circle to the back hem.
+- Column 6 (20 / 30 / 50°): no own envelope holds it; the two-column joint search (10° grid, nearest to the previous angles) sets it; the 50° (A only) is triangle 608, shared with column 5, grazing slab 0 while column 5 sits at 21.2°.
+- Slabs vs plain: the radius vertex always falls in slab 0, so slab 0 equals the plain capsule; the slabs change only column 6 of the female child girdleTails.
+
+Owner options, each by the cause it removes (none implemented): thigh margin 0.004 (removes the margin share; measured columns 0 → 7.5–7.8°, 5/7 → 12–19°, thigh misses return); a higher weight cut for thigh radius vertices (removes the crotch-front vertex); a per-sector thigh envelope (removes the circular far-side radius at the back; needs a triangle-level distance first); a finer joint search or re-search of column 6 after its partner (removes the grid values); revert the slabs (removes the 50°).
+
+Open: whether the back-hem cloth lies inside the drawn thigh surface itself (5–8 drawn vertices per slab, none within 45° of the hit); male girdleTails column 0 at 6.9–7.3° (profile); the `assertionHealth` red.
+
 ## 8. Open questions for the break check
 
 - Q1: Is the per-figure continuity state (section 3.4) with reset rules acceptable as the driver's only state, given that the rest of the pose pipeline keeps comparable per-figure gait state (`ClipGait`)?
