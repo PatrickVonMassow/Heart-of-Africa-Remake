@@ -154,6 +154,7 @@ put it is the mistake this line exists to stop.
   Budget and stop rule: point 1487's (shared 24 staffed hours; one implementation pass and one correction pass; no split permission, no new clothing points; minor leftovers to docs/backlog.md only).
   Bundle: Dorfleben.
   Criticality: high - every villager wearing these forms, visible at first glance.
+  CI run 41813029787 (red on feat/1485-skirt-containment-calibration 79643e4, the containment test of the closed point 1485) is charged to this point: that branch is assessment input only and is not landed.
 - [ ] 1379. Giza tourists and the traveller wear 1890 Western dress: shoes, long sleeves, long trousers or skirts, a seated hat
   Queue position: after point 1487's clothing closure, with its own budget (decoupled from the garment rebuild by point 1487, 04.11.2026; it needs new assets: shoes, hats, long trousers, long sleeves). Split from point 1378 on 18.10.2026.
   Source: picture check of point 1378 (18.10.2026): the Giza ambient figures and the bird's-eye traveller now use the shared skinned figure path, but the current garment set has no shoes, long sleeves, long trousers or hats, so the pith-helmeted tourists and the traveller show bare feet, bare forearms and calf-length trousers, and the hat sits as a head prop on the crown. Point 1378 was queued after 1347 for exactly this reason and was landed first as the body-path change only.
