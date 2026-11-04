@@ -146,6 +146,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 
 | 23.09. abends | Ein Nutzerauftrag, der kein Auftragspunkt ist, kommt nicht los: Nach dem regelkonformen Anspruch auf den Batch-Lock verweigerte die Leerlauf-Behauptung der Tafel JEDE Schreiboperation — auch die, die den Punkt erst angelegt hätte. Die beiden dokumentierten Auswege greifen nicht: `now <N>` braucht eine Warteschlangen-Karte, die aus TASKS.md gebaut wird, `closing <N>` einen gemergten Punkt. Durchgekommen bin ich nur, weil das board-first-Tor pro Zug genau einmal feuert — eine Einmal-Freigabe, kein vorgesehener Weg (§3.306) |
 | 29.10. abends | Vierter Wiedergänger von §3.271/§3.267, diesmal ohne `--gate`: Die Startpflicht `batch-doctor --repair` fand eine einzige geänderte Datei — die Zustandsdatei des Closing-Wächters, die der Vorgänger offen gelassen hatte — und stashte sie, obwohl sie den laufenden Prüflauf erkannt hatte (sie ließ `verification/` ausdrücklich draußen). Der Stash änderte den Index mitten in der Unit-Stufe des zweiten Abschluss-LARGE; die Integritätsprüfung brach den Lauf nach 8 m 41 s ab, bei 18 367 grünen Unit-Tests. Ein Neustart kostete gut zwei Stunden; der Fall steht als Punkt 1467 in der Arbeitsliste |
+| 04.11. nachmittags | Die Kleidungsarbeit konvergierte wochenlang nicht: 407 Kleidungs-Commits seit 01.10., und jede gescheiterte Runde erneuerte sich durch Aufteilung (1482 → 1485 → 1486) statt durch einen begrenzten POC-Rückfall; die siebte Rockrunde maß sogar einen anderen Zustand, als die Kamera fotografierte (§3.308) |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1750,7 +1751,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 04.11.2026, 13:57 · Quellen-Fingerprint: `9fdafe6688ce…`
+Zuletzt aktualisiert: Mittwoch, 04.11.2026, 16:08 · Quellen-Fingerprint: `81cc4f5033d7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1870,8 +1871,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 184 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: 9fdafe6688ceeb48231285085ecb10c9c5735bea87e7ef926a8a209e50262569 -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-04T12:57:41.013Z -->
+<!-- RETRO-FINGERPRINT: 81cc4f5033d7d3cb2b240db9d019363e1a6a73933f96f09db1c5bf791bd6436a -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-04T15:08:52.696Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8295,3 +8296,17 @@ Job das getan hat, wofür er da ist.
 **Lehre:** Ein Abschluss-Job wird an Zeitstempeln und an seinem Inhalt geprüft, nicht an
 seiner Farbe. Ein Lauf, der genau beim Zeitlimit endet, ist ein abgebrochener Lauf und kein
 Urteil. Und ein grünes CI-Ergebnis ersetzt keinen lokal gemessenen roten Test.
+
+### 3.308 Aufteilen ersetzte das Begrenzen
+
+Die Rockkalibrierung lief sieben Runden lang. Jede gescheiterte Runde erzeugte über die
+Aufteilungsregel einen neuen Punkt (1482 → 1485 → 1486), statt die Arbeit zu begrenzen.
+Die Regel war gegen festgefahrene Punkte gedacht und hielt so die Schleife am Leben. Die siebte
+Runde drückte den gemessenen Winkel von 17,5 auf 9,4 Grad, und das Bild blieb trotzdem gleich:
+Der Test las den eingeschwungenen Zustand nach 120 Frames, die Kamera fotografierte den
+Kaltstart des Treibers. Erst eine Diagnose am Bild fand das. Am selben Nachmittag gab der
+Nutzer eine begrenzte POC-Schließung frei (Punkt 1487): ein fester Zeitrahmen, ein Umsetzungs-
+und ein Korrekturdurchgang, keine weiteren Abspaltungen.
+
+**Lehre:** Eine Aufteilungsregel braucht ein Budget, das mitwandert. Und bevor eine Zahl
+nachgeregelt wird, muss feststehen, dass sie denselben Zustand misst, den das Bild zeigt.

@@ -127,6 +127,7 @@ put it is the mistake this line exists to stop.
   Stop rule (binding, record it): one implementation pass and one correction pass; no new clothing points, no descendant splits, no transferred acceptance debt, no renewed rounds; minor leftovers go to docs/backlog.md only. At the deadline only a rule-compliant result is accepted; otherwise freeze the state and report the failed acceptance. Reopening only by explicit owner decision with a fresh budget.
   Accepted trade-off: no swinging hems, no real drape.
   Source: user approval "ja" (04.11.2026, other window, findings carrier), spec cut from 373821fdb.
+  Bundle: Dorfleben.
 - [ ] 1485. Villager skirt driver: containment calibration of the driven panels
   Queue position: directly before point 1482.
   Source: split from point 1482 on 04.11.2026 (owner, standing split rule; stop rule 4 of local/1482-decision-r4.md: "If this round does not close, the owner splits the point (containment calibration as its own point) instead of buying another round"). Round r4b (hand-over local/1482-r4b-handover.md, plan section 3.5.z) rebuilt the asset with thigh margin 0.0241 and closed the thigh misses, but containment stays red.
