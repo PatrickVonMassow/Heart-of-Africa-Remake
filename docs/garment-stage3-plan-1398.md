@@ -716,6 +716,17 @@ Tasks:
 
 Open for the owner: rebuild with thigh margin 0.020 or 0.0241; the profile margin against the flare it causes; the response to the row-1 hits (3.5.y); the author's choices for columns without stations (no stations, no chord; bone-line fallback without a worn form).
 
+### Hand-over (author r4, round r4b, 04.11.2026)
+
+Branch `feat/1482-garment-driven-builder`. Commits: `ef985fe` (decisions 2 and 3, rescued from r4), `93a9a63` (asset rebuilt), `5b0f741` (section 3.5.z), plus this hand-over commit. Stopped under decision 4 (containment red), and the session's context passed the 122k fence. So origin/main was NOT merged and the four gates were NOT run on a merged tree: typecheck:test, build, lint and test:unit were not run. The pre-push hook's lint ran on each push (0 errors, 1 unrelated warning in `scripts/verify/polish-villagers.mjs`).
+
+1. Decision 1: thigh margin 0.0241 (`balance.ts`), asset rebuilt with the pinned Blender 3.4.1. Export pass ok. Second pass red: `SHELL_OUTFITS` does not wear the band shells (section 3.5.z). Covering test: `villagerSkirtDriverContainment.test.ts`, whose thigh misses are now closed.
+2. Decisions 2 and 3: profile margin 0.0335 in band `driver.profileMarginBand` 0.05 H, and row 1 profile-exempt, in the driver, the mirror and the containment test (`ef985fe`); plan 3.5/3.6 restated. The band size is NOT shown to be the smallest that closes the miss: the miss remains. Covering test: the containment test, red. The mirror selftests passed in the rebuild.
+3. Measured: containment 178,920,021 samples, profile 0.0312 m (female adult −1, start f1), pelvis band 0.0184 × scale (female child 1, jog 2.2); thighs 0. θ at the rest standstill and the male elder kneel: not measured.
+4. No browser suite run.
+
+Open: (a) `SHELL_OUTFITS` needs band outfits before `build.mjs` can pass its second pass; (b) the profile miss sits above bottom + 0.05 H, so the band or the margin rule needs an owner decision (the split under decision 4); (c) the pelvis band at 0.0184 is over its tolerance; (d) θ at the standstill and the elder kneel timing are owed; (e) merge main, then the four gates.
+
 ## 8. Open questions for the break check
 
 - Q1: Is the per-figure continuity state (section 3.4) with reset rules acceptable as the driver's only state, given that the rest of the pose pipeline keeps comparable per-figure gait state (`ClipGait`)?
