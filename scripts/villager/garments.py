@@ -440,13 +440,16 @@ def landmarks(j, H):
 
 
 def breast_cloth_span(L):
-    """The breast cloth's top and hem: the chest's top down to the waist.
-    The hem is the girdle (where a skirt or wrapper begins), 0.01 H lower so
+    """The breast cloth's top and hem: over the bust down to the waist.
+    The top is 0.045 H under the shoulder, not L['chestTop'] (0.065 H under
+    it): the hung rest tilts the chest forward, and at chestTop the cloth's
+    front edge stood only 5 mm above the bust's peak, the upper bust bare
+    (measured 04.11.2026, work-order point 1477; calibratable). The hem is the girdle (where a skirt or wrapper begins), 0.01 H lower so
     the cloth laps over it — not L['waist'], which is the chest bone's head
     (0.66 H on a woman, under the bust) and left only a band beneath the bust
     (work-order point 1477). shells.py cuts the pre-split body at the hem."""
     H = L['H']
-    return L['chestTop'], L['girdle'] - 0.01 * H
+    return L['shoulder'] - 0.045 * H, L['girdle'] - 0.01 * H
 
 
 def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True):

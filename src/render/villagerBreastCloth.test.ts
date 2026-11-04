@@ -3,7 +3,7 @@
 // measured on the shipped villager.glb, a woman's breast cloth reaches from
 // above the bust to the girdle where a skirt begins, and from the front the
 // cloth — not the skin under the worn cover mask and push — is what a ray
-// meets over that whole span. Cause of the narrow band: the builder hemmed it
+// meets over that whole span, the upper bust above the peak included. Cause of the narrow band: the builder hemmed it
 // at the chest bone's head (scripts/villager/garments.py breast_cloth_span).
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -64,7 +64,9 @@ describe('the breast cloth on a woman', () => {
       let peak = girdle
       for (let h = girdle; h < y('upperArm.L'); h += 0.0025 * H) if (front(0.05, h, body) > front(0.05, peak, body)) peak = h
       const bare: string[] = []
-      for (let h = girdle + 0.005 * H; h <= peak; h += 0.005 * H) {
+      // up to 0.02 H over the peak: the upper bust, which the hung rest's
+      // forward-tilted chest bared under a top at chestTop
+      for (let h = girdle + 0.005 * H; h <= peak + 0.02 * H; h += 0.005 * H) {
         for (const x of [-0.05, 0, 0.05]) if (!(front(x, h, cm) > front(x, h, body))) bare.push(`${(h / H).toFixed(3)} H, x ${x}`)
       }
       expect(bare).toEqual([])

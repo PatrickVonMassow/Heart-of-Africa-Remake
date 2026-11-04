@@ -44,8 +44,10 @@ def intervals(L):
 def cuts(L):
     """The pre-split's level sets in order: (scalar, value, height interval or None)."""
     H = L['H']
-    # L['girdle'] - 0.01 H: the breast cloth's hem (garments.breast_cloth_span)
+    # L['shoulder'] - 0.045 H and L['girdle'] - 0.01 H: the breast cloth's top
+    # and hem (garments.breast_cloth_span)
     ys = [L['girdle'], L['hip'] + 0.013 * H, L['hip'] + 0.027 * H, hem(L), L['chestTop'], L['girdle'] - 0.01 * H,
+          L['shoulder'] - 0.045 * H,
           L['chestTop'] - 0.06 * H, L['neck'] - 0.008 * H, L['neck'] + 0.002 * H]
     return [('y', y, None) for y in ys] + [('arm', ARM_LEVEL, (hem(L), L['neck'] + 0.002 * H))]
 
