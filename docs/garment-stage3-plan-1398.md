@@ -751,6 +751,24 @@ Branch `feat/1482-garment-driven-builder`. Commits: `ef985fe` (decisions 2 and 3
 
 Open: (a) `SHELL_OUTFITS` needs band outfits before `build.mjs` can pass its second pass; (b) the profile miss sits above bottom + 0.05 H, so the band or the margin rule needs an owner decision (the split under decision 4); (c) the pelvis band at 0.0184 is over its tolerance; (d) θ at the standstill and the elder kneel timing are owed; (e) merge main, then the four gates.
 
+### Hand-over (point 1485, author r2, 04.11.2026)
+
+Branch `feat/1485-skirt-containment-calibration`, worktree `/workspace/hoa/.claude/worktrees/point-1485`. Start `dbc5fb393` (main merged by r1). Commits: `0938eb71b` (plan section 3.5.z, the r2 cause analysis) plus this hand-over commit; pushed head: see the final line of `local/1485-r2-handover.md`. No code, config, mirror or test changed: the causes are not a driver, mirror or test defect but the section 3.5 envelope rules (owner decisions), so under the r2 brief the round stops with options.
+
+Gates on the main-merged tree at `dbc5fb393` (the probes were throw-away test files, deleted before the gates and never committed):
+
+- `npm run test:unit`: 643 files, 8 failed / 18 536 passed / 8 skipped, 621 s. Red: `villagerSkirtDriverContainment.test.ts` (profile 0.0312 m, band 0.0184 × scale, as r1), the six `villagerSkirtStandstill.test.ts` cases (51–80°), `villagerKneelGround.test.tsx` male elder (70.3 s in the full run against its 60 s limit; 52.9 s alone per r1: a load-dependent timeout, not a new defect).
+- `npm run typecheck:test`: green. `npm run build`: green. `npm run lint`: 0 errors, 1 unrelated warning (`scripts/verify/polish-villagers.mjs` `fireBlaze`).
+
+Tasks of the r2 preface:
+
+1. Cause of the front/back standstill tilt: measured and recorded in section 3.5.z ("author r2"). The side columns hang at 0° only because no panel crosses them. The cloth-carrying columns are pushed by the profile margin inside the band (240 hits of 0.024–0.031 on rows 3–4 at θ = 0, male adult loinFlap column 0; cleared only at θ ≥ 50°) and by the thigh capsule at the back hem (station deficit 0.041 on columns 5 and 7, of which 0.024 is the 23:20 margin raise and 0.021–0.034 the buttock-radius cylinder). Counterfactuals: margin 0 → 22–30°; both margins off → 15–23°. Covering test: `villagerSkirtStandstill.test.ts` (still red).
+2. Why the profile misses climb with the band: the bare-profile misses are continuous over 0.00–0.09 (female adult −1) and 0.00–0.11 × scale (male adult +1); a band hides those below its edge, so the reported miss is the first sample above it (0.0665 for 0.05 H, 0.1111 for 0.075 H). The samples are the lifted thigh top (dig, start ramp), 0.048–0.064 inside the thigh capsule yet above the bottom in both frames: an activation gap of variant U, not an envelope radius.
+3. Pelvis-band miss: the top bin of column 4 holds one of the 240 thinned samples (r 0.0766) while 9 body vertices pose into it (max 0.1047); the jog's trunk twist moves the spine1-weighted belly past it. Owning value `driver.pelvisSamples` (or per-cell thinning); not changed, consequence unmeasured.
+4. SECOND step: no defect found, so nothing fixed; the options with measured consequences are in section 3.5.z (keep margins / profile margin 0 / both margins off with rebuild / profile samples that follow a lifted thigh and a tapered thigh capsule / more pelvis samples).
+
+Open for the owner: the decision among those options; the elder kneel's 60 s limit under full-suite load; the male elder kneel and the containment stay red until then. Rebuild not needed in this round.
+
 ## 8. Open questions for the break check
 
 - Q1: Is the per-figure continuity state (section 3.4) with reset rules acceptable as the driver's only state, given that the rest of the pose pipeline keeps comparable per-figure gait state (`ClipGait`)?
