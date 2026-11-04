@@ -2814,12 +2814,13 @@ export const VILLAGER_ASSET = {
       pelvisBin: 0.02,
       pelvisSamples: 240,
       pelvisArm: 0.2,
-      /** Added to the skinned pelvis profile's radius below profileMarginBand (plan section 3.5's
-       *  named response to a profile shortfall: the start-ramp miss 0.0315 plus 2 mm), and only
-       *  there: the cloth's flare comes from the top bins. Calibratable. */
-      profileMargin: 0.0335,
-      /** The band above the profile bottom (× H) the profile margin applies in: the smallest that
-       *  closes the measured profile miss (owner decision 03.11.2026). Calibratable. */
+      /** Added to the skinned pelvis profile's radius below profileMarginBand. 0 by owner decision
+       *  04.11.2026 (plan section 3.5): the margin tilted every cloth-carrying column at rest, and
+       *  the misses it answered are closed at their cause (the profile follows a lifted thigh).
+       *  Calibratable; the band is inert while the margin is 0. */
+      profileMargin: 0,
+      /** The band above the profile bottom (× H) the profile margin applies in (owner decision
+       *  03.11.2026); inert with profileMargin 0. Calibratable. */
       profileMarginBand: 0.05,
       /** The containment test's guard on the pelvis band outside the skinned profile (× the
        *  person's scale): a regression guard, no acceptance threshold (point 1339). Calibratable. */
