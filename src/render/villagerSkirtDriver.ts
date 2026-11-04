@@ -266,12 +266,54 @@ const sliceMat = (M: ArrayLike<number>, i: number): ArrayLike<number> => {
 
 // ---------- the static rig of one person ----------
 
-/** A leg capsule: the bone it rides, its rest ends (figure frame) and its radius. */
+/** A leg capsule: the bone it rides, its rest ends (figure frame) and its radius (the largest
+ *  sector's on a thigh). A thigh also carries `sectors`, a radius per angular sector about a → b
+ *  measured from `ref` (a rest direction perpendicular to the axis), section 3.5. */
 export interface Capsule {
   bone: number
   a: V3
   b: V3
   radius: number
+  sectors?: number[]
+  ref?: V3
+}
+
+/** The posed envelope radius a capsule holds toward the point p: its sector's radius when it has
+ *  sectors (the angle of p about the axis a → b, measured from ref toward axis × ref), else its
+ *  radius (section 3.5, per-sector thigh envelope). */
+export function capsuleRadius(cap: { a: V3; b: V3; radius: number; sectors?: number[]; ref?: V3 }, p: V3): number {
+  const s = cap.sectors
+  if (!s || s.length < 2 || !cap.ref) return cap.radius
+  return s[sectorOf(cap.a, cap.b, cap.ref, s.length, p)]
+}
+
+/** The sector of p about the axis a → b: n sectors from −π, measured from ref toward axis × ref. */
+export function sectorOf(a: V3, b: V3, ref: V3, n: number, p: V3): number {
+  const u = norm(sub(b, a))
+  const w = sub(p, a)
+  const ang = Math.atan2(dot(w, cross(u, ref)), dot(w, ref))
+  return Math.min(n - 1, Math.max(0, Math.floor(((ang + Math.PI) / (2 * Math.PI)) * n)))
+}
+
+/** The largest sector radius over the points (a triangle's vertices and centroid). */
+export function capsuleRadiusOver(cap: { a: V3; b: V3; radius: number; sectors?: number[]; ref?: V3 }, pts: readonly V3[]): number {
+  let r = 0
+  for (const p of pts) r = Math.max(r, capsuleRadius(cap, p))
+  return r
+}
+
+/** Empty sectors (−1) take the nearest populated sector by circular index distance, the larger on a tie. */
+export function fillSectors(raw: readonly number[]): number[] {
+  const n = raw.length
+  return raw.map((r, j) => {
+    if (r >= 0) return r
+    for (let d = 1; d <= n / 2; d++) {
+      const lo = raw[(j - d + n) % n]
+      const hi = raw[(j + d) % n]
+      if (lo >= 0 || hi >= 0) return Math.max(lo, hi)
+    }
+    return 0
+  })
 }
 
 /** The pelvis samples (section 3.5): rest positions and four influences each. */
@@ -396,10 +438,24 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
       for (const p of mine) reach = Math.max(reach, dot(sub(p, a), u))
       b = add(a, mul(u, reach))
     }
+    const margin = (cols.capsules[bone] ?? 0) * scale
+    const n = thigh ? Math.max(1, Math.round(cfg.thighSectors)) : 1
+    if (n > 1) {
+      // per-sector thigh envelope (section 3.5): each sector about the bone takes the radius of the
+      // drawn vertices in it; the reference is the figure's +z made perpendicular to the rest axis
+      const u = norm(sub(b, a))
+      const ref = norm(sub([0, 0, 1], mul(u, u[2])))
+      const raw = new Array<number>(n).fill(-1)
+      for (const p of mine) {
+        const j = sectorOf(a, b, ref, n, p)
+        raw[j] = Math.max(raw[j], pointSegment(p, a, b))
+      }
+      const sectors = fillSectors(raw).map((r) => r + margin)
+      return { bone: i, a, b, radius: Math.max(...sectors), sectors, ref }
+    }
     let radius = 0
     for (const p of mine) radius = Math.max(radius, pointSegment(p, a, b))
-    const margin = cols.capsules[bone] ?? 0
-    return { bone: i, a, b, radius: radius + margin * scale }
+    return { bone: i, a, b, radius: radius + margin }
   })
   const arm = ARM_SET(asset)
   const thighs = new Set([bi('thigh.L'), bi('thigh.R')])
@@ -661,7 +717,7 @@ interface Posed {
   tangent: V3[]
   /** ry: the capsule bone's rest-frame height row (restHeight); a capsule constrains a point below
    *  the profile bottom in that frame or in the hips frame (capsuleActive, section 3.5). */
-  capsules: Array<{ a: V3; b: V3; radius: number; ry: [number, number, number, number] }>
+  capsules: Array<{ a: V3; b: V3; radius: number; ry: [number, number, number, number]; sectors?: number[]; ref?: V3 }>
   /** The posed hips frame's height row (restHeight), the frame the profile is read in. */
   hy: [number, number, number, number]
   profile: PelvisProfile
@@ -820,7 +876,9 @@ export class ColumnDriver {
     const capsules = rig.capsules.map((c) => {
       const m = sliceMat(M, c.bone)
       const r = at(rig.rest, c.bone)
-      return { a: xform(m, sub(c.a, r)), b: xform(m, sub(c.b, r)), radius: c.radius, ry: restHeightRow(m, r[1]) }
+      const posed = { a: xform(m, sub(c.a, r)), b: xform(m, sub(c.b, r)), radius: c.radius, ry: restHeightRow(m, r[1]) }
+      // the sector reference turns with the bone
+      return c.sectors && c.ref ? { ...posed, sectors: c.sectors, ref: norm(xdir(m, c.ref)) } : posed
     })
     const angles = rig.radial.map((r) => Math.atan2(r[2], r[0]))
     const profile = new PelvisProfile(angles, rig.profile.bottom, rig.profile.top, rig.profile.bin, rig.profile.margin, rig.profile.band)
@@ -954,7 +1012,7 @@ export class ColumnDriver {
       const above = h.y >= rig.profile.bottom
       P.capsules.forEach((c) => {
         if (!capsuleActive(c.ry, P.hy, p, rig.profile.bottom)) return
-        const C = c.radius + rig.clearance
+        const C = capsuleRadius(c, p) + rig.clearance
         const target = Math.sqrt(C * C + (chord / 2) * (chord / 2))
         worst = Math.max(worst, target - pointSegment(p, c.a, c.b))
       })
@@ -1133,8 +1191,12 @@ export class ColumnDriver {
         if (len(sub(mid, centre)) > bound + rad) return
         const below = clipActive([a, b, c], cap.ry, P.hy, rig.profile.bottom)
         if (!below.length) return
-        const dist = Math.min(...below.map(([p, q, r]) => segmentTriangle(cap.a, cap.b, p, q, r)))
-        const d = cap.radius + C - dist
+        // per clipped piece its sectors' radius over its vertices and centroid (section 3.5)
+        let d = -Infinity
+        for (const [p, q, r] of below) {
+          const R = capsuleRadiusOver(cap, [p, q, r, mul(add(add(p, q), r), 1 / 3)])
+          d = Math.max(d, R + C - segmentTriangle(cap.a, cap.b, p, q, r))
+        }
         if (d > 0) depth += d
       })
       // row 1 is exempt from the profile test like row 0 and the band; a triangle with two

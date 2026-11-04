@@ -29,7 +29,7 @@ import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { approach, legDims, phasePerDistance, rephase, strideReach, walkPose } from './figureWalk'
 import { createGltfSkeleton, gltfPerson } from './villagerFigureBody'
-import { capsuleActive, ColumnDriver, columnRig, pointSegment, restHeight } from './villagerSkirtDriver'
+import { capsuleActive, capsuleRadius, ColumnDriver, columnRig, pointSegment, restHeight, sectorOf } from './villagerSkirtDriver'
 
 type V3 = [number, number, number]
 const LEG = ['thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
@@ -182,9 +182,12 @@ describe('containment of the rendered legs and pelvis', () => {
                 const corner = (v: number): V3 => [skinned[v * 3], skinned[v * 3 + 1], skinned[v * 3 + 2]]
                 // both heights are affine, so three corners below the profile bottom in the capsule
                 // bone's rest frame (or all three in the hips frame) hold the interior there too
-                const holds = (cap: (typeof ob.capsules)[number], p: V3) => pointSegment(p, cap.a, cap.b) <= cap.radius
+                // a sectored thigh holds the triangle this way only with all three corners in one sector
+                // (the wedge of one sector and its circular capsule are both convex)
+                const holds = (cap: (typeof ob.capsules)[number], p: V3) => pointSegment(p, cap.a, cap.b) <= capsuleRadius(cap, p)
+                const oneSector = (cap: (typeof ob.capsules)[number]) => !cap.sectors || !cap.ref || new Set([a, b, cc].map((v) => sectorOf(cap.a, cap.b, cap.ref!, cap.sectors!.length, corner(v)))).size === 1
                 const activeAll = (cap: (typeof ob.capsules)[number]) => [a, b, cc].every((v) => restHeight(cap.ry, corner(v)) < rig.profile.bottom) || [a, b, cc].every((v) => restHeight(ob.hy, corner(v)) < rig.profile.bottom)
-                if (ob.capsules.some((cap) => activeAll(cap) && [a, b, cc].every((v) => holds(cap, corner(v))))) {
+                if (ob.capsules.some((cap) => activeAll(cap) && oneSector(cap) && [a, b, cc].every((v) => holds(cap, corner(v))))) {
                   samples += weights[t].length / 2
                   continue
                 }
@@ -202,7 +205,7 @@ describe('containment of the rendered legs and pelvis', () => {
                   let bone = 'no envelope'
                   for (const cap of ob.capsules) {
                     if (!capsuleActive(cap.ry, ob.hy, p, rig.profile.bottom)) continue
-                    const d = pointSegment(p, cap.a, cap.b) - cap.radius
+                    const d = pointSegment(p, cap.a, cap.b) - capsuleRadius(cap, p)
                     if (d < best) {
                       best = d
                       bone = asset.bones[rig.capsules[ob.capsules.indexOf(cap)].bone]

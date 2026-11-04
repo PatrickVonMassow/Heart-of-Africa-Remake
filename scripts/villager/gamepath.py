@@ -622,6 +622,24 @@ def col_point_segment(p, a, b):
     return _len(_sub(p, _add(a, _mul(ab, t))))
 
 
+def col_sector_of(a, b, ref, n, p):
+    """The sector of p about the axis a -> b: n sectors from -pi, measured from ref toward
+    axis x ref (as villagerSkirtDriver.ts sectorOf)."""
+    u = _norm(_sub(b, a))
+    w = _sub(p, a)
+    ang = math.atan2(_dot(w, _cross(u, ref)), _dot(w, ref))
+    return min(n - 1, max(0, math.floor((ang + math.pi) / (2 * math.pi) * n)))
+
+
+def col_capsule_radius(cap, p):
+    """The envelope radius a posed capsule (a, b, radius, ry, sectors, ref) holds toward p: its
+    sector's radius when it has sectors, else its radius (section 3.5; as capsuleRadius)."""
+    a, b, radius, _ry, sectors, ref = cap
+    if not sectors or len(sectors) < 2 or ref is None:
+        return radius
+    return sectors[col_sector_of(a, b, ref, len(sectors), p)]
+
+
 def col_rest_height(ry, p):
     """A posed point's height in a capsule bone's REST frame (as villagerSkirtDriver.ts restHeight)."""
     return ry[0] * p[0] + ry[1] * p[1] + ry[2] * p[2] + ry[3]
@@ -983,7 +1001,10 @@ class ColumnDriver:
             m = M[c['bone']]
             r = _at(rig['rest'], c['bone'])
             # the capsule constrains a point only below the profile bottom in its bone's rest frame (section 3.5)
-            caps.append((_xform(m, _sub(c['a'], r)), _xform(m, _sub(c['b'], r)), c['radius'], col_rest_height_row(m, r[1])))
+            # a thigh's sector reference turns with the bone (per-sector thigh envelope)
+            ref = _norm(_xdir(m, c['ref'])) if c.get('sectors') and c.get('ref') else None
+            caps.append((_xform(m, _sub(c['a'], r)), _xform(m, _sub(c['b'], r)), c['radius'], col_rest_height_row(m, r[1]),
+                         c.get('sectors') if ref is not None else None, ref))
         angles = [math.atan2(r[2], r[0]) for r in rig['radial']]
         pr = rig['profile']
         profile = PelvisProfile(angles, pr['bottom'], pr['top'], pr['bin'], pr['margin'], pr.get('band', float('inf')))
@@ -1067,10 +1088,11 @@ class ColumnDriver:
             # the profile at or above its bottom in the hips frame; a capsule below the profile bottom
             # in its own bone's rest frame or in the hips frame (section 3.5)
             above = hy >= rig['profile']['bottom']
-            for a, b, radius, ry in P['capsules']:
+            for cap in P['capsules']:
+                a, b, _radius, ry = cap[:4]
                 if not col_capsule_active(ry, P['hy'], p, rig['profile']['bottom']):
                     continue
-                C = radius + rig['clearance']
+                C = col_capsule_radius(cap, p) + rig['clearance']
                 target = math.sqrt(C * C + (chord / 2) * (chord / 2))
                 worst = max(worst, target - col_point_segment(p, a, b))
             if above:
@@ -1210,7 +1232,8 @@ class ColumnDriver:
             hv = [self._hips_local(x, P['hipsInv'], hips_at) for x in (a, b, c)]
             # a capsule meets only the part of a triangle where it is active: clipped at the profile
             # bottom in its bone's rest frame and in the hips frame (section 3.5; as villagerSkirtDriver.ts)
-            for ca, cb, radius, ry in P['capsules']:
+            for cap in P['capsules']:
+                ca, cb, radius, ry = cap[:4]
                 mid = _mul(_add(ca, cb), 0.5)
                 bound = _len(_sub(cb, ca)) / 2 + radius + C
                 if _len(_sub(mid, centre)) > bound + rad:
@@ -1218,8 +1241,12 @@ class ColumnDriver:
                 below = col_clip_active((a, b, c), ry, P['hy'], rig['profile']['bottom'])
                 if not below:
                     continue
-                dist = min(col_segment_triangle(ca, cb, p, q, r) for p, q, r in below)
-                d = radius + C - dist
+                # per clipped piece its sectors' radius over its vertices and centroid (section 3.5)
+                d = -math.inf
+                for p, q, r in below:
+                    cen = _mul(_add(_add(p, q), r), 1 / 3)
+                    R = max(col_capsule_radius(cap, x) for x in (p, q, r, cen))
+                    d = max(d, R + C - col_segment_triangle(ca, cb, p, q, r))
                 if d > 0:
                     depth += d
             # row 1 is exempt from the profile test like row 0 and the band; a triangle with two

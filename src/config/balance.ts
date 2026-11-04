@@ -2818,6 +2818,11 @@ export const VILLAGER_ASSET = {
        *  capsules: 0.1). Above 0.1 so the hips-dominant crotch vertices (thigh weight 0.10-0.12) set no
        *  thigh radius (owner decision 04.11.2026, plan section 3.5.z author r5). Calibratable. */
       thighRadiusWeight: 0.35,
+      /** Angular sectors about each thigh bone (owner decision 04.11.2026 11:25, plan section 3.5
+       *  "per-sector thigh envelope"): each sector takes the radius of the drawn vertices in it, so a
+       *  far-side vertex sets no radius at the back hem. An empty sector takes its nearest populated
+       *  one. 1 is the circular capsule. Calibratable. */
+      thighSectors: 12,
       /** Added to the skinned pelvis profile's radius below profileMarginBand. 0 by owner decision
        *  04.11.2026 (plan section 3.5): the margin tilted every cloth-carrying column at rest, and
        *  the misses it answered are closed at their cause (the profile follows a lifted thigh).
