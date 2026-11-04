@@ -870,6 +870,16 @@ Not done (the session reached its context fence after the code steps; no suite w
 - Gates on `b842b6fe9` not run: typecheck:test, build, lint, test:unit — all unknown, none claimed green.
 - Stop-rule state unknown; r4 already measured the male girdleTails column 0 at 6.9-7.3° (profile), which (a)-(c) do not address, so the stop rule is likely to apply.
 
+### Hand-over (point 1485, author r6, 04.11.2026; stop rule)
+
+Branch: the session permits pushes only to `claude/skirt-containment-sector-envelope-155wyt` (push to `feat/1485-skirt-containment-calibration` rejected by the remote, HTTP 500); that branch carries `feat/1485-skirt-containment-calibration` `79643e42a` with origin/main merged (`38c6c5a`) and the commits `b1da249` (per-sector thigh envelope, TS driver, Python mirror, containment test), `2f243c1` (`driver.thighSectors` 8), `6029d93` (section 3.5.z "author r6"), and this hand-over. The owner fast-forwards `feat/1485` onto it. Not merged into main.
+
+Gates on the merged head (`2f243c1`; later commits are docs only): typecheck:test green; build green; lint 0 errors, 1 warning (`polish-villagers.mjs` `fireBlaze`, unrelated); test:unit 644 files, 10 failed / 18 525 passed / 36 skipped: red are `villagerSkirtDriverContainment.test.ts` (1), `villagerSkirtStandstill.test.ts` (all six cases), `scripts/assertionHealth.test.mjs` (1) and `scripts/batch-doctor-protected.test.mjs` (2), the last two the tooling reds of r4. The male elder kneel is green inside the full run (54.4 s alone). Python mirror selftests green; `node scripts/villager/build.mjs runtime` (the real-rig round trip) not run: no cached pipeline build in this container. The asset is not rebuilt: the change is in the driver and its mirror, not in the export, so `public/models/villager.glb` is unchanged.
+
+Measured (section 3.5.z author r6): male columns 5 and 7 from 21–30° to 5.3–10.4°; female child columns 5 and 7 12.3–20.0°; column 6 2.4–17.5° (joint-search grid values); column 0 3.7–10.5°. Stop rule: columns stay above 5° after the sector envelope; residual causes per column in section 3.5.z; no further envelope rule invented.
+
+Open: per-hit trace of the male columns 5/7 residual and of the female child back sectors (not re-done); column 6's joint-search grid; male girdleTails column 0 (profile); containment (point 1486); the real-rig round trip on a cached pipeline build; the rest-row re-shoot on both backends (owner).
+
 ## 8. Open questions for the break check
 
 - Q1: Is the per-figure continuity state (section 3.4) with reset rules acceptable as the driver's only state, given that the rest of the pose pipeline keeps comparable per-figure gait state (`ClipGait`)?
