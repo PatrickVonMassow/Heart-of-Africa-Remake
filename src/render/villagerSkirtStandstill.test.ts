@@ -38,7 +38,7 @@ describe('driven columns at the rest standstill', () => {
           d.step(skeleton.bones, dt)
         }
         const deg = Array.from(d.theta, (t) => (t * 180) / Math.PI)
-        console.log(`standstill ${sex} ${age} ${form}: θ° ${deg.map((x) => x.toFixed(1)).join(' ')}`)
+        console.log(`standstill ${sex} ${age} ${form}: θ° ${deg.map((x) => x.toFixed(1)).join(' ')} (joint searches ${d.counters.jointSearches})`)
         expect(Math.max(...deg.map(Math.abs))).toBeLessThanOrEqual(LIMIT_DEG)
       }, 120_000)
     }

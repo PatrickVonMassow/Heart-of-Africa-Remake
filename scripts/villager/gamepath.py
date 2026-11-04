@@ -1400,6 +1400,37 @@ class ColumnDriver:
                     b = cb + j * r * _DEG
                     if 0 <= a <= top and 0 <= b <= top:
                         best = try_pair(a, b, best)
+        # a feasible pick leaves the sample grid as the single search does: the feasibility boundary
+        # on the line from the entry pair to the pick, then per column toward its entry angle with
+        # the other held
+        if best[2] <= 0:
+            def ok(a, b):
+                self.cur[s] = a
+                self.cur[partner] = b
+                return max(self._evaluate(s, a, self.cur, True)[0], self._evaluate(partner, b, self.cur, True)[0]) <= 0
+
+            def boundary(frm, to, at):
+                if at(frm):
+                    return frm
+                lo, hi = frm, to
+                while abs(hi - lo) > cfg['bisect'] * _DEG:
+                    mid = 0.5 * (lo + hi)
+                    if at(mid):
+                        hi = mid
+                    else:
+                        lo = mid
+                return hi
+            a0, b0 = save[s], save[partner]
+            ba, bb = best[0], best[1]
+            span = max(abs(ba - a0), abs(bb - b0))
+            if span > 0:
+                def lerp(t):
+                    return a0 + (ba - a0) * t, b0 + (bb - b0) * t
+                t = boundary(0.0, span, lambda x: ok(*lerp(x / span)))
+                ba, bb = lerp(t / span)
+            ba = boundary(a0, ba, lambda x: ok(x, bb))
+            bb = boundary(b0, bb, lambda x: ok(ba, x))
+            best = (ba, bb, best[2], best[3])
         self.cur = save
 
         # no feasible pair: the rate limit holds, as in the single search

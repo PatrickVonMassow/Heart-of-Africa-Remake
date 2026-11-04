@@ -1346,6 +1346,37 @@ export class ColumnDriver {
         }
       }
     }
+    // a feasible pick leaves the sample grid as the single search does: the feasibility boundary
+    // on the line from the entry pair to the pick, then per column toward its entry angle with
+    // the other held
+    if (best.w <= 0) {
+      const ok = (a: number, b: number) => {
+        this.cur[s] = a
+        this.cur[partner] = b
+        return Math.max(this.evaluate(s, a, this.cur, true).worst, this.evaluate(partner, b, this.cur, true).worst) <= 0
+      }
+      const boundary = (from: number, to: number, at: (x: number) => boolean) => {
+        if (at(from)) return from
+        let lo = from
+        let hi = to
+        while (Math.abs(hi - lo) > cfg.bisect * DEG) {
+          const mid = 0.5 * (lo + hi)
+          if (at(mid)) hi = mid
+          else lo = mid
+        }
+        return hi
+      }
+      const a0 = save[s]
+      const b0 = save[partner]
+      const span = Math.max(Math.abs(best.a - a0), Math.abs(best.b - b0))
+      if (span > 0) {
+        const lerp = (t: number) => [a0 + (best.a - a0) * t, b0 + (best.b - b0) * t]
+        const t = boundary(0, span, (x) => ok(...(lerp(x / span) as [number, number])))
+        ;[best.a, best.b] = lerp(t / span)
+      }
+      best.a = boundary(a0, best.a, (x) => ok(x, best.b))
+      best.b = boundary(b0, best.b, (x) => ok(best.a, x))
+    }
     this.cur.set(save)
     // no feasible pair: the rate limit holds, as in the single search (only a feasible larger step may break it)
     const limited = (th: number, seg: number) => {
