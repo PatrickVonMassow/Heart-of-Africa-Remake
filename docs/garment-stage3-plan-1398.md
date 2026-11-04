@@ -902,6 +902,16 @@ Measured (section 3.5.z author r6): male columns 5 and 7 from 21–30° to 5.3�
 
 Open: per-hit trace of the male columns 5/7 residual and of the female child back sectors (not re-done); column 6's joint-search grid; male girdleTails column 0 (profile); containment (point 1486); the real-rig round trip on a cached pipeline build; the rest-row re-shoot on both backends (owner).
 
+### Hand-over (point 1485, author r7, 04.11.2026; stop rule)
+
+Branch `feat/1485-skirt-containment-calibration` (pushed directly), mirrored on the session branch `claude/skirt-containment-calibration-r7-0w798w`; it carries `aca51bfab` with origin/main merged (`5da64d05e`) and the commits `56ff986bd` (joint search refined to the feasibility boundary, TS driver and Python mirror; the standstill test logs the joint-search count), `b30365364` (probe on the per-sector radius), `52c9c247c` (section 3.5.z "author r7"), `3f46ee302` (the probe's literal placeholder assertion dropped, which tripped `assertionHealth`) and this hand-over. Not merged into main. No new tunable; asset not rebuilt: the mirror's driver only replays the build's column round trip and writes nothing into the asset. Mirror selftests (`selftest_column_*`, 7) green; `villagerSkirtDriver.test.ts` 29/29 green.
+
+Gates on the merged head (`52c9c247c`, then `3f46ee302` for the probe file: typecheck:test, oxlint and `assertionHealth` re-run green): typecheck:test green; build green; lint 0 errors, 1 warning (`polish-villagers.mjs` `fireBlaze`, unrelated); test:unit 644 files, 11 failed / 18 527 passed: the six standstill cases and containment (expected red, section 3.5.z), the male elder kneel (timeout 60 s: 66.2 s here, the r6 driver 60.3 s on the same machine), `scripts/batch-doctor-protected.test.mjs` (2, environment red, as in r4–r6), `scripts/assertionHealth.test.mjs` (1, the probe placeholder, fixed in `3f46ee302`). Browser suites and picture: not run; the owner re-shoots the rest rows on both backends.
+
+Measured (section 3.5.z author r7): male elder girdleTails column 6 from 17.5° to 9.4°, the other joint-search cases from 10.0° to 7.2–7.7° (male elder loinFlap stays at 10.0° at frame 120); columns 0 / 5 / 7 unchanged except male elder loinFlap column 5 (5.3 → 7.5°) and male adult loinFlap column 5 (6.4 → 6.9°). Stop rule: column 6 stays above 5°; traced per case in 3.5.z: its own boundary is 6.5–8.0° (thigh back sectors 0/1 and 6/7, radius 0.097 including margin 0.024; the profile for the male adult loinFlap), plus 0.8–3° from searching column 6 while column 7 is still below its own boundary.
+
+Open: column 6's in-frame order relative to column 7 (the single search of column 6 runs against column 7's pass value; frame-to-frame alternation between the boundary and a single-search value in the male adult girdleTails); the male elder kneel time over 60 s on this machine (also with the r6 driver); columns 5 and 7 and column 0 as in r6; containment (point 1486).
+
 ## 8. Open questions for the break check
 
 - Q1: Is the per-figure continuity state (section 3.4) with reset rules acceptable as the driver's only state, given that the rest of the pose pipeline keeps comparable per-figure gait state (`ClipGait`)?
