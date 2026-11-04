@@ -2814,6 +2814,8 @@ export const VILLAGER_ASSET = {
       pelvisBin: 0.02,
       pelvisSamples: 240,
       pelvisArm: 0.2,
+      /** Slab height (× H) of the tapered thigh capsules (section 3.5, owner decision 04.11.2026). Calibratable. */
+      thighSlab: 0.06,
       /** Added to the skinned pelvis profile's radius below profileMarginBand. 0 by owner decision
        *  04.11.2026 (plan section 3.5): the margin tilted every cloth-carrying column at rest, and
        *  the misses it answered are closed at their cause (the profile follows a lifted thigh).
