@@ -435,7 +435,27 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
     if (y < bottom && !(tw > 0.1)) continue
     cand.push(v)
   }
-  const chosen = farthestPoints(cand.map((v) => [pos.getX(v), pos.getY(v), pos.getZ(v)] as V3), cfg.pelvisSamples).map((k) => cand[k])
+  // per profile cell (column × bin, the bins continued below the bottom for the thigh input) the
+  // widest rest vertex is kept; the remainder fills the sample cap by farthest-point selection
+  // (owner decision 04.11.2026, section 3.5)
+  const colAngles = radial.map((r) => Math.atan2(r[2], r[0]))
+  const widest = new Map<number, { v: number; r: number }>()
+  for (const v of cand) {
+    const x = pos.getX(v) - hipsAt[0]
+    const z = pos.getZ(v) - hipsAt[2]
+    const a = Math.atan2(z, x)
+    let k = 0
+    colAngles.forEach((c, j) => {
+      if (angleDist(a, c) < angleDist(a, colAngles[k]) - 1e-12) k = j
+    })
+    const key = k * 4096 + Math.floor((pos.getY(v) - bottom) / bin) + 2048
+    const r = Math.hypot(x, z)
+    const w = widest.get(key)
+    if (!w || r > w.r) widest.set(key, { v, r })
+  }
+  const kept = new Set([...widest.values()].map((w) => w.v))
+  const rest_ = cand.filter((v) => !kept.has(v))
+  const chosen = [...kept, ...farthestPoints(rest_.map((v) => [pos.getX(v), pos.getY(v), pos.getZ(v)] as V3), Math.max(0, cfg.pelvisSamples - kept.size)).map((k) => rest_[k])]
   if (chosen.length < 30) throw new Error(`columnRig: ${chosen.length} pelvis samples, at least 30 needed`)
   const pelvis: PelvisSamples = { pos: [], idx: [], w: [] }
   for (const v of chosen) {
