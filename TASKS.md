@@ -136,6 +136,7 @@ put it is the mistake this line exists to stop.
   FINAL STATE: a woman wearing the breast cloth shows it covering the bust down to the waist at 3 m and 7 m in a village and a port city on both backends; the cause (cover mask, pre-split body, runtime TSL correction or the builder) is named in the commit.
   Test: Vitest for the cause's layer; picture check of the forced breast-cloth rows on both backends (the garment-acceptance lineup once point 1347 has landed it, otherwise a village close-up of a woman wearing it).
   Criticality: high - visible on every woman wearing the breast cloth in normal play.
+  Status 04.11.2026 20:02 (batch session): cause named by cloud author (session_019XD8Qt4aPse1Td4zeR81gq): the hem sat at L['waist'] = chest bone head (0.662 H), not the girdle (0.582 H); builder and pre-split cut fixed (304c93341), asset-layer test added (835fef569), villager.glb rebuilt locally with the pinned pipeline (feat/1477 head, worktree .claude/worktrees/point-1477; report frames of that build still uncommitted). villagerBreastCloth.test.ts on the rebuilt asset: hem passes, one front ray at 0.702 H, x -0.05 still meets skin before the cloth (builds -0.6/0/0.6). Next: name that gap (bust side under the arm vs cover mask push), fix, rebuild, unit layer, picture check both backends, land.
   Bundle: Dorfleben.
 - [ ] 1482. Villager clothing closure: fix the frozen list of visible garment defects
   Queue position: directly after point 1477 (part of point 1487's bounded closure; 1477 is fixed first).
