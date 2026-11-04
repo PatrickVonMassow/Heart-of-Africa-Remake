@@ -328,7 +328,7 @@ const ARM_SET = (asset: VillagerAsset) => new Set(ARM_BONES.map((n) => asset.bon
 /**
  * The static rig of one hung person (sections 3.5 and 3.7): column rest data,
  * the eight body-only capsules (radius over the drawn vertices with weight
- * above 0.1 on the bone, at rest after the hang, plus the exported margin ×
+ * above 0.1 on the bone, above thighRadiusWeight on a thigh, at rest after the hang, plus the exported margin ×
  * scale), and the pelvis samples (arm weight ≤ pelvisArm between the crotch −
  * one bin and the top, thinned by farthest-point selection).
  */
@@ -368,17 +368,19 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
   const bin = cfg.pelvisBin * H
   const top = form ? form.top : Math.max(...upper.map((u) => rest[u * 3 + 1]))
   const bottom = crotch - bin
-  const capsules: Capsule[] = CAPSULE_BONES.flatMap(([bone, tail]) => {
+  const capsules: Capsule[] = CAPSULE_BONES.map(([bone, tail]) => {
     const i = bi(bone)
     const a = at(rest, i)
     let b: V3
     const mine: V3[] = []
     // a thigh's radius only from drawn vertices below the profile bottom: above it the profile governs (section 3.5)
+    // and only from vertices the thigh dominates enough: a hips-dominant crotch vertex sets no thigh radius
     const thigh = bone.startsWith('thigh.')
+    const cut = thigh ? cfg.thighRadiusWeight : 0.1
     for (let v = 0; v < pos.count; v++) {
       if (thigh && !(pos.getY(v) < bottom)) continue
       for (let c = 0; c < 4; c++) {
-        if (si.getComponent(v, c) === i && sw.getComponent(v, c) > 0.1) {
+        if (si.getComponent(v, c) === i && sw.getComponent(v, c) > cut) {
           mine.push([pos.getX(v), pos.getY(v), pos.getZ(v)])
           break
         }
@@ -394,26 +396,10 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
       for (const p of mine) reach = Math.max(reach, dot(sub(p, a), u))
       b = add(a, mul(u, reach))
     }
-    const margin = (cols.capsules[bone] ?? 0) * scale
-    if (!thigh) {
-      let radius = 0
-      for (const p of mine) radius = Math.max(radius, pointSegment(p, a, b))
-      return [{ bone: i, a, b, radius: radius + margin }]
-    }
-    // a thigh tapers per height: slabs of thighSlab × H along the bone, each a capsule with the
-    // radius of the vertices projecting into it, so the hem meets the hem's radius and not the
-    // buttock's (owner decision 04.11.2026, section 3.5); an empty slab adds no capsule
-    const ab = sub(b, a)
-    const l2 = dot(ab, ab)
-    const n = Math.max(1, Math.round(Math.sqrt(l2) / (cfg.thighSlab * H)))
-    const ends = (j: number): [V3, V3] => [add(a, mul(ab, j / n)), add(a, mul(ab, (j + 1) / n))]
-    const radii = new Array<number>(n).fill(-1)
-    for (const p of mine) {
-      const t = Math.min(1, Math.max(0, dot(sub(p, a), ab) / l2))
-      const j = Math.min(n - 1, Math.floor(t * n))
-      radii[j] = Math.max(radii[j], pointSegment(p, ...ends(j)))
-    }
-    return radii.flatMap((r, j) => (r < 0 ? [] : [{ bone: i, a: ends(j)[0], b: ends(j)[1], radius: r + margin }]))
+    let radius = 0
+    for (const p of mine) radius = Math.max(radius, pointSegment(p, a, b))
+    const margin = cols.capsules[bone] ?? 0
+    return { bone: i, a, b, radius: radius + margin * scale }
   })
   const arm = ARM_SET(asset)
   const thighs = new Set([bi('thigh.L'), bi('thigh.R')])
