@@ -2817,7 +2817,7 @@ export const VILLAGER_ASSET = {
       /** Skin weight on a thigh a drawn vertex must exceed to set that thigh capsule's radius (other
        *  capsules: 0.1). Above 0.1 so the hips-dominant crotch vertices (thigh weight 0.10-0.12) set no
        *  thigh radius (owner decision 04.11.2026, plan section 3.5.z author r5). Calibratable. */
-      thighRadiusWeight: 0.2,
+      thighRadiusWeight: 0.35,
       /** Added to the skinned pelvis profile's radius below profileMarginBand. 0 by owner decision
        *  04.11.2026 (plan section 3.5): the margin tilted every cloth-carrying column at rest, and
        *  the misses it answered are closed at their cause (the profile follows a lifted thigh).

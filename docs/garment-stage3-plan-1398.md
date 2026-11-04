@@ -365,6 +365,19 @@ Options the causes imply (owner; none implemented):
 4. Column 6: make the joint search refine about its coarse pick (as the single search does), or re-run the single search of column 6 after its partner's re-search: removes the 10° grid values 20 / 30 / 50°; unmeasured; with the final neighbours column 6 would settle at 14.5–16.5° (loinFlap) and 26.5–39° (girdleTails), so columns 5 and 7 still bound it.
 5. Count a triangle once per thigh rather than once per slab: removes the doubled triangle depth of A (it does not change the first feasible angle of columns 5 and 7, measured), so only cost and the joint-search inputs.
 
+**Point 1485, round r5 (owner measurement, 04.11.2026) — stop rule applies.** Author r5 landed (a) the slab revert, (b) the thigh-radius weight cut `driver.thighRadiusWeight` and (c) the joint search refining about its coarse pick (`0b69d098d`, `b842b6fe9`) without measuring them. The owner ran `villagerSkirtStandstill.test.ts` on `e79023b3b`, thigh margin 0.0241 as configured, sweeping the cut. θ at rest per column 0 / 5 / 6 / 7 (every other segment 0°):
+
+| Case | cut 0.12 | cut 0.2 | cut 0.35 | cut 0.6 |
+| --- | --- | --- | --- | --- |
+| male adult loinFlap | 0.7 / 20.9 / 15.0 / 22.4 | same | same | 0.7 / 20.3 / 15.0 / 21.9 |
+| female child loinFlap | 24.0 / 19.8 / 10.0 / 19.6 | 12.9 / 15.8 / 5.2 / 14.8 | 10.5 / 14.4 / 4.2 / 13.9 | as 0.35 |
+| male elder loinFlap | 3.7 / 24.8 / 17.5 / 26.7 | same | same | 3.7 / 22.1 / 20.0 / 24.1 |
+| male adult girdleTails | 6.9 / 28.0 / 11.1 / 26.7 | same | same | 6.9 / 27.5 / 10.3 / 26.5 |
+| female child girdleTails | 23.0 / 26.3 / 12.4 / 22.9 | 11.8 / 20.1 / 8.2 / 19.5 | 9.4 / 19.6 / 7.3 / 18.5 | as 0.35 |
+| male elder girdleTails | 7.2 / 27.5 / 30.0 / 29.5 | same | same | 7.2 / 25.0 / 17.5 / 27.1 |
+
+Reading: (a) removed the 50° of column 6 (female child girdleTails 8.2° at cut 0.2); (b) moves only the female child (column 0 from 24° to 10.5°, plateau from 0.35), never the male columns 5 and 7; (c) leaves column 6 at 10–30° on the males. Columns 5 and 7 stay at 14–30° in every case and cut, and r4's counterfactual C (margin 0.004) left them at 12–19°, so options 1, 2 and 4 of r4 cannot meet the 5° limit. The cut is set to 0.35, the smallest value on the female child plateau. Stop rule 4: the round stops here; the next lever is r4's option 3 (a per-sector thigh envelope), a new envelope rule that goes to the user as a card. The thigh margin 0.004 variant and the male elder kneel time were not re-measured (the margin variant is bounded by r4's C).
+
 ### 3.6 Chord target and verification on skinned triangles (B16, B17, check-3 B4)
 
 **Revision line (owner decisions 03.11.2026 and 04.11.2026).** The skinned-triangle check follows section 3.5's revision line: a thigh's slab capsules are tested one by one like any capsule, each on the triangle's active part (04.11.2026); each capsule term covers the triangle's part below the profile bottom in that capsule bone's rest frame or in the posed hips frame (22:19, variant U); the profile term applies at or above the bottom in the posed hips frame; a triangle with two exempt vertices skips the centroid's profile test (rule 3).
