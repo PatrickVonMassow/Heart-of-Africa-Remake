@@ -409,6 +409,9 @@ const SHELL_OUTFITS: Array<{ sex: Sex; age: AgeGroup; worn: string[] }> = [
   { sex: 'female', age: 'adult', worn: ['g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist'] },
   { sex: 'female', age: 'adult', worn: ['g-neckBeads-neck', 'g-neckBeads-chest'] },
   { sex: 'male', age: 'child', worn: ['g-waistBeads-waist', 'g-trousers-waist'] },
+  // the driven forms' waist bands (stage-3 plan 3.12), built as shells
+  { sex: 'female', age: 'adult', worn: ['g-loinFlap-waist.band'] },
+  { sex: 'male', age: 'adult', worn: ['g-girdleTails-waist.band'] },
 ]
 
 function shellRoundTrip() {
