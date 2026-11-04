@@ -314,8 +314,9 @@ export interface ColumnRig {
   lowerOffset: V3[]
   capsules: Capsule[]
   pelvis: PelvisSamples
-  /** Profile: rest-frame heights of its bottom and top, bin height, the margin added to its radius. */
-  profile: { bottom: number; top: number; bin: number; margin: number }
+  /** Profile: rest-frame heights of its bottom and top, bin height, the margin added to its radius
+   *  and the band above the bottom the margin applies in (section 3.5). */
+  profile: { bottom: number; top: number; bin: number; margin: number; band: number }
   crotch: number
   clearance: number
   ground: number
@@ -432,7 +433,7 @@ export function columnRig(asset: VillagerAsset, person: Pick<GltfPerson, 'rest' 
     lowerOffset,
     capsules,
     pelvis,
-    profile: { bottom, top, bin, margin: cfg.profileMargin * scale },
+    profile: { bottom, top, bin, margin: cfg.profileMargin * scale, band: cfg.profileMarginBand * H },
     crotch,
     clearance: form ? form.clearance : cfg.clearance * scale,
     ground: cfg.groundClearance * scale,
@@ -473,10 +474,12 @@ export class PelvisProfile {
   readonly bin: number
   /** The columns sorted by wrapped angle about the circle (the angles are fixed). */
   private readonly order: ReadonlyArray<{ c: number; k: number }>
-  /** Added to every query (the profile margin × scale, section 3.5's named response). */
+  /** Added to a query below bottom + band (the profile margin × scale, section 3.5's named response). */
   readonly margin: number
-  constructor(angles: readonly number[], bottom: number, top: number, bin: number, margin = 0) {
+  readonly band: number
+  constructor(angles: readonly number[], bottom: number, top: number, bin: number, margin = 0, band = Infinity) {
     this.margin = margin
+    this.band = band
     this.angles = angles
     this.order = angles.map((c, k) => ({ c: wrap(c), k })).sort((p, q) => p.c - q.c)
     this.bottom = bottom
@@ -575,7 +578,7 @@ export class PelvisProfile {
         break
       }
     }
-    return (1 - f) * this.columnAt(k0, y) + f * this.columnAt(k1, y) + this.margin
+    return (1 - f) * this.columnAt(k0, y) + f * this.columnAt(k1, y) + (y < this.bottom + this.band ? this.margin : 0)
   }
 
   private columnAt(k: number, y: number): number {
@@ -785,7 +788,7 @@ export class ColumnDriver {
       return { a: xform(m, sub(c.a, r)), b: xform(m, sub(c.b, r)), radius: c.radius, ry: restHeightRow(m, r[1]) }
     })
     const angles = rig.radial.map((r) => Math.atan2(r[2], r[0]))
-    const profile = new PelvisProfile(angles, rig.profile.bottom, rig.profile.top, rig.profile.bin, rig.profile.margin)
+    const profile = new PelvisProfile(angles, rig.profile.bottom, rig.profile.top, rig.profile.bin, rig.profile.margin, rig.profile.band)
     const samples: Array<{ a: number; y: number; r: number }> = []
     const pv = rig.pelvis
     for (let k = 0; k < pv.pos.length / 3; k++) {
@@ -1099,9 +1102,11 @@ export class ColumnDriver {
         const d = cap.radius + C - dist
         if (d > 0) depth += d
       })
-      // a triangle with two exempt vertices skips the centroid's profile test (section 3.6)
-      const bandEdge = ids.filter((v) => panel.exempt[v]).length >= 2
-      const pts: Array<[V3, number, { a: number; y: number; r: number }, boolean]> = ids.map((v, j) => [[a, b, c][j], panel.exempt[v], hv[j], true] as [V3, number, { a: number; y: number; r: number }, boolean])
+      // row 1 is exempt from the profile test like row 0 and the band; a triangle with two
+      // profile-exempt vertices skips the centroid's profile test (sections 3.5, 3.6)
+      const free = ids.map((v) => panel.exempt[v] === 1 || panel.row[v] === 1)
+      const bandEdge = free.filter(Boolean).length >= 2
+      const pts: Array<[V3, number, { a: number; y: number; r: number }, boolean]> = ids.map((v, j) => [[a, b, c][j], panel.exempt[v], hv[j], !free[j]] as [V3, number, { a: number; y: number; r: number }, boolean])
       pts.push([centre, 0, this.hipsLocal(centre, P.hipsInv, hipsAt), !bandEdge])
       for (const [p, ex, h, prof] of pts) {
         if (ex) continue

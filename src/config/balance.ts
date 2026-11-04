@@ -2763,9 +2763,11 @@ export const VILLAGER_ASSET = {
   /** The driven garments' column bones (docs/garment-stage3-plan-1398.md
    *  section 3.5): per leg bone the margin added to its body capsule's
    *  radius, figure units (≈ 5 mm), exported to extras.villager.columns.
-   *  Placeholder until the containment test calibrates it. Calibratable. */
+   *  The thigh margin is the containment test's measured value that holds the
+   *  legs and the pelvis band together (owner decision 03.11.2026, plan
+   *  section 3.5). Calibratable. */
   drivenGarments: {
-    capsuleMargin: { thigh: 0.004, shin: 0.004, foot: 0.004, toe: 0.004 },
+    capsuleMargin: { thigh: 0.0241, shin: 0.004, foot: 0.004, toe: 0.004 },
     /** The driven forms' panels (scripts/villager/driven.py, plan section 3.9):
      *  per form the ease (× H) over the hull plus the band offset, and the hem
      *  flare (× the hips' rest height, as the legacy tube). Calibratable
@@ -2812,11 +2814,13 @@ export const VILLAGER_ASSET = {
       pelvisBin: 0.02,
       pelvisSamples: 240,
       pelvisArm: 0.2,
-      /** Added to the skinned pelvis profile's radius (plan section 3.5's named response to a
-       *  profile shortfall: the measured miss plus 2 mm). Calibratable.
-       *  OPEN: sized at 0.0335 (start-ramp miss 0.0315 + 0.002), but at that value every cloth
-       *  column stands at 70 to 80 degrees at rest; held at 0 pending the owner (plan 3.5.y). */
-      profileMargin: 0,
+      /** Added to the skinned pelvis profile's radius below profileMarginBand (plan section 3.5's
+       *  named response to a profile shortfall: the start-ramp miss 0.0315 plus 2 mm), and only
+       *  there: the cloth's flare comes from the top bins. Calibratable. */
+      profileMargin: 0.0335,
+      /** The band above the profile bottom (× H) the profile margin applies in: the smallest that
+       *  closes the measured profile miss (owner decision 03.11.2026). Calibratable. */
+      profileMarginBand: 0.05,
       /** The containment test's guard on the pelvis band outside the skinned profile (× the
        *  person's scale): a regression guard, no acceptance threshold (point 1339). Calibratable. */
       pelvisBandTolerance: 0.007,

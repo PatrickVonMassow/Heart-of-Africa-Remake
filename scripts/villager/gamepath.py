@@ -764,9 +764,10 @@ class PelvisProfile:
     nearest populated one (same column first, lower on a tie; else other
     columns by angle, then height, larger value on a tie)."""
 
-    def __init__(self, angles, bottom, top, bin_, margin=0.0):
-        # margin: added to every query (the profile margin x scale, section 3.5)
+    def __init__(self, angles, bottom, top, bin_, margin=0.0, band=float('inf')):
+        # margin: added to a query below bottom + band (the profile margin x scale, section 3.5)
         self.margin = margin
+        self.band = band
         self.angles = list(angles)
         self.bottom = bottom
         self.top = top
@@ -843,7 +844,7 @@ class PelvisProfile:
                 k0, k1 = pk, qk
                 f = d / span if span > 0 else 0.0
                 break
-        return (1 - f) * self._column_at(k0, y) + f * self._column_at(k1, y) + self.margin
+        return (1 - f) * self._column_at(k0, y) + f * self._column_at(k1, y) + (self.margin if y < self.bottom + self.band else 0.0)
 
     def _column_at(self, k, y):
         nb = self.bins
@@ -982,7 +983,7 @@ class ColumnDriver:
             caps.append((_xform(m, _sub(c['a'], r)), _xform(m, _sub(c['b'], r)), c['radius'], col_rest_height_row(m, r[1])))
         angles = [math.atan2(r[2], r[0]) for r in rig['radial']]
         pr = rig['profile']
-        profile = PelvisProfile(angles, pr['bottom'], pr['top'], pr['bin'], pr['margin'])
+        profile = PelvisProfile(angles, pr['bottom'], pr['top'], pr['bin'], pr['margin'], pr.get('band', float('inf')))
         pv = rig['pelvis']
         samples = []
         for k in range(len(pv['pos']) // 3):
@@ -1218,9 +1219,11 @@ class ColumnDriver:
                 d = radius + C - dist
                 if d > 0:
                     depth += d
-            # a triangle with two exempt vertices skips the centroid's profile test (section 3.6)
-            band_edge = sum(1 for v in ids if panel['exempt'][v]) >= 2
-            pts = [(x, panel['exempt'][v], h, True) for x, v, h in zip((a, b, c), ids, hv)]
+            # row 1 is exempt from the profile test like row 0 and the band; a triangle with two
+            # profile-exempt vertices skips the centroid's profile test (sections 3.5, 3.6)
+            free = [panel['exempt'][v] == 1 or panel['row'][v] == 1 for v in ids]
+            band_edge = sum(1 for f in free if f) >= 2
+            pts = [(x, panel['exempt'][v], h, not fr) for x, v, h, fr in zip((a, b, c), ids, hv, free)]
             pts.append((centre, 0, self._hips_local(centre, P['hipsInv'], hips_at), not band_edge))
             for p, ex, (ha, hy, hr), prof in pts:
                 if ex:

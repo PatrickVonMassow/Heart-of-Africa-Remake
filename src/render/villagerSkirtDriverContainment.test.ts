@@ -13,9 +13,10 @@
 // The leg surface is asserted strictly; the pelvis band within
 // VILLAGER_ASSET.drivenGarments.driver.pelvisBandTolerance × the person's scale,
 // a regression guard and no acceptance threshold (point 1339; owner decision
-// 03.11.2026). OPEN: the pelvis band exceeds the profile by up to ~7 mm at the
-// waist top (≤ 240 thinned samples, linear between columns, both as the plan
-// states); the plan names no response for a profile shortfall. Not covered here: the
+// 03.11.2026). A profile shortfall takes the profile margin, which applies only
+// in the band driver.profileMarginBand above the profile bottom (owner decision
+// 03.11.2026 23:20); the obstacles come from the driver, so the test and the
+// driver use the same envelopes. Not covered here: the
 // kneel (posed by SkinnedFigure, not the clip layers) and the ten morph
 // corners (gltfPerson takes sex, age and build only).
 import { readFileSync } from 'node:fs'
