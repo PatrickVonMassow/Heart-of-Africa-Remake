@@ -80,7 +80,7 @@ function toyRig(n = 4, capsules: Array<[V3, V3, number]> = [], form: DrivenFormR
     lowerOffset: upper.map(() => [0, -0.4, 0] as V3),
     capsules: capsules.map(([a, b, radius]) => ({ bone: 1, a, b, radius })),
     pelvis: { pos, idx, w },
-    profile: { bottom: 0.9, top: 1.1, bin: 0.05, margin: 0 },
+    profile: { bottom: 0.9, top: 1.1, bin: 0.05, margin: 0, band: Infinity },
     crotch: 0.92,
     clearance: 0.006,
     ground: 0.002,
