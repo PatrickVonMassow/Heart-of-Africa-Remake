@@ -33,7 +33,7 @@ import {
   effectiveWaterDetailOctaves,
   effectiveFigureLimbSegments,
 } from '../../state/ui'
-import { balance, GIZA_CAST, START_YEAR } from '../../config/balance'
+import { balance, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
@@ -3337,6 +3337,7 @@ export function PlaceScene() {
         shadow-camera-near={5}
         shadow-camera-far={160}
         shadow-bias={-0.0004}
+        shadow-normalBias={VILLAGER_ASSET.sunShadowNormalBias}
       />
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}

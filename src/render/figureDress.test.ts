@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
+import { VILLAGER_ASSET } from '../config/balance'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
 import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
@@ -257,6 +258,35 @@ describe('the shared material', () => {
     expect(figureMaterial().vertexColors).toBe(false)
     expect(figureMaterial().colorNode).toBeTruthy()
     expect(figureMaterial().roughnessNode).toBeTruthy()
+  })
+
+  it('shades the back faces (the inside of a hem) by garmentBackShade on both variants', () => {
+    expect(VILLAGER_ASSET.garmentBackShade).toBeGreaterThan(0)
+    expect(VILLAGER_ASSET.garmentBackShade).toBeLessThan(1)
+    // every node the colour graph reaches (operands, wrapped nodes)
+    const reach = (root: unknown) => {
+      const seen = new Set<object>()
+      const walk = (n: unknown) => {
+        if (!n || typeof n !== 'object' || seen.has(n)) return
+        seen.add(n)
+        for (const k of ['node', 'aNode', 'bNode', 'cNode', 'condNode', 'ifNode', 'elseNode']) walk((n as Record<string, unknown>)[k])
+      }
+      walk(root)
+      return [...seen] as Array<{ constructor: { name: string }; method?: string; value?: unknown }>
+    }
+    for (const masked of [false, true]) {
+      const nodes = reach(figureMaterial(masked).colorNode)
+      const mixes = nodes.filter((n) => n.method === 'mix')
+      // the mix's first operand is the back-face shade
+      expect(mixes.some((m) => reach((m as { aNode?: unknown }).aNode).some((n) => n.value === VILLAGER_ASSET.garmentBackShade))).toBe(true)
+      expect(nodes.some((n) => n.constructor.name === 'FrontFacingNode')).toBe(true)
+    }
+  })
+
+  it('offsets the place sun shadow by about one texel against the figure material self-shadow acne', () => {
+    // the place sun's shadow camera spans 110 m on at most a 4096 map: ≈ 2.7 cm a texel
+    expect(VILLAGER_ASSET.sunShadowNormalBias).toBeGreaterThan(0)
+    expect(VILLAGER_ASSET.sunShadowNormalBias).toBeLessThanOrEqual(110 / 4096)
   })
 
   it('carries the baked micro-structure relief on both variants (plain and masked glTF body)', () => {

@@ -12,6 +12,7 @@ import {
   atan,
   attribute,
   clamp,
+  faceDirection,
   float,
   Fn,
   fract,
@@ -24,6 +25,7 @@ import {
   smoothstep,
   vertexColor,
 } from 'three/tsl'
+import { VILLAGER_ASSET } from '../config/balance'
 import type { DressLayer, DressPattern } from '../systems/appearance'
 import { merge, sweepTube, type SweepStation } from './faunaGeometry'
 import { FIGURE_FIBRE, figureMicroColor, figureMicroNormal } from './materials'
@@ -665,7 +667,9 @@ export function figureMaterial(masked = false): THREE.MeshStandardNodeMaterial {
     // (materials.ts): a mean-1 factor on the figure's own colours, and the
     // relief as the normal.
     const fibre = attribute<'vec4'>(SECOND_COLOUR_ATTRIBUTE, 'vec4').w
-    mat.colorNode = figureColorNode().mul(figureMicroColor(fibre))
+    // a back face (the inside of a hem or sleeve) lies in the cloth's own shade
+    const front = faceDirection.mul(0.5).add(0.5)
+    mat.colorNode = figureColorNode().mul(figureMicroColor(fibre)).mul(mix(float(VILLAGER_ASSET.garmentBackShade), float(1), front))
     mat.normalNode = figureMicroNormal(fibre)
     mat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
     if (masked) mat.positionNode = garmentPushPosition()

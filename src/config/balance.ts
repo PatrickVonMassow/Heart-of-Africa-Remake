@@ -2760,6 +2760,15 @@ export const VILLAGER_ASSET = {
    *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
   garmentShellBase: 0.003,
   garmentShellStep: 0.003,
+  /** Colour factor on a figure's back faces (render/figureDress.ts
+   *  figureMaterial): the inside of a hem or sleeve lies in the cloth's own
+   *  shade; drawn at full sky light it read as pale blue-grey patches where a
+   *  leg passes the hem. The closed body never shows its back. Calibratable. */
+  garmentBackShade: 0.5,
+  /** The place sun's shadow normal bias (world units, ≈ one shadow texel):
+   *  self-shadow acne of the double-sided figure material read as dark
+   *  patches on a close white robe, worst on WebGL 2. Calibratable. */
+  sunShadowNormalBias: 0.02,
   /** Local fit of the legacy garment builder (scripts/villager/garments.py;
    *  rebuilding public/models/villager.glb applies them). Eases are fractions
    *  of the stature H; blur width in radians; blend reach a share of the way
