@@ -7064,7 +7064,10 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
       try {
         for (const view of row.views) {
           for (const dist of row.dists ?? [3, 7]) {
-            const cam = await placeCamera(fig, scale, view, dist, row.flank)
+            let cam = await placeCamera(fig, scale, view, dist, row.flank)
+            // a fixed flank serves the 3 m far-sleeve frame; the 7 m frame
+            // judges no sleeve, so a blocked fixed flank takes the open one
+            if (!cam && row.flank && dist > 4) cam = await placeCamera(fig, scale, view, dist, -row.flank)
             if (!cam) {
               missed.push(`${row.slug} ${view} ${dist} m: no clear camera spot`)
               continue
@@ -7073,7 +7076,7 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
             const name = `${row.prefix ?? '1347-accept'}-${row.slug}-${view}-${place}-${dist}m`
             await frame(shot(name), {
               local: { x: fig.x, y: fig.y + 0.85 * scale, z: fig.z },
-              label: `${place}: acceptance row — ${row.text}; forced outfit ${row.fig.garments.join(' + ')}, ${pose}, ${VIEW_TEXT[view]}${cam.side < 0 ? ' (other flank)' : ''}${cam.turn ? ` (turned ${cam.turn} rad for a clear line)` : ''} from ${dist} m`,
+              label: `${place}: acceptance row — ${row.text}; forced outfit ${row.fig.garments.join(' + ')}, ${pose}, ${VIEW_TEXT[view]}${cam.side !== (row.flank ?? 1) ? ' (other flank)' : ''}${cam.turn ? ` (turned ${cam.turn} rad for a clear line)` : ''} from ${dist} m`,
             })
             shots++
           }
