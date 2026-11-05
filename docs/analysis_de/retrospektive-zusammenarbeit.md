@@ -147,6 +147,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 23.09. abends | Ein Nutzerauftrag, der kein Auftragspunkt ist, kommt nicht los: Nach dem regelkonformen Anspruch auf den Batch-Lock verweigerte die Leerlauf-Behauptung der Tafel JEDE Schreiboperation — auch die, die den Punkt erst angelegt hätte. Die beiden dokumentierten Auswege greifen nicht: `now <N>` braucht eine Warteschlangen-Karte, die aus TASKS.md gebaut wird, `closing <N>` einen gemergten Punkt. Durchgekommen bin ich nur, weil das board-first-Tor pro Zug genau einmal feuert — eine Einmal-Freigabe, kein vorgesehener Weg (§3.306) |
 | 29.10. abends | Vierter Wiedergänger von §3.271/§3.267, diesmal ohne `--gate`: Die Startpflicht `batch-doctor --repair` fand eine einzige geänderte Datei — die Zustandsdatei des Closing-Wächters, die der Vorgänger offen gelassen hatte — und stashte sie, obwohl sie den laufenden Prüflauf erkannt hatte (sie ließ `verification/` ausdrücklich draußen). Der Stash änderte den Index mitten in der Unit-Stufe des zweiten Abschluss-LARGE; die Integritätsprüfung brach den Lauf nach 8 m 41 s ab, bei 18 367 grünen Unit-Tests. Ein Neustart kostete gut zwei Stunden; der Fall steht als Punkt 1467 in der Arbeitsliste |
 | 04.11. nachmittags | Die Kleidungsarbeit konvergierte wochenlang nicht: 407 Kleidungs-Commits seit 01.10., und jede gescheiterte Runde erneuerte sich durch Aufteilung (1482 → 1485 → 1486) statt durch einen begrenzten POC-Rückfall; die siebte Rockrunde maß sogar einen anderen Zustand, als die Kamera fotografierte (§3.308) |
+| 05.11. abends | Der 24-Stunden-Rahmen von 1487 kürzte die Liste, nicht das Ritual: Seit 04.11. 17:00 waren 34 von 57 main-Commits Buchhaltung (Bildurteil, Delegation, Widerruf), der Kinder-Hüftschurz allein brauchte neun Commits. Der Nutzer ersetzte die Methode (Punkt 1488): ein Fix je Defekt, eine einzige Bildprüfung am Schluss (§3.309) |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1751,7 +1752,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 05.11.2026, 04:02 · Quellen-Fingerprint: `7afb472da53e…`
+Zuletzt aktualisiert: Donnerstag, 05.11.2026, 22:59 · Quellen-Fingerprint: `1f11949747e1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1871,8 +1872,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 184 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: 7afb472da53e2184864fe22649ce0c7a0bbc7fdb7c24175f73cdf933896a8d8a -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-05T03:02:31.617Z -->
+<!-- RETRO-FINGERPRINT: 1f11949747e131a6b49176a0db2805a9a3f0d64d50583a33c84b332022612383 -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-05T21:59:09.465Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8310,3 +8311,17 @@ und ein Korrekturdurchgang, keine weiteren Abspaltungen.
 
 **Lehre:** Eine Aufteilungsregel braucht ein Budget, das mitwandert. Und bevor eine Zahl
 nachgeregelt wird, muss feststehen, dass sie denselben Zustand misst, den das Bild zeigt.
+
+### 3.309 Der Zeitrahmen begrenzte die Liste, nicht das Ritual
+
+Die begrenzte Schließung (Punkt 1487) setzte 24 Stunden. Die Arbeit darin blieb aber, wie sie
+war: Jeder Kandidat bekam sein eigenes Bildurteil, seinen eigenen Delegations- und
+Widerrufsvermerk, jeweils als Commit auf main. Seit 04.11. 17:00 waren 34 von 57 main-Commits
+solche Vermerke, der Kinder-Hüftschurz allein brauchte am Vormittag des 05.11. neun Commits.
+Der Rahmen kürzte also, wie viele Defekte drankamen, nicht, was ein einzelner Defekt kostete.
+Der Nutzer ersetzte die Methode (Punkt 1488): genau ein Fix je Defekt, alle auf einem Branch,
+eine einzige Bildprüfung auf Spieldistanz auf beiden Backends, Gescheitertes wird
+zurückgenommen und ins Backlog gelegt. Nur eine Entblößung wird nie zurückgenommen (Punkt 1489).
+
+**Lehre:** Ein Budget wirkt nur auf das, was es zählt. Wer die Zeit begrenzt, muss auch den
+Aufwand pro Schritt begrenzen, sonst frisst die Begleitbuchhaltung den Rahmen.
