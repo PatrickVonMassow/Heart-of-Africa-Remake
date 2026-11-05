@@ -14,6 +14,7 @@ import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, OUT, section, check, unmeasured, waitForMoment, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
+import { overheadCamera, OVERHEAD_PITCH_DEG } from './garmentOverhead.mjs'
 import { standOrderMoment } from './standOrder.mjs'
 import { rimSeamPoints } from './rimSeam.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
@@ -6771,9 +6772,11 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   await assertBackend(page)
   const PLACES = (process.env.GARMENT_PLACES ?? 'hausa-village,cairo').split(',')
-  // Views as the bearing from the figure's heading to the camera.
-  const VIEW = { front: 0, front34: Math.PI / 4, side: Math.PI / 2, rear34: (3 * Math.PI) / 4, rear: Math.PI }
-  const VIEW_TEXT = { front: 'front-on', front34: 'front three-quarter', side: 'side-on', rear34: 'rear three-quarter', rear: 'from the rear' }
+  // Views as the bearing from the figure's heading to the camera. `overhead`
+  // looks from the rear three-quarter, lifted and pitched steeply down at the
+  // figure's middle (garmentOverhead.mjs); the others stand at eye height.
+  const VIEW = { front: 0, front34: Math.PI / 4, side: Math.PI / 2, rear34: (3 * Math.PI) / 4, rear: Math.PI, overhead: (3 * Math.PI) / 4 }
+  const VIEW_TEXT = { front: 'front-on', front34: 'front three-quarter', side: 'side-on', rear34: 'rear three-quarter', rear: 'from the rear', overhead: `from above behind at the rear three-quarter, looking down ${OVERHEAD_PITCH_DEG}°` }
   const MAN = { sex: 'male', age: 'adult' }
   const BOY = { sex: 'male', age: 'child' }
   const WOMAN = { sex: 'female', age: 'adult' }
@@ -6860,7 +6863,8 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
         prefix: BASE,
         text: `candidate 1: child's hip cloth standing off the body all round — ${what}, ${how}`,
         fig: { ...w, people, garments, clip, at },
-        views: ['side', 'rear34', 'front34'],
+        // overhead: the user's finding frame looks steeply down from behind
+        views: ['side', 'rear34', 'front34', 'overhead'],
       })
   // candidate 2: the loin-flap girdle as a torus off the waist
   for (const [who, w, people, what] of [
@@ -6986,16 +6990,21 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
   // The camera `dist` from the frozen figure at `view` (either flank, small
   // turns allowed), with clear sight lines to its hips, chest and head; the
   // first spot the player really stands on and sees the figure from is used.
+  // `overhead` stands the camera `dist` along its line of sight to the figure's
+  // middle, lifted above the eye (dev `__placeCameraLift`) and pitched down.
   const placeCamera = async (fig, scale, view, dist, flank) => {
-    const spots = await page.evaluate(({ fig, scale, bearing, dist, flank }) => {
+    const over = view === 'overhead' ? overheadCamera(dist, fig.y + 0.85 * scale) : null
+    await page.evaluate(() => { window.__placeCameraLift = 0 })
+    const spots = await page.evaluate(({ fig, scale, bearing, dist, flank, over }) => {
       const out = []
       for (const side of bearing % Math.PI === 0 ? [1] : flank ? [flank] : [1, -1])
         // the wider turns serve a 7 m spot a village fence or hut blocks
         for (const turn of [0, 0.12, -0.12, 0.25, -0.25, 0.4, -0.4]) {
           const a = fig.yaw + side * bearing + turn
-          const x = fig.x + Math.sin(a) * dist
-          const z = fig.z + Math.cos(a) * dist
-          const eye = [x, fig.y + 1.6, z]
+          const reach = over ? over.horiz : dist
+          const x = fig.x + Math.sin(a) * reach
+          const z = fig.z + Math.cos(a) * reach
+          const eye = [x, over ? over.eyeY : fig.y + 1.6, z]
           const clear = [0.5, 0.9, 1.4].every((y) => {
             const hit = window.__placeRayHit?.(fig.x, fig.y + y * scale, fig.z, eye)
             return !hit || hit.hitDistance == null || fig.meshes.includes(hit.hitUuid) || hit.hitDistance >= hit.targetDistance - 0.35
@@ -7003,18 +7012,24 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
           if (clear) out.push({ x, z, yaw: a, turn, side })
         }
       return out
-    }, { fig, scale, bearing: VIEW[view], dist, flank })
+    }, { fig, scale, bearing: VIEW[view], dist, flank, over })
     for (const s of spots) {
-      await page.evaluate(({ s, dist, scale }) => {
+      await page.evaluate(({ s, dist, scale, over }) => {
+        window.__placeCameraLift = 0
         const p = window.__placePlayer
         p.x = s.x
         p.z = s.z
         p.yaw = s.yaw
-        p.pitch = dist > 4 ? -0.06 : scale < 1 ? -0.2 : -0.1
-      }, { s, dist, scale })
+        p.pitch = over ? over.pitch : dist > 4 ? -0.06 : scale < 1 ? -0.2 : -0.1
+      }, { s, dist, scale, over })
       await nextFrames(4)
       const at = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
       if (Math.hypot(at.x - s.x, at.z - s.z) >= 0.05) continue
+      if (over) {
+        // lift the eye-height camera to the overhead height over this footing
+        await page.evaluate((eyeY) => { window.__placeCameraLift = eyeY - window.__placeCamera.position.y }, over.eyeY)
+        await nextFrames(3)
+      }
       // and from the camera as it really stands: shins to head unhidden
       const seen = await page.evaluate(({ fig, scale }) =>
         [0.25, 0.5, 0.75, 1.0, 1.3, 1.55].every((y) => {
@@ -7023,6 +7038,7 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
         }), { fig, scale })
       if (seen) return s
     }
+    await page.evaluate(() => { window.__placeCameraLift = 0 })
     return null
   }
 
@@ -7082,6 +7098,7 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
           }
         }
       } finally {
+        await page.evaluate(() => { window.__placeCameraLift = 0 })
         await page.evaluate(() => window.__dressLineup(null))
         await page.evaluate(() => window.__placeFreezeLife?.(false))
       }
