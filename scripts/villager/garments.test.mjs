@@ -3,7 +3,7 @@
 // villager clothing fixes changed — the girdle cord's weights, the skirts'
 // thigh blend, the short skirt's and chest wrapper's ease, the sleeve ring.
 import { execFileSync } from 'node:child_process'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET } from '../../src/config/balance'

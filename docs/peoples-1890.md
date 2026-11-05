@@ -2633,6 +2633,19 @@ keeps the code-built dress). Each foot has an ankle and a ball joint. Proportion
 educated guesses in `VILLAGER_ASSET` (`src/config/balance.ts`), calibratable;
 this document names no people-specific stature, so one body serves all peoples.
 
+Rendering fit of the garments (villager clothing closure, 05.11.2026; no
+change to who wears what): the girdle cord of a loin flap, apron or girdle
+tails rides the pelvis and spine only; below the crotch a long wrapper, a
+loin flap and an apron blend both thighs' weights within a short way, so the
+cloth neither wraps the forward thigh nor lifts off the buttocks; the short
+skirt sits close at the hips with little flare, a wrapper tied over the chest
+starts close to the bust, and a shirt's short sleeve fits the arm
+(`VILLAGER_ASSET.garmentFit`, applied when `villager.glb` is rebuilt). At run
+time the inside of a hem or sleeve is drawn in the cloth's shade
+(`garmentBackShade`) and the place sun's shadow carries a normal bias against
+self-shadow patches on light cloth (`sunShadowNormalBias`). No swinging hem or
+drape is simulated.
+
 ### 8.6 Covered upper body and hip layer: the deliberate deviation (work-order "covered women and children")
 
 Since the body of §8.5 carries a real bust form, a figure dressed by the record
