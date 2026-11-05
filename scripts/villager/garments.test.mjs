@@ -13,7 +13,7 @@ const dir = dirname(fileURLToPath(import.meta.url))
 // CI runners carry no numpy; the fit is checked where the asset is built.
 const hasNumpy = (() => {
   try {
-    execFileSync('python3', ['-c', 'import numpy'], { stdio: 'ignore', timeout: 30000 })
+    execFileSync('python3', ['-c', 'import numpy'], { stdio: 'ignore', timeout: 30000, windowsHide: true })
     return true
   } catch {
     return false
