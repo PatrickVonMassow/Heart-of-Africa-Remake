@@ -3252,7 +3252,10 @@ export function PlaceScene() {
     // The same surface carries every figure: the bank slopes down into the
     // shallows and worked earth rises smoothly above the village plateau.
     const footing = placeGroundHeight(ground, p.x, p.z)
-    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
+    // DEV only: a verify suite lifts the camera above the eye (metres) for a
+    // steep overhead garment frame; no player path sets it.
+    const lift = import.meta.env.DEV ? Number((window as unknown as Record<string, unknown>).__placeCameraLift) || 0 : 0
+    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing + lift, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
     camera.position.set(pose.position[0], pose.position[1], pose.position[2])
     camera.rotation.set(pose.rotation[0], pose.rotation[1], pose.rotation[2], 'YXZ')
     // Share the live LOGICAL position so the town-plan map marker can track it.
