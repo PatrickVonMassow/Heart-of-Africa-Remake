@@ -22,6 +22,20 @@ describe('dress lineup outfit override', () => {
     expect(other.form).toBe('breastCloth')
   })
 
+  it('dresses a named people’s garment in any settlement (the row’s `people`)', () => {
+    const man = (people: string) => ({ people, sex: 'male' as const, age: 'adult' as const })
+    const tuaregRobe = resolveOutfit(['robe-chest'], 'hausa', '#fff', man('tuareg'))[0]
+    const hausaRobe = resolveOutfit(['robe-chest'], 'hausa', '#fff')[0]
+    const swahiliRobe = resolveOutfit(['robe-chest'], null, '#fff', man('swahili'))[0]
+    expect(tuaregRobe.source).toEqual({ section: '§7.2 Tuareg' })
+    expect(hausaRobe.source).toEqual({ section: '§7.2 Hausa' })
+    expect(swahiliRobe.source).toEqual({ section: '§7.1 Swahili' })
+    expect(tuaregRobe.colour).not.toBe(hausaRobe.colour)
+    // a pair the wearer's own cell lacks falls back to the rest of the record
+    expect(resolveOutfit(['trousers-waist'], null, '#fff', man('tuareg'))[0].form).toBe('trousers')
+    expect(() => resolveOutfit(['robe-chest'], null, '#fff', man('nobody'))).toThrow(/no people/)
+  })
+
   it('resolves the chest collar and the neck beads as two garments', () => {
     const [a, b] = resolveOutfit(['neckBeads-chest', 'neckBeads-neck'], null, '#fff')
     expect([a.wear, b.wear].sort()).toEqual(['chest', 'neck'])
