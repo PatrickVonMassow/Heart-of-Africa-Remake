@@ -439,6 +439,19 @@ def landmarks(j, H):
     }
 
 
+def breast_cloth_span(L):
+    """The breast cloth's top and hem: over the bust down to the waist.
+    The top is 0.045 H under the shoulder, not L['chestTop'] (0.065 H under
+    it): the hung rest tilts the chest forward, and at chestTop the cloth's
+    front edge stood only 5 mm above the bust's peak, the upper bust bare
+    (measured 04.11.2026, work-order point 1477; calibratable). The hem is the girdle (where a skirt or wrapper begins), 0.01 H lower so
+    the cloth laps over it — not L['waist'], which is the chest bone's head
+    (0.66 H on a woman, under the bust) and left only a band beneath the bust
+    (work-order point 1477). shells.py cuts the pre-split body at the hem."""
+    H = L['H']
+    return L['shoulder'] - 0.045 * H, L['girdle'] - 0.01 * H
+
+
 def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True):
     """A garment round the trunk (and the legs together below the crotch)."""
     out = []
@@ -489,7 +502,7 @@ def build_form(B, form, wear, L):
             parts.append(sweep(rings))
         return merge(parts), 3
     if form == 'breastCloth':
-        return sweep(tube(B, L['chestTop'], L['waist'] - 0.01 * H, 0.011 * H, 0.01, trunk, 6)), 3
+        return sweep(tube(B, *breast_cloth_span(L), 0.011 * H, 0.01, trunk, 6)), 3
     if form in ('shirt', 'robe', 'toga'):
         bottom = L['knee'] + 0.02 * H if form == 'shirt' else L['ankle'] + 0.03 * H
         top = L['neck'] - 0.01 * H
