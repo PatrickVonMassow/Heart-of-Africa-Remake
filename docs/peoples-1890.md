@@ -2640,7 +2640,13 @@ loin flap and an apron blend both thighs' weights within a short way, so the
 cloth neither wraps the forward thigh nor lifts off the buttocks; the short
 skirt sits close at the hips with little flare, a wrapper tied over the chest
 starts close to the bust, and a shirt's short sleeve fits the arm
-(`VILLAGER_ASSET.garmentFit`, applied when `villager.glb` is rebuilt). At run
+(`VILLAGER_ASSET.garmentFit`, applied when `villager.glb` is rebuilt). The
+covering edges hug the body in every pose: the top edge of a breast cloth,
+wrapper or skirt, the top of a loin flap's or apron's flaps and a sleeve's
+cap ring lie on the skin with its own weights, and they and the girdle cord
+are left out of the clip fit's pushes (which had stood them off as the
+union of every pose's body), so no view from above opens onto covered skin
+(`edgeHugReach`). At run
 time the inside of a hem or sleeve is drawn in the cloth's shade
 (`garmentBackShade`) and the place sun's shadow carries a normal bias against
 self-shadow patches on light cloth (`sunShadowNormalBias`). No swinging hem or

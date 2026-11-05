@@ -117,4 +117,67 @@ print(json.dumps([float(r[2][0]) for r in rings]))`)
     for (let k = 0; k < 3; k++) expect(r[k]).toBeLessThan(0.04 * 1.12 + 0.006 + 0.004 * k)
     expect(r[0]).toBeGreaterThan(0.04)
   })
+
+  it('pulls a standing-off edge vertex onto the skin, within reach only', () => {
+    const r = py(`
+co = np.array([0.0, 1.0, 0.1])
+def at(off, inside=False, reach=0.04):
+  p = co + np.array([0, 0, off])
+  return float(G.hug_point(p, co, abs(off), inside, G.PUSH_CLEARANCE, reach)[2] - co[2])
+print(json.dumps({'near': at(0.02), 'far': at(0.05), 'inside': at(0.002, True), 'close': at(0.003)}))`)
+    expect(r.near).toBeCloseTo(0.007, 9)
+    expect(r.close).toBeCloseTo(0.007, 9)
+    // beyond reach and inside the body it stays (push_out clears the inside)
+    expect(r.far).toBeCloseTo(0.05, 9)
+    expect(r.inside).toBeCloseTo(0.002, 9)
+  })
+
+  it("hugs a tube garment's top ring and pins nothing else", () => {
+    const r = py(`
+out = {}
+for form in ('breastCloth', 'skirtShort', 'skirtKnee', 'wrapLong'):
+  v = np.array([[0, y, 0.1] for y in (1.0, 1.0, 0.9, 0.8)])
+  hug, pin = G.edge_masks(form, v)
+  out[form] = [hug.tolist(), pin.tolist()]
+v = np.array([[0, 1.0, 0.1]] * 3)
+out['robe'] = [m.tolist() for m in G.edge_masks('robe', v)]
+print(json.dumps(out))`)
+    for (const form of ['breastCloth', 'skirtShort', 'skirtKnee', 'wrapLong']) {
+      expect(r[form][0]).toEqual([true, true, false, false])
+      expect(r[form][1]).toEqual([true, true, false, false])
+    }
+    expect(r.robe).toEqual([[false, false, false], [false, false, false]])
+  })
+
+  it('pins the girdle cord without hugging it and hugs the flap tops', () => {
+    const r = py(`
+n = G.girdle_count()
+v = np.zeros((n + 4, 3)); v[:, 1] = 0.7
+v[n + 2:, 1] = 0.6
+hug, pin = G.edge_masks('loinFlap', v, None, 0.7)
+print(json.dumps({'cordHug': bool(hug[:n].any()), 'cordPin': bool(pin[:n].all()), 'top': hug[n:].tolist(), 'pin': pin[n:].tolist()}))`)
+    expect(r.cordHug).toBe(false)
+    expect(r.cordPin).toBe(true)
+    expect(r.top).toEqual([true, true, false, false])
+    expect(r.pin).toEqual([true, true, false, false])
+  })
+
+  it("hugs a sleeve's cap ring alone", () => {
+    const r = py(`
+v = np.zeros((5, 3))
+hug, pin = G.edge_masks('shirt', v, np.array([0, 3, 3, 1, 2]))
+print(json.dumps([hug.tolist(), pin.tolist()]))`)
+    expect(r[0]).toEqual([false, true, true, false, false])
+    expect(r[1]).toEqual(r[0])
+  })
+
+  it("takes the clip fit's push off a pinned vertex", () => {
+    const r = py(`
+push = np.ones((3, 3))
+pin = np.array([False, True, False])
+out = G.held(push, pin)
+print(json.dumps({'out': out.tolist(), 'kept': push.tolist()}))`)
+    expect(r.out).toEqual([[1, 1, 1], [0, 0, 0], [1, 1, 1]])
+    expect(r.kept[1]).toEqual([1, 1, 1])
+  })
 })

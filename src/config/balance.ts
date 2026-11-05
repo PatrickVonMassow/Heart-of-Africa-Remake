@@ -2788,6 +2788,11 @@ export const VILLAGER_ASSET = {
     sleeveScale: 1.06,
     sleeveEase: 0.004,
     sleeveEaseStep: 0.002,
+    /** A hugged garment edge (garments.edge_masks: a tube's top ring, a
+     *  flap's top at the girdle, a sleeve's cap ring): a vertex standing off
+     *  the drawn body by less than this (figure units, ≈ 5 cm) is pulled onto
+     *  it; the edge then rides the skin and the clip fit leaves it. */
+    edgeHugReach: 0.04,
   },
   /** The driven garments' column bones (docs/garment-stage3-plan-1398.md
    *  section 3.5): per leg bone the margin added to its body capsule's

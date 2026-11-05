@@ -224,6 +224,18 @@ class Body:
                     out[k] = co + (p - co) * (clearance / dist)
         return out
 
+    def hug(self, pts, reach):
+        """A garment edge pulled onto the drawn body (the decimated surface
+        the game shows): every vertex outside it by less than `reach` comes to
+        PUSH_CLEARANCE off its nearest point; vertices inside it or farther
+        off stay (push_out still clears the inside ones)."""
+        from fit import inside
+        out = pts.copy()
+        for k, p in enumerate(out):
+            co, _n, _fi, dist = self.dtree.find_nearest(p)
+            out[k] = hug_point(p, np.array(co), dist, inside(self.dtree, p.tolist()), PUSH_CLEARANCE, reach)
+        return out
+
     def weights_on_arm(self, pts, side):
         """Data transfer from one arm's skin alone (upper arm, forearm and
         hand of `side` weighing at least half)."""
@@ -875,6 +887,54 @@ def girdle_weights(W, n):
     return W
 
 
+PUSH_CLEARANCE = 0.007  # finish(): every garment vertex this far off the skin
+TUBES = ('breastCloth', 'skirtShort', 'skirtKnee', 'wrapLong')
+
+
+def hug_point(p, co, dist, is_inside, clearance, reach):
+    """One vertex of a hugged edge (Body.hug): outside the skin by less than
+    `reach` it comes to `clearance` off its nearest skin point `co` along the
+    line from it; inside, at the skin or farther off it stays."""
+    if is_inside or dist <= 1e-9 or dist >= reach:
+        return p
+    return co + (p - co) * (clearance / dist)
+
+
+def edge_masks(form, v, limb=None, girdle_y=None):
+    """(hug, pin) per vertex of a built garment. `pin`: held out of the clip
+    fit's pushes (fit.fit) — the fit pushes a vertex outward wherever the body
+    comes near it in ANY frame of ANY clip, so the rest geometry of an edge
+    became the union of every pose's body: the top edge of a breast cloth, a
+    wrapper or a short skirt stood off as a stiff ring one looked into from
+    above, the girdle cord rose off the back as a loop, a sleeve's cap ring
+    rose over the shoulder. `hug` (within pin): pulled onto the skin (Body.hug)
+    and weighted by the skin under it (finish), so it rides the body in every
+    pose. Hugged: a tube garment's top ring (the highest vertices), a flap
+    form's flap tops at the girdle (`girdle_y`), a sleeve's cap ring (`limb`
+    3). Pinned only: the girdle cord (a flap form's first girdle_count()
+    vertices, its torus kept round)."""
+    n = len(v)
+    hug = np.zeros(n, bool)
+    pin = np.zeros(n, bool)
+    if form in TUBES:
+        hug = v[:, 1] >= v[:, 1].max() - 1e-6
+    elif form in FLAPS:
+        cord = np.arange(n) < girdle_count()
+        hug = ~cord & np.isclose(v[:, 1], girdle_y, atol=1e-6)
+        pin = cord
+    elif limb is not None:
+        hug = np.asarray(limb) == 3
+    return hug, pin | hug
+
+
+def held(push, pin):
+    """The clip fit's pushes (fit.fit) with a pinned vertex's taken out (its neighbours spread
+    theirs onto it)."""
+    push = push.copy()
+    push[pin] = 0
+    return push
+
+
 def skirt_blend(form, fit):
     """(blur width in radians, share of crotch-to-hem over which the blend
     fades in) for skirt_weights: a long wrapper blends both thighs fully a
@@ -920,14 +980,20 @@ def skirt_weights(v, W, crotch, hem, width=0.9, reach=1.0):
     return W / W.sum(1, keepdims=True)
 
 
-def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None, rigid_chest=False, girdle_n=0):
+def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None, rigid_chest=False, girdle_n=0,
+           hug=None, pin=None, reach=0.0):
     """Push the garment off the body, transfer weights, unpose to rest, bind the morphs.
     Only a garment worn on the lower arm (`lower_arms`: the limb rings) takes
     weights from the forearms and hands; a sleeve (`limb`: 1 left, 2 right)
     takes them from its own arm alone, so it goes where the arm goes (from
     the nearest trunk skin it stayed at the shoulder while the arm swung out
-    of it)."""
-    v = B.push_out(v, 0.007)
+    of it). A hugged edge (`hug`, edge_masks) is pulled onto the skin first
+    and takes the weights of the skin under it, after every blend; `pin`
+    goes with the garment (g['pin']) to the clip fit, which leaves it."""
+    if hug is not None and hug.any():
+        v = v.copy()
+        v[hug] = B.hug(v[hug], reach)
+    v = B.push_out(v, PUSH_CLEARANCE)
     W = B.weights_at(v, lower_arms)
     if limb is not None:
         if (limb == 0).any():
@@ -945,6 +1011,11 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
         W = smooth_weights(v, t, W, smooth)
     if skirt is not None:
         W = skirt_weights(v, W, *skirt)
+    if hug is not None and hug.any():
+        # the skin's own weights: a sleeve's cap ring from the skin round the
+        # shoulder (its arm included), body cloth from the skin off the arms
+        cap = limb is not None and (np.asarray(limb)[hug] == 3).all()
+        W[hug] = B.weights_at(v[hug], False) if cap else B.weights_trunk(v[hug])
     if girdle_n:
         W = girdle_weights(W, girdle_n)
     W[W < 0.02] = 0
@@ -954,6 +1025,8 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     pos = apply_map(body['basis_full'], idx, bary, off)
     morph = {k: apply_map(body['basis_full'] + body['deltas_full'][k], idx, bary, off) - pos for k in MORPHS}
     g = {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
+    if pin is not None and pin.any():
+        g['pin'] = np.asarray(pin, bool)
     # which vertices are a sleeve's (its cap ring included): armholes reports
     # the sleeve cloth it cuts
     if limb is not None and (limb != 0).any():
@@ -1151,8 +1224,9 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
         skirt = (crotch, float(v[:, 1].min()), *skirt_blend(form, L['fit'])) if form in SKIRTS and v[:, 1].min() < crotch else None
         # the girdle cord is the first part of a flap form (build_form)
         girdle_n = girdle_count() if form in FLAPS else 0
+        hug, pin = edge_masks(form, v, limb, L['girdle'])
         g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings', limb=limb,
-                   rigid_chest=form in RIGID_CHEST, girdle_n=girdle_n)
+                   rigid_chest=form in RIGID_CHEST, girdle_n=girdle_n, hug=hug, pin=pin, reach=L['fit']['edgeHugReach'])
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g
