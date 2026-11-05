@@ -2760,6 +2760,26 @@ export const VILLAGER_ASSET = {
    *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
   garmentShellBase: 0.003,
   garmentShellStep: 0.003,
+  /** Local fit of the legacy garment builder (scripts/villager/garments.py;
+   *  rebuilding public/models/villager.glb applies them). Eases are fractions
+   *  of the stature H; blur width in radians; blend reach a share of the way
+   *  from the crotch to the hem. Calibratable estimates. */
+  garmentFit: {
+    /** The short skirt: ease at the girdle, at the hem, and the hem flare. */
+    skirtShortEaseTop: 0.004,
+    skirtShortEase: 0.008,
+    skirtShortFlare: 0.015,
+    /** A wrapper tied over the chest: its ease at the top edge. */
+    chestWrapEaseTop: 0.005,
+    /** The long wrapper's weight blur round the ring below the crotch, and how
+     *  soon the blend of both thighs is complete (also the flaps' reach). */
+    wrapBlurWidth: 1.6,
+    wrapBlendReach: 0.3,
+    /** A short sleeve's ring: arm radius × scale + ease + step per ring (m). */
+    sleeveScale: 1.06,
+    sleeveEase: 0.004,
+    sleeveEaseStep: 0.002,
+  },
   /** The driven garments' column bones (docs/garment-stage3-plan-1398.md
    *  section 3.5): per leg bone the margin added to its body capsule's
    *  radius, figure units (≈ 5 mm), exported to extras.villager.columns.
