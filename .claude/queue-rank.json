@@ -1789,12 +1789,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1477": {
-      "at": "2026-11-01T11:13:31.196Z",
-      "why": "a defect found by the 1347 bisect; it stays in the village-life bundle behind the garment stages it must not run beside",
-      "origin": "machine",
-      "place": "last"
-    },
     "1479": {
       "at": "2026-11-02T06:07:33.734Z",
       "why": "low-criticality residual of 1478; behind the open medium/high Dorfleben points",
@@ -1841,7 +1835,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-04T16:13:43.504Z",
+    "at": "2026-11-05T03:01:17.471Z",
     "points": [
       184,
       200,
@@ -2307,7 +2301,6 @@
       1473,
       1474,
       1476,
-      1477,
       1479,
       1482,
       1483,
