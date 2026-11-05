@@ -15847,3 +15847,24 @@ to land than a mechanism that needs a review.
   Test: Vitest for the check core with a remote ref whose fetched tip is newer than the local tracking ref.
   Criticality: high - a possible false approval to replace a working agent (CLAUDE.md §2 intake).
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1488. Villager clothing: one fix per listed defect, one final picture check (user order 05.11.2026; amends the working method of 1482 under 1487)
+  The 24-hour budget of 1487 did not limit precision: since 04.11 17:00, 34 of 57 main commits were bookkeeping ("Record the picture judgement / delegation / withdraw verdict ..."); the child hip cloth alone took nine commits on 05.11 morning. A time box cuts the list, it does not cut the per-candidate ritual. Replace the method of 1482:
+  1. Each defect on 1482's frozen list gets exactly ONE fix. All fixes land on the one branch; no picture judgement between them.
+  2. ONE final picture check at game distance, by eye, both backends: does it look right to a player, and is coverage met (see the companion request "No sensitive body part exposed from any view or pose" - its views and poses are part of this check).
+  3. A fix that fails that check is not iterated: it is reverted, the old state stays, the defect goes to docs/backlog.md. Exception: any coverage/exposure failure is never reverted to an exposing state; it keeps getting fixed until it holds.
+  4. No intermediate status/record commits on main; one closing commit with the result per defect.
+  5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
+  Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
+- [ ] 1489. No sensitive body part exposed from any view or pose (user rule 05.11.2026: "allgemein dürfen nie sensible Körperteile exponiert sein")
+  Design rule, to be written into design.md next to "Covered upper body and hip layer (user 06.10.2026)" and mirrored in docs/peoples-1890.md §8.6 where it applies:
+  - No figure ever shows a female breast, the genital area or the buttocks uncovered - from ANY camera angle the game can reach (including the overhead/bird's-eye and close first-person views) and in ANY pose or animation (standing, walking, running, kneeling, bending, pounding, digging, sitting).
+  - A garment that stands off the body must not open a view onto covered skin; coverage is judged by the rendered picture, not by garment presence in the outfit data.
+  - This rule outranks every budget, stop rule and revert rule: an exposure defect is never accepted, frozen or moved to the backlog; it is fixed until it holds.
+  Verification: the final picture check of 1482 includes an overhead view and a kneeling/bending pose for every covering garment form (breast cloth, wraps, tube tops, hip cloths, children's hip layer), both backends.
+  First known case: /backup/hoa/local/BlosseBrueste.zip (kneeling Bambara woman, breast cloth as stiff ring, breast bare from above).
+- [ ] 1490. Head-load porter: crate sinks into the head and the carrier sprints (user report 05.11.2026, not part of the clothing closure)
+  Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
+  Two defects:
+  1. The carried crate sits too low: the carrier's head is inside the crate. The load must rest on top of the head (with its pad, if any), never intersecting it.
+  2. The carrier moves in a sprint gait with arms flung out. A head-load carrier walks at a steady, upright pace with at least one hand steadying the load or arms close to the body.
+  Verify with a Playwright picture of a head-load carrier in Cairo (and any other place using head loads) in motion, both backends when isBackendSensitivePath applies. Related but separate: 1425 (water jar jumps from hip to shoulder).
