@@ -6935,6 +6935,48 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
         fig: { ...w, people: 'tuareg', garments: ['robe-chest', 'veil-face', 'turban-aroundHead'], clip, at, ...(headYaw === undefined ? {} : { headYaw }) },
         views: ['front', 'front34', 'side'],
       })
+  // Exposure (user rule: no view opens onto covered skin): every covering
+  // form kneeling and bent over (the dig at mid-stroke), from above and front
+  // three-quarter at 3 m. `e0-`: the user's finding, the kneeling Bambara
+  // woman's breast cloth seen from above (her wrapper from the waist below,
+  // judged at its top edge too); `exp-`: the other covering forms, the
+  // children's hip layer as children wear it.
+  const BEND = [
+    ['kneel', 'kneel', 0.25, 'kneeling, held down'],
+    ['dig', 'dig', 0.5, 'bent over, dig at mid-stroke'],
+  ]
+  const EXPOSURE_VIEWS = ['overhead', 'front34']
+  for (const [tag, clip, at, how] of BEND)
+    ROWS.push({
+      slug: `e0-breastcloth-bambara-woman-${tag}`,
+      prefix: BASE,
+      text: `exposure: breast cloth standing off the chest, the breast seen from above — Bambara breast cloth and long wrapper from the waist, adult woman, ${how}, judged at the breast cloth's top edge and the wrapper's`,
+      fig: { ...WOMAN, people: 'bambara', garments: ['breastCloth-chest', 'wrapLong-waist'], clip, at },
+      views: EXPOSURE_VIEWS,
+      dists: [3],
+    })
+  for (const [form, who, w, people, garments, what] of [
+    ['wraplong-chest', 'woman', WOMAN, 'hausa', ['wrapLong-chest'], 'long wrapper tied over the chest (tube top), adult woman (Hausa)'],
+    ['skirtknee', 'woman', WOMAN, 'zulu', ['skirtKnee-waist'], 'knee skirt, adult woman (Zulu)'],
+    ['skirtshort', 'woman', WOMAN, 'banda', ['skirtShort-waist'], 'short skirt, adult woman (Banda)'],
+    ['loinflap', 'woman', WOMAN, 'lunda', ['loinFlap-waist'], 'loin flap, adult woman (Lunda)'],
+    ['loinflap', 'man', MAN, 'wayeyi', ['loinFlap-waist'], 'loin flap, adult man (Wayeyi)'],
+    ['apron', 'woman', WOMAN, 'pedi', ['apron-waist'], 'apron, adult woman (Pedi)'],
+    ['girdletails', 'man', MAN, 'zulu', ['girdleTails-waist'], 'girdle tails, adult man (Zulu)'],
+    ['child-skirtshort', 'girl', GIRL, 'hausa', ['skirtShort-waist', 'waistBeads-waist'], 'Hausa short skirt and waist beads, girl (child)'],
+    ['child-loinflap', 'girl', GIRL, 'lunda', ['loinFlap-waist', 'waistBeads-waist'], 'Lunda loin flap and waist beads, girl (child)'],
+    ['child-loinflap', 'boy', BOY, 'bambara', ['loinFlap-waist', 'waistBeads-waist'], 'Bambara loin flap and waist beads, boy (child)'],
+    ['child-apron', 'girl', GIRL, 'wayeyi', ['apron-waist', 'waistBeads-waist'], 'Wayeyi apron and waist beads, girl (child)'],
+  ])
+    for (const [tag, clip, at, how] of BEND)
+      ROWS.push({
+        slug: `exp-${form}-${who}-${tag}`,
+        prefix: BASE,
+        text: `exposure: a view under or into the covering cloth onto covered skin — ${what}, ${how}, judged at the top edge and the hem`,
+        fig: { ...w, people, garments, clip, at },
+        views: EXPOSURE_VIEWS,
+        dists: [3],
+      })
   // GARMENT_ROWS=<prefix,..> stages only the rows whose slug starts with one
   const ROW_FILTER = (process.env.GARMENT_ROWS ?? '').split(',').map((p) => p.trim()).filter(Boolean)
   if (ROW_FILTER.length) {
