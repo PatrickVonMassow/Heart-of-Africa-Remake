@@ -15855,6 +15855,7 @@ to land than a mechanism that needs a review.
   4. No intermediate status/record commits on main; one closing commit with the result per defect.
   5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
   Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
+  Bundle: Dorfleben.
 - [ ] 1489. No sensitive body part exposed from any view or pose (user rule 05.11.2026: "allgemein dürfen nie sensible Körperteile exponiert sein")
   Design rule, to be written into design.md next to "Covered upper body and hip layer (user 06.10.2026)" and mirrored in docs/peoples-1890.md §8.6 where it applies:
   - No figure ever shows a female breast, the genital area or the buttocks uncovered - from ANY camera angle the game can reach (including the overhead/bird's-eye and close first-person views) and in ANY pose or animation (standing, walking, running, kneeling, bending, pounding, digging, sitting).
@@ -15862,9 +15863,11 @@ to land than a mechanism that needs a review.
   - This rule outranks every budget, stop rule and revert rule: an exposure defect is never accepted, frozen or moved to the backlog; it is fixed until it holds.
   Verification: the final picture check of 1482 includes an overhead view and a kneeling/bending pose for every covering garment form (breast cloth, wraps, tube tops, hip cloths, children's hip layer), both backends.
   First known case: /backup/hoa/local/BlosseBrueste.zip (kneeling Bambara woman, breast cloth as stiff ring, breast bare from above).
+  Bundle: Dorfleben.
 - [ ] 1490. Head-load porter: crate sinks into the head and the carrier sprints (user report 05.11.2026, not part of the clothing closure)
   Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
   Two defects:
   1. The carried crate sits too low: the carrier's head is inside the crate. The load must rest on top of the head (with its pad, if any), never intersecting it.
   2. The carrier moves in a sprint gait with arms flung out. A head-load carrier walks at a steady, upright pace with at least one hand steadying the load or arms close to the body.
   Verify with a Playwright picture of a head-load carrier in Cairo (and any other place using head loads) in motion, both backends when isBackendSensitivePath applies. Related but separate: 1425 (water jar jumps from hip to shoulder).
+  Bundle: Dorfleben.
