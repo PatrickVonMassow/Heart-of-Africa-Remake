@@ -6828,6 +6828,121 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
     ROWS.push({ slug: `waistbeads-under-${over.toLowerCase()}-walk`, text: `waist beads under ${over === 'apron' ? 'an apron' : 'a loin flap'}, walk, young woman`, fig: { ...YOUNG_WOMAN, garments: ['waistBeads-waist', `${over}-waist`], clip: 'walk', at: STRIDE }, views: ['side'] })
   ROWS.push({ slug: 'waistbeads-over-trousers-walk', text: 'waist beads over trousers, walk, adult man, judged at the waist seam', fig: { ...MAN, garments: ['waistBeads-waist', 'trousers-waist'], clip: 'walk', at: STRIDE }, views: ['side', 'front34'] })
 
+  // Baseline rows of the frozen clothing list (TASKS.md point "Villager
+  // clothing closure"): every candidate staged on main's own garment build,
+  // framed as `1482-base-*` so the 1347 frames stay. Slugs start with the
+  // candidate (`c1-` .. `c7-`), so GARMENT_ROWS=c3 runs one candidate. `people`
+  // dresses the figure as that people wears the pair (dressLineupSpec.ts);
+  // `flank` fixes which flank a side view looks from (+1: the figure's left,
+  // the lineup's +x; -1: its right).
+  const BASE = '1482-base'
+  const YOUNG_MAN = { sex: 'male', age: 'youth' }
+  const MOVES = [
+    ['idle', 'idle', 0.25, 'idle'],
+    ['walk-stride', 'walk', STRIDE, 'walk at the stride'],
+    ['walk-cross-l', 'walk', 'cross-L', 'walk at the left leg crossing'],
+    ['walk-cross-r', 'walk', 'cross-R', 'walk at the right leg crossing'],
+    ['run', 'run', STRIDE, 'run at the stride'],
+    ['kneel', 'kneel', 0.25, 'kneeling, held down'],
+    ['dig', 'dig', 0.5, 'dig at mid-stroke'],
+  ]
+  const MOVE_VIEWS = { idle: ['side', 'front34'], walk: ['side', 'front34'], run: ['side', 'front34'], kneel: ['side', 'front'], dig: ['side', 'rear34'] }
+  // candidate 1: the child's hip cloth as children wear it (hip cloth and beads)
+  for (const [who, w, people, garments, what] of [
+    ['boy-loinflap', BOY, 'bambara', ['loinFlap-waist', 'waistBeads-waist'], 'boy (child) in the Bambara loin flap and waist beads'],
+    ['girl-loinflap', GIRL, 'lunda', ['loinFlap-waist', 'waistBeads-waist'], 'girl (child) in the Lunda loin flap and waist beads'],
+    ['girl-skirtshort', GIRL, 'hausa', ['skirtShort-waist', 'waistBeads-waist'], 'girl (child) in the Hausa short skirt and waist beads'],
+    ['girl-apron', GIRL, 'wayeyi', ['apron-waist', 'waistBeads-waist'], 'girl (child) in the Wayeyi apron and waist beads'],
+  ])
+    for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride', 'run'].includes(t)))
+      ROWS.push({
+        slug: `c1-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate 1: child's hip cloth standing off the body all round — ${what}, ${how}`,
+        fig: { ...w, people, garments, clip, at },
+        views: ['side', 'rear34', 'front34'],
+      })
+  // candidate 2: the loin-flap girdle as a torus off the waist
+  for (const [who, w, people, what] of [
+    ['man', MAN, 'wayeyi', 'adult man (Wayeyi)'],
+    ['youngwoman', YOUNG_WOMAN, 'lunda', 'young woman (Lunda)'],
+  ])
+    for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride'].includes(t)))
+      ROWS.push({
+        slug: `c2-loinflap-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate 2: loin-flap girdle reading as a torus off the waist — loin flap, ${what}, ${how}, judged at the girdle`,
+        fig: { ...w, people, garments: ['loinFlap-waist'], clip, at },
+        views: ['side', 'front34'],
+      })
+  // candidates 3 and 4: every skirt, apron, loin-flap and girdle-tail form an
+  // adult or young villager wears on main, on a wearer of it, alone
+  for (const [form, who, w, people, what, long] of [
+    ['loinFlap', 'man', MAN, 'wayeyi', 'loin flap, adult man (Wayeyi)'],
+    ['loinFlap', 'woman', WOMAN, 'lunda', 'loin flap, adult woman (Lunda)'],
+    ['girdleTails', 'man', MAN, 'zulu', 'girdle tails, adult man (Zulu)'],
+    ['apron', 'man', MAN, 'lunda', 'apron, adult man (Lunda)'],
+    ['apron', 'woman', WOMAN, 'pedi', 'apron, adult woman (Pedi)'],
+    ['skirtShort', 'woman', WOMAN, 'banda', 'short skirt, adult woman (Banda)'],
+    ['skirtShort', 'youngwoman', YOUNG_WOMAN, 'zulu', 'short skirt, young woman (Zulu)'],
+    ['skirtKnee', 'man', MAN, 'bemba', 'knee skirt, adult man (Bemba)', true],
+    ['skirtKnee', 'woman', WOMAN, 'zulu', 'knee skirt, adult woman (Zulu)', true],
+    ['wrapLong-waist', 'woman', WOMAN, 'bambara', 'long wrapper from the waist, adult woman (Bambara)', true],
+    ['wrapLong-chest', 'woman', WOMAN, 'hausa', 'long wrapper from the chest, adult woman (Hausa)', true],
+  ]) {
+    const pair = form.includes('-') ? form : `${form}-waist`
+    const f = form.toLowerCase()
+    for (const [tag, clip, at, how] of MOVES) {
+      // candidate 4: the knee and long skirts' walk rows also look front-on at the hem
+      const hem = long && clip === 'walk'
+      ROWS.push({
+        slug: `c3-${f}-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate ${hem ? '3 and 4' : '3'}: panel flaring at rest or a leg passing through it${hem ? ', pale/dark patches at the hem where the leg passes' : ''} — ${what}, ${how}`,
+        fig: { ...w, people, garments: [pair], clip, at },
+        views: hem ? ['side', 'front34', 'front'] : MOVE_VIEWS[clip],
+      })
+    }
+  }
+  // candidate 5: the shirt's far sleeve; each flank looks at one far sleeve
+  for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride'].includes(t))) {
+    const fig = { ...MAN, people: 'bambara', garments: ['trousers-waist', 'shirt-chest', 'cap-crown'], clip, at }
+    const text = (where) => `candidate 5: shirt's far sleeve standing off the arm — Bambara shirt, trousers and cap, adult man, ${how}, ${where}`
+    ROWS.push({ slug: `c5-shirt-man-${tag}-lflank`, prefix: BASE, text: text('from his left flank, judged at the far (right) sleeve'), fig, views: ['side'], flank: 1 })
+    ROWS.push({ slug: `c5-shirt-man-${tag}-rflank`, prefix: BASE, text: text('from his right flank, judged at the far (left) sleeve'), fig, views: ['side'], flank: -1 })
+    ROWS.push({ slug: `c5-shirt-man-${tag}`, prefix: BASE, text: text('judged at both sleeves'), fig, views: ['front34'] })
+  }
+  // candidate 6: the white outer robe (the Swahili man's cotton robe and cap)
+  for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride'].includes(t)))
+    ROWS.push({
+      slug: `c6-whiterobe-man-${tag}`,
+      prefix: BASE,
+      text: `candidate 6: dark patches on a white outer robe — Swahili white cotton robe and cap, adult man, ${how}`,
+      fig: { ...MAN, people: 'swahili', garments: ['robe-chest', 'cap-crown'], clip, at },
+      views: ['front', 'side', 'rear34'],
+    })
+  // candidate 7: the Tuareg face veil at the robe collar, head turned standing
+  for (const [who, w, what] of [['man', MAN, 'adult man'], ['youngman', YOUNG_MAN, 'young man']])
+    for (const [tag, clip, at, how, headYaw] of [['idle-head', 'idle', 0.25, 'idle with the head turned', 0.6], ['walk-stride', 'walk', STRIDE, 'walk at the stride']])
+      ROWS.push({
+        slug: `c7-tuareg-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate 7: Tuareg face veil poking through the robe collar — indigo robe, black veil and turban, ${what}, ${how}, judged at the neck`,
+        fig: { ...w, people: 'tuareg', garments: ['robe-chest', 'veil-face', 'turban-aroundHead'], clip, at, ...(headYaw === undefined ? {} : { headYaw }) },
+        views: ['front', 'front34', 'side'],
+      })
+  // GARMENT_ROWS=<prefix,..> stages only the rows whose slug starts with one
+  const ROW_FILTER = (process.env.GARMENT_ROWS ?? '').split(',').map((p) => p.trim()).filter(Boolean)
+  if (ROW_FILTER.length) {
+    const keep = ROWS.filter((r) => ROW_FILTER.some((p) => r.slug.startsWith(p)))
+    check('garment acceptance: GARMENT_ROWS selects at least one row', keep.length > 0, `${keep.length} of ${ROWS.length} rows for ${ROW_FILTER.join(',')}`)
+    ROWS.splice(0, ROWS.length, ...keep)
+  }
+  {
+    const slugs = new Set(ROWS.map((r) => r.slug))
+    check('garment acceptance: every row slug is unique', slugs.size === ROWS.length, `${ROWS.length} rows, ${slugs.size} slugs`)
+  }
+
   // A straight track the figure walks along: `lead` behind the anchor to 3 m
   // past it, every sight line along it at hip and chest height clear, and the
   // camera ring 7.5 m round the anchor open in front, behind and on at least
@@ -6871,10 +6986,10 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
   // The camera `dist` from the frozen figure at `view` (either flank, small
   // turns allowed), with clear sight lines to its hips, chest and head; the
   // first spot the player really stands on and sees the figure from is used.
-  const placeCamera = async (fig, scale, view, dist) => {
-    const spots = await page.evaluate(({ fig, scale, bearing, dist }) => {
+  const placeCamera = async (fig, scale, view, dist, flank) => {
+    const spots = await page.evaluate(({ fig, scale, bearing, dist, flank }) => {
       const out = []
-      for (const side of bearing % Math.PI === 0 ? [1] : [1, -1])
+      for (const side of bearing % Math.PI === 0 ? [1] : flank ? [flank] : [1, -1])
         // the wider turns serve a 7 m spot a village fence or hut blocks
         for (const turn of [0, 0.12, -0.12, 0.25, -0.25, 0.4, -0.4]) {
           const a = fig.yaw + side * bearing + turn
@@ -6888,7 +7003,7 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
           if (clear) out.push({ x, z, yaw: a, turn, side })
         }
       return out
-    }, { fig, scale, bearing: VIEW[view], dist })
+    }, { fig, scale, bearing: VIEW[view], dist, flank })
     for (const s of spots) {
       await page.evaluate(({ s, dist, scale }) => {
         const p = window.__placePlayer
@@ -6939,17 +7054,23 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
       }
       // the figure's drawn place and heading, read off its group
       const fig = { x: f0.x, y: f0.y, z: f0.z, yaw: track.yaw, meshes: f0.meshes }
-      const pose = `${row.fig.clip}${row.fig.clip === 'dig' || !f0.clock ? '' : ` held at phase ${(st.held?.phase ?? 0).toFixed(3)}`}`
+      if (row.fig.clip === 'kneel' && !(f0.kneel >= 0.999)) {
+        missed.push(`${row.slug}: the figure never knelt down (kneel ${f0.kneel})`)
+        await page.evaluate(() => window.__dressLineup(null))
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+        continue
+      }
+      const pose = `${row.fig.clip}${row.fig.clip === 'dig' || row.fig.clip === 'kneel' || !f0.clock ? '' : ` held at phase ${(st.held?.phase ?? 0).toFixed(3)}`}`
       try {
         for (const view of row.views) {
           for (const dist of row.dists ?? [3, 7]) {
-            const cam = await placeCamera(fig, scale, view, dist)
+            const cam = await placeCamera(fig, scale, view, dist, row.flank)
             if (!cam) {
               missed.push(`${row.slug} ${view} ${dist} m: no clear camera spot`)
               continue
             }
             await nextFrames(3)
-            const name = `1347-accept-${row.slug}-${view}-${place}-${dist}m`
+            const name = `${row.prefix ?? '1347-accept'}-${row.slug}-${view}-${place}-${dist}m`
             await frame(shot(name), {
               local: { x: fig.x, y: fig.y + 0.85 * scale, z: fig.z },
               label: `${place}: acceptance row — ${row.text}; forced outfit ${row.fig.garments.join(' + ')}, ${pose}, ${VIEW_TEXT[view]}${cam.side < 0 ? ' (other flank)' : ''}${cam.turn ? ` (turned ${cam.turn} rad for a clear line)` : ''} from ${dist} m`,
