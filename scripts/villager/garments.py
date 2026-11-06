@@ -317,7 +317,7 @@ def sweep(rings, closed_top=False, closed_bottom=False, keep=None):
     for k, (y, c, r) in enumerate(rings):
         for i in range(n + 1):  # a seam column for the uv
             ii = i % n
-            verts.append([c[0] + A[ii, 0] * r[ii], y, c[1] + A[ii, 1] * r[ii]])
+            verts.append([c[0] + A[ii, 0] * r[ii], y[ii] if np.ndim(y) else y, c[1] + A[ii, 1] * r[ii]])
             uv.append([i / n, k / (len(rings) - 1)])
     tris = []
     for k in range(len(rings) - 1):
@@ -498,6 +498,22 @@ def chest_wrap_top(L):
     return L['shoulder'] - L['fit']['chestWrapTop'] * L['H']
 
 
+def chest_wrap_column_top(L, top, n=N_RADIAL):
+    """A chest wrapper's top edge per ring direction: over the breasts in
+    front and over the shoulder blades behind at `top`, dipping at the sides
+    by chestWrapSideDrop H under the armpits (smoothly between
+    chestWrapSideFrom and chestWrapSideTo degrees off the front or back).
+    Level all round at `top`, the edge ran through the hanging upper arm in
+    the build pose: the arm cut it (fit.settle armholes) and the settle
+    pushed the cloth round it radially, over the limb, into a cushion off
+    chest, upper arms and waist (work-order point 1482, pass 5)."""
+    fit = L['fit']
+    s = np.abs(angles(n)[:, 0])
+    lo, hi = np.sin(np.radians(fit['chestWrapSideFrom'])), np.sin(np.radians(fit['chestWrapSideTo']))
+    x = np.clip((s - lo) / (hi - lo), 0, 1)
+    return top - fit['chestWrapSideDrop'] * L['H'] * x * x * (3 - 2 * x), L['waist']
+
+
 def chest_wrap_heights(L, top, bottom, rings=10):
     """A chest wrapper's ring heights, top to hem: every chestWrapBustStep H
     from the top down to the chest bone's head (L['waist']), then `rings`
@@ -511,18 +527,31 @@ def chest_wrap_heights(L, top, bottom, rings=10):
     return [float(y) for y in np.concatenate([bust, np.linspace(L['waist'], bottom, rings)])]
 
 
-def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True, ease_top=None, heights=None):
+def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True, ease_top=None, heights=None, column_top=None):
     """A garment round the trunk (and the legs together below the crotch).
     `ease_top` (optional): the ease at the top ring, blending to `ease` at
     the hem, so a wrapped top edge lies on the body instead of standing off.
     `heights` (optional): the ring heights top to hem instead of `rings`
-    evenly spaced ones."""
+    evenly spaced ones. `column_top` (optional, (tops[N_RADIAL], floor)):
+    each ring direction's own top edge; the rings above `floor` are spread
+    per direction between floor and that top, and each direction's radius is
+    the body's outline at its own height (sweep takes a ring's height per
+    column)."""
     out = []
     ys = heights if heights is not None else [top + (bottom - top) * k / (rings - 1) for k in range(rings)]
     for y in ys:
         t = (y - top) / (bottom - top)
         m = mask & (B.arm < 0.3)
-        c, r = B.ring(y, m, ease if ease_top is None else ease_top + (ease - ease_top) * t)
+        e = ease if ease_top is None else ease_top + (ease - ease_top) * t
+        c, r = B.ring(y, m, e)
+        if column_top is not None and y > column_top[1]:
+            tops, floor = column_top
+            yc = floor + (y - floor) * (tops - floor) / (top - floor)
+            r = r.copy()
+            for yi in np.unique(np.round(yc, 5)):
+                at = np.round(yc, 5) == yi
+                r[at] = B.ring(float(yi), m, e, center=c)[1][at]
+            y = yc
         fl = flare * B.body['joints'][0, 1] * t * t
         A = angles(len(r))
         # the hem flares mostly sideways (a deep fore-aft flare becomes the
@@ -556,7 +585,8 @@ def build_form(B, form, wear, L):
         bottom = (L['hip'] + L['knee']) / 2 if form == 'skirtShort' else L['knee'] - 0.015 * H if form == 'skirtKnee' else L['knee'] - 0.6 * (L['knee'] - L['ankle'])
         ease, flare, ease_top = skirt_profile(form, wear, L)
         heights = chest_wrap_heights(L, top, bottom) if wear == 'chest' else None
-        return sweep(tube(B, top, bottom, ease, flare, trunk, 12, ease_top=ease_top, heights=heights)), 8
+        column_top = chest_wrap_column_top(L, top) if wear == 'chest' else None
+        return sweep(tube(B, top, bottom, ease, flare, trunk, 12, ease_top=ease_top, heights=heights, column_top=column_top)), 8
     if form == 'trousers':
         bottom = L['knee'] - 0.5 * (L['knee'] - L['ankle'])
         # the seat reaches below a child's crotch too: skin between the leg
@@ -1022,6 +1052,10 @@ def flap_weights(v, W, n, front_z, crotch, hem, hem_share, hips_x=0.0, core=np.p
 
 
 PUSH_CLEARANCE = 0.007  # finish(): every garment vertex this far off the skin
+# clear_corners outlines the trunk without the armpit skin the arms partly
+# ride (B.arm < 0.3 took a child's armpit into the chest outline and stood
+# the wrapper off her sides, work-order point 1482 pass 5)
+CLEAR_ARM = 0.05
 TUBES = ('breastCloth', 'skirtShort', 'skirtKnee', 'wrapLong')
 
 
@@ -1120,23 +1154,37 @@ def skirt_weights(v, W, crotch, hem, width=0.9, reach=1.0, hem_width=None):
     return W / W.sum(1, keepdims=True)
 
 
-def radial_clear(pts, skin, mask, clearance, slab=0.012, drape=0.0):
+def radial_clear(pts, skin, mask, clearance, slab=0.012, drape=0.0, front=np.cos(np.radians(45))):
     """Every point at least `clearance` outside the convex outline of
-    `skin[mask]` between its own height and `drape` above it (cloth hangs
-    straight down from a bulge, never tucked under it), pushed out radially
-    from the outline's centre; a point outside it, or at a height with no
-    skin, stays."""
+    `skin[mask]` at its own height, pushed out radially from the outline's
+    centre; a point outside it, or at a height with no skin, stays. In front
+    (within acos(`front`) of +z round its own outline's centre) the outline
+    reaches `drape` above the point: cloth hangs straight down from the
+    breast, never tucked under it. At the sides and the back the outline is
+    the point's own section: an outline over the whole drape there took in
+    the wider chest and the armpits and stood the cloth off the waist and
+    the arms all round (work-order point 1482, pass 5)."""
     out = pts.copy()
     hulls = {}
-    for k, p in enumerate(pts):
-        key = round(float(p[1]), 3)
+
+    def outline(y, up):
+        key = (round(float(y), 3), up > 0)
         if key not in hulls:
-            sec = skin[mask & (skin[:, 1] > p[1] - slab) & (skin[:, 1] < p[1] + slab + drape)][:, [0, 2]]
+            sec = skin[mask & (skin[:, 1] > y - slab) & (skin[:, 1] < y + slab + up)][:, [0, 2]]
             h = hull2d(sec) if len(sec) >= 3 else None
             hulls[key] = (h, h.mean(0)) if h is not None and len(h) >= 3 else None
-        if hulls[key] is None:
+        return hulls[key]
+
+    for k, p in enumerate(pts):
+        own = outline(p[1], 0.0)
+        if own is None:
             continue
-        h, c = hulls[key]
+        h, c = own
+        d = p[[0, 2]] - c
+        if drape > 0 and d[1] > front * np.linalg.norm(d):
+            hc = outline(p[1], drape)
+            if hc is not None:
+                h, c = hc
         d = p[[0, 2]] - c
         r = float(np.linalg.norm(d))
         if r < 1e-9:
@@ -1160,17 +1208,24 @@ def clear_corners(pos, morph, basis, deltas, mask, clearance, drape=0.0):
     between rings over a breast ran through it, and under the bust the
     vertices of the inframammary skin stayed behind the breast (`drape`:
     the cloth hangs straight down that far from a bulge). Each corner's
-    correction goes into its own morph. Returns new morphs."""
+    correction goes into its own morph. Each corner is cleared from its own
+    mapped cloth, not from the cloth an earlier corner's correction moved:
+    the woman's bust push rode on into the girl's, the youth's and the
+    elder's corners (they share the female morph) and stood the cloth off a
+    girl's flat chest by the woman's breast depth (work-order point 1482,
+    pass 5). Returns new morphs."""
+    raw = morph
     morph = dict(morph)
     for names, own in FEMALE_CORNERS:
         skin = basis + sum(deltas[n] for n in names)
+        mapped = pos + sum(raw[n] for n in names)
         p = pos + sum(morph[n] for n in names)
-        morph[own] = morph[own] + (radial_clear(p, skin, mask, clearance, drape=drape) - p)
+        morph[own] = morph[own] + (radial_clear(mapped, skin, mask, clearance, drape=drape) - p)
     return morph
 
 
 def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None, rigid_chest=False, girdle_n=0,
-           hug=None, pin=None, reach=0.0, flap=None, clear=0.0):
+           hug=None, pin=None, reach=0.0, flap=None, clear=None):
     """Push the garment off the body, transfer weights, unpose to rest, bind the morphs.
     Only a garment worn on the lower arm (`lower_arms`: the limb rings) takes
     weights from the forearms and hands; a sleeve (`limb`: 1 left, 2 right)
@@ -1180,7 +1235,7 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     and takes the weights of the skin under it, after every blend; `pin`
     goes with the garment (g['pin']) to the clip fit, which leaves it.
     `flap` (front_z, crotch, hem, hem_share): a flap form's front flap rides
-    both legs alike (flap_weights). `clear` (a drape height, or 0): every
+    both legs alike (flap_weights). `clear` (a drape height, or None): every
     woman's corner morph clears her trunk (clear_corners)."""
     if hug is not None and hug.any():
         v = v.copy()
@@ -1218,8 +1273,8 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     idx, bary, off = surface_map(mh, body['basis_full'], rest)
     pos = apply_map(body['basis_full'], idx, bary, off)
     morph = {k: apply_map(body['basis_full'] + body['deltas_full'][k], idx, bary, off) - pos for k in MORPHS}
-    if clear:
-        morph = clear_corners(pos, morph, body['basis_full'], body['deltas_full'], B.mask_body & (B.arm < 0.3), PUSH_CLEARANCE, clear)
+    if clear is not None:
+        morph = clear_corners(pos, morph, body['basis_full'], body['deltas_full'], B.mask_body & (B.arm < CLEAR_ARM), PUSH_CLEARANCE, clear)
     g = {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
     if pin is not None and pin.any():
         g['pin'] = np.asarray(pin, bool)
@@ -1430,7 +1485,7 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
                     L['fit']['flapSymmetryCore'], L['fit']['flapFrontHalfAngleTop'])
         g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings', limb=limb,
                    rigid_chest=form in RIGID_CHEST, girdle_n=girdle_n, hug=hug, pin=pin, reach=L['fit']['edgeHugReach'], flap=flap,
-                   clear=L['fit']['chestWrapDrape'] * H if (form, wear) == ('wrapLong', 'chest') else 0.0)
+                   clear=L['fit']['chestWrapDrape'] * H if (form, wear) == ('wrapLong', 'chest') else None)
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g

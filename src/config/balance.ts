@@ -2792,10 +2792,21 @@ export const VILLAGER_ASSET = {
      *  two rings cut 2-4 cm through the breast. Calibratable. */
     chestWrapBustStep: 0.005,
     /** A chest wrapper on a woman's corners hangs straight down from the
-     *  breast this far (fraction of H, garments.clear_corners): carried by the
-     *  surface map, the cloth under the bust followed the inframammary skin
-     *  behind the breast. Calibratable. */
-    chestWrapDrape: 0.05,
+     *  breast this far in front (fraction of H, garments.clear_corners; the
+     *  sides and back clear their own section only). 0.05 stood the cloth
+     *  off the waist under the bust (work-order point 1482, pass 5); the
+     *  section's own slab already keeps it off the inframammary skin.
+     *  Calibratable. */
+    chestWrapDrape: 0,
+    /** A chest wrapper's top edge dips this far (fraction of H) at the sides
+     *  under the armpits, smoothly from chestWrapSideFrom to chestWrapSideTo
+     *  degrees off the front and back (garments.chest_wrap_column_top): level
+     *  all round, the edge ran through the hanging upper arm and the settle
+     *  pushed the cloth round the arm into a cushion (work-order point 1482,
+     *  pass 5). Calibratable. */
+    chestWrapSideDrop: 0.035,
+    chestWrapSideFrom: 50,
+    chestWrapSideTo: 80,
     /** The long wrapper's weight blur round the ring below the crotch, and how
      *  soon the blend of both thighs is complete (also the flaps' reach). */
     wrapBlurWidth: 1.6,

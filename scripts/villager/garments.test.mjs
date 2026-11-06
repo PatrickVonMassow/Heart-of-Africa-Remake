@@ -86,6 +86,68 @@ print(json.dumps(out))
   }, 120000)
 })
 
+describe.skipIf(!hasNumpy || !hasSources)('chest wrapper lies on every body corner (builder output, browserless)', () => {
+  // Work-order point 1482, pass 5: the pass-4 wrapper ballooned off chest,
+  // upper arms and waist; its outward offset from the trunk at every ring of
+  // the builder's own output (build_form on the rest body, nearest-vertex map
+  // onto each corner, clear_corners) stays within a small fraction of H.
+  // Rest pose, no clip fit or settle (those need Blender): the asset build's
+  // penetration report and villagerFigureBody.test.ts measure the rest.
+  it('stands off no corner by more than 0.02 H and keeps its top clear of the arms at the sides', () => {
+    const src = `import sys, json
+sys.path.insert(0, ${JSON.stringify(dir)})
+import numpy as np
+import skeleton as SK
+import body as BD
+import garments as G
+from mhbody import MakeHuman
+cfg = {'VILLAGER_ASSET': json.loads(${JSON.stringify(JSON.stringify(VILLAGER_ASSET))})}
+mh = MakeHuman(${JSON.stringify(sources)})
+C = BD.corner_shapes(mh, cfg)
+basis, deltas = BD.morph_deltas(C)
+H = cfg['VILLAGER_ASSET']['stature']
+Wfull, _ = BD.full_weights(mh)
+jb = BD.joints_of(mh, basis)
+L = G.landmarks(np.array([[*jb[n][0], *jb[n][1]] if n in jb else [0.0] * 6 for n in SK.NAMES]), H)
+L['fit'] = cfg['VILLAGER_ASSET']['garmentFit']
+B = object.__new__(G.Body)
+B.v, B.W, B._hulls = basis, Wfull, {}
+B.arm = Wfull[:, [SK.INDEX[n] for n in BD.ARM_BONES]].sum(1)
+B.mask_body = np.zeros(len(basis), bool); B.mask_body[mh.groups['body']] = True
+B.body = {'joints': np.array([[*jb[n][0], *jb[n][1]] if n in jb else [0.0] * 6 for n in SK.NAMES])}
+v = G.build_form(B, 'wrapLong', 'chest', L)[0][0]
+v = v[v[:, 1] > L['hip']]
+bi = np.nonzero(B.mask_body)[0]
+ids = bi[np.array([((basis[B.mask_body] - p) ** 2).sum(1).argmin() for p in v])]
+morph = {k: deltas[k][ids] for k in deltas}
+morph = G.clear_corners(v, morph, basis, deltas, B.mask_body & (B.arm < G.CLEAR_ARM), G.PUSH_CLEARANCE, L['fit']['chestWrapDrape'] * H)
+trunk = B.mask_body & (B.arm < 0.3)
+out = {}
+for names in ((), ('female',), ('female', 'youth', 'youth_f'), ('female', 'child', 'child_f'), ('female', 'elder', 'elder_f'), ('stout',), ('slight',)):
+  skin = basis + sum((deltas[n] for n in names), np.zeros_like(basis))
+  gp = v + sum((morph[n] for n in names), np.zeros_like(v))
+  worst = 0.0
+  for y in np.linspace(gp[:, 1].max(), L['hip'], 10):
+    sec = skin[trunk & (np.abs(skin[:, 1] - y) < 0.012)][:, [0, 2]]
+    gs = gp[np.abs(gp[:, 1] - y) < 0.006][:, [0, 2]]
+    if len(sec) < 3 or not len(gs): continue
+    h = G.hull2d(sec); c = h.mean(0)
+    for p in gs:
+      d = p - c; r = np.linalg.norm(d)
+      worst = max(worst, r - G.ray_hull(h, c, d / r))
+  out['+'.join(names) or 'male'] = worst / H
+arm = basis[B.mask_body & (B.arm > 0.5)]
+top = v[v[:, 1] > L['shoulder'] - 0.12 * H]
+near = np.sqrt(((top[:, None, :] - arm[None]) ** 2).sum(2)).min(1)
+print(json.dumps({'off': out, 'nearArm': float(near.min() / H)}))
+`
+    const r = JSON.parse(execFileSync('python3', ['-c', src], { encoding: 'utf8', windowsHide: true, timeout: 300000 }))
+    // measured at pass 5: 0.009-0.015 H; the pass-4 drape stood a woman's cloth 0.04 H off under the bust and a girl's 0.03 H off her chest
+    for (const [corner, off] of Object.entries(r.off)) expect(off, corner).toBeLessThan(0.02)
+    expect(r.nearArm).toBeGreaterThan(0)
+  }, 300000)
+})
+
 describe.skipIf(!hasNumpy)('garment builder local fit', () => {
   it('rides the girdle cord on the hips and spine alone', () => {
     const r = py(`
@@ -131,6 +193,18 @@ print(json.dumps({'old': spread(old), 'new': spread(new), 'knee': spread(knee), 
     expect(r.sum).toBeLessThan(1e-9)
     // the other skirts keep their blend
     expect(r.knee).toBeCloseTo(r.old, 9)
+  })
+
+  it("dips a chest wrapper's top edge at the sides under the arms, level over the breasts and the back", () => {
+    const r = py(`
+L = {'H': 1.0, 'waist': 0.6, 'fit': FIT}
+tops, floor = G.chest_wrap_column_top(L, 0.8)
+print(json.dumps({'front': float(tops[0]), 'back': float(tops[G.N_RADIAL // 2]), 'side': float(tops[G.N_RADIAL // 4]), 'floor': floor}))`)
+    // level, the edge ran through the hanging upper arm and the settle cushioned the cloth round it (point 1482 pass 5)
+    expect(r.front).toBeCloseTo(0.8, 9)
+    expect(r.back).toBeCloseTo(0.8, 9)
+    expect(r.side).toBeCloseTo(0.8 - VILLAGER_ASSET.garmentFit.chestWrapSideDrop, 9)
+    expect(r.floor).toBe(0.6)
   })
 
   it('keeps the front and rear flap of a loin flap apart in the blur', () => {
