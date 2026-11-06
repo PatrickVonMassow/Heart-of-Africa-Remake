@@ -180,4 +180,67 @@ print(json.dumps({'out': out.tolist(), 'kept': push.tolist()}))`)
     expect(r.out).toEqual([[1, 1, 1], [0, 0, 0], [1, 1, 1]])
     expect(r.kept[1]).toEqual([1, 1, 1])
   })
+
+  it("builds a flap form's girdle as a flat band and its front flap wide over the pubic area", () => {
+    const r = py(`
+class B:
+  W = np.zeros((4, 1))
+  arm = np.zeros(4)
+  body = {'joints': np.array([[0, 0.9, 0]])}
+  def ring(self, y, m, ease):
+    return np.zeros(2), np.full(G.N_RADIAL, 0.12 + ease)
+H = 1.7
+L = {'H': H, 'hip': 0.9, 'knee': 0.5, 'girdle': 0.9 + 0.06 * H, 'fit': FIT}
+out = {}
+for form in G.FLAPS:
+  (v, t, uv), _ = G.build_form(B(), form, 'waist', L)
+  n = G.girdle_count()
+  cord, flaps = v[:n], v[n:]
+  rad = np.hypot(cord[:, 0], cord[:, 2])
+  front = flaps[flaps[:, 2] > 0]
+  top = front[np.isclose(front[:, 1], L['girdle'])]
+  out[form] = {'depth': float(rad.max() - rad.min()), 'height': float(cord[:, 1].max() - cord[:, 1].min()),
+               'width': float(top[:, 0].max() - top[:, 0].min())}
+out['cols'] = [float(G.flap_columns(a)) for a in (0.5, 0.785, 0.8)]
+print(json.dumps(out))`)
+    const H = 1.7
+    for (const form of ['loinFlap', 'apron', 'girdleTails']) {
+      // a band 0.016 H high (its six-sided section: × sin 60°) and a few millimetres deep, never a round cord
+      expect(r[form].height).toBeCloseTo(0.016 * H * Math.sin(Math.PI / 3), 6)
+      expect(r[form].depth).toBeLessThan(0.008)
+      expect(r[form].depth).toBeLessThan(r[form].height / 4)
+      // the front flap reaches ±45° round a 12 cm hip: over 16 cm, not the old ±15° (6 cm)
+      expect(r[form].width).toBeGreaterThan(0.16)
+    }
+    // rounded to the nearest of the 24 ring columns (0.5 rad is two, π/4 three)
+    expect(r.cols[0]).toBeCloseTo((2 * Math.PI) / 12, 9)
+    expect(r.cols[1]).toBeCloseTo(Math.PI / 4, 9)
+    expect(r.cols[2]).toBeCloseTo(Math.PI / 4, 9)
+  })
+
+  it('rides the front flap on both legs alike over the pubic area, the rear flap and cord unchanged', () => {
+    const r = py(`
+n = 2
+# cord (2), front flap above the crotch, front flap at the hem, rear flap
+v = np.array([[0.1, 1.0, 0.1], [-0.1, 1.0, -0.1], [0.05, 0.9, 0.1], [0.05, 0.7, 0.1], [0.05, 0.9, -0.1]])
+W = np.zeros((len(v), len(SK.NAMES)))
+L, R, hips = SK.INDEX['thigh.L'], SK.INDEX['thigh.R'], SK.INDEX['hips']
+W[:, L] = 0.6
+W[:, hips] = 0.4
+out = G.flap_weights(v, W, n, 0.0, 0.85, 0.7, 0.5)
+print(json.dumps({'cord': out[:2].tolist() == W[:2].tolist(), 'rear': out[4].tolist() == W[4].tolist(),
+  'top': [float(out[2, L]), float(out[2, R]), float(out[2, hips])], 'hem': [float(out[3, L]), float(out[3, R])],
+  'sum': float(np.abs(out.sum(1) - 1).max()), 'pairs': int((G.mirror_bones() != np.arange(len(SK.NAMES))).sum())}))`)
+    expect(r.cord).toBe(true)
+    expect(r.rear).toBe(true)
+    expect(r.top[0]).toBeCloseTo(0.3, 9)
+    expect(r.top[1]).toBeCloseTo(0.3, 9)
+    expect(r.top[2]).toBeCloseTo(0.4, 9)
+    // at the hem half the mirror blend: 0.6 → 0.45 / 0.15
+    expect(r.hem[0]).toBeCloseTo(0.45, 9)
+    expect(r.hem[1]).toBeCloseTo(0.15, 9)
+    expect(r.sum).toBeLessThan(1e-9)
+    expect(r.pairs).toBeGreaterThan(0)
+    expect(r.pairs % 2).toBe(0)
+  })
 })

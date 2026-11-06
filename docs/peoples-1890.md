@@ -2646,7 +2646,10 @@ wrapper or skirt, the top of a loin flap's or apron's flaps and a sleeve's
 cap ring lie on the skin with its own weights, and they and the girdle cord
 are left out of the clip fit's pushes (which had stood them off as the
 union of every pose's body), so no view from above opens onto covered skin
-(`edgeHugReach`). At run
+(`edgeHugReach`). The girdle of a flap form is a flat band on the waist,
+not a round cord (`flapGirdleBand`); the front flap spans about 17 cm on an
+adult (`flapFrontHalfAngle`) and rides both legs alike over the pubic area,
+so a stride no longer pulls it onto one hip (`flapHemSymmetry`). At run
 time the inside of a hem or sleeve is drawn in the cloth's shade
 (`garmentBackShade`) and the place sun's shadow carries a normal bias against
 self-shadow patches on light cloth (`sunShadowNormalBias`). No swinging hem or

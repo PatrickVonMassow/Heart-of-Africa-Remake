@@ -505,9 +505,15 @@ def build_form(B, form, wear, L):
     parts = []
     if form in FLAPS:
         long = L['knee'] + 0.02 * H if form == 'apron' else L['hip'] - (0.14 if form == 'girdleTails' else 0.10) * H
-        half = (0.075 if form == 'apron' else 0.05) * H
-        parts.append(girdle(B, L['girdle'], 0.008 * H))
-        front = 0.75 if form == 'apron' else 0.5
+        # the girdle a flat band on the waist (0.008 H high, flapGirdleBand H
+        # thick), as the game's own builder draws it (figureDress.ts girdle):
+        # a round cord 0.008 H thick stood off the waist as a torus, and the
+        # settle pushed its inner half out of the skin further still
+        parts.append(girdle(B, L['girdle'], 0.008 * H, L['fit']['flapGirdleBand'] * H))
+        # the front flap's half-angle (flap_columns): at 0.5 rad it kept only
+        # the columns at 0 and ±15° (N_RADIAL 24), a flap ~6 cm wide that left
+        # an adult's pubic area bare beside it in a stride
+        front = flap_columns(L['fit']['flapFrontHalfAngle'])
         parts.append(sweep(tube(B, L['girdle'], long, 0.009 * H, 0.03, trunk, 8), keep=lambda k, i: abs(ang(i)) <= front + 1e-6))
         back_long = L['knee'] + 0.05 * H if form == 'girdleTails' else long
         back = 0.9 if form == 'apron' else 0.75
@@ -738,21 +744,34 @@ def girdle_count(n=N_RADIAL, m=TORUS_TUBE):
     return (n + 1) * (m + 1)
 
 
-def girdle(B, y, thick):
+def flap_columns(half_angle, n=N_RADIAL):
+    """The `keep` bound of a front flap: `half_angle` (rad) rounded to the
+    nearest ring column, so a calibrated angle never falls just short of one
+    (0.5 rad dropped the column at 0.52)."""
+    step = 2 * np.pi / n
+    return round(half_angle / step) * step
+
+
+def girdle(B, y, thick, band=None):
+    """A ring round the waist at height y: `thick` its half-height, `band`
+    (optional) its radial half-thickness — a flat band, else a round cord."""
     c, r = B.ring(y, B.arm < 0.3, 0.006 * B.body['joints'][0, 1] / 0.7)
-    return torus(c, y, r, thick)
+    return torus(c, y, r, thick, radial=band)
 
 
-def torus(c, y, radii, thick, n=None, m=TORUS_TUBE):
+def torus(c, y, radii, thick, n=None, m=TORUS_TUBE, radial=None):
+    """A ring of tube round (c, y); the tube's section `thick` high and
+    `radial` (default `thick`) deep."""
     radii = np.asarray(radii, float)
     n = n or len(radii)
+    radial = thick if radial is None else radial
     A = angles(n)
     verts, uv, tris = [], [], []
     for i in range(n + 1):
         ii = i % n
         for k in range(m + 1):
             a = 2 * np.pi * k / m
-            rr = radii[ii] + thick * np.cos(a)
+            rr = radii[ii] + radial * np.cos(a)
             verts.append([c[0] + A[ii, 0] * rr, y + thick * np.sin(a), c[1] + A[ii, 1] * rr])
             uv.append([i / n, k / m])
     for i in range(n):
@@ -887,6 +906,38 @@ def girdle_weights(W, n):
     return W
 
 
+def mirror_bones():
+    """Each bone's index paired with its mirror's (a `.L` with its `.R`; a
+    middle bone with itself)."""
+    out = np.arange(len(SK.NAMES))
+    for i, name in enumerate(SK.NAMES):
+        for a, b in (('.L', '.R'), ('.R', '.L')):
+            if name.endswith(a) and name[:-2] + b in SK.INDEX:
+                out[i] = SK.INDEX[name[:-2] + b]
+    return out
+
+
+def flap_weights(v, W, n, front_z, crotch, hem, hem_share):
+    """A front flap (every vertex after the first `n`, the girdle cord, in
+    front of `front_z`) rides both legs alike: its weights are averaged with
+    their mirror, fully above the crotch (over the pubic area) and fading to
+    `hem_share` of that at the hem. From the nearest skin each half of the
+    flap took its own groin's thigh, and a stride sheared the flap sideways
+    onto the forward hip, baring the pubic area beside it. The rear flap and
+    the cord keep their weights."""
+    W = W.copy()
+    m = np.zeros(len(v), bool)
+    m[n:] = v[n:, 2] > front_z
+    if not m.any():
+        return W
+    sym = 0.5 * (W[m] + W[m][:, mirror_bones()])
+    f = np.clip((crotch - v[m, 1]) / max(1e-6, crotch - hem), 0, 1)
+    f = (1 - f * (1 - hem_share))[:, None]
+    W[m] = W[m] * (1 - f) + sym * f
+    W[m] /= W[m].sum(1, keepdims=True)
+    return W
+
+
 PUSH_CLEARANCE = 0.007  # finish(): every garment vertex this far off the skin
 TUBES = ('breastCloth', 'skirtShort', 'skirtKnee', 'wrapLong')
 
@@ -981,7 +1032,7 @@ def skirt_weights(v, W, crotch, hem, width=0.9, reach=1.0):
 
 
 def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None, rigid_chest=False, girdle_n=0,
-           hug=None, pin=None, reach=0.0):
+           hug=None, pin=None, reach=0.0, flap=None):
     """Push the garment off the body, transfer weights, unpose to rest, bind the morphs.
     Only a garment worn on the lower arm (`lower_arms`: the limb rings) takes
     weights from the forearms and hands; a sleeve (`limb`: 1 left, 2 right)
@@ -989,7 +1040,9 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     the nearest trunk skin it stayed at the shoulder while the arm swung out
     of it). A hugged edge (`hug`, edge_masks) is pulled onto the skin first
     and takes the weights of the skin under it, after every blend; `pin`
-    goes with the garment (g['pin']) to the clip fit, which leaves it."""
+    goes with the garment (g['pin']) to the clip fit, which leaves it.
+    `flap` (front_z, crotch, hem, hem_share): a flap form's front flap rides
+    both legs alike (flap_weights)."""
     if hug is not None and hug.any():
         v = v.copy()
         v[hug] = B.hug(v[hug], reach)
@@ -1018,6 +1071,8 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
         W[hug] = B.weights_at(v[hug], False) if cap else B.weights_trunk(v[hug])
     if girdle_n:
         W = girdle_weights(W, girdle_n)
+    if flap is not None:
+        W = flap_weights(v, W, girdle_n, *flap)
     W[W < 0.02] = 0
     W /= W.sum(1, keepdims=True)
     rest = unskin(v, W, B.j, B.wr, B.wp)
@@ -1225,8 +1280,13 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
         # the girdle cord is the first part of a flap form (build_form)
         girdle_n = girdle_count() if form in FLAPS else 0
         hug, pin = edge_masks(form, v, limb, L['girdle'])
+        # the front flap in front of the hips joint, its own hem the flap's
+        flap = None
+        if form in FLAPS:
+            front = v[girdle_n:][v[girdle_n:, 2] > B.wp[SK.INDEX['hips']][2]]
+            flap = (float(B.wp[SK.INDEX['hips']][2]), crotch, float(front[:, 1].min()), L['fit']['flapHemSymmetry'])
         g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings', limb=limb,
-                   rigid_chest=form in RIGID_CHEST, girdle_n=girdle_n, hug=hug, pin=pin, reach=L['fit']['edgeHugReach'])
+                   rigid_chest=form in RIGID_CHEST, girdle_n=girdle_n, hug=hug, pin=pin, reach=L['fit']['edgeHugReach'], flap=flap)
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g

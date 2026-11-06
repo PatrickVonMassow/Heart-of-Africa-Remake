@@ -2793,6 +2793,17 @@ export const VILLAGER_ASSET = {
      *  the drawn body by less than this (figure units, ≈ 5 cm) is pulled onto
      *  it; the edge then rides the skin and the clip fit leaves it. */
     edgeHugReach: 0.04,
+    /** A flap form's girdle: the band's radial half-thickness (fraction of
+     *  stature, ≈ 2.5 mm); its half-height stays 0.008. A round cord of
+     *  0.008 stood off the waist as a torus. */
+    flapGirdleBand: 0.0015,
+    /** A flap form's front flap: half-angle round the hips (rad, rounded to
+     *  the nearest of 24 ring columns; π/4 ≈ 17 cm wide on an adult). At 0.5
+     *  it kept ±15° and left the pubic area bare beside it. */
+    flapFrontHalfAngle: 0.785,
+    /** The front flap rides both legs alike above the crotch; this share of
+     *  that mirror blend is left at its hem. */
+    flapHemSymmetry: 0.5,
   },
   /** The driven garments' column bones (docs/garment-stage3-plan-1398.md
    *  section 3.5): per leg bone the margin added to its body capsule's
