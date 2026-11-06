@@ -181,14 +181,19 @@ print(json.dumps({'out': out.tolist(), 'kept': push.tolist()}))`)
     expect(r.kept[1]).toEqual([1, 1, 1])
   })
 
-  it("builds a flap form's girdle as a flat band and its front flap wide over the pubic area", () => {
+  it("builds a flap form's girdle as a flat band on the waist and its front flap across the pelvis front midline", () => {
     const r = py(`
 class B:
   W = np.zeros((4, 1))
   arm = np.zeros(4)
   body = {'joints': np.array([[0, 0.9, 0]])}
-  def ring(self, y, m, ease):
-    return np.zeros(2), np.full(G.N_RADIAL, 0.12 + ease)
+  def section(self, y, m, slab=0.012):
+    # an elliptic waist and hips 30 cm by 20 cm, a 1.5 cm hollow at the small of the back
+    a = np.linspace(-np.pi, np.pi, 240, endpoint=False)
+    s = 1 - 0.15 * np.exp(-((np.abs(a) - np.pi) / 0.3) ** 2)
+    return np.stack([0.15 * s * np.sin(a), 0.10 * s * np.cos(a)], 1)
+  ring = G.Body.ring
+  ring_star = G.Body.ring_star
 H = 1.7
 L = {'H': H, 'hip': 0.9, 'knee': 0.5, 'girdle': 0.9 + 0.06 * H, 'fit': FIT}
 out = {}
@@ -196,26 +201,40 @@ for form in G.FLAPS:
   (v, t, uv), _ = G.build_form(B(), form, 'waist', L)
   n = G.girdle_count()
   cord, flaps = v[:n], v[n:]
-  rad = np.hypot(cord[:, 0], cord[:, 2])
-  front = flaps[flaps[:, 2] > 0]
-  top = front[np.isclose(front[:, 1], L['girdle'])]
-  out[form] = {'depth': float(rad.max() - rad.min()), 'height': float(cord[:, 1].max() - cord[:, 1].min()),
-               'width': float(top[:, 0].max() - top[:, 0].min())}
-out['cols'] = [float(G.flap_columns(a)) for a in (0.5, 0.785, 0.8)]
+  col = cord.reshape(G.N_RADIAL + 1, G.TORUS_TUBE + 1, 3)
+  rad = np.hypot(col[..., 0], col[..., 2])
+  front = flaps[flaps[:, 2] > 0.02]
+  rows = []
+  for y in np.unique(np.round(front[:, 1], 6)):
+    f = front[np.isclose(front[:, 1], y)]
+    mid = f[np.argmin(np.abs(f[:, 0]))]
+    edge = f[np.argmax(f[:, 0])]
+    rows.append({'y': float(y), 'left': float(f[:, 0].min()), 'right': float(f[:, 0].max()), 'midz': float(mid[2]), 'edgez': float(edge[2])})
+  out[form] = {'depth': float((rad.max(1) - rad.min(1)).max()), 'height': float(cord[:, 1].max() - cord[:, 1].min()),
+               'back': float(np.hypot(*col[G.N_RADIAL // 2, :, [0, 2]]).mean()),
+               'hullBack': float(B().ring(L['girdle'], None, 0.006 * 0.9 / 0.7)[1][G.N_RADIAL // 2]), 'rows': rows}
 print(json.dumps(out))`)
     const H = 1.7
     for (const form of ['loinFlap', 'apron', 'girdleTails']) {
       // a band 0.016 H high (its six-sided section: × sin 60°) and a few millimetres deep, never a round cord
       expect(r[form].height).toBeCloseTo(0.016 * H * Math.sin(Math.PI / 3), 6)
       expect(r[form].depth).toBeLessThan(0.008)
-      expect(r[form].depth).toBeLessThan(r[form].height / 4)
-      // the front flap reaches ±45° round a 12 cm hip: over 16 cm, not the old ±15° (6 cm)
-      expect(r[form].width).toBeGreaterThan(0.16)
+      // the band follows the small of the back (the outline 1.5 cm in there) instead of the hull's chord
+      expect(r[form].back).toBeLessThan(r[form].hullBack - 0.004)
+      const rows = r[form].rows
+      expect(rows.length).toBe(8)
+      for (const row of rows) {
+        // diagnostic (point 1489): every row spans the pelvis front midline with a margin on both
+        // sides, symmetric about it, and its side edges wrap back onto the outline (no flat panel)
+        expect(row.left).toBeLessThan(-0.1)
+        expect(row.right).toBeGreaterThan(0.1)
+        expect(Math.abs(row.left + row.right)).toBeLessThan(1e-9)
+        expect(row.edgez).toBeLessThan(row.midz - 0.02)
+      }
+      // at the girdle the flap reaches over the hip bones (the 15 cm half-width)
+      const top = rows.reduce((a, b) => (b.y > a.y ? b : a))
+      expect(top.right).toBeGreaterThan(0.13)
     }
-    // rounded to the nearest of the 24 ring columns (0.5 rad is two, π/4 three)
-    expect(r.cols[0]).toBeCloseTo((2 * Math.PI) / 12, 9)
-    expect(r.cols[1]).toBeCloseTo(Math.PI / 4, 9)
-    expect(r.cols[2]).toBeCloseTo(Math.PI / 4, 9)
   })
 
   it('rides the front flap on both legs alike over the pubic area, the rear flap and cord unchanged', () => {
@@ -242,5 +261,22 @@ print(json.dumps({'cord': out[:2].tolist() == W[:2].tolist(), 'rear': out[4].tol
     expect(r.sum).toBeLessThan(1e-9)
     expect(r.pairs).toBeGreaterThan(0)
     expect(r.pairs % 2).toBe(0)
+  })
+
+  it('fades the front flap mirror blend out toward its side edges', () => {
+    const r = py(`
+v = np.array([[0.0, 0.9, 0.1], [0.1, 0.9, 0.06], [0.1, 0.9, 0.0001]])
+W = np.zeros((len(v), len(SK.NAMES)))
+L, R, hips = SK.INDEX['thigh.L'], SK.INDEX['thigh.R'], SK.INDEX['hips']
+W[:, L] = 0.6
+W[:, hips] = 0.4
+out = G.flap_weights(v, W, 0, 0.0, 0.85, 0.7, 0.5, 0.0, FIT['flapSymmetryCore'], FIT['flapFrontHalfAngleTop'])
+print(json.dumps({'mid': float(out[0, R]), 'side': float(out[1, R]), 'edge': float(out[2, R]), 'sum': float(np.abs(out.sum(1) - 1).max())}))`)
+    // the middle mirrored fully, the edge (at 90°, beyond flapFrontHalfAngleTop) on its own thigh
+    expect(r.mid).toBeCloseTo(0.3, 9)
+    expect(r.side).toBeGreaterThan(0)
+    expect(r.side).toBeLessThan(0.3)
+    expect(r.edge).toBe(0)
+    expect(r.sum).toBeLessThan(1e-9)
   })
 })

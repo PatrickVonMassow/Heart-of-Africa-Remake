@@ -2797,13 +2797,21 @@ export const VILLAGER_ASSET = {
      *  stature, ≈ 2.5 mm); its half-height stays 0.008. A round cord of
      *  0.008 stood off the waist as a torus. */
     flapGirdleBand: 0.0015,
-    /** A flap form's front flap: half-angle round the hips (rad, rounded to
-     *  the nearest of 24 ring columns; π/4 ≈ 17 cm wide on an adult). At 0.5
-     *  it kept ±15° and left the pubic area bare beside it. */
-    flapFrontHalfAngle: 0.785,
+    /** A flap form's front flap (garments.front_flap), a trapezoid round the
+     *  hips: half-angle at its hem (rad). At π/4 from girdle to hem it was a
+     *  flat panel ~±7 cm wide 3-4 cm off the groin, bare beside it from the
+     *  front three-quarter. Estimate, calibratable. */
+    flapFrontHalfAngle: 0.9,
+    /** The front flap's half-angle at the girdle (rad): over the hip bones,
+     *  so the groin creases lie under it. Estimate, calibratable. */
+    flapFrontHalfAngleTop: 1.2,
     /** The front flap rides both legs alike above the crotch; this share of
      *  that mirror blend is left at its hem. */
     flapHemSymmetry: 0.5,
+    /** Round the hips the mirror blend holds within this angle (rad) and
+     *  fades out at flapFrontHalfAngleTop: the flap's side edges ride their
+     *  own thigh. Estimate, calibratable. */
+    flapSymmetryCore: 0.5,
   },
   /** The driven garments' column bones (docs/garment-stage3-plan-1398.md
    *  section 3.5): per leg bone the margin added to its body capsule's
