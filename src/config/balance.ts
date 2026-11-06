@@ -2780,10 +2780,31 @@ export const VILLAGER_ASSET = {
     skirtShortFlare: 0.015,
     /** A wrapper tied over the chest: its ease at the top edge. */
     chestWrapEaseTop: 0.005,
+    /** A wrapper tied over the chest: its top edge this far under the
+     *  shoulder joint (fraction of H; the breast cloth's top, under the
+     *  armpits). At chestTop (0.065) the edge mapped onto a woman's upper
+     *  breast, ~1 cm over the nipple, and the breasts stood bare above it
+     *  (work-order points 1482, 1489). Calibratable. */
+    chestWrapTop: 0.045,
+    /** A chest wrapper's ring spacing from its top down to the chest bone's
+     *  head (fraction of H): the wrapper is cut on the man's body and follows
+     *  a woman's breast by its rings alone; 7 cm apart, the cloth between
+     *  two rings cut 2-4 cm through the breast. Calibratable. */
+    chestWrapBustStep: 0.005,
+    /** A chest wrapper on a woman's corners hangs straight down from the
+     *  breast this far (fraction of H, garments.clear_corners): carried by the
+     *  surface map, the cloth under the bust followed the inframammary skin
+     *  behind the breast. Calibratable. */
+    chestWrapDrape: 0.05,
     /** The long wrapper's weight blur round the ring below the crotch, and how
      *  soon the blend of both thighs is complete (also the flaps' reach). */
     wrapBlurWidth: 1.6,
     wrapBlendReach: 0.3,
+    /** The long wrapper's blur width at its hem (rad), blending from
+     *  wrapBlurWidth at the crotch: a hem blurred at 1.6 stayed between the
+     *  legs and the forward shin stood through its front in a stride (the
+     *  pre-1482 hem, blurred 0.9, covered it). Calibratable. */
+    wrapHemBlurWidth: 0.9,
     /** A short sleeve's ring: arm radius × scale + ease + step per ring (m). */
     sleeveScale: 1.06,
     sleeveEase: 0.004,

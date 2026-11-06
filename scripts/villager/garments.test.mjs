@@ -3,7 +3,8 @@
 // villager clothing fixes changed — the girdle cord's weights, the skirts'
 // thigh blend, the short skirt's and chest wrapper's ease, the sleeve ring.
 import { execFileSync } from 'node:child_process'
-import { dirname } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET } from '../../src/config/balance'
@@ -25,6 +26,65 @@ function py(body) {
   const src = `import sys, json\nsys.path.insert(0, ${JSON.stringify(dir)})\nimport numpy as np\nimport garments as G\nimport skeleton as SK\nFIT = json.loads(${JSON.stringify(JSON.stringify(VILLAGER_ASSET.garmentFit))})\n${body}\n`
   return JSON.parse(execFileSync('python3', ['-c', src], { encoding: 'utf8', windowsHide: true, timeout: 30000 }))
 }
+
+// The pinned MakeHuman sources (node scripts/villager/build.mjs fetch), git-ignored.
+const sources = join(dir, '..', '..', 'local', 'assets-src', 'villager')
+const hasSources = existsSync(join(sources, 'makehuman', 'base.obj'))
+
+describe.skipIf(!hasNumpy || !hasSources)('chest wrapper on the woman base mesh (diagnostic)', () => {
+  // Work-order points 1482/1489: the wrapper is cut on the man's body and the
+  // surface map carries it onto a woman's; its top edge there must lie above
+  // her breast apex. Nearest-vertex map, rest pose: a diagnostic of the
+  // anchor height, not a penetration gate (the asset build's settle and
+  // penetration report measure the cloth).
+  it('puts the top edge above the breast apex with margin', () => {
+    const src = `import sys, json
+sys.path.insert(0, ${JSON.stringify(dir)})
+import numpy as np
+import skeleton as SK
+import body as BD
+import garments as G
+from mhbody import MakeHuman
+cfg = {'VILLAGER_ASSET': json.loads(${JSON.stringify(JSON.stringify(VILLAGER_ASSET))})}
+mh = MakeHuman(${JSON.stringify(sources)})
+C = BD.corner_shapes(mh, cfg)
+AM = C[('male', 'adult', 0)]
+H = cfg['VILLAGER_ASSET']['stature']
+Wfull, _ = BD.full_weights(mh)
+arm = Wfull[:, [SK.INDEX[n] for n in BD.ARM_BONES]].sum(1)
+j = BD.joints_of(mh, AM)
+L = G.landmarks(np.array([[*j[n][0], *j[n][1]] if n in j else [0.0] * 6 for n in SK.NAMES]), H)
+L['fit'] = cfg['VILLAGER_ASSET']['garmentFit']
+body = np.zeros(len(AM), bool); body[mh.groups['body']] = True
+trunk = body & (arm < 0.3)
+bi = np.nonzero(body)[0]
+def top_ring(y):
+  m = trunk & (np.abs(AM[:, 1] - y) < 0.012)
+  h = G.hull2d(AM[m][:, [0, 2]]); c = h.mean(0)
+  return np.array([[c[0] + d[0] * (G.ray_hull(h, c, d) + L['fit']['chestWrapEaseTop'] * H), y, c[1] + d[1] * (G.ray_hull(h, c, d) + L['fit']['chestWrapEaseTop'] * H)] for d in G.angles()])
+out = {}
+for age in ('youth', 'adult'):
+  F = C[('female', age, 0)]
+  chest = trunk & (F[:, 1] > 0.75) & (F[:, 1] < 1.0) & (F[:, 0] > 0.02)
+  apex = F[np.argmax(np.where(chest, F[:, 2], -9))]
+  res = {}
+  for name, y in (('new', G.chest_wrap_top(L)), ('chestTop', L['chestTop'])):
+    p = top_ring(y)
+    ids = bi[((p[:, None, :] - AM[None, body, :]) ** 2).sum(2).argmin(1)]
+    q = F[ids] + (p - AM[ids])
+    res[name] = float(q[q[:, 2] > 0.03, 1].min() - apex[1])
+  out[age] = res
+print(json.dumps(out))
+`
+    const r = JSON.parse(execFileSync('python3', ['-c', src], { encoding: 'utf8', windowsHide: true, timeout: 120000 }))
+    for (const age of ['youth', 'adult']) {
+      // 3 cm over the apex at rest: the run's forward lean and the breathing chest keep it covered
+      expect(r[age].new).toBeGreaterThan(0.03)
+      // the old anchor's edge lay about 1 cm over the apex (the bare breasts of the owner's frames)
+      expect(r[age].chestTop).toBeLessThan(0.02)
+    }
+  }, 120000)
+})
 
 describe.skipIf(!hasNumpy)('garment builder local fit', () => {
   it('rides the girdle cord on the hips and spine alone', () => {
@@ -75,12 +135,74 @@ print(json.dumps({'old': spread(old), 'new': spread(new), 'knee': spread(knee), 
 
   it('keeps the front and rear flap of a loin flap apart in the blur', () => {
     const r = py(`
-w, reach = G.skirt_blend('loinFlap', FIT)
+w, reach, _hem = G.skirt_blend('loinFlap', FIT)
 print(json.dumps({'w': w, 'reach': reach, 'apron': list(G.skirt_blend('apron', FIT)), 'flap': 'loinFlap' in G.SKIRTS}))`)
     expect(r.flap).toBe(true)
     expect(r.w).toBe(0.9)
     expect(r.reach).toBe(VILLAGER_ASSET.garmentFit.wrapBlendReach)
-    expect(r.apron).toEqual([0.9, VILLAGER_ASSET.garmentFit.wrapBlendReach])
+    expect(r.apron).toEqual([0.9, VILLAGER_ASSET.garmentFit.wrapBlendReach, 0.9])
+  })
+
+  it("narrows a long wrapper's blur back at the hem so its front follows the forward leg", () => {
+    const r = py(`
+crotch, hem = 0.6, 0.1
+ys = np.linspace(crotch - 0.02, hem, 12)
+a = 2 * np.pi * np.arange(24) / 24
+v = np.array([[np.sin(t) * 0.15, y, np.cos(t) * 0.1] for y in ys for t in a])
+W = np.zeros((len(v), len(SK.NAMES)))
+# the front-left quarter rides the left thigh, the rest the right
+left = (v[:, 0] > 0) & (v[:, 2] > 0)
+W[left, SK.INDEX['thigh.L']] = 1
+W[~left, SK.INDEX['thigh.R']] = 1
+k = 11 * 24 + 2  # the hem ring, a front-left column
+def share(out):
+  return float(out[k, SK.INDEX['thigh.L']])
+w, reach, hem_w = G.skirt_blend('wrapLong', FIT)
+new = G.skirt_weights(v, W, crotch, hem, w, reach, hem_w)
+wide = G.skirt_weights(v, W, crotch, hem, w, reach)
+old = G.skirt_weights(v, W, crotch, hem)
+print(json.dumps({'new': share(new), 'wide': share(wide), 'old': share(old), 'hem_w': hem_w}))`)
+    // at the hem the blend is the pre-1482 one again, more of the column's own leg than the wide blur's
+    expect(r.hem_w).toBe(VILLAGER_ASSET.garmentFit.wrapHemBlurWidth)
+    expect(r.new).toBeCloseTo(r.old, 6)
+    expect(r.new).toBeGreaterThan(r.wide + 0.05)
+  })
+
+  it("rings a chest wrapper densely from its top to the chest bone's head", () => {
+    const r = py(`
+L = {'H': 1.34, 'shoulder': 1.07, 'waist': 0.89, 'fit': FIT}
+top = G.chest_wrap_top(L)
+ys = G.chest_wrap_heights(L, top, 0.25)
+print(json.dumps({'top': top, 'ys': ys}))`)
+    const H = 1.34
+    const { ys, top } = r
+    expect(top).toBeCloseTo(1.07 - VILLAGER_ASSET.garmentFit.chestWrapTop * H, 9)
+    expect(ys[0]).toBeCloseTo(top, 9)
+    expect(ys[ys.length - 1]).toBeCloseTo(0.25, 9)
+    for (let k = 1; k < ys.length; k++) expect(ys[k]).toBeLessThan(ys[k - 1])
+    const bust = ys.filter((y) => y >= 0.89 - 1e-9)
+    for (let k = 1; k < bust.length; k++) expect(bust[k - 1] - bust[k]).toBeLessThanOrEqual(VILLAGER_ASSET.garmentFit.chestWrapBustStep * H + 1e-9)
+  })
+
+  it('clears a point inside the trunk outline radially and lets cloth hang straight down from a bulge', () => {
+    const r = py(`
+a = np.linspace(-np.pi, np.pi, 72, endpoint=False)
+# a 10 cm trunk with a 14 cm bulge band at y 0.9 (a breast)
+skin = np.array([[np.sin(t) * rr, y, np.cos(t) * rr] for y in np.arange(0.7, 1.01, 0.01) for t in a
+                 for rr in [0.14 if abs(y - 0.9) < 0.015 else 0.10]])
+mask = np.ones(len(skin), bool)
+pts = np.array([[0, 0.9, 0.12], [0, 0.85, 0.105], [0, 0.85, 0.2]])
+plain = G.radial_clear(pts, skin, mask, 0.007)
+hung = G.radial_clear(pts, skin, mask, 0.007, drape=0.06)
+print(json.dumps({'plain': plain[:, 2].tolist(), 'hung': hung[:, 2].tolist(), 'y': plain[:, 1].tolist()}))`)
+    // the hull of a 72-gon of radius 0.14 is just inside 0.14 in front
+    expect(r.plain[0]).toBeGreaterThan(0.14)
+    expect(r.plain[1]).toBeCloseTo(0.107, 3)
+    expect(r.plain[2]).toBeCloseTo(0.2, 9)
+    // hung: under the bulge the cloth stays out at the bulge
+    expect(r.hung[1]).toBeGreaterThan(0.14)
+    expect(r.hung[2]).toBeCloseTo(0.2, 9)
+    expect(r.y).toEqual([0.9, 0.85, 0.85])
   })
 
   it('sits the short skirt and the chest wrapper close at their top edge', () => {
