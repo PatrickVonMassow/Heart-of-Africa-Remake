@@ -42,12 +42,36 @@ const md = readFileSync(resolve(dir, 'penetration-report.md'), 'utf8')
 // rows of them not compared (penetration.py compare)
 const MIGRATED = ['g-neckBeads-chest', 'g-neckBeads-neck', 'g-trousers-waist', 'g-waistBeads-waist']
 const legacyOf = <T,>(r: Record<string, T>) => Object.keys(r).filter((n) => !MIGRATED.includes(n)).sort()
+// the 1890 Western garments (point 1379), which main never measured: legacy
+// garments and shells
+const NEW_LEGACY = ['g-coat-chest', 'g-gown-chest', 'g-tarboosh-crown']
+const NEW_SHELLS = ['g-boots-feet', 'g-shoes-feet', 'g-trousersLong-waist']
+const SHELLS = [...MIGRATED, ...NEW_SHELLS].sort()
 
 // the build-pose layering residuals named in docs/backlog.md (point 1346):
 // garment → the outer garments it may show through in the build pose
 const BUILD_RESIDUALS: Record<string, string[]> = {
   'g-wrapLong-chest': ['g-breastCloth-chest'],
   'g-veil-face': ['g-shirt-chest', 'g-robe-chest', 'g-cape-leftShoulder', 'g-cloak-chest', 'g-cape-chest', 'g-cloak-bothShoulders'],
+}
+// build-pose residuals at a body corner no CAST_DRESS cell dresses in that
+// garment (docs/backlog.md, point 1379): garment → the one case key it may
+// carry, the corners its worst frame may stand at, and a ceiling
+interface Unworn { key: string; corner: RegExp; max: number }
+const UNWORN_BUILD_RESIDUALS: Record<string, Unworn> = {
+  // the coat is worn by male figures only; upperArm.L at the female corners
+  'g-coat-chest': { key: 'shown build upperArm.L None', corner: /\(female (adult|elder) build/, max: 0.004 },
+}
+type BuildEntry = Pick<Garment, 'cases'> & Record<Column, { value: number }>
+/** The build column `col` of garment `n` is the named unworn residual: its
+ *  value stays under the ceiling and every case of that column is the named
+ *  key at a named corner. A case at another part or corner, or a worse value,
+ *  is not covered. */
+function unworn(n: string, g: BuildEntry, col: string): boolean {
+  const u = UNWORN_BUILD_RESIDUALS[n]
+  if (!u || u.key.split(' ')[0] !== col || !(g[col as Column]?.value <= u.max)) return false
+  const cases = Object.entries(g.cases).filter(([k]) => k.split(' ')[0] === col)
+  return cases.length > 0 && cases.every(([k, e]) => k === u.key && u.corner.test(e.at) && e.value <= u.max)
 }
 
 // penetration.py DERIVED: a clip main never measured → the clips it is made from
@@ -57,10 +81,11 @@ const DERIVED: Record<string, string[]> = { jog: ['walk', 'sprint'], shoulders: 
 const LAYER: Record<string, number> = {
   ...Object.fromEntries(['limbRings', 'neckBeads', 'waistBeads'].map((f) => [f, 0])),
   ...Object.fromEntries(
-    ['loinFlap', 'girdleTails', 'apron', 'skirtShort', 'skirtKnee', 'wrapLong', 'trousers'].map((f) => [f, 1]),
+    ['loinFlap', 'girdleTails', 'apron', 'skirtShort', 'skirtKnee', 'wrapLong', 'trousers', 'trousersLong'].map((f) => [f, 1]),
   ),
-  ...Object.fromEntries(['cap', 'hairBag', 'headRing', 'headband', 'topknot', 'turban', 'veil'].map((f) => [f, 1])),
-  ...Object.fromEntries(['breastCloth', 'shirt', 'robe', 'toga'].map((f) => [f, 2])),
+  ...Object.fromEntries(['shoes', 'boots'].map((f) => [f, 0])),
+  ...Object.fromEntries(['cap', 'hairBag', 'headRing', 'headband', 'topknot', 'turban', 'veil', 'tarboosh'].map((f) => [f, 1])),
+  ...Object.fromEntries(['breastCloth', 'shirt', 'robe', 'toga', 'coat', 'gown'].map((f) => [f, 2])),
   ...Object.fromEntries(['cape', 'cloak', 'hood'].map((f) => [f, 3])),
 }
 const layer = (name: string) => LAYER[name.split('-')[1]]
@@ -88,6 +113,7 @@ function worseThanMain(r: Report, base: Report, buildOnly = false): string[] {
     for (const [n, g] of Object.entries(part)) {
       for (const [key, v] of Object.entries(g.clips)) {
         const was = b[n]?.clips[key] ?? 0
+        if (part === r.build && unworn(n, g, key.split(' ')[0])) continue
         if (v > limit(key.split(' ')[0]) && v > was + 0.0005) out.push(`${n} ${key}: ${was} → ${v}`)
       }
     }
@@ -121,7 +147,7 @@ describe('the visible-only penetration report', () => {
   })
 
   it('names the migrated garments as migrated and measures them in their own shell rows', () => {
-    expect(Object.keys(now.shells ?? {}).sort()).toEqual(MIGRATED)
+    expect(Object.keys(now.shells ?? {}).sort()).toEqual(SHELLS)
     for (const n of MIGRATED) {
       expect(now.garments[n], n).toBeUndefined()
       expect(now.build[n], n).toBeUndefined()
@@ -140,7 +166,7 @@ describe('the visible-only penetration report', () => {
     const anyLegacy = Object.values(now.garments)[0]
     const poses = anyLegacy.checked - (anyLegacy.checkedClips.shoulders ?? 0)
     expect(poses).toBeGreaterThan(0)
-    for (const n of MIGRATED) {
+    for (const n of SHELLS) {
       const r = now.shells?.[n]
       expect(r, n).toBeDefined()
       const { own, other, legacy } = r!
@@ -173,8 +199,14 @@ describe('the visible-only penetration report', () => {
   })
 
   it('measures every garment main measured, per column and clip', () => {
-    expect(Object.keys(now.garments).sort()).toEqual(legacyOf(main.garments))
+    expect(Object.keys(now.garments).sort()).toEqual([...legacyOf(main.garments), ...NEW_LEGACY].sort())
     for (const [n, g] of Object.entries(now.garments)) {
+      if (NEW_LEGACY.includes(n)) {
+        // main never measured it: its clips are the asset's own
+        expect(Object.values(g.checkedClips).reduce((t, c) => t + c, 0), n).toBe(g.checked)
+        expect(Object.keys(g.clips).length, n).toBeGreaterThan(0)
+        continue
+      }
       // main counts its frames over its own clips only; a clip main never
       // measured is one penetration.py compares with the clips it derives
       // from (DERIVED), and its frames come on top of main's, never instead
@@ -251,18 +283,37 @@ describe('the visible-only penetration report', () => {
     expect(worseThanMain(raised, main)).toEqual([expect.stringContaining(`${g} cloth build`)])
   })
 
+  it('the unworn coat residual covers only its named case: a male corner, another part or a worse value is a regression', () => {
+    const n = 'g-coat-chest'
+    const u = UNWORN_BUILD_RESIDUALS[n]
+    expect(unworn(n, now.build[n], 'shown'), 'the measured residual is the named one').toBe(true)
+    const at = (patch: (g: BuildEntry) => void) => {
+      const g = structuredClone(now.build[n])
+      patch(g)
+      return unworn(n, g, 'shown')
+    }
+    expect(at((g) => { g.cases[u.key].at = 'build frame 0 (male adult build +0)' })).toBe(false)
+    expect(at((g) => { g.cases['shown build forearm.R None'] = { value: 0.0035, at: 'build frame 0 (female elder build +0)', over: 1 } })).toBe(false)
+    expect(at((g) => { g.shown.value = g.cases[u.key].value = u.max + 0.001 })).toBe(false)
+    expect(unworn(n, now.build[n], 'cut'), 'another column is not covered').toBe(false)
+  })
+
   it('measures the build pose of every garment at every body corner, per column', () => {
     // an empty or partial build entry would pass the tolerance check below
     const outermost = Math.max(...Object.values(LAYER))
     expect(Object.keys(now.build).sort()).toEqual(Object.keys(now.garments).sort())
-    expect(Object.keys(now.build).sort()).toEqual(legacyOf(main.build))
+    expect(Object.keys(now.build).sort()).toEqual([...legacyOf(main.build), ...NEW_LEGACY].sort())
+    // every garment's build pose is measured at the same corners
+    const corners = main.build['g-robe-chest'].checked
     for (const [n, g] of Object.entries(now.build)) {
       expect(g.checked, n).toBeGreaterThan(0)
-      expect(g.checked, n).toBe(main.build[n].checked)
+      expect(g.checked, n).toBe(NEW_LEGACY.includes(n) ? corners : main.build[n].checked)
       expect(Object.keys(g.clips).length, n).toBeGreaterThan(0)
-      // every column main measured in the build pose, except layerings of the
-      // outermost layer (as for the motion keys above)
-      for (const key of Object.keys(main.build[n].clips)) {
+      // every column main measured in the build pose (every column for a
+      // garment main never measured), except layerings of the outermost layer
+      // (as for the motion keys above)
+      const want = NEW_LEGACY.includes(n) ? Object.keys(NAMES).map((c) => `${c} build`) : Object.keys(main.build[n].clips)
+      for (const key of want) {
         const col = key.split(' ')[0]
         if ((col === 'inner' || col === 'innerHole') && layer(n) === outermost) continue
         expect(Object.keys(g.clips), n).toContain(key)
@@ -283,22 +334,22 @@ describe('the visible-only penetration report', () => {
       // information) keeps exactly its inner layering cases, nothing else
       const allowed = BUILD_RESIDUALS[n] ?? []
       for (const col of Object.keys(NAMES) as Column[]) {
-        if (g[col].value > tol && !(col === 'inner' && allowed.length)) over.push(`${n} ${col} ${g[col].value}`)
+        if (g[col].value > tol && !(col === 'inner' && allowed.length) && !unworn(n, g, col)) over.push(`${n} ${col} ${g[col].value}`)
       }
       for (const [key, v] of Object.entries(g.clips)) {
-        if (v > tol && !(key === 'inner build' && allowed.length)) over.push(`${n} ${key} ${v}`)
+        if (v > tol && !(key === 'inner build' && allowed.length) && !unworn(n, g, key.split(' ')[0])) over.push(`${n} ${key} ${v}`)
       }
       for (const key of Object.keys(g.cases)) {
         const [col, , , outer] = key.split(' ')
-        expect(col === 'inner' && allowed.includes(outer), `${n}: ${key}`).toBe(true)
+        expect((col === 'inner' && allowed.includes(outer)) || unworn(n, g, col), `${n}: ${key}`).toBe(true)
       }
     }
     expect(over).toEqual([])
     const total = Object.keys(now.build).length
-    const residuals = Object.keys(BUILD_RESIDUALS).filter((n) => Object.keys(now.build[n]?.cases ?? {}).length).length
+    const residuals = [...Object.keys(BUILD_RESIDUALS), ...Object.keys(UNWORN_BUILD_RESIDUALS)].filter((n) => Object.keys(now.build[n]?.cases ?? {}).length).length
     expect(md).toContain(`**${total - residuals} of ${total} garments within tolerance in the build pose`)
     const backlog = readFileSync(resolve(__dirname, '../../docs/backlog.md'), 'utf8')
-    for (const n of Object.keys(BUILD_RESIDUALS)) expect(backlog, n).toContain(`\`${n}\``)
+    for (const n of [...Object.keys(BUILD_RESIDUALS), ...Object.keys(UNWORN_BUILD_RESIDUALS)]) expect(backlog, n).toContain(`\`${n}\``)
   })
 
   // the markdown names each garment's MD_CASES (penetration.py) worst cases and

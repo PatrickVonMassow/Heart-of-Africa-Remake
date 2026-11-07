@@ -476,3 +476,142 @@ print(json.dumps({'mid': float(out[0, R]), 'side': float(out[1, R]), 'edge': flo
     expect(r.sum).toBeLessThan(1e-9)
   })
 })
+
+describe.skipIf(!hasNumpy)('the 1890 Western dress forms (builder output, browserless)', () => {
+  // docs/giza-1890.md §4.1: the coat's and the gown's long sleeve, the
+  // dragoman's tarboosh, the long trousers and the footwear shells.
+  /** A synthetic arm: an upper-arm cylinder (r 0.04) and a forearm cylinder (r 0.03). */
+  const ARM = `
+class B:
+  pass
+b = B()
+NB = len(SK.NAMES)
+iu, il, ih = SK.INDEX['upperArm.L'], SK.INDEX['forearm.L'], SK.INDEX['hand.L']
+b.wp = np.zeros((NB, 3))
+b.wp[iu] = [0.2, 1.4, 0.0]; b.wp[il] = [0.25, 1.1, 0.0]; b.wp[ih] = [0.28, 0.85, 0.03]
+pts, W = [], []
+def cyl(p0, p1, r, bone):
+  ax = (p1 - p0) / np.linalg.norm(p1 - p0)
+  e1 = np.cross(ax, [0, 0, 1.0]); e1 /= np.linalg.norm(e1); e2 = np.cross(ax, e1)
+  for f in np.linspace(0, 1, 40):
+    for th in np.linspace(0, 2 * np.pi, 24, endpoint=False):
+      pts.append(p0 + (p1 - p0) * f + r * (np.cos(th) * e1 + np.sin(th) * e2))
+      w = np.zeros(NB); w[bone] = 1; W.append(w)
+cyl(b.wp[iu], b.wp[il], 0.04, iu)
+cyl(b.wp[il], b.wp[ih], 0.03, il)
+b.v = np.array(pts); b.W = np.array(W); b.mask_body = np.ones(len(pts), bool)
+L = {'fit': FIT}
+def axis_dist(p, p0, p1):
+  ax = (p1 - p0) / np.linalg.norm(p1 - p0)
+  t = np.clip((p - p0) @ ax, 0, np.linalg.norm(p1 - p0))
+  return float(np.linalg.norm(p - p0 - t * ax))
+`
+
+  it('runs a long sleeve down the forearm to the cuff, every ring outside the arm', () => {
+    const r = py(`${ARM}
+v, t, uv = G.sleeve(b, 'L', L, long=True)
+s, _, _ = G.sleeve(b, 'L', L)
+rings = v.reshape(-1, G.SLEEVE_RING, 3)
+fore = [min(axis_dist(p, b.wp[iu], b.wp[il]), axis_dist(p, b.wp[il], b.wp[ih])) for p in v]
+cuff = rings[-1][:-1].mean(0)
+want = b.wp[il] + (b.wp[ih] - b.wp[il]) * FIT['longSleeveWrist']
+print(json.dumps({'rings': len(rings), 'short': len(s) // G.SLEEVE_RING, 'cuffErr': float(np.linalg.norm(cuff - want)),
+  'cuffR': float(np.linalg.norm(rings[-1][0] - cuff)), 'upperR': float(np.linalg.norm(rings[2][0] - rings[2][:-1].mean(0))),
+  'foreMin': min(fore[4 * G.SLEEVE_RING:]), 'tris': len(t)}))`)
+    expect(r.short).toBe(4)
+    expect(r.rings).toBe(8)
+    expect(r.tris).toBe(7 * 12 * 2)
+    expect(r.cuffErr).toBeLessThan(1e-9)
+    // the cuff closes in round the forearm (no bell), the forearm rings clear its skin
+    expect(r.cuffR).toBeLessThan(r.upperR)
+    expect(r.foreMin).toBeGreaterThan(0.03)
+  })
+
+  it('winds every sleeve face outward, off the arm (the back-face shade darkened an inward one)', () => {
+    const r = py(`${ARM}
+def inward(long):
+  v, t, uv = G.sleeve(b, 'L', L, long=long)
+  bad = 0
+  for a, c, d in t:
+    m = (v[a] + v[c] + v[d]) / 3
+    n = np.cross(v[c] - v[a], v[d] - v[a])
+    # the nearest point on the arm's two bone segments
+    best = None
+    for p0, p1 in ((b.wp[iu], b.wp[il]), (b.wp[il], b.wp[ih])):
+      ax = (p1 - p0) / np.linalg.norm(p1 - p0)
+      q = p0 + np.clip((m - p0) @ ax, 0, np.linalg.norm(p1 - p0)) * ax
+      if best is None or np.linalg.norm(m - q) < np.linalg.norm(m - best): best = q
+    bad += int(n @ (m - best) <= 0)
+  return bad
+print(json.dumps({'short': inward(False), 'long': inward(True)}))`)
+    expect(r).toEqual({ short: 0, long: 0 })
+  })
+
+  it('keeps the short sleeve as it was: three rings on the upper arm and the cap ring', () => {
+    const r = py(`${ARM}
+v, t, uv = G.sleeve(b, 'L', L)
+rings = v.reshape(-1, G.SLEEVE_RING, 3)
+ends = [float(np.linalg.norm(rr[:-1].mean(0) - b.wp[iu])) / float(np.linalg.norm(b.wp[il] - b.wp[iu])) for rr in rings]
+print(json.dumps({'ends': ends, 'radii': [float(np.linalg.norm(rr[0] - rr[:-1].mean(0))) for rr in rings]}))`)
+    expect(r.ends.map((e) => Math.round(e * 100) / 100)).toEqual([0, 0.1, 0.45, 0.78])
+    for (let k = 1; k < 4; k++) expect(r.radii[k]).toBeCloseTo(0.04 * VILLAGER_ASSET.garmentFit.sleeveScale + VILLAGER_ASSET.garmentFit.sleeveEase + VILLAGER_ASSET.garmentFit.sleeveEaseStep * (k - 1), 2)
+  })
+
+  it('builds the tarboosh as a closed, tapering fez standing over the crown and clear of the head', () => {
+    const r = py(`
+H = 1.7
+class B:
+  head = np.ones(4)
+  def ring(self, y, mask, ease, n=G.N_RADIAL, **kw):
+    # a spherical head of radius 0.1 round (0, 1.6, 0)
+    rr = np.sqrt(max(0.1 ** 2 - (y - 1.6) ** 2, 0.0004))
+    return np.zeros(2), np.full(n, rr + ease)
+L = {'H': H, 'jaw': 1.5, 'crown': 1.7, 'fit': FIT}
+v, t, uv = G.tarboosh(B(), L)
+n = G.N_RADIAL + 1
+rim = v[v[:, 1] <= v[:, 1].min() + 1e-9]
+below = [(p, np.hypot(p[0], p[2])) for p in v if p[1] < 1.7 - 1e-9]
+inside = [float(rr - np.sqrt(max(0.1 ** 2 - (p[1] - 1.6) ** 2, 0))) for p, rr in below]
+topR = max(np.hypot(p[0], p[2]) for p in v if p[1] >= v[:, 1].max() - 1e-9)
+print(json.dumps({'top': float(v[:, 1].max()), 'rim': float(v[:, 1].min()), 'rimR': float(np.hypot(rim[:, 0], rim[:, 2]).max()), 'topR': float(topR),
+  'clear': min(inside), 'closed': bool(np.isclose(v[:, 1], v[:, 1].max()).sum() == G.N_RADIAL + 2)}))`)
+    expect(r.top).toBeCloseTo(1.7 + VILLAGER_ASSET.garmentFit.tarbooshRise * 1.7, 9)
+    expect(r.rim).toBeCloseTo(1.5 + 0.09 * 1.7, 9)
+    expect(r.topR).toBeCloseTo(r.rimR * VILLAGER_ASSET.garmentFit.tarbooshTopScale, 6)
+    expect(r.clear).toBeGreaterThan(0)
+    expect(r.closed).toBe(true)
+  })
+
+  it('lays the long trousers over the shoes and the boots over the trousers, the feet whole', () => {
+    const r = py(`
+import shells as SHL
+H = 1.7
+L = {'H': H, 'hip': 0.9, 'knee': 0.5, 'ankle': 0.08, 'girdle': 0.9 + 0.06 * H, 'chestTop': 1.3, 'neck': 1.45, 'shoulder': 1.4}
+y = np.array([0.0, 0.08, 0.11, 0.2, 0.5, 1.0, 1.2])
+words = SHL.region_words({'y': y, 'arm': np.zeros(len(y))}, L)
+has = lambda n: [(int(w) >> SHL.BIT[n]) & 1 == 1 for w in words]
+levels = [c[1] for c in SHL.cuts(L) if c[0] == 'y']
+print(json.dumps({'shoes': has('g-shoes-feet'), 'boots': has('g-boots-feet'), 'long': has('g-trousersLong-waist'),
+  'rank': {n: SHL.RANK[n] for n in ('g-shoes-feet', 'g-trousersLong-waist', 'g-boots-feet')},
+  'cut': all(any(abs(l - v) < 1e-9 for l in levels) for v in (SHL.long_hem(L), SHL.shoe_top(L), SHL.boot_top(L))),
+  'bits': len(SHL.NAMES)}))`)
+    // y: sole, ankle joint, just above it, shin, knee, thigh, above the girdle
+    expect(r.shoes).toEqual([true, true, true, false, false, false, false])
+    expect(r.boots).toEqual([true, true, true, true, false, false, false])
+    expect(r.long).toEqual([false, false, true, true, true, true, false])
+    expect(r.rank['g-trousersLong-waist']).toBeGreaterThan(r.rank['g-shoes-feet'])
+    expect(r.rank['g-boots-feet']).toBeGreaterThan(r.rank['g-trousersLong-waist'])
+    expect(r.cut).toBe(true)
+    expect(r.bits).toBeLessThanOrEqual(32)
+  })
+
+  it('holds every new pair in the set, the cloth within the cover mask', () => {
+    const r = py(`
+import shells as SHL
+cloth = [G.mesh_name(f, w) for f, w in G.GARMENTS if G.mesh_name(f, w) not in SHL.NAMES]
+print(json.dumps({'cloth': cloth, 'shells': SHL.NAMES}))`)
+    for (const n of ['g-coat-chest', 'g-gown-chest', 'g-tarboosh-crown']) expect(r.cloth).toContain(n)
+    for (const n of ['g-trousersLong-waist', 'g-shoes-feet', 'g-boots-feet']) expect(r.shells).toContain(n)
+    expect(r.cloth.length).toBeLessThanOrEqual(32)
+  })
+})

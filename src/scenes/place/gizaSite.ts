@@ -134,6 +134,8 @@ export interface GizaAmbientAnchor {
   z: number
   /** A person's sex where the role has both (the tourists); male otherwise. */
   sex?: Sex
+  /** A guide who is the tourists' dragoman: he wears the tarboosh. */
+  dragoman?: boolean
 }
 
 /** The plateau's people: every role but the mounts. */
@@ -148,7 +150,7 @@ export interface GizaFigureSpec {
   /** The figure's own cloth: the gown's or the suit's colour. */
   cloth: string
   skin: string
-  /** The hat worn as a prop on the head, where the garment set has none. */
+  /** The brimmed hat worn as a prop on the head (scenes/place/castHats.tsx). */
   hat: 'sunHelmet' | 'ladyHat' | null
 }
 
@@ -158,16 +160,16 @@ export function isGizaPerson(role: GizaAmbientRole): role is GizaPersonRole {
 
 /**
  * Who stands at an anchor (docs/giza-1890.md §4.1): guides in the galabiya and
- * turban, the Bedouin cameleer under his head cloth, the donkey-boy a youth in
- * a skullcap, the tourists in 1890s Western dress. No scale: all of them stand
- * at villager stature, the donkey-boy by his age group. Colours calibratable
- * (`GIZA_CAST`).
+ * turban (the dragoman in the tarboosh), the Bedouin cameleer under his head
+ * cloth, the donkey-boy a youth in a skullcap, the tourists in 1890s Western
+ * dress. No scale: all of them stand at villager stature, the donkey-boy by
+ * his age group. Colours calibratable (`GIZA_CAST`).
  */
-export function gizaFigure(role: GizaPersonRole, sex: Sex = 'male'): GizaFigureSpec {
+export function gizaFigure(role: GizaPersonRole, sex: Sex = 'male', dragoman = false): GizaFigureSpec {
   const c = GIZA_CAST
   switch (role) {
     case 'guide':
-      return { cast: 'egyptian', sex: 'male', age: 'adult', cloth: c.guideGown, skin: c.localSkin, hat: null }
+      return { cast: dragoman ? 'dragoman' : 'egyptian', sex: 'male', age: 'adult', cloth: c.guideGown, skin: c.localSkin, hat: null }
     case 'cameleer':
       return { cast: 'bedouin', sex: 'male', age: 'adult', cloth: c.cameleerGown, skin: c.bedouinSkin, hat: null }
     case 'donkeyboy':
@@ -193,7 +195,7 @@ export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
   { role: 'donkeyboy', x: -7, z: 22 },
   { role: 'donkey', x: -4, z: 24 },
   { role: 'tourist', x: -2, z: 30, sex: 'female' },
-  { role: 'guide', x: 16, z: 17 },
+  { role: 'guide', x: 16, z: 17, dragoman: true },
 ]
 
 /** The collidable monument set: an oriented box under each pyramid's footprint

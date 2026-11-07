@@ -32,9 +32,12 @@ export type LayerForm =
   | 'skirtKnee' // to the knee
   | 'wrapLong' // a wrapper from the chest or waist to the calf
   | 'trousers'
+  | 'trousersLong' // to the ankle (the Western suit, the khaki drill)
   | 'breastCloth' // a cloth wound round or hung over the chest
   | 'shirt' // a wide shirt or frock to the knee
   | 'robe' // a gown to the ankle
+  | 'coat' // the Western jacket to mid-thigh, long-sleeved
+  | 'gown' // the Western woman's long skirt and bodice to the ground, long-sleeved
   | 'toga' // a sheet knotted or thrown over one shoulder, to the ankle
   | 'cloak' // over both shoulders, to the knee
   | 'cape' // a short skin over one shoulder or both, to the waist
@@ -42,6 +45,7 @@ export type LayerForm =
   | 'turban'
   | 'veil' // the face veil below the eyes
   | 'cap'
+  | 'tarboosh' // the fez of the town and the dragoman
   | 'headRing' // the Zulu married man's isicoco
   | 'topknot' // dressed hair on the crown
   | 'hairBag' // the Somali married woman's chignon bag
@@ -51,6 +55,8 @@ export type LayerForm =
   | 'limbRings'
   | 'bodyPaint' // a colour on the skin itself (ochre, camwood, red clay)
   | 'babySling' // an infant carried on the back in the mantle
+  | 'shoes' // the Western leather shoe
+  | 'boots' // the laced ankle boot of the expedition
 
 export type DressMaterial =
   | 'hide'
@@ -81,6 +87,7 @@ export type DressWear =
   | 'crown'
   | 'neck'
   | 'limbs'
+  | 'feet'
   | 'skin'
 
 /** Where a layer comes from: a section of docs/peoples-1890.md or
@@ -129,6 +136,9 @@ const C = {
   raffia: '#b49a62',
   leaves: '#4f6a2c',
   blanket: '#b9b2a4', // a PLAIN trade blanket (§2.3: the patterned one is 1897)
+  shoeLeather: '#231c17', // the Western black shoe (giza-1890 §4.1, a guess)
+  bootLeather: '#5a3f26', // the expedition's brown boot (a guess)
+  fez: '#8e1f1f', // the tarboosh's red felt (a guess)
 } as const
 
 // ---- layer constructors ----------------------------------------------------
@@ -682,33 +692,43 @@ const NO_PEOPLE: PeopleDress = people({
 
 /**
  * The non-villager cast drawn on the same body (work-order "Giza figures and
- * traveller"): the plateau's people and the expedition leader. Keyed like a
- * people and passed as the figure look's `peopleId`; the hats are props on the
- * head (the garment set holds no brimmed hat). Sources: docs/giza-1890.md §4.1;
- * every colour is a calibratable guess, 'cloth' the figure's own colour.
+ * traveller"): the plateau's people, the dragoman and the expedition leader of
+ * the bird's-eye view. Keyed like a people and passed as the figure look's
+ * `peopleId`; the brimmed hats (sun helmet, lady's hat) stay props on the head
+ * (scenes/place/castHats.tsx). Sources: docs/giza-1890.md §4.1; every colour
+ * is a calibratable guess, 'cloth' the figure's own colour.
  */
 const GIZA = (why: string) => S(`giza-1890 §4.1: ${why}`)
 const CAST_GUESS = (why: string) => G(`giza-1890 §4.1 records no ${why}`)
 const galabiya = layer('torso', 'robe', 'cotton', 'cloth', 'chest', GIZA('the galabiya'))
-const suitCoat = layer('torso', 'shirt', 'wool', 'cloth', 'chest', GIZA('the suit coat, drawn knee-long'))
-const suitTrousers = layer('hip', 'trousers', 'wool', 'cloth', 'waist', GIZA('the suit'))
-const longGown = layer('torso', 'robe', 'wool', 'cloth', 'chest', GIZA('the long skirt and bodice as one gown'))
-export const CAST_DRESS: Record<'egyptian' | 'bedouin' | 'european', PeopleDress> = {
-  egyptian: people({
-    male: {
-      child: [{ ...galabiya }],
-      youth: [{ ...galabiya }, layer('head', 'cap', 'cotton', C.cotton, 'crown', GIZA("the boy's skullcap"))],
-      adult: [{ ...galabiya }, layer('head', 'turban', 'cotton', C.cotton, 'aroundHead', GIZA('the turban'))],
-    },
-    female: {
-      child: [{ ...galabiya }],
-      youth: [layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau'))],
-      adult: [
-        layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau')),
-        layer('shoulder', 'hood', 'cotton', C.black, 'overHead', CAST_GUESS('local women at the plateau')),
-      ],
-    },
-  }),
+const suitCoat = layer('torso', 'coat', 'wool', 'cloth', 'chest', GIZA('the suit coat'))
+const suitTrousers = layer('hip', 'trousersLong', 'wool', 'cloth', 'waist', GIZA('the suit'))
+const shoes = layer('ornament', 'shoes', 'hide', C.shoeLeather, 'feet', GIZA('Western dress: shoes'))
+const longGown = layer('torso', 'gown', 'wool', 'cloth', 'chest', GIZA('the long skirt and bodice as one gown'))
+const drillCoat = layer('torso', 'coat', 'cotton', 'cloth', 'chest', GIZA('the expedition leader in khaki drill'))
+const drillTrousers = layer('hip', 'trousersLong', 'cotton', 'cloth', 'waist', GIZA('the expedition leader in khaki drill'))
+const boots = layer('ornament', 'boots', 'hide', C.bootLeather, 'feet', CAST_GUESS("expedition footwear: the leader's boots"))
+const egyptian = people({
+  male: {
+    child: [{ ...galabiya }],
+    youth: [{ ...galabiya }, layer('head', 'cap', 'cotton', C.cotton, 'crown', GIZA("the boy's skullcap"))],
+    adult: [{ ...galabiya }, layer('head', 'turban', 'cotton', C.cotton, 'aroundHead', GIZA('the turban'))],
+  },
+  female: {
+    child: [{ ...galabiya }],
+    youth: [layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau'))],
+    adult: [
+      layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau')),
+      layer('shoulder', 'hood', 'cotton', C.black, 'overHead', CAST_GUESS('local women at the plateau')),
+    ],
+  },
+})
+const tarboosh = layer('head', 'tarboosh', 'wool', C.fez, 'crown', GIZA('the tarboosh, the town and official headgear'))
+export const CAST_DRESS: Record<'egyptian' | 'dragoman' | 'bedouin' | 'european' | 'expedition', PeopleDress> = {
+  egyptian,
+  // the dragoman: the guide in the town's tarboosh (his kaftan and sash are
+  // not drawn: the gown stands for them)
+  dragoman: { ...egyptian, male: { ...egyptian.male, adult: [{ ...galabiya }, { ...tarboosh }], elder: [{ ...galabiya }, { ...tarboosh }] } },
   bedouin: people({
     male: {
       child: [{ ...galabiya }],
@@ -726,14 +746,28 @@ export const CAST_DRESS: Record<'egyptian' | 'bedouin' | 'european', PeopleDress
   }),
   european: people({
     male: {
-      child: [{ ...suitCoat }, { ...suitTrousers }],
-      youth: [{ ...suitCoat }, { ...suitTrousers }],
-      adult: [{ ...suitCoat }, { ...suitTrousers }],
+      child: [{ ...suitCoat }, { ...suitTrousers }, { ...shoes }],
+      youth: [{ ...suitCoat }, { ...suitTrousers }, { ...shoes }],
+      adult: [{ ...suitCoat }, { ...suitTrousers }, { ...shoes }],
     },
     female: {
-      child: [{ ...longGown }],
-      youth: [{ ...longGown }],
-      adult: [{ ...longGown }],
+      child: [{ ...longGown }, { ...shoes }],
+      youth: [{ ...longGown }, { ...shoes }],
+      adult: [{ ...longGown }, { ...shoes }],
+    },
+  }),
+  // the expedition leader of the bird's-eye view: khaki drill and boots (his
+  // sun helmet and pack are props of the travel figure)
+  expedition: people({
+    male: {
+      child: [{ ...drillCoat }, { ...drillTrousers }, { ...boots }],
+      youth: [{ ...drillCoat }, { ...drillTrousers }, { ...boots }],
+      adult: [{ ...drillCoat }, { ...drillTrousers }, { ...boots }],
+    },
+    female: {
+      child: [{ ...longGown }, { ...boots }],
+      youth: [{ ...longGown }, { ...boots }],
+      adult: [{ ...longGown }, { ...boots }],
     },
   }),
 }

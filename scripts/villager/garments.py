@@ -561,6 +561,27 @@ def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True, ea
     return out
 
 
+def tarboosh(B, L, steps=5):
+    """The tarboosh (fez): a truncated cone of felt from the brow to a flat
+    top above the crown. Its rim is measured from the drawn chin as the cap's
+    (`jaw`); its wall never lies inside the head at its own height and tapers
+    from the rim to garmentFit.tarbooshTopScale of it at the top, closed."""
+    H, fit = L['H'], L['fit']
+    lo = L['jaw'] + 0.07 * H + 0.02 * H
+    top = L['crown'] + fit['tarbooshRise'] * H
+    ease = 0.008 * H
+    c0, r0 = B.ring(lo, B.head > 0.5, ease)
+    rings = []
+    for k in range(steps):
+        y = lo + (top - lo) * k / (steps - 1)
+        _c, r = B.ring(min(y, L['crown'] - 0.006 * H), B.head > 0.5, ease)
+        wall = r0 * (1 - (1 - fit['tarbooshTopScale']) * k / (steps - 1))
+        rings.append((y, c0, np.maximum(r, wall) if y < L['crown'] else wall))
+    # built from the rim up; sweep takes its rings top to bottom (the head
+    # pieces' winding), the flat top the closed end
+    return sweep(rings[::-1], closed_top=True)
+
+
 def build_form(B, form, wear, L):
     H = L['H']
     allm = np.ones(len(B.W), bool)
@@ -602,10 +623,13 @@ def build_form(B, form, wear, L):
         return merge(parts), 3
     if form == 'breastCloth':
         return sweep(tube(B, *breast_cloth_span(L), 0.011 * H, 0.01, trunk, 6)), 3
-    if form in ('shirt', 'robe', 'toga'):
-        bottom = L['knee'] + 0.02 * H if form == 'shirt' else L['ankle'] + 0.03 * H
+    if form in ('shirt', 'robe', 'toga', 'coat', 'gown'):
+        # the coat: the Western jacket to mid-thigh; the gown: the Western
+        # woman's long skirt and bodice to the ground (docs/giza-1890.md §4.1)
+        bottom = (L['knee'] + 0.02 * H if form == 'shirt' else (L['hip'] + L['knee']) / 2 if form == 'coat'
+                  else L['ankle'] if form == 'gown' else L['ankle'] + 0.03 * H)
         top = L['neck'] - 0.01 * H
-        flare = 0.03 if form == 'shirt' else 0.06
+        flare = 0.03 if form == 'shirt' else 0.02 if form == 'coat' else 0.06
         if form == 'toga':
             bare = 1 if wear == 'rightShoulder' else -1  # the figure's left is +x
             body_only, yoke = trunk & (B.arm < 0.3), trunk & (B.lower_arm < 0.3)
@@ -638,7 +662,7 @@ def build_form(B, form, wear, L):
             rings.append((y, c, r + flare * B.body['joints'][0, 1] * t * t * (0.45 + 0.55 * np.abs(A[:, 0]))))
         parts.append(sweep(rings))
         for s in 'LR':
-            parts.append(sleeve(B, s, L))
+            parts.append(sleeve(B, s, L, long=form in ('coat', 'gown')))
         # the sleeves' vertices, by side (1 left, 2 right): they take their
         # weights from their own arm, the body cloth (0) from the skin off
         # the arms (finish)
@@ -700,6 +724,8 @@ def build_form(B, form, wear, L):
         # the rings run from the waist up: the crown, the LAST ring, is the
         # closed end (a cap on the first ring is a disc through the chest)
         return sweep(rings, closed_bottom=True, keep=lambda k, i: not (abs(ang(i)) < 0.7 and face_lo < rings[k][0] < face_hi)), 2
+    if form == 'tarboosh':
+        return tarboosh(B, L), 0
     if form in ('turban', 'cap', 'headband'):
         # a cap and a headband from the drawn chin, not the head joint
         # (`chin`), which stands some centimetres above it: measured from the
@@ -922,42 +948,67 @@ def sleeve_radius(rad, k, fit):
     return rad * fit['sleeveScale'] + fit['sleeveEase'] + fit['sleeveEaseStep'] * k
 
 
-def sleeve(B, s, L):
-    """A short sleeve round the upper arm (to just above the elbow)."""
-    iu, il = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s]
+def sleeve(B, s, L, long=False):
+    """A sleeve round the arm: short (to just above the elbow), or `long` on
+    down the forearm to the wrist (the coat and the gown)."""
+    iu, il, ih = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s], SK.INDEX['hand.' + s]
     a = B.wp[iu]
     b = B.wp[il]
-    ax = (b - a) / np.linalg.norm(b - a)
     rings = []
-    W = B.W[:, iu]
-    pts = B.v[B.mask_body & (W > 0.5)]
-    for k, f in enumerate((0.1, 0.45, 0.78)):
-        p = a + (b - a) * f
+    fit = L['fit']
+    if long:
+        # one arm slice set over the upper arm and the forearm: at the elbow
+        # neither bone holds half the weight alone
+        pts = B.v[B.mask_body & (B.W[:, iu] + B.W[:, il] > 0.5)]
+        h = B.wp[ih]
+        span = [(a, b, f) for f in (0.1, 0.45, 0.78, 1.0)] + [(b, h, f) for f in (0.35, 0.7, fit['longSleeveWrist'])]
+    else:
+        pts = B.v[B.mask_body & (B.W[:, iu] > 0.5)]
+        span = [(a, b, f) for f in (0.1, 0.45, 0.78)]
+    for k, (p0, p1, f) in enumerate(span):
+        ax = (p1 - p0) / np.linalg.norm(p1 - p0)
+        p = p0 + (p1 - p0) * f
         rel = pts - p
         along = rel @ ax
         sl = pts[np.abs(along) < 0.015]
         rad = np.max(np.linalg.norm((sl - p) - np.outer((sl - p) @ ax, ax), axis=1)) if len(sl) else 0.035
-        rings.append((p, sleeve_radius(rad, k, L['fit'])))
+        rings.append((p, long_sleeve_radius(rad, k, fit) if long else sleeve_radius(rad, k, fit), ax))
     # a cap ring at the shoulder joint, under the body cloth's yoke: a
     # sleeve begun below the joint left the top of the shoulder bare between
     # the two (one begun above it lay in the shoulder, and the settle pulled
     # it out into ribbons)
-    rings.insert(0, (a, rings[0][1]))
-    # sweep round the arm axis
-    n = 12
-    e1 = np.cross(ax, [0, 0, 1.0])
-    e1 /= np.linalg.norm(e1)
-    e2 = np.cross(ax, e1)
+    rings.insert(0, (a, rings[0][1], rings[0][2]))
+    return arm_sweep(rings)
+
+
+def long_sleeve_radius(rad, k, fit):
+    """A long sleeve's ring round an arm slice of radius `rad`: the short
+    sleeve's fit over the upper arm (rings 0-2), from the elbow on a fixed
+    ease (VILLAGER_ASSET.garmentFit.longSleeveEase, calibratable) — the short
+    sleeve's growing step would open the cuff into a bell."""
+    if k < 3:
+        return sleeve_radius(rad, k, fit)
+    return rad * fit['sleeveScale'] + fit['longSleeveEase']
+
+
+def arm_sweep(rings, n=12):
+    """Rings [(centre, radius, axis)] down an arm → verts, tris, uv: each ring
+    square to its own segment (the elbow bends a long sleeve)."""
     verts, uv, tris = [], [], []
-    for k, (p, rad) in enumerate(rings):
+    for k, (p, rad, ax) in enumerate(rings):
+        e1 = np.cross(ax, [0, 0, 1.0])
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(ax, e1)
         for i in range(n + 1):
             th = 2 * np.pi * (i % n) / n
             verts.append(p + rad * (np.cos(th) * e1 + np.sin(th) * e2))
             uv.append([i / n, k / (len(rings) - 1)])
+    # wound so the faces look outward (ax × e2 = -e1 pointed them in, and the
+    # material's back-face shade darkened the whole sleeve)
     for k in range(len(rings) - 1):
         for i in range(n):
             a0 = k * (n + 1) + i
-            tris += [[a0, a0 + n + 1, a0 + 1], [a0 + 1, a0 + n + 1, a0 + n + 2]]
+            tris += [[a0, a0 + 1, a0 + n + 1], [a0 + 1, a0 + n + 2, a0 + n + 1]]
     return np.array(verts), np.array(tris), np.array(uv)
 
 
@@ -972,6 +1023,10 @@ GARMENTS = [
     ('hood', 'overHead'), ('turban', 'aroundHead'), ('cap', 'crown'), ('headband', 'aroundHead'), ('veil', 'face'),
     ('headRing', 'crown'), ('topknot', 'crown'), ('hairBag', 'crown'), ('neckBeads', 'neck'), ('neckBeads', 'chest'),
     ('waistBeads', 'waist'), ('limbRings', 'limbs'),
+    # the 1890 Western dress and the dragoman's fez (docs/giza-1890.md §4.1);
+    # the long trousers and the footwear are shells (shells.py)
+    ('coat', 'chest'), ('gown', 'chest'), ('tarboosh', 'crown'),
+    ('trousersLong', 'waist'), ('shoes', 'feet'), ('boots', 'feet'),
 ]
 # The set is the (form, wear) pairs the game's outfit generator puts on a
 # figure (src/systems/appearance.ts appearanceFor; villagerFigureBody.test.ts
@@ -979,8 +1034,8 @@ GARMENTS = [
 # code-built layer, and the cover mask holds at most 32 (mask.BITS).
 # The slot's ease order: an outer layer stands off the inner one.
 OUTER = {'cloak': 0.012, 'cape': 0.012, 'hood': 0.006}
-SKIRTS = {'loinFlap', 'apron', 'girdleTails', 'skirtShort', 'skirtKnee', 'wrapLong', 'shirt', 'robe', 'toga', 'cloak'}
-RIGID_HEAD = {'turban', 'cap', 'headband', 'headRing', 'topknot', 'hairBag'}
+SKIRTS = {'loinFlap', 'apron', 'girdleTails', 'skirtShort', 'skirtKnee', 'wrapLong', 'shirt', 'robe', 'toga', 'cloak', 'coat', 'gown'}
+RIGID_HEAD = {'turban', 'cap', 'headband', 'headRing', 'topknot', 'hairBag', 'tarboosh'}
 # rigid on the chest bone: the infant rides it as one piece (figureDress.ts babySling)
 RIGID_CHEST = {'babySling'}
 

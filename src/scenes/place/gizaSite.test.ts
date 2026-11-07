@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { appearanceFor, CAST_DRESS } from '../../systems/appearance'
+import { garmentMeshName } from '../../render/villagerFigureBody'
 import {
   GIZA_AMBIENT,
   GIZA_PYRAMIDS,
@@ -326,28 +327,39 @@ describe("Giza's people on the villagers' figure body (docs/giza-1890.md §4.1)"
   })
 
   it('gives each role its cast, sex and age group', () => {
-    const spec = persons.map((a) => ({ role: a.role, ...gizaFigure(a.role as GizaPersonRole, a.sex) }))
+    const spec = persons.map((a) => ({ role: a.role, dragoman: a.dragoman, ...gizaFigure(a.role as GizaPersonRole, a.sex, a.dragoman) }))
     for (const s of spec) {
       if (s.role === 'donkeyboy') expect(s.age).toBe('youth')
       else expect(s.age).toBe('adult')
-      expect(s.cast).toBe(s.role === 'tourist' ? 'european' : s.role === 'cameleer' ? 'bedouin' : 'egyptian')
+      expect(s.cast).toBe(s.role === 'tourist' ? 'european' : s.role === 'cameleer' ? 'bedouin' : s.dragoman ? 'dragoman' : 'egyptian')
     }
+    // one of the guides is the tourists' dragoman
+    expect(spec.filter((s) => s.cast === 'dragoman').map((s) => s.role)).toEqual(['guide'])
     // The tourists are a man in the sun helmet and a woman in her hat.
     const tourists = spec.filter((s) => s.role === 'tourist')
     expect(tourists.map((t) => [t.sex, t.hat]).sort()).toEqual([['female', 'ladyHat'], ['male', 'sunHelmet']])
   })
 
   it('dresses the locals in the galabiya and the tourists in Western dress', () => {
-    const dress = (role: GizaPersonRole, sex?: 'female' | 'male') => {
-      const s = gizaFigure(role, sex)
+    const dress = (role: GizaPersonRole, sex?: 'female' | 'male', dragoman = false) => {
+      const s = gizaFigure(role, sex, dragoman)
       return appearanceFor({ peopleId: s.cast, sex: s.sex, age: s.age, drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, cloth: s.cloth, palette: [s.cloth], pick: 0.5 })
     }
-    const forms = (role: GizaPersonRole, sex?: 'female' | 'male') => dress(role, sex).map((l) => l.form).sort()
+    const forms = (role: GizaPersonRole, sex?: 'female' | 'male', dragoman = false) => dress(role, sex, dragoman).map((l) => l.form).sort()
     expect(forms('guide')).toEqual(['robe', 'turban'])
+    expect(forms('guide', 'male', true)).toEqual(['robe', 'tarboosh'])
     expect(forms('cameleer')).toEqual(['hood', 'robe'])
     expect(forms('donkeyboy')).toEqual(['cap', 'robe'])
-    expect(forms('tourist', 'male')).toEqual(['shirt', 'trousers'])
-    expect(forms('tourist', 'female')).toEqual(['robe'])
+    // 1890 Western dress (§4.1): the man's jacket, long trousers and shoes, the
+    // woman's long-sleeved gown to the ground and shoes; the brimmed hats are props
+    expect(forms('tourist', 'male')).toEqual(['coat', 'shoes', 'trousersLong'])
+    expect(forms('tourist', 'female')).toEqual(['gown', 'shoes'])
+    const ids = (role: GizaPersonRole, sex?: 'female' | 'male', dragoman = false) => dress(role, sex, dragoman).map(garmentMeshName).sort()
+    expect(ids('tourist', 'male')).toEqual(['g-coat-chest', 'g-shoes-feet', 'g-trousersLong-waist'])
+    expect(ids('tourist', 'female')).toEqual(['g-gown-chest', 'g-shoes-feet'])
+    expect(ids('guide', 'male', true)).toEqual(['g-robe-chest', 'g-tarboosh-crown'])
+    expect(gizaFigure('tourist', 'male').hat).toBe('sunHelmet')
+    expect(gizaFigure('tourist', 'female').hat).toBe('ladyHat')
     // The figure's own cloth colours the gown.
     expect(dress('guide').find((l) => l.form === 'robe')?.colour).toBe(gizaFigure('guide').cloth)
   })

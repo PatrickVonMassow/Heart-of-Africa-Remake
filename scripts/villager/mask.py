@@ -67,11 +67,12 @@ from body import top4
 # The garment's slot (src/systems/appearance.ts LayerSlot), by form: two
 # garments of different slots can be worn together.
 SLOT = {
-    **{f: 'hip' for f in ('loinFlap', 'girdleTails', 'apron', 'skirtShort', 'skirtKnee', 'wrapLong', 'trousers')},
-    **{f: 'torso' for f in ('breastCloth', 'shirt', 'robe', 'toga')},
+    **{f: 'hip' for f in ('loinFlap', 'girdleTails', 'apron', 'skirtShort', 'skirtKnee', 'wrapLong', 'trousers', 'trousersLong')},
+    **{f: 'torso' for f in ('breastCloth', 'shirt', 'robe', 'toga', 'coat', 'gown')},
     **{f: 'shoulder' for f in ('cape', 'cloak', 'hood', 'babySling')},
-    **{f: 'head' for f in ('cap', 'hairBag', 'headRing', 'headband', 'topknot', 'turban', 'veil')},
-    **{f: 'ornament' for f in ('limbRings', 'neckBeads', 'waistBeads')},
+    **{f: 'head' for f in ('cap', 'hairBag', 'headRing', 'headband', 'topknot', 'turban', 'veil', 'tarboosh')},
+    # footwear rides the innermost layer: the trousers lie over a shoe's top
+    **{f: 'ornament' for f in ('limbRings', 'neckBeads', 'waistBeads', 'shoes', 'boots')},
 }
 # The layer a slot is worn in, innermost first: in a layering the garment of
 # the outer layer lies over the inner one (an ornament under everything, the
