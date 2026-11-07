@@ -1,13 +1,8 @@
 {
-  "lastReviewedAt": 1792788251355,
-  "reviewedCount": 154,
-  "evidence": "Explore audit against code: dashboard-reminder hook, batch-resume hook, 29 Stop guards, MEMORY.md + 42 memories, CLAUDE.md §2/4/6/7/9. 15 verified findings. Memory fixed directly: fable-sparingly (fable-switch/Astra/review-astra stale, rewritten to lane-switch --lane scarce), effort-high (ASTRA_REASONING_EFFORT gone), six-eyes (Astra->Sol), track-permission-prompts dontAsk paragraph withdrawn, protected-paths, boundary-marker (two-phase, 426 landed), 1053 notes in a-question and batch-stops. Repo-text findings (resume-hook clearPaused/boundary/intake contradictions, switched-off review guards still on Stop, §7.2 misattributions, rule-echo stamp gap, double timestamp enforcement) parked in docs/backlog.md 27f51c1bc under the freeze.",
+  "lastReviewedAt": 1794013904693,
+  "reviewedCount": 158,
+  "evidence": "Read-only review of dashboard-reminder hook/core, batch-resume hook (body, queue selection, model header), user-gate-core, render-verify guard/core, point-brief VERIFICATION_LADDER, six Stop-guard block texts, MEMORY.md plus 17 memories, CLAUDE.md §2/4/6/7/9 against the code; 12 findings: 10 contradictions/unclear rules filed to docs/backlog.md as input for point 1463 (freeze: no new mechanism), umsteuerung memory marked superseded by 1463, effort slug and dashboard reminder kept",
   "history": [
-    {
-      "at": "2026-07-29T11:49:09.337Z",
-      "entryCount": 97,
-      "evidence": "Durchsicht in der vorgegebenen Reihenfolge, jede Regel gegen den CODE geprueft. (1) dashboard-reminder-hook: FUND - der bei jedem Prompt eingeblendete Text verlangte 'per Artifact republishen' und einen 'Artifact-Republish'; seit dem Board-Umzug ist das fuer headless Sitzungen unmoeglich (kein Artifact-Werkzeug) und zeigt auf einen Spiegel, den der Nutzer verlassen hat - beide Stellen auf board-publish.mjs umgestellt (583beef). (2) batch-resume-hook: dieselbe Drift, mit korrigiert. (3) Waechter-Meldungstexte: gegen ihre Kerne gelesen, keine weitere Artifact-Drift; die queue-stubbed-Meldung nennt den richtigen Befehl. (4) MEMORY.md + Memories: FUND - der Index beschrieb die Tafel weiter als 'private phone artifact', und batch-dashboard-artifact hielt den claude.ai-Spiegel als 'MIRRORED bis der Nutzer sein Lesezeichen umzieht' - der Umzug ist heute erfolgt und bestaetigt, also als RETIRED nachgezogen; der dort genannte Viewer-Pfad public/board/index.html gegen das Dateisystem geprueft und korrekt, dagegen nannte meine eigene 419-Spec faelschlich docs/board/index.html - korrigiert. (5) CLAUDE.md Paragrafen 2/4/6/7/9: NICHT geprueft, dafuer reichte der Kontext dieser Sitzung nicht - offen fuer die Nachfolgesitzung."
-    },
     {
       "at": "2026-07-30T05:42:09.795Z",
       "entryCount": 107,
@@ -52,6 +47,11 @@
       "at": "2026-10-23T20:44:11.355Z",
       "entryCount": 154,
       "evidence": "Explore audit against code: dashboard-reminder hook, batch-resume hook, 29 Stop guards, MEMORY.md + 42 memories, CLAUDE.md §2/4/6/7/9. 15 verified findings. Memory fixed directly: fable-sparingly (fable-switch/Astra/review-astra stale, rewritten to lane-switch --lane scarce), effort-high (ASTRA_REASONING_EFFORT gone), six-eyes (Astra->Sol), track-permission-prompts dontAsk paragraph withdrawn, protected-paths, boundary-marker (two-phase, 426 landed), 1053 notes in a-question and batch-stops. Repo-text findings (resume-hook clearPaused/boundary/intake contradictions, switched-off review guards still on Stop, §7.2 misattributions, rule-echo stamp gap, double timestamp enforcement) parked in docs/backlog.md 27f51c1bc under the freeze."
+    },
+    {
+      "at": "2026-11-07T01:11:44.693Z",
+      "entryCount": 158,
+      "evidence": "Read-only review of dashboard-reminder hook/core, batch-resume hook (body, queue selection, model header), user-gate-core, render-verify guard/core, point-brief VERIFICATION_LADDER, six Stop-guard block texts, MEMORY.md plus 17 memories, CLAUDE.md §2/4/6/7/9 against the code; 12 findings: 10 contradictions/unclear rules filed to docs/backlog.md as input for point 1463 (freeze: no new mechanism), umsteuerung memory marked superseded by 1463, effort slug and dashboard reminder kept"
     }
   ]
 }
