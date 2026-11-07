@@ -55,12 +55,24 @@ const BUILD_RESIDUALS: Record<string, string[]> = {
   'g-veil-face': ['g-shirt-chest', 'g-robe-chest', 'g-cape-leftShoulder', 'g-cloak-chest', 'g-cape-chest', 'g-cloak-bothShoulders'],
 }
 // build-pose residuals at a body corner no CAST_DRESS cell dresses in that
-// garment (docs/backlog.md, point 1379): garment → its build columns
-const UNWORN_BUILD_RESIDUALS: Record<string, Column[]> = {
-  // the coat is worn by male figures only; upperArm.L at the female elder
-  'g-coat-chest': ['shown'],
+// garment (docs/backlog.md, point 1379): garment → the one case key it may
+// carry, the corners its worst frame may stand at, and a ceiling
+interface Unworn { key: string; corner: RegExp; max: number }
+const UNWORN_BUILD_RESIDUALS: Record<string, Unworn> = {
+  // the coat is worn by male figures only; upperArm.L at the female corners
+  'g-coat-chest': { key: 'shown build upperArm.L None', corner: /\(female (adult|elder) build/, max: 0.004 },
 }
-const unworn = (n: string, col: string) => (UNWORN_BUILD_RESIDUALS[n] ?? []).includes(col as Column)
+type BuildEntry = Pick<Garment, 'cases'> & Record<Column, { value: number }>
+/** The build column `col` of garment `n` is the named unworn residual: its
+ *  value stays under the ceiling and every case of that column is the named
+ *  key at a named corner. A case at another part or corner, or a worse value,
+ *  is not covered. */
+function unworn(n: string, g: BuildEntry, col: string): boolean {
+  const u = UNWORN_BUILD_RESIDUALS[n]
+  if (!u || u.key.split(' ')[0] !== col || !(g[col as Column]?.value <= u.max)) return false
+  const cases = Object.entries(g.cases).filter(([k]) => k.split(' ')[0] === col)
+  return cases.length > 0 && cases.every(([k, e]) => k === u.key && u.corner.test(e.at) && e.value <= u.max)
+}
 
 // penetration.py DERIVED: a clip main never measured → the clips it is made from
 const DERIVED: Record<string, string[]> = { jog: ['walk', 'sprint'], shoulders: ['idle'] }
@@ -101,7 +113,7 @@ function worseThanMain(r: Report, base: Report, buildOnly = false): string[] {
     for (const [n, g] of Object.entries(part)) {
       for (const [key, v] of Object.entries(g.clips)) {
         const was = b[n]?.clips[key] ?? 0
-        if (part === r.build && unworn(n, key.split(' ')[0])) continue
+        if (part === r.build && unworn(n, g, key.split(' ')[0])) continue
         if (v > limit(key.split(' ')[0]) && v > was + 0.0005) out.push(`${n} ${key}: ${was} → ${v}`)
       }
     }
@@ -271,6 +283,21 @@ describe('the visible-only penetration report', () => {
     expect(worseThanMain(raised, main)).toEqual([expect.stringContaining(`${g} cloth build`)])
   })
 
+  it('the unworn coat residual covers only its named case: a male corner, another part or a worse value is a regression', () => {
+    const n = 'g-coat-chest'
+    const u = UNWORN_BUILD_RESIDUALS[n]
+    expect(unworn(n, now.build[n], 'shown'), 'the measured residual is the named one').toBe(true)
+    const at = (patch: (g: BuildEntry) => void) => {
+      const g = structuredClone(now.build[n])
+      patch(g)
+      return unworn(n, g, 'shown')
+    }
+    expect(at((g) => { g.cases[u.key].at = 'build frame 0 (male adult build +0)' })).toBe(false)
+    expect(at((g) => { g.cases['shown build forearm.R None'] = { value: 0.0035, at: 'build frame 0 (female elder build +0)', over: 1 } })).toBe(false)
+    expect(at((g) => { g.shown.value = g.cases[u.key].value = u.max + 0.001 })).toBe(false)
+    expect(unworn(n, now.build[n], 'cut'), 'another column is not covered').toBe(false)
+  })
+
   it('measures the build pose of every garment at every body corner, per column', () => {
     // an empty or partial build entry would pass the tolerance check below
     const outermost = Math.max(...Object.values(LAYER))
@@ -281,11 +308,12 @@ describe('the visible-only penetration report', () => {
     for (const [n, g] of Object.entries(now.build)) {
       expect(g.checked, n).toBeGreaterThan(0)
       expect(g.checked, n).toBe(NEW_LEGACY.includes(n) ? corners : main.build[n].checked)
-      if (NEW_LEGACY.includes(n)) continue
       expect(Object.keys(g.clips).length, n).toBeGreaterThan(0)
-      // every column main measured in the build pose, except layerings of the
-      // outermost layer (as for the motion keys above)
-      for (const key of Object.keys(main.build[n].clips)) {
+      // every column main measured in the build pose (every column for a
+      // garment main never measured), except layerings of the outermost layer
+      // (as for the motion keys above)
+      const want = NEW_LEGACY.includes(n) ? Object.keys(NAMES).map((c) => `${c} build`) : Object.keys(main.build[n].clips)
+      for (const key of want) {
         const col = key.split(' ')[0]
         if ((col === 'inner' || col === 'innerHole') && layer(n) === outermost) continue
         expect(Object.keys(g.clips), n).toContain(key)
@@ -306,14 +334,14 @@ describe('the visible-only penetration report', () => {
       // information) keeps exactly its inner layering cases, nothing else
       const allowed = BUILD_RESIDUALS[n] ?? []
       for (const col of Object.keys(NAMES) as Column[]) {
-        if (g[col].value > tol && !(col === 'inner' && allowed.length) && !unworn(n, col)) over.push(`${n} ${col} ${g[col].value}`)
+        if (g[col].value > tol && !(col === 'inner' && allowed.length) && !unworn(n, g, col)) over.push(`${n} ${col} ${g[col].value}`)
       }
       for (const [key, v] of Object.entries(g.clips)) {
-        if (v > tol && !(key === 'inner build' && allowed.length) && !unworn(n, key.split(' ')[0])) over.push(`${n} ${key} ${v}`)
+        if (v > tol && !(key === 'inner build' && allowed.length) && !unworn(n, g, key.split(' ')[0])) over.push(`${n} ${key} ${v}`)
       }
       for (const key of Object.keys(g.cases)) {
         const [col, , , outer] = key.split(' ')
-        expect((col === 'inner' && allowed.includes(outer)) || unworn(n, col), `${n}: ${key}`).toBe(true)
+        expect((col === 'inner' && allowed.includes(outer)) || unworn(n, g, col), `${n}: ${key}`).toBe(true)
       }
     }
     expect(over).toEqual([])
