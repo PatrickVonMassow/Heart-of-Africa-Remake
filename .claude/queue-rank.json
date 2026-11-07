@@ -1806,6 +1806,24 @@
       "why": "infra hygiene behind the active garment point; it blocks no point while agent checks fetch by hand",
       "origin": "machine",
       "place": "last"
+    },
+    "1488": {
+      "at": "2026-11-05T17:58:01.406Z",
+      "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1489": {
+      "at": "2026-11-05T17:58:01.535Z",
+      "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1490": {
+      "at": "2026-11-05T17:58:01.663Z",
+      "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1835,7 +1853,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-05T03:01:17.471Z",
+    "at": "2026-11-05T17:58:01.673Z",
     "points": [
       184,
       200,
@@ -2305,7 +2323,10 @@
       1482,
       1483,
       1484,
-      1487
+      1487,
+      1488,
+      1489,
+      1490
     ]
   }
 }
