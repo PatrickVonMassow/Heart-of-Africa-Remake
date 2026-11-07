@@ -33,7 +33,7 @@ import {
   effectiveWaterDetailOctaves,
   effectiveFigureLimbSegments,
 } from '../../state/ui'
-import { balance, GIZA_CAST, START_YEAR } from '../../config/balance'
+import { balance, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
@@ -3252,7 +3252,10 @@ export function PlaceScene() {
     // The same surface carries every figure: the bank slopes down into the
     // shallows and worked earth rises smoothly above the village plateau.
     const footing = placeGroundHeight(ground, p.x, p.z)
-    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
+    // DEV only: a verify suite lifts the camera above the eye (metres) for a
+    // steep overhead garment frame; no player path sets it.
+    const lift = import.meta.env.DEV ? Number((window as unknown as Record<string, unknown>).__placeCameraLift) || 0 : 0
+    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing + lift, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
     camera.position.set(pose.position[0], pose.position[1], pose.position[2])
     camera.rotation.set(pose.rotation[0], pose.rotation[1], pose.rotation[2], 'YXZ')
     // Share the live LOGICAL position so the town-plan map marker can track it.
@@ -3334,6 +3337,7 @@ export function PlaceScene() {
         shadow-camera-near={5}
         shadow-camera-far={160}
         shadow-bias={-0.0004}
+        shadow-normalBias={VILLAGER_ASSET.sunShadowNormalBias}
       />
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
