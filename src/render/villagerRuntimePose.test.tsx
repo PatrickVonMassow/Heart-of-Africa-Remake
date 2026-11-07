@@ -398,7 +398,7 @@ async function play(s: Subject) {
 /** A forced shell layer (the round trip reads geometry, never its colour). */
 const shellLayer = (name: string): DressLayer => {
   const [, form, wear] = name.split('-')
-  const slot = form === 'trousers' ? 'hip' : 'ornament'
+  const slot = form.startsWith('trousers') ? 'hip' : 'ornament'
   return { slot, form, wear, material: 'cotton', colour: '#888888', colour2: null, pattern: 'plain', source: { guess: 'round trip' } } as DressLayer
 }
 
@@ -409,6 +409,9 @@ const SHELL_OUTFITS: Array<{ sex: Sex; age: AgeGroup; worn: string[] }> = [
   { sex: 'female', age: 'adult', worn: ['g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist'] },
   { sex: 'female', age: 'adult', worn: ['g-neckBeads-neck', 'g-neckBeads-chest'] },
   { sex: 'male', age: 'child', worn: ['g-waistBeads-waist', 'g-trousers-waist'] },
+  // the Western suit and the expedition drill (Giza tourists, the traveller)
+  { sex: 'male', age: 'adult', worn: ['g-trousersLong-waist', 'g-shoes-feet'] },
+  { sex: 'male', age: 'adult', worn: ['g-trousersLong-waist', 'g-boots-feet'] },
 ]
 
 function shellRoundTrip() {
