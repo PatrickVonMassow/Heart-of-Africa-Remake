@@ -627,7 +627,7 @@ def build_form(B, form, wear, L):
         # the coat: the Western jacket to mid-thigh; the gown: the Western
         # woman's long skirt and bodice to the ground (docs/giza-1890.md §4.1)
         bottom = (L['knee'] + 0.02 * H if form == 'shirt' else (L['hip'] + L['knee']) / 2 if form == 'coat'
-                  else L['ankle'] + 0.03 * H)
+                  else L['ankle'] if form == 'gown' else L['ankle'] + 0.03 * H)
         top = L['neck'] - 0.01 * H
         flare = 0.03 if form == 'shirt' else 0.02 if form == 'coat' else 0.06
         if form == 'toga':
