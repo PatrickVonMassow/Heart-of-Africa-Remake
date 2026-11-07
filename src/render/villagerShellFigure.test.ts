@@ -191,6 +191,7 @@ describe("a worn shell on the drawn body", () => {
     for (const worn of [
       ["g-waistBeads-waist", "g-trousers-waist"],
       ["g-neckBeads-neck", "g-neckBeads-chest"],
+      ...OUTFITS.slice(1),
       SHELLS,
     ]) {
       const label = worn.join("+");
