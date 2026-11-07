@@ -247,7 +247,8 @@ def far_surfaces(tris, fmask, shells, worn, ef=None):
 def check_regions(body, shells, log=print):
     """The region predicates on the real body (round-8 B2): no face carrying a
     bit has a corner with arm > 0.2, each contour corner lies on a boundary
-    loop, each region is one connected component; trousers and waist band
+    loop, each region is one connected component (a footwear region one per
+    foot); trousers and waist band
     have arm == 0 everywhere; waist band and both collars have two loops.
     Returns the failures (empty when every predicate holds)."""
     arm = body['region']['arm']
@@ -266,8 +267,9 @@ def check_regions(body, shells, log=print):
         off_loop = [x for x in contour if x not in on]
         if off_loop:
             bad.append(f'{n}: {len(off_loop)} contour corners off every boundary loop')
-        if components(tris[f]) != 1:
-            bad.append(f'{n}: {components(tris[f])} connected components')
+        want = 2 if n.endswith('-feet') else 1
+        if components(tris[f]) != want:
+            bad.append(f'{n}: {components(tris[f])} connected components ({want} expected)')
         if n in ('g-trousers-waist', 'g-waistBeads-waist') and (arm[v] != 0).any():
             bad.append(f'{n}: {int((arm[v] != 0).sum())} corners with arm != 0')
         if n in ('g-waistBeads-waist', 'g-neckBeads-neck', 'g-neckBeads-chest') and len(sh['rows']) != 2:
