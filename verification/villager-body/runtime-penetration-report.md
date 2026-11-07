@@ -86,3 +86,59 @@ female child, build +0.0, figure scale 0.55; 10 frames 0.20–1.50 s.
 | `g-skirtShort-waist` | 0.0191 ✗ | caught t 0.63 s (female child build +0.0) — forearm.R | 8 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
 
 0 of 1 worn garments within tolerance in every frame.
+
+## suit: Giza tourist man, 1.0 u/s
+
+male adult, build -0.6, figure scale 1; 8 frames 1.50–2.60 s.
+
+| Garment | Cloth | where | frames over (of 8) | Shown | where | frames over (of 8) | Hole | where | frames over (of 8) | Cut | where | frames over (of 8) | Inner | where | frames over (of 8) | Inner hole | where | frames over (of 8) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `g-coat-chest` | 0.0318 ✗ | suit t 1.66 s (male adult build -0.6) — thigh.R | 6 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+
+0 of 1 worn garments within tolerance in every frame.
+
+### Shell garments (shells.py; information, no gate)
+
+Row one: each shell vertex against its own source vertex's incident body triangles, posed (band [half the offset, the offset plus one step]; named response: under half the offset on more than one frame raises that shell's base by one step). Row two: a shell vertex inside another body part within one offset (no corner in its source's two-ring; parity confirmed), worst cases with source and hit bone (named response: inspect the frame in the picture, never an offset change). Row three: a covered shell point through a co-worn legacy garment of an outer layer (named response: raise that garment's ease by one rank step). Rim strips are not measured here. Figure units.
+
+| Shell | offset | row one min | at | row one max | frames under half | row two frames | row two worst | row three worst |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `g-shoes-feet` | 0.0090 | 0.0009 ✗ | suit t 1.81 s (male adult build -0.6) | 0.0090 | 8 of 8 | 8 | 0.0090 toe.L in toe.L (suit t 2.29 s (male adult build -0.6)); 0.0089 toe.L in toe.L (suit t 1.66 s (male adult build -0.6)) | — |
+| `g-trousersLong-waist` | 0.0120 | 0.0015 ✗ | suit t 1.66 s (male adult build -0.6) | 0.0120 | 8 of 8 | 8 | 0.0106 hips in hips (suit t 1.66 s (male adult build -0.6)); 0.0106 hips in hips (suit t 1.81 s (male adult build -0.6)) | — |
+
+## gown: Giza tourist woman, 1.0 u/s
+
+female adult, build +0.6, figure scale 1; 8 frames 1.50–2.60 s.
+
+| Garment | Cloth | where | frames over (of 8) | Shown | where | frames over (of 8) | Hole | where | frames over (of 8) | Cut | where | frames over (of 8) | Inner | where | frames over (of 8) | Inner hole | where | frames over (of 8) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `g-gown-chest` | 0.0368 ✗ | gown t 2.13 s (female adult build +0.6) — shin.R | 8 | 0.0095 ✗ | gown t 1.66 s (female adult build +0.6) — thigh.R | 2 | 0.0000 | — | 0 | 0.0055 | gown t 1.66 s (female adult build +0.6) — thigh.R | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+
+0 of 1 worn garments within tolerance in every frame.
+
+### Shell garments (shells.py; information, no gate)
+
+Row one: each shell vertex against its own source vertex's incident body triangles, posed (band [half the offset, the offset plus one step]; named response: under half the offset on more than one frame raises that shell's base by one step). Row two: a shell vertex inside another body part within one offset (no corner in its source's two-ring; parity confirmed), worst cases with source and hit bone (named response: inspect the frame in the picture, never an offset change). Row three: a covered shell point through a co-worn legacy garment of an outer layer (named response: raise that garment's ease by one rank step). Rim strips are not measured here. Figure units.
+
+| Shell | offset | row one min | at | row one max | frames under half | row two frames | row two worst | row three worst |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `g-shoes-feet` | 0.0090 | 0.0004 ✗ | gown t 2.44 s (female adult build +0.6) | 0.0090 | 8 of 8 | 8 | 0.0089 toe.R in toe.R (gown t 2.60 s (female adult build +0.6)); 0.0085 toe.L in toe.L (gown t 1.66 s (female adult build +0.6)) | — |
+
+## drill: expedition leader, 1.0 u/s
+
+male adult, build +0.0, figure scale 1; 8 frames 1.50–2.60 s.
+
+| Garment | Cloth | where | frames over (of 8) | Shown | where | frames over (of 8) | Hole | where | frames over (of 8) | Cut | where | frames over (of 8) | Inner | where | frames over (of 8) | Inner hole | where | frames over (of 8) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `g-coat-chest` | 0.0327 ✗ | drill t 1.66 s (male adult build +0.0) — thigh.R | 6 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 | 0.0000 | — | 0 |
+
+0 of 1 worn garments within tolerance in every frame.
+
+### Shell garments (shells.py; information, no gate)
+
+Row one: each shell vertex against its own source vertex's incident body triangles, posed (band [half the offset, the offset plus one step]; named response: under half the offset on more than one frame raises that shell's base by one step). Row two: a shell vertex inside another body part within one offset (no corner in its source's two-ring; parity confirmed), worst cases with source and hit bone (named response: inspect the frame in the picture, never an offset change). Row three: a covered shell point through a co-worn legacy garment of an outer layer (named response: raise that garment's ease by one rank step). Rim strips are not measured here. Figure units.
+
+| Shell | offset | row one min | at | row one max | frames under half | row two frames | row two worst | row three worst |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `g-boots-feet` | 0.0150 | 0.0044 ✗ | drill t 1.97 s (male adult build +0.0) | 0.0150 | 8 of 8 | 8 | 0.0094 toe.R in toe.R (drill t 2.44 s (male adult build +0.0)); 0.0094 toe.R in toe.R (drill t 1.50 s (male adult build +0.0)) | — |
+| `g-trousersLong-waist` | 0.0120 | 0.0015 ✗ | drill t 1.66 s (male adult build +0.0) | 0.0120 | 8 of 8 | 8 | 0.0106 hips in hips (drill t 1.66 s (male adult build +0.0)); 0.0106 hips in hips (drill t 1.81 s (male adult build +0.0)) | — |

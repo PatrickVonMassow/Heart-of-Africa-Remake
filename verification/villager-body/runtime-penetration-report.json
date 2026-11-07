@@ -75,7 +75,7 @@
       "over": 4
      },
      "cloth walk upperArm.L None": {
-      "value": 0.012888254524767278,
+      "value": 0.012888236510825447,
       "at": "walk t 1.90 s (male adult build +0.0)",
       "over": 4
      },
@@ -206,7 +206,7 @@
       "over": 10
      },
      "cloth turn upperArm.L None": {
-      "value": 0.021135693938340232,
+      "value": 0.02113562411805488,
       "at": "turn t 0.20 s (male adult build +0.0)",
       "over": 8
      },
@@ -221,7 +221,7 @@
       "over": 2
      },
      "shown turn upperArm.R None": {
-      "value": 0.012239024043083191,
+      "value": 0.012239052914083004,
       "at": "turn t 0.20 s (male adult build +0.0)",
       "over": 5
      },
@@ -533,7 +533,7 @@
     },
     "cases": {
      "cloth dig chest None": {
-      "value": 0.03268418237960806,
+      "value": 0.03268651748991201,
       "at": "dig t 1.34 s (male adult build +0.0)",
       "over": 9
      },
@@ -553,7 +553,7 @@
       "over": 12
      },
      "cloth dig shoulder.L None": {
-      "value": 0.021058835089206696,
+      "value": 0.021054448559880257,
       "at": "dig t 1.12 s (male adult build +0.0)",
       "over": 12
      },
@@ -568,7 +568,7 @@
       "over": 12
      },
      "cloth dig upperArm.L None": {
-      "value": 0.03362325388301113,
+      "value": 0.03362797045008039,
       "at": "dig t 1.34 s (male adult build +0.0)",
       "over": 12
      },
@@ -724,7 +724,7 @@
       "over": 9
      },
      "cloth pickup upperArm.R None": {
-      "value": 0.012365834006943893,
+      "value": 0.0123620250056128,
       "at": "pickup t 1.70 s (female adult build -0.6)",
       "over": 4
      },
@@ -769,7 +769,7 @@
       "over": 1
      },
      "cloth pickup upperArm.L None": {
-      "value": 0.007091243489719483,
+      "value": 0.0070919781564866505,
       "at": "pickup t 1.55 s (female adult build -0.6)",
       "over": 1
      }
@@ -791,7 +791,7 @@
      "part": "chest"
     },
     "shown": {
-     "value": 0.012437041848897934,
+     "value": 0.012437073513865471,
      "at": "point t 0.20 s (male adult build +0.6)",
      "over": 12,
      "part": "upperArm.R"
@@ -846,7 +846,7 @@
       "over": 12
      },
      "shown point upperArm.R None": {
-      "value": 0.012437041848897934,
+      "value": 0.012437073513865471,
       "at": "point t 0.20 s (male adult build +0.6)",
       "over": 12
      },
@@ -873,7 +873,7 @@
     },
     "clips": {
      "cloth point": 0.06934838742017746,
-     "shown point": 0.012437041848897934,
+     "shown point": 0.012437073513865471,
      "hole point": 0.0,
      "cut point": 0.00849652849137783
     }
@@ -1131,7 +1131,522 @@
      "cut caught": 0.0
     }
    }
+  },
+  "suit": {
+   "g-coat-chest": {
+    "cloth": {
+     "value": 0.03176567007983172,
+     "at": "suit t 1.66 s (male adult build -0.6)",
+     "over": 6,
+     "part": "thigh.R"
+    },
+    "shown": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "hole": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "cut": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "inner": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "innerHole": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "checked": 8,
+    "checkedClips": {
+     "suit": 8
+    },
+    "cases": {
+     "cloth suit hand.R None": {
+      "value": 0.00595607883586298,
+      "at": "suit t 1.66 s (male adult build -0.6)",
+      "over": 1
+     },
+     "cloth suit hips None": {
+      "value": 0.02848678899429665,
+      "at": "suit t 1.66 s (male adult build -0.6)",
+      "over": 3
+     },
+     "cloth suit thigh.R None": {
+      "value": 0.03176567007983172,
+      "at": "suit t 1.66 s (male adult build -0.6)",
+      "over": 3
+     },
+     "cloth suit upperArm.L None": {
+      "value": 0.011055726256850858,
+      "at": "suit t 1.81 s (male adult build -0.6)",
+      "over": 3
+     },
+     "cloth suit hand.L None": {
+      "value": 0.007889779633206962,
+      "at": "suit t 2.29 s (male adult build -0.6)",
+      "over": 2
+     },
+     "cloth suit upperArm.R None": {
+      "value": 0.0060933340756991064,
+      "at": "suit t 2.44 s (male adult build -0.6)",
+      "over": 2
+     }
+    },
+    "clips": {
+     "cloth suit": 0.03176567007983172,
+     "shown suit": 0.0,
+     "hole suit": 0.0,
+     "cut suit": 0.0
+    }
+   }
+  },
+  "gown": {
+   "g-gown-chest": {
+    "cloth": {
+     "value": 0.036773044661786124,
+     "at": "gown t 2.13 s (female adult build +0.6)",
+     "over": 8,
+     "part": "shin.R"
+    },
+    "shown": {
+     "value": 0.009524903260171413,
+     "at": "gown t 1.66 s (female adult build +0.6)",
+     "over": 2,
+     "part": "thigh.R"
+    },
+    "hole": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "cut": {
+     "value": 0.005478656385093927,
+     "at": "gown t 1.66 s (female adult build +0.6)",
+     "over": 0,
+     "part": "thigh.R"
+    },
+    "inner": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "innerHole": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "checked": 8,
+    "checkedClips": {
+     "gown": 8
+    },
+    "cases": {
+     "cloth gown hand.R None": {
+      "value": 0.009110803768245882,
+      "at": "gown t 1.81 s (female adult build +0.6)",
+      "over": 3
+     },
+     "cloth gown shin.L None": {
+      "value": 0.036303091396622064,
+      "at": "gown t 2.13 s (female adult build +0.6)",
+      "over": 8
+     },
+     "cloth gown shin.R None": {
+      "value": 0.036773044661786124,
+      "at": "gown t 2.13 s (female adult build +0.6)",
+      "over": 7
+     },
+     "cloth gown thigh.R None": {
+      "value": 0.03568991571631974,
+      "at": "gown t 2.13 s (female adult build +0.6)",
+      "over": 5
+     },
+     "cloth gown upperArm.L None": {
+      "value": 0.01843649181421644,
+      "at": "gown t 1.81 s (female adult build +0.6)",
+      "over": 3
+     },
+     "shown gown thigh.R None": {
+      "value": 0.009524903260171413,
+      "at": "gown t 1.66 s (female adult build +0.6)",
+      "over": 2
+     },
+     "cloth gown thigh.L None": {
+      "value": 0.03396871105957221,
+      "at": "gown t 1.97 s (female adult build +0.6)",
+      "over": 2
+     },
+     "cloth gown hand.L None": {
+      "value": 0.011414065722368517,
+      "at": "gown t 2.29 s (female adult build +0.6)",
+      "over": 3
+     },
+     "cloth gown foot.L None": {
+      "value": 0.016668028700695482,
+      "at": "gown t 2.44 s (female adult build +0.6)",
+      "over": 3
+     },
+     "cloth gown upperArm.R None": {
+      "value": 0.007077096123048768,
+      "at": "gown t 2.44 s (female adult build +0.6)",
+      "over": 2
+     }
+    },
+    "clips": {
+     "cloth gown": 0.036773044661786124,
+     "shown gown": 0.009524903260171413,
+     "hole gown": 0.0,
+     "cut gown": 0.005478656385093927
+    }
+   }
+  },
+  "drill": {
+   "g-coat-chest": {
+    "cloth": {
+     "value": 0.03268581429208925,
+     "at": "drill t 1.66 s (male adult build +0.0)",
+     "over": 6,
+     "part": "thigh.R"
+    },
+    "shown": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "hole": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "cut": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "inner": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "innerHole": {
+     "value": 0.0,
+     "at": null,
+     "over": 0,
+     "part": null
+    },
+    "checked": 8,
+    "checkedClips": {
+     "drill": 8
+    },
+    "cases": {
+     "cloth drill hand.R None": {
+      "value": 0.005802205992735273,
+      "at": "drill t 1.66 s (male adult build +0.0)",
+      "over": 3
+     },
+     "cloth drill hips None": {
+      "value": 0.029926913813669565,
+      "at": "drill t 1.66 s (male adult build +0.0)",
+      "over": 3
+     },
+     "cloth drill thigh.R None": {
+      "value": 0.03268581429208925,
+      "at": "drill t 1.66 s (male adult build +0.0)",
+      "over": 3
+     },
+     "cloth drill upperArm.L None": {
+      "value": 0.012532585096204097,
+      "at": "drill t 1.81 s (male adult build +0.0)",
+      "over": 3
+     },
+     "cloth drill hand.L None": {
+      "value": 0.011775224823906789,
+      "at": "drill t 2.29 s (male adult build +0.0)",
+      "over": 3
+     },
+     "cloth drill upperArm.R None": {
+      "value": 0.0067331003981020866,
+      "at": "drill t 2.44 s (male adult build +0.0)",
+      "over": 2
+     }
+    },
+    "clips": {
+     "cloth drill": 0.03268581429208925,
+     "shown drill": 0.0,
+     "hole drill": 0.0,
+     "cut drill": 0.0
+    }
+   }
   }
  },
- "shells": {}
+ "shells": {
+  "suit": {
+   "g-trousersLong-waist": {
+    "own": {
+     "min": 0.0015084340647319862,
+     "max": 0.012000004765109975,
+     "under": 8,
+     "at": "suit t 1.66 s (male adult build -0.6)",
+     "off": 0.012
+    },
+    "other": {
+     "frames": 8,
+     "cases": [
+      [
+       0.010627742856740952,
+       "hips",
+       "hips",
+       "suit t 1.66 s (male adult build -0.6)"
+      ],
+      [
+       0.01061820425093174,
+       "hips",
+       "hips",
+       "suit t 1.81 s (male adult build -0.6)"
+      ],
+      [
+       0.010617095045745373,
+       "hips",
+       "hips",
+       "suit t 1.50 s (male adult build -0.6)"
+      ],
+      [
+       0.010609758086502552,
+       "hips",
+       "hips",
+       "suit t 1.97 s (male adult build -0.6)"
+      ],
+      [
+       0.010608792304992676,
+       "hips",
+       "hips",
+       "suit t 2.60 s (male adult build -0.6)"
+      ]
+     ]
+    },
+    "legacy": {
+     "g-coat-chest": {
+      "value": 0.0,
+      "at": null,
+      "frames": 0
+     }
+    },
+    "checked": 8
+   },
+   "g-shoes-feet": {
+    "own": {
+     "min": 0.0009184317067526593,
+     "max": 0.00900000462285989,
+     "under": 8,
+     "at": "suit t 1.81 s (male adult build -0.6)",
+     "off": 0.009000000000000001
+    },
+    "other": {
+     "frames": 8,
+     "cases": [
+      [
+       0.008953061886131763,
+       "toe.L",
+       "toe.L",
+       "suit t 2.29 s (male adult build -0.6)"
+      ],
+      [
+       0.008884094655513763,
+       "toe.L",
+       "toe.L",
+       "suit t 1.66 s (male adult build -0.6)"
+      ],
+      [
+       0.008838933892548084,
+       "toe.L",
+       "toe.L",
+       "suit t 2.44 s (male adult build -0.6)"
+      ],
+      [
+       0.008828978054225445,
+       "toe.L",
+       "toe.L",
+       "suit t 1.50 s (male adult build -0.6)"
+      ],
+      [
+       0.008828976191580296,
+       "toe.L",
+       "toe.L",
+       "suit t 2.60 s (male adult build -0.6)"
+      ]
+     ]
+    },
+    "legacy": {},
+    "checked": 8
+   }
+  },
+  "gown": {
+   "g-shoes-feet": {
+    "own": {
+     "min": 0.0003941758454885174,
+     "max": 0.009000008198150637,
+     "under": 8,
+     "at": "gown t 2.44 s (female adult build +0.6)",
+     "off": 0.009000000000000001
+    },
+    "other": {
+     "frames": 8,
+     "cases": [
+      [
+       0.00892831664532423,
+       "toe.R",
+       "toe.R",
+       "gown t 2.60 s (female adult build +0.6)"
+      ],
+      [
+       0.008512006141245365,
+       "toe.L",
+       "toe.L",
+       "gown t 1.66 s (female adult build +0.6)"
+      ],
+      [
+       0.008324259892106056,
+       "toe.L",
+       "toe.L",
+       "gown t 2.44 s (female adult build +0.6)"
+      ],
+      [
+       0.008324257098138332,
+       "toe.L",
+       "toe.L",
+       "gown t 1.50 s (female adult build +0.6)"
+      ],
+      [
+       0.0081925755366683,
+       "toe.L",
+       "toe.L",
+       "gown t 1.97 s (female adult build +0.6)"
+      ]
+     ]
+    },
+    "legacy": {},
+    "checked": 8
+   }
+  },
+  "drill": {
+   "g-trousersLong-waist": {
+    "own": {
+     "min": 0.0014625775397422598,
+     "max": 0.012000004765022214,
+     "under": 8,
+     "at": "drill t 1.66 s (male adult build +0.0)",
+     "off": 0.012
+    },
+    "other": {
+     "frames": 8,
+     "cases": [
+      [
+       0.010608663782477379,
+       "hips",
+       "hips",
+       "drill t 1.66 s (male adult build +0.0)"
+      ],
+      [
+       0.010598208755254745,
+       "hips",
+       "hips",
+       "drill t 1.81 s (male adult build +0.0)"
+      ],
+      [
+       0.010596378706395626,
+       "hips",
+       "hips",
+       "drill t 1.50 s (male adult build +0.0)"
+      ],
+      [
+       0.010588792152702808,
+       "hips",
+       "hips",
+       "drill t 1.97 s (male adult build +0.0)"
+      ],
+      [
+       0.010586725547909737,
+       "hips",
+       "hips",
+       "drill t 2.60 s (male adult build +0.0)"
+      ]
+     ]
+    },
+    "legacy": {
+     "g-coat-chest": {
+      "value": 0.0,
+      "at": null,
+      "frames": 0
+     }
+    },
+    "checked": 8
+   },
+   "g-boots-feet": {
+    "own": {
+     "min": 0.004393786456672253,
+     "max": 0.015000007704766526,
+     "under": 8,
+     "at": "drill t 1.97 s (male adult build +0.0)",
+     "off": 0.015
+    },
+    "other": {
+     "frames": 8,
+     "cases": [
+      [
+       0.009392615407705307,
+       "toe.R",
+       "toe.R",
+       "drill t 2.44 s (male adult build +0.0)"
+      ],
+      [
+       0.009361257776618004,
+       "toe.R",
+       "toe.R",
+       "drill t 1.50 s (male adult build +0.0)"
+      ],
+      [
+       0.009127291850745678,
+       "toe.L",
+       "foot.L",
+       "drill t 1.97 s (male adult build +0.0)"
+      ],
+      [
+       0.00820132251828909,
+       "toe.R",
+       "foot.R",
+       "drill t 2.60 s (male adult build +0.0)"
+      ],
+      [
+       0.007390896324068308,
+       "toe.L",
+       "toe.L",
+       "drill t 2.13 s (male adult build +0.0)"
+      ]
+     ]
+    },
+    "legacy": {},
+    "checked": 8
+   }
+  }
+ }
 }
