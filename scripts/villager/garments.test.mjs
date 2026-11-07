@@ -527,6 +527,26 @@ print(json.dumps({'rings': len(rings), 'short': len(s) // G.SLEEVE_RING, 'cuffEr
     expect(r.foreMin).toBeGreaterThan(0.03)
   })
 
+  it('winds every sleeve face outward, off the arm (the back-face shade darkened an inward one)', () => {
+    const r = py(`${ARM}
+def inward(long):
+  v, t, uv = G.sleeve(b, 'L', L, long=long)
+  bad = 0
+  for a, c, d in t:
+    m = (v[a] + v[c] + v[d]) / 3
+    n = np.cross(v[c] - v[a], v[d] - v[a])
+    # the nearest point on the arm's two bone segments
+    best = None
+    for p0, p1 in ((b.wp[iu], b.wp[il]), (b.wp[il], b.wp[ih])):
+      ax = (p1 - p0) / np.linalg.norm(p1 - p0)
+      q = p0 + np.clip((m - p0) @ ax, 0, np.linalg.norm(p1 - p0)) * ax
+      if best is None or np.linalg.norm(m - q) < np.linalg.norm(m - best): best = q
+    bad += int(n @ (m - best) <= 0)
+  return bad
+print(json.dumps({'short': inward(False), 'long': inward(True)}))`)
+    expect(r).toEqual({ short: 0, long: 0 })
+  })
+
   it('keeps the short sleeve as it was: three rings on the upper arm and the cap ring', () => {
     const r = py(`${ARM}
 v, t, uv = G.sleeve(b, 'L', L)

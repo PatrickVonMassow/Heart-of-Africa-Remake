@@ -1003,10 +1003,12 @@ def arm_sweep(rings, n=12):
             th = 2 * np.pi * (i % n) / n
             verts.append(p + rad * (np.cos(th) * e1 + np.sin(th) * e2))
             uv.append([i / n, k / (len(rings) - 1)])
+    # wound so the faces look outward (ax × e2 = -e1 pointed them in, and the
+    # material's back-face shade darkened the whole sleeve)
     for k in range(len(rings) - 1):
         for i in range(n):
             a0 = k * (n + 1) + i
-            tris += [[a0, a0 + n + 1, a0 + 1], [a0 + 1, a0 + n + 1, a0 + n + 2]]
+            tris += [[a0, a0 + 1, a0 + n + 1], [a0 + 1, a0 + n + 2, a0 + n + 1]]
     return np.array(verts), np.array(tris), np.array(uv)
 
 
