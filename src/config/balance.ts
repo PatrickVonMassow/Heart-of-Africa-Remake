@@ -2820,6 +2820,14 @@ export const VILLAGER_ASSET = {
     sleeveScale: 1.06,
     sleeveEase: 0.004,
     sleeveEaseStep: 0.002,
+    /** A long sleeve (the coat, the gown): where its cuff ends along the
+     *  forearm (0 elbow, 1 wrist joint), and its ease from the elbow down (m). */
+    longSleeveWrist: 0.92,
+    longSleeveEase: 0.007,
+    /** The tarboosh: its flat top above the crown (× stature) and the top's
+     *  radius as a share of the rim's. */
+    tarbooshRise: 0.05,
+    tarbooshTopScale: 0.82,
     /** A hugged garment edge (garments.edge_masks: a tube's top ring, a
      *  flap's top at the girdle, a sleeve's cap ring): a vertex standing off
      *  the drawn body by less than this (figure units, ≈ 5 cm) is pulled onto

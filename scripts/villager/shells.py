@@ -26,7 +26,14 @@ SHELLS = (
     ('g-neckBeads-neck', 1, lambda L: (L['neck'] - 0.008 * L['H'], L['neck'] + 0.002 * L['H'])),
     ('g-neckBeads-chest', 2, lambda L: (L['chestTop'] - 0.06 * L['H'], L['neck'] - 0.008 * L['H'])),
     ('g-waistBeads-waist', 3, lambda L: (L['hip'] + 0.013 * L['H'], L['hip'] + 0.027 * L['H'])),
+    # the 1890 Western dress (docs/giza-1890.md §4.1): the long trousers lie
+    # over the shoes' tops (higher rank), the boots over the trousers (tucked in)
+    ('g-trousersLong-waist', 3, lambda L: (long_hem(L), L['girdle'])),
+    ('g-shoes-feet', 2, lambda L: (FLOOR, shoe_top(L))),
+    ('g-boots-feet', 4, lambda L: (FLOOR, boot_top(L))),
 )
+# below every sole: a footwear region has no lower edge
+FLOOR = -1.0
 NAMES = [n for n, _r, _f in SHELLS]
 BIT = {n: k for k, n in enumerate(NAMES)}
 RANK = {n: r for n, r, _f in SHELLS}
@@ -35,6 +42,21 @@ RANK = {n: r for n, r, _f in SHELLS}
 def hem(L):
     """The trousers' hem: half way from the knee to the ankle (both legs)."""
     return L['knee'] - 0.5 * (L['knee'] - L['ankle'])
+
+
+def long_hem(L):
+    """The long trousers' hem: just above the ankle joint, over the shoe's top."""
+    return L['ankle'] + 0.012 * L['H']
+
+
+def shoe_top(L):
+    """The shoe's top edge, a little above the ankle joint."""
+    return L['ankle'] + 0.02 * L['H']
+
+
+def boot_top(L):
+    """The boot's top edge: below the calf's widest, as a laced ankle boot."""
+    return L['ankle'] + 0.4 * (L['knee'] - L['ankle'])
 
 
 def intervals(L):
@@ -48,7 +70,8 @@ def cuts(L):
     # and hem (garments.breast_cloth_span)
     ys = [L['girdle'], L['hip'] + 0.013 * H, L['hip'] + 0.027 * H, hem(L), L['chestTop'], L['girdle'] - 0.01 * H,
           L['shoulder'] - 0.045 * H,
-          L['chestTop'] - 0.06 * H, L['neck'] - 0.008 * H, L['neck'] + 0.002 * H]
+          L['chestTop'] - 0.06 * H, L['neck'] - 0.008 * H, L['neck'] + 0.002 * H,
+          long_hem(L), shoe_top(L), boot_top(L)]
     return [('y', y, None) for y in ys] + [('arm', ARM_LEVEL, (hem(L), L['neck'] + 0.002 * H))]
 
 
@@ -96,7 +119,7 @@ def boundary_loops(tris, faces):
 
 
 def recipes(body, L, cfg):
-    """The four shell entries of garments['meshes'] (no geometry: a recipe)."""
+    """The shell entries of garments['meshes'] (no geometry: a recipe)."""
     a = cfg['VILLAGER_ASSET']
     fm = face_masks(body['region_bits'], body['tris'])
     out = {}
