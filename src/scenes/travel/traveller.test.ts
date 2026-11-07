@@ -1,12 +1,13 @@
 // The bird's-eye traveller on the villagers' figure body (work-order "Giza
 // figures and traveller"): the shared Figure at villager stature, dressed in
-// the European cast's khaki, never named by the Ctrl layer, with his wound
+// the expedition cast's khaki drill and boots, never named by the Ctrl layer, with his wound
 // marks, canoe kneel and swim float wired to that body.
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { appearanceFor } from '../../systems/appearance'
+import { appearanceFor, CAST_DRESS } from '../../systems/appearance'
+import { garmentMeshName } from '../../render/villagerFigureBody'
 import { markActor, pushMarkedActors, type LabelledActor } from '../actorLabelSource'
 import { qualifiesAsActor } from '../../systems/actorLabels'
 import { TRAVELLER_LOOK } from '../../config/balance'
@@ -21,17 +22,20 @@ describe("the traveller on the villagers' figure body", () => {
     expect(player).toMatch(/<Figure\b/)
     // no scale: he stands at FIGURE_STATURE like a villager
     expect(/<Figure[^>]*\bscale=/.test(player)).toBe(false)
-    expect(player).toContain("useFigureLook(null, TRAVELLER_PALETTE, 'european')")
+    expect(player).toContain("useFigureLook(null, TRAVELLER_PALETTE, 'expedition')")
     // The former box torso, belt and cylinder legs are gone.
     expect(player).not.toMatch(/Torso \(khaki jacket\)|Belt \*\/|<group ref=\{legs\}>/)
   })
 
-  it('wears the European cast’s khaki suit; the sun helmet rides his crown', () => {
-    const layers = appearanceFor({ peopleId: 'european', sex: 'male', age: 'adult', drivers: { coldness: 1, harmattan: 1, karif: 1 }, year: 1890, cloth: TRAVELLER_LOOK.khaki, palette: [TRAVELLER_LOOK.khaki], pick: 0.5 })
+  it('wears the expedition cast’s khaki drill and boots; the sun helmet rides his crown', () => {
+    const layers = appearanceFor({ peopleId: 'expedition', sex: 'male', age: 'adult', drivers: { coldness: 1, harmattan: 1, karif: 1 }, year: 1890, cloth: TRAVELLER_LOOK.khaki, palette: [TRAVELLER_LOOK.khaki], pick: 0.5 })
+    // docs/giza-1890.md §4.1: khaki jacket with long sleeves, long trousers, boots
     expect(layers.map((l) => [l.form, l.colour])).toEqual([
-      ['trousers', TRAVELLER_LOOK.khaki],
-      ['shirt', TRAVELLER_LOOK.khaki],
+      ['trousersLong', TRAVELLER_LOOK.khaki],
+      ['coat', TRAVELLER_LOOK.khaki],
+      ['boots', CAST_DRESS.expedition.male.adult.find((l) => l.form === 'boots')!.colour],
     ])
+    expect(layers.map(garmentMeshName)).toEqual(['g-trousersLong-waist', 'g-coat-chest', 'g-boots-feet'])
     expect(player).toMatch(/headProp=\{\s*<SunHelmet/)
   })
 

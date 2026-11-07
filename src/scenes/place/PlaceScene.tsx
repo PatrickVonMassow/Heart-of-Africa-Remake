@@ -2377,7 +2377,7 @@ function Donkey() {
  * monuments), paired with GIZA_AMBIENT's roles; each figure idles and looks
  * slowly around (no mechanics).
  */
-function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role: GizaAmbientRole; sex?: 'female' | 'male' }> }) {
+function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role: GizaAmbientRole; sex?: 'female' | 'male'; dragoman?: boolean }> }) {
   const groundHeight = usePlaceGround()
   const refs = useRef<Array<THREE.Group | null>>([])
   const phases = useMemo(() => anchors.map((_, i) => i * 1.7 + 0.3), [anchors])
@@ -2387,8 +2387,10 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
   const placeId = useGame((s) => s.placeId)
   const looks = {
     egyptian: useFigureLook(placeId, GIZA_PALETTE, 'egyptian'),
+    dragoman: useFigureLook(placeId, GIZA_PALETTE, 'dragoman'),
     bedouin: useFigureLook(placeId, GIZA_PALETTE, 'bedouin'),
     european: useFigureLook(placeId, GIZA_PALETTE, 'european'),
+    expedition: null,
   }
   const limbSegments = useUi(effectiveFigureLimbSegments)
   useFrame(({ clock }) => {
@@ -2401,11 +2403,11 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
       g.position.y = groundHeight(a.x, a.z)
     })
   })
-  const figureFor = (a: { role: GizaAmbientRole; sex?: 'female' | 'male' }) => {
+  const figureFor = (a: { role: GizaAmbientRole; sex?: 'female' | 'male'; dragoman?: boolean }) => {
     if (a.role === 'camel') return <Camel />
     if (a.role === 'donkey') return <Donkey />
     if (!isGizaPerson(a.role)) return null
-    const spec = gizaFigure(a.role, a.sex)
+    const spec = gizaFigure(a.role, a.sex, a.dragoman)
     const hat =
       spec.hat === 'sunHelmet' ? (
         <SunHelmet colour={GIZA_CAST.sunHelmet} />
@@ -3413,7 +3415,7 @@ export function PlaceScene() {
       {isMonument && (
         <PlaceDumpGroup id="giza-ambient" kind="giza-ambient">
           <GizaAmbient
-            anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex }))}
+            anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex, dragoman: GIZA_AMBIENT[i]?.dragoman }))}
           />
         </PlaceDumpGroup>
       )}
