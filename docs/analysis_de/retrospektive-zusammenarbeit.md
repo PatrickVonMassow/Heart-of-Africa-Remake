@@ -1752,7 +1752,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 07.11.2026, 02:00 · Quellen-Fingerprint: `c59842bcbcb1…`
+Zuletzt aktualisiert: Samstag, 07.11.2026, 03:24 · Quellen-Fingerprint: `c7315ad6d742…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1852,7 +1852,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 3 | mittel | — (Regel/Memory) | ◐ Regel |
-| Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A user order from a session that cannot write the work order goes into the findings carrier as a --request, never into a fire-and-forget peer message | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1872,8 +1872,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 184 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: c59842bcbcb1ce94283e5343f55e2dc601c42dda927585fa176bd040d1ac54a1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-07T01:00:27.509Z -->
+<!-- RETRO-FINGERPRINT: c7315ad6d742f30ab31a0013af385bbcd8c9044db90b76473c5081e8d0b9b795 -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-07T02:24:01.339Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
