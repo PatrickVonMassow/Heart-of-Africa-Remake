@@ -2,8 +2,8 @@
 
 Every inserted vertex against the point of its parent triangle, and the centroid and edge midpoints of every split triangle against the split surface, posed along the game path through every exported clip frame at every body corner (scripts/villager/fit.py `split_regression`), against the band-subdivided uncut body (body.py `subdivide`). Figure units; the garments step fails above VILLAGER_ASSET.bodySplit.gateLimit in any clip but the kneel family (fit.py `split_gate`).
 
-- inserted vertices: 2878, split triangles: 2803, posed frames: 6690
-- worst inserted vertex: 0.00267; over 1 mm: 31; at 3 mm or more: 0
+- inserted vertices: 3199, split triangles: 3076, posed frames: 6690
+- worst inserted vertex: 0.00267; over 1 mm: 41; at 3 mm or more: 0
 - worst split-triangle sample: 0.00183
 - cut edges snapped to their nearer end: 11
 
@@ -27,5 +27,5 @@ shells.selftest_body raises unless every seam edge face adjacency derives carrie
 
 - g-neckBeads-neck+g-neckBeads-chest: g-neckBeads-neck loop 1 (181 vertices) sees ['g-neckBeads-chest', 'skin']
 - g-neckBeads-neck+g-neckBeads-chest: g-neckBeads-chest loop 1 (515 vertices) sees ['g-neckBeads-neck', 'skin']
-- g-trousers-waist+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist: g-neckBeads-neck loop 1 (181 vertices) sees ['g-neckBeads-chest', 'skin']
-- g-trousers-waist+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist: g-neckBeads-chest loop 1 (515 vertices) sees ['g-neckBeads-neck', 'skin']
+- g-trousers-waist+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist+g-trousersLong-waist+g-shoes-feet+g-boots-feet: g-neckBeads-neck loop 1 (181 vertices) sees ['g-neckBeads-chest', 'skin']
+- g-trousers-waist+g-neckBeads-neck+g-neckBeads-chest+g-waistBeads-waist+g-trousersLong-waist+g-shoes-feet+g-boots-feet: g-neckBeads-chest loop 1 (515 vertices) sees ['g-neckBeads-neck', 'skin']
