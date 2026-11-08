@@ -132,6 +132,12 @@ def main():
     CL.selftest()
     import gamepath as GP
     GP.selftest_shell_round_trip()
+    GP.selftest_column_driver()
+    GP.selftest_column_scale()
+    GP.selftest_column_ground_panel()
+    GP.selftest_column_ground_blend()
+    GP.selftest_column_round_trip_finite()
+    GP.selftest_column_round_trip_nonempty()
     import sheets as SH
     SH.selftest_hand_layout()
     if 'garments' in steps or 'selftest' in steps:
@@ -202,6 +208,8 @@ def main():
         if garments is not None:
             # raises on an export missing a built shell (or carrying one not built)
             GP.shell_round_trip(body, garments, rt, cfg)
+        # the column driver's mirror replays the game's sequences (raises on a miss)
+        GP.column_round_trip(rt)
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)

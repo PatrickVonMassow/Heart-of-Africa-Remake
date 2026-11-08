@@ -289,12 +289,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "803": {
-      "at": "2026-08-21T02:07:14.003Z",
-      "why": "Bleibt hinten: Die Sperre löst sich, sobald der Agent fertig ist und erneut gepusht wird — heute genau so gemessen — also kostet sie einen Wiederholungslauf, nicht einen Punkt Vorrang.",
-      "origin": "machine",
-      "place": "last"
-    },
     "804": {
       "at": "2026-08-21T05:01:34.649Z",
       "why": "Medium, no product defect and nothing blocked: the four-eyes gate reports less than it knows but still reports, so it waits behind the release like every other machine-filed medium.",
@@ -1795,21 +1789,39 @@
       "origin": "machine",
       "place": "last"
     },
-    "1477": {
-      "at": "2026-11-01T11:13:31.196Z",
-      "why": "a defect found by the 1347 bisect; it stays in the village-life bundle behind the garment stages it must not run beside",
-      "origin": "machine",
-      "place": "last"
-    },
     "1479": {
       "at": "2026-11-02T06:07:33.734Z",
       "why": "low-criticality residual of 1478; behind the open medium/high Dorfleben points",
       "origin": "machine",
       "place": "last"
     },
-    "1481": {
-      "at": "2026-11-03T00:08:30.897Z",
-      "why": "a doctor guard fix behind 1467 in the same bundle; it blocks no point, the delegate already recovers by hand",
+    "1483": {
+      "at": "2026-11-03T04:36:52.830Z",
+      "why": "a guard data-risk fix in Session- & Repo-Hygiene; it blocks no point and nobody follows the wrong order now that it is filed",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1484": {
+      "at": "2026-11-03T13:07:55.414Z",
+      "why": "infra hygiene behind the active garment point; it blocks no point while agent checks fetch by hand",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1488": {
+      "at": "2026-11-05T17:58:01.406Z",
+      "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1489": {
+      "at": "2026-11-05T17:58:01.535Z",
+      "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1490": {
+      "at": "2026-11-05T17:58:01.663Z",
+      "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
       "origin": "machine",
       "place": "last"
     }
@@ -1841,7 +1853,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-03T00:08:30.910Z",
+    "at": "2026-11-07T02:09:15.698Z",
     "points": [
       184,
       200,
@@ -2033,7 +2045,6 @@
       798,
       799,
       802,
-      803,
       804,
       806,
       807,
@@ -2283,8 +2294,6 @@
       1395,
       1396,
       1397,
-      1399,
-      1400,
       1422,
       1423,
       1425,
@@ -2310,10 +2319,12 @@
       1473,
       1474,
       1476,
-      1477,
       1479,
-      1480,
-      1481
+      1483,
+      1484,
+      1488,
+      1489,
+      1490
     ]
   }
 }

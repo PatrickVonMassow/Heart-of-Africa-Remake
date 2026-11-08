@@ -24,6 +24,7 @@ import {
   type BoneName,
 } from '../../render/figureBody'
 import type { VillagerAsset } from '../../render/villagerAsset'
+import { carriesColumnWeight, ColumnDriver, columnRig } from '../../render/villagerSkirtDriver'
 import { restBounds } from '../../render/villagerBody'
 import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { gaitWeights } from '../../render/villagerRig'
@@ -47,7 +48,7 @@ import {
   type WalkMotion,
   type WalkPose,
 } from '../../render/figureWalk'
-import { VILLAGER_MOTION, VILLAGER_POSE } from '../../config/balance'
+import { VILLAGER_ASSET, VILLAGER_MOTION, VILLAGER_POSE } from '../../config/balance'
 import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
@@ -178,6 +179,8 @@ interface Rig {
   hands: [THREE.Object3D, THREE.Object3D]
   /** The glTF body's asset and person, whose clips this figure plays. */
   gltf: { asset: VillagerAsset; person: GltfPerson } | null
+  /** The column driver (render/villagerSkirtDriver.ts), only for a body carrying column weight. */
+  driver: ColumnDriver | null
 }
 
 function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string, office?: 'chief', dress?: readonly DressLayer[]): Rig {
@@ -247,6 +250,8 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     crown,
     hands: [hand('L', 'hand-left'), hand('R', 'hand-right')],
     gltf: asset && person ? { asset, person } : null,
+    // a new rig (a changed form among them) starts its driver from the gravity solution
+    driver: asset && person && carriesColumnWeight(asset, geo) ? new ColumnDriver(columnRig(asset, person)) : null,
   }
 }
 
@@ -401,6 +406,8 @@ export function SkinnedFigure({
   // The gaze (natural-villager-motion step 9): what the head looks at, damped
   // frame by frame toward what the pose wants; tighter under a head load.
   const gaze = useRef(newGaze())
+  // the column driver's frame: its dt and a count, so a second retarget in one frame re-solves it
+  const columnFrame = useRef({ n: 0, dt: 0, at: null as THREE.Vector3 | null })
   const gazeTight = useRef(1)
   // THE LEGS AND HIPS from the walk, the work crouch and the kneel — one
   // function, so the frame callback and an owning caller's retarget both
@@ -855,6 +862,8 @@ export function SkinnedFigure({
         } else anchor.quaternion.identity()
         anchor.updateWorldMatrix(false, true)
       })
+      // THE COLUMNS last: after every writer of the hips and the legs
+      if (rig.driver) rig.driver.stepFrame(rig.skeleton.bones, columnFrame.current.dt, columnFrame.current.n)
     }
   }, [rig, dims, pose, squat, poseLegs, headSteady, kneel, kneeling, clips])
 
@@ -871,6 +880,9 @@ export function SkinnedFigure({
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
+    // the unclamped step: a long gap re-enters the column solve (driver resetDt)
+    columnFrame.current.n++
+    columnFrame.current.dt = rawDt
     const m = motion.current
     // THE FIGURE'S OWN GROUND SPEED, measured where it is drawn: every walker
     // gets its stride from how fast it really goes, whoever moves it.
@@ -879,6 +891,10 @@ export function SkinnedFigure({
     if (g && dt > 0 && !isLifeFrozen()) {
       g.updateWorldMatrix(true, false)
       g.getWorldPosition(_here)
+      // a figure placed rather than walked re-enters the column solve from its gravity solution
+      const cf = columnFrame.current
+      if (rig.driver && cf.at && cf.at.distanceTo(_here) > VILLAGER_ASSET.drivenGarments.driver.teleport) rig.driver.reset()
+      ;(cf.at ??= new THREE.Vector3()).copy(_here)
       const unit = g.getWorldScale(_scale).x || 1
       g.getWorldDirection(_facing)
       // The hips' place and each thigh's offset in the hips' frame:

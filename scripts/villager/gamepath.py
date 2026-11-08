@@ -506,3 +506,1084 @@ def runtime_tool(frame):
     if not t or not t['visible']:
         return None
     return np.asarray(t['matrix'], float).reshape(4, 4).T
+
+
+# ---------------------------------------------------------------------------
+# THE COLUMN DRIVER MIRROR (docs/garment-stage3-plan-1398.md sections 3.4 to
+# 3.7): src/render/villagerSkirtDriver.ts `ColumnDriver`, step for step, on
+# plain lists (column-major 4×4 matrices as three stores them). It replays a
+# fixed-dt sequence statefully from the reset state; `column_round_trip`
+# compares its column locals with the game's export within 1e-4.
+
+_DEG = math.pi / 180
+
+
+def _sub(a, b):
+    return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+
+
+def _add(a, b):
+    return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+
+
+def _mul(a, s):
+    return [a[0] * s, a[1] * s, a[2] * s]
+
+
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _cross(a, b):
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+
+
+def _len(a):
+    return math.sqrt(_dot(a, a))
+
+
+def _norm(a):
+    n = _len(a) or 1.0
+    return _mul(a, 1.0 / n)
+
+
+def _at(a, i):
+    return [a[i * 3], a[i * 3 + 1], a[i * 3 + 2]]
+
+
+def col_rotate(v, k, th):
+    """Rodrigues: v turned by th about the unit axis k (right-handed)."""
+    c = math.cos(th)
+    s = math.sin(th)
+    kv = _cross(k, v)
+    kd = _dot(k, v) * (1 - c)
+    return [v[0] * c + kv[0] * s + k[0] * kd, v[1] * c + kv[1] * s + k[1] * kd, v[2] * c + kv[2] * s + k[2] * kd]
+
+
+def _xform(m, p):
+    return [m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
+            m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
+            m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]]
+
+
+def _xdir(m, p):
+    return [m[0] * p[0] + m[4] * p[1] + m[8] * p[2],
+            m[1] * p[0] + m[5] * p[1] + m[9] * p[2],
+            m[2] * p[0] + m[6] * p[1] + m[10] * p[2]]
+
+
+def _apply(m, p):
+    """three's Vector3.applyMatrix4 (with the perspective divide)."""
+    w = 1.0 / (m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15])
+    return [(m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]) * w,
+            (m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]) * w,
+            (m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]) * w]
+
+
+def _compose(p, q, s):
+    """three's Matrix4.compose (column-major)."""
+    x, y, z, w = q
+    x2, y2, z2 = x + x, y + y, z + z
+    xx, xy, xz = x * x2, x * y2, x * z2
+    yy, yz, zz = y * y2, y * z2, z * z2
+    wx, wy, wz = w * x2, w * y2, w * z2
+    sx, sy, sz = s
+    return [(1 - (yy + zz)) * sx, (xy + wz) * sx, (xz - wy) * sx, 0.0,
+            (xy - wz) * sy, (1 - (xx + zz)) * sy, (yz + wx) * sy, 0.0,
+            (xz + wy) * sz, (yz - wx) * sz, (1 - (xx + yy)) * sz, 0.0,
+            p[0], p[1], p[2], 1.0]
+
+
+def _matmul(a, b):
+    r = [0.0] * 16
+    for c in range(4):
+        for rr in range(4):
+            s = 0.0
+            for k in range(4):
+                s += a[k * 4 + rr] * b[c * 4 + k]
+            r[c * 4 + rr] = s
+    return r
+
+
+def _inverse(m):
+    a = np.array(m, float).reshape(4, 4).T
+    return np.linalg.inv(a).T.ravel().tolist()
+
+
+def _axis_quat(axis, th):
+    s = math.sin(th / 2)
+    return [axis[0] * s, axis[1] * s, axis[2] * s, math.cos(th / 2)]
+
+
+def col_point_segment(p, a, b):
+    ab = _sub(b, a)
+    l2 = _dot(ab, ab)
+    t = min(1.0, max(0.0, _dot(_sub(p, a), ab) / l2)) if l2 > 0 else 0.0
+    return _len(_sub(p, _add(a, _mul(ab, t))))
+
+
+def col_segment_segment(p1, q1, p2, q2):
+    """Ericson 5.1.9, as villagerSkirtDriver.ts segmentSegment."""
+    d1 = _sub(q1, p1)
+    d2 = _sub(q2, p2)
+    r = _sub(p1, p2)
+    a = _dot(d1, d1)
+    e = _dot(d2, d2)
+    f = _dot(d2, r)
+    eps = 1e-12
+    if a <= eps and e <= eps:
+        return _len(r)
+    if a <= eps:
+        s = 0.0
+        t = min(1.0, max(0.0, f / e))
+    else:
+        c = _dot(d1, r)
+        if e <= eps:
+            t = 0.0
+            s = min(1.0, max(0.0, -c / a))
+        else:
+            b = _dot(d1, d2)
+            den = a * e - b * b
+            s = min(1.0, max(0.0, (b * f - c * e) / den)) if den > eps else 0.0
+            t = (b * s + f) / e
+            if t < 0:
+                t = 0.0
+                s = min(1.0, max(0.0, -c / a))
+            elif t > 1:
+                t = 1.0
+                s = min(1.0, max(0.0, (b - c) / a))
+    return _len(_sub(_add(p1, _mul(d1, s)), _add(p2, _mul(d2, t))))
+
+
+def col_point_triangle(p, a, b, c):
+    """Ericson 5.1.5, as villagerSkirtDriver.ts pointTriangle."""
+    ab = _sub(b, a)
+    ac = _sub(c, a)
+    ap = _sub(p, a)
+    d1 = _dot(ab, ap)
+    d2 = _dot(ac, ap)
+    if d1 <= 0 and d2 <= 0:
+        return a
+    bp = _sub(p, b)
+    d3 = _dot(ab, bp)
+    d4 = _dot(ac, bp)
+    if d3 >= 0 and d4 <= d3:
+        return b
+    vc = d1 * d4 - d3 * d2
+    if vc <= 0 and d1 >= 0 and d3 <= 0:
+        return _add(a, _mul(ab, d1 / (d1 - d3)))
+    cp = _sub(p, c)
+    d5 = _dot(ab, cp)
+    d6 = _dot(ac, cp)
+    if d6 >= 0 and d5 <= d6:
+        return c
+    vb = d5 * d2 - d1 * d6
+    if vb <= 0 and d2 >= 0 and d6 <= 0:
+        return _add(a, _mul(ac, d2 / (d2 - d6)))
+    va = d3 * d6 - d5 * d4
+    if va <= 0 and d4 - d3 >= 0 and d5 - d6 >= 0:
+        return _add(b, _mul(_sub(c, b), (d4 - d3) / (d4 - d3 + (d5 - d6))))
+    den = 1 / (va + vb + vc)
+    return _add(a, _add(_mul(ab, vb * den), _mul(ac, vc * den)))
+
+
+def col_segment_triangle(p, q, a, b, c):
+    e1 = _sub(b, a)
+    e2 = _sub(c, a)
+    d = _sub(q, p)
+    h = _cross(d, e2)
+    det = _dot(e1, h)
+    if abs(det) > 1e-14:
+        s = _sub(p, a)
+        u = _dot(s, h) / det
+        qv = _cross(s, e1)
+        v = _dot(d, qv) / det
+        t = _dot(e2, qv) / det
+        if u >= 0 and v >= 0 and u + v <= 1 and 0 <= t <= 1:
+            return 0.0
+    return min(_len(_sub(p, col_point_triangle(p, a, b, c))), _len(_sub(q, col_point_triangle(q, a, b, c))),
+               col_segment_segment(p, q, a, b), col_segment_segment(p, q, b, c), col_segment_segment(p, q, c, a))
+
+
+def _wrap(a):
+    t = math.fmod(a, 2 * math.pi)
+    return t + 2 * math.pi if t < 0 else t
+
+
+def _angle_dist(a, b):
+    d = _wrap(a - b)
+    return min(d, 2 * math.pi - d)
+
+
+class PelvisProfile:
+    """villagerSkirtDriver.ts PelvisProfile: per column and height bin the
+    largest posed radius among the samples posed there; empty bins from the
+    nearest populated one (same column first, lower on a tie; else other
+    columns by angle, then height, larger value on a tie)."""
+
+    def __init__(self, angles, bottom, top, bin_):
+        self.angles = list(angles)
+        self.bottom = bottom
+        self.top = top
+        self.bin = bin_
+        self.columns = len(self.angles)
+        self.bins = max(1, math.ceil((top - bottom) / bin_ - 1e-9))
+        self.value = [0.0] * (self.columns * self.bins)
+
+    def column(self, a):
+        best, bd = 0, math.inf
+        for k, c in enumerate(self.angles):
+            d = _angle_dist(a, c)
+            if d < bd - 1e-12:
+                bd, best = d, k
+        return best
+
+    def bin_of(self, y):
+        return min(self.bins - 1, max(0, math.floor((y - self.bottom) / self.bin)))
+
+    def rebuild(self, samples):
+        nb = self.bins
+        filled = [0] * (self.columns * nb)
+        self.value = [0.0] * (self.columns * nb)
+        for a, y, r in samples:
+            i = self.column(a) * nb + self.bin_of(y)
+            if not filled[i] or r > self.value[i]:
+                self.value[i] = r
+            filled[i] = 1
+        out = list(self.value)
+        for k in range(self.columns):
+            for b in range(nb):
+                if filled[k * nb + b]:
+                    continue
+                found = -1
+                d = 1
+                while d < nb and found < 0:
+                    if b - d >= 0 and filled[k * nb + b - d]:
+                        found = k * nb + b - d
+                    elif b + d < nb and filled[k * nb + b + d]:
+                        found = k * nb + b + d
+                    d += 1
+                if found >= 0:
+                    out[k * nb + b] = self.value[found]
+                    continue
+                best, ba, bh = -1, math.inf, math.inf
+                for j in range(self.columns):
+                    if j == k:
+                        continue
+                    da = _angle_dist(self.angles[j], self.angles[k])
+                    for c in range(nb):
+                        i = j * nb + c
+                        if not filled[i]:
+                            continue
+                        dh = abs(c - b)
+                        if da < ba - 1e-12 or (abs(da - ba) <= 1e-12 and (dh < bh or (dh == bh and self.value[i] > self.value[best]))):
+                            best, ba, bh = i, da, dh
+                if best < 0:
+                    raise RuntimeError('PelvisProfile: no populated bin')
+                out[k * nb + b] = self.value[best]
+        self.value = out
+
+    def query(self, a, y):
+        n = self.columns
+        order = sorted(((_wrap(c), k) for k, c in enumerate(self.angles)), key=lambda x: x[0])
+        aw = _wrap(a)
+        k0 = k1 = 0
+        f = 0.0
+        for i in range(n):
+            pc, pk = order[i]
+            qc, qk = order[(i + 1) % n]
+            span = qc - pc if i + 1 < n else qc + 2 * math.pi - pc
+            d = aw - pc if aw >= pc else aw + 2 * math.pi - pc
+            if d <= span + 1e-12:
+                k0, k1 = pk, qk
+                f = d / span if span > 0 else 0.0
+                break
+        return (1 - f) * self._column_at(k0, y) + f * self._column_at(k1, y)
+
+    def _column_at(self, k, y):
+        nb = self.bins
+        c = (y - self.bottom) / self.bin - 0.5
+        if c <= 0:
+            return self.value[k * nb]
+        if c >= nb - 1:
+            return self.value[k * nb + nb - 1]
+        b = math.floor(c)
+        t = c - b
+        return (1 - t) * self.value[k * nb + b] + t * self.value[k * nb + b + 1]
+
+
+def _skin_point(p, idx, w, o, M, rest, override=None):
+    x = y = z = 0.0
+    for c in range(4):
+        wt = w[o + c]
+        if not wt > 0:
+            continue
+        i = idx[o + c]
+        m = (override(i) if override else None) or M[i]
+        q = _xform(m, [p[0] - rest[i * 3], p[1] - rest[i * 3 + 1], p[2] - rest[i * 3 + 2]])
+        x += q[0] * wt
+        y += q[1] * wt
+        z += q[2] * wt
+    return [x, y, z]
+
+
+def _sign(x):
+    return (x > 0) - (x < 0)
+
+
+class ColumnDriver:
+    """villagerSkirtDriver.ts ColumnDriver: segment s < n is the upper of
+    column s, else the lower of column s − n. `rig` is the game's ColumnRig
+    (exported as JSON), `cfg` VILLAGER_ASSET.drivenGarments.driver."""
+
+    def __init__(self, rig, cfg):
+        self.rig = rig
+        self.cfg = cfg
+        self.n = len(rig['upper'])
+        self.theta = [0.0] * (2 * self.n)
+        self.held = [0] * (2 * self.n)
+        self.hold = [0] * (2 * self.n)
+        self.cur = [0.0] * (2 * self.n)
+        self.violation = [0.0] * (2 * self.n)
+        self.counters = {'frames': 0, 'residual': 0, 'groundFallback': 0, 'repairs': 0, 'jointSearches': 0, 'rateBreaks': 0}
+        self.fresh = True
+        self.dt = 0.0
+        self.rated = True
+        self.P = None
+        self.carried = self._carried_sets()
+
+    def reset(self):
+        self.fresh = True
+
+    # ----- frames -----
+    def compose(self, bones):
+        """Figure-frame matrices from the bone locals [{p, q, s}] (composeFigureMatrices)."""
+        rig = self.rig
+        M = [None] * rig['bones']
+        for i in rig['order']:
+            b = bones[i]
+            m = _compose(b['p'], b['q'], b['s'])
+            p = rig['parents'][i]
+            M[i] = m if p < 0 else _matmul(M[p], m)
+        return M
+
+    def step(self, bones, dt):
+        """One frame: solve, then return the 24 column locals [{p, q, s}] (upper then lower)."""
+        self.solve(bones, dt)
+        return self.locals()
+
+    def solve(self, bones, dt):
+        cfg = self.cfg
+        reset = self.fresh or not dt > 0 or dt > cfg['resetDt']
+        self.dt = 0.0 if reset else dt
+        self.rated = not reset
+        self.P = self._pose(bones)
+        if reset:
+            for s in range(2 * self.n):
+                self.theta[s] = 0.0 if s < self.n else self.P['gravity'][s - self.n]
+                self.held[s] = 0
+            self.fresh = False
+        self.cur = list(self.theta)
+        self.hold = list(self.held)
+        for _pass in range(2):
+            for s in range(2 * self.n):
+                self.cur[s] = self._search(s, False)
+        self._final_evaluation()
+        self.counters['frames'] += 1
+        lim = cfg['omegaMax'] * _DEG * self.dt
+        for s in range(2 * self.n):
+            if self.rated and abs(self.cur[s] - self.theta[s]) > lim + 1e-12:
+                self.counters['rateBreaks'] += 1
+            self.theta[s] = self.cur[s]
+            self.held[s] = 1 if self.hold[s] and self.cur[s] > cfg['thetaMax'] * _DEG + 1e-9 else 0
+        return self.theta
+
+    def locals(self):
+        P = self.P
+        rig = self.rig
+        up, lo = [], []
+        for k in range(self.n):
+            axis = rig['tangent'][k]
+            up.append({'p': _apply(P['hipsInv'], P['head'][k]), 'q': _axis_quat(axis, self.theta[k]), 's': [1.0, 1.0, 1.0]})
+            lo.append({'p': list(rig['upperOffset'][k]), 'q': _axis_quat(axis, self.theta[self.n + k] - self.theta[k]), 's': [1.0, 1.0, 1.0]})
+        return up + lo
+
+    def _pose(self, bones):
+        rig = self.rig
+        cfg = self.cfg
+        M = self.compose(bones)
+        hipsM = M[rig['hips']]
+        hips_at = _at(rig['rest'], rig['hips'])
+        up = _norm(_xdir(hipsM, [0, 1, 0]))
+        hipsInv = _inverse(hipsM)
+        form = rig.get('form')
+        head, radial, tangent = [], [], []
+        for k in range(self.n):
+            radial.append(_norm(_xdir(hipsM, rig['radial'][k])))
+            tangent.append(_norm(_xdir(hipsM, rig['tangent'][k])))
+            if form:
+                an = form['anchors'][k]
+                pa = _skin_point(an['a'], an['ia'], an['wa'], 0, M, rig['rest'])
+                pb = _skin_point(an['b'], an['ib'], an['wb'], 0, M, rig['rest'])
+                head.append(_add(_mul(pa, 1 - an['t']), _mul(pb, an['t'])))
+            else:
+                head.append(_xform(hipsM, rig['headOffset'][k]))
+        caps = []
+        for c in rig['capsules']:
+            m = M[c['bone']]
+            r = _at(rig['rest'], c['bone'])
+            caps.append((_xform(m, _sub(c['a'], r)), _xform(m, _sub(c['b'], r)), c['radius']))
+        angles = [math.atan2(r[2], r[0]) for r in rig['radial']]
+        pr = rig['profile']
+        profile = PelvisProfile(angles, pr['bottom'], pr['top'], pr['bin'])
+        pv = rig['pelvis']
+        samples = []
+        for k in range(len(pv['pos']) // 3):
+            p = _skin_point(_at(pv['pos'], k), pv['idx'], pv['w'], k * 4, M, rig['rest'])
+            samples.append(self._hips_local(p, hipsInv, hips_at))
+        profile.rebuild(samples)
+        gravity = []
+        for r in radial:
+            down = [0.0, -1.0, 0.0]
+            th = math.atan2(_dot(down, r), -_dot(down, up))
+            gravity.append(min(cfg['thetaMax'] * _DEG, max(0.0, cfg['gravityBlend'] * th)))
+        return {'M': M, 'hipsM': hipsM, 'up': up, 'hipsInv': hipsInv, 'head': head, 'radial': radial, 'tangent': tangent,
+                'capsules': caps, 'profile': profile, 'gravity': gravity}
+
+    @staticmethod
+    def _hips_local(p, hipsInv, hips_at):
+        q = _apply(hipsInv, p)
+        return (math.atan2(q[2], q[0]), q[1] + hips_at[1], math.hypot(q[0], q[2]))
+
+    # ----- segment geometry -----
+    def _direction(self, k, th, offset):
+        # turned in the hips frame first, then carried by the hips matrix (the skeleton's order)
+        return _xdir(self.P['hipsM'], col_rotate(offset, self.rig['tangent'][k], th))
+
+    def _pivot(self, s, th):
+        P = self.P
+        if s < self.n:
+            return P['head'][s]
+        k = s - self.n
+        return _add(P['head'][k], self._direction(k, th[k], self.rig['upperOffset'][k]))
+
+    def _stations(self, s, theta, th):
+        k = s % self.n
+        top = self._pivot(s, th)
+        off = self.rig['upperOffset'][k] if s < self.n else self.rig['lowerOffset'][k]
+        d = self._direction(k, theta, off)
+        return [_add(top, _mul(d, f)) for f in self.cfg['stations']]
+
+    # ----- constraints -----
+    def _evaluate(self, s, theta, th, triangles):
+        P = self.P
+        rig = self.rig
+        cfg = self.cfg
+        n = self.n
+        k = s % n
+        level = 0 if s < n else n
+        trial = list(th)
+        trial[s] = theta
+        st = self._stations(s, theta, trial)
+        nb = [level + ((k + n - 1) % n), level + ((k + 1) % n)]
+        nst = [self._stations(o, trial[o], trial) for o in nb]
+        seg_len = _len(rig['upperOffset'][k] if s < n else rig['lowerOffset'][k])
+        worst = -math.inf
+        ground = -math.inf
+        hips_at = _at(rig['rest'], rig['hips'])
+        for j, p in enumerate(st):
+            chord = max(_len(_sub(p, nst[0][j])), _len(_sub(p, nst[1][j])))
+            for a, b, radius in P['capsules']:
+                C = radius + rig['clearance']
+                target = math.sqrt(C * C + (chord / 2) * (chord / 2))
+                worst = max(worst, target - col_point_segment(p, a, b))
+            ha, hy, hr = self._hips_local(p, P['hipsInv'], hips_at)
+            if hy > rig['crotch']:
+                worst = max(worst, P['profile'].query(ha, hy) + rig['clearance'] - hr)
+            g = rig['ground'] - p[1]
+            ground = max(ground, g)
+            worst = max(worst, g)
+        for o in nb:
+            if self.hold[s] and self.hold[o]:
+                continue
+            worst = max(worst, (abs(theta - trial[o]) - cfg['neighbourLimit'] * _DEG) * seg_len)
+        bound = (cfg['thetaGround'] if self.hold[s] else cfg['thetaMax']) * _DEG
+        worst = max(worst, (theta - bound) * seg_len, -theta * seg_len)
+        tri = 0.0
+        if triangles and rig.get('form'):
+            if s < n:
+                trial[n + k] = th[n + k] + (theta - th[s])
+            tri = self._triangle_depth(s, trial)
+            if tri > 0:
+                worst = max(worst, tri)
+        return worst, ground, tri
+
+    def _column_matrices(self, k, th):
+        P = self.P
+        rig = self.rig
+        axis = rig['tangent'][k]
+        local = _compose(_apply(P['hipsInv'], P['head'][k]), _axis_quat(axis, th[k]), [1.0, 1.0, 1.0])
+        U = _matmul(P['hipsM'], local)
+        lower = _compose(rig['upperOffset'][k], _axis_quat(axis, th[self.n + k] - th[k]), [1.0, 1.0, 1.0])
+        return U, _matmul(U, lower)
+
+    def _carried_sets(self):
+        rig = self.rig
+        n = self.n
+        out = [{'vertices': [], 'triangles': []} for _ in range(2 * n)]
+        form = rig.get('form')
+        if not form:
+            return out
+        panel = form['panel']
+        owner = {}
+        for k in range(n):
+            owner[rig['upper'][k]] = [k]
+            owner[rig['lower'][k]] = [k, n + k]
+        sets = [set() for _ in out]
+        for v in range(len(panel['pos']) // 3):
+            for c in range(4):
+                if not panel['w'][v * 4 + c] > 0:
+                    continue
+                for s in owner.get(panel['idx'][v * 4 + c], []):
+                    sets[s].add(v)
+        for s, st in enumerate(sets):
+            out[s]['vertices'] = sorted(st)
+            out[s]['triangles'] = [t for t in range(len(panel['index']) // 3) if any(panel['index'][t * 3 + j] in st for j in range(3))]
+        return out
+
+    def _triangle_depth(self, s, th):
+        rig = self.rig
+        panel = rig['form']['panel']
+        tris = self.carried[s]['triangles']
+        if not tris:
+            return 0.0
+        P = self.P
+        mats = {}
+        for k in range(self.n):
+            U, L = self._column_matrices(k, th)
+            mats[rig['upper'][k]] = U
+            mats[rig['lower'][k]] = L
+        posed = {}
+
+        def vert(v):
+            if v not in posed:
+                posed[v] = _skin_point(_at(panel['pos'], v), panel['idx'], panel['w'], v * 4, P['M'], rig['rest'], mats.get)
+            return posed[v]
+        hips_at = _at(rig['rest'], rig['hips'])
+        depth = 0.0
+        for t in tris:
+            ids = [panel['index'][t * 3], panel['index'][t * 3 + 1], panel['index'][t * 3 + 2]]
+            if all(panel['exempt'][v] for v in ids):
+                continue
+            a, b, c = (vert(v) for v in ids)
+            C = max(panel['clearance'][v] for v in ids)
+            centre = _mul(_add(_add(a, b), c), 1 / 3)
+            rad = max(_len(_sub(a, centre)), _len(_sub(b, centre)), _len(_sub(c, centre)))
+            for ca, cb, radius in P['capsules']:
+                mid = _mul(_add(ca, cb), 0.5)
+                bound = _len(_sub(cb, ca)) / 2 + radius + C
+                if _len(_sub(mid, centre)) > bound + rad:
+                    continue
+                d = radius + C - col_segment_triangle(ca, cb, a, b, c)
+                if d > 0:
+                    depth += d
+            pts = [(x, panel['exempt'][v]) for x, v in zip((a, b, c), ids)] + [(centre, 0)]
+            for p, ex in pts:
+                if ex:
+                    continue
+                ha, hy, hr = self._hips_local(p, P['hipsInv'], hips_at)
+                if hy > rig['crotch']:
+                    d = P['profile'].query(ha, hy) + C - hr
+                    if d > 0:
+                        depth += d
+                g = rig['ground'] - p[1]
+                if g > 0:
+                    depth += g
+        return depth
+
+    # ----- the search -----
+    def _search(self, s, triangles):
+        cfg = self.cfg
+        P = self.P
+        k = s % self.n
+        target = 0.0 if s < self.n else P['gravity'][k]
+        prev = self.theta[s]
+        held = self.hold[s] == 1
+        top = (cfg['thetaGround'] if held else cfg['thetaMax']) * _DEG
+        rel = min(top, max(0.0, target + (prev - target) * math.exp(-self.dt / cfg['tau'])))
+
+        def score(th):
+            return self._evaluate(s, th, self.cur, triangles)[0]
+
+        def feasible(th):
+            return score(th) <= 0
+        if feasible(rel):
+            chosen = rel
+        else:
+            pool = []
+            d = 0.0
+            while d <= cfg['thetaMax'] + 1e-9:
+                pool.append(d * _DEG)
+                d += cfg['coarseStep']
+            if held:
+                d = cfg['thetaMax'] + cfg['groundStep']
+                while d <= cfg['thetaGround'] + 1e-9:
+                    pool.append(d * _DEG)
+                    d += cfg['groundStep']
+            scored = [(th, score(th)) for th in pool]
+            best = _pick_best(scored, rel)
+            for r in cfg['refine']:
+                for sg in (-1, 1):
+                    th = best[0] + sg * r * _DEG
+                    if 0 <= th <= top + 1e-12:
+                        scored.append((th, score(th)))
+            pick = _pick_best(scored, rel)
+            if pick[1] <= 0:
+                lo, hi = rel, pick[0]
+                while abs(hi - lo) > cfg['bisect'] * _DEG:
+                    mid = 0.5 * (lo + hi)
+                    if feasible(mid):
+                        hi = mid
+                    else:
+                        lo = mid
+                chosen = hi
+            else:
+                chosen = pick[0] if pick[1] < score(rel) else rel
+        if self.rated:
+            lim = cfg['omegaMax'] * _DEG * self.dt
+            if abs(chosen - prev) > lim:
+                clamped = prev + _sign(chosen - prev) * lim
+                if feasible(clamped) or not feasible(chosen):
+                    chosen = clamped
+        return chosen
+
+    # ----- final evaluation, repair, ground fallback -----
+    def _final_evaluation(self):
+        cfg = self.cfg
+        n = self.n
+        S = 2 * n
+
+        def all_():
+            return [self._evaluate(s, self.cur[s], self.cur, True) for s in range(S)]
+        ev = all_()
+        for _round in range(cfg['repairRounds']):
+            bad = [s for s in range(S) if ev[s][0] > 0]
+            if not bad:
+                break
+            self.counters['repairs'] += 1
+            for s in bad:
+                before = self.cur[s]
+                th = self._search(s, True)
+                if abs(th - before) <= 1e-12 and self._evaluate(s, th, self.cur, True)[2] > 0:
+                    self._joint_search(s)
+                else:
+                    self.cur[s] = th
+                if s < n and self.cur[s] != before:
+                    self.cur[n + s] = self._search(n + s, True)
+            ev = all_()
+        # a station below ground, or a carried panel vertex (its depth is in the triangle score)
+        for s in range(S):
+            if ev[s][1] > 0 or self._lowest_row(s, self.cur[s]) < self.rig['ground']:
+                self._ground_fallback(s)
+                if s < n:
+                    self.cur[n + s] = self._search(n + s, True)
+        ev = all_()
+        for s in range(S):
+            self.violation[s] = ev[s][0]
+            if ev[s][0] > 0:
+                self.counters['residual'] += 1
+
+    def _joint_search(self, s):
+        cfg = self.cfg
+        n = self.n
+        k = s % n
+        level = 0 if s < n else n
+        cand = [level + ((k + n - 1) % n), level + ((k + 1) % n)]
+        partner = cand[0]
+        for b in cand[1:]:
+            if self._evaluate(b, self.cur[b], self.cur, True)[2] > self._evaluate(partner, self.cur[partner], self.cur, True)[2]:
+                partner = b
+        self.counters['jointSearches'] += 1
+        samples = []
+        d = 0.0
+        while d <= cfg['thetaMax'] + 1e-9:
+            samples.append(d * _DEG)
+            d += cfg['coarseStep']
+        save = list(self.cur)
+        best = (self.cur[s], self.cur[partner], math.inf, math.inf)
+        for a in samples:
+            for b in samples:
+                self.cur[s] = a
+                self.cur[partner] = b
+                w = max(self._evaluate(s, a, self.cur, True)[0], self._evaluate(partner, b, self.cur, True)[0])
+                dd = abs(a - save[s]) + abs(b - save[partner])
+                better = (w <= 0 and best[2] > 0) or (w <= 0 and best[2] <= 0 and dd < best[3] - 1e-12) or (w > 0 and best[2] > 0 and w < best[2])
+                if better:
+                    best = (a, b, w, dd)
+        self.cur = save
+
+        # no feasible pair: the rate limit holds, as in the single search
+        def limited(th, seg):
+            if best[2] <= 0 or not self.rated:
+                return th
+            prev = self.theta[seg]
+            lim = cfg['omegaMax'] * _DEG * self.dt
+            return prev + _sign(th - prev) * lim if abs(th - prev) > lim else th
+        self.cur[s] = limited(best[0], s)
+        self.cur[partner] = limited(best[1], partner)
+
+    def _ground_fallback(self, s):
+        cfg = self.cfg
+        self.counters['groundFallback'] += 1
+        chosen = cfg['thetaGround'] * _DEG
+        d = cfg['thetaMax'] + cfg['groundStep']
+        while d <= cfg['thetaGround'] + 1e-9:
+            if self._lowest_row(s, d * _DEG) >= self.rig['ground']:
+                chosen = d * _DEG
+                break
+            d += cfg['groundStep']
+        self.cur[s] = max(self.cur[s], chosen)
+        self.hold[s] = 1
+
+    def _lowest_row(self, s, theta):
+        n = self.n
+        trial = list(self.cur)
+        if s < n:
+            trial[n + s] = self.cur[n + s] + (theta - self.cur[s])
+        trial[s] = theta
+        form = self.rig.get('form')
+        if form and self.carried[s]['vertices']:
+            panel = form['panel']
+            # every column at the trial angles: a vertex blended across columns sees its neighbours as drawn
+            mats = {}
+            for k in range(n):
+                U, L = self._column_matrices(k, trial)
+                mats[self.rig['upper'][k]] = U
+                mats[self.rig['lower'][k]] = L
+            return min(_skin_point(_at(panel['pos'], v), panel['idx'], panel['w'], v * 4, self.P['M'], self.rig['rest'], mats.get)[1]
+                       for v in self.carried[s]['vertices'])
+        low = min(p[1] for p in self._stations(s, theta, trial))
+        if s < n:
+            low = min([low] + [p[1] for p in self._stations(n + s, trial[n + s], trial)])
+        return low
+
+
+def _pick_best(scored, rel):
+    """The feasible candidate nearest to rel (the larger angle on a tie), else the least violating."""
+    best = scored[0]
+    for c in scored:
+        cf = c[1] <= 0
+        bf = best[1] <= 0
+        if cf and not bf:
+            best = c
+        elif cf and bf:
+            dc = abs(c[0] - rel)
+            db = abs(best[0] - rel)
+            if dc < db - 1e-12 or (abs(dc - db) <= 1e-12 and c[0] > best[0]):
+                best = c
+        elif not cf and not bf and c[1] < best[1]:
+            best = c
+    return best
+
+
+def column_round_trip(rt, tol=RUNTIME_TOLERANCE, log=print):
+    """THE COLUMN ROUND TRIP (plan section 3.14): for every exported fixed-dt
+    sequence, the mirror replays the bone locals from the reset state with the
+    game's rig and config and recomputes the 24 column locals (translation,
+    rotation, scale) and the counters; each must match the game's within
+    `tol`. Raises on a miss or a nonfinite value; returns the worst values."""
+    seqs = rt.get('columns') or []
+    if not seqs:
+        raise RuntimeError('column round trip FAILED: the export carries no column sequence')
+    worst = {'p': 0.0, 'q': 0.0, 's': 0.0, 'frames': 0}
+    bad = []
+    for sq in seqs:
+        if not sq.get('frames'):
+            bad.append(f"{sq.get('id')}: no frames (an empty replay recomputes nothing)")
+            continue
+        d = ColumnDriver(sq['rig'], sq['config'])
+        cols = sq['rig']['upper'] + sq['rig']['lower']
+        for fi, f in enumerate(sq['frames']):
+            got = d.step(f['bones'], f['dt'])
+            for j, i in enumerate(cols):
+                want = f['bones'][i]
+                # every component finite before any max: max() can drop a NaN that follows a number
+                comps = [x for key in ('p', 'q', 's') for x in list(got[j][key]) + list(want[key])]
+                if len(comps) != 20 or not all(isinstance(x, (int, float)) and math.isfinite(x) for x in comps):
+                    bad.append(f"{sq['id']} frame {fi} bone {i}: a nonfinite or missing component")
+                    continue
+                for key in ('p', 's'):
+                    worst[key] = max(worst[key], max(abs(x - y) for x, y in zip(got[j][key], want[key])))
+                # q and −q are one rotation
+                e = min(max(abs(x - y) for x, y in zip(got[j]['q'], want['q'])), max(abs(x + y) for x, y in zip(got[j]['q'], want['q'])))
+                worst['q'] = max(worst['q'], e)
+            worst['frames'] += 1
+        if d.counters != sq['counters']:
+            bad.append(f"{sq['id']}: counters {d.counters} != game {sq['counters']}")
+    log(f"column round trip: {len(seqs)} sequences, {worst['frames']} frames; worst translation {worst['p']:.2e}, "
+        f"rotation {worst['q']:.2e}, scale {worst['s']:.2e} (tolerance {tol:g})")
+    if bad or not all(worst[k] <= tol for k in ('p', 'q', 's')):
+        raise RuntimeError(f'column round trip FAILED: {bad or worst}')
+    return worst
+
+
+def toy_column_rig(n=4, capsules=(), form=None, head_r=0.15):
+    """A toy rig for the driver's selftests: hips at (0, 1, 0), one thigh bone
+    at (0.1, 1, 0) carrying the given capsules [(a, b, radius)], n columns of
+    two 0.4-long segments hanging from the girdle (radius head_r, y 1.05), a
+    ring of pelvis samples. Bones: hips, thigh, n uppers, n lowers."""
+    rest = [0.0, 1.0, 0.0, 0.1, 1.0, 0.0]
+    upper = list(range(2, 2 + n))
+    lower = list(range(2 + n, 2 + 2 * n))
+    parents = [-1, 0] + [0] * n + upper
+    radial, tangent, head_off = [], [], []
+    heads = []
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        r = [math.cos(a), 0.0, math.sin(a)]
+        radial.append(r)
+        tangent.append(_norm(_cross(r, [0.0, 1.0, 0.0])))
+        h = [head_r * r[0], 1.05, head_r * r[2]]
+        heads.append(h)
+        head_off.append(_sub(h, [0.0, 1.0, 0.0]))
+    for h in heads:
+        rest += h
+    for h in heads:
+        rest += [h[0], h[1] - 0.4, h[2]]
+    pos, idx, w = [], [], []
+    for y in (0.95, 1.0, 1.05):
+        for j in range(16):
+            a = 2 * math.pi * j / 16
+            pos += [0.1 * math.cos(a), y, 0.1 * math.sin(a)]
+            idx += [0, 0, 0, 0]
+            w += [1.0, 0.0, 0.0, 0.0]
+    return {
+        'bones': 2 + 2 * n, 'order': list(range(2 + 2 * n)), 'parents': parents, 'rest': rest, 'hips': 0,
+        'upper': upper, 'lower': lower, 'radial': radial, 'tangent': tangent, 'headOffset': head_off,
+        'upperOffset': [[0.0, -0.4, 0.0]] * n, 'lowerOffset': [[0.0, -0.4, 0.0]] * n,
+        'capsules': [{'bone': 1, 'a': list(a), 'b': list(b), 'radius': r} for a, b, r in capsules],
+        'pelvis': {'pos': pos, 'idx': idx, 'w': w}, 'profile': {'bottom': 0.9, 'top': 1.1, 'bin': 0.05},
+        'crotch': 0.92, 'clearance': 0.006, 'ground': 0.002, 'form': form,
+    }
+
+
+def toy_column_bones(rig, hips=(0.0, 1.0, 0.0), thigh=(0.1, 0.0, 0.0)):
+    """The toy rig's bone locals: hips and thigh as given, the columns at rest."""
+    out = [{'p': list(hips), 'q': [0.0, 0.0, 0.0, 1.0], 's': [1.0, 1.0, 1.0]},
+           {'p': list(thigh), 'q': [0.0, 0.0, 0.0, 1.0], 's': [1.0, 1.0, 1.0]}]
+    while len(out) < rig['bones']:
+        out.append({'p': [0.0, 0.0, 0.0], 'q': [0.0, 0.0, 0.0, 1.0], 's': [1.0, 1.0, 1.0]})
+    return out
+
+
+TOY_DRIVER_CONFIG = {
+    'thetaMax': 80, 'thetaGround': 110, 'coarseStep': 10, 'refine': [5, 2.5], 'bisect': 0.25, 'groundStep': 2.5,
+    'tau': 0.25, 'omegaMax': 400, 'neighbourLimit': 60, 'repairRounds': 3, 'stations': [1 / 3, 2 / 3, 1],
+    'groundClearance': 0.002, 'clearance': 0.006, 'gravityBlend': 1, 'crotch': 0.03, 'pelvisBin': 0.02,
+    'pelvisSamples': 240, 'pelvisArm': 0.2, 'resetDt': 0.25,
+}
+
+
+def selftest_column_driver():
+    """The mirror's solve on toy capsules (plan section 5): the continuous
+    relaxation, determinism, the reset, the rate limit and its feasible break,
+    the lift-outward ground fallback on the carried rows, the bounded repair
+    with triangle scoring (an upper's trial carrying its lower), the joint
+    two-column search, and no column scale."""
+    cfg = TOY_DRIVER_CONFIG
+    dt = 1 / 60
+    # relaxation: a free hem released at 30° follows θg + (θs − θg)·e^(−t/τ), never sticking to a sample
+    rig = toy_column_rig()
+    d = ColumnDriver(rig, cfg)
+    d.step(toy_column_bones(rig), dt)
+    assert all(abs(x) < 1e-12 for x in d.theta), d.theta
+    d.theta[0] = 30 * _DEG
+    for f in range(1, 91):
+        d.step(toy_column_bones(rig), dt)
+        want = 30 * _DEG * math.exp(-f * dt / cfg['tau'])
+        assert abs(d.theta[0] - want) < 1e-9, (f, d.theta[0], want)
+    assert d.theta[0] < 0.5 * _DEG
+    # reset: a step above resetDt re-enters from the gravity solution
+    d.theta[0] = 30 * _DEG
+    d.step(toy_column_bones(rig), 1.0)
+    assert d.theta[0] == 0.0
+    # a leg capsule inside column 0 pushes it outward; θ stays in [0, θmax]; locals carry no scale
+    caps = [([0.1, 1.0, 0.0], [0.1, 0.5, 0.0], 0.04)]
+    rig = toy_column_rig(capsules=caps)
+    seq = [toy_column_bones(rig, thigh=(0.1 + 0.002 * f, 0.0, 0.0)) for f in range(40)]
+
+    def run(r, frames, step_dt=dt):
+        dd = ColumnDriver(r, cfg)
+        trace = []
+        for b in frames:
+            loc = dd.step(b, step_dt)
+            assert all(x['s'] == [1.0, 1.0, 1.0] for x in loc)
+            trace.append(list(dd.theta))
+        return dd, trace
+    d1, t1 = run(rig, seq)
+    d2, t2 = run(rig, seq)
+    assert t1 == t2 and d1.counters == d2.counters, 'the mirror is not deterministic'
+    assert t1[-1][0] > 5 * _DEG, t1[-1]
+    assert all(0 <= x <= cfg['thetaMax'] * _DEG + 1e-12 for tr in t1 for x in tr)
+    lim = cfg['omegaMax'] * _DEG * dt
+    breaks = sum(1 for a, b in zip(t1, t1[1:]) for x, y in zip(a, b) if abs(y - x) > lim + 1e-12)
+    assert breaks == d1.counters['rateBreaks'], (breaks, d1.counters)
+    # a capsule that jumps onto the column: only the larger step is feasible
+    jump = [toy_column_bones(rig, thigh=(-0.5, 0.0, 0.0))] * 3 + [toy_column_bones(rig, thigh=(0.1, 0.0, 0.0))] * 3
+    dj, tj = run(rig, jump)
+    assert dj.counters['rateBreaks'] >= 1, dj.counters
+    assert any(abs(y - x) > lim + 1e-12 for x, y in zip(tj[2], tj[3])), (tj[2], tj[3])
+    # ground fallback: hips so low the tips reach under the ground; lifted past θmax, carried rows clear
+    rig = toy_column_rig()
+    dg = ColumnDriver(rig, cfg)
+    dg.step(toy_column_bones(rig, hips=(0.0, 0.05, 0.0)), dt)
+    assert dg.counters['groundFallback'] > 0
+    assert any(x > cfg['thetaMax'] * _DEG for x in dg.theta) and all(x <= cfg['thetaGround'] * _DEG + 1e-12 for x in dg.theta)
+    for s in range(2 * dg.n):
+        assert dg._lowest_row(s, dg.cur[s]) >= rig['ground'] - 1e-12 or dg.cur[s] >= cfg['thetaGround'] * _DEG - 1e-12
+    # triangle scoring: a triangle weighted only to col.L.0; an upper trial that swings it into a capsule is infeasible
+    n = 4
+    tri_form = {'anchors': None, 'clearance': 0.006, 'top': 1.1,
+                'panel': {'pos': [0.15, 0.4, -0.05, 0.15, 0.4, 0.05, 0.15, 0.3, 0.0], 'idx': [2 + n, 0, 0, 0] * 3,
+                          'w': [1.0, 0.0, 0.0, 0.0] * 3, 'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3}}
+    rig = toy_column_rig(n=n, capsules=[([0.6, 0.51, -0.2], [0.6, 0.51, 0.2], 0.03)], form=tri_form)
+    rig['form']['anchors'] = [{'a': h, 'ia': [0, 0, 0, 0], 'wa': [1, 0, 0, 0], 'b': h, 'ib': [0, 0, 0, 0], 'wb': [1, 0, 0, 0], 't': 0.0}
+                              for h in (_at(rig['rest'], u) for u in rig['upper'])]
+    dt_ = ColumnDriver(rig, cfg)
+    dt_.step(toy_column_bones(rig), dt)
+    clear = dt_._evaluate(0, 0.0, dt_.cur, True)
+    hit = dt_._evaluate(0, 40 * _DEG, dt_.cur, True)
+    plain = dt_._evaluate(0, 40 * _DEG, dt_.cur, False)
+    assert clear[2] == 0 and hit[2] > 0 and hit[0] > 0 and plain[2] == 0, (clear, hit, plain)
+    # bounded repair and the joint search: a capsule through the triangle; rate-limited steps repeat an angle
+    rig['capsules'] = [{'bone': 1, 'a': [0.13, 0.35, -0.3], 'b': [0.13, 0.35, 0.3], 'radius': 0.02}]
+    dr = ColumnDriver(rig, cfg)
+    dr.step(toy_column_bones(rig, thigh=(-0.5, 0.0, 0.0)), dt)
+    before = dr._triangle_depth(n, dr.cur)
+    dr.step(toy_column_bones(rig), 1e-3)
+    assert dr.counters['repairs'] >= 1, dr.counters
+    assert dr.counters['repairs'] <= 2 * cfg['repairRounds']
+    assert before == 0.0
+    # no single segment clears an enclosing capsule: the rate-limited search repeats its
+    # angle with the triangle still hit, so the two columns are searched jointly, still bounded
+    rig['capsules'] = [{'bone': 1, 'a': [0.15, 0.35, -0.01], 'b': [0.15, 0.35, 0.01], 'radius': 1.0}]
+    dj2 = ColumnDriver(rig, cfg)
+    dj2.step(toy_column_bones(rig, thigh=(-5.0, 0.0, 0.0)), dt)
+    dj2.step(toy_column_bones(rig), 1e-3)
+    assert dj2.counters['jointSearches'] >= 1, dj2.counters
+    # no feasible pair: the joint search keeps the rate limit
+    assert dj2.counters['rateBreaks'] == 0, dj2.counters
+    assert dj2.counters['repairs'] <= 2 * cfg['repairRounds'] and dj2.counters['residual'] > 0, dj2.counters
+    print('column driver selftest: ok')
+
+
+def selftest_column_scale():
+    """Stations under a nonuniform hips scale lie where the written locals draw them."""
+    rig = toy_column_rig()
+    d = ColumnDriver(rig, TOY_DRIVER_CONFIG)
+    bones = toy_column_bones(rig, thigh=(-5.0, 0.0, 0.0))
+    bones[0]['s'] = [1.0, 2.0, 1.0]
+    d.step(bones, 1 / 60)
+    d.theta = [0.0] * 8
+    d.theta[0] = 30 * _DEG
+    d.theta[4] = 50 * _DEG
+    loc = d.locals()
+    for j, i in enumerate(rig['upper'] + rig['lower']):
+        bones[i] = loc[j]
+    M = d.compose(bones)
+    knee = _xform(M[rig['upper'][0]], rig['upperOffset'][0])
+    ankle = _xform(M[rig['lower'][0]], rig['lowerOffset'][0])
+    up = d._stations(0, d.theta[0], d.theta)[-1]
+    lo = d._stations(4, d.theta[4], d.theta)[-1]
+    assert _len(_sub(up, knee)) < 1e-9 and _len(_sub(lo, ankle)) < 1e-9, (up, knee, lo, ankle)
+    print('column scale selftest: ok')
+
+
+def _toy_low_hem():
+    """Hips so low the lowers must lift; a hem vertex below the ankle pivots, one blended
+    half and half across columns 0 and 1; the columns' incoming locals hang straight.
+    Returns the driver, the rig and the drawn heights of the three hem vertices."""
+    n = 4
+    form = {'anchors': None, 'clearance': 0.006, 'top': 1.1,
+            'panel': {'pos': [0.075, 0.25, 0.075, 0.15, 0.25, 0.0, 0.0, 0.25, 0.15],
+                      'idx': [2 + n, 3 + n, 0, 0, 2 + n, 0, 0, 0, 3 + n, 0, 0, 0],
+                      'w': [0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+                      'index': [0, 1, 2], 'exempt': [0, 0, 0], 'clearance': [0.006] * 3}}
+    rig = toy_column_rig(n=n, form=form)
+    form['anchors'] = [{'a': _at(rig['rest'], u), 'ia': [0, 0, 0, 0], 'wa': [1, 0, 0, 0], 'b': [0.0, 0.0, 0.0],
+                        'ib': [0, 0, 0, 0], 'wb': [0, 0, 0, 0], 't': 0.0} for u in rig['upper']]
+    bones = toy_column_bones(rig, hips=(0.0, 0.12, 0.0))
+    for k, u in enumerate(rig['upper']):
+        bones[u]['p'] = list(rig['headOffset'][k])
+    for k, lo in enumerate(rig['lower']):
+        bones[lo]['p'] = list(rig['upperOffset'][k])
+    d = ColumnDriver(rig, TOY_DRIVER_CONFIG)
+    loc = d.step(bones, 1 / 60)
+    for j, i in enumerate(rig['upper'] + rig['lower']):
+        bones[i] = loc[j]
+    M = d.compose(bones)
+    p = form['panel']
+    drawn = [_skin_point(_at(p['pos'], v), p['idx'], p['w'], v * 4, M, rig['rest'])[1] for v in range(3)]
+    return d, rig, drawn
+
+
+def selftest_column_ground_panel():
+    """A carried panel vertex below the ground with its stations above lifts the segment."""
+    d, rig, drawn = _toy_low_hem()
+    assert d.counters['groundFallback'] > 0 and min(drawn) >= rig['ground'] - 1e-9, (d.counters, drawn)
+    print('column ground-panel selftest: ok')
+
+
+def selftest_column_ground_blend():
+    """The fallback measures the hem as drawn, every column at its solved angle: no lift to θground
+    for a vertex blended across columns that a smaller lift clears."""
+    d, rig, drawn = _toy_low_hem()
+    assert max(d.theta) < TOY_DRIVER_CONFIG['thetaGround'] * _DEG - 1e-9 and min(drawn) >= rig['ground'] - 1e-9, (d.theta, drawn)
+    print('column ground-blend selftest: ok')
+
+
+def _toy_column_export():
+    """A faithful toy column export: the mirror's own replay of a short sequence, as the game writes it."""
+    import copy
+    rig = toy_column_rig(capsules=[([0.1, 1.0, 0.0], [0.1, 0.5, 0.0], 0.04)])
+    d = ColumnDriver(rig, TOY_DRIVER_CONFIG)
+    frames = []
+    for f in range(6):
+        bones = toy_column_bones(rig, thigh=(0.1 + 0.004 * f, 0.0, 0.0))
+        loc = d.step(bones, 1 / 60)
+        for j, i in enumerate(rig['upper'] + rig['lower']):
+            bones[i] = loc[j]
+        frames.append({'dt': 1 / 60, 'bones': copy.deepcopy(bones)})
+    return {'columns': [{'id': 'toy', 'rig': rig, 'config': TOY_DRIVER_CONFIG, 'counters': dict(d.counters), 'frames': frames}]}
+
+
+def _round_trip_fails(rt, why):
+    try:
+        column_round_trip(rt, log=lambda *_a: None)
+    except RuntimeError:
+        return
+    raise AssertionError(f'column round trip passed {why}')
+
+
+def selftest_column_round_trip_finite():
+    """A faithful export passes; a NaN in any translation, rotation or scale component fails."""
+    import copy
+    rt = _toy_column_export()
+    column_round_trip(rt, log=lambda *_a: None)
+    col = rt['columns'][0]['rig']['upper'][0]
+    for key, comp in (('p', 1), ('q', 2), ('s', 1)):
+        bad = copy.deepcopy(rt)
+        bad['columns'][0]['frames'][3]['bones'][col][key][comp] = float('nan')
+        _round_trip_fails(bad, f'a NaN in {key}[{comp}]')
+    print('column round trip finite selftest: ok')
+
+
+def selftest_column_round_trip_nonempty():
+    """A sequence without frames is no evidence: the round trip refuses it."""
+    import copy
+    rt = _toy_column_export()
+    bad = copy.deepcopy(rt)
+    bad['columns'][0]['frames'] = []
+    bad['columns'][0]['counters'] = {k: 0 for k in bad['columns'][0]['counters']}
+    _round_trip_fails(bad, 'a sequence without frames')
+    print('column round trip nonempty selftest: ok')

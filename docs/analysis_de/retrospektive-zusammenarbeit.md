@@ -146,6 +146,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 
 | 23.09. abends | Ein Nutzerauftrag, der kein Auftragspunkt ist, kommt nicht los: Nach dem regelkonformen Anspruch auf den Batch-Lock verweigerte die Leerlauf-Behauptung der Tafel JEDE Schreiboperation — auch die, die den Punkt erst angelegt hätte. Die beiden dokumentierten Auswege greifen nicht: `now <N>` braucht eine Warteschlangen-Karte, die aus TASKS.md gebaut wird, `closing <N>` einen gemergten Punkt. Durchgekommen bin ich nur, weil das board-first-Tor pro Zug genau einmal feuert — eine Einmal-Freigabe, kein vorgesehener Weg (§3.306) |
 | 29.10. abends | Vierter Wiedergänger von §3.271/§3.267, diesmal ohne `--gate`: Die Startpflicht `batch-doctor --repair` fand eine einzige geänderte Datei — die Zustandsdatei des Closing-Wächters, die der Vorgänger offen gelassen hatte — und stashte sie, obwohl sie den laufenden Prüflauf erkannt hatte (sie ließ `verification/` ausdrücklich draußen). Der Stash änderte den Index mitten in der Unit-Stufe des zweiten Abschluss-LARGE; die Integritätsprüfung brach den Lauf nach 8 m 41 s ab, bei 18 367 grünen Unit-Tests. Ein Neustart kostete gut zwei Stunden; der Fall steht als Punkt 1467 in der Arbeitsliste |
+| 04.11. nachmittags | Die Kleidungsarbeit konvergierte wochenlang nicht: 407 Kleidungs-Commits seit 01.10., und jede gescheiterte Runde erneuerte sich durch Aufteilung (1482 → 1485 → 1486) statt durch einen begrenzten POC-Rückfall; die siebte Rockrunde maß sogar einen anderen Zustand, als die Kamera fotografierte (§3.308) |
+| 05.11. abends | Der 24-Stunden-Rahmen von 1487 kürzte die Liste, nicht das Ritual: Seit 04.11. 17:00 waren 34 von 57 main-Commits Buchhaltung (Bildurteil, Delegation, Widerruf), der Kinder-Hüftschurz allein brauchte neun Commits. Der Nutzer ersetzte die Methode (Punkt 1488): ein Fix je Defekt, eine einzige Bildprüfung am Schluss (§3.309) |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1750,7 +1752,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 03.11.2026, 02:52 · Quellen-Fingerprint: `5fc202d21e8a…`
+Zuletzt aktualisiert: Sonntag, 08.11.2026, 01:20 · Quellen-Fingerprint: `2877546f4f9e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1780,7 +1782,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A side window that claims the batch only queues the user's point and hands over at once — never propose or do further work after the claim | 2 | mittel | clear-claim-guard.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
-| Cloud switch stays ON until the user explicitly orders it OFF — regardless of free credits or their 05.11.2026 expiry | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Cloud switch stays ON until the user explicitly orders it OFF — regardless of free credits or their 05.11.2026 expiry | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Never measure a model's spend by commit trailers — unlanded, looping work has no commits and is the most expensive kind | 2 | mittel | commit-scope-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | container-ask-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
@@ -1797,7 +1799,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Pure read/search delegations (locate or summarize only) use subagent_type Explore, not general-purpose; writing, committing, verifying, authoring, review and suites keep their agent types | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either ; the main chain authors, the cross lane reviews; switch: lane-switch --lane scarce | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 162 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 165 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1850,7 +1852,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 3 | mittel | — (Regel/Memory) | ◐ Regel |
-| Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Der 9-Punkte-Plan vom 01.09.2026 gegen die Governance-Selbstproduktion — Stand, offene Maßnahmen, Veto-Wege; Stichwort „Umsteuerung\" | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A user order from a session that cannot write the work order goes into the findings carrier as a --request, never into a fire-and-forget peer message | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1868,10 +1870,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 183 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
+Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 184 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: 5fc202d21e8a92400609ba327e6f5a61be3b7ebcbf68c236bc45d674912d47d6 -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-03T01:52:03.423Z -->
+<!-- RETRO-FINGERPRINT: 2877546f4f9ee72c2607ae19eb0bba15a71aa98a9d19cbffa1e97f617ea037b4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-08T00:20:46.033Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8275,3 +8277,51 @@ Jede war für sich klein, und jede hätte als neue Freigabe falsch gegriffen. Di
 Hälften: Ein Wächter trennt „Zustand fehlt" ausdrücklich von „Zustand verbietet", und eine
 Lockerung wird reviewt wie neuer Code, weil sie dieselbe Angriffsfläche hat. Der Befund liegt
 nicht blockierend in `docs/backlog.md` (Befund vom 23.10.2026).
+
+### 3.307 Die grüne Ampel über einem abgebrochenen Abschluss-Job
+
+Am 03.11.2026 ging die CI von `main` zweimal auf Rot, obwohl beide Test-Shards grün waren
+(Lauf 41680804084, 17:28:46 bis 17:33:46; Lauf 41692582189, 18:38:00 bis 18:43:02). Der
+`gate`-Job, der die beiden Shards zu einem Urteil zusammenführt, brach bei seinem Checkout ab.
+Das Zeitlimit von fünf Minuten war abgelaufen, bevor er überhaupt etwas prüfen konnte. Auf den
+`feat/`-Zweigen blieb derselbe Abbruch unsichtbar, weil `continue-on-error` ihn verschluckte.
+Erst die Zeitstempel verrieten den Grund: Jeder Lauf endete auf die Sekunde fünf Minuten nach
+seinem Start. Punkt 803 checkt seitdem nur noch `scripts/` aus (sparse checkout) und gibt dem
+Job 15 Minuten.
+
+Am selben Abend kam der umgekehrte Fall hinzu. Die CI meldete den Zweig von 1482 bei c9e7022dd
+grün, aber derselbe Containment-Test war lokal und in der Cloud rot. Der Befund liegt am Punkt.
+Beide Fälle haben dieselbe Ursache: Eine Ampel fasst Jobs zusammen und sagt nicht, ob jeder
+Job das getan hat, wofür er da ist.
+
+**Lehre:** Ein Abschluss-Job wird an Zeitstempeln und an seinem Inhalt geprüft, nicht an
+seiner Farbe. Ein Lauf, der genau beim Zeitlimit endet, ist ein abgebrochener Lauf und kein
+Urteil. Und ein grünes CI-Ergebnis ersetzt keinen lokal gemessenen roten Test.
+
+### 3.308 Aufteilen ersetzte das Begrenzen
+
+Die Rockkalibrierung lief sieben Runden lang. Jede gescheiterte Runde erzeugte über die
+Aufteilungsregel einen neuen Punkt (1482 → 1485 → 1486), statt die Arbeit zu begrenzen.
+Die Regel war gegen festgefahrene Punkte gedacht und hielt so die Schleife am Leben. Die siebte
+Runde drückte den gemessenen Winkel von 17,5 auf 9,4 Grad, und das Bild blieb trotzdem gleich:
+Der Test las den eingeschwungenen Zustand nach 120 Frames, die Kamera fotografierte den
+Kaltstart des Treibers. Erst eine Diagnose am Bild fand das. Am selben Nachmittag gab der
+Nutzer eine begrenzte POC-Schließung frei (Punkt 1487): ein fester Zeitrahmen, ein Umsetzungs-
+und ein Korrekturdurchgang, keine weiteren Abspaltungen.
+
+**Lehre:** Eine Aufteilungsregel braucht ein Budget, das mitwandert. Und bevor eine Zahl
+nachgeregelt wird, muss feststehen, dass sie denselben Zustand misst, den das Bild zeigt.
+
+### 3.309 Der Zeitrahmen begrenzte die Liste, nicht das Ritual
+
+Die begrenzte Schließung (Punkt 1487) setzte 24 Stunden. Die Arbeit darin blieb aber, wie sie
+war: Jeder Kandidat bekam sein eigenes Bildurteil, seinen eigenen Delegations- und
+Widerrufsvermerk, jeweils als Commit auf main. Seit 04.11. 17:00 waren 34 von 57 main-Commits
+solche Vermerke, der Kinder-Hüftschurz allein brauchte am Vormittag des 05.11. neun Commits.
+Der Rahmen kürzte also, wie viele Defekte drankamen, nicht, was ein einzelner Defekt kostete.
+Der Nutzer ersetzte die Methode (Punkt 1488): genau ein Fix je Defekt, alle auf einem Branch,
+eine einzige Bildprüfung auf Spieldistanz auf beiden Backends, Gescheitertes wird
+zurückgenommen und ins Backlog gelegt. Nur eine Entblößung wird nie zurückgenommen (Punkt 1489).
+
+**Lehre:** Ein Budget wirkt nur auf das, was es zählt. Wer die Zeit begrenzt, muss auch den
+Aufwand pro Schritt begrenzen, sonst frisst die Begleitbuchhaltung den Rahmen.

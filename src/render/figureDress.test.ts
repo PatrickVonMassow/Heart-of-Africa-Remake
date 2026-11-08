@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
-import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
+import { VILLAGER_ASSET } from '../config/balance'
+import { AGE_GROUPS, CAST_DRESS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
 import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { buildLayerGeometry, fibreOf, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
@@ -259,6 +260,35 @@ describe('the shared material', () => {
     expect(figureMaterial().roughnessNode).toBeTruthy()
   })
 
+  it('shades the back faces (the inside of a hem) by garmentBackShade on both variants', () => {
+    expect(VILLAGER_ASSET.garmentBackShade).toBeGreaterThan(0)
+    expect(VILLAGER_ASSET.garmentBackShade).toBeLessThan(1)
+    // every node the colour graph reaches (operands, wrapped nodes)
+    const reach = (root: unknown) => {
+      const seen = new Set<object>()
+      const walk = (n: unknown) => {
+        if (!n || typeof n !== 'object' || seen.has(n)) return
+        seen.add(n)
+        for (const k of ['node', 'aNode', 'bNode', 'cNode', 'condNode', 'ifNode', 'elseNode']) walk((n as Record<string, unknown>)[k])
+      }
+      walk(root)
+      return [...seen] as Array<{ constructor: { name: string }; method?: string; value?: unknown }>
+    }
+    for (const masked of [false, true]) {
+      const nodes = reach(figureMaterial(masked).colorNode)
+      const mixes = nodes.filter((n) => n.method === 'mix')
+      // the mix's first operand is the back-face shade
+      expect(mixes.some((m) => reach((m as { aNode?: unknown }).aNode).some((n) => n.value === VILLAGER_ASSET.garmentBackShade))).toBe(true)
+      expect(nodes.some((n) => n.constructor.name === 'FrontFacingNode')).toBe(true)
+    }
+  })
+
+  it('offsets the place sun shadow by about one texel against the figure material self-shadow acne', () => {
+    // the place sun's shadow camera spans 110 m on at most a 4096 map: ≈ 2.7 cm a texel
+    expect(VILLAGER_ASSET.sunShadowNormalBias).toBeGreaterThan(0)
+    expect(VILLAGER_ASSET.sunShadowNormalBias).toBeLessThanOrEqual(110 / 4096)
+  })
+
   it('carries the baked micro-structure relief on both variants (plain and masked glTF body)', () => {
     expect(figureMaterial().normalNode).toBeTruthy()
     expect(figureMaterial(true).normalNode).toBeTruthy()
@@ -470,5 +500,65 @@ describe('a cover tied over the breast (wear "chest", docs/peoples-1890.md §8.6
         // measured 0.0062 H at the stoop (−0.0038 before the stand-off)
         expect(axisClearance(s, inChestFrame(mantle, pose), 'outside').min / H).toBeGreaterThan(0.003)
       })
+  })
+})
+
+describe('the 1890 Western dress on the code-built body (docs/giza-1890.md §4.1)', () => {
+  const lowest = (g: THREE.BufferGeometry, bone: Parameters<typeof boneIndex>[0]) => {
+    // the lowest vertex weighted mostly to `bone`
+    const pos = g.getAttribute('position')
+    const i = g.getAttribute('skinIndex')
+    const w = g.getAttribute('skinWeight')
+    let y = Infinity
+    for (let k = 0; k < pos.count; k++) {
+      const pairs = [0, 1, 2, 3].map((c) => [i.getComponent(k, c), w.getComponent(k, c)])
+      if (pairs.some(([b, ww]) => b === boneIndex(bone) && ww > 0.5)) y = Math.min(y, pos.getY(k))
+    }
+    return y
+  }
+
+  it('builds every cast cell: a skinned, painted mesh per layer', () => {
+    for (const cast of Object.keys(CAST_DRESS) as Array<keyof typeof CAST_DRESS>)
+      for (const sex of SEXES)
+        for (const age of AGE_GROUPS) {
+          const p = bodyProportions(sex, age)
+          for (const l of CAST_DRESS[cast][sex][age]) {
+            const g = buildLayerGeometry({ ...l, colour: l.colour === 'cloth' ? '#c4ac72' : l.colour }, p, 10)
+            expect(g, `${cast} ${sex} ${age} ${l.form}`).not.toBeNull()
+            expect(g!.getIndex()!.count).toBeGreaterThan(0)
+          }
+        }
+  })
+
+  it('runs the coat’s and the gown’s sleeves down the forearm, the shirt’s stops above the elbow', () => {
+    const elbow = adultMan.shoulderY - adultMan.upperArm
+    for (const form of ['coat', 'gown'] as const) {
+      const g = buildLayerGeometry(layer({ slot: 'torso', form, wear: 'chest' }), adultMan)!
+      expect(lowest(g, 'forearm.L'), form).toBeLessThan(elbow - adultMan.forearm * 0.8)
+    }
+    const shirt = buildLayerGeometry(layer({ slot: 'torso', form: 'shirt', wear: 'chest' }), adultMan)!
+    expect(lowest(shirt, 'forearm.L')).toBe(Infinity)
+  })
+
+  it('takes the long trousers to the ankle, the coat to mid-thigh, the gown to the ground', () => {
+    const at = (form: DressLayer['form'], slot: DressLayer['slot'], wear: DressLayer['wear']) => bounds(buildLayerGeometry(layer({ slot, form, wear }), adultMan)!).min.y
+    expect(at('trousersLong', 'hip', 'waist')).toBeLessThan(adultMan.ankleY + 0.02 * adultMan.stature)
+    expect(at('trousers', 'hip', 'waist')).toBeGreaterThan(adultMan.ankleY + 0.1 * adultMan.stature)
+    const coat = at('coat', 'torso', 'chest')
+    expect(coat).toBeLessThan(adultMan.hipY)
+    expect(coat).toBeGreaterThan(adultMan.kneeY)
+    expect(at('gown', 'torso', 'chest')).toBeLessThan(adultMan.ankleY + 0.05 * adultMan.stature)
+  })
+
+  it('closes shoes and boots round the feet, the boot’s shaft up the shin; the tarboosh stands over the crown', () => {
+    const shoe = buildLayerGeometry(layer({ slot: 'ornament', form: 'shoes', wear: 'feet', material: 'hide' }), adultMan)!
+    const boot = buildLayerGeometry(layer({ slot: 'ornament', form: 'boots', wear: 'feet', material: 'hide' }), adultMan)!
+    expect(bounds(shoe).min.y).toBeLessThan(adultMan.ankleY * 0.3)
+    expect(bounds(shoe).max.z).toBeGreaterThan(adultMan.footLen * 0.7)
+    expect(bounds(boot).max.y).toBeGreaterThan(bounds(shoe).max.y + 0.05 * adultMan.stature)
+    expect(lowest(shoe, 'foot.R')).toBeLessThan(adultMan.ankleY)
+    const fez = bounds(buildLayerGeometry(layer({ slot: 'head', form: 'tarboosh', wear: 'crown', material: 'wool' }), adultMan)!)
+    expect(fez.max.y).toBeGreaterThan(adultMan.crownY + 0.03 * adultMan.stature)
+    expect(fez.min.y).toBeLessThan(adultMan.crownY)
   })
 })

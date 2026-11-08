@@ -97,7 +97,11 @@ jobs:
     # it names neither the cause nor a fix. 25 leaves real room on a ~15 min run
     # and still catches a genuine hang; a run that approaches it again is a
     # signal to make the suite cheaper, not to raise this a second time.
-    timeout-minutes: 25
+    # RAISED FOR THE NOT-JUDGED RE-RUN (03.11.2026), not for growth: run
+    # 41680804084 measured checkout up to 7 min and the unit step 9-11 min, so
+    # one re-run of a shard whose summary named no failure needs ~30 min. A run
+    # that hits 40 is still a hang, and a timeout still fails the gate closed.
+    timeout-minutes: 40
     # The one condition under which no step may fail the job. Repeated verbatim
     # on every step (`env` is not available to `continue-on-error`), and pinned
     # step by step in scripts/ci-gate-verdict-core.test.mjs.
@@ -154,7 +158,9 @@ jobs:
       - id: unit
         name: unit
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
-        run: npm run test:unit -- --shard=${{ matrix.shard }}/2
+        # Judged by vitest's own summary: no named failure + non-zero exit is
+        # NOT JUDGED and re-run once (scripts/ci-unit-shard.mjs).
+        run: node scripts/ci-unit-shard.mjs -- --shard=${{ matrix.shard }}/2
       - id: outcomes
         name: record shard outcomes
         if: always()
@@ -168,11 +174,19 @@ jobs:
     needs: fast
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # MEASURED 03.11.2026: the full checkout alone ran past the old 5-minute
+    # ceiling (run 41692582189: 18:38:00 -> cancelled 18:43:02; run 41680804084:
+    # 17:28:46 -> 17:33:46), so main went red with both shards green. The
+    # checkout is now sparse (the verdict's import closure lives in scripts/),
+    # and 15 minutes is headroom above the measured five.
+    timeout-minutes: 15
     steps:
       - id: checkout
         uses: actions/checkout@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        with:
+          sparse-checkout: scripts
+          filter: blob:none
       - id: node
         uses: actions/setup-node@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}

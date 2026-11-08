@@ -15,3 +15,7 @@
 # scripts/villager/build.mjs, too large for a review round; its readable
 # twin penetration-report.md carries the same verdicts and is reviewed.
 verification/villager-body/penetration-report.json -diff
+# The pipeline's machine-written cut-vertex parent table (one JSON line from
+# scripts/villager/pipeline.py), too large for a review round; its generator
+# is reviewed.
+verification/villager-body/split-parents.json -diff

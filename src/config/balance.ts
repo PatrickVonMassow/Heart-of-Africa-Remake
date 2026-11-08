@@ -2760,12 +2760,146 @@ export const VILLAGER_ASSET = {
    *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
   garmentShellBase: 0.003,
   garmentShellStep: 0.003,
+  /** Colour factor on a figure's back faces (render/figureDress.ts
+   *  figureMaterial): the inside of a hem or sleeve lies in the cloth's own
+   *  shade; drawn at full sky light it read as pale blue-grey patches where a
+   *  leg passes the hem. The closed body never shows its back. Calibratable. */
+  garmentBackShade: 0.5,
+  /** The place sun's shadow normal bias (world units, ≈ one shadow texel):
+   *  self-shadow acne of the double-sided figure material read as dark
+   *  patches on a close white robe, worst on WebGL 2. Calibratable. */
+  sunShadowNormalBias: 0.02,
+  /** Local fit of the legacy garment builder (scripts/villager/garments.py;
+   *  rebuilding public/models/villager.glb applies them). Eases are fractions
+   *  of the stature H; blur width in radians; blend reach a share of the way
+   *  from the crotch to the hem. Calibratable estimates. */
+  garmentFit: {
+    /** The short skirt: ease at the girdle, at the hem, and the hem flare. */
+    skirtShortEaseTop: 0.004,
+    skirtShortEase: 0.008,
+    skirtShortFlare: 0.015,
+    /** A wrapper tied over the chest: its ease at the top edge. */
+    chestWrapEaseTop: 0.005,
+    /** A wrapper tied over the chest: its top edge this far under the
+     *  shoulder joint (fraction of H; the breast cloth's top, under the
+     *  armpits). At chestTop (0.065) the edge mapped onto a woman's upper
+     *  breast, ~1 cm over the nipple, and the breasts stood bare above it
+     *  (work-order points 1482, 1489). Calibratable. */
+    chestWrapTop: 0.045,
+    /** A chest wrapper's ring spacing from its top down to the chest bone's
+     *  head (fraction of H): the wrapper is cut on the man's body and follows
+     *  a woman's breast by its rings alone; 7 cm apart, the cloth between
+     *  two rings cut 2-4 cm through the breast. Calibratable. */
+    chestWrapBustStep: 0.005,
+    /** A chest wrapper on a woman's corners hangs straight down from the
+     *  breast this far in front (fraction of H, garments.clear_corners; the
+     *  sides and back clear their own section only). 0.05 stood the cloth
+     *  off the waist under the bust (work-order point 1482, pass 5); the
+     *  section's own slab already keeps it off the inframammary skin.
+     *  Calibratable. */
+    chestWrapDrape: 0,
+    /** A chest wrapper's top edge dips this far (fraction of H) at the sides
+     *  under the armpits, smoothly from chestWrapSideFrom to chestWrapSideTo
+     *  degrees off the front and back (garments.chest_wrap_column_top): level
+     *  all round, the edge ran through the hanging upper arm and the settle
+     *  pushed the cloth round the arm into a cushion (work-order point 1482,
+     *  pass 5). Calibratable. */
+    chestWrapSideDrop: 0.035,
+    chestWrapSideFrom: 50,
+    chestWrapSideTo: 80,
+    /** The long wrapper's weight blur round the ring below the crotch, and how
+     *  soon the blend of both thighs is complete (also the flaps' reach). */
+    wrapBlurWidth: 1.6,
+    wrapBlendReach: 0.3,
+    /** The long wrapper's blur width at its hem (rad), blending from
+     *  wrapBlurWidth at the crotch: a hem blurred at 1.6 stayed between the
+     *  legs and the forward shin stood through its front in a stride (the
+     *  pre-1482 hem, blurred 0.9, covered it). Calibratable. */
+    wrapHemBlurWidth: 0.9,
+    /** A short sleeve's ring: arm radius × scale + ease + step per ring (m). */
+    sleeveScale: 1.06,
+    sleeveEase: 0.004,
+    sleeveEaseStep: 0.002,
+    /** A long sleeve (the coat, the gown): where its cuff ends along the
+     *  forearm (0 elbow, 1 wrist joint), and its ease from the elbow down (m). */
+    longSleeveWrist: 0.92,
+    longSleeveEase: 0.007,
+    /** The tarboosh: its flat top above the crown (× stature) and the top's
+     *  radius as a share of the rim's. */
+    tarbooshRise: 0.05,
+    tarbooshTopScale: 0.82,
+    /** A hugged garment edge (garments.edge_masks: a tube's top ring, a
+     *  flap's top at the girdle, a sleeve's cap ring): a vertex standing off
+     *  the drawn body by less than this (figure units, ≈ 5 cm) is pulled onto
+     *  it; the edge then rides the skin and the clip fit leaves it. */
+    edgeHugReach: 0.04,
+    /** A flap form's girdle: the band's radial half-thickness (fraction of
+     *  stature, ≈ 2.5 mm); its half-height stays 0.008. A round cord of
+     *  0.008 stood off the waist as a torus. */
+    flapGirdleBand: 0.0015,
+    /** A flap form's front flap (garments.front_flap), a trapezoid round the
+     *  hips: half-angle at its hem (rad). At π/4 from girdle to hem it was a
+     *  flat panel ~±7 cm wide 3-4 cm off the groin, bare beside it from the
+     *  front three-quarter. Estimate, calibratable. */
+    flapFrontHalfAngle: 0.9,
+    /** The front flap's half-angle at the girdle (rad): over the hip bones,
+     *  so the groin creases lie under it. Estimate, calibratable. */
+    flapFrontHalfAngleTop: 1.2,
+    /** The front flap rides both legs alike above the crotch; this share of
+     *  that mirror blend is left at its hem. */
+    flapHemSymmetry: 0.5,
+    /** Round the hips the mirror blend holds within this angle (rad) and
+     *  fades out at flapFrontHalfAngleTop: the flap's side edges ride their
+     *  own thigh. Estimate, calibratable. */
+    flapSymmetryCore: 0.5,
+  },
   /** The driven garments' column bones (docs/garment-stage3-plan-1398.md
    *  section 3.5): per leg bone the margin added to its body capsule's
    *  radius, figure units (≈ 5 mm), exported to extras.villager.columns.
    *  Placeholder until the containment test calibrates it. Calibratable. */
   drivenGarments: {
     capsuleMargin: { thigh: 0.004, shin: 0.004, foot: 0.004, toe: 0.004 },
+    /** The column driver (render/villagerSkirtDriver.ts, plan sections 3.4 to
+     *  3.7; mirrored by scripts/villager/gamepath.py). Angles in degrees,
+     *  lengths in pipeline figure units (× the person's scale at run time),
+     *  heights relative to the stature H. Calibratable placeholders. */
+    driver: {
+      /** Outward tilt bound; the ground fallback alone may reach thetaGround. */
+      thetaMax: 80,
+      thetaGround: 110,
+      /** Coarse sample step, the two refinements about the best sample, the bisection resolution. */
+      coarseStep: 10,
+      refine: [5, 2.5],
+      bisect: 0.25,
+      /** The ground fallback's candidate step over (thetaMax, thetaGround]. */
+      groundStep: 2.5,
+      /** Relaxation time constant toward the gravity target (s) and the rate limit (°/s). */
+      tau: 0.25,
+      omegaMax: 400,
+      /** Largest tilt difference between neighbouring columns. */
+      neighbourLimit: 60,
+      repairRounds: 3,
+      /** Stations along a segment, as fractions from its top pivot. */
+      stations: [1 / 3, 2 / 3, 1],
+      /** Lowest row height over the ground plane. */
+      groundClearance: 0.002,
+      /** Cloth clearance while no driven form supplies its own (the rank-1 band offset). */
+      clearance: 0.006,
+      /** Share of the world-down tilt a lower segment hangs toward (revision 2's gravity blend). */
+      gravityBlend: 1,
+      /** Pelvis profile: crotch below the hips joint, bin height, sample cap and arm-weight cap. */
+      crotch: 0.03,
+      pelvisBin: 0.02,
+      pelvisSamples: 240,
+      pelvisArm: 0.2,
+      /** The containment test's guard on the pelvis band outside the skinned profile (× the
+       *  person's scale): a regression guard, no acceptance threshold (point 1339). Calibratable. */
+      pelvisBandTolerance: 0.007,
+      /** A frame step above this (s) re-enters solving from the gravity solution. */
+      resetDt: 0.25,
+      /** A figure moved farther than this in one frame (world units) was placed, not walked: reset. */
+      teleport: 1,
+    },
   },
   /** Per shell mesh name, a base that replaces garmentShellBase; empty since
    *  the breast cloth returned to its hull-tube builder. Calibratable. */

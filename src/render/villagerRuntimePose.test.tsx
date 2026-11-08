@@ -2,8 +2,8 @@
 // THE RUNTIME-POSE EXPORTER (natural villager motion, concept step 1): the
 // glTF villager posed by the game's OWN code — SkinnedFigure mounted through
 // react-three-fiber's reconciler, its frame callback driven frame by frame —
-// for eight subjects (walk, turn, run, dig, pick-up, point, port-city chaser,
-// river-bank caught child). A stage component plays the caller's part the way
+// for eleven subjects (walk, turn, run, dig, pick-up, point, port-city chaser,
+// river-bank caught child, and the Western suit, gown and drill walking). A stage component plays the caller's part the way
 // PlaceLife.tsx does (it moves, turns and squashes the figure's group and
 // writes the pose after the figure's own frame), using the same exported pose
 // functions. Nothing here changes a pose: it records one.
@@ -43,6 +43,7 @@ import {
   type GestureState,
 } from './gesture'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
+import { ROUND_TRIP_SEQUENCES, runSequence } from './villagerSkirtDriverSequences'
 import { garmentMeshName, gltfLayerGeometry, gltfPerson, gltfShellParts, isShellLayer } from './villagerFigureBody'
 import { tidy } from './figureBody'
 import { applyGarmentMask } from './villagerGarmentMask'
@@ -95,7 +96,7 @@ interface Subject {
 
 const yawStep = (from: number, to: number, rate: number, dt: number) => from + Math.max(-rate * dt, Math.min(rate * dt, to - from))
 
-/** The eight subjects. Paces and timings: see each `drive`. */
+/** The eleven subjects. Paces and timings: see each `drive`. */
 const SUBJECTS: Subject[] = [
   {
     // a villager walking straight ahead at 1.0 units/s (~1.3 m/s)
@@ -284,6 +285,59 @@ const SUBJECTS: Subject[] = [
       w.slump = easeWeight(w.slump, c.t >= 0.4, VILLAGER_POSE.caughtSlump.settleSeconds, dt)
       c.pose = bankFigurePose(c.t >= 0.4, gesturePose(c.gesture), 0, TAG, w.slump)
     },
+  },  {
+    // the Western suit (coat, long trousers, shoes) walking, as at Giza
+    id: 'suit',
+    title: 'suit: Giza tourist man, 1.0 u/s',
+    sex: 'male',
+    age: 'adult',
+    scale: 1,
+    peopleId: 'european',
+    seconds: 2.7,
+    from: 1.5,
+    to: 2.6,
+    frames: 8,
+    views: ['side', 'front'],
+    drive: (c, dt) => {
+      c.root.position.z += 1.0 * dt
+      c.pose = REST_POSE
+    },
+  },
+  {
+    // the Western gown and shoes walking, as at Giza
+    id: 'gown',
+    title: 'gown: Giza tourist woman, 1.0 u/s',
+    sex: 'female',
+    age: 'adult',
+    scale: 1,
+    peopleId: 'european',
+    seconds: 2.7,
+    from: 1.5,
+    to: 2.6,
+    frames: 8,
+    views: ['side', 'front'],
+    drive: (c, dt) => {
+      c.root.position.z += 1.0 * dt
+      c.pose = REST_POSE
+    },
+  },
+  {
+    // the khaki drill and boots walking (the traveller)
+    id: 'drill',
+    title: 'drill: expedition leader, 1.0 u/s',
+    sex: 'male',
+    age: 'adult',
+    scale: 1,
+    peopleId: 'expedition',
+    seconds: 2.7,
+    from: 1.5,
+    to: 2.6,
+    frames: 8,
+    views: ['side', 'front'],
+    drive: (c, dt) => {
+      c.root.position.z += 1.0 * dt
+      c.pose = REST_POSE
+    },
   },
 ]
 
@@ -397,7 +451,7 @@ async function play(s: Subject) {
 /** A forced shell layer (the round trip reads geometry, never its colour). */
 const shellLayer = (name: string): DressLayer => {
   const [, form, wear] = name.split('-')
-  const slot = form === 'trousers' ? 'hip' : 'ornament'
+  const slot = form.startsWith('trousers') ? 'hip' : 'ornament'
   return { slot, form, wear, material: 'cotton', colour: '#888888', colour2: null, pattern: 'plain', source: { guess: 'round trip' } } as DressLayer
 }
 
@@ -408,6 +462,9 @@ const SHELL_OUTFITS: Array<{ sex: Sex; age: AgeGroup; worn: string[] }> = [
   { sex: 'female', age: 'adult', worn: ['g-trousers-waist', 'g-neckBeads-neck', 'g-neckBeads-chest', 'g-waistBeads-waist'] },
   { sex: 'female', age: 'adult', worn: ['g-neckBeads-neck', 'g-neckBeads-chest'] },
   { sex: 'male', age: 'child', worn: ['g-waistBeads-waist', 'g-trousers-waist'] },
+  // the Western suit and the expedition drill (Giza tourists, the traveller)
+  { sex: 'male', age: 'adult', worn: ['g-trousersLong-waist', 'g-shoes-feet'] },
+  { sex: 'male', age: 'adult', worn: ['g-trousersLong-waist', 'g-boots-feet'] },
 ]
 
 function shellRoundTrip() {
@@ -428,11 +485,24 @@ function shellRoundTrip() {
   })
 }
 
+/** The column driver's round trip (scripts/villager/gamepath.py column_round_trip):
+ *  per fixed-dt sequence the rig and config the game solved with, and every
+ *  frame's dt and bone locals (the columns as the driver wrote them). No driven
+ *  garment is worn: the columns are posed, unweighted. */
+function columnRoundTrip() {
+  if (!asset.columns) return []
+  return ROUND_TRIP_SEQUENCES.map((s) => {
+    const frames: Array<{ dt: number; bones: Array<ReturnType<typeof trs>> }> = []
+    const d = runSequence(asset, s, (f) => frames.push({ dt: f.dt, bones: f.bones.map(trs) }))
+    return { id: s.id, rig: d.rig, config: d.cfg, counters: { ...d.counters }, frames }
+  })
+}
+
 describe('the runtime-pose exporter', () => {
-  it('records all eight subjects through the game\'s own figure, and the export is complete', async () => {
+  it('records all eleven subjects through the game\'s own figure, and the export is complete', async () => {
     const out: Awaited<ReturnType<typeof play>>[] = []
     for (const s of SUBJECTS) out.push(await play(s))
-    expect(out.map((s) => s.id)).toEqual(['walk', 'turn', 'run', 'dig', 'pickup', 'point', 'chaser', 'caught'])
+    expect(out.map((s) => s.id)).toEqual(['walk', 'turn', 'run', 'dig', 'pickup', 'point', 'chaser', 'caught', 'suit', 'gown', 'drill'])
     for (const s of out) {
       const spec = SUBJECTS.find((x) => x.id === s.id)!
       expect(s.frames.length, s.id).toBe(spec.frames)
@@ -463,6 +533,10 @@ describe('the runtime-pose exporter', () => {
     expect(by('dig').frames.some((f) => f.tool?.visible)).toBe(true)
     const yaw = (q: number[]) => 2 * Math.atan2(q[1], q[3])
     expect(yaw(by('turn').frames.at(-1)!.root.q)).toBeGreaterThan(1.5)
+    // the Western subjects wear their shells, so the runtime report measures them
+    expect(by('suit').garments).toEqual(expect.arrayContaining(['g-trousersLong-waist', 'g-shoes-feet']))
+    expect(by('gown').garments).toEqual(expect.arrayContaining(['g-shoes-feet']))
+    expect(by('drill').garments).toEqual(expect.arrayContaining(['g-trousersLong-waist', 'g-boots-feet']))
     for (const id of ['walk', 'run', 'chaser']) expect(by(id).frames.at(-1)!.root.p[2] - by(id).frames[0].root.p[2]).toBeGreaterThan(0.5)
     // natural-villager-motion steps 15/16 on the COMPOSED body: the caught
     // child, once settled, stands planted (no foot drift, no squash) with the
@@ -504,7 +578,7 @@ describe('the runtime-pose exporter', () => {
     const path = process.env.VILLAGER_RUNTIME_POSES
     if (path) {
       mkdirSync(dirname(path), { recursive: true })
-      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out, shells: shellRoundTrip() }))
+      writeFileSync(path, JSON.stringify({ version: 1, bones: asset.bones, parents: asset.parents, dt: DT, subjects: out, shells: shellRoundTrip(), columns: columnRoundTrip() }))
     }
   }, 120_000)
 })
