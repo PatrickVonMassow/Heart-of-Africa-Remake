@@ -118,11 +118,12 @@ describe('a touch on the glTF body', () => {
     expect(crouch[0]).toBeGreaterThan(0.3)
   }, 60_000)
 
-  it('while a point, which grows out of rest, still hands the arm over from the clips', async () => {
-    // the hand-over is kept for every gesture that eases in itself: the first
-    // frame of a point stands near the clip's hanging arm, not at its aim
-    const { trace } = await handTrace('point')
-    const settled = trace[trace.length - 1]
-    expect(trace[0].distanceTo(settled)).toBeGreaterThan(0.05)
-  }, 60_000)
+  it('only a gesture that begins at its pose skips the clips\' hand-over', () => {
+    // a point grows out of rest itself, so its arm is still handed over from
+    // the clips; only the touch names its arm as arriving
+    const at = { bearing: 0.35, elevation: -0.45, duration: 4 }
+    const posed = (kind: GestureKind) => gesturePose(advanceGesture(startGesture(kind, at), 1 / 60))
+    expect(posed('point').arrive).toBeUndefined()
+    expect(posed('touch').arrive).toBeDefined()
+  })
 })

@@ -1627,7 +1627,10 @@ export function bankFigurePose(
   if (shown.arrive) free.arrive = shown.arrive
   const pose = slumped ? caughtSlumpPose(cfg) : free
   if (slump <= 0) return pose
-  return { ...pose, body: mixPose(free, caughtBodyPose(slumpCfg), smooth01(slump)) }
+  const body = mixPose(free, caughtBodyPose(slumpCfg), smooth01(slump))
+  // the blend carries no extras: a child easing out of its slump still taps
+  if (!slumped && free.arrive && body !== free) body.arrive = free.arrive
+  return { ...pose, body }
 }
 
 // ---- the glTF body's tag poses (natural-villager-motion steps 15 and 16) -----
