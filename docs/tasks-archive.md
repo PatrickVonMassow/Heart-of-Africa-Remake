@@ -35698,3 +35698,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Verifiable: polish-children --section=children-motion green for that frame on both backends; frame judged by looking.
   Bundle: Dorfleben.
   Criticality: low - a test frame's aim; blocks the suite's covering run.
+- [x] 1341. Pipeline garments: smooth the crumpled fold surface, fit the head cover, measure the garment frame cost
+  Queue position: after point 1340.
+  Source: findings carrier 12.10.2026 02:47Z, picture check of point 1315 (feat/1315 8aaf9ac28, 1294-dress-swahili.png WebGPU vs main): kanzu and kanga/buibui robes show a lumpy crumpled-paper fold surface at the normal camera distance, and the red women's head cover rises to a peak above the head. The same frame read 10 FPS on the branch against 21 on main (one snapshot on an unquiet host) with villager.glb at 6.9 MB.
+  Final state (rewritten 04.11.2026 by point 1487): the current coastal robes read as smooth cloth and the head cover follows the head without a peak at the normal camera distance; the frame cost of the garment glb is compared on a quiet host against the pre-1315 main in a repeatable measurement of at most one hour, and reduced if it costs measurably.
+  Verifiable: 1294-dress-swahili.png before/after on both backends, judged by looking; the recorded repeatable FPS comparison. (The former "garment penetration gate green" is dropped: it contradicts the point 1339 procedure.)
+  Criticality: medium - every coastal villager; possible frame-rate cost on all villager scenes.
+  Bundle: Dorfleben.
+  Closed 08.11.2026 by the user order in point 1488 item 5 (05.11.2026, verbatim: "1341 is dropped (closed as cancelled)."): cancelled. The unlanded robe-hang and hood-dome fix stays on origin/feat/1341-garment-smooth-surface with its rebuilt villager.glb; recorded in docs/backlog.md, revived only by owner decision.
