@@ -11,6 +11,7 @@ import {
   contactWantsLean,
   holdsPosedReach,
   leastLean,
+  nextRelease,
   searchDeepBend,
   gestureArmEuler,
   hangToward,
@@ -130,6 +131,20 @@ describe('the contact lean', () => {
     expect(bend(false, [null, 1])).toBe(0)
     // once the release has faded out an ordinary contact bends nearest again
     expect(bend(false, [null, null])).toBe(0.2)
+  })
+  it('ends a reach’s release when an arriving touch takes the arm over', () => {
+    const at = { releasing: null, reach: undefined, lastReach: null, arrive: false, clipsOn: true }
+    // a reach given up starts releasing at its last value, and carries on
+    const started = nextRelease({ ...at, lastReach: 0.6 })
+    expect(started).toBe(0.6)
+    expect(nextRelease({ ...at, releasing: started })).toBe(0.6)
+    // a touch arriving on the releasing arm drops the stale release target,
+    // also on the very frame the reach is given up
+    expect(nextRelease({ ...at, releasing: started, arrive: true })).toBeNull()
+    expect(nextRelease({ ...at, lastReach: 0.6, arrive: true })).toBeNull()
+    // a reach on the arm owns it too; without clips nothing releases
+    expect(nextRelease({ ...at, releasing: started, reach: 0.4 })).toBeNull()
+    expect(nextRelease({ ...at, lastReach: 0.6, clipsOn: false })).toBeNull()
   })
 })
 

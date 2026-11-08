@@ -461,6 +461,10 @@ describe('the caught child on the glTF body (natural-villager-motion step 16)', 
     expect(half.body!.lean).toBeGreaterThan(0.12 * 0.3)
     expect(half.body!.lean).toBeLessThan(0.2)
     expect(bankFigurePose(false, shown, 0.2, CFG, 0).body).toBeUndefined()
+    // a child easing out of its slump keeps its touch's arrival on the body
+    const tap = { ...shown, arrive: { left: true } }
+    expect(bankFigurePose(false, tap, 0.2, CFG, 0.5).body!.arrive).toEqual({ left: true })
+    expect(bankFigurePose(true, tap, 0.2, CFG, 0.5).body!.arrive).toBeUndefined()
     // a pose blend at its ends is either pose exactly
     expect(mixPose(shown, caughtBodyPose(), 0)).toBe(shown)
   })
