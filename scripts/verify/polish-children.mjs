@@ -498,11 +498,12 @@ if (section('tag-catch')) {
           : // readied and still: no grab out or easing back after a miss, no arm handover
             gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side && w.reach <= 0 && !(w.handover > 0)
       if (!inWindow) return null
-      // the SAME runner through the series: two children's still hands at
-      // different places would otherwise read as one swinging pair
+      // the SAME runner through a far series: two children's still hands at
+      // different places would otherwise read as one swinging pair. The near
+      // series judges only the catcher, so a runner never ends it.
       const isRunner = (k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind)
-      const runner = lock ? lock.runnerIndex : t.children.findIndex(isRunner)
-      if (runner < 0 || !isRunner(t.children[runner], runner)) return null
+      const runner = want !== 'far' ? -1 : lock ? lock.runnerIndex : t.children.findIndex(isRunner)
+      if (want === 'far' && (runner < 0 || !isRunner(t.children[runner], runner))) return null
       return {
         gap,
         clock: t.clock,
@@ -512,7 +513,7 @@ if (section('tag-catch')) {
         side: w ? w.side : null,
         chaser: window.__placeTagHands(t.chaser),
         runnerIndex: runner,
-        runner: window.__placeTagHands(runner),
+        runner: runner < 0 ? null : window.__placeTagHands(runner),
       }
     }
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
