@@ -5,7 +5,7 @@
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { assertBackend } from './_browser.mjs'
 import { waitForSceneReady } from './frameSubject.mjs'
-import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
+import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeRunnerArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
 import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
 
@@ -570,11 +570,8 @@ if (section('tag-catch')) {
       !!far && ['left', 'right'].every((side) => sweep(far, side) > 0.12),
       far ? `${fmt(far, 'left')}; ${fmt(far, 'right')} at ${far[0].gap.toFixed(2)} m` : 'no far chasing stride without a grab',
     )
-    check(
-      "while a runner's hands hang at its sides",
-      !!far && far[0].runner?.length === 2 && far[0].runner.every((h) => h.local.z < 0.15),
-      far ? JSON.stringify(far[0].runner?.map((h) => h.local)) : 'no runner frame',
-    )
+    const runnerArms = judgeRunnerArms(far)
+    check("while a runner's hands hang at its sides or swing with its run (neither is held out)", runnerArms.ok, runnerArms.detail)
     // Inside the prepare window the readied hand is HELD out in front while
     // the free hand keeps swinging. Every window read until the first long one
     // is judged (judgePrepareArms), so a short defective window is never

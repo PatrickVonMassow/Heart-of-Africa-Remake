@@ -203,6 +203,23 @@ export const armSweep = (series, side) => {
   return Math.max(...z) - Math.min(...z)
 }
 export const armMinZ = (series, side) => Math.min(...series.map((r) => handZ(r, side)))
+/**
+ * A runner's hands are not HELD out the way the catcher's readied one is: each
+ * hangs (never ahead of `readiedAhead`) or swings with the run (a full
+ * `freeSweep`), since a running child carries its arms bent in front for most
+ * of its stride (point 1344). `{ ok, detail }` over the runner's frames.
+ */
+export function judgeRunnerArms(series) {
+  const frames = (series || []).filter((r) => r.runner?.length === 2)
+  if (!frames.length) return { ok: false, detail: 'no runner frame' }
+  const sides = ['hand-left', 'hand-right'].map((name) => {
+    const z = frames.map((r) => r.runner.find((h) => h.hand === name).local.z)
+    const sweep = Math.max(...z) - Math.min(...z)
+    return { name, max: Math.max(...z), sweep, ok: Math.max(...z) < PREPARE_ARMS.readiedAhead || sweep > PREPARE_ARMS.freeSweep }
+  })
+  const detail = sides.map((h) => `${h.name} max z ${h.max.toFixed(3)} sweep ${h.sweep.toFixed(3)}`).join('; ')
+  return { ok: sides.every((h) => h.ok), detail: `${detail} over ${frames.length} frames` }
+}
 const fmtArm = (series, side) => `${side} sweep ${armSweep(series, side).toFixed(3)} min z ${armMinZ(series, side).toFixed(3)}`
 const otherSide = (side) => (side === 'left' ? 'right' : 'left')
 
