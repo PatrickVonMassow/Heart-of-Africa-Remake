@@ -30,7 +30,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, holdsPosedReach, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, newGaze, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, holdsPosedReach, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, newGaze, nextRelease, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -483,10 +483,10 @@ export function SkinnedFigure({
       for (const i of [0, 1] as const) {
         const k = reachOfPose(i)
         const v = arms.current[i]
-        if (k !== undefined) {
-          releasing.current[i] = null
-          releasedAt.current[i] = v ? { pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z } : null
-        } else if (lastReach.current[i] !== null && gltf && clips) releasing.current[i] = lastReach.current[i]
+        if (k !== undefined) releasedAt.current[i] = v ? { pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z } : null
+        // an arriving touch takes the arm over from a reach easing back
+        const arrive = !!(i === 0 ? extras?.arrive?.left : extras?.arrive?.right)
+        releasing.current[i] = nextRelease({ releasing: releasing.current[i], reach: k, lastReach: lastReach.current[i], arrive, clipsOn: !!(gltf && clips) })
         lastReach.current[i] = k ?? null
       }
       const reachFor = (i: number) => reachOfPose(i) ?? releasing.current[i] ?? undefined
