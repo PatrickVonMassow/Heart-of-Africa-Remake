@@ -2064,16 +2064,16 @@ if (section('children-bank-game')) {
      *  (measured 10.09.2026, WebGPU). The offset between the drawn hand and the
      *  drawn body says which side to stand on. */
     //
-    // `stand` picks an ALTERNATIVE standpoint on the same flank when a passer-by
+    // `alt` picks an ALTERNATIVE standpoint on the same flank when a passer-by
     // blocks the first one (work-order 1491): the quarter-turn widens or narrows
     // around the rock, never towards 0 (behind the child) or π (the rock in front
     // of the hand), and never to the other flank (the body in front of the hand).
-    const aimAtTap = async (hand, stand = 0) =>
-      !!(await page.evaluate(({ h, stand }) => {
+    const aimAtTap = async (hand, alt = 0) =>
+      !!(await page.evaluate(({ h, alt }) => {
         const p = window.__placePlayer
         if (!p) return null
         const bearing = Math.atan2(h.x - h.rock.x, h.z - h.rock.z)
-        const turn = [0.9, 1.3, 0.6, 1.7][stand % 4]
+        const turn = [0.9, 1.3, 0.6, 1.7][alt % 4]
         const at = (s) => ({
           x: h.rock.x + Math.sin(bearing + turn * s) * 4.2,
           z: h.rock.z + Math.cos(bearing + turn * s) * 4.2,
@@ -2098,7 +2098,7 @@ if (section('children-bank-game')) {
         p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
         p.pitch = -0.1
         return true
-      }, { h: hand, stand }))
+      }, { h: hand, alt }))
     // THE BUDGET IS THE HOLD'S OWN LENGTH, NOT A ROUND NUMBER (work-order 1065).
     // INSIDE a hold this loop steps ONE frame per turn, so reading a hold from
     // the word to its far side costs as many turns as the lane draws frames in
