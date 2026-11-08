@@ -1157,7 +1157,7 @@ async function checkChildrenMotion(motionPlace) {
       const p = window.__placePlayer
       const best = window.__pickChildVantage()
       if (!p || !best) return null
-      const pose = { x: p.x, z: p.z, yaw: p.yaw }
+      const pose = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch }
       p.x = best.sx
       p.z = best.sz
       // LOOK AT WHAT THE FRAME DECLARES. The camera used to face the centroid of
@@ -1189,12 +1189,16 @@ async function checkChildrenMotion(motionPlace) {
     if (aimed) {
       await nextFrames(2)
       // The declared child is read where it is NOW, and the camera turned to it
-      // again: the frames since the aim are frames of a walking child.
+      // again: the frames since the aim are frames of a walking child. The pitch
+      // is aimed at its head too — without the shutter's settle a child two
+      // metres off fell out under the bottom edge of the upward-looking view.
       const at = await page.evaluate((ki) => {
         const p = window.__placePlayer
         const k = window.__placeTag()?.children[ki]
+        const eyeY = window.__placeCamera?.position.y
         if (!p || !k) return null
         p.yaw = Math.atan2(-(k.x - p.x), -(k.z - p.z))
+        if (eyeY != null) p.pitch = -Math.atan2(eyeY - 1.0, Math.max(0.5, Math.hypot(k.x - p.x, k.z - p.z)))
         return { x: k.x, z: k.z }
       }, aimed.ki)
       if (at) {
@@ -1223,6 +1227,7 @@ async function checkChildrenMotion(motionPlace) {
         p.x = pose.x
         p.z = pose.z
         p.yaw = pose.yaw
+        p.pitch = pose.pitch
       }, aimed.pose)
     }
     // The world goes back as it was found, the injected search included — every
