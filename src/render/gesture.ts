@@ -154,6 +154,11 @@ export interface FigurePose {
    *  the face needs its elbow down in front, or the solve raises it beside
    *  the head (point 1450). */
   elbow?: { left?: [number, number, number]; right?: [number, number, number] }
+  /** An arm that stands at its pose from the gesture's first frame on (a
+   *  GESTURE_NO_FADE_IN kind, the touch): the glTF body takes it from its
+   *  clips in that frame instead of over VILLAGER_GLTF.transitionSeconds,
+   *  so the hand is on its contact as the word falls. */
+  arrive?: { left?: boolean; right?: boolean }
   /** The glTF body's own pose where it differs from this one, which the
    *  primitive figure keeps (the low preset untouched, natural-villager-motion
    *  constraint 7): applyFigurePose writes it onto a skinned figure's pivots. */
@@ -179,6 +184,7 @@ export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
   into.gaze = from.gaze
   into.reach = from.reach
   into.elbow = from.elbow
+  into.arrive = from.arrive
   into.body = from.body
 }
 
@@ -529,6 +535,9 @@ export function gesturePose(s: GestureState): FigurePose {
   // An aim solved from the drawn shoulder (`side` given) is held along that
   // line by the glTF body's drawn arm, not reached to the primitive's hand.
   if (s.side && (s.kind === 'point' || s.kind === 'indicate')) posed.reach = side === 'left' ? { left: 1 } : { right: 1 }
+  // A kind that begins at its pose names its arm, so the glTF body does not
+  // ease it out of the clips' swing after the word has fallen.
+  if (GESTURE_NO_FADE_IN.includes(s.kind)) posed.arrive = side === 'left' ? { left: true } : { right: true }
   return posed
 }
 

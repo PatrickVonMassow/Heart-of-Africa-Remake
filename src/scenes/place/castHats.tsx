@@ -1,8 +1,10 @@
 // The brimmed hats of the non-villager cast (docs/giza-1890.md §4.1): the sun
 // helmet of the Western men and the expedition leader, and the women tourists'
-// hat. The garment set holds no brimmed hat, so they ride the figure's crown as
-// a head prop (`Figure headProp`) on either body. Authored for the skinned
-// head, scaled up to the larger primitive head on the low preset.
+// hat. They stay a head prop on the figure's crown (`Figure headProp`) on
+// either body rather than a garment of the villager builder: a brim bounds no
+// volume for the garment cover mask (scripts/villager/mask.py), whose 32 places
+// are nearly spent. Authored for the skinned head, scaled up to the larger
+// primitive head on the low preset.
 
 import { useContext, type ReactNode } from 'react'
 import { FIGURE_STATURE } from '../../render/figureBody'

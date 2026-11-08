@@ -7,6 +7,7 @@ import {
   PREPARE_ARMS,
   describeReading,
   judgePrepareArms,
+  judgeRunnerArms,
   recordArmFrame,
   ARM_ACQUISITION,
   judgeTagStandpoint,
@@ -289,5 +290,29 @@ describe('the prepare window is recorded to its end', () => {
     const acq = { first: frames[0], all: [frames[0]], frames: 0 }
     const got = frames.slice(1, 50).reduce((r, f) => r ?? recordArmFrame(acq, f, { ...ARM_ACQUISITION.near, maxFrames: 40 }), null)
     expect(got.complete).toBe(false)
+  })
+})
+
+describe("a runner's arms are never held out", () => {
+  const frame = (l, r) => ({ runner: [{ hand: 'hand-left', local: { z: l } }, { hand: 'hand-right', local: { z: r } }] })
+  it('passes the bent run swing measured 08.11.2026 on WebGPU, both hands ahead but sweeping', () => {
+    const series = [frame(0.401, 0.104), frame(0.3, 0.2), frame(0.152, 0.359)]
+    expect(judgeRunnerArms(series).ok).toBe(true)
+  })
+  it('passes hands hanging still at the sides', () => {
+    expect(judgeRunnerArms([frame(0.02, -0.03), frame(0.04, -0.01)]).ok).toBe(true)
+  })
+  it('fails a hand held still out in front', () => {
+    const got = judgeRunnerArms([frame(0.35, 0.0), frame(0.37, 0.1), frame(0.36, -0.05)])
+    expect(got.ok).toBe(false)
+    expect(got.detail).toMatch(/hand-left max z 0\.370 sweep 0\.020/)
+  })
+  it('fails without a runner frame', () => {
+    expect(judgeRunnerArms([]).ok).toBe(false)
+    expect(judgeRunnerArms(null).detail).toBe('no runner frame')
+    // two children each holding still hands do not add up to one sweep
+    const a = { ...frame(0.2, 0.2), runnerIndex: 1 }
+    const b = { ...frame(0.4, 0.4), runnerIndex: 2 }
+    expect(judgeRunnerArms([a, b, a]).ok).toBe(false)
   })
 })

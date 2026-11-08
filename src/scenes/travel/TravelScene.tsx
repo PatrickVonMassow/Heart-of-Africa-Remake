@@ -2506,7 +2506,7 @@ function Player() {
   /** Kneels in the canoe: the legs fold into the hull. */
   const kneeling = useRef(false)
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
-  const look = useFigureLook(null, TRAVELLER_PALETTE, 'european')
+  const look = useFigureLook(null, TRAVELLER_PALETTE, 'expedition')
   const limbSegments = useUi(effectiveFigureLimbSegments)
   const heading = useRef(0)
   const last = useRef<{ x: number; z: number } | null>(null)

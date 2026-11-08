@@ -112,71 +112,13 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try. Point 1419 (cloud session_019XD8Qts48RxNzEfjXP9wSR, 27.10.2026) does not meet item 2 either: owner commits after the handover (capture subject fix, review fix) changed the tree, so build, lint and test:unit ran again before the merge; acceptance log local/1419-land.log.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 1482. Villager garments stage 3, sub-steps 3 to 7: driven builder and migration of skirts, loin flap, apron and girdle tails
-  Queue position: directly after point 1480.
-  Source: split from point 1398 on 02.11.2026 (owner decision under the standing split rule): point 1398 lands sub-step 1 (column bones, unchanged picture) of docs/garment-stage3-plan-1398.md section 7; point 1480 lands sub-step 2 (the column driver, 03.11.2026); this point carries sub-steps 3 to 7 and the user goal inherited from point 1347 (user 12.10.2026: a walking villager's swing leg leaves its trouser leg behind; a child's hip cloth stands off the body like a diaper).
-  Spec: docs/garment-stage3-plan-1398.md (revision 5) sections 3.2 to 3.16 and section 7 items 3 to 7 (driven builder with loinFlap and girdleTails; apron; skirtShort and skirtKnee; routing under outer garments; penetration.py rows and the final picture pass). Each sub-step may land on its own under the same rule.
-  Procedure: implementation gets the usual cross-vendor code review; per point 1339 no numeric penetration threshold is an acceptance gate.
-  Carried from point 1347: the child's hip cloth standing off the body all round (user report local/WindelLook.zip); the legacy loin-flap girdle reading as a torus standing off the waist (1347 acceptance frames waistbeads-under-loinflap and collars-skin, 21.10.2026); the `shoulders` clip making 23 garments deeper than main's idle (skirtShort 0.0214 vs 0.0036, charged from point 1354) where it concerns these forms; the pale blue-grey (WebGPU) / dark (WebGL 2) patches at the skirt hem where the leg passes (charged from point 1380, verification/1380-figure-micro-walk-pair*.png).
-  Final state: every generated outfit with a skirt, loin flap, apron or girdle tails looks dressed at 3 m and 7 m in a port city and a village on both backends, walking, running, kneeling and digging: no hem stands visibly off the body, no leg passes through the cloth, no under-garment or back face shows through; the legacy builders for these forms are removed.
-  Verifiable: plan and break-check record; forced-outfit acceptance rows per form in `polish-villagers`, both backends, picture-checked, the WindelLook situation re-shot; pipeline selftests and Vitest; cross-vendor review record.
+- [ ] 1491. Frame 1106 arriving runner occluded by a passing adult on WebGL 2
+  Queue position: directly behind point 1385.
+  Source: findings carrier 08.11.2026 05:25Z, picture check of point 1344: WebGL 2 children-bank-game section green at feat/1344 429fb29e1 (local/verify-logs/2026-11-08T05-11-37-658-polish-children.log), but verification/1106-arriving-runner-hand-on-the-far-stone.png is mostly covered by a woman with a head load walking into the camera; the arriving runner's hand at the far stone is barely visible. The WebGPU frame of the same run is clear. The shutter does not refuse a foreground occluder of the subject.
+  Final state: the 1106 frame shows the arriving runner's hand at the far stone unoccluded at the shutter on both backends.
+  Verifiable: polish-children --section=children-bank-game on both backends; frame judged by looking.
   Bundle: Dorfleben.
-  Criticality: high - every villager wearing these forms, visible at first glance.
-  Status 03.11.2026 (branch at 85700efa4): CI unit red, the male elder's kneel test runs 340 s (limit 60 s). Cause measured: already while walking the elder's upper segments 5-8 sit at thetaMax 80° with a triangle residual every frame, so each frame pays ~9 joint searches; no tilt clears those triangles (likely waist-anchored top rows inside the elder's pelvis profile or a capsule) and the panel stands 80° off the body. Next: locate the offending triangles and constraint, fix the elder fit per plan sections 3.5/3.6, then re-time. Status 03.11.2026 10:31 (cloud author session_019XD8Qx7VNonA6UAqMyBRoP, branch at 9ca48a230 = main merged; build 0, lint 0, test:unit pending there): cause located, fix needs a plan decision (section 3.5). The thigh capsule radius (elder 0.13, shin 0.073) is set by buttock vertices at crotch height (y 0.66-0.69, thigh weight >0.1), so its hip-joint hemisphere reaches y ~0.81, above the waistband at 0.779; the row-0 triangles with anchored waistband vertices lie inside that capsule at every tilt (violation 0.96-1.81 on segments 5-8). This affects male adult as well. Trial: radius only over vertices below the profile bottom cuts the violation to 0.01-0.025 but turns villagerSkirtDriverContainment red (leg surface near the crotch up to 1.4 cm outside, male adult walk 1.1 / jog 2.8), so it was discarded. A small residual remains: row 0 lies ~1.3 cm inside the pelvis profile. Kneel test file measured 992 s in the cloud VM (loaded). Next: decide how section 3.5 bounds the thigh capsule near the crotch (e.g. clip its top hemisphere at the profile bottom and let the pelvis profile cover the crotch) without losing containment, then implement and re-time. Result 10:57 (same cloud session, context exhausted, ended): the preferred clip (thigh capsule radius only over vertices below the profile bottom, with 240/1000/4000 pelvis samples) keeps containment RED - buttock vertices at rest y 0.664-0.678 sit above the profile bottom but sink below it in the hips frame while walking/jogging, where per section 3.5 only the capsule answers (thigh.L 1.38 cm, thigh.R 1.40 cm outside, male adult walk 1.1 / jog 2.8). Both trials reverted; no fix commit. test:unit on 9ca48a230: exit 1, 4/18489 red - the elder kneel (1137 s), villagerColumnBones 'carry no clip channel and no skin weight' (likely stale against driven panels, unverified), scripts/batch-doctor-protected.test.mjs 2 cases (likely cloud-VM, local re-run owed); containment green on the base. Next: a section 3.5 rule where the pelvis profile is also asked below its bottom for the crotch band (or a posed, not rest, height cut for the capsule), then re-run containment and the kneel test. Decision 03.11.2026 12:15 (owner, no-standstill rule, user veto on the board): variants 1 + 3 of local/1482-elder-local-report.md. (1) Thigh capsules constrain a panel point only where its posed hips-frame height lies below the pelvis profile bottom (crotch - 0.02 H); above it the profile alone governs; the capsule radius rule is unchanged. (2) Containment additionally asserts that rendered pelvis/leg samples at or above the profile bottom lie in the profile alone; a red there stops and reports. (3) A panel triangle with two exempt (band/row-0) vertices skips the centroid check; its third vertex is still tested. Plan sections 3.5/3.6 get a matching revision line on the branch. Full text: local/1482-decision-3.5.md. Result 12:44 (cloud author session_019XD8QvTDDj6ybJnwaED8Ce, branch at b94b24e04, GitHub CI green there): rules 1 and 3 implemented in TS driver and gamepath.py (7556de95b); stale villagerColumnBones skin-weight test now exempts driven panels (b94b24e04, 5/5 green). Decision rule 2 tripped: the new "at or above the profile bottom, profile alone" containment assertion is red only in stand<->walk blend poses (weights 0.25/0.5), with thigh, shin, foot and toe samples 0.35-0.66 outside the profile; feet sit at rest y ~0.005, so a foot landing above the profile bottom in the hips frame points to a wrong hips matrix in the blend poses or a fault in the check itself (unverified). Elder kneel test still red: 91.9 s alone (limit 60 s; before 340 s). batch-doctor-protected 2 reds judged environment. Plan sections 3.5/3.6 not yet revised. Next: verify the hips frame used by the containment check in the stand<->walk blends (compare with the driver's own hips frame); then re-time the elder kneel and look at which constraint still costs the joint searches. Handover 03.11.2026 14:10 (batch session at the context watermark): live cloud author session_019XD8QtXYcNHmCuQry2keV1 (started 13:37) pushed ffd3ea844 (containment drives the game's speed/walk-weight state) and 1365e958c (triangle clip at the profile bottom; elder kneel 41.8 s, green) and runs build/lint/test:unit there; containment still red only in the dig squat (knee above the profile bottom). Owner decision 13:56 sent to it (rules 1'/2': above the bottom also the knee-half thigh capsules, t >= 0.5; profile-alone assertion only for band and hip-half thigh samples; local/1482-decision-3.5.md). Successor: FETCH before any agent check (point 1484), read its log (RemoteTrigger get_run_log), do not start a second author while it is live. Status 03.11.2026 17:00 (batch session): garment-acceptance section GREEN on WebGPU at 5a3172fcc (150 frames, 67 min, local/verify-logs/2026-11-03T14-35-47-529-polish-villagers.log); GitHub CI green at 5a3172fcc; cloud author idle since that push. main merged into the branch (340a1bb6c, docs only, pushed). Running: full polish-villagers WebGPU on 340a1bb6c (local/1482-polish-villagers-full-webgpu.out, VERIFY_SUITE_TIMEOUT_MS=10800000, ladder waived for the docs-only merge) and cross-review passes 1-7 of 340a1bb6c (local/1482-cross-review-pass*.out; passes 2-7 detached via local/1482-review-passes.sh, status in local/1482-review-passes.status); the review had refused for the 235k one-line verification/villager-body/split-parents.json diff until 01bb22e53 marked it -diff. WebGPU frames of 5a3172fcc saved to the session scratchpad only; picture notes: skirts sit well (dig-stout, walk-slight), the loin flap now shows as a rear cloth where main showed none; breastcloth-under-bust filed in docs/backlog.md. Pass 1 (GPT-6.1 Sol) returned VERDICT do-not-merge (conflicting envelope rules, see local/1482-cross-review-pass1.out). Next: read the suite receipt and all review records, fix confirmed findings, then the WebGL 2 garment-acceptance picture run (the frames carry no backend suffix, so save the WebGPU set first), commit the frames, land. Status 03.11.2026 17:18 (batch session): the full WebGPU polish-villagers run on 340a1bb6c was killed by SIGTERM after 30 min at the session handover (no product red; local/verify-logs/2026-11-03T15-44-51-745-polish-villagers.log), so it closes as charged to the handover and re-runs after the fixes. Review passes 1-7 of 340a1bb6c recorded in .claude/mechanism-reviews.jsonl: 3/4/7 merge, 2/5/6 merge-with-fixes, 1 do-not-merge; eight findings (missing kneel-transition/carry/shoulder/low-camera/moving-strip acceptance rows; plan envelope wording vs the 03.11. owner decision; strict-< boundary clips in gamepath.py and villagerSkirtDriver.ts; containment tests starting from rest instead of walkPose and taking bone dominance from vertex a; stale normals after clearance; driven-asset test checking only row 0) sent to cloud author session_019XD8Qx7VNonA6UAqMyBRoP. Next: its handover, then the covering suite and the picture runs on both backends.
-- [ ] 1399. Villager garments stage 4: shirt, robe, togas and wraps as trunk shells with driven hems
-  Queue position: directly after point 1482.
-  Source: split from point 1347 on 21.10.2026 (owner decision under the standing split rule): point 1347 delivered stage 1 of the approved staged garment plan (docs/garment-merge-r9-1347.md, user decision on the board "Kleidungsplan stufenweise prüfen"); its user goal (user 12.10.2026: a walking villager's swing leg leaves its trouser leg behind; a child's hip cloth stands off the body like a diaper) is finished by this point and its siblings.
-  Spec: docs/garment-merge-r9-1347.md section 3, stage 4: trunk shells plus driven hems for shirt, robe, both togas and both wraps; the breast cloth's cleft if the stage-1 shell fails a later picture; delete `tube`, `sleeve` and `armholes`.
-  Procedure: the stage plan is written against the then-current code, checked cross-vendor for "does this break anything or look visibly wrong in the game picture" until approved, and shown to the user before implementation; implementation gets the usual cross-vendor code review. Per point 1339 no numeric penetration threshold is an acceptance gate; the penetration report stays information only.
-  Carried from point 1347: the shirt's far sleeve standing off the arm as a separate tube (1347 acceptance frame trousers-under-shirt-walk-front34, 21.10.2026); runtime g-robe-chest shown at thigh.R (run 0.0129, walk 0.0084 vs main 0.0006/0.0034; fit.py stops at the first pass worsening the global max depth, so the knee skirt under the robe stays tight; numbers in the point 1342 entry, charged from 1342); dark patches on a white outer robe on WebGL 2 (charged from point 1380); the `shoulders` clip depth (charged from point 1354) where it concerns these forms.
-  Carried from point 1454 (02.11.2026, owner decision on GPT-6.1 Sol's pass-3 P2): the restanced jog/run poses raise the adult run's g-robe-chest cut at thigh.R from 0.0226 to 0.0268 (1 -> 2 of 10 frames; verification/villager-body/runtime-penetration-report.md); the robe was already over tolerance there, and the robe's trunk shell is this stage's work, so it closes here.
-  Final state: every generated outfit with a shirt, robe, toga or wrap looks dressed at 3 m and 7 m in a port city and a village on both backends, walking, running, kneeling and digging: sleeves follow their arms, no hem or neckline stands visibly off the body, no inner garment or body shows through; `tube`, `sleeve` and `armholes` are removed.
-  Verifiable: plan and break-check record; forced-outfit acceptance rows per form in `polish-villagers`, both backends, picture-checked; pipeline selftests and Vitest; cross-vendor review record.
-  Bundle: Dorfleben.
-  Criticality: high - most adult villagers, visible at first glance.
-- [ ] 1400. Villager garments stage 5: capes, cloaks, hood and veil; remove the old construction
-  Queue position: directly after point 1399.
-  Source: split from point 1347 on 21.10.2026 (owner decision under the standing split rule): point 1347 delivered stage 1 of the approved staged garment plan (docs/garment-merge-r9-1347.md, user decision on the board "Kleidungsplan stufenweise prüfen"); its user goal (user 12.10.2026: a walking villager's swing leg leaves its trouser leg behind; a child's hip cloth stands off the body like a diaper) is finished by this point and its siblings.
-  Spec: docs/garment-merge-r9-1347.md section 3, stage 5: cloaks and capes with arm clearance, hood shell, head envelopes and outfit-dependent offsets, the veil as a convex shell hung from the head envelope with region `arm` <= 0.2, the 0.2 contour cut extended above neck + 0.002 H, the mouth cavity bridged by the envelope, sling, limb rings, hair bag, `finish_rigid`; delete `column_sweep`, `skirt_weights`, `OUTER`, `SKIRTS`, `RIGID_HEAD`, `RIGID_CHEST` and the per-slot layer table.
-  Procedure: the stage plan is written against the then-current code, checked cross-vendor for "does this break anything or look visibly wrong in the game picture" until approved, and shown to the user before implementation; implementation gets the usual cross-vendor code review. Per point 1339 no numeric penetration threshold is an acceptance gate; the penetration report stays information only.
-  Carried from point 1347: the Tuareg face veil poking through the robe collar at the neck (g-veil-face inner 0.037 m under g-shirt-chest, 0.034 under g-robe-chest, idle up to 0.040 over 532 frames; worn by Tuareg youth/adult/elder men; findings carrier 12.10.2026 16:48); the `shoulders` clip depth (charged from point 1354) where it concerns these forms, and the penetration report re-measured after point 1354's fixes.
-  Final state: every outfit the game can generate looks dressed in the picture inventory's poses at the game's camera distances - no limb leaves its garment, no garment stands visibly off the body, no inner garment or body shows through where it should not; the old construction path is removed, not kept beside the new one.
-  Verifiable: plan and break-check record; forced-outfit acceptance rows for capes, cloaks, hood and veil plus the full after-picture inventory against point 1347's before inventory, `polish-villagers` both backends, picture-checked; pipeline selftests and Vitest; cross-vendor review record.
-  Bundle: Dorfleben.
-  Criticality: high - every villager on medium/high presets.
-
-
-- [ ] 1379. Giza tourists and the traveller wear 1890 Western dress: shoes, long sleeves, long trousers or skirts, a seated hat
-  Queue position: directly after point 1347 (it needs the rebuilt garment construction); split from point 1378 on 18.10.2026.
-  Source: picture check of point 1378 (18.10.2026): the Giza ambient figures and the bird's-eye traveller now use the shared skinned figure path, but the current garment set has no shoes, long sleeves, long trousers or hats, so the pith-helmeted tourists and the traveller show bare feet, bare forearms and calf-length trousers, and the hat sits as a head prop on the crown. Point 1378 was queued after 1347 for exactly this reason and was landed first as the body-path change only.
-  Final state: Western tourists at Giza (men: jacket, long trousers, shoes, pith helmet; women: long skirt, long sleeves, shoes, hat) and the bird's-eye traveller (khaki jacket and trousers, boots, pith helmet, backpack) are dressed period-correct for 1890 per docs/giza-1890.md with garments from the rebuilt construction of point 1347; the dragoman's tarboosh is drawn; wound marks, swim, canoe and drag stay readable from above.
-  Verifiable: Vitest on the Giza cast and traveller look (garment ids present per role); per backend one picture of the Giza tourists close up and one of the traveller from above, picture-checked.
-  Criticality: medium - player-visible at Giza and in the whole travel view, both backends.
-  Bundle: Dorfleben.
-
-- [ ] 1344. Children's hand contacts in polish-children: runner hands at its sides, bank-tap hand on the flank, arriving runner's hand on the far stone
-  Queue position: directly after point 1340 (same suite and the same children's pose write).
-  Source: findings carrier 12.10.2026 04:48Z: full WebGPU polish-children run 06:19 on main 06c727d21 red with three checks not in the classified baseline and owned by no point — tag-catch "while a runner's hands hang at its sides"; children-bank-game "the tapping hand stays within 5 mm of the flank over the whole hold" (22 cm off); arriving runner "DRAWN hand stays within 5 mm of the far stone, including the word frame" (24.6 cm off). Machine quietness of that run is unverified; the WebGL 2 full run is still owed.
-  Final state:
-  1. polish-children re-run alone on a quiet machine on both backends; a red that does not reproduce closes with that run as evidence.
-  2. For each reproduced red the cause is named and fixed: the drawn hand lands on its contact (flank, far stone) within the suite's 5 mm over the whole hold and word frame, and a runner's hands hang at its sides, with no change to the tag or bank-game rules.
-  Verifiable: polish-children sections tag-catch and children-bank-game green on both backends, frames judged by looking; Vitest for any pose-solve change.
-  Criticality: medium - visible hands off their contacts in two children's games.
-  Bundle: Dorfleben.
-- [ ] 1341. Pipeline garments: smooth the crumpled fold surface, fit the head cover, measure the garment frame cost
-  Queue position: after point 1340.
-  Source: findings carrier 12.10.2026 02:47Z, picture check of point 1315 (feat/1315 8aaf9ac28, 1294-dress-swahili.png WebGPU vs main): kanzu and kanga/buibui robes show a lumpy crumpled-paper fold surface at the normal camera distance, and the red women's head cover rises to a peak above the head. The same frame read 10 FPS on the branch against 21 on main (one snapshot on an unquiet host) with villager.glb at 6.9 MB.
-  Final state: the coastal robes' fold surface reads smooth cloth at the normal camera distance; the head cover follows the head without a peak; the frame cost of the garment glb is measured on a quiet host against the pre-1315 main, and reduced if it costs measurably. Zulu/Bambara walk, kneel, dig, run and the Cairo children stay clean.
-  Verifiable: Blender frame sheet and 1294-dress-swahili.png before/after on both backends, judged by looking; the recorded FPS comparison; garment penetration gate green.
-  Criticality: medium - every coastal villager; possible frame-rate cost on all villager scenes.
-  Bundle: Dorfleben.
-- [ ] 1385. Cairo children frame aimed before the walking child moves out on WebGL 2
-  Queue position: after point 1341 (or after point 1340 if 1341 is absorbed by point 1347).
-  Source: docs/backlog.md (picture check of 1129, 02.10.2026), recurred 19.10.2026 on the full WebGL 2 polish-children run at feat/1343 4b9870e65 (local/verify-logs/2026-10-19T08-17-42-344-polish-children.log): "frame 690-cairo-children — its subject is not in the rendered picture: off the bottom edge of the frame". The aim is taken before the shot while the child keeps walking; test-frame aim only, no player impact, but it holds every covering polish-children run red.
-  Final state: the 690-cairo-children frame holds its child inside the picture at the shutter on both backends.
-  Verifiable: polish-children --section=children-motion green for that frame on both backends; frame judged by looking.
-  Bundle: Dorfleben.
-  Criticality: low - a test frame's aim; blocks the suite's covering run.
+  Criticality: low - a test frame shows no subject (CLAUDE.md §7.2); no player impact.
 
 - [ ] 1301. Low-preset primitive villager kneels with constant limb lengths and stays above ground
   Queue position: directly behind point 1294.
@@ -198,6 +140,7 @@ put it is the mistake this line exists to stop.
   the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
   Bundle: Dorfleben.
   Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
+  Status 03.11.2026 17:57 (batch session): cloud-authored by session_019XD8QvSQcNXLjoCtCepvrU (brief: point-brief 1301 plus owner instructions) on branch feat/1301-primitive-kneel-limbs; awaiting its handover (pushed sha, build/lint/test:unit). Next: covering polish --section=village-walk on both backends with a low-preset kneel frame picture-checked, cross-vendor review, landing.
 
 - [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
   (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
@@ -796,7 +739,6 @@ put it is the mistake this line exists to stop.
   work past the watermark, and this session ran to 272k tokens with it observing.
   Bundle: Session- & Repo-Hygiene.
 
-
 - [ ] 938. Three recorded `enrichments` reds name a TICKED point, so nothing can ever own them
   (measured 26.08.2026 on `.claude/render-verify-state.json` while answering point 734's sixth
   round). The `webgpu/enrichments` runs of 17.08.2026 08:46, 09:07 and 09:26 each carry the same
@@ -916,7 +858,6 @@ put it is the mistake this line exists to stop.
   running agent, which is the control the batch relies on to stop.
   Bundle: Session- & Repo-Hygiene.
 
-
 - [ ] 896. `review-sol.mjs` swallows an unknown flag and spends a real cross-vendor pass on it.
   MEASURED 24.08.2026 while reviewing point 890: the call
   `review-sol.mjs --sha 8d25cf42 --brief "plan probe" --point 890 --plan` was accepted. `--plan`
@@ -982,7 +923,6 @@ put it is the mistake this line exists to stop.
   of gap that later reads as a review that happened.
   Bundle: unbundled (batch autonomy).
 
-
 - [ ] 888. Naming the cross-vendor reviewer in a commit trailer silently removes those files from
   cross-vendor review. CLAUDE.md §6 permits a commit to name its reviewer in a second model trailer.
   Nothing in the machinery distinguishes that from a second AUTHOR: `modelsFromTrailers`
@@ -1007,7 +947,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it does not corrupt anything, but it quietly turns a four-eyes review into a
   receipt, which is the class of gap the ledger exists to prevent.
   Bundle: unbundled (batch autonomy).
-
 
 - [ ] 867. An exhausted vendor allowance parks its point on a probe, not on the user. Point 861's
   inventory row Q2: an OpenAI author or reviewer run can return `allowance-exhausted` while that
@@ -3829,7 +3768,6 @@ Build order, chosen so no two parallel agents own the same file:
   inspected as a PICTURE once, not only as a number; and the compass check FAILS
   when the panorama orientation is deliberately inverted — a check that cannot
   fail proves nothing.
-
 
 - [ ] 321. Grass fire reads wrong on every count (user 25.07.2026 with screenshot:
   the burning-grass event shows a column of flat orange blocks — no recognizable
@@ -8605,7 +8543,6 @@ to land than a mechanism that needs a review.
   frame it was written for hides the next regression as reliably as this one.
   Bundle: Tierverhalten.
 
-
 - [ ] 728. The chat responder answers while a session owns the batch, and answers one message
   three times (user 19.08.2026, 09:00, in the board chat: »Du hast bzg. 685 jetzt dreimal
   geantwortet.«). `scripts/chat-watcher.mjs` may spawn a light responder from the chat inbox
@@ -9058,7 +8995,6 @@ to land than a mechanism that needs a review.
   escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.
 
-
 - [ ] 785. The chat header's context reading is wrong exactly where it is read most — at the start
   of a session and after a blocked turn (measured 20.08.2026 in the transcript of session
   c0ad5041). Point 764 is about whether the suffix is ENFORCED; this point is about whether the
@@ -9157,62 +9093,6 @@ to land than a mechanism that needs a review.
   the two guard the same ruling on both documents.
   Criticality: low — no product defect and nothing is red today; it is a stale instruction that
   contradicts a standing user ruling and misdirects the next session that reads it.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 803. The push gate runs the full unit layer while an authoring agent holds the same machine
-  (measured 21.08.2026, 04:00). A `main` push was refused because `unit` came back red twice. The
-  gate's own words name the finding correctly: 357 files, 12320 tests, NO failing test named, and a
-  runner that exited non-zero — the `[vitest-worker]: Timeout calling "onTaskUpdate"` signature of a
-  run that never finished, not of a test that failed. Measured beside it: load average 11.35, then
-  18.35, because GPT-5.6 Sol was authoring point 795 in its isolated worktree and running its own
-  three gates while the main session started the full unit layer for the push.
-  WHY IT MATTERS: the contention is self-inflicted and repeats on every push that runs beside a
-  delegated agent. The result is a red gate with no product defect behind it, and it leaves
-  bookkeeping committed but unpushed — the exact state the push-after-every-commit rule exists to
-  prevent. The gate's own retry does not help: it runs under the same load. The standing user rule
-  (judge a rotating failure only after a quiet-host rerun) is never consulted BEFORE the expensive
-  run starts.
-  REPRODUCED 22.08.2026, 12:04, with the same signature and the same cause: a `main` push of one
-  bookkeeping commit was refused after two red `unit` runs while GPT-5.6 Sol answered the review of
-  point 597 in its own worktree. Vitest itself reported 374 files / 12,795 tests with NOTHING
-  failing; the gate named it correctly ("its summary named NO failing test, yet the runner exited
-  non-zero ... a run that could not finish proved nothing") and its retry ran under the very load
-  that caused the first red. Two hours earlier the same push had gone green on a quiet host with
-  the same 374 files. So the defect is confirmed as contention, not flakiness of unknown origin,
-  and the cost is measured twice now: bookkeeping left committed and unpushed both times.
-  REPRODUCED A THIRD TIME 02.09.2026, ON A QUIET HOST, AND IT BLOCKED A LANDING. Three LARGE runs
-  for point 688 died at the unit stage with the same signature. The first two had a cause of the
-  known kind — a six-pass review running beside the suite, then a repository action taken while it
-  ran — but the THIRD had neither: nothing else was on the machine, and vitest's own summary read
-  `Test Files 447 passed (447)` and `Tests 14642 passed | 6 skipped`. NOTHING failed. What made the
-  runner exit non-zero was two `[vitest-worker]: Timeout calling "onTaskUpdate"` reporter errors,
-  counted as unhandled errors. The LARGE then skipped every browser suite, so the point's picture
-  evidence could not be taken at all.
-  THAT CHANGES THE SHAPE OF THIS POINT: the load reading is not sufficient. A quiet-host run can
-  exit non-zero with nothing failing, so the discriminator has to be the SUMMARY — a run whose own
-  report names no failing test has not judged anything, at any load — and the load reading belongs
-  in the verdict text as evidence rather than as the condition.
-  FINAL STATE: the gate measures load before it starts and names it in its verdict. A run whose
-  summary names NO failing test is treated as NOT JUDGED and re-run, rather than blocking as a red
-  — at any load, with the measured load named in the verdict either way. A run that names a
-  failing test blocks as it does today, at any load. The same rule applies to the LARGE runner,
-  which today throws away every browser suite behind such a stage.
-  VERIFIABLE: pure tests over the verdict function — a summary with a named failure blocks at any
-  load; a no-failure non-zero exit yields "not judged" at any load, high or low; and the measured
-  load appears in the verdict text in every case.
-  REPRODUCED ON CI 02.11.2026 (run 41383325806, feat/1454-jog-stance 823d9ef): the gate job read
-  `CI gate FAILED: shard-1/unit` while shard 1's summary named 318/318 files and 9990 tests
-  passed, 0 failed — exit 1 from one `onTaskUpdate` timeout. The CI gate therefore needs the
-  same not-judged verdict; the launcher handed it on as a RED repair path with nothing to repair.
-  Repeated on `main` the same day: runs 41393581230 (a7eff02), 41409116847 (0edc5af) and
-  41413354701 (dc4c2fe), each shard fast (1) with 318/318 files passed and one `onTaskUpdate`
-  timeout; each one spent a launcher successor as a repair path with nothing to repair.
-  Again on `main` 02.11.2026 at the landing of point 1398: run 41522159050 (6bf31d1), shard fast (1)
-  with 319/319 files and 9997 tests passed, 0 failed, exit 1 from one `onTaskUpdate` timeout.
-  The next main push repeated it: run 41526217975 (1b99454), same counts and signature; two main
-  reds in a row make this a real blockade for every turn end after a main push (finding 02.11.2026).
-  Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
-  a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 804. Merge attribution survives only while the merged parent stays in the analysed commit set
@@ -11033,7 +10913,6 @@ to land than a mechanism that needs a review.
   closed work is really in `main`.
   Bundle: Modell & Wächter.
 
-
 - [ ] 919. A sha whose ref has already moved on is reported as a red CI verdict, and
   the successor session is sent down a repair path for code that is not broken. MEASURED
   25.08.2026 at this session's start: the CI-terminal handoff named
@@ -11751,7 +11630,6 @@ to land than a mechanism that needs a review.
   by.
   Bundle: Chat & Tafel.
 
-
 - [ ] 960. A filed finding is never checked against the work order, so with 313 open points the
   cheapest mistake is to write a point that already exists (MEASURED 27.08.2026 01:35-01:50, while
   closing point 953). Four items were carried that turn. The board-closing wedge, recorded through
@@ -11811,7 +11689,6 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing is corrupted and no gate is bypassed, but it damages every log the
   project reads about itself, and it is one line of shell to prevent.
   Bundle: Session- & Repo-Hygiene.
-
 
 - [ ] 964. The launcher's stalled-writer recovery is unreachable, so only a DECLARED delegate can
   ever be recovered. MEASURED 27.08.2026 while reviewing point 945 on `scripts/batch-autostart.mjs`:
@@ -13582,8 +13459,6 @@ to land than a mechanism that needs a review.
   scripts/render-verify-charges.mjs
   Bundle: Session- & Repo-Hygiene.
 
-
-
 - [ ] 1054. A content guard demands a write from a session that no guard lets write
   (measured 03.09.2026, four blocked turn ends in a row).
   MEASURED: at 21:42 a stood-down session deposited a user order on the findings
@@ -14360,7 +14235,6 @@ to land than a mechanism that needs a review.
   run, and it will do so again on any busy machine.
   Bundle: Testinfrastruktur.
 
-
 - [ ] 1114. Repair pre-existing settings check: first-person ground shows micro-detail
   (edge energy) (filed automatically by a LARGE run on 12.09.2026 under point 1089's
   ownership rule; the user ordered these three reds filed at once on 10.09.2026).
@@ -14551,7 +14425,6 @@ to land than a mechanism that needs a review.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
-
 
 - [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
   and the dev assertion that says so has been firing unread (measured 17.09.2026 while
@@ -15653,7 +15526,6 @@ to land than a mechanism that needs a review.
   Criticality: medium - a red regression lane on the fallback backend.
   Bundle: Dorfleben.
 
-
 - [ ] 1422. Villager knee snaps when a walker leaves the walk gait in a corner
   Source: finding 22.10.2026 09:46 from the point-1402 moving capture (seed 42, walker 0, WebGPU 60 Hz fixed clock): while the walk share drops 1 -> 0 in a ~2.8 rad/s corner the knee jumps 0.49-0.66 rad per frame (shin.L 0.836 -> 1.499) into a deep-knee pose; present on main 9ecb039 before 1402, same on WebGL 2.
   Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
@@ -15896,13 +15768,6 @@ to land than a mechanism that needs a review.
   Charged 31.10.2026 (findings carrier, polish-villagers --section=adult-errands, WebGPU, 5f6679479, 1 of 10 runs): the jar-mouth check rotates — 'the jar's mouth is tipped under the water surface — mouth at 0.097 m, surface at -0.25 m (hand 0.107, feet 0, ground -0.348)'; not in the classified baseline. It blocks the same three-green proof, so it is named and fixed or charged here.
   Criticality: medium — a standing red on every adult-errands run.
   Bundle: Dorfleben
-- [ ] 1477. The breast cloth renders as a narrow band under the bust instead of covering chest to waist
-  Source: owner bisect for point 1347, 01.11.2026: the forced outfit breastCloth-chest + skirtKnee-waist on an adult woman of stout build, walk at clip time 0.02, front at 3 m in hausa-village, WebGPU, shows only a narrow band under the bust; upper bust and belly stay bare. Reproduced with main's villager.glb, villagerFigureBody.ts and balance.ts (only the dev lineup harness of feat/1347-garment-rebuild added), so the defect is on main, not on the 1347 branch. Frames: local/bisect-1347/verification/1347-accept-breastcloth-walk-stout-front-hausa-village-3m.png (main asset) and the 1347 branch frame of the same name.
-  Expected: the legacy hull-tube builder (scripts/villager/garments.py, `form == 'breastCloth'`) spans chestTop to waist − 0.01 H, so the cloth should cover the bust down to the waist.
-  FINAL STATE: a woman wearing the breast cloth shows it covering the bust down to the waist at 3 m and 7 m in a village and a port city on both backends; the cause (cover mask, pre-split body, runtime TSL correction or the builder) is named in the commit.
-  Test: Vitest for the cause's layer; picture check of the forced breast-cloth rows on both backends (the garment-acceptance lineup once point 1347 has landed it, otherwise a village close-up of a woman wearing it).
-  Criticality: high - visible on every woman wearing the breast cloth in normal play.
-  Bundle: Dorfleben.
 - [ ] 1479. Villager far shoulder keeps a flat, corner-topped outline in walk rear-3/4 views
   Source: split from point 1478, owner picture check 02.11.2026 of feat/1478-shoulder-slab dd4538115 (garment-acceptance, cairo, 3 m, WebGPU and WebGL 2 identical): rows trousers-walk-man-rear34 and trousers-walk-child-rear34 show the far shoulder with a flat top edge and a near-right-angled outer corner. Frames: local/1478-after/1347-accept-trousers-walk-{man,child}-rear34-cairo-3m{,-webgl2}.png; before-frames local/1478-before/. The gait clips' shoulder turn is already 0 (VILLAGER_GLTF.clipShoulderKeep), so the clip swing is not the cause.
   FINAL STATE: the far shoulder of a walking man and child reads as a rounded shoulder at 3 m in rear-3/4 views on both backends; the cause (body mesh silhouette at the shoulder cap, skin weights, or shading) is named in the commit.
@@ -15921,3 +15786,27 @@ to land than a mechanism that needs a review.
   Test: Vitest for the check core with a remote ref whose fetched tip is newer than the local tracking ref.
   Criticality: high - a possible false approval to replace a working agent (CLAUDE.md §2 intake).
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1488. Villager clothing: one fix per listed defect, one final picture check (user order 05.11.2026; amends the working method of 1482 under 1487)
+  The 24-hour budget of 1487 did not limit precision: since 04.11 17:00, 34 of 57 main commits were bookkeeping ("Record the picture judgement / delegation / withdraw verdict ..."); the child hip cloth alone took nine commits on 05.11 morning. A time box cuts the list, it does not cut the per-candidate ritual. Replace the method of 1482:
+  1. Each defect on 1482's frozen list gets exactly ONE fix. All fixes land on the one branch; no picture judgement between them.
+  2. ONE final picture check at game distance, by eye, both backends: does it look right to a player, and is coverage met (see the companion request "No sensitive body part exposed from any view or pose" - its views and poses are part of this check).
+  3. A fix that fails that check is not iterated: it is reverted, the old state stays, the defect goes to docs/backlog.md. Exception: any coverage/exposure failure is never reverted to an exposing state; it keeps getting fixed until it holds.
+  4. No intermediate status/record commits on main; one closing commit with the result per defect.
+  5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
+  Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
+  Bundle: Dorfleben.
+- [ ] 1489. No sensitive body part exposed from any view or pose (user rule 05.11.2026: "allgemein dürfen nie sensible Körperteile exponiert sein")
+  Design rule, to be written into design.md next to "Covered upper body and hip layer (user 06.10.2026)" and mirrored in docs/peoples-1890.md §8.6 where it applies:
+  - No figure ever shows a female breast, the genital area or the buttocks uncovered - from ANY camera angle the game can reach (including the overhead/bird's-eye and close first-person views) and in ANY pose or animation (standing, walking, running, kneeling, bending, pounding, digging, sitting).
+  - A garment that stands off the body must not open a view onto covered skin; coverage is judged by the rendered picture, not by garment presence in the outfit data.
+  - This rule outranks every budget, stop rule and revert rule: an exposure defect is never accepted, frozen or moved to the backlog; it is fixed until it holds.
+  Verification: the final picture check of 1482 includes an overhead view and a kneeling/bending pose for every covering garment form (breast cloth, wraps, tube tops, hip cloths, children's hip layer), both backends.
+  First known case: /backup/hoa/local/BlosseBrueste.zip (kneeling Bambara woman, breast cloth as stiff ring, breast bare from above).
+  Bundle: Dorfleben.
+- [ ] 1490. Head-load porter: crate sinks into the head and the carrier sprints (user report 05.11.2026, not part of the clothing closure)
+  Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
+  Two defects:
+  1. The carried crate sits too low: the carrier's head is inside the crate. The load must rest on top of the head (with its pad, if any), never intersecting it.
+  2. The carrier moves in a sprint gait with arms flung out. A head-load carrier walks at a steady, upright pace with at least one hand steadying the load or arms close to the body.
+  Verify with a Playwright picture of a head-load carrier in Cairo (and any other place using head loads) in motion, both backends when isBackendSensitivePath applies. Related but separate: 1425 (water jar jumps from hip to shoulder).
+  Bundle: Dorfleben.

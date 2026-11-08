@@ -746,7 +746,17 @@ export function chargedRunIds(tasksText, branch) {
     if (!m) return ids
     const lines = String(tasksText ?? '').split(/\r?\n/)
     const start = lines.findIndex((line) => line.startsWith(`- [ ] ${m[1]}.`))
-    if (start < 0) return ids
+    if (start < 0) {
+      // A closed point merged into another: an open point's line naming both
+      // the branch and the run charges it.
+      let open = false
+      for (const line of lines) {
+        if (line.startsWith('- [')) open = line.startsWith('- [ ] ')
+        if (open && line.includes(String(branch)))
+          for (const hit of line.matchAll(/\brun (\d{8,})\b/g)) ids.add(hit[1])
+      }
+      return ids
+    }
     for (let i = start; i < lines.length; i++) {
       if (i > start && lines[i].startsWith('- [')) break
       for (const hit of lines[i].matchAll(/\brun (\d{8,})\b/g)) ids.add(hit[1])

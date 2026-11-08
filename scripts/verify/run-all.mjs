@@ -22,6 +22,7 @@ import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
+import { parseUnitTotals, runnerErrorSignature, unitAttemptsVerdict } from '../pre-push-gate-core.mjs'
 import {
   RETRY_ENV, chargeablePoints, chargeFor, isCrashedRun,
   isIncompleteRecording, owned, runIdentity,
@@ -610,15 +611,30 @@ if (!skipPreflight && (fullRun || filter.includes('unit'))) {
   }
   console.log('PASS  test-types   (tsc -p tsconfig.vitest.json)')
   // NO_COLOR keeps the summary free of ANSI escapes so the count parses cleanly.
-  const unit = spawnSync('npx vitest run', {
-    windowsHide: true,
-    cwd: root, shell: true, encoding: 'utf8',
-    env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
-  })
-  const out = (unit.stdout ?? '') + (unit.stderr ?? '')
-  const unitOk = unit.status === 0
+  // Judged by vitest's own summary (unitAttemptsVerdict): a run naming no
+  // failing test but exiting non-zero is NOT JUDGED and re-run once, so a
+  // runner death no longer throws away every browser suite behind it.
+  const attempts = []
+  let unitVerdict
+  let out = ''
+  let status = null
+  for (;;) {
+    const unit = spawnSync('npx vitest run', {
+      windowsHide: true,
+      cwd: root, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
+    })
+    out = (unit.stdout ?? '') + (unit.stderr ?? '')
+    status = unit.status
+    attempts.push({ ok: unit.status === 0, totals: parseUnitTotals(out), signature: runnerErrorSignature(out) })
+    unitVerdict = unitAttemptsVerdict(attempts, { load: loadMode !== 'off' ? machine : undefined })
+    if (!unitVerdict.rerun) break
+    console.log(`      ${unitVerdict.line}`)
+  }
+  const unitOk = unitVerdict.ok
   const m = out.match(/Tests\s+(\d+) passed/)
-  console.log(`${unitOk ? 'PASS' : 'FAIL'}  unit         (vitest jsdom, ${m ? m[1] : '?'} tests, exit ${unit.status})`)
+  console.log(`${unitOk ? 'PASS' : 'FAIL'}  unit         (vitest jsdom, ${m ? m[1] : '?'} tests, exit ${status}${attempts.length > 1 ? ', re-run once' : ''})`)
+  console.log(`      ${unitVerdict.line}`)
   if (!unitOk) {
     console.log(out)
     console.log('\n1 SUITE(S) FAILED — vitest failed, skipping the browser suites')

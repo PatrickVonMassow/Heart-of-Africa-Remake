@@ -220,6 +220,9 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     arm_face = np.isin(np.argmax(body['W'], 1)[body['tris']], arm).any(1)
     on_arm = {n: G[n]['W'][:, arm].sum(1) > 0.05 for n in names}
     drapes = {n: M.layer(n) == M.LAYER['shoulder'] for n in names}
+    # a pinned edge (garments.edge_masks) rides the skin and is never pushed:
+    # pushed off the body of every frame it stood off in all of them
+    pins = {n: np.asarray(G[n].pop('pin', np.zeros(len(G[n]['pos']), bool)), bool) for n in names}
     shapes = {c: morphed(body, corner_weights(*c)) for c in corners()}
     frames = [(c, cname, f) for c in corners() for cname in EXPORT_CLIPS for f in range(len(clips['clips'][cname]['times']))]
 
@@ -243,7 +246,7 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
             # and does not follow them: the arms swing under it in every
             # clip, and pushing it off them in the rest pose crumpled it into
             # lumpy blobs (measured 09.10.2026)
-            bad = np.nonzero((s < margin) & ~(arm_face[fi] & ~on_arm[n] & drapes[n]))[0]
+            bad = np.nonzero((s < margin) & ~(arm_face[fi] & ~on_arm[n] & drapes[n]) & ~pins[n])[0]
             if not len(bad):
                 out[n] = (depth, None)
                 continue
@@ -260,7 +263,7 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
 
     def apply(n, pos, push):
         nb, twins = topo[n]
-        return pos + spread(push, nb, twins)
+        return pos + G_.held(spread(push, nb, twins), pins[n])
 
     state = {n: G[n]['pos'].copy() for n in names}
     state, deep = descend(state, frames, sample, apply, passes, stride, log)

@@ -11,7 +11,8 @@ export interface LineupGarment {
   wear: DressWear
 }
 
-export type LineupClip = 'idle' | 'walk' | 'run' | 'dig'
+/** `kneel`: knelt down from the first frame (the game's held kneel), timed on the idle clip. */
+export type LineupClip = 'idle' | 'walk' | 'run' | 'dig' | 'kneel'
 
 /**
  * Where the clip is held when the lineup freezes life: a phase of the clip in
@@ -32,12 +33,15 @@ export interface LineupFigure {
   at?: LineupAt
   /** Head turned off the heading (rad, + to the figure's left), standing only. */
   headYaw?: number
+  /** The people whose record the outfit resolves from first (default: the
+   *  settlement's), so a row dresses e.g. a Tuareg man in any place. */
+  people?: string
 }
 
 /** Ground speed of each clip in figure units per second (scaled by the figure's
  *  own scale): the walk under the jog band, the run inside the jog
  *  (VILLAGER_GLTF.jogThreshold 1.8 ± 0.35 per unit of leg). */
-export const LINEUP_CLIP_SPEED: Record<LineupClip, number> = { idle: 0, walk: 1.2, run: 3.0, dig: 0 }
+export const LINEUP_CLIP_SPEED: Record<LineupClip, number> = { idle: 0, walk: 1.2, run: 3.0, dig: 0, kneel: 0 }
 
 /** `'trousers-waist'` → `{form: 'trousers', wear: 'waist'}`. */
 export function parseGarment(g: LineupGarment | string): LineupGarment {
@@ -53,15 +57,27 @@ export function parseGarment(g: LineupGarment | string): LineupGarment {
  * settlement's people first, then the whole table in its order — with the
  * 'cloth' token resolved to the figure's cloth, in slot order as
  * `appearanceFor` returns them. A pair nobody wears throws: it has no garment.
+ * A `wearer` (the row's `people`) is looked up first in that people's own
+ * cell of its sex and age, then in the rest of that people's record.
  */
-export function resolveOutfit(garments: ReadonlyArray<LineupGarment | string>, peopleId: string | null, cloth: string): DressLayer[] {
+export function resolveOutfit(
+  garments: ReadonlyArray<LineupGarment | string>,
+  peopleId: string | null,
+  cloth: string,
+  wearer?: { people: string; sex: Sex; age: AgeGroup },
+): DressLayer[] {
+  const own = wearer ? (PEOPLE_DRESS[wearer.people] ?? CAST_DRESS[wearer.people as keyof typeof CAST_DRESS]) : undefined
+  if (wearer && !own) throw new Error(`dress lineup: no people '${wearer.people}' in the dress record`)
   const tables = [
+    ...(own ? [own] : []),
     ...(peopleId ? [PEOPLE_DRESS[peopleId] ?? CAST_DRESS[peopleId as keyof typeof CAST_DRESS]].filter(Boolean) : []),
     ...Object.values(PEOPLE_DRESS),
     ...Object.values(CAST_DRESS),
   ]
   const out = garments.map((raw) => {
     const g = parseGarment(raw)
+    const mine = own && wearer ? own[wearer.sex][wearer.age].find((l) => l.form === g.form && l.wear === g.wear) : undefined
+    if (mine) return { ...mine, colour: mine.colour === 'cloth' ? cloth : mine.colour }
     for (const t of tables)
       for (const sex of ['female', 'male'] as const)
         for (const age of ['adult', 'youth', 'elder', 'child'] as const) {

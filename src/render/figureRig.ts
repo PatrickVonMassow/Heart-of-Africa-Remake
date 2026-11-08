@@ -143,6 +143,15 @@ export function holdsPosedReach(reach: boolean, releasing: readonly (number | nu
   return reach || releasing.some((r) => r !== null)
 }
 
+/** An arm's release state for this frame: a pose reach on the arm, or a touch
+ *  arriving on it (FigurePose.arrive), owns the arm and ends any release; a
+ *  reach given up this frame starts releasing at its last value while the
+ *  clips take the arm back (`clipsOn`); otherwise the release carries on. */
+export function nextRelease(o: { releasing: number | null; reach: number | undefined; lastReach: number | null; arrive: boolean; clipsOn: boolean }): number | null {
+  if (o.reach !== undefined || o.arrive) return null
+  return o.lastReach !== null && o.clipsOn ? o.lastReach : o.releasing
+}
+
 /** The least of `leans` whose `shortfall` (m, ≤ 0 when every contact is in
  *  reach) is met; failing that, with `nearest` the one that comes closest, so
  *  a contact the bend cannot fully make up is still brought as near as it

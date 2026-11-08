@@ -5,7 +5,7 @@
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { assertBackend } from './_browser.mjs'
 import { waitForSceneReady } from './frameSubject.mjs'
-import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
+import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeRunnerArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
 import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
 
@@ -498,8 +498,12 @@ if (section('tag-catch')) {
           : // readied and still: no grab out or easing back after a miss, no arm handover
             gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side && w.reach <= 0 && !(w.handover > 0)
       if (!inWindow) return null
-      const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
-      if (runner < 0) return null
+      // the SAME runner through a far series: two children's still hands at
+      // different places would otherwise read as one swinging pair. The near
+      // series judges only the catcher, so a runner never ends it.
+      const isRunner = (k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind)
+      const runner = want !== 'far' ? -1 : lock ? lock.runnerIndex : t.children.findIndex(isRunner)
+      if (want === 'far' && (runner < 0 || !isRunner(t.children[runner], runner))) return null
       return {
         gap,
         clock: t.clock,
@@ -508,7 +512,8 @@ if (section('tag-catch')) {
         tags: t.tags,
         side: w ? w.side : null,
         chaser: window.__placeTagHands(t.chaser),
-        runner: window.__placeTagHands(runner),
+        runnerIndex: runner,
+        runner: runner < 0 ? null : window.__placeTagHands(runner),
       }
     }
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
@@ -570,11 +575,8 @@ if (section('tag-catch')) {
       !!far && ['left', 'right'].every((side) => sweep(far, side) > 0.12),
       far ? `${fmt(far, 'left')}; ${fmt(far, 'right')} at ${far[0].gap.toFixed(2)} m` : 'no far chasing stride without a grab',
     )
-    check(
-      "while a runner's hands hang at its sides",
-      !!far && far[0].runner?.length === 2 && far[0].runner.every((h) => h.local.z < 0.15),
-      far ? JSON.stringify(far[0].runner?.map((h) => h.local)) : 'no runner frame',
-    )
+    const runnerArms = judgeRunnerArms(far)
+    check("while a runner's hands hang at its sides or swing with its run (neither is held out)", runnerArms.ok, runnerArms.detail)
     // Inside the prepare window the readied hand is HELD out in front while
     // the free hand keeps swinging. Every window read until the first long one
     // is judged (judgePrepareArms), so a short defective window is never
@@ -1040,6 +1042,19 @@ async function checkChildrenMotion(motionPlace) {
     // searches once more and shoots that moment's best vantage rather than
     // skipping the picture.
     await page.evaluate(() => {
+      // The occluders below, shared with the back-step before the shutter so a
+      // moved camera is held to the same room as a searched one (point 1385).
+      window.__childVantageHuts = () =>
+        [
+          ...window.__placeLayout.dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
+          ...(window.__placeLayout.colliders ?? []).flatMap((c) =>
+            c.kind === 'box'
+              ? [{ x: c.x, z: c.z, r: Math.hypot(c.hx, c.hz) }]
+              : c.kind === 'segment' || c.r === undefined
+                ? []
+                : [{ x: c.x, z: c.z, r: c.r }],
+          ),
+        ].filter((h) => h.r > 0.8)
       window.__pickChildVantage = () => {
         const kids = window.__placeTag().children
         if (kids.length === 0) return null
@@ -1060,16 +1075,7 @@ async function checkChildrenMotion(motionPlace) {
         // segments, which the search leaves out; anything smaller
         // than a child neither hides one nor crowds the camera and is dropped,
         // so scattered stones do not veto every vantage in the settlement.
-        const huts = [
-          ...window.__placeLayout.dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
-          ...(window.__placeLayout.colliders ?? []).flatMap((c) =>
-            c.kind === 'box'
-              ? [{ x: c.x, z: c.z, r: Math.hypot(c.hx, c.hz) }]
-              : c.kind === 'segment' || c.r === undefined
-                ? []
-                : [{ x: c.x, z: c.z, r: c.r }],
-          ),
-        ].filter((h) => h.r > 0.8)
+        const huts = window.__childVantageHuts()
         const blocks = (ax, az, bx, bz, pad) =>
           huts.some((h) => {
             const dx = bx - ax
@@ -1133,12 +1139,18 @@ async function checkChildrenMotion(motionPlace) {
                 Math.hypot(sx - k.x, sz - k.z) < Math.hypot(sx - a.x, sz - a.z) ? k : a)
               best.kx = nearest.x
               best.kz = nearest.z
+              best.ki = kids.indexOf(nearest)
             }
           }
         }
         return best
       }
     })
+    // THE SCENE IS WAITED FOR ONCE, HERE — before the aim, not between the aim
+    // and the shutter (point 1385, the pattern of frame 480). The shutter's own
+    // five-second settle let the declared child walk out under the bottom edge
+    // on WebGL 2; the frame below is shot with `sceneReady: false`.
+    await waitForSceneReady(page).catch(() => {})
     // Worth photographing: most of the group in the clear, and the camera in the
     // open rather than up against a wall.
     await stepUntil(() => {
@@ -1149,7 +1161,7 @@ async function checkChildrenMotion(motionPlace) {
       const p = window.__placePlayer
       const best = window.__pickChildVantage()
       if (!p || !best) return null
-      const pose = { x: p.x, z: p.z, yaw: p.yaw }
+      const pose = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch }
       p.x = best.sx
       p.z = best.sz
       // LOOK AT WHAT THE FRAME DECLARES. The camera used to face the centroid of
@@ -1160,7 +1172,7 @@ async function checkChildrenMotion(motionPlace) {
       // by construction, and it is the same body the shutter is handed (point 690).
       p.yaw = Math.atan2(-(best.kx - p.x), -(best.kz - p.z))
       return {
-        pose, kx: best.kx, kz: best.kz,
+        pose, kx: best.kx, kz: best.kz, ki: best.ki,
         seen: best.seen, of: best.of, clear: best.clear, near: best.near,
       }
     })
@@ -1180,6 +1192,59 @@ async function checkChildrenMotion(motionPlace) {
     )
     if (aimed) {
       await nextFrames(2)
+      // The declared child is read where it is NOW, and the camera turned to it
+      // again: the frames since the aim are frames of a walking child. A child
+      // that has run up to the camera fell out under the bottom edge, and
+      // pitching down to it photographed the ground: the camera steps back along
+      // the sightline to five metres when that line stays clear, and the pitch
+      // is aimed at the head.
+      const at = await page.evaluate((ki) => {
+        const p = window.__placePlayer
+        const k = window.__placeTag()?.children[ki]
+        const eyeY = window.__placeCamera?.position.y
+        if (!p || !k) return null
+        const h = Math.hypot(p.x - k.x, p.z - k.z)
+        const R = window.__placeLayout?.radius ?? 28
+        if (eyeY != null && h > 0.01 && h < 5) {
+          const x = k.x + ((p.x - k.x) / h) * 5
+          const z = k.z + ((p.z - k.z) / h) * 5
+          const hit = window.__placeRayHit?.(k.x, 1.0, k.z, [x, eyeY, z])
+          const clear = hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
+          // The same 2.5 m of room the standpoint verdict above holds a searched
+          // vantage to; a back-step into a wall's lee stays where it was.
+          const huts = window.__childVantageHuts?.() ?? []
+          const room = huts.length > 0 ? Math.min(...huts.map((o) => Math.hypot(x - o.x, z - o.z) - o.r)) : Infinity
+          if (clear && room >= 2.5 && Math.hypot(x, z) < R - 2) {
+            p.x = x
+            p.z = z
+          }
+        }
+        p.yaw = Math.atan2(-(k.x - p.x), -(k.z - p.z))
+        if (eyeY != null) p.pitch = -Math.atan2(eyeY - 1.0, Math.max(0.5, Math.hypot(k.x - p.x, k.z - p.z)))
+        return { x: k.x, z: k.z }
+      }, aimed.ki)
+      // Where the declared child stands, projected through the place camera at
+      // its head. Read after the turn's rendered frame and again after the
+      // shutter: the view is convex, so a child inside it at both readings was
+      // inside it at the capture between them.
+      const childInView = () =>
+        page.evaluate((ki) => {
+          const k = window.__placeTag()?.children[ki]
+          const cam = window.__placeCamera
+          if (!k || !cam) return null
+          const e = cam.matrixWorldInverse.elements
+          const m = cam.projectionMatrix.elements
+          const ap = (a, w) => [0, 1, 2, 3].map((r) => a[r] * w[0] + a[r + 4] * w[1] + a[r + 8] * w[2] + a[r + 12] * w[3])
+          const c = ap(m, ap(e, [k.x, 1.0, k.z, 1]))
+          const inView = c[3] > 0 && Math.abs(c[0] / c[3]) <= 1 && Math.abs(c[1] / c[3]) <= 1
+          return { x: k.x, z: k.z, inView, ndc: c[3] > 0 ? [c[0] / c[3], c[1] / c[3]] : null }
+        }, aimed.ki)
+      if (at) {
+        await nextFrames(1)
+        const now = await childInView()
+        aimed.kx = now?.x ?? at.x
+        aimed.kz = now?.z ?? at.z
+      }
       await frame(motionPlace === 'bambara-village' ? '648-village-children' : `690-${motionPlace}-children`, {
         // AT THE CHILD'S HEAD, not its knees. The camera looks slightly upward,
         // so the group always sits in the lower third of the picture and a
@@ -1191,13 +1256,23 @@ async function checkChildrenMotion(motionPlace) {
         label:
           `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear, ` +
           `on average ${aimed.near.toFixed(1)} m off)`,
+        // Waited for before the aim (above); a second settle here would only
+        // give the child time to leave the frame (point 1385).
+        sceneReady: false,
       })
+      const after = await childInView()
+      checkAt(
+        'the declared child is still in the picture after the shutter',
+        !!after?.inView,
+        after ? `head at NDC ${after.ndc?.map((n) => n.toFixed(2)).join(', ') ?? 'behind the camera'}` : 'child gone',
+      )
       await page.evaluate((pose) => {
         const p = window.__placePlayer
         if (!p) return
         p.x = pose.x
         p.z = pose.z
         p.yaw = pose.yaw
+        p.pitch = pose.pitch
       }, aimed.pose)
     }
     // The world goes back as it was found, the injected search included — every

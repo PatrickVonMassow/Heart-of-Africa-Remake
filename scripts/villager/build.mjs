@@ -99,7 +99,7 @@ export async function pipelineConfig() {
   return { VILLAGER_ASSET: mod.VILLAGER_ASSET, VILLAGER_GLTF: mod.VILLAGER_GLTF, VILLAGER_POSE: { shoulders: mod.VILLAGER_POSE.shoulders }, FIGURE_STATURE: mod.VILLAGER_ASSET.stature }
 }
 
-/** The game's composed poses for the eight subjects, as JSON at `path` (Vitest). */
+/** The game's composed poses for the eleven subjects, as JSON at `path` (Vitest). */
 export function exportRuntimePoses(path) {
   const r = spawnSync('npx', ['vitest', 'run', 'src/render/villagerRuntimePose.test.tsx'], {
     cwd: repo,

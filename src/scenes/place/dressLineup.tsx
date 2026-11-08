@@ -10,7 +10,9 @@
 // outfit as (form, wear) pairs, and a clip. A walk or run starts `lead` metres
 // (default: two seconds of its pace) behind its place in the row and walks
 // through it; `at` freezes life (`__placeFreezeLife`) the frame the first
-// figure carrying it reaches that clip time, once its clip is fully in.
+// figure carrying it reaches that clip time, once its clip is fully in. A
+// `kneel` figure is down from its first frame and held on the idle clock;
+// `people` resolves its outfit from that people's record first.
 // `window.__dressLineup.state()` reads where every figure is and whether the
 // lineup froze. Nothing renders in a production build.
 
@@ -63,7 +65,7 @@ interface Clock {
 /** The clip phase `at` names, on this asset's clips. */
 function targetPhase(asset: VillagerAsset | null, clip: LineupClip, at: LineupAt): number | null {
   if (typeof at === 'number') return at
-  const c = asset?.clips[clip === 'run' ? 'jog' : clip]
+  const c = asset?.clips[clip === 'run' ? 'jog' : clip === 'kneel' ? 'idle' : clip]
   if (!c) return null
   if (typeof at === 'object') return c.duration > 0 ? (c.times[Math.min(at.frame, c.times.length - 1)] ?? 0) / c.duration : 0
   return midSwing(stanceOf(c, at === 'cross-L' ? 'L' : 'R'))
@@ -104,7 +106,12 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
         g.traverse((o) => {
           if ((o as THREE.Mesh).isMesh) meshes.push(o.uuid)
         })
-        return { x: g.position.x, y: g.position.y, z: g.position.z, clock: clockOf(g), meshes }
+        // the drawn kneel (skinnedFigure's dumpKneel): 1 once a kneel row is down
+        let kneel: number | null = null
+        g.traverse((o) => {
+          if (kneel === null && typeof o.userData.dumpKneel === 'number') kneel = o.userData.dumpKneel as number
+        })
+        return { x: g.position.x, y: g.position.y, z: g.position.z, clock: clockOf(g), meshes, kneel }
       }),
     })
     w.__dressLineup = set
@@ -140,7 +147,7 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
         clip,
         speed,
         cloth: fc,
-        dress: f.garments ? resolveOutfit(f.garments, look?.peopleId ?? null, fc) : undefined,
+        dress: f.garments ? resolveOutfit(f.garments, look?.peopleId ?? null, fc, f.people ? { people: f.people, sex: f.sex, age: f.age } : undefined) : undefined,
         start: [at.x + right[0] * off - ahead[0] * lead, at.z + right[1] * off - ahead[1] * lead] as const,
         ahead,
         phase,
@@ -175,9 +182,11 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
     r.prev[i] = now
     const ready = f.clip === 'dig' ? c.dig >= 1 : moving ? r.elapsed >= WARM_SECONDS && c.weight >= 0.999 : r.elapsed >= 0.5
     if (!ready) return
-    if (f.clip === 'dig' || (prev !== undefined && crossedPhase(prev, now, f.phase!))) {
+    // a dig or a held kneel freezes as soon as it is in, at its own clip time
+    const atOnce = f.clip === 'dig' || f.clip === 'kneel'
+    if (atOnce || (prev !== undefined && crossedPhase(prev, now, f.phase!))) {
       r.frozen = true
-      r.held = { index: i, phase: f.clip === 'dig' ? f.phase! : now }
+      r.held = { index: i, phase: atOnce ? f.phase! : now }
       ;(window as unknown as { __placeFreezeLife?: (on: boolean) => void }).__placeFreezeLife?.(true)
     }
   })
@@ -195,7 +204,7 @@ export function DressLineup({ cloth }: { cloth: readonly string[] }) {
           position={[f.start[0], groundHeight(f.start[0], f.start[1]), f.start[1]]}
           rotation={[0, at.yaw, 0]}
         >
-          <Figure cloth={f.cloth} sex={f.sex} age={f.age} scale={f.scale} legs dress={f.dress} build={f.build} work={f.work} pose={f.pose} />
+          <Figure cloth={f.cloth} sex={f.sex} age={f.age} scale={f.scale} legs dress={f.dress} build={f.build} work={f.work} pose={f.pose} kneel={f.clip === 'kneel'} />
         </group>
       ))}
     </group>

@@ -14,6 +14,7 @@ import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, OUT, section, check, unmeasured, waitForMoment, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
+import { overheadCamera, OVERHEAD_PITCH_DEG } from './garmentOverhead.mjs'
 import { standOrderMoment } from './standOrder.mjs'
 import { rimSeamPoints } from './rimSeam.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
@@ -6845,9 +6846,11 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   await assertBackend(page)
   const PLACES = (process.env.GARMENT_PLACES ?? 'hausa-village,cairo').split(',')
-  // Views as the bearing from the figure's heading to the camera.
-  const VIEW = { front: 0, front34: Math.PI / 4, side: Math.PI / 2, rear34: (3 * Math.PI) / 4, rear: Math.PI }
-  const VIEW_TEXT = { front: 'front-on', front34: 'front three-quarter', side: 'side-on', rear34: 'rear three-quarter', rear: 'from the rear' }
+  // Views as the bearing from the figure's heading to the camera. `overhead`
+  // looks from the rear three-quarter, lifted and pitched steeply down at the
+  // figure's middle (garmentOverhead.mjs); the others stand at eye height.
+  const VIEW = { front: 0, front34: Math.PI / 4, side: Math.PI / 2, rear34: (3 * Math.PI) / 4, rear: Math.PI, overhead: (3 * Math.PI) / 4 }
+  const VIEW_TEXT = { front: 'front-on', front34: 'front three-quarter', side: 'side-on', rear34: 'rear three-quarter', rear: 'from the rear', overhead: `from above behind at the rear three-quarter, looking down ${OVERHEAD_PITCH_DEG}°` }
   const MAN = { sex: 'male', age: 'adult' }
   const BOY = { sex: 'male', age: 'child' }
   const WOMAN = { sex: 'female', age: 'adult' }
@@ -6902,6 +6905,164 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
     ROWS.push({ slug: `waistbeads-under-${over.toLowerCase()}-walk`, text: `waist beads under ${over === 'apron' ? 'an apron' : 'a loin flap'}, walk, young woman`, fig: { ...YOUNG_WOMAN, garments: ['waistBeads-waist', `${over}-waist`], clip: 'walk', at: STRIDE }, views: ['side'] })
   ROWS.push({ slug: 'waistbeads-over-trousers-walk', text: 'waist beads over trousers, walk, adult man, judged at the waist seam', fig: { ...MAN, garments: ['waistBeads-waist', 'trousers-waist'], clip: 'walk', at: STRIDE }, views: ['side', 'front34'] })
 
+  // Baseline rows of the frozen clothing list (TASKS.md point "Villager
+  // clothing closure"): every candidate staged on main's own garment build,
+  // framed as `1482-base-*` so the 1347 frames stay. Slugs start with the
+  // candidate (`c1-` .. `c7-`), so GARMENT_ROWS=c3 runs one candidate. `people`
+  // dresses the figure as that people wears the pair (dressLineupSpec.ts);
+  // `flank` fixes which flank a side view looks from (+1: the figure's left,
+  // the lineup's +x; -1: its right).
+  const BASE = '1482-base'
+  const YOUNG_MAN = { sex: 'male', age: 'youth' }
+  const MOVES = [
+    ['idle', 'idle', 0.25, 'idle'],
+    ['walk-stride', 'walk', STRIDE, 'walk at the stride'],
+    ['walk-cross-l', 'walk', 'cross-L', 'walk at the left leg crossing'],
+    ['walk-cross-r', 'walk', 'cross-R', 'walk at the right leg crossing'],
+    ['run', 'run', STRIDE, 'run at the stride'],
+    ['kneel', 'kneel', 0.25, 'kneeling, held down'],
+    ['dig', 'dig', 0.5, 'dig at mid-stroke'],
+  ]
+  const MOVE_VIEWS = { idle: ['side', 'front34'], walk: ['side', 'front34'], run: ['side', 'front34'], kneel: ['side', 'front'], dig: ['side', 'rear34'] }
+  // candidate 1: the child's hip cloth as children wear it (hip cloth and beads)
+  for (const [who, w, people, garments, what] of [
+    ['boy-loinflap', BOY, 'bambara', ['loinFlap-waist', 'waistBeads-waist'], 'boy (child) in the Bambara loin flap and waist beads'],
+    ['girl-loinflap', GIRL, 'lunda', ['loinFlap-waist', 'waistBeads-waist'], 'girl (child) in the Lunda loin flap and waist beads'],
+    ['girl-skirtshort', GIRL, 'hausa', ['skirtShort-waist', 'waistBeads-waist'], 'girl (child) in the Hausa short skirt and waist beads'],
+    ['girl-apron', GIRL, 'wayeyi', ['apron-waist', 'waistBeads-waist'], 'girl (child) in the Wayeyi apron and waist beads'],
+  ])
+    for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride', 'run'].includes(t)))
+      ROWS.push({
+        slug: `c1-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate 1: child's hip cloth standing off the body all round — ${what}, ${how}`,
+        fig: { ...w, people, garments, clip, at },
+        // overhead: the user's finding frame looks steeply down from behind
+        views: ['side', 'rear34', 'front34', 'overhead'],
+      })
+  // candidate 2: the loin-flap girdle as a torus off the waist
+  for (const [who, w, people, what] of [
+    ['man', MAN, 'wayeyi', 'adult man (Wayeyi)'],
+    ['youngwoman', YOUNG_WOMAN, 'lunda', 'young woman (Lunda)'],
+  ])
+    for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride'].includes(t)))
+      ROWS.push({
+        slug: `c2-loinflap-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate 2: loin-flap girdle reading as a torus off the waist — loin flap, ${what}, ${how}, judged at the girdle`,
+        fig: { ...w, people, garments: ['loinFlap-waist'], clip, at },
+        views: ['side', 'front34'],
+      })
+  // candidates 3 and 4: every skirt, apron, loin-flap and girdle-tail form an
+  // adult or young villager wears on main, on a wearer of it, alone
+  for (const [form, who, w, people, what, long] of [
+    ['loinFlap', 'man', MAN, 'wayeyi', 'loin flap, adult man (Wayeyi)'],
+    ['loinFlap', 'woman', WOMAN, 'lunda', 'loin flap, adult woman (Lunda)'],
+    ['girdleTails', 'man', MAN, 'zulu', 'girdle tails, adult man (Zulu)'],
+    ['apron', 'man', MAN, 'lunda', 'apron, adult man (Lunda)'],
+    ['apron', 'woman', WOMAN, 'pedi', 'apron, adult woman (Pedi)'],
+    ['skirtShort', 'woman', WOMAN, 'banda', 'short skirt, adult woman (Banda)'],
+    ['skirtShort', 'youngwoman', YOUNG_WOMAN, 'zulu', 'short skirt, young woman (Zulu)'],
+    ['skirtKnee', 'man', MAN, 'bemba', 'knee skirt, adult man (Bemba)', true],
+    ['skirtKnee', 'woman', WOMAN, 'zulu', 'knee skirt, adult woman (Zulu)', true],
+    ['wrapLong-waist', 'woman', WOMAN, 'bambara', 'long wrapper from the waist, adult woman (Bambara)', true],
+    ['wrapLong-chest', 'woman', WOMAN, 'hausa', 'long wrapper from the chest, adult woman (Hausa)', true],
+  ]) {
+    const pair = form.includes('-') ? form : `${form}-waist`
+    const f = form.toLowerCase()
+    for (const [tag, clip, at, how] of MOVES) {
+      // candidate 4: the knee and long skirts' walk rows also look front-on at the hem
+      const hem = long && clip === 'walk'
+      ROWS.push({
+        slug: `c3-${f}-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate ${hem ? '3 and 4' : '3'}: panel flaring at rest or a leg passing through it${hem ? ', pale/dark patches at the hem where the leg passes' : ''} — ${what}, ${how}`,
+        fig: { ...w, people, garments: [pair], clip, at },
+        views: hem ? ['side', 'front34', 'front'] : MOVE_VIEWS[clip],
+      })
+    }
+  }
+  // candidate 5: the shirt's far sleeve; each flank looks at one far sleeve
+  for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride'].includes(t))) {
+    const fig = { ...MAN, people: 'bambara', garments: ['trousers-waist', 'shirt-chest', 'cap-crown'], clip, at }
+    const text = (where) => `candidate 5: shirt's far sleeve standing off the arm — Bambara shirt, trousers and cap, adult man, ${how}, ${where}`
+    ROWS.push({ slug: `c5-shirt-man-${tag}-lflank`, prefix: BASE, text: text('from his left flank, judged at the far (right) sleeve'), fig, views: ['side'], flank: 1 })
+    ROWS.push({ slug: `c5-shirt-man-${tag}-rflank`, prefix: BASE, text: text('from his right flank, judged at the far (left) sleeve'), fig, views: ['side'], flank: -1 })
+    ROWS.push({ slug: `c5-shirt-man-${tag}`, prefix: BASE, text: text('judged at both sleeves'), fig, views: ['front34'] })
+  }
+  // candidate 6: the white outer robe (the Swahili man's cotton robe and cap)
+  for (const [tag, clip, at, how] of MOVES.filter(([t]) => ['idle', 'walk-stride'].includes(t)))
+    ROWS.push({
+      slug: `c6-whiterobe-man-${tag}`,
+      prefix: BASE,
+      text: `candidate 6: dark patches on a white outer robe — Swahili white cotton robe and cap, adult man, ${how}`,
+      fig: { ...MAN, people: 'swahili', garments: ['robe-chest', 'cap-crown'], clip, at },
+      views: ['front', 'side', 'rear34'],
+    })
+  // candidate 7: the Tuareg face veil at the robe collar, head turned standing
+  for (const [who, w, what] of [['man', MAN, 'adult man'], ['youngman', YOUNG_MAN, 'young man']])
+    for (const [tag, clip, at, how, headYaw] of [['idle-head', 'idle', 0.25, 'idle with the head turned', 0.6], ['walk-stride', 'walk', STRIDE, 'walk at the stride']])
+      ROWS.push({
+        slug: `c7-tuareg-${who}-${tag}`,
+        prefix: BASE,
+        text: `candidate 7: Tuareg face veil poking through the robe collar — indigo robe, black veil and turban, ${what}, ${how}, judged at the neck`,
+        fig: { ...w, people: 'tuareg', garments: ['robe-chest', 'veil-face', 'turban-aroundHead'], clip, at, ...(headYaw === undefined ? {} : { headYaw }) },
+        views: ['front', 'front34', 'side'],
+      })
+  // Exposure (user rule: no view opens onto covered skin): every covering
+  // form kneeling and bent over (the dig at mid-stroke), from above and front
+  // three-quarter at 3 m. `e0-`: the user's finding, the kneeling Bambara
+  // woman's breast cloth seen from above (her wrapper from the waist below,
+  // judged at its top edge too); `exp-`: the other covering forms, the
+  // children's hip layer as children wear it.
+  const BEND = [
+    ['kneel', 'kneel', 0.25, 'kneeling, held down'],
+    ['dig', 'dig', 0.5, 'bent over, dig at mid-stroke'],
+  ]
+  const EXPOSURE_VIEWS = ['overhead', 'front34']
+  for (const [tag, clip, at, how] of BEND)
+    ROWS.push({
+      slug: `e0-breastcloth-bambara-woman-${tag}`,
+      prefix: BASE,
+      text: `exposure: breast cloth standing off the chest, the breast seen from above — Bambara breast cloth and long wrapper from the waist, adult woman, ${how}, judged at the breast cloth's top edge and the wrapper's`,
+      fig: { ...WOMAN, people: 'bambara', garments: ['breastCloth-chest', 'wrapLong-waist'], clip, at },
+      views: EXPOSURE_VIEWS,
+      dists: [3],
+    })
+  for (const [form, who, w, people, garments, what] of [
+    ['wraplong-chest', 'woman', WOMAN, 'hausa', ['wrapLong-chest'], 'long wrapper tied over the chest (tube top), adult woman (Hausa)'],
+    ['skirtknee', 'woman', WOMAN, 'zulu', ['skirtKnee-waist'], 'knee skirt, adult woman (Zulu)'],
+    ['skirtshort', 'woman', WOMAN, 'banda', ['skirtShort-waist'], 'short skirt, adult woman (Banda)'],
+    ['loinflap', 'woman', WOMAN, 'lunda', ['loinFlap-waist'], 'loin flap, adult woman (Lunda)'],
+    ['loinflap', 'man', MAN, 'wayeyi', ['loinFlap-waist'], 'loin flap, adult man (Wayeyi)'],
+    ['apron', 'woman', WOMAN, 'pedi', ['apron-waist'], 'apron, adult woman (Pedi)'],
+    ['girdletails', 'man', MAN, 'zulu', ['girdleTails-waist'], 'girdle tails, adult man (Zulu)'],
+    ['child-skirtshort', 'girl', GIRL, 'hausa', ['skirtShort-waist', 'waistBeads-waist'], 'Hausa short skirt and waist beads, girl (child)'],
+    ['child-loinflap', 'girl', GIRL, 'lunda', ['loinFlap-waist', 'waistBeads-waist'], 'Lunda loin flap and waist beads, girl (child)'],
+    ['child-loinflap', 'boy', BOY, 'bambara', ['loinFlap-waist', 'waistBeads-waist'], 'Bambara loin flap and waist beads, boy (child)'],
+    ['child-apron', 'girl', GIRL, 'wayeyi', ['apron-waist', 'waistBeads-waist'], 'Wayeyi apron and waist beads, girl (child)'],
+  ])
+    for (const [tag, clip, at, how] of BEND)
+      ROWS.push({
+        slug: `exp-${form}-${who}-${tag}`,
+        prefix: BASE,
+        text: `exposure: a view under or into the covering cloth onto covered skin — ${what}, ${how}, judged at the top edge and the hem`,
+        fig: { ...w, people, garments, clip, at },
+        views: EXPOSURE_VIEWS,
+        dists: [3],
+      })
+  // GARMENT_ROWS=<prefix,..> stages only the rows whose slug starts with one
+  const ROW_FILTER = (process.env.GARMENT_ROWS ?? '').split(',').map((p) => p.trim()).filter(Boolean)
+  if (ROW_FILTER.length) {
+    const keep = ROWS.filter((r) => ROW_FILTER.some((p) => r.slug.startsWith(p)))
+    check('garment acceptance: GARMENT_ROWS selects at least one row', keep.length > 0, `${keep.length} of ${ROWS.length} rows for ${ROW_FILTER.join(',')}`)
+    ROWS.splice(0, ROWS.length, ...keep)
+  }
+  {
+    const slugs = new Set(ROWS.map((r) => r.slug))
+    check('garment acceptance: every row slug is unique', slugs.size === ROWS.length, `${ROWS.length} rows, ${slugs.size} slugs`)
+  }
+
   // A straight track the figure walks along: `lead` behind the anchor to 3 m
   // past it, every sight line along it at hip and chest height clear, and the
   // camera ring 7.5 m round the anchor open in front, behind and on at least
@@ -6945,16 +7106,21 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
   // The camera `dist` from the frozen figure at `view` (either flank, small
   // turns allowed), with clear sight lines to its hips, chest and head; the
   // first spot the player really stands on and sees the figure from is used.
-  const placeCamera = async (fig, scale, view, dist) => {
-    const spots = await page.evaluate(({ fig, scale, bearing, dist }) => {
+  // `overhead` stands the camera `dist` along its line of sight to the figure's
+  // middle, lifted above the eye (dev `__placeCameraLift`) and pitched down.
+  const placeCamera = async (fig, scale, view, dist, flank) => {
+    const over = view === 'overhead' ? overheadCamera(dist, fig.y + 0.85 * scale) : null
+    await page.evaluate(() => { window.__placeCameraLift = 0 })
+    const spots = await page.evaluate(({ fig, scale, bearing, dist, flank, over }) => {
       const out = []
-      for (const side of bearing % Math.PI === 0 ? [1] : [1, -1])
+      for (const side of bearing % Math.PI === 0 ? [1] : flank ? [flank] : [1, -1])
         // the wider turns serve a 7 m spot a village fence or hut blocks
         for (const turn of [0, 0.12, -0.12, 0.25, -0.25, 0.4, -0.4]) {
           const a = fig.yaw + side * bearing + turn
-          const x = fig.x + Math.sin(a) * dist
-          const z = fig.z + Math.cos(a) * dist
-          const eye = [x, fig.y + 1.6, z]
+          const reach = over ? over.horiz : dist
+          const x = fig.x + Math.sin(a) * reach
+          const z = fig.z + Math.cos(a) * reach
+          const eye = [x, over ? over.eyeY : fig.y + 1.6, z]
           const clear = [0.5, 0.9, 1.4].every((y) => {
             const hit = window.__placeRayHit?.(fig.x, fig.y + y * scale, fig.z, eye)
             return !hit || hit.hitDistance == null || fig.meshes.includes(hit.hitUuid) || hit.hitDistance >= hit.targetDistance - 0.35
@@ -6962,18 +7128,24 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
           if (clear) out.push({ x, z, yaw: a, turn, side })
         }
       return out
-    }, { fig, scale, bearing: VIEW[view], dist })
+    }, { fig, scale, bearing: VIEW[view], dist, flank, over })
     for (const s of spots) {
-      await page.evaluate(({ s, dist, scale }) => {
+      await page.evaluate(({ s, dist, scale, over }) => {
+        window.__placeCameraLift = 0
         const p = window.__placePlayer
         p.x = s.x
         p.z = s.z
         p.yaw = s.yaw
-        p.pitch = dist > 4 ? -0.06 : scale < 1 ? -0.2 : -0.1
-      }, { s, dist, scale })
+        p.pitch = over ? over.pitch : dist > 4 ? -0.06 : scale < 1 ? -0.2 : -0.1
+      }, { s, dist, scale, over })
       await nextFrames(4)
       const at = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
       if (Math.hypot(at.x - s.x, at.z - s.z) >= 0.05) continue
+      if (over) {
+        // lift the eye-height camera to the overhead height over this footing
+        await page.evaluate((eyeY) => { window.__placeCameraLift = eyeY - window.__placeCamera.position.y }, over.eyeY)
+        await nextFrames(3)
+      }
       // and from the camera as it really stands: shins to head unhidden
       const seen = await page.evaluate(({ fig, scale }) =>
         [0.25, 0.5, 0.75, 1.0, 1.3, 1.55].every((y) => {
@@ -6982,6 +7154,7 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
         }), { fig, scale })
       if (seen) return s
     }
+    await page.evaluate(() => { window.__placeCameraLift = 0 })
     return null
   }
 
@@ -7013,25 +7186,35 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
       }
       // the figure's drawn place and heading, read off its group
       const fig = { x: f0.x, y: f0.y, z: f0.z, yaw: track.yaw, meshes: f0.meshes }
-      const pose = `${row.fig.clip}${row.fig.clip === 'dig' || !f0.clock ? '' : ` held at phase ${(st.held?.phase ?? 0).toFixed(3)}`}`
+      if (row.fig.clip === 'kneel' && !(f0.kneel >= 0.999)) {
+        missed.push(`${row.slug}: the figure never knelt down (kneel ${f0.kneel})`)
+        await page.evaluate(() => window.__dressLineup(null))
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+        continue
+      }
+      const pose = `${row.fig.clip}${row.fig.clip === 'dig' || row.fig.clip === 'kneel' || !f0.clock ? '' : ` held at phase ${(st.held?.phase ?? 0).toFixed(3)}`}`
       try {
         for (const view of row.views) {
           for (const dist of row.dists ?? [3, 7]) {
-            const cam = await placeCamera(fig, scale, view, dist)
+            let cam = await placeCamera(fig, scale, view, dist, row.flank)
+            // a fixed flank serves the 3 m far-sleeve frame; the 7 m frame
+            // judges no sleeve, so a blocked fixed flank takes the open one
+            if (!cam && row.flank && dist > 4) cam = await placeCamera(fig, scale, view, dist, -row.flank)
             if (!cam) {
               missed.push(`${row.slug} ${view} ${dist} m: no clear camera spot`)
               continue
             }
             await nextFrames(3)
-            const name = `1347-accept-${row.slug}-${view}-${place}-${dist}m`
+            const name = `${row.prefix ?? '1347-accept'}-${row.slug}-${view}-${place}-${dist}m`
             await frame(shot(name), {
               local: { x: fig.x, y: fig.y + 0.85 * scale, z: fig.z },
-              label: `${place}: acceptance row — ${row.text}; forced outfit ${row.fig.garments.join(' + ')}, ${pose}, ${VIEW_TEXT[view]}${cam.side < 0 ? ' (other flank)' : ''}${cam.turn ? ` (turned ${cam.turn} rad for a clear line)` : ''} from ${dist} m`,
+              label: `${place}: acceptance row — ${row.text}; forced outfit ${row.fig.garments.join(' + ')}, ${pose}, ${VIEW_TEXT[view]}${cam.side !== (row.flank ?? 1) ? ' (other flank)' : ''}${cam.turn ? ` (turned ${cam.turn} rad for a clear line)` : ''} from ${dist} m`,
             })
             shots++
           }
         }
       } finally {
+        await page.evaluate(() => { window.__placeCameraLift = 0 })
         await page.evaluate(() => window.__dressLineup(null))
         await page.evaluate(() => window.__placeFreezeLife?.(false))
       }

@@ -190,14 +190,27 @@ class Body:
             self._hulls[key] = (h, np.array([hips[0], hips[2]]))
         return self._hulls[key]
 
-    def ring(self, y, mask, ease, center=None, n=N_RADIAL, slab=0.012):
+    def ring(self, y, mask, ease, center=None, n=N_RADIAL, slab=0.012, thetas=None):
+        """(centre, radii) of the eased convex outline at height y, along
+        the N_RADIAL ring directions or along `thetas` (rad, 0 the front)."""
         pts = self.section(y, mask, slab)
         if len(pts) < 3:
             pts = self.section(y, mask, slab * 3)
         h = hull2d(pts)
         c = np.array(center) if center is not None else h.mean(0)
-        r = np.array([ray_hull(h, c, d) for d in angles(n)])
+        dirs = angles(n) if thetas is None else np.stack([np.sin(thetas), np.cos(thetas)], 1)
+        r = np.array([ray_hull(h, c, d) for d in dirs])
         return c, r + ease
+
+    def ring_star(self, y, mask, ease, n=N_RADIAL, slab=0.012):
+        """Like ring(), but each direction's radius is the farthest body
+        point within its own sector, not the convex hull's: the outline
+        follows a hollow (the small of the back) instead of bridging it."""
+        pts = self.section(y, mask, slab)
+        if len(pts) < 3:
+            pts = self.section(y, mask, slab * 3)
+        c, hull_r = self.ring(y, mask, 0.0, n=n, slab=slab)
+        return c, star_radii(pts, c, hull_r) + ease
 
     def push_out(self, pts, clearance):
         """Every garment vertex at least `clearance` outside the body's surface
@@ -222,6 +235,18 @@ class Body:
                     # outside: away from the nearest skin, never along a face
                     # normal that points into a cavity (the mouth's slit)
                     out[k] = co + (p - co) * (clearance / dist)
+        return out
+
+    def hug(self, pts, reach):
+        """A garment edge pulled onto the drawn body (the decimated surface
+        the game shows): every vertex outside it by less than `reach` comes to
+        PUSH_CLEARANCE off its nearest point; vertices inside it or farther
+        off stay (push_out still clears the inside ones)."""
+        from fit import inside
+        out = pts.copy()
+        for k, p in enumerate(out):
+            co, _n, _fi, dist = self.dtree.find_nearest(p)
+            out[k] = hug_point(p, np.array(co), dist, inside(self.dtree, p.tolist()), PUSH_CLEARANCE, reach)
         return out
 
     def weights_on_arm(self, pts, side):
@@ -292,7 +317,7 @@ def sweep(rings, closed_top=False, closed_bottom=False, keep=None):
     for k, (y, c, r) in enumerate(rings):
         for i in range(n + 1):  # a seam column for the uv
             ii = i % n
-            verts.append([c[0] + A[ii, 0] * r[ii], y, c[1] + A[ii, 1] * r[ii]])
+            verts.append([c[0] + A[ii, 0] * r[ii], y[ii] if np.ndim(y) else y, c[1] + A[ii, 1] * r[ii]])
             uv.append([i / n, k / (len(rings) - 1)])
     tris = []
     for k in range(len(rings) - 1):
@@ -439,14 +464,94 @@ def landmarks(j, H):
     }
 
 
-def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True):
-    """A garment round the trunk (and the legs together below the crotch)."""
+def breast_cloth_span(L):
+    """The breast cloth's top and hem: over the bust down to the waist.
+    The top is 0.045 H under the shoulder, not L['chestTop'] (0.065 H under
+    it): the hung rest tilts the chest forward, and at chestTop the cloth's
+    front edge stood only 5 mm above the bust's peak, the upper bust bare
+    (measured 04.11.2026, work-order point 1477; calibratable). The hem is the girdle (where a skirt or wrapper begins), 0.01 H lower so
+    the cloth laps over it — not L['waist'], which is the chest bone's head
+    (0.66 H on a woman, under the bust) and left only a band beneath the bust
+    (work-order point 1477). shells.py cuts the pre-split body at the hem."""
+    H = L['H']
+    return L['shoulder'] - 0.045 * H, L['girdle'] - 0.01 * H
+
+
+def skirt_profile(form, wear, L):
+    """A wrapped skirt's (ease, flare, ease_top) in figure units: the short
+    skirt sits close at the hips with little flare (with the old 0.012 H ease
+    and 0.035 flare it stood off a child's hips as a stiff ring and ballooned
+    off a digging woman's), and a wrapper tied over the chest starts close to
+    the bust (its top edge stood off the chest as a pointed wing). Values from
+    VILLAGER_ASSET.garmentFit (src/config/balance.ts, calibratable)."""
+    H = L['H']
+    fit = L['fit']
+    if form == 'skirtShort':
+        return fit['skirtShortEase'] * H, fit['skirtShortFlare'], fit['skirtShortEaseTop'] * H
+    flare = 0.05 if form == 'wrapLong' else 0.035
+    return 0.012 * H, flare, fit['chestWrapEaseTop'] * H if wear == 'chest' else None
+
+
+def chest_wrap_top(L):
+    """A wrapper tied over the chest: its top edge under the armpits, above
+    the breasts (VILLAGER_ASSET.garmentFit chestWrapTop, calibratable)."""
+    return L['shoulder'] - L['fit']['chestWrapTop'] * L['H']
+
+
+def chest_wrap_column_top(L, top, n=N_RADIAL):
+    """A chest wrapper's top edge per ring direction: over the breasts in
+    front and over the shoulder blades behind at `top`, dipping at the sides
+    by chestWrapSideDrop H under the armpits (smoothly between
+    chestWrapSideFrom and chestWrapSideTo degrees off the front or back).
+    Level all round at `top`, the edge ran through the hanging upper arm in
+    the build pose: the arm cut it (fit.settle armholes) and the settle
+    pushed the cloth round it radially, over the limb, into a cushion off
+    chest, upper arms and waist (work-order point 1482, pass 5)."""
+    fit = L['fit']
+    s = np.abs(angles(n)[:, 0])
+    lo, hi = np.sin(np.radians(fit['chestWrapSideFrom'])), np.sin(np.radians(fit['chestWrapSideTo']))
+    x = np.clip((s - lo) / (hi - lo), 0, 1)
+    return top - fit['chestWrapSideDrop'] * L['H'] * x * x * (3 - 2 * x), L['waist']
+
+
+def chest_wrap_heights(L, top, bottom, rings=10):
+    """A chest wrapper's ring heights, top to hem: every chestWrapBustStep H
+    from the top down to the chest bone's head (L['waist']), then `rings`
+    rings evenly to the hem. The wrapper is cut on the man's body and a
+    woman's breast is carried onto it by the surface map ring by ring
+    (finish): with the hem's 7 cm spacing the cloth between two rings cut
+    through the breast."""
+    step = L['fit']['chestWrapBustStep'] * L['H']
+    n = max(1, int(np.ceil((top - L['waist']) / step)))
+    bust = top + (L['waist'] - top) * np.arange(n) / n
+    return [float(y) for y in np.concatenate([bust, np.linspace(L['waist'], bottom, rings)])]
+
+
+def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True, ease_top=None, heights=None, column_top=None):
+    """A garment round the trunk (and the legs together below the crotch).
+    `ease_top` (optional): the ease at the top ring, blending to `ease` at
+    the hem, so a wrapped top edge lies on the body instead of standing off.
+    `heights` (optional): the ring heights top to hem instead of `rings`
+    evenly spaced ones. `column_top` (optional, (tops[N_RADIAL], floor)):
+    each ring direction's own top edge; the rings above `floor` are spread
+    per direction between floor and that top, and each direction's radius is
+    the body's outline at its own height (sweep takes a ring's height per
+    column)."""
     out = []
-    for k in range(rings):
-        t = k / (rings - 1)
-        y = top + (bottom - top) * t
+    ys = heights if heights is not None else [top + (bottom - top) * k / (rings - 1) for k in range(rings)]
+    for y in ys:
+        t = (y - top) / (bottom - top)
         m = mask & (B.arm < 0.3)
-        c, r = B.ring(y, m, ease)
+        e = ease if ease_top is None else ease_top + (ease - ease_top) * t
+        c, r = B.ring(y, m, e)
+        if column_top is not None and y > column_top[1]:
+            tops, floor = column_top
+            yc = floor + (y - floor) * (tops - floor) / (top - floor)
+            r = r.copy()
+            for yi in np.unique(np.round(yc, 5)):
+                at = np.round(yc, 5) == yi
+                r[at] = B.ring(float(yi), m, e, center=c)[1][at]
+            y = yc
         fl = flare * B.body['joints'][0, 1] * t * t
         A = angles(len(r))
         # the hem flares mostly sideways (a deep fore-aft flare becomes the
@@ -456,25 +561,53 @@ def tube(B, top, bottom, ease, flare, mask, rings=10, below_crotch_legs=True):
     return out
 
 
+def tarboosh(B, L, steps=5):
+    """The tarboosh (fez): a truncated cone of felt from the brow to a flat
+    top above the crown. Its rim is measured from the drawn chin as the cap's
+    (`jaw`); its wall never lies inside the head at its own height and tapers
+    from the rim to garmentFit.tarbooshTopScale of it at the top, closed."""
+    H, fit = L['H'], L['fit']
+    lo = L['jaw'] + 0.07 * H + 0.02 * H
+    top = L['crown'] + fit['tarbooshRise'] * H
+    ease = 0.008 * H
+    c0, r0 = B.ring(lo, B.head > 0.5, ease)
+    rings = []
+    for k in range(steps):
+        y = lo + (top - lo) * k / (steps - 1)
+        _c, r = B.ring(min(y, L['crown'] - 0.006 * H), B.head > 0.5, ease)
+        wall = r0 * (1 - (1 - fit['tarbooshTopScale']) * k / (steps - 1))
+        rings.append((y, c0, np.maximum(r, wall) if y < L['crown'] else wall))
+    # built from the rim up; sweep takes its rings top to bottom (the head
+    # pieces' winding), the flat top the closed end
+    return sweep(rings[::-1], closed_top=True)
+
+
 def build_form(B, form, wear, L):
     H = L['H']
     allm = np.ones(len(B.W), bool)
     trunk = allm
     parts = []
-    if form in ('loinFlap', 'apron', 'girdleTails'):
+    if form in FLAPS:
         long = L['knee'] + 0.02 * H if form == 'apron' else L['hip'] - (0.14 if form == 'girdleTails' else 0.10) * H
-        half = (0.075 if form == 'apron' else 0.05) * H
-        parts.append(girdle(B, L['girdle'], 0.008 * H))
-        front = 0.75 if form == 'apron' else 0.5
-        parts.append(sweep(tube(B, L['girdle'], long, 0.009 * H, 0.03, trunk, 8), keep=lambda k, i: abs(ang(i)) <= front + 1e-6))
+        # the girdle a flat band on the waist (0.008 H high, flapGirdleBand H
+        # thick), as the game's own builder draws it (figureDress.ts girdle):
+        # a round cord 0.008 H thick stood off the waist as a torus, and the
+        # settle pushed its inner half out of the skin further still
+        parts.append(girdle(B, L['girdle'], 0.008 * H, L['fit']['flapGirdleBand'] * H))
+        # the front flap a trapezoid over the hip bones (front_flap)
+        fit = L['fit']
+        parts.append(front_flap(B, L['girdle'], long, 0.009 * H, 0.03, fit['flapFrontHalfAngleTop'], fit['flapFrontHalfAngle']))
         back_long = L['knee'] + 0.05 * H if form == 'girdleTails' else long
         back = 0.9 if form == 'apron' else 0.75
         parts.append(sweep(tube(B, L['girdle'], back_long, 0.009 * H, 0.03, trunk, 8), keep=lambda k, i: abs(ang(i)) >= np.pi - back - 1e-6))
         return merge(parts), 4
     if form in ('skirtShort', 'skirtKnee', 'wrapLong'):
-        top = L['chestTop'] if wear == 'chest' else L['girdle']
+        top = chest_wrap_top(L) if wear == 'chest' else L['girdle']
         bottom = (L['hip'] + L['knee']) / 2 if form == 'skirtShort' else L['knee'] - 0.015 * H if form == 'skirtKnee' else L['knee'] - 0.6 * (L['knee'] - L['ankle'])
-        return sweep(tube(B, top, bottom, 0.012 * H, 0.05 if form == 'wrapLong' else 0.035, trunk, 12)), 8
+        ease, flare, ease_top = skirt_profile(form, wear, L)
+        heights = chest_wrap_heights(L, top, bottom) if wear == 'chest' else None
+        column_top = chest_wrap_column_top(L, top) if wear == 'chest' else None
+        return sweep(tube(B, top, bottom, ease, flare, trunk, 12, ease_top=ease_top, heights=heights, column_top=column_top)), 8
     if form == 'trousers':
         bottom = L['knee'] - 0.5 * (L['knee'] - L['ankle'])
         # the seat reaches below a child's crotch too: skin between the leg
@@ -489,11 +622,14 @@ def build_form(B, form, wear, L):
             parts.append(sweep(rings))
         return merge(parts), 3
     if form == 'breastCloth':
-        return sweep(tube(B, L['chestTop'], L['waist'] - 0.01 * H, 0.011 * H, 0.01, trunk, 6)), 3
-    if form in ('shirt', 'robe', 'toga'):
-        bottom = L['knee'] + 0.02 * H if form == 'shirt' else L['ankle'] + 0.03 * H
+        return sweep(tube(B, *breast_cloth_span(L), 0.011 * H, 0.01, trunk, 6)), 3
+    if form in ('shirt', 'robe', 'toga', 'coat', 'gown'):
+        # the coat: the Western jacket to mid-thigh; the gown: the Western
+        # woman's long skirt and bodice to the ground (docs/giza-1890.md §4.1)
+        bottom = (L['knee'] + 0.02 * H if form == 'shirt' else (L['hip'] + L['knee']) / 2 if form == 'coat'
+                  else L['ankle'] if form == 'gown' else L['ankle'] + 0.03 * H)
         top = L['neck'] - 0.01 * H
-        flare = 0.03 if form == 'shirt' else 0.06
+        flare = 0.03 if form == 'shirt' else 0.02 if form == 'coat' else 0.06
         if form == 'toga':
             bare = 1 if wear == 'rightShoulder' else -1  # the figure's left is +x
             body_only, yoke = trunk & (B.arm < 0.3), trunk & (B.lower_arm < 0.3)
@@ -526,7 +662,7 @@ def build_form(B, form, wear, L):
             rings.append((y, c, r + flare * B.body['joints'][0, 1] * t * t * (0.45 + 0.55 * np.abs(A[:, 0]))))
         parts.append(sweep(rings))
         for s in 'LR':
-            parts.append(sleeve(B, s, L))
+            parts.append(sleeve(B, s, L, long=form in ('coat', 'gown')))
         # the sleeves' vertices, by side (1 left, 2 right): they take their
         # weights from their own arm, the body cloth (0) from the skin off
         # the arms (finish)
@@ -588,6 +724,8 @@ def build_form(B, form, wear, L):
         # the rings run from the waist up: the crown, the LAST ring, is the
         # closed end (a cap on the first ring is a disc through the chest)
         return sweep(rings, closed_bottom=True, keep=lambda k, i: not (abs(ang(i)) < 0.7 and face_lo < rings[k][0] < face_hi)), 2
+    if form == 'tarboosh':
+        return tarboosh(B, L), 0
     if form in ('turban', 'cap', 'headband'):
         # a cap and a headband from the drawn chin, not the head joint
         # (`chin`), which stands some centimetres above it: measured from the
@@ -686,21 +824,88 @@ def build_form(B, form, wear, L):
     return None, 0
 
 
-def girdle(B, y, thick):
-    c, r = B.ring(y, B.arm < 0.3, 0.006 * B.body['joints'][0, 1] / 0.7)
-    return torus(c, y, r, thick)
+FLAPS = ('loinFlap', 'apron', 'girdleTails')
+TORUS_TUBE = 6  # a torus's segments round its tube (torus `m`)
 
 
-def torus(c, y, radii, thick, n=None, m=6):
+def girdle_count(n=N_RADIAL, m=TORUS_TUBE):
+    """The vertex count of girdle(): (n + 1) ring columns × (m + 1) tube rows."""
+    return (n + 1) * (m + 1)
+
+
+def star_radii(pts, c, hull_r):
+    """Per ring direction (angles(len(hull_r))) the farthest of `pts`
+    (x, z) from `c` within that direction's sector, blurred 1-2-1 round the
+    ring; an empty sector keeps the hull's radius."""
+    n = len(hull_r)
+    d = np.asarray(pts, float) - c
+    a = np.arctan2(d[:, 0], d[:, 1])
+    rho = np.linalg.norm(d, axis=1)
+    r = np.array(hull_r, float)
+    for i in range(n):
+        da = np.abs(np.angle(np.exp(1j * (a - 2 * np.pi * i / n))))
+        m = da <= np.pi / n
+        if m.any():
+            r[i] = min(r[i], float(rho[m].max()))
+    return 0.25 * np.roll(r, 1) + 0.5 * r + 0.25 * np.roll(r, -1)
+
+
+def flap_half_angles(rings, top, hem):
+    """A front flap's half-angle (rad) per ring, top to hem: `top` at the
+    girdle tapering linearly to `hem`."""
+    return [top + (hem - top) * k / (rings - 1) for k in range(rings)]
+
+
+def front_flap(B, y_top, y_bottom, ease, flare, half_top, half_hem, rings=8, step=2 * np.pi / N_RADIAL):
+    """The front flap of a flap form (loin flap, apron, girdle tails): a
+    trapezoid of columns spread evenly over ±half-angle round the hips, wide
+    at the girdle (over the hip bones) and narrower at the hem, every column
+    on the eased outline. Its edges lie on the body, so no oblique view
+    looks behind them onto the groin. The 24 fixed ring columns of
+    a tube cut at ±π/4 left a flat panel ~±7 cm wide standing 3-4 cm off the
+    groin: from the front three-quarter the near groin showed beside it."""
+    halves = flap_half_angles(rings, half_top, half_hem)
+    cols = 2 * max(1, int(round(max(half_top, half_hem) / step))) + 1
+    verts, uv, tris = [], [], []
+    for k in range(rings):
+        t = k / (rings - 1)
+        y = y_top + (y_bottom - y_top) * t
+        th = np.linspace(-halves[k], halves[k], cols)
+        c, r = B.ring(y, B.arm < 0.3, ease, thetas=th)
+        fl = flare * B.body['joints'][0, 1] * t * t
+        r = r + fl * (0.45 + 0.55 * np.abs(np.sin(th)))
+        for i in range(cols):
+            verts.append([c[0] + np.sin(th[i]) * r[i], y, c[1] + np.cos(th[i]) * r[i]])
+            uv.append([i / (cols - 1), t])
+    for k in range(rings - 1):
+        for i in range(cols - 1):
+            a = k * cols + i
+            tris += [[a, a + cols, a + 1], [a + 1, a + cols, a + cols + 1]]
+    return np.array(verts), np.array(tris), np.array(uv)
+
+
+def girdle(B, y, thick, band=None):
+    """A ring round the waist at height y: `thick` its half-height, `band`
+    (optional) its radial half-thickness — a flat band, else a round cord."""
+    # the sector outline, not the convex hull: over the hull's chord across
+    # the small of the back the band stood off as a loop above the buttocks
+    c, r = B.ring_star(y, B.arm < 0.3, 0.006 * B.body['joints'][0, 1] / 0.7)
+    return torus(c, y, r, thick, radial=band)
+
+
+def torus(c, y, radii, thick, n=None, m=TORUS_TUBE, radial=None):
+    """A ring of tube round (c, y); the tube's section `thick` high and
+    `radial` (default `thick`) deep."""
     radii = np.asarray(radii, float)
     n = n or len(radii)
+    radial = thick if radial is None else radial
     A = angles(n)
     verts, uv, tris = [], [], []
     for i in range(n + 1):
         ii = i % n
         for k in range(m + 1):
             a = 2 * np.pi * k / m
-            rr = radii[ii] + thick * np.cos(a)
+            rr = radii[ii] + radial * np.cos(a)
             verts.append([c[0] + A[ii, 0] * rr, y + thick * np.sin(a), c[1] + A[ii, 1] * rr])
             uv.append([i / n, k / m])
     for i in range(n):
@@ -735,42 +940,75 @@ def blob(center, r, scale, n=12, m=8):
 SLEEVE_RING = 13  # vertices per sleeve ring (12 columns and the uv seam)
 
 
-def sleeve(B, s, L):
-    """A short sleeve round the upper arm (to just above the elbow)."""
-    iu, il = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s]
+def sleeve_radius(rad, k, fit):
+    """A sleeve ring's radius round an arm slice of radius `rad` (ring k from
+    the shoulder): close round the arm. With 1.12 × rad + 6 mm + 4 mm per ring
+    the far sleeve stood off the arm as a separate tube (VILLAGER_ASSET.
+    garmentFit, calibratable)."""
+    return rad * fit['sleeveScale'] + fit['sleeveEase'] + fit['sleeveEaseStep'] * k
+
+
+def sleeve(B, s, L, long=False):
+    """A sleeve round the arm: short (to just above the elbow), or `long` on
+    down the forearm to the wrist (the coat and the gown)."""
+    iu, il, ih = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s], SK.INDEX['hand.' + s]
     a = B.wp[iu]
     b = B.wp[il]
-    ax = (b - a) / np.linalg.norm(b - a)
     rings = []
-    W = B.W[:, iu]
-    pts = B.v[B.mask_body & (W > 0.5)]
-    for k, f in enumerate((0.1, 0.45, 0.78)):
-        p = a + (b - a) * f
+    fit = L['fit']
+    if long:
+        # one arm slice set over the upper arm and the forearm: at the elbow
+        # neither bone holds half the weight alone
+        pts = B.v[B.mask_body & (B.W[:, iu] + B.W[:, il] > 0.5)]
+        h = B.wp[ih]
+        span = [(a, b, f) for f in (0.1, 0.45, 0.78, 1.0)] + [(b, h, f) for f in (0.35, 0.7, fit['longSleeveWrist'])]
+    else:
+        pts = B.v[B.mask_body & (B.W[:, iu] > 0.5)]
+        span = [(a, b, f) for f in (0.1, 0.45, 0.78)]
+    for k, (p0, p1, f) in enumerate(span):
+        ax = (p1 - p0) / np.linalg.norm(p1 - p0)
+        p = p0 + (p1 - p0) * f
         rel = pts - p
         along = rel @ ax
         sl = pts[np.abs(along) < 0.015]
         rad = np.max(np.linalg.norm((sl - p) - np.outer((sl - p) @ ax, ax), axis=1)) if len(sl) else 0.035
-        rings.append((p, rad * 1.12 + 0.006 + 0.004 * k))
+        rings.append((p, long_sleeve_radius(rad, k, fit) if long else sleeve_radius(rad, k, fit), ax))
     # a cap ring at the shoulder joint, under the body cloth's yoke: a
     # sleeve begun below the joint left the top of the shoulder bare between
     # the two (one begun above it lay in the shoulder, and the settle pulled
     # it out into ribbons)
-    rings.insert(0, (a, rings[0][1]))
-    # sweep round the arm axis
-    n = 12
-    e1 = np.cross(ax, [0, 0, 1.0])
-    e1 /= np.linalg.norm(e1)
-    e2 = np.cross(ax, e1)
+    rings.insert(0, (a, rings[0][1], rings[0][2]))
+    return arm_sweep(rings)
+
+
+def long_sleeve_radius(rad, k, fit):
+    """A long sleeve's ring round an arm slice of radius `rad`: the short
+    sleeve's fit over the upper arm (rings 0-2), from the elbow on a fixed
+    ease (VILLAGER_ASSET.garmentFit.longSleeveEase, calibratable) — the short
+    sleeve's growing step would open the cuff into a bell."""
+    if k < 3:
+        return sleeve_radius(rad, k, fit)
+    return rad * fit['sleeveScale'] + fit['longSleeveEase']
+
+
+def arm_sweep(rings, n=12):
+    """Rings [(centre, radius, axis)] down an arm → verts, tris, uv: each ring
+    square to its own segment (the elbow bends a long sleeve)."""
     verts, uv, tris = [], [], []
-    for k, (p, rad) in enumerate(rings):
+    for k, (p, rad, ax) in enumerate(rings):
+        e1 = np.cross(ax, [0, 0, 1.0])
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(ax, e1)
         for i in range(n + 1):
             th = 2 * np.pi * (i % n) / n
             verts.append(p + rad * (np.cos(th) * e1 + np.sin(th) * e2))
             uv.append([i / n, k / (len(rings) - 1)])
+    # wound so the faces look outward (ax × e2 = -e1 pointed them in, and the
+    # material's back-face shade darkened the whole sleeve)
     for k in range(len(rings) - 1):
         for i in range(n):
             a0 = k * (n + 1) + i
-            tris += [[a0, a0 + n + 1, a0 + 1], [a0 + 1, a0 + n + 1, a0 + n + 2]]
+            tris += [[a0, a0 + 1, a0 + n + 1], [a0 + 1, a0 + n + 2, a0 + n + 1]]
     return np.array(verts), np.array(tris), np.array(uv)
 
 
@@ -785,6 +1023,10 @@ GARMENTS = [
     ('hood', 'overHead'), ('turban', 'aroundHead'), ('cap', 'crown'), ('headband', 'aroundHead'), ('veil', 'face'),
     ('headRing', 'crown'), ('topknot', 'crown'), ('hairBag', 'crown'), ('neckBeads', 'neck'), ('neckBeads', 'chest'),
     ('waistBeads', 'waist'), ('limbRings', 'limbs'),
+    # the 1890 Western dress and the dragoman's fez (docs/giza-1890.md §4.1);
+    # the long trousers and the footwear are shells (shells.py)
+    ('coat', 'chest'), ('gown', 'chest'), ('tarboosh', 'crown'),
+    ('trousersLong', 'waist'), ('shoes', 'feet'), ('boots', 'feet'),
 ]
 # The set is the (form, wear) pairs the game's outfit generator puts on a
 # figure (src/systems/appearance.ts appearanceFor; villagerFigureBody.test.ts
@@ -792,8 +1034,8 @@ GARMENTS = [
 # code-built layer, and the cover mask holds at most 32 (mask.BITS).
 # The slot's ease order: an outer layer stands off the inner one.
 OUTER = {'cloak': 0.012, 'cape': 0.012, 'hood': 0.006}
-SKIRTS = {'apron', 'girdleTails', 'skirtShort', 'skirtKnee', 'wrapLong', 'shirt', 'robe', 'toga', 'cloak'}
-RIGID_HEAD = {'turban', 'cap', 'headband', 'headRing', 'topknot', 'hairBag'}
+SKIRTS = {'loinFlap', 'apron', 'girdleTails', 'skirtShort', 'skirtKnee', 'wrapLong', 'shirt', 'robe', 'toga', 'cloak', 'coat', 'gown'}
+RIGID_HEAD = {'turban', 'cap', 'headband', 'headRing', 'topknot', 'hairBag', 'tarboosh'}
 # rigid on the chest bone: the infant rides it as one piece (figureDress.ts babySling)
 RIGID_CHEST = {'babySling'}
 
@@ -811,11 +1053,137 @@ def shell_names(meshes):
     return [n for n in meshes if meshes[n].get('part') == 'shell']
 
 
-def skirt_weights(v, W, crotch, hem):
+def girdle_weights(W, n):
+    """The first `n` vertices (a girdle cord) ride the pelvis and spine alone:
+    taken from the nearest skin, the cord's back took the buttocks' thigh
+    weights, and a striding thigh lifted it off the waist as a hooked loop
+    above the rear flap."""
+    W = W.copy()
+    keep = np.zeros(W.shape[1], bool)
+    keep[[SK.INDEX['hips'], SK.INDEX['spine']]] = True
+    W[:n, ~keep] = 0
+    s = W[:n].sum(1)
+    W[:n][s <= 1e-9, SK.INDEX['hips']] = 1
+    s[s <= 1e-9] = 1
+    W[:n] /= s[:, None]
+    return W
+
+
+def mirror_bones():
+    """Each bone's index paired with its mirror's (a `.L` with its `.R`; a
+    middle bone with itself)."""
+    out = np.arange(len(SK.NAMES))
+    for i, name in enumerate(SK.NAMES):
+        for a, b in (('.L', '.R'), ('.R', '.L')):
+            if name.endswith(a) and name[:-2] + b in SK.INDEX:
+                out[i] = SK.INDEX[name[:-2] + b]
+    return out
+
+
+def flap_weights(v, W, n, front_z, crotch, hem, hem_share, hips_x=0.0, core=np.pi, edge=np.pi):
+    """A front flap (every vertex after the first `n`, the girdle cord, in
+    front of `front_z`) rides both legs alike in its middle: its weights are
+    averaged with their mirror, fully above the crotch (over the pubic area)
+    and fading to `hem_share` of that at the hem. From the nearest skin each
+    half of the flap took its own groin's thigh, and a stride sheared the
+    flap sideways onto the forward hip, baring the pubic area beside it.
+    Round the hips (angle about (hips_x, front_z), 0 the front) the mirror
+    blend holds within `core` and fades out at `edge`: a side edge rides its
+    own thigh and stays on it, where a mirrored edge left the striding thigh
+    and stood off it. The rear flap and the cord keep their weights."""
+    W = W.copy()
+    m = np.zeros(len(v), bool)
+    m[n:] = v[n:, 2] > front_z
+    if not m.any():
+        return W
+    sym = 0.5 * (W[m] + W[m][:, mirror_bones()])
+    f = np.clip((crotch - v[m, 1]) / max(1e-6, crotch - hem), 0, 1)
+    f = 1 - f * (1 - hem_share)
+    a = np.abs(np.arctan2(v[m, 0] - hips_x, v[m, 2] - front_z))
+    f = (f * np.clip((edge - a) / max(1e-6, edge - core), 0, 1))[:, None]
+    W[m] = W[m] * (1 - f) + sym * f
+    W[m] /= W[m].sum(1, keepdims=True)
+    return W
+
+
+PUSH_CLEARANCE = 0.007  # finish(): every garment vertex this far off the skin
+# clear_corners outlines the trunk without the armpit skin the arms partly
+# ride (B.arm < 0.3 took a child's armpit into the chest outline and stood
+# the wrapper off her sides, work-order point 1482 pass 5)
+CLEAR_ARM = 0.05
+TUBES = ('breastCloth', 'skirtShort', 'skirtKnee', 'wrapLong')
+
+
+def hug_point(p, co, dist, is_inside, clearance, reach):
+    """One vertex of a hugged edge (Body.hug): outside the skin by less than
+    `reach` it comes to `clearance` off its nearest skin point `co` along the
+    line from it; inside, at the skin or farther off it stays."""
+    if is_inside or dist <= 1e-9 or dist >= reach:
+        return p
+    return co + (p - co) * (clearance / dist)
+
+
+def edge_masks(form, v, limb=None, girdle_y=None):
+    """(hug, pin) per vertex of a built garment. `pin`: held out of the clip
+    fit's pushes (fit.fit) — the fit pushes a vertex outward wherever the body
+    comes near it in ANY frame of ANY clip, so the rest geometry of an edge
+    became the union of every pose's body: the top edge of a breast cloth, a
+    wrapper or a short skirt stood off as a stiff ring one looked into from
+    above, the girdle cord rose off the back as a loop, a sleeve's cap ring
+    rose over the shoulder. `hug` (within pin): pulled onto the skin (Body.hug)
+    and weighted by the skin under it (finish), so it rides the body in every
+    pose. Hugged: a tube garment's top ring (the highest vertices), a flap
+    form's flap tops at the girdle (`girdle_y`), a sleeve's cap ring (`limb`
+    3). Pinned only: the girdle cord (a flap form's first girdle_count()
+    vertices, its torus kept round)."""
+    n = len(v)
+    hug = np.zeros(n, bool)
+    pin = np.zeros(n, bool)
+    if form in TUBES:
+        hug = v[:, 1] >= v[:, 1].max() - 1e-6
+    elif form in FLAPS:
+        cord = np.arange(n) < girdle_count()
+        hug = ~cord & np.isclose(v[:, 1], girdle_y, atol=1e-6)
+        pin = cord
+    elif limb is not None:
+        hug = np.asarray(limb) == 3
+    return hug, pin | hug
+
+
+def held(push, pin):
+    """The clip fit's pushes (fit.fit) with a pinned vertex's taken out (its neighbours spread
+    theirs onto it)."""
+    push = push.copy()
+    push[pin] = 0
+    return push
+
+
+def skirt_blend(form, fit):
+    """(blur width in radians, share of crotch-to-hem over which the blend
+    fades in) for skirt_weights: a long wrapper blends both thighs fully a
+    short way below the crotch, a loin flap's or apron's rear flap likewise,
+    so the cloth no longer follows the forward thigh alone (it closed round
+    it like a trouser leg when digging and kneeling, and the rear flap lifted
+    off the buttocks as a stiff panel). VILLAGER_ASSET.garmentFit, calibratable.
+    The third value, the blur width at the hem: a long wrapper's narrows
+    back to wrapHemBlurWidth, so its hem front follows the forward leg in a
+    stride (blurred wide it stayed between the legs and the forward shin
+    stood through it)."""
+    if form == 'wrapLong':
+        return fit['wrapBlurWidth'], fit['wrapBlendReach'], fit['wrapHemBlurWidth']
+    # a flap's ring holds the front and the rear flap: a wide blur would tie them together
+    if form in ('loinFlap', 'apron'):
+        return 0.9, fit['wrapBlendReach'], 0.9
+    return 0.9, 1.0, 0.9
+
+
+def skirt_weights(v, W, crotch, hem, width=0.9, reach=1.0, hem_width=None):
     """Below the crotch a skirt hangs round both legs: each ring's weights are
     blurred round the ring (the sides still lean to their own leg, the middle
-    takes both) and the shin's share goes to the thigh — cloth does not bend at
-    the knee — fading in from the crotch down."""
+    takes both; `width` the blur's standard deviation in radians, blending
+    linearly to `hem_width` at the hem when given) and the
+    shin's share goes to the thigh — cloth does not bend at the knee — fading
+    in from the crotch down over `reach` of the way to the hem."""
     W = W.copy()
     I = {n: SK.INDEX[n] for n in SK.NAMES}
     below = v[:, 1] < crotch
@@ -832,22 +1200,102 @@ def skirt_weights(v, W, crotch, hem):
         ring = np.nonzero(below & (ys == y))[0]
         d = a[ring][:, None] - a[ring][None, :]
         d = np.abs(np.arctan2(np.sin(d), np.cos(d)))
-        k = np.exp(-0.5 * (d / 0.9) ** 2)
+        wy = width if hem_width is None else width + (hem_width - width) * min(1.0, max(0.0, (crotch - y) / max(1e-6, crotch - hem)))
+        k = np.exp(-0.5 * (d / wy) ** 2)
         k /= k.sum(1, keepdims=True)
         out[ring] = k @ W[ring]
-    f = np.clip((crotch - v[:, 1]) / max(1e-6, crotch - hem), 0, 1)[:, None] * below[:, None]
+    f = np.clip((crotch - v[:, 1]) / max(1e-6, (crotch - hem) * reach), 0, 1)[:, None] * below[:, None]
     W = W * (1 - f) + out * f
     return W / W.sum(1, keepdims=True)
 
 
-def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None, rigid_chest=False):
+def radial_clear(pts, skin, mask, clearance, slab=0.012, drape=0.0, front=np.cos(np.radians(45))):
+    """Every point at least `clearance` outside the convex outline of
+    `skin[mask]` at its own height, pushed out radially from the outline's
+    centre; a point outside it, or at a height with no skin, stays. In front
+    (within acos(`front`) of +z round its own outline's centre) the outline
+    reaches `drape` above the point: cloth hangs straight down from the
+    breast, never tucked under it. At the sides and the back the outline is
+    the point's own section: an outline over the whole drape there took in
+    the wider chest and the armpits and stood the cloth off the waist and
+    the arms all round (work-order point 1482, pass 5)."""
+    out = pts.copy()
+    hulls = {}
+
+    def outline(y, up):
+        key = (round(float(y), 3), up > 0)
+        if key not in hulls:
+            sec = skin[mask & (skin[:, 1] > y - slab) & (skin[:, 1] < y + slab + up)][:, [0, 2]]
+            h = hull2d(sec) if len(sec) >= 3 else None
+            hulls[key] = (h, h.mean(0)) if h is not None and len(h) >= 3 else None
+        return hulls[key]
+
+    for k, p in enumerate(pts):
+        own = outline(p[1], 0.0)
+        if own is None:
+            continue
+        h, c = own
+        d = p[[0, 2]] - c
+        if drape > 0 and d[1] > front * np.linalg.norm(d):
+            hc = outline(p[1], drape)
+            if hc is not None:
+                h, c = hc
+        d = p[[0, 2]] - c
+        r = float(np.linalg.norm(d))
+        if r < 1e-9:
+            continue
+        need = ray_hull(h, c, d / r) + clearance
+        if r < need:
+            out[k, [0, 2]] = c + d / r * need
+    return out
+
+
+# A woman's corners in the order their own morph is cleared (clear_corners):
+# each corner's weights are an earlier one's plus its own morph (fit.SETTLE_ORDER).
+FEMALE_CORNERS = ((('female',), 'female'), (('female', 'child', 'child_f'), 'child_f'),
+                  (('female', 'youth', 'youth_f'), 'youth_f'), (('female', 'elder', 'elder_f'), 'elder_f'))
+
+
+def clear_corners(pos, morph, basis, deltas, mask, clearance, drape=0.0):
+    """A garment cut on the man's body carried onto every woman's corner by
+    the surface map clears her trunk's section outline there (radial_clear):
+    the map carries a ring vertex with its own skin triangle, so the cloth
+    between rings over a breast ran through it, and under the bust the
+    vertices of the inframammary skin stayed behind the breast (`drape`:
+    the cloth hangs straight down that far from a bulge). Each corner's
+    correction goes into its own morph. Each corner is cleared from its own
+    mapped cloth, not from the cloth an earlier corner's correction moved:
+    the woman's bust push rode on into the girl's, the youth's and the
+    elder's corners (they share the female morph) and stood the cloth off a
+    girl's flat chest by the woman's breast depth (work-order point 1482,
+    pass 5). Returns new morphs."""
+    raw = morph
+    morph = dict(morph)
+    for names, own in FEMALE_CORNERS:
+        skin = basis + sum(deltas[n] for n in names)
+        mapped = pos + sum(raw[n] for n in names)
+        p = pos + sum(morph[n] for n in names)
+        morph[own] = morph[own] + (radial_clear(mapped, skin, mask, clearance, drape=drape) - p)
+    return morph
+
+
+def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None, rigid_chest=False, girdle_n=0,
+           hug=None, pin=None, reach=0.0, flap=None, clear=None):
     """Push the garment off the body, transfer weights, unpose to rest, bind the morphs.
     Only a garment worn on the lower arm (`lower_arms`: the limb rings) takes
     weights from the forearms and hands; a sleeve (`limb`: 1 left, 2 right)
     takes them from its own arm alone, so it goes where the arm goes (from
     the nearest trunk skin it stayed at the shoulder while the arm swung out
-    of it)."""
-    v = B.push_out(v, 0.007)
+    of it). A hugged edge (`hug`, edge_masks) is pulled onto the skin first
+    and takes the weights of the skin under it, after every blend; `pin`
+    goes with the garment (g['pin']) to the clip fit, which leaves it.
+    `flap` (front_z, crotch, hem, hem_share): a flap form's front flap rides
+    both legs alike (flap_weights). `clear` (a drape height, or None): every
+    woman's corner morph clears her trunk (clear_corners)."""
+    if hug is not None and hug.any():
+        v = v.copy()
+        v[hug] = B.hug(v[hug], reach)
+    v = B.push_out(v, PUSH_CLEARANCE)
     W = B.weights_at(v, lower_arms)
     if limb is not None:
         if (limb == 0).any():
@@ -865,13 +1313,26 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
         W = smooth_weights(v, t, W, smooth)
     if skirt is not None:
         W = skirt_weights(v, W, *skirt)
+    if hug is not None and hug.any():
+        # the skin's own weights: a sleeve's cap ring from the skin round the
+        # shoulder (its arm included), body cloth from the skin off the arms
+        cap = limb is not None and (np.asarray(limb)[hug] == 3).all()
+        W[hug] = B.weights_at(v[hug], False) if cap else B.weights_trunk(v[hug])
+    if girdle_n:
+        W = girdle_weights(W, girdle_n)
+    if flap is not None:
+        W = flap_weights(v, W, girdle_n, *flap)
     W[W < 0.02] = 0
     W /= W.sum(1, keepdims=True)
     rest = unskin(v, W, B.j, B.wr, B.wp)
     idx, bary, off = surface_map(mh, body['basis_full'], rest)
     pos = apply_map(body['basis_full'], idx, bary, off)
     morph = {k: apply_map(body['basis_full'] + body['deltas_full'][k], idx, bary, off) - pos for k in MORPHS}
+    if clear is not None:
+        morph = clear_corners(pos, morph, body['basis_full'], body['deltas_full'], B.mask_body & (B.arm < CLEAR_ARM), PUSH_CLEARANCE, clear)
     g = {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
+    if pin is not None and pin.any():
+        g['pin'] = np.asarray(pin, bool)
     # which vertices are a sleeve's (its cap ring included): armholes reports
     # the sleeve cloth it cuts
     if limb is not None and (limb != 0).any():
@@ -1042,6 +1503,7 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
     q = design_pose(body)
     B = Body(mh, body, q)
     L = landmarks(body['joints'], H)
+    L['fit'] = cfg['VILLAGER_ASSET']['garmentFit']
     # the drawn chin: the lowest point of the head's own skin (as the game
     # measures `chinY`, render/villagerFigureBody.ts measureProportions)
     L['jaw'] = float(B.v[B.mask_body & (B.head > 0.5)][:, 1].min())
@@ -1065,9 +1527,20 @@ def build_garments(mh, body, clips, cfg, shell_body=None):
             continue
         v, t, uv = geo
         crotch = L['hip'] - 0.03 * H
-        skirt = (crotch, float(v[:, 1].min())) if form in SKIRTS and v[:, 1].min() < crotch else None
+        skirt = (crotch, float(v[:, 1].min()), *skirt_blend(form, L['fit'])) if form in SKIRTS and v[:, 1].min() < crotch else None
+        # the girdle cord is the first part of a flap form (build_form)
+        girdle_n = girdle_count() if form in FLAPS else 0
+        hug, pin = edge_masks(form, v, limb, L['girdle'])
+        # the front flap in front of the hips joint, its own hem the flap's
+        flap = None
+        if form in FLAPS:
+            front = v[girdle_n:][v[girdle_n:, 2] > B.wp[SK.INDEX['hips']][2]]
+            hips = B.wp[SK.INDEX['hips']]
+            flap = (float(hips[2]), crotch, float(front[:, 1].min()), L['fit']['flapHemSymmetry'], float(hips[0]),
+                    L['fit']['flapSymmetryCore'], L['fit']['flapFrontHalfAngleTop'])
         g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings', limb=limb,
-                   rigid_chest=form in RIGID_CHEST)
+                   rigid_chest=form in RIGID_CHEST, girdle_n=girdle_n, hug=hug, pin=pin, reach=L['fit']['edgeHugReach'], flap=flap,
+                   clear=L['fit']['chestWrapDrape'] * H if (form, wear) == ('wrapLong', 'chest') else None)
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g

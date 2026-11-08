@@ -108,6 +108,7 @@ export const NON_RENDER_VERIFY = new Set([
   'edgeBandReading.mjs', // crop measurements and failure details; the polish-* suites captures the frames
   'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; the polish-* suites drives the browser
   'errandShutter.mjs', // the fill shot's line test over positions; polish-villagers.mjs reads them
+  'garmentOverhead.mjs', // the overhead garment camera's geometry; polish-villagers.mjs places the camera
   'standOrder.mjs', // the stand-order moment over errand state; polish-villagers.mjs drives the page
   'rimSeam.mjs', // the river-rim band lines on the camera's forward line; polish-villagers.mjs projects them
   'fixedWaits.mjs',

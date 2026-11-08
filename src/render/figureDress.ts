@@ -12,6 +12,7 @@ import {
   atan,
   attribute,
   clamp,
+  faceDirection,
   float,
   Fn,
   fract,
@@ -24,6 +25,7 @@ import {
   smoothstep,
   vertexColor,
 } from 'three/tsl'
+import { VILLAGER_ASSET } from '../config/balance'
 import type { DressLayer, DressPattern } from '../systems/appearance'
 import { merge, sweepTube, type SweepStation } from './faunaGeometry'
 import { FIGURE_FIBRE, figureMicroColor, figureMicroNormal } from './materials'
@@ -342,8 +344,9 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
       parts.push({ geo: wrapTube(p, top, bottom, 0.01 * H, l.form === 'wrapLong' ? 0.035 : 0.025, radial, 12), weigh: near(top > p.waistY ? LONG : LOWER) })
       break
     }
-    case 'trousers': {
-      bottom = p.kneeY - 0.5 * (p.kneeY - p.ankleY)
+    case 'trousers':
+    case 'trousersLong': {
+      bottom = l.form === 'trousersLong' ? p.ankleY + 0.012 * H : p.kneeY - 0.5 * (p.kneeY - p.ankleY)
       parts.push({ geo: wrapTube(p, girdleY, p.hipY - 0.07 * H, 0.012 * H, 0, radial, 5), weigh: near(LOWER) })
       for (const s of ['L', 'R'] as const) {
         const x = (s === 'L' ? 1 : -1) * p.hipX
@@ -366,31 +369,39 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
     }
     case 'shirt':
     case 'robe':
-    case 'toga': {
+    case 'toga':
+    case 'coat':
+    case 'gown': {
       // The body of the garment from the shoulders down; short sleeves on the
-      // upper arms so a hanging arm reads OUT of the cloth, not inside it.
-      bottom = l.form === 'shirt' ? p.kneeY + 0.02 * H : p.ankleY + 0.03 * H
+      // upper arms so a hanging arm reads OUT of the cloth, not inside it —
+      // the Western coat and gown long ones, to the wrist.
+      const long = l.form === 'coat' || l.form === 'gown'
+      bottom = l.form === 'shirt' ? p.kneeY + 0.02 * H : l.form === 'coat' ? (p.hipY + p.kneeY) / 2 : p.ankleY + 0.03 * H
       const top = p.neckY + 0.005 * H
-      const body = wrapTube(p, top, bottom, 0.012 * H, l.form === 'shirt' ? 0.03 : 0.05, radial, 14)
+      const body = wrapTube(p, top, bottom, 0.012 * H, l.form === 'shirt' ? 0.03 : l.form === 'coat' ? 0.02 : 0.05, radial, 14)
       if (l.form === 'toga') {
         // Thrown over ONE shoulder: the other shoulder and its side stay bare
         // above the armpit (the figure's left is +x).
         const bare = l.wear === 'rightShoulder' ? 1 : -1
         sector(body, (c) => !(c.x * bare > -0.02 * H && c.y > chestTop - c.x * bare * 0.6))
       }
-      parts.push({ geo: body, weigh: near(l.form === 'shirt' ? UPPER : LONG) })
+      parts.push({ geo: body, weigh: near(l.form === 'shirt' || l.form === 'coat' ? UPPER : LONG) })
       if (l.form !== 'toga') {
         for (const s of ['L', 'R'] as const) {
           const x = (s === 'L' ? 1 : -1) * p.shoulderX
+          const elbow = p.shoulderY - p.upperArm
           const sleeve = sweepTube(
             [
               { p: [x, p.shoulderY - p.armR * 0.2, 0], rx: p.armR * 1.5, ry: p.armR * 1.5 },
-              { p: [x, p.shoulderY - p.upperArm * 0.75, 0], rx: p.armR * 1.9, ry: p.armR * 1.9 },
+              long
+                ? { p: [x, elbow, 0], rx: p.armR * 1.5, ry: p.armR * 1.5 }
+                : { p: [x, p.shoulderY - p.upperArm * 0.75, 0], rx: p.armR * 1.9, ry: p.armR * 1.9 },
+              ...(long ? [{ p: [x, elbow - p.forearm * 0.9, 0] as [number, number, number], rx: p.armR * 1.3, ry: p.armR * 1.3 }] : []),
             ],
-            { radial: Math.max(8, radial - 4), rings: 4 },
+            { radial: Math.max(8, radial - 4), rings: long ? 8 : 4 },
           )
           // a sleeve follows its arm all the way down
-          parts.push({ geo: sleeve, weigh: (v) => vertexWeights(v, segs, ['chest', `upperArm.${s}`]) })
+          parts.push({ geo: sleeve, weigh: (v) => vertexWeights(v, segs, long ? ['chest', `upperArm.${s}`, `forearm.${s}`] : ['chest', `upperArm.${s}`]) })
         }
       }
       break
@@ -474,6 +485,46 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
       )
       parts.push({ geo, weigh: rigid('head') })
       bottom = from
+      break
+    }
+    case 'tarboosh': {
+      // the fez: a truncated cone from the brow to a flat top above the crown
+      const from = hc + p.headHalfH * 0.3
+      const to = p.crownY + 0.05 * H
+      const geo = sweepTube(
+        [st(from, p.headHalfW * 1.07, p.headHalfW * 1.2, -0.004 * H), st(to, p.headHalfW * 0.88, p.headHalfW * 0.98, -0.006 * H)],
+        { radial, rings: 4, capEnd: true },
+      )
+      parts.push({ geo, weigh: rigid('head') })
+      bottom = from
+      break
+    }
+    case 'shoes':
+    case 'boots': {
+      // a closed leather shell round each foot; the boot's shaft up the shin
+      const top = l.form === 'boots' ? p.ankleY + 0.4 * (p.kneeY - p.ankleY) : p.ankleY + 0.02 * H
+      for (const s of ['L', 'R'] as const) {
+        const x = (s === 'L' ? 1 : -1) * p.hipX
+        // the code-built foot's own stations (figureBody.ts), eased over it
+        const foot = sweepTube(
+          [
+            { p: [x, p.ankleY + 0.02 * H, -0.024 * H], rx: p.calfR * 0.82, ry: p.calfR * 0.74 },
+            { p: [x, p.ankleY * 0.6, p.footLen * 0.25], rx: p.calfR * 0.98, ry: p.ankleY * 0.7 },
+            { p: [x, p.ankleY * 0.42, p.footLen * 0.8], rx: p.calfR * 0.94, ry: p.ankleY * 0.5 },
+          ],
+          { radial: Math.max(8, radial - 4), rings: 6, capStart: true, capEnd: true },
+        )
+        parts.push({ geo: foot, weigh: rigid(`foot.${s}`) })
+        const shaft = sweepTube(
+          [
+            { p: [x, p.ankleY, 0], rx: p.calfR * 1.2, ry: p.calfR * 1.2 },
+            { p: [x, top, 0], rx: p.calfR * (l.form === 'boots' ? 1.45 : 1.15), ry: p.calfR * (l.form === 'boots' ? 1.45 : 1.15) },
+          ],
+          { radial: Math.max(8, radial - 4), rings: 3 },
+        )
+        parts.push({ geo: shaft, weigh: near([`foot.${s}`, `shin.${s}`]) })
+      }
+      bottom = 0
       break
     }
     case 'veil': {
@@ -665,7 +716,9 @@ export function figureMaterial(masked = false): THREE.MeshStandardNodeMaterial {
     // (materials.ts): a mean-1 factor on the figure's own colours, and the
     // relief as the normal.
     const fibre = attribute<'vec4'>(SECOND_COLOUR_ATTRIBUTE, 'vec4').w
-    mat.colorNode = figureColorNode().mul(figureMicroColor(fibre))
+    // a back face (the inside of a hem or sleeve) lies in the cloth's own shade
+    const front = faceDirection.mul(0.5).add(0.5)
+    mat.colorNode = figureColorNode().mul(figureMicroColor(fibre)).mul(mix(float(VILLAGER_ASSET.garmentBackShade), float(1), front))
     mat.normalNode = figureMicroNormal(fibre)
     mat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
     if (masked) mat.positionNode = garmentPushPosition()
