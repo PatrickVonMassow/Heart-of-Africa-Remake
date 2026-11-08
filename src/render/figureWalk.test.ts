@@ -597,8 +597,8 @@ describe('kneeling folds the body, it never squashes it', () => {
       // the hip cap's lowest rim, and the foot cap's (a tapered cylinder's
       // lowest point is one of its two cap rims)
       expect(l.hipY - rHip * Math.abs(Math.sin(th))).toBeGreaterThanOrEqual(-1e-9)
-      const e = k * k * (3 - 2 * k)
-      expect(l.hipY - leg * Math.cos(th) - rFoot * Math.abs(Math.sin(th)) * e).toBeCloseTo(0, 9)
+      // the drawn cylinder keeps its full foot radius through the transition
+      expect(l.hipY - leg * Math.cos(th) - rFoot * Math.abs(Math.sin(th))).toBeGreaterThanOrEqual(-1e-9)
     }
     // full kneel: neither rim below the ground, the foot's on it
     const full = primitiveLayout(1, true, FIGURE_LIMBS)

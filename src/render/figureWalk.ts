@@ -630,7 +630,10 @@ export function primitiveLegFold(hipY: number, leg: number, rFoot: number, w: nu
 export function primitiveLayout(k: number, legs: boolean, L: PrimitiveLimbs): PrimitiveLayout {
   const e = smooth(k)
   const lowered = L.hipY + (PRIMITIVE_KNEEL.hip - L.hipY) * e
-  const hipY = legs ? lowered : 0
+  const legFold = legs ? primitiveLegFold(lowered, L.hipY, L.legRadius[1], e) : 0
+  // the faded cap share keeps the fold continuous; the drawn cylinder has its
+  // full radius, so mid-kneel the hip rides up until that rim sits on the ground
+  const hipY = legs ? Math.max(lowered, L.hipY * Math.cos(legFold) + L.legRadius[1] * Math.sin(legFold)) : 0
   const skirt = legs ? 0 : lowered
   const trunkLength = 1 - L.hipY
   const height = hipY + skirt + trunkLength
@@ -646,7 +649,7 @@ export function primitiveLayout(k: number, legs: boolean, L: PrimitiveLimbs): Pr
     headY: height + 0.18,
     headRadius: PRIMITIVE_HEAD_RADIUS,
     labelHeight: height + 0.45,
-    legFold: legs ? primitiveLegFold(hipY, L.hipY, L.legRadius[1], e) : 0,
+    legFold,
   }
 }
 
