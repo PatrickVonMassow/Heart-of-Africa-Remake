@@ -1042,6 +1042,19 @@ async function checkChildrenMotion(motionPlace) {
     // searches once more and shoots that moment's best vantage rather than
     // skipping the picture.
     await page.evaluate(() => {
+      // The occluders below, shared with the back-step before the shutter so a
+      // moved camera is held to the same room as a searched one (point 1385).
+      window.__childVantageHuts = () =>
+        [
+          ...window.__placeLayout.dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
+          ...(window.__placeLayout.colliders ?? []).flatMap((c) =>
+            c.kind === 'box'
+              ? [{ x: c.x, z: c.z, r: Math.hypot(c.hx, c.hz) }]
+              : c.kind === 'segment' || c.r === undefined
+                ? []
+                : [{ x: c.x, z: c.z, r: c.r }],
+          ),
+        ].filter((h) => h.r > 0.8)
       window.__pickChildVantage = () => {
         const kids = window.__placeTag().children
         if (kids.length === 0) return null
@@ -1062,16 +1075,7 @@ async function checkChildrenMotion(motionPlace) {
         // segments, which the search leaves out; anything smaller
         // than a child neither hides one nor crowds the camera and is dropped,
         // so scattered stones do not veto every vantage in the settlement.
-        const huts = [
-          ...window.__placeLayout.dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
-          ...(window.__placeLayout.colliders ?? []).flatMap((c) =>
-            c.kind === 'box'
-              ? [{ x: c.x, z: c.z, r: Math.hypot(c.hx, c.hz) }]
-              : c.kind === 'segment' || c.r === undefined
-                ? []
-                : [{ x: c.x, z: c.z, r: c.r }],
-          ),
-        ].filter((h) => h.r > 0.8)
+        const huts = window.__childVantageHuts()
         const blocks = (ax, az, bx, bz, pad) =>
           huts.some((h) => {
             const dx = bx - ax
@@ -1206,7 +1210,11 @@ async function checkChildrenMotion(motionPlace) {
           const z = k.z + ((p.z - k.z) / h) * 5
           const hit = window.__placeRayHit?.(k.x, 1.0, k.z, [x, eyeY, z])
           const clear = hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
-          if (clear && Math.hypot(x, z) < R - 2) {
+          // The same 2.5 m of room the standpoint verdict above holds a searched
+          // vantage to; a back-step into a wall's lee stays where it was.
+          const huts = window.__childVantageHuts?.() ?? []
+          const room = huts.length > 0 ? Math.min(...huts.map((o) => Math.hypot(x - o.x, z - o.z) - o.r)) : Infinity
+          if (clear && room >= 2.5 && Math.hypot(x, z) < R - 2) {
             p.x = x
             p.z = z
           }
@@ -1215,10 +1223,27 @@ async function checkChildrenMotion(motionPlace) {
         if (eyeY != null) p.pitch = -Math.atan2(eyeY - 1.0, Math.max(0.5, Math.hypot(k.x - p.x, k.z - p.z)))
         return { x: k.x, z: k.z }
       }, aimed.ki)
+      // Where the declared child stands, projected through the place camera at
+      // its head. Read after the turn's rendered frame and again after the
+      // shutter: the view is convex, so a child inside it at both readings was
+      // inside it at the capture between them.
+      const childInView = () =>
+        page.evaluate((ki) => {
+          const k = window.__placeTag()?.children[ki]
+          const cam = window.__placeCamera
+          if (!k || !cam) return null
+          const e = cam.matrixWorldInverse.elements
+          const m = cam.projectionMatrix.elements
+          const ap = (a, w) => [0, 1, 2, 3].map((r) => a[r] * w[0] + a[r + 4] * w[1] + a[r + 8] * w[2] + a[r + 12] * w[3])
+          const c = ap(m, ap(e, [k.x, 1.0, k.z, 1]))
+          const inView = c[3] > 0 && Math.abs(c[0] / c[3]) <= 1 && Math.abs(c[1] / c[3]) <= 1
+          return { x: k.x, z: k.z, inView, ndc: c[3] > 0 ? [c[0] / c[3], c[1] / c[3]] : null }
+        }, aimed.ki)
       if (at) {
-        aimed.kx = at.x
-        aimed.kz = at.z
         await nextFrames(1)
+        const now = await childInView()
+        aimed.kx = now?.x ?? at.x
+        aimed.kz = now?.z ?? at.z
       }
       await frame(motionPlace === 'bambara-village' ? '648-village-children' : `690-${motionPlace}-children`, {
         // AT THE CHILD'S HEAD, not its knees. The camera looks slightly upward,
@@ -1235,6 +1260,12 @@ async function checkChildrenMotion(motionPlace) {
         // give the child time to leave the frame (point 1385).
         sceneReady: false,
       })
+      const after = await childInView()
+      checkAt(
+        'the declared child is still in the picture after the shutter',
+        !!after?.inView,
+        after ? `head at NDC ${after.ndc?.map((n) => n.toFixed(2)).join(', ') ?? 'behind the camera'}` : 'child gone',
+      )
       await page.evaluate((pose) => {
         const p = window.__placePlayer
         if (!p) return
