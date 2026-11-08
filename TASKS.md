@@ -119,13 +119,6 @@ put it is the mistake this line exists to stop.
   Verifiable: 1294-dress-swahili.png before/after on both backends, judged by looking; the recorded repeatable FPS comparison. (The former "garment penetration gate green" is dropped: it contradicts the point 1339 procedure.)
   Criticality: medium - every coastal villager; possible frame-rate cost on all villager scenes.
   Bundle: Dorfleben.
-- [ ] 1385. Cairo children frame aimed before the walking child moves out on WebGL 2
-  Queue position: after point 1341 (or after point 1340 if 1341 is absorbed by point 1347).
-  Source: docs/backlog.md (picture check of 1129, 02.10.2026), recurred 19.10.2026 on the full WebGL 2 polish-children run at feat/1343 4b9870e65 (local/verify-logs/2026-10-19T08-17-42-344-polish-children.log): "frame 690-cairo-children — its subject is not in the rendered picture: off the bottom edge of the frame". The aim is taken before the shot while the child keeps walking; test-frame aim only, no player impact, but it holds every covering polish-children run red.
-  Final state: the 690-cairo-children frame holds its child inside the picture at the shutter on both backends.
-  Verifiable: polish-children --section=children-motion green for that frame on both backends; frame judged by looking.
-  Bundle: Dorfleben.
-  Criticality: low - a test frame's aim; blocks the suite's covering run.
 - [ ] 1491. Frame 1106 arriving runner occluded by a passing adult on WebGL 2
   Queue position: directly behind point 1385.
   Source: findings carrier 08.11.2026 05:25Z, picture check of point 1344: WebGL 2 children-bank-game section green at feat/1344 429fb29e1 (local/verify-logs/2026-11-08T05-11-37-658-polish-children.log), but verification/1106-arriving-runner-hand-on-the-far-stone.png is mostly covered by a woman with a head load walking into the camera; the arriving runner's hand at the far stone is barely visible. The WebGPU frame of the same run is clear. The shutter does not refuse a foreground occluder of the subject.
