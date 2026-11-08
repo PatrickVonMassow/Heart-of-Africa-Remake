@@ -1135,12 +1135,18 @@ async function checkChildrenMotion(motionPlace) {
                 Math.hypot(sx - k.x, sz - k.z) < Math.hypot(sx - a.x, sz - a.z) ? k : a)
               best.kx = nearest.x
               best.kz = nearest.z
+              best.ki = kids.indexOf(nearest)
             }
           }
         }
         return best
       }
     })
+    // THE SCENE IS WAITED FOR ONCE, HERE — before the aim, not between the aim
+    // and the shutter (point 1385, the pattern of frame 480). The shutter's own
+    // five-second settle let the declared child walk out under the bottom edge
+    // on WebGL 2; the frame below is shot with `sceneReady: false`.
+    await waitForSceneReady(page).catch(() => {})
     // Worth photographing: most of the group in the clear, and the camera in the
     // open rather than up against a wall.
     await stepUntil(() => {
@@ -1162,7 +1168,7 @@ async function checkChildrenMotion(motionPlace) {
       // by construction, and it is the same body the shutter is handed (point 690).
       p.yaw = Math.atan2(-(best.kx - p.x), -(best.kz - p.z))
       return {
-        pose, kx: best.kx, kz: best.kz,
+        pose, kx: best.kx, kz: best.kz, ki: best.ki,
         seen: best.seen, of: best.of, clear: best.clear, near: best.near,
       }
     })
@@ -1182,6 +1188,20 @@ async function checkChildrenMotion(motionPlace) {
     )
     if (aimed) {
       await nextFrames(2)
+      // The declared child is read where it is NOW, and the camera turned to it
+      // again: the frames since the aim are frames of a walking child.
+      const at = await page.evaluate((ki) => {
+        const p = window.__placePlayer
+        const k = window.__placeTag()?.children[ki]
+        if (!p || !k) return null
+        p.yaw = Math.atan2(-(k.x - p.x), -(k.z - p.z))
+        return { x: k.x, z: k.z }
+      }, aimed.ki)
+      if (at) {
+        aimed.kx = at.x
+        aimed.kz = at.z
+        await nextFrames(1)
+      }
       await frame(motionPlace === 'bambara-village' ? '648-village-children' : `690-${motionPlace}-children`, {
         // AT THE CHILD'S HEAD, not its knees. The camera looks slightly upward,
         // so the group always sits in the lower third of the picture and a
@@ -1193,6 +1213,9 @@ async function checkChildrenMotion(motionPlace) {
         label:
           `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear, ` +
           `on average ${aimed.near.toFixed(1)} m off)`,
+        // Waited for before the aim (above); a second settle here would only
+        // give the child time to leave the frame (point 1385).
+        sceneReady: false,
       })
       await page.evaluate((pose) => {
         const p = window.__placePlayer
