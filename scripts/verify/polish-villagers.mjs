@@ -5342,7 +5342,8 @@ if (section('village-walk')) {
         g.traverse((o) => own.add(o.uuid))
         let mesh = null
         g.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
-        const hips = mesh?.skeleton.bones.find((b) => b.name === 'bone-hips')
+        // the low preset's primitive has no skeleton: its trunk pivots at the hip
+        const hips = mesh ? mesh.skeleton.bones.find((b) => b.name === 'bone-hips') : g.getObjectByName('figure-trunk')
         const head = g.getObjectByName('figure-head')
         if (!hips || !head) return 'no hips or head'
         g.updateWorldMatrix(true, true)
