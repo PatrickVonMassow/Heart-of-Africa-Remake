@@ -126,7 +126,7 @@ put it is the mistake this line exists to stop.
   Verifiable: polish-children --section=children-motion green for that frame on both backends; frame judged by looking.
   Bundle: Dorfleben.
   Criticality: low - a test frame's aim; blocks the suite's covering run.
-- [ ] 1488. Frame 1106 arriving runner occluded by a passing adult on WebGL 2
+- [ ] 1491. Frame 1106 arriving runner occluded by a passing adult on WebGL 2
   Queue position: directly behind point 1385.
   Source: findings carrier 08.11.2026 05:25Z, picture check of point 1344: WebGL 2 children-bank-game section green at feat/1344 429fb29e1 (local/verify-logs/2026-11-08T05-11-37-658-polish-children.log), but verification/1106-arriving-runner-hand-on-the-far-stone.png is mostly covered by a woman with a head load walking into the camera; the arriving runner's hand at the far stone is barely visible. The WebGPU frame of the same run is clear. The shutter does not refuse a foreground occluder of the subject.
   Final state: the 1106 frame shows the arriving runner's hand at the far stone unoccluded at the shutter on both backends.
