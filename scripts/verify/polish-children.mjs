@@ -1189,14 +1189,28 @@ async function checkChildrenMotion(motionPlace) {
     if (aimed) {
       await nextFrames(2)
       // The declared child is read where it is NOW, and the camera turned to it
-      // again: the frames since the aim are frames of a walking child. The pitch
-      // is aimed at its head too — without the shutter's settle a child two
-      // metres off fell out under the bottom edge of the upward-looking view.
+      // again: the frames since the aim are frames of a walking child. A child
+      // that has run up to the camera fell out under the bottom edge, and
+      // pitching down to it photographed the ground: the camera steps back along
+      // the sightline to five metres when that line stays clear, and the pitch
+      // is aimed at the head.
       const at = await page.evaluate((ki) => {
         const p = window.__placePlayer
         const k = window.__placeTag()?.children[ki]
         const eyeY = window.__placeCamera?.position.y
         if (!p || !k) return null
+        const h = Math.hypot(p.x - k.x, p.z - k.z)
+        const R = window.__placeLayout?.radius ?? 28
+        if (eyeY != null && h > 0.01 && h < 5) {
+          const x = k.x + ((p.x - k.x) / h) * 5
+          const z = k.z + ((p.z - k.z) / h) * 5
+          const hit = window.__placeRayHit?.(k.x, 1.0, k.z, [x, eyeY, z])
+          const clear = hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
+          if (clear && Math.hypot(x, z) < R - 2) {
+            p.x = x
+            p.z = z
+          }
+        }
         p.yaw = Math.atan2(-(k.x - p.x), -(k.z - p.z))
         if (eyeY != null) p.pitch = -Math.atan2(eyeY - 1.0, Math.max(0.5, Math.hypot(k.x - p.x, k.z - p.z)))
         return { x: k.x, z: k.z }
