@@ -498,8 +498,11 @@ if (section('tag-catch')) {
           : // readied and still: no grab out or easing back after a miss, no arm handover
             gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side && w.reach <= 0 && !(w.handover > 0)
       if (!inWindow) return null
-      const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
-      if (runner < 0) return null
+      // the SAME runner through the series: two children's still hands at
+      // different places would otherwise read as one swinging pair
+      const isRunner = (k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind)
+      const runner = lock ? lock.runnerIndex : t.children.findIndex(isRunner)
+      if (runner < 0 || !isRunner(t.children[runner], runner)) return null
       return {
         gap,
         clock: t.clock,
@@ -508,6 +511,7 @@ if (section('tag-catch')) {
         tags: t.tags,
         side: w ? w.side : null,
         chaser: window.__placeTagHands(t.chaser),
+        runnerIndex: runner,
         runner: window.__placeTagHands(runner),
       }
     }

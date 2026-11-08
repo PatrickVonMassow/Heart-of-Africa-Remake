@@ -310,5 +310,9 @@ describe("a runner's arms are never held out", () => {
   it('fails without a runner frame', () => {
     expect(judgeRunnerArms([]).ok).toBe(false)
     expect(judgeRunnerArms(null).detail).toBe('no runner frame')
+    // two children each holding still hands do not add up to one sweep
+    const a = { ...frame(0.2, 0.2), runnerIndex: 1 }
+    const b = { ...frame(0.4, 0.4), runnerIndex: 2 }
+    expect(judgeRunnerArms([a, b, a]).ok).toBe(false)
   })
 })

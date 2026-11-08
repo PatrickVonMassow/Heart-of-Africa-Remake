@@ -212,6 +212,8 @@ export const armMinZ = (series, side) => Math.min(...series.map((r) => handZ(r, 
 export function judgeRunnerArms(series) {
   const frames = (series || []).filter((r) => r.runner?.length === 2)
   if (!frames.length) return { ok: false, detail: 'no runner frame' }
+  // one child's hands only: two still children read as one swinging pair
+  if (new Set(frames.map((r) => r.runnerIndex)).size > 1) return { ok: false, detail: 'the runner changed within the series' }
   const sides = ['hand-left', 'hand-right'].map((name) => {
     const z = frames.map((r) => r.runner.find((h) => h.hand === name).local.z)
     const sweep = Math.max(...z) - Math.min(...z)
