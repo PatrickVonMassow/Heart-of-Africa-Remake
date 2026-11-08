@@ -201,13 +201,6 @@ export const RED_CHARGES = [
     why: 'Full WebGL 2 run on main ac714e5cf, 23.10.2026 (log 10-51-21-476), owned by no point until filed as 1434; only this measured composition, every other one stays uncovered. The charge dies with it.',
   },
   {
-    point: 1385,
-    suite: 'polish-children',
-    kind: 'check',
-    match: /^frame 690-cairo-children/i,
-    why: 'Backlog since 02.10.2026, recurred 19.10.2026 on the full WebGL 2 run at feat/1343 4b9870e65: the aim precedes the walking child. Point 1385 owns it; the charge dies with it.',
-  },
-  {
     point: 1013,
     suite: 'enrichments',
     kind: 'check',
