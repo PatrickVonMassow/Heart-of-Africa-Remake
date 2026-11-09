@@ -100,7 +100,7 @@ export function burnScarColor(col: unknown, mask: FloatNode) {
   return mix(cc, SOOT.mul(luma.mul(0.6).add(0.4)), mask.mul(d.y).clamp(0, 1))
 }
 
-/** The ember band's emissive glow: white-gold AT the burning line, deepening to
+/** The ember band's emissive glow: orange AT the burning line, deepening to
  *  red over `emberDepth` behind it, flickering by a space-time noise (no
  *  travelling pattern: the noise has no preferred direction along the line). */
 export function burnEmberEmissive() {
@@ -113,6 +113,6 @@ export function burnEmberEmissive() {
     .mul(smoothstep(float(0), float(0.8), b.y.sub(abs(across))))
   const flick = (mx_noise_float(vec3(positionWorld.xz.mul(1.3), time.mul(2.2))) as unknown as FloatNode).mul(0.3).add(0.85)
   const t = clamp(dFront.div(depth), float(0), float(1))
-  const hue = mix(vec3(1.0, 0.82, 0.45), vec3(0.75, 0.16, 0.03), t)
-  return hue.mul(max(inBand.mul(d.w).mul(flick), float(0)).mul(2.4))
+  const hue = mix(vec3(1.0, 0.5, 0.12), vec3(0.75, 0.16, 0.03), t)
+  return hue.mul(max(inBand.mul(d.w).mul(flick), float(0)).mul(1.3))
 }

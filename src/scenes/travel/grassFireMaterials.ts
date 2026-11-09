@@ -38,7 +38,8 @@ function flameMaterial(): THREE.MeshBasicNodeMaterial {
   m.transparent = true
   m.depthWrite = false
   m.side = THREE.DoubleSide
-  m.blending = THREE.AdditiveBlending
+  // Alpha-blended, not additive: added onto sunlit savanna the tongues clip
+  // to white and lose the orange the front must read as (point 321).
   const seed = hash(instanceIndex.toFloat().mul(7.31).add(1.7)).mul(40) as unknown as FloatNode
   const rate = hash(instanceIndex.toFloat().mul(3.17).add(9.1)).mul(0.9).add(2.2) as unknown as FloatNode
   const p = uv()
@@ -50,9 +51,9 @@ function flameMaterial(): THREE.MeshBasicNodeMaterial {
   const body = smoothstep(float(0), float(0.28), width.sub(cx))
   const tip = float(1).sub(smoothstep(float(0.55), float(1.0), p.y.add(n.mul(0.22))))
   const foot = smoothstep(float(0), float(0.08), p.y)
-  // White-gold at the root, orange through the body, a deep red at the tip.
-  const lower = mix(vec3(1.0, 0.92, 0.62), vec3(1.0, 0.5, 0.1), smoothstep(float(0.02), float(0.45), p.y))
-  m.colorNode = mix(lower, vec3(0.75, 0.16, 0.03), smoothstep(float(0.45), float(0.9), p.y)).mul(1.7)
+  // Yellow-orange at the root, orange through the body, a deep red at the tip.
+  const lower = mix(vec3(1.0, 0.72, 0.28), vec3(1.0, 0.42, 0.06), smoothstep(float(0.02), float(0.45), p.y))
+  m.colorNode = mix(lower, vec3(0.75, 0.16, 0.03), smoothstep(float(0.45), float(0.9), p.y)).mul(1.25)
   m.opacityNode = body.mul(tip).mul(foot).mul(FIRE_FLAME_FADE_U).clamp(0, 1)
   return m
 }
