@@ -173,14 +173,20 @@ function r3(n: number): number {
   return Math.round(n * 1000) / 1000
 }
 
-/** Rounds every number of a plain value; non-finite numbers become strings. */
-function rounded<T>(v: T, depth = 0): T {
+/** Rounds every number of a plain value into a JSON-safe copy: non-finite
+ *  numbers and bigints become strings, cycles and values past depth six become
+ *  markers, so the report's `JSON.stringify()` cannot throw on them. */
+function rounded<T>(v: T, depth = 0, seen: object[] = []): T {
   if (typeof v === 'number') return (Number.isFinite(v) ? r3(v) : String(v)) as T
-  if (v === null || typeof v !== 'object' || depth > 6) return v
-  if (Array.isArray(v)) return v.map((x) => rounded(x, depth + 1)) as T
+  if (typeof v === 'bigint') return String(v) as T
+  if (v === null || typeof v !== 'object') return v
+  if (seen.includes(v)) return '[circular]' as T
+  if (depth > 6) return '[depth limit]' as T
+  const path = [...seen, v]
+  if (Array.isArray(v)) return v.map((x) => rounded(x, depth + 1, path)) as T
   const out: Record<string, unknown> = {}
   for (const [k, x] of Object.entries(v)) {
-    if (typeof x !== 'function' && x !== undefined) out[k] = rounded(x, depth + 1)
+    if (typeof x !== 'function' && typeof x !== 'symbol' && x !== undefined) out[k] = rounded(x, depth + 1, path)
   }
   return out as T
 }
@@ -222,17 +228,29 @@ export function buildPlaceLife(
     if (c.error !== undefined) errors[c.id] = c.error
     const d = c.data
     if (!d) continue
-    for (const h of d.inhabitants ?? []) {
-      const e = rounded(h)
-      const dist = o ? r3(Math.hypot(h.x - o.x, h.z - o.z)) : 0
-      all.push({ ...e, dist })
-    }
-    if (d.tag) tag = rounded(d.tag)
-    if (d.errands) errands = rounded(d.errands)
-    if (d.geography) {
-      for (const [k, v] of Object.entries(d.geography)) {
-        if (v !== undefined && v !== null) (geography as unknown as Record<string, unknown>)[k] = rounded(v)
+    // Read into locals first: a contribution that throws mid-way (a getter, a
+    // malformed entry) is reported under its id and leaves nothing half-merged.
+    try {
+      const entries: PlaceLifeInhabitantEntry[] = []
+      for (const h of d.inhabitants ?? []) {
+        const e = rounded(h)
+        const dist = o ? r3(Math.hypot(h.x - o.x, h.z - o.z)) : 0
+        entries.push({ ...e, dist })
       }
+      const t = d.tag ? rounded(d.tag) : null
+      const er = d.errands ? rounded(d.errands) : null
+      const geo: Record<string, unknown> = {}
+      if (d.geography) {
+        for (const [k, v] of Object.entries(d.geography)) {
+          if (v !== undefined && v !== null) geo[k] = rounded(v)
+        }
+      }
+      all.push(...entries)
+      if (t) tag = t
+      if (er) errands = er
+      Object.assign(geography, geo)
+    } catch (err) {
+      errors[c.id] = err instanceof Error ? err.message : String(err)
     }
   }
   const byKind: Record<PlaceLifeKind, number> = { child: 0, adult: 0, porter: 0, 'errand-walker': 0 }
