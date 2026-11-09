@@ -49,12 +49,6 @@
       "origin": "user",
       "place": "last"
     },
-    "663": {
-      "at": "2026-08-21T16:06:01.959Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. The deploy flake is intermittent rather than currently blocking, and one automatic retry is the cheap half if it recurs.",
-      "origin": "user",
-      "place": "last"
-    },
     "668": {
       "at": "2026-08-13T12:07:50.425Z",
       "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes",
@@ -1830,6 +1824,12 @@
       "why": "cosmetic low-preset clash; behind the open Dorfleben work",
       "origin": "machine",
       "place": "last"
+    },
+    "1493": {
+      "at": "2026-11-09T13:14:24.408Z",
+      "why": "load-only test reds with charges; nothing waits on them, so they stand behind the user's ordered work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1839,7 +1839,6 @@
       553,
       596,
       660,
-      663,
       708,
       715,
       719,
@@ -1859,7 +1858,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-09T05:14:09.322Z",
+    "at": "2026-11-09T13:14:24.417Z",
     "points": [
       184,
       200,
@@ -1996,7 +1995,6 @@
       653,
       658,
       660,
-      663,
       664,
       665,
       668,
@@ -2188,7 +2186,6 @@
       1023,
       1024,
       1025,
-      1026,
       1027,
       1028,
       1029,
@@ -2209,7 +2206,6 @@
       1060,
       1062,
       1063,
-      1068,
       1071,
       1074,
       1078,
@@ -2326,7 +2322,8 @@
       1488,
       1489,
       1490,
-      1492
+      1492,
+      1493
     ]
   }
 }

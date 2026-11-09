@@ -201,6 +201,15 @@ export const RED_CHARGES = [
     why: 'Full WebGL 2 run on main ac714e5cf, 23.10.2026 (log 10-51-21-476), owned by no point until filed as 1434; only this measured composition, every other one stays uncovered. The charge dies with it.',
   },
   {
+    point: 1493,
+    suite: 'polish-children',
+    kind: 'check',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /at the catch frame the catcher's drawn hand is ON the caught child/i,
+    why: 'Full WebGPU polish-children run on feat/680-place-life-dump a75df90ca under load, 09.11.2026 (log 12-08-14-648); --section=tag-catch ran green alone at the same head. Owned by no point until filed as 1493. The charge dies with it.',
+  },
+  {
     point: 1013,
     suite: 'enrichments',
     kind: 'check',
