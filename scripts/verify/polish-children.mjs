@@ -2413,6 +2413,8 @@ if (section('children-bank-game')) {
       if (!r || r.tapper !== runner || r.opening?.clock !== arrivalOpening.clock || !(r.arrivalFor > 0)) {
         return 'the contact hold had ended'
       }
+      // A reading inside the hold is contact evidence like any loop reading.
+      arrivalTrace.push(r)
       if (!(Math.abs(r.gap) <= contactBar) || r.gesture !== 'touch') {
         return `the hand had left the stone (gap ${(Math.abs(r.gap) * 100).toFixed(1)} cm, gesture ${r.gesture})`
       }

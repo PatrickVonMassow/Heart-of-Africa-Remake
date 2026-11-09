@@ -34,10 +34,10 @@ const CLEAR = () => ({ hitDistance: 4.1, targetDistance: 4.2, hitName: 'hand-lef
 
 /**
  * `ray(probe)` answers each `__placeRayHit` call; `probe` counts them. The mock
- * shutter runs `beforeCapture` (a throw vetoes the write) and then advances
- * `shutterReadings` readings, as the real pipeline wait lets the scene run.
+ * shutter advances `wait` readings (the pipeline wait), runs `beforeCapture`
+ * (a throw vetoes the write) and then advances `after` readings.
  */
-async function sample(readings, ray = CLEAR, shutterReadings = 0) {
+async function sample(readings, ray = CLEAR, { wait = 0, after = 0 } = {}) {
   let index = 0
   let probe = 0
   const checks = []
@@ -55,9 +55,10 @@ async function sample(readings, ray = CLEAR, shutterReadings = 0) {
       { evaluate: async (fn, arg) => fn(arg) }, async () => {},
       (name, pass, detail) => checks.push({ name, pass, detail }),
       async (name, _decl, extra) => {
+        index += wait
         await extra?.beforeCapture?.()
         frames.push(name)
-        index += shutterReadings
+        index += after
         return true
       },
       async (_hand, stand) => (stands.push(stand), true), async () => { index++ }, 0.005,
@@ -148,13 +149,31 @@ it('deletes a written frame whose occluder stepped in after the shutter and shoo
   expect(checks[3].detail).toContain('stand 0: after the shutter, torso behind villager-body')
 })
 
-it('refuses and deletes a frame whose pipeline wait outlasted the contact hold', async () => {
-  // The shutter's wait runs past the last reading of the hold; nothing may pass.
-  const { checks, dropped } = await sample(hold(1, 9), CLEAR, 200)
+it('vetoes the write when the pipeline wait outlasted the contact hold', async () => {
+  // The wait before the screenshot runs past the hold's last reading.
+  const { checks, frames, dropped } = await sample(hold(1, 9), CLEAR, { wait: 200 })
   expect(checks[2].pass).toBe(false)
   expect(checks[3].pass).toBe(false)
+  expect(frames).toEqual([])
+  expect(dropped).toEqual([])
+  expect(checks[3].detail).toContain('at the shutter, the contact hold had ended')
+})
+
+it('deletes a written frame when the hold ends right after the screenshot', async () => {
+  const { checks, dropped } = await sample(hold(1, 9), CLEAR, { after: 200 })
+  expect(checks[2].pass).toBe(false)
   expect(dropped).toEqual(['1106-arriving-runner-hand-on-the-far-stone'])
   expect(checks[3].detail).toContain('after the shutter, the contact hold had ended')
+})
+
+it('counts a hand off the stone seen at the shutter against the whole-hold contact', async () => {
+  // The shutter reading (index 10 after a 9-reading wait) lifts the hand;
+  // a later stand succeeds, but the contact verdict must still fail.
+  const readings = hold(1, 9)
+  readings[10] = { ...readings[10], gap: 0.06 }
+  const { checks } = await sample(readings, CLEAR, { wait: 9 })
+  expect(checks[1].pass).toBe(false)
+  expect(checks[3].detail).toContain('at the shutter, the hand had left the stone')
 })
 
 it('fails loudly when every stand stays occluded for the whole hold', async () => {
