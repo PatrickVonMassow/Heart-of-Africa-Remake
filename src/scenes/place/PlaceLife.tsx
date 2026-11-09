@@ -81,7 +81,8 @@ import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
 import { isLifeFrozen } from './lifeFreeze'
-import { figureSnapshot, loadsUnder, objectSnapshot, shownInScene, usePlaceDumpProvider } from './placeDumpRead'
+import { figureSnapshot, loadsUnder, objectSnapshot, shownInScene, usePlaceDumpProvider, usePlaceLifeSource } from './placeDumpRead'
+import type { PlaceLifeInhabitant, PlaceLifeTagRole } from '../../systems/placeLifeDump'
 import { PlaceDumpGroup } from './PlaceDumpGroup'
 import type { PlaceFigureSnapshot, PlaceObjectSnapshot } from '../../systems/placeDump'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
@@ -1329,6 +1330,65 @@ function Kids({
     }
   })
 
+  // The children for the bug report's `placeLife` section, in every build: the
+  // same round `__placeTag` reports, read through a channel that ships.
+  usePlaceLifeSource('kids', () => {
+    const bank = round.bank
+    const quarries = new Set(bank ? bank.children.filter((c) => c.role === 'catcher').map((c) => c.quarry) : [])
+    const roleOf = (i: number): PlaceLifeTagRole => {
+      if (bank) return bank.children[i]?.role === 'catcher' ? 'chaser' : quarries.has(i) ? 'target' : 'free'
+      return i === game!.chaser ? 'chaser' : i === game!.target ? 'target' : 'free'
+    }
+    const inhabitants: PlaceLifeInhabitant[] = children.map((c, i) => {
+      const bc = c as BankChild
+      const pose = bank
+        ? bc.slumped ? 'slumped' : bc.climb && bc.climb !== 'none' ? `climb:${bc.climb}` : bc.role
+        : tagBody(game!, i)
+      return {
+        id: `kids/${i}`,
+        kind: 'child',
+        x: c.x,
+        z: c.z,
+        // The commanded pace along the heading.
+        velocity: { x: Math.sin(c.heading) * c.pace, z: Math.cos(c.heading) * c.pace },
+        yaw: c.facing,
+        pose,
+        child: {
+          tagRole: roleOf(i),
+          pinned: c.pinned > 0,
+          pinnedSeconds: c.pinned,
+          noProgressSeconds: c.anchorFor,
+          nudges: c.nudges,
+          carried: c.carried,
+          held: c.held,
+          ...(bank ? { bankRole: bc.role } : {}),
+        },
+      }
+    })
+    return {
+      inhabitants,
+      tag: {
+        round: bank ? 'bank' : 'tag',
+        playing: bank ? bank.playing : game!.playing,
+        chaser: bank ? bank.children.findIndex((c) => c.role === 'catcher') : game!.chaser,
+        target: bank ? (bank.children.find((c) => c.role === 'catcher')?.quarry ?? -1) : game!.target,
+        tags: bank ? bank.tags : game!.tags,
+        chaserFor: bank ? bank.phaseFor : game!.chaserFor,
+        phase: bank ? bank.phase : null,
+      },
+      ...(stage
+        ? {
+            geography: {
+              bank: { x: stage.water.x, z: stage.water.z },
+              upstream: { x: stage.upstream.x, z: stage.upstream.z },
+              downstream: { x: stage.downstream.x, z: stage.downstream.z },
+              teachingStone: { ...stage.boulder },
+            },
+          }
+        : {}),
+    }
+  })
+
   // Dev hook for the headless verification (CLAUDE.md §7.2): the live game.
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1883,7 +1943,19 @@ function Porters({
   // crate's front corners. Constant — a porter holds the load, it does not wave.
   const carry = useRef<FigurePose | null>({ left: armAim(0.3, 0.45), right: armAim(-0.3, 0.45), lean: 0.05, turn: 0 })
   // Where each porter actually stands, so its move can be swept from there.
-  const pos = useRef<Array<{ x: number; z: number; yaw?: number } | null>>([])
+  const pos = useRef<Array<{ x: number; z: number; yaw?: number; vx?: number; vz?: number } | null>>([])
+  // The porters for the bug report's `placeLife` section, in every build.
+  usePlaceLifeSource('porters', () => ({
+    inhabitants: pos.current.flatMap((p, i): PlaceLifeInhabitant[] => p ? [{
+      id: `porters/${i}`,
+      kind: 'porter',
+      x: p.x,
+      z: p.z,
+      velocity: p.vx !== undefined && p.vz !== undefined ? { x: p.vx, z: p.vz } : null,
+      yaw: p.yaw ?? null,
+      pose: 'carry',
+    }] : []),
+  }))
   // The body each porter presents to the other inhabitants (point 578).
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(routes.length)
@@ -1911,6 +1983,8 @@ function Porters({
         ? stepRoundBodies(bodySet, b, p.x, p.z, x, z, balance.villageLife.separation, separationWorld.blocked)
         : { x, z }
       const [px0, pz0] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [p.x, p.z])
+      const fromX = p.x
+      const fromZ = p.z
       p.x = px0
       p.z = pz0
       if (b) {
@@ -1919,6 +1993,11 @@ function Porters({
         separateBody(bodySet, b, dt, balance.villageLife.separation, separationWorld)
         p.x = b.x
         p.z = b.z
+      }
+      // The frame's own displacement, for the bug report's velocity.
+      if (dt > 0) {
+        p.vx = (p.x - fromX) / dt
+        p.vz = (p.z - fromZ) / dt
       }
       const px = p.x
       const pz = p.z
@@ -2255,6 +2334,7 @@ function TaskWalker({
   carry,
   colliders,
   startDelay,
+  dumpId,
 }: {
   home: HomeDef
   target: [number, number]
@@ -2262,6 +2342,8 @@ function TaskWalker({
   carry: TaskLoad
   colliders: Collider[]
   startDelay: number
+  /** Its id in the bug report's `placeLife` section. */
+  dumpId: string
 }) {
   const groundHeight = usePlaceGround()
   // ONE body that walks, kneels at its work and gets up again (work-order
@@ -2279,6 +2361,32 @@ function TaskWalker({
     timer: startDelay,
     /** This stop's kneeling time (`workSpan`). */
     span: 0,
+  })
+
+  // This walker for the bug report's `placeLife` section, in every build.
+  usePlaceLifeSource(dumpId, () => {
+    const s = state.current
+    const walking = s.mode === 'go' || s.mode === 'back'
+    const atStop = !walking && s.mode !== 'inside'
+    return {
+      inhabitants: [{
+        id: dumpId,
+        kind: 'errand-walker',
+        x: s.x,
+        z: s.z,
+        // The walking speed (1.2 m/s in the frame) along the facing.
+        velocity: walking ? { x: Math.sin(s.yaw) * 1.2, z: Math.cos(s.yaw) * 1.2 } : { x: 0, z: 0 },
+        yaw: s.yaw,
+        pose: s.mode,
+        errand: {
+          situation: carry,
+          phase: s.mode,
+          target: s.mode === 'back' ? { x: home.x, z: home.z } : s.mode === 'inside' ? null : { x: target[0], z: target[1] },
+          arrived: atStop,
+          dwellRemaining: atStop ? s.timer : null,
+        },
+      }],
+    }
   })
   // The load in its hands (taskWalkerLoad.ts): its own pose, the kneel as the
   // body draws it, and each hand's aim correction toward the drawn arm.
@@ -2617,6 +2725,31 @@ function Walkers({
     })
     return { kind: 'walkers', figures, objects }
   })
+
+  // The walkers for the bug report's `placeLife` section, in every build.
+  usePlaceLifeSource(dumpId, () => ({
+    inhabitants: states.current.map((st, i): PlaceLifeInhabitant => {
+      const end = st.route.length > 0 ? st.route[st.route.length - 1] : null
+      const sp = st.mode === 'walk' && st.pause <= 0 ? defs[i]?.speed ?? 0 : 0
+      return {
+        id: `${dumpId}/${i}`,
+        kind: 'errand-walker',
+        x: st.x,
+        z: st.z,
+        // The commanded walking speed along the facing.
+        velocity: { x: Math.sin(st.yaw) * sp, z: Math.cos(st.yaw) * sp },
+        yaw: st.yaw,
+        pose: st.mode === 'inside' ? 'inside' : st.pause > 0 ? 'pause' : 'walk',
+        errand: {
+          situation: 'round',
+          phase: st.mode,
+          target: st.mode === 'walk' && end ? { x: end[0], z: end[1] } : null,
+          arrived: st.pause > 0,
+          dwellRemaining: st.pause > 0 ? st.pause : null,
+        },
+      }
+    }),
+  }))
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   const heldWalker = useRef<number | null>(null)
@@ -3577,6 +3710,60 @@ function ErrandVillagers({
     }
   })
 
+  // The adults for the bug report's `placeLife` section, in every build: each
+  // villager's errand and the scheduler `__placeErrands` reports.
+  usePlaceLifeSource('errands', () => {
+    const cfg = balance.villageLife.adultErrands
+    const inhabitants: PlaceLifeInhabitant[] = people.map((p, i) => {
+      const task = taskOf(work, i)
+      const yaw = yaws.current[i] ?? 0
+      // The drawn body's own measured ground speed, where the figure keeps one.
+      let speed: number | null = null
+      refs.current[i]?.traverse((o) => {
+        if (speed === null && o.userData.walk) speed = (o.userData.walk as { speed: number }).speed
+      })
+      const dwell = !task || !task.arrived
+        ? null
+        : task.phase === 'dig' ? cfg.digSeconds - task.dug
+          : task.phase === 'fill' ? balance.bankFillSeconds - task.dug
+            : task.phase === 'take' ? balance.waterJarTakeSeconds - task.dug
+              : null
+      return {
+        id: `errands/${i}`,
+        kind: 'adult',
+        x: p.x,
+        z: p.z,
+        velocity: speed === null ? null : { x: Math.sin(yaw) * speed, z: Math.cos(yaw) * speed },
+        yaw,
+        pose: isDigging(work, i, view) ? 'dig' : task ? task.phase : p.free ? 'free' : 'idle',
+        errand: {
+          situation: task ? task.situation : null,
+          phase: task ? task.phase : null,
+          target: task ? { x: task.x, z: task.z } : null,
+          arrived: task ? task.arrived : false,
+          dwellRemaining: dwell === null ? null : Math.max(0, dwell),
+        },
+      }
+    })
+    const dug = digProgressOf(work, geography.digSites.length)
+    return {
+      inhabitants,
+      errands: {
+        staged: { ...work.staged } as Record<string, number>,
+        last: work.last ? { id: work.last.id, concept: work.last.concept, speaker: work.last.speaker, age: work.last.age } : null,
+        silenceSeconds: work.last ? work.last.age : work.clock,
+        nextCastIn: work.next,
+        standJars: work.standJars,
+      },
+      geography: {
+        waterHead: geography.waterHead,
+        waterFoot: geography.waterFoot,
+        waterStand: geography.waterStand,
+        digSites: geography.digSites.map((d, k) => ({ ...d, ...dug[k] })),
+      },
+    }
+  })
+
   // Dev hook for the headless verification (CLAUDE.md §7.2): what the adults
   // have said this visit, and what each of them is doing about it.
   useEffect(() => {
@@ -4518,6 +4705,7 @@ export function PlaceLife({
                 carry="bundle"
                 colliders={colliders}
                 startDelay={4}
+                dumpId="task-walker-bundle"
               />
             </PlaceDumpGroup>
           )}
@@ -4533,6 +4721,7 @@ export function PlaceLife({
                 carry="jar"
                 colliders={colliders}
                 startDelay={9}
+                dumpId="task-walker-jar"
               />
             </PlaceDumpGroup>
           )}

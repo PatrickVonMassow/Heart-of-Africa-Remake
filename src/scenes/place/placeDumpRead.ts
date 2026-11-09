@@ -18,6 +18,7 @@ import {
   type PlaceVignetteSnapshot,
 } from '../../systems/placeDump'
 import { crownIn } from './placeFigureContext'
+import { registerPlaceLifeSource, type PlaceLifeContribution } from '../../systems/placeLifeDump'
 
 /** The name every drawn figure's outer group carries (placeFigure, skinnedFigure). */
 const FIGURE_NAME = 'inhabitant'
@@ -187,4 +188,15 @@ export function usePlaceDumpProvider(id: string, fn: () => PlaceVignetteSnapshot
     latest.current = fn
   })
   useEffect(() => registerPlaceDumpProvider(id, () => latest.current()), [id])
+}
+
+/** Registers a place-life source for the bug report's `placeLife` section
+ *  (src/systems/placeLifeDump.ts) while the component is mounted — in every
+ *  build, unlike the DEV-only `__placeTag` / `__placeErrands` hooks. */
+export function usePlaceLifeSource(id: string, fn: () => PlaceLifeContribution): void {
+  const latest = useRef(fn)
+  useEffect(() => {
+    latest.current = fn
+  })
+  useEffect(() => registerPlaceLifeSource(id, () => latest.current()), [id])
 }
