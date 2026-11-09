@@ -735,6 +735,10 @@ export interface Strings {
     bankWadeDepth: string
     bloodStainSize: string
     bloodStainIrregularity: string
+    grassFireDrawn: string
+    grassFireSpeed: string
+    grassFireWidth: string
+    grassFireScarDarkness: string
     season: string
     seasonAuto: string
     seasonDry: string

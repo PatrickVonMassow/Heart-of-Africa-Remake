@@ -620,6 +620,14 @@ export function DebugMenu() {
         (v) => { balance.bloodStain.sizeScale = Math.max(0, v); bump() }, 0.1),
       num(t.debug.bloodStainIrregularity, balance.bloodStain.irregularity,
         (v) => { balance.bloodStain.irregularity = clampIrregularity(v); bump() }, 0.05),
+      // The grass fire's front and burn scar (design.md §19.8/§19.13).
+      check(t.debug.grassFireDrawn, balance.grassFire.drawn, (v) => { balance.grassFire.drawn = v; bump() }),
+      num(t.debug.grassFireSpeed, balance.grassFire.frontSpeed,
+        (v) => { balance.grassFire.frontSpeed = Math.max(0.1, v); bump() }, 0.1),
+      num(t.debug.grassFireWidth, balance.grassFire.maxHalfWidth,
+        (v) => { balance.grassFire.maxHalfWidth = Math.max(balance.grassFire.startHalfWidth, v); bump() }, 0.5),
+      num(t.debug.grassFireScarDarkness, balance.grassFire.scarDarkness,
+        (v) => { balance.grassFire.scarDarkness = Math.max(0, Math.min(1, v)); bump() }, 0.05),
     ],
     // The village-life levers (walker unstuck, edge band, wade depth, village
     // speech, tag, the bank game, adult errands, separation) have no home

@@ -50,6 +50,8 @@ device pixel ratio is kept (no cap).
 | `faunaBodySegments` | 12 | 18 | 24 |
 | `figureBodySegments` | 0 | 16 | 24 |
 | `figureGltfBody` | off | on | on |
+| `grassFireFlames` | 16 | 28 | 40 |
+| `grassFireSmoke` | 6 | 14 | 24 |
 
 ## What each setting does
 
@@ -236,6 +238,15 @@ added.
 > per-level value to read) but no render consumer reads them yet. They are listed
 > honestly here as declared registry keys, not shipped behaviour.
 
+
+- **`grassFireFlames`** — Flame billboards standing along the grass fire's
+  burning line (design.md §19.8/§19.13, `src/scenes/travel/grassFireFront.ts`).
+  The line itself — the glowing ember edge and the burn scar behind it — is a
+  shading term of the ground and draws on every level, so a frugal level thins
+  the tongues, never the front. One instanced draw. Climbs 16 → 28 → 40.
+- **`grassFireSmoke`** — Smoke puffs rising behind the line: alpha-blended,
+  camera-facing sprites, so it prices overdraw while a fire burns in view, and
+  nothing otherwise. One instanced draw. Climbs 6 → 14 → 24.
 ## Profiling the low preset (F8 benchmark, point 293)
 
 The in-game render benchmark (**F8** / `?bench`, design.md §21.1) exists to price
