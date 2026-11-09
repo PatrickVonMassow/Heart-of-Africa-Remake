@@ -142,6 +142,7 @@ export const NON_RENDER_VERIFY = new Set([
   'settingsSceneLuma.mjs', // the interface-free scene crop; settings.mjs supplies the frame
   'settingsPipelineState.mjs', // read-only program evidence at the TRAA shutter
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
+  'grassFireReading.mjs', // the burning-grass frame-131 pixel verdict; enrichments.mjs feeds it the fire crops
   'speechSampler.mjs', // analyser polling and coverage; voice.mjs owns the browser
   'spawnAssertion.mjs', // a TEXT audit of the test files' spawn assertions; it opens no page
   'stanceSlip.mjs', // the planted-foot verdict over a sample series; the polish-* suites records the samples
