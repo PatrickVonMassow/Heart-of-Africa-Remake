@@ -1825,6 +1825,12 @@
       "why": "load-only test reds with charges; nothing waits on them, so they stand behind the user's ordered work",
       "origin": "machine",
       "place": "last"
+    },
+    "1494": {
+      "at": "2026-11-09T17:04:52.102Z",
+      "why": "unowned trample-stain red in Tierverhalten; ordinary defect, behind the release front like its bundle siblings 1205/1290",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1853,7 +1859,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-09T14:59:02.154Z",
+    "at": "2026-11-09T17:04:52.110Z",
     "points": [
       184,
       200,
@@ -1906,7 +1912,6 @@
       448,
       449,
       451,
-      453,
       455,
       456,
       457,
@@ -2317,7 +2322,8 @@
       1489,
       1490,
       1492,
-      1493
+      1493,
+      1494
     ]
   }
 }
