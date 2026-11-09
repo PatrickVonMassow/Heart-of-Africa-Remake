@@ -185,6 +185,18 @@ describe('describeReport (the .txt that must stand on its own)', () => {
     expect(text).not.toContain(' animals, ')
   })
 
+  it('names the JSON placeLife section in both languages, only when it is there', () => {
+    const counts = { radius: 90, cap: 60, listed: 14, omitted: 3 }
+    const text = describeReport(input({ placeLife: counts }))
+    expect(text).toContain('hoa-state-2026-07-27-4711.json → "placeLife"')
+    expect(text).toContain(en.stateDump.report.placeLifeNote)
+    expect(text).toContain('(14 inhabitants within 90, cap 60, 3 omitted)')
+    const german = describeReport(input({ texts: de.stateDump.report, placeLife: counts }))
+    expect(german).toContain(de.stateDump.report.placeLifeNote)
+    expect(german).not.toContain(en.stateDump.report.placeLifeNote)
+    expect(describeReport(input({ placeLife: null }))).not.toContain('"placeLife"')
+  })
+
   it('omits the duplicate section when no label is doubled', () => {
     const text = describeReport(input({ overlay: [overlay[2]] }))
     expect(text).not.toContain(en.stateDump.report.duplicateNote)

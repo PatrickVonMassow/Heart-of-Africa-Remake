@@ -25,6 +25,7 @@ import {
   wildlifeReportCounts,
   type DumpEnvironment,
 } from '../state/stateDump'
+import { placeLifeReportCounts } from '../systems/placeLifeDump'
 import { getStrings, useLocale, useStrings } from '../i18n'
 import { captureRenderedFrame } from '../render/frameCapture'
 import { describeBackend } from '../render/backendInfo'
@@ -126,6 +127,7 @@ export function StateDump() {
       // Read back from the very JSON that goes into the archive, so the
       // description can never name other counts than the file holds.
       wildlife: wildlifeReportCounts(json),
+      placeLife: placeLifeReportCounts(json),
       env: environment,
       texts: s.stateDump.report,
     })
