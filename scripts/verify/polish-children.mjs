@@ -3,11 +3,12 @@
 // (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
+import { rmSync } from 'node:fs'
 import { assertBackend } from './_browser.mjs'
 import { waitForSceneReady } from './frameSubject.mjs'
 import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeRunnerArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
-import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, OUT } from './_polish.mjs'
 
 // --- The children's game of tag (design.md §19.10, point 480/351) ------------
 // What needs a real browser is that the RAF-driven chase is a GAME and not a
@@ -2068,7 +2069,9 @@ if (section('children-bank-game')) {
     // blocks the first one (work-order 1491): the quarter-turn widens or narrows
     // around the rock, never towards 0 (behind the child) or π (the rock in front
     // of the hand), and never to the other flank (the body in front of the hand).
-    const aimAtTap = async (hand, alt = 0) =>
+    // Deletes a written frame the suite refused after its shutter (work-order 1491).
+  const dropFrame = (name) => rmSync(`${OUT}${name}.png`, { force: true })
+  const aimAtTap = async (hand, alt = 0) =>
       !!(await page.evaluate(({ h, alt }) => {
         const p = window.__placePlayer
         if (!p) return null
@@ -2403,6 +2406,18 @@ if (section('children-bank-game')) {
         }
         return null
       }, { h, kidHeight: KID_HEIGHT, occludedRatio: OCCLUDED_RATIO })
+    // The runner re-read at the shutter: still the same hold, still touching
+    // the far stone, and nothing in front of it. Null when fit, else why not.
+    const arrivalUnfit = async () => {
+      const r = await page.evaluate((speaker) => window.__placeArrivalHand?.(speaker) ?? null, runner)
+      if (!r || r.tapper !== runner || r.opening?.clock !== arrivalOpening.clock || !(r.arrivalFor > 0)) {
+        return 'the contact hold had ended'
+      }
+      if (!(Math.abs(r.gap) <= contactBar) || r.gesture !== 'touch') {
+        return `the hand had left the stone (gap ${(Math.abs(r.gap) * 100).toFixed(1)} cm, gesture ${r.gesture})`
+      }
+      return arrivalOccluder(r)
+    }
     const arrivalTrace = []
     const arrivalBudget = Math.ceil(arrivalSeconds * 60) * 2 + 900
     for (let i = 0; i < arrivalBudget; i++) {
@@ -2433,20 +2448,36 @@ if (section('children-bank-game')) {
         if (!arrivalShot && Math.abs(now.gap) <= contactBar && now.gesture === 'touch') {
           if (!arrivalAimed) arrivalAimed = await aimAtTap(now, arrivalStand)
           else {
-            // Judged before the shutter and again after it: the pipeline wait
-            // inside `frame` lets a passer-by step in; a frame refused after
-            // the shutter is overwritten by the next clear one.
-            const before = await arrivalOccluder(now)
-            let after = null
-            if (!before) {
-              await frame('1106-arriving-runner-hand-on-the-far-stone', {
-                local: { x: now.x, y: now.y, z: now.z },
-                label: 'the arriving runner with its hand on the far play rock while it names ROCK',
-              })
-              after = await arrivalOccluder(now)
+            // Judged before the pipeline wait, again on a FRESH reading right
+            // before the screenshot (`beforeCapture`, which vetoes the write)
+            // and once more after it: the wait inside `frame` lets a passer-by
+            // step in and can use up the hold. A frame refused after the
+            // shutter is deleted, so no occluded 1106 file survives.
+            const arrivalName = '1106-arriving-runner-hand-on-the-far-stone'
+            let refusal = await arrivalOccluder(now)
+            if (!refusal) {
+              const veto = {}
+              const atShutter = async () => {
+                const why = await arrivalUnfit()
+                if (why) throw Object.assign(new Error(why), { veto })
+              }
+              try {
+                const written = await frame(arrivalName, {
+                  local: { x: now.x, y: now.y, z: now.z },
+                  label: 'the arriving runner with its hand on the far play rock while it names ROCK',
+                }, { beforeCapture: atShutter })
+                const after = written ? await arrivalUnfit() : 'the shutter refused the subject'
+                if (after) {
+                  if (written) dropFrame(arrivalName)
+                  refusal = `after the shutter, ${after}`
+                }
+              } catch (error) {
+                if (error?.veto !== veto) throw error
+                refusal = `at the shutter, ${error.message}`
+              }
             }
-            if (before || after) {
-              arrivalRefusals.push(`stand ${arrivalStand % 4}: ${before ?? `after the shutter, ${after}`}`)
+            if (refusal) {
+              arrivalRefusals.push(`stand ${arrivalStand % 4}: ${refusal}`)
               arrivalStand++
               arrivalAimed = false
             } else {

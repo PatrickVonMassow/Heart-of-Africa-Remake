@@ -18,7 +18,7 @@ const end = source.indexOf('\n  }\n\n  // ', start)
 if (start < 0 || end < 0) throw new Error('Arrival sampler block missing')
 const runSampler = new (Object.getPrototypeOf(async function () {}).constructor)(
   'page', 'restoreEarshotStance', 'check', 'frame', 'aimAtTap', 'nextFrames', 'contactBar',
-  'KID_HEIGHT', 'OCCLUDED_RATIO',
+  'KID_HEIGHT', 'OCCLUDED_RATIO', 'dropFrame',
   source.slice(start, end),
 )
 
@@ -32,13 +32,18 @@ function hold(clock, heardFrom, gap = 0.001, gesture = 'touch') {
 
 const CLEAR = () => ({ hitDistance: 4.1, targetDistance: 4.2, hitName: 'hand-left' })
 
-/** `ray(probe)` answers each `__placeRayHit` call; `probe` counts them. */
-async function sample(readings, ray = CLEAR) {
+/**
+ * `ray(probe)` answers each `__placeRayHit` call; `probe` counts them. The mock
+ * shutter runs `beforeCapture` (a throw vetoes the write) and then advances
+ * `shutterReadings` readings, as the real pipeline wait lets the scene run.
+ */
+async function sample(readings, ray = CLEAR, shutterReadings = 0) {
   let index = 0
   let probe = 0
   const checks = []
   const frames = []
   const stands = []
+  const dropped = []
   const previousBalance = window.__balance
   const previousReader = window.__placeArrivalHand
   const previousRay = window.__placeRayHit
@@ -49,8 +54,14 @@ async function sample(readings, ray = CLEAR) {
     await runSampler(
       { evaluate: async (fn, arg) => fn(arg) }, async () => {},
       (name, pass, detail) => checks.push({ name, pass, detail }),
-      async (name) => frames.push(name), async (_hand, stand) => (stands.push(stand), true), async () => { index++ }, 0.005,
-      KID_HEIGHT, OCCLUDED_RATIO,
+      async (name, _decl, extra) => {
+        await extra?.beforeCapture?.()
+        frames.push(name)
+        index += shutterReadings
+        return true
+      },
+      async (_hand, stand) => (stands.push(stand), true), async () => { index++ }, 0.005,
+      KID_HEIGHT, OCCLUDED_RATIO, (name) => dropped.push(name),
     )
   } finally {
     if (previousRay === undefined) delete window.__placeRayHit
@@ -60,7 +71,7 @@ async function sample(readings, ray = CLEAR) {
     if (previousReader === undefined) delete window.__placeArrivalHand
     else window.__placeArrivalHand = previousReader
   }
-  return { checks, frames, stands }
+  return { checks, frames, stands, dropped }
 }
 
 it('reads the whole first audible hold after an unheard arrival with its arm at rest', async () => {
@@ -117,13 +128,33 @@ it('refuses an occluded stand and shoots from the next clear one inside the hold
   expect(checks[3].detail).toContain('1 occluded stand(s) refused: stand 0: hand behind villager-body')
 })
 
-it('refuses a frame whose occluder stepped in during the shutter and shoots again', async () => {
-  // Three clear lines before the shutter, then the torso line blocked after it.
-  const { checks, frames, stands } = await sample(hold(1, 9), (n) => (n === 5 ? WOMAN() : CLEAR()))
+it('vetoes the write when an occluder stands in front at the shutter itself', async () => {
+  // Clear before the pipeline wait (probes 0-2); the hand line blocked at the shutter (3).
+  const { checks, frames, stands, dropped } = await sample(hold(1, 9), (n) => (n === 3 ? WOMAN() : CLEAR()))
+  expect(checks.every((c) => c.pass)).toBe(true)
+  expect(stands).toEqual([0, 1])
+  expect(frames).toEqual(['1106-arriving-runner-hand-on-the-far-stone'])
+  expect(dropped).toEqual([])
+  expect(checks[3].detail).toContain('stand 0: at the shutter, hand behind villager-body')
+})
+
+it('deletes a written frame whose occluder stepped in after the shutter and shoots again', async () => {
+  // Clear before (0-2) and at the shutter (3-5), the torso line blocked after it (8).
+  const { checks, frames, stands, dropped } = await sample(hold(1, 9), (n) => (n === 8 ? WOMAN() : CLEAR()))
   expect(checks.every((c) => c.pass)).toBe(true)
   expect(stands).toEqual([0, 1])
   expect(frames).toHaveLength(2)
+  expect(dropped).toEqual(['1106-arriving-runner-hand-on-the-far-stone'])
   expect(checks[3].detail).toContain('stand 0: after the shutter, torso behind villager-body')
+})
+
+it('refuses and deletes a frame whose pipeline wait outlasted the contact hold', async () => {
+  // The shutter's wait runs past the last reading of the hold; nothing may pass.
+  const { checks, dropped } = await sample(hold(1, 9), CLEAR, 200)
+  expect(checks[2].pass).toBe(false)
+  expect(checks[3].pass).toBe(false)
+  expect(dropped).toEqual(['1106-arriving-runner-hand-on-the-far-stone'])
+  expect(checks[3].detail).toContain('after the shutter, the contact hold had ended')
 })
 
 it('fails loudly when every stand stays occluded for the whole hold', async () => {
