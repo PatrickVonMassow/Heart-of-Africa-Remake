@@ -1824,6 +1824,12 @@
       "why": "cosmetic low-preset clash; behind the open Dorfleben work",
       "origin": "machine",
       "place": "last"
+    },
+    "1493": {
+      "at": "2026-11-09T13:14:24.408Z",
+      "why": "load-only test reds with charges; nothing waits on them, so they stand behind the user's ordered work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1852,7 +1858,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-09T10:24:52.540Z",
+    "at": "2026-11-09T13:14:24.417Z",
     "points": [
       184,
       200,
@@ -2316,7 +2322,8 @@
       1488,
       1489,
       1490,
-      1492
+      1492,
+      1493
     ]
   }
 }
