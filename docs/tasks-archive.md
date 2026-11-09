@@ -35919,3 +35919,40 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   download in the log), and a forced cache miss still succeeds via the retry.
   Criticality: medium — it stalls every landing behind a dice roll on a runner's network.
   Bundle: unbundled (infrastructure).
+
+- [x] 680. The bug report carries the settlement's life, not only the wildlife (measured
+  13.08.2026 on the user's report "Kind hängt wieder fest", `local/KindHaengtWieder/`). The
+  archive holds a picture, the game state, the balance and UI values — and a WILDLIFE section
+  reading "0 animals, 0 carcasses, 0 flocks", because the report was taken inside a village.
+  About the child the report is ABOUT, and about every other inhabitant, it holds nothing: no
+  position, no state, no tag role, no errand. The one report kind a settlement produces is the
+  one the dump cannot describe, so a stuck-inhabitant report can only ever be answered by trying
+  to reproduce it from the seed.
+  FINAL STATE: a new bounded `placeLife` section in the state JSON, built like
+  `src/systems/wildlifeDump.ts` and named in the archive listing (`.txt`) in BOTH languages,
+  written whenever the report is taken in `place` mode and absent otherwise. It holds, all in
+  world coordinates so it can be replayed against the layout: every INHABITANT within a stated
+  radius — kind (child / adult / porter / errand walker), position, velocity, pose, and for a
+  child its tag role (chaser/target/free), whether it is pinned, the seconds without progress and
+  how often the unstuck nudge fired on it this visit; for an adult the errand it is on (situation
+  id, target place, arrived, remaining dwell). Beside them the TAG GAME state as `__placeTag`
+  reports it (playing, chaser, target, tags, chaserFor), the errand scheduler state as
+  `__placeErrands` reports it (staged counts, last situation, silence), and the settlement's
+  teaching GEOGRAPHY: bank, upstream, downstream, the teaching stone and every dig site. Same
+  bounding discipline as the wildlife section — a stated radius, a cap, and the count of what was
+  left out.
+  IT MUST WORK IN A PRODUCTION BUILD. `__placeTag` and `__placeErrands` are
+  `import.meta.env.DEV`-gated (`src/scenes/place/PlaceLife.tsx`), so today they are absent from
+  exactly the build the player reports from. The dump therefore reads the same state through a
+  channel that SHIPS — a registered snapshot callback, not a debug hook — while the DEV hooks
+  stay as they are for the headless suites, and production gains no debug surface beyond the
+  snapshot the report itself reads. Nothing player-visible changes; the report grows by one
+  section.
+  VERIFIABLE: Vitest over the pure dump builder — a settlement view with more inhabitants than
+  the cap yields the cap plus a correct left-out count, a child with a pinned state and a nudge
+  count round-trips, and the section is absent in travel mode — plus the existing report test
+  extended so the archive listing names the new section in both languages.
+  AUTHOR: the OpenAI lane (Sol) fits — mechanical, bounded, and its verification is not the work.
+  Criticality: medium — nothing is broken by its absence, but every stuck-inhabitant report the
+  user sends is undiagnosable without it, and point 666 is waiting on exactly that.
+  Bundle: Dorfleben.
