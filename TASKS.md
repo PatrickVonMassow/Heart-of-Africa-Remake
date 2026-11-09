@@ -112,14 +112,6 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try. Point 1419 (cloud session_019XD8Qts48RxNzEfjXP9wSR, 27.10.2026) does not meet item 2 either: owner commits after the handover (capture subject fix, review fix) changed the tree, so build, lint and test:unit ran again before the merge; acceptance log local/1419-land.log.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
-- [ ] 1491. Frame 1106 arriving runner occluded by a passing adult on WebGL 2
-  Queue position: directly behind point 1385.
-  Source: findings carrier 08.11.2026 05:25Z, picture check of point 1344: WebGL 2 children-bank-game section green at feat/1344 429fb29e1 (local/verify-logs/2026-11-08T05-11-37-658-polish-children.log), but verification/1106-arriving-runner-hand-on-the-far-stone.png is mostly covered by a woman with a head load walking into the camera; the arriving runner's hand at the far stone is barely visible. The WebGPU frame of the same run is clear. The shutter does not refuse a foreground occluder of the subject.
-  Final state: the 1106 frame shows the arriving runner's hand at the far stone unoccluded at the shutter on both backends.
-  Verifiable: polish-children --section=children-bank-game on both backends; frame judged by looking.
-  Bundle: Dorfleben.
-  Criticality: low - a test frame shows no subject (CLAUDE.md §7.2); no player impact.
-
 - [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
   (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
   polish`, log `local/verify-logs/2026-09-07T05-44-35-994-polish.log`).

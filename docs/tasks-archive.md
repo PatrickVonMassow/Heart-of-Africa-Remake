@@ -35733,3 +35733,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Picture REFUSED: verification/1301-village-kneel-low(-webgl2).png show the kneeler from BEHIND, arms/hands not
   judgeable. Next: aim the frame by the inhabitant's world facing, re-run village-walk both backends, picture, land.
   Status 03.11.2026 17:57 (batch session): cloud-authored by session_019XD8QvSQcNXLjoCtCepvrU (brief: point-brief 1301 plus owner instructions) on branch feat/1301-primitive-kneel-limbs; awaiting its handover (pushed sha, build/lint/test:unit). Next: covering polish --section=village-walk on both backends with a low-preset kneel frame picture-checked, cross-vendor review, landing.
+
+- [x] 1491. Frame 1106 arriving runner occluded by a passing adult on WebGL 2
+  Queue position: directly behind point 1385.
+  Source: findings carrier 08.11.2026 05:25Z, picture check of point 1344: WebGL 2 children-bank-game section green at feat/1344 429fb29e1 (local/verify-logs/2026-11-08T05-11-37-658-polish-children.log), but verification/1106-arriving-runner-hand-on-the-far-stone.png is mostly covered by a woman with a head load walking into the camera; the arriving runner's hand at the far stone is barely visible. The WebGPU frame of the same run is clear. The shutter does not refuse a foreground occluder of the subject.
+  Final state: the 1106 frame shows the arriving runner's hand at the far stone unoccluded at the shutter on both backends.
+  Verifiable: polish-children --section=children-bank-game on both backends; frame judged by looking.
+  Bundle: Dorfleben.
+  Criticality: low - a test frame shows no subject (CLAUDE.md §7.2); no player impact.
