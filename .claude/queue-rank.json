@@ -69,11 +69,6 @@
       "why": "Vor dem Release gehen die Release-Punkte vor; die akute Haelfte — die Rettung ungesicherter Arbeit — fuehre ich bis dahin von Hand aus, und die leere Spur ist ab jetzt bekannt",
       "place": "last"
     },
-    "680": {
-      "at": "2026-08-13T18:48:25.602Z",
-      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor",
-      "place": "last"
-    },
     "683": {
       "at": "2026-08-13T20:19:36.791Z",
       "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt",
@@ -1858,7 +1853,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-09T13:14:24.417Z",
+    "at": "2026-11-09T14:59:02.154Z",
     "points": [
       184,
       200,
@@ -2001,7 +1996,6 @@
       670,
       677,
       678,
-      680,
       683,
       694,
       696,
