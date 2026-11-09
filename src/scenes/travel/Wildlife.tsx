@@ -196,8 +196,12 @@ import {
 } from '../../render/fauna'
 import { setGroundStains } from '../../render/groundStains'
 import {
+  feedCarcassScale,
   feedRemnant,
   handVigilToRemains,
+  listIndexOf,
+  remnantDrawable,
+  victimFeedEnds,
   killFlockLands,
   killFlockRemnant,
   markKilled,
@@ -231,6 +235,11 @@ const MAX_INSTANCES: Record<Species, number> = {
   leopard: 6,
   hyena: 6,
 }
+/** Slots above MAX_INSTANCES that only hunt remnants may take (point 453):
+ *  herd spawns stop at MAX_INSTANCES, so a full herd list still draws the
+ *  scrap the kill flock serves instead of clamping it out of the picture. */
+const REMNANT_HEADROOM = 2
+const herdCapacity = (sp: Species) => MAX_INSTANCES[sp] + REMNANT_HEADROOM
 /** Juveniles render through their own baby-schema geometry (design.md §19) in
  *  a separate instanced mesh per species; a calibratable fraction of each herd
  *  group (calvesForGroup, point 169) keeps the counts small. Flamingos raise no
@@ -1084,23 +1093,31 @@ function leaveHeading(x: number, z: number, px: number, pz: number): number {
 
 /** A predator does not strip its kill bare (design.md §19): when it walks off,
  *  a small remnant of the prey stays behind at the site — a carcass scrap the
- *  kill-circling flock then descends on and finishes. */
-const REMNANT_SCALE = 0.35
-function spawnRemnant(s: LionHuntState, seed: number): Animal | null {
+ *  kill-circling flock then descends on and finishes. It takes over from the
+ *  carcass at the carcass's own final size and yaw (point 453), and is only
+ *  laid when the herd mesh will draw it — otherwise there is no remnant and
+ *  the kill flock leaves with the predator. */
+function spawnRemnant(
+  sp: Species,
+  at: { x: number; z: number; rot: number; young?: boolean },
+  seed: number,
+): Animal | null {
   const herds = ACTIVE_HERDS
   if (!herds) return null
-  const ll = worldToLatLon(s.px, s.pz)
+  if (!remnantDrawable(herds[sp].length, herdCapacity(sp))) return null
+  const ll = worldToLatLon(at.x, at.z)
+  const base = (PREY_SCALE as Partial<Record<Species, number>>)[sp] ?? 1
   const remnant: Animal = {
-    x: s.px,
-    z: s.pz,
+    x: at.x,
+    z: at.z,
     y: Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height),
-    rot: Math.random() * Math.PI * 2,
-    scale: PREY_SCALE[s.prey] * REMNANT_SCALE,
+    rot: at.rot,
+    scale: base * balance.hunt.remnantScale * (at.young ? balance.hunt.remnantYoungFactor : 1),
     phase: 0,
     dead: true,
     remnant: true,
   }
-  herds[s.prey].push(remnant)
+  herds[sp].push(remnant)
   return remnant
 }
 
@@ -1707,7 +1724,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   const crocMaterial = createCrocodileMaterial()
   const adult = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
-    const m = new THREE.InstancedMesh(geometries[sp], sp === 'crocodile' ? crocMaterial : material, MAX_INSTANCES[sp])
+    const m = new THREE.InstancedMesh(geometries[sp], sp === 'crocodile' ? crocMaterial : material, herdCapacity(sp))
     // No croc cast shadow (point 246): a submerged body threw a crisp shadow
     // onto the river bed, which read through the ~0.9-alpha sheet exactly like
     // the body itself. The flat-on-the-water croc loses nothing visible.
@@ -4414,7 +4431,7 @@ function Herds() {
       const mesh = meshRefs.current[sp]
       if (!mesh) continue
       const list = herds[sp]
-      const n = Math.min(list.length, MAX_INSTANCES[sp])
+      const n = Math.min(list.length, herdCapacity(sp))
       // Juveniles divert into their own baby-schema instanced mesh (design.md
       // §19); adults and calves keep separate instance counters.
       const calfMesh = calfMeshRefs.current[sp]
@@ -5911,12 +5928,19 @@ function LionHunt() {
           if (v.dissolve === undefined) v.dissolve = CARCASS_DISSOLVE_SECONDS
           v.dissolve -= dt
         }
-        const consumed = v.dead && (v.dissolve ?? 0) <= 0
-        if (consumed || s.timer <= 0) {
-          // A remnant stays behind only when a kill was actually eaten — a
-          // feed that timed out over a rescued calf leaves nothing (§19).
-          if (v.dead) {
-            const remains = spawnRemnant(s, seed)
+        // The feed never outlives its carcass (point 453): it ends when the
+        // body has left the herds (culled, removed), when it has shrunk to the
+        // remnant's size, or on the timer — never feeding over empty ground.
+        const herdsNow = ACTIVE_HERDS
+        const vIdx = herdsNow ? listIndexOf(SPECIES.map((sp) => herdsNow[sp]), v) : -1
+        if (victimFeedEnds(v, vIdx >= 0, s.timer, CARCASS_DISSOLVE_SECONDS, balance.hunt.remnantScale)) {
+          // A remnant stays behind only when a kill was actually eaten and its
+          // body is still here — a feed that timed out over a rescued calf
+          // leaves nothing (§19). The remnant replaces the shrunk body in
+          // place: same species, spot and yaw; the body is consumed now.
+          if (v.dead && vIdx >= 0) {
+            v.dissolve = 0
+            const remains = spawnRemnant(SPECIES[vIdx], { x: v.x, z: v.z, rot: v.rot, young: v.young }, seed)
             // The vigil follows the remains (point 121 (f)): the keeper's
             // carcass anchor is handed from the consumed victim (dissolve
             // just hit 0 this frame — atomically before any gone-check can
@@ -5937,8 +5961,9 @@ function LionHunt() {
       } else {
         s.timer -= dt
         if (s.timer <= 0) {
-          // Carcass consumed: the lion moves on, leaving a scrap (§19).
-          spawnRemnant(s, seed)
+          // Carcass eaten down to the scrap: the lion moves on and the remnant
+          // takes over in place, at the carcass's final size and yaw (§19).
+          spawnRemnant(s.prey, { x: s.px, z: s.pz, rot: Math.atan2(s.px - s.lx, s.pz - s.lz) }, seed)
           s.mode = 'leave'
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
           s.leaveHeading = undefined // fresh corridor pick per leave (point 188)
@@ -6059,8 +6084,10 @@ function LionHunt() {
         prey.current.rotation.y = feeding ? Math.atan2(s.px - s.lx, s.pz - s.lz) : s.preyHeading
         // Fallen on its side once caught.
         prey.current.rotation.z = feeding ? Math.PI / 2.2 : 0
+        // Never below the remnant's size (point 453): while the predator feeds,
+        // a recognisable body lies under it; the remnant continues it as is.
         const eaten = feeding ? Math.min(1, (FEED_DURATION - s.timer) / FEED_DURATION) : 0
-        prey.current.scale.setScalar(Math.max(0.06, 1 - eaten * 0.96))
+        prey.current.scale.setScalar(feedCarcassScale(eaten, balance.hunt.remnantScale))
       }
     }
     // The red stain stays behind while the lion walks off. A calf kill's stain
