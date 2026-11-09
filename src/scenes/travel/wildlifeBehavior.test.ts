@@ -56,6 +56,7 @@ import {
   rescueSpeed,
   sheetAnchorY,
   drinkPoseBodyY,
+  clashBodyY,
   wadeSpeed,
   waderStandY,
   PREY_WALK_SPEED,
@@ -3317,6 +3318,16 @@ describe('drink pose body height (point 565)', () => {
         }
       }
     }
+  })
+
+  it('stands a clashing fighter on the ground under its lunge-offset spot', () => {
+    // The recorded firing: sim spot ground 2.43, the lunge spot's ground 3.59
+    // up the slope, lift 0.29 — the body drew at 2.72, 0.87 under the turf.
+    const body = clashBodyY('grass', 3.59, 2.43, 0.29)
+    expect(body).toBeCloseTo(3.88, 10)
+    expect(body).toBeGreaterThan(3.59 - 0.75 * 1.2)
+    // Over a bank's water edge the offset keeps the sim height.
+    expect(clashBodyY('water', 0.4, 2.43, 0.29)).toBeCloseTo(2.72, 10)
   })
 
   it('rides a bather chest-deep on the sheet over the water edge', () => {

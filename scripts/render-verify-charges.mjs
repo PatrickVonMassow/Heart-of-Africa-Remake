@@ -1791,33 +1791,6 @@ export const RED_CHARGES = [
       + 'spread is the host or the scene, and the charge dies with that point.',
   },
   {
-    point: 565,
-    suite: 'enrichments',
-    backend: 'webgl',
-    kind: 'console',
-    // NAME-SCOPED ON PURPOSE, where its neighbours are detail-scoped: 565's own
-    // VERIFIABLE is "`enrichments` runs on both backends without the
-    // `animal-buried` assert firing", so the assert AS SUCH is what that point
-    // owes — a second buried animal is the same unmet acceptance, not a second
-    // owner. Anchored at the front so only this assert is read, and scoped to the
-    // WebGL 2 lane both recorded firings were measured on; on WebGPU it has never
-    // fired and stays a real red.
-    match: /^console error: \[ASSERT\] animal-buried /i,
-    why:
-      'THE TRIPWIRE POINT 565 WAS FILED FOR, on the lane it was filed from. 565 records the first '
-      + 'firing (08.08.2026, webgl/enrichments): a drinking wildebeest calf with `y` equal to its '
-      + 'ground sample and the BODY 0.73 below it. Measured again 03.09.2026, 07:21:44Z, in the '
-      + 'LARGE run on feat/1047-bank-game-readable: `animal-buried — warthog bodyY=2.72 '
-      + 'ground=3.59 y=2.43 young=false bathe=false drink=false dodge=false hop=false chunk=11,-1 '
-      + 'shoreSeed=false parent=false child=false dPlayer=84` — a SECOND composition, in which the '
-      + 'ANCHOR itself sits 1.16 below the ground sample and no drink, bathe or dodge pose is '
-      + 'running. It is recorded in 565 with that reading, because the drink-pose lead the point '
-      + 'was opened on cannot explain it and the point must not be closed on the calf alone. '
-      + 'It says nothing about the bank-game branch: that change moves village children, bank-game '
-      + 'balance values and play-rock geometry, and touches no wildlife anchoring. The charge dies '
-      + 'with 565.',
-  },
-  {
     point: 1187,
     backend: 'webgl',
     suite: 'polish-villagers',

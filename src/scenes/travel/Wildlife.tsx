@@ -126,6 +126,7 @@ import {
   rescueSpeed,
   sheetAnchorY,
   drinkPoseBodyY,
+  clashBodyY,
   wadeSpeed,
   waderStandY,
   PREY_WALK_SPEED,
@@ -4822,8 +4823,13 @@ function Herds() {
               a.clashPitch = cp.pitch
               // Rise with the pitch so the down-tilted end keeps its feet on the
               // ground: a rearing animal stands on its hind legs, it does not
-              // drive them through the turf.
-              bodyY = a.y + cp.lift
+              // drive them through the turf. Measured from the ground under the
+              // RENDERED spot (point 565): on a slope the lunge offset buried it.
+              {
+                const cll = worldToLatLon(px, pz)
+                const cter = sampleTerrain(cll.lat, cll.lon, seed)
+                bodyY = clashBodyY(cter.type, cter.height, a.y, cp.lift)
+              }
             } else {
               yaw = a.face ?? (a.fight.aggressor ? toFoe : Math.atan2(a.x - foe.x, a.z - foe.z))
               pitch = 0
