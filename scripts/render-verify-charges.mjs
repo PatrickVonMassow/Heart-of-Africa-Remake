@@ -2086,5 +2086,24 @@ export const RED_CHARGES = [
       'MEASURED 30.10.2026, communication --section=continuous-route alone on aed84aa2f (webgpu): the errand '
       + 'assert fired for a Bambara water-back pair forced after 240 s. Filed as point 1473. The charge dies with point 1473.',
   },
+  {
+    point: 1495,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^frame 87-continent-zoom\b/i,
+    why:
+      'MEASURED 09.11.2026 on both backends: enrichments on main ca908ee7d (webgpu, --section=seasons) and on '
+      + 'feat/565 313289975 (webgpu and webgl, whole suite): the continent zoom never draws (0 draw calls). '
+      + 'Filed as point 1495. The charge dies with point 1495.',
+  },
+  {
+    point: 1495,
+    suite: 'enrichments',
+    kind: 'console',
+    match: /^console error: TypeError: undefined is not iterable \(cannot read property Symbol\(Symbol\.iterator\)\)/i,
+    why:
+      'MEASURED 09.11.2026 beside the frame 87-continent-zoom red on both backends, the per-frame TypeError '
+      + 'point 1495 names. The charge dies with point 1495.',
+  },
 
 ]
