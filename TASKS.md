@@ -14577,6 +14577,12 @@ to land than a mechanism that needs a review.
   round the ports and the bankless villages play)
   Criticality: medium — it is the user's own report of 648/656, alive on about a tenth of
   the worlds he can be dealt, and it is player-visible wherever it fires.
+  ALSO OWNS THE BROWSER CHARGES (09.11.2026, from point 1068): both children-motion entries in
+  `scripts/render-verify-charges.mjs` now name 1169, because a quiet unthrottled WebGPU probe
+  read the same signature (1.13 m inside 0.27 m, bursts clean); the fix strikes them. Lead from
+  1068: src/scenes/place/tagGame.ts ~1150-1205 documents this composition at catch moments (a
+  cornered runner beside the standing chaser, the ex-chaser's U-turn) — check first whether the
+  red windows coincide with catches; then the catch steering, not the gate, is the repair.
   Bundle: Dorfleben.
 
 - [ ] 1171. A bank-game unit test runs into its 20-second timeout on CI and blocks every main
@@ -15781,4 +15787,19 @@ to land than a mechanism that needs a review.
   1. The carried crate sits too low: the carrier's head is inside the crate. The load must rest on top of the head (with its pad, if any), never intersecting it.
   2. The carrier moves in a sprint gait with arms flung out. A head-load carrier walks at a steady, upright pace with at least one hand steadying the load or arms close to the body.
   Verify with a Playwright picture of a head-load carrier in Cairo (and any other place using head loads) in motion, both backends when isBackendSensitivePath applies. Related but separate: 1425 (water jar jumps from hip to shoulder).
+  Bundle: Dorfleben.
+
+- [ ] 1492. On the low preset the task walker's head-load cone pierces the bundle at full kneel
+  (measured 09.11.2026 on feat/1301 43d129505, polish-villagers --section=village-walk, WebGPU).
+  With detailLevel low, at the first frame with `inhabitant.userData.kneel === 1` the task
+  walker still holds its bundle at chest height on the body axis, and the blue wrap cone's apex
+  sticks out through the box top, identically from both flanks
+  (verification/1301-village-kneel-low.png of that run). The skinned figure
+  (1432-village-load-set-down) holds it in front of the chest without contact.
+  Player impact: visible on the low preset at every set-down and pick-up.
+  Final state: at full kneel on the low preset no part of the figure's mesh intersects the load.
+  Test: Vitest geometry check of the low-preset kneel pose against the load box; picture on both
+  backends (polish-villagers --section=village-walk).
+  Refs: src/scenes/place/placeFigure.tsx, src/render/figureWalk.ts
+  Criticality: low — cosmetic, low preset only, but player-visible.
   Bundle: Dorfleben.
