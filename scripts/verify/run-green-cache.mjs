@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { readRecord } from './run-record.mjs'
 import { DEV_SUITES, SERVERLESS_SUITES, laneFor, parseArgs, selectBackend, suitesFor } from './tiers.mjs'
-import { isCrashedRun, isIncompleteRecording, isRenderPath, owned } from '../render-verify-core.mjs'
+import { isBackendSensitivePath, isCrashedRun, isIncompleteRecording, isRenderPath, owned } from '../render-verify-core.mjs'
 import { isProseOnlyPath } from '../pre-push-gate-core.mjs'
 
 // These controls stay out of the environment key: VERIFY_GL is matched on its
@@ -82,12 +82,32 @@ export function isNeutralPath(path) {
     /^scripts\/.+\.test\.mjs$/.test(p) || isProseOnlyPath(p)
 }
 
-/** Is the whole diff neutral, and does it touch prose the `docs` suite reads? */
+/** May a WebGL 2 receipt stand across this path (point 1026)? Every one-backend
+ *  defect on record showed on WebGPU while WebGL 2 stayed green, so a change
+ *  that cannot render differently per backend (`isBackendSensitivePath`) needs
+ *  only the fresh WebGPU pass. Fail closed: the verify harness (it picks the
+ *  backend a suite opens), package and lockfile, build config, public/ and any
+ *  unknown path keep the WebGL 2 pass. */
+export function isBackendNeutralPath(path) {
+  const p = String(path ?? '').replace(/\\/g, '/')
+  if (isNeutralPath(p)) return true
+  if (!p || isBackendSensitivePath(p)) return false
+  if (/^scripts\/verify\//.test(p) && !/\.test\.mjs$/.test(p)) return false
+  return /^(src|scripts|docs|\.claude|verification)\//.test(p)
+}
+
+/** Is the whole diff neutral (or at least backend-neutral), and does it touch
+ *  prose the `docs` suite reads? */
 export function neutralDiff(paths) {
   const list = Array.isArray(paths) ? paths.filter(Boolean) : null
-  if (!list) return { neutral: false, docs: false, blocking: [] }
+  if (!list) return { neutral: false, backendNeutral: false, docs: false, blocking: [] }
   const blocking = list.filter((p) => !isNeutralPath(p))
-  return { neutral: blocking.length === 0, docs: list.some((p) => String(p).endsWith('.md')), blocking }
+  return {
+    neutral: blocking.length === 0,
+    backendNeutral: blocking.every(isBackendNeutralPath),
+    docs: list.some((p) => String(p).endsWith('.md')),
+    blocking,
+  }
 }
 
 /** The per-suite records a LARGE run wrote, copied into its receipt at close:
@@ -185,9 +205,13 @@ export function rejudgeLarge({ records, argv, head, verifyGl, environment = '[]'
         diffs.set(r.head, neutralDiff(paths))
       }
       const diff = diffs.get(r.head)
-      if (!diff.neutral) continue
-      if (!rejudgeBackend(r, backend, { openPoints, ledger }).covered) continue
-      covered.push({ backend, entry, range: `${r.head}..${head}` })
+      // The WebGL 2 receipt also stands across a backend-neutral diff (point 1026).
+      const cut = !diff.neutral && backend === 'webgl' && diff.backendNeutral
+      if (!diff.neutral && !cut) continue
+      // A newer applicable receipt that does not cover ends the search: an
+      // older green never outvotes a later red on the same backend.
+      if (!rejudgeBackend(r, backend, { openPoints, ledger }).covered) break
+      covered.push({ backend, entry, range: `${r.head}..${head}`, ...(cut ? { backendCut: true } : {}) })
       docs ||= diff.docs
       break
     }
@@ -220,6 +244,7 @@ export function neutralDiffReader(cwd) {
 
 /** One line per re-judged backend, naming the receipt and the neutral range. */
 export function formatRejudged(result, display = (p) => p) {
-  return result.covered.map(({ backend, entry, range }) =>
-    `re-judged receipt ${display(entry.path)} covers ${backend} on this HEAD — neutral diff ${range}`)
+  return result.covered.map(({ backend, entry, range, backendCut }) => backendCut
+    ? `SKIP ${backend} pass: re-judged receipt ${display(entry.path)} covers it on this HEAD — backend-neutral diff ${range} (no backend-sensitive path; not closing evidence, --again runs it)`
+    : `re-judged receipt ${display(entry.path)} covers ${backend} on this HEAD — neutral diff ${range}`)
 }

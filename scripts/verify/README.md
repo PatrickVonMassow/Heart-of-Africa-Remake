@@ -402,6 +402,20 @@ missing, it runs pinned (`VERIFY_GL=<backend>`). If both are covered but a
 `*.md` changed, the `docs` suite runs fresh. If nothing is left, nothing runs.
 `--again` always runs fresh.
 
+**The WebGL 2 pass across a backend-neutral diff (point 1026).** The WebGL 2
+backend alone may also stand across a diff that is not neutral but
+**backend-neutral** (`isBackendNeutralPath`): every non-neutral path fails
+`isBackendSensitivePath` (the predicate that also decides the picture check's
+second backend), lies under `src/`, `scripts/`, `docs/`, `.claude/` or
+`verification/`, and is not verify-harness code. Package or lockfile, build
+config, `public/`, a verify script and any unknown path keep the pass. WebGPU
+always runs fresh then (pinned), and the wrapper prints `SKIP webgl pass: …
+backend-neutral diff <old>..<head> (… not closing evidence, --again runs it)`.
+Every one-backend defect on record showed on WebGPU while WebGL 2 stayed green
+(points 210/334/506); the residual risk is a WebGL-2-only defect in a
+backend-neutral path. Such a skip is **not closing evidence**: the closing's
+two LARGE runs use `--again` whenever the wrapper prints it.
+
 **Closing evidence for a re-judged LARGE.** `closing-guard` stays text-only. The
 `large-regression` (or `regression-after-cleanup`) evidence names both receipt
 paths and the neutral range, e.g. `LARGE both backends on <head>: re-judged
