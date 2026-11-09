@@ -122,8 +122,10 @@ jobs:
               echo "tag $tag ($sha): cached build reused"
             else
               echo "tag $tag ($sha): building"
-              if git fetch --depth 1 origin tag "$tag" \
-                && git worktree add "src-$tag" "$tag" \
+              # Build the RESOLVED commit, never the tag name: a tag moved since
+              # resolution would otherwise be cached under the old sha.
+              if git fetch --depth 1 origin "$sha" \
+                && git worktree add --detach "src-$tag" "$sha" \
                 && ( cd "src-$tag" && { n=0; until npm ci; do n=$((n+1)); [ "$n" -ge 3 ] && exit 1; echo "npm ci failed, retry $n after 15s"; sleep 15; done; } && npx tsc -b && npx vite build --base="/Heart-of-Africa-Remake/$tag/" ); then
                 mkdir -p "$build"
                 cp -r "src-$tag/dist/." "$build/"
