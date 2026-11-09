@@ -1779,6 +1779,29 @@ export function sheetAnchorY(surface: number | null, bedHeight: number, dip: num
 }
 
 /**
+ * A clash's body height at its RENDERED (lunge-offset) spot (point 565): the
+ * shove moves the drawn body off the sim spot, and on a slope a.y — the sim
+ * spot's ground — left it under the turf it lunged into (the warthog firing
+ * of the anchoring tripwire). On land it stands on that spot's own ground and
+ * rises by the pose's lift; over water (a fight never steps there, but the
+ * offset can reach a bank's edge) it keeps the sim height.
+ */
+export function clashBodyY(type: string, height: number, simY: number, lift: number): number {
+  return (type === 'water' || type === 'ocean' ? simY : groundedBodyY(height)) + lift
+}
+
+/**
+ * The drink pose's body height at the RENDERED (slid) spot (point 196): on
+ * land the body stands on that spot's own ground, over the water's edge a
+ * bather rides the sheet chest-deep. It belongs to the slid spot only — a
+ * branch that renders the animal back at its sim spot must resync to a.y
+ * (point 565: a parent guarding its calf kept the low bank height inland).
+ */
+export function drinkPoseBodyY(type: string, height: number, surface: number | null): number {
+  return type === 'water' ? sheetAnchorY(surface, height, 0.32) : Math.max(0.02, height)
+}
+
+/**
  * A shoreline wader's standing height (point 196): legs in the shallow sheet
  * (a fixed wade depth below the surface), but never below its own bed — on
  * the shallow edge it simply stands on the bottom. The flat 0.02 this

@@ -55,6 +55,8 @@ import {
   elephantStepAllowed,
   rescueSpeed,
   sheetAnchorY,
+  drinkPoseBodyY,
+  clashBodyY,
   wadeSpeed,
   waderStandY,
   PREY_WALK_SPEED,
@@ -3299,6 +3301,37 @@ describe('the lioness defends her cub against a hyena (design.md §19.8, point 1
     // 1 − defendChance = 0.05 — a poignant but uncommon ending (the lioness
     // stands vigil), consistent with the mother routing the threat.
     expect(1 - defendChance('lion', 'hyena', shipped)).toBeCloseTo(0.05, 10)
+  })
+})
+
+describe('drink pose body height (point 565)', () => {
+  it('keeps a land drinker on its own ground sample at every herd scale and age', () => {
+    // Spawn scales run 0.55 (plover) to 1.2 (grazer); a juvenile is drawn
+    // smaller still, so sweep well past both ends. The anchoring tripwire
+    // fires below ground - 0.75 * scale; the pose may never reach it.
+    for (const young of [false, true]) {
+      for (let scale = 0.3; scale <= 1.4; scale += 0.05) {
+        for (const ground of [0.02, 0.5, 1.09, 1.82, 3.59, 12]) {
+          const body = drinkPoseBodyY('grass', ground, null)
+          expect(body, `young=${young} scale=${scale.toFixed(2)} ground=${ground}`).toBeGreaterThanOrEqual(ground)
+          expect(body).toBeGreaterThan(ground - 0.75 * scale)
+        }
+      }
+    }
+  })
+
+  it('stands a clashing fighter on the ground under its lunge-offset spot', () => {
+    // The recorded firing: sim spot ground 2.43, the lunge spot's ground 3.59
+    // up the slope, lift 0.29 — the body drew at 2.72, 0.87 under the turf.
+    const body = clashBodyY('grass', 3.59, 2.43, 0.29)
+    expect(body).toBeCloseTo(3.88, 10)
+    expect(body).toBeGreaterThan(3.59 - 0.75 * 1.2)
+    // Over a bank's water edge the offset keeps the sim height.
+    expect(clashBodyY('water', 0.4, 2.43, 0.29)).toBeCloseTo(2.72, 10)
+  })
+
+  it('rides a bather chest-deep on the sheet over the water edge', () => {
+    expect(drinkPoseBodyY('water', 1.0, 2.0)).toBeCloseTo(1.68, 10)
   })
 })
 
