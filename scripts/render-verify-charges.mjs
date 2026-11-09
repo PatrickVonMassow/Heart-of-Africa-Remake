@@ -1542,7 +1542,7 @@ export const RED_CHARGES = [
       'lands.',
   },
   {
-    point: 1068,
+    point: 1169,
     suite: 'polish-children',
     backend: 'webgl',
     kind: 'check',
@@ -1621,10 +1621,12 @@ export const RED_CHARGES = [
       + 'local/verify-logs/2026-09-18T16-41-50-415-polish.log), was GREEN on this check and on '
       + 'the whole suite — so the composition is a transient even at the length of a full pass, '
       + 'and this charge is a record of a red that happened, not of one that reproduces. It now '
-      + 'has three shapes to explain.',
+      + 'has three shapes to explain. RE-OWNED to 1169 on 09.11.2026: the WebGPU probe in the sibling '
+      + 'entry put the same signature on a quiet unthrottled host, and the browserless replay reads it '
+      + 'on six of sixty seeds, so it is the shuffle 1169 fixes and dies with that fix.',
   },
   {
-    point: 1068,
+    point: 1169,
     suite: 'polish-children',
     backend: 'webgpu',
     // LEVEL-SCOPED because the measurement was taken at that level and only
@@ -1681,9 +1683,11 @@ export const RED_CHARGES = [
       + '8 (run 4: maasai-village worst child 0 at 0.25 %, group 0.05 %, 1.13 m inside 0.27 m; cairo '
       + 'worst child 3 at 0.68 %, group 0.14 %, 1.00 m inside 0.33 m; burst series 0.00 % in both), '
       + 'and that red was NOT charged: the run did not match this entry\'s compatibility scope, and the ledger requires every WebGPU entry to name one level. So the composition is '
-      + 'neither load nor a lane or level property: it is a rare standing trait of the play. STILL '
-      + 'UNNAMED, and what 1068 stays open for: whether those windows are legitimate chase reversals '
-      + '(then the per-child gate is too tight for a one-window event) or a child snagging.',
+      + 'neither load nor a lane or level property: it is a rare standing trait of the play. NAMED, '
+      + 'and RE-OWNED to 1169 when 1068 closed on this measurement: the same signature (about a metre '
+      + 'walked inside a quarter of a metre, bursts clean) is what the browserless replay reads above '
+      + 'the gate on six of sixty bambara seeds, so it is the play shuffling, not the browser or the '
+      + 'host, and the charge now dies with the fix of that shuffle.',
   },
   {
     point: 1010,

@@ -2960,14 +2960,14 @@ describe('the shipped charge ledger', () => {
         'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
         '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
         '[run×16 part×72 roam×307] over 45s played, 3 tagged',
-      '1068/polish-children/webgl':
+      '1169/polish-children/webgl':
         'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5805 1s windows, ' +
         '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 153.8 judged ' +
         'child-seconds, least judgeable child 4 at 98.5 %. Bad = over 1 m walked inside 0.35 m',
       // The real WebGPU text, from the run that earned the entry
       // (local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log).
-      '1068/polish-children/webgpu':
+      '1169/polish-children/webgpu':
         'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5880 1s windows, ' +
         '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
