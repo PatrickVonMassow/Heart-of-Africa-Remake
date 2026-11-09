@@ -155,9 +155,9 @@ affected copies change together.
 - Test player-reachable states and judge visibility by the rendered projection,
   never an assumed radius. Every screenshot declares and contains its actual
   world/local/place/HUD/general subject at the shutter.
-- Everyday browser lane: WebGPU; LARGE adds the full WebGL 2 regression lane.
-  Every browser suite asserts the requested backend; touch/voice use WebGL 2.
-  A WebGL-2-only defect may wait until the next LARGE. Operation:
+- Everyday browser lane: WebGPU; LARGE adds WebGL 2 unless every change since
+  its receipt is backend-neutral. Each suite asserts its backend; touch/voice use
+  WebGL 2. WebGL-2-only defects may wait for the next LARGE. Operation:
   `scripts/verify/README.md`.
 - A red run closes only when its cause is fixed, charged to its owning point, or
   filed as a new point. A retry is SUSPECT and covers nothing.

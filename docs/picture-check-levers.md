@@ -10,6 +10,11 @@ independently and blind and the union is evaluated. The replay is
 **convergent**, so one model runs it and the evidence is readable before the
 author's rationale.
 
+The TEST lane asks the same predicate as the picture check
+(`isBackendSensitivePath`): since point 1026 a LARGE keeps its WebGL 2 pass
+from the last receipt across a backend-neutral diff
+(`scripts/verify/README.md`, "Re-judged LARGE receipts").
+
 ---
 
 ## 1. Lever list A — the main chain, written blind

@@ -55,7 +55,8 @@ export const WEBGL_ONLY_SUITES = ['touch', 'voice']
  * WebGL 2 stayed green (points 210/334/506) — never the other way round. So the
  * everyday lane (the SMALL tier, a bare suite filter) is WebGPU, and WebGL 2 is
  * the REGRESSION lane, run by every unpinned LARGE (a LARGE with VERIFY_GL set
- * runs that one lane only). Measured on this host, WebGPU is not
+ * runs that one lane only; across a backend-neutral diff the wrapper keeps
+ * WebGL 2 from the last receipt, point 1026). Measured on this host, WebGPU is not
  * the slower lane, so the swap costs no run time.
  */
 export const DEFAULT_BACKEND = 'webgpu'
