@@ -140,6 +140,11 @@ put it is the mistake this line exists to stop.
   the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
   Bundle: Dorfleben.
   Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
+  Status 09.11.2026 01:02 (batch session): branch at ec605e18b (review fix: hip rides up so the full-radius foot rim
+  stays on the ground; side-on search aims at figure-trunk when there is no skeleton). Unit green, cross review merge
+  (GPT-6.1 Sol, receipts 0831c18adea5d5e6, c0a395c22c43aa71); village-walk low-preset checks green on both backends.
+  Picture REFUSED: verification/1301-village-kneel-low(-webgl2).png show the kneeler from BEHIND, arms/hands not
+  judgeable. Next: aim the frame by the inhabitant's world facing, re-run village-walk both backends, picture, land.
   Status 03.11.2026 17:57 (batch session): cloud-authored by session_019XD8QvSQcNXLjoCtCepvrU (brief: point-brief 1301 plus owner instructions) on branch feat/1301-primitive-kneel-limbs; awaiting its handover (pushed sha, build/lint/test:unit). Next: covering polish --section=village-walk on both backends with a low-preset kneel frame picture-checked, cross-vendor review, landing.
 
 - [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
@@ -15469,6 +15474,8 @@ to land than a mechanism that needs a review.
   foot does not slide"; walker 2 gaitWalk 0 at ~2 m/s), log local/1415-suspect-rungs.log, and
   "village walk: the camera found a free spot side-on to the walker" once in the full WebGPU run
   (log local/verify-logs/2026-10-26T06-39-00-663).
+  Also (finding 09.11.2026, feat/1301 ec605e18b): the same side-on walker check red once on WebGL 2
+  (green on WebGPU at that sha and on WebGL 2 at 1d55f9f75), log local/1301-walk-webgl.log.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side occlusion, no player impact measured.
 - [ ] 1382. The WebGPU polish-villagers suite finishes inside its wall timeout.
