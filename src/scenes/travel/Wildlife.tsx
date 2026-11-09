@@ -125,6 +125,7 @@ import {
   elephantStepAllowed,
   rescueSpeed,
   sheetAnchorY,
+  drinkPoseBodyY,
   wadeSpeed,
   waderStandY,
   PREY_WALK_SPEED,
@@ -4587,10 +4588,11 @@ function Herds() {
             {
               const dll = worldToLatLon(px, pz)
               const dter = sampleTerrain(dll.lat, dll.lon, seed)
-              bodyY =
-                dter.type === 'water'
-                  ? sheetAnchorY(waterSurfaceY(dll.lat, dll.lon, seed, dter.height), dter.height, 0.32)
-                  : Math.max(0.02, dter.height)
+              bodyY = drinkPoseBodyY(
+                dter.type,
+                dter.height,
+                dter.type === 'water' ? waterSurfaceY(dll.lat, dll.lon, seed, dter.height) : null,
+              )
             }
             if (k > 0.04) yaw = Math.atan2(toX, toZ) + (cycle >= 0.38 ? Math.PI : 0)
             if (cycle >= 0.12 && cycle < 0.38) {
@@ -5094,6 +5096,7 @@ function Herds() {
                   const bank = swimOutBank(a, sp)
                   if (bank) a.crossing = { tx: bank.tx, tz: bank.tz, time: 0 }
                 }
+                bodyY = a.y // resync off any drink slide (see the kick branch); the ground-follow refines it on land
                 { // ground-follow (point 203(A)) — THE main calf mover: every
                   // background calf tails its drifting parent through this step,
                   // and without the height update they sank into every slope
@@ -5137,6 +5140,11 @@ function Herds() {
             const eng = guardEngagement(gd, a.guardMinD ?? null, GUARD_RADIUS)
             a.guardMinD = eng.minSeen ?? undefined
             if (eng.engaged) {
+              // Resync off any drink slide (point 565): the guard renders at the
+              // sim spot, and a parent that stood on station kept the low bank
+              // height of this frame's drink slide — buried inland under its own
+              // ground, the drink=true child=true firing of the anchoring tripwire.
+              bodyY = a.y
               const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, GUARD_STANDOFF)
               if (h !== null) {
                 a.x += Math.sin(h) * RESCUE_SPEED * dt
