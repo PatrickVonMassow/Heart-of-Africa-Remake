@@ -11,6 +11,7 @@
 
 import { balance, START_YEAR } from '../config/balance'
 import { placeSection } from '../systems/placeDump'
+import { placeLifeSection } from '../systems/placeLifeDump'
 import { wildlifeSection, type WildlifeDump } from '../systems/wildlifeDump'
 import { placePlayerPosition } from '../scenes/place/playerPosition'
 import { regionAt, worldToLatLon, type RegionId } from '../world/geo'
@@ -120,8 +121,14 @@ function dataOnly(_key: string, value: unknown): unknown {
  * (src/systems/placeDump.ts): its figures with position, yaw, phase, pose and
  * crown, its carried and set-down objects with their holders — bounded around
  * the traveller's place-local position, empty outside a place scene.
+ *
+ * The `placeLife` section (src/systems/placeLifeDump.ts) is written only in
+ * `place` mode: every inhabitant with its tag role, pinned clock, nudge count
+ * or errand, the children's round, the errand scheduler and the teaching
+ * geography — bounded the same way.
  */
 export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {
+  const placeOrigin = placePlayerPosition.active ? { x: placePlayerPosition.x, z: placePlayerPosition.z } : null
   const dump = {
     app: DUMP_APP,
     build: import.meta.env.MODE,
@@ -131,7 +138,9 @@ export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {
     env: opts.env,
     game,
     wildlife: wildlifeSection(game.pos),
-    place: placeSection(placePlayerPosition.active ? { x: placePlayerPosition.x, z: placePlayerPosition.z } : null),
+    place: placeSection(placeOrigin),
+    // Absent (undefined, dropped by JSON) outside `place` mode.
+    placeLife: placeLifeSection(game.mode, placeOrigin),
     balance,
     ui: opts.ui,
   }

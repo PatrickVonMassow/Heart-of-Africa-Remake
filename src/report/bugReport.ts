@@ -37,6 +37,7 @@ interface ReportTexts {
   stateNote: string
   /** Names the JSON's `wildlife` section and what bounds it (point 454). */
   wildlifeNote: string
+  placeLifeNote: string
   overlayNote: string
   /** Heading for same-text labels at overlapping boxes, if any were found. */
   duplicateNote: string
@@ -61,6 +62,14 @@ export interface ReportInput {
     animals: number
     carcasses: number
     flocks: number
+  } | null
+  /** Bounds and sizes of the JSON's placeLife section, read back from that
+   *  same JSON; null or omitted when the dump carries none (outside a place). */
+  placeLife?: {
+    radius: number
+    cap: number
+    listed: number
+    omitted: number
   } | null
   env: DumpEnvironment
   texts: ReportTexts
@@ -163,6 +172,10 @@ export function describeReport(input: ReportInput): string {
     // a wildlife report stands or falls on, and it is bounded — the counts say
     // how much of it the file actually holds.
     `${stem}.json → "wildlife" — ${t.wildlifeNote}${wildlifeCounts(input)}`,
+    // Named only when the JSON carries it: it is written in place mode alone.
+    ...(input.placeLife
+      ? [`${stem}.json → "placeLife" — ${t.placeLifeNote} (${input.placeLife.listed} inhabitants within ${input.placeLife.radius}, cap ${input.placeLife.cap}, ${input.placeLife.omitted} omitted)`]
+      : []),
     `${stem}-overlay.json — ${t.overlayNote} (${input.overlay.length})`,
   ]
   if (dupes.length > 0) {

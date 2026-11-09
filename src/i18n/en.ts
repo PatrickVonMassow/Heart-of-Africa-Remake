@@ -342,6 +342,8 @@ export const en: Strings = {
       stateNote: 'the complete game state, balance values and UI state as JSON.',
       wildlifeNote:
         'the section of that same JSON holding the wildlife around the traveller: every animal with its species, position, state and target, every carcass with its remaining seconds and who feeds on it, and every vulture flock with the carcass it owns. Bounded — the section names its radius and its cap, and how many entries were left out.',
+      placeLifeNote:
+        'the section of that same JSON holding the life of the settlement, written only for a report taken inside a place: every inhabitant with its kind, position, velocity and pose, each child with its tag role, pinned clock and unstuck nudges, each adult with its errand, plus the children\'s round, the errand scheduler and the teaching geography. Bounded — the section names its radius and its cap, and how many inhabitants were left out.',
       overlayNote: 'every label and HUD element visible at that moment, with its text and its on-screen rectangle — this is where the HUD and the map labels are.',
       duplicateNote: 'Labels sharing a text at overlapping positions',
     },

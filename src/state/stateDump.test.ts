@@ -23,6 +23,7 @@ import {
   type WildlifeFlockLike,
   type WildlifeSource,
 } from '../systems/wildlifeDump'
+import { registerPlaceLifeSource } from '../systems/placeLifeDump'
 
 beforeEach(() => {
   localStorage.clear()
@@ -354,6 +355,55 @@ describe('the wildlife section (point 454)', () => {
     })
     expect(wildlifeReportCounts('{"summary":{}}')).toBeNull()
     expect(wildlifeReportCounts('not json')).toBeNull()
+  })
+})
+
+describe('dumpGameState placeLife section', () => {
+  it('is written in place mode and absent in travel mode', () => {
+    const off = registerPlaceLifeSource('test', () => ({
+      inhabitants: [{ id: 'kids/0', kind: 'child', x: 1, z: 2, velocity: null, yaw: 0, pose: 'runner' }],
+    }))
+    try {
+      useGame.setState({ mode: 'travel' })
+      expect(JSON.parse(dumpGameState(useGame.getState())).placeLife).toBeUndefined()
+      useGame.setState({ mode: 'place' })
+      const placeLife = JSON.parse(dumpGameState(useGame.getState())).placeLife
+      expect(placeLife.counts.listed).toBe(1)
+      expect(placeLife.inhabitants[0].id).toBe('kids/0')
+    } finally {
+      off()
+    }
+  })
+
+  it('still produces the report when a source throws while it is processed', () => {
+    const off = registerPlaceLifeSource('test', () => ({
+      get inhabitants(): never {
+        throw new Error('kids gone')
+      },
+    }))
+    try {
+      useGame.setState({ mode: 'place' })
+      const placeLife = JSON.parse(dumpGameState(useGame.getState())).placeLife
+      expect(placeLife.errors).toEqual({ test: 'kids gone' })
+      expect(placeLife.counts.inhabitants).toBe(0)
+    } finally {
+      off()
+    }
+  })
+
+  it('writes a cyclic dig-site value as a marker instead of failing the report', () => {
+    const meta: Record<string, unknown> = { name: 'pit' }
+    meta.self = meta
+    const off = registerPlaceLifeSource('test', () => ({
+      geography: { digSites: [{ x: 1, z: 2, meta }] },
+    }))
+    try {
+      useGame.setState({ mode: 'place' })
+      const placeLife = JSON.parse(dumpGameState(useGame.getState())).placeLife
+      expect(placeLife.geography.digSites[0].meta).toEqual({ name: 'pit', self: '[circular]' })
+    } finally {
+      off()
+    }
   })
 })
 

@@ -306,6 +306,7 @@ export interface Strings {
       pictureMissing: string
       stateNote: string
       wildlifeNote: string
+      placeLifeNote: string
       overlayNote: string
       duplicateNote: string
     }

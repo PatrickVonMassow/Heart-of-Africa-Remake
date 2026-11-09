@@ -341,6 +341,8 @@ export const de: Strings = {
       stateNote: 'der vollständige Spielzustand, die Balance-Werte und der UI-Zustand als JSON.',
       wildlifeNote:
         'der Abschnitt ebendieser JSON-Datei mit der Tierwelt um den Reisenden: jedes Tier mit Art, Position, Zustand und Ziel, jeder Kadaver mit seiner Restzeit und seinen Fressern sowie jeder Geierschwarm mit dem Kadaver, den er beansprucht. Begrenzt – der Abschnitt nennt seinen Radius, seine Obergrenze und wie viele Einträge weggelassen wurden.',
+      placeLifeNote:
+        'der Abschnitt ebendieser JSON-Datei mit dem Leben der Siedlung, nur geschrieben, wenn die Meldung in einem Ort entstand: jeder Bewohner mit Art, Position, Geschwindigkeit und Haltung, jedes Kind mit seiner Rolle im Fangspiel, seiner Feststeck-Uhr und den Befreiungsstößen, jeder Erwachsene mit seinem Auftrag, dazu die Runde der Kinder, die Auftragsplanung und die Lehrgeografie. Begrenzt – der Abschnitt nennt seinen Radius, seine Obergrenze und wie viele Bewohner weggelassen wurden.',
       overlayNote: 'jede in diesem Moment sichtbare Beschriftung und jedes Anzeigeelement, mit Text und Bildschirmrechteck – hier stehen die Anzeigeleiste und die Kartenbeschriftungen.',
       duplicateNote: 'Beschriftungen mit gleichem Text an überlappenden Stellen',
     },
