@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  cacheEnvironment, findGreenReceipt, formatCachedGreen, isNeutralPath, lastGreenReceipt, neutralDiffReader, parseNameList, readSuiteSink, rejudgeBackend, rejudgeLarge, snapshotSuiteRuns,
+  cacheEnvironment, findGreenReceipt, formatCachedGreen, formatRejudged, isBackendNeutralPath, isNeutralPath, lastGreenReceipt, neutralDiffReader, parseNameList, readSuiteSink, rejudgeBackend, rejudgeLarge, snapshotSuiteRuns,
 } from './run-green-cache.mjs'
 import { DEV_SUITES, SERVERLESS_SUITES, WEBGL_ONLY_SUITES } from './tiers.mjs'
 import { MAX_RUNS, SUITE_SINK_ENV, appendSuiteSink } from '../render-verify-state.mjs'
@@ -118,15 +118,36 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
     expect(result.docs).toBe(false)
   })
 
-  it('runs everything when the diff touches src/', () => {
-    expect(ask(['docs/backlog.md', 'src/game/store.ts']).missing).toEqual(['webgl', 'webgpu'])
+  it('runs everything when the diff touches a backend-sensitive path', () => {
+    expect(ask(['docs/backlog.md', 'src/scenes/place/PlaceScene.tsx']).missing).toEqual(['webgl', 'webgpu'])
   })
 
-  it.each(['vite.config.ts', 'package-lock.json', 'public/favicon.svg', 'scripts/closing-guard-core.mjs', 'scripts/verify/polish-villagers.mjs'])(
-    'runs everything for a path outside the neutral set (fail closed): %s', (path) => {
+  // Point 1026: the WebGL 2 pass is dropped as an explicit SKIP when nothing since
+  // its receipt can render differently per backend; WebGPU always runs fresh.
+  it.each(['src/game/store.ts', 'src/ui/StatusBar.tsx', 'scripts/closing-guard-core.mjs', '.claude/settings.json'])(
+    'keeps the WebGL 2 receipt across a backend-neutral path and reruns WebGPU: %s', (path) => {
       expect(isNeutralPath(path)).toBe(false)
+      expect(isBackendNeutralPath(path)).toBe(true)
+      const result = ask([path])
+      expect(result.covered.map((c) => [c.backend, c.backendCut])).toEqual([['webgl', true]])
+      expect(result.missing).toEqual(['webgpu'])
+      expect(formatRejudged(result)[0]).toMatch(/^SKIP webgl pass: .*backend-neutral diff old1234\.\.new5678 .*not closing evidence/)
+    })
+
+  it.each(['vite.config.ts', 'package-lock.json', 'package.json', 'index.html', 'public/favicon.svg',
+    'scripts/verify/polish-villagers.mjs', 'scripts/verify/_browser.mjs', 'scripts/verify/launch-args-core.mjs',
+    'src/render/water.tsl.ts', 'src/world/redSea.ts', 'unknown-root-file.txt'])(
+    'runs everything for a backend-sensitive or unclassifiable path (fail closed): %s', (path) => {
+      expect(isNeutralPath(path)).toBe(false)
+      expect(isBackendNeutralPath(path)).toBe(false)
       expect(ask([path]).missing).toEqual(['webgl', 'webgpu'])
     })
+
+  it('never cuts the WebGPU pass, and a pinned WebGPU receipt never stands in for WebGL 2', () => {
+    const records = [large(passOf('webgpu'), { verifyGl: 'webgpu', exitCode: 0, receipt: { exitCode: 0, green: true, failing: [] } })]
+    expect(ask(['src/ui/StatusBar.tsx'], { records }).missing).toEqual(['webgl', 'webgpu'])
+    expect(ask(['src/ui/StatusBar.tsx'], { records }).covered).toEqual([])
+  })
 
   it('does not re-judge a red whose run record is incomplete — that backend reruns', () => {
     const ledger = [{ point: 42, suite: 'polish-villagers', match: /^a red nobody owns$/ }]
@@ -191,23 +212,23 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
     }
   })
 
-  it('judges both sides of a rename: moving code out of src/ into docs/ is not neutral', () => {
+  it('judges both sides of a rename: moving scene code out of src/ into docs/ is not neutral', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-rejudge-rename-'))
     const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
     try {
       git('init', '-q')
       git('config', 'user.email', 't@example.invalid')
       git('config', 'user.name', 'test')
-      mkdirSync(join(dir, 'src'))
-      writeFileSync(join(dir, 'src', 'a.ts'), 'export const a = 1\n'.repeat(20))
+      mkdirSync(join(dir, 'src', 'scenes'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'scenes', 'a.ts'), 'export const a = 1\n'.repeat(20))
       git('add', '.')
       git('commit', '-q', '-m', 'base')
       const base = git('rev-parse', 'HEAD').trim()
       mkdirSync(join(dir, 'docs'))
-      git('mv', 'src/a.ts', 'docs/x.md')
+      git('mv', 'src/scenes/a.ts', 'docs/x.md')
       git('commit', '-q', '-m', 'move')
       const paths = neutralDiffReader(dir)(base)
-      expect(paths.sort()).toEqual(['docs/x.md', 'src/a.ts'])
+      expect(paths.sort()).toEqual(['docs/x.md', 'src/scenes/a.ts'])
       expect(ask(paths).missing).toEqual(['webgl', 'webgpu'])
       expect(parseNameList('src/a b.ts\0docs/x.md\0')).toEqual(['src/a b.ts', 'docs/x.md'])
     } finally {
