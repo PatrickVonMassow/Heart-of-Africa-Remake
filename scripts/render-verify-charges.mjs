@@ -228,15 +228,6 @@ export const RED_CHARGES = [
     why: 'Same crashed WebGPU polish-children --section=tag-catch run on feat/680-place-life-dump a17e2f8e1, 09.11.2026 06:38; the catch beat of the same tag-catch section 1493 owns, unfixed since. The charge dies with it.',
   },
   {
-    point: 1013,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^every predator fits the region and period/i,
-    why: 'Recurred 18.10.2026 on full WebGPU enrichments (feat/1378 335c9552e): the cheetah/central '
-      + 'food-web mismatch point 1013 describes; the section alone was green on rerun. Point 1013 '
-      + 'owns the cause; the charge dies with it.',
-  },
-  {
     point: 1236,
     suite: 'enrichments',
     kind: 'check',
@@ -245,25 +236,6 @@ export const RED_CHARGES = [
       'Measured 29.09.2026 on the full webgl enrichments pass after the 1234 landing (machine '
       + 'under load): the arrival variant never moved the traveller out of the ring (dP 1.25) and '
       + 'the calf ended 0.094 from its target. Point 1236 owns the cause; the charge dies with it.',
-  },
-  {
-    point: 1236,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^a purposeful crossing swims the channel chest-deep and lands on the far bank/i,
-    why:
-      'Measured 29.09.2026 on the same webgl pass: sawOnWater false, landed true. The purposeful '
-      + 'crossing is suspected to arrive or end early since the 1234 arrival snap or shy-ring '
-      + 'interruption. Point 1236 owns the cause; the charge dies with it.',
-  },
-  {
-    point: 1468,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^Traveller \(low\): his head stands at villager height/i,
-    why:
-      'FILED AS 1468 ON 30.10.2026: headRise 1.352-1.356 m against the 1.35 m bound on 54b326987 and '
-      + 'a48606517, red before the 1462 cleanup. The charge dies with 1468.',
   },
   {
     point: 1469,
@@ -1864,17 +1836,6 @@ export const RED_CHARGES = [
       + 'continuous-route alone on webgpu at 53b168c14 on a quiet machine was GREEN. The charge dies with 200.',
   },
   {
-    point: 200,
-    suite: 'enrichments',
-    kind: 'check',
-    backend: 'webgl',
-    match: /^a feed that ends without a kill leaves no remnant\b/i,
-    why:
-      'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): deadAfter 2 with the calf alive — '
-      + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
-      + 'was green. The charge dies with 200.',
-  },
-  {
     point: 1265,
     suite: 'polish-villagers',
     kind: 'check',
@@ -1981,15 +1942,14 @@ export const RED_CHARGES = [
   },
   {
     point: 1449,
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
     suite: 'enrichments',
     kind: 'check',
     match: /^a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up \(calf-in-water\)$/i,
     why:
       'FILED AS 1449 ON 26.10.2026: red in the full enrichments run on webgpu, main 64bed6b45, '
       + 'owned by no open point; from the calf-shield-river work of 1297 (calf-in-water). '
-      + 'The charge dies with point 1449.',
+      + 'Red on WebGL 2 in the full enrichments run on main 9afb575 (09.11.2026), so the entry '
+      + 'names no backend and therefore no feature level. The charge dies with point 1449.',
   },
   {
     point: 1395,
