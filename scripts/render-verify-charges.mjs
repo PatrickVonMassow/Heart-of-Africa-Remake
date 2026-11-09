@@ -219,6 +219,15 @@ export const RED_CHARGES = [
     why: 'WebGPU polish-children --section=tag-catch on feat/680-place-life-dump a17e2f8e1, 09.11.2026 06:38, a run that then died (crash signed off); same catcher-hand family and section as 1493, unfixed since. The charge dies with it.',
   },
   {
+    point: 1493,
+    suite: 'polish-children',
+    kind: 'check',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /through its beat the caught child stands \(no pace, arms dropped\) while the catcher-that-was is already away/i,
+    why: 'Same crashed WebGPU polish-children --section=tag-catch run on feat/680-place-life-dump a17e2f8e1, 09.11.2026 06:38; the catch beat of the same tag-catch section 1493 owns, unfixed since. The charge dies with it.',
+  },
+  {
     point: 1013,
     suite: 'enrichments',
     kind: 'check',
