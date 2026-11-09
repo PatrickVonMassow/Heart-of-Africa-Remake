@@ -1938,7 +1938,7 @@ function Herds() {
     // the drown threshold. A staged water-drama check asserts this reading
     // instead of assuming a forced season arrived (point 502).
     w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, meshRefs, calfMeshRefs, herdState,
-      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
+      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, groundAt: (x: number, z: number) => { const l = worldToLatLon(x, z); return Math.max(0.02, sampleTerrain(l.lat, l.lon, useGame.getState().seed).height) }, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
       waterDrama: (lat: number, lon: number) => {
         const bw = balance.waterDrama
         const wetness = CURRENT_WEATHER.wetness
