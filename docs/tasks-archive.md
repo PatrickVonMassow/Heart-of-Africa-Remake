@@ -35706,3 +35706,30 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Criticality: medium - every coastal villager; possible frame-rate cost on all villager scenes.
   Bundle: Dorfleben.
   Closed 08.11.2026 by the user order in point 1488 item 5 (05.11.2026, verbatim: "1341 is dropped (closed as cancelled)."): cancelled. The unlanded robe-hang and hood-dome fix stays on origin/feat/1341-garment-smooth-surface with its rebuilt villager.glb; recorded in docs/backlog.md, revived only by owner decision.
+
+- [x] 1301. Low-preset primitive villager kneels with constant limb lengths and stays above ground
+  Queue position: directly behind point 1294.
+  Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
+  (owner decision under the standing split rule, recorded for veto). Cross-vendor review at e8b17e850 (GPT-6 Astra,
+  pass 1/2, receipt 32873f1442e6ce05) and the round-3 author report leave three defects of the low-preset primitive
+  figure (`src/scenes/place/placeFigure.tsx`, `primitiveLayout()` in `src/render/figureWalk.ts`).
+  Final state:
+  1. The primitive kneel folds with fixed limb lengths: no arm-length, shoulder-width or body-height scaling
+     (today 55 % arms/shoulders, 0.4125 body, `placeFigure.tsx` ~196). The primitive arm gets an elbow and its
+     contacts are solved like the skinned figure's, so the low-preset kneel poses tuned for the short 0.242 arm
+     (loom weaver, griller, fish gutting, net seat) keep their hand targets without overshooting into the ground.
+  2. The leg fold (`acos(hipY / legLength)`, `placeFigure.tsx` ~204) leaves clearance for the leg radius: no tilted
+     rim and no lower half of a leg cylinder below the ground at full kneel.
+  3. Resting hands of a kneeling primitive stay on or above the ground (measured today ~4 cm below).
+  Not in scope: horizontal foot slide of the low-preset walk (rejected in 1295 under its item 6).
+  Test: `figureWalk.test.ts` stops accepting shortened arms (~404-415) and asserts constant limb lengths through a
+  kneel; the low-preset grounding check in `scripts/verify/polish-villagers.mjs` measures legs and hands, not only
+  the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
+  Bundle: Dorfleben.
+  Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
+  Status 09.11.2026 01:02 (batch session): branch at ec605e18b (review fix: hip rides up so the full-radius foot rim
+  stays on the ground; side-on search aims at figure-trunk when there is no skeleton). Unit green, cross review merge
+  (GPT-6.1 Sol, receipts 0831c18adea5d5e6, c0a395c22c43aa71); village-walk low-preset checks green on both backends.
+  Picture REFUSED: verification/1301-village-kneel-low(-webgl2).png show the kneeler from BEHIND, arms/hands not
+  judgeable. Next: aim the frame by the inhabitant's world facing, re-run village-walk both backends, picture, land.
+  Status 03.11.2026 17:57 (batch session): cloud-authored by session_019XD8QvSQcNXLjoCtCepvrU (brief: point-brief 1301 plus owner instructions) on branch feat/1301-primitive-kneel-limbs; awaiting its handover (pushed sha, build/lint/test:unit). Next: covering polish --section=village-walk on both backends with a low-preset kneel frame picture-checked, cross-vendor review, landing.
