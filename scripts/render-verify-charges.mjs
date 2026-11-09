@@ -214,6 +214,7 @@ export const RED_CHARGES = [
     suite: 'polish-children',
     kind: 'check',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     match: /inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging/i,
     why: 'WebGPU polish-children --section=tag-catch on feat/680-place-life-dump a17e2f8e1, 09.11.2026 06:38, a run that then died (crash signed off); same catcher-hand family and section as 1493, unfixed since. The charge dies with it.',
   },
