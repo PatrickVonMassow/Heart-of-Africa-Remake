@@ -3,11 +3,12 @@
 // (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
+import { rmSync } from 'node:fs'
 import { assertBackend } from './_browser.mjs'
 import { waitForSceneReady } from './frameSubject.mjs'
 import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeRunnerArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
-import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, OUT } from './_polish.mjs'
 
 // --- The children's game of tag (design.md §19.10, point 480/351) ------------
 // What needs a real browser is that the RAF-driven chase is a GAME and not a
@@ -2063,14 +2064,22 @@ if (section('children-bank-game')) {
      *  showing a child leaning against a rock with its visible arm hanging
      *  (measured 10.09.2026, WebGPU). The offset between the drawn hand and the
      *  drawn body says which side to stand on. */
-    const aimAtTap = async (hand) =>
-      !!(await page.evaluate((h) => {
+    //
+    // `alt` picks an ALTERNATIVE standpoint on the same flank when a passer-by
+    // blocks the first one (work-order 1491): the quarter-turn widens or narrows
+    // around the rock, never towards 0 (behind the child) or π (the rock in front
+    // of the hand), and never to the other flank (the body in front of the hand).
+    // Deletes a written frame the suite refused after its shutter (work-order 1491).
+  const dropFrame = (name) => rmSync(`${OUT}${name}.png`, { force: true })
+  const aimAtTap = async (hand, alt = 0) =>
+      !!(await page.evaluate(({ h, alt }) => {
         const p = window.__placePlayer
         if (!p) return null
         const bearing = Math.atan2(h.x - h.rock.x, h.z - h.rock.z)
+        const turn = [0.9, 1.3, 0.6, 1.7][alt % 4]
         const at = (s) => ({
-          x: h.rock.x + Math.sin(bearing + 0.9 * s) * 4.2,
-          z: h.rock.z + Math.cos(bearing + 0.9 * s) * 4.2,
+          x: h.rock.x + Math.sin(bearing + turn * s) * 4.2,
+          z: h.rock.z + Math.cos(bearing + turn * s) * 4.2,
         })
         // The side is CHOSEN, not assumed, and by the thing that matters: from
         // which of the two does the drawn hand stand clear of the drawn body?
@@ -2092,7 +2101,7 @@ if (section('children-bank-game')) {
         p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
         p.pitch = -0.1
         return true
-      }, hand))
+      }, { h: hand, alt }))
     // THE BUDGET IS THE HOLD'S OWN LENGTH, NOT A ROUND NUMBER (work-order 1065).
     // INSIDE a hold this loop steps ONE frame per turn, so reading a hold from
     // the word to its far side costs as many turns as the lane draws frames in
@@ -2377,6 +2386,40 @@ if (section('children-bank-game')) {
     let arrivalEnded = false
     let arrivalAimed = false
     let arrivalShot = false
+    // THE SHUTTER REFUSES A FOREGROUND OCCLUDER (work-order 1491). On WebGL 2 a
+    // woman with a head load walked into the camera and covered the hand. Each
+    // stand is judged by the suite's own per-line test (OCCLUDED_RATIO, as the
+    // tag frames are): the hand, a line just above it and the runner's torso.
+    // An occluded stand moves to the next alternative while the 9 s hold lasts.
+    let arrivalStand = 0
+    const arrivalRefusals = []
+    const arrivalOccluder = (h) =>
+      page.evaluate(({ h, kidHeight, occludedRatio }) => {
+        if (!window.__placeRayHit) return 'no ray probe'
+        const lines = [['hand', h.x, h.y, h.z], ['above the hand', h.x, h.y + 0.35, h.z]]
+        if (h.body) lines.push(['torso', h.body.x, kidHeight * 0.6, h.body.z])
+        for (const [what, x, y, z] of lines) {
+          const hit = window.__placeRayHit(x, y, z)
+          if (hit?.hitDistance != null && hit.hitDistance / hit.targetDistance < occludedRatio) {
+            return `${what} behind ${hit.hitName ?? 'mesh'} at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)} m`
+          }
+        }
+        return null
+      }, { h, kidHeight: KID_HEIGHT, occludedRatio: OCCLUDED_RATIO })
+    // The runner re-read at the shutter: still the same hold, still touching
+    // the far stone, and nothing in front of it. Null when fit, else why not.
+    const arrivalUnfit = async () => {
+      const r = await page.evaluate((speaker) => window.__placeArrivalHand?.(speaker) ?? null, runner)
+      if (!r || r.tapper !== runner || r.opening?.clock !== arrivalOpening.clock || !(r.arrivalFor > 0)) {
+        return 'the contact hold had ended'
+      }
+      // A reading inside the hold is contact evidence like any loop reading.
+      arrivalTrace.push(r)
+      if (!(Math.abs(r.gap) <= contactBar) || r.gesture !== 'touch') {
+        return `the hand had left the stone (gap ${(Math.abs(r.gap) * 100).toFixed(1)} cm, gesture ${r.gesture})`
+      }
+      return arrivalOccluder(r)
+    }
     const arrivalTrace = []
     const arrivalBudget = Math.ceil(arrivalSeconds * 60) * 2 + 900
     for (let i = 0; i < arrivalBudget; i++) {
@@ -2405,14 +2448,44 @@ if (section('children-bank-game')) {
         }
         arrivalTrace.push(now)
         if (!arrivalShot && Math.abs(now.gap) <= contactBar && now.gesture === 'touch') {
-          if (!arrivalAimed) arrivalAimed = await aimAtTap(now)
+          if (!arrivalAimed) arrivalAimed = await aimAtTap(now, arrivalStand)
           else {
-            await frame('1106-arriving-runner-hand-on-the-far-stone', {
-              local: { x: now.x, y: now.y, z: now.z },
-              label: 'the arriving runner with its hand on the far play rock while it names ROCK',
-            })
-            arrivalShot = true
-            await restoreEarshotStance()
+            // Judged before the pipeline wait, again on a FRESH reading right
+            // before the screenshot (`beforeCapture`, which vetoes the write)
+            // and once more after it: the wait inside `frame` lets a passer-by
+            // step in and can use up the hold. A frame refused after the
+            // shutter is deleted, so no occluded 1106 file survives.
+            const arrivalName = '1106-arriving-runner-hand-on-the-far-stone'
+            let refusal = await arrivalOccluder(now)
+            if (!refusal) {
+              const veto = {}
+              const atShutter = async () => {
+                const why = await arrivalUnfit()
+                if (why) throw Object.assign(new Error(why), { veto })
+              }
+              try {
+                const written = await frame(arrivalName, {
+                  local: { x: now.x, y: now.y, z: now.z },
+                  label: 'the arriving runner with its hand on the far play rock while it names ROCK',
+                }, { beforeCapture: atShutter })
+                const after = written ? await arrivalUnfit() : 'the shutter refused the subject'
+                if (after) {
+                  if (written) dropFrame(arrivalName)
+                  refusal = `after the shutter, ${after}`
+                }
+              } catch (error) {
+                if (error?.veto !== veto) throw error
+                refusal = `at the shutter, ${error.message}`
+              }
+            }
+            if (refusal) {
+              arrivalRefusals.push(`stand ${arrivalStand % 4}: ${refusal}`)
+              arrivalStand++
+              arrivalAimed = false
+            } else {
+              arrivalShot = true
+              await restoreEarshotStance()
+            }
           }
         }
       }
@@ -2441,6 +2514,13 @@ if (section('children-bank-game')) {
       'the arriving runner was photographed naming ROCK with its hand on the far stone',
       arrivalShot,
       arrivalShot ? 'shutter inside the arrival hold' : 'no arrival contact frame was captured',
+    )
+    check(
+      'the 1106 frame has nothing between the camera and the arriving runner`s hand at the shutter',
+      arrivalShot,
+      `${arrivalRefusals.length} occluded stand(s) refused` +
+        (arrivalRefusals.length ? `: ${arrivalRefusals.slice(-4).join('; ')}` : '') +
+        (arrivalShot ? '' : arrivalRefusals.length ? '; no clear stand within the hold' : '; no contact to aim at'),
     )
   }
 
