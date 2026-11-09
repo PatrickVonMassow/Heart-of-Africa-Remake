@@ -1193,6 +1193,11 @@ async function checkChildrenMotion(motionPlace) {
     )
     if (aimed) {
       await nextFrames(2)
+      // THE PLAY HOLDS STILL FROM HERE TO THE READING AFTER THE SHUTTER (point
+      // 1068): with the scene wait moved before the aim, a child still ran out
+      // between aim and capture — NDC -8.80 at cairo, WebGPU, 09.11.2026. The
+      // dev life freeze the villager frames use stops the tag loop too.
+      await page.evaluate(() => window.__placeFreezeLife?.(true))
       // The declared child is read where it is NOW, and the camera turned to it
       // again: the frames since the aim are frames of a walking child. A child
       // that has run up to the camera fell out under the bottom edge, and
@@ -1267,6 +1272,7 @@ async function checkChildrenMotion(motionPlace) {
         !!after?.inView,
         after ? `head at NDC ${after.ndc?.map((n) => n.toFixed(2)).join(', ') ?? 'behind the camera'}` : 'child gone',
       )
+      await page.evaluate(() => window.__placeFreezeLife?.(false))
       await page.evaluate((pose) => {
         const p = window.__placePlayer
         if (!p) return
@@ -1280,6 +1286,7 @@ async function checkChildrenMotion(motionPlace) {
     // section after this one would otherwise read a page this one left behind.
     await page.evaluate(() => {
       delete window.__pickChildVantage
+      window.__placeFreezeLife?.(false)
     })
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
