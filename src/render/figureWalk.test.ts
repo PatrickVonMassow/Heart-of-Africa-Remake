@@ -22,8 +22,13 @@ import {
   loadRadiusAt,
   phasePerDistance,
   leanedHipY,
+  primitiveHandTarget,
   primitiveLayout,
+  primitivePoseRig,
+  primitiveTrunkRadius,
+  PRIMITIVE_KNEEL,
   restingMotion,
+  solvePrimitiveArm,
   solveLeg,
   steerHeading,
   stepWalk,
@@ -37,6 +42,9 @@ import {
 } from './figureWalk'
 import { TASK_BUNDLE, TASK_JAR, steadiedLoad, taskLoadShape } from '../scenes/place/headLoads'
 import { RISE_SECONDS, workSpan, workStop, type WorkStopMode } from '../scenes/place/taskWalkerStop'
+import { carrierGutPose } from '../scenes/place/fisheryPoses'
+import { loomPose, type LoomPicture } from '../scenes/place/loomWork'
+import { REST_POSE, type FigurePose } from './gesture'
 
 const bodies = AGE_GROUPS.flatMap((age) => SEXES.map((sex) => ({ age, sex, p: bodyProportions(sex, age, 0) })))
 const SPEEDS = [0.3, 0.8, 1.2, 1.8]
@@ -554,9 +562,118 @@ describe('kneeling folds the body, it never squashes it', () => {
       expect(l.headRadius).toBe(primitiveLayout(0, false, FIGURE_LIMBS).headRadius)
       expect(l.headY - l.headRadius).toBeGreaterThan(l.height - 0.01)
     }
-    // Kneeling contacts keep the shoulder height they were solved for.
-    const kneel = primitiveLayout(1, false, FIGURE_LIMBS)
-    expect(kneel.height * FIGURE_LIMBS.shoulderY).toBeCloseTo(0.55 * 0.75 * FIGURE_LIMBS.shoulderY, 9)
-    expect(kneel.armLength).toBeCloseTo(0.55 * FIGURE_LIMBS.armLength, 9)
+  })
+
+  // Work-order 1301: the kneel folds at the hip; no limb is shortened.
+  it('the primitive keeps every limb length through a kneel, with legs and without', () => {
+    for (const legs of [false, true]) {
+      const stand = primitiveLayout(0, legs, FIGURE_LIMBS)
+      expect(stand.height).toBeCloseTo(1, 12)
+      expect(stand.shoulderY).toBeCloseTo(FIGURE_LIMBS.shoulderY, 12)
+      for (let k = 0; k <= 1.0001; k += 0.05) {
+        const l = primitiveLayout(k, legs, FIGURE_LIMBS)
+        expect(l.armLength).toBe(FIGURE_LIMBS.armLength)
+        expect(l.upperArm * 2).toBeCloseTo(FIGURE_LIMBS.armLength, 12)
+        expect(l.shoulderX).toBe(FIGURE_LIMBS.shoulderX)
+        expect(l.trunkLength).toBeCloseTo(1 - FIGURE_LIMBS.hipY, 12)
+        // the cone from its base to its tip, and the shoulder on it, unchanged
+        expect(l.height - l.hipY - l.skirt).toBeCloseTo(l.trunkLength, 12)
+        expect(l.height - l.shoulderY).toBeCloseTo(1 - FIGURE_LIMBS.shoulderY, 12)
+        expect(l.headY - l.height).toBeCloseTo(stand.headY - stand.height, 12)
+      }
+      const kneel = primitiveLayout(1, legs, FIGURE_LIMBS)
+      // it really goes down: the hip to the leg's round
+      expect(kneel.height).toBeCloseTo(PRIMITIVE_KNEEL.hip + 1 - FIGURE_LIMBS.hipY, 12)
+    }
+  })
+
+  it('a folded primitive leg keeps its whole round above the ground at every kneel', () => {
+    const leg = FIGURE_LIMBS.hipY
+    const [rHip, rFoot] = FIGURE_LIMBS.legRadius
+    expect(primitiveLayout(0, true, FIGURE_LIMBS).legFold).toBe(0)
+    for (let k = 0; k <= 1.0001; k += 0.02) {
+      const l = primitiveLayout(k, true, FIGURE_LIMBS)
+      const th = l.legFold
+      // the hip cap's lowest rim, and the foot cap's (a tapered cylinder's
+      // lowest point is one of its two cap rims)
+      expect(l.hipY - rHip * Math.abs(Math.sin(th))).toBeGreaterThanOrEqual(-1e-9)
+      // the drawn cylinder keeps its full foot radius through the transition
+      expect(l.hipY - leg * Math.cos(th) - rFoot * Math.abs(Math.sin(th))).toBeGreaterThanOrEqual(-1e-9)
+    }
+    // full kneel: neither rim below the ground, the foot's on it
+    const full = primitiveLayout(1, true, FIGURE_LIMBS)
+    expect(full.hipY - leg * Math.cos(full.legFold) - rFoot * Math.sin(full.legFold)).toBeCloseTo(0, 9)
+    expect(full.hipY - rHip * Math.sin(full.legFold)).toBeGreaterThanOrEqual(-1e-9)
+  })
+
+  describe('the primitive arm reaches its tuned hand with an elbow (work-order 1301)', () => {
+    const L = FIGURE_LIMBS
+    const loom = (shuttle: number, beat: number) => loomPose({ shuttle, beat, fold: null } as unknown as LoomPicture)
+    const poses: Array<[string, FigurePose]> = [
+      ['rest', REST_POSE],
+      ['loom thrown', loom(1, 0.2)],
+      ['loom beat', loom(-0.6, 1)],
+      ['loom centre', loom(0, 0.5)],
+      ['gut cut', carrierGutPose(0.1)],
+      ['gut lift', carrierGutPose(0.9 * 1.4)],
+    ]
+    const posed = (k: number, legs: boolean, pose: FigurePose) => {
+      const lay = primitiveLayout(k, legs, L)
+      const rig = primitivePoseRig(k, legs, L)
+      const base = lay.skirt > 0 ? L.bodyRadius : primitiveTrunkRadius(L)
+      const trunk = {
+        position: new THREE.Vector3(0, leanedHipY(lay.hipY, base, pose.lean), 0),
+        quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(pose.lean, pose.turn, 0)),
+        lean: pose.lean,
+      }
+      return ([pose.left, pose.right] as const).map((a, i) => {
+        const side = i === 0 ? 1 : -1
+        const pivot = {
+          position: new THREE.Vector3(side * lay.shoulderX, lay.shoulderY - lay.hipY, 0),
+          quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(a.pitch, a.yaw, a.roll, 'YXZ')),
+        }
+        const target = primitiveHandTarget(pivot.quaternion, side, rig, trunk, 0, L.handRadius, new THREE.Vector3())
+        const unclamped = primitiveHandTarget(pivot.quaternion, side, rig, trunk, -10, L.handRadius, new THREE.Vector3())
+        const up = new THREE.Quaternion()
+        const fore = new THREE.Quaternion()
+        solvePrimitiveArm(pivot, target, lay.upperArm, side as 1 | -1, up, fore)
+        // the drawn chain: shoulder → elbow → hand, each segment the upper-arm length
+        const elbowQ = pivot.quaternion.clone().multiply(up)
+        const elbow = new THREE.Vector3(0, -lay.upperArm, 0).applyQuaternion(elbowQ).add(pivot.position)
+        const hand = new THREE.Vector3(0, -lay.upperArm, 0).applyQuaternion(elbowQ.clone().multiply(fore)).add(elbow)
+        const world = (v: THREE.Vector3) => v.clone().applyQuaternion(trunk.quaternion).add(trunk.position)
+        return { pivot, target, unclamped, up, fore, elbow, hand, handWorld: world(hand), lay, world }
+      })
+    }
+
+    it('a standing arm is the straight arm it always was', () => {
+      for (const legs of [false, true]) for (const [, pose] of poses) for (const a of posed(0, legs, pose)) {
+        expect(a.up.angleTo(new THREE.Quaternion())).toBeLessThan(1e-6)
+        expect(a.fore.angleTo(new THREE.Quaternion())).toBeLessThan(1e-6)
+      }
+    })
+
+    it('kneeling, the full-length arm lands on the hand its pose was tuned for — never shortened, never into the ground', () => {
+      for (const legs of [false, true]) for (const [name, pose] of poses) for (const a of posed(1, legs, pose)) {
+        const at = `${name} legs=${legs}`
+        // constant segment lengths: the arm is never shortened
+        expect(a.elbow.distanceTo(a.pivot.position), at).toBeCloseTo(L.armLength / 2, 9)
+        expect(a.hand.distanceTo(a.elbow), at).toBeCloseTo(L.armLength / 2, 9)
+        // the tuned hand is within the drawn arm's reach, and reached
+        expect(a.target.distanceTo(a.pivot.position), at).toBeLessThan(L.armLength)
+        expect(a.hand.distanceTo(a.target), at).toBeLessThan(1e-6)
+        // the hand's whole round on or above the ground
+        expect(a.handWorld.y - L.handRadius, at).toBeGreaterThanOrEqual(-1e-9)
+        // a tuned hand already above the ground is kept exactly where it was
+        if (a.world(a.unclamped).y >= L.handRadius) expect(a.target.distanceTo(a.unclamped), at).toBeLessThan(1e-9)
+      }
+    })
+
+    it('a kneeling primitive’s resting hands stay on or above the ground', () => {
+      for (const legs of [false, true]) for (let k = 0; k <= 1.0001; k += 0.1) for (const a of posed(k, legs, REST_POSE)) {
+        expect(a.handWorld.y - L.handRadius).toBeGreaterThanOrEqual(-1e-9)
+        expect(a.hand.distanceTo(a.pivot.position)).toBeLessThanOrEqual(L.armLength + 1e-9)
+      }
+    })
   })
 })

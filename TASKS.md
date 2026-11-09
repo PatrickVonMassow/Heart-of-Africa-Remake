@@ -120,28 +120,6 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: low - a test frame shows no subject (CLAUDE.md §7.2); no player impact.
 
-- [ ] 1301. Low-preset primitive villager kneels with constant limb lengths and stays above ground
-  Queue position: directly behind point 1294.
-  Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
-  (owner decision under the standing split rule, recorded for veto). Cross-vendor review at e8b17e850 (GPT-6 Astra,
-  pass 1/2, receipt 32873f1442e6ce05) and the round-3 author report leave three defects of the low-preset primitive
-  figure (`src/scenes/place/placeFigure.tsx`, `primitiveLayout()` in `src/render/figureWalk.ts`).
-  Final state:
-  1. The primitive kneel folds with fixed limb lengths: no arm-length, shoulder-width or body-height scaling
-     (today 55 % arms/shoulders, 0.4125 body, `placeFigure.tsx` ~196). The primitive arm gets an elbow and its
-     contacts are solved like the skinned figure's, so the low-preset kneel poses tuned for the short 0.242 arm
-     (loom weaver, griller, fish gutting, net seat) keep their hand targets without overshooting into the ground.
-  2. The leg fold (`acos(hipY / legLength)`, `placeFigure.tsx` ~204) leaves clearance for the leg radius: no tilted
-     rim and no lower half of a leg cylinder below the ground at full kneel.
-  3. Resting hands of a kneeling primitive stay on or above the ground (measured today ~4 cm below).
-  Not in scope: horizontal foot slide of the low-preset walk (rejected in 1295 under its item 6).
-  Test: `figureWalk.test.ts` stops accepting shortened arms (~404-415) and asserts constant limb lengths through a
-  kneel; the low-preset grounding check in `scripts/verify/polish-villagers.mjs` measures legs and hands, not only
-  the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
-  Bundle: Dorfleben.
-  Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
-  Status 03.11.2026 17:57 (batch session): cloud-authored by session_019XD8QvSQcNXLjoCtCepvrU (brief: point-brief 1301 plus owner instructions) on branch feat/1301-primitive-kneel-limbs; awaiting its handover (pushed sha, build/lint/test:unit). Next: covering polish --section=village-walk on both backends with a low-preset kneel frame picture-checked, cross-vendor review, landing.
-
 - [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
   (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
   polish`, log `local/verify-logs/2026-09-07T05-44-35-994-polish.log`).
@@ -15469,6 +15447,8 @@ to land than a mechanism that needs a review.
   foot does not slide"; walker 2 gaitWalk 0 at ~2 m/s), log local/1415-suspect-rungs.log, and
   "village walk: the camera found a free spot side-on to the walker" once in the full WebGPU run
   (log local/verify-logs/2026-10-26T06-39-00-663).
+  Also (finding 09.11.2026, feat/1301 ec605e18b): the same side-on walker check red once on WebGL 2
+  (green on WebGPU at that sha and on WebGL 2 at 1d55f9f75), log local/1301-walk-webgl.log.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side occlusion, no player impact measured.
 - [ ] 1382. The WebGPU polish-villagers suite finishes inside its wall timeout.

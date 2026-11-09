@@ -16,9 +16,10 @@
 
 import { VILLAGER_MOTION as M } from '../config/balance'
 import type { AgeGroup } from '../systems/appearance'
-import type { BufferGeometry } from 'three/webgpu'
+import * as THREE from 'three/webgpu'
 import type { BodyProportions } from './figureBody'
-import { kneelLegs } from './figureRig'
+import { kneelLegs, solveTwoBone } from './figureRig'
+import { ELBOW_DEFAULT } from './gesture'
 
 /** The leg as the walk needs it (figure units). */
 export interface LegDims {
@@ -388,7 +389,7 @@ export const HEAD_TOP_AXIS = 0.06
  * drawn. The global top would put the load on whatever pokes highest
  * anywhere on the figure.
  */
-export function drawnHeadTop(g: BufferGeometry, head: number, x: number, z: number): number | null {
+export function drawnHeadTop(g: THREE.BufferGeometry, head: number, x: number, z: number): number | null {
   const pos = g.getAttribute('position')
   const si = g.getAttribute('skinIndex')
   const sw = g.getAttribute('skinWeight')
@@ -413,7 +414,7 @@ export function drawnHeadTop(g: BufferGeometry, head: number, x: number, z: numb
  *  `headAt` in the bind pose, unrotated) to the drawn head top over the
  *  bone's vertical — or the figure's top where nothing is drawn wholly on the
  *  head there. */
-export function figureCrownOffset(p: BodyProportions, g: BufferGeometry, head: number, headAt: { x: number; y: number; z: number }): number {
+export function figureCrownOffset(p: BodyProportions, g: THREE.BufferGeometry, head: number, headAt: { x: number; y: number; z: number }): number {
   return crownOffset(p, drawnHeadTop(g, head, headAt.x, headAt.z) ?? g.boundingBox?.max.y, headAt.y)
 }
 
@@ -564,41 +565,194 @@ export function headLoadGrip(
 
 // ---- the low preset's primitive figure (render/figures.ts FIGURE_LIMBS) -----
 
-/** The primitive's kneel: its standing proportions folded, not squashed — a
- *  trunk 0.55 wide and 0.4125 tall (the former 0.55 body under a 0.75 squash,
- *  so every kneeling contact keeps its shoulder height), arms 0.242 long. */
-export const PRIMITIVE_KNEEL = { width: 0.55, height: 0.55 * 0.75 } as const
+/** The primitive's kneel (work-order 1301): its limbs keep their lengths — the
+ *  trunk (hip to cone tip) keeps its height and taper, the shoulders their
+ *  separation, the arms their length — and the kneel is a FOLD at the hip. The
+ *  hip sinks to `hip`, the upper leg cylinder's radius, so a leg folded flat
+ *  still clears the ground with its whole round (and a legless figure's wrap,
+ *  pooled over the folded legs, has that height). */
+export const PRIMITIVE_KNEEL = { hip: 0.062 } as const
 export const PRIMITIVE_HEAD_RADIUS = 0.16
 
-export interface PrimitiveLayout {
-  /** Trunk pivot height (the hip; 0 without legs). */
+type PrimitiveLimbs = {
   hipY: number
-  /** Vertical and horizontal proportion of the body (1 standing). */
-  height: number
-  width: number
   armLength: number
+  shoulderY: number
+  shoulderX: number
+  bodyRadius: number
+  legRadius: readonly [number, number]
+}
+
+export interface PrimitiveLayout {
+  /** Trunk pivot height (the hip with legs; 0 without — the trunk then leans
+   *  about the ground, as it always has). */
+  hipY: number
+  /** Height, over the trunk pivot, of the wrap's lower part (legless figures
+   *  only: the dress over the legs, folded with them); the trunk cone sits on it. */
+  skirt: number
+  /** The trunk cone's tip, over the ground. */
+  height: number
+  /** Trunk length from the hip to the cone's tip: constant (1 − leg length). */
+  trunkLength: number
+  /** Shoulder pivot height over the ground, and half-separation: constant offsets. */
+  shoulderY: number
+  shoulderX: number
+  /** Shoulder to hand centre, and its upper-arm share (the elbow halfway). */
+  armLength: number
+  upperArm: number
   /** Head centre height, and its radius (never scaled). */
   headY: number
   headRadius: number
   /** Height the actor label reads for this figure. */
   labelHeight: number
+  /** Each leg's backward tilt about its hip (rad; 0 standing). */
+  legFold: number
+}
+
+const smooth = (k: number) => {
+  const t = Math.min(1, Math.max(0, k))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * How far a rigid tapered leg of length `leg` from a hip at `hipY` tilts back so
+ * its foot end clears the ground by its own round: the foot cap's lowest rim is
+ * `hipY − leg·cosθ − w·rFoot·sinθ`, held at 0. `w` fades the cap's share in with
+ * the kneel, so a standing leg (hip at leg length) stays upright.
+ */
+export function primitiveLegFold(hipY: number, leg: number, rFoot: number, w: number): number {
+  const r = w * rFoot
+  const R = Math.hypot(leg, r)
+  return Math.atan2(r, leg) + Math.acos(Math.min(1, Math.max(0, hipY / R)))
 }
 
 /** The primitive figure from standing (k = 0) to kneeling (k = 1). */
-export function primitiveLayout(k: number, legs: boolean, L: { hipY: number; armLength: number }): PrimitiveLayout {
-  const t = Math.min(1, Math.max(0, k))
-  const e = t * t * (3 - 2 * t)
-  const mix = (a: number, b: number) => a + (b - a) * e
-  const height = mix(1, PRIMITIVE_KNEEL.height)
+export function primitiveLayout(k: number, legs: boolean, L: PrimitiveLimbs): PrimitiveLayout {
+  const e = smooth(k)
+  const lowered = L.hipY + (PRIMITIVE_KNEEL.hip - L.hipY) * e
+  const legFold = legs ? primitiveLegFold(lowered, L.hipY, L.legRadius[1], e) : 0
+  // the faded cap share keeps the fold continuous; the drawn cylinder has its
+  // full radius, so mid-kneel the hip rides up until that rim sits on the ground
+  const hipY = legs ? Math.max(lowered, L.hipY * Math.cos(legFold) + L.legRadius[1] * Math.sin(legFold)) : 0
+  const skirt = legs ? 0 : lowered
+  const trunkLength = 1 - L.hipY
+  const height = hipY + skirt + trunkLength
   return {
-    hipY: legs ? mix(L.hipY, 0) : 0,
+    hipY,
+    skirt,
     height,
-    width: mix(1, PRIMITIVE_KNEEL.width),
-    armLength: mix(1, PRIMITIVE_KNEEL.width) * L.armLength,
-    headY: height + mix(0.18, 0.175),
+    trunkLength,
+    shoulderY: height - (1 - L.shoulderY),
+    shoulderX: L.shoulderX,
+    armLength: L.armLength,
+    upperArm: L.armLength * 0.5,
+    headY: height + 0.18,
     headRadius: PRIMITIVE_HEAD_RADIUS,
-    labelHeight: mix(1.45, (0.55 + 0.45) * 0.75),
+    labelHeight: height + 0.45,
+    legFold,
   }
+}
+
+/** The trunk cone's base radius (at the hip, or on the wrap's lower part): the
+ *  standing cone's taper, so the arm clearance in figures.test.ts holds. */
+export function primitiveTrunkRadius(L: Pick<PrimitiveLimbs, 'hipY' | 'bodyRadius'>): number {
+  return L.bodyRadius * (1 - L.hipY)
+}
+
+/**
+ * THE RIG THE KNEELING CONTACTS WERE SOLVED ON (before work-order 1301): the
+ * figure squashed to 0.4125 of its height and 0.55 of its width, the arms 0.55
+ * long. Every low-preset kneel pose (the loom weaver, the griller, the fish
+ * gutting, the net seat) was tuned for where ITS hand lands, so the drawn arm —
+ * full length, with an elbow — is solved to that hand, as the skinned figure's
+ * arm is solved to its virtual primitive hand (skinnedFigure.tsx). Standing it
+ * is the drawn figure exactly, so a standing arm reaches straight, as before.
+ */
+export function primitivePoseRig(k: number, legs: boolean, L: Pick<PrimitiveLimbs, 'hipY' | 'armLength' | 'shoulderY' | 'shoulderX' | 'bodyRadius'>) {
+  const e = smooth(k)
+  const mix = (a: number, b: number) => a + (b - a) * e
+  const height = mix(1, 0.55 * 0.75)
+  const width = mix(1, 0.55)
+  const hipY = legs ? mix(L.hipY, 0) : 0
+  return {
+    hipY,
+    shoulderY: height * L.shoulderY,
+    shoulderX: width * L.shoulderX,
+    armLength: width * L.armLength,
+    trunkRadius: L.bodyRadius * width * ((height - hipY) / height),
+  }
+}
+
+const _inv = new THREE.Quaternion()
+
+/**
+ * Where a posed primitive hand is meant to be, in its trunk's own frame: the
+ * hand of the rig the poses were tuned on (`primitivePoseRig`) under the same
+ * shoulder rotation and the same trunk turn, carried from that rig's (leaned)
+ * hip to the drawn one, and held with the hand's whole round on or above the
+ * ground (`groundY`, the ground's height in the trunk's parent frame).
+ */
+export function primitiveHandTarget(
+  pivotQ: THREE.Quaternion,
+  side: 1 | -1,
+  rig: ReturnType<typeof primitivePoseRig>,
+  trunk: { position: THREE.Vector3; quaternion: THREE.Quaternion; lean: number },
+  groundY: number,
+  handRadius: number,
+  out: THREE.Vector3,
+): THREE.Vector3 {
+  out.set(0, -rig.armLength, 0).applyQuaternion(pivotQ)
+  out.x += side * rig.shoulderX
+  out.y += rig.shoulderY - rig.hipY
+  out.applyQuaternion(trunk.quaternion)
+  out.y += leanedHipY(rig.hipY, rig.trunkRadius, trunk.lean)
+  out.y = Math.max(out.y, groundY + handRadius)
+  return out.sub(trunk.position).applyQuaternion(_inv.copy(trunk.quaternion).invert())
+}
+
+const _down = new THREE.Vector3(0, -1, 0)
+const _q = new THREE.Quaternion()
+const _qi = new THREE.Quaternion()
+const _v = new THREE.Vector3()
+const _t = new THREE.Vector3()
+const _s = new THREE.Vector3()
+const _pole = new THREE.Vector3()
+
+/**
+ * The drawn primitive arm (shoulder → elbow → hand, `upper` + `upper`) brought
+ * to a hand target, in its shoulder pivot's PARENT frame (the trunk's).
+ *
+ * `pivot` is the posed shoulder: its position and its rotation (the pose's
+ * pitch/yaw/roll). The target arrives in the trunk frame; the result is the
+ * upper arm's and the forearm's local rotations (each hangs along its own −y),
+ * written into `upperQ` (relative to the pivot) and `foreQ` (relative to the
+ * upper arm). A target past the arm's reach is reached toward with a straight
+ * arm — the standing case, where it lies exactly at the arm's length.
+ */
+export function solvePrimitiveArm(
+  pivot: { position: THREE.Vector3; quaternion: THREE.Quaternion },
+  target: THREE.Vector3,
+  upper: number,
+  side: 1 | -1,
+  upperQ: THREE.Quaternion,
+  foreQ: THREE.Quaternion,
+): void {
+  _qi.copy(pivot.quaternion).invert()
+  // The target and the elbow's pole, in the pivot's own frame.
+  _t.copy(target).sub(pivot.position).applyQuaternion(_qi)
+  _pole.set(side * ELBOW_DEFAULT[0], ELBOW_DEFAULT[1], ELBOW_DEFAULT[2]).applyQuaternion(_qi)
+  _s.set(0, 0, 0)
+  const reach = _t.length()
+  if (reach >= 2 * upper * (1 - 1e-9)) {
+    // Straight toward it: the hand at the arm's full length (standing: the pose's own direction).
+    upperQ.setFromUnitVectors(_down, _v.copy(_t).normalize())
+    foreQ.identity()
+    return
+  }
+  const sol = solveTwoBone(_s, _t, upper, upper, _pole)
+  upperQ.setFromUnitVectors(_down, sol.upper)
+  _q.copy(upperQ).invert()
+  foreQ.setFromUnitVectors(_down, _v.copy(sol.fore).applyQuaternion(_q).normalize())
 }
 
 /** The primitive's hip pivot under a trunk lean: the cone's base rim tips by
