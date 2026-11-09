@@ -1202,9 +1202,9 @@ async function checkChildrenMotion(motionPlace) {
         // The declared child is read where it is NOW, and the camera turned to it
         // again: the frames since the aim are frames of a walking child. A child
         // that has run up to the camera fell out under the bottom edge, and
-        // pitching down to it photographed the ground: the camera steps back along
-        // the sightline to five metres when that line stays clear, and the pitch
-        // is aimed at the head.
+        // pitching down to it photographed the ground: the camera steps out to five
+        // metres from it where the line to the child stays clear, and the pitch is
+        // aimed at the head.
         const at = await page.evaluate((ki) => {
           const p = window.__placePlayer
           const k = window.__placeTag()?.children[ki]
@@ -1212,18 +1212,28 @@ async function checkChildrenMotion(motionPlace) {
           if (!p || !k) return null
           const h = Math.hypot(p.x - k.x, p.z - k.z)
           const R = window.__placeLayout?.radius ?? 28
-          if (eyeY != null && h > 0.01 && h < 5) {
-            const x = k.x + ((p.x - k.x) / h) * 5
-            const z = k.z + ((p.z - k.z) / h) * 5
-            const hit = window.__placeRayHit?.(k.x, 1.0, k.z, [x, eyeY, z])
-            const clear = hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
-            // The same 2.5 m of room the standpoint verdict above holds a searched
-            // vantage to; a back-step into a wall's lee stays where it was.
+          if (eyeY != null && h < 5) {
+            // The sightline first, then bearings fanning out to either side: with
+            // the play held, a child that ran up to the camera stays there, and a
+            // refused sightline step left the camera pitched straight down on it
+            // (bambara-village, 09.11.2026).
+            const base = h > 0.01 ? Math.atan2(p.x - k.x, p.z - k.z) : 0
             const huts = window.__childVantageHuts?.() ?? []
-            const room = huts.length > 0 ? Math.min(...huts.map((o) => Math.hypot(x - o.x, z - o.z) - o.r)) : Infinity
-            if (clear && room >= 2.5 && Math.hypot(x, z) < R - 2) {
-              p.x = x
-              p.z = z
+            for (const turn of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6]) {
+              const b = base + (turn * Math.PI) / 6
+              const x = k.x + Math.sin(b) * 5
+              const z = k.z + Math.cos(b) * 5
+              if (Math.hypot(x, z) >= R - 2) continue
+              const hit = window.__placeRayHit?.(k.x, 1.0, k.z, [x, eyeY, z])
+              const clear = hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
+              // The same 2.5 m of room the standpoint verdict above holds a searched
+              // vantage to; a step into a wall's lee is no standpoint.
+              const room = huts.length > 0 ? Math.min(...huts.map((o) => Math.hypot(x - o.x, z - o.z) - o.r)) : Infinity
+              if (clear && room >= 2.5) {
+                p.x = x
+                p.z = z
+                break
+              }
             }
           }
           p.yaw = Math.atan2(-(k.x - p.x), -(k.z - p.z))
