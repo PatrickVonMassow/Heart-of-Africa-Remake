@@ -19,6 +19,7 @@ import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
 import { FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { frameShutter, captureFrame, capturePixels, waitForSceneReady, jumpBeside } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
+import { boxOf, readFireFrame, regionStats } from './grassFireReading.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -3143,11 +3144,22 @@ if (section('rinderpest')) {
 // is caught and the parent goes in after it (a point-134 surrender). Staged:
 // jump to the Sahel, force the dry season, plant a chunk-less family in the
 // line's path, ignite via the dev hook, and require catch, both deaths and
-// the resolve into the smouldering band. Screenshot 131.
+// the resolve into the smouldering scar.
+// Frame 131 is taken WHILE THE FRONT BURNS, in the middle of the picture, and
+// its guard reads the DRAWN fire (grassFireReading.mjs): flame at the front,
+// front brighter and warmer than the scar, scar darker than unburnt savanna,
+// smoke behind the line. The same crops are read again with the fire's drawing
+// switched off (balance.grassFire.drawn, the debug-menu switch) and that
+// reading must FAIL — the proof the check reads the picture, not the state.
 if (section('burning-grass')) {
-  const grassFire = await page.evaluate(async () => {
+  // Fire axis 14 east of the traveller (the traveller stays off the scar and off
+  // the crops), ignited 16 north and walking south (heading 0 = +z), so the
+  // line crosses the middle of the bird's-eye frame toward the camera.
+  const AXIS = 14
+  const stage = await page.evaluate(async (axis) => {
     window.__game.getState().debugJumpTo(13.5, 5.0) // Sahel savanna
     window.__ui.getState().setSeasonWetnessOverride(0)
+    window.__balance.grassFire.drawn = true
     await window.__sleepSim(0.6) // sim-clock (point 249): the local herds must exist for the shove below
     const herds = window.__wildlife.herdsRef.current
     const p0 = window.__game.getState().pos
@@ -3156,24 +3168,105 @@ if (section('burning-grass')) {
     // shove every other young clear of the corridor first.
     for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']) {
       for (const a of herds[sp] ?? []) {
-        if (!a.dead && a.young && Math.abs(a.x - (p0.x + 6)) < 12 && a.z > p0.z - 10 && a.z < p0.z + 60) a.x += 40
+        if (!a.dead && a.young && Math.abs(a.x - (p0.x + axis)) < 16 && a.z > p0.z - 30 && a.z < p0.z + 40) a.x += 50
       }
     }
-    const parent = { x: p0.x + 6, z: p0.z + 26, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: undefined }
-    const calf = { x: p0.x + 6, z: p0.z + 14, y: 0.2, rot: 0, scale: 0.5, phase: 0.7, chunk: undefined, young: true, parent }
+    const parent = { x: p0.x + axis, z: p0.z + 8, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: undefined }
+    const calf = { x: p0.x + axis, z: p0.z - 4, y: 0.2, rot: 0, scale: 0.5, phase: 0.7, chunk: undefined, young: true, parent }
     parent.child = calf
     herds.zebra.push(parent, calf)
-    // Ignite north of the calf, burning due south over it (heading 0 = +z; north is -z).
-    window.__wildlife.igniteFire(p0.x + 6, p0.z + 4, 0)
+    window.__grassFireStage = { parent, calf, p0 }
+    window.__wildlife.igniteFire(p0.x + axis, p0.z - 16, 0)
     const f = window.__wildlife.fire
-    const out = { trapped: false, calfDead: false, parentDead: false, resolved: false }
+    const out = { trapped: false, calfDead: false, parentDead: false, resolved: false, frontAtShutter: 0 }
+    // Burn until the line is ~24 units in: the scar is long, the front sits
+    // mid-frame, and the drama has had its catch.
+    await window.__pollSim(30, () => {
+      // Staging fix (point 177): hold the calf in the front's catch band until caught.
+      if (calf.fireTrapped === undefined && !calf.dead) { calf.x = p0.x + axis; calf.z = p0.z - 4 }
+      if (calf.fireTrapped !== undefined) out.trapped = true
+      if (calf.dead) out.calfDead = true
+      if (parent.dead) out.parentDead = true
+      return f.mode !== 'burning' || f.front >= 24
+    })
+    out.frontAtShutter = f.front
+    out.burning = f.mode === 'burning'
+    return out
+  }, AXIS)
+
+  // The four crops, located by projecting the fire's own geometry (the
+  // grassFireFront.ts formulas, restated here — the page has no module access).
+  const fireCrops = () => page.evaluate(() => {
+    const f = window.__wildlife.fire
+    const g = window.__balance.grassFire
+    const hwAt = (front) => Math.min(g.maxHalfWidth, g.startHalfWidth + Math.max(0, front) * g.spreadRate)
+    const hw = hwAt(f.front)
+    const lead = Math.max(0, Math.min(g.maxLead, g.headLead * hw, f.front))
+    const lineAt = (across) => f.front - lead * Math.min(1, Math.abs(across) / hw) ** 2
+    const sh = Math.sin(f.heading), ch = Math.cos(f.heading)
+    const px = (along, across, up) => {
+      const x = f.x + sh * along + ch * across
+      const z = f.z + ch * along - sh * across
+      const n = window.__camera.ndc(x, z, window.__wildlife.groundAt(x, z) + up)
+      return { x: (n.x * 0.5 + 0.5) * window.innerWidth, y: (0.5 - n.y * 0.5) * window.innerHeight }
+    }
+    const pts = (alongs, acrosses, ups, rel) => {
+      const out = []
+      for (const c of acrosses) for (const a of alongs) for (const u of ups) out.push(px(rel ? lineAt(c) + a : a, c, u))
+      return out
+    }
+    const scarAlong = [f.front * 0.2, f.front * 0.4]
+    const scarHw = hwAt(f.front * 0.2)
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      mode: f.mode,
+      front: pts([-1.2, 0.3], [-0.5 * hw, 0, 0.5 * hw], [0, g.flameHeight * 0.6], true),
+      scar: pts(scarAlong, [-0.35 * scarHw, 0.35 * scarHw], [0], false),
+      // West of the scar, toward the traveller (14 off the axis): the east side
+      // runs past the frame's right edge at this shutter.
+      unburnt: pts(scarAlong, [-(scarHw + 5.5), -(scarHw + 2.5)], [0], false),
+      smoke: pts([-5, -1.5], [-0.4 * hw, 0.4 * hw], [g.flameHeight + 0.5, g.flameHeight + 5], true),
+    }
+  })
+  const readFire = async (tag) => {
+    const c = await fireCrops()
+    const stats = {}
+    const boxes = {}
+    for (const k of ['front', 'scar', 'unburnt', 'smoke']) {
+      const b = boxOf(c[k], c.vw, c.vh)
+      boxes[k] = b
+      if (!b) return { pass: false, failed: [`${k} crop off screen`], boxes, mode: c.mode }
+      const buf = await capturePixels(page, `burning grass ${k} crop (${tag})`, { clip: { x: b.left, y: b.top, width: b.width, height: b.height } })
+      const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+      stats[k] = regionStats(data, info.channels)
+    }
+    return { ...readFireFrame(stats), boxes, mode: c.mode }
+  }
+  // The fire as drawn, then the shutter at once — the front is still burning.
+  const drawnFire = stage.burning ? await readFire('drawn') : { pass: false, failed: ['the line was not burning at the shutter'] }
+  await shot('131-burning-grass', { world: { lat: 13.5, lon: 5.0 }, label: 'the Sahel fire front burning', settle: false })
+  // Negative control: the same crops with the fire's drawing switched off.
+  await page.evaluate(async () => { window.__balance.grassFire.drawn = false; await window.__sleepSim(0.3) })
+  const hiddenFire = stage.burning ? await readFire('switched off') : { pass: true, failed: ['not measured'] }
+  await page.evaluate(() => { window.__balance.grassFire.drawn = true })
+  check(
+    'frame 131 shows the burning fire: flame at the front, front brighter and warmer than the scar, scar darker than unburnt savanna, smoke behind the line (point 321)',
+    stage.burning && drawnFire.pass,
+    JSON.stringify({ frontAtShutter: stage.frontAtShutter, ...drawnFire }),
+  )
+  check(
+    'the frame-131 fire reading FAILS with the fire switched off in the debug menu (point 321 negative control)',
+    stage.burning && !hiddenFire.pass,
+    JSON.stringify(hiddenFire),
+  )
+
+  // The drama runs on to the burn-out.
+  const grassFire = await page.evaluate(async (pre) => {
+    const { parent, calf } = window.__grassFireStage
+    const f = window.__wildlife.fire
+    const out = { ...pre, resolved: false }
     await window.__pollSim(40, () => {
-      // Staging fix (point 177): hold the calf in the fire front's narrow catch
-      // band until it is caught — its young-animal gambol/idle drift otherwise
-      // slides it out of the band, so the fire smoulders without ever trapping it
-      // (the observed resolved-but-not-trapped flake), and a stray natural calf
-      // could claim the single victim slot from outside the shoved corridor.
-      if (calf.fireTrapped === undefined && !calf.dead) { calf.x = p0.x + 6; calf.z = p0.z + 14 }
       if (calf.fireTrapped !== undefined) out.trapped = true
       if (calf.dead) out.calfDead = true
       if (parent.dead) out.parentDead = true
@@ -3181,16 +3274,17 @@ if (section('burning-grass')) {
       return false
     })
     // Cleanup: the staged family retires; the fire resolves on its own clock.
+    const herds = window.__wildlife.herdsRef.current
     herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+    delete window.__grassFireStage
     window.__ui.getState().setSeasonWetnessOverride(null)
     return out
-  })
+  }, stage)
   check(
     'the burning grass catches the calf, takes the following parent, and burns out (point 145a)',
     grassFire.trapped && grassFire.calfDead && grassFire.parentDead && grassFire.resolved,
     JSON.stringify(grassFire),
   )
-  await shot('131-burning-grass', { world: { lat: 13.5, lon: 5.0 }, label: 'the Sahel fire line', settle: false })
 }
 
 // --- Point 145b: the broken-wing lure -----------------------------------------

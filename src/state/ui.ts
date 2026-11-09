@@ -433,6 +433,9 @@ export const effectiveFaunaBodySegments = (s: UiState): number => currentQuality
 export const effectiveFigureBodySegments = (s: UiState): number => currentQuality(s).figureBodySegments
 /** Whether the villagers' skinned body is the glTF one (work-order "glTF villager body"). */
 export const effectiveFigureGltfBody = (s: UiState): boolean => currentQuality(s).figureGltfBody
+/** Flame billboards and smoke puffs of the grass fire (design.md §19.8/§19.13). */
+export const effectiveGrassFireFlames = (s: UiState): number => currentQuality(s).grassFireFlames
+export const effectiveGrassFireSmoke = (s: UiState): number => currentQuality(s).grassFireSmoke
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

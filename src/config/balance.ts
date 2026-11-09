@@ -756,6 +756,42 @@ interface BalanceConfig {
     /** How much full rain damps an UNSHELTERED open flame (0..1, large: rain drowns it toward embers). */
     openRainDamp: number
   }
+  /** The burning of the steppe (design.md §19.8/§19.13): the grass fire's
+   *  front, its smoke and the burn scar it leaves (src/scenes/travel/grassFireFront.ts). */
+  grassFire: {
+    /** Draw the fire at all (debug switch; off is the frame-131 negative control). */
+    drawn: boolean
+    /** How fast the line walks, world units per second. */
+    frontSpeed: number
+    /** How far it walks before it burns out. */
+    maxFront: number
+    /** Half-width of the line at ignition. */
+    startHalfWidth: number
+    /** Half-width it never exceeds. */
+    maxHalfWidth: number
+    /** Half-width gained per unit of advance (the fan of a spreading fire). */
+    spreadRate: number
+    /** How far the centre leads the flanks, as a fraction of the half-width. */
+    headLead: number
+    /** Cap on that lead, world units (bounds the curvature). */
+    maxLead: number
+    /** Flame height, world units. */
+    flameHeight: number
+    /** Depth of the glowing ember band behind the line. */
+    emberDepth: number
+    /** Width of the scar's soft rim. */
+    scarEdgeSoft: number
+    /** How far the noise frays the scar's rim, world units. */
+    scarJag: number
+    /** How dark the scar reads, 0 (none) .. 1 (full soot). */
+    scarDarkness: number
+    /** How long the scar lingers after the line burns out, seconds. */
+    smoulderSeconds: number
+    /** One smoke puff's life, seconds. */
+    smokeLife: number
+    /** How fast a puff rises, world units per second. */
+    smokeRise: number
+  }
   /** The hold-Ctrl label layer (design.md §17.8). */
   labelOverlay: {
     /** How many labels may stand at once while Ctrl is held — the nearest ones
@@ -1747,6 +1783,28 @@ export const balance: BalanceConfig = {
     // only dips a touch (steamier), the unsheltered flame is drowned toward embers.
     shelteredRainDamp: 0.25, // calibratable, debug-editable
     openRainDamp: 0.7, // calibratable, debug-editable
+  },
+  grassFire: {
+    // Educated guesses (§14), all calibratable. The speed and burn-out extent
+    // keep the values the fire shipped with (1.4 u/s over 45 u, ~32 s); the
+    // line fans from 5 to 11 u half-width and its centre leads the flanks by a
+    // third of that, so the bow reads at bird's-eye zoom without a kink.
+    drawn: true, // debug-editable
+    frontSpeed: 1.4, // debug-editable
+    maxFront: 45,
+    startHalfWidth: 5,
+    maxHalfWidth: 11, // debug-editable
+    spreadRate: 0.15,
+    headLead: 0.33,
+    maxLead: 3.5,
+    flameHeight: 1.7,
+    emberDepth: 1.6,
+    scarEdgeSoft: 1.4,
+    scarJag: 1.6,
+    scarDarkness: 0.88, // debug-editable
+    smoulderSeconds: 90, // the scar lingers, then fades (the old band's 90 s)
+    smokeLife: 4.5,
+    smokeRise: 2.2,
   },
   labelOverlay: {
     // Educated guess: a herd in the near view holds a dozen-odd animals, and
