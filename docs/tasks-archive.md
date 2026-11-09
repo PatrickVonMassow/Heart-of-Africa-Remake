@@ -35956,3 +35956,19 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Criticality: medium — nothing is broken by its absence, but every stuck-inhabitant report the
   user sends is undiagnosable without it, and point 666 is waiting on exactly that.
   Bundle: Dorfleben.
+
+- [x] 453. What is the lion eating? (user bug report 30.07.2026,
+  `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
+  "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
+  Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
+  over the ground — and there is no prey body anywhere. Two candidates, both consistent with
+  the code: (a) the carcass was consumed (`carcassSeconds` reached 0 and it was removed) while
+  the feeding pose and the vulture staging carry on — a state that does not clear when its
+  subject disappears; (b) what remains is the prey remnant of `Wildlife.tsx` (the scrap left at
+  the kill site), which renders as a small white sphere and reads to a human as nothing at all.
+  Find out which by reproducing from the seed, then fix so that the picture always answers the
+  question: while a predator feeds, something recognisable as prey lies under it; when the
+  carcass is gone, the pose and the vultures end with it.
+  VERIFIABLE: Vitest on the behaviour — a predator's feeding state cannot outlive its carcass,
+  and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
+  that seed showing predator and prey together, on both backends.

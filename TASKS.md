@@ -102,22 +102,6 @@ put it is the mistake this line exists to stop.
   Queue position: at the very top of the open work order, directly after the v0.3.1 release point (user order 28.10.2026).
   Bundle: Session- & Repo-Hygiene.
   Criticality: high — touches every batch mechanism.
-- [ ] 453. What is the lion eating? (user bug report 30.07.2026,
-  `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
-  "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
-  Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
-  over the ground — and there is no prey body anywhere. Two candidates, both consistent with
-  the code: (a) the carcass was consumed (`carcassSeconds` reached 0 and it was removed) while
-  the feeding pose and the vulture staging carry on — a state that does not clear when its
-  subject disappears; (b) what remains is the prey remnant of `Wildlife.tsx` (the scrap left at
-  the kill site), which renders as a small white sphere and reads to a human as nothing at all.
-  Find out which by reproducing from the seed, then fix so that the picture always answers the
-  question: while a predator feeds, something recognisable as prey lies under it; when the
-  carcass is gone, the pose and the vultures end with it.
-  VERIFIABLE: Vitest on the behaviour — a predator's feeding state cannot outlive its carcass,
-  and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
-  that seed showing predator and prey together, on both backends.
-
 - [ ] 565. A drinking wildebeest calf stands buried in the ground
   (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
   WebGL 2 lane). The dev-mode assert fired: `animal-buried — wildebeest bodyY=1.09
