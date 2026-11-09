@@ -35741,3 +35741,92 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Verifiable: polish-children --section=children-bank-game on both backends; frame judged by looking.
   Bundle: Dorfleben.
   Criticality: low - a test frame shows no subject (CLAUDE.md §7.2); no player impact.
+
+- [x] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
+  (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
+  polish`, log `local/verify-logs/2026-09-07T05-44-35-994-polish.log`).
+  The check `no child walks without getting anywhere` failed with: worst child 0 at 0.34 % of its
+  own judged time, group 0.07 % (4 of 5805 one-second windows, 151.4 judged child-seconds), and in
+  the burst reading worst child 0 at 10.7 s having walked 1.40 m inside 0.32 m. The retry passed
+  with 207 checks, so the run is recorded SUSPECT and covers NO backend.
+  IT HAS NO OWNER. `scripts/render-verify-charges.mjs` holds no entry that matches, and no open
+  point names a child treading in place, so the red rides along unowned — the same shape point
+  1010 records for the label-fusion check.
+  WHAT IT COSTS. It blocks the covering WebGL 2 picture run that every render change on that lane
+  owes: it is the run point 1067 had to hand to its successor, and the next render point pays the
+  same until this has an owner.
+  WHAT IS AND IS NOT MEASURED. Measured: one child, 10.7 s, 1.40 m walked inside a 0.32 m circle,
+  in one run of the WebGL 2 lane, with the retry green — on a host that had drawn suites for six
+  hours. NOT measured, and named here rather than assumed: whether it reproduces at all (`node
+  scripts/throttle-probe.mjs polish --section=children-motion --runs 8` has not been run), whether
+  the WebGPU lane shows it (that lane's run was green, but this reading was not printed), and
+  whether a player watching the settlement would see a child tread rather than walk.
+  ALREADY DONE, 07.09.2026: the red is CHARGED — `scripts/render-verify-charges.mjs` holds an
+  entry scoped to the measured composition (the one-second reading red while the 0.5 s burst
+  reading stands at 0.00 %), so the WebGL 2 lane can be read again. The charge dies with this
+  point and decides nothing about the cause.
+  FIRST PAIRED READING, 18.09.2026 on main c57a1c2c9, WebGL 2, the same check twice in one hour.
+  UNDER LOAD (a main push ran its full gate beside the picture run; load average 6.7): worst child
+  1 at 0.99 % of its own judged time, group 0.20 % (11 of 5785 one-second windows, 133.3 judged
+  child-seconds), worst window 14.4 s having walked 1.40 m inside 0.24 m. That group share is ABOVE
+  the tenth-of-a-percent cap this point's charge entry deliberately draws, so it stayed unaccounted
+  and red. QUIET, the same block alone 40 minutes later: worst child 1 at 0.34 %, group 0.07 %
+  (4 of 5850 windows, 196.0 judged child-seconds), burst reading 0.00 % — exactly the composition
+  already charged here, and the runner said so ("every red is charged to open point 1068"). The
+  full quiet WebGL 2 pass afterwards was GREEN on this check, and the same block on WebGPU was
+  green in the same window. So the composition SCALES WITH LOAD: quiet it stays under the cap,
+  loaded it jumps over it. This is one pair, not the eight-run probe this point still owes, but it
+  is the first measured statement about what the load moves.
+  THE EIGHT-RUN PROBE, 18.09.2026 on main a4877b189 (`node scripts/throttle-probe.mjs polish
+  --section=children-motion --backend webgl --runs 8`, one of sixteen cores, about a quarter of a
+  core, shared with three busy processes): 0 of 8 runs red, SKEW RATE 0 %. Squeezing the CPU does
+  NOT reproduce it, which is the opposite of what the paired reading above suggested — so the load
+  that moves this composition is not the load a core limit imposes.
+  AND THE THIRD FULL-PASS SHAPE, the same day on the same commit (log
+  `local/verify-logs/2026-09-18T15-22-15-911-polish.log`): worst child 0 at 0.56 %, group 0.11 %
+  (6 of 5780 one-second windows), burst series wholly clean at 0.00 %. Charged here — the entry's
+  group-share scope widened from 0.0x to 0.1x for it, and no further, so a sustained tread at
+  0.2 % and up stays a real red exactly as before. WHAT THAT MEASUREMENT RULES OUT: the WHOLE
+  polish suite ran GREEN on WebGPU at the SAME commit half an hour earlier (290 checks), and the
+  children-motion block alone on WebGL 2 at that commit was green in 1 m 28 s. Neither the code
+  under it nor CPU pressure explains the red; what the red run alone has is the thirty minutes of
+  suite that ran before it IN THE SAME BROWSER, and that is now the one hypothesis left to test —
+  run the block alone after a long pass in the same page, rather than in a fresh one.
+  AND THE NEXT FULL PASS WAS GREEN, one commit later on the same backend and the same day
+  (log `local/verify-logs/2026-09-18T16-41-50-415-polish.log`, 27 m 02 s, exit 0, on a machine
+  the runner itself called busy). So a full pass does not reproduce it either: four full
+  WebGL 2 passes are now on record for this check, three green and one red. Whatever this
+  point finally names, it is a transient of that order and not a standing defect.
+  THE WEBGPU COMPARISON THIS POINT LISTED AS NOT MEASURED IS NOW MEASURED, 21.09.2026 on
+  feat/1158-escape-cooldown-return at 6a34fffa2, in the three-suite WebGPU pass a settlement
+  pointer-lock change owed (log
+  `local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log`): worst child 0 at
+  0.34 % of its own judged time, group 0.07 % (4 of 5880 one-second windows, 263.5 judged
+  child-seconds), burst series wholly clean at 0.00 % with no offending window at all, at recorded
+  featureLevel=compatibility. That is EXACTLY the composition this point already charges — on the
+  other lane, which had never had a reading printed for it.
+  WHAT RULES OUT THE CHEAP EXPLANATIONS HERE: the children-motion block re-run ALONE on the SAME
+  backend at the SAME HEAD was GREEN in 2 m 00 s over 8 checks (log
+  `local/verify-logs/2026-09-21T08-40-03-361-polish.log`); the change beneath it is confined to
+  the settlement pointer-lock recovery, touching no walker, no path and no motion code; and the
+  runner itself marked the red run NOT AUTHORITATIVE because the host quiet could not be verified.
+  SO THE TRANSIENT IS NOT A WEBGL 2 PROPERTY, which is what the charge entry's lane scoping had
+  implied. A SECOND, LANE-SCOPED ENTRY was added the same day rather than dropping the scope from
+  the first: the ledger's own rule is to scope as narrowly as the evidence allows, an unscoped entry
+  would also excuse a lane nobody has read, and each entry now carries the measurement that
+  justifies it. Composition, cut and group-share cap are unchanged on both, so a sustained tread
+  stays a real red. WHAT THIS DOES NOT DO is name the cause, and the eight-run WebGPU probe the
+  Test line below asks for is still owed — this is a fifth shape, not an answer.
+  Final state:
+  - The throttle probe says whether it is load or a defect, and the eight results are printed.
+  - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that
+    justifies it and this point closes on that.
+  Test: `node scripts/throttle-probe.mjs polish --section=children-motion --runs 8` on a quiet
+  host, plus the same probe on WebGPU for the comparison this point lacks; and after the decision,
+  either the section green over eight consecutive runs on a loaded host, or the charge entry.
+  Criticality: medium — it costs no player anything yet, but it blocks the evidence one backend's
+  render changes are filed with.
+  Refs: scripts/verify/polish.mjs (`children-motion`), scripts/verify/childMotionMetric.mjs,
+  scripts/render-verify-charges.mjs
+  Also on WebGPU (23.10.2026, quiet host, run singly): polish-children --section=children-motion red on main ecea34998 (child 2, 1.29 m walked inside 0.25 m at 46.5 s, maasai-village, log local/verify-logs/2026-10-23T08-35-49-348-polish-children.log) and on feat/1424 86a68f5c1 (child 1, 1.01 m inside 0.27 m at 10.7 s).
+  Bundle: Session- & Repo-Hygiene.
