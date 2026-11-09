@@ -228,15 +228,6 @@ export const RED_CHARGES = [
     why: 'Same crashed WebGPU polish-children --section=tag-catch run on feat/680-place-life-dump a17e2f8e1, 09.11.2026 06:38; the catch beat of the same tag-catch section 1493 owns, unfixed since. The charge dies with it.',
   },
   {
-    point: 1013,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^every predator fits the region and period/i,
-    why: 'Recurred 18.10.2026 on full WebGPU enrichments (feat/1378 335c9552e): the cheetah/central '
-      + 'food-web mismatch point 1013 describes; the section alone was green on rerun. Point 1013 '
-      + 'owns the cause; the charge dies with it.',
-  },
-  {
     point: 1236,
     suite: 'enrichments',
     kind: 'check',
@@ -245,25 +236,6 @@ export const RED_CHARGES = [
       'Measured 29.09.2026 on the full webgl enrichments pass after the 1234 landing (machine '
       + 'under load): the arrival variant never moved the traveller out of the ring (dP 1.25) and '
       + 'the calf ended 0.094 from its target. Point 1236 owns the cause; the charge dies with it.',
-  },
-  {
-    point: 1236,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^a purposeful crossing swims the channel chest-deep and lands on the far bank/i,
-    why:
-      'Measured 29.09.2026 on the same webgl pass: sawOnWater false, landed true. The purposeful '
-      + 'crossing is suspected to arrive or end early since the 1234 arrival snap or shy-ring '
-      + 'interruption. Point 1236 owns the cause; the charge dies with it.',
-  },
-  {
-    point: 1468,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^Traveller \(low\): his head stands at villager height/i,
-    why:
-      'FILED AS 1468 ON 30.10.2026: headRise 1.352-1.356 m against the 1.35 m bound on 54b326987 and '
-      + 'a48606517, red before the 1462 cleanup. The charge dies with 1468.',
   },
   {
     point: 1469,
@@ -1010,31 +982,6 @@ export const RED_CHARGES = [
       'these reds so the narrow half becomes reachable at all.',
   },
   {
-    point: 938,
-    suite: 'enrichments',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
-    why:
-      'Measured 26.08.2026: five recorded webgpu/enrichments runs of 17.08.2026 carry this check ' +
-      'red with point=null, because the check names point 278 and 278 is TICKED — a charge dies ' +
-      'with its point, so the red had no owner it could be charged to. Point 938 was opened for ' +
-      'exactly this red and is the owner until it settles whether the check or the dressing is ' +
-      'stale. ' +
-      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
-      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
-      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
-      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
-      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
-      'whose level went unrecorded — so the narrowing withdraws no charge that stands. ' +
-      'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
-      'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
-      'recorded before the record kept a detail and carry none, so the narrow half would ' +
-      'withdraw a standing charge today. Measured that day, empty on every one of them. POINT 995 ' +
-      'owns it.',
-  },
-  {
     point: 939,
     suite: 'startup',
     backend: 'webgpu',
@@ -1222,24 +1169,6 @@ export const RED_CHARGES = [
       'MISSED ITS SUBJECT, and a future failure of the same frame for another reason stays a real ' +
       'red. The charge dies with point 521, which replaces the stopwatch with a wait on the ' +
       'camera actually arriving.',
-  },
-  {
-    point: 938,
-    suite: 'enrichments',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
-    why:
-      'THE WebGL 2 HALF OF POINT 938, measured 29.08.2026 and entered because the WebGPU entry ' +
-      'above is scoped to that lane and its compatibility level, so it deliberately excuses ' +
-      'nothing here. Classified with scripts/verify/baseline-classify.mjs enrichments at ' +
-      'VERIFY_GL=webgl against the merge-base 4acf6039abe0: the check is red on the BASELINE and ' +
-      'on the branch with the IDENTICAL detail — {"samples":[0,0,0,0,0],"min":0,"max":0,' +
-      '"spread":0} — over two baseline runs and seven branch observations, so it is pre-existing ' +
-      'and nothing about the bank-round rebuild touches it. Zero samples on both sides says the ' +
-      'dressing does not stream at all here rather than that it grows too little, which is the ' +
-      'same question 938 already owns: whether the CHECK or the dressing is the stale one. The ' +
-      'charge dies with that point.',
   },
   {
     point: 1009,
@@ -1864,17 +1793,6 @@ export const RED_CHARGES = [
       + 'continuous-route alone on webgpu at 53b168c14 on a quiet machine was GREEN. The charge dies with 200.',
   },
   {
-    point: 200,
-    suite: 'enrichments',
-    kind: 'check',
-    backend: 'webgl',
-    match: /^a feed that ends without a kill leaves no remnant\b/i,
-    why:
-      'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): deadAfter 2 with the calf alive — '
-      + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
-      + 'was green. The charge dies with 200.',
-  },
-  {
     point: 1265,
     suite: 'polish-villagers',
     kind: 'check',
@@ -1981,7 +1899,6 @@ export const RED_CHARGES = [
   },
   {
     point: 1449,
-    backend: 'webgpu',
     featureLevel: 'compatibility',
     suite: 'enrichments',
     kind: 'check',
