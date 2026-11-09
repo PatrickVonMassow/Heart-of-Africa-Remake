@@ -5307,15 +5307,15 @@ if (section('village-walk')) {
   // sees it. A spot counts only when the subject is in the picture and the
   // first surface on the sight line to its hips and its head is its own body:
   // a hut wall or another villager in front is the next spot, and no spot at
-  // all is no frame.
+  // all is no frame. `flanks` orders the flanks tried (+1: the figure's +x).
   let sideOnMisses = []
-  const sideOn = async (walker, near, pitch) => {
+  const sideOn = async (walker, near, pitch, flanks = [1, -1]) => {
     sideOnMisses = []
     // Square first, then ever more oblique (at most 26 degrees off square): a
     // post in one sight line (measured: an unnamed cylinder blocked every one
     // of the former 18 spots at the kneeling task walker) leaves the next a
     // few degrees on clear. Each refused spot's reason is kept for the red.
-    const spots = [0, 0.15, -0.15, 0.3, -0.3, 0.45, -0.45].flatMap((turn) => [1, -1].flatMap((f) => [near, near * 0.85, near * 1.2, near * 0.7, near * 1.35].map((d) => [f, d, turn])))
+    const spots = [0, 0.15, -0.15, 0.3, -0.3, 0.45, -0.45].flatMap((turn) => flanks.flatMap((f) => [near, near * 0.85, near * 1.2, near * 0.7, near * 1.35].map((d) => [f, d, turn])))
     for (const [flank, dist, turn] of spots) {
       const want = await page.evaluate(({ walker, dist, pitch, flank, turn }) => {
         const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
@@ -6202,7 +6202,9 @@ if (section('village-walk')) {
         const g = window.__placeScene.getObjectByName('village-task-walker')
         return { x: g.position.x, z: g.position.z }
       })
-      const seen = await sideOn(null, 2.6, -0.16)
+      // its right flank first: the load it set down lies on its left (+x,
+      // LOAD_GROUND) and hid the arms and hands from that side
+      const seen = await sideOn(null, 2.6, -0.16, [-1, 1])
       check('low preset kneel: the camera found a free spot side-on to the kneeling task walker', !!seen, seen ? '' : JSON.stringify(sideOnMisses))
       if (seen) await frame(shot('1301-village-kneel-low'), {
         local: { x: at.x, y: 0.4, z: at.z },
