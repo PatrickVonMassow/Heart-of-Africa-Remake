@@ -143,6 +143,16 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
       expect(ask([path]).missing).toEqual(['webgl', 'webgpu'])
     })
 
+  it('never falls back past a newer WebGL 2 red to an older green receipt', () => {
+    const webglRed = { 'polish-villagers': loose['polish-villagers'] }
+    const older = receipt()
+    const newer = large([...passOf('webgl', webglRed), ...passOf('webgpu')], { head: 'mid9999', finishedAt: 2000 })
+    const diffFor = (old) => (old === 'mid9999' ? [] : ['src/ui/StatusBar.tsx'])
+    const result = ask(null, { records: [older, newer], head: 'mid9999', diffFor })
+    expect(result.covered.map((c) => c.backend)).not.toContain('webgl')
+    expect(result.missing).toContain('webgl')
+  })
+
   it('never cuts the WebGPU pass, and a pinned WebGPU receipt never stands in for WebGL 2', () => {
     const records = [large(passOf('webgpu'), { verifyGl: 'webgpu', exitCode: 0, receipt: { exitCode: 0, green: true, failing: [] } })]
     expect(ask(['src/ui/StatusBar.tsx'], { records }).missing).toEqual(['webgl', 'webgpu'])

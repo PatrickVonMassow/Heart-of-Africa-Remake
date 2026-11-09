@@ -208,7 +208,9 @@ export function rejudgeLarge({ records, argv, head, verifyGl, environment = '[]'
       // The WebGL 2 receipt also stands across a backend-neutral diff (point 1026).
       const cut = !diff.neutral && backend === 'webgl' && diff.backendNeutral
       if (!diff.neutral && !cut) continue
-      if (!rejudgeBackend(r, backend, { openPoints, ledger }).covered) continue
+      // A newer applicable receipt that does not cover ends the search: an
+      // older green never outvotes a later red on the same backend.
+      if (!rejudgeBackend(r, backend, { openPoints, ledger }).covered) break
       covered.push({ backend, entry, range: `${r.head}..${head}`, ...(cut ? { backendCut: true } : {}) })
       docs ||= diff.docs
       break
