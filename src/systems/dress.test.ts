@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { QUALITY_PRESETS } from '../config/quality'
+import { FIGURE_LIMBS } from '../render/figures'
 import { primitiveLayout } from '../render/figureWalk'
 import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from './appearance'
 import { cloakForCloth, seasonalDressFor, wearsByRank } from './dress'
@@ -305,7 +306,7 @@ describe('the covered upper body and the hip layer (design.md §19.15)', () => {
     // …and the primitive's trunk cone runs from the hip to the shoulders,
     // standing and kneeling, in the cloth colour: no bare chest or pelvis.
     for (const k of [0, 1]) {
-      const lay = primitiveLayout(k, true, { hipY: 0.45, armLength: 0.5 })
+      const lay = primitiveLayout(k, true, { ...FIGURE_LIMBS, hipY: 0.45, armLength: 0.5 })
       expect(lay.height).toBeGreaterThan(lay.hipY)
     }
     const src = readFileSync(resolve(process.cwd(), 'src/scenes/place/placeFigure.tsx'), 'utf8')
