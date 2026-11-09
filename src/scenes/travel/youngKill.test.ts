@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { findAdopter } from './wildlifeBehavior'
 import {
+  feedCarcassScale,
   feedRemnant,
   handVigilToRemains,
+  listIndexOf,
+  remnantDrawable,
+  victimFeedEnds,
   killFlockLands,
   killFlockRemnant,
   markKilled,
@@ -215,5 +219,65 @@ describe('the kill flock only eats once landed (point 1213)', () => {
     handVigilToRemains([[keeper, deadKeeper]], victim, remains)
     expect(keeper.vigil.carcass).toBe(remains)
     expect(deadKeeper.vigil.carcass).toBe(victim)
+  })
+})
+
+// Point 453 (user report: a lion feeds, vultures circle, no prey visible).
+describe('a predator feeding never stands over nothing', () => {
+  const D = 9
+  const frac = balance.hunt.remnantScale
+
+  it('the scripted carcass never shrinks below the remnant it hands over to', () => {
+    for (let e = -0.5; e <= 1.5; e += 0.05) expect(feedCarcassScale(e, frac)).toBeGreaterThanOrEqual(frac)
+    expect(feedCarcassScale(0, frac)).toBe(1)
+    expect(feedCarcassScale(1, frac)).toBeCloseTo(frac)
+  })
+
+  it('the remnant fraction is large enough to read as prey, small enough to read as a scrap', () => {
+    expect(frac).toBeGreaterThanOrEqual(0.4)
+    expect(frac).toBeLessThan(0.6)
+  })
+
+  it('the feed on a herd victim cannot outlive its carcass', () => {
+    // Body removed from the herds (culled, consumed elsewhere): the feed ends.
+    expect(victimFeedEnds({ dead: true, dissolve: 8 }, false, 20, D, frac)).toBe(true)
+    expect(victimFeedEnds({ dead: true, gone: true, dissolve: 8 }, true, 20, D, frac)).toBe(true)
+    // Shrunk to the remnant's size: the remnant takes over, the feed ends.
+    expect(victimFeedEnds({ dead: true, dissolve: D * frac }, true, 20, D, frac)).toBe(true)
+    // Still a body larger than the remnant: feeding goes on.
+    expect(victimFeedEnds({ dead: true, dissolve: D * frac + 0.5 }, true, 20, D, frac)).toBe(false)
+    // A live struggle keeps the hunter on it until the timer.
+    expect(victimFeedEnds({ dead: false }, true, 20, D, frac)).toBe(false)
+    expect(victimFeedEnds({ dead: false }, true, 0, D, frac)).toBe(true)
+  })
+
+  it('simulated feed: every feeding frame has a body at least the remnant size', () => {
+    const v: { dead: boolean; dissolve?: number } = { dead: true, dissolve: D }
+    let timer = 30
+    let frames = 0
+    for (;;) {
+      timer -= 0.1
+      v.dissolve! -= 0.1
+      if (victimFeedEnds(v, true, timer, D, frac)) break
+      expect(v.dissolve! / D).toBeGreaterThan(frac)
+      frames++
+    }
+    expect(frames).toBeGreaterThan(0)
+  })
+
+  it('a remnant that keeps vultures on station is itself drawn', () => {
+    // The herd draw clamps at capacity; a remnant is only laid inside it.
+    expect(remnantDrawable(10, 12)).toBe(true)
+    expect(remnantDrawable(11, 12)).toBe(true)
+    expect(remnantDrawable(12, 12)).toBe(false)
+    // Refused remnant -> nothing for the flock: it leaves with the predator.
+    expect(killFlockRemnant([[]])).toBeNull()
+  })
+
+  it('listIndexOf names the list holding the body, -1 once it is gone', () => {
+    const a = { x: 0 }
+    const b = { x: 1 }
+    expect(listIndexOf([[b], [a]], a)).toBe(1)
+    expect(listIndexOf([[b], []], a)).toBe(-1)
   })
 })

@@ -106,3 +106,40 @@ export function killFlockLands(
     !vigilBlocksLanding(nearestKeeperDist)
   )
 }
+
+/** The carcass under a feeding predator (point 453): it shrinks as the meal
+ *  goes on, but never below `floor` — the remnant's own fraction — so while
+ *  the feeding pose lasts, something recognisable as prey lies under it. */
+export function feedCarcassScale(eaten: number, floor: number): number {
+  const e = Math.min(1, Math.max(0, eaten))
+  return Math.max(floor, 1 - e * (1 - floor))
+}
+
+/** Does the feed on a herd victim end this frame (point 453)? The feeding
+ *  state never outlives its carcass: it ends when the body has left its herd
+ *  list (`listed` false, `gone`), when it has dissolved down to the remnant
+ *  fraction (the remnant takes over at that size), or when the timer runs out. */
+export function victimFeedEnds(
+  v: { dead?: boolean; gone?: boolean; dissolve?: number },
+  listed: boolean,
+  timer: number,
+  dissolveSeconds: number,
+  remnantFraction: number,
+): boolean {
+  if (timer <= 0 || !listed || v.gone) return true
+  if (!v.dead) return false
+  return (v.dissolve ?? 0) <= dissolveSeconds * remnantFraction
+}
+
+/** May a remnant join a herd list of this length (point 453)? Only when the
+ *  herd mesh will draw it: the draw clamps at `capacity`, and a scrap past it
+ *  would hold the kill flock over nothing visible. */
+export function remnantDrawable(listLength: number, capacity: number): boolean {
+  return listLength < capacity
+}
+
+/** The index of the list holding `a`, or -1 when no list holds it. */
+export function listIndexOf<A>(lists: readonly (readonly A[])[], a: A): number {
+  for (let i = 0; i < lists.length; i++) if (lists[i].includes(a)) return i
+  return -1
+}

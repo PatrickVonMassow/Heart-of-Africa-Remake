@@ -591,6 +591,13 @@ interface BalanceConfig {
      *  frame — a coast pocket can never pin it pacing forever, while "never
      *  despawns in sight" holds via the frustum projection. */
     leaveOvertimeSeconds: number
+    /** The prey remnant a finished feed leaves (point 453), as a fraction of
+     *  the prey's full size: the carcass under a feeding predator shrinks no
+     *  further, and the remnant takes over at exactly this size. */
+    remnantScale: number
+    /** A young victim's remnant relative to an adult's (the remnant draws on
+     *  the adult body, the carcass it replaces on the smaller calf body). */
+    remnantYoungFactor: number
   }
   /** Family rescue drives (design.md §19.8, point 127). */
   family: {
@@ -1722,6 +1729,8 @@ export const balance: BalanceConfig = {
   },
   hunt: {
     leaveOvertimeSeconds: 45, // calibratable: walk-off overtime before an off-frame retire (point 188) — generous vs the ~20 s a clear walk-off needs
+    remnantScale: 0.45, // calibratable: remnant/final-carcass size vs the whole prey (point 453) — 0.35 read as nothing at travel zoom
+    remnantYoungFactor: 0.6, // calibratable: calf body vs adult body, so a calf's remnant matches its shrunk carcass (point 453)
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
