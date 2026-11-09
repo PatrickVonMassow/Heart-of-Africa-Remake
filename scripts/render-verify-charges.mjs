@@ -1674,7 +1674,16 @@ export const RED_CHARGES = [
       + 'judgeability reading, well clear of that bound. What the bound removes is the burst series '
       + 'and the printed threshold sentence: the threshold is a constant the check prints, and a '
       + 'worse burst series would be a different composition than the one charged here — but it is '
-      + 'unreadable by construction, so this entry owns the whole of it exactly as the sibling does.',
+      + 'unreadable by construction, so this entry owns the whole of it exactly as the sibling does. '
+      + 'THE EIGHT-RUN WEBGPU PROBE, 09.11.2026 on feat/1068-children-motion-tread from main '
+      + 'cbfab3c17, quiet host, UNTHROTTLED (scripts/throttle-probe.mjs polish-children '
+      + '--section=children-motion --runs 8 --no-throttle --backend webgpu): this check red in 1 of '
+      + '8 (run 4: maasai-village worst child 0 at 0.25 %, group 0.05 %, 1.13 m inside 0.27 m; cairo '
+      + 'worst child 3 at 0.68 %, group 0.14 %, 1.00 m inside 0.33 m; burst series 0.00 % in both), '
+      + 'and that red was NOT charged: the run did not match this entry\'s compatibility scope, and the ledger requires every WebGPU entry to name one level. So the composition is '
+      + 'neither load nor a lane or level property: it is a rare standing trait of the play. STILL '
+      + 'UNNAMED, and what 1068 stays open for: whether those windows are legitimate chase reversals '
+      + '(then the per-child gate is too tight for a one-window event) or a child snagging.',
   },
   {
     point: 1010,
