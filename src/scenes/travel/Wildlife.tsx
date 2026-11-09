@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
-import { effectiveFaunaBodySegments, useUi } from '../../state/ui'
+import { effectiveFaunaBodySegments, effectiveGrassFireFlames, effectiveGrassFireSmoke, useUi } from '../../state/ui'
 import { setAmbienceAnimals, playTrampleCrunch, proximityGain, trampleCrunchFires } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
 import {
@@ -197,6 +197,9 @@ import {
   crocodileBodyY,
 } from '../../render/fauna'
 import { setGroundStains } from '../../render/groundStains'
+import { fireHalfWidth, fireHash, fireLocal, flameSlot, frontAlong, frontPoint, smokeFade, smokePhase } from './grassFireFront'
+import { setBurnScar } from './burnScarNode'
+import { FIRE_FLAME_FADE_U, FIRE_FLAME_MAX, FIRE_SMOKE_MAX, fireFlameGeo, fireFlameMat, fireSmokeFade, fireSmokeGeo, fireSmokeMat } from './grassFireMaterials'
 import {
   feedCarcassScale,
   feedRemnant,
@@ -748,25 +751,16 @@ function igniteFireAt(x: number, z: number, heading: number): void {
   FIRE_STATE.victim = null
   FIRE_STATE.keeper = null
 }
-const FIRE_FRONT_SPEED = 1.4
-const FIRE_MAX_FRONT = 45
-const FIRE_HALF_WIDTH = 6
-const FIRE_SMOULDER_SECONDS = 90 // the blackened band lingers, then fades
+// The line's speed, extent, shape and scar live in balance.grassFire; the
+// geometry in grassFireFront.ts, the drawing in burnScarNode.ts (the scar and
+// ember edge on the ground) and grassFireMaterials.ts (flames, smoke).
 const FIRE_COOLDOWN_SECONDS = 300
 const FIRE_TRAP_SECONDS = 3
 // GRIEF, not a rescue (point 134): the parent walks into the fire after its
 // calf — its own pace, off the rescue burst, and it never rolls a defence.
 const FIRE_PLUNGE_SPEED = 5.5
-const FIRE_FLAME_COUNT = 14
-const fireFlameGeo = new THREE.PlaneGeometry(1.0, 1.4)
-const fireFlameMat = new THREE.MeshBasicMaterial({
-  color: '#ff7a1e', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false,
-})
-const FIRE_BAND_SEGMENTS = 16 // terrain-following scorch strip (point 196)
-const fireBandGeo = new THREE.PlaneGeometry(1, 1)
-const fireBandMat = new THREE.MeshBasicMaterial({
-  color: '#181008', transparent: true, opacity: 0.8, depthWrite: false,
-})
+/** How long after burn-out the ember edge keeps glowing, seconds. */
+const FIRE_EMBER_AFTERGLOW = 8
 /** Prey dodge an elephant only when it comes this close, and a touch slower
  *  than the elephant, so a head-on herd still tramples them now and then. */
 const PREY_PANIC_RADIUS = 3.2
@@ -1866,7 +1860,9 @@ function Herds() {
   const vpos = useMemo(() => new THREE.Vector3(), [])
   const vscl = useMemo(() => new THREE.Vector3(), [])
   const fireFlames = useRef<THREE.InstancedMesh>(null)
-  const fireBand = useRef<THREE.InstancedMesh>(null)
+  const fireSmoke = useRef<THREE.InstancedMesh>(null)
+  const grassFireFlames = useUi(effectiveGrassFireFlames)
+  const grassFireSmoke = useUi(effectiveGrassFireSmoke)
   // A stain is a patch of GROUND the terrain material tints red (point 267,
   // render/groundStains.ts) — no mesh of its own, so it follows the relief
   // exactly. It used to be a disc laid into the local slope plane, which on a
@@ -2257,7 +2253,7 @@ function Herds() {
     return () => setWildlifeDumpSource(null)
   }, [])
 
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock, camera }, delta) => {
     const dt = Math.min(delta, 0.1)
     // Accumulate the SIM clock (point 177): drama verifications budget in these
     // sim-seconds so they stay deterministic when headless load drops the fps.
@@ -3839,7 +3835,8 @@ function Herds() {
           }
         }
       } else if (f.mode === 'burning') {
-        f.front += FIRE_FRONT_SPEED * dt
+        const gf = balance.grassFire
+        f.front += gf.frontSpeed * dt
         if (!f.victim) {
           // A calf standing just ahead of the line is caught by it.
           outer: for (const sp of CALF_HUNT_SPECIES) {
@@ -3848,11 +3845,10 @@ function Herds() {
               // 197, the 194 seam): the lion's chase victim, a crossing calf.
               if (a.dead || !a.young || claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim }))
                 continue
-              const rx = a.x - f.x
-              const rz = a.z - f.z
-              const along = rx * Math.sin(f.heading) + rz * Math.cos(f.heading)
-              const across = Math.abs(rx * Math.cos(f.heading) - rz * Math.sin(f.heading))
-              if (across < FIRE_HALF_WIDTH && along > f.front - 1 && along < f.front + 2.5) {
+              // Caught where the CURVED line stands across its own width.
+              const { along, across } = fireLocal(f, a.x, a.z)
+              const lineAt = frontAlong(across, f.front, gf)
+              if (Math.abs(across) < fireHalfWidth(f.front, gf) && along > lineAt - 1 && along < lineAt + 2.5) {
                 a.fireTrapped = FIRE_TRAP_SECONDS
                 f.victim = a
                 const par = a.parent
@@ -3881,7 +3877,7 @@ function Herds() {
             f.keeper = null
           }
         }
-        if (f.front >= FIRE_MAX_FRONT) {
+        if (f.front >= gf.maxFront) {
           // The line burns out: the drama ALWAYS resolves (point 118) — a
           // still-struggling calf is released singed, an unarrived keeper's
           // grief passes and it rejoins its herd.
@@ -3889,7 +3885,7 @@ function Herds() {
           f.victim = null
           f.keeper = null
           f.mode = 'smoulder'
-          f.timer = FIRE_SMOULDER_SECONDS
+          f.timer = gf.smoulderSeconds
         }
       } else {
         f.timer -= dt
@@ -3898,55 +3894,82 @@ function Herds() {
           f.timer = FIRE_COOLDOWN_SECONDS
         }
       }
-      // Render the line and the blackened band behind it.
+      // Draw the line (design.md §19.8/§19.13): the burn scar and the glowing
+      // ember edge are terms of the ground shader (burnScarNode.ts); flame
+      // tongues stand along the curved line and smoke rises behind it. The
+      // debug switch `balance.grassFire.drawn` draws none of it — the frame-131
+      // negative control — while the drama itself runs on unchanged.
+      const gf = balance.grassFire
+      const drawn = gf.drawn && f.mode !== 'idle'
+      const burning = drawn && f.mode === 'burning'
+      const sinceOut = f.mode === 'smoulder' ? gf.smoulderSeconds - f.timer : 0
+      setBurnScar(f, gf, {
+        // The scar holds while the fire burns and through the first 60 % of
+        // the smoulder, then fades out over the rest.
+        scarStrength: !drawn ? 0 : f.mode === 'burning' ? 1 : Math.min(1, f.timer / Math.max(1e-3, gf.smoulderSeconds * 0.4)),
+        emberStrength: !drawn ? 0 : burning ? 1 : Math.max(0, 1 - sinceOut / FIRE_EMBER_AFTERGLOW),
+        edgeSoft: gf.scarEdgeSoft,
+        jag: gf.scarJag,
+        darkness: gf.scarDarkness,
+        emberDepth: gf.emberDepth,
+      })
       const flames = fireFlames.current
-      const band = fireBand.current
       if (flames) {
-        flames.visible = f.mode === 'burning'
-        if (flames.visible) {
-          const fx = f.x + Math.sin(f.heading) * f.front
-          const fz = f.z + Math.cos(f.heading) * f.front
-          for (let i = 0; i < FIRE_FLAME_COUNT; i++) {
-            const off = ((i / (FIRE_FLAME_COUNT - 1)) * 2 - 1) * FIRE_HALF_WIDTH
-            const x = fx + Math.cos(f.heading) * off
-            const z = fz - Math.sin(f.heading) * off
+        flames.visible = burning
+        if (burning) {
+          const n = Math.min(FIRE_FLAME_MAX, grassFireFlames)
+          // Flames shrink as the line nears its burn-out, so it dies down
+          // rather than vanishing at full height.
+          const life = Math.min(1, (gf.maxFront - f.front) / 6 + 0.25)
+          FIRE_FLAME_FADE_U.value = Math.min(1, life + 0.2)
+          for (let i = 0; i < n; i++) {
+            // A fixed slot on the line per tongue, set slightly behind it so
+            // the white-gold ember edge stays the leading pixels.
+            const pt = frontPoint(f, flameSlot(i, n), gf)
+            const back = 0.25 + fireHash(i, 1.3) * 0.6
+            const x = pt.x - Math.sin(f.heading) * back
+            const z = pt.z - Math.cos(f.heading) * back
             const ll2 = worldToLatLon(x, z)
             const g = Math.max(0.02, sampleTerrain(ll2.lat, ll2.lon, seed).height)
-            const flick = 0.75 + Math.abs(Math.sin(clock.elapsedTime * 9 + i * 1.7)) * 0.5
-            vpos.set(x, g + 0.7 * flick, z)
-            euler.set(0, f.heading + Math.PI / 2, 0)
-            quat.setFromEuler(euler)
-            vscl.set(0.9, flick, 1)
-            mtx.compose(vpos, quat, vscl)
+            const h = gf.flameHeight * (0.7 + fireHash(i, 5.9) * 0.6) * life
+            vpos.set(x, g - 0.05, z)
+            vscl.set(h * 0.75, h, 1)
+            mtx.compose(vpos, camera.quaternion, vscl)
             flames.setMatrixAt(i, mtx)
           }
-          flames.count = FIRE_FLAME_COUNT
+          flames.count = n
           flames.instanceMatrix.needsUpdate = true
         }
       }
-      if (band) {
-        band.visible = f.mode !== 'idle'
-        if (band.visible) {
-          // Terrain-following strip (point 196): one long plane at the midpoint
-          // height clipped into rising ground and floated over falling ground —
-          // each segment sits at its own sampled ground height instead.
-          const segLen = f.front / FIRE_BAND_SEGMENTS
-          for (let i = 0; i < FIRE_BAND_SEGMENTS; i++) {
-            const along = (i + 0.5) * segLen
-            const sx = f.x + Math.sin(f.heading) * along
-            const sz = f.z + Math.cos(f.heading) * along
-            const ll3 = worldToLatLon(sx, sz)
-            const g = Math.max(0.02, sampleTerrain(ll3.lat, ll3.lon, seed).height)
-            vpos.set(sx, g + 0.06, sz)
-            euler.set(-Math.PI / 2, 0, -f.heading, 'XYZ')
-            quat.setFromEuler(euler)
-            vscl.set(FIRE_HALF_WIDTH * 2, segLen * 1.08, 1) // slight overlap hides the steps
-            mtx.compose(vpos, quat, vscl)
-            band.setMatrixAt(i, mtx)
+      const smoke = fireSmoke.current
+      if (smoke) {
+        // Smoke rises behind the line while it burns, and thins out over the
+        // ember afterglow once it is out.
+        const thin = burning ? 1 : Math.max(0, 1 - sinceOut / FIRE_EMBER_AFTERGLOW)
+        smoke.visible = drawn && thin > 0
+        if (smoke.visible) {
+          const n = Math.min(FIRE_SMOKE_MAX, grassFireSmoke)
+          const t = simTimeRef.current
+          for (let i = 0; i < n; i++) {
+            const { age, cycle } = smokePhase(i, t, gf.smokeLife)
+            // Each cycle a puff starts from a new hashed spot on the line,
+            // drifts back over the scar and rises, swelling as it goes.
+            const pt = frontPoint(f, fireHash(i, cycle) * 2 - 1, gf)
+            const drift = 0.8 + age * gf.smokeLife * 0.9
+            const x = pt.x - Math.sin(f.heading) * drift
+            const z = pt.z - Math.cos(f.heading) * drift
+            const ll2 = worldToLatLon(x, z)
+            const g = Math.max(0.02, sampleTerrain(ll2.lat, ll2.lon, seed).height)
+            const size = 1.6 + age * 3.2
+            vpos.set(x, g + gf.flameHeight * 0.7 + age * gf.smokeLife * gf.smokeRise, z)
+            vscl.set(size, size, 1)
+            mtx.compose(vpos, camera.quaternion, vscl)
+            smoke.setMatrixAt(i, mtx)
+            fireSmokeFade.setX(i, smokeFade(age) * thin)
           }
-          band.count = FIRE_BAND_SEGMENTS
-          band.instanceMatrix.needsUpdate = true
-          fireBandMat.opacity = f.mode === 'smoulder' ? 0.8 * (f.timer / FIRE_SMOULDER_SECONDS) : 0.8
+          smoke.count = n
+          smoke.instanceMatrix.needsUpdate = true
+          fireSmokeFade.needsUpdate = true
         }
       }
     }
@@ -5501,8 +5524,8 @@ function Herds() {
         <primitive key={`${sp}-calf`} object={pool.calf[sp]} dispose={null} />
       ))}
       <primitive object={pool.crocStrike} dispose={null} />
-      <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_COUNT]} visible={false} frustumCulled={false} />
-      <instancedMesh ref={fireBand} args={[fireBandGeo, fireBandMat, FIRE_BAND_SEGMENTS]} visible={false} frustumCulled={false} />
+      <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_MAX]} visible={false} frustumCulled={false} renderOrder={3} />
+      <instancedMesh ref={fireSmoke} args={[fireSmokeGeo, fireSmokeMat, FIRE_SMOKE_MAX]} visible={false} frustumCulled={false} renderOrder={4} />
       {scavengers.current.map((_, si) => (
         <group
           key={si}

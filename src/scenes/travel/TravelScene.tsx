@@ -62,6 +62,7 @@ import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFa
 import { crownCollapse, drynessFromTint, FLORA_COLOR_LIFT, groundSprout, seasonTintNode, wetGroundColor, wetGroundRoughness } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { bloodGroundColor, bloodGroundRoughness, groundStainMask } from '../../render/groundStains'
+import { burnEmberEmissive, burnScarColor, burnScarMask } from './burnScarNode'
 import { RiversAndLakes } from './Rivers'
 import { NILE_FLOOD, waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
@@ -547,7 +548,15 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
   // splat albedo and macro variation so the whole ground reads wet together —
   // and the blood over all of it, so a stain neither bleaches with the season
   // nor washes out in the rain.
-  mat.colorNode = bloodGroundColor(wetGroundColor(mat.colorNode.mul(macro.mul(0.3).add(0.85))), stainMask)
+  // The grass fire's burn scar soots the ground under the blood (design.md
+  // §19.8/§19.13): like the blood it is a term of the terrain itself, so it
+  // follows the relief; the ember band at the burning line glows emissive.
+  const scarMask = burnScarMask()
+  mat.colorNode = bloodGroundColor(
+    burnScarColor(wetGroundColor(mat.colorNode.mul(macro.mul(0.3).add(0.85))), scarMask),
+    stainMask,
+  )
+  mat.emissiveNode = burnEmberEmissive()
   terrainMaterialCache = mat
   return mat
 }
