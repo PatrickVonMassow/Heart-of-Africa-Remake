@@ -23,6 +23,7 @@ import {
   type WildlifeFlockLike,
   type WildlifeSource,
 } from '../systems/wildlifeDump'
+import { registerPlaceLifeSource } from '../systems/placeLifeDump'
 
 beforeEach(() => {
   localStorage.clear()
@@ -354,6 +355,24 @@ describe('the wildlife section (point 454)', () => {
     })
     expect(wildlifeReportCounts('{"summary":{}}')).toBeNull()
     expect(wildlifeReportCounts('not json')).toBeNull()
+  })
+})
+
+describe('dumpGameState placeLife section', () => {
+  it('is written in place mode and absent in travel mode', () => {
+    const off = registerPlaceLifeSource('test', () => ({
+      inhabitants: [{ id: 'kids/0', kind: 'child', x: 1, z: 2, velocity: null, yaw: 0, pose: 'runner' }],
+    }))
+    try {
+      useGame.setState({ mode: 'travel' })
+      expect(JSON.parse(dumpGameState(useGame.getState())).placeLife).toBeUndefined()
+      useGame.setState({ mode: 'place' })
+      const placeLife = JSON.parse(dumpGameState(useGame.getState())).placeLife
+      expect(placeLife.counts.listed).toBe(1)
+      expect(placeLife.inhabitants[0].id).toBe('kids/0')
+    } finally {
+      off()
+    }
   })
 })
 
