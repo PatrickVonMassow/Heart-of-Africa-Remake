@@ -1831,6 +1831,12 @@
       "why": "unowned trample-stain red in Tierverhalten; ordinary defect, behind the release front like its bundle siblings 1205/1290",
       "origin": "machine",
       "place": "last"
+    },
+    "1495": {
+      "at": "2026-11-09T19:56:19.311Z",
+      "why": "Pre-existing main defect found while landing 565; no user report, joins the queue behind the open defect points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1859,7 +1865,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-09T17:04:52.110Z",
+    "at": "2026-11-09T19:56:19.320Z",
     "points": [
       184,
       200,
@@ -2323,7 +2329,8 @@
       1490,
       1492,
       1493,
-      1494
+      1494,
+      1495
     ]
   }
 }

@@ -15584,3 +15584,10 @@ to land than a mechanism that needs a review.
   Test: the section above green; a Vitest case for the trample-to-stain path if the cause sits in browserless logic.
   Source: picture check of the 453 landing session, 09.11.2026.
   Bundle: Tierverhalten.
+- [ ] 1495. The continent zoom stops drawing — a TypeError fires every frame
+  Final state: `npm test -- enrichments --section=seasons` is green on both backends: frame 87-continent-zoom is drawn at the unlocked wide zoom, and the page logs no "TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))".
+  Observed problem: at the continent zoom the scene draws nothing ("no frame has been drawn yet (0 draw calls)") and the TypeError repeats every frame. Measured 09.11.2026 on main ca908ee7d (`--section=seasons`, WebGPU, 277 errors, log local/verify-logs/2026-11-09T19-49-07-979-enrichments.log) and on feat/565-buried-drinking-calf 313289975 (full enrichments, WebGPU 5600 and WebGL 2 406 errors). No enrichments run up to 31.10.2026 logged it. Point 565's diff only moves wildlife body heights, so the red is owned by no point. The suite logs only the message text, so the first step is the stack (pageerror `e.stack`).
+  Player impact: zooming out to the whole continent shows a frozen or empty scene.
+  Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
+  Source: picture check of the 565 landing session, 09.11.2026.
+  Bundle: Steuerung & Performance.
