@@ -1824,6 +1824,12 @@
       "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
       "origin": "machine",
       "place": "last"
+    },
+    "1492": {
+      "at": "2026-11-09T05:14:09.313Z",
+      "why": "cosmetic low-preset clash; behind the open Dorfleben work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1853,7 +1859,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-09T04:42:30.102Z",
+    "at": "2026-11-09T05:14:09.322Z",
     "points": [
       184,
       200,
@@ -2319,7 +2325,8 @@
       1484,
       1488,
       1489,
-      1490
+      1490,
+      1492
     ]
   }
 }
