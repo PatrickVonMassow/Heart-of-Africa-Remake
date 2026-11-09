@@ -3223,7 +3223,9 @@ if (section('burning-grass')) {
       mode: f.mode,
       front: pts([-1.2, 0.3], [-0.5 * hw, 0, 0.5 * hw], [0, g.flameHeight * 0.6], true),
       scar: pts(scarAlong, [-0.35 * scarHw, 0.35 * scarHw], [0], false),
-      unburnt: pts(scarAlong, [scarHw + 5, scarHw + 9], [0], false),
+      // West of the scar, toward the traveller (14 off the axis): the east side
+      // runs past the frame's right edge at this shutter.
+      unburnt: pts(scarAlong, [-(scarHw + 5.5), -(scarHw + 2.5)], [0], false),
       smoke: pts([-5, -1.5], [-0.4 * hw, 0.4 * hw], [g.flameHeight + 0.5, g.flameHeight + 5], true),
     }
   })
