@@ -30,6 +30,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      failed_tags: ${{ steps.frozen.outputs.failed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,8 +58,8 @@ jobs:
       # Frozen playable builds of each tag under /Heart-of-Africa-Remake/<tag>/
       # (TASKS point 103): the same Pages site serves main at the root and each
       # tag at its subpath — GitHub allows one Pages site per repository, so
-      # every frozen build is a subdirectory of the same artifact, rebuilt from
-      # its immutable tag on every deploy. The set is EVERY version tag (vX.Y)
+      # every frozen build is a subdirectory of the same artifact, built from
+      # its immutable tag. The set is EVERY version tag (vX.Y)
       # plus `poc` — version tags are enumerated DYNAMICALLY so a new release
       # needs no workflow edit. Each tag is guarded so the workflow still deploys
       # the ones that exist while another does not.
@@ -68,27 +70,90 @@ jobs:
       # is the current playable build and is moved on request, without a
       # closing run. So `poc` is not a release and points wherever it was last
       # set, which is usually a main commit between two versions.
+      #
+      # A frozen tag's site is immutable, so it is built ONCE per tag sha and
+      # reused from the cache afterwards: rebuilding every tag on every push re-ran
+      # a network-dependent `npm ci` per tag, and one flaky download in a frozen
+      # tree took main's deploy down with it (point 663, 12.08.2026). `poc` moves,
+      # so its sha changes the key and it rebuilds exactly when it moved.
+      - name: Resolve the frozen tags and their commits
+        id: tags
+        run: |
+          mkdir -p tag-cache
+          VERSION_TAGS=$(git ls-remote --tags origin 'refs/tags/v*' | sed 's#.*refs/tags/##' | grep -vE '\^\{\}$' | sort -u)
+          : > tag-cache/wanted.txt
+          for tag in $VERSION_TAGS poc; do
+            sha=$(git ls-remote --tags origin "refs/tags/$tag" | awk '{print $1}')
+            if [ -z "$sha" ]; then
+              echo "tag $tag does not exist yet — skipping"
+              continue
+            fi
+            echo "$tag $sha" >> tag-cache/wanted.txt
+          done
+          cat tag-cache/wanted.txt
+          echo "key=frozen-tags-$(sha256sum tag-cache/wanted.txt | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the frozen tag builds
+        id: tag_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: tag-cache/builds
+          key: ${{ steps.tags.outputs.key }}
+          # Any older set still holds the builds of the tags that did not move.
+          restore-keys: frozen-tags-
+
       - name: Build each tag's frozen site (all version tags + poc)
+        id: frozen
         # The CUDA download is SKIPPED: onnxruntime-node is a transitive server-side
         # dep of kokoro-js that a `vite build` never executes, its postinstall pulls a
         # ~300 MB GPU tarball from a GitHub release, and that download ECONNRESET
         # three times in one evening (12.08.2026) — a frozen tag's build died on an
         # asset it does not use. The npm ci retry matches the main build's, above.
+        # A tag that still fails is NAMED and left out; main's own site deploys
+        # anyway and the deploy job's verdict turns the run red afterwards.
         env:
           npm_config_onnxruntime_node_install_cuda: skip
         run: |
-          VERSION_TAGS=$(git ls-remote --tags origin 'refs/tags/v*' | sed 's#.*refs/tags/##' | grep -vE '\^\{\}$' | sort -u)
-          for tag in $VERSION_TAGS poc; do
-            if [ -z "$(git ls-remote --tags origin "$tag")" ]; then
-              echo "tag $tag does not exist yet — skipping"
-              continue
+          mkdir -p tag-cache/builds
+          failed=""
+          while read -r tag sha; do
+            build="tag-cache/builds/$tag-$sha"
+            if [ -d "$build" ]; then
+              echo "tag $tag ($sha): cached build reused"
+            else
+              echo "tag $tag ($sha): building"
+              # Build the RESOLVED commit, never the tag name: a tag moved since
+              # resolution would otherwise be cached under the old sha.
+              if git fetch --depth 1 origin "$sha" \
+                && git worktree add --detach "src-$tag" "$sha" \
+                && ( cd "src-$tag" && { n=0; until npm ci; do n=$((n+1)); [ "$n" -ge 3 ] && exit 1; echo "npm ci failed, retry $n after 15s"; sleep 15; done; } && npx tsc -b && npx vite build --base="/Heart-of-Africa-Remake/$tag/" ); then
+                mkdir -p "$build"
+                cp -r "src-$tag/dist/." "$build/"
+              else
+                echo "::error title=Frozen tag build failed::tag $tag ($sha) did not build; main and the other tags deploy without it."
+                failed="$failed $tag"
+                continue
+              fi
             fi
-            git fetch --depth 1 origin tag "$tag"
-            git worktree add "src-$tag" "$tag"
-            ( cd "src-$tag" && { n=0; until npm ci; do n=$((n+1)); [ "$n" -ge 3 ] && exit 1; echo "npm ci failed, retry $n after 15s"; sleep 15; done; } && npx tsc -b && npx vite build --base="/Heart-of-Africa-Remake/$tag/" )
             mkdir -p "dist/$tag"
-            cp -r "src-$tag/dist/." "dist/$tag/"
+            cp -r "$build/." "dist/$tag/"
+          done < tag-cache/wanted.txt
+          # Keep only the builds of the current tag commits in the saved cache.
+          for dir in tag-cache/builds/*; do
+            [ -d "$dir" ] || continue
+            name=$(basename "$dir")
+            grep -qxF "${name%-*} ${name##*-}" tag-cache/wanted.txt || rm -rf "$dir"
           done
+          echo "failed=${failed# }" >> "$GITHUB_OUTPUT"
+
+      - name: Save the frozen tag builds
+        # Not after a failed tag: the saved set would lack it under a key that
+        # claims the full set, and the next run would never rebuild it.
+        if: steps.tag_cache.outputs.cache-hit != 'true' && steps.frozen.outputs.failed == ''
+        uses: actions/cache/save@v4
+        with:
+          path: tag-cache/builds
+          key: ${{ steps.tags.outputs.key }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -173,9 +238,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           FIRST: ${{ steps.deployment.outcome }}
           RETRY: ${{ steps.deployment_retry.outcome }}
+          FAILED_TAGS: ${{ needs.build.outputs.failed_tags }}
         run: |
           if [ "$FIRST" = "success" ] || [ "$RETRY" = "success" ]; then
             echo "Pages deployment succeeded (first attempt: $FIRST, retry: ${RETRY:-skipped})."
+            if [ -n "$FAILED_TAGS" ]; then
+              echo "::error title=Frozen tags missing::deployed without the tag(s) $FAILED_TAGS, whose build failed in the build job."
+              exit 1
+            fi
             exit 0
           fi
           echo "::error title=Pages deploy failed::first attempt: $FIRST, retry: ${RETRY:-skipped}. The report below names every Pages deployment still holding the queue."
