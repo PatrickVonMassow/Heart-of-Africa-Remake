@@ -15577,3 +15577,10 @@ to land than a mechanism that needs a review.
   Observed problem: full WebGPU polish-children+report run on feat/680-place-life-dump a75df90ca, 09.11.2026 (log local/verify-logs/2026-11-09T12-08-14-648-polish-children-report.log), quiet-machine check "MACHINE NOT QUIET (busy)". The same head ran --section=tag-catch alone (log 2026-11-09T12-53-10-287), GREEN. Point 680 only adds a read-on-dump callback, so the red is owned by no point. The run's two bank-game reds belong to 1268 and 1470.
   Source: picture check of the 680 landing session, 09.11.2026.
   Bundle: Dorfleben.
+- [ ] 1494. An elephant-trampled animal dies on clean ground — no stain is pushed
+  Final state: `npm test -- enrichments --section=elephant-trampling` is green on WebGPU: the trampled animal lies dead over a ground stain ("Elephant tramples a smaller animal (dead over a stain)").
+  Observed problem: the section is red on origin/main 2c9fefacc (WebGPU, fresh detached tree, 09.11.2026 16:42) and twice on feat/453-lion-prey with "zebra, 0 stain(s)". The victim dies but no stain is pushed; the trampled body is the first natural zebra herds.zebra[0]. Point 453's diff touches neither trample nor stain code, so the red is owned by no point. Point 1205 (lion moves on) is a different check in the same section.
+  Player impact: a trampled animal lies on clean ground.
+  Test: the section above green; a Vitest case for the trample-to-stain path if the cause sits in browserless logic.
+  Source: picture check of the 453 landing session, 09.11.2026.
+  Bundle: Tierverhalten.
