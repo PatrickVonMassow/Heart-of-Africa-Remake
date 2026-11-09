@@ -6190,11 +6190,15 @@ if (section('village-walk')) {
   // The low-preset kneel as a picture (work-order 1301): the task walker held
   // at full kneel, side-on — trunk at its standing height, arms full length
   // bent at the elbow, hands and wrap on the ground, nothing through it.
+  // At kneel 1 the load can still be in its hands; wait until it stands on the ground.
   const lowKnelt = await stepUntil(() => {
     const g = window.__placeScene.getObjectByName('village-task-walker')
-    return !!g?.visible && g.getObjectByName('inhabitant')?.userData.kneel === 1
+    const load = g?.getObjectByName('task-walker-load')
+    if (!g?.visible || !load || g.getObjectByName('inhabitant')?.userData.kneel !== 1) return false
+    g.updateWorldMatrix(true, true)
+    return load.getWorldPosition(g.position.clone()).y - g.position.y < 0.08
   }, null, 7200)
-  check('low preset kneel: the task walker was caught at full kneel', lowKnelt, '')
+  check('low preset kneel: the task walker was caught at full kneel, its load on the ground', lowKnelt, '')
   if (lowKnelt) {
     await freezeLife(true)
     try {
@@ -6202,10 +6206,22 @@ if (section('village-walk')) {
         const g = window.__placeScene.getObjectByName('village-task-walker')
         return { x: g.position.x, z: g.position.z }
       })
-      // its right flank first: the load it set down lies on its left (+x,
-      // LOAD_GROUND) and hid the arms and hands from that side
-      const seen = await sideOn(null, 2.6, -0.16, [-1, 1])
+      // the flank away from the load it set down: measured, flank -1 looks
+      // across the load, which hid the arms and hands
+      const seen = await sideOn(null, 2.6, -0.16, [1])
       check('low preset kneel: the camera found a free spot side-on to the kneeling task walker', !!seen, seen ? '' : JSON.stringify(sideOnMisses))
+      // side-on as drawn: the camera's horizontal view against the figure's world facing
+      const aim = await page.evaluate(() => {
+        const g = window.__placeScene.getObjectByName('village-task-walker')
+        const cam = window.__placeCamera
+        const V = g.position.constructor
+        const face = new V(0, 0, 1).applyQuaternion(g.getWorldQuaternion(new g.quaternion.constructor()))
+        const view = cam.getWorldDirection(new V())
+        const off = Math.abs(Math.atan2(face.x * view.z - face.z * view.x, face.x * view.x + face.z * view.z)) * (180 / Math.PI)
+        return { off: +off.toFixed(1), groupYaw: +g.rotation.y.toFixed(3), playerYaw: +window.__placePlayer.yaw.toFixed(3), cam: [cam.position.x, cam.position.z].map((v) => +v.toFixed(2)), fig: [g.position.x, g.position.z].map((v) => +v.toFixed(2)) }
+      })
+      report(`  low-preset kneel aim ${JSON.stringify(aim)}`)
+      check('low preset kneel: the camera looks at the kneeler from its flank (60–120° off its facing)', !!seen && aim.off >= 60 && aim.off <= 120, JSON.stringify(aim))
       if (seen) await frame(shot('1301-village-kneel-low'), {
         local: { x: at.x, y: 0.4, z: at.z },
         label: 'low preset: the Zulu task walker kneeling at its work, side-on — the primitive figure at full kneel, arms full length and bent at the elbow, hands and wrap on the ground, nothing sunk into it',
