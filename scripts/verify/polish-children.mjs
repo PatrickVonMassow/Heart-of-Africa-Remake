@@ -1238,8 +1238,26 @@ async function checkChildrenMotion(motionPlace) {
           }
           p.yaw = Math.atan2(-(k.x - p.x), -(k.z - p.z))
           if (eyeY != null) p.pitch = -Math.atan2(eyeY - 1.0, Math.max(0.5, Math.hypot(k.x - p.x, k.z - p.z)))
-          return { x: k.x, z: k.z }
+          // The group is counted again from where the camera now stands: a
+          // fanned bearing was chosen by the declared child's line alone and
+          // can put its siblings behind a hut.
+          const kids = window.__placeTag()?.children ?? []
+          const seen = eyeY == null ? [] : kids.filter((c) => {
+            const hit = window.__placeRayHit?.(c.x, 1.0, c.z, [p.x, eyeY, p.z])
+            return hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
+          })
+          const near = seen.length > 0 ? seen.reduce((s, c) => s + Math.hypot(p.x - c.x, p.z - c.z), 0) / seen.length : 0
+          return { x: k.x, z: k.z, seen: seen.length, near }
         }, aimed.ki)
+        if (at && at.seen != null) {
+          aimed.seen = at.seen
+          aimed.near = at.near
+          checkAt(
+            'the group is still in the clear from the final camera standpoint',
+            aimed.seen >= Math.min(3, aimed.of),
+            `${aimed.seen} of ${aimed.of} in the clear`,
+          )
+        }
         // Where the declared child stands, projected through the place camera at
         // its head. Read after the turn's rendered frame and again after the
         // shutter: the view is convex, so a child inside it at both readings was
