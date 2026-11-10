@@ -5946,8 +5946,27 @@ function Herds() {
         if (sp === 'flamingo' && !familyHeld && birdEscapeMode(sp, !!a.young) === 'running') {
           const bf = balance.birdFlight
           let dGround = Infinity
-          for (const [gx, gz] of groundPredatorPos) dGround = Math.min(dGround, Math.hypot(gx - a.x, gz - a.z))
+          let dPred = Infinity
+          let predX = 0
+          let predZ = 0
+          for (const [gx, gz] of groundPredatorPos) {
+            const d = Math.hypot(gx - a.x, gz - a.z)
+            if (d < dPred) {
+              dPred = d
+              predX = gx
+              predZ = gz
+            }
+          }
+          dGround = dPred
           for (const [ex, ez] of elephantPos) dGround = Math.min(dGround, Math.hypot(ex - a.x, ez - a.z))
+          // Surprised late (research B1): a ground predator ON a bird still on
+          // the ground or in its take-off run takes it; an airborne one is safe.
+          if (groundPredatorCanReach(a.air, dPred, bf.groundCatchReach)) {
+            a.air = undefined
+            takeAnimal(a, 'predator', { x: predX, z: predZ }, { stain: true })
+            i--
+            continue
+          }
           const engaged = a.air !== undefined
           const shyRing = engaged ? PLAYER_SHY_RADIUS * PREY_PANIC_EXIT : PLAYER_SHY_RADIUS
           const trigger = engaged ? bf.takeoffTrigger * PREY_PANIC_EXIT : bf.takeoffTrigger
