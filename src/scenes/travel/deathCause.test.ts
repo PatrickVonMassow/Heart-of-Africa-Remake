@@ -148,12 +148,26 @@ describe('the dev-assert "death without a visible cause"', () => {
 
 describe('a land catch is held only by a hunter that is there', () => {
   it('holds the hunt victim and a body within the predator reach', () => {
-    expect(huntHoldsCatch(true, true, 50)).toBe(true)
-    expect(huntHoldsCatch(true, false, 1)).toBe(true) // the mired calf beside the taken parent
+    expect(huntHoldsCatch(true, 1)).toBe(true) // its victim, or the mired calf beside the taken parent
   })
   it('releases a catch whose hunt is idle or far away', () => {
-    expect(huntHoldsCatch(false, true, 0)).toBe(false)
-    expect(huntHoldsCatch(true, false, DEATH_ACTOR_REACH + 1)).toBe(false)
+    expect(huntHoldsCatch(false, 0)).toBe(false)
+    expect(huntHoldsCatch(true, DEATH_ACTOR_REACH + 1)).toBe(false)
+    expect(huntHoldsCatch(true, 50)).toBe(false) // its own victim, abandoned by a distant hunter
+  })
+  it('an abandoned victim outlives its original countdown alive', () => {
+    // The herds' land-catch step: release when the hunter is not there, else
+    // run the countdown to the kill. The hunt stays active but its predator
+    // walked 50 units off, so the catch is let go and the calf lives on.
+    const calf: Body = { id: 'c', x: 0, z: 0, young: true, caught: 1 }
+    const DT = 0.1
+    for (let t = 0; t < 3; t += DT) {
+      if (calf.caught === undefined) break
+      if (!huntHoldsCatch(true, 50)) calf.caught = undefined
+      else if (stepCaught(calf, DT)) markKilled(calf, CARCASS_SECONDS, 'predator')
+    }
+    expect(calf.caught).toBeUndefined()
+    expect(calf.dead).toBeUndefined()
   })
 })
 
@@ -206,7 +220,7 @@ function stageCrocKillThenVigil(opts: { predatorComes: boolean; parentGap: numbe
     // The keeper's own struggle (a land catch by the drawn predator).
     if (parent.caught !== undefined && parent.caught > 0) {
       const pd = predator ? Math.hypot(predator.x - parent.x, predator.z - parent.z) : Infinity
-      if (!huntHoldsCatch(predator !== null, true, pd)) parent.caught = undefined
+      if (!huntHoldsCatch(predator !== null, pd)) parent.caught = undefined
       else if (stepCaught(parent, DT)) {
         markKilled(parent, CARCASS_SECONDS, 'predator')
         assertVisibleDeath(parent, pd, 'parent')

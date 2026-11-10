@@ -2569,7 +2569,7 @@ function Herds() {
         if (
           a.caught !== undefined && a.caught > 0 && a.caughtBy !== 'crocodile' &&
           !huntHoldsCatch(
-            LION_STATE.mode !== 'idle', LION_STATE.victim === a, Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z),
+            LION_STATE.mode !== 'idle', Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z),
           )
         ) {
           // A land catch whose hunter has gone (the hunt reset or moved to

@@ -80,19 +80,18 @@ export function assertVisibleDeath(
 }
 
 /**
- * Does the scripted hunt still hold a land-predator catch? It does while the
- * hunt runs and the animal is its victim — or lies within the predator's reach
- * (the mired calf whose charging parent the hunter took in its place, point
- * 123: both are taken at the waterhole). A seized animal whose hunter has gone
+ * Does the scripted hunt still hold a land-predator catch? Only while the hunt
+ * runs AND its predator stands within reach of the animal — its own victim
+ * (the feeding hunter keeps to the body's flank) or the mired calf beside the
+ * parent it took instead (point 123). A seized animal whose hunter has gone
  * (the hunt reset to idle, or walked off) can never be killed by it — it is
- * released ALIVE instead of dying with no predator at it (the land twin of the
- * crocodile's point-319 release).
+ * released ALIVE instead of dying with no predator at it (the land twin of
+ * the crocodile's point-319 release).
  */
 export function huntHoldsCatch(
   huntActive: boolean,
-  isVictim: boolean,
   predatorDist: number,
   reach: number = DEATH_ACTOR_REACH,
 ): boolean {
-  return huntActive && (isVictim || predatorDist <= reach)
+  return huntActive && predatorDist <= reach
 }
