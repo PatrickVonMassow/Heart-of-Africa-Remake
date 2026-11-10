@@ -11246,9 +11246,6 @@ if (section('bird-flight-escape')) {
     await window.__pollSim(25, () => {
       if (w.lion) w.lion.mode = 'idle'
       const h = w.raptor.hunt
-      // The prey's last flight state while alive — the strike must land on a
-      // bird in the air, not one caught on the ground.
-      if (w.raptor.prey && !w.raptor.prey.dead) window.__stoopPreyAir = w.raptor.prey.air?.phase ?? 'ground'
       if (h) {
         // Keep the traveller pinned just behind the prey (the flock fled toward
         // the frame's edge and keeps shying from him), so the plunge, which
@@ -11280,7 +11277,7 @@ if (section('bird-flight-escape')) {
   const stoopEnd = await page.evaluate(async () => {
     const w = window.__wildlife
     const bf = window.__balance.birdFlight
-    const out = { resolved: false, outcome: null, phases: [], preyDead: false, preyAirAtStrike: null }
+    const out = { resolved: false, outcome: null, phases: [], preyDead: false, strikeAirborne: null }
     // The hunt may already have fed and left while the shutter ran, so its
     // outcome and prey are read from what outlives it.
     const prey = window.__stoopPrey
@@ -11289,7 +11286,6 @@ if (section('bird-flight-escape')) {
       if (w.lion) w.lion.mode = 'idle'
       const h = w.raptor.hunt
       out.outcome = w.raptor.outcome ?? null
-      if (prey && !prey.dead) window.__stoopPreyAir = prey.air?.phase ?? 'ground'
       if (prey && prey.dead) out.preyDead = true
       if (!h) {
         out.resolved = true
@@ -11298,8 +11294,8 @@ if (section('bird-flight-escape')) {
       return false
     })
     out.phases = [...w.raptor.phases]
-    out.preyAirAtStrike = window.__stoopPreyAir ?? null
-    delete window.__stoopPreyAir
+    // Recorded by the strike itself: the bird was airborne when it was hit.
+    out.strikeAirborne = w.raptor.strikeAirborne ?? null
     // Cleanup: restore the staged values and retire the staged animals.
     bf.diveSpeed = window.__birdFlightPrev.diveSpeed
     bf.forceStrike = window.__birdFlightPrev.forceStrike
@@ -11316,7 +11312,7 @@ if (section('bird-flight-escape')) {
   check(
     'a forced peregrine enters high, stoops on a flying bird, strikes, and the hunt resolves (design.md §19.19)',
     stoopStart.started && stoopStart.enteredHigh && stoopStart.diving && stoopStart.preyInFlock &&
-      stoopEnd.preyAirAtStrike === 'air' &&
+      stoopEnd.strikeAirborne === true &&
       stoopEnd.phases.join('>').startsWith('high>dive>feed') && stoopEnd.outcome === 'caught' && stoopEnd.preyDead && stoopEnd.resolved,
     JSON.stringify({ stoopStart, stoopEnd }),
   )

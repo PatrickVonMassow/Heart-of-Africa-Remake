@@ -955,6 +955,8 @@ const RAPTOR_STATE: {
   phases: string[]
   /** The current/last hunt's outcome, kept past its despawn (verification). */
   outcome?: AerialHunt['outcome']
+  /** Whether the struck bird was airborne at the strike (read by the live check). */
+  strikeAirborne?: boolean
 } = { hunt: null, prey: null, phases: [] }
 /** Family life (design.md §19): a calf keeps within the calibratable leash
  *  radius of its parent (balance.family.followRadius, read fresh per frame so
@@ -4994,6 +4996,7 @@ function Herds() {
             R.prey = best
             R.phases = [R.hunt.phase]
             R.outcome = undefined
+            R.strikeAirborne = undefined
           }
         }
       }
@@ -5016,6 +5019,7 @@ function Herds() {
         if (ev === 'caught' && live) {
           // The struck bird drops as an ordinary predator kill; the raptor
           // comes down onto it and feeds.
+          R.strikeAirborne = isAirborne(prey.air)
           prey.air = undefined
           prey.lure = undefined
           h.x = prey.x
