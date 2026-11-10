@@ -10,6 +10,7 @@ import { bakeShoreLand } from './seaMask'
 let flags: Uint8Array
 let width = 0
 let height = 0
+let res = 0
 let texelLatLon: (x: number, y: number) => { lat: number; lon: number }
 
 beforeAll(async () => {
@@ -18,7 +19,7 @@ beforeAll(async () => {
   const dem = getDemPixels()
   width = dem.width
   height = dem.height
-  const res = (meta.lonMax - meta.lonMin) / width
+  res = (meta.lonMax - meta.lonMin) / width
   flags = new Uint8Array(width * height)
   for (let i = 0; i < flags.length; i++) flags[i] = dem.data[i * 4 + 2] > 0 ? 1 : 0
   texelLatLon = (x, y) => ({ lat: meta.latMax - (y + 0.5) * res, lon: meta.lonMin + (x + 0.5) * res })
@@ -38,8 +39,8 @@ describe('sea plane land mask (point 314)', () => {
       for (let lon = 29.8; lon <= 32.4; lon += 0.025) {
         const s = sampleTerrain(lat, lon, 1)
         const meta = getDemMeta()
-        const x = Math.floor((lon - meta.lonMin) / meta.res)
-        const y = Math.floor((meta.latMax - lat) / meta.res)
+        const x = Math.floor((lon - meta.lonMin) / res)
+        const y = Math.floor((meta.latMax - lat) / res)
         if (flags[y * width + x] === 1 && s.type === 'ocean') wrong++
       }
     }
@@ -73,8 +74,8 @@ describe('sea plane land mask (point 314)', () => {
     for (const [clat, clon] of [[31.4, 30.4], [-6.0, 12.4]]) {
       for (let dy = -20; dy <= 20; dy++) {
         for (let dx = -20; dx <= 20; dx++) {
-          const x = Math.floor((clon - meta.lonMin) / meta.res) + dx
-          const y = Math.floor((meta.latMax - clat) / meta.res) + dy
+          const x = Math.floor((clon - meta.lonMin) / res) + dx
+          const y = Math.floor((meta.latMax - clat) / res) + dy
           const { lat, lon } = texelLatLon(x, y)
           const terrainSea = sampleTerrain(lat, lon, 1).type === 'ocean'
           expect(baked[y * width + x] < 0.5, `${lat.toFixed(3)},${lon.toFixed(3)}`).toBe(terrainSea)
