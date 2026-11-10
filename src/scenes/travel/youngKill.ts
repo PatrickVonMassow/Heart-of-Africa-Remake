@@ -3,6 +3,7 @@
 // remains. Pure — Wildlife.tsx drives these every frame, the Vitest drives the
 // same functions in the same order.
 import { killFlockMayDescend, vigilBlocksLanding } from './wildlifeBehavior'
+import { recordDeathCause, type DeathCause } from './deathCause'
 
 /** One frame of a seized animal's struggle window: true on the frame the
  *  window runs out and the kill completes (the field is then cleared). */
@@ -15,9 +16,15 @@ export function stepCaught(a: { caught?: number }, dt: number): boolean {
 }
 
 /** The kill's own death (Wildlife takeAnimal): the body is the predator's
- *  (lionFed, no ground scavenger) and dissolves over `dissolveSeconds`. */
-export function markKilled(a: { dead?: boolean; lionFed?: boolean; dissolve?: number }, dissolveSeconds: number): void {
+ *  (lionFed, no ground scavenger) and dissolves over `dissolveSeconds`. The
+ *  cause is recorded on the body (point 326: every death has a visible cause). */
+export function markKilled(
+  a: { dead?: boolean; lionFed?: boolean; dissolve?: number; deathCause?: DeathCause },
+  dissolveSeconds: number,
+  cause: DeathCause,
+): void {
   a.dead = true
+  recordDeathCause(a, cause)
   a.lionFed = true
   a.dissolve = dissolveSeconds
 }

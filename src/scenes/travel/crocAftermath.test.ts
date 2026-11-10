@@ -53,7 +53,7 @@ const seize = (): { croc: Croc; victim: Victim } => {
 /** One frame of the herd pre-pass for a caught victim (Wildlife: stepCaught
  *  then takeAnimal with `sink` for a crocodile catch). */
 const herdStep = (v: Victim) => {
-  if (!v.dead && stepCaught(v, DT) && v.caughtBy === 'crocodile') sinkKill(v, DISSOLVE)
+  if (!v.dead && stepCaught(v, DT) && v.caughtBy === 'crocodile') sinkKill(v, DISSOLVE, 'crocodile')
   // The water-death pass: a sinking body runs its own dissolve.
   if (v.dead && v.inWater !== undefined && v.dissolve !== undefined && v.dissolve > 0) v.dissolve -= DT
 }
@@ -130,7 +130,7 @@ describe('crocodile exit paths (point 319)', () => {
 
   it('ring despawn mid-sink: the body keeps SINKING (the river keeps it), never re-animated', () => {
     const victim: Victim = { caughtBy: 'crocodile' }
-    sinkKill(victim, DISSOLVE)
+    sinkKill(victim, DISSOLVE, 'crocodile')
     releaseOrphanedCrocVictims([victim], [])
     expect(victim.dead).toBe(true)
     expect(crocVictimState(victim, false)).toBe('sinking')
@@ -154,8 +154,8 @@ describe('crocodile exit paths (point 319)', () => {
     const { croc, victim } = seize()
     const parent: Victim = {}
     victim.caught = undefined
-    sinkKill(victim, DISSOLVE)
-    sinkKill(parent, DISSOLVE)
+    sinkKill(victim, DISSOLVE, 'crocodile')
+    sinkKill(parent, DISSOLVE, 'crocodile')
     croc.lunge!.alongside = parent
     expect(lungeHolds(croc.lunge, parent)).toBe(true)
     expect(crocVictimState(parent, true)).toBe('sinking')
@@ -164,7 +164,7 @@ describe('crocodile exit paths (point 319)', () => {
 
   it('a dead crocodile victim off the sink path is detached (a bank carcass with no actor)', () => {
     const v: Victim = { caughtBy: 'crocodile' }
-    markKilled(v, DISSOLVE)
+    markKilled(v, DISSOLVE, 'crocodile')
     expect(crocVictimState(v, true)).toBe('detached')
   })
 })
@@ -182,7 +182,7 @@ describe('carcassShrinkUnfed — the "shrinking carcass has no feeder" rule (poi
   })
   it('a crocodile kill run through its whole sink never counts as an unfed shrink', () => {
     const v: Victim = {}
-    sinkKill(v, DISSOLVE)
+    sinkKill(v, DISSOLVE, 'crocodile')
     let prev: number | undefined
     let flagged = false
     while (v.dissolve! > 0) {

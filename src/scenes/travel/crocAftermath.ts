@@ -7,6 +7,7 @@
 // reported defect. Pure over the animal's state fields so it is unit-testable.
 
 import { markKilled } from './youngKill'
+import type { DeathCause } from './deathCause'
 
 /** The victim fields the crocodile aftermath reads and writes. */
 export interface CrocVictim {
@@ -39,8 +40,12 @@ export function releaseCrocVictim(v: CrocVictim): void {
  *  waterfall plunge): the kill's own death (markKilled — no ground scavenger,
  *  no vulture over open water) put on the SINK path, so the body goes under
  *  over `dissolveSeconds` instead of shrinking on the bank. */
-export function sinkKill(v: CrocVictim & { lionFed?: boolean }, dissolveSeconds: number): void {
-  markKilled(v, dissolveSeconds)
+export function sinkKill(
+  v: CrocVictim & { lionFed?: boolean; deathCause?: DeathCause },
+  dissolveSeconds: number,
+  cause: DeathCause,
+): void {
+  markKilled(v, dissolveSeconds, cause)
   v.inWater = 0
 }
 
