@@ -14,6 +14,7 @@
 import * as THREE from 'three/webgpu'
 import {
   cameraPosition,
+  clamp,
   color,
   float,
   max,
@@ -29,7 +30,7 @@ import {
   vec3,
 } from 'three/tsl'
 import { getDemMeta } from '../world/geodata'
-import { demDatasetLand, demElevation } from './demElevation'
+import { demElevation, seaSheetCover, terrainLandFraction } from './demElevation'
 
 interface WaterMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
@@ -69,6 +70,16 @@ export function createWaterMaterial(): WaterMaterialHandle {
   // plane rotation; the mesh is scaled up in the debug zoom range).
   const wp = positionLocal.xy.mul(planeScale).add(offset)
 
+  // --- Real bathymetry: depth in meters from the DEM texture -------------
+  // Built from the loaded (northeast-trimmed) pixels rather than dem.png, so
+  // the water sees the same world cut as the terrain (world/redSea.ts). The
+  // shared module decodes the two-byte elevation into a filterable
+  // half-float texture (render/demElevation.ts).
+  const meta = getDemMeta()
+  const lon = wp.x.div(UNITS_PER_DEGREE)
+  const lat = wp.y.div(UNITS_PER_DEGREE) // wp.y is stable world -Z → +lat
+  const elevation = demElevation(lon, lat) // meters above sea level
+
   // --- Gerstner-style wave field: three directional components + swell ----
   const wave = (dirX: number, dirY: number, len: number, amp: number, speed: number) => {
     const k = (Math.PI * 2) / len
@@ -83,19 +94,36 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const w2 = wave(-0.55, 0.83, 5.7, 0.03, 0.8)
   const w3 = wave(0.2, -0.98, 14.5, 0.04, 0.35)
   const swell = mx_fractal_noise_float(vec3(wp.mul(0.045), time.mul(0.09)), 3).mul(0.1)
-  const waveH = w1.add(w2).add(w3).add(swell).mul(lively)
+  // Point 314: the troughs must never sink below the terrain's own sea floor.
+  // Near the shore that floor lies only ~0.12 under the plane while a trough
+  // reaches ~0.2, so the pale shallow floor broke through in patches that
+  // flickered with the waves. The swell is scaled by the floor depth the
+  // terrain builds there (terrain.ts: hOcean, blended toward a conservative
+  // land height across the shore ramp), so it keeps its full height only over
+  // water deep enough to carry it.
+  const landHere = terrainLandFraction(lon, lat)
+  const floorY = mix(
+    float(-0.12).add(max(elevation.mul(0.0006), float(-3.4))),
+    float(0.26),
+    smoothstep(float(0.32), float(0.68), landHere),
+  )
+  const swellRoom = clamp(floorY.negate().sub(0.03).div(0.25), 0, 1)
+  const waveH = w1.add(w2).add(w3).add(swell).mul(lively).mul(swellRoom)
   m.positionNode = positionLocal.add(vec3(0, 0, waveH))
 
-  // --- Real bathymetry: depth in meters from the DEM texture -------------
-  // Built from the loaded (northeast-trimmed) pixels rather than dem.png, so
-  // the water sees the same world cut as the terrain (world/redSea.ts). The
-  // shared module decodes the two-byte elevation into a filterable
-  // half-float texture (render/demElevation.ts).
-  const meta = getDemMeta()
-  const lon = wp.x.div(UNITS_PER_DEGREE)
-  const lat = wp.y.div(UNITS_PER_DEGREE) // wp.y is stable world -Z → +lat
-  const elevation = demElevation(lon, lat) // meters above sea level
-  const depthSampled = max(elevation.negate(), 0) // meters of water below sea level
+  // Meters of water below sea level. Point 314: the DEM's own depth crosses
+  // its coastal texels in one blocky step, and where the terrain's coast lies
+  // seaward of the DEM's it reads 0 m over open terrain sea — the shallowest,
+  // most transparent tone, rimmed by shore foam that traced the texel steps
+  // (the pale, foam-edged plates off the Rosetta mouth). A shelf grown from
+  // the terrain's own smooth land fraction (0 m at its shore, SHORE_SHELF_M a
+  // band's width out) sets the floor of the depth, so tone and shore foam
+  // follow the terrain's waterline instead of the DEM's texels.
+  const SHORE_SHELF_M = 30
+  const depthSampled = max(
+    max(elevation.negate(), 0),
+    smoothstep(float(0.5), float(0.0), landHere).mul(SHORE_SHELF_M),
+  )
   // Outside the DEM bbox the texture would clamp-repeat its edge texels into
   // endless streaks across the far sea (visible at the continent zoom,
   // especially northeast). Blend to plain deep ocean beyond the bbox instead.
@@ -159,14 +187,18 @@ export function createWaterMaterial(): WaterMaterialHandle {
   // Shallow water is clearer and deep water denser (0.58 → 0.93), foam adding
   // up to 0.3 on top. Far from the camera the surface turns fully opaque, so the end of the
   // terrain chunks underneath is never visible.
-  // The plane is the OPEN-SEA surface only: over dataset land it fades out
-  // entirely — keyed on the dataset's own land flag, not on elevation (the
-  // delta floodplain sits at ~0–2 m, where any height threshold leaks).
-  // River valleys carved below sea level (the lower Nile) would otherwise
-  // show the sheet as pale patches floating on the rivers' own dark
-  // surfaces — shifting with the chunk LOD as the traveller moves, since
-  // the carve depth depends on it.
-  const overSea = demDatasetLand(lon, lat).oneMinus()
+  // The plane is the OPEN-SEA surface only: over land it fades out entirely
+  // — keyed on a land flag, not on elevation (the delta floodplain sits at
+  // ~0–2 m, where any height threshold leaks). River valleys carved below sea
+  // level (the lower Nile) would otherwise show the sheet as pale patches
+  // floating on the rivers' own dark surfaces. Point 314: the flag is the
+  // TERRAIN's coast (the vector-rebuilt shore), not the DEM's raw land flag —
+  // the raw flag left terrain sea bare in blocky, foam-rimmed pale patches
+  // (the Rosetta mouth) and laid the sheet over terrain land (the Congo
+  // mouth). It reaches up to the waterline (where the terrain crosses sea
+  // level, land ~0.6) and is gone just inland of it, so no wave crest can
+  // climb onto the shore.
+  const overSea = seaSheetCover(lon, lat)
   m.opacityNode = smoothstep(float(0), float(60), depthM)
     .mul(0.35)
     .add(0.58)

@@ -1140,6 +1140,145 @@ if (section('traveller-figure')) {
 // current drifts him, resolves ALONG the coast wherever it would push into the
 // blocked sea (never a hard stop, never a step into blocked water), and he
 // swims his way back up the river alive.
+// --- Point 314: the water at a river mouth holds still while he walks --------
+// The user saw pale, greenish patches and white foam "plates" on the water at
+// a sea mouth that moved and changed as the traveller walked. Causes: the sea
+// sheet masked by the DEM's raw land flag instead of the terrain's coast, the
+// ribbon dissolving where no sheet took over, and the sheet's vertex lattice
+// sliding with him. At the Rosetta mouth: stand on the bank, read the colour
+// of fixed WORLD water points (projected through the live camera), wait, read
+// again (the standing baseline), then walk half a lattice cell and read again.
+// Walking may change no more water points than the same wait standing still.
+if (section('water-stability')) {
+  const tag = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  const MOUTH = { lat: 31.42, lon: 30.43 }
+  const stand = await jumpBeside(page, 31.36, 30.6, 'water-stability stand')
+  if (stand) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await page.waitForFunction(() => window.__camera?.settled?.(), null, { timeout: 30000 }).catch(() => {})
+    // Chunks, the time-sliced sea-mask refinement and the ribbon settle (app clock).
+    await page.evaluate(() => window.__sleepSim(2.5))
+    // World water points around the mouth: terrain sea and the river channel.
+    const pts = await page.evaluate(async (c) => {
+      const terrain = await import('/src/world/terrain.ts')
+      const seed = window.__game.getState().seed
+      const p = window.__game.getState().pos
+      const out = []
+      for (let dlat = -0.5; dlat <= 0.5; dlat += 0.02) {
+        for (let dlon = -0.7; dlon <= 0.7; dlon += 0.02) {
+          const lat = c.lat + dlat
+          const lon = c.lon + dlon
+          const t = terrain.sampleTerrain(lat, lon, seed).type
+          if (t !== 'ocean' && t !== 'water') continue
+          const x = lon * 10
+          const z = -lat * 10
+          if (Math.hypot(x - p.x, z - p.z) < 0.8) continue // not the figure itself
+          out.push([x, z, t === 'ocean' ? 1 : 0])
+        }
+      }
+      return out
+    }, MOUTH)
+    const read = async () => {
+      await page.waitForFunction(() => window.__camera?.settled?.(), null, { timeout: 30000 }).catch(() => {})
+      const proj = await page.evaluate((pts) => pts.map(([x, z]) => {
+        const n = window.__camera.ndc(x, z, 0)
+        return [(n.x * 0.5 + 0.5) * window.innerWidth, (0.5 - n.y * 0.5) * window.innerHeight, n.z]
+      }), pts)
+      const png = await capturePixels(page, 'water-stability')
+      const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
+      return proj.map(([px, py, pz]) => {
+        // Inside the picture, clear of the HUD bars.
+        if (pz >= 1 || px < 4 || px >= info.width - 4 || py < 60 || py >= info.height - 70) return null
+        const i = (Math.round(py) * info.width + Math.round(px)) * info.channels
+        return [data[i], data[i + 1], data[i + 2]]
+      })
+    }
+    // cls: 1 = terrain sea (the sea sheet), 0 = river channel (the ribbon).
+    const changed = (a, b, cls) => {
+      let seen = 0
+      let flips = 0
+      for (let k = 0; k < a.length; k++) {
+        if (!a[k] || !b[k] || pts[k][2] !== cls) continue
+        seen++
+        const d = Math.abs(a[k][0] - b[k][0]) + Math.abs(a[k][1] - b[k][1]) + Math.abs(a[k][2] - b[k][2])
+        if (d > 90) flips++
+      }
+      return { seen, flips, share: flips / Math.max(1, seen) }
+    }
+    await shot(tag('314-water-mouth-before-walk'), {
+      world: MOUTH,
+      label: 'the Rosetta mouth before the walk',
+    })
+    const a0 = await read()
+    await page.evaluate(() => window.__sleepSim(1.5))
+    const a1 = await read()
+    const stillSea = changed(a0, a1, 1)
+    const stillRiver = changed(a0, a1, 0)
+    // Walk half a sea-plane lattice cell (2 world units) along the bank, the
+    // phase at which a sliding lattice moved the waves the most.
+    const walked = await page.evaluate(async () => {
+      const terrain = await import('/src/world/terrain.ts')
+      const g = () => window.__game.getState()
+      const seed = g().seed
+      const from = { ...g().pos }
+      // The first bearing whose 2-unit path is unblocked, preferring one that
+      // stays on dry ground (no current to carry him on afterwards).
+      const bearings = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]]
+      const pathOk = ([dx, dz], dryOnly) => {
+        for (let s = 0.25; s <= 2.2; s += 0.25) {
+          const lat = -(from.z + dz * s) / 10
+          const lon = (from.x + dx * s) / 10
+          const t = terrain.sampleTerrain(lat, lon, seed).type
+          if (terrain.isBlocked(t, lat, lon) || (dryOnly && (t === 'ocean' || t === 'water'))) return false
+        }
+        return true
+      }
+      const dir = bearings.find((b) => pathOk(b, true)) ?? bearings.find((b) => pathOk(b, false))
+      if (!dir) return { moved: 0 }
+      for (let i = 0; i < 400 && Math.hypot(g().pos.x - from.x, g().pos.z - from.z) < 2; i++) g().moveTravel(dir[0], dir[1], 0.05)
+      return { dir, moved: Math.hypot(g().pos.x - from.x, g().pos.z - from.z) }
+    })
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await page.evaluate(() => window.__sleepSim(1.5))
+    const b = await read()
+    const walkSea = changed(a1, b, 1)
+    const walkRiver = changed(a1, b, 0)
+    await shot(tag('314-water-mouth-after-walk'), {
+      world: MOUTH,
+      label: 'the Rosetta mouth after the walk',
+    })
+    const detail = JSON.stringify({ stand, walked, stillSea, walkSea, stillRiver, walkRiver, points: pts.length })
+    check('water stability: the walk covers half a sea-plane lattice cell (point 314)', walked.moved >= 1.8, detail)
+    check(
+      'water stability: enough sea water in the picture to judge (point 314)',
+      stillSea.seen >= 200 && walkSea.seen >= 200,
+      detail,
+    )
+    check(
+      'water stability: enough river water in the picture to judge (point 314)',
+      stillRiver.seen >= 100 && walkRiver.seen >= 100,
+      detail,
+    )
+    // A pale patch or foam plate appearing or vanishing flips a water point by
+    // far more than the slow drift of the surface does in the same time.
+    // Measured 10.11.2026, share of points flipped over the walk —
+    //   sea:   before the fix 3.0 % (WebGPU) / 3.4 % (WebGL 2), after 0.4 / 0.6 %;
+    //   river: before 1.5 / 2.2 %, after 2.4 / 2.0 % (standing 0.3-1.5 %) — the
+    //   ribbon's defect was its static see-through mouth, not flicker, so its
+    //   bound only caps the foam drift and does not separate old from new.
+    check(
+      'water stability: walking flips no more sea water than standing still (point 314)',
+      walkSea.share <= stillSea.share + 0.01 && walkSea.share <= 0.013,
+      detail,
+    )
+    check(
+      'water stability: walking flips no more river water than its foam drift allows (point 314)',
+      walkRiver.share <= stillRiver.share + 0.03 && walkRiver.share <= 0.04,
+      detail,
+    )
+  }
+}
+
 if (section('river-mouth-swim')) {
   const notch = await page.evaluate(async () => {
     const terrain = await import('/src/world/terrain.ts')
