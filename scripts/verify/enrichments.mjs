@@ -1156,7 +1156,8 @@ if (section('water-stability')) {
   if (stand) {
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     await page.waitForFunction(() => window.__camera?.settled?.(), null, { timeout: 30000 }).catch(() => {})
-    await page.waitForTimeout(2500) // chunks, the sea-mask refinement and the ribbon settle
+    // Chunks, the time-sliced sea-mask refinement and the ribbon settle (app clock).
+    await page.evaluate(() => window.__sleepSim(2.5))
     // World water points around the mouth: terrain sea and the river channel.
     const pts = await page.evaluate(async (c) => {
       const terrain = await import('/src/world/terrain.ts')
@@ -1208,7 +1209,7 @@ if (section('water-stability')) {
       label: 'the Rosetta mouth before the walk',
     })
     const a0 = await read()
-    await page.waitForTimeout(1500)
+    await page.evaluate(() => window.__sleepSim(1.5))
     const a1 = await read()
     const still = changed(a0, a1)
     const stillSea = changed(a0, a1, true)
@@ -1237,7 +1238,7 @@ if (section('water-stability')) {
       return { dir, moved: Math.hypot(g().pos.x - from.x, g().pos.z - from.z) }
     })
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-    await page.waitForTimeout(1500)
+    await page.evaluate(() => window.__sleepSim(1.5))
     const b = await read()
     const walk = changed(a1, b)
     const walkSea = changed(a1, b, true)
