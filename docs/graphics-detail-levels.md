@@ -44,6 +44,7 @@ device pixel ratio is kept (no cap).
 | `weatherIntensity` | 0.6 | 1 | 1 |
 | `waterCalm` | on | off | off |
 | `wildlifeDensity` | 0.6 | 1 | 1 |
+| `offscreenBehaviourInterval` | 3 | 1 | 1 |
 | `figureLimbSegments` | 5 | 8 | 12 |
 | `placeRiverSegments` | 8 | 32 | 64 |
 | `placeRiverFlotsam` | 12 | 48 | 90 |
@@ -121,6 +122,16 @@ added.
 - **`wildlifeDensity`** *(declared, not yet consumed)* — Ambient wildlife
   spawn-density factor (`1` = full, design.md §19.2). Declared for the §21
   registry; will be read by the spawner once wired. 0.6 on low.
+- **`offscreenBehaviourInterval`** — The CPU lever for weak phones (point 310):
+  an ambient animal OUTSIDE the rendered frame (the shared `isOnScreen`
+  projection, never an assumed radius) that is in no drama steps its behaviour
+  only every N frames and holds its last pose in between. Every animal in a
+  §19 drama (hunt, fight, crossing, rescue, mire, grief, mourning, a dying elder,
+  the crocodile, the birds, the elephants) steps every frame, so every sim-time
+  deadline runs as before and no drama stalls. Held off-screen animals also skip
+  the per-frame elephant-trample check on their held frames. Low `3`
+  (calibratable), medium/high `1` (every frame). The internal allow-flag
+  `offscreenThrottleEnabled` steps everyone every frame within the level.
 - **`figureLimbSegments`** — Radial segments of the villager figures' arms,
   hands and legs (point 479). The limbs are thin and the player stands within a
   metre of them while a figure gestures, so the count decides whether an arm

@@ -67,6 +67,13 @@ export interface QualityPreset {
   /** Ambient wildlife spawn-density factor (1 = full, design.md §19.2).
    *  Declared for the §21 registry; consumed by the spawner when wired. */
   wildlifeDensity: number
+  /** Frames between behaviour steps of an OFF-SCREEN ambient animal (point
+   *  310, the CPU lever for the phone): 1 steps everyone every frame; N > 1
+   *  lets an animal outside the rendered frame (the shared isOnScreen
+   *  projection) that is in no drama hold its pose for N-1 frames. Drama
+   *  animals always step, so every §19 deadline runs in sim time as before
+   *  (offscreenThrottle.ts). */
+  offscreenBehaviourInterval: number
   /** Radial segments of the villager figures' arm/leg/hand primitives (point
    *  479). The limbs are thin and the eye passes within a metre of them at
    *  conversation range, so the count is what decides whether an arm reads as a
@@ -141,6 +148,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     weatherIntensity: 0.6,
     waterCalm: true,
     wildlifeDensity: 0.6,
+    offscreenBehaviourInterval: 3, // calibratable: off-screen ambient animals step every 3rd frame
     figureLimbSegments: 5, // point 479: the frugal floor — a limb still reads, faceted
     placeRiverSegments: 8, // a coarse undulation; the current still reads
     placeRiverFlotsam: 12, // x2 only, to spare the weakest tier (frame cost measured, work-order 1280); never none
@@ -171,6 +179,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     weatherIntensity: 1,
     waterCalm: false,
     wildlifeDensity: 1,
+    offscreenBehaviourInterval: 1,
     figureLimbSegments: 8, // point 479: smooth enough at conversation range
     placeRiverSegments: 32,
     placeRiverFlotsam: 48, // ~3x the 16 foam patches it had, now a mixed drift
@@ -200,6 +209,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     weatherIntensity: 1,
     waterCalm: false,
     wildlifeDensity: 1,
+    offscreenBehaviourInterval: 1,
     figureLimbSegments: 12, // point 479: no facet on an arm the player stands beside
     placeRiverSegments: 64,
     placeRiverFlotsam: 90, // ~3x the 30 foam patches it had

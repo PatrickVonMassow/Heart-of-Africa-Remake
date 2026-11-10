@@ -20,7 +20,8 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
-import { effectiveFaunaBodySegments, effectiveGrassFireFlames, effectiveGrassFireSmoke, useUi } from '../../state/ui'
+import { effectiveFaunaBodySegments, effectiveGrassFireFlames, effectiveGrassFireSmoke, effectiveOffscreenBehaviourInterval, useUi } from '../../state/ui'
+import { behaviourStepDue, isAmbientForThrottle } from './offscreenThrottle'
 import { setAmbienceAnimals, playTrampleCrunch, proximityGain, trampleCrunchFires } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
 import {
@@ -640,6 +641,10 @@ interface Animal {
   /** Dying of old age (design.md §19.18): the stepped decline (stepDying) and,
    *  for a moving animal, the heading it drifts on. Cleared only by death. */
   dying?: DyingState & { heading?: number; stage?: DyingStage }
+  /** The off-screen behaviour throttle's held pose (point 310): the matrix of
+   *  this animal's last full step and the frame it was written in. */
+  heldPose?: Float32Array
+  heldPoseFrame?: number
 }
 
 /**
@@ -5062,6 +5067,9 @@ function Herds() {
     // carries it, and the collider accepts only circles stamped with it.
     const drawFrame = frameCountRef.current
     ACTIVE_DRAW_FRAME = drawFrame
+    // Off-screen behaviour throttle (point 310, offscreenThrottle.ts): 1 on
+    // medium/high, so everyone steps every frame there.
+    const offscreenInterval = effectiveOffscreenBehaviourInterval(useUi.getState())
     for (const sp of SPECIES) {
       const mesh = meshRefs.current[sp]
       if (!mesh) continue
@@ -5117,6 +5125,27 @@ function Herds() {
           vpos.set(a.x, groundedBodyY(a.y) - sinkY, a.z)
           vscl.setScalar(a.scale * df)
           mtx.compose(vpos, quat, vscl)
+          write(a)
+          continue
+        }
+        // An off-screen animal in no drama holds its last full-step pose between
+        // its throttled steps (point 310): the matrix is re-written (so it keeps
+        // its instance slot and its collider stamp), the behaviour is not run.
+        // Drama animals and every on-screen one step every frame.
+        if (
+          offscreenInterval > 1 &&
+          a.heldPose !== undefined &&
+          a.heldPoseFrame !== undefined &&
+          drawFrame - a.heldPoseFrame < offscreenInterval &&
+          !behaviourStepDue(
+            isOnScreen(a.x, a.z),
+            isAmbientForThrottle(sp, a, a === LION_STATE.victim),
+            offscreenInterval,
+            drawFrame,
+            a.phase,
+          )
+        ) {
+          mtx.fromArray(a.heldPose)
           write(a)
           continue
         }
@@ -6170,6 +6199,11 @@ function Herds() {
             )
             devAssert(!(persistent && floating), 'animal-floating', () => `${sp} bodyY=${bodyY.toFixed(2)} ground=${ground.toFixed(2)}`)
           }
+        }
+        if (offscreenInterval > 1) {
+          a.heldPose ??= new Float32Array(16)
+          mtx.toArray(a.heldPose)
+          a.heldPoseFrame = drawFrame
         }
         write(a)
       }
