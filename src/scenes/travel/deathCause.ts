@@ -21,6 +21,7 @@ export const DEATH_CAUSES = [
   'plague', // the rinderpest toll, spawned dead (point 133)
   'remnant', // the scrap a predator leaves, spawned dead
   'staged', // a debug-menu carcass (design.md §21.3)
+  'old-age', // a natural death after the depicted decline (design.md §19.18); the body itself is the actor
 ] as const
 
 export type DeathCause = (typeof DEATH_CAUSES)[number]
