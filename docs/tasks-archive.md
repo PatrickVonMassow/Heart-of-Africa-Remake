@@ -36084,3 +36084,24 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   point 319. VERIFIABLE: pure test enumerating the death causes, each setting a
   cause field; the assert fires on a synthetic causeless death; a staged
   croc-kill-then-vigil ends in one of the two legitimate outcomes; both backends.
+
+- [x] 314. Drifting pale patches on water (user 25.07.2026, screenshot: bird's-eye at
+  a river mouth near the ocean — two elongated pale/greenish patches ON the water
+  surface near the shore, which MOVE/CHANGE as the traveller walks; "immer noch
+  gelegentlich", i.e. the class was seen before). DIAGNOSE BY THE PICTURE first
+  (drive the reported shore on both backends, screenshot series), then root-cause —
+  candidate hypotheses to check, not to assume: (1) shore/crest foam sampled in a
+  non-world-anchored space so the mask swims with the camera; (2) the far-sheet vs
+  near-water overlap at the coast (zoom-gated far sheet showing through); (3) the
+  point-211 ribbon-row lift re-evaluating per terrain-chunk LOD so lifted rows pop
+  as chunks stream (matches "changes while walking"); (4) foam from the river mouth
+  bridge (MOUTH_BRIDGE) rows extending into the shelf. FIX the identified cause; the
+  §11.3 continuity/never-buried/mouth-bridge invariants stay green. VERIFIABLE: a
+  driven enrichments check at the reported spot asserts the water pixels stay
+  stable while the traveller moves (frame-diff over the water region bounded, on
+  BOTH backends), plus the screenshot pair before/after; pure test for whichever
+  sampling rule was wrong.
+  SEEN AGAIN 04.09.2026 (user, findings carrier): white plates drift on the RIVER,
+  away from the river mouth, and read as plastic rather than as water — so the
+  class is not confined to the coast, and whatever the diagnosis finds must also
+  explain a plate-like, hard-edged look on an inland river surface.
