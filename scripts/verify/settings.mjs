@@ -1086,6 +1086,38 @@ if (section('graphics-levels')) {
     errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
 }
 
+// --- Start level from the URL (design.md §21.1, point 347) ------------------
+// `?quality=` seeds the store before the first frame. A fresh page per level
+// records the level at the first animation frame that sees the store, so a
+// level applied after mount (a medium frame, then a rebuild) reads wrong here.
+// The parser and the seed are pure-tested in src/config/startQuality.test.ts
+// and src/state/uiStartQuality.test.ts; this proves the live wiring.
+if (section('quality-url')) {
+  for (const [param, level, expectShadows] of [['low', 'low', false], ['HIGH', 'high', true]]) {
+    const p = await browser.newPage({ viewport: SETTINGS_VIEWPORT })
+    const errs = []
+    p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
+    p.on('pageerror', (e) => errs.push(String(e)))
+    await p.addInitScript(() => {
+      const raf = window.requestAnimationFrame.bind(window)
+      window.requestAnimationFrame = (cb) => raf((t) => {
+        if (window.__firstFrameLevel === undefined && window.__ui) window.__firstFrameLevel = window.__ui.getState().detailLevel
+        cb(t)
+      })
+    })
+    await p.goto(`${BASE}?quality=${param}`)
+    await waitForSceneBuilt(p)
+    const r = await p.evaluate(() => {
+      const s = window.__ui.getState()
+      return { first: window.__firstFrameLevel, now: s.detailLevel, shadows: s.detailLevel !== 'low' && s.shadowsEnabled }
+    })
+    check(`?quality=${param} opens at ${level} on the first frame, sun shadows ${expectShadows ? 'on' : 'off'}`,
+      r.first === level && r.now === level && r.shadows === expectShadows, JSON.stringify(r))
+    check(`?quality=${param}: no console errors`, errs.length === 0, errs.join(' | ').slice(0, 300))
+    await p.close()
+  }
+}
+
 // --- Point 325: a wheel over the debug panel never moves the zoom -------------
 // The bird's-eye zoom listens on `window`, so a wheel over the long debug menu
 // used to scroll the panel AND zoom the view underneath it (the panel's own
