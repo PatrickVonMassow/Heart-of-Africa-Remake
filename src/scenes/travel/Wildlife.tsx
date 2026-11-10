@@ -943,7 +943,8 @@ const CARCASS_DISSOLVE_SECONDS = 9
  *  feeder"): every feeder (landed scavenger flock, feeding predator, kill
  *  flock at a remnant) registers the carcass it worked; the Herds frame checks
  *  each dead body's dissolve against its last value and clears the set. Shared
- *  module state because the feeders run in three components' frames. */
+ *  module state because the feeders run in three components' frames; dev
+ *  builds only, so production retains no fed carcass. */
 const SHRINK_FED = new Set<object>()
 const SHRINK_PREV = new WeakMap<object, number>()
 /** A feeding predator stands this far from its victim, on the side it came
@@ -4467,7 +4468,7 @@ function Herds() {
           sc.y = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
           if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
           target.dissolve -= dt
-          SHRINK_FED.add(target) // the landed flock is this shrink's actor (point 319)
+          if (import.meta.env.DEV) SHRINK_FED.add(target) // the landed flock is this shrink's actor (point 319)
         } else if (target && sc.mode === 'in') {
           // Glide down toward the carcass as the approach closes.
           const d = Math.hypot(target.x - sc.x, target.z - sc.z)
@@ -6060,7 +6061,7 @@ function LionHunt() {
         if (v.dead) {
           if (v.dissolve === undefined) v.dissolve = CARCASS_DISSOLVE_SECONDS
           v.dissolve -= dt
-          SHRINK_FED.add(v) // the feeding predator is this shrink's actor (point 319)
+          if (import.meta.env.DEV) SHRINK_FED.add(v) // the feeding predator is this shrink's actor (point 319)
         }
         // The feed never outlives its carcass (point 453): it ends when the
         // body has left the herds (culled, removed), when it has shrunk to the
@@ -6377,7 +6378,7 @@ function Vultures() {
         f.z += (remnant.z - f.z) * Math.min(1, dt * 3)
         // Only landed birds eat; the scrap dissolves like a scavenged carcass.
         feedRemnant(remnant, dt, killDescend.current > 0.7, CARCASS_DISSOLVE_SECONDS)
-        SHRINK_FED.add(remnant) // the kill flock is the scrap's actor (point 319)
+        if (import.meta.env.DEV) SHRINK_FED.add(remnant) // the kill flock is the scrap's actor (point 319)
       }
       killDescend.current = Math.max(
         0,
