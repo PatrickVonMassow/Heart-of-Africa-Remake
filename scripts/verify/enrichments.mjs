@@ -7171,7 +7171,12 @@ if (section('elderly-natural-death')) {
   // forage and dies there (research §4.2); within reach of the §4.4 graveyard
   // that is where it goes — alone, its herd left behind (no pilgrimage, §4.3).
   await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6)) // onto the graveyard
-  await page.waitForTimeout(1500)
+  // Wait for the jump to land, not on the wall clock: the traveller stands at
+  // the graveyard and the herds hook is live again.
+  await page.waitForFunction(() => {
+    const p = window.__game.getState().pos
+    return !!window.__wildlife?.herdsRef?.current && Math.hypot(p.x - 366, p.z - 49) < 5
+  }, null, { timeout: 30000 }).catch(() => {})
   const tusker = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const be = window.__balance.elderly
