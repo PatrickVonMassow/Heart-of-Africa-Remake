@@ -215,6 +215,22 @@ describe('the aerial hunt (research B3/B4: scripted descend-and-strike, air-catc
   })
 })
 
+describe('aerial hunt hard cap', () => {
+  it('a kill struck at the deadline still reaches done by deadline + feed + leave under coarse steps', () => {
+    const bound = HUNT.deadline + HUNT.feedSeconds + HUNT.leaveSeconds
+    const dt = 1.9 // a frame hitch: each phase change would drop up to one step
+    const h = startAerialHunt('ayresHawkEagle', 0, 0, 2.5, HUNT)
+    // A strike on the deadline's last step: the raptor feeds, then leaves.
+    h.phase = 'feed'
+    h.phaseT = 0
+    h.t = HUNT.deadline
+    let ev = 'none'
+    while (ev !== 'done' && h.t < bound * 2) ev = aerialHuntStep(h, null, dt, HUNT, 0.1)
+    expect(ev).toBe('done')
+    expect(h.t).toBeLessThan(bound + dt)
+  })
+})
+
 describe('raptor builds (src/render/fauna.ts)', () => {
   it('every pooled raptor has a plumage and builds a spread-wing body wider than long', () => {
     for (const id of Object.keys(AERIAL_PREDATORS) as Array<keyof typeof AERIAL_PREDATORS>) {

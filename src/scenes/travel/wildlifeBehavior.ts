@@ -3834,6 +3834,12 @@ export function aerialHuntStep(
     h.outcome = outcome
     return outcome
   }
+  // The I4 bound holds absolutely: a phase change resets phaseT and drops the
+  // step's overflow, so the per-phase timers alone could overrun it by frames.
+  if (h.t >= cfg.deadline + cfg.feedSeconds + cfg.leaveSeconds) {
+    h.phase = 'leave'
+    return 'done'
+  }
   if (h.phase === 'leave') {
     h.y += cfg.cruiseSpeed * 0.5 * dt
     h.x += Math.sin(h.heading) * cfg.cruiseSpeed * dt
@@ -3852,6 +3858,8 @@ export function aerialHuntStep(
   if (prey === null) return toLeave('lost')
   if (h.phase === 'high') {
     // Hold the high band and set up over the prey; the plunge waits for the gate.
+    // A bird that landed meanwhile keeps the falcon waiting on above it (it may
+    // flush again); the deadline above ends the wait (design.md §19.19).
     h.y = cfg.highY
     const left = homeOn(h, prey.x, h.y, prey.z, cfg.cruiseSpeed, dt, false)
     if (h.phaseT >= cfg.setupSeconds && left < cfg.highY && stoopDiveAllowed(h.y, prey.y, prey.airborne, cfg.highY, cfg.lowY)) {

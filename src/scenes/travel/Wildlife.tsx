@@ -4372,7 +4372,9 @@ function Herds() {
     // sometimes fails at the recovery moment.
     // The ground predators on the field this frame (design.md §19.19): the
     // running hunt's predator and every live adult of the seeded predator
-    // families. A flight-capable bird takes off before them; a crouching chick
+    // families. LION_STATE is the one running hunt of any kind (lion, cheetah,
+    // leopard or hyena); the lion family is the only standing predator herd.
+    // A flight-capable bird takes off before them; a crouching chick
     // or a bird still on the ground is all they can reach.
     const groundPredatorPos: Array<[number, number]> = []
     if (LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave')
