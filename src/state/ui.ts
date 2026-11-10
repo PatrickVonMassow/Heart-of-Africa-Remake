@@ -7,6 +7,7 @@ import type { UtteranceId } from '../communication/lexicon'
 import type { DrumMessageId, DrumMessagePlan } from '../communication/drumMessage'
 import type { TreasureId } from '../systems/economy'
 import { QUALITY_PRESETS, nextDetailLevel, type DetailLevel } from '../config/quality'
+import { startQualityFromUrl } from '../config/startQuality'
 
 export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'bazaar' | 'agency' | 'chief'
 
@@ -282,7 +283,8 @@ export const useUi = create<UiState>()((set) => ({
   journalDnd: false,
   travelZoom: DEFAULT_TRAVEL_ZOOM,
   touchActive: false,
-  detailLevel: 'medium',
+  // Seeded from ?quality= so the first frame already renders at the linked level (point 347)
+  detailLevel: (typeof window !== 'undefined' ? startQualityFromUrl(window.location.search) : null) ?? 'medium',
   ssaoEnabled: true,
   shadowMapHalf: false,
   shadowsEnabled: true,
