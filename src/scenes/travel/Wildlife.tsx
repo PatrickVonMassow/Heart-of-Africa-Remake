@@ -171,6 +171,7 @@ import {
   dyingSlowdown,
   elderSpeedFactor,
   elderTurnsSolitary,
+  dyingSuspended,
   elephantDyingTarget,
   fightInitiates,
   fightResolveAged,
@@ -3558,8 +3559,7 @@ function Herds() {
           const dy = a.dying
           // A predator's catch, the water or the fire took the failing animal
           // over: that drama decides its end, the decline waits.
-          if (a.caught !== undefined || a.inWater !== undefined || a.fireTrapped !== undefined ||
-              a.crossing !== undefined || a === LION_STATE.victim) continue
+          if (dyingSuspended(a, a === LION_STATE.victim)) continue
           if (dy.target === undefined) {
             dy.target = sp === 'elephant'
               ? elephantDyingTarget(a.x, a.z, findWaterNear(a.x, a.z, seed), GRAVEYARD_POS, be.graveyardReach)
@@ -5702,8 +5702,10 @@ function Herds() {
         // Dying of old age (design.md §19.18): a failing elder hangs its head
         // and faces its slow drift; a downed one rolls onto its side and lies
         // there, breathing, while the flock gathers over it.
+        // A drama that took the dying animal over (dyingSuspended) owns its
+        // pose and position: the caught, swept or burning animal is drawn by it.
         let roll = 0
-        if (a.dying !== undefined) {
+        if (a.dying !== undefined && !dyingSuspended(a, a === LION_STATE.victim)) {
           wobTarget = 0
           px = a.x
           pz = a.z

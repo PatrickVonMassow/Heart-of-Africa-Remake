@@ -3491,6 +3491,18 @@ export function stepDying(s: DyingState, dt: number, arrived: boolean, t: DyingT
   return s.elapsed - s.downSince >= Math.max(0.01, t.seconds) - fail ? 'dead' : 'down'
 }
 
+/** Has another drama taken a dying animal over — a predator's catch (or the
+ *  hunt's victim), the water, the fire or a crossing? Then that drama decides
+ *  its end and owns its body: the decline waits AND its failing/down pose is
+ *  not drawn (one predicate for the sim pass and the render, point 265). */
+export function dyingSuspended(
+  a: { caught?: unknown; inWater?: unknown; fireTrapped?: unknown; crossing?: unknown },
+  huntVictim: boolean,
+): boolean {
+  return huntVictim || a.caught !== undefined || a.inWater !== undefined ||
+    a.fireTrapped !== undefined || a.crossing !== undefined
+}
+
 /** The latest a dying can resolve: the grace-extended failing window plus the down window. */
 export function dyingDeadline(t: DyingTiming): number {
   const fail = failSecondsOf(t)

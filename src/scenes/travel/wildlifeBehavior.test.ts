@@ -10,6 +10,7 @@ import {
   calvesForGroup,
   DYING_DOWN_ROLL,
   dyingDeadline,
+  dyingSuspended,
   dyingDownRoll,
   dyingDrawsFlock,
   dyingFailSeconds,
@@ -5049,6 +5050,16 @@ describe('natural death of old age (design.md §19.18)', () => {
       expect(t).toBeLessThanOrEqual(dyingDeadline(T) + 0.5)
     }
     expect(dyingDeadline(T)).toBeCloseTo(24 * 3 + 16, 9)
+  })
+
+  it('another drama that takes the dying animal over owns it — decline and pose wait (point 265)', () => {
+    expect(dyingSuspended({}, false)).toBe(false)
+    expect(dyingSuspended({}, true)).toBe(true) // the hunt's victim
+    expect(dyingSuspended({ caught: 2 }, false)).toBe(true) // seized by a predator
+    expect(dyingSuspended({ caught: 0 }, false)).toBe(true) // even at the last second of the grip
+    expect(dyingSuspended({ inWater: 0 }, false)).toBe(true) // swept into the water
+    expect(dyingSuspended({ fireTrapped: 1 }, false)).toBe(true)
+    expect(dyingSuspended({ crossing: { tx: 0, tz: 0, time: 0 } }, false)).toBe(true)
   })
 
   it('a tick spanning both stages keeps the remainder past the threshold (deadline holds exactly)', () => {
