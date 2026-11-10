@@ -54,6 +54,7 @@ device pixel ratio is kept (no cap).
 | `figureGltfBody` | off | on | on |
 | `grassFireFlames` | 16 | 28 | 40 |
 | `grassFireSmoke` | 6 | 14 | 24 |
+| `sphinxSiteDetail` | reduced | standard | full |
 
 ## What each setting does
 
@@ -271,6 +272,27 @@ added.
 - **`grassFireSmoke`** — Smoke puffs rising behind the line: alpha-blended,
   camera-facing sprites, so it prices overdraw while a fire burns in view, and
   nothing otherwise. One instanced draw. Climbs 6 → 14 → 24.
+- **`sphinxSiteDetail`** — The level of the Great Sphinx's mesh at the
+  walkable Giza site (`src/world/sphinx.ts`, the ONE definition every view of
+  the monument derives from; `src/render/sphinx.ts` builds it). `reduced` is
+  the named frugal mesh of the low level: the same parts, coarser rings, a
+  coarser drift grid and no painted eye and mouth marks; `standard` and
+  `full` add tessellation, the face marks and a finer drift. The limestone
+  banding is a per-fragment term of its TSL material on every level. One draw.
+  Counted per level (vertices / triangles; the bird's-eye landmark and the
+  Cairo skyline outline are fixed distant levels outside the presets):
+
+  | Level | Vertices | Triangles |
+  | --- | --- | --- |
+  | reduced (low) | 2862 | 4048 |
+  | standard (medium) | 9056 | 13954 |
+  | full (high) | 19492 | 30546 |
+  | landmark (bird's-eye) | 1099 | 1400 |
+  | skyline (Cairo) | 447 | 524 |
+
+  The measured frame cost at the site on both backends at LOW and MEDIUM is
+  owed by the owner's local run (`polish-panorama`, section `sphinx`).
+
 ## Profiling the low preset (F8 benchmark, point 293)
 
 The in-game render benchmark (**F8** / `?bench`, design.md §21.1) exists to price

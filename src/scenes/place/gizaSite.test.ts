@@ -19,6 +19,7 @@ import {
   GIZA_SPHINX,
   buildGizaLayout,
   gizaColliders,
+  gizaSphinxColliders,
   pyramidFootprint,
 } from './gizaSite'
 import {
@@ -37,7 +38,8 @@ import { balance } from '../../config/balance'
 import { GIZA_PLATEAU } from '../../world/data/gizaPlateau'
 import { sampleTerrain } from '../../world/terrain'
 import { setupGeodata } from '../../test/geodata'
-import { buildGizaSiteMonuments, MEROE_PYRAMIDS, SPHINX_BURIAL_DEPTH } from '../../render/landmarks'
+import { buildGizaSiteMonuments, buildGizaSiteSphinx, MEROE_PYRAMIDS } from '../../render/landmarks'
+import { onSphinxFootprint, sphinxDriftBounds } from '../../world/sphinx'
 
 const byId = (id: string) => GIZA_PYRAMIDS.find((p) => p.id === id)!
 
@@ -96,9 +98,9 @@ describe('Giza site — the three great pyramids and the Sphinx (docs/giza-1890.
 describe('Giza site — collision and the walkable layout', () => {
   it('makes each pyramid and the Sphinx a solid collidable mass', () => {
     const colliders = gizaColliders()
-    // Three oriented pyramid boxes + one Sphinx circle.
+    // Three oriented pyramid boxes + the Sphinx's footprint circles.
     expect(colliders.filter((c) => c.kind === 'box').length).toBe(3)
-    expect(colliders.filter((c) => c.kind !== 'box').length).toBe(1)
+    expect(colliders.filter((c) => c.kind !== 'box').length).toBe(gizaSphinxColliders().length)
     // A point at each pyramid's centre is blocked (inside the mass).
     for (const p of GIZA_PYRAMIDS) {
       expect(standingClear(colliders, p.x, p.z, WALKER_RADIUS)).toBe(false)
@@ -250,22 +252,60 @@ describe('Giza site — the walkable sand reaches as far as the picture offers i
     // few strides out. It is now ~56 m of open desert.
     const cluster = Math.max(
       ...GIZA_PYRAMIDS.map((p) => Math.hypot(p.x, p.z) + pyramidFootprint(p.base)),
-      Math.hypot(GIZA_SPHINX.x, GIZA_SPHINX.z) + GIZA_SPHINX.scale * 0.6,
+      ...gizaSphinxColliders().flatMap((c) => [Math.hypot(c.x1, c.z1) + c.r, Math.hypot(c.x2, c.z2) + c.r]),
     )
     expect(GIZA_SITE_RADIUS - cluster).toBeGreaterThan(50)
   })
 })
 
 describe('Giza site — the site-scale monument geometry', () => {
-  it('renders the pyramids tall and the Sphinx buried below the sand line', () => {
+  it('renders the pyramids tall and the Sphinx as its own mesh, its drift running under the ground', () => {
     const geo = buildGizaSiteMonuments()
     geo.computeBoundingBox()
-    const b = geo.boundingBox!
     // The pyramids stand well above person height (giant masses).
-    expect(b.max.y).toBeGreaterThan(15)
-    // The Sphinx is sunk to the shoulders — the merged field reaches below the
-    // ground (buildSphinx's SPHINX_BURIAL_DEPTH, scaled up).
-    expect(b.min.y).toBeLessThan(-SPHINX_BURIAL_DEPTH)
+    expect(geo.boundingBox!.max.y).toBeGreaterThan(15)
+    const sphinx = buildGizaSiteSphinx('standard')
+    sphinx.computeBoundingBox()
+    const b = sphinx.boundingBox!
+    // The drift's foot crosses the ground; the head stands metres above it.
+    expect(b.min.y).toBeLessThan(0)
+    expect(b.max.y).toBeGreaterThan(4)
+    // Its stone carries the banding attribute the site material reads.
+    expect(sphinx.getAttribute('sphinxBand')).toBeTruthy()
+  })
+
+  it("the Sphinx's collidable mass is its drawn body (point 378)", () => {
+    // Sample the drawn footprint in site metres: every point of it is inside a
+    // collider, and no collider reaches past it by more than a stride's fraction.
+    const capsules = gizaSphinxColliders()
+    const L = GIZA_SPHINX.length
+    const b = sphinxDriftBounds()
+    const inCollider = (x: number, z: number) =>
+      capsules.some((c) => {
+        const dx = c.x2 - c.x1
+        const dz = c.z2 - c.z1
+        const t = Math.max(0, Math.min(1, ((x - c.x1) * dx + (z - c.z1) * dz) / (dx * dx + dz * dz || 1)))
+        return Math.hypot(x - (c.x1 + t * dx), z - (c.z1 + t * dz)) <= c.r
+      })
+    const drawn = (x: number, z: number) => onSphinxFootprint((x - GIZA_SPHINX.x) / L, (z - GIZA_SPHINX.z) / L)
+    let covered = 0
+    for (let x = GIZA_SPHINX.x + b.minX * L; x <= GIZA_SPHINX.x + b.maxX * L; x += 0.2) {
+      for (let z = GIZA_SPHINX.z + b.minZ * L; z <= GIZA_SPHINX.z + b.maxZ * L; z += 0.2) {
+        if (drawn(x, z)) {
+          covered++
+          expect(inCollider(x, z), `drawn sand at (${x.toFixed(1)}, ${z.toFixed(1)}) collides`).toBe(true)
+        } else if (inCollider(x, z)) {
+          // Outside the drawn footprint, a collider may only overshoot its rim slightly.
+          let near = false
+          for (let a = 0; a < 16 && !near; a++) {
+            const ang = (a / 16) * Math.PI * 2
+            for (let d = 0.05; d <= 0.6 && !near; d += 0.05) near = drawn(x + Math.cos(ang) * d, z + Math.sin(ang) * d)
+          }
+          expect(near, `collider overshoot at (${x.toFixed(1)}, ${z.toFixed(1)})`).toBe(true)
+        }
+      }
+    }
+    expect(covered).toBeGreaterThan(100)
   })
 
   it("carries Khafre's pale casing cap only near Khafre's own apex", () => {

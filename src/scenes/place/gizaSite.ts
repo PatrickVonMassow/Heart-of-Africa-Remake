@@ -16,10 +16,11 @@
 // cluster of small, steep ~70° cones — the slope ratio here is far flatter than
 // MEROE_PYRAMIDS' (~2.6·base) so the two can never be mistaken.
 
-import { balance, GIZA_CAST } from '../../config/balance'
+import { balance, GIZA_CAST, SPHINX_FORM } from '../../config/balance'
+import { sphinxColliderSegments } from '../../world/sphinx'
 import type { AgeGroup, CastId, Sex } from '../../systems/appearance'
 import { openPlainWalkRadius } from './backdrop'
-import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider, type SegmentCollider } from './collision'
 import type { PlaceLayout } from './layout'
 
 /**
@@ -112,11 +113,27 @@ export const GIZA_PYRAMIDS: readonly GizaPyramid[] = [
   pyramid('menkaure', -20, 18, 6.6, 0, { skirt: true }),
 ]
 
-/** The Great Sphinx east of Khafre, facing east (+x), buried to the shoulders.
- *  `scale` multiplies the unit-scale buildSphinx geometry (which is already
- *  sunk by SPHINX_BURIAL_DEPTH), so the burial and the noseless head come for
- *  free. */
-export const GIZA_SPHINX = { x: 20, z: 2, scale: 11 } as const
+/** The Great Sphinx east of Khafre, facing east (+x), buried to the shoulders
+ *  in its drift (the ONE definition, src/world/sphinx.ts). `length` is the
+ *  body length in metres (paw tip to tail) the unit definition is scaled to;
+ *  the drawn mesh (buildGizaSiteSphinx) and the collider below both use it. */
+export const GIZA_SPHINX: { readonly x: number; readonly z: number; readonly length: number } = SPHINX_FORM.site
+
+/** The Sphinx's collidable mass in site metres: the definition's footprint
+ *  capsules, scaled and placed like the drawn mesh (point 378: the collider is
+ *  the drawn body — the drift and the stone breaking it — and nothing else). */
+export function gizaSphinxColliders(): SegmentCollider[] {
+  const L = GIZA_SPHINX.length
+  const { x, z } = GIZA_SPHINX
+  return sphinxColliderSegments().map((c) => ({
+    kind: 'segment',
+    x1: x + c.x1 * L,
+    z1: z + c.z1 * L,
+    x2: x + c.x2 * L,
+    z2: z + c.z2 * L,
+    r: c.r * L,
+  }))
+}
 
 /** Footprint half-extent of a pyramid's collider box: the base square, after
  *  the 45° rotation that faces its flats to the axes, is axis-aligned with a
@@ -199,8 +216,8 @@ export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
 ]
 
 /** The collidable monument set: an oriented box under each pyramid's footprint
- *  and a circle around the Sphinx's emerged head and sand drift. Derived from
- *  the same GIZA_PYRAMIDS/GIZA_SPHINX constants the renderer draws, so a
+ *  and the Sphinx's drift footprint as a row of capsules. Derived from the
+ *  same GIZA_PYRAMIDS constants and Sphinx definition the renderer draws, so a
  *  monument can never leave a phantom collider or a gap. */
 export function gizaColliders(): Collider[] {
   const colliders: Collider[] = []
@@ -208,10 +225,10 @@ export function gizaColliders(): Collider[] {
     const h = pyramidFootprint(p.base)
     colliders.push(boxCollider(p.x, p.z, h, h, 0))
   }
-  // The buried Sphinx: only the head, nemes and shoulders break the sand, so a
-  // modest circle around its centre keeps the traveller from walking through
-  // the head without walling off the whole (sand-covered) body.
-  colliders.push({ x: GIZA_SPHINX.x, z: GIZA_SPHINX.z, r: GIZA_SPHINX.scale * 0.6 })
+  // The buried Sphinx: its drift is a solid mound on the flat site ground, so
+  // the whole drawn footprint collides, the stone that breaks it included
+  // (capsules across the body, the shape the existing segment collider has).
+  colliders.push(...gizaSphinxColliders())
   return colliders
 }
 

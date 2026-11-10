@@ -32,6 +32,7 @@ import {
   effectivePlaceRiverSegments,
   effectiveWaterDetailOctaves,
   effectiveFigureLimbSegments,
+  effectiveSphinxSiteDetail,
 } from '../../state/ui'
 import { balance, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
@@ -80,8 +81,9 @@ import { Figure } from './placeFigure'
 import { ColdCloaksContext, FigureLookContext, LimbDetailContext } from './placeFigureContext'
 import { useFigureLook } from './useFigureLook'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildPlayRock, buildRock } from '../../render/flora'
-import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments } from '../../render/landmarks'
-import { GIZA_AMBIENT, GIZA_PYRAMIDS, gizaFigure, isGizaPerson, type GizaAmbientRole } from './gizaSite'
+import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments, buildGizaSiteSphinx } from '../../render/landmarks'
+import { createSphinxSiteMaterial } from '../../render/sphinxMaterial'
+import { GIZA_AMBIENT, GIZA_PYRAMIDS, GIZA_SPHINX, gizaFigure, isGizaPerson, type GizaAmbientRole } from './gizaSite'
 import { LadyHat, SunHelmet } from './castHats'
 import {
   buildAntelopeParts,
@@ -1427,7 +1429,7 @@ function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
 // behind town buildings is a normal depth relationship, not a crossing). The
 // positions/scaleX mirror the <GizaSkyline>/<TableMountainSkyline> meshes below.
 const PLACE_SKYLINES: Record<string, Array<{ build: () => THREE.BufferGeometry; x: number; z: number; scaleX: number }>> = {
-  cairo: [{ build: buildGizaPyramids, x: -130, z: 10, scaleX: 13 }],
+  cairo: [{ build: () => buildGizaPyramids('skyline'), x: -130, z: 10, scaleX: 13 }],
   capetown: [{ build: buildTableMountain, x: 0, z: -118, scaleX: 1 }],
 }
 
@@ -1846,7 +1848,8 @@ function PanoramaWildlife({
  */
 function GizaSkyline({ placeId }: { placeId: string }) {
   const show = placeId === 'cairo'
-  const geometry = useMemo(() => (show ? buildGizaPyramids() : null), [show])
+  // The field at its skyline level: only the Sphinx's outline-bearing parts.
+  const geometry = useMemo(() => (show ? buildGizaPyramids('skyline') : null), [show])
   const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
   useEffect(() => () => geometry?.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
@@ -2262,15 +2265,32 @@ function PlaceRiver({
 // --- Giza monument site (design.md §4.4, point 273) ---------------------------
 
 /**
- * The three great pyramids and the buried Sphinx at the walkable Giza site,
- * as giant collidable masses the traveller walks around (the collision comes
- * from gizaSite.ts; this is the visible geometry). One merged, vertex-colored
- * mesh carrying the ~1890 casing cues — Khufu's blunt top, Khafre's pale cap,
- * Menkaure's granite skirt, and the Sphinx buried to the shoulders.
+ * The three great pyramids at the walkable Giza site, as giant collidable
+ * masses the traveller walks around (the collision comes from gizaSite.ts;
+ * this is the visible geometry). One merged, vertex-colored mesh carrying the
+ * ~1890 casing cues — Khufu's blunt top, Khafre's pale cap, Menkaure's granite
+ * skirt. The Sphinx is its own mesh below.
  */
 function GizaMonuments() {
   const geometry = useMemo(() => buildGizaSiteMonuments(), [])
   const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => material.dispose(), [material])
+  return <mesh geometry={geometry} material={material} castShadow receiveShadow />
+}
+
+/**
+ * The Great Sphinx at the walkable site (design.md §4.4, docs/giza-1890.md
+ * §1.3): the shared definition at the level the quality preset picks
+ * (`sphinxSiteDetail` — the named reduced mesh on low), buried to the
+ * shoulders in its drift, under the TSL material that bands the limestone
+ * courses and the nemes stripes. Its collider is the same definition's
+ * footprint (gizaSite.ts).
+ */
+function GizaSphinx() {
+  const detail = useUi(effectiveSphinxSiteDetail)
+  const geometry = useMemo(() => buildGizaSiteSphinx(detail), [detail])
+  const material = useMemo(() => createSphinxSiteMaterial(), [])
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
   useEffect(() => {
@@ -2280,14 +2300,17 @@ function GizaMonuments() {
     const bb = geometry.boundingBox
     w.__placeMonuments = {
       pyramids: GIZA_PYRAMIDS.length,
-      // The Sphinx is buried, so the merged field reaches below the sand line.
+      sphinxDetail: detail,
+      sphinx: { x: GIZA_SPHINX.x, z: GIZA_SPHINX.z, length: GIZA_SPHINX.length },
+      sphinxTriangles: geometry.index ? geometry.index.count / 3 : 0,
+      // The drift's foot runs below the ground, so the mesh reaches under it.
       sphinxBuried: bb ? bb.min.y < 0 : false,
       maxY: bb ? bb.max.y : 0,
     }
     return () => {
       delete w.__placeMonuments
     }
-  }, [geometry])
+  }, [geometry, detail])
   return <mesh geometry={geometry} material={material} castShadow receiveShadow />
 }
 
@@ -3412,6 +3435,7 @@ export function PlaceScene() {
           pyramids and the buried Sphinx as giant collidable monuments, and the
           sparse Thomas-Cook-era ambient life around them. */}
       {isMonument && <GizaMonuments />}
+      {isMonument && <GizaSphinx />}
       {isMonument && (
         <PlaceDumpGroup id="giza-ambient" kind="giza-ambient">
           <GizaAmbient

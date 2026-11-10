@@ -1324,6 +1324,95 @@ if (section('giza-site')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- The Great Sphinx from every standpoint (work-order point 315) ------------
+// One definition, three levels (src/world/sphinx.ts). At the walkable site: a
+// frame face on, in profile, from behind and low along the drift, then a
+// moving-camera pass round the monument (a frame series for the flicker
+// judgement — no z-offset hides a fight, so a fight would show here), and the
+// frame cost at the site at LOW and MEDIUM. Both backends: the names carry the
+// backend. The bird's-eye landmark and the Cairo skyline frames are sections
+// `sphinx-travel` and `giza-skyline`.
+if (section('sphinx')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('giza')
+  await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeMonuments?.sphinx,
+    null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  const level = await page.evaluate(() => window.__ui.getState().detailLevel)
+  const sx = await page.evaluate(() => window.__placeMonuments.sphinx)
+  const L = sx.length
+  // Stand at (x, z) looking at the target (tx, tz); yaw 0 faces −z.
+  const standAt = (x, z, tx, tz, pitch = 0) =>
+    page.evaluate(
+      ({ x, z, tx, tz, pitch }) => {
+        const p = window.__placePlayer
+        p.x = x
+        p.z = z
+        p.yaw = Math.atan2(tx - x, tz - z) + Math.PI
+        p.pitch = pitch
+      },
+      { x, z, tx, tz, pitch },
+    )
+  const head = { x: sx.x + 0.28 * L, y: 0.24 * L, z: sx.z }
+  try {
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    const stands = [
+      ['315-sphinx-face', [sx.x + 0.95 * L, sx.z, head.x, head.z, 0.02], head, 'the Sphinx face on: nemes, brow band, lappets, broken nose'],
+      ['315-sphinx-profile', [sx.x + 0.05 * L, sx.z + 0.85 * L, sx.x, sx.z, 0], { x: sx.x, y: 0.15 * L, z: sx.z }, 'the Sphinx in profile: head over the couchant drift'],
+      ['315-sphinx-behind', [sx.x - 0.95 * L, sx.z + 0.15 * L, head.x, head.z, 0.04], head, 'the Sphinx from behind: back ridge, queue, head'],
+      ['315-sphinx-low-drift', [sx.x + 0.6 * L, sx.z + 0.38 * L, sx.x - 0.3 * L, sx.z, -0.02], { x: sx.x, y: 0.12 * L, z: sx.z }, 'low along the drift: shoulder swell, paw lobes, back ridge'],
+    ]
+    for (const [name, at, subject, label] of stands) {
+      await standAt(...at)
+      await waitForStable(page)
+      await frame(shot(name), { local: subject, label })
+    }
+    const monuments = await page.evaluate(() => window.__placeMonuments)
+    check('the Sphinx stands at its medium level, its drift running under the ground', monuments.sphinxDetail === 'standard' && monuments.sphinxBuried === true, JSON.stringify(monuments))
+    // The moving-camera pass: a slow orbit round the monument, one frame per
+    // step, for the flicker judgement on every surface the camera sweeps.
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2
+      await standAt(sx.x + Math.cos(a) * 0.8 * L, sx.z + Math.sin(a) * 0.8 * L, sx.x + 0.1 * L, sx.z, 0)
+      await nextFrames(3)
+      await frame(shot(`315-sphinx-orbit-${k}`), { local: { x: sx.x, y: 0.15 * L, z: sx.z }, label: `the moving-camera pass round the Sphinx, step ${k + 1} of 8` })
+    }
+    // The frame cost at the site, LOW and MEDIUM, standing in profile.
+    await standAt(sx.x + 0.05 * L, sx.z + 0.85 * L, sx.x, sx.z, 0)
+    for (const lvl of ['low', 'medium']) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), lvl)
+      await nextFrames(20)
+      const cost = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const times = []
+            const calls = []
+            const tris = []
+            let last = performance.now()
+            const tick = (t) => {
+              times.push(t - last)
+              last = t
+              const r = window.__renderer?.info?.render
+              calls.push(r?.drawCalls ?? 0)
+              tris.push(r?.triangles ?? 0)
+              if (times.length < 61) return requestAnimationFrame(tick)
+              const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
+              resolve({ detail: window.__placeMonuments?.sphinxDetail, sphinxTriangles: window.__placeMonuments?.sphinxTriangles, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+            }
+            requestAnimationFrame(tick)
+          }),
+      )
+      console.log(`SPHINX FRAME COST ${VERIFY_GL ?? 'webgpu'} ${lvl}: ${JSON.stringify(cost)}`)
+      check(`the Sphinx at ${lvl} draws its ${lvl === 'low' ? 'reduced' : 'standard'} mesh (frame cost logged)`,
+        cost.detail === (lvl === 'low' ? 'reduced' : 'standard') && cost.sphinxTriangles > 0, JSON.stringify(cost))
+    }
+  } finally {
+    await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 // --- The plateau's people on the villagers' body (work-order 1378) ------------
 // The guides, the cameleer, the donkey-boy and the two tourists are drawn
 // through the villagers' Figure: skinned and dressed on medium (and high), the

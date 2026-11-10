@@ -389,28 +389,32 @@ export function onSphinxFootprint(x: number, z: number): boolean {
 }
 
 /**
- * The collidable mass as circles (body units): one per station along the
- * body, each the circumcircle of the footprint's slice between neighbouring
- * stations, so the union covers the drawn footprint and overshoots it by at
- * most about half a station step (point 378: the collider is the drawn body).
+ * The collidable mass (body units) as capsules ACROSS the body: per station
+ * along it, one capsule for each contiguous run of the drawn footprint's slice
+ * there (so the notch between the paw lobes stays open), its radius three
+ * quarters of the station step so neighbours overlap into an even rim. The
+ * union covers the drawn footprint and overshoots it by at most about a
+ * station step (point 378: the collider is the drawn body, nothing more).
  */
-export function sphinxColliderCircles(): Array<{ x: number; z: number; r: number }> {
+export function sphinxColliderSegments(): Array<{ x1: number; z1: number; x2: number; z2: number; r: number }> {
   const step = SPHINX_FORM.colliderStep
   const b = sphinxDriftBounds()
   const dz = 0.002
-  const circles: Array<{ x: number; z: number; r: number }> = []
+  const nz = Math.ceil((b.maxZ - b.minZ) / dz)
+  const out: Array<{ x1: number; z1: number; x2: number; z2: number; r: number }> = []
   for (let x0 = b.minX + step / 2; x0 < b.maxX; x0 += step) {
-    let zMin = Infinity
-    let zMax = -Infinity
-    for (const x of [x0 - step / 2, x0 - step / 4, x0, x0 + step / 4, x0 + step / 2]) {
-      for (let z = b.minZ; z <= b.maxZ; z += dz) {
-        if (!onSphinxFootprint(x, z)) continue
-        zMin = Math.min(zMin, z - dz)
-        zMax = Math.max(zMax, z + dz)
-      }
+    const hit = new Uint8Array(nz + 1)
+    for (let k = 0; k <= 4; k++) {
+      const x = x0 - step / 2 + (step * k) / 4
+      for (let j = 0; j <= nz; j++) if (onSphinxFootprint(x, b.minZ + j * dz)) hit[j] = 1
     }
-    if (zMin > zMax) continue
-    circles.push({ x: x0, z: (zMin + zMax) / 2, r: Math.hypot((zMax - zMin) / 2, step / 2) })
+    for (let j = 0; j <= nz; j++) {
+      if (!hit[j]) continue
+      let k = j
+      while (k + 1 <= nz && hit[k + 1]) k++
+      out.push({ x1: x0, z1: b.minZ + (j - 1) * dz, x2: x0, z2: b.minZ + (k + 1) * dz, r: step * 0.75 })
+      j = k
+    }
   }
-  return circles
+  return out
 }

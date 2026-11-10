@@ -2778,8 +2778,9 @@ export const SPHINX_FORM = {
     /** Blend radius of the domes' smooth union. */
     blend: 0.012,
   },
-  /** Spacing of the collider circles laid along the drift's footprint. */
-  colliderStep: 0.025,
+  /** Spacing of the collider capsules laid across the drift's footprint
+   *  (0.25 m at the site's 20 m length). */
+  colliderStep: 0.0125,
   /** Tessellation per level of detail: ring and row segments of a body or
    *  head part (head parts take `headFactor` more), drift grid cells along the
    *  body, and whether the face carries its painted eye and mouth marks. The
