@@ -15305,3 +15305,20 @@ to land than a mechanism that needs a review.
   Source: cross-vendor review of point 321, 09.11.2026; landing slip 10.11.2026.
   Measured 10.11.2026: the whole enrichments pass on main 091e97140 failed frame 131 on both backends (no flame at the front, frontAtShutter 24.05) while the burning-grass section alone was green — the crop timing of objection 3; charged to this point in scripts/render-verify-charges.mjs.
   Bundle: Wetter & Wasser.
+- [ ] 1497. LOW geometry lever for the travel terrain (split from point 310, 10.11.2026)
+  Source: point 310's cloud author (handover 799bbdd, 10.11.2026) named every travel system for F8
+  and recomputed the constant unnamed 425,118-triangle group at LOW (docs/bench/310-projection.md):
+  `travel-terrain` 352,832 tris (83 %), `travel-sea` 64,800 (15 %), the river ribbon at most 5,876
+  (1.4 %). Point 310's lever (c) assumed the group was river water; a coarser ribbon would remove at
+  most ~2,900 triangles, so (c) was not built there and is split off here with the corrected target.
+  Final state:
+  - A calibratable LOW geometry lever for the terrain chunks (e.g. fewer segments per ring at LOW,
+    in `src/config/quality.ts` with entries in all three QUALITY_PRESETS levels, debug-tunable,
+    read through the effective-selector pattern); the touch preset stays a subset of low.
+  - Every §11.3 invariant keeps passing at LOW: rivers lie in their carved beds, never buried, one
+    continuous ribbon (enrichments `rivers` and `water-stability` sections), no seam between chunks.
+  - The removed triangles are computed against the 310 projection table, and a before/after F8 run
+    of the three bench phases at LOW confirms the relative drop.
+  Tests: a Vitest case per new preset key; the enrichments river sections and a LOW picture on both
+  backends.
+  Bundle: Steuerung & Performance.
