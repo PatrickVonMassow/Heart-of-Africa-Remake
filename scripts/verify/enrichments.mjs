@@ -6164,11 +6164,12 @@ if (section('crocodile-ambush')) {
             // and this calf is staged on a drink errand.
             const d0 = calf.drawn ? { x: calf.drawn.x, z: calf.drawn.z } : null
             const f0 = parent.drawn?.frame ?? -1
+            const c0 = calf.drawn?.frame ?? -1
             await window.__sleepSim(1.5)
             const d = calf.drawn
             // Both records must have ADVANCED past the release and match: equal
             // but stale frames would pass a pose drawn before the release.
-            out.aftermath.drawnFresh = d !== undefined && parent.drawn !== undefined && d.frame > f0 && d.frame === parent.drawn.frame
+            out.aftermath.drawnFresh = d !== undefined && parent.drawn !== undefined && d.frame > c0 && parent.drawn.frame > f0 && d.frame === parent.drawn.frame
             out.aftermath.upY = d ? +d.upY.toFixed(2) : null
             out.aftermath.walked = d && d0 ? +Math.hypot(d.x - d0.x, d.z - d0.z).toFixed(2) : null
             out.aftermath.freedAlive = !calf.dead && calf.caught === undefined && calf.caughtBy === undefined &&
@@ -6212,7 +6213,7 @@ if (section('crocodile-ambush')) {
             }
             const m = out.aftermath.sink
             out.aftermath.sank = calf.dead === true && calf.inWater !== undefined && m.samples >= 3 && m.stale === 0 &&
-              m.rises === 0 && m.drop >= 0.5 * depth && m.scaleDev <= 0.05 && m.jawErrMax <= 0.5
+              m.rises === 0 && m.drop >= 0.5 * depth && sk.sDev <= 0.05 && sk.jawErrMax <= 0.5
           }
           const log = (window.__assertLog ?? []).filter((e) => e.t >= t0)
           out.aftermath.asserts = log
