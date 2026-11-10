@@ -9,18 +9,41 @@
 
 import * as THREE from 'three/webgpu'
 import { float, positionGeometry, smoothstep } from 'three/tsl'
-import { calfProportions, merge, tint, type GoatLeg, type QuadrupedSpec } from './faunaGeometry'
+import {
+  agedBoneKnobs,
+  agedColor,
+  calfProportions,
+  ELDERLY_SCHEMA,
+  elderlyProportions,
+  greyMuzzle,
+  merge,
+  swayDrop,
+  tint,
+  type GoatLeg,
+  type QuadrupedSpec,
+} from './faunaGeometry'
 import { faunaMarkingColorNode, MARK, markGeometry, silhouetteMarkingColorNode } from './faunaMarkings'
+import { buildAntelopeElder, buildZebraElder } from './faunaUngulates'
 
-export { calfProportions, type GoatLeg, type QuadrupedSpec } from './faunaGeometry'
+export {
+  agedColor,
+  calfProportions,
+  ELDERLY_SCHEMA,
+  elderlyProportions,
+  greyMuzzle,
+  type GoatLeg,
+  type QuadrupedSpec,
+} from './faunaGeometry'
 export {
   buildAntelope,
   buildAntelopeCalf,
+  buildAntelopeElder,
   buildAntelopeParts,
   buildGoat,
   buildGoatParts,
   buildZebra,
   buildZebraCalf,
+  buildZebraElder,
   buildZebraParts,
   DEFAULT_FAUNA_BODY_SEGMENTS,
 } from './faunaUngulates'
@@ -529,8 +552,14 @@ function buildQuadruped(s: QuadrupedSpec): THREE.BufferGeometry[] {
 
   const body = new THREE.SphereGeometry(s.bodyR, ...FAUNA_TESSELLATION.body)
   body.scale(0.8, 0.8, s.bodyLen / (2 * s.bodyR) + 0.55)
-  body.translate(0, backY, 0)
+  // An aged sway-back (design.md §19.18): the barrel drops between the hips
+  // and withers, which stay at the prime topline as bony knobs.
+  body.translate(0, backY - swayDrop(s), 0)
   parts.push(tint(body, s.bodyColor, 0.1, s.seed))
+  if (s.elderly) {
+    const top = backY + s.bodyR * 0.8
+    parts.push(...agedBoneKnobs(-s.bodyLen * 0.38, s.bodyLen * 0.34, top - s.bodyR * 0.08, s.bodyR * 0.3, s.bodyR * 0.16, s.bodyColor, s.seed + 9))
+  }
 
   for (const [lx, lz] of [
     [-0.4, 0.75],
@@ -670,16 +699,37 @@ export function buildElephantTrunk(calf = false): THREE.BufferGeometry {
   return geo
 }
 
+/** The elderly elephant's cues (design.md §19.18; research
+ *  docs/fauna-behaviour-1890.md §2.2/§10.4/§10.8). Exported for the tests. */
+export const ELEPHANT_ELDER = {
+  /** The worn MASTER tusk's length as a share of the idle slave tusk — the
+   *  asymmetry that is the single best old-elephant cue (§10.4). */
+  masterTusk: 0.5,
+  /** The worn tip's radius as a share of the base: blunt, not pointed. */
+  bluntTip: 0.5,
+  /** Barrel width: the gaunt, bony frame. */
+  bodyWidth: 0.86,
+  /** Topline sag (world units) between hips and withers. */
+  sag: 0.09,
+  /** Skull width: the temples sink. */
+  skullWidth: 0.88,
+} as const
+
 /** Savanna elephant, ~2.6 units tall. With `calf`, baby-schema proportions
  *  (design.md §19): a rounder, shorter body, a proportionally bigger head with
  *  smaller ears, a stubby trunk and no tusks yet — built at adult scale, the
- *  spawn scale shrinks it. */
-export function buildElephant(calf = false): THREE.BufferGeometry {
+ *  spawn scale shrinks it. With `elderly` (design.md §19.18), the aged bull or
+ *  matriarch: a gaunt barrel sagging between prominent hips and withers, a
+ *  narrower skull with sunken temples, lower ragged ears, and ASYMMETRIC worn
+ *  tusks — the right (master) tusk short and blunt, the left whole (§10.4). */
+export function buildElephant(calf = false, elderly = false): THREE.BufferGeometry {
+  const old = elderly && !calf
   const parts: THREE.BufferGeometry[] = []
   const body = new THREE.SphereGeometry(1.05, ...FAUNA_TESSELLATION.body)
-  body.scale(0.95, 0.95, calf ? 1.15 : 1.4)
-  body.translate(0, 1.75, 0)
+  body.scale(old ? 0.95 * ELEPHANT_ELDER.bodyWidth : 0.95, 0.95, calf ? 1.15 : 1.4)
+  body.translate(0, old ? 1.75 - ELEPHANT_ELDER.sag : 1.75, 0)
   parts.push(tint(body, '#8d8680', 0.06, 101))
+  if (old) parts.push(...agedBoneKnobs(-0.95, 0.75, 2.66, 0.32, 0.17, '#8d8680', 109))
 
   for (const [lx, lz] of [
     [-0.5, 0.85],
@@ -687,19 +737,30 @@ export function buildElephant(calf = false): THREE.BufferGeometry {
     [-0.5, -0.85],
     [0.5, -0.85],
   ]) {
-    const leg = new THREE.CylinderGeometry(0.26, 0.3, 1.3, FAUNA_TESSELLATION.limb)
+    const leg = new THREE.CylinderGeometry(old ? 0.24 : 0.26, old ? 0.28 : 0.3, 1.3, FAUNA_TESSELLATION.limb)
     leg.translate(lx, 0.65, lz * (calf ? 0.85 : 1))
     parts.push(tint(leg, '#847d77', 0.06, 102))
   }
 
   const head = new THREE.SphereGeometry(calf ? 0.85 : 0.62, ...FAUNA_TESSELLATION.head)
+  if (old) head.scale(ELEPHANT_ELDER.skullWidth, 1, 1)
   head.translate(0, 2.15, calf ? 1.25 : 1.45)
   parts.push(tint(head, '#8d8680', 0.06, 103))
+  if (old) {
+    // Sunken temples: a shadowed hollow on each side of the narrowed skull.
+    for (const side of [-1, 1]) {
+      const temple = new THREE.SphereGeometry(0.17, 12, 10)
+      temple.scale(0.35, 1, 1.1)
+      temple.translate(side * 0.5, 2.36, 1.52)
+      parts.push(tint(temple, '#5d5853', 0.04, 110))
+    }
+  }
 
   for (const ex of calf ? [-0.88, 0.88] : [-0.72, 0.72]) {
-    const ear = new THREE.BoxGeometry(0.1, calf ? 0.6 : 0.75, calf ? 0.5 : 0.62)
+    // The old ear hangs lower and is worn smaller at its ragged edge.
+    const ear = new THREE.BoxGeometry(0.1, calf ? 0.6 : old ? 0.68 : 0.75, calf ? 0.5 : old ? 0.56 : 0.62)
     ear.rotateY(ex < 0 ? 0.35 : -0.35)
-    ear.translate(ex, 2.2, calf ? 1.1 : 1.3)
+    ear.translate(ex, old ? 2.08 : 2.2, calf ? 1.1 : 1.3)
     parts.push(tint(ear, '#7d766f', 0.06, 104))
   }
 
@@ -709,10 +770,25 @@ export function buildElephant(calf = false): THREE.BufferGeometry {
 
   if (!calf) {
     for (const tx of [-0.3, 0.3]) {
-      const tusk = new THREE.ConeGeometry(0.07, 0.6, FAUNA_TESSELLATION.spike)
+      if (!old) {
+        const tusk = new THREE.ConeGeometry(0.07, 0.6, FAUNA_TESSELLATION.spike)
+        tusk.rotateX(1.9)
+        tusk.translate(tx, 1.75, 2.0)
+        parts.push(tint(tusk, '#e8ddc4', 0.05, 108))
+        continue
+      }
+      // The aged pair keeps the prime tusk's ROOT and direction; the right
+      // (master) tusk is worn short with a blunt end, the left stays whole
+      // to a point. A worn tusk yellows (#d8c9a4).
+      const master = tx > 0
+      const len = master ? 0.6 * ELEPHANT_ELDER.masterTusk : 0.6
+      const tusk = master
+        ? new THREE.CylinderGeometry(0.07 * ELEPHANT_ELDER.bluntTip, 0.07, len, FAUNA_TESSELLATION.spike)
+        : new THREE.ConeGeometry(0.07, len, FAUNA_TESSELLATION.spike)
+      tusk.translate(0, len / 2 - 0.3, 0) // base fixed where the prime cone's base sits
       tusk.rotateX(1.9)
       tusk.translate(tx, 1.75, 2.0)
-      parts.push(tint(tusk, '#e8ddc4', 0.05, 108))
+      parts.push(tint(tusk, '#d8c9a4', 0.05, 108))
     }
   }
   return merge(parts)
@@ -745,14 +821,19 @@ const HYENA_SPOTS = [5, 0.28, 0] as const
 /** Giraffe, ~3.6 units tall. With `calf`, baby-schema proportions (design.md
  *  §19): a much shorter neck carrying a proportionally bigger head over the
  *  same leggy stance, and short ossicone nubs — built at adult scale, the
- *  spawn scale shrinks it. */
-export function buildGiraffe(calf = false): THREE.BufferGeometry {
+ *  spawn scale shrinks it. With `elderly` (design.md §19.18) the aged giraffe
+ *  is read by FRAME, never by colour (research §10.2: giraffes do not grey): a
+ *  leaner, sagging barrel between prominent hips and withers, and worn,
+ *  bald-topped ossicones. The coat keeps its adult colour. */
+export function buildGiraffe(calf = false, elderly = false): THREE.BufferGeometry {
+  const old = elderly && !calf
   const parts: THREE.BufferGeometry[] = []
   const body = new THREE.SphereGeometry(0.62, ...FAUNA_TESSELLATION.body)
-  body.scale(0.85, 0.85, calf ? 1.1 : 1.35)
+  body.scale(old ? 0.85 * ELDERLY_SCHEMA.bodyR : 0.85, 0.85, calf ? 1.1 : 1.35)
   body.rotateX(-0.18)
-  body.translate(0, 1.9, 0)
+  body.translate(0, old ? 1.84 : 1.9, 0)
   parts.push(giraffePatches(tint(body, '#c89a55', 0.14, 111)))
+  if (old) parts.push(...agedBoneKnobs(-0.6, 0.55, 2.3, 0.16, 0.09, '#c89a55', 116, 2.5))
 
   for (const [lx, lz] of [
     [-0.3, 0.5],
@@ -776,9 +857,11 @@ export function buildGiraffe(calf = false): THREE.BufferGeometry {
   parts.push(giraffePatches(tint(head, '#c89a55', 0.12, 114), GIRAFFE_FACE_CELLS))
 
   for (const ox of [-0.08, 0.08]) {
-    const ossicone = new THREE.CylinderGeometry(0.025, 0.025, calf ? 0.1 : 0.18, FAUNA_TESSELLATION.spike)
-    ossicone.translate(ox, calf ? 3.3 : 3.72, calf ? 0.92 : 1.15)
-    parts.push(tint(ossicone, '#8a6a38', 0.1, 115))
+    // A life of necking wears the ossicones down and bald on top (§2.1).
+    const h = calf ? 0.1 : old ? 0.12 : 0.18
+    const ossicone = new THREE.CylinderGeometry(0.025, 0.025, h, FAUNA_TESSELLATION.spike)
+    ossicone.translate(ox, calf ? 3.3 : 3.63 + h / 2, calf ? 0.92 : 1.15)
+    parts.push(tint(ossicone, old ? '#a8916a' : '#8a6a38', 0.1, 115))
   }
   return merge(parts)
 }
@@ -796,17 +879,20 @@ const WILDEBEEST_SPEC: QuadrupedSpec = {
   seed: 171,
 }
 
-/** Wildebeest (gnu), the quintessential savanna lion prey (~1.6 units tall at the horn tips). */
-export function buildWildebeest(): THREE.BufferGeometry {
-  const parts = buildQuadruped(WILDEBEEST_SPEC)
-  // Muscular shoulder hump.
-  const hump = new THREE.SphereGeometry(0.3, ...FAUNA_TESSELLATION.body)
+/** Wildebeest (gnu), the quintessential savanna lion prey (~1.6 units tall at
+ *  the horn tips). With `elderly` (design.md §19.18): the aged schema
+ *  (elderlyProportions), a wasted hump and worn-down horns. */
+export function buildWildebeest(elderly = false): THREE.BufferGeometry {
+  const spec = elderly ? elderlyProportions(WILDEBEEST_SPEC) : WILDEBEEST_SPEC
+  const parts = buildQuadruped(spec)
+  // Muscular shoulder hump — wasted on the old animal.
+  const hump = new THREE.SphereGeometry(elderly ? 0.24 : 0.3, ...FAUNA_TESSELLATION.body)
   hump.scale(0.85, 0.7, 1.0)
-  hump.translate(0, 1.36, 0.5)
-  parts.push(tint(hump, '#4a453f', 0.1, 172))
-  // Short horns angled out to the sides.
+  hump.translate(0, elderly ? 1.3 : 1.36, 0.5)
+  parts.push(tint(hump, elderly ? agedColor('#4a453f', ELDERLY_SCHEMA.coatGrey) : '#4a453f', 0.1, 172))
+  // Short horns angled out to the sides; worn shorter with age (§2.1).
   for (const hx of [-1, 1]) {
-    const horn = new THREE.ConeGeometry(0.04, 0.3, FAUNA_TESSELLATION.spike)
+    const horn = new THREE.ConeGeometry(0.04, elderly ? 0.2 : 0.3, FAUNA_TESSELLATION.spike)
     horn.rotateZ(hx * 1.1)
     horn.translate(hx * 0.16, 1.55, 0.95)
     parts.push(tint(horn, '#2b2620', 0.08, 173))
@@ -842,12 +928,13 @@ const WARTHOG_SPEC: QuadrupedSpec = {
   seed: 181,
 }
 
-/** Warthog, a small tusked savanna lion prey (~0.9 units tall at the head). */
-export function buildWarthog(): THREE.BufferGeometry {
-  const parts = buildQuadruped(WARTHOG_SPEC)
-  // Tusks angled out of the snout.
+/** Warthog, a small tusked savanna lion prey (~0.9 units tall at the head).
+ *  With `elderly` (design.md §19.18): the aged schema and one chipped tusk. */
+export function buildWarthog(elderly = false): THREE.BufferGeometry {
+  const parts = buildQuadruped(elderly ? elderlyProportions(WARTHOG_SPEC) : WARTHOG_SPEC)
+  // Tusks angled out of the snout; an old boar's right tusk is chipped short (§2.1).
   for (const hx of [-1, 1]) {
-    const tusk = new THREE.ConeGeometry(0.022, 0.18, FAUNA_TESSELLATION.spike)
+    const tusk = new THREE.ConeGeometry(0.022, elderly && hx > 0 ? 0.1 : 0.18, FAUNA_TESSELLATION.spike)
     tusk.rotateX(-0.5)
     tusk.rotateZ(hx * 0.5)
     tusk.translate(hx * 0.08, 0.6, 0.72)
@@ -877,17 +964,23 @@ const LION_SPEC: QuadrupedSpec = {
   seed: 141,
 }
 
-/** Lion, ~1.3 units at the back, with a mane reaching ~1.7. */
-export function buildLion(): THREE.BufferGeometry {
-  const parts = buildQuadruped(LION_SPEC)
-  const mane = new THREE.SphereGeometry(0.42, ...FAUNA_TESSELLATION.body)
+/** The old lion's mane (research §2.3): darkened, then thinned. Exported for the tests. */
+export const LION_ELDER_MANE = { radius: 0.3, color: '#4e3a24' } as const
+
+/** Lion, ~1.3 units at the back, with a mane reaching ~1.7. With `elderly`
+ *  (design.md §19.18): the aged schema — gaunt, sway-backed, greyer face —
+ *  under a thin, dark mane. */
+export function buildLion(elderly = false): THREE.BufferGeometry {
+  const spec = elderly ? elderlyProportions(LION_SPEC) : LION_SPEC
+  const parts = buildQuadruped(elderly ? { ...spec, headColor: greyMuzzle(spec.headColor ?? spec.bodyColor) } : spec)
+  const mane = new THREE.SphereGeometry(elderly ? LION_ELDER_MANE.radius : 0.42, ...FAUNA_TESSELLATION.body)
   mane.scale(1, 1, 0.85)
-  mane.translate(0, 1.25, 0.85)
-  parts.push(tint(mane, '#7a5228', 0.14, 142))
+  mane.translate(0, elderly ? 1.18 : 1.25, 0.85)
+  parts.push(tint(mane, elderly ? LION_ELDER_MANE.color : '#7a5228', 0.14, 142))
   const tail = new THREE.CylinderGeometry(0.03, 0.05, 0.9, FAUNA_TESSELLATION.limb)
   tail.rotateX(1.1)
   tail.translate(0, 1.1, -1.0)
-  parts.push(tint(tail, '#b6905a', 0.1, 143))
+  parts.push(tint(tail, spec.bodyColor, 0.1, 143))
   return merge(parts)
 }
 
@@ -905,8 +998,9 @@ function buildCatPredator(
   scale: number,
   seed: number,
   spots: readonly [number, number, number],
+  elderly = false,
 ): THREE.BufferGeometry {
-  const parts = buildQuadruped({
+  const prime: QuadrupedSpec = {
     bodyLen: 1.3 * scale,
     bodyR: 0.34 * scale,
     legH: 0.62 * scale,
@@ -917,7 +1011,11 @@ function buildCatPredator(
     bodyColor,
     headColor,
     seed,
-  })
+  }
+  // The aged cat (design.md §19.18, research §2.3 "the lion template minus the
+  // mane"): gaunt, sway-backed, the muzzle greyed.
+  const spec = elderly ? { ...elderlyProportions(prime), headColor: greyMuzzle(headColor) } : prime
+  const parts = buildQuadruped(spec)
   const tail = new THREE.CylinderGeometry(0.025 * scale, 0.04 * scale, 1.0 * scale, FAUNA_TESSELLATION.limb)
   tail.rotateX(1.25)
   tail.translate(0, 0.85 * scale, -0.95 * scale)
@@ -927,18 +1025,20 @@ function buildCatPredator(
 }
 
 /** Cheetah: slim, tawny, the open-plains sprinter (~1.1 units tall). */
-export function buildCheetah(): THREE.BufferGeometry {
-  return buildCatPredator('#c9a86a', '#8f7038', 1.0, 191, CHEETAH_SPOTS)
+export function buildCheetah(elderly = false): THREE.BufferGeometry {
+  return buildCatPredator('#c9a86a', '#8f7038', 1.0, 191, CHEETAH_SPOTS, elderly)
 }
 
 /** Leopard: stockier, darker coat; ambush hunter near cover. */
-export function buildLeopard(): THREE.BufferGeometry {
-  return buildCatPredator('#b7923f', '#6f5722', 1.05, 201, LEOPARD_ROSETTES)
+export function buildLeopard(elderly = false): THREE.BufferGeometry {
+  return buildCatPredator('#b7923f', '#6f5722', 1.05, 201, LEOPARD_ROSETTES, elderly)
 }
 
-/** Spotted hyena: sloping back (high shoulders), coarse grey-brown coat. */
-export function buildHyena(): THREE.BufferGeometry {
-  const parts = buildQuadruped({
+/** Spotted hyena: sloping back (high shoulders), coarse grey-brown coat. With
+ *  `elderly` (design.md §19.18; research §10.3, the most condition-driven
+ *  carnivore): the aged schema, a greyed muzzle and a wasted shoulder hump. */
+export function buildHyena(elderly = false): THREE.BufferGeometry {
+  const prime: QuadrupedSpec = {
     bodyLen: 1.2,
     bodyR: 0.34,
     legH: 0.62,
@@ -949,9 +1049,10 @@ export function buildHyena(): THREE.BufferGeometry {
     bodyColor: '#8a7d63',
     headColor: '#5f5442',
     seed: 211,
-  })
+  }
+  const parts = buildQuadruped(elderly ? { ...elderlyProportions(prime), headColor: greyMuzzle('#5f5442') } : prime)
   // Higher shoulders than hindquarters: a raised hump over the front legs.
-  const hump = new THREE.SphereGeometry(0.26, ...FAUNA_TESSELLATION.body)
+  const hump = new THREE.SphereGeometry(elderly ? 0.21 : 0.26, ...FAUNA_TESSELLATION.body)
   hump.scale(0.85, 0.7, 1.0)
   hump.translate(0, 1.02, 0.5)
   parts.push(tint(hump, '#7c6f57', 0.12, 212))
@@ -962,6 +1063,26 @@ export function buildHyena(): THREE.BufferGeometry {
   spotted(parts.slice(0, -1), HYENA_SPOTS)
   return merge(parts)
 }
+
+/**
+ * The elderly-adult builds per species (design.md §19.18; research
+ * docs/fauna-behaviour-1890.md §10.7): every rendered mammal that visibly ages.
+ * The crocodile has NO entry — an indeterminate grower with no legible aged
+ * cue (§2.4) — and neither do the birds. `radial` reaches the detailed swept
+ * ungulates (zebra, antelope) like their adult and calf builds.
+ */
+export const ELDER_BUILDERS = {
+  elephant: () => buildElephant(false, true),
+  giraffe: () => buildGiraffe(false, true),
+  zebra: (radial?: number) => buildZebraElder(radial),
+  wildebeest: () => buildWildebeest(true),
+  antelope: (radial?: number) => buildAntelopeElder(radial),
+  warthog: () => buildWarthog(true),
+  lion: () => buildLion(true),
+  cheetah: () => buildCheetah(true),
+  leopard: () => buildLeopard(true),
+  hyena: () => buildHyena(true),
+} as const satisfies Record<string, (radial?: number) => THREE.BufferGeometry>
 
 /** Flamingo, ~1.3 units tall, standing. */
 export function buildFlamingo(): THREE.BufferGeometry {

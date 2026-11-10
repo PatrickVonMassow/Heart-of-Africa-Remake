@@ -57,6 +57,96 @@ export interface QuadrupedSpec {
   headColor?: string
   horns?: boolean
   seed: number
+  /** Sag of the topline at mid-back, in bodyR units (an aged sway-back;
+   *  design.md §19.18). The body drops between withers and hips. */
+  swayBack?: number
+  /** Aged build: adds the prominent hip and shoulder bones (`agedBoneKnobs`). */
+  elderly?: boolean
+}
+
+/** Dull and grey a coat colour by `amount` (0..1): toward the grey of its own
+ *  luminance, a little darker — the staring, faded coat of an old animal
+ *  (docs/fauna-behaviour-1890.md §2.1). Never applied to the giraffe (§10.2). */
+export function agedColor(hex: string, amount: number): string {
+  const c = new THREE.Color(hex)
+  const k = Math.min(1, Math.max(0, amount))
+  const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+  const grey = lum * 0.95
+  c.setRGB(c.r + (grey - c.r) * k, c.g + (grey - c.g) * k, c.b + (grey - c.b) * k)
+  return `#${c.getHexString()}`
+}
+
+/** The greying muzzle of an old mammal (§2.1/§2.3): a face colour pulled toward a pale grey. */
+export function greyMuzzle(hex: string, amount = 0.5): string {
+  const c = new THREE.Color(hex).lerp(new THREE.Color('#8f8a84'), Math.min(1, Math.max(0, amount)))
+  return `#${c.getHexString()}`
+}
+
+/** Shares by which the elderly schema changes an adult spec. Exported for the tests. */
+export const ELDERLY_SCHEMA = {
+  /** Barrel radius: a leaner, gaunter body (the strongest cue, research §2.1). */
+  bodyR: 0.86,
+  /** Bonier legs. */
+  legR: 0.9,
+  /** The head carried lower: added forward tilt of the neck (rad). */
+  neckDrop: 0.15,
+  /** Topline sag in bodyR units (sway-back, research §2.1, INFERRED for zebra). */
+  swayBack: 0.14,
+  /** Coat dulling/greying share (`agedColor`). */
+  coatGrey: 0.3,
+  /** Face dulling share — the greyer face reads before the coat does. */
+  faceGrey: 0.5,
+} as const
+
+/**
+ * The elderly-adult schema (design.md §19.18, research docs/fauna-behaviour-1890.md
+ * §2/§10.7/§10.8), the old-age twin of `calfProportions`: a leaner, more
+ * angular body with a sagging topline between prominent hips and withers, the
+ * head carried lower, and a duller, greyer coat and face. `grey: false` keeps
+ * the coat colour — the giraffe does not grey (§10.2). Built at adult scale.
+ */
+export function elderlyProportions<S extends QuadrupedSpec>(s: S, opts: { grey?: boolean } = {}): S {
+  const grey = opts.grey !== false
+  const head = s.headColor ?? s.bodyColor
+  return {
+    ...s,
+    bodyR: s.bodyR * ELDERLY_SCHEMA.bodyR,
+    legR: s.legR * ELDERLY_SCHEMA.legR,
+    neckTilt: s.neckTilt + ELDERLY_SCHEMA.neckDrop,
+    bodyColor: grey ? agedColor(s.bodyColor, ELDERLY_SCHEMA.coatGrey) : s.bodyColor,
+    headColor: grey ? agedColor(head, ELDERLY_SCHEMA.faceGrey) : head,
+    swayBack: ELDERLY_SCHEMA.swayBack,
+    elderly: true,
+  }
+}
+
+/** The prominent pin/hip bones and the withers of an aged body (research
+ *  §2.1/§2.2): small rounded knobs standing proud of the dropped topline.
+ *  `hipZ`/`withersZ` are the knobs' positions along the body, `topY` the
+ *  topline height they crown (`withersY` where a sloping back sets the withers
+ *  higher than the hips). */
+export function agedBoneKnobs(
+  hipZ: number,
+  withersZ: number,
+  topY: number,
+  halfWidth: number,
+  r: number,
+  color: string,
+  seed: number,
+  withersY = topY,
+): THREE.BufferGeometry[] {
+  const out: THREE.BufferGeometry[] = []
+  for (const [x, y, z] of [
+    [-halfWidth, topY, hipZ],
+    [halfWidth, topY, hipZ],
+    [0, withersY, withersZ],
+  ] as const) {
+    const knob = new THREE.SphereGeometry(r, 10, 8)
+    knob.scale(1, 0.8, 1.2)
+    knob.translate(x, y, z)
+    out.push(tint(knob, color, 0.06, seed))
+  }
+  return out
 }
 
 /**
@@ -76,6 +166,11 @@ export function calfProportions<S extends QuadrupedSpec>(s: S): S {
     headSize: s.headSize * 1.45,
     horns: false,
   }
+}
+
+/** The topline sag of a spec in world units (0 for a prime adult). */
+export function swayDrop(s: QuadrupedSpec): number {
+  return (s.swayBack ?? 0) * s.bodyR
 }
 
 /** One pivoted quadruped leg (point 228; goat, zebra, antelope, elephant,

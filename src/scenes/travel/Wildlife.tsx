@@ -158,14 +158,33 @@ import {
   groundedBodyY,
   groundFollowY,
   FIGHTING_SPECIES,
-  wantsToFight,
   pickFightOpponent,
   fightApproach,
   fightApproachOutcome,
-  fightResolve,
   fightPairBroken,
   clashOver,
   clashPose,
+  dyingDeadline,
+  dyingDownRoll,
+  dyingDrawsFlock,
+  dyingFailSeconds,
+  dyingSlowdown,
+  elderSpeedFactor,
+  elderTurnsSolitary,
+  huntPredatorElderly,
+  dyingSuspended,
+  elephantDyingTarget,
+  fightInitiates,
+  fightResolveAged,
+  hasElderVariant,
+  herdPaceFactor,
+  isInDrama,
+  isElderRoll,
+  naturalDeathStarts,
+  solitarySpot,
+  stepDying,
+  type DyingStage,
+  type DyingState,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
 import { rinderpestCarrionActive, rinderpestPhaseAtDay } from '../../systems/rinderpest'
@@ -195,6 +214,7 @@ import {
   createFaunaMaterial,
   DEFAULT_FAUNA_BODY_SEGMENTS,
   crocodileBodyY,
+  ELDER_BUILDERS,
 } from '../../render/fauna'
 import { setGroundStains } from '../../render/groundStains'
 import { fireHalfWidth, fireHash, fireLocal, flameSlot, frontAlong, frontPoint, smokeFade, smokePhase } from './grassFireFront'
@@ -280,6 +300,27 @@ const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 
 // group is now calves, so several groups in view can hold more than the old
 // one-per-group), still a small buffer.
 const MAX_CALF_INSTANCES = 48
+/** Elders render through their aged build (design.md §19.18) in a separate
+ *  instanced mesh per species, like the calves. Only the species with a live
+ *  herd population carry herd elders; no ambient adult cat population exists
+ *  (herds.lion holds the §19.8 lioness-and-cub family and revenge carcasses),
+ *  so the ousted old cat male appears as the hunt's lone hunter instead
+ *  (LionHuntState.elderly, huntPredatorElderly). The hyena gets no elder. */
+const ELDER_RENDER_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog'] as const
+type ElderRenderSpecies = (typeof ELDER_RENDER_SPECIES)[number]
+const isElderRenderSpecies = (sp: string): sp is ElderRenderSpecies =>
+  (ELDER_RENDER_SPECIES as readonly string[]).includes(sp)
+// A low fraction of the adults (balance.elderly.fraction), so a small buffer.
+const MAX_ELDER_INSTANCES = 24
+/** How close a dying elephant must come to its target to count as arrived. */
+const DYING_ARRIVE_DIST = 3
+/** Height over the downed animal at which its gathering flock circles. */
+const DYING_FLOCK_CIRCLE_Y = 3.2
+/** How fast (units/s) that flock comes down onto the body once it has died. */
+const DYING_FLOCK_DESCEND_SPEED = 3
+/** A failing grazer's stagger (units/s) before the elder and slowdown factors:
+ *  a few body lengths over the whole decline, so it stays where it was seen. */
+const DYING_WALK_SPEED = 0.8
 
 interface Animal {
   x: number
@@ -574,6 +615,12 @@ interface Animal {
    *  jaws placement back without a render-matrix probe. Set only in the
    *  caught-by-crocodile render branch; never read by the sim. */
   jawAnchor?: [number, number]
+  /** An elderly adult (design.md §19.18): drawn through the aged build,
+   *  slower, never the winner of a rival fight, and liable to die of old age. */
+  elderly?: boolean
+  /** Dying of old age (design.md §19.18): the stepped decline (stepDying) and,
+   *  for a moving animal, the heading it drifts on. Cleared only by death. */
+  dying?: DyingState & { heading?: number; stage?: DyingStage }
 }
 
 /**
@@ -616,7 +663,11 @@ interface LionHuntState {
    *  idle frame, which skips the cooldown and the ambient dice and stages the
    *  named hunt at this spot. `generic` runs a scripted-prey hunt there, `calf`
    *  takes a nearby herd calf, `cub` a lion cub (always a hyena's hunt). */
-  force?: { x: number; z: number; kind: 'generic' | 'calf' | 'cub' }
+  force?: { x: number; z: number; kind: 'generic' | 'calf' | 'cub'; elderly?: boolean }
+  /** The hunter is an ousted old cat male hunting alone (design.md §19.18):
+   *  drawn through its aged build, at the elder's reduced pace. Rolled per
+   *  ambient hunt; a forced hunt takes `force.elderly` (default: not old). */
+  elderly?: boolean
 }
 const LION_STATE: LionHuntState = {
   mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
@@ -647,6 +698,7 @@ function dramaStateOf(a: Animal, isHunted: boolean): DramaState {
       (a.child.caught !== undefined || a.child.inWater !== undefined || a.child.mired !== undefined ||
         LION_STATE.victim === a.child),
     fighting: a.fight !== undefined,
+    dying: a.dying,
     isLionVictim: a === LION_STATE.victim,
     isHunted,
   }
@@ -685,6 +737,9 @@ const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antel
 
 /** Render scale per predator (cheetah/leopard lithe, hyena mid, lion large). */
 const PREDATOR_SCALE: Record<PredatorKind, number> = { lion: 1, cheetah: 0.9, leopard: 0.92, hyena: 0.88 }
+
+/** The hunter's chase speed: an old cat male runs at the elder's pace (§19.18). */
+const huntPredatorSpeed = () => HUNT_LION_SPEED * elderSpeedFactor(LION_STATE.elderly, balance.elderly.speedFactor)
 
 /** Distance (world units) at which walking into the hunt predator triggers an attack. */
 const LION_CONTACT_RADIUS = 2
@@ -1332,7 +1387,7 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   // Elephants placed together share a herd id (stable per chunk) so they move
   // as one; other species roam/graze individually.
   const herdId = species === 'elephant' ? ccx * 1000003 + ccz : undefined
-  placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, BODY_RADIUS[species], false, herdId, key)
+  placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, BODY_RADIUS[species], false, herdId, key, species)
 }
 
 function placeGroup(
@@ -1349,6 +1404,7 @@ function placeGroup(
   shoreline: boolean,
   herdId?: number,
   chunkKey?: string,
+  species?: Species,
 ) {
   const placedStart = list.length
   for (let i = 0; i < count; i++) {
@@ -1467,6 +1523,33 @@ function placeGroup(
         calf.parent = parent
         calf.scale *= 0.55 // a small juvenile
         parent.child = calf
+      }
+    }
+    // Elderly adults (design.md §19.18, point 265): a calibratable small
+    // fraction of the FREE adults — neither parent nor calf, the middle of the
+    // placed range — is old, on its own deterministic roll. Of the grazers an
+    // ousted elder stands apart from its group (research §3.1); an old
+    // elephant keeps its place in the herd. Only the streamed chunk spawn
+    // passes `species` (placed beyond the view by SPAWN_MARGIN, which the
+    // solitary distance stays inside), so no guarantee-seeded group gains an
+    // animal that could step into the frame.
+    if (species && hasElderVariant(species)) {
+      for (let i = k; i < n - k; i++) {
+        const a = list[placedStart + i]
+        if (!a || a.young || a.child) continue
+        if (!isElderRoll(hash(ccx, ccz, 90 + i, seed), balance.elderly.fraction)) continue
+        a.elderly = true
+        if (!elderTurnsSolitary(species)) continue
+        const spot = solitarySpot(ax, az, a.x, a.z, balance.elderly.solitaryDistance, hash(ccx, ccz, 91 + i, seed) * Math.PI * 2)
+        const sll = worldToLatLon(spot.x, spot.z)
+        const st = sampleTerrain(sll.lat, sll.lon, seed)
+        if (st.type === 'ocean' || st.type === 'water' || st.height <= 0.05) continue // keeps its place
+        a.x = spot.x
+        a.z = spot.z
+        a.y = Math.max(0.02, st.height)
+        // Its shore walk was measured from the group spot it left.
+        a.drink = undefined
+        a.bathe = undefined
       }
     }
   }
@@ -1711,6 +1794,7 @@ function seedDryShoreDrinkers(
 interface WildlifeMeshPool {
   adult: Record<Species, THREE.InstancedMesh>
   calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
+  elder: Record<ElderRenderSpecies, THREE.InstancedMesh>
   material: THREE.MeshStandardNodeMaterial
   /** STRIKING crocodiles' mesh (point 274): same geometry as the hidden pool
    *  mesh but the ordinary OPAQUE fauna material — the two croc poses draw
@@ -1788,7 +1872,15 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.count = 0
     calf[sp] = m
   }
-  wildlifeMeshCache = { adult, calf, material, crocStrike, vultureGeo: buildVulture(), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
+  const elder = {} as Record<ElderRenderSpecies, THREE.InstancedMesh>
+  for (const sp of ELDER_RENDER_SPECIES) {
+    const m = new THREE.InstancedMesh(ELDER_BUILDERS[sp](), material, MAX_ELDER_INSTANCES)
+    m.castShadow = true
+    m.frustumCulled = false
+    m.count = 0
+    elder[sp] = m
+  }
+  wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
   return wildlifeMeshCache
 }
 
@@ -1809,6 +1901,8 @@ function applyFaunaBodySegments(segments: number): void {
   swap(pool.adult.antelope, buildAntelope(segments))
   swap(pool.calf.zebra, buildZebraCalf(segments))
   swap(pool.calf.antelope, buildAntelopeCalf(segments))
+  swap(pool.elder.zebra, ELDER_BUILDERS.zebra(segments))
+  swap(pool.elder.antelope, ELDER_BUILDERS.antelope(segments))
 }
 
 // Lion-hunt predator/prey geometries, module-cached for the same reason: the
@@ -1816,6 +1910,8 @@ function applyFaunaBodySegments(segments: number): void {
 // under dispose={null}, leak) its geometry set per place visit.
 interface HuntGeos {
   predator: Record<PredatorKind, THREE.BufferGeometry>
+  /** The aged builds of the cats whose old male hunts alone (§19.18). */
+  elderPredator: Record<'lion' | 'cheetah' | 'leopard', THREE.BufferGeometry>
   prey: Record<PreyKind, THREE.BufferGeometry>
 }
 let huntGeoCache: HuntGeos | null = null
@@ -1823,6 +1919,7 @@ function getHuntGeos(): HuntGeos {
   if (huntGeoCache) return huntGeoCache
   huntGeoCache = {
     predator: { lion: buildLion(), cheetah: buildCheetah(), leopard: buildLeopard(), hyena: buildHyena() },
+    elderPredator: { lion: ELDER_BUILDERS.lion(), cheetah: ELDER_BUILDERS.cheetah(), leopard: ELDER_BUILDERS.leopard() },
     prey: {
       zebra: buildZebra(),
       wildebeest: buildWildebeest(),
@@ -1991,7 +2088,7 @@ function Herds() {
     // debug override), the drama current there and the effective flow against
     // the drown threshold. A staged water-drama check asserts this reading
     // instead of assuming a forced season arrived (point 502).
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, meshRefs, calfMeshRefs, herdState,
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, scavengers, restock, meshRefs, calfMeshRefs, herdState,
       colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, groundAt: (x: number, z: number) => { const l = worldToLatLon(x, z); return Math.max(0.02, sampleTerrain(l.lat, l.lon, useGame.getState().seed).height) }, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
       waterDrama: (lat: number, lon: number) => {
         const bw = balance.waterDrama
@@ -2065,6 +2162,7 @@ function Herds() {
       LION_STATE.timer = 0
       LION_STATE.victim = null
       LION_STATE.victimHunt = false
+      LION_STATE.elderly = false
       LION_STATE.force = { x, z, kind }
     }
 
@@ -2362,7 +2460,9 @@ function Herds() {
     // ends) and sets the body height; returns the step. A wader stands on the
     // sheet.
     const fleeMove = (a: Animal, heading: number, speed: number, wader = false) => {
-      const pace = wader ? speed : swimBrakedPace(speed, terrainTypeAtWorld(a.x, a.z), swimPace)
+      // An elder runs at its calibratable reduced pace (design.md §19.18).
+      const aged = speed * elderSpeedFactor(a.elderly, balance.elderly.speedFactor)
+      const pace = wader ? aged : swimBrakedPace(aged, terrainTypeAtWorld(a.x, a.z), swimPace)
       const step = fleeWaterStep(a.x, a.z, heading, pace * dt, terrainTypeAtWorld, 0.8)
       a.x = step.x
       a.z = step.z
@@ -2766,7 +2866,7 @@ function Herds() {
           // is reconstructed from the lion's heading + speed (robust — no stored
           // prev-position that a directly-staged hunt could leave stale, which
           // fired the take a frame too early before the calf could flee).
-          const lmv = HUNT_LION_SPEED * dt
+          const lmv = huntPredatorSpeed() * dt
           const lpx = LION_STATE.lx - Math.sin(LION_STATE.lionHeading) * lmv
           const lpz = LION_STATE.lz - Math.cos(LION_STATE.lionHeading) * lmv
           if (segPointDist(lpx, lpz, LION_STATE.lx, LION_STATE.lz, a.x, a.z) < PARENT_TAKE_DIST) {
@@ -3290,6 +3390,7 @@ function Herds() {
         a.plungeTo === undefined &&
         a.trampleTo === undefined &&
         a.lure === undefined &&
+        a.dying === undefined &&
         !claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim })
       for (const sp of FIGHTING_SPECIES) {
         const list = herds[sp as Species]
@@ -3326,7 +3427,11 @@ function Herds() {
             // false, so the ground scavengers and the §19.6 vultures work it
             // exactly like a trampled grazer; no bespoke body path. A dead
             // parent is picked up by the orphan pass above on the next frame.
-            const res = fightResolve(sp, a.scale, foe.scale, Math.random(), Math.random(), fb)
+            // An elder always loses to a younger adult (design.md §19.18).
+            const res = fightResolveAged(
+              sp, { size: a.scale, elderly: a.elderly }, { size: foe.scale, elderly: foe.elderly },
+              Math.random(), Math.random(), fb,
+            )
             const loser = res.loser === 'a' ? a : foe
             const winner = loser === a ? foe : a
             endFight(a)
@@ -3379,9 +3484,11 @@ function Herds() {
             // One-sided: the quarry flees, slower, on the corridor flight
             // (calfFleeStep, point 226) with the water-refusing wetOrSea
             // predicate — unlike a hunted calf's chaseFleeStep, it never swims.
+            // An elder quarry flees at its reduced pace (design.md §19.18).
             const fl = calfFleeStep(
               foe.x, foe.z, a.x, a.z,
-              fightSpeed * fb.quarryFleeFactor * dt, wetOrSea, 0.8, foe.fleeCorridor,
+              fightSpeed * fb.quarryFleeFactor * elderSpeedFactor(foe.elderly, balance.elderly.speedFactor) * dt,
+              wetOrSea, 0.8, foe.fleeCorridor,
             )
             foe.fleeCorridor = fl.corridor
             if (fl.moved) fightStep(sp, foe, fl.x, fl.z)
@@ -3410,7 +3517,8 @@ function Herds() {
           if (a.fightRollAt > 0) continue
           a.fightRollAt = fb.dispositionInterval
           if (!fightEligible(a)) continue
-          if (!wantsToFight(sp, Math.random(), fb.dispositionRate)) continue
+          // An elder never starts a fight (design.md §19.18).
+          if (!fightInitiates(sp, a.elderly, Math.random(), fb.dispositionRate)) continue
           const foe = pickFightOpponent(
             a.x, a.z,
             list.filter((c) => c !== a && fightEligible(c)),
@@ -3419,10 +3527,91 @@ function Herds() {
           if (!foe) continue
           // Path (a) vs (b) (point 264): the opponent's own disposition decides
           // whether the two run AT each other or one chases the other.
-          const mode = fightApproach(true, wantsToFight(sp, Math.random(), fb.dispositionRate))
+          // An elder opponent never wants it: the bout becomes a HUNT and the
+          // elder flees the impending conflict (design.md §19.18).
+          const mode = fightApproach(true, fightInitiates(sp, foe.elderly, Math.random(), fb.dispositionRate))
           const bout = { ox: a.x, oz: a.z, time: 0, clash: 0 }
           a.fight = { foe, mode, aggressor: true, ...bout }
           foe.fight = { foe: a, mode, aggressor: false, ...bout }
+        }
+      }
+    }
+
+    // Natural death of old age (design.md §19.18, point 265; research
+    // docs/fauna-behaviour-1890.md §4/§5). An IDLE elder occasionally begins
+    // to die with no outside cause, at the calibratable rate. The decline is
+    // the pure stepDying: it FAILS on its feet, slowing progressively (a
+    // grazer staggers on; an elephant leaves its herd and drifts to water or
+    // the §4.4 graveyard, walked by the elephant loop below), goes DOWN — the
+    // moment the ordinary per-carcass vulture flock is drawn to gather over it
+    // (the scavenging pass) — and then DIES into the ordinary carcass system,
+    // which the same flock then consumes. No second body path, no new flock.
+    {
+      const be = balance.elderly
+      const timing = { seconds: be.dyingSeconds, downFraction: be.downFraction, graceFactor: be.dyingGraceFactor }
+      const failSeconds = dyingFailSeconds(timing)
+      const wetOrSea = (x: number, z: number) => {
+        const ll = worldToLatLon(x, z)
+        const ty = sampleTerrain(ll.lat, ll.lon, seed).type
+        return ty === 'ocean' || ty === 'water'
+      }
+      for (const sp of ELDER_RENDER_SPECIES) {
+        for (const a of herds[sp]) {
+          if (a.dead || a.elderly !== true) continue
+          if (a.dying === undefined) {
+            // Only an idle elder begins: one a drama holds keeps that drama, and
+            // a guardian of a living (adopted) young keeps its charge.
+            if (isInDrama(dramaStateOf(a, false)) || (a.child !== undefined && a.child.dead !== true)) continue
+            if (!naturalDeathStarts(Math.random(), be.deathRatePerMinute, dt)) continue
+            a.dying = { elapsed: 0 }
+            a.drink = undefined
+            a.bathe = undefined
+            a.dodgeHeading = undefined
+          }
+          const dy = a.dying
+          // A predator's catch, the water or the fire took the failing animal
+          // over: that drama decides its end, the decline waits.
+          if (dyingSuspended(a, a === LION_STATE.victim)) continue
+          if (dy.target === undefined) {
+            dy.target = sp === 'elephant'
+              ? elephantDyingTarget(a.x, a.z, findWaterNear(a.x, a.z, seed), GRAVEYARD_POS, be.graveyardReach)
+              : null
+            if (dy.target === null) dy.arrived = true
+          }
+          const stage = stepDying(dy, dt, dy.arrived === true, timing)
+          dy.stage = stage
+          // Invariant I4: every natural death resolves within its deadline.
+          devAssert(
+            dy.elapsed <= dyingDeadline(timing) + 2,
+            'dying-bounded',
+            () => `${sp} dying ${dy.elapsed.toFixed(1)}s stage=${stage} arrived=${dy.arrived === true}`,
+          )
+          if (stage === 'dead') {
+            // The body is its own visible cause: the decline was depicted.
+            a.dead = true
+            recordDeathCause(a, 'old-age')
+            if (import.meta.env.DEV) assertVisibleDeath(a, actorDistance(a, 'here'), sp)
+            a.lionFed = false
+            if (sp === 'elephant' && a.heading !== undefined) a.rot = a.heading // the carcass lies as it walked
+            a.dying = undefined
+            continue
+          }
+          // The elephant loop walks a dying elephant; a downed animal lies still.
+          if (sp === 'elephant' || stage !== 'failing') continue
+          if (dy.heading === undefined) dy.heading = a.rot
+          const pace =
+            DYING_WALK_SPEED *
+            elderSpeedFactor(true, be.speedFactor) *
+            dyingSlowdown(dy.elapsed, failSeconds, be.dyingSpeedFloor)
+          const step = deflectedStep(a.x, a.z, dy.heading, pace * dt, wetOrSea, 0.9)
+          if (step.moved) {
+            a.x = step.x
+            a.z = step.z
+            dy.heading = step.heading
+            const ll = worldToLatLon(a.x, a.z)
+            const gt = sampleTerrain(ll.lat, ll.lon, seed)
+            if (gt.type !== 'water' && gt.type !== 'ocean') a.y = groundedBodyY(gt.height)
+          }
         }
       }
     }
@@ -4193,20 +4382,26 @@ function Herds() {
     // move forward. They do not hunt — a smaller animal is trampled only if it
     // is in the herd's path and dodges too late. First aggregate each live
     // herd's centre and advance its shared heading.
-    const herdCentre = new Map<number, { cx: number; cz: number; heading: number }>()
+    const herdCentre = new Map<number, { cx: number; cz: number; heading: number; pace: number }>()
     {
-      const sum = new Map<number, { sx: number; sz: number; n: number }>()
+      // A dying elephant has left its herd's drive (design.md §19.18): it is
+      // neither counted into the centre nor pacing the herd.
+      const sum = new Map<number, { sx: number; sz: number; n: number; members: Animal[] }>()
       for (const a of herds.elephant) {
-        if (a.dead || a.herd === undefined) continue
-        const agg = sum.get(a.herd) ?? { sx: 0, sz: 0, n: 0 }
+        if (a.dead || a.herd === undefined || a.dying !== undefined) continue
+        const agg = sum.get(a.herd) ?? { sx: 0, sz: 0, n: 0, members: [] }
         agg.sx += a.x
         agg.sz += a.z
         agg.n++
+        agg.members.push(a)
         sum.set(a.herd, agg)
       }
       for (const [hid, agg] of sum) {
         const ccx = agg.sx / agg.n
         const ccz = agg.sz / agg.n
+        // The herd walks at its slowest living member's pace — an old elephant
+        // keeps its place rather than falling behind (research §3.1).
+        const pace = herdPaceFactor(agg.members, balance.elderly.speedFactor)
         let st = herdState.current.get(hid)
         if (!st) {
           st = { heading: hash(hid, 0, 7, seed) * Math.PI * 2, phase: hash(hid, 0, 8, seed) * Math.PI * 2 }
@@ -4246,7 +4441,7 @@ function Herds() {
           st.mourned = true // vigil over — move on; not again until the herd has left the radius
         }
         if (!st.mourn && shouldMourn(tgD, bm.radius, st.mourned === true)) {
-          st.mourn = { x: tgX, z: tgZ, until: mournDeadline(simTimeRef.current, tgD, bm.seconds, ELEPHANT_SPEED) }
+          st.mourn = { x: tgX, z: tgZ, until: mournDeadline(simTimeRef.current, tgD, bm.seconds, ELEPHANT_SPEED * pace) }
         }
         if (st.mourned && tgD > bm.radius) st.mourned = undefined
         if (st.mourn) {
@@ -4272,7 +4467,7 @@ function Herds() {
           if ((ct === 'savanna' || ct === 'jungle') && ft !== 'savanna' && ft !== 'jungle')
             st.heading += ELEPHANT_TURN * 2 * dt
         }
-        herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading })
+        herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading, pace })
       }
     }
     // The traveller as a threat source for the player-shy flight (design.md
@@ -4311,7 +4506,46 @@ function Herds() {
         const ex0 = a.x
         const ez0 = a.z
         if (a.heading === undefined) a.heading = a.rot
+        // A dying elephant (design.md §19.18) leaves the herd's drive and drifts
+        // alone, slowing, to its water or the graveyard (research §4.2) — the
+        // decline itself is stepped in the natural-death pass above. Down, it
+        // lies still. Over any land, like a mourner; never into the water.
+        if (a.dying !== undefined) {
+          const dy = a.dying
+          const tg = dy.target
+          if (dy.stage === 'failing' && tg && dy.arrived !== true) {
+            const toX = tg.x - a.x
+            const toZ = tg.z - a.z
+            if (Math.hypot(toX, toZ) <= DYING_ARRIVE_DIST) {
+              dy.arrived = true
+            } else {
+              a.heading = turnToward(a.heading, Math.atan2(toX, toZ), ELEPHANT_TURN * dt)
+              const be = balance.elderly
+              const spd =
+                ELEPHANT_SPEED *
+                elderSpeedFactor(true, be.speedFactor) *
+                dyingSlowdown(dy.elapsed, dyingFailSeconds({ seconds: be.dyingSeconds, downFraction: be.downFraction, graceFactor: be.dyingGraceFactor }), be.dyingSpeedFloor)
+              const nx = a.x + Math.sin(a.heading) * spd * dt
+              const nz = a.z + Math.cos(a.heading) * spd * dt
+              const nll = worldToLatLon(nx, nz)
+              const nter = sampleTerrain(nll.lat, nll.lon, seed)
+              if (elephantStepAllowed(nter.type, true)) {
+                a.x = nx
+                a.z = nz
+                a.y = Math.max(0.02, nter.height)
+              } else if (tg.kind === 'water' && (nter.type === 'water' || nter.type === 'ocean')) {
+                dy.arrived = true // at the water's edge: this is where it dies
+              }
+            }
+          }
+          elephantPos.push([a.x, a.z])
+          elephantVel.push([a.x - ex0, a.z - ez0])
+          elephantVelMap.set(a, [a.x - ex0, a.z - ez0])
+          continue
+        }
         const info = a.herd !== undefined ? herdCentre.get(a.herd) : undefined
+        // The herd's pace (its slowest living member); a lone elephant its own.
+        const herdSpeed = ELEPHANT_SPEED * (info?.pace ?? elderSpeedFactor(a.elderly, balance.elderly.speedFactor))
         const mournInfo = a.herd !== undefined ? herdState.current.get(a.herd)?.mourn : undefined
         // Follow the herd heading; steer back toward the centre if drifting off.
         let desired = a.heading
@@ -4356,7 +4590,7 @@ function Herds() {
             const bll = worldToLatLon(bx, bz)
             return !elephantStepAllowed(sampleTerrain(bll.lat, bll.lon, seed).type, mournInfo !== undefined, standT)
           }
-          const def = deflectedStep(a.x, a.z, a.heading, ELEPHANT_SPEED * dt, blockedStep, 6)
+          const def = deflectedStep(a.x, a.z, a.heading, herdSpeed * dt, blockedStep, 6)
           if (def.moved) {
             desired = def.heading
           } else {
@@ -4376,8 +4610,8 @@ function Herds() {
         // An arrived mourner stands at the bones (point 126) — no step, only
         // the soft turn above; the vigil's deadline moves it on again.
         if (!mournHold) {
-          const nx = a.x + Math.sin(a.heading) * ELEPHANT_SPEED * dt
-          const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
+          const nx = a.x + Math.sin(a.heading) * herdSpeed * dt
+          const nz = a.z + Math.cos(a.heading) * herdSpeed * dt
           const ll = worldToLatLon(nx, nz)
           const ter = sampleTerrain(ll.lat, ll.lon, seed)
           if (elephantStepAllowed(ter.type, mournInfo !== undefined, standT)) {
@@ -4464,6 +4698,14 @@ function Herds() {
       const eligible: Animal[] = []
       for (const sp of SPECIES) {
         for (const a of herds[sp]) {
+          // An elder DOWN in its natural death draws its flock now, before it
+          // dies (design.md §19.18; research §4.4): the flock keys on the
+          // downed animal, gathers over it, and lands only once it is dead —
+          // the same flock, carcass-owned from then on (point 251).
+          if (!a.dead && a.dying?.stage !== undefined && dyingDrawsFlock(a.dying.stage)) {
+            eligible.push(a)
+            continue
+          }
           if (!a.dead || a.lionFed) continue // the on-scene predator eats its own kill
           if (a.remnant) continue // hunt scraps belong to the circling kill flock
           if (a.gone) continue
@@ -4501,7 +4743,8 @@ function Herds() {
           0.6,
           (x, z) => !isOnScreen(x, z), // spawn OFF the rendered frame, fly in (point 178)
         )
-        sc.landed = sc.mode === 'active' && target !== null
+        // Only on a body: over a still-living downed elder the flock gathers.
+        sc.landed = sc.mode === 'active' && target !== null && target.dead === true
         if (!sg) continue
         sg.visible = sc.mode !== 'idle'
         if (sc.mode === 'idle') {
@@ -4517,14 +4760,31 @@ function Herds() {
           // the pecking body; the old +0.5 group pre-lift DOUBLED that clearance
           // and floated the flock ~0.5 above the carcass it feeds on.
           const scll = worldToLatLon(sc.x, sc.z)
-          sc.y = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
-          if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
-          target.dissolve -= dt
-          if (import.meta.env.DEV) SHRINK_FED.add(target) // the landed flock is this shrink's actor (point 319)
+          const groundY = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
+          if (target.deathCause === 'old-age' && sc.y > groundY + 0.05 && sc.y < groundY + DYING_FLOCK_CIRCLE_Y + 1) {
+            // The flock that gathered over the dying elder DESCENDS onto the
+            // body (design.md §19.18) rather than snapping down; it feeds once
+            // it stands on the ground.
+            sc.y = Math.max(groundY, sc.y - DYING_FLOCK_DESCEND_SPEED * dt)
+            sc.landed = false
+          } else {
+            sc.y = groundY
+            if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
+            target.dissolve -= dt
+            if (import.meta.env.DEV) SHRINK_FED.add(target) // the landed flock is this shrink's actor (point 319)
+          }
+        } else if (target && sc.mode === 'active') {
+          // Gathered over a downed, still-living elder (design.md §19.18):
+          // circling low over the body, following it, until it dies.
+          sc.x = target.x
+          sc.z = target.z
+          sc.y = target.y + DYING_FLOCK_CIRCLE_Y
         } else if (target && sc.mode === 'in') {
-          // Glide down toward the carcass as the approach closes.
+          // Glide down toward the carcass as the approach closes — over a
+          // still-living elder no lower than the gathering circle.
           const d = Math.hypot(target.x - sc.x, target.z - sc.z)
           sc.y = target.y + 0.4 + Math.min(1, d / 40) * 13
+          if (!target.dead) sc.y = Math.max(sc.y, target.y + DYING_FLOCK_CIRCLE_Y)
         } else {
           sc.y = Math.min(14, sc.y + 6 * dt) // climbing away
         }
@@ -4579,6 +4839,10 @@ function Herds() {
       // 274 — the pose split that replaced the per-instance waterline).
       let sIdx = 0
       let crocStrikeThis = false
+      // Elders divert into their aged-build mesh (design.md §19.18) — alive,
+      // dying and as a carcass alike, so the body that falls is the old one.
+      const elderMesh = isElderRenderSpecies(sp) ? pool.elder[sp] : undefined
+      let oIdx = 0
       const write = (a: Animal) => {
         if (a.young && calfMesh) {
           // Over the calf budget: this juvenile is NOT drawn this frame, so it
@@ -4586,6 +4850,10 @@ function Herds() {
           // collider behind (point 378/129).
           if (cIdx >= MAX_CALF_INSTANCES) return
           calfMesh.setMatrixAt(cIdx++, mtx)
+        } else if (a.elderly && elderMesh) {
+          // Over the elder budget: not drawn, so not stamped (point 378).
+          if (oIdx >= MAX_ELDER_INSTANCES) return
+          elderMesh.setMatrixAt(oIdx++, mtx)
         } else if (crocStrikeThis) {
           pool.crocStrike.setMatrixAt(sIdx++, mtx)
         } else {
@@ -5324,7 +5592,7 @@ function Herds() {
         // smoothly, accumulating into its own position, so it never teleports
         // when the hunt begins or snaps back when it ends.
         let fleeingLion = false // set once the flee actually fires this frame
-        if (!familyHeld && lionActive && FLEES_LION[sp] && sp !== 'elephant') {
+        if (!familyHeld && lionActive && FLEES_LION[sp] && sp !== 'elephant' && a.dying?.stage !== 'down') {
           const dx = a.x - LION_STATE.lx
           const dz = a.z - LION_STATE.lz
           const d = Math.hypot(dx, dz)
@@ -5393,7 +5661,8 @@ function Herds() {
               drinking: a.drink !== undefined,
               stagedBankVictim: stagedBankVictim(a),
             },
-            FLEES_LION[sp] ? elephantPos : [],
+            // A downed dying elder can no longer dart (design.md §19.18).
+            FLEES_LION[sp] && a.dying?.stage !== 'down' ? elephantPos : [],
             playerThreat,
             ring,
             shyRing,
@@ -5440,6 +5709,27 @@ function Herds() {
               if (a.flyLift <= 0) a.flyLift = undefined
             }
             if (a.flyLift !== undefined) bodyY += a.flyLift * BIRD_FLY_LIFT
+          }
+        }
+        // Dying of old age (design.md §19.18): a failing elder hangs its head
+        // and faces its slow drift; a downed one rolls onto its side and lies
+        // there, breathing, while the flock gathers over it.
+        // A drama that took the dying animal over (dyingSuspended) owns its
+        // pose and position: the caught, swept or burning animal is drawn by it.
+        let roll = 0
+        if (a.dying !== undefined && !dyingSuspended(a, a === LION_STATE.victim)) {
+          wobTarget = 0
+          px = a.x
+          pz = a.z
+          const dy = a.dying
+          if (dy.stage === 'down' && dy.downSince !== undefined) {
+            yaw = a.face ?? yaw
+            pitch = 0
+            roll = dyingDownRoll(dy.elapsed - dy.downSince)
+            bodyY = groundedBodyY(a.y) + Math.sin(t * 1.4 + a.phase) * 0.012 * a.scale
+          } else {
+            if (sp !== 'elephant' && dy.heading !== undefined) yaw = dy.heading
+            pitch = 0.1
           }
         }
         // The LOGICAL render spot (point 196): the anchoring assert judges the
@@ -5530,8 +5820,8 @@ function Herds() {
         const crocOwnsFacing = sp === 'crocodile' && a.lunge !== undefined
         if (sp !== 'elephant' && !thrashing && !crocOwnsFacing && yaw !== idleYaw) a.rot = face
         vpos.set(px, bodyY, pz)
-        if (pitch !== 0) {
-          euler.set(pitch, face, 0, 'YXZ')
+        if (pitch !== 0 || roll !== 0) {
+          euler.set(pitch, face, roll, 'YXZ')
           quat.setFromEuler(euler)
         } else {
           quat.setFromAxisAngle(up, face)
@@ -5598,6 +5888,10 @@ function Herds() {
       if (calfMesh) {
         calfMesh.count = cIdx
         calfMesh.instanceMatrix.needsUpdate = true
+      }
+      if (elderMesh) {
+        elderMesh.count = oIdx
+        elderMesh.instanceMatrix.needsUpdate = true
       }
     }
 
@@ -5681,6 +5975,9 @@ function Herds() {
       {CALF_SPECIES.map((sp) => (
         <primitive key={`${sp}-calf`} object={pool.calf[sp]} dispose={null} />
       ))}
+      {ELDER_RENDER_SPECIES.map((sp) => (
+        <primitive key={`${sp}-elder`} object={pool.elder[sp]} dispose={null} />
+      ))}
       <primitive object={pool.crocStrike} dispose={null} />
       <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_MAX]} visible={false} frustumCulled={false} renderOrder={3} />
       <instancedMesh ref={fireSmoke} args={[fireSmokeGeo, fireSmokeMat, FIRE_SMOKE_MAX]} visible={false} frustumCulled={false} renderOrder={4} />
@@ -5728,7 +6025,7 @@ function LionHunt() {
   // plains and take varied game — geometries and material from the module
   // pool (point 96): with the travel scene's dispose={null} a per-mount
   // useMemo would leak a fresh geometry set on every place visit.
-  const { predator: predatorGeo, prey: preyGeo } = getHuntGeos()
+  const { predator: predatorGeo, elderPredator: elderPredatorGeo, prey: preyGeo } = getHuntGeos()
   const material = getWildlifeMeshes().material
 
   // Dev hook for the headless verification (CLAUDE.md §7.2). `stain` is the
@@ -5955,8 +6252,14 @@ function LionHunt() {
       // and it only spawns where hyenas roam. The scripted prey mesh stays
       // hidden through the victim hunt, so s.prey's value is cosmetic here.
       if (cubHunt) s.predator = 'hyena'
+      // An ousted old cat male hunts alone (design.md §19.18): ambient hunts
+      // roll it on the elderly share; a forced hunt is old only when asked.
+      s.elderly = force
+        ? force.elderly === true && huntPredatorElderly(s.predator, cubHunt, 0, 1)
+        : huntPredatorElderly(s.predator, cubHunt, Math.random(), balance.elderly.fraction)
       if (predatorMesh.current) {
-        predatorMesh.current.geometry = predatorGeo[s.predator]
+        const p = s.predator
+        predatorMesh.current.geometry = s.elderly && p !== 'hyena' ? elderPredatorGeo[p] : predatorGeo[p]
         predatorMesh.current.scale.setScalar(PREDATOR_SCALE[s.predator])
       }
       if (preyMesh.current) {
@@ -6072,7 +6375,7 @@ function LionHunt() {
         // swimming calf quarry does (design.md §19.5; the generic scripted prey
         // runs unbraked), so the water is a real escape: a close
         // pursuer still catches, a distant one sees it reach the far bank.
-        const lionPace = swimBrakedPace(HUNT_LION_SPEED, terrainAt(s.lx, s.lz), huntSwimPace())
+        const lionPace = swimBrakedPace(huntPredatorSpeed(), terrainAt(s.lx, s.lz), huntSwimPace())
         s.lx += Math.sin(s.lionHeading) * lionPace * dt
         s.lz += Math.cos(s.lionHeading) * lionPace * dt
         // SWEPT catch (point 179): test the lion's MOVE SEGMENT against the prey,
@@ -6101,6 +6404,7 @@ function LionHunt() {
         if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR) {
           s.mode = 'idle'
           s.timer = 10
+          s.elderly = false // the stage is empty: no old hunter lingers into the next
         }
       }
     } else if (s.mode === 'feed') {
@@ -6222,6 +6526,7 @@ function LionHunt() {
       if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR || leaveOvertime) {
         s.mode = 'idle'
         s.timer = 30 + Math.random() * 30
+        s.elderly = false // the stage is empty: no old hunter lingers into the next
         s.leaveHeading = undefined
         s.leaveT = 0
       }

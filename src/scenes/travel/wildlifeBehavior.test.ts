@@ -8,6 +8,31 @@ import {
   vicinityAttemptSeed,
   pickOffscreenLandAnchor,
   calvesForGroup,
+  DYING_DOWN_ROLL,
+  dyingDeadline,
+  dyingSuspended,
+  huntPredatorElderly,
+  SOLITARY_ELDER_CATS,
+  dyingDownRoll,
+  dyingDrawsFlock,
+  dyingFailSeconds,
+  dyingSlowdown,
+  ELDER_SPECIES,
+  ELDER_SPEED_MAX,
+  elderSpeedFactor,
+  elderTurnsSolitary,
+  elephantDyingTarget,
+  fightInitiates,
+  fightResolveAged,
+  hasElderVariant,
+  herdPaceFactor,
+  isElderRoll,
+  naturalDeathChance,
+  naturalDeathStarts,
+  solitarySpot,
+  stepDying,
+  type DyingState,
+  type DyingTiming,
   seasonFlowFactor,
   waterStruggleFate,
   blockHeading,
@@ -4891,5 +4916,196 @@ describe('the hunted calf flees into rivers and lakes too (design.md §19.5)', (
     // An open quarter-unit channel whose banks fall exactly on even spacing.
     const open = (_x: number, z: number) => (z > 0 && z < 0.25 ? 'water' : 'savanna')
     expect(chaseSwimEscaped({ x: 0, z: -0.25 }, 0, 0.75, open)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Elderly animals and natural death (design.md §19.18, point 265).
+// ---------------------------------------------------------------------------
+describe('elderly variants (design.md §19.18)', () => {
+  it('every species that visibly ages has one; the crocodile and the birds none (research §2.4/§10.7)', () => {
+    for (const sp of ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'lion', 'cheetah', 'leopard', 'hyena'])
+      expect(hasElderVariant(sp), sp).toBe(true)
+    for (const sp of ['crocodile', 'flamingo', 'plover', 'vulture']) expect(hasElderVariant(sp), sp).toBe(false)
+    expect(ELDER_SPECIES.length).toBe(10)
+  })
+
+  it('the elderly roll takes exactly the calibratable fraction, clamped', () => {
+    expect(isElderRoll(0.07, 0.08)).toBe(true)
+    expect(isElderRoll(0.08, 0.08)).toBe(false)
+    expect(isElderRoll(0, 0)).toBe(false)
+    expect(isElderRoll(0.999, 2)).toBe(true)
+    expect(isElderRoll(0, -1)).toBe(false)
+  })
+
+  it('an elder moves strictly slower than a prime adult, whatever the calibration', () => {
+    expect(elderSpeedFactor(false, 0.7)).toBe(1)
+    expect(elderSpeedFactor(undefined, 0.7)).toBe(1)
+    expect(elderSpeedFactor(true, 0.7)).toBe(0.7)
+    for (const f of [0, 0.5, 0.95, 1, 1.5, 99]) {
+      const k = elderSpeedFactor(true, f)
+      expect(k, String(f)).toBeLessThan(1)
+      expect(k, String(f)).toBeGreaterThan(0)
+    }
+    expect(elderSpeedFactor(true, 1)).toBe(ELDER_SPEED_MAX)
+  })
+
+  it('an elephant herd waits for its elder; a dying or dead member no longer sets the pace', () => {
+    expect(herdPaceFactor([{}, {}, {}], 0.7)).toBe(1)
+    expect(herdPaceFactor([{}, { elderly: true }, {}], 0.7)).toBe(0.7)
+    expect(herdPaceFactor([{}, { elderly: true, dying: { elapsed: 1 } }], 0.7)).toBe(1)
+    expect(herdPaceFactor([{}, { elderly: true, dead: true }], 0.7)).toBe(1)
+  })
+
+  it('an elder never INITIATES a same-species fight (point 264), a prime adult still can', () => {
+    for (const roll of [0, 1e-6, 0.001, 0.5]) expect(fightInitiates('zebra', true, roll, 1)).toBe(false)
+    expect(fightInitiates('zebra', false, 0, 1)).toBe(true)
+    expect(fightInitiates('zebra', undefined, 0, 1)).toBe(true)
+  })
+
+  it('an elder ALWAYS loses to a younger adult, whichever side and size; lethality stays the research row', () => {
+    const w = { lethalityScale: 1 }
+    for (const rollLoser of [0, 0.25, 0.5, 0.75, 0.999]) {
+      // The elder is the HEAVIER animal and still loses.
+      expect(fightResolveAged('zebra', { size: 1.3, elderly: true }, { size: 0.9 }, rollLoser, 0.9, w).loser).toBe('a')
+      expect(fightResolveAged('zebra', { size: 0.9 }, { size: 1.3, elderly: true }, rollLoser, 0.9, w).loser).toBe('b')
+    }
+    // Lethal on the zebra's researched row (0.75), submission on the antelope's (0).
+    expect(fightResolveAged('zebra', { size: 1, elderly: true }, { size: 1 }, 0.5, 0.1, w).lethal).toBe(true)
+    expect(fightResolveAged('zebra', { size: 1, elderly: true }, { size: 1 }, 0.5, 0.9, w).lethal).toBe(false)
+    // Two prime adults (or two elders) keep the size-weighted roll.
+    expect(fightResolveAged('zebra', { size: 1 }, { size: 1 }, 0.4, 0.9, w).loser).toBe('a')
+    expect(fightResolveAged('zebra', { size: 1, elderly: true }, { size: 1, elderly: true }, 0.6, 0.9, w).loser).toBe('b')
+  })
+
+  it('the ousted old male turns solitary for the grazers and the big cats, never the elephant', () => {
+    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'lion', 'cheetah', 'leopard'])
+      expect(elderTurnsSolitary(sp), sp).toBe(true)
+    for (const sp of ['elephant', 'hyena', 'crocodile']) expect(elderTurnsSolitary(sp), sp).toBe(false)
+    const p = solitarySpot(10, 10, 13, 14, 10, 0)
+    expect(Math.hypot(p.x - 10, p.z - 10)).toBeCloseTo(10, 6)
+    expect(p.x).toBeGreaterThan(10) // on the side it was placed
+    const q = solitarySpot(0, 0, 0, 0, 5, Math.PI / 2)
+    expect(q.x).toBeCloseTo(5, 6)
+    expect(q.z).toBeCloseTo(0, 6)
+  })
+})
+
+describe('natural death of old age (design.md §19.18)', () => {
+  const T: DyingTiming = { seconds: 40, downFraction: 0.6, graceFactor: 3 }
+
+  it('the natural-death roll: never at rate 0, a constant hazard at the boundaries', () => {
+    expect(naturalDeathChance(0, 10)).toBe(0)
+    expect(naturalDeathStarts(0, 0, 1)).toBe(false)
+    expect(naturalDeathChance(1, 0)).toBe(0)
+    expect(naturalDeathStarts(0, 1, 0)).toBe(false)
+    // One death per minute: over one minute the chance is 1 - 1/e.
+    expect(naturalDeathChance(1, 60)).toBeCloseTo(1 - Math.exp(-1), 9)
+    // Frame-rate independent: two half-steps compose to one whole step.
+    const half = naturalDeathChance(0.5, 0.5)
+    expect(1 - (1 - half) * (1 - half)).toBeCloseTo(naturalDeathChance(0.5, 1), 12)
+    const c = naturalDeathChance(0.03, 1 / 60)
+    expect(naturalDeathStarts(c - 1e-12, 0.03, 1 / 60)).toBe(true)
+    expect(naturalDeathStarts(c, 0.03, 1 / 60)).toBe(false)
+    expect(naturalDeathStarts(0.999999, 1e9, 1)).toBe(true)
+    expect(naturalDeathChance(-1, 10)).toBe(0)
+  })
+
+  it('the dying slowdown falls monotonically from full pace to its floor, then holds it', () => {
+    const fail = dyingFailSeconds(T)
+    expect(fail).toBeCloseTo(24, 9)
+    expect(dyingSlowdown(0, fail, 0.3)).toBe(1)
+    expect(dyingSlowdown(fail / 2, fail, 0.3)).toBeCloseTo(0.65, 9)
+    expect(dyingSlowdown(fail, fail, 0.3)).toBeCloseTo(0.3, 9)
+    expect(dyingSlowdown(fail * 5, fail, 0.3)).toBeCloseTo(0.3, 9)
+    let prev = Infinity
+    for (let e = 0; e <= fail * 1.2; e += 0.5) {
+      const k = dyingSlowdown(e, fail, 0.3)
+      expect(k).toBeLessThanOrEqual(prev)
+      prev = k
+    }
+  })
+
+  it('the stages: failing on its feet, then down while the vultures gather, then dead', () => {
+    const s: DyingState = { elapsed: 0 }
+    const stages: string[] = []
+    for (let i = 0; i < 45; i++) stages.push(stepDying(s, 1, true, T))
+    expect(stages.slice(0, 23).every((x) => x === 'failing')).toBe(true)
+    expect(stages[24]).toBe('down')
+    expect(stages[38]).toBe('down')
+    expect(stages[40]).toBe('dead')
+    expect(dyingDrawsFlock('failing')).toBe(false) // no long pre-death circle
+    expect(dyingDrawsFlock('down')).toBe(true)
+    expect(dyingDrawsFlock('dead')).toBe(true)
+  })
+
+  it('a dying animal short of its water goes down only on arrival — or at the hard deadline (I4)', () => {
+    const s: DyingState = { elapsed: 0 }
+    let st = ''
+    for (let i = 0; i < 30; i++) st = stepDying(s, 1, false, T)
+    expect(st).toBe('failing') // past the failing window, still walking to water
+    expect(stepDying(s, 1, true, T)).toBe('down') // arrived: it goes down
+    const never: DyingState = { elapsed: 0 }
+    let t = 0
+    while (stepDying(never, 0.5, false, T) !== 'dead') {
+      t += 0.5
+      expect(t).toBeLessThanOrEqual(dyingDeadline(T) + 0.5)
+    }
+    expect(dyingDeadline(T)).toBeCloseTo(24 * 3 + 16, 9)
+  })
+
+  it('the ousted old cat male hunts alone: lion, cheetah, leopard only — never the hyena (point 265)', () => {
+    for (const cat of ['lion', 'cheetah', 'leopard']) {
+      expect(huntPredatorElderly(cat, false, 0.01, 0.06)).toBe(true)
+      expect(huntPredatorElderly(cat, false, 0.5, 0.06)).toBe(false) // off the elderly share
+      expect(huntPredatorElderly(cat, true, 0, 1)).toBe(false) // the cub hunt is the hyena's
+      expect(elderTurnsSolitary(cat)).toBe(true)
+    }
+    expect(huntPredatorElderly('hyena', false, 0, 1)).toBe(false)
+    expect(huntPredatorElderly('lion', false, 0, 0)).toBe(false) // rate 0: never
+    expect(SOLITARY_ELDER_CATS).not.toContain('hyena')
+  })
+
+  it('another drama that takes the dying animal over owns it — decline and pose wait (point 265)', () => {
+    expect(dyingSuspended({}, false)).toBe(false)
+    expect(dyingSuspended({}, true)).toBe(true) // the hunt's victim
+    expect(dyingSuspended({ caught: 2 }, false)).toBe(true) // seized by a predator
+    expect(dyingSuspended({ caught: 0 }, false)).toBe(true) // even at the last second of the grip
+    expect(dyingSuspended({ inWater: 0 }, false)).toBe(true) // swept into the water
+    expect(dyingSuspended({ fireTrapped: 1 }, false)).toBe(true)
+    expect(dyingSuspended({ crossing: { tx: 0, tz: 0, time: 0 } }, false)).toBe(true)
+  })
+
+  it('a tick spanning both stages keeps the remainder past the threshold (deadline holds exactly)', () => {
+    const quick = { seconds: 10, downFraction: 0.5, graceFactor: 1 }
+    expect(dyingDeadline(quick)).toBeCloseTo(10, 9)
+    const s: DyingState = { elapsed: 0 }
+    expect(stepDying(s, 10, true, quick)).toBe('dead')
+    const half: DyingState = { elapsed: 0 }
+    expect(stepDying(half, 7, true, quick)).toBe('down')
+    expect(half.downSince).toBeCloseTo(5, 9)
+    expect(stepDying(half, 3, true, quick)).toBe('dead')
+    const late: DyingState = { elapsed: 0 }
+    expect(stepDying(late, 10, false, { ...quick, graceFactor: 1.5 })).toBe('down')
+    expect(late.downSince).toBeCloseTo(7.5, 9)
+    expect(stepDying(late, 2.5, false, { ...quick, graceFactor: 1.5 })).toBe('dead')
+  })
+
+  it('the downed animal rolls onto its side over the fall, short of the carcass roll', () => {
+    expect(dyingDownRoll(0)).toBe(0)
+    expect(dyingDownRoll(0.75)).toBeGreaterThan(0)
+    expect(dyingDownRoll(0.75)).toBeLessThan(DYING_DOWN_ROLL)
+    expect(dyingDownRoll(10)).toBeCloseTo(DYING_DOWN_ROLL, 9)
+    expect(DYING_DOWN_ROLL).toBeLessThan(Math.PI / 2.15)
+  })
+
+  it('a dying elephant drifts to the graveyard within reach, else to the nearest water, else nowhere', () => {
+    const graveyard = { x: 100, z: 0 }
+    const water = { x: 0, z: 8 }
+    expect(elephantDyingTarget(60, 0, water, graveyard, 60)).toEqual({ x: 100, z: 0, kind: 'graveyard' })
+    expect(elephantDyingTarget(40, 0, water, graveyard, 60)).toEqual({ x: 100, z: 0, kind: 'graveyard' })
+    expect(elephantDyingTarget(0, 0, water, graveyard, 60)).toEqual({ x: 0, z: 8, kind: 'water' })
+    expect(elephantDyingTarget(0, 0, null, graveyard, 60)).toBeNull()
+    expect(elephantDyingTarget(100, 0, null, graveyard, 0)).toEqual({ x: 100, z: 0, kind: 'graveyard' })
   })
 })

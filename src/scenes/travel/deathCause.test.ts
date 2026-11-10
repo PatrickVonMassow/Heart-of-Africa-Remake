@@ -67,6 +67,7 @@ describe('the death causes (point 326)', () => {
     expect(new Set(DEATH_CAUSES).size).toBe(DEATH_CAUSES.length)
     for (const c of [
       'predator', 'crocodile', 'trample', 'drowning', 'waterfall', 'fire', 'fight', 'revenge', 'plague', 'remnant', 'staged',
+      'old-age',
     ] as const)
       expect(DEATH_CAUSES).toContain(c)
   })

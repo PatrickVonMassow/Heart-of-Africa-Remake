@@ -16,8 +16,13 @@
 import * as THREE from 'three/webgpu'
 import { QUALITY_PRESETS } from '../config/quality'
 import {
+  agedBoneKnobs,
+  agedColor,
   calfProportions,
+  ELDERLY_SCHEMA,
+  elderlyProportions,
   fitLegToPivot,
+  greyMuzzle,
   merge,
   sweepTube,
   tint,
@@ -179,7 +184,9 @@ function ungulateBodyParts(s: UngulateSpec, segs: Segs): THREE.BufferGeometry[] 
       ...endCap(-halfL - 0.15 * R, 0.7 * R, -1, 0.02, 0.8, 0.84).reverse(),
       st(-halfL - 0.15 * R, 0.0, 0.8, 0.84),
       st(-halfL + 0.2 * R, -0.03, 0.8, 0.85),
-      st(0, -0.1, 0.8, 0.86),
+      // The waist carries the aged sway-back (design.md §19.18): the topline
+      // dips between the hips and the withers.
+      st(0, -0.1 - (s.swayBack ?? 0), 0.8, 0.86),
       st(halfL - 0.15 * R, -0.12, 0.76, 0.96),
       st(halfL + 0.2 * R, -0.08, 0.66, 0.88),
       ...endCap(halfL + 0.2 * R, 0.55 * R, 1, -0.04, 0.66, 0.88),
@@ -187,6 +194,7 @@ function ungulateBodyParts(s: UngulateSpec, segs: Segs): THREE.BufferGeometry[] 
     { radial: segs.body, rings: 20, capStart: true, capEnd: true },
   )
   parts.push(tint(torso, s.bodyColor, 0.08, s.seed))
+  if (s.elderly) parts.push(...agedBoneKnobs(-halfL + 0.2 * R, halfL - 0.15 * R, backY + 0.78 * R, 0.3 * R, 0.16 * R, s.bodyColor, s.seed + 11, backY + 0.8 * R))
 
   // Neck: deep where it springs from the shoulder, tapering to the poll, the
   // crest gently arched.
@@ -415,6 +423,27 @@ export function buildZebraCalf(radial = DEFAULT_FAUNA_BODY_SEGMENTS): THREE.Buff
   return buildUngulate(calfProportions(ZEBRA), radial)
 }
 
+/**
+ * The elderly ungulate (design.md §19.18; research docs/fauna-behaviour-1890.md
+ * §2.1/§10.7): the shared aged schema (lean, sway-backed, duller and greyer)
+ * plus a greyed muzzle, a faded mane and tail, and horns worn shorter.
+ */
+export function elderlyUngulate(s: UngulateSpec): UngulateSpec {
+  const e = elderlyProportions(s)
+  return {
+    ...e,
+    ...(s.muzzleColor ? { muzzleColor: greyMuzzle(s.muzzleColor) } : {}),
+    ...(s.mane ? { mane: { ...s.mane, color: agedColor(s.mane.color, ELDERLY_SCHEMA.coatGrey) } } : {}),
+    tail: { ...s.tail, color: agedColor(s.tail.color, ELDERLY_SCHEMA.coatGrey) },
+    ...(s.hornLen !== undefined ? { hornLen: s.hornLen * 0.8 } : {}),
+  }
+}
+
+/** Old zebra (design.md §19.18): the sway-backed aged equine silhouette. */
+export function buildZebraElder(radial = DEFAULT_FAUNA_BODY_SEGMENTS): THREE.BufferGeometry {
+  return buildUngulate(elderlyUngulate(ZEBRA), radial)
+}
+
 /** Antelope/gazelle, ~1.2 units tall (more at the horn tips). */
 export function buildAntelope(radial = DEFAULT_FAUNA_BODY_SEGMENTS): THREE.BufferGeometry {
   return buildUngulate(ANTELOPE, radial)
@@ -428,6 +457,11 @@ export function buildAntelopeParts(radial = DEFAULT_FAUNA_BODY_SEGMENTS): { body
 /** Antelope calf: baby schema, hornless (design.md §19). */
 export function buildAntelopeCalf(radial = DEFAULT_FAUNA_BODY_SEGMENTS): THREE.BufferGeometry {
   return buildUngulate(calfProportions(ANTELOPE), radial)
+}
+
+/** Old antelope (design.md §19.18): lean, dull, worn horns. */
+export function buildAntelopeElder(radial = DEFAULT_FAUNA_BODY_SEGMENTS): THREE.BufferGeometry {
+  return buildUngulate(elderlyUngulate(ANTELOPE), radial)
 }
 
 /** Goat for village life (design.md §19 village life), ~0.7 units tall — the
