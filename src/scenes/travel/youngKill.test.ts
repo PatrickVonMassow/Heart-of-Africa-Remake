@@ -66,7 +66,7 @@ function driveYoungKill() {
   for (; t < 240; t += DT) {
     // The struggle and the kill.
     if (stepCaught(young, DT)) {
-      markKilled(young, CARCASS_SECONDS)
+      markKilled(young, CARCASS_SECONDS, 'predator')
       killedAt = { x: young.x, z: young.z }
       const fate = releaseBereavedParent(young, {
         tooLateDist: TOO_LATE,

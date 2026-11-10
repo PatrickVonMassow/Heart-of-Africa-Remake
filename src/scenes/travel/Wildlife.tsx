@@ -223,8 +223,24 @@ import {
   sinkKill,
   sinkOffset,
 } from './crocAftermath'
+import {
+  assertVisibleDeath,
+  huntHoldsCatch,
+  recordDeathCause,
+  tooLateDistFor,
+  type DeathCause,
+} from './deathCause'
 
 const CHUNK_SIZE = 24
+
+/** The actor of a death (point 326): the killer's position, 'here' for an
+ *  environment cause the body is in, or null when nothing is there. */
+type DeathActor = { x: number; z: number } | 'here' | null
+function actorDistance(a: { x: number; z: number }, actor: DeathActor): number | null {
+  if (actor === null) return null
+  if (actor === 'here') return 0
+  return Math.hypot(actor.x - a.x, actor.z - a.z)
+}
 
 // The predator kinds are herd species too (point 146): a predator KILLED by
 // an avenging parent becomes an ordinary carcass in the herd lists, so the
@@ -277,6 +293,9 @@ interface Animal {
   /** Dead at (x,z) by any cause — trampled, taken, slain, drowned, plague
    *  carrion or a fight loss (design.md §19). */
   dead?: boolean
+  /** What killed it (point 326): every death records its cause, and the
+   *  dev-assert checks the cause's actor is there at the moment of death. */
+  deathCause?: DeathCause
   /** Shore point this animal periodically walks to and drinks at. */
   drink?: { tx: number; tz: number }
   /** Current heading for roaming elephants (radians; set lazily). */
@@ -1133,6 +1152,7 @@ function spawnRemnant(
     scale: base * balance.hunt.remnantScale * (at.young ? balance.hunt.remnantYoungFactor : 1),
     phase: 0,
     dead: true,
+    deathCause: 'remnant',
     remnant: true,
   }
   herds[sp].push(remnant)
@@ -1232,6 +1252,7 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
           x, z, y: Math.max(0.02, ct.height), rot: hash(ccx, ccz, 46 + i, seed) * Math.PI * 2,
           scale: 0.9 + hash(ccx, ccz, 47 + i, seed) * 0.2, phase: hash(ccx, ccz, 48 + i, seed), chunk: key,
           dead: true,
+          deathCause: 'plague',
           plague: true,
         })
       }
@@ -1908,20 +1929,31 @@ function Herds() {
   // logic grew by accretion across eight sites — this is its single
   // spelling. sink: a water victim sinks (no scavenger lands on open
   // water); stain: a land kill marks the ground.
-  const takeAnimal = (a: Animal, opts: { sink?: boolean; stain?: boolean } = {}) => {
-    if (opts.sink) sinkKill(a, CARCASS_DISSOLVE_SECONDS)
-    else markKilled(a, CARCASS_DISSOLVE_SECONDS)
+  // Every death names its cause and the actor that dealt it (point 326):
+  // `actor` is the killer's position, 'here' for an environment cause the
+  // body is in (the river, the falls, the flame line), null for none — the
+  // dev-assert then reports a death without a visible cause.
+  const takeAnimal = (
+    a: Animal,
+    cause: DeathCause,
+    actor: DeathActor,
+    opts: { sink?: boolean; stain?: boolean } = {},
+  ) => {
+    if (opts.sink) sinkKill(a, CARCASS_DISSOLVE_SECONDS, cause)
+    else markKilled(a, CARCASS_DISSOLVE_SECONDS, cause)
     if (opts.stain) pushStain(a.x, a.z)
+    if (import.meta.env.DEV) assertVisibleDeath(a, actorDistance(a, actor), cause)
   }
 
   // Revenge (design.md §19.8, point 146): a strong parent's strike kills a
   // weak predator outright. The predator drops where it stands as an ORDINARY
   // herd carcass — lionFed stays false so the ground scavenger works it like
   // any trampled grazer (no stain: the kick breaks, it does not open a kill).
-  const slayPredator = (kind: PredatorKind, x: number, z: number, rot: number) => {
+  const slayPredator = (kind: PredatorKind, x: number, z: number, rot: number, slayer: { x: number; z: number }) => {
     const h = herdsRef.current
     if (!h) return
     const ll = worldToLatLon(x, z)
+    if (import.meta.env.DEV) assertVisibleDeath({ x, z, deathCause: 'revenge' }, actorDistance({ x, z }, slayer), kind)
     h[kind].push({
       x,
       z,
@@ -1930,6 +1962,7 @@ function Herds() {
       scale: PREDATOR_SCALE[kind],
       phase: 0,
       dead: true,
+      deathCause: 'revenge',
       dissolve: CARCASS_DISSOLVE_SECONDS,
       lionFed: false,
       chunk: `${Math.floor(x / CHUNK_SIZE)},${Math.floor(z / CHUNK_SIZE)}`,
@@ -2166,6 +2199,7 @@ function Herds() {
           }
           if (!victim || herdId === undefined) return 'noElephant'
           victim.dead = true
+          recordDeathCause(victim, 'staged') // a debug-menu death (§21.3): no actor owed
           victim.lionFed = true // the herd keeps its own — no vulture over it
           pushStain(victim.x, victim.z)
           const st = herdState.current.get(herdId)
@@ -2225,6 +2259,7 @@ function Herds() {
           // A NON-lion carcass (lionFed stays false): the ground scavengers
           // fly in for it exactly as they do for a trampled animal.
           carrion.dead = true
+          recordDeathCause(carrion, 'staged') // a debug-menu carcass (§21.3): no actor owed
           carrion.lionFed = false
           carrion.drink = undefined
           pushStain(carrion.x, carrion.z)
@@ -2532,7 +2567,18 @@ function Herds() {
           a.kick -= dt
           if (a.kick <= 0) a.kick = undefined
         }
-        if (a.caught !== undefined && a.caught > 0) {
+        if (
+          a.caught !== undefined && a.caught > 0 && a.caughtBy !== 'crocodile' &&
+          !huntHoldsCatch(
+            LION_STATE.mode !== 'idle', LION_STATE.victim === a, Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z),
+          )
+        ) {
+          // A land catch whose hunter has gone (the hunt reset or moved to
+          // another body, point 326) is released ALIVE: no predator is there to
+          // finish it, so it may not drop dead on its own (the land twin of
+          // the crocodile's point-319 release).
+          a.caught = undefined
+        } else if (a.caught !== undefined && a.caught > 0) {
           // Caught calf: count down the struggle. Unrescued, the kill completes —
           // and a parent that charged in but only got close (too late) is taken
           // alongside it: both are eaten (§19).
@@ -2540,7 +2586,13 @@ function Herds() {
             // A crocodile drags its kill under — the river takes the body
             // (design.md §19.16); land predators leave the stained carcass.
             const croc = a.caughtBy === 'crocodile'
-            takeAnimal(a, croc ? { sink: true } : { stain: true })
+            const seized = croc
+              ? herds.crocodile.find((k) => !k.dead && k.lunge?.victim === a)
+              : undefined
+            const killer: DeathActor = croc
+              ? (seized ?? null)
+              : LION_STATE.mode !== 'idle' ? { x: LION_STATE.lx, z: LION_STATE.lz } : null
+            takeAnimal(a, croc ? 'crocodile' : 'predator', killer, croc ? { sink: true } : { stain: true })
             const par = a.parent
             // The vigil (design.md §19.8, point 121): a parent that stayed
             // clear of the kill does not resume grazing — it walks to the
@@ -2550,20 +2602,21 @@ function Herds() {
             // A CROCODILE kill has been hauled into the river (point 383), so
             // the keeper stands at the WATERLINE its calf was seized from —
             // never out in the channel over a body the river has taken.
-            const seized = croc
-              ? herds.crocodile.find((k) => k.lunge?.victim === a)?.lunge
-              : undefined
+            // A crocodile's too-late parent is taken only where its jaws reach
+            // it (point 326): the ambusher holds its catch in the water, so a
+            // parent still back on the bank SURVIVES into the vigil — it never
+            // drops dead at the waterline with no crocodile at it.
             const fate = releaseBereavedParent(a, {
-              tooLateDist: PARENT_TOO_LATE_DIST,
+              tooLateDist: tooLateDistFor(croc, PARENT_TOO_LATE_DIST, PARENT_SACRIFICE_DIST),
               bereavedSeconds: balance.family.bereavedSeconds,
-              vigilAt: { x: seized?.seizeX ?? a.x, z: seized?.seizeZ ?? a.z },
+              vigilAt: { x: seized?.lunge?.seizeX ?? a.x, z: seized?.lunge?.seizeZ ?? a.z },
             })
             if (fate === 'taken' && par) {
-              takeAnimal(par, croc ? { sink: true } : { stain: true })
+              takeAnimal(par, croc ? 'crocodile' : 'predator', killer, croc ? { sink: true } : { stain: true })
               // The crocodile takes the too-late parent as well (point 319): it
               // owns that body too and hauls it under beside the catch, so it
               // never sinks on the bank with no crocodile at it.
-              if (seized) seized.alongside = par
+              if (seized?.lunge) seized.lunge.alongside = par
             }
           }
         } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
@@ -2630,7 +2683,7 @@ function Herds() {
                   // straight to idle, which hides the scripted predator mesh
                   // — the carcass pushed into the herds replaces it in place,
                   // so nothing pops. No walk-off: the predator is dead.
-                  slayPredator(LION_STATE.predator, LION_STATE.lx, LION_STATE.lz, Math.atan2(LION_STATE.px - LION_STATE.lx, LION_STATE.pz - LION_STATE.lz))
+                  slayPredator(LION_STATE.predator, LION_STATE.lx, LION_STATE.lz, Math.atan2(LION_STATE.px - LION_STATE.lx, LION_STATE.pz - LION_STATE.lz), a)
                   LION_STATE.victimHunt = false
                   LION_STATE.mode = 'idle'
                   LION_STATE.timer = 30 + Math.random() * 30
@@ -2666,8 +2719,8 @@ function Herds() {
               if (calf.caughtBy === 'crocodile') {
                 // The sacrifice at the waterline (point 130): the crocodile
                 // takes the charging parent under in the calf's place.
-                takeAnimal(a, { sink: true })
                 const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
+                takeAnimal(a, 'crocodile', cc ?? null, { sink: true })
                 if (cc && cc.lunge) {
                   // The parent is taken IN the calf's place (point 319): the
                   // crocodile's catch becomes the parent's body, which it hauls
@@ -2681,7 +2734,7 @@ function Herds() {
                 }
                 calf.caughtBy = undefined
               } else {
-                takeAnimal(a, { stain: true })
+                takeAnimal(a, 'predator', LION_STATE.mode !== 'idle' ? { x: LION_STATE.lx, z: LION_STATE.lz } : null, { stain: true })
                 if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
               }
             }
@@ -2736,7 +2789,7 @@ function Herds() {
                 // Revenge (point 146): the hunter drops where it stands and
                 // becomes an ordinary herd carcass; straight to idle hides
                 // the scripted mesh in the same frame — no walk-off.
-                slayPredator(LION_STATE.predator, LION_STATE.lx, LION_STATE.lz, LION_STATE.lionHeading)
+                slayPredator(LION_STATE.predator, LION_STATE.lx, LION_STATE.lz, LION_STATE.lionHeading, a)
                 LION_STATE.victimHunt = false
                 LION_STATE.mode = 'idle'
                 LION_STATE.timer = 30 + Math.random() * 30
@@ -2751,7 +2804,7 @@ function Herds() {
               a.child = undefined
               calf.escape = balance.family.escapeSeconds // the escape run owns it (point 311)
               mournOrphan(calf, a) // …and grieves the shield that fell for it (point 369)
-              takeAnimal(a, { stain: true })
+              takeAnimal(a, 'predator', { x: LION_STATE.lx, z: LION_STATE.lz }, { stain: true })
               LION_STATE.victim = a // the hunt closes out feeding on the parent
             }
           }
@@ -2832,7 +2885,7 @@ function Herds() {
             const fd = fallsDistanceDeg(ll.lat, ll.lon)
             if (fd < FALLS_DEATH_RADIUS_DEG) {
               // Swept over the fall: the calf dies, its parent plunges after it.
-              takeAnimal(a) // the river takes it — it sinks, nothing scavenges
+              takeAnimal(a, 'waterfall', 'here') // the river takes it — it sinks, nothing scavenges
               const par = a.parent
               a.parent = undefined
               if (par && !par.dead) {
@@ -2883,7 +2936,7 @@ function Herds() {
               bw.drownFlowThreshold,
             )
             if (fate === 'drowned') {
-              takeAnimal(a) // the river takes it — it sinks, nothing scavenges
+              takeAnimal(a, 'drowning', 'here') // the river takes it — it sinks, nothing scavenges
               const par = a.parent
               a.parent = undefined
               if (par) par.child = undefined
@@ -2923,7 +2976,7 @@ function Herds() {
           a.x += (dx / d) * PLUNGE_SPEED * dt
           a.z += (dz / d) * PLUNGE_SPEED * dt
           if (d < PLUNGE_REACH) {
-            takeAnimal(a, { sink: true }) // sinks in the plunge pool like its calf
+            takeAnimal(a, 'waterfall', 'here', { sink: true }) // sinks in the plunge pool like its calf
           }
         } else if (a.child && !a.child.dead && a.child.inWater !== undefined) {
           const calf = a.child
@@ -2972,7 +3025,7 @@ function Herds() {
                   bw.drownFlowThreshold,
                 ) === 'drowned'
               if (swept || drowned) {
-                takeAnimal(a, { sink: true })
+                takeAnimal(a, swept ? 'waterfall' : 'drowning', 'here', { sink: true })
                 calf.parent = undefined
                 a.child = undefined
               }
@@ -3282,6 +3335,8 @@ function Herds() {
             endFight(a)
             if (res.lethal) {
               loser.dead = true
+              recordDeathCause(loser, 'fight')
+              if (import.meta.env.DEV) assertVisibleDeath(loser, actorDistance(loser, winner), sp)
               loser.lionFed = false
               loser.dissolve = CARCASS_DISSOLVE_SECONDS
               loser.drink = undefined
@@ -3922,7 +3977,7 @@ function Herds() {
           f.victim.fireTrapped -= dt
           if (f.victim.fireTrapped <= 0) {
             f.victim.fireTrapped = undefined
-            takeAnimal(f.victim, { stain: true }) // the burn mark where it fell
+            takeAnimal(f.victim, 'fire', 'here', { stain: true }) // the burn mark where it fell
           }
         }
         // The parent goes in after it — surrender, alive or already lost.
@@ -3933,7 +3988,7 @@ function Herds() {
           f.keeper.x += (dx / d) * FIRE_PLUNGE_SPEED * dt
           f.keeper.z += (dz / d) * FIRE_PLUNGE_SPEED * dt
           if (d < 1.2) {
-            takeAnimal(f.keeper, { stain: true })
+            takeAnimal(f.keeper, 'fire', 'here', { stain: true })
             f.keeper = null
           }
         }
@@ -4073,7 +4128,7 @@ function Herds() {
             const dPred = lionActive2 ? Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) : Infinity
             const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
             if (ploverTaken(roll, dPred < 3)) {
-              takeAnimal(a, { stain: true })
+              takeAnimal(a, 'predator', { x: LION_STATE.lx, z: LION_STATE.lz }, { stain: true })
               a.lure = undefined
               continue
             }
@@ -5421,6 +5476,8 @@ function Herds() {
             // elephant driving into/over the animal crushes it.
             if (elephantWouldTrample(evx, evz, ex, ez, a.x, a.z, TRAMPLE_RADIUS)) {
               a.dead = true
+              recordDeathCause(a, 'trample')
+              if (import.meta.env.DEV) assertVisibleDeath(a, actorDistance(a, { x: ex, z: ez }), sp)
               pushStain(a.x, a.z)
               // A trampled CALF takes its parent with it (design.md §19): the
               // parent throws itself before the elephant's feet and is
@@ -5590,6 +5647,13 @@ function Herds() {
       for (const sp of SPECIES) {
         for (const a of herds[sp]) {
           if (a.dead) {
+            // Every body names what killed it (point 326): a death path that
+            // forgets its cause reports itself here, whatever drama it is.
+            devAssert(
+              a.deathCause !== undefined,
+              'death-without-visible-cause',
+              () => `${sp} at ${a.x.toFixed(1)},${a.z.toFixed(1)} lies dead with no recorded cause`,
+            )
             const prev = SHRINK_PREV.get(a)
             devAssert(
               !carcassShrinkUnfed(prev, a.dissolve, isSinkingBody(a), SHRINK_FED.has(a)),
