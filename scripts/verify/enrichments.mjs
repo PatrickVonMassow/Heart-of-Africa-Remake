@@ -7043,6 +7043,199 @@ if (section('intraspecies-fight')) {
   })
 }
 
+// --- Point 265: an elder dies of old age, and the vultures take it ----------
+// design.md §19.18 (research docs/fauna-behaviour-1890.md §4/§5). The rate is
+// rare by design, so the check FORCES the start of one natural death on an
+// injected elderly zebra (the §19.17 checks inject their pair the same way) and
+// lets the ordinary drive do the rest: the elder slows, goes down, the ordinary
+// per-carcass vulture flock gathers over the DOWNED animal (never a long circle
+// over a walking one), the elder dies with the old-age cause into the ordinary
+// carcass system, and that flock descends and consumes it. A second stage
+// starts a dying elder elephant near the §4.4 graveyard: it must drift there —
+// the place water-side deaths accumulate — and die there, alone.
+if (section('elderly-natural-death')) {
+  await page.evaluate(() => { if (window.__game.getState().placeId) window.__game.getState().leavePlace() })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 30000 }).catch(() => {})
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
+  await page.evaluate(() => window.__wildlife.restock())
+  await waitForHerds()
+  const dying = await page.evaluate(async () => {
+    const herds = window.__wildlife.herdsRef.current
+    const be = window.__balance.elderly
+    const p = window.__game.getState().pos
+    const seed = window.__game.getState().seed
+    const U = 10
+    // A quiet stage: no running hunt may claim the elder mid-decline.
+    const lion = window.__lionHunt.state
+    lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+    const land = (x, z) => {
+      const ty = window.__terrainType(-z / U, x / U, seed)
+      return ty !== 'water' && ty !== 'ocean'
+    }
+    let spot = null
+    for (let r = 6; r <= 24 && !spot; r += 2) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2
+        const x = p.x + Math.sin(a) * r
+        const z = p.z + Math.cos(a) * r
+        if (land(x, z) && land(x + 4, z) && land(x - 4, z) && land(x, z + 4) && land(x, z - 4)) { spot = { x, z }; break }
+      }
+    }
+    if (!spot) return { staged: false, noLand: true }
+    // Free every vulture slot from older bodies near by, so the flock that
+    // arrives is the one this elder draws (each carcass owns its own flock).
+    for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+    const kept = { seconds: be.dyingSeconds, rate: be.deathRatePerMinute, down: be.downFraction }
+    // A shorter decline keeps the check quick, with a down window long enough
+    // for a flock spawned beyond the frame to fly in; the stages are unchanged.
+    be.dyingSeconds = 30
+    be.downFraction = 0.4
+    be.deathRatePerMinute = 0 // no OTHER elder starts dying meanwhile
+    const elder = {
+      x: spot.x, z: spot.z, y: 0.2, rot: 0.6, scale: 1, phase: 0.3, chunk: undefined, grounded: true,
+      elderly: true,
+      // The forced START of a natural death — everything after is the drive.
+      dying: { elapsed: 0 },
+    }
+    herds.zebra.push(elder)
+    const out = { staged: true }
+    const slots = () => window.__wildlife.scavengers.current
+    // Early versus late pace of the failing elder: the decline SLOWS it.
+    const pace = []
+    let last = { x: elder.x, z: elder.z, t: window.__simTime() }
+    let flockWhileWalking = false
+    await window.__pollSim(30, () => {
+      const now = window.__simTime()
+      if (now - last.t >= 1) {
+        pace.push({ e: elder.dying?.elapsed ?? -1, v: Math.hypot(elder.x - last.x, elder.z - last.z) / (now - last.t) })
+        last = { x: elder.x, z: elder.z, t: now }
+      }
+      if (elder.dying?.stage === 'failing' && slots().some((f) => f.target === elder)) flockWhileWalking = true
+      if (elder.dying?.stage === 'down' && slots().some((f) => f.target === elder && f.mode === 'active')) return true
+      return elder.dead === true
+    })
+    const fail = window.__balance.elderly.dyingSeconds * window.__balance.elderly.downFraction
+    const early = pace.filter((s) => s.e >= 0 && s.e < fail * 0.3).map((s) => s.v)
+    const late = pace.filter((s) => s.e >= fail * 0.7 && s.e < fail).map((s) => s.v)
+    const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN)
+    out.earlyPace = mean(early)
+    out.latePace = mean(late)
+    out.slowed = early.length > 0 && late.length > 0 && out.latePace < out.earlyPace
+    out.flockWhileWalking = flockWhileWalking
+    out.down = elder.dying?.stage === 'down' && !elder.dead
+    out.gathered = out.down && slots().some((f) => f.target === elder && f.mode === 'active' && !f.landed)
+    window.__elderDeath = { elder, kept, out }
+    return out
+  })
+  check('a forced natural death: the elder SLOWS as it fails, then goes DOWN alive (point 265)',
+    dying.staged && dying.slowed && dying.down, JSON.stringify(dying))
+  check('the vultures gather over the DOWNED elder, not over a walking one (point 265)',
+    dying.gathered === true && dying.flockWhileWalking === false, JSON.stringify(dying))
+  if (dying.gathered) {
+    const at = await page.evaluate(() => ({ x: window.__elderDeath.elder.x, z: window.__elderDeath.elder.z }))
+    await shot('265-elder-down-vultures-gather', {
+      world: at,
+      label: 'an old zebra down in its natural death, the vulture flock gathering over it',
+    })
+  }
+  const ended = await page.evaluate(async () => {
+    const st = window.__elderDeath
+    if (!st) return { staged: false }
+    const { elder, out } = st
+    const herds = window.__wildlife.herdsRef.current
+    const slots = () => window.__wildlife.scavengers.current
+    await window.__pollSim(30, () => elder.dead === true)
+    out.dead = elder.dead === true
+    out.cause = elder.deathCause
+    out.ordinaryCarcass = elder.dead === true && elder.lionFed !== true && elder.remnant !== true
+    let fed = false
+    await window.__pollSim(60, () => {
+      if (slots().some((f) => f.target === elder && f.landed) && elder.dissolve !== undefined) fed = true
+      return !herds.zebra.includes(elder)
+    })
+    out.fed = fed
+    out.consumed = !herds.zebra.includes(elder)
+    window.__balance.elderly.dyingSeconds = st.kept.seconds
+    window.__balance.elderly.deathRatePerMinute = st.kept.rate
+    window.__balance.elderly.downFraction = st.kept.down
+    herds.zebra = herds.zebra.filter((a) => a !== elder)
+    window.__elderDeath = undefined
+    return out
+  })
+  check('it FALLS dead of old age into the ordinary carcass system (point 265)',
+    ended.dead === true && ended.cause === 'old-age' && ended.ordinaryCarcass === true, JSON.stringify(ended))
+  check('the same flock descends and the carcass is consumed (point 265)',
+    ended.fed === true && ended.consumed === true, JSON.stringify(ended))
+
+  // The elephant: an old elephant's last molars fail, it seeks soft water-side
+  // forage and dies there (research §4.2); within reach of the §4.4 graveyard
+  // that is where it goes — alone, its herd left behind (no pilgrimage, §4.3).
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6)) // onto the graveyard
+  await page.waitForTimeout(1500)
+  const tusker = await page.evaluate(async () => {
+    const herds = window.__wildlife.herdsRef.current
+    const be = window.__balance.elderly
+    const seed = window.__game.getState().seed
+    const U = 10
+    const gx = 36.6 * U
+    const gz = 4.9 * U
+    const land = (x, z) => {
+      const ty = window.__terrainType(-z / U, x / U, seed)
+      return ty !== 'water' && ty !== 'ocean'
+    }
+    let spot = null
+    for (let k = 0; k < 16 && !spot; k++) {
+      const a = (k / 16) * Math.PI * 2
+      const x = gx + Math.sin(a) * 12
+      const z = gz + Math.cos(a) * 12
+      if (land(x, z) && land((x + gx) / 2, (z + gz) / 2)) spot = { x, z }
+    }
+    if (!spot) return { staged: false, noLand: true }
+    const kept = { seconds: be.dyingSeconds, rate: be.deathRatePerMinute }
+    be.dyingSeconds = 20
+    be.deathRatePerMinute = 0
+    const e = {
+      x: spot.x, z: spot.z, y: 0.2, rot: 0, heading: Math.atan2(gx - spot.x, gz - spot.z), scale: 1, phase: 0.2,
+      chunk: undefined, grounded: true, elderly: true, dying: { elapsed: 0 },
+    }
+    herds.elephant.push(e)
+    const d0 = Math.hypot(e.x - gx, e.z - gz)
+    await window.__pollSim(5, () => e.dying?.target !== undefined)
+    const out = { staged: true, d0, kind: e.dying?.target?.kind ?? null }
+    await window.__pollSim(60, () => e.dying?.stage === 'down' || e.dead === true)
+    out.dNear = Math.hypot(e.x - gx, e.z - gz)
+    out.headed = out.dNear < d0 - 3
+    out.downThere = e.dying?.stage === 'down' && out.dNear <= 6
+    window.__elephantDeath = { e, kept, out }
+    return out
+  })
+  check('a dying elephant drifts to the graveyard within reach and goes down THERE (point 265)',
+    tusker.staged && tusker.kind === 'graveyard' && tusker.headed && tusker.downThere, JSON.stringify(tusker))
+  if (tusker.downThere) {
+    const at = await page.evaluate(() => ({ x: window.__elephantDeath.e.x, z: window.__elephantDeath.e.z }))
+    await shot('265b-elephant-dies-at-graveyard', {
+      world: at,
+      label: 'an old elephant down at the elephant graveyard, dying of old age',
+    })
+  }
+  const tuskerEnd = await page.evaluate(async () => {
+    const st = window.__elephantDeath
+    if (!st) return { staged: false }
+    const { e, out } = st
+    const herds = window.__wildlife.herdsRef.current
+    await window.__pollSim(30, () => e.dead === true)
+    out.dead = e.dead === true
+    out.cause = e.deathCause
+    window.__balance.elderly.dyingSeconds = st.kept.seconds
+    window.__balance.elderly.deathRatePerMinute = st.kept.rate
+    herds.elephant = herds.elephant.filter((a) => a !== e)
+    window.__elephantDeath = undefined
+    return out
+  })
+  check('the old elephant dies of old age where it went down (point 265)',
+    tuskerEnd.dead === true && tuskerEnd.cause === 'old-age', JSON.stringify(tuskerEnd))
+}
+
 // --- Point 188: the coastal walk-off resolves --------------------------------
 // A predator that finished feeding at a coast pocket must actually LEAVE — the
 // old radial re-aim shuttled it on the beach forever (the user's Cairo report).
