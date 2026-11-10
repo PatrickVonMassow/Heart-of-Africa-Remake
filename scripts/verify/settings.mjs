@@ -1086,6 +1086,41 @@ if (section('graphics-levels')) {
     errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
 }
 
+// --- Start level from the URL (design.md §21.1, point 347) ------------------
+// `?quality=` seeds the store before the first frame. A fresh page per level
+// records the level at the first animation frame that sees the store, so a
+// level applied after mount (a medium frame, then a rebuild) reads wrong here.
+// The parser and the seed are pure-tested in src/config/startQuality.test.ts
+// and src/state/uiStartQuality.test.ts; this proves the live wiring.
+if (section('quality-url')) {
+  for (const [param, level, expectShadows] of [['low', 'low', false], ['HIGH', 'high', true]]) {
+    const p = await browser.newPage({ viewport: SETTINGS_VIEWPORT })
+    const errs = []
+    p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
+    p.on('pageerror', (e) => errs.push(String(e)))
+    await p.addInitScript(() => {
+      const raf = window.requestAnimationFrame.bind(window)
+      window.requestAnimationFrame = (cb) => raf((t) => {
+        if (window.__firstFrameLevel === undefined && window.__ui) window.__firstFrameLevel = window.__ui.getState().detailLevel
+        cb(t)
+      })
+    })
+    await p.goto(`${BASE}?quality=${param}`)
+    const built = await waitForSceneBuilt(p)
+    // The SHIPPED selector, imported from the dev server's own module graph
+    // (the same instance the app uses), not a re-derivation of the preset.
+    const r = await p.evaluate(async () => {
+      const { useUi, effectiveShadows } = await import('/src/state/ui.ts')
+      const s = useUi.getState()
+      return { first: window.__firstFrameLevel, now: s.detailLevel, shadows: effectiveShadows(s) }
+    })
+    check(`?quality=${param} opens at ${level} on the first frame, sun shadows ${expectShadows ? 'on' : 'off'}`,
+      built.built && r.first === level && r.now === level && r.shadows === expectShadows, JSON.stringify({ ...r, built }))
+    check(`?quality=${param}: no console errors`, errs.length === 0, errs.join(' | ').slice(0, 300))
+    await p.close()
+  }
+}
+
 // --- Point 325: a wheel over the debug panel never moves the zoom -------------
 // The bird's-eye zoom listens on `window`, so a wheel over the long debug menu
 // used to scroll the panel AND zoom the view underneath it (the panel's own
