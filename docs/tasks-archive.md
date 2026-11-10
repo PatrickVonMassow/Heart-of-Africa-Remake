@@ -36071,3 +36071,16 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   leaves → victim must either sink or stand up, and NO shrink without an actor —
   add a dev-assert for "shrinking carcass has no feeder" so every session detects
   it); both backends.
+
+- [x] 326. A parent dies with no visible cause after a crocodile kill (user
+  25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
+  spot and simply fell over dead — reading as suicide). Every §19.8 death must have
+  a VISIBLE cause on screen (a predator that reaches it, a trample, a drowning, a
+  fall). Audit the vigil/grief paths against the crocodile case: a parent standing
+  vigil after a crocodile kill either is taken by a VISIBLE predator (the point-121f
+  draw that spawns beyond the ring and walks in) or survives and rejoins — never
+  dies in place with no actor. Add a dev-assert "death without a visible cause"
+  covering every death path so the class is caught in every session. Related to
+  point 319. VERIFIABLE: pure test enumerating the death causes, each setting a
+  cause field; the assert fires on a synthetic causeless death; a staged
+  croc-kill-then-vigil ends in one of the two legitimate outcomes; both backends.

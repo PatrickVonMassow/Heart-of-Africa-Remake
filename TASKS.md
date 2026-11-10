@@ -102,19 +102,6 @@ put it is the mistake this line exists to stop.
   Queue position: at the very top of the open work order, directly after the v0.3.1 release point (user order 28.10.2026).
   Bundle: Session- & Repo-Hygiene.
   Criticality: high — touches every batch mechanism.
-- [ ] 326. A parent dies with no visible cause after a crocodile kill (user
-  25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
-  spot and simply fell over dead — reading as suicide). Every §19.8 death must have
-  a VISIBLE cause on screen (a predator that reaches it, a trample, a drowning, a
-  fall). Audit the vigil/grief paths against the crocodile case: a parent standing
-  vigil after a crocodile kill either is taken by a VISIBLE predator (the point-121f
-  draw that spawns beyond the ring and walks in) or survives and rejoins — never
-  dies in place with no actor. Add a dev-assert "death without a visible cause"
-  covering every death path so the class is caught in every session. Related to
-  point 319. VERIFIABLE: pure test enumerating the death causes, each setting a
-  cause field; the assert fires on a synthetic causeless death; a staged
-  croc-kill-then-vigil ends in one of the two legitimate outcomes; both backends.
-
 - [ ] 314. Drifting pale patches on water (user 25.07.2026, screenshot: bird's-eye at
   a river mouth near the ocean — two elongated pale/greenish patches ON the water
   surface near the shore, which MOVE/CHANGE as the traveller walks; "immer noch
