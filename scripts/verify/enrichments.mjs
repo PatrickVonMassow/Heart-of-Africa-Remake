@@ -2371,25 +2371,53 @@ if (section('low-preset-levers')) {
     ui.setDetailLevel('low')
     await window.__sleepSim(3)
     const species = ['acacia', 'jungle', 'palm', 'baobab', 'kopje', 'bush', 'rock', 'termite', 'deadtree', 'papyrus']
-    const counts = () => Object.fromEntries(species.map((sp) => [sp, window.__vegetation.drawnTranslations(sp).length]))
-    const thinned = counts()
+    // One snapshot = the drawn plants AND the fill they were drawn from: the
+    // spawn circle is anchored at each fill's start position, so two fills a
+    // few units apart differ at the circle EDGE whatever the density (the
+    // first run compared whole-circle counts: acacia 525 vs 526).
+    const snap = () => ({
+      fill: window.__vegetation.drawnFill(),
+      plants: Object.fromEntries(species.map((sp) => [sp, window.__vegetation.drawnTranslations(sp)])),
+    })
+    const thinnedSnap = snap()
     window.__ui.getState().setFloraThinningEnabled(false)
     await window.__sleepSim(2)
-    const full = counts()
+    const fullSnap = snap()
     window.__ui.getState().setFloraThinningEnabled(true)
     await window.__sleepSim(2)
+    // Compared plant by plant where BOTH fills cover the ground: inside both
+    // spawn circles, 2 wu clear of either edge.
+    const inBoth = ([x, z]) => [thinnedSnap.fill, fullSnap.fill].every((f) => f && Math.hypot(x - f.x, z - f.z) <= f.spawnR - 2)
+    const key = ([x, z]) => `${x.toFixed(2)},${z.toFixed(2)}`
+    const thinned = {}
+    const full = {}
+    const missing = {}
+    for (const sp of species) {
+      const t = thinnedSnap.plants[sp].filter(inBoth)
+      const f = fullSnap.plants[sp].filter(inBoth)
+      thinned[sp] = t.length
+      full[sp] = f.length
+      const tk = new Set(t.map(key))
+      missing[sp] = f.filter((q) => !tk.has(key(q))).length
+    }
+    const fills = { thinned: thinnedSnap.fill, full: fullSnap.fill }
     const h = window.__wildlife?.herdsRef?.current ?? {}
     let held = 0
     let live = 0
     for (const sp of Object.keys(h)) if (Array.isArray(h[sp])) for (const a of h[sp]) if (!a.dead) { live++; if (a.heldPose) held++ }
-    return { dpr: window.__renderer?.getPixelRatio?.() ?? null, thinned, full, held, live }
+    return { dpr: window.__renderer?.getPixelRatio?.() ?? null, thinned, full, missing, fills, held, live }
   }, B)
   check('LOW: the renderer runs at the sub-1 dpr cap', res.dpr !== null && Math.abs(res.dpr - 0.8) < 1e-6, JSON.stringify(res.dpr))
   const collidable = ['acacia', 'jungle', 'palm', 'baobab', 'kopje']
-  const thin = ['bush', 'rock', 'termite', 'deadtree', 'papyrus']
-  check('LOW: collidable trees draw in full under the density lever',
-    collidable.every((sp) => res.thinned[sp] === res.full[sp]), JSON.stringify(res))
   const sum = (o, ks) => ks.reduce((n, k) => n + o[k], 0)
+  const thin = ['bush', 'rock', 'termite', 'deadtree', 'papyrus']
+  check('LOW: the two fills are the LOW density and the full dressing',
+    res.fills.thinned?.density < 1 && res.fills.full?.density === 1, JSON.stringify(res.fills))
+  // Plant by plant on the ground both fills cover: every collidable plant of
+  // the full fill is drawn in the thinned one too (no collider without a body).
+  check('LOW: collidable trees draw in full under the density lever',
+    collidable.every((sp) => res.missing[sp] === 0 && res.thinned[sp] === res.full[sp]) && sum(res.full, collidable) > 0,
+    JSON.stringify({ thinned: res.thinned, full: res.full, missing: res.missing, fills: res.fills }))
   check('LOW: the small dressing is thinned, not removed (savanna still dressed)',
     sum(res.thinned, thin) < sum(res.full, thin) && sum(res.thinned, thin) > 0.4 * sum(res.full, thin), JSON.stringify(res))
   check('LOW: off-screen ambient animals hold a throttled pose', res.live > 0 && res.held > 0, `${res.held}/${res.live}`)

@@ -1526,6 +1526,10 @@ function Vegetation() {
   const lastCollapseRef = useRef(true)
   // A changed flora density (level switch, point 310) re-streams likewise.
   const lastDensityRef = useRef<number | null>(null)
+  // The anchor, radius and density of the fill the meshes are DRAWING (dev
+  // hook): a check comparing two fills must compare them plant by plant at
+  // the same place, since the spawn circle follows the fill-start position.
+  const drawnFillRef = useRef<{ x: number; z: number; spawnR: number; density: number } | null>(null)
   // The in-progress amortised fill (docs/perf-driving-hitches.md), if any.
   const fillRef = useRef<FloraFill | null>(null)
 
@@ -1554,6 +1558,7 @@ function Vegetation() {
     w.__vegetation = {
       visible: () => !hiddenRef.current,
       rebuilds: () => rebuildCountRef.current,
+      drawnFill: () => drawnFillRef.current,
       // The collidable dressing the traveller is actually tested against, so a
       // blocked step can be traced to the circle that blocks it.
       obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
@@ -1740,6 +1745,7 @@ function Vegetation() {
       if (!amortise) {
         stepFloraFill(fill, seed, Infinity)
         swapFloraFill(fill, meshes)
+        drawnFillRef.current = { x: fill.anchorX, z: fill.anchorZ, spawnR: fill.spawnR, density: fill.density }
         fillRef.current = null
       }
       worked = true
@@ -1752,6 +1758,7 @@ function Vegetation() {
       stepFloraFill(fill, seed, fill.batch)
       if (fill.next >= fill.offsets.length) {
         swapFloraFill(fill, meshes)
+        drawnFillRef.current = { x: fill.anchorX, z: fill.anchorZ, spawnR: fill.spawnR, density: fill.density }
         fillRef.current = null
       }
       worked = true
