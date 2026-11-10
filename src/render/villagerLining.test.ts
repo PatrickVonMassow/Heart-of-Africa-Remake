@@ -43,7 +43,6 @@ type Zone = 'breast' | 'genital' | 'buttocks'
 function zones(person: ReturnType<typeof gltfPerson>, sex: Sex, age: AgeGroup): Record<Zone, (i: number) => boolean> {
   const pos = person.geometry.getAttribute('position') as THREE.BufferAttribute
   const H = person.p.stature
-  const y = (b: string) => person.rest[asset.bones.indexOf(b) * 3 + 1]
   let crotch = Infinity
   let peakZ = -Infinity
   let peak = 0
