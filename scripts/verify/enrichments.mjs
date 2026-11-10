@@ -11129,9 +11129,10 @@ if (section('ctrl-labels-attacking-predator')) {
 // --- Bird flight escape and aerial predators (design.md §19.19, point 269) ----
 // (A) A forced ground-predator approach: a lioness walked onto a staged flamingo
 // flock makes every bird take off (running take-off, then airborne) and escape —
-// none is caught, and an airborne bird is out of her reach. (B) An aerial
-// predator stoops on a flying bird: a forced peregrine enters HIGH, plunges and
-// strikes, and the hunt resolves (I4). Both frames are taken with the subject at
+// none is caught, and an airborne bird is out of her reach even with her set
+// on it. (B) An aerial predator stoops on a flying bird of that flock: a forced
+// peregrine enters HIGH, plunges and strikes it in the air, and the hunt
+// resolves (I4). Both frames are taken with the subject at
 // the shutter (the flock in the air; the raptor in its plunge).
 if (section('bird-flight-escape')) {
   const flush = await page.evaluate(async () => {
@@ -11190,6 +11191,22 @@ if (section('bird-flight-escape')) {
     // Per bird: a scattering flock's centroid can stay over the lioness while
     // every bird is well clear of her.
     out.escapedFar = flock.every((a) => Math.hypot(a.x - lioness.x, a.z - lioness.z) > 6)
+    // Contact probe: the ground-catch gate reads the lioness's POSITION, not a
+    // hunt mode, so she is set ON each airborne bird in turn — an airborne
+    // bird must survive even zero distance.
+    out.contactProbes = 0
+    for (const a of flock) {
+      if (a.air?.phase !== 'air') continue
+      await window.__pollSim(0.4, () => {
+        lioness.x = a.x
+        lioness.z = a.z
+        return false
+      })
+      out.contactProbes++
+    }
+    out.caughtOnContact = flock.filter((a) => a.dead).length
+    lioness.x = cx + 30
+    lioness.z = cz
     const ll = geo.worldToLatLon(cx, cz)
     out.flockAt = { lat: ll.lat, lon: ll.lon }
     window.__birdFlightStage = { flock, lioness }
@@ -11204,7 +11221,8 @@ if (section('bird-flight-escape')) {
   check(
     'a forced ground-predator approach makes the flamingos take off and escape, uncaught (design.md §19.19)',
     flush.groundedAtStart === 6 && flush.tookOff === 6 && flush.airborne === 6 && flush.caught === 0 &&
-      flush.phases.includes('takeoff') && flush.phases.includes('air') && flush.escapedFar,
+      flush.phases.includes('takeoff') && flush.phases.includes('air') && flush.escapedFar &&
+      flush.contactProbes === 6 && flush.caughtOnContact === 0,
     JSON.stringify(flush),
   )
   if (flush.flockAt) {
@@ -11222,11 +11240,15 @@ if (section('bird-flight-escape')) {
     bf.diveSpeed = 2
     bf.forceStrike = 'catch'
     w.raptor.force = 'peregrine'
-    const out = { started: false, enteredHigh: false, diving: false, at: null }
+    const out = { started: false, enteredHigh: false, diving: false, at: null, preyInFlock: false }
     const geo = await import('/src/world/geo.ts')
+    const flock = window.__birdFlightStage.flock
     await window.__pollSim(25, () => {
       if (w.lion) w.lion.mode = 'idle'
       const h = w.raptor.hunt
+      // The prey's last flight state while alive — the strike must land on a
+      // bird in the air, not one caught on the ground.
+      if (w.raptor.prey && !w.raptor.prey.dead) window.__stoopPreyAir = w.raptor.prey.air?.phase ?? 'ground'
       if (h) {
         // Keep the traveller pinned just behind the prey (the flock fled toward
         // the frame's edge and keeps shying from him), so the plunge, which
@@ -11242,6 +11264,7 @@ if (section('bird-flight-escape')) {
         if (h.phase === 'dive' && h.y < bf.stoopHighY * 0.6 && Math.abs(ndc.x) < 0.8 && Math.abs(ndc.y) < 0.8) {
           out.diving = true
           window.__stoopPrey = w.raptor.prey
+          out.preyInFlock = flock.includes(w.raptor.prey)
           const ll = geo.worldToLatLon(h.x, h.z)
           out.at = { lat: ll.lat, lon: ll.lon, y }
           return true
@@ -11257,7 +11280,7 @@ if (section('bird-flight-escape')) {
   const stoopEnd = await page.evaluate(async () => {
     const w = window.__wildlife
     const bf = window.__balance.birdFlight
-    const out = { resolved: false, outcome: null, phases: [], preyDead: false }
+    const out = { resolved: false, outcome: null, phases: [], preyDead: false, preyAirAtStrike: null }
     // The hunt may already have fed and left while the shutter ran, so its
     // outcome and prey are read from what outlives it.
     const prey = window.__stoopPrey
@@ -11266,6 +11289,7 @@ if (section('bird-flight-escape')) {
       if (w.lion) w.lion.mode = 'idle'
       const h = w.raptor.hunt
       out.outcome = w.raptor.outcome ?? null
+      if (prey && !prey.dead) window.__stoopPreyAir = prey.air?.phase ?? 'ground'
       if (prey && prey.dead) out.preyDead = true
       if (!h) {
         out.resolved = true
@@ -11274,6 +11298,8 @@ if (section('bird-flight-escape')) {
       return false
     })
     out.phases = [...w.raptor.phases]
+    out.preyAirAtStrike = window.__stoopPreyAir ?? null
+    delete window.__stoopPreyAir
     // Cleanup: restore the staged values and retire the staged animals.
     bf.diveSpeed = window.__birdFlightPrev.diveSpeed
     bf.forceStrike = window.__birdFlightPrev.forceStrike
@@ -11289,7 +11315,8 @@ if (section('bird-flight-escape')) {
   })
   check(
     'a forced peregrine enters high, stoops on a flying bird, strikes, and the hunt resolves (design.md §19.19)',
-    stoopStart.started && stoopStart.enteredHigh && stoopStart.diving &&
+    stoopStart.started && stoopStart.enteredHigh && stoopStart.diving && stoopStart.preyInFlock &&
+      stoopEnd.preyAirAtStrike === 'air' &&
       stoopEnd.phases.join('>').startsWith('high>dive>feed') && stoopEnd.outcome === 'caught' && stoopEnd.preyDead && stoopEnd.resolved,
     JSON.stringify({ stoopStart, stoopEnd }),
   )
