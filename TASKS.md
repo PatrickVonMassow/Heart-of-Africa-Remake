@@ -102,26 +102,6 @@ put it is the mistake this line exists to stop.
   Queue position: at the very top of the open work order, directly after the v0.3.1 release point (user order 28.10.2026).
   Bundle: Session- & Repo-Hygiene.
   Criticality: high — touches every batch mechanism.
-- [ ] 319. Crocodile kill aftermath: prey dissolves without sink or visible scavenger
-  (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
-  point, and the prey then kept slowly dissolving — possibly "eaten" with no vulture
-  visible). Per §19.16 a crocodile KILL must SINK — the river keeps the body, no
-  bank carcass, no vulture; a slow in-place dissolve with no visible actor matches
-  NO legitimate path. INVESTIGATE the victim's state machine after the croc leaves:
-  every crocodile exit path (kill → sink; grip-deadline release → victim freed
-  ALIVE; croc streamed out by the view ring mid-drama) must leave the victim in a
-  consistent, VISIBLE state — either sinking (kill) or alive and walking (release);
-  the carcass-shrink animation must only ever run with a visible feeding/scavenging
-  actor present (lion feed, vulture flock, ground scavenger), never as an invisible
-  decay. Likely suspects to check: the caught victim being handed to the ordinary
-  land-carcass system when the grip ends instead of the sink path, and the shrink
-  timer running detached from any feeder. VERIFIABLE: pure tests over the croc exit
-  paths (kill/sink, deadline-release/alive, ring-despawn — victim state asserted
-  for each); an enrichments stage reproducing the reported sequence (catch → croc
-  leaves → victim must either sink or stand up, and NO shrink without an actor —
-  add a dev-assert for "shrinking carcass has no feeder" so every session detects
-  it); both backends.
-
 - [ ] 326. A parent dies with no visible cause after a crocodile kill (user
   25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
   spot and simply fell over dead — reading as suicide). Every §19.8 death must have
