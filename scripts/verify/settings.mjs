@@ -1106,13 +1106,16 @@ if (section('quality-url')) {
       })
     })
     await p.goto(`${BASE}?quality=${param}`)
-    await waitForSceneBuilt(p)
-    const r = await p.evaluate(() => {
-      const s = window.__ui.getState()
-      return { first: window.__firstFrameLevel, now: s.detailLevel, shadows: s.detailLevel !== 'low' && s.shadowsEnabled }
+    const built = await waitForSceneBuilt(p)
+    // The SHIPPED selector, imported from the dev server's own module graph
+    // (the same instance the app uses), not a re-derivation of the preset.
+    const r = await p.evaluate(async () => {
+      const { useUi, effectiveShadows } = await import('/src/state/ui.ts')
+      const s = useUi.getState()
+      return { first: window.__firstFrameLevel, now: s.detailLevel, shadows: effectiveShadows(s) }
     })
     check(`?quality=${param} opens at ${level} on the first frame, sun shadows ${expectShadows ? 'on' : 'off'}`,
-      r.first === level && r.now === level && r.shadows === expectShadows, JSON.stringify(r))
+      built.built && r.first === level && r.now === level && r.shadows === expectShadows, JSON.stringify({ ...r, built }))
     check(`?quality=${param}: no console errors`, errs.length === 0, errs.join(' | ').slice(0, 300))
     await p.close()
   }
