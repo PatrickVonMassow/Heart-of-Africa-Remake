@@ -11165,11 +11165,13 @@ if (section('bird-flight-escape')) {
       const t = w.simTime()
       const dt = t - tPrev
       tPrev = t
-      // The forced approach: the lioness walks at the flock's centre.
+      // The forced approach: the lioness walks at the flock's centre until the
+      // whole flock is up; walking on into its middle would scatter it radially
+      // out of any one frame.
       const cx = flock.reduce((s, a) => s + a.x, 0) / flock.length
       const cz = flock.reduce((s, a) => s + a.z, 0) / flock.length
       const d = Math.hypot(cx - lioness.x, cz - lioness.z)
-      if (d > 0.5) {
+      if (d > 0.5 && flock.some((a) => a.air?.phase !== 'air')) {
         lioness.x += ((cx - lioness.x) / d) * 4 * dt
         lioness.z += ((cz - lioness.z) / d) * 4 * dt
       }
@@ -11194,6 +11196,13 @@ if (section('bird-flight-escape')) {
     // Contact probe: the ground-catch gate reads the lioness's POSITION, not a
     // hunt mode, so she is set ON each airborne bird in turn — an airborne
     // bird must survive even zero distance.
+    // Hold the flock airborne and in view through the contact probe, the flush
+    // frame and the stoop below (restored at the end of the section); at full
+    // flight speed the probe scatters the birds out of any one frame.
+    const bf = window.__balance.birdFlight
+    window.__birdFlightPrev = { diveSpeed: bf.diveSpeed, forceStrike: bf.forceStrike, flightSpeed: bf.flightSpeed, settleSeconds: bf.settleSeconds }
+    bf.flightSpeed = 0.5
+    bf.settleSeconds = 120
     out.contactProbes = 0
     const lionAt = { x: lioness.x, z: lioness.z }
     for (const a of flock) {
@@ -11210,33 +11219,58 @@ if (section('bird-flight-escape')) {
     lioness.x = lionAt.x
     lioness.z = lionAt.z
     window.__birdFlightStage = { flock, lioness }
-    // Hold the flock airborne and in view through the flush frame and the
-    // stoop below (restored at the end of the section).
-    const bf = window.__balance.birdFlight
-    window.__birdFlightPrev = { diveSpeed: bf.diveSpeed, forceStrike: bf.forceStrike, flightSpeed: bf.flightSpeed, settleSeconds: bf.settleSeconds }
-    bf.flightSpeed = 0.5
-    bf.settleSeconds = 120
     // The camera follows the traveller, who stood where the flush began; the
-    // flock has flown on since. Pin him behind its CURRENT centroid so the
-    // frame holds the birds, and count the birds the camera projects.
+    // flock has scattered since. Pin him where the camera projects the most
+    // birds, every candidate outside the engaged player-shy ring (6 × 1.5 in
+    // Wildlife.tsx) so he does not flush the flock on again.
+    const flyY = (a) => a.y + (a.air?.lift ?? 0) * 2.6 // BIRD_FLY_LIFT in Wildlife.tsx
+    const inView = () =>
+      flock.filter((a) => {
+        const n = window.__camera.ndc(a.x, a.z, flyY(a))
+        return Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.9
+      }).length
     const fx1 = flock.reduce((s, a) => s + a.x, 0) / flock.length
     const fz1 = flock.reduce((s, a) => s + a.z, 0) / flock.length
-    // Beside it (the frame is wider than tall), outside the take-off trigger
-    // so he does not flush the flock on again.
-    window.__game.setState({ pos: { x: fx1 + bf.takeoffTrigger + 1, z: fz1 } })
-    await window.__pollSim(0.5, () => {
+    // Near-still while the pin is searched and shot, so the count taken at the
+    // best candidate still holds at the shutter (the stoop restores 0.5).
+    bf.flightSpeed = 0.05
+    const candidates = []
+    for (const r of [10, 14, 18]) {
+      for (let k = 0; k < 8; k++) candidates.push({ x: fx1 + Math.cos((k * Math.PI) / 4) * r, z: fz1 + Math.sin((k * Math.PI) / 4) * r })
+    }
+    const clear = candidates.filter((c) => flock.every((a) => Math.hypot(a.x - c.x, a.z - c.z) > 9.5))
+    let best = null
+    for (const c of clear) {
+      window.__game.setState({ pos: c })
+      // Counted only once the follow camera has caught up with the pin.
+      await window.__pollSim(1.5, () => {
+        if (w.lion) w.lion.mode = 'idle'
+        return window.__camera.settled()
+      })
+      const n = inView()
+      if (!best || n > best.n) best = { ...c, n }
+      if (n === flock.length) break
+    }
+    out.pinCandidates = clear.length
+    out.pinBest = best?.n ?? null
+    if (best) window.__game.setState({ pos: { x: best.x, z: best.z } })
+    await window.__pollSim(1.5, () => {
       if (w.lion) w.lion.mode = 'idle'
-      return false
+      return window.__camera.settled()
     })
-    const flyY = (a) => a.y + (a.air?.lift ?? 0) * 2.6 // BIRD_FLY_LIFT in Wildlife.tsx
-    out.onScreen = flock.filter((a) => {
+    out.onScreen = inView()
+    // The frame's subject is the birds the camera holds, not a centroid a
+    // scattered bird can drag out of the picture.
+    const shown = flock.filter((a) => {
       const n = window.__camera.ndc(a.x, a.z, flyY(a))
       return Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.9
-    }).length
-    const fx2 = flock.reduce((s, a) => s + a.x, 0) / flock.length
-    const fz2 = flock.reduce((s, a) => s + a.z, 0) / flock.length
+    })
+    const held = shown.length > 0 ? shown : flock
+    const fx2 = held.reduce((s, a) => s + a.x, 0) / held.length
+    const fz2 = held.reduce((s, a) => s + a.z, 0) / held.length
     const ll2 = geo.worldToLatLon(fx2, fz2)
-    out.flockAt = { lat: ll2.lat, lon: ll2.lon, y: flock.reduce((s, a) => s + flyY(a), 0) / flock.length }
+    out.flockAt = { lat: ll2.lat, lon: ll2.lon, y: held.reduce((s, a) => s + flyY(a), 0) / held.length }
+    out.flockSpread = +Math.max(...flock.map((a) => Math.hypot(a.x - fx1, a.z - fz1))).toFixed(1)
     return out
   })
   check(
@@ -11246,7 +11280,7 @@ if (section('bird-flight-escape')) {
       flush.contactProbes === 6 && flush.caughtOnContact === 0,
     JSON.stringify(flush),
   )
-  check('the airborne flock stands in the take-off frame at the shutter (at least 4 of 6 birds)', flush.onScreen >= 4, `onScreen=${flush.onScreen}`)
+  check('the airborne flock stands in the take-off frame at the shutter (at least 4 of 6 birds)', flush.onScreen >= 4, `onScreen=${flush.onScreen} best=${flush.pinBest} spread=${flush.flockSpread} candidates=${flush.pinCandidates}`)
   if (flush.flockAt) {
     await shot('269-birds-take-off', { world: flush.flockAt, label: 'the flamingo flock airborne, fleeing the lioness', settle: false })
   }
@@ -11261,6 +11295,7 @@ if (section('bird-flight-escape')) {
     const bf = window.__balance.birdFlight
     bf.diveSpeed = 2
     bf.forceStrike = 'catch'
+    bf.flightSpeed = 0.5
     w.raptor.force = 'peregrine'
     const out = { started: false, enteredHigh: false, diving: false, at: null, preyInFlock: false }
     const geo = await import('/src/world/geo.ts')
