@@ -118,3 +118,20 @@ describe('the animal collider is derived from the drawn transform (point 378)', 
     expect(Object.keys(BODY_RADIUS).sort()).toEqual([...SPECIES].sort())
   })
 })
+
+describe('the drawn record carries the body pose (point 319)', () => {
+  it('reads an upright instance as upY 1 and a carcass on its side as near 0 (cos of the roll)', () => {
+    const up: DrawnBodyCarrier = {}
+    recordDrawnBody(up, instanceMatrix(0, 0, 0, 0.7, 0, 0.8).elements, 1)
+    expect(up.drawn!.upY).toBeCloseTo(1, 6)
+    // The dead pose of the herd loop: Euler(0, rot, PI / 2.15), scaled.
+    const lying: DrawnBodyCarrier = {}
+    const m = new THREE.Matrix4().compose(
+      new THREE.Vector3(),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.7, Math.PI / 2.15)),
+      new THREE.Vector3().setScalar(0.8),
+    )
+    recordDrawnBody(lying, m.elements, 1)
+    expect(lying.drawn!.upY).toBeLessThan(0.2)
+  })
+})

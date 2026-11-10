@@ -6028,6 +6028,7 @@ if (section('crocodile-ambush')) {
       lion.timer = 9999
       lion.victim = null
       lion.victimHunt = false
+      const CAUGHT_PLUS = 8 // > the 5 s struggle window: a victim left counting would have died by then
       const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false, foreignParent: false }
       // Sweep the drink phase so the bank window comes around quickly, watching
       // the croc for motion and teleports until it grips.
@@ -6094,7 +6095,9 @@ if (section('crocodile-ambush')) {
         const lx = bank.x - water.x
         const lz = bank.z - water.z
         const ll2 = Math.hypot(lx, lz) || 1
-        if (MODE.kind === 'lunge') {
+        if (MODE.kind === 'lunge' || MODE.kind === 'leaves' || MODE.kind === 'sinkhold') {
+          // (Point 319's two aftermath stagings park the parent the same way:
+          // they observe the crocodile's own exit, which no parent may resolve.)
           // The LUNGE case tests the grip itself, so the parent must not resolve
           // it either way. Until 25.07.2026 this case was the only staging that
           // pinned NOTHING — it silently relied on the parent happening to stand
@@ -6140,6 +6143,82 @@ if (section('crocodile-ambush')) {
           // and the outcome is pinned, so the grip window simply expires.
           await window.__pollSim(12, () => calf.dead, 56000)
           await window.__sleepSim(0.4)
+        } else if (MODE.kind === 'leaves' || MODE.kind === 'sinkhold') {
+          // Point 319, the reported sequence: catch -> the crocodile leaves ->
+          // the victim must either STAND UP (freed alive) or SINK, and no carcass
+          // may shrink without a feeder. The in-game asserts ride along: any
+          // 'carcass-shrink-has-feeder' / 'croc-victim-detached' entry logged
+          // during the scenario fails the check.
+          const t0 = performance.now()
+          out.aftermath = { freedAlive: false, sank: false, heldWhileSinking: true, croc319: MODE.kind }
+          if (MODE.kind === 'leaves') {
+            // The crocodile is streamed out mid-struggle — the view-ring cull,
+            // reproduced by removing it from the herds while the calf is held.
+            await window.__sleepSim(2)
+            herds.crocodile = herds.crocodile.filter((k) => k !== croc)
+            await window.__sleepSim(CAUGHT_PLUS)
+            // Freed as the PLAYER sees it, not only as state: drawn in the same
+            // pass as its parent and upright (the instance the render loop
+            // wrote, point 378's drawn record). `walked` is reported, not
+            // required: §19.16 leaves the released victim standing at the bank,
+            // and this calf is staged on a drink errand.
+            const d0 = calf.drawn ? { x: calf.drawn.x, z: calf.drawn.z } : null
+            const f0 = parent.drawn?.frame ?? -1
+            const c0 = calf.drawn?.frame ?? -1
+            await window.__sleepSim(1.5)
+            const d = calf.drawn
+            // Both records must have ADVANCED past the release and match: equal
+            // but stale frames would pass a pose drawn before the release.
+            out.aftermath.drawnFresh = d !== undefined && parent.drawn !== undefined && d.frame > c0 && parent.drawn.frame > f0 && d.frame === parent.drawn.frame
+            out.aftermath.upY = d ? +d.upY.toFixed(2) : null
+            out.aftermath.walked = d && d0 ? +Math.hypot(d.x - d0.x, d.z - d0.z).toFixed(2) : null
+            out.aftermath.freedAlive = !calf.dead && calf.caught === undefined && calf.caughtBy === undefined &&
+              out.aftermath.drawnFresh && out.aftermath.upY > 0.8
+          } else {
+            // The kill: the crocodile keeps the body at its jaws while it sinks
+            // and only slinks home once it is gone.
+            await window.__pollSim(12, () => calf.dead, 56000)
+            // The sink as DRAWN (the instance matrix, not the state flag): the
+            // body goes DOWN without rising, keeps its size (no shrink in
+            // place, nor grows), is drawn in the crocodile's pass and lies at
+            // the mouth anchor (crocodileMouthAnchor: mouthOffsetLocal ahead
+            // along the heading) — sampled once per NEW draw pass.
+            const reach = window.__balance.crocodile.mouthOffsetLocal * croc.scale
+            const sk = { samples: 0, stale: 0, rises: 0, y0: null, yLast: null, s0: null, sDev: 0, jawErrMax: 0, frame: -1 }
+            await window.__pollSim(window.__balance.crocodile.gripSeconds + 12, () => {
+              if (calf.dead && !calf.gone && (calf.dissolve ?? 0) > 0) {
+                if (!(croc.lunge && croc.lunge.victim === calf && !croc.lunge.retreat)) out.aftermath.heldWhileSinking = false
+                const d = calf.drawn
+                const c = croc.drawn
+                if (d && c && d.frame > sk.frame) {
+                  sk.frame = d.frame
+                  sk.samples++
+                  if (d.frame !== c.frame) sk.stale++
+                  if (sk.y0 === null) { sk.y0 = d.y; sk.s0 = d.scale }
+                  else if (d.y > sk.yLast + 0.02) sk.rises++
+                  sk.yLast = d.y
+                  sk.sDev = Math.max(sk.sDev, Math.abs(d.scale / sk.s0 - 1))
+                  const jx = croc.x + Math.sin(croc.rot) * reach
+                  const jz = croc.z + Math.cos(croc.rot) * reach
+                  sk.jawErrMax = Math.max(sk.jawErrMax, Math.hypot(d.x - jx, d.z - jz))
+                }
+              }
+              return calf.gone === true || (calf.dissolve !== undefined && calf.dissolve <= 0)
+            })
+            const depth = window.__balance.crocodile.sinkDepth * calf.scale
+            out.aftermath.sink = {
+              samples: sk.samples, stale: sk.stale, rises: sk.rises,
+              drop: sk.y0 === null ? null : +(sk.y0 - sk.yLast).toFixed(2), depth: +depth.toFixed(2),
+              scaleDev: +sk.sDev.toFixed(3), jawErrMax: +sk.jawErrMax.toFixed(2),
+            }
+            const m = out.aftermath.sink
+            out.aftermath.sank = calf.dead === true && calf.inWater !== undefined && m.samples >= 3 && m.stale === 0 &&
+              m.rises === 0 && m.drop >= 0.5 * depth && sk.sDev <= 0.05 && sk.jawErrMax <= 0.5
+          }
+          const log = (window.__assertLog ?? []).filter((e) => e.t >= t0)
+          out.aftermath.asserts = log
+            .filter((e) => e.code === 'carcass-shrink-has-feeder' || e.code === 'croc-victim-detached')
+            .map((e) => `${e.code}: ${e.detail}`)
         } else {
           await window.__pollSim(25, () => {
             // Rescue (point 249): the calf rises a frame or two BEFORE the crocodile's
@@ -6208,6 +6287,24 @@ if (section('crocodile-ambush')) {
     'too late at the bank: the crocodile takes calf and parent both (point 130)',
     crocLate.staged && crocLate.gripped && !crocLate.calfAlive && !crocLate.parentAlive && !crocLate.lionTouched,
     JSON.stringify(crocLate),
+  )
+  // Point 319: the crocodile kill's aftermath. (a) The crocodile is streamed
+  // out mid-struggle: the victim stands up alive, no sink with no crocodile
+  // there. (b) The kill: the body sinks at the crocodile's jaws, held until it
+  // is gone. Neither may log a shrink without a feeder or a detached victim.
+  const crocLeaves = await crocDrama('leaves')
+  check(
+    'a crocodile streamed out mid-struggle frees its victim ALIVE — no feederless dissolve (point 319)',
+    crocLeaves.staged && crocLeaves.gripped && crocLeaves.aftermath?.freedAlive === true &&
+      crocLeaves.aftermath.asserts.length === 0 && !crocLeaves.lionTouched,
+    JSON.stringify(crocLeaves),
+  )
+  const crocSink = await crocDrama('sinkhold')
+  check(
+    'a crocodile kill SINKS at the jaws and the crocodile holds it until it is gone (point 319)',
+    crocSink.staged && crocSink.gripped && !crocSink.calfAlive && crocSink.aftermath?.sank === true &&
+      crocSink.aftermath.heldWhileSinking === true && crocSink.aftermath.asserts.length === 0,
+    JSON.stringify(crocSink),
   )
   const crocVanish = await crocDrama('vanish')
   check(

@@ -213,6 +213,16 @@ import {
   releaseBereavedParent,
   stepCaught,
 } from './youngKill'
+import {
+  carcassShrinkUnfed,
+  crocVictimState,
+  isSinkingBody,
+  lungeHolds,
+  releaseCrocVictim,
+  releaseOrphanedCrocVictims,
+  sinkKill,
+  sinkOffset,
+} from './crocAftermath'
 
 const CHUNK_SIZE = 24
 
@@ -451,6 +461,10 @@ interface Animal {
     seizeX?: number
     seizeZ?: number
     retreat?: boolean
+    /** A parent taken ALONGSIDE the catch (the too-late ending, point 319): the
+     *  crocodile owns this body too, hauls it into the water beside the catch
+     *  and holds it until it has sunk — never a body sinking on the bank alone. */
+    alongside?: Animal
   }
   /** Elapsed time a DRIVEN-OFF crocodile's rest expires at (point 130 under the
    *  broadened waterline trigger): while it holds, this crocodile takes no new
@@ -925,6 +939,14 @@ const SPAWN_RANGE_MAX = Math.ceil(SPAWN_COVER_RADIUS_MAX / CHUNK_SIZE)
  *  vulture flock (point 251) that flies in, lands and consumes it, dissolving
  *  it like a lion kill. */
 const CARCASS_DISSOLVE_SECONDS = 9
+/** Point 319's shrink bookkeeping (dev assert "shrinking carcass has no
+ *  feeder"): every feeder (landed scavenger flock, feeding predator, kill
+ *  flock at a remnant) registers the carcass it worked; the Herds frame checks
+ *  each dead body's dissolve against its last value and clears the set. Shared
+ *  module state because the feeders run in three components' frames; dev
+ *  builds only, so production retains no fed carcass. */
+const SHRINK_FED = new Set<object>()
+const SHRINK_PREV = new WeakMap<object, number>()
 /** A feeding predator stands this far from its victim, on the side it came
  *  from (feedFlank) — the old fixed +x/+z flank's own distance. */
 const FEED_FLANK_DIST = Math.hypot(0.7, 0.25)
@@ -1887,8 +1909,8 @@ function Herds() {
   // spelling. sink: a water victim sinks (no scavenger lands on open
   // water); stain: a land kill marks the ground.
   const takeAnimal = (a: Animal, opts: { sink?: boolean; stain?: boolean } = {}) => {
-    markKilled(a, CARCASS_DISSOLVE_SECONDS)
-    if (opts.sink) a.inWater = 0
+    if (opts.sink) sinkKill(a, CARCASS_DISSOLVE_SECONDS)
+    else markKilled(a, CARCASS_DISSOLVE_SECONDS)
     if (opts.stain) pushStain(a.x, a.z)
   }
 
@@ -2452,6 +2474,11 @@ function Herds() {
     const living: Array<{ dead?: boolean; origin?: string; chunk?: string }> = []
     for (const sp of SPECIES) for (const a of herds[sp]) living.push(a)
     spawnedChunks.current = retainedSpawnChunks(spawnedChunks.current, living, beyondDespawn)
+    // A crocodile streamed out by the view ring mid-drama (point 319) can never
+    // finish its kill: its still-struggling victim is freed ALIVE here, in the
+    // very frame of the cull, instead of counting down into a sink with no
+    // crocodile there — the reported "prey dissolving on its own".
+    for (const sp of CALF_HUNT_SPECIES) releaseOrphanedCrocVictims(herds[sp], herds.crocodile)
     for (const hid of [...herdState.current.keys()]) {
       if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)
     }
@@ -2531,7 +2558,13 @@ function Herds() {
               bereavedSeconds: balance.family.bereavedSeconds,
               vigilAt: { x: seized?.seizeX ?? a.x, z: seized?.seizeZ ?? a.z },
             })
-            if (fate === 'taken' && par) takeAnimal(par, croc ? { sink: true } : { stain: true })
+            if (fate === 'taken' && par) {
+              takeAnimal(par, croc ? { sink: true } : { stain: true })
+              // The crocodile takes the too-late parent as well (point 319): it
+              // owns that body too and hauls it under beside the catch, so it
+              // never sinks on the bank with no crocodile at it.
+              if (seized) seized.alongside = par
+            }
           }
         } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
           // A calf of ours is being eaten: charge the predator (at the calf). On
@@ -2636,7 +2669,11 @@ function Herds() {
                 takeAnimal(a, { sink: true })
                 const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
                 if (cc && cc.lunge) {
-                  cc.lunge.retreat = true
+                  // The parent is taken IN the calf's place (point 319): the
+                  // crocodile's catch becomes the parent's body, which it hauls
+                  // and holds until it has sunk — it no longer swims off and
+                  // leaves the parent dissolving at the bank on its own.
+                  cc.lunge.victim = a
                   // And it stays off the bank for a while: the spared calf
                   // still stands right there, so without this rest the
                   // broadened waterline trigger would hand it straight back.
@@ -3585,6 +3622,20 @@ function Herds() {
         v.x = hold.victimX
         v.z = hold.victimZ
         v.y = c.y
+        // The parent taken alongside (point 319) is dragged to lie beside the
+        // catch at the jaws — a visible haul at the drag pace, never a snap.
+        const al = c.lunge!.alongside
+        if (al && al.gone !== true) {
+          const ax = hold.victimX + Math.cos(c.rot) * 0.6 * c.scale - al.x
+          const az = hold.victimZ - Math.sin(c.rot) * 0.6 * c.scale - al.z
+          const ad = Math.hypot(ax, az)
+          const st = Math.min(ad, bc.dragSpeed * dt)
+          if (ad > 1e-6) {
+            al.x += (ax / ad) * st
+            al.z += (az / ad) * st
+          }
+          if (isWaterAt(al.x, al.z)) al.y = c.y
+        }
         return hold
       }
       for (const c of herds.crocodile) {
@@ -3689,7 +3740,9 @@ function Herds() {
           // Mid-burst (nothing seized yet): a victim that died or vanished before
           // contact ends the run.
           (c.lunge.gripped || c.lunge.dragging
-            ? !crocodileHoldsCatch(true, c.lunge.victim.caught, c.lunge.victim.dead === true, c.lunge.victim.dissolve)
+            ? !crocodileHoldsCatch(true, c.lunge.victim.caught, c.lunge.victim.dead === true, c.lunge.victim.dissolve) &&
+              !(c.lunge.alongside !== undefined && c.lunge.alongside.gone !== true &&
+                crocodileHoldsCatch(true, undefined, c.lunge.alongside.dead === true, c.lunge.alongside.dissolve))
             : c.lunge.victim.dead)
         ) {
           // Meal taken, victim freed or moment passed: slink back and submerge.
@@ -3787,7 +3840,14 @@ function Herds() {
             // Point 207(i): the grip deadline is a hard invariant — a timer past
             // it (while still struggling) means the release below failed.
             devAssert(c.lunge.timer <= bc.gripSeconds + 2, 'croc-grip-bounded', () => `grip ${c.lunge?.timer.toFixed(1)}s`)
-            if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) c.lunge.retreat = true
+            if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) {
+              // The deadline is a RELEASE (point 319): the victim is freed
+              // ALIVE, never left counting down into a kill — and a sink —
+              // after the crocodile has let go and swum home.
+              c.lunge.retreat = true
+              releaseCrocVictim(v)
+              c.ambushRestUntil = clock.elapsedTime + bc.driveOffRestSeconds
+            }
             // The victim renders AT the jaws (point 268): register this croc as
             // its holder so the render draws it where the sim just placed it.
             else crocByVictim.set(v, c)
@@ -4408,6 +4468,7 @@ function Herds() {
           sc.y = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
           if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
           target.dissolve -= dt
+          if (import.meta.env.DEV) SHRINK_FED.add(target) // the landed flock is this shrink's actor (point 319)
         } else if (target && sc.mode === 'in') {
           // Glide down toward the carcass as the approach closes.
           const d = Math.hypot(target.x - sc.x, target.z - sc.z)
@@ -4488,10 +4549,15 @@ function Herds() {
         if (a.dead) {
           // Trampled: lies on its side where it was caught, over a stain; once
           // a scavenger lands the carcass shrinks away (design.md §19).
-          const df = a.dissolve === undefined ? 1 : Math.max(0, a.dissolve / CARCASS_DISSOLVE_SECONDS)
+          // A water death (the crocodile's kill, a plunge) does not shrink: it
+          // SINKS under the sheet over the same window (point 319, §19.16 — the
+          // river keeps the body). Shrinking is reserved for a fed carcass.
+          const sinking = isSinkingBody(a)
+          const df = sinking || a.dissolve === undefined ? 1 : Math.max(0, a.dissolve / CARCASS_DISSOLVE_SECONDS)
+          const sinkY = sinking ? sinkOffset(a.dissolve, CARCASS_DISSOLVE_SECONDS, balance.crocodile.sinkDepth * a.scale) : 0
           euler.set(0, a.rot, Math.PI / 2.15)
           quat.setFromEuler(euler)
-          vpos.set(a.x, groundedBodyY(a.y), a.z)
+          vpos.set(a.x, groundedBodyY(a.y) - sinkY, a.z)
           vscl.setScalar(a.scale * df)
           mtx.compose(vpos, quat, vscl)
           write(a)
@@ -5513,6 +5579,37 @@ function Herds() {
         }
       }
     }
+
+    // Point 319 as in-game invariants (dev only), so every session detects the
+    // reported picture: (1) a carcass whose dissolve went down since the last
+    // check, that is not sinking and that no feeder worked meanwhile, is
+    // shrinking with no visible actor; (2) a crocodile victim is struggling in
+    // a live crocodile's hold, sinking, or alive — never detached.
+    if (import.meta.env.DEV) {
+      const lunges = herds.crocodile.filter((c) => !c.dead && c.lunge).map((c) => c.lunge)
+      for (const sp of SPECIES) {
+        for (const a of herds[sp]) {
+          if (a.dead) {
+            const prev = SHRINK_PREV.get(a)
+            devAssert(
+              !carcassShrinkUnfed(prev, a.dissolve, isSinkingBody(a), SHRINK_FED.has(a)),
+              'carcass-shrink-has-feeder',
+              () => `${sp} at ${a.x.toFixed(1)},${a.z.toFixed(1)} dissolve ${prev?.toFixed(2)} -> ${a.dissolve?.toFixed(2)}`,
+            )
+            if (a.dissolve !== undefined) SHRINK_PREV.set(a, a.dissolve)
+          }
+          if (a.caughtBy === 'crocodile') {
+            const held = lunges.some((l) => lungeHolds(l, a))
+            devAssert(
+              crocVictimState(a, held) !== 'detached',
+              'croc-victim-detached',
+              () => `${sp} at ${a.x.toFixed(1)},${a.z.toFixed(1)} dead ${a.dead === true} caught ${a.caught?.toFixed(2)} inWater ${a.inWater !== undefined}`,
+            )
+          }
+        }
+      }
+      SHRINK_FED.clear()
+    }
   })
 
   return (
@@ -5964,6 +6061,7 @@ function LionHunt() {
         if (v.dead) {
           if (v.dissolve === undefined) v.dissolve = CARCASS_DISSOLVE_SECONDS
           v.dissolve -= dt
+          if (import.meta.env.DEV) SHRINK_FED.add(v) // the feeding predator is this shrink's actor (point 319)
         }
         // The feed never outlives its carcass (point 453): it ends when the
         // body has left the herds (culled, removed), when it has shrunk to the
@@ -6280,6 +6378,7 @@ function Vultures() {
         f.z += (remnant.z - f.z) * Math.min(1, dt * 3)
         // Only landed birds eat; the scrap dissolves like a scavenged carcass.
         feedRemnant(remnant, dt, killDescend.current > 0.7, CARCASS_DISSOLVE_SECONDS)
+        if (import.meta.env.DEV) SHRINK_FED.add(remnant) // the kill flock is the scrap's actor (point 319)
       }
       killDescend.current = Math.max(
         0,

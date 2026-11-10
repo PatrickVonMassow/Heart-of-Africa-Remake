@@ -556,6 +556,10 @@ interface BalanceConfig {
      *  "every started drama resolves" rule. Above the ~5 s caught window so a normal
      *  kill is never cut short. */
     gripSeconds: number
+    /** How far a water death (the crocodile's kill, a waterfall plunge) goes
+     *  DOWN under the sheet over its dissolve window (units, point 319): the
+     *  river visibly takes the body instead of a carcass shrinking in place. */
+    sinkDepth: number
     /** Rest after a DRIVE-OFF (s, point 130 under the broadened waterline
      *  trigger): a crocodile the parent repelled keeps to its water this long
      *  before it may take a new ambush target. Without it the freed victim,
@@ -1754,6 +1758,7 @@ export const balance: BalanceConfig = {
     dragSpeed: 5, // calibratable (point 383): how fast the catch is hauled back into the water — a visible drag, not a snap
     dragSeconds: 6, // calibratable (point 383): hard deadline on that haul (I4) — far above the ~1 s a bank kill needs
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
+    sinkDepth: 1.6, // calibratable (point 319): a water death sinks this far under the sheet over its dissolve window — past a lying body's height, so it is gone before removal
     driveOffRestSeconds: 20, // calibratable: a repelled crocodile keeps to its water this long — long enough for the freed victim to leave the bank, so a rescue is not undone the next frame
   },
   waterCross: {
