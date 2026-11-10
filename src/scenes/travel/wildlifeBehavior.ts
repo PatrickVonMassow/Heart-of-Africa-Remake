@@ -3571,3 +3571,310 @@ export function dyingDownRoll(secondsDown: number, fallSeconds = 1.5): number {
   const p = Math.min(1, Math.max(0, secondsDown / Math.max(0.01, fallSeconds)))
   return DYING_DOWN_ROLL * (1 - (1 - p) * (1 - p))
 }
+
+// ---------------------------------------------------------------------------
+// Bird flight escape and aerial predators (design.md §19.19; research:
+// docs/fauna-behaviour-1890.md PART B). A flight-capable bird keeps a
+// GROUND/TAKE-OFF/AIR state; a ground predator or an elephant reaches only a
+// bird still on the ground (or caught in its take-off), never an airborne one.
+// The raptors hunt airborne birds: the stoop guild by a SCRIPTED
+// descend-and-strike event with a two-state high/low band — no persistent
+// per-bird altitude (research B3/B4 item 10).
+// ---------------------------------------------------------------------------
+
+/** How a bird answers a ground threat (research B1 table). `fly`: a fast burst
+ *  launch; `running`: the flamingo's laborious running take-off (a longer
+ *  vulnerable window); `crouch`: the plover chick freezes and relies on
+ *  camouflage; `none`: not a fly-to-escape prey bird (the vulture, mammals). */
+export type BirdEscape = 'fly' | 'running' | 'crouch' | 'none'
+
+export function birdEscapeMode(species: string, isJuvenile: boolean): BirdEscape {
+  if (species === 'flamingo') return 'running'
+  if (species === 'plover') return isJuvenile ? 'crouch' : 'fly'
+  return 'none'
+}
+
+/** A bird's flight state. `t` counts seconds in the phase (in `air`: seconds
+ *  since the last threat); `lift` is the rendered climb fraction 0..1. */
+export interface BirdAirState {
+  phase: 'takeoff' | 'air'
+  t: number
+  lift: number
+}
+
+export interface BirdAirCfg {
+  /** Seconds from the first wingbeat until the bird is airborne. */
+  takeoffSeconds: number
+  /** Seconds without a threat before the airborne bird starts to settle. */
+  settleSeconds: number
+  /** Lift fraction gained / lost per second in the air. */
+  climbRate: number
+  descendRate: number
+}
+
+/**
+ * One step of the ground/air machine. `undefined` is the GROUND state. A
+ * threatened grounded bird starts its take-off; the take-off is committed (it
+ * runs to the end even if the threat turns away); the airborne bird climbs
+ * while threatened, and after `settleSeconds` without a threat it descends and
+ * lands (returns `undefined`). Pure; returns the next state.
+ */
+export function birdAirStep(
+  s: BirdAirState | undefined,
+  threatened: boolean,
+  dt: number,
+  cfg: BirdAirCfg,
+): BirdAirState | undefined {
+  if (s === undefined) {
+    if (!threatened) return undefined
+    s = { phase: 'takeoff', t: 0, lift: 0 }
+    if (cfg.takeoffSeconds <= 0) s = { phase: 'air', t: 0, lift: 0 }
+    return s
+  }
+  if (s.phase === 'takeoff') {
+    const t = s.t + dt
+    return t >= cfg.takeoffSeconds ? { phase: 'air', t: 0, lift: 0 } : { phase: 'takeoff', t, lift: 0 }
+  }
+  const t = threatened ? 0 : s.t + dt
+  if (t < cfg.settleSeconds) return { phase: 'air', t, lift: Math.min(1, s.lift + cfg.climbRate * dt) }
+  const lift = s.lift - cfg.descendRate * dt
+  return lift <= 0 ? undefined : { phase: 'air', t, lift }
+}
+
+/** Airborne — out of every ground hunter's reach (research B1). */
+export function isAirborne(s: BirdAirState | undefined): boolean {
+  return s !== undefined && s.phase === 'air'
+}
+
+/**
+ * Can a GROUND predator (or an elephant's feet) reach this bird at
+ * `distance`? Only while it is still on the ground or in its take-off — the
+ * bird surprised late. An airborne bird is excluded whatever the distance.
+ */
+export function groundPredatorCanReach(s: BirdAirState | undefined, distance: number, reach: number): boolean {
+  return !isAirborne(s) && distance <= reach
+}
+
+/** The plover chick's answer to a near threat: crouch and freeze (B1). */
+export function chickShouldCrouch(threatDist: number, trigger: number): boolean {
+  return threatDist < trigger
+}
+
+// --- Aerial predators (research B2.1) ----------------------------------------
+
+/** Attack mode (research B2): `stoop` — the falcons and the two hawk-eagles,
+ *  a descend-and-strike from height; `chase` — the accipiters' ambush from
+ *  cover and level tail-chase (and the level dashers); `low` — the fish eagle's
+ *  surface snatch and the harrier's low quartering, which may also take a bird
+ *  still on the ground or the water. */
+export type AerialGuild = 'stoop' | 'chase' | 'low'
+
+export type AerialPredatorId =
+  | 'peregrine' | 'lanner' | 'barbary' | 'taita' | 'eleonoras'
+  | 'bonellisEagle' | 'africanHawkEagle' | 'ayresHawkEagle'
+  | 'blackSparrowhawk' | 'africanGoshawk' | 'gabarGoshawk'
+  | 'fishEagle' | 'marshHarrier'
+
+/** Per raptor: its guild, render scale, and whether it takes the large prey
+ *  bird (the flamingo) or only the small one (the plover). */
+export const AERIAL_PREDATORS: Record<AerialPredatorId, { guild: AerialGuild; scale: number; largePrey: boolean }> = {
+  peregrine: { guild: 'stoop', scale: 1, largePrey: true },
+  lanner: { guild: 'stoop', scale: 1, largePrey: true },
+  barbary: { guild: 'stoop', scale: 0.9, largePrey: false },
+  taita: { guild: 'stoop', scale: 0.8, largePrey: false },
+  eleonoras: { guild: 'chase', scale: 0.9, largePrey: false }, // mostly level manoeuvring
+  bonellisEagle: { guild: 'chase', scale: 1.4, largePrey: true }, // the fast dashing attack
+  africanHawkEagle: { guild: 'stoop', scale: 1.4, largePrey: true },
+  ayresHawkEagle: { guild: 'stoop', scale: 1.2, largePrey: false },
+  blackSparrowhawk: { guild: 'chase', scale: 1, largePrey: false },
+  africanGoshawk: { guild: 'chase', scale: 0.9, largePrey: false },
+  gabarGoshawk: { guild: 'chase', scale: 0.7, largePrey: false },
+  fishEagle: { guild: 'low', scale: 1.6, largePrey: true },
+  marshHarrier: { guild: 'low', scale: 1.1, largePrey: false },
+}
+
+/** Region-keyed aerial-predator pool (research B2.1/B4). `rare` marks the
+ *  range-uncertain or localised entries (Taita, Eleonora's) that draw at the
+ *  balance's rare weight. The East's wintering harriers are not named by the
+ *  research and stay out (B5). */
+export const AERIAL_PREDATOR_POOL: Record<RegionId, ReadonlyArray<{ id: AerialPredatorId; rare?: true }>> = {
+  north: [{ id: 'barbary' }, { id: 'peregrine' }, { id: 'lanner' }, { id: 'eleonoras', rare: true }, { id: 'bonellisEagle' }],
+  west: [
+    { id: 'peregrine' }, { id: 'lanner' }, { id: 'africanHawkEagle' }, { id: 'ayresHawkEagle' },
+    { id: 'blackSparrowhawk' }, { id: 'africanGoshawk' }, { id: 'gabarGoshawk' }, { id: 'fishEagle' },
+  ],
+  central: [{ id: 'ayresHawkEagle' }, { id: 'africanGoshawk' }, { id: 'blackSparrowhawk' }, { id: 'fishEagle' }],
+  east: [
+    { id: 'peregrine' }, { id: 'lanner' }, { id: 'taita', rare: true }, { id: 'africanHawkEagle' },
+    { id: 'ayresHawkEagle' }, { id: 'blackSparrowhawk' }, { id: 'africanGoshawk' }, { id: 'gabarGoshawk' },
+    { id: 'fishEagle' },
+  ],
+  south: [
+    { id: 'peregrine' }, { id: 'lanner' }, { id: 'taita', rare: true }, { id: 'africanHawkEagle' },
+    { id: 'ayresHawkEagle' }, { id: 'blackSparrowhawk' }, { id: 'gabarGoshawk' }, { id: 'africanGoshawk' },
+    { id: 'marshHarrier' }, { id: 'fishEagle' },
+  ],
+}
+
+/** Weighted pick from a region's pool, restricted to the raptors that can take
+ *  the given prey (`large`: the flamingo). `roll` in [0, 1). Null when none can. */
+export function pickAerialPredator(
+  region: RegionId,
+  roll: number,
+  largePrey: boolean,
+  rareWeight: number,
+): AerialPredatorId | null {
+  const pool = AERIAL_PREDATOR_POOL[region].filter((e) => !largePrey || AERIAL_PREDATORS[e.id].largePrey)
+  let total = 0
+  for (const e of pool) total += e.rare ? rareWeight : 1
+  if (total <= 0) return null
+  let r = Math.min(Math.max(roll, 0), 0.999999) * total
+  for (const e of pool) {
+    r -= e.rare ? rareWeight : 1
+    if (r < 0) return e.id
+  }
+  return pool[pool.length - 1].id
+}
+
+/** Whether a guild may take this prey: the stoop and the chase need it
+ *  AIRBORNE (an air-catch); the low guild also snatches it from the ground or
+ *  the water surface. */
+export function aerialCanTake(guild: AerialGuild, preyAirborne: boolean): boolean {
+  return guild === 'low' || preyAirborne
+}
+
+/** The stoop's height gate — the two-state high/low band of the scripted
+ *  event: the dive starts only from the HIGH band onto an airborne prey flying
+ *  at or under the LOW band. */
+export function stoopDiveAllowed(raptorY: number, preyY: number, preyAirborne: boolean, highY: number, lowY: number): boolean {
+  return preyAirborne && raptorY >= highY - 1e-6 && preyY <= lowY
+}
+
+export interface AerialHuntCfg {
+  highY: number // the stoop's high band (height above ground)
+  lowY: number // the low band — the prey's flight ceiling for the stoop gate
+  cruiseSpeed: number // the stooper's set-up flight at the high band
+  diveSpeed: number // the plunge
+  chaseSpeed: number // the level tail-chase / low glide
+  strikeReach: number // 3D distance at which the strike resolves
+  setupSeconds: number // minimum seconds high before the plunge
+  diveCatchChance: number
+  chaseCatchChance: number
+  deadline: number // hard deadline on the hunting phases (I4)
+  feedSeconds: number
+  leaveSeconds: number // hard deadline on the departure (I4)
+}
+
+/** One aerial hunt — the scripted event. Heights are above the local ground. */
+export interface AerialHunt {
+  id: AerialPredatorId
+  phase: 'high' | 'dive' | 'chase' | 'feed' | 'leave'
+  x: number
+  z: number
+  y: number
+  t: number // seconds since the hunt began
+  phaseT: number
+  heading: number
+  outcome?: 'caught' | 'missed' | 'lost'
+}
+
+/** Starts a hunt at a spawn point: the stooper enters HIGH, the chase and low
+ *  guilds at the prey's own level (surprise from cover / from low). */
+export function startAerialHunt(id: AerialPredatorId, x: number, z: number, preyY: number, cfg: AerialHuntCfg): AerialHunt {
+  const guild = AERIAL_PREDATORS[id].guild
+  const y = guild === 'stoop' ? cfg.highY : Math.max(0.3, preyY)
+  return { id, phase: guild === 'stoop' ? 'high' : 'chase', x, z, y, t: 0, phaseT: 0, heading: 0 }
+}
+
+export interface AerialPrey {
+  x: number
+  z: number
+  y: number // flight height above ground (0 on the ground)
+  airborne: boolean
+}
+
+function homeOn(h: AerialHunt, tx: number, ty: number, tz: number, speed: number, dt: number, vertical: boolean): number {
+  const dx = tx - h.x
+  const dy = vertical ? ty - h.y : 0
+  const dz = tz - h.z
+  const d = Math.hypot(dx, dy, dz)
+  const step = speed * dt
+  if (d > 1e-6) {
+    const k = Math.min(1, step / d)
+    h.x += dx * k
+    h.z += dz * k
+    if (vertical) h.y += dy * k
+    if (Math.hypot(dx, dz) > 1e-4) h.heading = Math.atan2(dx, dz)
+  }
+  return Math.max(0, d - step)
+}
+
+/**
+ * Advances an aerial hunt one step and reports what happened this step:
+ * `caught` (the caller kills the prey and the raptor feeds), `missed` (the
+ * prey out-climbed or dived to cover), `lost` (the prey is gone, landed out of
+ * the guild's reach, or the hunting deadline passed), `done` (the departure is
+ * over — despawn), or `none`. Every hunt reaches `done` within
+ * `deadline + feedSeconds + leaveSeconds` (invariant I4). `roll` in [0, 1)
+ * decides a strike. Mutates `h`.
+ */
+export function aerialHuntStep(
+  h: AerialHunt,
+  prey: AerialPrey | null,
+  dt: number,
+  cfg: AerialHuntCfg,
+  roll: number,
+): 'none' | 'caught' | 'missed' | 'lost' | 'done' {
+  h.t += dt
+  h.phaseT += dt
+  const guild = AERIAL_PREDATORS[h.id].guild
+  const toLeave = (outcome: 'missed' | 'lost'): 'missed' | 'lost' => {
+    h.phase = 'leave'
+    h.phaseT = 0
+    h.outcome = outcome
+    return outcome
+  }
+  if (h.phase === 'leave') {
+    h.y += cfg.cruiseSpeed * 0.5 * dt
+    h.x += Math.sin(h.heading) * cfg.cruiseSpeed * dt
+    h.z += Math.cos(h.heading) * cfg.cruiseSpeed * dt
+    return h.phaseT >= cfg.leaveSeconds ? 'done' : 'none'
+  }
+  if (h.phase === 'feed') {
+    h.y = Math.max(0, h.y - cfg.chaseSpeed * dt)
+    if (h.phaseT >= cfg.feedSeconds) {
+      h.phase = 'leave'
+      h.phaseT = 0
+    }
+    return 'none'
+  }
+  if (h.t > cfg.deadline) return toLeave('lost')
+  if (prey === null) return toLeave('lost')
+  if (h.phase === 'high') {
+    // Hold the high band and set up over the prey; the plunge waits for the gate.
+    h.y = cfg.highY
+    const left = homeOn(h, prey.x, h.y, prey.z, cfg.cruiseSpeed, dt, false)
+    if (h.phaseT >= cfg.setupSeconds && left < cfg.highY && stoopDiveAllowed(h.y, prey.y, prey.airborne, cfg.highY, cfg.lowY)) {
+      h.phase = 'dive'
+      h.phaseT = 0
+    }
+    return 'none'
+  }
+  if (h.phase === 'dive') {
+    const left = homeOn(h, prey.x, prey.y, prey.z, cfg.diveSpeed, dt, true)
+    if (left > cfg.strikeReach) return 'none'
+    return roll < cfg.diveCatchChance ? caught(h) : toLeave('missed')
+  }
+  // chase / low: level at the prey's height (surprise from cover or from low).
+  if (!aerialCanTake(guild, prey.airborne)) return toLeave('lost')
+  const left = homeOn(h, prey.x, prey.y, prey.z, cfg.chaseSpeed, dt, true)
+  if (left > cfg.strikeReach) return 'none'
+  return roll < cfg.chaseCatchChance ? caught(h) : toLeave('missed')
+}
+
+function caught(h: AerialHunt): 'caught' {
+  h.phase = 'feed'
+  h.phaseT = 0
+  h.outcome = 'caught'
+  return 'caught'
+}
