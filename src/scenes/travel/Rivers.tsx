@@ -20,6 +20,7 @@ import {
   mix,
   mx_fractal_noise_float,
   positionLocal,
+  positionWorld,
   smoothstep,
   time,
   uniform,
@@ -27,6 +28,7 @@ import {
   vec3,
 } from 'three/tsl'
 import { useGame } from '../../state/store'
+import { seaSheetCover } from '../../render/demElevation'
 import { latLonToWorld, worldToLatLon } from '../../world/geo'
 import { sampleTerrain, RIVER_WIDTH_DEG } from '../../world/terrain'
 import { lakeContains } from '../../world/hydro'
@@ -333,11 +335,28 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
 
   const base = mix(color('#2c6285'), color('#4189a4'), streak.mul(0.45))
   const edgeD = min(v, v.oneMinus())
-  const bankFoam = smoothstep(float(0.14), float(0.02), edgeD)
+  // Point 314: the streak field alone is a few world units long, so a hard
+  // threshold of it painted the foam as flat, uniform white slabs — "plastic
+  // plates" drifting down the river. A finer fleck field, carried at the SAME
+  // drift speed (its phase scaled by FLECK_ALONG / 0.55), frays every foam
+  // patch into froth with water showing through, and the bank band is
+  // narrowed to a fringe along the edge.
+  const FLECK_ALONG = 2.6
+  const fleck = mx_fractal_noise_float(
+    vec3(u.mul(FLECK_ALONG).sub(time.mul(flow).mul(0.5 * (FLECK_ALONG / 0.55))), v.mul(22), time.mul(0.05)),
+    2,
+  )
+    .mul(0.5)
+    .add(0.5)
+  const froth = smoothstep(float(0.42), float(0.66), fleck)
+  const bankFoam = smoothstep(float(0.09), float(0.015), edgeD)
     .mul(smoothstep(float(0.35), float(0.7), streak))
+    .mul(froth)
     .mul(bank)
-  const rapidFoam = smoothstep(float(1.7), float(3.0), flow).mul(smoothstep(float(0.3), float(0.62), streak))
-  const foam = max(bankFoam, rapidFoam)
+  const rapidFoam = smoothstep(float(1.7), float(3.0), flow)
+    .mul(smoothstep(float(0.3), float(0.62), streak))
+    .mul(froth)
+  const foam = max(bankFoam, rapidFoam).mul(0.85)
   // The sea-mouth crossfade is applied LAST, over base and foam alike, so
   // streaks and whitewater dissolve along with the ribbon ('#1c5c86' is the
   // sea sheet's nearshore mid tone, render/water.ts).
@@ -352,7 +371,14 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   const floodRise = (attribute('floodK', 'float') as unknown as ReturnType<typeof float>).mul(NILE_FLOOD_U)
   m.positionNode = positionLocal.add(vec3(0, ripple.mul(0.035).add(floodRise), 0))
 
-  m.opacityNode = merge.mul(seaFade.oneMinus()).mul(0.9)
+  // Point 314: the ribbon dissolves only where the sea sheet really draws.
+  // Over its final approach the widened channel still lies on terrain LAND,
+  // where the sheet is masked out — fading there left neither surface, and the
+  // bare carved bed showed through as pale, greenish, blocky patches rimmed by
+  // the sheet's shore foam (the Rosetta mouth). Its colour still slides to
+  // the sea tone, so the hand-over at the waterline stays seamless.
+  const sheetHere = seaSheetCover(positionWorld.x.div(10), positionWorld.z.negate().div(10))
+  m.opacityNode = merge.mul(seaFade.mul(sheetHere).oneMinus()).mul(0.9)
   m.roughnessNode = foam.mul(0.6).add(0.12)
   return m
 }
