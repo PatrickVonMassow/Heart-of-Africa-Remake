@@ -6158,8 +6158,10 @@ if (section('crocodile-ambush')) {
             herds.crocodile = herds.crocodile.filter((k) => k !== croc)
             await window.__sleepSim(CAUGHT_PLUS)
             // Freed as the PLAYER sees it, not only as state: drawn in the same
-            // pass as its parent, upright, and walking off (the instance the
-            // render loop wrote, point 378's drawn record).
+            // pass as its parent and upright (the instance the render loop
+            // wrote, point 378's drawn record). `walked` is reported, not
+            // required: §19.16 leaves the released victim standing at the bank,
+            // and this calf is staged on a drink errand.
             const d0 = calf.drawn ? { x: calf.drawn.x, z: calf.drawn.z } : null
             await window.__sleepSim(1.5)
             const d = calf.drawn
@@ -6167,7 +6169,7 @@ if (section('crocodile-ambush')) {
             out.aftermath.upY = d ? +d.upY.toFixed(2) : null
             out.aftermath.walked = d && d0 ? +Math.hypot(d.x - d0.x, d.z - d0.z).toFixed(2) : null
             out.aftermath.freedAlive = !calf.dead && calf.caught === undefined && calf.caughtBy === undefined &&
-              out.aftermath.drawnFresh && out.aftermath.upY > 0.8 && out.aftermath.walked > 0.2
+              out.aftermath.drawnFresh && out.aftermath.upY > 0.8
           } else {
             // The kill: the crocodile keeps the body at its jaws while it sinks
             // and only slinks home once it is gone.
