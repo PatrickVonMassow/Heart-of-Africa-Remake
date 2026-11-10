@@ -11126,6 +11126,158 @@ if (section('ctrl-labels-attacking-predator')) {
     .catch(() => {})
 }
 
+// --- Bird flight escape and aerial predators (design.md §19.19, point 269) ----
+// (A) A forced ground-predator approach: a lioness walked onto a staged flamingo
+// flock makes every bird take off (running take-off, then airborne) and escape —
+// none is caught, and an airborne bird is out of her reach. (B) An aerial
+// predator stoops on a flying bird: a forced peregrine enters HIGH, plunges and
+// strikes, and the hunt resolves (I4). Both frames are taken with the subject at
+// the shutter (the flock in the air; the raptor in its plunge).
+if (section('bird-flight-escape')) {
+  const flush = await page.evaluate(async () => {
+    window.__game.getState().debugJumpTo(-2.5, 34.0) // Serengeti savanna (the broken-wing site)
+    await window.__sleepSim(1.5)
+    const w = window.__wildlife
+    const herds = w.herdsRef.current
+    const geo = await import('/src/world/geo.ts')
+    const p0 = window.__game.getState().pos
+    // The flock stands 12 units off the traveller — outside the player-shy ring,
+    // so only the predator can flush it.
+    const fx = p0.x + 12
+    const fz = p0.z
+    const flock = []
+    for (let i = 0; i < 6; i++) {
+      const a = { x: fx + (i % 3) * 0.9, z: fz + Math.floor(i / 3) * 0.9, y: w.groundAt(fx, fz), rot: 0, scale: 1, phase: i / 6, chunk: undefined }
+      flock.push(a)
+    }
+    herds.flamingo.push(...flock)
+    // The lioness starts well outside the take-off trigger and is walked in.
+    const lioness = { x: fx + 30, z: fz, y: w.groundAt(fx + 30, fz), rot: -Math.PI / 2, scale: 1, phase: 0.1, chunk: undefined }
+    herds.lion.push(lioness)
+    const out = { groundedAtStart: 0, tookOff: 0, airborne: 0, caught: 0, minAirDistToLion: Infinity, phases: [], escapedFar: false }
+    out.groundedAtStart = flock.filter((a) => a.air === undefined).length
+    const seen = new Set()
+    let tPrev = w.simTime()
+    await window.__pollSim(20, () => {
+      if (w.lion) w.lion.mode = 'idle'
+      if (w.fire) w.fire.mode = 'idle'
+      const t = w.simTime()
+      const dt = t - tPrev
+      tPrev = t
+      // The forced approach: the lioness walks at the flock's centre.
+      const cx = flock.reduce((s, a) => s + a.x, 0) / flock.length
+      const cz = flock.reduce((s, a) => s + a.z, 0) / flock.length
+      const d = Math.hypot(cx - lioness.x, cz - lioness.z)
+      if (d > 0.5) {
+        lioness.x += ((cx - lioness.x) / d) * 4 * dt
+        lioness.z += ((cz - lioness.z) / d) * 4 * dt
+      }
+      for (const a of flock) {
+        if (a.dead) out.caught++
+        if (a.air && !seen.has(a)) seen.add(a)
+        if (a.air?.phase === 'air') out.minAirDistToLion = Math.min(out.minAirDistToLion, Math.hypot(a.x - lioness.x, a.z - lioness.z))
+        if (a.air && !out.phases.includes(a.air.phase)) out.phases.push(a.air.phase)
+      }
+      out.tookOff = seen.size
+      out.airborne = flock.filter((a) => a.air?.phase === 'air').length
+      return out.airborne === flock.length && flock.every((a) => (a.air?.lift ?? 0) > 0.6)
+    })
+    const cx = flock.reduce((s, a) => s + a.x, 0) / flock.length
+    const cz = flock.reduce((s, a) => s + a.z, 0) / flock.length
+    out.escapedFar = Math.hypot(cx - lioness.x, cz - lioness.z) > 6
+    const ll = geo.worldToLatLon(cx, cz)
+    out.flockAt = { lat: ll.lat, lon: ll.lon }
+    window.__birdFlightStage = { flock, lioness }
+    // Hold the flock airborne and in view through the flush frame and the
+    // stoop below (restored at the end of the section).
+    const bf = window.__balance.birdFlight
+    window.__birdFlightPrev = { diveSpeed: bf.diveSpeed, forceStrike: bf.forceStrike, flightSpeed: bf.flightSpeed, settleSeconds: bf.settleSeconds }
+    bf.flightSpeed = 0.5
+    bf.settleSeconds = 120
+    return out
+  })
+  check(
+    'a forced ground-predator approach makes the flamingos take off and escape, uncaught (design.md §19.19)',
+    flush.groundedAtStart === 6 && flush.tookOff === 6 && flush.airborne === 6 && flush.caught === 0 &&
+      flush.phases.includes('takeoff') && flush.phases.includes('air') && flush.escapedFar,
+    JSON.stringify(flush),
+  )
+  if (flush.flockAt) {
+    await shot('269-birds-take-off', { world: flush.flockAt, label: 'the flamingo flock airborne, fleeing the lioness', settle: false })
+  }
+
+  // (B) The stoop: a forced peregrine on the airborne flock. For the staged
+  // frame only (debug-editable values, restored below) the flock hovers in
+  // view instead of settling or flying out of the frame, and the plunge is
+  // slowed so the shutter can catch it; the strike is pinned to a catch so the
+  // run needs no retry.
+  const stoopStart = await page.evaluate(async () => {
+    const w = window.__wildlife
+    const bf = window.__balance.birdFlight
+    bf.diveSpeed = 5
+    bf.forceStrike = 'catch'
+    w.raptor.force = 'peregrine'
+    const out = { started: false, enteredHigh: false, diving: false, at: null }
+    const geo = await import('/src/world/geo.ts')
+    await window.__pollSim(25, () => {
+      if (w.lion) w.lion.mode = 'idle'
+      const h = w.raptor.hunt
+      if (h) {
+        out.started = true
+        if (h.phase === 'high' && h.y >= bf.stoopHighY - 1e-6) out.enteredHigh = true
+        // Shoot partway down the plunge, where the bird is lower in the frame.
+        if (h.phase === 'dive' && h.y < bf.stoopHighY * 0.6) {
+          out.diving = true
+          const ll = geo.worldToLatLon(h.x, h.z)
+          out.at = { lat: ll.lat, lon: ll.lon }
+          return true
+        }
+      }
+      return false
+    })
+    return out
+  })
+  if (stoopStart.at) {
+    await shot('269-raptor-stoop', { world: stoopStart.at, label: 'the peregrine plunging onto the flying flamingo flock', settle: false })
+  }
+  const stoopEnd = await page.evaluate(async () => {
+    const w = window.__wildlife
+    const bf = window.__balance.birdFlight
+    const out = { resolved: false, outcome: null, phases: [], preyDead: false }
+    const prey = w.raptor.prey
+    await window.__pollSim(40, () => {
+      if (w.lion) w.lion.mode = 'idle'
+      const h = w.raptor.hunt
+      if (h) out.outcome = h.outcome ?? out.outcome
+      if (prey && prey.dead) out.preyDead = true
+      if (!h) {
+        out.resolved = true
+        return true
+      }
+      return false
+    })
+    out.phases = [...w.raptor.phases]
+    // Cleanup: restore the staged values and retire the staged animals.
+    bf.diveSpeed = window.__birdFlightPrev.diveSpeed
+    bf.forceStrike = window.__birdFlightPrev.forceStrike
+    bf.flightSpeed = window.__birdFlightPrev.flightSpeed
+    bf.settleSeconds = window.__birdFlightPrev.settleSeconds
+    const herds = w.herdsRef.current
+    const st = window.__birdFlightStage
+    herds.flamingo = herds.flamingo.filter((a) => !st.flock.includes(a))
+    herds.lion = herds.lion.filter((a) => a !== st.lioness)
+    delete window.__birdFlightStage
+    delete window.__birdFlightPrev
+    return out
+  })
+  check(
+    'a forced peregrine enters high, stoops on a flying bird, strikes, and the hunt resolves (design.md §19.19)',
+    stoopStart.started && stoopStart.enteredHigh && stoopStart.diving &&
+      stoopEnd.phases.join('>').startsWith('high>dive>feed') && stoopEnd.outcome === 'caught' && stoopEnd.preyDead && stoopEnd.resolved,
+    JSON.stringify({ stoopStart, stoopEnd }),
+  )
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
