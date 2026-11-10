@@ -44,9 +44,10 @@ export default function App() {
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
   // Graphics level (design.md §21, F9 / point 276 part B): the low preset caps
-  // the device pixel ratio to 1.0 — the biggest fill-rate lever on the user's
-  // real hardware (~35 % GPU, point 277). null keeps R3F's native dpr (medium/
-  // high). R3F re-applies the ratio when this prop changes.
+  // the device pixel ratio below 1.0 — the biggest fill-rate lever on the
+  // user's real hardware (point 277; the LOW frame is pixel-bound, point 310).
+  // null keeps R3F's native dpr (medium/high). R3F re-applies the ratio when
+  // this prop changes.
   const dprCap = useUi(effectiveDprCap)
   // Can the renderer start on any backend (CLAUDE.md §3)? WebGL 2 answers at
   // once; without it only a WebGPU adapter can still carry the game. A device

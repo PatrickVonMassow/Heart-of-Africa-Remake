@@ -21,7 +21,9 @@ export const DETAIL_LEVELS: readonly DetailLevel[] = ['low', 'medium', 'high']
  *  the runtime completeness gate (quality.test.ts) guards the same at test time. */
 export interface QualityPreset {
   /** Device-pixel-ratio cap; null keeps R3F's native ratio. The biggest
-   *  fill-rate lever on real hardware (~35 % GPU, point 277). */
+   *  fill-rate lever on real hardware (~35 % GPU, point 277). Below 1 the
+   *  canvas renders fewer pixels than CSS pixels and is upscaled: the LOW
+   *  frame is pixel-bound (docs/bench/310-projection.md). */
   dprCap: number | null
   /** Screen-space ambient occlusion (design.md §2.7) — high only (user: SSAO
    *  only in high). */
@@ -117,7 +119,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
   // nothing), 880 extra draw calls (952→72) and ~2 M extra triangles per frame,
   // the biggest remaining lever once dpr + post are already minimal.
   low: {
-    dprCap: 1,
+    dprCap: 0.8, // calibratable: 0.64x the pixels of dpr 1 — the primary LOW lever (docs/bench/310-projection.md)
     ssao: false,
     traa: false,
     bloom: false,

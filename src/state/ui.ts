@@ -179,6 +179,10 @@ interface UiState {
    *  the level's preset. Default ON — medium/high enable campfire shadows, and a
    *  player can tune them off here; low never casts them regardless. */
   fireShadowsEnabled: boolean
+  /** Allow-flag for a level's device-pixel-ratio cap BELOW 1 (LOW's primary
+   *  fill-rate lever): off clamps the cap back to 1, for A/B tuning within the
+   *  level. Default ON. */
+  subOneDprEnabled: boolean
   /** Debug diagnosis (point 111): render the settlement ground with a plain
    *  material (no TSL surface structure/normal) to isolate a WebGPU-only black
    *  patch. Default off. */
@@ -247,6 +251,7 @@ interface UiState {
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
   setFireShadowsEnabled: (enabled: boolean) => void
+  setSubOneDprEnabled: (enabled: boolean) => void
   setGroundDebugFlat: (flat: boolean) => void
   setSeasonCollapseEnabled: (enabled: boolean) => void
   toggleStateDump: () => void
@@ -289,6 +294,7 @@ export const useUi = create<UiState>()((set) => ({
   shadowMapHalf: false,
   shadowsEnabled: true,
   fireShadowsEnabled: true,
+  subOneDprEnabled: true,
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
   stateDumpOpen: false,
@@ -368,6 +374,7 @@ export const useUi = create<UiState>()((set) => ({
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
   setFireShadowsEnabled: (fireShadowsEnabled) => set({ fireShadowsEnabled }),
+  setSubOneDprEnabled: (subOneDprEnabled) => set({ subOneDprEnabled }),
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
   setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
   toggleStateDump: () => set((s) => ({ stateDumpOpen: !s.stateDumpOpen })),
@@ -389,8 +396,12 @@ export const useUi = create<UiState>()((set) => ({
 /** The quality preset for the current graphics level. */
 const currentQuality = (s: UiState) => QUALITY_PRESETS[s.detailLevel]
 
-/** Device-pixel-ratio cap for the current level; null keeps the native ratio. */
-export const effectiveDprCap = (s: UiState): number | null => currentQuality(s).dprCap
+/** Device-pixel-ratio cap for the current level; null keeps the native ratio. A
+ *  cap below 1 holds only while its allow-flag is on (off clamps it to 1). */
+export const effectiveDprCap = (s: UiState): number | null => {
+  const cap = currentQuality(s).dprCap
+  return cap !== null && cap < 1 && !s.subOneDprEnabled ? 1 : cap
+}
 /** SSAO renders when the level allows it AND the player has not tuned it off. */
 export const effectiveSsao = (s: UiState): boolean => currentQuality(s).ssao && s.ssaoEnabled
 /** TRAA renders when the level allows it AND the player has not tuned it off. */

@@ -31,7 +31,7 @@ beforeEach(() => {
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
     traaEnabled: true, touchActive: false, detailLevel: 'medium', ssaoEnabled: true, shadowMapHalf: false,
     shadowsEnabled: true, fireShadowsEnabled: true, groundDebugFlat: false, seasonCollapseEnabled: true,
-    invertLook: true,
+    invertLook: true, subOneDprEnabled: true,
   })
 })
 
@@ -182,9 +182,10 @@ describe('graphics quality level (design.md §21, F9 / point 276 part B)', () =>
     expect(effectiveWeatherIntensity(u())).toBe(1)
   })
 
-  it('low is the frugal floor: dpr 1, all post off, no shadows at all, tight flora', () => {
+  it('low is the frugal floor: dpr below 1, all post off, no shadows at all, tight flora', () => {
     u().setDetailLevel('low')
-    expect(effectiveDprCap(u())).toBe(1)
+    expect(effectiveDprCap(u())).toBe(QUALITY_PRESETS.low.dprCap)
+    expect(effectiveDprCap(u())!).toBeLessThan(1)
     expect(effectiveSsao(u())).toBe(false)
     expect(effectiveTraa(u())).toBe(false)
     expect(effectiveBloom(u())).toBe(false)
@@ -197,6 +198,31 @@ describe('graphics quality level (design.md §21, F9 / point 276 part B)', () =>
     expect(effectiveFloraFogFactor(u())).toBeLessThan(1)
     expect(effectiveFloraCastShadow(u())).toBe(false)
     expect(effectiveWeatherIntensity(u())).toBeLessThan(1)
+  })
+
+  it('the sub-1 dpr cap is debug-tunable within LOW: its allow-flag clamps it back to 1', () => {
+    u().setDetailLevel('low')
+    u().setSubOneDprEnabled(false)
+    expect(effectiveDprCap(u())).toBe(1)
+    u().setSubOneDprEnabled(true)
+    expect(effectiveDprCap(u())).toBe(QUALITY_PRESETS.low.dprCap)
+    // A native-ratio level is never touched by the flag.
+    u().setDetailLevel('medium')
+    u().setSubOneDprEnabled(false)
+    expect(effectiveDprCap(u())).toBeNull()
+  })
+
+  it('the touch preset stays a SUBSET of low: on LOW it changes no effective lever', () => {
+    u().setDetailLevel('low')
+    const before = {
+      dpr: effectiveDprCap(u()), ssao: effectiveSsao(u()), traa: effectiveTraa(u()),
+      shadows: effectiveShadows(u()), fire: effectiveFireShadows(u()), flora: effectiveFloraFogFactor(u()),
+    }
+    u().activateTouch()
+    expect({
+      dpr: effectiveDprCap(u()), ssao: effectiveSsao(u()), traa: effectiveTraa(u()),
+      shadows: effectiveShadows(u()), fire: effectiveFireShadows(u()), flora: effectiveFloraFogFactor(u()),
+    }).toEqual(before)
   })
 
   it('high is the richest: SSAO on, 4096 shadows, the soft campfire variant', () => {

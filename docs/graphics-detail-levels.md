@@ -28,7 +28,7 @@ device pixel ratio is kept (no cap).
 
 | Setting | Low | Medium | High |
 | --- | --- | --- | --- |
-| `dprCap` | 1 | native | native |
+| `dprCap` | 0.8 | native | native |
 | `ssao` | off | off | on |
 | `traa` | off | on | on |
 | `bloom` | off | on | on |
@@ -62,8 +62,12 @@ later levers (from `figureLimbSegments` on) are appended in the order they were
 added.
 
 - **`dprCap`** — Device-pixel-ratio cap; `native` keeps R3F's native ratio, `1`
-  caps it to one physical pixel per CSS pixel. The single biggest fill-rate lever
-  on real hardware (~35 % GPU), so low leads with it.
+  caps it to one physical pixel per CSS pixel, below 1 renders fewer pixels than
+  CSS pixels and upscales. The single biggest fill-rate lever on real hardware
+  (~35 % GPU), so low leads with it: `0.8` (0.64x the pixels of dpr 1,
+  calibratable) because the LOW frame is pixel-bound
+  (`docs/bench/310-projection.md`). The internal allow-flag `subOneDprEnabled`
+  clamps a sub-1 cap back to 1 for A/B tuning within the level.
 - **`ssao`** — Screen-space ambient occlusion (design.md §2.7). High only — a
   ~25 % GPU cost kept for the richest level.
 - **`traa`** — Temporal anti-aliasing (design.md §2.7). Off only on low; when a
