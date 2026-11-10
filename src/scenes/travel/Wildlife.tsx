@@ -4631,7 +4631,14 @@ function Herds() {
     const elephantVelMap = new Map<Animal, [number, number]>()
     {
       const list = herds.elephant
-      const n = Math.min(list.length, MAX_INSTANCES.elephant)
+      // The SAME bound as the draw loop below (herdCapacity, point 453's
+      // remnant headroom included): every living elephant that is drawn must
+      // have stepped and pushed its position, or the draw reads past the end of
+      // elephantPos. With MAX_INSTANCES here, a living elephant at index 60/61
+      // (behind dead remnants) was drawn but never stepped — the per-frame
+      // "undefined is not iterable" throw that aborted the frame loop once the
+      // continent zoom streamed in a big herd population.
+      const n = Math.min(list.length, herdCapacity('elephant'))
       for (let i = 0; i < n; i++) {
         const a = list[i]
         if (a.dead) continue
