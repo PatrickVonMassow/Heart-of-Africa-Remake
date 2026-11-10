@@ -11180,11 +11180,16 @@ if (section('bird-flight-escape')) {
       }
       out.tookOff = seen.size
       out.airborne = flock.filter((a) => a.air?.phase === 'air').length
-      return out.airborne === flock.length && flock.every((a) => (a.air?.lift ?? 0) > 0.6)
+      // Judged once the whole flock is up AND has opened a real gap — the
+      // moment of lift-off alone is still within the lioness's reach.
+      out.birdGaps = flock.map((a) => +Math.hypot(a.x - lioness.x, a.z - lioness.z).toFixed(1))
+      return out.airborne === flock.length && flock.every((a) => (a.air?.lift ?? 0) > 0.6) && Math.min(...out.birdGaps) > 8
     })
     const cx = flock.reduce((s, a) => s + a.x, 0) / flock.length
     const cz = flock.reduce((s, a) => s + a.z, 0) / flock.length
-    out.escapedFar = Math.hypot(cx - lioness.x, cz - lioness.z) > 6
+    // Per bird: a scattering flock's centroid can stay over the lioness while
+    // every bird is well clear of her.
+    out.escapedFar = flock.every((a) => Math.hypot(a.x - lioness.x, a.z - lioness.z) > 6)
     const ll = geo.worldToLatLon(cx, cz)
     out.flockAt = { lat: ll.lat, lon: ll.lon }
     window.__birdFlightStage = { flock, lioness }
@@ -11214,7 +11219,7 @@ if (section('bird-flight-escape')) {
   const stoopStart = await page.evaluate(async () => {
     const w = window.__wildlife
     const bf = window.__balance.birdFlight
-    bf.diveSpeed = 5
+    bf.diveSpeed = 2
     bf.forceStrike = 'catch'
     w.raptor.force = 'peregrine'
     const out = { started: false, enteredHigh: false, diving: false, at: null }
@@ -11223,13 +11228,22 @@ if (section('bird-flight-escape')) {
       if (w.lion) w.lion.mode = 'idle'
       const h = w.raptor.hunt
       if (h) {
+        // Once, while the raptor sets up high: re-centre the traveller on its
+        // prey (the flock fled toward the frame's edge), so the plunge falls
+        // inside the picture.
+        if (!out.started && w.raptor.prey) window.__game.setState({ pos: { x: w.raptor.prey.x, z: w.raptor.prey.z } })
         out.started = true
         if (h.phase === 'high' && h.y >= bf.stoopHighY - 1e-6) out.enteredHigh = true
-        // Shoot partway down the plunge, where the bird is lower in the frame.
-        if (h.phase === 'dive' && h.y < bf.stoopHighY * 0.6) {
+        // Shoot down the plunge once the raptor itself, at its height,
+        // projects well inside the frame: the oblique bird's-eye camera puts
+        // the high band above the top edge, so only the late plunge is seen.
+        const y = w.groundAt(h.x, h.z) + h.y
+        const ndc = window.__camera.ndc(h.x, h.z, y)
+        if (h.phase === 'dive' && h.y < bf.stoopHighY * 0.6 && Math.abs(ndc.x) < 0.8 && Math.abs(ndc.y) < 0.8) {
           out.diving = true
+          window.__stoopPrey = w.raptor.prey
           const ll = geo.worldToLatLon(h.x, h.z)
-          out.at = { lat: ll.lat, lon: ll.lon }
+          out.at = { lat: ll.lat, lon: ll.lon, y }
           return true
         }
       }
@@ -11244,11 +11258,14 @@ if (section('bird-flight-escape')) {
     const w = window.__wildlife
     const bf = window.__balance.birdFlight
     const out = { resolved: false, outcome: null, phases: [], preyDead: false }
-    const prey = w.raptor.prey
+    // The hunt may already have fed and left while the shutter ran, so its
+    // outcome and prey are read from what outlives it.
+    const prey = window.__stoopPrey
+    delete window.__stoopPrey
     await window.__pollSim(40, () => {
       if (w.lion) w.lion.mode = 'idle'
       const h = w.raptor.hunt
-      if (h) out.outcome = h.outcome ?? out.outcome
+      out.outcome = w.raptor.outcome ?? null
       if (prey && prey.dead) out.preyDead = true
       if (!h) {
         out.resolved = true
