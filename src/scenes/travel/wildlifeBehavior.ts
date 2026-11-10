@@ -103,6 +103,7 @@ export interface DramaState {
   trampleTo?: unknown // charging the elephant that trampled its calf
   defending?: boolean // parent shield / charge / guard / wade for its calf
   fighting?: boolean // running an intraspecies fight/chase (point 264)
+  dying?: unknown // an elder dying of old age (design.md §19.18) — it keeps to its decline
   isLionVictim?: boolean // the designated victim of the running lion hunt
   isHunted?: boolean // actively fleeing a predator this frame
 }
@@ -131,6 +132,7 @@ export function isInDrama(f: DramaState): boolean {
     f.trampleTo !== undefined ||
     f.defending === true ||
     f.fighting === true ||
+    f.dying !== undefined ||
     f.isLionVictim === true ||
     f.isHunted === true
   )
@@ -3307,4 +3309,238 @@ export function fightPairBroken(self: FightSide, foe: FightSide): boolean {
     foe.gone === true ||
     foe.fight?.foe !== self
   )
+}
+
+// ---------------------------------------------------------------------------
+// Elderly animals and natural death (design.md §19.18, point 265).
+// Research: docs/fauna-behaviour-1890.md — which rendered animals visibly age
+// (§10.7), how an elder behaves (§3), and how a natural death unfolds (§4/§5):
+// a slowing decline, the vultures keyed on the downed animal (§4.4), the fall
+// into the ordinary carcass system, and the elephant's drift to water — the
+// real kernel the §4.4 graveyard folklore romanticises.
+// ---------------------------------------------------------------------------
+
+/** The species with an elderly variant (research §10.7): every rendered mammal
+ *  that visibly ages. The crocodile has none (no legible aged cue, §2.4), nor
+ *  have the birds. Mirrors `ELDER_BUILDERS` in src/render/fauna.ts. */
+export const ELDER_SPECIES = [
+  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog',
+  'lion', 'cheetah', 'leopard', 'hyena',
+] as const
+
+/** Does this species have an elderly variant at all? */
+export function hasElderVariant(species: string): boolean {
+  return (ELDER_SPECIES as readonly string[]).includes(species)
+}
+
+/** Is a free adult spawned elderly on its deterministic roll? `fraction` is the
+ *  calibratable elderly share of adults (balance.elderly.fraction). */
+export function isElderRoll(roll: number, fraction: number): boolean {
+  return roll < Math.min(1, Math.max(0, fraction))
+}
+
+/** The highest elder speed factor allowed: an elder is ALWAYS strictly slower
+ *  than a prime adult, whatever a debug edit sets (research §3.2). */
+export const ELDER_SPEED_MAX = 0.95
+
+/** An animal's speed multiplier for its age: 1 for a prime adult, the
+ *  calibratable elder factor — clamped strictly below 1 and above 0 — for an elder. */
+export function elderSpeedFactor(elderly: boolean | undefined, factor: number): number {
+  if (elderly !== true) return 1
+  return Math.min(ELDER_SPEED_MAX, Math.max(0.05, factor))
+}
+
+/** An elephant herd's shared pace (research §3.1: old elephants keep their place
+ *  in the herd — the herd waits for its slowest living member rather than
+ *  leaving it). Members already dying have left the herd's drive and do not count. */
+export function herdPaceFactor(
+  members: ReadonlyArray<{ elderly?: boolean; dead?: boolean; dying?: unknown }>,
+  factor: number,
+): number {
+  let pace = 1
+  for (const m of members) {
+    if (m.dead || m.dying !== undefined) continue
+    pace = Math.min(pace, elderSpeedFactor(m.elderly, factor))
+  }
+  return pace
+}
+
+/** Does this animal START a same-species fight (point 264) on its roll? An
+ *  elder never does (research §3.2: it withdraws from contests). */
+export function fightInitiates(species: string, elderly: boolean | undefined, roll: number, rate: number): boolean {
+  if (elderly === true) return false
+  return wantsToFight(species, roll, rate)
+}
+
+/**
+ * The clash resolution with age (research §3.2): an elder ALWAYS loses to a
+ * younger adult — whatever the size roll — and whether the loss is fatal stays
+ * the species' researched lethality (`fightResolve`). Two elders, or two prime
+ * adults, fall back to the ordinary size-weighted roll.
+ */
+export function fightResolveAged(
+  species: string,
+  a: { size: number; elderly?: boolean },
+  b: { size: number; elderly?: boolean },
+  rollLoser: number,
+  rollLethal: number,
+  weights: FightWeights,
+): FightResolution {
+  const res = fightResolve(species, a.size, b.size, rollLoser, rollLethal, weights)
+  const ea = a.elderly === true
+  const eb = b.elderly === true
+  if (ea === eb) return res
+  return { loser: ea ? 'a' : 'b', lethal: res.lethal }
+}
+
+/** Species whose ousted old male turns SOLITARY (point 265 spec; research §3.1):
+ *  the grazers and the big cats. NOT the elephant — old bulls keep their status
+ *  (§3.1) — and not the hyena, whose clan rank the research leaves a GAP. */
+export const SOLITARY_ELDER_SPECIES: readonly string[] = [
+  'zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'lion', 'cheetah', 'leopard',
+]
+
+/** Does an elder of this species withdraw from its herd/pride and live alone? */
+export function elderTurnsSolitary(species: string): boolean {
+  return SOLITARY_ELDER_SPECIES.includes(species)
+}
+
+/** Where an ousted elder stands: `distance` from its group's anchor, on the
+ *  side it was placed (or along `fallbackAngle` when it stood on the anchor). */
+export function solitarySpot(
+  ax: number,
+  az: number,
+  x: number,
+  z: number,
+  distance: number,
+  fallbackAngle: number,
+): { x: number; z: number } {
+  let dx = x - ax
+  let dz = z - az
+  const d = Math.hypot(dx, dz)
+  if (d < 1e-3) {
+    dx = Math.sin(fallbackAngle)
+    dz = Math.cos(fallbackAngle)
+  } else {
+    dx /= d
+    dz /= d
+  }
+  return { x: ax + dx * distance, z: az + dz * distance }
+}
+
+/** The chance that an idle elder begins dying of old age within `dt` seconds,
+ *  for a calibratable rate of natural deaths per elder per minute (a constant
+ *  hazard, so the per-frame roll is frame-rate independent). */
+export function naturalDeathChance(ratePerMinute: number, dt: number): number {
+  const r = Math.max(0, ratePerMinute)
+  const t = Math.max(0, dt)
+  return 1 - Math.exp((-r * t) / 60)
+}
+
+/** Does an elder begin dying this frame, on its roll? Never at rate 0. */
+export function naturalDeathStarts(roll: number, ratePerMinute: number, dt: number): boolean {
+  return roll < naturalDeathChance(ratePerMinute, dt)
+}
+
+/** The dying animal's own state. `target`: undefined until resolved, then the
+ *  spot it drifts to (an elephant's water or graveyard) or null for none. */
+export interface DyingState {
+  elapsed: number
+  /** `elapsed` at the moment it went down; undefined while still on its feet. */
+  downSince?: number
+  target?: { x: number; z: number; kind: 'water' | 'graveyard' } | null
+  /** It has reached its target (or never had one). */
+  arrived?: boolean
+}
+
+/** The calibratable timing of a natural death (balance.elderly). */
+export interface DyingTiming {
+  /** Seconds from the first slowdown to the death. */
+  seconds: number
+  /** Share of `seconds` spent failing on its feet before it goes down. */
+  downFraction: number
+  /** An animal still short of its target goes down anyway at this multiple of
+   *  the failing window — the hard deadline (invariant I4). */
+  graceFactor: number
+}
+
+export type DyingStage = 'failing' | 'down' | 'dead'
+
+const failSecondsOf = (t: DyingTiming) =>
+  Math.max(0.01, t.seconds) * Math.min(0.95, Math.max(0.05, t.downFraction))
+
+/**
+ * One step of a natural death (research §5): FAILING on its feet, slowing,
+ * for the failing window; then DOWN — distressed on the ground while the
+ * vultures gather — for the rest of `seconds`; then DEAD. An animal with a
+ * target (the elephant's water) goes down only once `arrived`, or at the grace
+ * deadline. Every dying RESOLVES within `dyingDeadline` (invariant I4).
+ * Mutates and returns the stage.
+ */
+export function stepDying(s: DyingState, dt: number, arrived: boolean, t: DyingTiming): DyingStage {
+  s.elapsed += Math.max(0, dt)
+  const fail = failSecondsOf(t)
+  if (s.downSince === undefined && s.elapsed >= fail && (arrived || s.elapsed >= fail * Math.max(1, t.graceFactor))) {
+    s.downSince = s.elapsed
+  }
+  if (s.downSince === undefined) return 'failing'
+  return s.elapsed - s.downSince >= Math.max(0.01, t.seconds) - fail ? 'dead' : 'down'
+}
+
+/** The latest a dying can resolve: the grace-extended failing window plus the down window. */
+export function dyingDeadline(t: DyingTiming): number {
+  const fail = failSecondsOf(t)
+  return fail * Math.max(1, t.graceFactor) + (Math.max(0.01, t.seconds) - fail)
+}
+
+/** The progressive slowdown while failing: its speed multiplier falls linearly
+ *  from 1 at the first symptom to `floor` at the end of the failing window,
+ *  then holds the floor (so a late elephant still drifts on to its water). */
+export function dyingSlowdown(elapsed: number, failSeconds: number, floor: number): number {
+  const f = Math.min(1, Math.max(0, floor))
+  const p = Math.min(1, Math.max(0, elapsed / Math.max(0.01, failSeconds)))
+  return 1 - (1 - f) * p
+}
+
+/** The failing window in seconds for a timing (the slowdown's span). */
+export function dyingFailSeconds(t: DyingTiming): number {
+  return failSecondsOf(t)
+}
+
+/**
+ * Where a dying ELEPHANT drifts (research §4.1/§4.2/§4.3): its last molars can
+ * no longer grind coarse forage, so it seeks soft water-side vegetation and
+ * dies there. Within `graveyardReach` of the §4.4 graveyard it goes there —
+ * the place such water-side deaths have accumulated; else to the nearest
+ * water found; with neither, nowhere (it dies where it stands). One animal's
+ * drift — never a herd's pilgrimage (§4.3 MYTH).
+ */
+export function elephantDyingTarget(
+  x: number,
+  z: number,
+  water: { x: number; z: number } | null,
+  graveyard: { x: number; z: number },
+  graveyardReach: number,
+): { x: number; z: number; kind: 'water' | 'graveyard' } | null {
+  if (Math.hypot(graveyard.x - x, graveyard.z - z) <= Math.max(0, graveyardReach)) {
+    return { x: graveyard.x, z: graveyard.z, kind: 'graveyard' }
+  }
+  if (water) return { x: water.x, z: water.z, kind: 'water' }
+  return null
+}
+
+/** Does a dying animal draw its vulture flock now? Only once it is DOWN — the
+ *  flock keys on the distressed/downed animal, never a long pre-death circle
+ *  over a walking one (research §4.4: the patient circling is embellished). */
+export function dyingDrawsFlock(stage: DyingStage): boolean {
+  return stage !== 'failing'
+}
+
+/** How far the downed animal has rolled onto its side, `secondsDown` after it
+ *  went down: a fall over `fallSeconds`, easing into the lying roll of a body
+ *  that is still alive (the carcass pose rolls a little further, PI/2.15). */
+export const DYING_DOWN_ROLL = Math.PI / 2.5
+export function dyingDownRoll(secondsDown: number, fallSeconds = 1.5): number {
+  const p = Math.min(1, Math.max(0, secondsDown / Math.max(0.01, fallSeconds)))
+  return DYING_DOWN_ROLL * (1 - (1 - p) * (1 - p))
 }
