@@ -7199,23 +7199,37 @@ if (section('elderly-natural-death')) {
     const kept = { seconds: be.dyingSeconds, rate: be.deathRatePerMinute }
     be.dyingSeconds = 20
     be.deathRatePerMinute = 0
+    // It starts FACING AWAY from the graveyard, so only working target
+    // steering can bring it there (continuing its spawn heading cannot).
+    const away = Math.atan2(gx - spot.x, gz - spot.z) + Math.PI
     const e = {
-      x: spot.x, z: spot.z, y: 0.2, rot: 0, heading: Math.atan2(gx - spot.x, gz - spot.z), scale: 1, phase: 0.2,
+      x: spot.x, z: spot.z, y: 0.2, rot: away, heading: away, scale: 1, phase: 0.2,
       chunk: undefined, grounded: true, elderly: true, dying: { elapsed: 0 },
     }
     herds.elephant.push(e)
     const d0 = Math.hypot(e.x - gx, e.z - gz)
+    const offBearing = () => {
+      const want = Math.atan2(gx - e.x, gz - e.z)
+      return Math.abs(Math.atan2(Math.sin(e.heading - want), Math.cos(e.heading - want)))
+    }
+    const out = { staged: true, d0, off0: +offBearing().toFixed(2) }
     await window.__pollSim(5, () => e.dying?.target !== undefined)
-    const out = { staged: true, d0, kind: e.dying?.target?.kind ?? null }
+    out.kind = e.dying?.target?.kind ?? null
+    // It turns toward the graveyard while still on its feet.
+    await window.__pollSim(30, () => offBearing() < 0.35 || e.dying?.stage !== 'failing')
+    out.offTurned = +offBearing().toFixed(2)
+    out.turned = out.off0 > 2.8 && out.offTurned < 0.35
     await window.__pollSim(60, () => e.dying?.stage === 'down' || e.dead === true)
     out.dNear = Math.hypot(e.x - gx, e.z - gz)
     out.headed = out.dNear < d0 - 3
     out.downThere = e.dying?.stage === 'down' && out.dNear <= 6
+    // Where it went down: the death must come at this very spot.
+    out.downAt = { x: e.x, z: e.z }
     window.__elephantDeath = { e, kept, out }
     return out
   })
   check('a dying elephant drifts to the graveyard within reach and goes down THERE (point 265)',
-    tusker.staged && tusker.kind === 'graveyard' && tusker.headed && tusker.downThere, JSON.stringify(tusker))
+    tusker.staged && tusker.kind === 'graveyard' && tusker.turned && tusker.headed && tusker.downThere, JSON.stringify(tusker))
   if (tusker.downThere) {
     const at = await page.evaluate(() => ({ x: window.__elephantDeath.e.x, z: window.__elephantDeath.e.z }))
     await shot('265b-elephant-dies-at-graveyard', {
@@ -7231,6 +7245,7 @@ if (section('elderly-natural-death')) {
     await window.__pollSim(30, () => e.dead === true)
     out.dead = e.dead === true
     out.cause = e.deathCause
+    out.movedAfterDown = +Math.hypot(e.x - out.downAt.x, e.z - out.downAt.z).toFixed(3)
     window.__balance.elderly.dyingSeconds = st.kept.seconds
     window.__balance.elderly.deathRatePerMinute = st.kept.rate
     herds.elephant = herds.elephant.filter((a) => a !== e)
@@ -7238,7 +7253,7 @@ if (section('elderly-natural-death')) {
     return out
   })
   check('the old elephant dies of old age where it went down (point 265)',
-    tuskerEnd.dead === true && tuskerEnd.cause === 'old-age', JSON.stringify(tuskerEnd))
+    tuskerEnd.dead === true && tuskerEnd.cause === 'old-age' && tuskerEnd.movedAfterDown < 0.05, JSON.stringify(tuskerEnd))
 }
 
 // --- Point 188: the coastal walk-off resolves --------------------------------
