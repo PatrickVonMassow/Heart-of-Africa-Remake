@@ -759,6 +759,50 @@ interface BalanceConfig {
      *  verification needs no retry loop. Never set in normal play. */
     forceOutcome?: 'death' | 'submission'
   }
+  /** Bird flight escape and aerial predators (design.md §19.19; research
+   *  docs/fauna-behaviour-1890.md PART B). Every value is a calibratable game
+   *  estimate (research B5: no field rates exist) and debug-editable (§21.2). */
+  birdFlight: {
+    /** Distance (world units) at which a ground predator or an elephant makes a
+     *  flight-capable bird take off (the traveller keeps the player-shy ring). */
+    takeoffTrigger: number
+    /** Seconds of the burst launch of a small bird (the adult plover). */
+    burstTakeoffSeconds: number
+    /** Seconds of the flamingo's running take-off — its vulnerable window. */
+    runningTakeoffSeconds: number
+    /** Ground speed of the flamingo's take-off run. */
+    takeoffRunSpeed: number
+    /** Flight speed of an escaping bird. */
+    flightSpeed: number
+    /** Seconds without a threat before an airborne bird settles again. */
+    settleSeconds: number
+    /** Distance at which a ground predator catches a grounded bird or a
+     *  crouching chick (an airborne bird is never reached). */
+    groundCatchReach: number
+    /** Distance at which a plover chick crouches and freezes. */
+    crouchTrigger: number
+    /** Aerial hunts started per minute while a takeable bird is in view. */
+    aerialHuntRatePerMinute: number
+    /** Draw weight of the range-uncertain raptors (Taita, Eleonora's) against
+     *  1 for the others. */
+    rareRaptorWeight: number
+    /** The stoop's HIGH band: height (world units) the stooper enters at. */
+    stoopHighY: number
+    /** The stoop's LOW band: the prey must fly at or below it for the plunge. */
+    stoopLowY: number
+    /** Speed of the stoop's plunge. */
+    diveSpeed: number
+    /** Chance a stoop's strike takes the prey (else it out-climbs or dives to cover). */
+    diveCatchChance: number
+    /** Speed of the level tail-chase and the low glide. */
+    chaseSpeed: number
+    /** Chance a chase or low snatch takes the prey. */
+    chaseCatchChance: number
+    /** Hard deadline (seconds) on an aerial hunt's hunting phases (I4). */
+    huntDeadline: number
+    /** TEST-ONLY: pins every strike's outcome for a staged verification. */
+    forceStrike?: 'catch' | 'miss'
+  }
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -1796,6 +1840,27 @@ export const balance: BalanceConfig = {
     quarryFleeFactor: 0.75, // with the 24-unit drive-off: a chase begun inside ~7.5 units is caught, a wider one ends in the drive-off
     lethalityScale: 1, // ships the researched per-species rates unchanged
     cooldownSeconds: 45, // a settled pair does not re-engage at once
+  },
+  // Bird flight escape + aerial predators (design.md §19.19). All calibratable
+  // estimates; research PART B5 gives no field figure for any of them.
+  birdFlight: {
+    takeoffTrigger: 9, // a lion/elephant a few body lengths off flushes the flock
+    burstTakeoffSeconds: 0.15, // small birds launch in a blink (research B1)
+    runningTakeoffSeconds: 1.4, // the flamingo's running start — long enough to read, short enough to mostly escape
+    takeoffRunSpeed: 3.5, // a wading run, under the hunt's 4.6 so a close predator still closes in
+    flightSpeed: 7, // over every ground predator's pace — airborne is escape
+    settleSeconds: 4, // circles off before it comes down again
+    groundCatchReach: 1.2, // a body length: the predator must be ON the grounded bird
+    crouchTrigger: 8, // the chick freezes before the threat is on it
+    aerialHuntRatePerMinute: 0.5, // with prey in view, a raptor stoops every couple of minutes — an occasional event
+    rareRaptorWeight: 0.2, // Taita/Eleonora's: rare and localised (research B2.1)
+    stoopHighY: 22, // enters well above the frame's birds — reads as "from the sky"
+    stoopLowY: 6, // the escaping birds fly at ~1-3 units; anything at or under 6 is in the stoop's band
+    diveSpeed: 30, // the plunge is the fastest thing on screen (4x the fleeing bird)
+    diveCatchChance: 0.5, // half the stoops connect; the rest out-climb or dive to cover (research B3)
+    chaseSpeed: 11, // a dash that outflies the 7-unit escape
+    chaseCatchChance: 0.4, // tail-chases fail more often than they succeed
+    huntDeadline: 18, // a chase that cannot close breaks off (I4)
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

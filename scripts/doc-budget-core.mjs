@@ -299,7 +299,8 @@ export const DOC_BUDGETS = [
     // RAISED by 2 measured lines for the §19.15 dress rule (user 06.10.2026).
     // RAISED by 2 measured lines for the §19.15 open outer garment rule (user 11.10.2026).
     // RAISED by 5 measured lines for the new §19.18 elderly animals subsection (work-order 265).
-    maxLines: 863,
+    // RAISED by 5 measured lines for the new §19.19 bird flight and raptor subsection (work-order 269).
+    maxLines: 868,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -500,7 +501,10 @@ export const DOC_BUDGETS = [
     // RAISED by the 21 measured words of the point-265 review answer: the
     // ousted old cat male as the hunt's lone hunter — a new decision; §19.18
     // named only the grazer elder as solitary.
-    maxWords: 30339,
+    // RAISED by the 203 measured words of the new §19.19 (work-order 269):
+    // birds escape by taking off and only a grounded bird is catchable, and the
+    // region-true raptors' stoop and air-catch — a new mechanic no section described.
+    maxWords: 30542,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

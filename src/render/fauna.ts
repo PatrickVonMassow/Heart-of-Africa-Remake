@@ -1458,6 +1458,72 @@ export function buildVulture(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/** Plumage of a bird-hunting raptor (design.md §19.19; research PART B2.1):
+ *  back/wings, underparts, head, and the wing shape — `pointed` for the
+ *  falcons (long narrow wings), `rounded` for the accipiters and eagles. */
+export interface RaptorPlumage {
+  back: string
+  under: string
+  head: string
+  span: number
+  wing: 'pointed' | 'rounded'
+}
+
+/** Field-guide plumages, simplified to three tones per bird. */
+export const RAPTOR_PLUMAGE = {
+  peregrine: { back: '#4a5058', under: '#d8d0c0', head: '#24262a', span: 1, wing: 'pointed' },
+  lanner: { back: '#6a6660', under: '#e2d6c2', head: '#b0703c', span: 1.05, wing: 'pointed' },
+  barbary: { back: '#6c7480', under: '#e0c8a8', head: '#a8683a', span: 0.9, wing: 'pointed' },
+  taita: { back: '#3a3e46', under: '#c07a48', head: '#2a2a2e', span: 0.8, wing: 'pointed' },
+  eleonoras: { back: '#3e3a38', under: '#8a5a3e', head: '#2e2a28', span: 0.95, wing: 'pointed' },
+  bonellisEagle: { back: '#4a3c30', under: '#ece4d6', head: '#4a3c30', span: 1.3, wing: 'rounded' },
+  africanHawkEagle: { back: '#2e2a28', under: '#f0ece4', head: '#2e2a28', span: 1.3, wing: 'rounded' },
+  ayresHawkEagle: { back: '#2a2826', under: '#f2eee6', head: '#2a2826', span: 1.1, wing: 'rounded' },
+  blackSparrowhawk: { back: '#222224', under: '#eeeeea', head: '#222224', span: 0.95, wing: 'rounded' },
+  africanGoshawk: { back: '#4e5258', under: '#c89a78', head: '#4e5258', span: 0.85, wing: 'rounded' },
+  gabarGoshawk: { back: '#7a7e84', under: '#b8bcc0', head: '#7a7e84', span: 0.7, wing: 'rounded' },
+  fishEagle: { back: '#5a3a26', under: '#5a3a26', head: '#f4f2ee', span: 1.5, wing: 'rounded' },
+  marshHarrier: { back: '#5a4636', under: '#7a5a40', head: '#c8b490', span: 1.15, wing: 'rounded' },
+} as const satisfies Record<string, RaptorPlumage>
+
+/** A bird-hunting raptor in flight, wings spread (design.md §19.19): ~1 unit
+ *  span at plumage span 1, +Z forward. The stoop's tucked wings are a render
+ *  scale on X, not a second build. */
+export function buildRaptor(p: RaptorPlumage): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  const s = p.span
+  const body = new THREE.SphereGeometry(0.09 * s, ...FAUNA_TESSELLATION.small)
+  body.scale(0.8, 0.7, 1.6)
+  parts.push(tint(body, p.under, 0.08, 221))
+  const mantle = new THREE.SphereGeometry(0.085 * s, ...FAUNA_TESSELLATION.small)
+  mantle.scale(0.85, 0.5, 1.5)
+  mantle.translate(0, 0.025 * s, -0.01 * s)
+  parts.push(tint(mantle, p.back, 0.1, 222))
+  const head = new THREE.SphereGeometry(0.05 * s, ...FAUNA_TESSELLATION.small)
+  head.translate(0, 0.02 * s, 0.17 * s)
+  parts.push(tint(head, p.head, 0.08, 223))
+  const beak = new THREE.ConeGeometry(0.015 * s, 0.04 * s, FAUNA_TESSELLATION.spike)
+  beak.rotateX(Math.PI / 2)
+  beak.translate(0, 0.01 * s, 0.23 * s)
+  parts.push(tint(beak, '#2a2622', 0.06, 224))
+  const tail = new THREE.BoxGeometry(0.1 * s, 0.015 * s, 0.16 * s)
+  tail.translate(0, 0, -0.2 * s)
+  parts.push(tint(tail, p.back, 0.1, 225))
+  const pointed = p.wing === 'pointed'
+  for (const side of [-1, 1]) {
+    // Inner wing: broad for the accipiters/eagles, narrow for the falcons.
+    const inner = new THREE.BoxGeometry(0.3 * s, 0.018 * s, (pointed ? 0.14 : 0.2) * s)
+    inner.translate(side * 0.18 * s, 0.02 * s, 0)
+    parts.push(tint(inner, p.back, 0.12, 226))
+    // Outer hand: swept back to a point (falcon) or a square fingered tip.
+    const outer = new THREE.BoxGeometry(0.25 * s, 0.014 * s, (pointed ? 0.08 : 0.17) * s)
+    outer.rotateY(side * (pointed ? 0.45 : 0.12))
+    outer.translate(side * 0.43 * s, 0.03 * s, (pointed ? -0.06 : -0.02) * s)
+    parts.push(tint(outer, p.back, 0.14, 227))
+  }
+  return merge(parts)
+}
+
 /** The gait constants a built rig walks on — all read off its OWN legs. */
 interface GaitRig {
   /** Hip height above the foot: the leg the animal actually stands on. */

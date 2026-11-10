@@ -724,6 +724,17 @@ export interface Strings {
     elderSpeedFactor: string
     elderDeathRate: string
     elderDyingSeconds: string
+    /** Bird flight escape and aerial predators (design.md §19.19). */
+    birdTakeoffTrigger: string
+    birdRunningTakeoff: string
+    birdGroundCatchReach: string
+    aerialHuntRate: string
+    stoopHighY: string
+    stoopLowY: string
+    stoopDiveSpeed: string
+    stoopCatchChance: string
+    aerialChaseSpeed: string
+    aerialChaseCatchChance: string
     benchmarkStart: string
     crocDragSpeed: string
     crocDragSeconds: string
