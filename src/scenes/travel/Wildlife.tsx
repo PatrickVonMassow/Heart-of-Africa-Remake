@@ -953,6 +953,8 @@ const RAPTOR_STATE: {
   force?: AerialPredatorId | true
   /** Every phase the current/last hunt passed through (verification). */
   phases: string[]
+  /** The current/last hunt's outcome, kept past its despawn (verification). */
+  outcome?: AerialHunt['outcome']
 } = { hunt: null, prey: null, phases: [] }
 /** Family life (design.md §19): a calf keeps within the calibratable leash
  *  radius of its parent (balance.family.followRadius, read fresh per frame so
@@ -4991,6 +4993,7 @@ function Herds() {
             R.hunt = startAerialHunt(id, pos.x + dx * out, pos.z + dz * out, birdFlightY(best), cfg)
             R.prey = best
             R.phases = [R.hunt.phase]
+            R.outcome = undefined
           }
         }
       }
@@ -5009,6 +5012,7 @@ function Herds() {
           forcedRoll ?? Math.random(),
         )
         if (R.phases[R.phases.length - 1] !== h.phase) R.phases.push(h.phase)
+        if (h.outcome) R.outcome = h.outcome
         if (ev === 'caught' && live) {
           // The struck bird drops as an ordinary predator kill; the raptor
           // comes down onto it and feeds.
