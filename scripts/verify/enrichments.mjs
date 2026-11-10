@@ -11228,10 +11228,10 @@ if (section('bird-flight-escape')) {
       if (w.lion) w.lion.mode = 'idle'
       const h = w.raptor.hunt
       if (h) {
-        // Once, while the raptor sets up high: re-centre the traveller on its
-        // prey (the flock fled toward the frame's edge), so the plunge falls
-        // inside the picture.
-        if (!out.started && w.raptor.prey) window.__game.setState({ pos: { x: w.raptor.prey.x, z: w.raptor.prey.z } })
+        // Keep the traveller pinned just behind the prey (the flock fled toward
+        // the frame's edge and keeps shying from him), so the plunge, which
+        // projects above its ground point, falls inside the picture.
+        if (w.raptor.prey) window.__game.setState({ pos: { x: w.raptor.prey.x, z: w.raptor.prey.z + 2 } })
         out.started = true
         if (h.phase === 'high' && h.y >= bf.stoopHighY - 1e-6) out.enteredHigh = true
         // Shoot down the plunge once the raptor itself, at its height,
