@@ -6163,9 +6163,12 @@ if (section('crocodile-ambush')) {
             // required: §19.16 leaves the released victim standing at the bank,
             // and this calf is staged on a drink errand.
             const d0 = calf.drawn ? { x: calf.drawn.x, z: calf.drawn.z } : null
+            const f0 = parent.drawn?.frame ?? -1
             await window.__sleepSim(1.5)
             const d = calf.drawn
-            out.aftermath.drawnFresh = d !== undefined && parent.drawn !== undefined && d.frame === parent.drawn.frame
+            // Both records must have ADVANCED past the release and match: equal
+            // but stale frames would pass a pose drawn before the release.
+            out.aftermath.drawnFresh = d !== undefined && parent.drawn !== undefined && d.frame > f0 && d.frame === parent.drawn.frame
             out.aftermath.upY = d ? +d.upY.toFixed(2) : null
             out.aftermath.walked = d && d0 ? +Math.hypot(d.x - d0.x, d.z - d0.z).toFixed(2) : null
             out.aftermath.freedAlive = !calf.dead && calf.caught === undefined && calf.caughtBy === undefined &&
@@ -6176,23 +6179,27 @@ if (section('crocodile-ambush')) {
             await window.__pollSim(12, () => calf.dead, 56000)
             // The sink as DRAWN (the instance matrix, not the state flag): the
             // body goes DOWN without rising, keeps its size (no shrink in
-            // place), is drawn in the crocodile's pass and stays at its jaws.
-            const sk = { samples: 0, stale: 0, rises: 0, y0: null, yLast: null, s0: null, sMin: null, gap0: null, gapMax: 0 }
+            // place, nor grows), is drawn in the crocodile's pass and lies at
+            // the mouth anchor (crocodileMouthAnchor: mouthOffsetLocal ahead
+            // along the heading) — sampled once per NEW draw pass.
+            const reach = window.__balance.crocodile.mouthOffsetLocal * croc.scale
+            const sk = { samples: 0, stale: 0, rises: 0, y0: null, yLast: null, s0: null, sDev: 0, jawErrMax: 0, frame: -1 }
             await window.__pollSim(window.__balance.crocodile.gripSeconds + 12, () => {
               if (calf.dead && !calf.gone && (calf.dissolve ?? 0) > 0) {
                 if (!(croc.lunge && croc.lunge.victim === calf && !croc.lunge.retreat)) out.aftermath.heldWhileSinking = false
                 const d = calf.drawn
                 const c = croc.drawn
-                if (d && c) {
+                if (d && c && d.frame > sk.frame) {
+                  sk.frame = d.frame
                   sk.samples++
                   if (d.frame !== c.frame) sk.stale++
-                  if (sk.y0 === null) { sk.y0 = d.y; sk.s0 = d.scale; sk.sMin = d.scale }
+                  if (sk.y0 === null) { sk.y0 = d.y; sk.s0 = d.scale }
                   else if (d.y > sk.yLast + 0.02) sk.rises++
                   sk.yLast = d.y
-                  sk.sMin = Math.min(sk.sMin, d.scale)
-                  const gap = Math.hypot(d.x - c.x, d.z - c.z)
-                  if (sk.gap0 === null) sk.gap0 = gap
-                  sk.gapMax = Math.max(sk.gapMax, gap)
+                  sk.sDev = Math.max(sk.sDev, Math.abs(d.scale / sk.s0 - 1))
+                  const jx = croc.x + Math.sin(croc.rot) * reach
+                  const jz = croc.z + Math.cos(croc.rot) * reach
+                  sk.jawErrMax = Math.max(sk.jawErrMax, Math.hypot(d.x - jx, d.z - jz))
                 }
               }
               return calf.gone === true || (calf.dissolve !== undefined && calf.dissolve <= 0)
@@ -6201,12 +6208,11 @@ if (section('crocodile-ambush')) {
             out.aftermath.sink = {
               samples: sk.samples, stale: sk.stale, rises: sk.rises,
               drop: sk.y0 === null ? null : +(sk.y0 - sk.yLast).toFixed(2), depth: +depth.toFixed(2),
-              scaleKept: sk.s0 ? +(sk.sMin / sk.s0).toFixed(3) : null,
-              gapGrowth: sk.gap0 === null ? null : +(sk.gapMax - sk.gap0).toFixed(2),
+              scaleDev: +sk.sDev.toFixed(3), jawErrMax: +sk.jawErrMax.toFixed(2),
             }
             const m = out.aftermath.sink
             out.aftermath.sank = calf.dead === true && calf.inWater !== undefined && m.samples >= 3 && m.stale === 0 &&
-              m.rises === 0 && m.drop >= 0.5 * depth && m.scaleKept >= 0.95 && m.gapGrowth <= 1
+              m.rises === 0 && m.drop >= 0.5 * depth && m.scaleDev <= 0.05 && m.jawErrMax <= 0.5
           }
           const log = (window.__assertLog ?? []).filter((e) => e.t >= t0)
           out.aftermath.asserts = log
