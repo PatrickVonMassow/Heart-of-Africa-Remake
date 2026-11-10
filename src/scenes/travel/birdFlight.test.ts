@@ -179,6 +179,16 @@ describe('the aerial hunt (research B3/B4: scripted descend-and-strike, air-catc
     expect(minY).toBeLessThan(HUNT.lowY)
   })
 
+  it('a stoop already plunging never takes a bird that landed meanwhile', () => {
+    const h = startAerialHunt('peregrine', 12, 0, 2.5, HUNT)
+    for (let i = 0; i < 400 && h.phase !== 'dive'; i++) aerialHuntStep(h, flyingPrey(), 0.05, HUNT, 0.1)
+    expect(h.phase).toBe('dive')
+    let ev = 'none'
+    for (let i = 0; i < 400 && ev === 'none'; i++) ev = aerialHuntStep(h, { x: 0, z: 0, y: 0, airborne: false }, 0.05, HUNT, 0.1)
+    expect(ev).toBe('lost')
+    expect(h.outcome).not.toBe('caught')
+  })
+
   it('a failed strike lets the prey escape and the raptor leaves', () => {
     const h = startAerialHunt('lanner', 5, 0, 2.5, HUNT)
     let ev = 'none'

@@ -3860,13 +3860,14 @@ export function aerialHuntStep(
     }
     return 'none'
   }
+  // A bird that landed mid-plunge or mid-chase is out of the guild's reach.
+  if (!aerialCanTake(guild, prey.airborne)) return toLeave('lost')
   if (h.phase === 'dive') {
     const left = homeOn(h, prey.x, prey.y, prey.z, cfg.diveSpeed, dt, true)
     if (left > cfg.strikeReach) return 'none'
     return roll < cfg.diveCatchChance ? caught(h) : toLeave('missed')
   }
   // chase / low: level at the prey's height (surprise from cover or from low).
-  if (!aerialCanTake(guild, prey.airborne)) return toLeave('lost')
   const left = homeOn(h, prey.x, prey.y, prey.z, cfg.chaseSpeed, dt, true)
   if (left > cfg.strikeReach) return 'none'
   return roll < cfg.chaseCatchChance ? caught(h) : toLeave('missed')
