@@ -238,6 +238,16 @@ export const RED_CHARGES = [
       + 'the calf ended 0.094 from its target. Point 1236 owns the cause; the charge dies with it.',
   },
   {
+    point: 1468,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^Traveller \((low|medium)\): his head stands at villager height/i,
+    why:
+      'WebGPU enrichments --section=traveller-figure on main 10.11.2026 18:16 read headRise 1.469 m at '
+      + 'medium (helmet 1) against the 1.35 bound (local/verify-logs/2026-11-10T17-16-14-136-enrichments.log); '
+      + '1468 owns the head-height reading and its bound, now also at medium. The charge dies with 1468.',
+  },
+  {
     point: 1469,
     suite: 'touch',
     kind: 'check',
