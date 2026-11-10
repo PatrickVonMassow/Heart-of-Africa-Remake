@@ -2939,6 +2939,19 @@ export const VILLAGER_ASSET = {
    *  normal while the covering garment is worn (render/villagerGarmentMask.ts;
    *  figure units, ≈ 5 mm). Calibratable. */
   garmentMaskPush: 0.004,
+  /** The lining of a flat hip cloth (loin flap, apron, girdle tails; work-order
+   *  point 1489, render/villagerFigureBody.ts lineCoveredSkin): the band of the
+   *  pelvis — trunk and upper thighs from this far below the hips' head to
+   *  this far above it, within this half-width of the midline (fractions of
+   *  stature) — takes the cloth's colour, read as the cloth passed between
+   *  the legs: genital area and buttocks, not the thighs below. Calibratable. */
+  liningFlapBelowHips: 0.09,
+  liningFlapAboveHips: 0.06,
+  liningFlapHalfWidth: 0.09,
+  /** How far (figure units) a trunk point may stand in front of a covering
+   *  garment's panel and still count as behind it (the projected lining,
+   *  from liningFlapBelowHips under the hips' head up). Calibratable. */
+  liningProjectSlack: 0.01,
   /** A shell garment's offset off the skin (scripts/villager/shells.py, render/
    *  villagerShell.ts): base + rank × step along the body normal, figure units
    *  (≈ 4 mm each), times the person's scale at run time. Calibratable. */
