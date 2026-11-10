@@ -42,6 +42,11 @@ it('covers every covering form, adults and the children’s hip layer, from abov
       expect(exposure.some((r) => r.fig.clip === clip && r.fig.age === 'child' && r.fig.garments.includes(form)), `child ${form} ${clip}`).toBe(true)
 })
 
+it('dresses every grown woman of an exposure row in her chest layer, as the game does', () => {
+  for (const r of ROWS.filter((x) => /^(e0|exp)-/.test(x.slug) && x.fig.sex === 'female' && x.fig.age !== 'child'))
+    expect(r.fig.garments.some((g) => g.endsWith('-chest')), r.slug).toBe(true)
+})
+
 it('keeps every slug unique and the existing candidate rows as they were', () => {
   expect(new Set(ROWS.map((r) => r.slug)).size).toBe(ROWS.length)
   for (const slug of ['c1-girl-skirtshort-idle', 'c2-loinflap-youngwoman-walk-stride', 'c5-shirt-man-idle-lflank'])
