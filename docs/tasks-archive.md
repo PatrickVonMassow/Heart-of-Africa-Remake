@@ -36267,3 +36267,79 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   as the vulnerable window, the plover chick that crouches while the adult flies, and
   whether "a ground predator only gets a bird caught on the ground" matches real behaviour.
   So no research is owed at all; only the build waits for the wildlife cluster to be free.
+
+- [x] 310. Low-preset performance pass for two opposite devices (user 25.07.2026,
+  recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
+  Galaxy S25 — one preset, two opposite bottlenecks, which is the whole difficulty
+  of this point.
+  INPUTS — REAL F8 REPORTS. `local/hoa-bench-2026-08-03-webgpu-kohler.json` (WEAK
+  Windows desktop, AMD RDNA-3, WebGPU with real GPU timestamps, production build
+  2b6b417, 2195x1235 at dpr 1.75, deposited by the user 06.08.2026) is what this
+  point is CALIBRATED against, being the slowest machine measured. It is NOT the
+  user's own PC — that one runs MEDIUM acceptably, and its occasional stutter is
+  explicitly not part of this point. `local/samsung-s25-bench.json` (Galaxy S25,
+  Adreno 8xx) is the second target. `local/m1pro-bench.json` is CONTEXT ONLY: it
+  predates the LOW preset and its absolute GPU milliseconds aggregate passes — judge
+  that machine on its FRAME series and on ratios between its own configs.
+  NO SECOND RUN IS AVAILABLE (user 06.08.2026): the weak PC is a third party's and
+  cannot be re-measured, so plan no step that needs a fresh run on a user machine.
+  Everything needed is in the deposited report — real GPU timestamps, eleven
+  ablation configs, per-system triangle and mesh counts per phase.
+  WHAT THE TWO DEVICES SAY.
+  - DESKTOP: the default (medium) preset is unplayable — 17.9 / 12.7 / 13.1 fps at a
+    GPU median of 45.22 / 68.35 / 65.93 ms. LOW holds 60 fps with almost no headroom
+    in the desert: GPU median 14.81 ms of the 16.70 ms budget (89 %), 95th-percentile
+    frame 33.7 ms — every twentieth frame is dropped. Savanna 8.65 ms, driving
+    9.63 ms (p95 frame 33.1 ms); CPU 5.20 / 7.70 / 6.80 ms.
+  - S25: LOW GPU 9.83 / 8.72 / 6.95 ms against a CPU of 8.70 / 7.50 / 7.60 ms. The
+    CPU sits AS HIGH AS the GPU, so a pixel cut alone buys the phone little — this is
+    where the behaviour-throttling and instance-count levers pay.
+  THE DECISIVE READING — THE LOW FRAME IS PIXEL-BOUND, NOT TRIANGLE-BOUND. At LOW the
+  desert draws 542,748 triangles in 55 calls for 14.81 ms while the savanna draws
+  1,008,904 triangles in 58 calls for 8.65 ms: nearly double the geometry at 58 % of
+  the cost. The ablations agree — from dpr 1.75 to dpr 1 the pixel count falls 3.06x
+  and the GPU time 2.77x / 2.91x / 3.10x, almost exactly in step. This governs the
+  ORDER of the delivery: the dpr cap is the primary lever, and the triangle levers
+  below must never be reported as the fix for the desert phase, whose share figures
+  are shares of TRIANGLES, never of milliseconds. The constant 425,118-triangle /
+  180-mesh system is 78 % of the desert frame at LOW on this second device and
+  backend too, and travel-dressing is 53 % of the savanna frame (531,058 tris),
+  matching the S25.
+  SALVAGED IDEA (25.07, from the retired `feat/276-wildlife-lod` branch — see point
+  329): throttling the BEHAVIOUR updates of off-screen animals cuts the driving
+  frame cost. The branch itself was retired unmerged (219 commits behind main, its
+  three files moved on 16/9/1 commits since), but the lever is sound and belongs
+  here: update animals outside the rendered frame at a reduced rate (projected via
+  the shared `isOnScreen`, never an assumed radius — the point-172 rule), keeping
+  every §19 drama deadline in sim time so no drama stalls. Judge it on the CPU
+  series, where both devices sit at 5-9 ms at LOW.
+  DIAGNOSIS DONE (25.07, main session): the unnamed 425k system IS the river/lake
+  water geometry — `src/scenes/travel/Rivers.tsx` mounts the ribbon mesh and every
+  lake sheet with NO `name` prop (around the `<mesh geometry={geometry}
+  material={riverMat}>` / lake map), so `groupKey` in src/systems/benchmark.ts falls
+  back to the material name `MeshStandardNodeMaterial`; the courses are global and
+  biome-independent, which explains the constant count in every phase. Deliver:
+  (a) NAME those groups (and any other unnamed one) so the F8 report attributes
+  every system, (b) a LOW flora/dressing DENSITY lever (calibratable
+  instance-count factor on top of the existing floraFogFactor radius cut — the §19.9
+  dressing keeps reading as savanna, only thinner), (c) a LOW geometry lever for the
+  identified 425k-tris system (e.g. coarser river-ribbon tessellation on LOW if it is
+  the water — every §11.3 continuity/never-buried invariant must keep passing), (d) a
+  calibratable `dprCap` BELOW 1 on LOW itself (starting value 0.8 = 0.64x the pixels,
+  which projects the desert's 14.81 ms near 9.5 ms) — the primary lever, not a
+  last resort, and the touch preset stays a SUBSET of low. EVERY new lever gets
+  entries in ALL THREE QUALITY_PRESETS levels (the src/config/quality.test.ts
+  completeness gate and the docs/graphics-detail-levels.md sync test enforce this),
+  stays debug-tunable within its level, and reads through the point-276
+  effective-selector pattern. The delivery must move BOTH the pixel cost and the
+  CPU/instance cost: a LOW that only cuts dpr fixes the desktop and leaves the phone
+  where it is. VERIFIABLE: pure tests for each new preset key; the §11.3/§19 suites
+  stay green at LOW (ribbon continuity, dressing-streaming no-pop projection checks);
+  picture checked on BOTH backends at LOW; and the price check in this order —
+  FIRST hardware-independent arithmetic against the deposited numbers (the rendered
+  pixel count and the per-system triangles the new levers remove, with the desert's
+  14.81 ms projected to 10 ms or below by the measured pixel-to-time
+  proportionality), THEN a before/after F8 run of the SAME three phases at LOW on the
+  project's own verification host, whose absolute milliseconds mean nothing but whose
+  RELATIVE drop must confirm the projection rather than contradict it — without a
+  visual regression the user rejects.
