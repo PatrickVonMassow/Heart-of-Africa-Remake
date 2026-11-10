@@ -24,7 +24,7 @@ import { en } from '../../i18n/en'
 const FRAME = 7
 
 /** A body the last render pass drew, at an arbitrary but definite transform. */
-const drawn = () => ({ x: 10, y: 2, z: -4, scale: 1.1, frame: FRAME })
+const drawn = () => ({ x: 10, y: 2, z: -4, scale: 1.1, upY: 1, frame: FRAME })
 
 /** One herd of exactly the animals handed in; every other species empty. */
 function herdOf(sp: Species, animals: LabelledAnimal[]): Record<Species, LabelledAnimal[]> {
