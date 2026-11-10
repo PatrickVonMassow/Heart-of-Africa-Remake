@@ -3198,11 +3198,23 @@ export function TravelScene() {
       </group>
       <primitive object={TRAVEL_HEMI_LIGHT} dispose={null} />
       <Sun />
-      <TerrainChunks />
-      <FarTerrain />
-      <RiversAndLakes />
-      <RegionBorders />
-      <WaterPlane />
+      {/* Named system groups (the F8 report attributes every mesh to its
+          nearest named ancestor, benchmark.ts groupKey): without them the
+          terrain chunks, sea, rivers and borders fell together under the
+          material name "(unnamed) MeshStandardNodeMaterial". */}
+      <group name="travel-terrain">
+        <TerrainChunks />
+        <FarTerrain />
+      </group>
+      <group name="travel-rivers">
+        <RiversAndLakes />
+      </group>
+      <group name="travel-region-borders">
+        <RegionBorders />
+      </group>
+      <group name="travel-sea">
+        <WaterPlane />
+      </group>
       {/* Named for the panorama capture: the symbolic travel-scale dressing
           (trees the size of hills, animals, markers) would read absurd on
           the person-scale horizon — the capture keeps terrain, water,
@@ -3212,13 +3224,17 @@ export function TravelScene() {
         <Wildlife />
         <CommunicationRock />
       </group>
-      {PLACES.map((p) => (
-        <PlaceMarker key={p.id} place={p} />
-      ))}
+      <group name="travel-places">
+        {PLACES.map((p) => (
+          <PlaceMarker key={p.id} place={p} />
+        ))}
+      </group>
       <PanoramaCaptureTrigger />
-      <LandmarkLabels />
-      <ElephantGraveyard />
-      <CulturalLandmarks />
+      <group name="travel-landmarks">
+        <LandmarkLabels />
+        <ElephantGraveyard />
+        <CulturalLandmarks />
+      </group>
       {/* Map symbols, kept out of the panorama capture (panoramaCaptureHideNames). */}
       <group name={NATURAL_SITES_GROUP}>
         <NaturalSites />

@@ -422,7 +422,7 @@ function buildLakeSurfaces(
 function Waterfall({ fall }: { fall: FallDef }) {
   const drop = Math.max(0.8, fall.yTop - fall.yBottom)
   return (
-    <group position={[fall.x, 0, fall.z]} rotation={[0, fall.yaw, 0]}>
+    <group name="river-waterfall" position={[fall.x, 0, fall.z]} rotation={[0, fall.yaw, 0]}>
       {/* Cascade sheet leaning down the flow direction */}
       <mesh position={[0, fall.yBottom + drop / 2, 0]} rotation={[0.22, 0, 0]}>
         <planeGeometry args={[2.4, drop + 0.4]} />
@@ -471,7 +471,7 @@ function Spring({ spring }: { spring: SpringDef }) {
     }
   })
   return (
-    <group position={[spring.x, spring.y, spring.z]}>
+    <group name="river-spring" position={[spring.x, spring.y, spring.z]}>
       {/* Pool surface — a shallow disc of spring water at the source height. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[SPRING_POOL_RADIUS, 24]} />
@@ -589,7 +589,7 @@ export function RiversAndLakes() {
           the ribbon the bird's-eye view actually paints). */}
       <mesh name="rivers-ribbon" geometry={geometry} material={riverMat} renderOrder={1} dispose={null} />
       {lakes.map((l, i) => (
-        <mesh key={i} geometry={l.geometry} material={lakeMat} position={[0, l.y, 0]} renderOrder={1} dispose={null} />
+        <mesh key={i} name="lake-sheet" geometry={l.geometry} material={lakeMat} position={[0, l.y, 0]} renderOrder={1} dispose={null} />
       ))}
       {falls.map((f, i) => (
         <Waterfall key={i} fall={f} />
