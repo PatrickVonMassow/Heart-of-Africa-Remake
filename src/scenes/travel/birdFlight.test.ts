@@ -3,6 +3,7 @@
 // predator's reach, the region pools and the scripted aerial hunt.
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
+import { RAPTOR_PLUMAGE, buildRaptor } from '../../render/fauna'
 import type { RegionId } from '../../world/geo'
 import {
   AERIAL_PREDATORS,
@@ -200,6 +201,18 @@ describe('the aerial hunt (research B3/B4: scripted descend-and-strike, air-catc
       let t = 0
       for (let i = 0; t < bound && !done; i++, t += 0.05) done = aerialHuntStep(h, prey(i), 0.05, HUNT, 0.1) === 'done'
       expect(done, id).toBe(true)
+    }
+  })
+})
+
+describe('raptor builds (src/render/fauna.ts)', () => {
+  it('every pooled raptor has a plumage and builds a spread-wing body wider than long', () => {
+    for (const id of Object.keys(AERIAL_PREDATORS) as Array<keyof typeof AERIAL_PREDATORS>) {
+      const geo = buildRaptor(RAPTOR_PLUMAGE[id])
+      geo.computeBoundingBox()
+      const b = geo.boundingBox!
+      expect(geo.getAttribute('position').count, id).toBeGreaterThan(0)
+      expect(b.max.x - b.min.x, id).toBeGreaterThan(b.max.z - b.min.z)
     }
   })
 })
