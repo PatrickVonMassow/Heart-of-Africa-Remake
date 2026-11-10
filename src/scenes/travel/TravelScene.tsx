@@ -29,6 +29,7 @@ import {
   effectiveShadowResolution,
   effectiveTerrainRefine,
   effectiveFloraFogFactor,
+  effectiveFloraDensity,
   effectiveFloraCastShadow,
   effectiveFigureLimbSegments,
 } from '../../state/ui'
@@ -85,7 +86,7 @@ import {
 } from './canoeDrag'
 import { SWIM_IMMERSION, travellerPose } from './travellerPose'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
-import { chunkOffsetsByDistance, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraFogFar, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
+import { chunkOffsetsByDistance, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraFogFar, floraInSpawnCircle, floraKeptAtDensity, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
 import { FIGURE_LIMBS, TRAVELLER_PACK } from '../../render/figures'
 import { FIGURE_STATURE } from '../../render/figureBody'
@@ -1416,6 +1417,8 @@ interface FloraFill {
   batch: number
   counts: Record<Species, number>
   collapseEnabled: boolean
+  /** Flora density factor (point 310): the share of thinnable dressing drawn. */
+  density: number
 }
 
 const FILL_MTX = new THREE.Matrix4()
@@ -1448,6 +1451,9 @@ function stepFloraFill(fill: FloraFill, seed: number, limit: number): void {
       // Circular streaming edge at fog far + margin (points 164/171): a plant
       // beyond it is not drawn, so the edge sits in the fog, out of sight.
       if (!floraInSpawnCircle(x, z, fill.anchorX, fill.anchorZ, fill.spawnR)) continue
+      // LOW's density lever (point 310): thins only the non-collidable small
+      // dressing, so no drawn-away plant keeps a collider.
+      if (!floraKeptAtDensity(COLLIDABLE_FLORA[species] === undefined, r4, fill.density)) continue
       const idx = fill.counts[species]
       if (idx >= MAX_INSTANCES[species]) continue
       // This plant's own dry-season state (points 151/175): its field tint
@@ -1518,6 +1524,8 @@ function Vegetation() {
   // The dry-season deformation is baked into the matrices at each rebuild
   // (point 175), so flipping the debug collapse toggle forces one re-bake.
   const lastCollapseRef = useRef(true)
+  // A changed flora density (level switch, point 310) re-streams likewise.
+  const lastDensityRef = useRef<number | null>(null)
   // The in-progress amortised fill (docs/perf-driving-hitches.md), if any.
   const fillRef = useRef<FloraFill | null>(null)
 
@@ -1672,6 +1680,11 @@ function Vegetation() {
       lastCollapseRef.current = collapseEnabled
       lastBuild.current = null
     }
+    const density = effectiveFloraDensity(useUi.getState())
+    if (density !== lastDensityRef.current) {
+      lastDensityRef.current = density
+      lastBuild.current = null
+    }
     // Streaming with a rebuild hysteresis (points 164 + 171): the drawn edge is
     // a circle sized to the SEASON-FREE fog far (point 175: FLORA_FOG, not the
     // per-frame-lerped TRAVEL_FOG) — the dry-season max visible limit plus a
@@ -1721,6 +1734,7 @@ function Vegetation() {
         batch: floraFillBatchSize(offsets.length),
         counts: zeroSpeciesCounts(),
         collapseEnabled,
+        density,
       }
       fillRef.current = fill
       if (!amortise) {

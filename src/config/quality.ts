@@ -50,6 +50,12 @@ export interface QualityPreset {
   /** Flora fog-radius factor; <1 tightens the spawn circle so the instance
    *  count falls quadratically (floraStreaming.ts). */
   floraFogFactor: number
+  /** Flora/dressing instance-count factor (point 310) on top of the
+   *  floraFogFactor radius cut: the share of the NON-collidable dressing
+   *  (bush, rock, termite mound, dead tree, papyrus) that draws; collidable
+   *  trees and kopjes always draw (floraStreaming.ts floraKeptAtDensity).
+   *  The land keeps reading as its region (design.md §19.9), only thinner. */
+  floraDensity: number
   /** Ground flora (bush/papyrus/rock) casts sun shadows. */
   floraCastShadow: boolean
   /** Atmospheric haze/rain intensity factor (1 = full); low thins the pall so
@@ -130,6 +136,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: false,
     terrainRefine: false,
     floraFogFactor: 0.55,
+    floraDensity: 0.6, // calibratable: 40 % fewer small-dressing instances (docs/bench/310-projection.md)
     floraCastShadow: false,
     weatherIntensity: 0.6,
     waterCalm: true,
@@ -159,6 +166,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: false,
     terrainRefine: true,
     floraFogFactor: 1,
+    floraDensity: 1,
     floraCastShadow: true,
     weatherIntensity: 1,
     waterCalm: false,
@@ -187,6 +195,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: true,
     terrainRefine: true,
     floraFogFactor: 1,
+    floraDensity: 1,
     floraCastShadow: true,
     weatherIntensity: 1,
     waterCalm: false,

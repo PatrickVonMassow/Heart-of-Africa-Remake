@@ -183,6 +183,9 @@ interface UiState {
    *  fill-rate lever): off clamps the cap back to 1, for A/B tuning within the
    *  level. Default ON. */
   subOneDprEnabled: boolean
+  /** Allow-flag for a level's flora density cut (floraDensity < 1): off draws
+   *  the full dressing within the level, for A/B tuning. Default ON. */
+  floraThinningEnabled: boolean
   /** Debug diagnosis (point 111): render the settlement ground with a plain
    *  material (no TSL surface structure/normal) to isolate a WebGPU-only black
    *  patch. Default off. */
@@ -252,6 +255,7 @@ interface UiState {
   setShadowsEnabled: (enabled: boolean) => void
   setFireShadowsEnabled: (enabled: boolean) => void
   setSubOneDprEnabled: (enabled: boolean) => void
+  setFloraThinningEnabled: (enabled: boolean) => void
   setGroundDebugFlat: (flat: boolean) => void
   setSeasonCollapseEnabled: (enabled: boolean) => void
   toggleStateDump: () => void
@@ -295,6 +299,7 @@ export const useUi = create<UiState>()((set) => ({
   shadowsEnabled: true,
   fireShadowsEnabled: true,
   subOneDprEnabled: true,
+  floraThinningEnabled: true,
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
   stateDumpOpen: false,
@@ -375,6 +380,7 @@ export const useUi = create<UiState>()((set) => ({
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
   setFireShadowsEnabled: (fireShadowsEnabled) => set({ fireShadowsEnabled }),
   setSubOneDprEnabled: (subOneDprEnabled) => set({ subOneDprEnabled }),
+  setFloraThinningEnabled: (floraThinningEnabled) => set({ floraThinningEnabled }),
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
   setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
   toggleStateDump: () => set((s) => ({ stateDumpOpen: !s.stateDumpOpen })),
@@ -427,6 +433,10 @@ export const effectiveFireShadowSoft = (s: UiState): boolean => currentQuality(s
 export const effectiveTerrainRefine = (s: UiState): boolean => currentQuality(s).terrainRefine
 /** Flora fog-radius factor for the current level (<1 tightens the spawn circle). */
 export const effectiveFloraFogFactor = (s: UiState): number => currentQuality(s).floraFogFactor
+/** Flora/dressing density factor for the current level (1 = full); the
+ *  allow-flag off draws the full dressing. */
+export const effectiveFloraDensity = (s: UiState): number =>
+  s.floraThinningEnabled ? currentQuality(s).floraDensity : 1
 /** Whether ground flora casts sun shadows at the current level. */
 export const effectiveFloraCastShadow = (s: UiState): boolean => currentQuality(s).floraCastShadow
 /** Atmospheric haze/rain intensity factor for the current level (1 = full). */

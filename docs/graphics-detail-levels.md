@@ -39,6 +39,7 @@ device pixel ratio is kept (no cap).
 | `fireShadowSoft` | off | off | on |
 | `terrainRefine` | off | on | on |
 | `floraFogFactor` | 0.55 | 1 | 1 |
+| `floraDensity` | 0.6 | 1 | 1 |
 | `floraCastShadow` | off | on | on |
 | `weatherIntensity` | 0.6 | 1 | 1 |
 | `waterCalm` | on | off | off |
@@ -95,6 +96,14 @@ added.
 - **`floraFogFactor`** — Flora fog-radius factor; `< 1` tightens the spawn circle
   so the plant instance count falls quadratically (`floraStreaming.ts`). Low
   tightens it to 0.55.
+- **`floraDensity`** — Instance-count factor for the flora dressing on top of the
+  `floraFogFactor` radius cut (point 310): the share of the NON-collidable
+  dressing (bush, rock, termite mound, dead tree, papyrus) that draws. Collidable
+  trees and kopjes always draw, because the collider shares the placement and must
+  not depend on the graphics level. The thinning is deterministic and nested
+  (raising the level only adds plants). Low `0.6` (calibratable), medium/high `1`.
+  The internal allow-flag `floraThinningEnabled` draws the full dressing within
+  the level for A/B tuning.
 - **`floraCastShadow`** — Whether ground flora (bush / papyrus / rock) casts sun
   shadows. Off on low. The communication PoC's erratic boulder (work-order 482)
   is rock dressing too and rides this same lever rather than inventing a lever

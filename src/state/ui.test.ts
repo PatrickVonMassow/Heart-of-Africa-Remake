@@ -17,6 +17,7 @@ import {
   effectiveFireShadowSoft,
   effectiveTerrainRefine,
   effectiveFloraFogFactor,
+  effectiveFloraDensity,
   effectiveFloraCastShadow,
   effectiveWeatherIntensity,
 } from './ui'
@@ -31,7 +32,7 @@ beforeEach(() => {
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
     traaEnabled: true, touchActive: false, detailLevel: 'medium', ssaoEnabled: true, shadowMapHalf: false,
     shadowsEnabled: true, fireShadowsEnabled: true, groundDebugFlat: false, seasonCollapseEnabled: true,
-    invertLook: true, subOneDprEnabled: true,
+    invertLook: true, subOneDprEnabled: true, floraThinningEnabled: true,
   })
 })
 
@@ -210,6 +211,15 @@ describe('graphics quality level (design.md §21, F9 / point 276 part B)', () =>
     u().setDetailLevel('medium')
     u().setSubOneDprEnabled(false)
     expect(effectiveDprCap(u())).toBeNull()
+  })
+
+  it('the flora density reads the level and is debug-tunable within it', () => {
+    expect(effectiveFloraDensity(u())).toBe(1) // medium: full dressing
+    u().setDetailLevel('low')
+    expect(effectiveFloraDensity(u())).toBe(QUALITY_PRESETS.low.floraDensity)
+    expect(effectiveFloraDensity(u())).toBeLessThan(1)
+    u().setFloraThinningEnabled(false)
+    expect(effectiveFloraDensity(u())).toBe(1)
   })
 
   it('the touch preset stays a SUBSET of low: on LOW it changes no effective lever', () => {

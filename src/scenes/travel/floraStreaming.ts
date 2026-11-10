@@ -86,6 +86,28 @@ export function floraInSpawnCircle(x: number, z: number, px: number, pz: number,
   return dx * dx + dz * dz <= spawnR * spawnR
 }
 
+/** Whether a placed plant is DRAWN at a flora density factor (LOW's instance-
+ *  count lever, point 310, on top of the floraFogFactor radius cut). Only
+ *  `thinnable` dressing is thinned — the non-collidable small kinds; a
+ *  collidable plant always draws, because the collider (one placement shared
+ *  with the render, point 129) does not depend on the graphics level and a
+ *  hidden plant must never leave an invisible wall. The keep test reads a
+ *  high-frequency digit of the plant's own hash, decorrelated from the coarse
+ *  value that sets its scale and rotation, so the thinning is spatially even,
+ *  deterministic (no flicker across rebuilds) and NESTED: a plant kept at a
+ *  lower density is kept at every higher one, so raising the level only adds. */
+export function floraKeptAtDensity(thinnable: boolean, r4: number, density: number): boolean {
+  if (!thinnable || density >= 1) return true
+  return floraThinningKey(r4) < density
+}
+
+/** The plant's thinning key in [0, 1): the fractional part of a large multiple of
+ *  its placement hash. */
+export function floraThinningKey(r4: number): number {
+  const v = r4 * 9973.1
+  return v - Math.floor(v)
+}
+
 /** The rebuild hysteresis: rebuild when there is no prior build, when the player
  *  has moved at least FLORA_REBUILD_STEP since the last one, or when the fog far
  *  changed ENOUGH TO MOVE THE SPAWN RADIUS (a new region widening/narrowing the
