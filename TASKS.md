@@ -77,6 +77,26 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1489. No sensitive body part exposed from any view or pose (user rule 05.11.2026: "allgemein dürfen nie sensible Körperteile exponiert sein")
+  Design rule, to be written into design.md next to "Covered upper body and hip layer (user 06.10.2026)" and mirrored in docs/peoples-1890.md §8.6 where it applies:
+  - No figure ever shows a female breast, the genital area or the buttocks uncovered - from ANY camera angle the game can reach (including the overhead/bird's-eye and close first-person views) and in ANY pose or animation (standing, walking, running, kneeling, bending, pounding, digging, sitting).
+  - A garment that stands off the body must not open a view onto covered skin; coverage is judged by the rendered picture, not by garment presence in the outfit data.
+  - This rule outranks every budget, stop rule and revert rule: an exposure defect is never accepted, frozen or moved to the backlog; it is fixed until it holds.
+  Verification: the final picture check of 1482 includes an overhead view and a kneeling/bending pose for every covering garment form (breast cloth, wraps, tube tops, hip cloths, children's hip layer), both backends.
+  First known case: /backup/hoa/local/BlosseBrueste.zip (kneeling Bambara woman, breast cloth as stiff ring, breast bare from above).
+  Second case (finding 10.11.2026 22:46; 1482's chest RESOLVED verdict for 1489 was false): breast still bare from above on the kneeling Bambara woman. Evidence /backup/hoa/local/BruesteExponiert.zip (seed 3641016855, bambara-village, x/z -59.45/-130.99, webgpu, build 51c7783).
+  Acceptance (user front-order 10.11.2026): the user's exact spot judged from the steep overhead camera, and an overhead + kneeling/pounding frame of every covering garment form on both backends.
+  Queue position: user front-order 10.11.2026 — the very front of the work order, ahead of every other open point including the 35-point front-order of 09.11.2026; in-flight branches are parked, not discarded.
+  Bundle: Dorfleben.
+- [ ] 1498. Make elderly animals recognisable at game distance, with believable vultures and a readable elephant graveyard
+  User report 10.11.2026 (build 51c7783): the user has never seen or recognised an elderly animal (point 265, landed 10.11.2026 13:13, merge a56504f8d). Point 265 committed only two frames, both of the death drama (verification/265-elder-down-vultures-gather.png, verification/265b-elephant-dies-at-graveyard.png); no frame shows an elder next to a prime adult, so recognisability was never accepted.
+  FINAL STATE
+  1. Elderly animals are recognisable as old at the normal travel-camera height and distance, for every species that has an elder (design.md §19.18; crocodile has none). Levers (calibratable, in src/config/balance.ts and the fauna schema): elderly.fraction (now 0.08), ELDERLY_SCHEMA (bodyR 0.86, swayBack 0.14, coatGrey 0.3, faceGrey 0.5, neckDrop 0.15), the elephant master tusk, the lion elder mane; keep the cues researched (docs/fauna-behaviour-1890.md), only stronger.
+  2. Vulture size: in 265-elder-down-vultures-gather.png the vultures read as flat oversized planks almost a zebra long; bring them to a believable size and shape at that distance.
+  3. Elephant graveyard (user asked explicitly): in 265b-elephant-dies-at-graveyard.png the graveyard shows pale WHOLE elephant bodies that read like plaster casts, not as bones/remains; the graveyard must read as an elephant graveyard (remains, bones, tusks) from the travel camera.
+  ACCEPTANCE: per species one comparison frame, elder beside a prime adult, from the travel camera at game distance; a vulture frame over a downed animal; a graveyard frame; both backends; judged by eye "does it look right to a person".
+  PLACEMENT (user 10.11.2026 23:02): at the front of the work order, directly behind point 1489 (no exposed body parts) and ahead of every other open point, including the 35-point front-order of 09.11.2026. If the owner splits this request (elders/vultures vs. graveyard), both parts sit there, in that order.
+  Bundle: Tierverhalten.
 - [ ] 1463. Drastic zero-based simplification of the whole infrastructure, analysed six-eyes with final cross-vendor check
   Source: User order 28.10.2026 in chat session cf715472: "Wie wäre es mit einer gründlichen Analyse, die feststellt, ob wir nicht drastische Vereinfachungen der gesamten Infrastruktur durchführen können, durch die auch ganz viele der noch offenen Infra-Punkte obsolet würden?" and "Ja, drastisch bedeutet, auch ganze Säulen ersatzlos zu streichen und zahlreiche noch offene Infra-Punkte zu löschen. Reihe einen solchen Punkt vorne in der Queue ein - wie du sagst, mit sechs Augen und Nachkontrolle." Limits on new points were rejected as symptom treatment; the cause is the infrastructure's own complexity. Wording approved by the user: "ja, beide so einreichen".
   Final state: the repository's infrastructure (scripts/ outside the game's verify suites, hooks in .claude/settings.json, guards, lanes, locks, ledgers, board, daemon, launcher, their docs) is drastically simplified from a zero base, and every open infrastructure point made obsolete by it is deleted from the work order.
@@ -15171,14 +15191,6 @@ to land than a mechanism that needs a review.
   5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
   Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
   Bundle: Dorfleben.
-- [ ] 1489. No sensitive body part exposed from any view or pose (user rule 05.11.2026: "allgemein dürfen nie sensible Körperteile exponiert sein")
-  Design rule, to be written into design.md next to "Covered upper body and hip layer (user 06.10.2026)" and mirrored in docs/peoples-1890.md §8.6 where it applies:
-  - No figure ever shows a female breast, the genital area or the buttocks uncovered - from ANY camera angle the game can reach (including the overhead/bird's-eye and close first-person views) and in ANY pose or animation (standing, walking, running, kneeling, bending, pounding, digging, sitting).
-  - A garment that stands off the body must not open a view onto covered skin; coverage is judged by the rendered picture, not by garment presence in the outfit data.
-  - This rule outranks every budget, stop rule and revert rule: an exposure defect is never accepted, frozen or moved to the backlog; it is fixed until it holds.
-  Verification: the final picture check of 1482 includes an overhead view and a kneeling/bending pose for every covering garment form (breast cloth, wraps, tube tops, hip cloths, children's hip layer), both backends.
-  First known case: /backup/hoa/local/BlosseBrueste.zip (kneeling Bambara woman, breast cloth as stiff ring, breast bare from above).
-  Bundle: Dorfleben.
 - [ ] 1490. Head-load porter: crate sinks into the head and the carrier sprints (user report 05.11.2026, not part of the clothing closure)
   Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
   Two defects:
@@ -15246,3 +15258,9 @@ to land than a mechanism that needs a review.
   Tests: a Vitest case per new preset key; the enrichments river sections and a LOW picture on both
   backends.
   Bundle: Steuerung & Performance.
+- [ ] 1499. A predator appears out of nowhere at a calf crushed by an elephant and eats it
+  User bug report 10.11.2026 23:06, evidence /backup/hoa/local/PredatorErscheintAusDemNichts.zip (seed 1116517146, travel, region north, x/z 290.95/-146.00, day 561.94, webgpu, production build 51c7783). User text: Ein Jungtier wurde unter den Fuessen eines Elefanten zerquetscht und daraufhin ist an seinem toten Koerper ein Praedator erschienen, der es auffrisst. Frame: a spotted cat feeds on a red carcass under the circling vultures beside the traveller, elephant herd below; the predator was not there before and did not walk in. The JSON wildlife section names every animal, carcass and flock. Expected: a scavenger/predator reaching a carcass approaches from outside visibly (or is streamed in out of view), never spawns at the carcass. Also visible again: the plank-like oversized vultures (see request Make elderly animals recognisable at game distance). PLACEMENT (user order 10.11.2026 23:06, verbatim: Das nach Greisentiere und Geier einreihen): as its own point directly behind the elders/vultures part of that request, i.e. after 1489 and elders/vultures, ahead of the elephant graveyard and every other open point.
+  User addition 10.11.2026 23:09 to the finding A predator appears out of nowhere at a calf crushed by an elephant and eats it (same evidence /backup/hoa/local/PredatorErscheintAusDemNichts.zip): the calf had just been crushed under an elephant's feet; the user suspects that this death path itself makes the predator appear. Check first whether the trample/crush death creates its carcass through a path that also places (spawns or teleports) a feeder at the body, unlike the ordinary hunt/old-age carcass; a quick grep for trample+spawn in src/scenes/travel found nothing obvious, so trace it in the runtime. Same point, same placement as the original finding.
+  Final state: a feeder at any carcass, the trample/crush death included, has walked there on screen from where it was; no predator is placed or teleported onto a body.
+  Test: Vitest on the crush-death carcass path (no feeder spawned at the body); picture on both backends at the evidence spot.
+  Bundle: Tierverhalten.
