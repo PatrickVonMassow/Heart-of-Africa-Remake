@@ -227,7 +227,6 @@ import {
   assertVisibleDeath,
   huntHoldsCatch,
   recordDeathCause,
-  tooLateDistFor,
   type DeathCause,
 } from './deathCause'
 
@@ -2589,8 +2588,10 @@ function Herds() {
             const seized = croc
               ? herds.crocodile.find((k) => !k.dead && k.lunge?.victim === a)
               : undefined
+            // The crocodile's actor point is its JAWS, where the catch rides
+            // (haulCatch), not its body centre a mouth-length behind.
             const killer: DeathActor = croc
-              ? (seized ?? null)
+              ? seized ? { x: a.x, z: a.z } : null
               : LION_STATE.mode !== 'idle' ? { x: LION_STATE.lx, z: LION_STATE.lz } : null
             takeAnimal(a, croc ? 'crocodile' : 'predator', killer, croc ? { sink: true } : { stain: true })
             const par = a.parent
@@ -2602,12 +2603,8 @@ function Herds() {
             // A CROCODILE kill has been hauled into the river (point 383), so
             // the keeper stands at the WATERLINE its calf was seized from —
             // never out in the channel over a body the river has taken.
-            // A crocodile's too-late parent is taken only where its jaws reach
-            // it (point 326): the ambusher holds its catch in the water, so a
-            // parent still back on the bank SURVIVES into the vigil — it never
-            // drops dead at the waterline with no crocodile at it.
             const fate = releaseBereavedParent(a, {
-              tooLateDist: tooLateDistFor(croc, PARENT_TOO_LATE_DIST, PARENT_SACRIFICE_DIST),
+              tooLateDist: PARENT_TOO_LATE_DIST,
               bereavedSeconds: balance.family.bereavedSeconds,
               vigilAt: { x: seized?.lunge?.seizeX ?? a.x, z: seized?.lunge?.seizeZ ?? a.z },
             })
@@ -2720,7 +2717,7 @@ function Herds() {
                 // The sacrifice at the waterline (point 130): the crocodile
                 // takes the charging parent under in the calf's place.
                 const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
-                takeAnimal(a, 'crocodile', cc ?? null, { sink: true })
+                takeAnimal(a, 'crocodile', cc ? { x: calf.x, z: calf.z } : null, { sink: true }) // the jaws hold the calf
                 if (cc && cc.lunge) {
                   // The parent is taken IN the calf's place (point 319): the
                   // crocodile's catch becomes the parent's body, which it hauls

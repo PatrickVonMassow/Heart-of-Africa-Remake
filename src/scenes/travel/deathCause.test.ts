@@ -15,7 +15,6 @@ import {
   deathCauseVisible,
   huntHoldsCatch,
   recordDeathCause,
-  tooLateDistFor,
   type DeathCause,
 } from './deathCause'
 import { vigilDrawReady } from './wildlifeBehavior'
@@ -45,7 +44,6 @@ const DT = 0.1
 const CAUGHT_DURATION = 5
 const CARCASS_SECONDS = 9
 const PARENT_TOO_LATE_DIST = 3.2
-const PARENT_SACRIFICE_DIST = 1.3
 const VIGIL_HOLD_DIST = 1
 const KEEPER_WALK = 1.2 // the vigil walk (YOUNG_FOLLOW_SPEED order)
 const PREDATOR_SPEED = 4 // the drawn predator's approach (HUNT_LION_SPEED order)
@@ -159,21 +157,13 @@ describe('a land catch is held only by a hunter that is there', () => {
   })
 })
 
-describe('the too-late distance (points 121/326)', () => {
-  it('a land predator drags down a parent within the too-late distance', () => {
-    expect(tooLateDistFor(false, PARENT_TOO_LATE_DIST, PARENT_SACRIFICE_DIST)).toBe(PARENT_TOO_LATE_DIST)
-  })
-  it('a crocodile takes only a parent its jaws reach', () => {
-    expect(tooLateDistFor(true, PARENT_TOO_LATE_DIST, PARENT_SACRIFICE_DIST)).toBe(PARENT_SACRIFICE_DIST)
-  })
-})
-
 type Outcome = 'taken-by-visible-predator' | 'survived-and-rejoined'
 
 /**
  * Stage the user's report (25.07.2026): a crocodile seizes a calf at the
- * waterline, its parent rushes in but is still short of the jaws when the
- * struggle ends. The frame order mirrors Wildlife.tsx: the struggle countdown
+ * waterline, its parent rushes in but has not reached the catch when the
+ * struggle ends — inside the too-late ring it is taken alongside (§19.8: the
+ * too-late ending holds at the waterline), outside it it keeps the vigil. The frame order mirrors Wildlife.tsx: the struggle countdown
  * and the kill, the parent's release, the vigil walk and its resolve, the
  * vigil's predator draw (spawned beyond the ring, walking in) and the keeper's
  * own struggle. Every death runs the dev-assert with the distance to its
@@ -198,7 +188,7 @@ function stageCrocKillThenVigil(opts: { predatorComes: boolean; parentGap: numbe
       sinkKill(calf, CARCASS_SECONDS, 'crocodile')
       assertVisibleDeath(calf, Math.hypot(croc.x - calf.x, croc.z - calf.z), 'calf')
       fate = releaseBereavedParent(calf, {
-        tooLateDist: tooLateDistFor(true, PARENT_TOO_LATE_DIST, PARENT_SACRIFICE_DIST),
+        tooLateDist: PARENT_TOO_LATE_DIST,
         bereavedSeconds: balance.family.bereavedSeconds,
         vigilAt: seize,
       })
@@ -260,10 +250,8 @@ function stageCrocKillThenVigil(opts: { predatorComes: boolean; parentGap: numbe
 }
 
 describe('a staged crocodile kill then vigil ends in a legitimate outcome (point 326)', () => {
-  it('the report: a parent short of the jaws is NOT killed in place — it keeps the vigil', () => {
-    // 2.5 lies inside the land too-late distance (3.2): before the fix this
-    // parent dropped dead at the waterline with no crocodile at it.
-    const r = stageCrocKillThenVigil({ predatorComes: false, parentGap: 2.5 })
+  it('the report: a parent beyond the too-late ring is not killed in place — it keeps the vigil and rejoins', () => {
+    const r = stageCrocKillThenVigil({ predatorComes: false, parentGap: 4 })
     expect(r.fate).toBe('vigil')
     expect(r.outcome).toBe('survived-and-rejoined')
     expect(r.parent.dead).toBeUndefined()
@@ -276,14 +264,14 @@ describe('a staged crocodile kill then vigil ends in a legitimate outcome (point
     // before the carcass can draw a predator — survival is the crocodile vigil's
     // ordinary ending (the second legitimate outcome).
     expect(CARCASS_SECONDS).toBeLessThan(balance.vigil.predatorDelay)
-    const r = stageCrocKillThenVigil({ predatorComes: true, parentGap: 2.5 })
+    const r = stageCrocKillThenVigil({ predatorComes: true, parentGap: 4 })
     expect(r.outcome).toBe('survived-and-rejoined')
     expect(r.parent.dead).toBeUndefined()
     expect(assertFired()).toBe(false)
   })
 
   it('a predator drawn before the body is gone takes the keeper, standing at the body', () => {
-    const r = stageCrocKillThenVigil({ predatorComes: true, parentGap: 2.5, predatorDelay: 0 })
+    const r = stageCrocKillThenVigil({ predatorComes: true, parentGap: 4, predatorDelay: 0 })
     expect(r.fate).toBe('vigil')
     expect(r.outcome).toBe('taken-by-visible-predator')
     expect(r.parent.dead).toBe(true)
@@ -291,8 +279,8 @@ describe('a staged crocodile kill then vigil ends in a legitimate outcome (point
     expect(assertFired()).toBe(false)
   })
 
-  it('a parent the jaws do reach is taken by the crocodile, visibly', () => {
-    const r = stageCrocKillThenVigil({ predatorComes: false, parentGap: 1 })
+  it('a too-late parent is taken by the crocodile, the crocodile within reach of it', () => {
+    const r = stageCrocKillThenVigil({ predatorComes: false, parentGap: 3.1 })
     expect(r.fate).toBe('taken')
     expect(r.outcome).toBe('taken-by-visible-predator')
     expect(r.parent.deathCause).toBe('crocodile')

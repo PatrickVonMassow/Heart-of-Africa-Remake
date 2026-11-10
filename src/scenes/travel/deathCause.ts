@@ -96,14 +96,3 @@ export function huntHoldsCatch(
 ): boolean {
   return huntActive && (isVictim || predatorDist <= reach)
 }
-
-/**
- * The too-late distance for a kill's parent (points 121/326). On land the
- * predator feeds right at the calf, so a parent that got close is dragged down
- * by it. A crocodile holds its catch in the water with its jaws full: it can
- * only take a parent its jaws actually reach (the contact distance), never one
- * standing back on the bank — that parent survives into the vigil instead.
- */
-export function tooLateDistFor(croc: boolean, landTooLate: number, contact: number): number {
-  return croc ? contact : landTooLate
-}
