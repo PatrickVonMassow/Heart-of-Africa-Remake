@@ -74,6 +74,10 @@ const DEFAULTS = {
   fightClashSeconds: balance.fight.clashSeconds,
   fightClashIntensity: balance.fight.clashIntensity,
   fightLethalityScale: balance.fight.lethalityScale,
+  elderFraction: balance.elderly.fraction,
+  elderSpeedFactor: balance.elderly.speedFactor,
+  elderDeathRate: balance.elderly.deathRatePerMinute,
+  elderDyingSeconds: balance.elderly.dyingSeconds,
   crocStrikeRadius: balance.crocodile.strikeRadius,
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
   crocMouthOffset: balance.crocodile.mouthOffsetLocal,
@@ -167,6 +171,10 @@ afterEach(() => {
   balance.fight.clashSeconds = DEFAULTS.fightClashSeconds
   balance.fight.clashIntensity = DEFAULTS.fightClashIntensity
   balance.fight.lethalityScale = DEFAULTS.fightLethalityScale
+  balance.elderly.fraction = DEFAULTS.elderFraction
+  balance.elderly.speedFactor = DEFAULTS.elderSpeedFactor
+  balance.elderly.deathRatePerMinute = DEFAULTS.elderDeathRate
+  balance.elderly.dyingSeconds = DEFAULTS.elderDyingSeconds
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
   balance.crocodile.mouthOffsetLocal = DEFAULTS.crocMouthOffset
@@ -367,6 +375,11 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.fightClashSeconds, read: () => balance.fight.clashSeconds, value: 8 },
     { label: en.debug.fightClashIntensity, read: () => balance.fight.clashIntensity, value: 0 },
     { label: en.debug.fightLethalityScale, read: () => balance.fight.lethalityScale, value: 0 },
+    // Elderly animals (design.md §19.18): fraction, speed, death rate and dying duration.
+    { label: en.debug.elderFraction, read: () => balance.elderly.fraction, value: 0.2 },
+    { label: en.debug.elderSpeedFactor, read: () => balance.elderly.speedFactor, value: 0.5 },
+    { label: en.debug.elderDeathRate, read: () => balance.elderly.deathRatePerMinute, value: 0.5 },
+    { label: en.debug.elderDyingSeconds, read: () => balance.elderly.dyingSeconds, value: 20 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
     // The broadened waterline ambush band and the mouth anchor (points 275/268).
@@ -880,6 +893,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.fightContactRadius', 'debug.fightDriveOffDistance', 'debug.fightApproachSeconds',
     'debug.fightClashSeconds', 'debug.fightClashIntensity', 'debug.fightApproachBurst', 'debug.fightQuarryFleeFactor',
     'debug.fightLethalityScale', 'debug.fightCooldownSeconds',
+    // Elderly animals (design.md §19.18).
+    'debug.elderFraction', 'debug.elderSpeedFactor', 'debug.elderDeathRate', 'debug.elderDyingSeconds',
     'debug.crocStrikeRadius', 'debug.crocAmbushBankBand',
     'debug.crocMouthOffset', 'debug.crocDragSpeed', 'debug.crocDragSeconds', 'debug.crocGripSeconds',
     'debug.crocDriveOffRest', 'debug.huntLeaveOvertime', 'debug.waterCrossMax', 'debug.waterCrossChance',
@@ -1005,12 +1020,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 218 controls in total, and none twice', () => {
+  it('carries all 222 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(218)
+    expect(labels.length).toBe(222)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1057,7 +1072,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(218)
+    expect(rows.length).toBe(222)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1111,7 +1126,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(218)
+    expect(renderedRowLabels().length).toBe(222)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1159,7 +1174,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(218)
+    expect(renderedRowLabels().length).toBe(222)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

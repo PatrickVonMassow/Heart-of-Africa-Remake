@@ -719,6 +719,11 @@ export interface Strings {
     fightQuarryFleeFactor: string
     fightLethalityScale: string
     fightCooldownSeconds: string
+    /** Elderly animals (design.md §19.18). */
+    elderFraction: string
+    elderSpeedFactor: string
+    elderDeathRate: string
+    elderDyingSeconds: string
     benchmarkStart: string
     crocDragSpeed: string
     crocDragSeconds: string

@@ -675,6 +675,39 @@ interface BalanceConfig {
      *  as the dead young come back to life. Calibratable. */
     bereavedSeconds: number
   }
+  /** Elderly animals (design.md §19.18; research docs/fauna-behaviour-1890.md
+   *  §3/§5/§10): a small aged minority of the herd adults, slower, never the
+   *  winner of a rival fight, and occasionally dying of old age with no outside
+   *  cause. Every value is a calibratable estimate, debug-editable (§21.2). */
+  elderly: {
+    /** Share of a herd group's free adults (neither parent nor calf) spawned
+     *  elderly. Kept LOW: senescence is real in the wild but a small visible
+     *  minority (research §10.1). */
+    fraction: number
+    /** An elder's movement speed as a share of the adult's, strictly below 1. */
+    speedFactor: number
+    /** Natural deaths per elder per game MINUTE of sim time: the hazard that an
+     *  idle elder begins dying of old age. Rare by design. */
+    deathRatePerMinute: number
+    /** Seconds the dying process takes from its first slowdown to the fall
+     *  (research §10.6: no field figure exists — a pure game duration). */
+    dyingSeconds: number
+    /** Share of `dyingSeconds` spent failing on its feet before it goes down;
+     *  the rest it lies distressed while the vultures gather. */
+    downFraction: number
+    /** Floor of the progressive slowdown while still on its feet, so a dying
+     *  elephant keeps drifting toward its water. */
+    dyingSpeedFloor: number
+    /** A dying elephant still short of its water goes down anyway at this
+     *  multiple of the failing window — the hard deadline (invariant I4). */
+    dyingGraceFactor: number
+    /** How far (world units) a dying elephant may be from the §4.4 graveyard
+     *  for it to drift there rather than to the nearest water. */
+    graveyardReach: number
+    /** How far (world units) an ousted elder of a solitary species stands
+     *  apart from its group's anchor at spawn. */
+    solitaryDistance: number
+  }
   /** Intraspecies combat (design.md §19.17, point 264): territorial/dominance
    *  fights WITHIN a species, on the researched species only
    *  (docs/intraspecies-combat-1890.md; the per-species table lives in
@@ -1729,6 +1762,20 @@ export const balance: BalanceConfig = {
     // landing and the remnant's ~10 s dissolve, so the parent has left the kill
     // site or the remains are gone before it may take in another young.
     bereavedSeconds: 90,
+  },
+  // Elderly animals (design.md §19.18). All calibratable estimates: the
+  // research (docs/fauna-behaviour-1890.md §10.6/§10.9) gives no field figure
+  // for the fraction's exact size or the length of a natural decline.
+  elderly: {
+    fraction: 0.08, // about one free adult in twelve — a few elders in view, never a quarter of a herd
+    speedFactor: 0.7, // visibly slower (research §3.2), still a walk, not a crawl
+    deathRatePerMinute: 0.03, // with ~10 elders in the streamed ring: a natural death every few minutes somewhere
+    dyingSeconds: 40, // long enough to read the slowdown, the fall and the gathering flock
+    downFraction: 0.6, // 24 s failing on its feet, 16 s down — the flock flies in and gathers over it
+    dyingSpeedFloor: 0.3, // the elephant still drifts at 30 % of its elder pace toward its water
+    dyingGraceFactor: 3, // an elephant that never reaches water goes down at 3x the failing window
+    graveyardReach: 60, // inside this the graveyard, where water-side deaths accumulate, is the goal
+    solitaryDistance: 10, // apart from the group, inside the chunk spawn margin (SPAWN_MARGIN 18)
   },
   // Intraspecies combat (point 264). All calibratable; the per-species rates
   // and lethalities they scale come from docs/intraspecies-combat-1890.md.
