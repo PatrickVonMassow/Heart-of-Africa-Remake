@@ -504,7 +504,11 @@ export const DOC_BUDGETS = [
     // RAISED by the 203 measured words of the new §19.19 (work-order 269):
     // birds escape by taking off and only a grounded bird is catchable, and the
     // region-true raptors' stoop and air-catch — a new mechanic no section described.
-    maxWords: 30542,
+    // RAISED by the 95 measured words of the §19.15 exposure rule (work-order
+    // 1489, user 05.11.2026): no breast, genital area or buttocks bare from any
+    // camera or pose, judged by the picture, outranking every budget — a new
+    // rule the point orders written next to the covered-body rule; no new line.
+    maxWords: 30637,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
