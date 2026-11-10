@@ -3478,10 +3478,14 @@ const failSecondsOf = (t: DyingTiming) =>
  * Mutates and returns the stage.
  */
 export function stepDying(s: DyingState, dt: number, arrived: boolean, t: DyingTiming): DyingStage {
+  const before = s.elapsed
   s.elapsed += Math.max(0, dt)
   const fail = failSecondsOf(t)
-  if (s.downSince === undefined && s.elapsed >= fail && (arrived || s.elapsed >= fail * Math.max(1, t.graceFactor))) {
-    s.downSince = s.elapsed
+  const grace = fail * Math.max(1, t.graceFactor)
+  if (s.downSince === undefined && s.elapsed >= fail && (arrived || s.elapsed >= grace)) {
+    // It went down at the threshold it crossed within this tick, not at the
+    // tick's end, so a long tick keeps its remainder (deadline holds exactly).
+    s.downSince = Math.max(before, arrived ? fail : grace)
   }
   if (s.downSince === undefined) return 'failing'
   return s.elapsed - s.downSince >= Math.max(0.01, t.seconds) - fail ? 'dead' : 'down'

@@ -5051,6 +5051,21 @@ describe('natural death of old age (design.md §19.18)', () => {
     expect(dyingDeadline(T)).toBeCloseTo(24 * 3 + 16, 9)
   })
 
+  it('a tick spanning both stages keeps the remainder past the threshold (deadline holds exactly)', () => {
+    const quick = { seconds: 10, downFraction: 0.5, graceFactor: 1 }
+    expect(dyingDeadline(quick)).toBeCloseTo(10, 9)
+    const s: DyingState = { elapsed: 0 }
+    expect(stepDying(s, 10, true, quick)).toBe('dead')
+    const half: DyingState = { elapsed: 0 }
+    expect(stepDying(half, 7, true, quick)).toBe('down')
+    expect(half.downSince).toBeCloseTo(5, 9)
+    expect(stepDying(half, 3, true, quick)).toBe('dead')
+    const late: DyingState = { elapsed: 0 }
+    expect(stepDying(late, 10, false, { ...quick, graceFactor: 1.5 })).toBe('down')
+    expect(late.downSince).toBeCloseTo(7.5, 9)
+    expect(stepDying(late, 2.5, false, { ...quick, graceFactor: 1.5 })).toBe('dead')
+  })
+
   it('the downed animal rolls onto its side over the fall, short of the carcass roll', () => {
     expect(dyingDownRoll(0)).toBe(0)
     expect(dyingDownRoll(0.75)).toBeGreaterThan(0)
