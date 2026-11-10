@@ -28,7 +28,7 @@ device pixel ratio is kept (no cap).
 
 | Setting | Low | Medium | High |
 | --- | --- | --- | --- |
-| `dprCap` | 1 | native | native |
+| `dprCap` | 0.8 | native | native |
 | `ssao` | off | off | on |
 | `traa` | off | on | on |
 | `bloom` | off | on | on |
@@ -39,10 +39,12 @@ device pixel ratio is kept (no cap).
 | `fireShadowSoft` | off | off | on |
 | `terrainRefine` | off | on | on |
 | `floraFogFactor` | 0.55 | 1 | 1 |
+| `floraDensity` | 0.6 | 1 | 1 |
 | `floraCastShadow` | off | on | on |
 | `weatherIntensity` | 0.6 | 1 | 1 |
 | `waterCalm` | on | off | off |
 | `wildlifeDensity` | 0.6 | 1 | 1 |
+| `offscreenBehaviourInterval` | 3 | 1 | 1 |
 | `figureLimbSegments` | 5 | 8 | 12 |
 | `placeRiverSegments` | 8 | 32 | 64 |
 | `placeRiverFlotsam` | 12 | 48 | 90 |
@@ -62,8 +64,12 @@ later levers (from `figureLimbSegments` on) are appended in the order they were
 added.
 
 - **`dprCap`** — Device-pixel-ratio cap; `native` keeps R3F's native ratio, `1`
-  caps it to one physical pixel per CSS pixel. The single biggest fill-rate lever
-  on real hardware (~35 % GPU), so low leads with it.
+  caps it to one physical pixel per CSS pixel, below 1 renders fewer pixels than
+  CSS pixels and upscales. The single biggest fill-rate lever on real hardware
+  (~35 % GPU), so low leads with it: `0.8` (0.64x the pixels of dpr 1,
+  calibratable) because the LOW frame is pixel-bound
+  (`docs/bench/310-projection.md`). The internal allow-flag `subOneDprEnabled`
+  clamps a sub-1 cap back to 1 for A/B tuning within the level.
 - **`ssao`** — Screen-space ambient occlusion (design.md §2.7). High only — a
   ~25 % GPU cost kept for the richest level.
 - **`traa`** — Temporal anti-aliasing (design.md §2.7). Off only on low; when a
@@ -91,6 +97,14 @@ added.
 - **`floraFogFactor`** — Flora fog-radius factor; `< 1` tightens the spawn circle
   so the plant instance count falls quadratically (`floraStreaming.ts`). Low
   tightens it to 0.55.
+- **`floraDensity`** — Instance-count factor for the flora dressing on top of the
+  `floraFogFactor` radius cut (point 310): the share of the NON-collidable
+  dressing (bush, rock, termite mound, dead tree, papyrus) that draws. Collidable
+  trees and kopjes always draw, because the collider shares the placement and must
+  not depend on the graphics level. The thinning is deterministic and nested
+  (raising the level only adds plants). Low `0.6` (calibratable), medium/high `1`.
+  The internal allow-flag `floraThinningEnabled` draws the full dressing within
+  the level for A/B tuning.
 - **`floraCastShadow`** — Whether ground flora (bush / papyrus / rock) casts sun
   shadows. Off on low. The communication PoC's erratic boulder (work-order 482)
   is rock dressing too and rides this same lever rather than inventing a lever
@@ -108,6 +122,16 @@ added.
 - **`wildlifeDensity`** *(declared, not yet consumed)* — Ambient wildlife
   spawn-density factor (`1` = full, design.md §19.2). Declared for the §21
   registry; will be read by the spawner once wired. 0.6 on low.
+- **`offscreenBehaviourInterval`** — The CPU lever for weak phones (point 310):
+  an ambient animal OUTSIDE the rendered frame (the shared `isOnScreen`
+  projection, never an assumed radius) that is in no drama steps its behaviour
+  only every N frames and holds its last pose in between. Every animal in a
+  §19 drama (hunt, fight, crossing, rescue, mire, grief, mourning, a dying elder,
+  the crocodile, the birds, the elephants) steps every frame, so every sim-time
+  deadline runs as before and no drama stalls. Held off-screen animals also skip
+  the per-frame elephant-trample check on their held frames. Low `3`
+  (calibratable), medium/high `1` (every frame). The internal allow-flag
+  `offscreenThrottleEnabled` steps everyone every frame within the level.
 - **`figureLimbSegments`** — Radial segments of the villager figures' arms,
   hands and legs (point 479). The limbs are thin and the player stands within a
   metre of them while a figure gestures, so the count decides whether an arm

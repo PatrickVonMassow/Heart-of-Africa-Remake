@@ -2355,6 +2355,76 @@ if (section('streaming-despawn')) {
   check('zoom-out keeps animals the default view would despawn', stream.ok && stream.goneAtZoom1 && stream.keptAtZoom3, JSON.stringify(stream))
 }
 
+// --- LOW-preset performance levers (point 310) --------------------------------
+// The LOW level's levers, read live at the savanna perf-bench anchor: the
+// renderer runs at the sub-1 dpr cap, the flora density thins only the
+// non-collidable dressing (collidable trees draw in full), off-screen ambient
+// animals hold a throttled pose, and the picture at LOW is captured for the
+// owner's both-backend judgement. The drama sections stay the deadline proof;
+// run them with this one at LOW by the same level switch.
+if (section('low-preset-levers')) {
+  const B = { lat: -2.5, lon: 34.0 }
+  const res = await page.evaluate(async (B) => {
+    const ui = window.__ui.getState()
+    ui.setTravelZoom(0.5)
+    window.__game.getState().debugJumpTo(B.lat, B.lon)
+    ui.setDetailLevel('low')
+    await window.__sleepSim(3)
+    const species = ['acacia', 'jungle', 'palm', 'baobab', 'kopje', 'bush', 'rock', 'termite', 'deadtree', 'papyrus']
+    // One snapshot = the drawn plants AND the fill they were drawn from: the
+    // spawn circle is anchored at each fill's start position, so two fills a
+    // few units apart differ at the circle EDGE whatever the density (the
+    // first run compared whole-circle counts: acacia 525 vs 526).
+    const snap = () => ({
+      fill: window.__vegetation.drawnFill(),
+      plants: Object.fromEntries(species.map((sp) => [sp, window.__vegetation.drawnTranslations(sp)])),
+    })
+    const thinnedSnap = snap()
+    window.__ui.getState().setFloraThinningEnabled(false)
+    await window.__sleepSim(2)
+    const fullSnap = snap()
+    window.__ui.getState().setFloraThinningEnabled(true)
+    await window.__sleepSim(2)
+    // Compared plant by plant where BOTH fills cover the ground: inside both
+    // spawn circles, 2 wu clear of either edge.
+    const inBoth = ([x, z]) => [thinnedSnap.fill, fullSnap.fill].every((f) => f && Math.hypot(x - f.x, z - f.z) <= f.spawnR - 2)
+    const key = ([x, z]) => `${x.toFixed(2)},${z.toFixed(2)}`
+    const thinned = {}
+    const full = {}
+    const missing = {}
+    for (const sp of species) {
+      const t = thinnedSnap.plants[sp].filter(inBoth)
+      const f = fullSnap.plants[sp].filter(inBoth)
+      thinned[sp] = t.length
+      full[sp] = f.length
+      const tk = new Set(t.map(key))
+      missing[sp] = f.filter((q) => !tk.has(key(q))).length
+    }
+    const fills = { thinned: thinnedSnap.fill, full: fullSnap.fill }
+    const h = window.__wildlife?.herdsRef?.current ?? {}
+    let held = 0
+    let live = 0
+    for (const sp of Object.keys(h)) if (Array.isArray(h[sp])) for (const a of h[sp]) if (!a.dead) { live++; if (a.heldPose) held++ }
+    return { dpr: window.__renderer?.getPixelRatio?.() ?? null, thinned, full, missing, fills, held, live }
+  }, B)
+  check('LOW: the renderer runs at the sub-1 dpr cap', res.dpr !== null && Math.abs(res.dpr - 0.8) < 1e-6, JSON.stringify(res.dpr))
+  const collidable = ['acacia', 'jungle', 'palm', 'baobab', 'kopje']
+  const sum = (o, ks) => ks.reduce((n, k) => n + o[k], 0)
+  const thin = ['bush', 'rock', 'termite', 'deadtree', 'papyrus']
+  check('LOW: the two fills are the LOW density and the full dressing',
+    res.fills.thinned?.density < 1 && res.fills.full?.density === 1, JSON.stringify(res.fills))
+  // Plant by plant on the ground both fills cover: every collidable plant of
+  // the full fill is drawn in the thinned one too (no collider without a body).
+  check('LOW: collidable trees draw in full under the density lever',
+    collidable.every((sp) => res.missing[sp] === 0 && res.thinned[sp] === res.full[sp]) && sum(res.full, collidable) > 0,
+    JSON.stringify({ thinned: res.thinned, full: res.full, missing: res.missing, fills: res.fills }))
+  check('LOW: the small dressing is thinned, not removed (savanna still dressed)',
+    sum(res.thinned, thin) < sum(res.full, thin) && sum(res.thinned, thin) > 0.4 * sum(res.full, thin), JSON.stringify(res))
+  check('LOW: off-screen ambient animals hold a throttled pose', res.live > 0 && res.held > 0, `${res.held}/${res.live}`)
+  if (await jumpBeside(page, B.lat, B.lon, '310-low-savanna')) await shot('310-low-savanna', { world: B, label: '310-low-savanna' })
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+}
+
 // --- The dressing must NOT grow over a session (point 278) -------------------
 // At a FIXED anchor, with a fixed seed and date, the streamed instanced dressing
 // used to CLIMB the longer one played: a roamer re-homed off its birth chunk
@@ -7217,8 +7287,11 @@ if (section('elderly-natural-death')) {
     out.kind = e.dying?.target?.kind ?? null
     // It turns toward the graveyard while still on its feet.
     await window.__pollSim(30, () => offBearing() < 0.35 || e.dying?.stage !== 'failing')
-    out.offTurned = +offBearing().toFixed(2)
-    out.turned = out.off0 > 2.8 && out.offTurned < 0.35
+    // Judge the raw bearings: the poll above exits below 0.35, which rounds
+    // to 0.35 at two decimals and failed the check it had just passed.
+    const offTurned = offBearing()
+    out.offTurned = +offTurned.toFixed(3)
+    out.turned = out.off0 > 2.8 && offTurned < 0.35
     await window.__pollSim(60, () => e.dying?.stage === 'down' || e.dead === true)
     out.dNear = Math.hypot(e.x - gx, e.z - gz)
     out.headed = out.dNear < d0 - 3

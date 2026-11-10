@@ -21,7 +21,9 @@ export const DETAIL_LEVELS: readonly DetailLevel[] = ['low', 'medium', 'high']
  *  the runtime completeness gate (quality.test.ts) guards the same at test time. */
 export interface QualityPreset {
   /** Device-pixel-ratio cap; null keeps R3F's native ratio. The biggest
-   *  fill-rate lever on real hardware (~35 % GPU, point 277). */
+   *  fill-rate lever on real hardware (~35 % GPU, point 277). Below 1 the
+   *  canvas renders fewer pixels than CSS pixels and is upscaled: the LOW
+   *  frame is pixel-bound (docs/bench/310-projection.md). */
   dprCap: number | null
   /** Screen-space ambient occlusion (design.md §2.7) — high only (user: SSAO
    *  only in high). */
@@ -48,6 +50,12 @@ export interface QualityPreset {
   /** Flora fog-radius factor; <1 tightens the spawn circle so the instance
    *  count falls quadratically (floraStreaming.ts). */
   floraFogFactor: number
+  /** Flora/dressing instance-count factor (point 310) on top of the
+   *  floraFogFactor radius cut: the share of the NON-collidable dressing
+   *  (bush, rock, termite mound, dead tree, papyrus) that draws; collidable
+   *  trees and kopjes always draw (floraStreaming.ts floraKeptAtDensity).
+   *  The land keeps reading as its region (design.md §19.9), only thinner. */
+  floraDensity: number
   /** Ground flora (bush/papyrus/rock) casts sun shadows. */
   floraCastShadow: boolean
   /** Atmospheric haze/rain intensity factor (1 = full); low thins the pall so
@@ -59,6 +67,13 @@ export interface QualityPreset {
   /** Ambient wildlife spawn-density factor (1 = full, design.md §19.2).
    *  Declared for the §21 registry; consumed by the spawner when wired. */
   wildlifeDensity: number
+  /** Frames between behaviour steps of an OFF-SCREEN ambient animal (point
+   *  310, the CPU lever for the phone): 1 steps everyone every frame; N > 1
+   *  lets an animal outside the rendered frame (the shared isOnScreen
+   *  projection) that is in no drama hold its pose for N-1 frames. Drama
+   *  animals always step, so every §19 deadline runs in sim time as before
+   *  (offscreenThrottle.ts). */
+  offscreenBehaviourInterval: number
   /** Radial segments of the villager figures' arm/leg/hand primitives (point
    *  479). The limbs are thin and the eye passes within a metre of them at
    *  conversation range, so the count is what decides whether an arm reads as a
@@ -117,7 +132,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
   // nothing), 880 extra draw calls (952→72) and ~2 M extra triangles per frame,
   // the biggest remaining lever once dpr + post are already minimal.
   low: {
-    dprCap: 1,
+    dprCap: 0.8, // calibratable: 0.64x the pixels of dpr 1 — the primary LOW lever (docs/bench/310-projection.md)
     ssao: false,
     traa: false,
     bloom: false,
@@ -128,10 +143,12 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: false,
     terrainRefine: false,
     floraFogFactor: 0.55,
+    floraDensity: 0.6, // calibratable: 40 % fewer small-dressing instances (docs/bench/310-projection.md)
     floraCastShadow: false,
     weatherIntensity: 0.6,
     waterCalm: true,
     wildlifeDensity: 0.6,
+    offscreenBehaviourInterval: 3, // calibratable: off-screen ambient animals step every 3rd frame
     figureLimbSegments: 5, // point 479: the frugal floor — a limb still reads, faceted
     placeRiverSegments: 8, // a coarse undulation; the current still reads
     placeRiverFlotsam: 12, // x2 only, to spare the weakest tier (frame cost measured, work-order 1280); never none
@@ -157,10 +174,12 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: false,
     terrainRefine: true,
     floraFogFactor: 1,
+    floraDensity: 1,
     floraCastShadow: true,
     weatherIntensity: 1,
     waterCalm: false,
     wildlifeDensity: 1,
+    offscreenBehaviourInterval: 1,
     figureLimbSegments: 8, // point 479: smooth enough at conversation range
     placeRiverSegments: 32,
     placeRiverFlotsam: 48, // ~3x the 16 foam patches it had, now a mixed drift
@@ -185,10 +204,12 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: true,
     terrainRefine: true,
     floraFogFactor: 1,
+    floraDensity: 1,
     floraCastShadow: true,
     weatherIntensity: 1,
     waterCalm: false,
     wildlifeDensity: 1,
+    offscreenBehaviourInterval: 1,
     figureLimbSegments: 12, // point 479: no facet on an arm the player stands beside
     placeRiverSegments: 64,
     placeRiverFlotsam: 90, // ~3x the 30 foam patches it had

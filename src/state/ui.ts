@@ -179,6 +179,16 @@ interface UiState {
    *  the level's preset. Default ON — medium/high enable campfire shadows, and a
    *  player can tune them off here; low never casts them regardless. */
   fireShadowsEnabled: boolean
+  /** Allow-flag for a level's device-pixel-ratio cap BELOW 1 (LOW's primary
+   *  fill-rate lever): off clamps the cap back to 1, for A/B tuning within the
+   *  level. Default ON. */
+  subOneDprEnabled: boolean
+  /** Allow-flag for a level's flora density cut (floraDensity < 1): off draws
+   *  the full dressing within the level, for A/B tuning. Default ON. */
+  floraThinningEnabled: boolean
+  /** Allow-flag for a level's off-screen wildlife behaviour throttle: off steps
+   *  every animal every frame within the level, for A/B tuning. Default ON. */
+  offscreenThrottleEnabled: boolean
   /** Debug diagnosis (point 111): render the settlement ground with a plain
    *  material (no TSL surface structure/normal) to isolate a WebGPU-only black
    *  patch. Default off. */
@@ -247,6 +257,9 @@ interface UiState {
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
   setFireShadowsEnabled: (enabled: boolean) => void
+  setSubOneDprEnabled: (enabled: boolean) => void
+  setFloraThinningEnabled: (enabled: boolean) => void
+  setOffscreenThrottleEnabled: (enabled: boolean) => void
   setGroundDebugFlat: (flat: boolean) => void
   setSeasonCollapseEnabled: (enabled: boolean) => void
   toggleStateDump: () => void
@@ -289,6 +302,9 @@ export const useUi = create<UiState>()((set) => ({
   shadowMapHalf: false,
   shadowsEnabled: true,
   fireShadowsEnabled: true,
+  subOneDprEnabled: true,
+  floraThinningEnabled: true,
+  offscreenThrottleEnabled: true,
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
   stateDumpOpen: false,
@@ -368,6 +384,9 @@ export const useUi = create<UiState>()((set) => ({
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
   setFireShadowsEnabled: (fireShadowsEnabled) => set({ fireShadowsEnabled }),
+  setSubOneDprEnabled: (subOneDprEnabled) => set({ subOneDprEnabled }),
+  setFloraThinningEnabled: (floraThinningEnabled) => set({ floraThinningEnabled }),
+  setOffscreenThrottleEnabled: (offscreenThrottleEnabled) => set({ offscreenThrottleEnabled }),
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
   setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
   toggleStateDump: () => set((s) => ({ stateDumpOpen: !s.stateDumpOpen })),
@@ -389,8 +408,12 @@ export const useUi = create<UiState>()((set) => ({
 /** The quality preset for the current graphics level. */
 const currentQuality = (s: UiState) => QUALITY_PRESETS[s.detailLevel]
 
-/** Device-pixel-ratio cap for the current level; null keeps the native ratio. */
-export const effectiveDprCap = (s: UiState): number | null => currentQuality(s).dprCap
+/** Device-pixel-ratio cap for the current level; null keeps the native ratio. A
+ *  cap below 1 holds only while its allow-flag is on (off clamps it to 1). */
+export const effectiveDprCap = (s: UiState): number | null => {
+  const cap = currentQuality(s).dprCap
+  return cap !== null && cap < 1 && !s.subOneDprEnabled ? 1 : cap
+}
 /** SSAO renders when the level allows it AND the player has not tuned it off. */
 export const effectiveSsao = (s: UiState): boolean => currentQuality(s).ssao && s.ssaoEnabled
 /** TRAA renders when the level allows it AND the player has not tuned it off. */
@@ -416,10 +439,18 @@ export const effectiveFireShadowSoft = (s: UiState): boolean => currentQuality(s
 export const effectiveTerrainRefine = (s: UiState): boolean => currentQuality(s).terrainRefine
 /** Flora fog-radius factor for the current level (<1 tightens the spawn circle). */
 export const effectiveFloraFogFactor = (s: UiState): number => currentQuality(s).floraFogFactor
+/** Flora/dressing density factor for the current level (1 = full); the
+ *  allow-flag off draws the full dressing. */
+export const effectiveFloraDensity = (s: UiState): number =>
+  s.floraThinningEnabled ? currentQuality(s).floraDensity : 1
 /** Whether ground flora casts sun shadows at the current level. */
 export const effectiveFloraCastShadow = (s: UiState): boolean => currentQuality(s).floraCastShadow
 /** Atmospheric haze/rain intensity factor for the current level (1 = full). */
 export const effectiveWeatherIntensity = (s: UiState): number => currentQuality(s).weatherIntensity
+/** Frames between behaviour steps of an off-screen ambient animal (1 = every
+ *  frame); the allow-flag off steps everyone every frame. */
+export const effectiveOffscreenBehaviourInterval = (s: UiState): number =>
+  s.offscreenThrottleEnabled ? currentQuality(s).offscreenBehaviourInterval : 1
 /** Radial segments of the villager figures' limb primitives (point 479). */
 export const effectiveFigureLimbSegments = (s: UiState): number => currentQuality(s).figureLimbSegments
 /** Segments along the current of a settlement river's surface (work-order 482). */

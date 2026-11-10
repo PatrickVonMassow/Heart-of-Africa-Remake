@@ -29,6 +29,7 @@ import {
   effectiveShadowResolution,
   effectiveTerrainRefine,
   effectiveFloraFogFactor,
+  effectiveFloraDensity,
   effectiveFloraCastShadow,
   effectiveFigureLimbSegments,
 } from '../../state/ui'
@@ -85,7 +86,7 @@ import {
 } from './canoeDrag'
 import { SWIM_IMMERSION, travellerPose } from './travellerPose'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
-import { chunkOffsetsByDistance, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraFogFar, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
+import { chunkOffsetsByDistance, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraFogFar, floraInSpawnCircle, floraKeptAtDensity, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
 import { FIGURE_LIMBS, TRAVELLER_PACK } from '../../render/figures'
 import { FIGURE_STATURE } from '../../render/figureBody'
@@ -1416,6 +1417,8 @@ interface FloraFill {
   batch: number
   counts: Record<Species, number>
   collapseEnabled: boolean
+  /** Flora density factor (point 310): the share of thinnable dressing drawn. */
+  density: number
 }
 
 const FILL_MTX = new THREE.Matrix4()
@@ -1448,6 +1451,9 @@ function stepFloraFill(fill: FloraFill, seed: number, limit: number): void {
       // Circular streaming edge at fog far + margin (points 164/171): a plant
       // beyond it is not drawn, so the edge sits in the fog, out of sight.
       if (!floraInSpawnCircle(x, z, fill.anchorX, fill.anchorZ, fill.spawnR)) continue
+      // LOW's density lever (point 310): thins only the non-collidable small
+      // dressing, so no drawn-away plant keeps a collider.
+      if (!floraKeptAtDensity(COLLIDABLE_FLORA[species] === undefined, r4, fill.density)) continue
       const idx = fill.counts[species]
       if (idx >= MAX_INSTANCES[species]) continue
       // This plant's own dry-season state (points 151/175): its field tint
@@ -1518,6 +1524,12 @@ function Vegetation() {
   // The dry-season deformation is baked into the matrices at each rebuild
   // (point 175), so flipping the debug collapse toggle forces one re-bake.
   const lastCollapseRef = useRef(true)
+  // A changed flora density (level switch, point 310) re-streams likewise.
+  const lastDensityRef = useRef<number | null>(null)
+  // The anchor, radius and density of the fill the meshes are DRAWING (dev
+  // hook): a check comparing two fills must compare them plant by plant at
+  // the same place, since the spawn circle follows the fill-start position.
+  const drawnFillRef = useRef<{ x: number; z: number; spawnR: number; density: number } | null>(null)
   // The in-progress amortised fill (docs/perf-driving-hitches.md), if any.
   const fillRef = useRef<FloraFill | null>(null)
 
@@ -1546,6 +1558,7 @@ function Vegetation() {
     w.__vegetation = {
       visible: () => !hiddenRef.current,
       rebuilds: () => rebuildCountRef.current,
+      drawnFill: () => drawnFillRef.current,
       // The collidable dressing the traveller is actually tested against, so a
       // blocked step can be traced to the circle that blocks it.
       obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
@@ -1672,6 +1685,11 @@ function Vegetation() {
       lastCollapseRef.current = collapseEnabled
       lastBuild.current = null
     }
+    const density = effectiveFloraDensity(useUi.getState())
+    if (density !== lastDensityRef.current) {
+      lastDensityRef.current = density
+      lastBuild.current = null
+    }
     // Streaming with a rebuild hysteresis (points 164 + 171): the drawn edge is
     // a circle sized to the SEASON-FREE fog far (point 175: FLORA_FOG, not the
     // per-frame-lerped TRAVEL_FOG) — the dry-season max visible limit plus a
@@ -1721,11 +1739,13 @@ function Vegetation() {
         batch: floraFillBatchSize(offsets.length),
         counts: zeroSpeciesCounts(),
         collapseEnabled,
+        density,
       }
       fillRef.current = fill
       if (!amortise) {
         stepFloraFill(fill, seed, Infinity)
         swapFloraFill(fill, meshes)
+        drawnFillRef.current = { x: fill.anchorX, z: fill.anchorZ, spawnR: fill.spawnR, density: fill.density }
         fillRef.current = null
       }
       worked = true
@@ -1738,6 +1758,7 @@ function Vegetation() {
       stepFloraFill(fill, seed, fill.batch)
       if (fill.next >= fill.offsets.length) {
         swapFloraFill(fill, meshes)
+        drawnFillRef.current = { x: fill.anchorX, z: fill.anchorZ, spawnR: fill.spawnR, density: fill.density }
         fillRef.current = null
       }
       worked = true
@@ -3198,11 +3219,23 @@ export function TravelScene() {
       </group>
       <primitive object={TRAVEL_HEMI_LIGHT} dispose={null} />
       <Sun />
-      <TerrainChunks />
-      <FarTerrain />
-      <RiversAndLakes />
-      <RegionBorders />
-      <WaterPlane />
+      {/* Named system groups (the F8 report attributes every mesh to its
+          nearest named ancestor, benchmark.ts groupKey): without them the
+          terrain chunks, sea, rivers and borders fell together under the
+          material name "(unnamed) MeshStandardNodeMaterial". */}
+      <group name="travel-terrain">
+        <TerrainChunks />
+        <FarTerrain />
+      </group>
+      <group name="travel-rivers">
+        <RiversAndLakes />
+      </group>
+      <group name="travel-region-borders">
+        <RegionBorders />
+      </group>
+      <group name="travel-sea">
+        <WaterPlane />
+      </group>
       {/* Named for the panorama capture: the symbolic travel-scale dressing
           (trees the size of hills, animals, markers) would read absurd on
           the person-scale horizon — the capture keeps terrain, water,
@@ -3212,13 +3245,17 @@ export function TravelScene() {
         <Wildlife />
         <CommunicationRock />
       </group>
-      {PLACES.map((p) => (
-        <PlaceMarker key={p.id} place={p} />
-      ))}
+      <group name="travel-places">
+        {PLACES.map((p) => (
+          <PlaceMarker key={p.id} place={p} />
+        ))}
+      </group>
       <PanoramaCaptureTrigger />
-      <LandmarkLabels />
-      <ElephantGraveyard />
-      <CulturalLandmarks />
+      <group name="travel-landmarks">
+        <LandmarkLabels />
+        <ElephantGraveyard />
+        <CulturalLandmarks />
+      </group>
       {/* Map symbols, kept out of the panorama capture (panoramaCaptureHideNames). */}
       <group name={NATURAL_SITES_GROUP}>
         <NaturalSites />

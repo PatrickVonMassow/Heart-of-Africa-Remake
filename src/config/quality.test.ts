@@ -45,7 +45,10 @@ describe('preset calibration invariants (a clear, visible low→high climb)', ()
   })
 
   it('low is the frugal floor: dpr capped, all post off, no shadows at all', () => {
-    expect(QUALITY_PRESETS.low.dprCap).toBe(1)
+    // Point 310: LOW renders below one pixel per CSS pixel (the frame is pixel-bound).
+    expect(QUALITY_PRESETS.low.dprCap).not.toBeNull()
+    expect(QUALITY_PRESETS.low.dprCap!).toBeLessThan(1)
+    expect(QUALITY_PRESETS.low.dprCap!).toBeGreaterThanOrEqual(0.5)
     expect(QUALITY_PRESETS.low.ssao).toBe(false)
     expect(QUALITY_PRESETS.low.traa).toBe(false)
     expect(QUALITY_PRESETS.low.bloom).toBe(false)
