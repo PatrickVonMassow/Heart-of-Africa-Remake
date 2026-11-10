@@ -185,6 +185,21 @@ import {
   stepDying,
   type DyingStage,
   type DyingState,
+  AERIAL_PREDATORS,
+  aerialCanTake,
+  aerialHuntStep,
+  birdAirStep,
+  birdEscapeMode,
+  chickShouldCrouch,
+  fleeHeading,
+  groundPredatorCanReach,
+  isAirborne,
+  pickAerialPredator,
+  startAerialHunt,
+  type AerialHunt,
+  type AerialHuntCfg,
+  type AerialPredatorId,
+  type BirdAirState,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
 import { rinderpestCarrionActive, rinderpestPhaseAtDay } from '../../systems/rinderpest'
@@ -204,6 +219,8 @@ import {
   buildLion,
   buildLionCub,
   buildVulture,
+  buildRaptor,
+  RAPTOR_PLUMAGE,
   buildWarthog,
   buildWarthogCalf,
   buildWildebeest,
@@ -371,10 +388,12 @@ interface Animal {
    *  the elephant dodge AND the player-shy flight — ONE held heading, so the
    *  two threats can never fight each other into an oscillation. */
   dodgeHeading?: number
-  /** Blended climb (0..1) of a bird flying off from the traveller (design.md
-   *  §19): ramps up while the shy flight is engaged, settles once it ends —
-   *  never a pop. */
-  flyLift?: number
+  /** Flight state of a flight-capable bird (design.md §19.19): undefined on
+   *  the ground, then the take-off and the airborne climb/settle — an airborne
+   *  bird is out of every ground hunter's and elephant's reach. */
+  air?: BirdAirState
+  /** A plover chick crouched and frozen before a near threat (§19.19). */
+  crouch?: boolean
   /** Sticky escape-corridor heading for a hunted calf boxed against the sea
    *  (point 226): held while the direct flight dead-ends at a concave coast
    *  pocket so the shore run cannot flip-flop; cleared by the step itself the
@@ -872,6 +891,69 @@ const PREY_PANIC_EXIT = 1.5
 const PLAYER_SHY_RADIUS = 6
 const PLAYER_SHY_SPEED = 4.2
 const BIRD_FLY_LIFT = 2.6 // world units of climb at full flight
+// The airborne bird's blended climb and settle rates (lift fraction per
+// second) — the former shy-flight ramp, kept so the flight never pops.
+const BIRD_CLIMB_RATE = 1.5
+const BIRD_DESCEND_RATE = 0.8
+
+// Aerial predators (design.md §19.19). The fixed motion constants of the
+// scripted hunt; the calibratable ones come from balance.birdFlight.
+const RAPTOR_CRUISE_SPEED = 14 // the stooper's set-up flight and the departure
+const RAPTOR_STRIKE_REACH = 0.8
+const RAPTOR_SETUP_SECONDS = 1.5 // seen circling high before the plunge
+const RAPTOR_FEED_SECONDS = 6
+const RAPTOR_LEAVE_SECONDS = 14 // hard cap on the departure (I4); it usually leaves the frame first
+const RAPTOR_RENDER_SCALE = 1.6
+const RAPTOR_SPAWN_OUT = 12 // spawn step beyond the view, as the scavenger flock's
+/** The adult plover's flight height on its way home (render: the lure return). */
+const PLOVER_FLIGHT_Y = 1.2
+
+function aerialHuntCfg(): AerialHuntCfg {
+  const bf = balance.birdFlight
+  return {
+    highY: bf.stoopHighY,
+    lowY: bf.stoopLowY,
+    cruiseSpeed: RAPTOR_CRUISE_SPEED,
+    diveSpeed: bf.diveSpeed,
+    chaseSpeed: bf.chaseSpeed,
+    strikeReach: RAPTOR_STRIKE_REACH,
+    setupSeconds: RAPTOR_SETUP_SECONDS,
+    diveCatchChance: bf.diveCatchChance,
+    chaseCatchChance: bf.chaseCatchChance,
+    deadline: bf.huntDeadline,
+    feedSeconds: RAPTOR_FEED_SECONDS,
+    leaveSeconds: RAPTOR_LEAVE_SECONDS,
+  }
+}
+
+/** A prey bird's flight height above its ground (0 on the ground). */
+function birdFlightY(a: Animal): number {
+  if (!isAirborne(a.air)) return 0
+  return a.lure?.returning ? PLOVER_FLIGHT_Y : (a.air?.lift ?? 0) * BIRD_FLY_LIFT
+}
+
+/** The raptor geometries, built once on first use. */
+let raptorGeoCache: Map<AerialPredatorId, THREE.BufferGeometry> | null = null
+function raptorGeo(id: AerialPredatorId): THREE.BufferGeometry {
+  if (!raptorGeoCache) raptorGeoCache = new Map()
+  let g = raptorGeoCache.get(id)
+  if (!g) {
+    g = buildRaptor(RAPTOR_PLUMAGE[id])
+    raptorGeoCache.set(id, g)
+  }
+  return g
+}
+
+/** The one running aerial hunt (design.md §19.19) — a singleton like the
+ *  scripted lion hunt. `force` (dev hook / staged verification) starts one on
+ *  the next frame, optionally with a named raptor. */
+const RAPTOR_STATE: {
+  hunt: AerialHunt | null
+  prey: Animal | null
+  force?: AerialPredatorId | true
+  /** Every phase the current/last hunt passed through (verification). */
+  phases: string[]
+} = { hunt: null, prey: null, phases: [] }
 /** Family life (design.md §19): a calf keeps within the calibratable leash
  *  radius of its parent (balance.family.followRadius, read fresh per frame so
  *  the debug edit applies live), and a parent moves between an approaching
@@ -1964,6 +2046,7 @@ function Herds() {
   // one global set of vultures hopping from the finished carcass to the next.
   type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null }
   const scavengeGroups = useRef<(THREE.Group | null)[]>([])
+  const raptorMesh = useRef<THREE.Mesh>(null)
   const makeScavFlock = (): ScavFlock => ({ mode: 'idle', x: 0, z: 0, y: 14, landed: false, target: null })
   // scavenger.current is flock 0 — the dev hook (window.__wildlife.scavenger)
   // and the single-carcass verify checks read/reset it; scavengers.current[0]
@@ -1989,6 +2072,8 @@ function Herds() {
     // clear them so no blood from the last run shows on the first frame.
     stains.current.length = 0
     HUNT_STAIN.active = false
+    RAPTOR_STATE.hunt = null
+    RAPTOR_STATE.prey = null
     setGroundStains([], 0, 0)
   }, [seed])
 
@@ -2089,7 +2174,7 @@ function Herds() {
     // the drown threshold. A staged water-drama check asserts this reading
     // instead of assuming a forced season arrived (point 502).
     w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, scavengers, restock, meshRefs, calfMeshRefs, herdState,
-      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, groundAt: (x: number, z: number) => { const l = worldToLatLon(x, z); return Math.max(0.02, sampleTerrain(l.lat, l.lon, useGame.getState().seed).height) }, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
+      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, raptor: RAPTOR_STATE, igniteFire: igniteFireAt, groundAt: (x: number, z: number) => { const l = worldToLatLon(x, z); return Math.max(0.02, sampleTerrain(l.lat, l.lon, useGame.getState().seed).height) }, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
       waterDrama: (lat: number, lon: number) => {
         const bw = balance.waterDrama
         const wetness = CURRENT_WEATHER.wetness
@@ -4281,10 +4366,42 @@ function Herds() {
     // distance (or when the act has run its time) it recovers and flies
     // home. The one sacrifice that is a lie — and near a predator the lie
     // sometimes fails at the recovery moment.
+    // The ground predators on the field this frame (design.md §19.19): the
+    // running hunt's predator and every live adult of the seeded predator
+    // families. A flight-capable bird takes off before them; a crouching chick
+    // or a bird still on the ground is all they can reach.
+    const groundPredatorPos: Array<[number, number]> = []
+    if (LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave')
+      groundPredatorPos.push([LION_STATE.lx, LION_STATE.lz])
+    for (const l of herds.lion) if (!l.dead && !l.young) groundPredatorPos.push([l.x, l.z])
     {
       const lionActive2 = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed'
+      const bf = balance.birdFlight
       for (const a of herds.plover) {
-        if (a.dead || !a.nest || a.young) continue
+        if (a.dead) continue
+        if (a.young) {
+          // The chick cannot fly (research B1): it crouches and freezes before
+          // a near threat — and a ground predator that walks onto it takes it.
+          let dPred = Infinity
+          let gx = 0
+          let gz = 0
+          for (const [px2, pz2] of groundPredatorPos) {
+            const d = Math.hypot(px2 - a.x, pz2 - a.z)
+            if (d < dPred) {
+              dPred = d
+              gx = px2
+              gz = pz2
+            }
+          }
+          const dThreat = Math.min(dPred, Math.hypot(pos.x - a.x, pos.z - a.z))
+          a.crouch = chickShouldCrouch(dThreat, bf.crouchTrigger) ? true : undefined
+          if (a.crouch && groundPredatorCanReach(a.air, dPred, bf.groundCatchReach)) {
+            takeAnimal(a, 'predator', { x: gx, z: gz }, { stain: true })
+            a.crouch = undefined
+          }
+          continue
+        }
+        if (!a.nest) continue
         const dPlayerNest = Math.hypot(pos.x - a.nest.x, pos.z - a.nest.z)
         const dLionNest = lionActive2 ? Math.hypot(LION_STATE.lx - a.nest.x, LION_STATE.lz - a.nest.z) : Infinity
         const threatIsLion = dLionNest < dPlayerNest
@@ -4319,6 +4436,9 @@ function Herds() {
               continue
             }
             a.lure.returning = true
+            // The recovered adult flies home (research B1): airborne, out of
+            // the ground hunters' reach — and a target for a raptor.
+            a.air = { phase: 'air', t: 0, lift: 1 }
           }
         } else {
           // Fly home in a low arc; the act is over when it lands at the nest.
@@ -4327,6 +4447,7 @@ function Herds() {
           const d = Math.hypot(dx, dz)
           if (d < 0.4) {
             a.lure = undefined
+            a.air = undefined
             a.lureCooldown = 25
           } else {
             a.x += (dx / d) * 6 * dt
@@ -4821,6 +4942,112 @@ function Herds() {
       }
     }
 
+    // Aerial predators (design.md §19.19; research PART B2-B4): with a
+    // takeable bird on screen a region-true raptor occasionally hunts it —
+    // the stoop guild by the scripted descend-and-strike (enters HIGH,
+    // plunges, strikes), the chase/low guilds by an air-catch tail-chase or
+    // low snatch. A catch is an ordinary predator kill (the carcass machinery);
+    // every hunt resolves by its hard deadlines (I4).
+    {
+      const R = RAPTOR_STATE
+      const bf = balance.birdFlight
+      const cfg = aerialHuntCfg()
+      if (R.hunt === null && (R.force !== undefined || Math.random() < (bf.aerialHuntRatePerMinute / 60) * dt)) {
+        const forced = R.force
+        R.force = undefined
+        // The prey: the nearest on-screen flamingo or homing plover, airborne
+        // ones first (the stoop and the chase need an airborne bird).
+        let best: Animal | null = null
+        let bestScore = Infinity
+        for (const list of [herds.flamingo, herds.plover]) {
+          for (const b of list) {
+            if (b.dead || b.young) continue
+            const airborne = isAirborne(b.air)
+            if (!airborne && list === herds.plover) continue
+            if (!isOnScreen(b.x, b.z)) continue
+            const score = Math.hypot(b.x - pos.x, b.z - pos.z) + (airborne ? 0 : 1000)
+            if (score < bestScore) {
+              bestScore = score
+              best = b
+            }
+          }
+        }
+        if (best) {
+          const bll = worldToLatLon(best.x, best.z)
+          const large = herds.flamingo.includes(best)
+          const id = forced !== undefined && forced !== true
+            ? forced
+            : pickAerialPredator(regionAt(bll.lat, bll.lon), Math.random(), large, bf.rareRaptorWeight)
+          if (id && aerialCanTake(AERIAL_PREDATORS[id].guild, isAirborne(best.air))) {
+            // Enter from beyond the frame on the prey's far side from the
+            // traveller, never popping into view (the point-178 discipline).
+            let dx = best.x - pos.x
+            let dz = best.z - pos.z
+            const d = Math.hypot(dx, dz) || 1
+            dx /= d
+            dz /= d
+            let out = viewR + RAPTOR_SPAWN_OUT
+            for (let k = 0; k < 12 && isOnScreen(pos.x + dx * out, pos.z + dz * out); k++) out += RAPTOR_SPAWN_OUT
+            R.hunt = startAerialHunt(id, pos.x + dx * out, pos.z + dz * out, birdFlightY(best), cfg)
+            R.prey = best
+            R.phases = [R.hunt.phase]
+          }
+        }
+      }
+      const h = R.hunt
+      const mesh = raptorMesh.current
+      if (h) {
+        const prey = R.prey
+        const live =
+          prey !== null && !prey.dead && (herds.flamingo.includes(prey) || herds.plover.includes(prey))
+        const forcedRoll = bf.forceStrike === 'catch' ? 0 : bf.forceStrike === 'miss' ? 0.999 : undefined
+        const ev = aerialHuntStep(
+          h,
+          live ? { x: prey.x, z: prey.z, y: birdFlightY(prey), airborne: isAirborne(prey.air) } : null,
+          dt,
+          cfg,
+          forcedRoll ?? Math.random(),
+        )
+        if (R.phases[R.phases.length - 1] !== h.phase) R.phases.push(h.phase)
+        if (ev === 'caught' && live) {
+          // The struck bird drops as an ordinary predator kill; the raptor
+          // comes down onto it and feeds.
+          prey.air = undefined
+          prey.lure = undefined
+          h.x = prey.x
+          h.z = prey.z
+          takeAnimal(prey, 'predator', { x: h.x, z: h.z })
+        }
+        // Feeding: the raptor eats the small kill down within its feed window.
+        if (h.phase === 'feed' && prey && prey.dead && prey.dissolve !== undefined && prey.dissolve > 0) {
+          prey.dissolve = Math.max(0, prey.dissolve - dt * (CARCASS_DISSOLVE_SECONDS / RAPTOR_FEED_SECONDS))
+          if (import.meta.env.DEV) SHRINK_FED.add(prey) // the feeding raptor is this shrink's actor (point 319)
+        }
+        // The departure ends once the raptor is off the frame (or at its cap).
+        if (ev === 'done' || (h.phase === 'leave' && h.phaseT > 1 && !isOnScreen(h.x, h.z))) {
+          R.hunt = null
+          R.prey = null
+        }
+      }
+      if (mesh) {
+        const cur = R.hunt
+        mesh.visible = cur !== null
+        if (cur) {
+          if (mesh.geometry !== raptorGeo(cur.id)) mesh.geometry = raptorGeo(cur.id)
+          const rll = worldToLatLon(cur.x, cur.z)
+          const g = Math.max(0, sampleTerrain(rll.lat, rll.lon, seed).height)
+          const flap = cur.phase === 'feed' ? 0 : Math.sin(t * 9) * 0.06
+          mesh.position.set(cur.x, g + cur.y + 0.15, cur.z)
+          mesh.rotation.order = 'YXZ'
+          // The stoop tucks its wings and points its beak down the plunge.
+          const diving = cur.phase === 'dive'
+          mesh.rotation.set(diving ? 1.1 : cur.phase === 'leave' ? -0.25 : 0, cur.heading, diving ? 0 : flap * 3)
+          const sc = AERIAL_PREDATORS[cur.id].scale * RAPTOR_RENDER_SCALE
+          mesh.scale.set(sc * (diving ? 0.45 : 1), sc, sc)
+        }
+      }
+    }
+
     // Frame stamp of THIS draw pass (point 378): every instance written below
     // carries it, and the collider accepts only circles stamped with it.
     const drawFrame = frameCountRef.current
@@ -5018,8 +5245,17 @@ function Herds() {
         // charge can still save it; otherwise a parent stands between an
         // approaching predator and its calf to defend it. These override the
         // flee/dodge below.
-        let familyHeld = false
-        if (sp !== 'elephant') {
+        // A crouching plover chick (design.md §19.19) freezes in place, flat
+        // to the ground: it neither follows its parent nor flees.
+        let familyHeld = a.crouch === true
+        if (familyHeld) {
+          px = a.x
+          pz = a.z
+          wobTarget = 0
+          yaw = a.rot
+          bodyY = a.y - 0.03 * a.scale
+        }
+        if (sp !== 'elephant' && !familyHeld) {
           // Where this juvenile keeps (design.md §19.8, points 341/369): its
           // LIVING parent — the adoptive one once the point-262 adoption found
           // it — or, for an orphan still inside its mourning window, the spot
@@ -5628,7 +5864,7 @@ function Herds() {
         // exact degeneracy the leash damping teaches to avoid), and the
         // capped turnToward smooths any hand-over between the two sources.
         if (
-          !familyHeld && sp !== 'elephant' &&
+          !familyHeld && sp !== 'elephant' && sp !== 'flamingo' &&
           (FLEES_LION[sp] || fleesFromPlayer(sp, !!a.young, balance.parentDefense.preyWeapon))
         ) {
           // Hysteresis: once dodging, only disengage well past the trigger
@@ -5685,9 +5921,9 @@ function Herds() {
             const spd = pick.source === 'elephant' ? PREY_PANIC_SPEED : PLAYER_SHY_SPEED
             // Unrestricted flight (point 312): the dart and the shy flight go
             // INTO a river or lake in their way and swim it — the herd does
-            // not follow into the deep; only the ocean edge deflects. The
-            // wader stands on the sheet instead of swimming.
-            fleeMove(a, a.dodgeHeading, spd, sp === 'flamingo')
+            // not follow into the deep; only the ocean edge deflects. (The
+            // flamingo wader flies off in its own block below, §19.19.)
+            fleeMove(a, a.dodgeHeading, spd)
             bodyY = a.y
             px = a.x
             pz = a.z
@@ -5700,15 +5936,44 @@ function Herds() {
             a.rot = a.dodgeHeading
             a.dodgeHeading = undefined
           }
-          // Birds fly off (design.md §19): the climb ramps while the shy
-          // flight is engaged and settles once it ends — blended, never a pop.
-          if (sp === 'flamingo') {
-            if (pick !== null) a.flyLift = Math.min(1, (a.flyLift ?? 0) + dt * 1.5)
-            else if (a.flyLift !== undefined) {
-              a.flyLift -= dt * 0.8
-              if (a.flyLift <= 0) a.flyLift = undefined
-            }
-            if (a.flyLift !== undefined) bodyY += a.flyLift * BIRD_FLY_LIFT
+        }
+        // Birds fly off (design.md §19.19; research PART B1): the flamingo takes
+        // off before the traveller (the player-shy ring), a ground predator or
+        // an elephant (the take-off trigger). Its running take-off is the
+        // vulnerable window — still on the ground, still reachable; once
+        // airborne it climbs away out of every ground hunter's reach, and after
+        // the threat is gone it settles — blended, never a pop.
+        if (sp === 'flamingo' && !familyHeld && birdEscapeMode(sp, !!a.young) === 'running') {
+          const bf = balance.birdFlight
+          let dGround = Infinity
+          for (const [gx, gz] of groundPredatorPos) dGround = Math.min(dGround, Math.hypot(gx - a.x, gz - a.z))
+          for (const [ex, ez] of elephantPos) dGround = Math.min(dGround, Math.hypot(ex - a.x, ez - a.z))
+          const engaged = a.air !== undefined
+          const shyRing = engaged ? PLAYER_SHY_RADIUS * PREY_PANIC_EXIT : PLAYER_SHY_RADIUS
+          const trigger = engaged ? bf.takeoffTrigger * PREY_PANIC_EXIT : bf.takeoffTrigger
+          const dPlayer = Math.hypot(pos.x - a.x, pos.z - a.z)
+          const threatened = dGround < trigger || dPlayer < shyRing
+          a.air = birdAirStep(a.air, threatened, dt, {
+            takeoffSeconds: bf.runningTakeoffSeconds,
+            settleSeconds: bf.settleSeconds,
+            climbRate: BIRD_CLIMB_RATE,
+            descendRate: BIRD_DESCEND_RATE,
+          })
+          if (a.air !== undefined) {
+            const away = fleeHeading(a.x, a.z, [...groundPredatorPos, ...elephantPos, ...playerThreat], Math.max(trigger, shyRing) * 1.5)
+            if (away !== null) a.dodgeHeading = a.dodgeHeading === undefined ? away : turnToward(a.dodgeHeading, away, PREY_DODGE_TURN * dt)
+            if (a.dodgeHeading === undefined) a.dodgeHeading = a.rot
+            const spd = a.air.phase === 'takeoff' ? bf.takeoffRunSpeed : bf.flightSpeed * Math.max(0.3, a.air.lift)
+            fleeMove(a, a.dodgeHeading, spd, true)
+            bodyY = a.y + a.air.lift * BIRD_FLY_LIFT
+            px = a.x
+            pz = a.z
+            wobTarget = 0
+            yaw = a.dodgeHeading
+            pitch = 0
+          } else if (a.dodgeHeading !== undefined) {
+            a.rot = a.dodgeHeading
+            a.dodgeHeading = undefined
           }
         }
         // Dying of old age (design.md §19.18): a failing elder hangs its head
@@ -5752,7 +6017,8 @@ function Herds() {
         // the SIM position — the idle-shuffle render offset is cosmetic and
         // must never carry an animal under a trample. (Dead animals never reach
         // here: the loop head renders them and continues.)
-        if (sp !== 'elephant') {
+        // An airborne bird is out of the elephant's reach (design.md §19.19).
+        if (sp !== 'elephant' && !isAirborne(a.air)) {
           for (let ei = 0; ei < elephantPos.length; ei++) {
             const [ex, ez] = elephantPos[ei]
             const [evx, evz] = elephantVel[ei]
@@ -5979,6 +6245,7 @@ function Herds() {
         <primitive key={`${sp}-elder`} object={pool.elder[sp]} dispose={null} />
       ))}
       <primitive object={pool.crocStrike} dispose={null} />
+      <mesh ref={raptorMesh} material={material} visible={false} frustumCulled={false} dispose={null} />
       <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_MAX]} visible={false} frustumCulled={false} renderOrder={3} />
       <instancedMesh ref={fireSmoke} args={[fireSmokeGeo, fireSmokeMat, FIRE_SMOKE_MAX]} visible={false} frustumCulled={false} renderOrder={4} />
       {scavengers.current.map((_, si) => (
