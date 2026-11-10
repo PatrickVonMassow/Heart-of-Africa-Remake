@@ -7287,8 +7287,11 @@ if (section('elderly-natural-death')) {
     out.kind = e.dying?.target?.kind ?? null
     // It turns toward the graveyard while still on its feet.
     await window.__pollSim(30, () => offBearing() < 0.35 || e.dying?.stage !== 'failing')
-    out.offTurned = +offBearing().toFixed(2)
-    out.turned = out.off0 > 2.8 && out.offTurned < 0.35
+    // Judge the raw bearings: the poll above exits below 0.35, which rounds
+    // to 0.35 at two decimals and failed the check it had just passed.
+    const offTurned = offBearing()
+    out.offTurned = +offTurned.toFixed(3)
+    out.turned = out.off0 > 2.8 && offTurned < 0.35
     await window.__pollSim(60, () => e.dying?.stage === 'down' || e.dead === true)
     out.dNear = Math.hypot(e.x - gx, e.z - gz)
     out.headed = out.dNear < d0 - 3
