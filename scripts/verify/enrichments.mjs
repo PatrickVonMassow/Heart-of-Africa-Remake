@@ -11209,8 +11209,6 @@ if (section('bird-flight-escape')) {
     // Back to her chasing spot, so the flock stays threatened and airborne.
     lioness.x = lionAt.x
     lioness.z = lionAt.z
-    const ll = geo.worldToLatLon(cx, cz)
-    out.flockAt = { lat: ll.lat, lon: ll.lon }
     window.__birdFlightStage = { flock, lioness }
     // Hold the flock airborne and in view through the flush frame and the
     // stoop below (restored at the end of the section).
@@ -11218,6 +11216,23 @@ if (section('bird-flight-escape')) {
     window.__birdFlightPrev = { diveSpeed: bf.diveSpeed, forceStrike: bf.forceStrike, flightSpeed: bf.flightSpeed, settleSeconds: bf.settleSeconds }
     bf.flightSpeed = 0.5
     bf.settleSeconds = 120
+    // The camera follows the traveller, who stood where the flush began: pin
+    // him just behind the airborne flock so the frame holds the birds, not
+    // only their ground centroid, and count the birds the camera projects.
+    window.__game.setState({ pos: { x: cx, z: cz + 2 } })
+    await window.__pollSim(0.5, () => {
+      if (w.lion) w.lion.mode = 'idle'
+      return false
+    })
+    const flyY = (a) => a.y + (a.air?.lift ?? 0) * 2.6 // BIRD_FLY_LIFT in Wildlife.tsx
+    out.onScreen = flock.filter((a) => {
+      const n = window.__camera.ndc(a.x, a.z, flyY(a))
+      return Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.9
+    }).length
+    const fx2 = flock.reduce((s, a) => s + a.x, 0) / flock.length
+    const fz2 = flock.reduce((s, a) => s + a.z, 0) / flock.length
+    const ll2 = geo.worldToLatLon(fx2, fz2)
+    out.flockAt = { lat: ll2.lat, lon: ll2.lon, y: flock.reduce((s, a) => s + flyY(a), 0) / flock.length }
     return out
   })
   check(
@@ -11227,6 +11242,7 @@ if (section('bird-flight-escape')) {
       flush.contactProbes === 6 && flush.caughtOnContact === 0,
     JSON.stringify(flush),
   )
+  check('the airborne flock stands in the take-off frame at the shutter (at least 4 of 6 birds)', flush.onScreen >= 4, `onScreen=${flush.onScreen}`)
   if (flush.flockAt) {
     await shot('269-birds-take-off', { world: flush.flockAt, label: 'the flamingo flock airborne, fleeing the lioness', settle: false })
   }
