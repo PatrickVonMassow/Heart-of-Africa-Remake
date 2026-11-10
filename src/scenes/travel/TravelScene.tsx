@@ -98,6 +98,7 @@ import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
 import { TRAVEL_SKY } from '../../render/skyPresets'
 import { createWaterMaterial } from '../../render/water'
+import { SEA_PLANE_SEGMENTS, SEA_PLANE_SIZE, seaPlaneOrigin } from '../../render/seaPlaneLattice'
 import {
   buildAcacia,
   buildBaobab,
@@ -461,7 +462,7 @@ const LANDMARK_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, r
 
 // The water plane's geometry, shared across mounts (point 96): larger than
 // the fog far distance so its edge is never visible.
-const WATER_PLANE_GEOMETRY = new THREE.PlaneGeometry(CHUNK_SIZE * 30, CHUNK_SIZE * 30, 180, 180)
+const WATER_PLANE_GEOMETRY = new THREE.PlaneGeometry(SEA_PLANE_SIZE, SEA_PLANE_SIZE, SEA_PLANE_SEGMENTS, SEA_PLANE_SEGMENTS)
 
 // Seed-independent elephant-graveyard geometries (point 96), built lazily once.
 let graveyardGeoCache: { elephantGeo: THREE.BufferGeometry; tuskGeo: THREE.BufferGeometry; ribGeo: THREE.BufferGeometry } | null = null
@@ -792,19 +793,22 @@ function WaterPlane() {
     const pos = useGame.getState().pos
     const zoom = useUi.getState().travelZoom
     if (ref.current) {
-      ref.current.position.set(pos.x, 0, pos.z)
       // In the debug zoom range the plane grows with the view so the sea
       // reaches the horizon at the whole-continent zoom; the wave field calms
       // to glass out there — crests, foam and glints alias into speckle noise
       // at that distance (design.md §21).
       const s = Math.max(1, zoom / 2)
+      // Laid on the world-fixed vertex lattice, not at his exact position
+      // (point 314): the per-vertex waves then stay put while he walks.
+      const o = seaPlaneOrigin(pos.x, pos.z, s)
+      ref.current.position.set(o.x, 0, o.z)
       ref.current.scale.setScalar(s)
       // The shader reconstructs world XZ as local * scale + offset; feed it
       // the same scale, or the bathymetry drifts against the land while the
       // player walks in the zoomed view.
       planeScale.value = s
       calm.value = Math.min(1, Math.max(0, (zoom - 1) / 0.6))
-      offset.value.set(pos.x, -pos.z) // plane local Y maps to world -Z
+      offset.value.set(o.x, -o.z) // plane local Y maps to world -Z
     }
   })
   // Dev hook for the headless verification (CLAUDE.md §7.2): the shader's
