@@ -218,10 +218,17 @@ function lakeBasinLevel(li: number, seed: number): number {
 }
 
 /**
- * Sample terrain at geographic coordinates. `seed` controls the per-run
- * procedural appearance; geography itself is fixed real data.
+ * The land fraction the terrain decides land and sea by (0 = sea, 1 = land,
+ * the shore at about 0.5): the raster mask, rebuilt from the smooth vector
+ * coast near the shore (point 209) and from the trim boundary where that cut is
+ * the coast (point 210). Exported because the sea surface must be masked by
+ * THIS coast, not by the raw raster flag (point 314, render/demElevation.ts).
  */
-export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSample {
+export function shoreLandFraction(lat: number, lon: number): {
+  land: number
+  bsd: number
+  boundaryIsCoast: boolean
+} {
   let land = landFractionAt(lat, lon)
   // point 209: the bilinear BINARY land mask crosses 0.5 only along the DEM
   // texel grid, so the sea coast staircased at close zoom. Near the coast,
@@ -266,6 +273,15 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
       land = Math.max(0, Math.min(1, 0.5 + bsd / (2 * COAST_SMOOTH_BAND)))
     }
   }
+  return { land, bsd, boundaryIsCoast }
+}
+
+/**
+ * Sample terrain at geographic coordinates. `seed` controls the per-run
+ * procedural appearance; geography itself is fixed real data.
+ */
+export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSample {
+  const { land, bsd, boundaryIsCoast } = shoreLandFraction(lat, lon)
   const elevation = elevationAt(lat, lon)
   const detail = fbm2(lon * 3, lat * 3, seed + 7, 3)
 

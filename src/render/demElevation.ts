@@ -6,15 +6,17 @@
 // and G holds an inland-water mask baked from the hydrology vectors (river
 // ribbons and lake polygons), which the DEM itself cannot provide: carved
 // rivers lie ABOVE sea level, so elevation alone cannot exclude them. B holds
-// the DEM's own dataset-land flag (read through demDatasetLand).
+// the DEM's own dataset-land flag; the sea plane masks by the TERRAIN's coast
+// instead (terrainLandFraction below, point 314).
 
 import * as THREE from 'three/webgpu'
-import { float, texture, vec2 } from 'three/tsl'
+import { float, smoothstep, texture, vec2 } from 'three/tsl'
 import { LAKES } from '../world/data/lakes'
 import { RIVERS_DATA } from '../world/data/rivers'
 import { getDemMeta, getDemPixels } from '../world/geodata'
 import { catmullRom } from '../world/hydro'
-import { RIVER_WIDTH_DEG } from '../world/terrain'
+import { RIVER_WIDTH_DEG, shoreLandFraction } from '../world/terrain'
+import { shoreTexels } from '../world/seaMask'
 import { boundarySignedDistance } from '../world/redSea'
 
 // point 210: the water material reads THIS texture's R channel (metersUp) for its
@@ -193,10 +195,71 @@ export function demInlandWater(
   return texture(getDemDataTexture(), demUvAt(lon, lat)).g as unknown as ReturnType<typeof float>
 }
 
-/** TSL node: the dataset's own land flag in [0,1] at (lon, lat). */
-export function demDatasetLand(
+
+// Point 314: the open-sea plane's land mask. The DEM's own land flag (B above)
+// is NOT the terrain's coast — the terrain rebuilds it from the vector coast and
+// the trim boundary (shoreLandFraction) — so the plane left terrain sea bare and
+// lay over terrain land. This one-channel texture holds the terrain's land
+// fraction per texel; it starts as the raster flag and its shore texels are
+// refined in short time slices (~0.3 s of work in all), so neither the boot
+// nor the first travel frame pays for the bake in one block.
+let seaMaskCached: THREE.DataTexture | null = null
+/** Shore texels evaluated per time slice of the sea-mask refinement. */
+const SEA_MASK_SLICE = 20000
+
+function getSeaMaskTexture(): THREE.DataTexture {
+  if (seaMaskCached) return seaMaskCached
+  const meta = getDemMeta()
+  const dem = getDemPixels()
+  const n = dem.width * dem.height
+  const flags = new Uint8Array(n)
+  const data = new Uint8Array(n)
+  for (let i = 0; i < n; i++) {
+    flags[i] = dem.data[i * 4 + 2] > 0 ? 1 : 0
+    data[i] = flags[i] * 255
+  }
+  const tex = new THREE.DataTexture(data, dem.width, dem.height, THREE.RedFormat, THREE.UnsignedByteType)
+  tex.needsUpdate = true
+  tex.flipY = false
+  tex.colorSpace = THREE.NoColorSpace
+  tex.minFilter = THREE.LinearFilter
+  tex.magFilter = THREE.LinearFilter
+  seaMaskCached = tex
+  const res = (meta.lonMax - meta.lonMin) / dem.width
+  const todo = shoreTexels(flags, dem.width, dem.height)
+  let k = 0
+  const slice = () => {
+    const end = Math.min(todo.length, k + SEA_MASK_SLICE)
+    for (; k < end; k++) {
+      const i = todo[k]
+      const lon = meta.lonMin + ((i % dem.width) + 0.5) * res
+      const lat = meta.latMax - (((i / dem.width) | 0) + 0.5) * res
+      data[i] = Math.round(255 * Math.max(0, Math.min(1, shoreLandFraction(lat, lon).land)))
+    }
+    if (k < todo.length) setTimeout(slice, 0)
+    else tex.needsUpdate = true
+  }
+  setTimeout(slice, 0)
+  return tex
+}
+
+/** TSL node: the TERRAIN's land fraction in [0,1] at (lon, lat) — 0 sea,
+ *  1 land, the shore near 0.5 (point 314; see getSeaMaskTexture). */
+export function terrainLandFraction(
   lon: THREE.Node<'float'>,
   lat: THREE.Node<'float'>,
 ): ReturnType<typeof float> {
-  return texture(getDemDataTexture(), demUvAt(lon, lat)).b as unknown as ReturnType<typeof float>
+  return texture(getSeaMaskTexture(), demUvAt(lon, lat)).r as unknown as ReturnType<typeof float>
+}
+
+/** TSL node: how fully the open-sea sheet draws at (lon, lat) — 1 over the
+ *  terrain's sea up to its waterline (land ~0.6, where the ground crosses sea
+ *  level), 0 just inland of it. ONE rule for the sheet itself (water.ts) and
+ *  for the river ribbon that dissolves into it at a mouth (Rivers.tsx): the
+ *  ribbon may only fade where the sheet is really there (point 314). */
+export function seaSheetCover(
+  lon: THREE.Node<'float'>,
+  lat: THREE.Node<'float'>,
+): ReturnType<typeof float> {
+  return smoothstep(float(0.56), float(0.7), terrainLandFraction(lon, lat)).oneMinus() as unknown as ReturnType<typeof float>
 }
