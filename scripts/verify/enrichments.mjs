@@ -2355,6 +2355,48 @@ if (section('streaming-despawn')) {
   check('zoom-out keeps animals the default view would despawn', stream.ok && stream.goneAtZoom1 && stream.keptAtZoom3, JSON.stringify(stream))
 }
 
+// --- LOW-preset performance levers (point 310) --------------------------------
+// The LOW level's levers, read live at the savanna perf-bench anchor: the
+// renderer runs at the sub-1 dpr cap, the flora density thins only the
+// non-collidable dressing (collidable trees draw in full), off-screen ambient
+// animals hold a throttled pose, and the picture at LOW is captured for the
+// owner's both-backend judgement. The drama sections stay the deadline proof;
+// run them with this one at LOW by the same level switch.
+if (section('low-preset-levers')) {
+  const B = { lat: -2.5, lon: 34.0 }
+  const res = await page.evaluate(async (B) => {
+    const ui = window.__ui.getState()
+    ui.setTravelZoom(0.5)
+    window.__game.getState().debugJumpTo(B.lat, B.lon)
+    ui.setDetailLevel('low')
+    await window.__sleepSim(3)
+    const species = ['acacia', 'jungle', 'palm', 'baobab', 'kopje', 'bush', 'rock', 'termite', 'deadtree', 'papyrus']
+    const counts = () => Object.fromEntries(species.map((sp) => [sp, window.__vegetation.drawnTranslations(sp).length]))
+    const thinned = counts()
+    window.__ui.getState().setFloraThinningEnabled(false)
+    await window.__sleepSim(2)
+    const full = counts()
+    window.__ui.getState().setFloraThinningEnabled(true)
+    await window.__sleepSim(2)
+    const h = window.__wildlife?.herdsRef?.current ?? {}
+    let held = 0
+    let live = 0
+    for (const sp of Object.keys(h)) if (Array.isArray(h[sp])) for (const a of h[sp]) if (!a.dead) { live++; if (a.heldPose) held++ }
+    return { dpr: window.__renderer?.getPixelRatio?.() ?? null, thinned, full, held, live }
+  }, B)
+  check('LOW: the renderer runs at the sub-1 dpr cap', res.dpr !== null && Math.abs(res.dpr - 0.8) < 1e-6, JSON.stringify(res.dpr))
+  const collidable = ['acacia', 'jungle', 'palm', 'baobab', 'kopje']
+  const thin = ['bush', 'rock', 'termite', 'deadtree', 'papyrus']
+  check('LOW: collidable trees draw in full under the density lever',
+    collidable.every((sp) => res.thinned[sp] === res.full[sp]), JSON.stringify(res))
+  const sum = (o, ks) => ks.reduce((n, k) => n + o[k], 0)
+  check('LOW: the small dressing is thinned, not removed (savanna still dressed)',
+    sum(res.thinned, thin) < sum(res.full, thin) && sum(res.thinned, thin) > 0.4 * sum(res.full, thin), JSON.stringify(res))
+  check('LOW: off-screen ambient animals hold a throttled pose', res.live > 0 && res.held > 0, `${res.held}/${res.live}`)
+  if (await jumpBeside(page, B.lat, B.lon, '310-low-savanna')) await shot('310-low-savanna', { world: B, label: '310-low-savanna' })
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+}
+
 // --- The dressing must NOT grow over a session (point 278) -------------------
 // At a FIXED anchor, with a fixed seed and date, the streamed instanced dressing
 // used to CLIMB the longer one played: a roamer re-homed off its birth chunk
