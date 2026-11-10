@@ -11195,6 +11195,7 @@ if (section('bird-flight-escape')) {
     // hunt mode, so she is set ON each airborne bird in turn — an airborne
     // bird must survive even zero distance.
     out.contactProbes = 0
+    const lionAt = { x: lioness.x, z: lioness.z }
     for (const a of flock) {
       if (a.air?.phase !== 'air') continue
       await window.__pollSim(0.4, () => {
@@ -11205,8 +11206,9 @@ if (section('bird-flight-escape')) {
       out.contactProbes++
     }
     out.caughtOnContact = flock.filter((a) => a.dead).length
-    lioness.x = cx + 30
-    lioness.z = cz
+    // Back to her chasing spot, so the flock stays threatened and airborne.
+    lioness.x = lionAt.x
+    lioness.z = lionAt.z
     const ll = geo.worldToLatLon(cx, cz)
     out.flockAt = { lat: ll.lat, lon: ll.lon }
     window.__birdFlightStage = { flock, lioness }
