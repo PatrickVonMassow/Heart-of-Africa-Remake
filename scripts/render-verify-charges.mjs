@@ -2065,5 +2065,15 @@ export const RED_CHARGES = [
       'MEASURED 09.11.2026 beside the frame 87-continent-zoom red on both backends, the per-frame TypeError '
       + 'point 1495 names. The charge dies with point 1495.',
   },
+  {
+    point: 1496,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^frame 131 shows the burning fire\b/i,
+    why:
+      'MEASURED 10.11.2026 on both backends: whole enrichments on main 091e97140 failed frame 131 (no flame at '
+      + 'the front, frontAtShutter 24.05) while --section=burning-grass was green on b2023ba37; the frame crops '
+      + 'are computed before the sim advances (review objection 3). Filed in point 1496. The charge dies with point 1496.',
+  },
 
 ]

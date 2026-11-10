@@ -15519,4 +15519,5 @@ to land than a mechanism that needs a review.
   Player impact: (1) can render the scar edge wrongly on a driver that takes the undefined branch; (2) leaves unsooted strips at the flanks of a curved fire; (4) adds per-frame garbage.
   Test: Vitest for the scar width; the burning-grass section on both backends.
   Source: cross-vendor review of point 321, 09.11.2026; landing slip 10.11.2026.
+  Measured 10.11.2026: the whole enrichments pass on main 091e97140 failed frame 131 on both backends (no flame at the front, frontAtShutter 24.05) while the burning-grass section alone was green — the crop timing of objection 3; charged to this point in scripts/render-verify-charges.mjs.
   Bundle: Wetter & Wasser.
