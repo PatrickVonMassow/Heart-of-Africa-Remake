@@ -2416,7 +2416,7 @@ if (section('dressing-growth')) {
     const adopter = mk(3, 0) // a childless zebra adult within adoptionRadius (20)
     herds.zebra.unshift(parent, calf, adopter)
     await window.__sleepSim(0.3)
-    parent.dead = true; parent.child = undefined // the parent dies (leaves the calf orphaned)
+    parent.dead = true; parent.deathCause = 'staged'; parent.child = undefined // the parent dies (leaves the calf orphaned)
     await window.__pollSim(4, () => calf.parent && calf.parent !== parent && calf.parent.dead !== true)
     const np = calf.parent
     const adopted = !!np && np !== parent && np.dead !== true && np.young !== true
@@ -2433,7 +2433,7 @@ if (section('dressing-growth')) {
     const farAdult = mk(6, 0) // eligible, but now far outside the shrunk radius
     herds.zebra.unshift(lone, orphan, farAdult)
     await window.__sleepSim(0.3)
-    lone.dead = true; orphan.parent = undefined
+    lone.dead = true; lone.deathCause = 'staged'; orphan.parent = undefined
     await window.__pollSim(2, () => false)
     const stayedOrphan = !orphan.parent // no crash, no dangling reference
     window.__balance.family.adoptionRadius = prevR
@@ -2547,7 +2547,7 @@ if (section('carcass-scavenging')) {
     for (const sp of sp5) herds[sp] = herds[sp].filter((a) => !a.dead)
     w.scavenger.current.target = null
     const p = window.__game.getState().pos
-    const carcass = { x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject' }
+    const carcass = { x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk: 'inject' }
     herds.zebra.push(carcass)
     let landed = false
     let dissolveStarted = false
@@ -3356,10 +3356,10 @@ if (section('broken-wing-lure')) {
     for (const sp of sp5) herds[sp] = herds[sp].filter((a) => !a.dead)
     w.scavenger.current.target = null
     const p = window.__game.getState().pos
-    const near = { x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'near' }
+    const near = { x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk: 'near' }
     herds.zebra.push(near)
     for (let i = 0; i < 300; i++) {
-      herds.zebra.push({ x: p.x + 900 + i, z: p.z + 900, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: `far${i}` })
+      herds.zebra.push({ x: p.x + 900 + i, z: p.z + 900, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk: `far${i}` })
     }
     const before = herds.zebra.filter((a) => a.dead).length
     // Player stays put; the cull runs per frame — a SIM settle guarantees frames
@@ -3862,7 +3862,7 @@ if (section('calf-jitter')) {
     const { parent, calf } = fam
     await window.__sleepSim(0.4)
     const bodyX = parent.x, bodyZ = parent.z
-    parent.dead = true // THE TRIGGER IS DEATH: the calf watches its parent fall
+    parent.dead = true; parent.deathCause = 'staged' // THE TRIGGER IS DEATH: the calf watches its parent fall
     await window.__pollSim(4, () => calf.mourn !== undefined)
     const armed = calf.mourn > 0 && !!calf.mournAt
     const anchored = armed && Math.hypot(calf.mournAt.x - bodyX, calf.mournAt.z - bodyZ) < 0.01
@@ -3885,7 +3885,7 @@ if (section('calf-jitter')) {
     const adopter = { x: fam2.parent.x + 3, z: fam2.parent.z, y: 0.2, rot: 0, scale: 1, phase: 0.11, chunk: fam2.parent.chunk }
     window.__wildlife.herdsRef.current.zebra.push(adopter)
     await window.__sleepSim(0.4)
-    fam2.parent.dead = true
+    fam2.parent.dead = true; fam2.parent.deathCause = 'staged'
     await window.__pollSim(4, () => calf2.mourn !== undefined && !!calf2.parent)
     const adoptedWhileMourning = !!calf2.parent && calf2.parent !== fam2.parent && calf2.mourn > 0
     let hopped2 = false
@@ -3907,7 +3907,7 @@ if (section('calf-jitter')) {
     const fam3 = window.__makeTestFamily(p2.x + 26, p2.z + 20)
     const calf3 = fam3.calf
     await window.__sleepSim(0.4)
-    fam3.parent.dead = true
+    fam3.parent.dead = true; fam3.parent.deathCause = 'staged'
     await window.__pollSim(4, () => calf3.mourn !== undefined)
     const mourningWhenHunted = calf3.mourn !== undefined
     const lx = calf3.x + 5, lz = calf3.z // pinned well beyond CALF_CATCH_DIST: it flees, it is not seized
@@ -4139,7 +4139,8 @@ if (section('predator-food-web')) {
 // to force this branch); a parent that only got
 // close by the time the window ends is eaten alongside the calf. The predation is
 // resolved by the herds off the calf's `caught` timer, so it can be forced by
-// hand (the live LionHunt is pinned idle first). Each scenario re-finds a live
+// hand (the live LionHunt is pinned idle first, then staged feeding at the
+// forced catch: a catch no predator holds is released alive, point 326). Each scenario re-finds a live
 // family (the inline finder skips animals a prior scenario killed).
 if (section('calf-predation-drama')) {
   // (1) The caught calf struggles unharmed for the first seconds, then is killed.
@@ -4157,6 +4158,7 @@ if (section('calf-predation-drama')) {
     const stains = window.__wildlife.stains
     const stains0 = stains.current.length
     calf.caught = 5
+    { const s = window.__lionHunt.state; s.predator = 'lion'; s.victim = calf; s.victimHunt = true; s.px = calf.x; s.pz = calf.z; s.lx = calf.x + 0.7; s.lz = calf.z; s.mode = 'feed'; s.timer = 30 } // the predator holding the catch (point 326: no death without a visible actor)
     // Sim-clock (point 249): the struggle countdown ticks by dt, so a fixed wall
     // wait could span zero frames on a slow backend and read caught still at 5.
     // Latch the mid-struggle state as soon as the countdown has visibly ticked.
@@ -4193,6 +4195,7 @@ if (section('calf-predation-drama')) {
     pd.preyWeapon = {}
     calf.caught = 5
     calf.x = parent.x + 5; calf.z = parent.z // pinned 5 units off; the parent must run to it
+    { const s = window.__lionHunt.state; s.predator = 'lion'; s.victim = calf; s.victimHunt = true; s.px = calf.x; s.pz = calf.z; s.lx = calf.x + 0.7; s.lz = calf.z; s.mode = 'feed'; s.timer = 30 } // the predator holding the catch (point 326: no death without a visible actor)
     const d0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
     await window.__sleepSim(0.4) // sim-time (point 177) so the charge start is load-independent
     const dCharged = Math.hypot(parent.x - calf.x, parent.z - calf.z)
@@ -4226,6 +4229,7 @@ if (section('calf-predation-drama')) {
     if (!parent) return { found: false }
     calf.x = parent.x + 2.8; calf.z = parent.z // close, but the window shuts before the parent reaches
     calf.caught = 0.03
+    { const s = window.__lionHunt.state; s.predator = 'lion'; s.victim = calf; s.victimHunt = true; s.px = calf.x; s.pz = calf.z; s.lx = calf.x + 0.7; s.lz = calf.z; s.mode = 'feed'; s.timer = 30 } // the predator holding the catch (point 326: no death without a visible actor)
     // Poll until the kill resolves (point 249): both die on the same herd tick, so
     // wait for it rather than sampling after a fixed sim-sleep. A genuine bug that
     // leaves the parent alive still exhausts the budget and fails the check.
@@ -4247,6 +4251,7 @@ if (section('calf-predation-drama')) {
     if (!parent) return { found: false }
     calf.x = parent.x + 20; calf.z = parent.z // parent far off — cannot reach in time
     calf.caught = 0.03
+    { const s = window.__lionHunt.state; s.predator = 'lion'; s.victim = calf; s.victimHunt = true; s.px = calf.x; s.pz = calf.z; s.lx = calf.x + 0.7; s.lz = calf.z; s.mode = 'feed'; s.timer = 30 } // the predator holding the catch (point 326: no death without a visible actor)
     // Poll until the calf is killed (point 249) rather than sampling after a fixed
     // sim-sleep; the far parent stays alive, which the check asserts afterwards.
     await window.__pollSim(8, () => calf.dead)
@@ -7177,7 +7182,7 @@ if (section('channel-crossing')) {
     // Inject FIRST, then reset the flight: the re-pick that follows must find our
     // carcass as the nearest valid target (a frame between reset and inject could
     // otherwise bind the scavenger to some far natural kill).
-    const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5' }
+    const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk: 'inject-p5' }
     herds.zebra.push(carcass)
     const sc = w.scavenger.current
     sc.target = null
@@ -7221,7 +7226,7 @@ if (section('channel-crossing')) {
     herds.elephant.length = 0
     // Inject FIRST, then reset the flight (see above): zoom 2 streams in fresh
     // chunks whose animals could otherwise die and outbid our carcass.
-    const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5z' }
+    const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk: 'inject-p5z' }
     herds.zebra.push(carcass)
     const sc = w.scavenger.current
     sc.target = null
@@ -8565,7 +8570,7 @@ if (section('walk-off-land-constraint')) {
     // A dead non-flock carcass there: the lone scavenger's kind of meal.
     const carcass = {
       x: best.x, z: best.z, y: Math.max(0.02, best.h0), rot: 0, scale: 1, phase: 0.2,
-      chunk: undefined, dead: true,
+      chunk: undefined, dead: true, deathCause: 'staged',
     }
     herds.zebra.push(carcass)
     const sc = window.__wildlife.scavenger.current
@@ -8622,7 +8627,7 @@ if (section('walk-off-land-constraint')) {
     if (!best) return { found: false }
     const carcass = {
       x: best.x, z: best.z, y: Math.max(0.02, best.h0), rot: 0, scale: 1, phase: 0.2,
-      chunk: undefined, dead: true,
+      chunk: undefined, dead: true, deathCause: 'staged',
     }
     herds.zebra.push(carcass)
     const sc = window.__wildlife.scavenger.current
