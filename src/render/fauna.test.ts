@@ -57,6 +57,14 @@ import {
   buildZebra,
   buildZebraCalf,
   calfProportions,
+  agedColor,
+  buildAntelopeElder,
+  buildZebraElder,
+  ELDER_BUILDERS,
+  ELDERLY_SCHEMA,
+  ELEPHANT_ELDER,
+  elderlyProportions,
+  LION_ELDER_MANE,
   createCrocodileMaterial,
   createFaunaMaterial,
   CROCODILE_ALPHA_TEST,
@@ -1419,5 +1427,173 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
       expect(legs.filter((l) => l.phaseOffset === 0), name).toHaveLength(2)
       expect(legs.filter((l) => l.phaseOffset === Math.PI), name).toHaveLength(2)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The elderly-adult schema (design.md §19.18; research
+// docs/fauna-behaviour-1890.md §2/§10.7/§10.8) — the old-age twin of the calf
+// schema above: leaner, sway-backed between prominent hips and withers, duller
+// and greyer (never the giraffe), the elephant's asymmetric worn tusks.
+// ---------------------------------------------------------------------------
+describe('elderlyProportions (design.md §19.18 — the aged schema)', () => {
+  const adult: QuadrupedSpec = {
+    bodyLen: 1.4,
+    bodyR: 0.42,
+    legH: 0.6,
+    legR: 0.09,
+    neckLen: 0.4,
+    neckTilt: 0.85,
+    headSize: 0.22,
+    bodyColor: '#b6905a',
+    seed: 1,
+  }
+  const old = elderlyProportions(adult)
+
+  it('is leaner on bonier legs, carries the head lower and sags the topline', () => {
+    expect(old.bodyR).toBeLessThan(adult.bodyR)
+    expect(old.legR).toBeLessThan(adult.legR)
+    expect(old.neckTilt).toBeGreaterThan(adult.neckTilt)
+    expect(old.swayBack).toBeGreaterThan(0)
+    expect(old.elderly).toBe(true)
+    // Size and stance stay adult: an elder is not a shrunken animal.
+    expect(old.bodyLen).toBe(adult.bodyLen)
+    expect(old.legH).toBe(adult.legH)
+    expect(old.headSize).toBe(adult.headSize)
+  })
+
+  it('dulls and greys the coat and the face, but `grey: false` keeps the colour (giraffe, §10.2)', () => {
+    const sat = (hex: string) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 }).s
+    expect(sat(old.bodyColor)).toBeLessThan(sat(adult.bodyColor))
+    expect(sat(old.headColor!)).toBeLessThan(sat(old.bodyColor))
+    expect(sat(agedColor('#c89a55', 0))).toBeCloseTo(sat('#c89a55'), 5)
+    const kept = elderlyProportions(adult, { grey: false })
+    expect(kept.bodyColor).toBe(adult.bodyColor)
+    expect(kept.bodyR).toBe(old.bodyR)
+  })
+
+  it('is a schema of shares, every one an ageing direction', () => {
+    expect(ELDERLY_SCHEMA.bodyR).toBeLessThan(1)
+    expect(ELDERLY_SCHEMA.legR).toBeLessThan(1)
+    expect(ELDERLY_SCHEMA.swayBack).toBeGreaterThan(0)
+    expect(ELDERLY_SCHEMA.faceGrey).toBeGreaterThanOrEqual(ELDERLY_SCHEMA.coatGrey)
+  })
+})
+
+describe('elderly geometries (design.md §19.18 — elders read as old)', () => {
+  /** Highest point of the body near a given z (a thin slice), off the midline
+   *  knobs' reach — the topline the eye reads from above and from the side. */
+  const toplineAt = (g: THREE.BufferGeometry, z: number, halfSlice = 0.06, maxX = Infinity): number => {
+    const p = g.attributes.position
+    let top = -Infinity
+    for (let i = 0; i < p.count; i++) {
+      if (Math.abs(p.getZ(i) - z) > halfSlice || Math.abs(p.getX(i)) > maxX) continue
+      top = Math.max(top, p.getY(i))
+    }
+    return top
+  }
+  /** Half-width of the barrel at mid-body. */
+  const widthAt = (g: THREE.BufferGeometry, z: number, halfSlice = 0.3): number => {
+    const p = g.attributes.position
+    let w = 0
+    for (let i = 0; i < p.count; i++) if (Math.abs(p.getZ(i) - z) <= halfSlice) w = Math.max(w, Math.abs(p.getX(i)))
+    return w
+  }
+  const meanSaturation = (g: THREE.BufferGeometry): number => {
+    const c = g.attributes.color
+    const col = new THREE.Color()
+    const hsl = { h: 0, s: 0, l: 0 }
+    let sum = 0
+    for (let i = 0; i < c.count; i++) sum += col.setRGB(c.getX(i), c.getY(i), c.getZ(i)).getHSL(hsl).s
+    return sum / c.count
+  }
+
+  const quadrupeds: Array<[string, THREE.BufferGeometry, THREE.BufferGeometry]> = [
+    ['zebra', buildZebra(), buildZebraElder()],
+    ['antelope', buildAntelope(), buildAntelopeElder()],
+    ['wildebeest', buildWildebeest(), buildWildebeest(true)],
+    ['warthog', buildWarthog(), buildWarthog(true)],
+    ['lion', buildLion(), buildLion(true)],
+    ['cheetah', buildCheetah(), buildCheetah(true)],
+    ['leopard', buildLeopard(), buildLeopard(true)],
+    ['hyena', buildHyena(), buildHyena(true)],
+  ]
+
+  it('every elder builds the prominent hip and withers bones (extra part vertices)', () => {
+    for (const [name, adult, old] of quadrupeds) expect(vertices(old), name).toBeGreaterThan(vertices(adult))
+    expect(vertices(buildElephant(false, true))).toBeGreaterThan(vertices(buildElephant()))
+    expect(vertices(buildGiraffe(false, true))).toBeGreaterThan(vertices(buildGiraffe()))
+  })
+
+  it('every elder is leaner at mid-body than its prime adult', () => {
+    for (const [name, adult, old] of quadrupeds) expect(widthAt(old, 0), name).toBeLessThan(widthAt(adult, 0))
+    expect(widthAt(buildElephant(false, true), 0)).toBeLessThan(widthAt(buildElephant(), 0))
+    expect(widthAt(buildGiraffe(false, true), 0)).toBeLessThan(widthAt(buildGiraffe(), 0))
+  })
+
+  it('the aged topline sags at mid-back BELOW its own hip bones (sway-back)', () => {
+    // zebra/antelope: swept torso; wildebeest/lion: the capsule plan.
+    for (const [name, build, hipZ] of [
+      ['zebra', buildZebraElder(), -0.75 + 0.2 * 0.42 * ELDERLY_SCHEMA.bodyR],
+      ['lion', buildLion(true), -1.4 * 0.38],
+      ['wildebeest', buildWildebeest(true), -1.5 * 0.38],
+    ] as const) {
+      const mid = toplineAt(build, 0, 0.3, 0.05)
+      expect(Number.isFinite(mid), name).toBe(true)
+      expect(mid, name).toBeLessThan(toplineAt(build, hipZ, 0.08))
+    }
+    const prime = toplineAt(buildElephant(), 0, 0.3, 0.05)
+    const old = toplineAt(buildElephant(false, true), 0, 0.3, 0.05)
+    expect(Number.isFinite(old)).toBe(true)
+    expect(old).toBeLessThan(prime)
+  })
+
+  it('the coat dulls and greys — except the giraffe, which never greys (§10.2)', () => {
+    for (const [name, adult, old] of quadrupeds) {
+      if (name === 'zebra') continue // near-white: its stripes are a shader mark, not vertex colour
+      expect(meanSaturation(old), name).toBeLessThan(meanSaturation(adult))
+    }
+    const g = meanSaturation(buildGiraffe())
+    expect(Math.abs(meanSaturation(buildGiraffe(false, true)) - g)).toBeLessThan(0.02)
+  })
+
+  it('the old elephant carries ASYMMETRIC tusks: the right (master) worn short, the left whole (§10.4)', () => {
+    /** Furthest-forward tusk point per side; tusks are the only ivory-bright vertices. */
+    const tuskReach = (g: THREE.BufferGeometry) => {
+      const p = g.attributes.position
+      const c = g.attributes.color
+      const reach = { left: -Infinity, right: -Infinity }
+      for (let i = 0; i < p.count; i++) {
+        if (c.getX(i) < 0.55 || c.getY(i) < 0.5) continue
+        if (p.getX(i) < 0) reach.left = Math.max(reach.left, p.getZ(i))
+        else reach.right = Math.max(reach.right, p.getZ(i))
+      }
+      return reach
+    }
+    const prime = tuskReach(buildElephant())
+    expect(Math.abs(prime.left - prime.right)).toBeLessThan(0.01)
+    const old = tuskReach(buildElephant(false, true))
+    expect(old.left).toBeCloseTo(prime.left, 2) // the slave tusk stays whole
+    expect(old.right).toBeLessThan(old.left - 0.1) // the master tusk is visibly shorter
+    expect(ELEPHANT_ELDER.masterTusk).toBeLessThan(1)
+  })
+
+  it('the old lion wears a thin, darker mane: its silhouette top drops', () => {
+    expect(topY(buildLion(true))).toBeLessThan(topY(buildLion()))
+    const l = (hex: string) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 }).l
+    expect(l(LION_ELDER_MANE.color)).toBeLessThan(l('#7a5228'))
+  })
+
+  it('the old giraffe wears its ossicones down; an elder stays adult-sized (not a calf)', () => {
+    expect(topY(buildGiraffe(false, true))).toBeLessThan(topY(buildGiraffe()))
+    for (const [name, adult, old] of quadrupeds) expect(zExtent(old), name).toBeGreaterThan(zExtent(adult) * 0.9)
+  })
+
+  it('every rendered mammal that ages has an elder build; the crocodile and the birds have none (§2.4)', () => {
+    expect(Object.keys(ELDER_BUILDERS).sort()).toEqual(
+      ['antelope', 'cheetah', 'elephant', 'giraffe', 'hyena', 'leopard', 'lion', 'warthog', 'wildebeest', 'zebra'],
+    )
+    for (const k of ['crocodile', 'flamingo', 'plover', 'vulture']) expect(k in ELDER_BUILDERS).toBe(false)
+    for (const build of Object.values(ELDER_BUILDERS)) expect(vertices(build())).toBeGreaterThan(0)
   })
 })
