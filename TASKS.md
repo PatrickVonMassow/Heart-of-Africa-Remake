@@ -15511,4 +15511,12 @@ to land than a mechanism that needs a review.
   Player impact: zooming out to the whole continent shows a frozen or empty scene.
   Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
   Source: picture check of the 565 landing session, 09.11.2026.
+  Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
   Bundle: Steuerung & Performance.
+- [ ] 1496. Grass fire: close the four cross-vendor review objections point 321 landed without
+  Final state: the four objections of the GPT-6.1 Sol review of feat/321 b2023ba (passes 2/6/7, verdict merge-with-fixes) are fixed on main and `npm test -- enrichments --section=burning-grass` is green on both backends with the frame judged: (1) `src/scenes/travel/burnScarNode.ts` uses `1 - smoothstep(0, depth, dFront)` instead of the reversed-edge `smoothstep(depth, 0, dFront)`, which is undefined in GLSL; (2) the scar width derives from the swept curved front, so the flank ground the front passed is sooted too, pinned by a Vitest flank-coverage case; (3) the negative control in `scripts/verify/enrichments.mjs` reuses the positive crop boxes and requires valid on-screen captures instead of accepting off-screen crops after the sim advanced; (4) `src/scenes/travel/Wildlife.tsx` reuses one preallocated record instead of allocating a `setBurnScar` options object every frame.
+  Observed problem: point 321 was landed on 10.11.2026 before these objections were fixed; the review had asked for the fixes and a both-backend rerun before landing.
+  Player impact: (1) can render the scar edge wrongly on a driver that takes the undefined branch; (2) leaves unsooted strips at the flanks of a curved fire; (4) adds per-frame garbage.
+  Test: Vitest for the scar width; the burning-grass section on both backends.
+  Source: cross-vendor review of point 321, 09.11.2026; landing slip 10.11.2026.
+  Bundle: Wetter & Wasser.
