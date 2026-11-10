@@ -11217,11 +11217,13 @@ if (section('bird-flight-escape')) {
     bf.flightSpeed = 0.5
     bf.settleSeconds = 120
     // The camera follows the traveller, who stood where the flush began; the
-    // flock has flown on since. Pin him just behind its CURRENT centroid so the
+    // flock has flown on since. Pin him behind its CURRENT centroid so the
     // frame holds the birds, and count the birds the camera projects.
     const fx1 = flock.reduce((s, a) => s + a.x, 0) / flock.length
     const fz1 = flock.reduce((s, a) => s + a.z, 0) / flock.length
-    window.__game.setState({ pos: { x: fx1, z: fz1 + 2 } })
+    // Beside it (the frame is wider than tall), outside the take-off trigger
+    // so he does not flush the flock on again.
+    window.__game.setState({ pos: { x: fx1 + bf.takeoffTrigger + 1, z: fz1 } })
     await window.__pollSim(0.5, () => {
       if (w.lion) w.lion.mode = 'idle'
       return false
