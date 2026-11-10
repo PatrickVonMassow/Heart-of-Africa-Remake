@@ -497,7 +497,10 @@ export const DOC_BUDGETS = [
     // RAISED by the 173 measured words of the new §19.18 (work-order 265):
     // elderly variants, their behaviour, natural death and the elephant's
     // water-side death at the graveyard — a new mechanic no section described.
-    maxWords: 30318,
+    // RAISED by the 21 measured words of the point-265 review answer: the
+    // ousted old cat male as the hunt's lone hunter — a new decision; §19.18
+    // named only the grazer elder as solitary.
+    maxWords: 30339,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
