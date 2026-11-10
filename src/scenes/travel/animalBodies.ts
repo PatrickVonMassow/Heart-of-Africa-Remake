@@ -64,6 +64,9 @@ export interface DrawnBody {
   z: number
   /** Uniform scale of the drawn instance (the basis length of the matrix). */
   scale: number
+  /** Vertical component of the instance's unit up axis: 1 upright, near 0
+   *  for a body lying on its side (point 319's "stands up" check). */
+  upY: number
   /** Render-loop frame counter at the moment the instance was written. */
   frame: number
 }
@@ -82,13 +85,15 @@ export interface DrawnBodyCarrier {
  */
 export function recordDrawnBody(a: DrawnBodyCarrier, m: ArrayLike<number>, frame: number): void {
   const scale = Math.hypot(m[0], m[1], m[2])
+  const upY = scale > 0 ? m[5] / scale : 0
   const d = a.drawn
-  if (d === undefined) a.drawn = { x: m[12], y: m[13], z: m[14], scale, frame }
+  if (d === undefined) a.drawn = { x: m[12], y: m[13], z: m[14], scale, upY, frame }
   else {
     d.x = m[12]
     d.y = m[13]
     d.z = m[14]
     d.scale = scale
+    d.upY = upY
     d.frame = frame
   }
 }

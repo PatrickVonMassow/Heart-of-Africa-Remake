@@ -6157,18 +6157,54 @@ if (section('crocodile-ambush')) {
             await window.__sleepSim(2)
             herds.crocodile = herds.crocodile.filter((k) => k !== croc)
             await window.__sleepSim(CAUGHT_PLUS)
-            out.aftermath.freedAlive = !calf.dead && calf.caught === undefined && calf.caughtBy === undefined
+            // Freed as the PLAYER sees it, not only as state: drawn in the same
+            // pass as its parent, upright, and walking off (the instance the
+            // render loop wrote, point 378's drawn record).
+            const d0 = calf.drawn ? { x: calf.drawn.x, z: calf.drawn.z } : null
+            await window.__sleepSim(1.5)
+            const d = calf.drawn
+            out.aftermath.drawnFresh = d !== undefined && parent.drawn !== undefined && d.frame === parent.drawn.frame
+            out.aftermath.upY = d ? +d.upY.toFixed(2) : null
+            out.aftermath.walked = d && d0 ? +Math.hypot(d.x - d0.x, d.z - d0.z).toFixed(2) : null
+            out.aftermath.freedAlive = !calf.dead && calf.caught === undefined && calf.caughtBy === undefined &&
+              out.aftermath.drawnFresh && out.aftermath.upY > 0.8 && out.aftermath.walked > 0.2
           } else {
             // The kill: the crocodile keeps the body at its jaws while it sinks
             // and only slinks home once it is gone.
             await window.__pollSim(12, () => calf.dead, 56000)
+            // The sink as DRAWN (the instance matrix, not the state flag): the
+            // body goes DOWN without rising, keeps its size (no shrink in
+            // place), is drawn in the crocodile's pass and stays at its jaws.
+            const sk = { samples: 0, stale: 0, rises: 0, y0: null, yLast: null, s0: null, sMin: null, gap0: null, gapMax: 0 }
             await window.__pollSim(window.__balance.crocodile.gripSeconds + 12, () => {
               if (calf.dead && !calf.gone && (calf.dissolve ?? 0) > 0) {
                 if (!(croc.lunge && croc.lunge.victim === calf && !croc.lunge.retreat)) out.aftermath.heldWhileSinking = false
+                const d = calf.drawn
+                const c = croc.drawn
+                if (d && c) {
+                  sk.samples++
+                  if (d.frame !== c.frame) sk.stale++
+                  if (sk.y0 === null) { sk.y0 = d.y; sk.s0 = d.scale; sk.sMin = d.scale }
+                  else if (d.y > sk.yLast + 0.02) sk.rises++
+                  sk.yLast = d.y
+                  sk.sMin = Math.min(sk.sMin, d.scale)
+                  const gap = Math.hypot(d.x - c.x, d.z - c.z)
+                  if (sk.gap0 === null) sk.gap0 = gap
+                  sk.gapMax = Math.max(sk.gapMax, gap)
+                }
               }
               return calf.gone === true || (calf.dissolve !== undefined && calf.dissolve <= 0)
             })
-            out.aftermath.sank = calf.dead === true && calf.inWater !== undefined
+            const depth = window.__balance.crocodile.sinkDepth * calf.scale
+            out.aftermath.sink = {
+              samples: sk.samples, stale: sk.stale, rises: sk.rises,
+              drop: sk.y0 === null ? null : +(sk.y0 - sk.yLast).toFixed(2), depth: +depth.toFixed(2),
+              scaleKept: sk.s0 ? +(sk.sMin / sk.s0).toFixed(3) : null,
+              gapGrowth: sk.gap0 === null ? null : +(sk.gapMax - sk.gap0).toFixed(2),
+            }
+            const m = out.aftermath.sink
+            out.aftermath.sank = calf.dead === true && calf.inWater !== undefined && m.samples >= 3 && m.stale === 0 &&
+              m.rises === 0 && m.drop >= 0.5 * depth && m.scaleKept >= 0.95 && m.gapGrowth <= 1
           }
           const log = (window.__assertLog ?? []).filter((e) => e.t >= t0)
           out.aftermath.asserts = log
