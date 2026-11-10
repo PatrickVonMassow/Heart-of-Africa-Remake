@@ -3405,6 +3405,17 @@ export function elderTurnsSolitary(species: string): boolean {
   return SOLITARY_ELDER_SPECIES.includes(species)
 }
 
+/** The big cats whose ousted old MALE turns solitary (research §3.1): with no
+ *  ambient pride or coalition in the world, he appears as the §19.8 hunt's
+ *  lone hunter — the nomad that hunts alone. Never the hyena (clan rank). */
+export const SOLITARY_ELDER_CATS: readonly string[] = ['lion', 'cheetah', 'leopard']
+
+/** Is this hunt's predator an old ousted male hunting alone? Only a solitary
+ *  elder cat on its calibratable elderly roll — never the cub hunt's hyena. */
+export function huntPredatorElderly(predator: string, cubHunt: boolean, roll: number, fraction: number): boolean {
+  return !cubHunt && SOLITARY_ELDER_CATS.includes(predator) && elderTurnsSolitary(predator) && isElderRoll(roll, fraction)
+}
+
 /** Where an ousted elder stands: `distance` from its group's anchor, on the
  *  side it was placed (or along `fallbackAngle` when it stood on the anchor). */
 export function solitarySpot(

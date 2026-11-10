@@ -7254,6 +7254,39 @@ if (section('elderly-natural-death')) {
   })
   check('the old elephant dies of old age where it went down (point 265)',
     tuskerEnd.dead === true && tuskerEnd.cause === 'old-age' && tuskerEnd.movedAfterDown < 0.05, JSON.stringify(tuskerEnd))
+
+  // The ousted old cat male (design.md §19.18): no ambient pride exists, so he
+  // is the hunt's lone hunter — drawn through the aged build. A forced hunt is
+  // old only when asked; the roll repeats until the region's pool gives a cat.
+  const oldCat = await page.evaluate(async () => {
+    const L = window.__lionHunt.state
+    const mesh = window.__lionHunt.predatorMesh
+    const p = window.__game.getState().pos
+    const frames = (n) =>
+      new Promise((res) => {
+        let i = 0
+        const step = () => (++i >= n ? res() : requestAnimationFrame(step))
+        requestAnimationFrame(step)
+      })
+    const stage = async (elderly, want) => {
+      for (let k = 0; k < 24; k++) {
+        L.mode = 'idle'; L.timer = 0; L.victim = null; L.victimHunt = false
+        L.force = { x: p.x + 6, z: p.z + 6, kind: 'generic', elderly }
+        await frames(3)
+        if (L.mode !== 'idle' && L.predator !== 'hyena' && (!want || L.predator === want)) {
+          return { predator: L.predator, elderly: L.elderly === true, geo: mesh.current?.geometry?.uuid ?? null }
+        }
+      }
+      return null
+    }
+    const old = await stage(true)
+    const young = old ? await stage(false, old.predator) : null
+    L.mode = 'idle'; L.timer = 9999; L.victim = null; L.victimHunt = false; L.elderly = false
+    return { old, young }
+  })
+  check('an ousted old cat male hunts alone through his aged build (point 265)',
+    !!oldCat.old && !!oldCat.young && oldCat.old.elderly && !oldCat.young.elderly &&
+      !!oldCat.old.geo && oldCat.old.geo !== oldCat.young.geo, JSON.stringify(oldCat))
 }
 
 // --- Point 188: the coastal walk-off resolves --------------------------------

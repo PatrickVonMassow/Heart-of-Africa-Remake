@@ -11,6 +11,8 @@ import {
   DYING_DOWN_ROLL,
   dyingDeadline,
   dyingSuspended,
+  huntPredatorElderly,
+  SOLITARY_ELDER_CATS,
   dyingDownRoll,
   dyingDrawsFlock,
   dyingFailSeconds,
@@ -5050,6 +5052,18 @@ describe('natural death of old age (design.md §19.18)', () => {
       expect(t).toBeLessThanOrEqual(dyingDeadline(T) + 0.5)
     }
     expect(dyingDeadline(T)).toBeCloseTo(24 * 3 + 16, 9)
+  })
+
+  it('the ousted old cat male hunts alone: lion, cheetah, leopard only — never the hyena (point 265)', () => {
+    for (const cat of ['lion', 'cheetah', 'leopard']) {
+      expect(huntPredatorElderly(cat, false, 0.01, 0.06)).toBe(true)
+      expect(huntPredatorElderly(cat, false, 0.5, 0.06)).toBe(false) // off the elderly share
+      expect(huntPredatorElderly(cat, true, 0, 1)).toBe(false) // the cub hunt is the hyena's
+      expect(elderTurnsSolitary(cat)).toBe(true)
+    }
+    expect(huntPredatorElderly('hyena', false, 0, 1)).toBe(false)
+    expect(huntPredatorElderly('lion', false, 0, 0)).toBe(false) // rate 0: never
+    expect(SOLITARY_ELDER_CATS).not.toContain('hyena')
   })
 
   it('another drama that takes the dying animal over owns it — decline and pose wait (point 265)', () => {

@@ -171,6 +171,7 @@ import {
   dyingSlowdown,
   elderSpeedFactor,
   elderTurnsSolitary,
+  huntPredatorElderly,
   dyingSuspended,
   elephantDyingTarget,
   fightInitiates,
@@ -301,10 +302,10 @@ const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 
 const MAX_CALF_INSTANCES = 48
 /** Elders render through their aged build (design.md §19.18) in a separate
  *  instanced mesh per species, like the calves. Only the species with a live
- *  herd population carry elders in the world; the predators' elder builds
- *  exist (src/render/fauna.ts) but no ambient adult population hosts them —
- *  herds.lion holds the §19.8 lioness-and-cub family and revenge carcasses.
- *  OPEN: give the predators elders when an ambient adult population exists. */
+ *  herd population carry herd elders; no ambient adult cat population exists
+ *  (herds.lion holds the §19.8 lioness-and-cub family and revenge carcasses),
+ *  so the ousted old cat male appears as the hunt's lone hunter instead
+ *  (LionHuntState.elderly, huntPredatorElderly). The hyena gets no elder. */
 const ELDER_RENDER_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog'] as const
 type ElderRenderSpecies = (typeof ELDER_RENDER_SPECIES)[number]
 const isElderRenderSpecies = (sp: string): sp is ElderRenderSpecies =>
@@ -662,7 +663,11 @@ interface LionHuntState {
    *  idle frame, which skips the cooldown and the ambient dice and stages the
    *  named hunt at this spot. `generic` runs a scripted-prey hunt there, `calf`
    *  takes a nearby herd calf, `cub` a lion cub (always a hyena's hunt). */
-  force?: { x: number; z: number; kind: 'generic' | 'calf' | 'cub' }
+  force?: { x: number; z: number; kind: 'generic' | 'calf' | 'cub'; elderly?: boolean }
+  /** The hunter is an ousted old cat male hunting alone (design.md §19.18):
+   *  drawn through its aged build, at the elder's reduced pace. Rolled per
+   *  ambient hunt; a forced hunt takes `force.elderly` (default: not old). */
+  elderly?: boolean
 }
 const LION_STATE: LionHuntState = {
   mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
@@ -732,6 +737,9 @@ const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antel
 
 /** Render scale per predator (cheetah/leopard lithe, hyena mid, lion large). */
 const PREDATOR_SCALE: Record<PredatorKind, number> = { lion: 1, cheetah: 0.9, leopard: 0.92, hyena: 0.88 }
+
+/** The hunter's chase speed: an old cat male runs at the elder's pace (§19.18). */
+const huntPredatorSpeed = () => HUNT_LION_SPEED * elderSpeedFactor(LION_STATE.elderly, balance.elderly.speedFactor)
 
 /** Distance (world units) at which walking into the hunt predator triggers an attack. */
 const LION_CONTACT_RADIUS = 2
@@ -1902,6 +1910,8 @@ function applyFaunaBodySegments(segments: number): void {
 // under dispose={null}, leak) its geometry set per place visit.
 interface HuntGeos {
   predator: Record<PredatorKind, THREE.BufferGeometry>
+  /** The aged builds of the cats whose old male hunts alone (§19.18). */
+  elderPredator: Record<'lion' | 'cheetah' | 'leopard', THREE.BufferGeometry>
   prey: Record<PreyKind, THREE.BufferGeometry>
 }
 let huntGeoCache: HuntGeos | null = null
@@ -1909,6 +1919,7 @@ function getHuntGeos(): HuntGeos {
   if (huntGeoCache) return huntGeoCache
   huntGeoCache = {
     predator: { lion: buildLion(), cheetah: buildCheetah(), leopard: buildLeopard(), hyena: buildHyena() },
+    elderPredator: { lion: ELDER_BUILDERS.lion(), cheetah: ELDER_BUILDERS.cheetah(), leopard: ELDER_BUILDERS.leopard() },
     prey: {
       zebra: buildZebra(),
       wildebeest: buildWildebeest(),
@@ -2151,6 +2162,7 @@ function Herds() {
       LION_STATE.timer = 0
       LION_STATE.victim = null
       LION_STATE.victimHunt = false
+      LION_STATE.elderly = false
       LION_STATE.force = { x, z, kind }
     }
 
@@ -2854,7 +2866,7 @@ function Herds() {
           // is reconstructed from the lion's heading + speed (robust — no stored
           // prev-position that a directly-staged hunt could leave stale, which
           // fired the take a frame too early before the calf could flee).
-          const lmv = HUNT_LION_SPEED * dt
+          const lmv = huntPredatorSpeed() * dt
           const lpx = LION_STATE.lx - Math.sin(LION_STATE.lionHeading) * lmv
           const lpz = LION_STATE.lz - Math.cos(LION_STATE.lionHeading) * lmv
           if (segPointDist(lpx, lpz, LION_STATE.lx, LION_STATE.lz, a.x, a.z) < PARENT_TAKE_DIST) {
@@ -6013,7 +6025,7 @@ function LionHunt() {
   // plains and take varied game — geometries and material from the module
   // pool (point 96): with the travel scene's dispose={null} a per-mount
   // useMemo would leak a fresh geometry set on every place visit.
-  const { predator: predatorGeo, prey: preyGeo } = getHuntGeos()
+  const { predator: predatorGeo, elderPredator: elderPredatorGeo, prey: preyGeo } = getHuntGeos()
   const material = getWildlifeMeshes().material
 
   // Dev hook for the headless verification (CLAUDE.md §7.2). `stain` is the
@@ -6240,8 +6252,14 @@ function LionHunt() {
       // and it only spawns where hyenas roam. The scripted prey mesh stays
       // hidden through the victim hunt, so s.prey's value is cosmetic here.
       if (cubHunt) s.predator = 'hyena'
+      // An ousted old cat male hunts alone (design.md §19.18): ambient hunts
+      // roll it on the elderly share; a forced hunt is old only when asked.
+      s.elderly = force
+        ? force.elderly === true && huntPredatorElderly(s.predator, cubHunt, 0, 1)
+        : huntPredatorElderly(s.predator, cubHunt, Math.random(), balance.elderly.fraction)
       if (predatorMesh.current) {
-        predatorMesh.current.geometry = predatorGeo[s.predator]
+        const p = s.predator
+        predatorMesh.current.geometry = s.elderly && p !== 'hyena' ? elderPredatorGeo[p] : predatorGeo[p]
         predatorMesh.current.scale.setScalar(PREDATOR_SCALE[s.predator])
       }
       if (preyMesh.current) {
@@ -6357,7 +6375,7 @@ function LionHunt() {
         // swimming calf quarry does (design.md §19.5; the generic scripted prey
         // runs unbraked), so the water is a real escape: a close
         // pursuer still catches, a distant one sees it reach the far bank.
-        const lionPace = swimBrakedPace(HUNT_LION_SPEED, terrainAt(s.lx, s.lz), huntSwimPace())
+        const lionPace = swimBrakedPace(huntPredatorSpeed(), terrainAt(s.lx, s.lz), huntSwimPace())
         s.lx += Math.sin(s.lionHeading) * lionPace * dt
         s.lz += Math.cos(s.lionHeading) * lionPace * dt
         // SWEPT catch (point 179): test the lion's MOVE SEGMENT against the prey,
@@ -6386,6 +6404,7 @@ function LionHunt() {
         if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR) {
           s.mode = 'idle'
           s.timer = 10
+          s.elderly = false // the stage is empty: no old hunter lingers into the next
         }
       }
     } else if (s.mode === 'feed') {
@@ -6507,6 +6526,7 @@ function LionHunt() {
       if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR || leaveOvertime) {
         s.mode = 'idle'
         s.timer = 30 + Math.random() * 30
+        s.elderly = false // the stage is empty: no old hunter lingers into the next
         s.leaveHeading = undefined
         s.leaveT = 0
       }
