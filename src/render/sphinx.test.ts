@@ -20,9 +20,11 @@ import {
   sphinxDriftBounds,
   sphinxDriftHeight,
   sphinxDriftNormal,
+  headBlockWidths,
   sphinxHeadBlock,
   sphinxPartsFor,
   type SphinxLod,
+  type SphinxPart,
 } from '../world/sphinx'
 import { buildSphinxGeometry, SPHINX_BAND_ATTRIBUTE } from './sphinx'
 
@@ -109,18 +111,30 @@ describe('three levels of detail, one source', () => {
     expect([...skyline].sort()).toEqual(['face', 'headBlock', 'neck', 'spine'])
   })
 
-  it('the skyline level carries the drift: the mound is present and stands over half the crown height', () => {
+  it('the skyline level carries the drift: the mound is DRAWN and stands over half the crown height', () => {
+    // Counted on the triangles, not the vertex grid: addDrift emits the whole
+    // grid before it indexes the cells, so only vertices a drift triangle
+    // references — and the area those triangles cover — prove the mound is drawn.
     const geo = buildSphinxGeometry('skyline')
     const pos = geo.getAttribute('position')
+    const idx = geo.index!
+    const onDrift = (i: number) => Math.abs(pos.getY(i) - sphinxDriftHeight(pos.getX(i), pos.getZ(i), 'skyline')) < 1e-6
+    const used = new Set<number>()
+    let area = 0
     let driftTop = 0
-    let driftVerts = 0
-    for (let i = 0; i < pos.count; i++) {
-      const y = pos.getY(i)
-      if (Math.abs(y - sphinxDriftHeight(pos.getX(i), pos.getZ(i), 'skyline')) > 1e-6) continue
-      driftVerts++
-      driftTop = Math.max(driftTop, y)
+    for (let t = 0; t < idx.count; t += 3) {
+      const v = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)]
+      if (!v.every(onDrift)) continue
+      for (const i of v) {
+        used.add(i)
+        driftTop = Math.max(driftTop, pos.getY(i))
+      }
+      const [ax, az, bx, bz, cx, cz] = [pos.getX(v[0]), pos.getZ(v[0]), pos.getX(v[1]), pos.getZ(v[1]), pos.getX(v[2]), pos.getZ(v[2])]
+      area += Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2
     }
-    expect(driftVerts).toBeGreaterThan(100)
+    expect(used.size).toBeGreaterThan(100)
+    // A plan area of at least a tenth of the body's length squared.
+    expect(area).toBeGreaterThan(0.1)
     expect(driftTop).toBeGreaterThan(sphinxCrownHeight('skyline') * 0.4)
     // The skyline drift is the site's drift, drawn true.
     expect(sphinxDriftBounds('skyline')).toEqual(sphinxDriftBounds())
@@ -146,7 +160,7 @@ describe('three levels of detail, one source', () => {
         expect(p.centre[2]).toBeCloseTo(src.centre[2] * e.pawSpread, 9)
         continue
       }
-      const k = p.group === 'head' ? e.head : 1
+      const k = p.group === 'head' || p.id === 'neck' ? e.head : 1
       const w = p.id === 'spine' ? e.spineWidth : 1
       for (let i = 0; i < 3; i++) {
         expect(p.radii[i]).toBeCloseTo(src.radii[i] * k * (i === 2 ? w : 1), 9)
@@ -244,9 +258,23 @@ describe('three levels of detail, one source', () => {
     const block = sphinxHeadBlock()
     // Derived from the nemes parts: it spans exactly their extent.
     const srcs = SPHINX_CLEAR_PARTS.filter((p) => (SPHINX_HEAD_BLOCK_SOURCES as readonly string[]).includes(p.id))
-    const ys = srcs.flatMap((p) => sampleSurface(p, 32, 24).map((q) => q.p[1]))
+    const pts = srcs.flatMap((p) => sampleSurface(p, 64, 48).map((q) => q.p))
+    const ys = pts.map((q) => q[1])
     expect(block.centre[1] + block.radii[1]).toBeCloseTo(Math.max(...ys), 6)
     expect(block.centre[1] - block.radii[1]).toBeCloseTo(Math.min(...ys), 6)
+    // …and laterally: the DRAWN block is as wide as its sources (no loss to
+    // the superellipsoid's contraction), its crown as wide as theirs.
+    const srcMax = Math.max(...pts.map((q) => Math.abs(q[2])))
+    const srcTop = Math.max(...pts.filter((q) => q[1] >= Math.max(...ys) - (Math.max(...ys) - Math.min(...ys)) * 0.25).map((q) => Math.abs(q[2])))
+    const drawn = headBlockWidths(block)
+    expect(Math.abs(drawn.max / srcMax - 1)).toBeLessThan(0.01)
+    expect(Math.abs(drawn.top / srcTop - 1)).toBeLessThan(0.02)
+    const flared = headBlockWidths(sphinxHeadBlock(SPHINX_FORM.emphasis.skyline.lappetFlare))
+    expect(Math.abs(flared.max / (srcMax * SPHINX_FORM.emphasis.skyline.lappetFlare) - 1)).toBeLessThan(0.01)
+    // Depth: front and back as far as the sources reach.
+    const xs = pts.map((q) => q[0])
+    expect(block.centre[0] + block.radii[0]).toBeCloseTo(Math.max(...xs), 6)
+    expect(block.centre[0] - block.radii[0]).toBeCloseTo(Math.min(...xs), 6)
     // The face-on outline: the half-width per height band, top to bottom.
     const sky = sphinxPartsFor('skyline').find((p) => p.id === 'headBlock')!
     // Scanned through the solid (partLevel ≤ 1), not from surface samples,
@@ -280,7 +308,41 @@ describe('three levels of detail, one source', () => {
     expect(sphinxPartsFor('skyline').some((p) => p.id.startsWith('wing') || p.id.startsWith('lappet'))).toBe(false)
   })
 
-  it('the distant levels have nothing to z-fight either: their parts cross each other and the drift at real angles', () => {
+  it('the distant levels\' own parts meet each other only at real angles (transformed paws, widened spine, head block)', () => {
+    const deg = (r: number) => (r * 180) / Math.PI
+    const crossing = (a: readonly number[], b: readonly number[]) =>
+      deg(Math.acos(Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))))
+    const gradient = (p: SphinxPart, x: number, y: number, z: number) => {
+      const e = 1e-5
+      const g = [
+        partLevel(p, x + e, y, z) - partLevel(p, x - e, y, z),
+        partLevel(p, x, y + e, z) - partLevel(p, x, y - e, z),
+        partLevel(p, x, y, z + e) - partLevel(p, x, y, z - e),
+      ]
+      const l = Math.hypot(g[0], g[1], g[2])
+      return g.map((v) => v / l)
+    }
+    let contacts = 0
+    for (const lod of ['landmark', 'skyline'] as const) {
+      const parts = sphinxPartsFor(lod)
+      for (const a of parts) {
+        for (const b of parts) {
+          if (a === b) continue
+          for (const s of sampleSurface(a, 64, 48)) {
+            const level = partLevel(b, s.p[0], s.p[1], s.p[2])
+            const r = Math.hypot(s.p[0] - b.centre[0], s.p[1] - b.centre[1], s.p[2] - b.centre[2])
+            if (Math.abs(r * (1 - 1 / level)) > 0.0015) continue
+            contacts++
+            expect(crossing(s.n, gradient(b, s.p[0], s.p[1], s.p[2])), `${lod}: ${a.id} against ${b.id}`).toBeGreaterThan(10)
+          }
+        }
+      }
+    }
+    // The levels' parts do touch (the check is not vacuous).
+    expect(contacts).toBeGreaterThan(0)
+  })
+
+  it('the distant levels have nothing to z-fight either: their parts cross the drift and the ground at real angles', () => {
     const deg = (r: number) => (r * 180) / Math.PI
     const crossing = (a: readonly number[], b: readonly number[]) =>
       deg(Math.acos(Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))))

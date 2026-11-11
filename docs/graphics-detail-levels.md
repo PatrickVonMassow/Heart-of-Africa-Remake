@@ -284,17 +284,21 @@ added.
   spine, the Cairo skyline only the head, the neck and the back ridge above its
   drift (owner verdict 11.11.2026). The landmark is the one definition under
   its documented travel-scale emphasis (`SPHINX_FORM.emphasis.landmark`: head
-  block ×1.45, the two forepaws revealed in stone — lengthened, lifted, spread
-  and widened, no sand over them, so the notch between them stays open — the
-  back ridge widened ×2.2, stone tones ×0.66); its drift is drawn in the travel
-  ground's own desert tone (`SPHINX_FORM.landmarkDrift`), cut along its zero
-  contour instead of grid cells, with shading and normals feathered into the
-  flat ground over its lowest 0.05 (owner verdict 11.11.2026, 11:02). The
-  skyline is drawn true in proportion and sized so its crown stands
+  block ×1.45 with the neck scaled alongside, the two forepaws revealed in
+  stone at their own length — lifted, spread and widened, joined to the chest,
+  the notch between them open — the back ridge widened ×2.2, stone tones
+  ×0.66) and draws NO drift: an untextured sand mesh cannot take the travel
+  ground's textured response and rendered as a pale patch (owner picture
+  check 11.11.2026), so at travel scale the stone alone carries the figure.
+  The skyline is drawn true in proportion and sized so its crown stands
   20/138.5 of Khufu's standing height; its nemes, wings, lappets and nemes
   back are drawn as their one derived tapered block (`sphinxHeadBlock`, the
-  flat-topped trapezoid widening to the shoulders) and its stone ×1.38 in the
-  pyramids' core tone family. The limestone banding is a per-fragment
+  flat-topped trapezoid widening to the shoulders, normalised on its drawn
+  surface to its sources' crown and full width, the foot flared ×1.2,
+  tessellated three times finer) and its stone ×1.38 in the pyramids' core
+  tone family. Both distant levels are judged on rendered pixels too
+  (`polish-panorama`, sections `sphinx-travel` and `giza-skyline`, through
+  the field Sphinx's DEV probe, `src/render/sphinxProbe.tsx`). The limestone banding is a per-fragment
   term of its TSL material on every site level. One draw.
   Counted per level (vertices / triangles; the bird's-eye landmark and the
   Cairo skyline outline are fixed distant levels outside the presets):
@@ -304,8 +308,8 @@ added.
   | reduced (low) | 3927 | 5634 |
   | standard (medium) | 12352 | 19642 |
   | full (high) | 26041 | 42616 |
-  | landmark (bird's-eye) | 4349 | 5118 |
-  | skyline (Cairo) | 432 | 510 |
+  | landmark (bird's-eye) | 1770 | 2580 |
+  | skyline (Cairo) | 644 | 870 |
 
   The measured frame cost at the site on both backends at LOW and MEDIUM is
   owed by the owner's local run (`polish-panorama`, section `sphinx`).

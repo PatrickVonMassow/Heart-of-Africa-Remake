@@ -2840,7 +2840,7 @@ export const SPHINX_FORM = {
       stoneShade: 0.66,
       flankShade: 0.3,
     },
-    skyline: { stoneShade: 1.38, headBlock: true, lappetFlare: 1.35 },
+    skyline: { stoneShade: 1.38, headBlock: true, lappetFlare: 1.2 },
   },
   /** Walkable site placement (metres, site frame: +x east, +z south). */
   site: { x: 27, z: 3, length: 20 },

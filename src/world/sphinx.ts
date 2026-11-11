@@ -267,7 +267,7 @@ export const SPHINX_HEAD_BLOCK_SOURCES = ['nemes', 'wingR', 'wingL', 'lappetR', 
  */
 export function sphinxHeadBlock(flare = 1): SphinxPart {
   const src = SPHINX_CLEAR_PARTS.filter((p) => (SPHINX_HEAD_BLOCK_SOURCES as readonly string[]).includes(p.id))
-  const samples = src.flatMap((p) => sampleSurface(p, 32, 24))
+  const samples = src.flatMap((p) => sampleSurface(p, 64, 48))
   let minX = Infinity
   let maxX = -Infinity
   let minY = Infinity
@@ -280,25 +280,54 @@ export function sphinxHeadBlock(flare = 1): SphinxPart {
     maxY = Math.max(maxY, p[1])
     bottomHalf = Math.max(bottomHalf, Math.abs(p[2]))
   }
-  // The crown's half-width: the widest sample in the top tenth of the block.
-  const band = maxY - (maxY - minY) * 0.1
+  // The crown's half-width: the widest sample in the top quarter of the block
+  // (the flat crown proper, above where it widens into the wings).
+  const band = maxY - (maxY - minY) * 0.25
   let topHalf = 0
   for (const { p } of samples) if (p[1] >= band) topHalf = Math.max(topHalf, Math.abs(p[2]))
   bottomHalf *= flare
-  return {
+  // Average-and-taper alone ignores the superellipsoid's own contraction away
+  // from its equator, so the drawn block came out narrower than its sources
+  // (cross-vendor review of 8879aa7: −9 %). Normalise on the ACTUAL surface:
+  // measure the drawn crown band and the drawn maximum, and rescale the top
+  // and bottom coefficients until they match the targets.
+  const block = (rz: number, taper: number): SphinxPart => ({
     id: 'headBlock',
     group: 'head',
     centre: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
-    radii: [(maxX - minX) / 2, (maxY - minY) / 2, (topHalf + bottomHalf) / 2],
+    radii: [(maxX - minX) / 2, (maxY - minY) / 2, rz],
     shape: [0.15, 0.5],
     roll: 0,
     pitch: 0,
-    taper: (bottomHalf - topHalf) / (bottomHalf + topHalf),
+    taper,
     tone: 'nemes',
     band: 'none',
     burial: 'clear',
     reach: 'skyline',
+  })
+  let top = topHalf
+  let bottom = bottomHalf
+  let part = block((top + bottom) / 2, (bottom - top) / (bottom + top))
+  for (let i = 0; i < 6; i++) {
+    const w = headBlockWidths(part)
+    top *= topHalf / w.top
+    bottom *= bottomHalf / w.max
+    part = block((top + bottom) / 2, (bottom - top) / (bottom + top))
   }
+  return part
+}
+
+/** A block's drawn half-widths: at its crown band (top quarter) and at most. */
+export function headBlockWidths(part: SphinxPart): { top: number; max: number } {
+  const samples = sampleSurface(part, 64, 96)
+  const band = part.centre[1] + part.radii[1] * 0.5
+  let top = 0
+  let max = 0
+  for (const { p } of samples) {
+    max = Math.max(max, Math.abs(p[2]))
+    if (p[1] >= band) top = Math.max(top, Math.abs(p[2]))
+  }
+  return { top, max }
 }
 
 let headBlockCache: SphinxPart | null = null
@@ -340,8 +369,10 @@ export function sphinxPartsFor(lod: SphinxLod): SphinxPart[] {
       parts.push({ ...p, centre: [paw.c[0], cy, paw.c[2]], radii: paw.r, reach: 'landmark' })
     }
   }
+  // The neck scales with the head (about the same anchor), so the head
+  // parts meet it at the site's angles rather than near-tangent.
   return parts.map((p) =>
-    p.group !== 'head' || k === 1
+    (p.group !== 'head' && p.id !== 'neck') || k === 1
       ? p
       : {
           ...p,
