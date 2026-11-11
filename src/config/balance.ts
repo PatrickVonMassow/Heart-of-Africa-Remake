@@ -2866,7 +2866,7 @@ export const SPHINX_FORM = {
     skyline: { stoneShade: 1.38, headBlock: true, lappetFlare: 1.2 },
   },
   /** Walkable site placement (metres, site frame: +x east, +z south). */
-  site: { x: 22, z: 20, length: GIZA_SITE_SCALE.real.sphinxLength * GIZA_SITE_SCALE.sphinxFraction },
+  site: { x: 30, z: 20, length: GIZA_SITE_SCALE.real.sphinxLength * GIZA_SITE_SCALE.sphinxFraction },
   /** Bird's-eye landmark and Cairo skyline: body length in the Giza field's
    *  own units and the position east of Khafre (calibratable; the field is a
    *  compressed symbol, so the landmark Sphinx is drawn larger than its true
