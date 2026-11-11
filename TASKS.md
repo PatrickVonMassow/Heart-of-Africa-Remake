@@ -87,6 +87,23 @@ put it is the mistake this line exists to stop.
   check with two staged carcasses close together — exactly one flock, both eaten,
   no overlap; both backends.
 
+- [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
+   Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
+   Evidence 2: /backup/hoa/local/hoa-state-2026-11-11-1117999851.zip (seed 1117999851, place tangier, x/z -58.71/-356.97, webgpu, build ed95b5b). User text: "Hängt mit Kopf in der Kiste, sodass er nichts sehen kann und läuft sinnlos hin und her und immer wieder gegen die Wände". placeLife shows porters with no errand/target (unlike the errand walkers beside them).
+   Defects:
+   1. The carried crate sits too low: the carrier's head is inside the crate. The load must rest on top of the head (with its pad, if any), never intersecting it.
+   2. The carrier moves in a sprint gait with arms flung out. A head-load carrier walks at a steady, upright pace with at least one hand steadying the load or arms close to the body.
+   3. The porter grinds against walls. Cause in src/scenes/place/PlaceLife.tsx, function Porters: the route is a straight line from a point 3.2 m in front of a building centre (toward the plaza centre) to a random plaza point, with no path finding. In a dense place like Tangier the line runs through houses (the end point can lie inside one); resolveMove only pushes the porter to the wall, and the sine ping-pong rubs him against the same wall again and again. Heading comes from the route line, not from the actual movement, so he walks sideways or faces the wall.
+   Shared cause of defect 2 (sprint): the position follows sin(t*speed) along the line, so peak speed = speed * routeLength / 2 — a 20 m route gives about 6-7 m/s. The pace scales with route length.
+   Final state:
+   1. The crate rests on top of the head (with its pad, if any), never intersecting it.
+   2. Porters walk walkable routes between a building entrance and the plaza (as the errand walkers do) at a steady head-load walking pace independent of route length; upright gait, at least one hand steadying the load or arms close to the body.
+   3. Heading follows the actual movement.
+   4. No porter stands at a wall without progress for longer than a bounded time (dev-mode invariant or test assertion).
+   Verify: Playwright pictures of a moving head-load porter in Cairo (seed 1177128818) and Tangier (seed 1117999851), both backends when isBackendSensitivePath applies; plus a test that porters make progress and do not grind against colliders. Related but separate: 1425 (water jar jumps from hip to shoulder).
+   Ranked to the front by user order 11.11.2026 ("Ja, so erweitern und 1490 nach vorne ziehen.").
+   Bundle: Dorfleben.
+
 - [ ] 328. Vultures do not visibly land (user 25.07.2026: "they seem to fly one
   moment and stand the next — is there a landing at all?"). Add a real landing
   approach to the §19.6 flock AND the lone ground scavenger: a descending glide
@@ -15014,14 +15031,6 @@ to land than a mechanism that needs a review.
   5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
   Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
   Bundle: Dorfleben.
-- [ ] 1490. Head-load porter: crate sinks into the head and the carrier sprints (user report 05.11.2026, not part of the clothing closure)
-  Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
-  Two defects:
-  1. The carried crate sits too low: the carrier's head is inside the crate. The load must rest on top of the head (with its pad, if any), never intersecting it.
-  2. The carrier moves in a sprint gait with arms flung out. A head-load carrier walks at a steady, upright pace with at least one hand steadying the load or arms close to the body.
-  Verify with a Playwright picture of a head-load carrier in Cairo (and any other place using head loads) in motion, both backends when isBackendSensitivePath applies. Related but separate: 1425 (water jar jumps from hip to shoulder).
-  Bundle: Dorfleben.
-
 - [ ] 1492. On the low preset the task walker's head-load cone pierces the bundle at full kneel
   (measured 09.11.2026 on feat/1301 43d129505, polish-villagers --section=village-walk, WebGPU).
   With detailLevel low, at the first frame with `inhabitant.userData.kneel === 1` the task
