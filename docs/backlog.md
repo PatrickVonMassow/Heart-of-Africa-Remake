@@ -2293,3 +2293,4 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
       Queue position: at the very top of the open work order, directly after the v0.3.1 release point (user order 28.10.2026).
       Bundle: Session- & Repo-Hygiene.
       Criticality: high — touches every batch mechanism.
+- Goat-stance charge passes again on WebGPU (finding 11.11.2026, catch-up polish-panorama run after the Sphinx landing): the guard printed STRIKE for the `settlement walker (goat): the planted foot …` entry charged to open point 725 in `scripts/render-verify-charges.mjs`. Not struck: five ledger tests (`render-verify-core`, `render-verify-recorder`) are built on that entry, and one green run is weak evidence while 725 disputes the cause. Missing information: whether the pass holds over several WebGPU runs — 725 settles it.
