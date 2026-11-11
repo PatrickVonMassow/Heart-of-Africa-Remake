@@ -10189,12 +10189,14 @@ if (section('debug-jump-dropdown')) {
   check('F2 toggles do-not-disturb', f2.on === true && f2.off === false, '')
 }
 
-// --- Elephant graveyard: fallen carcasses + strewn ivory (user request) ------
+// --- Elephant graveyard: skeletons, skulls + strewn ivory (user request) -----
 // The graveyard is a fixed scene decoration; read its layout via the dev hook
 // (mounted in the current bird's-eye scene), then jump onto it for a shot.
 if (section('elephant-graveyard')) {
   const graveyard = await page.evaluate(() => (window.__graveyard ? { ...window.__graveyard } : null))
-  check('elephant graveyard has fallen elephant carcasses', !!graveyard && graveyard.carcasses >= 5, graveyard ? `${graveyard.carcasses} carcasses` : 'no dev hook')
+  // Point 1498: remains, never whole bodies — skeletons and skulls lying low.
+  check('elephant graveyard has elephant skeletons and skulls', !!graveyard && graveyard.skeletons >= 5 && graveyard.skulls >= 6, graveyard ? `${graveyard.skeletons} skeletons, ${graveyard.skulls} skulls` : 'no dev hook')
+  check('elephant graveyard shows no whole body: the remains lie low (point 1498)', !!graveyard && graveyard.remainsHeight < 1.3, graveyard ? `remains top ${graveyard.remainsHeight?.toFixed(2)}` : 'no dev hook')
   check('elephant graveyard has strewn ivory tusks', !!graveyard && graveyard.tusks >= 10, graveyard ? `${graveyard.tusks} tusks` : 'no dev hook')
   check('elephant graveyard has scattered bones', !!graveyard && graveyard.bones >= 8, graveyard ? `${graveyard.bones} bones` : 'no dev hook')
   await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6)) // onto the graveyard
