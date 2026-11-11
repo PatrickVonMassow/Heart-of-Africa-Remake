@@ -1711,7 +1711,8 @@ export function buildGiraffeParts(): { body: THREE.BufferGeometry; legs: GoatLeg
   bodyParts.push(giraffePatches(tint(body, '#c89a55', 0.14, 111)))
 
   const neck = new THREE.CylinderGeometry(0.13, 0.2, 1.6, FAUNA_TESSELLATION.limb)
-  neck.rotateX(-0.35)
+  // Positive about X tips the neck top forward (+z), toward the head.
+  neck.rotateX(0.35)
   neck.translate(0, 2.85, 0.85)
   bodyParts.push(giraffePatches(tint(neck, '#c89a55', 0.14, 113)))
 

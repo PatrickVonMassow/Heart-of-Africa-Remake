@@ -1654,8 +1654,8 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
     })
   }
 
-  it('rework: the giraffe head sits on its neck, prime and elder alike', () => {
-    for (const g of [buildGiraffe(), buildGiraffe(false, true)]) {
+  it('rework: the giraffe head sits on its neck — prime, elder and the split panorama build', () => {
+    for (const g of [buildGiraffe(), buildGiraffe(false, true), buildGiraffeParts().body]) {
       const p = g.attributes.position
       let maxY = -Infinity
       for (let i = 0; i < p.count; i++) maxY = Math.max(maxY, p.getY(i))
