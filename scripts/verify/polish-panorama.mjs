@@ -11,6 +11,7 @@ import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './foot
 import { judgeStanceSlip } from './stanceSlip.mjs'
 import { judgeFlickerSeries } from './flickerSeries.mjs'
 import sharp from 'sharp'
+import { HEAD_MIN_ROWS, judgeSkylineHead, judgeTravelSphinx } from './sphinxSilhouette.mjs'
 import { section, check, probeSilhouetteFooting, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
 
 // --- Field Sphinx pixel layers (work-order point 315) ---------------------------
@@ -125,17 +126,11 @@ if (section('giza-skyline')) {
         if (first < 0) first = y
         widths.push(b - a + 1)
       }
-      const h = widths.length
-      const at = (f) => widths[Math.min(h - 1, Math.max(0, Math.round(f * (h - 1))))] ?? 0
-      const crownW = widths[1] ?? 0
-      const quarterW = at(0.25)
-      const shoulderW = Math.max(0, ...widths.slice(Math.round(h * 0.7)))
-      const detail = `head ${h} px tall above its drift; widths crown ${crownW}, quarter ${quarterW}, shoulders ${shoulderW} px; rows ${widths.join(',')}`
-      check('the skyline Sphinx head is large enough in the frame to judge (>= 15 px above the drift)', h >= 15, detail)
-      check('face-on the skyline Sphinx head is flat-topped in the frame (crown row >= 0.6 of the width a quarter down)',
-        h >= 15 && crownW >= 0.6 * quarterW, detail)
-      check('face-on the skyline Sphinx head widens to the shoulders in the frame (shoulders >= 1.4x the upper head)',
-        h >= 15 && shoulderW >= 1.4 * Math.max(crownW, quarterW), detail)
+      const j = judgeSkylineHead(widths)
+      const detail = `head ${j.occupied} of ${j.rows} rows occupied above its drift; widths crown ${j.crownW}, quarter ${j.quarterW}, shoulders ${j.shoulderW} px; rows ${widths.join(',')}`
+      check(`the skyline Sphinx head is large enough in the frame to judge (>= ${HEAD_MIN_ROWS} occupied rows above the drift)`, j.enough, detail)
+      check('face-on the skyline Sphinx head is flat-topped in the frame (crown row >= 0.6 of the width a quarter down)', j.flat, detail)
+      check('face-on the skyline Sphinx head widens to the shoulders in the frame (shoulders >= 1.4x the upper head)', j.widens, detail)
     }
   }
 
@@ -1059,26 +1054,18 @@ if (section('sphinx-travel')) {
       const x1 = Math.min(W - 1, Math.ceil(probe.box.maxX * k) + 4)
       const y0 = Math.max(0, Math.floor(probe.box.minY * k) - 4)
       const y1 = Math.min(L.H - 1, Math.ceil(probe.box.maxY * k) + 4)
-      let n = 0
-      let pale = 0
-      let lumN = 0
-      let lumG = 0
+      const pixels = []
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
           const i = y * W + x
-          if (!isMask(i)) continue
-          n++
-          const d = px(drawn, i)
-          const g = px(hidden, i)
-          lumN += lum(d)
-          lumG += lum(g)
-          if (lum(d) > lum(g) * 1.08 && sat(d) < sat(g) * 0.85) pale++
+          if (isMask(i)) pixels.push({ drawn: px(drawn, i), hidden: px(hidden, i) })
         }
       }
-      const detail = `${n} Sphinx px in box ${x0}-${x1} x ${y0}-${y1}; pale ${pale} (${((100 * pale) / Math.max(1, n)).toFixed(1)} %); mean luminance Sphinx ${(lumN / Math.max(1, n)).toFixed(1)} vs ground behind ${(lumG / Math.max(1, n)).toFixed(1)}`
-      check('the bird\'s-eye Sphinx is visible in the frame (>= 150 px)', n >= 150, detail)
+      const t = judgeTravelSphinx(pixels)
+      const detail = `${t.n} Sphinx px in box ${x0}-${x1} x ${y0}-${y1}; drawn-vs-ground contrast ${t.meanContrast.toFixed(1)} (changed ${(100 * t.changedShare).toFixed(0)} %); pale ${t.pale} (${((100 * t.pale) / Math.max(1, t.n)).toFixed(1)} %); mean luminance Sphinx ${t.lumDrawn.toFixed(1)} vs ground behind ${t.lumGround.toFixed(1)}`
+      check('the bird\'s-eye Sphinx is visible in the frame (>= 150 px, drawn distinctly from the ground behind)', t.visible, detail)
       check('the bird\'s-eye Sphinx draws no pale patch over the ground (< 5 % of its pixels lighter and greyer than the ground behind)',
-        n >= 150 && pale / n < 0.05, detail)
+        t.noPale, detail)
     }
   }
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
