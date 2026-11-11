@@ -36343,3 +36343,15 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   project's own verification host, whose absolute milliseconds mean nothing but whose
   RELATIVE drop must confirm the projection rather than contradict it — without a
   visual regression the user rejects.
+
+- [x] 1489. No sensitive body part exposed from any view or pose (user rule 05.11.2026: "allgemein dürfen nie sensible Körperteile exponiert sein")
+  Design rule, to be written into design.md next to "Covered upper body and hip layer (user 06.10.2026)" and mirrored in docs/peoples-1890.md §8.6 where it applies:
+  - No figure ever shows a female breast, the genital area or the buttocks uncovered - from ANY camera angle the game can reach (including the overhead/bird's-eye and close first-person views) and in ANY pose or animation (standing, walking, running, kneeling, bending, pounding, digging, sitting).
+  - A garment that stands off the body must not open a view onto covered skin; coverage is judged by the rendered picture, not by garment presence in the outfit data.
+  - This rule outranks every budget, stop rule and revert rule: an exposure defect is never accepted, frozen or moved to the backlog; it is fixed until it holds.
+  Verification: the final picture check of 1482 includes an overhead view and a kneeling/bending pose for every covering garment form (breast cloth, wraps, tube tops, hip cloths, children's hip layer), both backends.
+  First known case: /backup/hoa/local/BlosseBrueste.zip (kneeling Bambara woman, breast cloth as stiff ring, breast bare from above).
+  Second case (finding 10.11.2026 22:46; 1482's chest RESOLVED verdict for 1489 was false): breast still bare from above on the kneeling Bambara woman. Evidence /backup/hoa/local/BruesteExponiert.zip (seed 3641016855, bambara-village, x/z -59.45/-130.99, webgpu, build 51c7783).
+  Acceptance (user front-order 10.11.2026): the user's exact spot judged from the steep overhead camera, and an overhead + kneeling/pounding frame of every covering garment form on both backends.
+  Queue position: user front-order 10.11.2026 — the very front of the work order, ahead of every other open point including the 35-point front-order of 09.11.2026; in-flight branches are parked, not discarded.
+  Bundle: Dorfleben.
