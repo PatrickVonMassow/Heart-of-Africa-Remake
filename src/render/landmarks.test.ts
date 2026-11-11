@@ -10,6 +10,7 @@ import {
   buildGizaPyramids,
   buildFieldSphinx,
   fieldSphinxLength,
+  fieldSphinxAnchors,
   GIZA_FIELD_CORE_TONE,
   GIZA_FIELD_KHUFU_HEIGHT,
   buildStoneCity,
@@ -130,9 +131,8 @@ describe('landmark builders', () => {
     // lower than the hex reads: the tawny core peaks ~1.2 with jitter while
     // the pale cap stays above 2.0.
     const khafreH = 1.5 * 0.64 * 2
-    // The bird's-eye Sphinx's drift is drawn in the travel ground's own desert
-    // tone, which is brighter in linear terms than the pyramids' core
-    // (src/render/sphinx.test.ts pins it): its footprint is discounted here.
+    // The field Sphinx is judged by its own tests (src/render/sphinx.test.ts):
+    // its footprint is discounted here.
     const sphinxGeo = buildFieldSphinx('landmark')
     sphinxGeo.computeBoundingBox()
     const sb = sphinxGeo.boundingBox!
@@ -177,8 +177,9 @@ describe('landmark builders', () => {
       const b = geo.boundingBox!
       const length = b.max.x - b.min.x
       const width = b.max.z - b.min.z
-      // Couchant: much longer than tall, longer than wide.
-      expect(length / b.max.y).toBeGreaterThan(2.5)
+      // Couchant: much longer than tall, longer than wide (the bird's-eye
+      // level's enlarged head and stone-only body make it a little taller).
+      expect(length / b.max.y).toBeGreaterThan(lod === 'landmark' ? 2 : 2.5)
       expect(length / width).toBeGreaterThan(1.5)
       // East of Khafre (the field's centre), so the face looks away from it.
       expect(b.min.x).toBeGreaterThan(0)
@@ -198,6 +199,26 @@ describe('landmark builders', () => {
     // Smaller than the bird's-eye symbol, which is drawn enlarged.
     expect(fieldSphinxLength('skyline')).toBeLessThan(fieldSphinxLength('landmark'))
     geo.dispose()
+  })
+
+  it('the scenes draw the field Sphinx as its own mesh: the pyramids without it, its anchors on it', () => {
+    for (const lod of ['landmark', 'skyline'] as const) {
+      const all = buildGizaPyramids(lod)
+      const bare = buildGizaPyramids(lod, false)
+      const sphinx = buildFieldSphinx(lod)
+      expect(bare.getAttribute('position').count + sphinx.getAttribute('position').count).toBe(all.getAttribute('position').count)
+      sphinx.computeBoundingBox()
+      const b = sphinx.boundingBox!
+      const a = fieldSphinxAnchors(lod)
+      // The crown is the mesh's top; the head's foot lies below it, on the body.
+      expect(a.crown[1]).toBeCloseTo(b.max.y, 1)
+      expect(a.headBase[1]).toBeLessThan(a.crown[1] * 0.6)
+      for (const p of [a.crown, a.headBase]) {
+        expect(p[0]).toBeGreaterThan(b.min.x)
+        expect(p[0]).toBeLessThan(b.max.x)
+      }
+      for (const g of [all, bare, sphinx]) g.dispose()
+    }
   })
 
   it("the skyline Sphinx's stone is in the pyramids' tone family, not a darker brown (owner verdict 11.11.2026, 11:02)", () => {

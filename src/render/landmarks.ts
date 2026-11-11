@@ -13,7 +13,7 @@ import { mulberry32 } from '../world/noise'
 import { buildPapyrus } from './flora'
 import { GIZA_PYRAMIDS, GIZA_SPHINX, type GizaPyramid } from '../scenes/place/gizaSite'
 import { SPHINX_FORM } from '../config/balance'
-import { SPHINX_SITE_LOD, sphinxCrownHeight, type SphinxSiteDetail } from '../world/sphinx'
+import { SPHINX_SITE_LOD, sphinxCrownHeight, sphinxDriftHeight, sphinxLodSpec, sphinxPartsFor, type SphinxSiteDetail } from '../world/sphinx'
 import { buildSphinxGeometry } from './sphinx'
 
 /** Paint a geometry with a base color plus deterministic per-vertex jitter. */
@@ -191,7 +191,7 @@ export const GIZA_FIELD_CORE_TONE = '#c9a76a'
  *  of original smooth Tura casing near its apex. Menkaure's red-granite casing
  *  is left to the walkable site (see below). Both cues are cosmetic; the
  *  footprint is unchanged. */
-export function buildGizaPyramids(sphinxLod: 'landmark' | 'skyline' = 'landmark'): THREE.BufferGeometry {
+export function buildGizaPyramids(sphinxLod: 'landmark' | 'skyline' = 'landmark', withSphinx = true): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   const core = GIZA_FIELD_CORE_TONE
   // [x, z, base half-extent] per pyramid: the diagonal row, Khufu largest in
@@ -241,7 +241,9 @@ export function buildGizaPyramids(sphinxLod: 'landmark' | 'skyline' = 'landmark'
   }
   // Sphinx east of Khafre, facing east like the real one: the ONE definition
   // at the distant level the view asks for (src/world/sphinx.ts).
-  parts.push(buildFieldSphinx(sphinxLod))
+  // The scenes draw it as its own mesh (`withSphinx` false) so the picture
+  // checks can mask it (src/render/sphinxProbe.ts).
+  if (withSphinx) parts.push(buildFieldSphinx(sphinxLod))
   return merge(parts)
 }
 
@@ -264,6 +266,31 @@ export function buildFieldSphinx(lod: 'landmark' | 'skyline'): THREE.BufferGeome
   geo.scale(length, length, length)
   geo.translate(f.x, 0, f.z)
   return geo
+}
+
+/** Points of the field Sphinx the picture checks project into the frame
+ *  (field units, as `buildFieldSphinx` places it): the crown, and the head's
+ *  foot where it leaves the drift (the highest drift under the head; the
+ *  ground where the level draws no drift). */
+export function fieldSphinxAnchors(lod: 'landmark' | 'skyline'): { crown: [number, number, number]; headBase: [number, number, number] } {
+  const f = SPHINX_FORM.field
+  const len = fieldSphinxLength(lod)
+  const head = sphinxPartsFor(lod).filter((p) => p.group === 'head')
+  let minX = Infinity
+  let maxX = -Infinity
+  let half = 0
+  for (const p of head) {
+    minX = Math.min(minX, p.centre[0] - p.radii[0])
+    maxX = Math.max(maxX, p.centre[0] + p.radii[0])
+    half = Math.max(half, Math.abs(p.centre[2]) + p.radii[2])
+  }
+  let base = 0
+  if (sphinxLodSpec(lod).driftCells > 0) {
+    for (let i = 0; i <= 8; i++)
+      for (let j = 0; j <= 8; j++) base = Math.max(base, sphinxDriftHeight(minX + ((maxX - minX) * i) / 8, -half + (2 * half * j) / 8, lod))
+  }
+  const hx = f.x + ((minX + maxX) / 2) * len
+  return { crown: [hx, sphinxCrownHeight(lod) * len, f.z], headBase: [hx, base * len, f.z] }
 }
 
 /** The Great Sphinx at the WALKABLE site (design.md §4.4, docs/giza-1890.md

@@ -2797,17 +2797,13 @@ export const SPHINX_FORM = {
     'site-full': { rings: 28, rows: 18, headFactor: 1.5, driftCells: 112, faceMarks: true },
     'site-standard': { rings: 20, rows: 12, headFactor: 1.5, driftCells: 72, faceMarks: true },
     'site-reduced': { rings: 12, rows: 8, headFactor: 1.25, driftCells: 40, faceMarks: false },
-    landmark: { rings: 10, rows: 8, headFactor: 1, driftCells: 64, faceMarks: false },
+    // The bird's-eye level draws NO drift (`driftCells: 0`; owner picture
+    // check 11.11.2026): an untextured sand mesh cannot match the travel
+    // ground's splatted, textured response and read as a pale cream patch, so
+    // at travel scale the stone alone carries the figure.
+    landmark: { rings: 10, rows: 8, headFactor: 1, driftCells: 0, faceMarks: false },
     skyline: { rings: 6, rows: 4, headFactor: 1, driftCells: 20, faceMarks: false },
   },
-  /** The bird's-eye drift (owner verdict 11.11.2026, 11:02): coloured in the
-   *  travel ground's own desert tone (src/world/terrainPalette.ts through the
-   *  far-terrain albedo response) times `groundShade`, so it reads as sand,
-   *  not as a pale grey patch; its rim is cut along the drift's zero contour
-   *  (no grid steps) and over its lowest `rimFeather` (body units) the flank
-   *  shading and the normals fade into the flat ground's, so the edge melts
-   *  into the desert (calibratable). */
-  landmarkDrift: { groundShade: 0.94, rimFeather: 0.05 },
   /** TRAVEL-SCALE EMPHASIS (owner verdict 11.11.2026): the bird's-eye landmark
    *  is read from above and far, where the true proportions blur into a pale
    *  lump. The level stays the ONE definition, transformed by these documented
@@ -2826,14 +2822,17 @@ export const SPHINX_FORM = {
    *  is drawn true in proportion, but face-on its head read as a round head
    *  with two hanging lobes: `headBlock` draws the nemes, its wings, lappets
    *  and back as their one derived tapered block (`sphinxHeadBlock`), the
-   *  flat-topped trapezoid widening to the shoulders, and `stoneShade` lifts
-   *  the stone into the pyramids' core tone family (#c9a76a). */
+   *  flat-topped trapezoid widening to the shoulders, its foot widened by
+   *  `lappetFlare` so the flare survives at the ~45 px the frame gives it,
+   *  and `stoneShade` lifts the stone into the pyramids' core tone family
+   *  (#c9a76a). The landmark's paws are kept short (`pawReach` 1) so they
+   *  stay joined to the chest. */
   emphasis: {
     landmark: {
       head: 1.45,
       pawLift: 1.9,
-      pawReach: 1.25,
-      pawSpread: 1.4,
+      pawReach: 1,
+      pawSpread: 1.3,
       pawWidth: 1.25,
       revealPaws: true,
       spineWidth: 2.2,
@@ -2841,7 +2840,7 @@ export const SPHINX_FORM = {
       stoneShade: 0.66,
       flankShade: 0.3,
     },
-    skyline: { stoneShade: 1.38, headBlock: true },
+    skyline: { stoneShade: 1.38, headBlock: true, lappetFlare: 1.35 },
   },
   /** Walkable site placement (metres, site frame: +x east, +z south). */
   site: { x: 27, z: 3, length: 20 },

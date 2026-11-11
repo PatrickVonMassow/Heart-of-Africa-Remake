@@ -230,6 +230,8 @@ export interface SphinxEmphasis {
   /** Draw the nemes, its wings, lappets and back as their derived block
    *  (`sphinxHeadBlock`) — the face-on outline of the distant skyline. */
   headBlock: boolean
+  /** Width factor of the head block's foot (the lappets flaring to the shoulders). */
+  lappetFlare: number
 }
 
 export function sphinxEmphasis(lod?: SphinxLod): SphinxEmphasis {
@@ -246,6 +248,7 @@ export function sphinxEmphasis(lod?: SphinxLod): SphinxEmphasis {
     stoneShade: 1,
     flankShade: SPHINX_FORM.drift.flankShade,
     headBlock: false,
+    lappetFlare: 1,
     ...listed,
   }
 }
@@ -258,11 +261,11 @@ export const SPHINX_HEAD_BLOCK_SOURCES = ['nemes', 'wingR', 'wingL', 'lappetR', 
  * one tapered, flat-topped superellipsoid spanning their extent — as high as
  * the crown down to the lappets' feet, as deep as crown front to nemes back —
  * whose half-width runs from the crown's at the top to the widest of the wings
- * and lappets at the bottom. Face-on that is the nemes' flat-topped trapezoid
+ * and lappets at the bottom (times the level's `lappetFlare`). Face-on that is the nemes' flat-topped trapezoid
  * widening down to the shoulders, the lappets joined to it (the skyline level,
  * where the separate wings read as two hanging lobes; owner verdict 11.11.2026).
  */
-export function sphinxHeadBlock(): SphinxPart {
+export function sphinxHeadBlock(flare = 1): SphinxPart {
   const src = SPHINX_CLEAR_PARTS.filter((p) => (SPHINX_HEAD_BLOCK_SOURCES as readonly string[]).includes(p.id))
   const samples = src.flatMap((p) => sampleSurface(p, 32, 24))
   let minX = Infinity
@@ -281,12 +284,13 @@ export function sphinxHeadBlock(): SphinxPart {
   const band = maxY - (maxY - minY) * 0.1
   let topHalf = 0
   for (const { p } of samples) if (p[1] >= band) topHalf = Math.max(topHalf, Math.abs(p[2]))
+  bottomHalf *= flare
   return {
     id: 'headBlock',
     group: 'head',
     centre: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
     radii: [(maxX - minX) / 2, (maxY - minY) / 2, (topHalf + bottomHalf) / 2],
-    shape: [0.3, 0.5],
+    shape: [0.15, 0.5],
     roll: 0,
     pitch: 0,
     taper: (bottomHalf - topHalf) / (bottomHalf + topHalf),
@@ -321,7 +325,7 @@ export function sphinxPartsFor(lod: SphinxLod): SphinxPart[] {
   const a = SPHINX_HEAD_ANCHOR
   let parts = SPHINX_CLEAR_PARTS.filter((p) => REACH_ORDER[p.reach] <= reach)
   if (e.headBlock) {
-    headBlockCache ??= sphinxHeadBlock()
+    headBlockCache ??= sphinxHeadBlock(e.lappetFlare)
     const sources = SPHINX_HEAD_BLOCK_SOURCES as readonly string[]
     parts = [...parts.filter((p) => !sources.includes(p.id)), headBlockCache]
   }

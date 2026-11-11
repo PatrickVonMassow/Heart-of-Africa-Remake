@@ -24,17 +24,15 @@ import {
   sphinxPartsFor,
   type SphinxLod,
 } from '../world/sphinx'
-import { PALETTE, PALETTE_ALT } from '../world/terrainPalette'
-import { farTerrainColor } from '../scenes/travel/farColor'
-import { buildSphinxGeometry, sphinxDriftTone, SPHINX_BAND_ATTRIBUTE } from './sphinx'
+import { buildSphinxGeometry, SPHINX_BAND_ATTRIBUTE } from './sphinx'
 
 /** The z of a part's surface samples (its half-width in plan). */
 const sampleSurfaceOf = (p: (typeof SPHINX_PARTS)[number]) => sampleSurface(p, 24, 16).map((s) => s.p[2])
 
-/** A level's drawn footprint: its drift's bounds joined with its drawn parts'
- *  extents (the bird's-eye paws are stone, standing past the drift). */
+/** A level's drawn footprint: its drift's bounds (where it draws one) joined
+ *  with its drawn parts' extents. */
 function drawnBounds(lod: SphinxLod) {
-  const b = { ...sphinxDriftBounds(lod) }
+  const b = SPHINX_FORM.lods[lod].driftCells > 0 ? { ...sphinxDriftBounds(lod) } : { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
   for (const p of sphinxPartsFor(lod)) {
     for (const { p: q } of sampleSurface(p, 24, 16)) {
       b.minX = Math.min(b.minX, q[0])
@@ -45,8 +43,6 @@ function drawnBounds(lod: SphinxLod) {
   }
   return b
 }
-
-const onDriftAt = (lod: SphinxLod, x: number, y: number, z: number) => Math.abs(y - sphinxDriftHeight(x, z, lod)) < 1e-6
 
 const triangles = (lod: (typeof SPHINX_LODS)[number]) => {
   const g = buildSphinxGeometry(lod)
@@ -162,7 +158,7 @@ describe('three levels of detail, one source', () => {
     expect(sphinxEmphasis('site-full')).toEqual(sphinxEmphasis())
     const sky = sphinxEmphasis('skyline')
     expect(sky).toMatchObject(SPHINX_FORM.emphasis.skyline)
-    expect({ ...sky, stoneShade: 1, headBlock: false }).toEqual(sphinxEmphasis())
+    expect({ ...sky, stoneShade: 1, headBlock: false, lappetFlare: 1 }).toEqual(sphinxEmphasis())
   })
 
   it('from above the landmark reads paws, body line and head: two stone paw tongues ahead of the chest, the notch open between them', () => {
@@ -175,16 +171,21 @@ describe('three levels of detail, one source', () => {
     expect(pawR.centre[0]).toBeCloseTo(pawL.centre[0], 9)
     const chest = SPHINX_PARTS.find((p) => p.id === 'chest')!
     const tip = pawR.centre[0] + pawR.radii[0]
-    // Reaching well forward of the chest (a fifth of the body length)...
-    expect(tip - (chest.centre[0] + chest.radii[0])).toBeGreaterThan(0.2)
+    // Reaching forward of the chest (over a tenth of the body length)...
+    expect(tip - (chest.centre[0] + chest.radii[0])).toBeGreaterThan(0.1)
     // ...standing out of the ground, with no sand over them...
     const mid = pawR.centre[0] + pawR.radii[0] * 0.5
     expect(pawR.centre[1] + pawR.radii[1]).toBeGreaterThan(0.06)
-    expect(sphinxDriftHeight(mid, pawR.centre[2], 'landmark')).toBeLessThan(0)
+    // ...joined to the body: the paw's root lies within the chest's width,
+    // under the shoulders, and its inner edge inside the chest's flank...
+    const root = pawR.centre[0] - pawR.radii[0]
+    expect(root).toBeLessThan(chest.centre[0])
+    expect(pawR.centre[2] - pawR.radii[2]).toBeLessThan(chest.radii[2])
+    // ...short enough to stay a paw: about a third of the body length at most...
+    expect(2 * pawR.radii[0]).toBeLessThanOrEqual(0.35)
     // ...and the notch between them open ground, at least a paw's width wide.
     const gap = 2 * (pawR.centre[2] - pawR.radii[2])
     expect(gap).toBeGreaterThan(2 * pawR.radii[2])
-    expect(sphinxDriftHeight(mid, 0, 'landmark')).toBeLessThan(0)
     for (const p of parts) expect(partLevel(p, mid, 0.01, 0), p.id).toBeGreaterThan(1)
     // The body line: the back ridge reads wider in plan than at the site.
     const plan = (lod: SphinxLod, ids: string[]) => {
@@ -194,116 +195,33 @@ describe('three levels of detail, one source', () => {
       return w
     }
     expect(plan('landmark', ['spine'])).toBeGreaterThan(plan('site-full', ['spine']) * 2)
-    // The body swell: the drift is higher over the shoulders than at the paws' root.
-    expect(sphinxDriftHeight(0.16, 0.1, 'landmark')).toBeGreaterThan(sphinxDriftHeight(0.3, pawR.centre[2], 'landmark'))
+    // The back line runs from the haunches to the shoulders in stone.
+    const spine = parts.find((p) => p.id === 'spine')!
+    expect(spine.centre[0] - spine.radii[0]).toBeLessThan(-0.25)
+    expect(spine.centre[0] + spine.radii[0]).toBeGreaterThan(0.2)
     // The head-and-nemes block is wider in plan than the neck and the back ridge.
     expect(plan('landmark', ['nemes', 'wing'])).toBeGreaterThan(plan('landmark', ['neck']) * 2)
     expect(plan('landmark', ['nemes', 'wing'])).toBeGreaterThan(plan('landmark', ['spine']) * 1.5)
   })
 
-  it('the landmark drift is the desert ground\'s sand tone, at most slightly shaded — never grey or white', () => {
-    // The travel ground's desert tone, as the far-terrain sheet bakes it.
-    const tint = PALETTE.desert.map((v, i) => (v + PALETTE_ALT.desert[i]) / 2) as [number, number, number]
-    const ground = farTerrainColor(tint, [1, 0, 0, 0])
+  it('the landmark draws no drift: no untextured sand patch beside the travel ground (owner picture check 11.11.2026)', () => {
+    expect(SPHINX_FORM.lods.landmark.driftCells).toBe(0)
     const geo = buildSphinxGeometry('landmark')
     const pos = geo.getAttribute('position')
-    const col = geo.getAttribute('color')
-    let n = 0
+    const parts = sphinxPartsFor('landmark')
+    // Every vertex is stone: on a drawn part, none on a drift.
     for (let i = 0; i < pos.count; i++) {
-      if (!onDriftAt('landmark', pos.getX(i), pos.getY(i), pos.getZ(i))) continue
-      n++
-      const c = [col.getX(i), col.getY(i), col.getZ(i)]
-      // Same hue: each channel's share of the ground's within 3 %.
-      const sum = c[0] + c[1] + c[2]
-      const gsum = ground[0] + ground[1] + ground[2]
-      for (let k = 0; k < 3; k++) expect(Math.abs(c[k] / sum - ground[k] / gsum), `hue ${k}`).toBeLessThan(0.03)
-      // Never lighter than the ground (jitter aside), at most a light shade darker.
-      expect(sum / gsum).toBeLessThan(1.03)
-      expect(sum / gsum).toBeGreaterThan(0.6)
-      // Saturated sand, not grey: red at least three times blue.
-      expect(c[0] / c[2]).toBeGreaterThan(3)
+      const on = parts.some((p) => Math.abs(partLevel(p, pos.getX(i), pos.getY(i), pos.getZ(i)) - 1) < 1e-3)
+      expect(on, `landmark vertex ${i}`).toBe(true)
     }
-    expect(n).toBeGreaterThan(500)
-    // The other levels keep the site's sand.
-    const sand = new THREE.Color(SPHINX_FORM.tones.sand)
-    expect(sphinxDriftTone('skyline')).toEqual([sand.r, sand.g, sand.b])
-    expect(sphinxDriftTone('site-full')).toEqual([sand.r, sand.g, sand.b])
     geo.dispose()
   })
 
-  it('the landmark drift has no grid steps: its rim runs on the zero contour and feathers into the ground', () => {
-    const geo = buildSphinxGeometry('landmark')
-    const pos = geo.getAttribute('position')
-    const nor = geo.getAttribute('normal')
-    const col = geo.getAttribute('color')
-    const idx = geo.index!
-    const drift = (i: number) => onDriftAt('landmark', pos.getX(i), pos.getY(i), pos.getZ(i))
-    // Boundary edges of the drift's sheet: edges used by exactly one drift triangle.
-    const use = new Map<string, number>()
-    const key = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`)
-    for (let t = 0; t < idx.count; t += 3) {
-      const v = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)]
-      if (!v.every(drift)) continue
-      // Nothing of the drift is drawn under the ground.
-      for (const i of v) expect(pos.getY(i), `drift vertex ${i} under the ground`).toBeGreaterThan(-1e-6)
-      for (let k = 0; k < 3; k++) {
-        const e = key(v[k], v[(k + 1) % 3])
-        use.set(e, (use.get(e) ?? 0) + 1)
-      }
-    }
-    const ground = sphinxDriftTone('landmark')
-    let rim = 0
-    for (const [e, count] of use) {
-      if (count !== 1) continue
-      for (const i of e.split(':').map(Number)) {
-        rim++
-        // On the contour: the drift meets the ground exactly here (no cell
-        // corner standing above it, so no step)...
-        expect(Math.abs(pos.getY(i)), `rim vertex ${i}`).toBeLessThan(1e-6)
-        // ...lit like the flat ground (feathered normal)...
-        expect(nor.getY(i)).toBeGreaterThan(0.999)
-        // ...and in the ground's own tone, unshaded (jitter aside).
-        for (let k = 0; k < 3; k++) expect(Math.abs([col.getX(i), col.getY(i), col.getZ(i)][k] / ground[k] - 1)).toBeLessThan(0.035)
-      }
-    }
-    expect(rim).toBeGreaterThan(100)
-    // Away from the rim the true drift normal returns (the swell still shades).
-    let steep = 0
-    for (let i = 0; i < pos.count; i++) {
-      if (!drift(i) || pos.getY(i) < SPHINX_FORM.landmarkDrift.rimFeather) continue
-      const n = sphinxDriftNormal(pos.getX(i), pos.getZ(i), 'landmark')
-      expect(Math.abs(nor.getY(i) - n[1])).toBeLessThan(1e-4)
-      if (n[1] < 0.8) steep++
-    }
-    expect(steep).toBeGreaterThan(0)
-    geo.dispose()
-  })
-
-  it('at the landmark the stone reads darker than the sand, in the same limestone hue', () => {
-    const geo = buildSphinxGeometry('landmark')
-    const pos = geo.getAttribute('position')
-    const col = geo.getAttribute('color')
-    let stone = 0
-    let stoneN = 0
-    let sand = 0
-    let sandN = 0
-    for (let i = 0; i < pos.count; i++) {
-      const lum = col.getX(i) + col.getY(i) + col.getZ(i)
-      const onDrift = Math.abs(pos.getY(i) - sphinxDriftHeight(pos.getX(i), pos.getZ(i), 'landmark')) < 1e-6
-      if (onDrift) {
-        sand += lum
-        sandN++
-      } else {
-        stone += lum
-        stoneN++
-      }
-    }
-    expect(stone / stoneN).toBeLessThan((sand / sandN) * 0.6)
-    // A uniform shade: the hue is the site's limestone, not a new colour.
+  it('at the landmark the stone is the limestone hue under a uniform shade', () => {
     const site = new THREE.Color(SPHINX_FORM.tones.limestone)
     const shaded = site.clone().multiplyScalar(SPHINX_FORM.emphasis.landmark.stoneShade)
     expect(shaded.r / shaded.b).toBeCloseTo(site.r / site.b, 9)
-    geo.dispose()
+    expect(SPHINX_FORM.emphasis.landmark.stoneShade).toBeLessThan(1)
   })
 
   it('the skyline outline reads as a crouching figure with a raised head', () => {
@@ -331,22 +249,27 @@ describe('three levels of detail, one source', () => {
     expect(block.centre[1] - block.radii[1]).toBeCloseTo(Math.min(...ys), 6)
     // The face-on outline: the half-width per height band, top to bottom.
     const sky = sphinxPartsFor('skyline').find((p) => p.id === 'headBlock')!
-    const samples = sampleSurface(sky, 48, 48).map((q) => q.p)
+    // Scanned through the solid (partLevel ≤ 1), not from surface samples,
+    // which crowd at a flat superellipsoid's crown and foot.
     const top = sky.centre[1] + sky.radii[1]
     const h = 2 * sky.radii[1]
     const bands = 8
     const half: number[] = []
     for (let k = 0; k < bands; k++) {
-      const y1 = top - (h * k) / bands
-      const y0 = y1 - h / bands
-      half.push(Math.max(0, ...samples.filter((q) => q[1] <= y1 && q[1] > y0).map((q) => Math.abs(q[2]))))
+      const y = top - (h * (k + 0.5)) / bands
+      let w = 0
+      for (let i = 0; i <= 40; i++) {
+        const x = sky.centre[0] - sky.radii[0] + (2 * sky.radii[0] * i) / 40
+        for (let z = 0; z <= 0.3; z += 0.001) if (partLevel(sky, x, y, z) <= 1) w = Math.max(w, z)
+      }
+      half.push(w)
     }
     // Flat-topped: already most of the crown's width in the top band…
     expect(half[0]).toBeGreaterThan(half[1] * 0.75)
     // …widening steadily downward (one outline, no lobes hanging beside it)…
     for (let k = 1; k < bands - 1; k++) expect(half[k], `band ${k}`).toBeGreaterThanOrEqual(half[k - 1] - 1e-3)
-    // …to the shoulders: at least half again as wide below as at the crown.
-    expect(Math.max(...half)).toBeGreaterThan(half[0] * 1.5)
+    // …to the shoulders: at least twice as wide below as at the crown.
+    expect(Math.max(...half)).toBeGreaterThan(half[0] * 2)
     // The lappets' foot runs into the drift at the chest (joined to the body),
     // and the face stands inside the outline, in front of it.
     expect(sky.centre[1] - sky.radii[1]).toBeLessThan(sphinxDriftHeight(sky.centre[0], 0, 'skyline'))
@@ -365,10 +288,11 @@ describe('three levels of detail, one source', () => {
       const parts = sphinxPartsFor(lod)
       for (const a of parts) {
         for (const s of sampleSurface(a, 64, 48)) {
-          if (Math.abs(s.p[1] - sphinxDriftHeight(s.p[0], s.p[2], lod)) <= 0.002 && s.p[1] > 0.002)
+          const drift = SPHINX_FORM.lods[lod].driftCells > 0
+          if (drift && Math.abs(s.p[1] - sphinxDriftHeight(s.p[0], s.p[2], lod)) <= 0.002 && s.p[1] > 0.002)
             expect(crossing(s.n, sphinxDriftNormal(s.p[0], s.p[2], lod)), `${lod} ${a.id} through the drift`).toBeGreaterThan(10)
           // The ground itself (the paws stand on it).
-          if (Math.abs(s.p[1]) <= 0.002 && sphinxDriftHeight(s.p[0], s.p[2], lod) < 0)
+          if (Math.abs(s.p[1]) <= 0.002 && (!drift || sphinxDriftHeight(s.p[0], s.p[2], lod) < 0))
             expect(crossing(s.n, [0, 1, 0]), `${lod} ${a.id} on the ground`).toBeGreaterThan(10)
         }
       }

@@ -82,6 +82,7 @@ import { ColdCloaksContext, FigureLookContext, LimbDetailContext } from './place
 import { useFigureLook } from './useFigureLook'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildPlayRock, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments, buildGizaSiteSphinx } from '../../render/landmarks'
+import { FieldSphinx } from '../../render/sphinxProbe'
 import { createSphinxSiteMaterial } from '../../render/sphinxMaterial'
 import { GIZA_AMBIENT, GIZA_PYRAMIDS, GIZA_SPHINX, gizaFigure, isGizaPerson, type GizaAmbientRole } from './gizaSite'
 import { LadyHat, SunHelmet } from './castHats'
@@ -1849,7 +1850,9 @@ function PanoramaWildlife({
 function GizaSkyline({ placeId }: { placeId: string }) {
   const show = placeId === 'cairo'
   // The field at its skyline level: only the Sphinx's outline-bearing parts.
-  const geometry = useMemo(() => (show ? buildGizaPyramids('skyline') : null), [show])
+  // The pyramids without the Sphinx, which is its own mesh (FieldSphinx, with
+  // the picture checks' probe); both from the field at its skyline level.
+  const geometry = useMemo(() => (show ? buildGizaPyramids('skyline', false) : null), [show])
   const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
   useEffect(() => () => geometry?.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
@@ -1864,7 +1867,12 @@ function GizaSkyline({ placeId }: { placeId: string }) {
   if (!geometry) return null
   // West of the town, scaled to a distant-monument silhouette under the
   // §2.5 looming bound (peak ~26 at 130 out ≈ 11°).
-  return <mesh geometry={geometry} material={material} position={[-130, -1.2, 10]} rotation={[0, 0.35, 0]} scale={[13, 13, 13]} />
+  return (
+    <group position={[-130, -1.2, 10]} rotation={[0, 0.35, 0]} scale={[13, 13, 13]}>
+      <mesh geometry={geometry} material={material} />
+      <FieldSphinx lod="skyline" material={material} probe="__gizaSkylineSphinx" />
+    </group>
+  )
 }
 
 /**
