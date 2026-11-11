@@ -1466,7 +1466,14 @@ if (section('giza-scale')) {
   await waitForStable(page)
   const kApex = await project({ x: k.x, y: k.apex, z: k.z })
   check('from the foot of Khufu the apex stands far above the frame top', kApex.z < 1 && kApex.y > 1.5, JSON.stringify(kApex))
-  await frame(shot('391-giza-khufu-base'), { local: { x: k.x, y: k.apex * 0.3, z: k.z }, label: 'the foot of the Great Pyramid, looking level north' })
+  // The level view is face only; the picture stands near the south-east corner
+  // and looks up, so the edge rising out of frame against the sky reads as scale.
+  const ex = k.x + k.foot * 0.8
+  await standAt(ex, k.z + k.foot + 8, ex, k.z, 0.2)
+  await waitForStable(page)
+  const kApexUp = await project({ x: k.x, y: k.apex, z: k.z })
+  check('looking up from the foot of Khufu the apex is still out of frame', kApexUp.z < 1 && kApexUp.y > 1, JSON.stringify(kApexUp))
+  await frame(shot('391-giza-khufu-base'), { local: { x: ex, y: k.apex * 0.2, z: k.z + k.foot * 0.8 }, label: 'the foot of the Great Pyramid, looking up its south face' })
 
   const mid = m.pyramidSites.reduce((a, p) => ({ x: a.x + p.x / 3, z: a.z + p.z / 3 }), { x: 0, z: 0 })
   // The arrival view itself: at the spawn, facing north, glancing up.
