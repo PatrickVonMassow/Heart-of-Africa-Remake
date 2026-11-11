@@ -1480,26 +1480,50 @@ if (section('sphinx')) {
     const monuments = await page.evaluate(() => window.__placeMonuments)
     check('the Sphinx stands at its medium level, its drift running under the ground', monuments.sphinxDetail === 'standard' && monuments.sphinxBuried === true, JSON.stringify(monuments))
     // The moving-camera pass: four continuous arcs round the monument (face,
-    // flank, back, other flank). Within an arc the camera advances one small
-    // step per rendered frame and EVERY frame is captured, so consecutive
-    // frames are compared while the camera moves; a depth fight flips pixels
+    // flank, back, other flank). The camera advances one small step per
+    // sample and every step is captured; a depth fight flips pixels
     // A → B → A, true motion does not (scripts/verify/flickerSeries.mjs).
+    // The browser renders on between captures, so the series is made of
+    // CONSECUTIVE CAMERA POSES rather than of consecutive frame ids: before a
+    // capture the pass waits until the rendered camera has settled on the
+    // step's pose (no smoothing still under way), and after it confirms the
+    // pose did not move — so every frame drawn between two captures shows one
+    // of the two captured poses, and no intermediate pose goes unrecorded
+    // (cross-vendor review of 8879aa7, P2). A step that never settles fails.
     const ARC_FRAMES = 24
     const STEP = (0.35 * Math.PI) / 180
+    const pose = () =>
+      page.evaluate(() => {
+        const c = window.__scenePass?.camera
+        return c ? Array.from(c.matrixWorld.elements, (v) => Math.round(v * 1e5) / 1e5).join(',') : null
+      })
     for (let arc = 0; arc < 4; arc++) {
       const a0 = (arc / 4) * Math.PI * 2 - (ARC_FRAMES / 2) * STEP
       const series = []
+      let unsettled = 0
+      let maxSettle = 0
       for (let k = 0; k < ARC_FRAMES; k++) {
         const a = a0 + k * STEP
         await standAt(sx.x + Math.cos(a) * 0.8 * L, sx.z + Math.sin(a) * 0.8 * L, sx.x + 0.1 * L, sx.z, 0)
-        await nextFrames(1)
+        let prev = null
+        let settle = 0
+        for (; settle < 12; settle++) {
+          await nextFrames(1)
+          const cur = await pose()
+          if (cur !== null && cur === prev) break
+          prev = cur
+        }
+        maxSettle = Math.max(maxSettle, settle)
         const png = await capturePixels(page, `Sphinx moving-camera arc ${arc + 1}, frame ${k + 1}`)
+        if (prev === null || (await pose()) !== prev) unsettled++
         const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
         series.push({ data, width: info.width, height: info.height, channels: info.channels })
       }
+      check(`the moving-camera arc ${arc + 1} samples settled consecutive poses (no unrecorded pose between captures)`, unsettled === 0,
+        `${unsettled} of ${ARC_FRAMES} captures not on a settled pose; settling took at most ${maxSettle} frame(s)`)
       const flicker = judgeFlickerSeries(series)
       console.log(`SPHINX FLICKER ${VERIFY_GL ?? 'webgpu'} arc ${arc + 1}: worst ${(flicker.worst * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
-      check(`no flicker on the Sphinx while the camera moves (arc ${arc + 1} of 4, ${ARC_FRAMES} consecutive frames)`, flicker.ok,
+      check(`no flicker on the Sphinx while the camera moves (arc ${arc + 1} of 4, ${ARC_FRAMES} consecutive poses)`, flicker.ok,
         `worst flip share ${(flicker.worst * 100).toFixed(3)}% > ${(flicker.limit * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
       await frame(shot(`315-sphinx-orbit-${arc}`), { local: { x: sx.x, y: 0.15 * L, z: sx.z }, label: `the end of moving-camera arc ${arc + 1} of 4 round the Sphinx` })
     }
