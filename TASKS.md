@@ -77,17 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1504. Delete the finished branches 1341, 1482, 1485 and close the branch-hygiene gap
-  RANK AT THE VERY FRONT of the work order (user order 11.11.2026, 22:14), ahead of 1490.
-
-  Measured 11.11.2026 22:12: origin carries feat/1341-garment-smooth-surface (tip 08.11., 370 behind main), feat/1482-garment-driven-builder (04.11., 574 behind) and feat/1485-skirt-containment-calibration (04.11., 547 behind). Points 1341, 1482 and 1485 are closed ([x] in docs/tasks-archive.md). Local branches feat/1482-* and feat/1485-* also still exist. Each open feat/* branch occupies a pool slot (POOL_CAP = 3, scripts/batch-in-flight-core.mjs); batch-in-flight --status showed slotsFree 0 with agents 0 — the stale branches block parallel work.
-
-  Final state:
-  1. Confirm each of the three branches has no commit that is missing from main in substance (merged or superseded); then delete them locally and on origin, plus any worktree.
-  2. Find why branch-hygiene-guard (CLAUDE.md §6 "the merge ends the branch") let them survive the landing, and close that gap with the smallest fix (infrastructure freeze: fix only, no new mechanism). A test reproduces the missed case.
-  3. batch-in-flight --status then counts only genuinely open branches.
-  Bundle: unbundled.
-
 - [ ] 1505. Decide point 1463: continue, park or close
   RANK AT THE VERY FRONT of the work order (user order 11.11.2026, 22:14), directly after the stale-branch cleanup request and ahead of 1490.
 
