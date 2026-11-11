@@ -50,6 +50,29 @@ export function decodeCover(cover: ArrayLike<number>, bits: { lo: number; hi: nu
   return { hidden, covered }
 }
 
+/**
+ * The lining (work-order point 1489, design.md "No sensitive body part
+ * exposed"): per vertex of `cover`, the index in `lined` of the garment whose
+ * colour the covered skin takes — the last of `lined` (callers order it
+ * innermost layer first) that hides or pushes the vertex — or -1; `count`
+ * vertices, any past the mask's -1. A covering
+ * garment that stands off the body (a kneeling woman's breast cloth seen from
+ * above) then opens a view onto its own lining, never onto bare skin.
+ */
+export function coverLining(cover: ArrayLike<number> | null, order: readonly string[], lined: readonly string[], count = cover ? cover.length / 4 : 0): Int16Array {
+  const out = new Int16Array(count).fill(-1)
+  if (!cover) return out
+  const n = Math.min(count, cover.length / 4)
+  lined.forEach((name, j) => {
+    const bits = wornBits(order, [name])
+    if (!bits.lo && !bits.hi) return
+    for (let i = 0; i < n; i++) {
+      if ((cover[i * 4] & bits.lo) | (cover[i * 4 + 1] & bits.hi) | (cover[i * 4 + 2] & bits.lo) | (cover[i * 4 + 3] & bits.hi)) out[i] = j
+    }
+  })
+  return out
+}
+
 /** The triangle index without the triangles whose three corners are hidden
  *  (`hidden` covers the first vertices; any later vertex is never hidden). */
 export function maskedIndex(index: ArrayLike<number>, hidden: Uint8Array): Uint32Array {

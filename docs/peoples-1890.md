@@ -2700,6 +2700,22 @@ primitive figure draws its trunk in the figure's cloth and so never shows a
 bare body. OPEN: the glTF body's bust and the child's pelvis are not yet
 stylised in the asset (a Blender re-bake under `scripts/villager/`).
 
+**No sensitive body part exposed** (design.md §19.15, user 05.11.2026,
+work-order 1489). Wearing a covering garment is not enough: no figure may show
+a female breast, the genital area or the buttocks bare from any camera the game
+reaches (steep overhead and close first-person included) or in any pose
+(kneeling, bending, pounding, digging, sitting, walking, running). The first
+case was a kneeling Bambara woman whose breast cloth stood off the chest like a
+stiff ring, the bust bare from above. The glTF figure therefore draws the skin
+a covering garment covers as that garment's lining, in its colour and fibre
+(`lineCoveredSkin`, render/villagerFigureBody.ts): what its cover mask hides
+or pushes, what of the trunk lies behind its panels, and — for the flat hip
+cloths (loin flap, apron, girdle tails), which hold no volume — the pelvis band
+from just under the hips' head to the girdle, read as the cloth passed between
+the legs. The colour is per vertex, so it holds in every pose and from every
+camera; `src/render/villagerLining.test.ts` pins it for every covering
+garment form on women, men and children.
+
 ---
 
 ### 8.7 Cloth, hide and skin micro-structure on the figures (design.md line 64)
