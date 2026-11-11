@@ -40,7 +40,19 @@ describe('flicker judgement of a moving-camera series', () => {
     }
   })
 
-  it('still fails a one-pixel fight that toggles in place beside a moving stripe', () => {
+  it('fails twelve stationary single pixels toggling 30 <-> 130 (1 % of the frame) — the centre must be explained, not averaged away', () => {
+    const spots = Array.from({ length: 12 }, (_, i) => [4 + (i % 6) * 6, 6 + Math.floor(i / 6) * 12])
+    const frames = Array.from({ length: 6 }, (_, k) => {
+      const data = new Uint8Array(W * H * 3).fill(30)
+      for (const [x, y] of spots) data.fill(k % 2 ? 130 : 30, (y * W + x) * 3, (y * W + x) * 3 + 3)
+      return { data, width: W, height: H, channels: 3 }
+    })
+    const r = judgeFlickerSeries(frames)
+    expect(r.ok).toBe(false)
+    expect(r.worst).toBeCloseTo(12 / (W * H), 6)
+  })
+
+  it('still fails a patch that toggles in place beside a moving stripe', () => {
     const frames = Array.from({ length: 8 }, (_, k) => {
       const data = new Uint8Array(W * H * 3).fill(30)
       for (let y = 0; y < H; y++) data.fill(230, (y * W + 5 + k) * 3, (y * W + 5 + k) * 3 + 3)

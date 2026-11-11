@@ -29,12 +29,21 @@ function luma(frame, i) {
 }
 
 /** Does the 3×3 neighbourhood of (x, y) in `b` reappear in `a` shifted by
- *  some (dx, dy) ≠ 0 within the motion radius (mean luma difference below
- *  tol)? Edge pixels compare only the in-frame part. */
+ *  some (dx, dy) ≠ 0 within the motion radius — the changed CENTRE pixel
+ *  itself matching its shifted source within tol, and the neighbourhood's
+ *  mean luma difference below tol? The centre test matters: a mean over nine
+ *  pixels dilutes one changed pixel among eight unchanged ones (a 100-point
+ *  jump averages 11.1), so a stationary toggling pixel would pass as motion.
+ *  Edge pixels compare only the in-frame part. */
 function movedFrom(a, b, x, y, width, height, tol) {
+  const centre = luma(b, y * width + x)
   for (let dy = -MOTION_RADIUS; dy <= MOTION_RADIUS; dy++) {
     for (let dx = -MOTION_RADIUS; dx <= MOTION_RADIUS; dx++) {
       if (dx === 0 && dy === 0) continue
+      const sx = x - dx
+      const sy = y - dy
+      if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue
+      if (Math.abs(centre - luma(a, sy * width + sx)) >= tol) continue
       let sum = 0
       let n = 0
       for (let oy = -1; oy <= 1; oy++) {
