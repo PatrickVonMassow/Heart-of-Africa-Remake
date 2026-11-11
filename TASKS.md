@@ -86,7 +86,7 @@ put it is the mistake this line exists to stop.
   1. Confirm each of the three branches has no commit that is missing from main in substance (merged or superseded); then delete them locally and on origin, plus any worktree.
   2. Find why branch-hygiene-guard (CLAUDE.md §6 "the merge ends the branch") let them survive the landing, and close that gap with the smallest fix (infrastructure freeze: fix only, no new mechanism). A test reproduces the missed case.
   3. batch-in-flight --status then counts only genuinely open branches.
-  Bundle: not bundled.
+  Bundle: unbundled.
 
 - [ ] 1505. Decide point 1463: continue, park or close
   RANK AT THE VERY FRONT of the work order (user order 11.11.2026, 22:14), directly after the stale-branch cleanup request and ahead of 1490.
@@ -94,7 +94,7 @@ put it is the mistake this line exists to stop.
   Measured 11.11.2026 22:12: feat/1463-infra-simplification (local, origin, worktree .claude/worktrees/point-1463) has its last commit on 01.11.2026, 10 commits ahead and 855 behind main. No "- [ ] 1463." / "- [x] 1463." line was found in TASKS.md or docs/tasks-archive.md. It occupies one of the three pool slots.
 
   Final state: one recorded decision on 1463 — continue (rebase onto main and work it), park (recorded park so it no longer counts as a slot), or close (delete branch and worktree, archive the point) — with what/why/veto effect recorded. If 1463 has no work-order line, give it one or record where it is tracked. The decision is presented to the user if it is a genuine choice without a clear recommendation.
-  Bundle: not bundled.
+  Bundle: unbundled.
 
 - [ ] 1506. Board: show why pool slots sit unused
   Rank directly AFTER the two front requests of 11.11.2026 (stale-branch cleanup, 1463 decision), ahead of 1490.
@@ -115,7 +115,7 @@ put it is the mistake this line exists to stop.
   - When no reason is measurable, show "Grund nicht messbar" visibly and file it as a finding — never a filler text and never agent-written free text (the point-427 reason demand died of boilerplate; see point 1452).
   - At full use: "3 von 3 Slots in Arbeit".
   Values are measured at board render time. German visible wording. Board guards and section contract stay valid (update their tests); unit tests for each line variant above.
-  Bundle: not bundled.
+  Bundle: unbundled.
 
 - [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
    Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
@@ -140,7 +140,7 @@ put it is the mistake this line exists to stop.
   336, 364, 1063, 1078, 1163, 1164, 1167, 1169, 1205, 1227, 1229, 1269, 1264, 1265, 1290, 1309, 1395, 1396, 1422, 1423, 1425, 1427, 1457, 1458, 1473, 1492, 1494, 1495, 1496, 1499, 205
 
   Point 1490 stays at the front, as ordered earlier the same evening (it is ranked ahead of this group). No point text changes; only the ranking (.claude/queue-rank.json / work order) changes. All 31 points were measured open in TASKS.md at 21:32.
-  Bundle: not bundled.
+  Bundle: unbundled.
 
 - [ ] 328. Vultures do not visibly land (user 25.07.2026: "they seem to fly one
   moment and stand the next — is there a landing at all?"). Add a real landing
