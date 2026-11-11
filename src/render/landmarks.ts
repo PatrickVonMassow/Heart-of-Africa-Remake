@@ -12,6 +12,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { mulberry32 } from '../world/noise'
 import { buildPapyrus } from './flora'
 import { GIZA_PYRAMIDS, GIZA_SPHINX, type GizaPyramid } from '../scenes/place/gizaSite'
+import { SPHINX_FORM } from '../config/balance'
+import { SPHINX_SITE_LOD, sphinxCrownHeight, sphinxDriftHeight, sphinxLodSpec, sphinxPartsFor, type SphinxSiteDetail } from '../world/sphinx'
+import { buildSphinxGeometry } from './sphinx'
 
 /** Paint a geometry with a base color plus deterministic per-vertex jitter. */
 function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): THREE.BufferGeometry {
@@ -170,18 +173,27 @@ export function buildMeroePyramids(): THREE.BufferGeometry {
  *  platform where the point should be (docs/giza-1890.md §1.1). */
 export const KHUFU_STANDING = 0.945
 
+/** Khufu's standing height in the Giza field symbol's own units (base
+ *  half-extent 1.6, Old-Kingdom slope): the skyline Sphinx is sized against it. */
+export const GIZA_FIELD_KHUFU_HEIGHT = 1.6 * 0.64 * 2 * KHUFU_STANDING
+
+/** The pyramids' weathered core tone in the Giza field symbol: the skyline
+ *  Sphinx's stone is drawn in this family (SPHINX_FORM.emphasis.skyline). */
+export const GIZA_FIELD_CORE_TONE = '#c9a76a'
+
 /** Giza: the three great pyramids in their real southwest-diagonal row —
  *  Khufu NE (largest), Khafre centre, Menkaure SW, flatter-sided than the
  *  steep Nubian tombs (Old-Kingdom ~52° slope, height ≈ 0.64 · base) — with
  *  the Sphinx east of Khafre, buried to the shoulders as in 1890 (design.md
- *  §4.4), and the ~1890 casing cues (docs/giza-1890.md §1.1-§1.2/§3): Khufu
+ *  §4.4; the shared definition's `landmark` level, or its `skyline` outline
+ *  where the field stands on Cairo's horizon), and the ~1890 casing cues (docs/giza-1890.md §1.1-§1.2/§3): Khufu
  *  ends in a blunt flat platform, not a point; Khafre alone keeps a paler cap
  *  of original smooth Tura casing near its apex. Menkaure's red-granite casing
  *  is left to the walkable site (see below). Both cues are cosmetic; the
  *  footprint is unchanged. */
-export function buildGizaPyramids(): THREE.BufferGeometry {
+export function buildGizaPyramids(sphinxLod: 'landmark' | 'skyline' = 'landmark', withSphinx = true): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
-  const core = '#c9a76a'
+  const core = GIZA_FIELD_CORE_TONE
   // [x, z, base half-extent] per pyramid: the diagonal row, Khufu largest in
   // the NE. Kept compact: the field stands only ~4 world units west of Cairo
   // (the real 13 km), so the symbol must not swallow the port marker or the
@@ -190,8 +202,7 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
     // Khufu: the cone cut at KHUFU_STANDING of its height and closed FLAT —
     // the small summit platform 19th-century visitors climbed to.
     const [x, z, b] = [1.3, -1.3, 1.6]
-    const h = b * 0.64 * 2
-    const stand = h * KHUFU_STANDING
+    const stand = GIZA_FIELD_KHUFU_HEIGHT
     const frustum = new THREE.CylinderGeometry(b * (1 - KHUFU_STANDING), b, stand, 4)
     frustum.rotateY(Math.PI / 4)
     frustum.translate(x, stand / 2, z)
@@ -228,119 +239,70 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
     const h = b * 0.64 * 2
     parts.push(pyramid(x, z, b, h, 8202))
   }
-  // Sphinx east of Khafre, facing east like the real one.
-  const sphinx = buildSphinx()
-  sphinx.translate(2.1, 0, 0.3)
-  parts.push(sphinx)
+  // Sphinx east of Khafre, facing east like the real one: the ONE definition
+  // at the distant level the view asks for (src/world/sphinx.ts).
+  // The scenes draw it as its own mesh (`withSphinx` false) so the picture
+  // checks can mask it (src/render/sphinxProbe.ts).
+  if (withSphinx) parts.push(buildFieldSphinx(sphinxLod))
   return merge(parts)
 }
 
-/**
- * How deep the couchant body sits below the sand. In 1890 the Sphinx was NOT
- * the freestanding lion of the modern postcard: it lay buried to the neck and
- * shoulders for the whole 19th century. Caviglia cleared the chest in 1817 and
- * the sand took it back; Mariette cleared it again in 1853 with the same
- * result; only Baraize's 1925-36 excavation freed the body for good. A ~1890
- * expedition therefore sees a head and its nemes rising out of a drift, with
- * the shoulders barely breaking the surface — nothing of the paws, torso,
- * haunches or tail. The depth is chosen so the chest just grazes the sand while
- * head, crown and most of the nemes stand proud (the hanging lappets' lower
- * ends reach just into the drift).
- */
-export const SPHINX_BURIAL_DEPTH = 0.4
+/** The Sphinx's body length in the Giza field symbol at a distant level: the
+ *  bird's-eye landmark at the field's compressed length, the Cairo skyline at
+ *  the real proportion to Khufu (SPHINX_FORM.field.skylineCrownRatio). */
+export function fieldSphinxLength(lod: 'landmark' | 'skyline'): number {
+  const f = SPHINX_FORM.field
+  if (lod === 'landmark') return f.length
+  return (f.skylineCrownRatio * GIZA_FIELD_KHUFU_HEIGHT) / sphinxCrownHeight(lod)
+}
 
-/** The Great Sphinx as a couchant lion under the nemes (design.md §4.4,
- *  user request: clearly more than a box stand-in): a lying torso with
- *  raised haunches and folded hind legs, both fore paws stretched forward,
- *  the tail around the right haunch, an upright chest and the head under
- *  the trapezoid nemes silhouette (widening down toward the shoulders,
- *  flat crown). Faces +x (east); origin on the ground at the body centre.
- *  Proportions are readability-exaggerated for the travel camera; the same
- *  geometry scales up in Cairo's western skyline.
- *
- *  The whole lion is BUILT and then sunk by SPHINX_BURIAL_DEPTH, rather than
- *  the buried parts being left out: the body below the sand costs nothing the
- *  player can see, and keeping it means the couchant proportions stay the
- *  honest thing this builder describes. A low sand drift closes the seam so
- *  the sand meets the neck as drift rather than as a clean cut. */
-export function buildSphinx(): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = []
-  const sand = '#c29c66'
-  const put = (g: THREE.BufferGeometry, hex: string, seed: number) => parts.push(tint(g, hex, 0.07, seed))
-  // Lying torso between haunches and shoulders.
-  const torso = new THREE.BoxGeometry(0.78, 0.22, 0.34)
-  torso.translate(-0.05, 0.17, 0)
-  put(torso, sand, 8210)
-  // Raised haunches over the folded hind legs — wider than the torso (hips).
-  const haunch = new THREE.BoxGeometry(0.36, 0.30, 0.40)
-  haunch.translate(-0.36, 0.15, 0)
-  put(haunch, sand, 8211)
-  for (const side of [-1, 1]) {
-    // Folded hind leg along each flank.
-    const hind = new THREE.BoxGeometry(0.42, 0.1, 0.09)
-    hind.translate(-0.3, 0.05, side * 0.21)
-    put(hind, sand, side < 0 ? 8212 : 8213)
-    // Fore paw stretched forward from below the chest.
-    const paw = new THREE.BoxGeometry(0.6, 0.1, 0.1)
-    paw.translate(0.52, 0.05, side * 0.12)
-    put(paw, sand, side < 0 ? 8214 : 8215)
+/** The Sphinx in the Giza field symbol (bird's-eye landmark, Cairo skyline):
+ *  the shared definition at a distant level, scaled and placed east of Khafre
+ *  (SPHINX_FORM.field). */
+export function buildFieldSphinx(lod: 'landmark' | 'skyline'): THREE.BufferGeometry {
+  const f = SPHINX_FORM.field
+  const geo = buildSphinxGeometry(lod)
+  const length = fieldSphinxLength(lod)
+  geo.scale(length, length, length)
+  geo.translate(f.x, 0, f.z)
+  return geo
+}
+
+/** Points of the field Sphinx the picture checks project into the frame
+ *  (field units, as `buildFieldSphinx` places it): the crown, and the head's
+ *  foot where it leaves the drift (the highest drift under the head; the
+ *  ground where the level draws no drift). */
+export function fieldSphinxAnchors(lod: 'landmark' | 'skyline'): { crown: [number, number, number]; headBase: [number, number, number] } {
+  const f = SPHINX_FORM.field
+  const len = fieldSphinxLength(lod)
+  const head = sphinxPartsFor(lod).filter((p) => p.group === 'head')
+  let minX = Infinity
+  let maxX = -Infinity
+  let half = 0
+  for (const p of head) {
+    minX = Math.min(minX, p.centre[0] - p.radii[0])
+    maxX = Math.max(maxX, p.centre[0] + p.radii[0])
+    half = Math.max(half, Math.abs(p.centre[2]) + p.radii[2])
   }
-  // Tail curling around the right haunch.
-  const tail = new THREE.BoxGeometry(0.06, 0.06, 0.26)
-  tail.translate(-0.52, 0.06, 0.26)
-  put(tail, sand, 8216)
-  // Upright chest between the shoulders.
-  const chest = new THREE.BoxGeometry(0.26, 0.3, 0.3)
-  chest.translate(0.26, 0.33, 0)
-  put(chest, sand, 8217)
-  // Nemes: the headdress silhouette, a truncated four-sided pyramid
-  // widening down toward the shoulders.
-  const nemes = new THREE.CylinderGeometry(0.1, 0.19, 0.22, 4, 1)
-  nemes.rotateY(Math.PI / 4)
-  nemes.translate(0.24, 0.55, 0)
-  put(nemes, sand, 8218)
-  // Nemes lappets: the two headcloth flaps that hang down each side of the
-  // face. They FRAME the face and are the single most recognisable Sphinx cue
-  // — without them the nemes read as a plain tan block at the walkable site's
-  // 11x scale (point 273). They sit forward and to each side, sloping outward
-  // down to the chest; they widen the head across (in z), never along x, so the
-  // couchant "longer than wide" silhouette and the buried-to-the-shoulders
-  // profile (only the head clears the sand) are untouched.
-  for (const side of [-1, 1]) {
-    const lappet = new THREE.BoxGeometry(0.17, 0.28, 0.08)
-    lappet.rotateX(side * -0.12)
-    lappet.translate(0.28, 0.49, side * 0.17)
-    put(lappet, sand, side < 0 ? 8222 : 8223)
+  let base = 0
+  if (sphinxLodSpec(lod).driftCells > 0) {
+    for (let i = 0; i <= 8; i++)
+      for (let j = 0; j <= 8; j++) base = Math.max(base, sphinxDriftHeight(minX + ((maxX - minX) * i) / 8, -half + (2 * half * j) / 8, lod))
   }
-  // Face block, set below the crown and between the lappets, proud of the
-  // nemes front — enlarged so it reads as a face, not a bump.
-  const head = new THREE.BoxGeometry(0.16, 0.19, 0.16)
-  head.translate(0.31, 0.53, 0)
-  put(head, '#b8905c', 8219)
-  // Flat, wide nemes crown capping the headdress.
-  const crown = new THREE.BoxGeometry(0.15, 0.05, 0.17)
-  crown.translate(0.24, 0.685, 0)
-  put(crown, sand, 8220)
-  // Sink the lion: what remains above the sand is the head under its nemes,
-  // with the shoulders and upper chest just breaking the surface (see
-  // SPHINX_BURIAL_DEPTH).
-  const buried = merge(parts)
-  buried.translate(0, -SPHINX_BURIAL_DEPTH, 0)
-  // The wind-blown sand the body lies in — a soft, low dune banked ALONG the
-  // lion (squashed across it, so the mound stays longer than it is wide) that
-  // rises to meet the emerging chest and FEATHERS to nothing at its rim. It is
-  // a CONE whose base circle sits exactly at ground level (y = 0) and whose low
-  // apex hides behind the chest: the old build was a flat-topped cylinder whose
-  // vertical rim read as a hard disc with a seam (the "looks like an error"
-  // lower part, point 273). With no vertical face there is no seam and nothing
-  // to z-fight, and the 28-segment rim reads as a smooth dune edge. Tinted to
-  // the walkable site's warm desert-sand ground so the drift is of a piece with
-  // the surrounding sand rather than a foreign-coloured patch.
-  const drift = new THREE.ConeGeometry(0.74, 0.07, 28, 1, true)
-  drift.translate(0, 0.035, 0) // base circle down to y = 0, apex at y = 0.07
-  drift.scale(1, 1, 0.35) // banked ALONG the lion (clearly longer than wide)
-  drift.translate(0.04, 0, 0) // centred just forward, under the chest/shoulders
-  return merge([buried, tint(drift, '#dcc48a', 0.05, 8221)])
+  const hx = f.x + ((minX + maxX) / 2) * len
+  return { crown: [hx, sphinxCrownHeight(lod) * len, f.z], headBase: [hx, base * len, f.z] }
+}
+
+/** The Great Sphinx at the WALKABLE site (design.md §4.4, docs/giza-1890.md
+ *  §1.3): the shared definition at the site level the quality preset picks
+ *  (`sphinxSiteDetail`), scaled to metres and placed east of Khafre, with the
+ *  banding attribute its site material reads. The collider derives from the
+ *  same definition (gizaSite.ts). */
+export function buildGizaSiteSphinx(detail: SphinxSiteDetail): THREE.BufferGeometry {
+  const geo = buildSphinxGeometry(SPHINX_SITE_LOD[detail], { banding: true })
+  geo.scale(GIZA_SPHINX.length, GIZA_SPHINX.length, GIZA_SPHINX.length)
+  geo.translate(GIZA_SPHINX.x, 0, GIZA_SPHINX.z)
+  return geo
 }
 
 /** One great pyramid at the WALKABLE Giza site (design.md §4.4, point 273):
@@ -404,19 +366,15 @@ function gizaSitePyramidParts(p: GizaPyramid, seed: number): THREE.BufferGeometr
   return parts
 }
 
-/** The walkable Giza plateau's monuments (design.md §4.4, point 273): the three
+/** The walkable Giza plateau's pyramids (design.md §4.4, point 273): the three
  *  great pyramids in their SW-diagonal row at site scale, each carrying its
- *  ~1890 casing cue, plus the Great Sphinx buried to the shoulders east of
- *  Khafre (the shared buildSphinx, scaled up — its burial and noseless face
- *  come along). One merged, vertex-colored geometry; the collidable masses are
- *  derived from the SAME GIZA_PYRAMIDS/GIZA_SPHINX constants in gizaSite.ts. */
+ *  ~1890 casing cue. One merged, vertex-colored geometry; the collidable
+ *  masses are derived from the SAME GIZA_PYRAMIDS constants in gizaSite.ts.
+ *  The Sphinx is its own mesh (buildGizaSiteSphinx): its level follows the
+ *  quality preset and its stone carries the banded site material. */
 export function buildGizaSiteMonuments(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   GIZA_PYRAMIDS.forEach((p, i) => parts.push(...gizaSitePyramidParts(p, 8300 + i * 10)))
-  const sphinx = buildSphinx()
-  sphinx.scale(GIZA_SPHINX.scale, GIZA_SPHINX.scale, GIZA_SPHINX.scale)
-  sphinx.translate(GIZA_SPHINX.x, 0, GIZA_SPHINX.z)
-  parts.push(sphinx)
   return merge(parts)
 }
 

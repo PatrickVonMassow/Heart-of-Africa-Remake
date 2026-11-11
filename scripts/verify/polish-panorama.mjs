@@ -9,8 +9,45 @@ import { VERIFY_GL, waitForStable } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
+import { judgeFlickerSeries } from './flickerSeries.mjs'
 import sharp from 'sharp'
+import { HEAD_MIN_ROWS, judgeSkylineHead, judgeTravelSphinx } from './sphinxSilhouette.mjs'
 import { section, check, probeSilhouetteFooting, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
+
+// --- Field Sphinx pixel layers (work-order point 315) ---------------------------
+// The field Sphinx is its own mesh with a DEV probe (src/render/sphinxProbe.tsx):
+// it projects the Sphinx's bounds and head anchors into the frame and switches
+// the mesh to hidden or to a flat magenta mask. Three captures of the same view
+// — as drawn, masked, hidden — give the Sphinx's own pixels, what it looks like
+// there, and what lies behind it (ground or sky), so a check judges the RENDERED
+// result, not the albedo inputs.
+async function sphinxLayers(key) {
+  const probe = await page.evaluate((k) => window[k]?.project() ?? null, key)
+  if (!probe) return null
+  const shot = async (mode) => {
+    await page.evaluate(([k, m]) => window[k].mode(m), [key, mode])
+    await nextFrames(4)
+    return sharp(await capturePixels(page, `field Sphinx ${key}, ${mode} layer`)).raw().toBuffer({ resolveWithObject: true })
+  }
+  const drawn = await shot('normal')
+  const mask = await shot('mask')
+  const hidden = await shot('hidden')
+  await page.evaluate((k) => window[k].mode('normal'), key)
+  const { width: W, height: H, channels: C } = drawn.info
+  const k = W / probe.width
+  const px = (img, i) => [img.data[i * C], img.data[i * C + 1], img.data[i * C + 2]]
+  // RELATIVE to the hidden layer: haze, grading and bloom shift the mask's
+  // magenta differently per backend, but it always pulls red and blue up
+  // against green where the Sphinx is drawn.
+  const isMask = (i) => {
+    const [r, g, b] = px(mask, i)
+    const [rh, gh, bh] = px(hidden, i)
+    return r - rh + (b - bh) - 2 * (g - gh) > 90
+  }
+  return { probe, k, W, H, px, isMask, drawn, hidden }
+}
+const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
+const sat = ([r, g, b]) => (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(1, Math.max(r, g, b))
 
 // --- Giza skyline behind Cairo (design.md §4.4, point 82) ----------------------
 // In Cairo the great pyramids stand as the western skyline silhouette
@@ -59,6 +96,43 @@ if (section('giza-skyline')) {
   })
   await page.waitForTimeout(700)
   const skyBuf = await frame('100-cairo-giza-skyline', { place: 'cairo', label: 'the Giza skyline over Cairo' })
+
+  // Point 315 (owner picture check 11.11.2026): face-on the skyline Sphinx's
+  // head must read as the nemes — flat-topped and visibly wider at the
+  // shoulders than at the crown — in the FRAME, not only in the geometry. The
+  // head's silhouette is cut out of the frame by the mask capture; per row the
+  // run of Sphinx pixels through the crown's column is its width.
+  {
+    const L = await sphinxLayers('__gizaSkylineSphinx')
+    if (!L) check('the Cairo skyline Sphinx exposes its picture probe', false, 'no __gizaSkylineSphinx')
+    else {
+      const { probe, k, W, isMask } = L
+      const cx = Math.round(probe.crown[0] * k)
+      const baseRow = Math.round(probe.headBase[1] * k)
+      let first = -1
+      const widths = []
+      for (let y = Math.max(0, Math.round(probe.crown[1] * k) - 6); y <= baseRow; y++) {
+        // The run through the crown's column (or its nearest mask pixel within 2 px).
+        let c = -1
+        for (const d of [0, -1, 1, -2, 2]) if (c < 0 && isMask(y * W + cx + d)) c = cx + d
+        if (c < 0) {
+          if (first >= 0) widths.push(0)
+          continue
+        }
+        let a = c
+        let b = c
+        while (a > 0 && isMask(y * W + a - 1)) a--
+        while (b < W - 1 && isMask(y * W + b + 1)) b++
+        if (first < 0) first = y
+        widths.push(b - a + 1)
+      }
+      const j = judgeSkylineHead(widths)
+      const detail = `head ${j.occupied} of ${j.rows} rows occupied above its drift; widths crown ${j.crownW}, quarter ${j.quarterW}, shoulders ${j.shoulderW} px; rows ${widths.join(',')}`
+      check(`the skyline Sphinx head is large enough in the frame to judge (>= ${HEAD_MIN_ROWS} occupied rows above the drift)`, j.enough, detail)
+      check('face-on the skyline Sphinx head is flat-topped in the frame (crown row >= 0.6 of the width a quarter down)', j.flat, detail)
+      check('face-on the skyline Sphinx head widens to the shoulders in the frame (shoulders >= 1.4x the upper head)', j.widens, detail)
+    }
+  }
 
   // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
   // BAND at this distant skyline scale, so it was removed (kept only at the
@@ -967,6 +1041,33 @@ if (section('sphinx-travel')) {
   // Giza's own position (the marker jumped to in the block below), not the
   // standpoint: the frame claims the field, so the field must be in the picture.
   await frame('103-giza-sphinx-travel', { world: { lat: 29.98, lon: 30.59 }, label: 'the Giza field with the Sphinx' })
+  // Point 315 (owner picture check 11.11.2026): no pale patch. Per pixel of the
+  // Sphinx (mask capture), the frame as drawn against the same pixel with the
+  // Sphinx hidden (the travel ground behind it): a pixel that is lighter AND
+  // less saturated than the ground there is the pale-cream-patch signature.
+  {
+    const L = await sphinxLayers('__gizaTravelSphinx')
+    if (!L) check('the bird\'s-eye Sphinx exposes its picture probe', false, 'no __gizaTravelSphinx')
+    else {
+      const { probe, k, W, isMask, px, drawn, hidden } = L
+      const x0 = Math.max(0, Math.floor(probe.box.minX * k) - 4)
+      const x1 = Math.min(W - 1, Math.ceil(probe.box.maxX * k) + 4)
+      const y0 = Math.max(0, Math.floor(probe.box.minY * k) - 4)
+      const y1 = Math.min(L.H - 1, Math.ceil(probe.box.maxY * k) + 4)
+      const pixels = []
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = y * W + x
+          if (isMask(i)) pixels.push({ drawn: px(drawn, i), hidden: px(hidden, i) })
+        }
+      }
+      const t = judgeTravelSphinx(pixels)
+      const detail = `${t.n} Sphinx px in box ${x0}-${x1} x ${y0}-${y1}; drawn-vs-ground contrast ${t.meanContrast.toFixed(1)} (changed ${(100 * t.changedShare).toFixed(0)} %); pale ${t.pale} (${((100 * t.pale) / Math.max(1, t.n)).toFixed(1)} %); mean luminance Sphinx ${t.lumDrawn.toFixed(1)} vs ground behind ${t.lumGround.toFixed(1)}`
+      check('the bird\'s-eye Sphinx is visible in the frame (>= 150 px, drawn distinctly from the ground behind)', t.visible, detail)
+      check('the bird\'s-eye Sphinx draws no pale patch over the ground (< 5 % of its pixels lighter and greyer than the ground behind)',
+        t.noPale, detail)
+    }
+  }
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 }
 
@@ -1319,6 +1420,166 @@ if (section('giza-site')) {
       await settleFrames(30)
       await frame('390-giza-sand-open', { place: 'giza', label: 'the open sand seen from beside the monument row' })
     }
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
+// --- The Great Sphinx from every standpoint (work-order point 315) ------------
+// One definition, three levels (src/world/sphinx.ts). At the walkable site: a
+// frame face on, in profile, from behind and low along the drift, then a
+// moving-camera pass round the monument (a frame series for the flicker
+// judgement — no z-offset hides a fight, so a fight would show here), and the
+// frame cost at the site at LOW and MEDIUM. Both backends: the names carry the
+// backend. The bird's-eye landmark and the Cairo skyline frames are sections
+// `sphinx-travel` and `giza-skyline`.
+if (section('sphinx')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('giza')
+  await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeMonuments?.sphinx,
+    null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  const level = await page.evaluate(() => window.__ui.getState().detailLevel)
+  const sx = await page.evaluate(() => window.__placeMonuments.sphinx)
+  const L = sx.length
+  // Stand at (x, z) looking at the target (tx, tz); yaw 0 faces −z.
+  const standAt = (x, z, tx, tz, pitch = 0) =>
+    page.evaluate(
+      ({ x, z, tx, tz, pitch }) => {
+        const p = window.__placePlayer
+        p.x = x
+        p.z = z
+        p.yaw = Math.atan2(tx - x, tz - z) + Math.PI
+        p.pitch = pitch
+      },
+      { x, z, tx, tz, pitch },
+    )
+  const head = { x: sx.x + 0.28 * L, y: 0.24 * L, z: sx.z }
+  try {
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    const stands = [
+      ['315-sphinx-face', [sx.x + 0.95 * L, sx.z, head.x, head.z, 0.02], head, 'the Sphinx face on: nemes, brow band, lappets, broken nose'],
+      ['315-sphinx-profile', [sx.x + 0.05 * L, sx.z + 0.85 * L, sx.x, sx.z, 0], { x: sx.x, y: 0.15 * L, z: sx.z }, 'the Sphinx in profile: head over the couchant drift'],
+      ['315-sphinx-behind', [sx.x - 0.95 * L, sx.z + 0.15 * L, head.x, head.z, 0.04], head, 'the Sphinx from behind: back ridge, queue, head'],
+      ['315-sphinx-low-drift', [sx.x + 0.6 * L, sx.z + 0.38 * L, sx.x - 0.3 * L, sx.z, -0.02], { x: sx.x, y: 0.12 * L, z: sx.z }, 'low along the drift: shoulder swell, paw lobes, back ridge'],
+    ]
+    for (const [name, at, subject, label] of stands) {
+      await standAt(...at)
+      await waitForStable(page)
+      await frame(shot(name), { local: subject, label })
+    }
+    const monuments = await page.evaluate(() => window.__placeMonuments)
+    check('the Sphinx stands at its medium level, its drift running under the ground', monuments.sphinxDetail === 'standard' && monuments.sphinxBuried === true, JSON.stringify(monuments))
+    // The moving-camera pass: four continuous arcs round the monument (face,
+    // flank, back, other flank). The camera advances one small step per
+    // sample and every step is captured; a depth fight flips pixels
+    // A → B → A, true motion does not (scripts/verify/flickerSeries.mjs).
+    // The browser renders on between captures, so the series is made of
+    // CONSECUTIVE CAMERA POSES rather than of consecutive frame ids: before a
+    // capture the pass waits until the rendered camera has settled on the
+    // step's pose (no smoothing still under way), and after it confirms the
+    // pose did not move — so every frame drawn between two captures shows one
+    // of the two captured poses, and no intermediate pose goes unrecorded
+    // (cross-vendor review of 8879aa7, P2). A step that never settles fails.
+    const ARC_FRAMES = 24
+    const STEP = (0.35 * Math.PI) / 180
+    // A pose: the rendered camera's position and view direction. "Settled"
+    // is relative to the step: between two frames the camera moves less than
+    // SETTLE_SHARE of one arc step (position and direction) — exact matrix
+    // equality never holds on real hardware (float noise, idle sway).
+    const SETTLE_SHARE = 0.05
+    const stepLen = STEP * 0.8 * L
+    const pose = () =>
+      page.evaluate(() => {
+        const c = window.__scenePass?.camera
+        if (!c) return null
+        const e = c.matrixWorld.elements
+        return { p: [e[12], e[13], e[14]], f: [-e[8], -e[9], -e[10]] }
+      })
+    const moved = (a, b) => {
+      if (!a || !b) return { dp: Infinity, da: Infinity }
+      const dp = Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1], a.p[2] - b.p[2])
+      const dot = (a.f[0] * b.f[0] + a.f[1] * b.f[1] + a.f[2] * b.f[2]) / (Math.hypot(...a.f) * Math.hypot(...b.f))
+      return { dp, da: Math.acos(Math.min(1, Math.max(-1, dot))) }
+    }
+    const still = (m) => m.dp <= SETTLE_SHARE * stepLen && m.da <= SETTLE_SHARE * STEP
+    for (let arc = 0; arc < 4; arc++) {
+      const a0 = (arc / 4) * Math.PI * 2 - (ARC_FRAMES / 2) * STEP
+      const series = []
+      let unsettled = 0
+      let maxSettle = 0
+      let worstDrift = 0
+      for (let k = 0; k < ARC_FRAMES; k++) {
+        const a = a0 + k * STEP
+        await standAt(sx.x + Math.cos(a) * 0.8 * L, sx.z + Math.sin(a) * 0.8 * L, sx.x + 0.1 * L, sx.z, 0)
+        let prev = await pose()
+        let settle = 0
+        let ok = false
+        for (; settle < 30; settle++) {
+          await nextFrames(1)
+          const cur = await pose()
+          if (still(moved(prev, cur))) {
+            ok = true
+            prev = cur
+            break
+          }
+          prev = cur
+        }
+        maxSettle = Math.max(maxSettle, settle)
+        const png = await capturePixels(page, `Sphinx moving-camera arc ${arc + 1}, frame ${k + 1}`)
+        const after = moved(prev, await pose())
+        worstDrift = Math.max(worstDrift, after.dp / stepLen)
+        if (!ok || !still(after)) unsettled++
+        const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
+        series.push({ data, width: info.width, height: info.height, channels: info.channels })
+      }
+      check(`the moving-camera arc ${arc + 1} samples settled consecutive poses (no unrecorded pose between captures)`, unsettled === 0,
+        `${unsettled} of ${ARC_FRAMES} captures not on a settled pose (motion per frame above ${SETTLE_SHARE * 100} % of a step); settling took at most ${maxSettle} frame(s); worst drift across a capture ${(worstDrift * 100).toFixed(2)} % of a step`)
+      const flicker = judgeFlickerSeries(series)
+      console.log(`SPHINX FLICKER ${VERIFY_GL ?? 'webgpu'} arc ${arc + 1}: worst ${(flicker.worst * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
+      check(`no flicker on the Sphinx while the camera moves (arc ${arc + 1} of 4, ${ARC_FRAMES} consecutive poses)`, flicker.ok,
+        `worst flip share ${(flicker.worst * 100).toFixed(3)}% > ${(flicker.limit * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
+      await frame(shot(`315-sphinx-orbit-${arc}`), { local: { x: sx.x, y: 0.15 * L, z: sx.z }, label: `the end of moving-camera arc ${arc + 1} of 4 round the Sphinx` })
+    }
+    // The frame cost at the site, LOW and MEDIUM, standing in profile.
+    await standAt(sx.x + 0.05 * L, sx.z + 0.85 * L, sx.x, sx.z, 0)
+    for (const lvl of ['low', 'medium']) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), lvl)
+      await nextFrames(20)
+      const cost = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const times = []
+            const calls = []
+            const tris = []
+            let last = performance.now()
+            // A counter the renderer does not report stays MISSING (null), never
+            // zero, so the check below cannot pass on a substituted value.
+            const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+            const tick = (t) => {
+              times.push(t - last)
+              last = t
+              const r = window.__renderer?.info?.render
+              calls.push(num(r?.drawCalls))
+              tris.push(num(r?.triangles))
+              if (times.length < 61) return requestAnimationFrame(tick)
+              const med = (a) => (a.some((v) => v === null) ? null : [...a].sort((x, y) => x - y)[a.length >> 1])
+              resolve({ detail: window.__placeMonuments?.sphinxDetail, sphinxTriangles: window.__placeMonuments?.sphinxTriangles, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+            }
+            requestAnimationFrame(tick)
+          }),
+      )
+      console.log(`SPHINX FRAME COST ${VERIFY_GL ?? 'webgpu'} ${lvl}: ${JSON.stringify(cost)}`)
+      check(`the Sphinx at ${lvl} draws its ${lvl === 'low' ? 'reduced' : 'standard'} mesh`,
+        cost.detail === (lvl === 'low' ? 'reduced' : 'standard') && cost.sphinxTriangles > 0, JSON.stringify(cost))
+      // The cost sample counts only on MEASURED values: the renderer's draw
+      // calls and triangles must be reported and nonzero, the frame time
+      // positive, and the frame must draw at least the Sphinx's own triangles.
+      check(`the Sphinx frame cost at ${lvl} is measured, not substituted`,
+        cost.drawCalls > 0 && cost.triangles >= cost.sphinxTriangles && cost.frameMs > 0, JSON.stringify(cost))
+    }
+  } finally {
+    await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })

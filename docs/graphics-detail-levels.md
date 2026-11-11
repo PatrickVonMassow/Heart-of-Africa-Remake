@@ -54,6 +54,7 @@ device pixel ratio is kept (no cap).
 | `figureGltfBody` | off | on | on |
 | `grassFireFlames` | 16 | 28 | 40 |
 | `grassFireSmoke` | 6 | 14 | 24 |
+| `sphinxSiteDetail` | reduced | standard | full |
 
 ## What each setting does
 
@@ -271,6 +272,48 @@ added.
 - **`grassFireSmoke`** — Smoke puffs rising behind the line: alpha-blended,
   camera-facing sprites, so it prices overdraw while a fire burns in view, and
   nothing otherwise. One instanced draw. Climbs 6 → 14 → 24.
+- **`sphinxSiteDetail`** — The level of the Great Sphinx's mesh at the
+  walkable Giza site (`src/world/sphinx.ts`, the ONE definition every view of
+  the monument derives from; `src/render/sphinx.ts` builds it). `reduced` is
+  the named frugal mesh of the low level: the same parts, coarser rings, a
+  coarser drift grid and no painted eye and mouth marks; `standard` and
+  `full` add tessellation, the face marks and a finer drift. The face's
+  modelled features (brow ridge, cheekbones, nose stump, lips, chin) and the
+  shoulder tops are site parts on every site level; the bird's-eye landmark
+  keeps the nemes trapezoid, face block, lappets, neck, chest, shoulder tops and
+  spine, the Cairo skyline only the head, the neck and the back ridge above its
+  drift (owner verdict 11.11.2026). The landmark is the one definition under
+  its documented travel-scale emphasis (`SPHINX_FORM.emphasis.landmark`: head
+  block ×1.45 with the neck scaled alongside, the two forepaws revealed in
+  stone at their own length — lifted, spread and widened, joined to the chest,
+  the notch between them open — the back ridge widened ×2.2, stone tones
+  ×0.66) and draws NO drift: an untextured sand mesh cannot take the travel
+  ground's textured response and rendered as a pale patch (owner picture
+  check 11.11.2026), so at travel scale the stone alone carries the figure.
+  The skyline is drawn true in proportion and sized so its crown stands
+  20/138.5 of Khufu's standing height; its nemes, wings, lappets and nemes
+  back are drawn as their one derived tapered block (`sphinxHeadBlock`, the
+  flat-topped trapezoid widening to the shoulders, normalised on its drawn
+  surface to its sources' crown and full width, the foot flared ×1.2,
+  tessellated three times finer) and its stone ×1.38 in the pyramids' core
+  tone family. Both distant levels are judged on rendered pixels too
+  (`polish-panorama`, sections `sphinx-travel` and `giza-skyline`, through
+  the field Sphinx's DEV probe, `src/render/sphinxProbe.tsx`). The limestone banding is a per-fragment
+  term of its TSL material on every site level. One draw.
+  Counted per level (vertices / triangles; the bird's-eye landmark and the
+  Cairo skyline outline are fixed distant levels outside the presets):
+
+  | Level | Vertices | Triangles |
+  | --- | --- | --- |
+  | reduced (low) | 3927 | 5634 |
+  | standard (medium) | 12352 | 19642 |
+  | full (high) | 26041 | 42616 |
+  | landmark (bird's-eye) | 1770 | 2580 |
+  | skyline (Cairo) | 644 | 870 |
+
+  The measured frame cost at the site on both backends at LOW and MEDIUM is
+  owed by the owner's local run (`polish-panorama`, section `sphinx`).
+
 ## Profiling the low preset (F8 benchmark, point 293)
 
 The in-game render benchmark (**F8** / `?bench`, design.md §21.1) exists to price

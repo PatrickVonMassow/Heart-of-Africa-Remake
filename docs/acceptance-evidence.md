@@ -1242,9 +1242,10 @@ surroundings always do and the far-field artefact never did
 hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
 its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
 Cairo mounts the Giza pyramids as its western skyline (point 82) —
-the field's Sphinx modelled as a recognizable couchant lion under the
-nemes (proportions and part count pure-tested via `buildSphinx` in
-`src/render/landmarks.test.ts`; travel-scale screenshot 103) — and
+the field's Sphinx drawn at its `skyline` level of the ONE Sphinx
+definition (`src/world/sphinx.ts`, below; its outline as a crouching figure
+with a raised head pure-tested in `src/render/sphinx.test.ts`; the
+bird's-eye `landmark` level in travel-scale screenshot 103) — and
 Timbuktu builds the Djinguereber mosque as a collidable dwelling
 (`scripts/verify/polish-panorama.mjs`, screenshots 96/97/100); and the Giza
 plateau is an ENTERABLE first-person monument site (§4.4, point 273):
@@ -1276,6 +1277,70 @@ collidable site with neither trade nor chief, and the warm desert-sand ground
 gated in `scripts/verify/polish-panorama.mjs` (screenshot 139);
 the same period casing cap and half-buried Sphinx carry into Cairo's
 western skyline (point 82).
+The Great Sphinx is ONE definition with three levels of detail (point 315):
+`src/world/sphinx.ts` holds the couchant body — the buried parts (torso and
+falling rear torso, shoulders, two haunches, breast, legs, forepaws, tail,
+the bank under the spine) that only raise the drift, and the clear stone
+(the head as the nemes' flaring trapezoid: flat crown with brow band, broad
+flat wings, the lappets as long flat striped panels beside the neck falling
+into the sand at the chest; a narrower face with brow ridge, almond eye
+sockets, cheekbones, the flattened nose stump, lips, rounded chin and no
+beard; the neck, a little of the chest, the shoulder tops under the wings
+and the spine) — and the drift as a body UNDER sand, one cover dome per
+buried part plus two wind-blown sand banks (one bank piled against the
+chest over the forepaws, one long swell over the haunches tapering to the
+tail, both a little to the lee side), so the shoulder swell shows through,
+the paws only as a broad shallow hint, and the spine rises out of banked
+sand to the neck (reworked twice after the owner's picture verdicts of
+11.11.2026: the second removed the paw and haunch lobe pairs that read as
+two round mounds with a crease face-on and from behind);
+the walkable site's mesh (three levels, `sphinxSiteDetail` per quality
+preset, the named reduced mesh on low), the bird's-eye landmark and the
+Cairo skyline outline all derive from it (`src/render/sphinx.ts`), and the
+site mesh's TSL material bands the limestone courses and the nemes stripes.
+Pure-tested in `src/world/sphinx.test.ts`: the burial line at the upper
+chest within the documented ~1890 state (docs/giza-1890.md §1.3, measured
+against the real crown, not the enlarged head), head, neck and upper back
+clear of the drift while every other body part sits below it, the nemes
+trapezoid wider than the face, the lappets reaching the sand, the face
+features in order, the spine's crest continuously clear from mid-back to
+the shoulders with sand banked against it, crown, nemes back and spine
+visible from the behind standpoint over one long tapering haunch swell
+(dip between the haunch swells at most 10 % of the drift height), the paw
+dip at most 15 % with no V-crease, the stone one
+limestone family and darker than the sand, the drift's footprint within the body's plus its skirt, and no
+coplanar contact anywhere (every clear part leaves the drift at a real
+angle, the drift meets the ground at its repose slope, no two drawn parts
+touch near-parallel) — so no z-offset is used; in
+`src/render/sphinx.test.ts` that every vertex of every level lies on the
+definition and the levels' parts nest, that the bird's-eye level is the
+definition under its documented travel-scale emphasis (head block enlarged,
+the two forepaws revealed as parallel stone tongues joined to the chest and
+reaching ahead of it with open ground between them, the back ridge wider
+than at the site, the stone the limestone hue under a uniform shade), that
+it draws no drift (every vertex stone: an untextured drift rendered as a
+pale patch over the textured travel ground, owner picture check
+11.11.2026), that the skyline level DRAWS its drift (triangle-referenced
+vertices and plan area) with only head, neck and back ridge above it, its
+nemes drawn as the derived block — as high, deep and wide as its sources on
+its drawn surface — whose face-on outline is a flat-topped trapezoid
+widening to the shoulders with the lappets' foot in the drift and the face
+in front, and that neither distant level has a near-coplanar contact,
+part against part or part against drift and ground;  in `src/render/landmarks.test.ts` that the
+skyline Sphinx's crown stands 0.12-0.17 of Khufu's height (owner verdict
+11.11.2026), its stone lies in the pyramids' core tone family and the
+scenes draw the field Sphinx as its own mesh with projectable anchors; in
+`scripts/verify/polish-panorama.mjs` on rendered pixels (mask capture
+through the field Sphinx's DEV probe) that the bird's-eye Sphinx is visible
+and draws no pale patch over the ground behind it and that face-on the
+skyline head is flat-topped and widens to the shoulders in the frame; in `src/scenes/place/gizaSite.test.ts`
+that the collidable mass is the drawn footprint (point 378's rule). Live
+(owed by the owner's local run, both backends): `polish-panorama` section
+`sphinx` — face on, profile, behind, low along the drift, a moving-camera
+flicker pass (four continuous arcs, every consecutive frame captured and
+judged for A-B-A pixel flips by `scripts/verify/flickerSeries.mjs`) and the
+frame cost at LOW and MEDIUM, accepted only on reported, nonzero renderer
+counters.
 The walkable ground of an OPEN-PLAIN place reaches to where the picture
 stops offering ground (point 390): at Giza the desert runs unbroken to the
 horizon, so a 60 m disc ended the world ~18 m past the outermost mass, in
@@ -1894,7 +1959,8 @@ languages, that the sighting entry's heading names the site
 treasure's name (§10); `scripts/verify/enrichments.mjs` that all EIGHT cultural
 landmarks of §4.4 mount on the travel map (`__culturalLandmarks` — Giza
 among them, and it ADDITIONALLY stands as Cairo's first-person skyline
-and as the walkable monument site, pt. 15) and all four natural sites
+and as the walkable monument site, pt. 15; its Sphinx in all three views
+from the one definition in `src/world/sphinx.ts`, pt. 15) and all four natural sites
 (`__naturalSites`) mount in the scene, render a non-black frame at
 their coordinates and reveal their label on sighting (screenshots 91,
 94, 95).

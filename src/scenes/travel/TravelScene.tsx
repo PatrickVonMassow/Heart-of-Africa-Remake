@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { TalusSocket } from './TalusSocket'
+import { FieldSphinx } from '../../render/sphinxProbe'
 import * as THREE from 'three/webgpu'
 import {
   attribute,
@@ -2251,7 +2252,8 @@ function CulturalLandmarks() {
   const geos = useMemo(
     () => ({
       pyramids: buildMeroePyramids(),
-      'giza-pyramids': buildGizaPyramids(),
+      // The Sphinx is its own mesh below (FieldSphinx, the picture checks' probe).
+      'giza-pyramids': buildGizaPyramids('landmark', false),
       'stone-city': buildStoneCity(),
       'rock-churches': buildRockChurches(),
       'coastal-ruins': buildCoastalRuins(),
@@ -2307,6 +2309,7 @@ function CulturalLandmarks() {
           receiveShadow
           dispose={null}
         />
+        {it.kind === 'giza-pyramids' && <FieldSphinx lod="landmark" material={material} probe="__gizaTravelSphinx" castShadow />}
         </group>
       ))}
     </>

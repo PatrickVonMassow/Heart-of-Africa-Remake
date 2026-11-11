@@ -8,8 +8,11 @@ import {
   buildMeroePyramids,
   MEROE_PYRAMIDS,
   buildGizaPyramids,
-  buildSphinx,
-  SPHINX_BURIAL_DEPTH,
+  buildFieldSphinx,
+  fieldSphinxLength,
+  fieldSphinxAnchors,
+  GIZA_FIELD_CORE_TONE,
+  GIZA_FIELD_KHUFU_HEIGHT,
   buildStoneCity,
   buildRockChurches,
   buildCoastalRuins,
@@ -28,6 +31,7 @@ import {
   buildWetland,
   buildTableMountain,
 } from './landmarks'
+import { SPHINX_FORM } from '../config/balance'
 
 const BUILDERS = {
   buildMeroePyramids,
@@ -76,10 +80,10 @@ describe('landmark builders', () => {
     const b = geo.boundingBox
     expect(b).toBeTruthy()
     if (!b) return
-    // The field reaches BELOW the ground now: the Sphinx it embeds lies buried
-    // to the shoulders as it did in 1890 (point 279), so the floor is its sunk
-    // body rather than the pyramids' bases.
-    expect(b.min.y).toBeGreaterThanOrEqual(-SPHINX_BURIAL_DEPTH - 0.1)
+    // The field reaches just BELOW the ground: the Sphinx's drift runs its foot
+    // under the sand line (src/world/sphinx.ts), never deeper than its floor.
+    expect(b.min.y).toBeLessThan(0)
+    expect(b.min.y).toBeGreaterThanOrEqual(-SPHINX_FORM.drift.sink * SPHINX_FORM.field.length - 1e-6)
     // Khufu (base half-extent 1.6, Old-Kingdom slope) peaks just under 2 at
     // its blunt 1890 top — a compact symbol: the field stands only ~4 world
     // units from Cairo's marker.
@@ -127,10 +131,18 @@ describe('landmark builders', () => {
     // lower than the hex reads: the tawny core peaks ~1.2 with jitter while
     // the pale cap stays above 2.0.
     const khafreH = 1.5 * 0.64 * 2
+    // The field Sphinx is judged by its own tests (src/render/sphinx.test.ts):
+    // its footprint is discounted here.
+    const sphinxGeo = buildFieldSphinx('landmark')
+    sphinxGeo.computeBoundingBox()
+    const sb = sphinxGeo.boundingBox!
+    sphinxGeo.dispose()
+    const inSphinx = (i: number) =>
+      pos.getX(i) >= sb.min.x - 1e-6 && pos.getX(i) <= sb.max.x + 1e-6 && pos.getZ(i) >= sb.min.z - 1e-6 && pos.getZ(i) <= sb.max.z + 1e-6 && pos.getY(i) <= sb.max.y + 1e-6
     let pale = 0
     for (let i = 0; i < pos.count; i++) {
       const bright = col.getX(i) + col.getY(i) + col.getZ(i)
-      if (bright <= 1.6) continue
+      if (bright <= 1.6 || inSphinx(i)) continue
       pale++
       expect(Math.hypot(pos.getX(i), pos.getZ(i)), 'pale casing only on Khafre').toBeLessThan(0.5)
       expect(pos.getY(i), 'pale casing only near the apex').toBeGreaterThan(khafreH * 0.7)
@@ -138,75 +150,85 @@ describe('landmark builders', () => {
     expect(pale, 'the casing cap exists').toBeGreaterThan(0)
     // Menkaure (SW, smallest): NO dark red band at skyline scale — the granite
     // casing is a close-range cue only (it read as a floating error stripe out
-    // here). Nothing on the whole skyline is both dark (linear sum < 0.6) and
-    // red-dominant; the tawny cores and the Sphinx face all sit brighter.
-    let redBand = 0
-    for (let i = 0; i < pos.count; i++) {
-      const bright = col.getX(i) + col.getY(i) + col.getZ(i)
-      if (bright >= 0.6) continue
-      if (col.getX(i) > col.getZ(i) * 1.5) redBand++
-    }
-    expect(redBand, 'no red granite error band at skyline scale').toBe(0)
-    geo.dispose()
-  })
-
-  it('the Sphinx reads as a couchant lion under the nemes (user request)', () => {
-    const geo = buildSphinx()
-    geo.computeBoundingBox()
-    const b = geo.boundingBox
-    expect(b).toBeTruthy()
-    if (!b) return
-    const length = b.max.x - b.min.x
-    const width = b.max.z - b.min.z
-    // Couchant: clearly longer than tall, and longer than wide. Measured over
-    // the WHOLE lion, buried body included — that is the shape this builder
-    // describes, whether or not the sand happens to cover it.
-    const bodyHeight = b.max.y - b.min.y
-    expect(length / bodyHeight).toBeGreaterThan(1.6)
-    expect(length / width).toBeGreaterThan(2)
-    // The fore paws stretch forward well beyond the chest front (chest face
-    // at x ≈ 0.39): the +x extreme is the paw tips.
-    expect(b.max.x).toBeGreaterThan(0.7)
-    // Distinctly more parts than the old three-box stand-in (72 vertices).
-    expect(geo.attributes.position.count).toBeGreaterThan(200)
-    geo.dispose()
-  })
-
-  it('the Sphinx stands buried to the shoulders, as it did in 1890 (point 279)', () => {
-    // Until Baraize's 1925-36 excavation the body lay under the sand: Caviglia
-    // cleared the chest in 1817 and Mariette in 1853, and both times the sand
-    // took it back. A ~1890 expedition sees a head and nemes out of a drift.
-    // The regression this pins is the modern postcard — the freestanding lion
-    // the builder used to make, which also mounted at 13x as Cairo's skyline.
-    const geo = buildSphinx()
-    const pos = geo.getAttribute('position') as THREE.BufferAttribute
-    let minY = Infinity
-    let maxY = -Infinity
-    let aboveMinX = Infinity
-    let aboveMaxX = -Infinity
-    let above = 0
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i)
-      const y = pos.getY(i)
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-      // Count only what genuinely clears the sand, not the drift's own rim.
-      if (y > 0.09) {
-        above += 1
-        if (x < aboveMinX) aboveMinX = x
-        if (x > aboveMaxX) aboveMaxX = x
+    // here). Nothing on the pyramids is both dark (linear sum < 0.6) and
+    // red-dominant; the tawny cores sit brighter. The bird's-eye Sphinx's stone
+    // IS drawn darker on purpose (its travel-scale emphasis, the limestone hue
+    // kept: src/render/sphinx.test.ts), so its own vertices are discounted.
+    const darkRed = (c: THREE.BufferAttribute) => {
+      let n = 0
+      for (let i = 0; i < c.count; i++) {
+        const bright = c.getX(i) + c.getY(i) + c.getZ(i)
+        if (bright < 0.6 && c.getX(i) > c.getZ(i) * 1.5) n++
       }
+      return n
     }
-    // The body really is sunk, not merely shortened.
-    expect(minY).toBeLessThanOrEqual(-SPHINX_BURIAL_DEPTH + 1e-6)
-    // Something still stands proud — the head under its nemes.
-    expect(above).toBeGreaterThan(0)
-    expect(maxY).toBeGreaterThan(0.2)
-    // And it is only the HEAD: what clears the sand spans a small part of the
-    // lion's length, near the front, nowhere near the paws out at x > 0.7.
-    expect(aboveMaxX - aboveMinX).toBeLessThan(0.35)
-    expect(aboveMaxX).toBeLessThan(0.6)
+    const sphinx = buildFieldSphinx('landmark')
+    expect(darkRed(col), 'no red granite error band at skyline scale').toBe(darkRed(sphinx.getAttribute('color') as THREE.BufferAttribute))
+    sphinx.dispose()
     geo.dispose()
+  })
+
+  it('the field Sphinx reads as a couchant figure under sand, east of Khafre (one definition)', () => {
+    // The distant levels of the shared definition (src/world/sphinx.ts); its
+    // own tests pin the burial, the head and the drift.
+    for (const lod of ['landmark', 'skyline'] as const) {
+      const geo = buildFieldSphinx(lod)
+      geo.computeBoundingBox()
+      const b = geo.boundingBox!
+      const length = b.max.x - b.min.x
+      const width = b.max.z - b.min.z
+      // Couchant: much longer than tall, longer than wide (the bird's-eye
+      // level's enlarged head and stone-only body make it a little taller).
+      expect(length / b.max.y).toBeGreaterThan(lod === 'landmark' ? 2 : 2.5)
+      expect(length / width).toBeGreaterThan(1.5)
+      // East of Khafre (the field's centre), so the face looks away from it.
+      expect(b.min.x).toBeGreaterThan(0)
+      geo.dispose()
+    }
+  })
+
+  it('the skyline Sphinx stands in its real proportion to Khufu, buried in its drift (owner verdict 11.11.2026)', () => {
+    // ~20 m head height against Khufu's ~138.5 m: the crown within 0.12-0.17 of
+    // Khufu's standing height, measured from the built geometry.
+    const geo = buildFieldSphinx('skyline')
+    geo.computeBoundingBox()
+    const ratio = geo.boundingBox!.max.y / GIZA_FIELD_KHUFU_HEIGHT
+    expect(ratio).toBeGreaterThan(0.12)
+    expect(ratio).toBeLessThan(0.17)
+    expect(ratio).toBeCloseTo(SPHINX_FORM.field.skylineCrownRatio, 2)
+    // Smaller than the bird's-eye symbol, which is drawn enlarged.
+    expect(fieldSphinxLength('skyline')).toBeLessThan(fieldSphinxLength('landmark'))
+    geo.dispose()
+  })
+
+  it('the scenes draw the field Sphinx as its own mesh: the pyramids without it, its anchors on it', () => {
+    for (const lod of ['landmark', 'skyline'] as const) {
+      const all = buildGizaPyramids(lod)
+      const bare = buildGizaPyramids(lod, false)
+      const sphinx = buildFieldSphinx(lod)
+      expect(bare.getAttribute('position').count + sphinx.getAttribute('position').count).toBe(all.getAttribute('position').count)
+      sphinx.computeBoundingBox()
+      const b = sphinx.boundingBox!
+      const a = fieldSphinxAnchors(lod)
+      // The crown is the mesh's top; the head's foot lies below it, on the body.
+      expect(a.crown[1]).toBeCloseTo(b.max.y, 1)
+      expect(a.headBase[1]).toBeLessThan(a.crown[1] * 0.6)
+      for (const p of [a.crown, a.headBase]) {
+        expect(p[0]).toBeGreaterThan(b.min.x)
+        expect(p[0]).toBeLessThan(b.max.x)
+      }
+      for (const g of [all, bare, sphinx]) g.dispose()
+    }
+  })
+
+  it("the skyline Sphinx's stone is in the pyramids' tone family, not a darker brown (owner verdict 11.11.2026, 11:02)", () => {
+    // The skyline Sphinx's limestone, shaded by its level's emphasis, against
+    // the pyramids' core: each channel within 15 % (linear), same hue order.
+    const core = new THREE.Color(GIZA_FIELD_CORE_TONE)
+    const stone = new THREE.Color(SPHINX_FORM.tones.limestone).multiplyScalar(SPHINX_FORM.emphasis.skyline.stoneShade)
+    for (const k of ['r', 'g', 'b'] as const) expect(Math.abs(stone[k] - core[k]) / core[k], k).toBeLessThan(0.15)
+    expect(stone.r).toBeGreaterThan(stone.g)
+    expect(stone.g).toBeGreaterThan(stone.b)
   })
 
   it('the Meroë pyramid field is unmistakable at travel zoom (user request)', () => {

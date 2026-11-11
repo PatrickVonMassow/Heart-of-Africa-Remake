@@ -2739,6 +2739,130 @@ export const GIZA_CAST = {
   ladyHatBand: '#8a2a2a',
 } as const
 
+/**
+ * The Great Sphinx (docs/giza-1890.md §1.3): the tunable estimates the ONE
+ * shared definition (src/world/sphinx.ts) reads. The SHAPE of the monument is
+ * the definition's; what lives here is every value that is a judgement rather
+ * than a record — the head's readability exaggeration, the drift's cover and
+ * skirt, the burial-line target, the per-level tessellation, the banding and
+ * the tones. Every value is CALIBRATABLE; the unit is the body length (paw tip
+ * to tail = 1) unless a field says metres.
+ */
+export const SPHINX_FORM = {
+  /** The emergent head is drawn this much larger than the real proportion
+   *  (crown ~0.27 of the length) so the face reads from across the site and as
+   *  a raised head in the skyline (calibratable). */
+  headScale: 1.45,
+  /** The real crown height as a fraction of the body length (~20 m of ~73 m,
+   *  docs/giza-1890.md §1.3): the burial line is measured against it, since
+   *  the drawn head is enlarged by `headScale`. */
+  realCrown: 0.27,
+  /** The burial line the drift must hit at the chest front, as a fraction of
+   *  the real crown height: "buried to roughly the shoulders/upper chest",
+   *  only head, neck, lappets and a little of the chest clear (calibratable;
+   *  the record gives no number). */
+  burialLineFraction: 0.55,
+  /** Allowed deviation of the drawn burial line from that target (fraction of
+   *  the real crown height). */
+  burialLineTolerance: 0.06,
+  drift: {
+    /** Sand cover over the top of every buried body part. */
+    cover: 0.012,
+    /** Horizontal margin of each buried part's cover ellipsoid. */
+    margin: 0.02,
+    /** Repose slope of the drift's flanks (rise over run): 1.25 ≈ 51°, firm
+     *  wind-packed sand. Steeper keeps the swell close to the body. */
+    slope: 1.25,
+    /** The SKIRT: how far the drift's foot may reach past the buried body's
+     *  footprint at most (the bound the tests hold the drawn drift to). */
+    skirt: 0.15,
+    /** Depth of the drift's floor below the ground, so its foot crosses the
+     *  ground at the repose slope and never lies flat on it. */
+    sink: 0.03,
+    /** Blend radius of the domes' smooth union. */
+    blend: 0.012,
+    /** How much darker the drift's steepest sand is drawn than its flat top
+     *  (vertex shading), so the swell reads from above (calibratable). */
+    flankShade: 0.45,
+  },
+  /** Spacing of the collider capsules laid across the drift's footprint
+   *  (0.25 m at the site's 20 m length). */
+  colliderStep: 0.0125,
+  /** Tessellation per level of detail: ring and row segments of a body or
+   *  head part (head parts take `headFactor` more), drift grid cells along the
+   *  body, and whether the face carries its painted eye and mouth marks. The
+   *  three `site-*` levels are what `sphinxSiteDetail` picks per quality
+   *  preset; `landmark` and `skyline` are the distant views (calibratable). */
+  lods: {
+    'site-full': { rings: 28, rows: 18, headFactor: 1.5, driftCells: 112, faceMarks: true },
+    'site-standard': { rings: 20, rows: 12, headFactor: 1.5, driftCells: 72, faceMarks: true },
+    'site-reduced': { rings: 12, rows: 8, headFactor: 1.25, driftCells: 40, faceMarks: false },
+    // The bird's-eye level draws NO drift (`driftCells: 0`; owner picture
+    // check 11.11.2026): an untextured sand mesh cannot match the travel
+    // ground's splatted, textured response and read as a pale cream patch, so
+    // at travel scale the stone alone carries the figure.
+    landmark: { rings: 10, rows: 8, headFactor: 1, driftCells: 0, faceMarks: false },
+    skyline: { rings: 6, rows: 4, headFactor: 1, driftCells: 20, faceMarks: false },
+  },
+  /** TRAVEL-SCALE EMPHASIS (owner verdict 11.11.2026): the bird's-eye landmark
+   *  is read from above and far, where the true proportions blur into a pale
+   *  lump. The level stays the ONE definition, transformed by these documented
+   *  factors (src/world/sphinx.ts `sphinxEmphasis`); a level not listed is
+   *  drawn true. `head`: extra scale of the head-and-nemes block about the head
+   *  anchor. `pawLift` / `pawReach`: height and forward length of the sand
+   *  lobes over the buried forepaws, `pawSpread` their distance from the axis.
+   *  `frontBank`: height factor of the front
+   *  sand bank (0 = none, so the gap between the paws stays open in plan).
+   *  `stoneShade`: the stone tones' multiplier, so the limestone reads darker
+   *  than the sand. `flankShade`: the drift's flank shading (calibratable).
+   *  Owner verdict 11.11.2026, 11:02 — the stone must carry the read from
+   *  above: `revealPaws` draws the two forepaws in stone (lifted, lengthened,
+   *  spread and widened by `pawWidth`) instead of raising sand over them, and
+   *  `spineWidth` broadens the back ridge so the body line shows. The SKYLINE
+   *  is drawn true in proportion, but face-on its head read as a round head
+   *  with two hanging lobes: `headBlock` draws the nemes, its wings, lappets
+   *  and back as their one derived tapered block (`sphinxHeadBlock`), the
+   *  flat-topped trapezoid widening to the shoulders, its foot widened by
+   *  `lappetFlare` so the flare survives at the ~45 px the frame gives it,
+   *  and `stoneShade` lifts the stone into the pyramids' core tone family
+   *  (#c9a76a). The landmark's paws are kept short (`pawReach` 1) so they
+   *  stay joined to the chest. */
+  emphasis: {
+    landmark: {
+      head: 1.45,
+      pawLift: 1.9,
+      pawReach: 1,
+      pawSpread: 1.3,
+      pawWidth: 1.25,
+      revealPaws: true,
+      spineWidth: 2.2,
+      frontBank: 0,
+      stoneShade: 0.66,
+      flankShade: 0.3,
+    },
+    skyline: { stoneShade: 1.38, headBlock: true, lappetFlare: 1.2 },
+  },
+  /** Walkable site placement (metres, site frame: +x east, +z south). */
+  site: { x: 27, z: 3, length: 20 },
+  /** Bird's-eye landmark and Cairo skyline: body length in the Giza field's
+   *  own units and the position east of Khafre (calibratable; the field is a
+   *  compressed symbol, so the landmark Sphinx is drawn larger than its true
+   *  ratio). The SKYLINE level is sized by the real proportion instead: its
+   *  crown stands `skylineCrownRatio` of Khufu's standing height (~20 m head
+   *  height against ~138.5 m, docs/giza-1890.md §1.1/§1.3). */
+  field: { x: 2.25, z: 0.35, length: 1.25, skylineCrownRatio: 20 / 138.5 },
+  /** Horizontal weathered limestone courses at the site (metres). */
+  banding: { coursePeriod: 0.9, courseAmplitude: 0.12, nemesPeriod: 0.32, nemesAmplitude: 0.22 },
+  tones: {
+    limestone: '#b38e59',
+    face: '#b8935e',
+    nemes: '#ba9660',
+    band: '#b08b58',
+    sand: '#dcc48a',
+    shadowMark: '#6e5434',
+  },
+} as const
+
 /** The expedition leader of the bird's-eye view: khaki drill, sun helmet and
  *  pack, on the same body (calibratable colours). */
 export const TRAVELLER_LOOK = {

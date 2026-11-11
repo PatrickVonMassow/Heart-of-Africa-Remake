@@ -462,6 +462,8 @@ export const effectivePlaceRiverFlotsam = (s: UiState): number => currentQuality
 export const effectiveWaterDetailOctaves = (s: UiState): number => currentQuality(s).waterDetailOctaves
 /** Radial segments of the detailed ungulates' swept bodies (work-order 1284). */
 export const effectiveFaunaBodySegments = (s: UiState): number => currentQuality(s).faunaBodySegments
+/** The Great Sphinx's site mesh level for the current preset. */
+export const effectiveSphinxSiteDetail = (s: UiState) => currentQuality(s).sphinxSiteDetail
 /** The villagers' skinned-body resolution; 0 = the primitive figure (work-order "villager dress"). */
 export const effectiveFigureBodySegments = (s: UiState): number => currentQuality(s).figureBodySegments
 /** Whether the villagers' skinned body is the glTF one (work-order "glTF villager body"). */

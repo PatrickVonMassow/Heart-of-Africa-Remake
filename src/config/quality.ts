@@ -121,6 +121,12 @@ export interface QualityPreset {
   /** Smoke puffs rising behind the grass fire's line; alpha-blended sprites,
    *  so this prices overdraw. */
   grassFireSmoke: number
+  /** Level of the Great Sphinx's site mesh (src/world/sphinx.ts, one
+   *  definition for every view): `reduced` is the named frugal mesh, `full`
+   *  the finest. Drawn every frame at the walkable Giza site, so this prices
+   *  its vertices; the bird's-eye landmark and the Cairo skyline have their
+   *  own fixed distant levels. */
+  sphinxSiteDetail: 'reduced' | 'standard' | 'full'
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -158,6 +164,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureGltfBody: false, // the primitive figure stays: no glTF body is loaded at all
     grassFireFlames: 16, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 6, // smoke puffs behind the line (overdraw)
+    sphinxSiteDetail: 'reduced', // the named reduced Sphinx mesh (calibratable)
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -189,6 +196,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureGltfBody: true, // the CC0 glTF body under the dress
     grassFireFlames: 28, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 14, // smoke puffs behind the line (overdraw)
+    sphinxSiteDetail: 'standard', // calibratable
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -219,6 +227,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureGltfBody: true, // the CC0 glTF body under the dress
     grassFireFlames: 40, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 24, // smoke puffs behind the line (overdraw)
+    sphinxSiteDetail: 'full', // the fuller Sphinx mesh (calibratable)
   },
 }
 
