@@ -709,9 +709,15 @@ if (section('rivers')) {
       const lat = -body0.z / 10
       const lon = body0.x / 10
       const stood = await jumpBeside(page, lat, lon, 'spring 3D')
+      // Wait on frames the page actually draws, so the time-driven surface has moved.
+      const renderedFrames = (n) => page.evaluate((k) => new Promise((done) => {
+        let left = k
+        const step = () => (--left <= 0 ? done(true) : requestAnimationFrame(step))
+        requestAnimationFrame(step)
+      }), n)
       await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
       await page.evaluate(() => window.__pollSim(20, () => window.__camera.settled()))
-      await page.waitForTimeout(1500) // chunks and the spring mesh stream in at the new spot
+      await waitForSceneReady(page) // chunks and the spring mesh stream in at the new spot
       // 3D: the drawn body's bounding box is not flat, and the dome stands
       // clear of the pool.
       const solid = await page.evaluate(([x, z]) => {
@@ -783,7 +789,7 @@ if (section('rivers')) {
             return sharp(buf).raw().toBuffer({ resolveWithObject: true })
           }
           const a = await grab()
-          await page.waitForTimeout(600)
+          await renderedFrames(36) // ~0.6 s of drawn frames, not a wall-clock sleep
           const b = await grab()
           let sum = 0
           let changed = 0
@@ -796,14 +802,14 @@ if (section('rivers')) {
           }
           const meanDelta = sum / px
           check(
-            `Spring: the surface animates over time (pixel delta between two frames, ${VERIFY_GL})`,
+            `Spring: the surface animates over time (pixel delta between two frames ~36 drawn frames apart, ${VERIFY_GL})`,
             changed / px >= 0.03 && meanDelta >= 1,
             JSON.stringify({ clip, meanDelta: +meanDelta.toFixed(2), changedShare: +(changed / px).toFixed(3) }),
           )
         }
         // §7.2 evidence: the spring at the default zoom, two moments apart.
         await shot('320-spring-3d-a', { world: { lat, lon }, label: 'the 3D welling spring at a river source' })
-        await page.waitForTimeout(700)
+        await renderedFrames(42)
         await shot('320-spring-3d-b', { world: { lat, lon }, label: 'the same spring, a moment later (the boil has moved)' })
       }
     }

@@ -1867,7 +1867,7 @@ rule itself pure-tested in `src/scenes/travel/riverBanks.test.ts`; screenshots o
 (71-73) show the courses; the open-land spring is a 3D water feature —
 the browser check asserts its body mesh has a non-flat bounding box
 with the dome above the pool, its rim lies on the sampled terrain (no
-gap, no clip), and two frames 0.6 s apart differ inside its projected
+gap, no clip), and two frames ~36 drawn frames apart differ inside its projected
 footprint, with the frame pair 320-spring-3d-a/b as picture evidence;
 the shape, rim-on-ground and per-level completeness are pure-tested in
 `src/scenes/travel/springGeometry.test.ts`; an idle traveller on a river is swept
