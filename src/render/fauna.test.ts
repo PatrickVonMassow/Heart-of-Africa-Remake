@@ -1605,6 +1605,7 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
       const g = build()
       g.computeBoundingBox()
       expect(g.boundingBox!.min.y).toBeGreaterThan(-0.05)
+      expect(g.boundingBox!.min.y).toBeLessThan(0.05)
     }
   })
 
@@ -1622,7 +1623,9 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
       for (let i = 0; i < p.count; i++) if (Math.abs(p.getZ(i)) < 0.25 && Math.abs(p.getX(i)) < 0.15 && p.getY(i) > 0.4) low = Math.min(low, p.getY(i))
       return low
     }
-    expect(bellyAt(buildZebraElder())).toBeGreaterThan(bellyAt(buildZebra()))
+    const [elderBelly, primeBelly] = [bellyAt(buildZebraElder()), bellyAt(buildZebra())]
+    expect(Number.isFinite(elderBelly) && Number.isFinite(primeBelly)).toBe(true)
+    expect(elderBelly).toBeGreaterThan(primeBelly)
   })
 
   it('rework: the old elephant back reads as a narrow ridge, not round lumps', () => {
