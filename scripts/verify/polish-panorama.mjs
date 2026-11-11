@@ -9,6 +9,7 @@ import { VERIFY_GL, waitForStable } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
+import { judgeFlickerSeries } from './flickerSeries.mjs'
 import sharp from 'sharp'
 import { section, check, probeSilhouetteFooting, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
 
@@ -1369,13 +1370,29 @@ if (section('sphinx')) {
     }
     const monuments = await page.evaluate(() => window.__placeMonuments)
     check('the Sphinx stands at its medium level, its drift running under the ground', monuments.sphinxDetail === 'standard' && monuments.sphinxBuried === true, JSON.stringify(monuments))
-    // The moving-camera pass: a slow orbit round the monument, one frame per
-    // step, for the flicker judgement on every surface the camera sweeps.
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2
-      await standAt(sx.x + Math.cos(a) * 0.8 * L, sx.z + Math.sin(a) * 0.8 * L, sx.x + 0.1 * L, sx.z, 0)
-      await nextFrames(3)
-      await frame(shot(`315-sphinx-orbit-${k}`), { local: { x: sx.x, y: 0.15 * L, z: sx.z }, label: `the moving-camera pass round the Sphinx, step ${k + 1} of 8` })
+    // The moving-camera pass: four continuous arcs round the monument (face,
+    // flank, back, other flank). Within an arc the camera advances one small
+    // step per rendered frame and EVERY frame is captured, so consecutive
+    // frames are compared while the camera moves; a depth fight flips pixels
+    // A → B → A, true motion does not (scripts/verify/flickerSeries.mjs).
+    const ARC_FRAMES = 24
+    const STEP = (0.35 * Math.PI) / 180
+    for (let arc = 0; arc < 4; arc++) {
+      const a0 = (arc / 4) * Math.PI * 2 - (ARC_FRAMES / 2) * STEP
+      const series = []
+      for (let k = 0; k < ARC_FRAMES; k++) {
+        const a = a0 + k * STEP
+        await standAt(sx.x + Math.cos(a) * 0.8 * L, sx.z + Math.sin(a) * 0.8 * L, sx.x + 0.1 * L, sx.z, 0)
+        await nextFrames(1)
+        const png = await capturePixels(page, `Sphinx moving-camera arc ${arc + 1}, frame ${k + 1}`)
+        const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
+        series.push({ data, width: info.width, height: info.height, channels: info.channels })
+      }
+      const flicker = judgeFlickerSeries(series)
+      console.log(`SPHINX FLICKER ${VERIFY_GL ?? 'webgpu'} arc ${arc + 1}: worst ${(flicker.worst * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
+      check(`no flicker on the Sphinx while the camera moves (arc ${arc + 1} of 4, ${ARC_FRAMES} consecutive frames)`, flicker.ok,
+        `worst flip share ${(flicker.worst * 100).toFixed(3)}% > ${(flicker.limit * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
+      await frame(shot(`315-sphinx-orbit-${arc}`), { local: { x: sx.x, y: 0.15 * L, z: sx.z }, label: `the end of moving-camera arc ${arc + 1} of 4 round the Sphinx` })
     }
     // The frame cost at the site, LOW and MEDIUM, standing in profile.
     await standAt(sx.x + 0.05 * L, sx.z + 0.85 * L, sx.x, sx.z, 0)
@@ -1389,22 +1406,30 @@ if (section('sphinx')) {
             const calls = []
             const tris = []
             let last = performance.now()
+            // A counter the renderer does not report stays MISSING (null), never
+            // zero, so the check below cannot pass on a substituted value.
+            const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
             const tick = (t) => {
               times.push(t - last)
               last = t
               const r = window.__renderer?.info?.render
-              calls.push(r?.drawCalls ?? 0)
-              tris.push(r?.triangles ?? 0)
+              calls.push(num(r?.drawCalls))
+              tris.push(num(r?.triangles))
               if (times.length < 61) return requestAnimationFrame(tick)
-              const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
+              const med = (a) => (a.some((v) => v === null) ? null : [...a].sort((x, y) => x - y)[a.length >> 1])
               resolve({ detail: window.__placeMonuments?.sphinxDetail, sphinxTriangles: window.__placeMonuments?.sphinxTriangles, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
             }
             requestAnimationFrame(tick)
           }),
       )
       console.log(`SPHINX FRAME COST ${VERIFY_GL ?? 'webgpu'} ${lvl}: ${JSON.stringify(cost)}`)
-      check(`the Sphinx at ${lvl} draws its ${lvl === 'low' ? 'reduced' : 'standard'} mesh (frame cost logged)`,
+      check(`the Sphinx at ${lvl} draws its ${lvl === 'low' ? 'reduced' : 'standard'} mesh`,
         cost.detail === (lvl === 'low' ? 'reduced' : 'standard') && cost.sphinxTriangles > 0, JSON.stringify(cost))
+      // The cost sample counts only on MEASURED values: the renderer's draw
+      // calls and triangles must be reported and nonzero, the frame time
+      // positive, and the frame must draw at least the Sphinx's own triangles.
+      check(`the Sphinx frame cost at ${lvl} is measured, not substituted`,
+        cost.drawCalls > 0 && cost.triangles >= cost.sphinxTriangles && cost.frameMs > 0, JSON.stringify(cost))
     }
   } finally {
     await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
