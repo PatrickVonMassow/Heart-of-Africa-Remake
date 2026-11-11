@@ -19,6 +19,7 @@ import {
   agedBoneKnobs,
   agedColor,
   calfProportions,
+  coatGreyFor,
   ELDERLY_SCHEMA,
   elderlyProportions,
   fitLegToPivot,
@@ -171,6 +172,8 @@ function ungulateBodyParts(s: UngulateSpec, segs: Segs): THREE.BufferGeometry[] 
   // forelegs and the breast — not a capsule. The ends close along an
   // elliptical falloff so the rump reads round, never as a cut-off tube.
   const w = s.bodyWidth ?? 1
+  const sb = s.swayBack ?? 0
+  const tuck = s.bellyTuck ?? 0
   const st = (z: number, y: number, rx: number, ry: number): SweepStation => ({ p: [0, backY + y * R, z], rx: rx * R * w, ry: ry * R })
   // Elliptical end cap: stations falling off as sqrt(1 - u²) from a full
   // section at `z0` over `len` (sign -1 toward the rump, +1 toward the breast).
@@ -183,10 +186,11 @@ function ungulateBodyParts(s: UngulateSpec, segs: Segs): THREE.BufferGeometry[] 
     [
       ...endCap(-halfL - 0.15 * R, 0.7 * R, -1, 0.02, 0.8, 0.84).reverse(),
       st(-halfL - 0.15 * R, 0.0, 0.8, 0.84),
-      st(-halfL + 0.2 * R, -0.03, 0.8, 0.85),
+      st(-halfL + 0.2 * R, -0.03 + tuck / 4, 0.8, 0.85 - tuck / 4),
       // The waist carries the aged sway-back (design.md §19.18): the topline
-      // dips between the hips and the withers.
-      st(0, -0.1 - (s.swayBack ?? 0), 0.8, 0.86),
+      // dips between the hips and the withers while the tucked-up belly
+      // rises — a thinner barrel, not merely a lower one.
+      st(0, -0.1 + (tuck - sb) / 2, 0.8, 0.86 - (sb + tuck) / 2),
       st(halfL - 0.15 * R, -0.12, 0.76, 0.96),
       st(halfL + 0.2 * R, -0.08, 0.66, 0.88),
       ...endCap(halfL + 0.2 * R, 0.55 * R, 1, -0.04, 0.66, 0.88),
@@ -433,8 +437,10 @@ export function elderlyUngulate(s: UngulateSpec): UngulateSpec {
   return {
     ...e,
     ...(s.muzzleColor ? { muzzleColor: greyMuzzle(s.muzzleColor) } : {}),
-    ...(s.mane ? { mane: { ...s.mane, color: agedColor(s.mane.color, ELDERLY_SCHEMA.coatGrey) } } : {}),
-    tail: { ...s.tail, color: agedColor(s.tail.color, ELDERLY_SCHEMA.coatGrey) },
+    ...(s.mane
+      ? { mane: { color: agedColor(s.mane.color, coatGreyFor(s.mane.color)), height: s.mane.height * ELDERLY_SCHEMA.maneThin } }
+      : {}),
+    tail: { ...s.tail, color: agedColor(s.tail.color, coatGreyFor(s.tail.color)) },
     ...(s.hornLen !== undefined ? { hornLen: s.hornLen * 0.8 } : {}),
   }
 }

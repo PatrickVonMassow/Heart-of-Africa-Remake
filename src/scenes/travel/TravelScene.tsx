@@ -114,7 +114,7 @@ import {
   buildTermiteMound,
   splitFoliage,
 } from '../../render/flora'
-import { buildElephant } from '../../render/fauna'
+import { buildGraveyardRemains, graveyardLayout, type GraveyardLayout } from '../../render/graveyardRemains'
 import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurches, buildCoastalRuins,
   buildStelae,
   buildCastles,
@@ -457,23 +457,24 @@ export function buildChunkGeometry(
 let terrainMaterialCache: THREE.MeshStandardNodeMaterial | null = null
 let waterHandleCache: ReturnType<typeof createWaterMaterial> | null = null
 const FAR_TERRAIN_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
-const BONE_MATERIAL = new THREE.MeshStandardMaterial({ color: '#c7bda6', roughness: 1, vertexColors: false })
-const IVORY_MATERIAL = new THREE.MeshStandardMaterial({ color: '#e9dec6', roughness: 0.65 })
+const REMAINS_MATERIAL = new THREE.MeshStandardMaterial({ roughness: 1, vertexColors: true })
+const REMAINS_IVORY_MATERIAL = new THREE.MeshStandardMaterial({ roughness: 0.65, vertexColors: true })
 const LANDMARK_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
 
 // The water plane's geometry, shared across mounts (point 96): larger than
 // the fog far distance so its edge is never visible.
 const WATER_PLANE_GEOMETRY = new THREE.PlaneGeometry(SEA_PLANE_SIZE, SEA_PLANE_SIZE, SEA_PLANE_SEGMENTS, SEA_PLANE_SEGMENTS)
 
-// Seed-independent elephant-graveyard geometries (point 96), built lazily once.
-let graveyardGeoCache: { elephantGeo: THREE.BufferGeometry; tuskGeo: THREE.BufferGeometry; ribGeo: THREE.BufferGeometry } | null = null
-function getGraveyardGeos() {
-  if (graveyardGeoCache) return graveyardGeoCache
-  const tuskGeo = new THREE.ConeGeometry(0.1, 1.3, 6)
-  tuskGeo.rotateZ(Math.PI / 2)
-  const ribGeo = new THREE.CylinderGeometry(0.05, 0.06, 1.0, 5)
-  ribGeo.rotateZ(Math.PI / 2)
-  graveyardGeoCache = { elephantGeo: buildElephant(), tuskGeo, ribGeo }
+// Elephant-graveyard remains (point 96: built once per seed, not per mount;
+// point 1498: bones and ivory, never whole bodies).
+let graveyardGeoCache: { seed: number; bones: THREE.BufferGeometry; ivory: THREE.BufferGeometry } | null = null
+function getGraveyardGeos(seed: number, layout: GraveyardLayout) {
+  if (graveyardGeoCache?.seed === seed) return graveyardGeoCache
+  if (graveyardGeoCache) {
+    graveyardGeoCache.bones.dispose()
+    graveyardGeoCache.ivory.dispose()
+  }
+  graveyardGeoCache = { seed, ...buildGraveyardRemains(layout) }
   return graveyardGeoCache
 }
 /**
@@ -2112,9 +2113,11 @@ function HiddenCross({ lat, lon, label, scale = 1 }: { lat: number; lon: number;
 }
 
 /**
- * Elephant graveyard (design.md §4.4/§19): the site is recognizable from afar
- * by a field of fallen, bleached elephant carcasses and scattered ivory tusks
- * and bones over a bone-strewn patch of ground. Layout is seeded per run.
+ * Elephant graveyard (design.md §4.4/§19.18): recognisable from afar as the
+ * place old elephants' water-side deaths accumulated — collapsed skeletons
+ * with standing rib arches, skulls and jaws, scattered long bones, ribs and
+ * ivory tusks over a bone-strewn patch of ground (point 1498: remains, never
+ * whole bodies). Layout is seeded per run (graveyardRemains.ts).
  */
 function ElephantGraveyard() {
   const seed = useGame((s) => s.seed)
@@ -2122,50 +2125,30 @@ function ElephantGraveyard() {
     const g = ELEPHANT_GRAVEYARD
     const center = latLonToWorld(g.lat, g.lon)
     const groundY = Math.max(0.2, sampleTerrain(g.lat, g.lon, seed).height)
-    const rand = mulberry32((seed ^ 0x51ef4a2d) >>> 0)
-    const carcasses = Array.from({ length: 8 }, () => {
-      const a = rand() * Math.PI * 2
-      const r = 1 + rand() * 4.5
-      return {
-        x: Math.cos(a) * r,
-        z: Math.sin(a) * r,
-        yaw: rand() * Math.PI * 2,
-        roll: (rand() < 0.5 ? 1 : -1) * (Math.PI / 2 + (rand() - 0.5) * 0.35),
-        s: 0.85 + rand() * 0.45,
-      }
-    })
-    const scatter = (n: number) =>
-      Array.from({ length: n }, () => {
-        const a = rand() * Math.PI * 2
-        const r = rand() * 6.5
-        // `tilt` is drawn only by the tusks; the bones keep the draw so the
-        // seeded layout stays as it is.
-        return { x: Math.cos(a) * r, z: Math.sin(a) * r, rot: rand() * Math.PI * 2, tilt: (rand() - 0.5) * 0.5, s: 0.6 + rand() * 0.7 }
-      })
-    return { center, groundY, carcasses, tusks: scatter(22), bones: scatter(16) }
+    return { center, groundY, remains: graveyardLayout(seed) }
   }, [seed])
 
-  // Seed-independent geometries from the module cache (point 96): a per-mount
-  // useMemo would leak a fresh set on every place visit under dispose={null}.
-  const { elephantGeo, tuskGeo, ribGeo } = getGraveyardGeos()
-  // Bleached carcass/bone material (flat, ignores the elephant's vertex colors).
-  const boneMat = BONE_MATERIAL
-  const ivoryMat = IVORY_MATERIAL
+  const { bones, ivory } = getGraveyardGeos(seed, layout.remains)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
+    const r = layout.remains
     w.__graveyard = {
-      carcasses: layout.carcasses.length,
-      tusks: layout.tusks.length,
-      bones: layout.bones.length,
+      skeletons: r.skeletons.length,
+      skulls: r.skeletons.length + r.skulls.length,
+      tusks: r.tusks.length,
+      bones: r.longBones.length + r.ribs.length,
+      // No whole elephant body stands on the site: the tallest remains (the
+      // rib arches) stay low, in world units above the ground.
+      remainsHeight: (bones.computeBoundingBox(), bones.boundingBox!.max.y),
       x: layout.center.x,
       z: layout.center.z,
     }
     return () => {
       delete w.__graveyard
     }
-  }, [layout])
+  }, [layout, bones])
 
   return (
     <group position={[layout.center.x, layout.groundY, layout.center.z]}>
@@ -2174,31 +2157,8 @@ function ElephantGraveyard() {
         <circleGeometry args={[8, 28]} />
         <meshStandardMaterial color="#b9ad90" roughness={1} />
       </mesh>
-      {/* Fallen, bleached elephant carcasses lying on their sides. */}
-      {layout.carcasses.map((c, i) => (
-        <group key={`c${i}`} position={[c.x, 0, c.z]} rotation={[0, c.yaw, 0]}>
-          <group position={[0, 0.8 * c.s, 0]} rotation={[0, 0, c.roll]} scale={c.s}>
-            <mesh geometry={elephantGeo} material={boneMat} castShadow dispose={null} />
-          </group>
-        </group>
-      ))}
-      {/* Scattered ivory tusks. */}
-      {layout.tusks.map((t, i) => (
-        <mesh
-          key={`t${i}`}
-          geometry={tuskGeo}
-          material={ivoryMat}
-          position={[t.x, 0.12 * t.s, t.z]}
-          rotation={[t.tilt, t.rot, 0]}
-          scale={t.s}
-          castShadow
-          dispose={null}
-        />
-      ))}
-      {/* Scattered rib bones. */}
-      {layout.bones.map((b, i) => (
-        <mesh key={`b${i}`} geometry={ribGeo} material={boneMat} position={[b.x, 0.08 * b.s, b.z]} rotation={[0, b.rot, 0]} scale={b.s} castShadow dispose={null} />
-      ))}
+      <mesh geometry={bones} material={REMAINS_MATERIAL} castShadow receiveShadow dispose={null} />
+      <mesh geometry={ivory} material={REMAINS_IVORY_MATERIAL} castShadow dispose={null} />
     </group>
   )
 }

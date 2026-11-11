@@ -228,6 +228,15 @@ describe('pelt markings (procedural, no texture asset)', () => {
   it('the unmarked species of the audit now carry their pattern', () => {
     expect(kinds(buildGiraffe()).has(MARK.patches)).toBe(true)
     expect(kinds(buildGiraffe(true)).has(MARK.patches)).toBe(true)
+    // The elder's hip and withers knobs wear the patches too: the elder adds
+    // no unmarked vertex over the prime (bare knobs read as orange balls).
+    const unmarked = (g: THREE.BufferGeometry) => {
+      const m = g.getAttribute(FAUNA_MARK_ATTRIBUTE)
+      let n = 0
+      for (let i = 0; i < m.count; i++) if (m.getX(i) === MARK.none) n++
+      return n
+    }
+    expect(unmarked(buildGiraffe(false, true))).toBe(unmarked(buildGiraffe()))
     for (const leg of buildGiraffeParts().legs) expect(kinds(leg.geo).has(MARK.patches)).toBe(true)
     expect(kinds(buildGiraffeParts().body).has(MARK.patches)).toBe(true)
     expect(kinds(buildCheetah()).has(MARK.spots)).toBe(true)

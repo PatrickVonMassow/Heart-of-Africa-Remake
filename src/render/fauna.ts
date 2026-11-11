@@ -15,7 +15,6 @@ import {
   calfProportions,
   ELDERLY_SCHEMA,
   elderlyProportions,
-  greyMuzzle,
   merge,
   swayDrop,
   tint,
@@ -24,6 +23,8 @@ import {
 } from './faunaGeometry'
 import { faunaMarkingColorNode, MARK, markGeometry, silhouetteMarkingColorNode } from './faunaMarkings'
 import { buildAntelopeElder, buildZebraElder } from './faunaUngulates'
+
+export { buildVulture, buildVultureLanded } from './faunaVulture'
 
 export {
   agedColor,
@@ -574,15 +575,12 @@ function buildQuadruped(s: QuadrupedSpec): THREE.BufferGeometry[] {
 
   const neck = new THREE.CylinderGeometry(s.bodyR * 0.32, s.bodyR * 0.45, s.neckLen, FAUNA_TESSELLATION.limb)
   neck.rotateX(-s.neckTilt)
-  const nz = s.bodyLen * 0.5 + Math.sin(s.neckTilt) * s.neckLen * 0.4
-  const ny = backY + Math.cos(s.neckTilt) * s.neckLen * 0.4
+  const { ny, nz, hy, hz } = quadrupedNeckHead(s)
   neck.translate(0, ny, nz)
   parts.push(tint(neck, s.bodyColor, 0.1, s.seed + 2))
 
   const head = new THREE.SphereGeometry(s.headSize, ...FAUNA_TESSELLATION.head)
   head.scale(0.8, 0.85, 1.35)
-  const hz = nz + Math.sin(s.neckTilt) * s.neckLen * 0.35 + s.headSize * 0.5
-  const hy = ny + Math.cos(s.neckTilt) * s.neckLen * 0.35
   head.translate(0, hy, hz)
   parts.push(tint(head, s.headColor ?? s.bodyColor, 0.1, s.seed + 3))
 
@@ -702,18 +700,89 @@ export function buildElephantTrunk(calf = false): THREE.BufferGeometry {
 /** The elderly elephant's cues (design.md §19.18; research
  *  docs/fauna-behaviour-1890.md §2.2/§10.4/§10.8). Exported for the tests. */
 export const ELEPHANT_ELDER = {
-  /** The worn MASTER tusk's length as a share of the idle slave tusk — the
-   *  asymmetry that is the single best old-elephant cue (§10.4). */
-  masterTusk: 0.5,
+  /** The worn MASTER tusk's length as a share of the prime tusk — broken
+   *  short and blunt, the asymmetry that is the single best old-elephant cue
+   *  (§10.4). Calibratable; point 1498 made it read at game distance. */
+  masterTusk: 0.3,
+  /** The idle SLAVE tusk's length as a share of the prime tusk: ivory grows
+   *  for life, so the unworn side of an old elephant is the long, heavy one. */
+  slaveTusk: 1.6,
+  /** Tusk base radius as a share of the prime tusk's (an old tusk is heavy). */
+  tuskGirth: 1.3,
   /** The worn tip's radius as a share of the base: blunt, not pointed. */
-  bluntTip: 0.5,
+  bluntTip: 0.6,
   /** Barrel width: the gaunt, bony frame. */
-  bodyWidth: 0.86,
+  bodyWidth: 0.78,
   /** Topline sag (world units) between hips and withers. */
-  sag: 0.09,
+  sag: 0.22,
   /** Skull width: the temples sink. */
-  skullWidth: 0.88,
+  skullWidth: 0.82,
+  /** How far the old head hangs lower (world units). */
+  headDrop: 0.12,
+  /** The spine ridge standing out of the sunken back (world units above the
+   *  barrel top) — a sharp line, not round knobs (point 1498 rework). */
+  ridge: 0.07,
+  /** Shadowed hollows of the sunken flanks and the rib lines (darker skin). */
+  hollowColor: '#66605a',
+  /** Visible rib lines per flank. */
+  ribs: 5,
 } as const
+
+/** The old elephant's gauntness (design.md §19.18; research §2.2): a sharp
+ *  spine ridge along the sunken back with narrow hip points, hollow flanks in
+ *  front of the hips and the rib lines showing — age read as bone under slack
+ *  skin, never as round lumps (point 1498 rework). Built against the aged
+ *  barrel `buildElephant` makes: an ellipsoid of semi-axes (a, b, c) centred
+ *  at height yc. */
+function elephantGauntness(): THREE.BufferGeometry[] {
+  const E = ELEPHANT_ELDER
+  const a = 1.05 * 0.95 * E.bodyWidth
+  const b = 1.05 * 0.95
+  const c = 1.05 * 1.4
+  const yc = 1.75 - E.sag
+  /** Flank surface x at (y, z) on the barrel. */
+  const flankX = (y: number, z: number) => a * Math.sqrt(Math.max(0, 1 - ((y - yc) / b) ** 2 - (z / c) ** 2))
+  const out: THREE.BufferGeometry[] = []
+  // Spine ridge: a long, narrow crest bent along the curved topline, so its
+  // ends sit on the barrel instead of floating above it.
+  const ridge = new THREE.SphereGeometry(1, 16, 8)
+  ridge.scale(0.07, 0.1, c * 0.78)
+  ridge.translate(0, 0, -0.05)
+  const rp = ridge.attributes.position
+  for (let i = 0; i < rp.count; i++) {
+    const z = rp.getZ(i)
+    rp.setY(i, rp.getY(i) + yc + b * Math.sqrt(Math.max(0, 1 - (z / c) ** 2)) + E.ridge - 0.1)
+  }
+  ridge.computeVertexNormals()
+  out.push(tint(ridge, '#857e78', 0.05, 109))
+  // Hip points: narrow, angular, just proud of the back at the rear.
+  for (const side of [-1, 1]) {
+    const hip = new THREE.ConeGeometry(0.1, 0.22, 6)
+    hip.rotateZ(-side * 0.5)
+    const z = -0.95
+    const y = yc + b * 0.8
+    hip.translate(side * Math.max(0.12, flankX(y, z) - 0.06), y + 0.06, z)
+    out.push(tint(hip, '#857e78', 0.05, 110 + side))
+    // The hollow flank in front of the hip (paralumbar fossa).
+    const hz = -0.55
+    const hy = yc + 0.15
+    const hollow = new THREE.SphereGeometry(1, 12, 8)
+    hollow.scale(0.05, 0.32, 0.3)
+    hollow.translate(side * (flankX(hy, hz) - 0.025), hy, hz)
+    out.push(tint(hollow, E.hollowColor, 0.04, 112))
+    // Rib lines over the chest.
+    for (let i = 0; i < E.ribs; i++) {
+      const rz = -0.15 + i * 0.2
+      const ry = yc + 0.05
+      const rib = new THREE.SphereGeometry(1, 8, 8)
+      rib.scale(0.03, 0.36, 0.035)
+      rib.rotateX(-0.25)
+      rib.translate(side * (flankX(ry, rz) - 0.012), ry, rz)
+      out.push(tint(rib, E.hollowColor, 0.04, 113 + i))
+    }
+  }
+  return out
+}
 
 /** Savanna elephant, ~2.6 units tall. With `calf`, baby-schema proportions
  *  (design.md §19): a rounder, shorter body, a proportionally bigger head with
@@ -729,7 +798,7 @@ export function buildElephant(calf = false, elderly = false): THREE.BufferGeomet
   body.scale(old ? 0.95 * ELEPHANT_ELDER.bodyWidth : 0.95, 0.95, calf ? 1.15 : 1.4)
   body.translate(0, old ? 1.75 - ELEPHANT_ELDER.sag : 1.75, 0)
   parts.push(tint(body, '#8d8680', 0.06, 101))
-  if (old) parts.push(...agedBoneKnobs(-0.95, 0.75, 2.66, 0.32, 0.17, '#8d8680', 109))
+  if (old) parts.push(...elephantGauntness())
 
   for (const [lx, lz] of [
     [-0.5, 0.85],
@@ -744,14 +813,14 @@ export function buildElephant(calf = false, elderly = false): THREE.BufferGeomet
 
   const head = new THREE.SphereGeometry(calf ? 0.85 : 0.62, ...FAUNA_TESSELLATION.head)
   if (old) head.scale(ELEPHANT_ELDER.skullWidth, 1, 1)
-  head.translate(0, 2.15, calf ? 1.25 : 1.45)
+  head.translate(0, old ? 2.15 - ELEPHANT_ELDER.headDrop : 2.15, calf ? 1.25 : 1.45)
   parts.push(tint(head, '#8d8680', 0.06, 103))
   if (old) {
     // Sunken temples: a shadowed hollow on each side of the narrowed skull.
     for (const side of [-1, 1]) {
       const temple = new THREE.SphereGeometry(0.17, 12, 10)
       temple.scale(0.35, 1, 1.1)
-      temple.translate(side * 0.5, 2.36, 1.52)
+      temple.translate(side * 0.5 * ELEPHANT_ELDER.skullWidth / 0.88, 2.36 - ELEPHANT_ELDER.headDrop, 1.52)
       parts.push(tint(temple, '#5d5853', 0.04, 110))
     }
   }
@@ -760,7 +829,7 @@ export function buildElephant(calf = false, elderly = false): THREE.BufferGeomet
     // The old ear hangs lower and is worn smaller at its ragged edge.
     const ear = new THREE.BoxGeometry(0.1, calf ? 0.6 : old ? 0.68 : 0.75, calf ? 0.5 : old ? 0.56 : 0.62)
     ear.rotateY(ex < 0 ? 0.35 : -0.35)
-    ear.translate(ex, old ? 2.08 : 2.2, calf ? 1.1 : 1.3)
+    ear.translate(ex, old ? 2.08 - ELEPHANT_ELDER.headDrop : 2.2, calf ? 1.1 : 1.3)
     parts.push(tint(ear, '#7d766f', 0.06, 104))
   }
 
@@ -778,16 +847,17 @@ export function buildElephant(calf = false, elderly = false): THREE.BufferGeomet
         continue
       }
       // The aged pair keeps the prime tusk's ROOT and direction; the right
-      // (master) tusk is worn short with a blunt end, the left stays whole
-      // to a point. A worn tusk yellows (#d8c9a4).
+      // (master) tusk is broken short with a blunt end, the left (slave)
+      // grown long and heavy to a point. A worn tusk yellows (#d8c9a4).
       const master = tx > 0
-      const len = master ? 0.6 * ELEPHANT_ELDER.masterTusk : 0.6
+      const len = 0.6 * (master ? ELEPHANT_ELDER.masterTusk : ELEPHANT_ELDER.slaveTusk)
+      const r = 0.07 * ELEPHANT_ELDER.tuskGirth
       const tusk = master
-        ? new THREE.CylinderGeometry(0.07 * ELEPHANT_ELDER.bluntTip, 0.07, len, FAUNA_TESSELLATION.spike)
-        : new THREE.ConeGeometry(0.07, len, FAUNA_TESSELLATION.spike)
+        ? new THREE.CylinderGeometry(r * ELEPHANT_ELDER.bluntTip, r, len, FAUNA_TESSELLATION.spike)
+        : new THREE.ConeGeometry(r, len, FAUNA_TESSELLATION.spike)
       tusk.translate(0, len / 2 - 0.3, 0) // base fixed where the prime cone's base sits
       tusk.rotateX(1.9)
-      tusk.translate(tx, 1.75, 2.0)
+      tusk.translate(tx, 1.75 - ELEPHANT_ELDER.headDrop, 2.0)
       parts.push(tint(tusk, '#d8c9a4', 0.05, 108))
     }
   }
@@ -818,6 +888,19 @@ const CHEETAH_SPOTS = [9, 0.3, 0] as const
 const LEOPARD_ROSETTES = [6.5, 0.42, 0.2] as const
 const HYENA_SPOTS = [5, 0.28, 0] as const
 
+/** The elderly giraffe's frame cues (design.md §19.18; research §10.2: read by
+ *  FRAME, never by colour). Calibratable; exported for the tests. */
+export const GIRAFFE_ELDER = {
+  /** Barrel drop (world units): the sagging back between hips and withers. */
+  sag: 0.14,
+  /** Added forward lean of the neck (rad): the head carried lower. */
+  neckDrop: 0.22,
+  /** Ossicone height as a share of the prime's: worn down, bald-topped. */
+  ossicone: 0.55,
+  /** Worn bald ossicone tip colour (prime #8a6a38). */
+  ossiconeColor: '#c2ad86',
+} as const
+
 /** Giraffe, ~3.6 units tall. With `calf`, baby-schema proportions (design.md
  *  §19): a much shorter neck carrying a proportionally bigger head over the
  *  same leggy stance, and short ossicone nubs — built at adult scale, the
@@ -831,9 +914,11 @@ export function buildGiraffe(calf = false, elderly = false): THREE.BufferGeometr
   const body = new THREE.SphereGeometry(0.62, ...FAUNA_TESSELLATION.body)
   body.scale(old ? 0.85 * ELDERLY_SCHEMA.bodyR : 0.85, 0.85, calf ? 1.1 : 1.35)
   body.rotateX(-0.18)
-  body.translate(0, old ? 1.84 : 1.9, 0)
+  body.translate(0, old ? 1.9 - GIRAFFE_ELDER.sag : 1.9, 0)
   parts.push(giraffePatches(tint(body, '#c89a55', 0.14, 111)))
-  if (old) parts.push(...agedBoneKnobs(-0.6, 0.55, 2.3, 0.16, 0.09, '#c89a55', 116, 2.5))
+  // The hips and withers wear the coat's patch network, or they read as bare
+  // orange balls on the back.
+  if (old) parts.push(...agedBoneKnobs(-0.6, 0.55, 2.3 - GIRAFFE_ELDER.sag / 2, 0.16, 0.09, '#c89a55', 116, 2.5 - GIRAFFE_ELDER.sag / 2).map((k) => giraffePatches(k)))
 
   for (const [lx, lz] of [
     [-0.3, 0.5],
@@ -846,22 +931,35 @@ export function buildGiraffe(calf = false, elderly = false): THREE.BufferGeometr
     parts.push(giraffePatches(tint(leg, '#bf9150', 0.14, 112), GIRAFFE_LEG_CELLS))
   }
 
-  const neck = new THREE.CylinderGeometry(0.13, 0.2, calf ? 1.0 : 1.6, FAUNA_TESSELLATION.limb)
-  neck.rotateX(-0.35)
-  neck.translate(0, calf ? 2.55 : 2.85, calf ? 0.73 : 0.85)
+  // The neck pivots at its base; the old giraffe leans it forward and its
+  // head (and ossicones) follow the neck top.
+  const neckLen = calf ? 1.0 : 1.6
+  const lean = 0.35 + (old ? GIRAFFE_ELDER.neckDrop : 0)
+  const neckMid: [number, number] = [calf ? 2.55 : 2.85, calf ? 0.73 : 0.85]
+  const neckBase: [number, number] = [neckMid[0] - (neckLen / 2) * Math.cos(0.35), neckMid[1] - (neckLen / 2) * Math.sin(0.35)]
+  const baseY = neckBase[0] - (old ? GIRAFFE_ELDER.sag : 0)
+  const neck = new THREE.CylinderGeometry(0.13, 0.2, neckLen, FAUNA_TESSELLATION.limb)
+  // Positive about X tips the neck top forward (+z), toward the head.
+  neck.rotateX(lean)
+  neck.translate(0, baseY + (neckLen / 2) * Math.cos(lean), neckBase[1] + (neckLen / 2) * Math.sin(lean))
   parts.push(giraffePatches(tint(neck, '#c89a55', 0.14, 113)))
+  // Head offset from the neck top, as on the prime build.
+  const primeTop: [number, number] = [neckMid[0] + (neckLen / 2) * Math.cos(0.35), neckMid[1] + (neckLen / 2) * Math.sin(0.35)]
+  const top: [number, number] = [baseY + neckLen * Math.cos(lean), neckBase[1] + neckLen * Math.sin(lean)]
+  const dy = top[0] - primeTop[0]
+  const dz = top[1] - primeTop[1]
 
   const head = new THREE.SphereGeometry(calf ? 0.29 : 0.2, ...FAUNA_TESSELLATION.head)
   head.scale(0.8, 0.8, 1.4)
-  head.translate(0, calf ? 3.08 : 3.55, calf ? 1.0 : 1.25)
+  head.translate(0, (calf ? 3.08 : 3.55) + dy, (calf ? 1.0 : 1.25) + dz)
   parts.push(giraffePatches(tint(head, '#c89a55', 0.12, 114), GIRAFFE_FACE_CELLS))
 
   for (const ox of [-0.08, 0.08]) {
     // A life of necking wears the ossicones down and bald on top (§2.1).
-    const h = calf ? 0.1 : old ? 0.12 : 0.18
+    const h = calf ? 0.1 : old ? 0.18 * GIRAFFE_ELDER.ossicone : 0.18
     const ossicone = new THREE.CylinderGeometry(0.025, 0.025, h, FAUNA_TESSELLATION.spike)
-    ossicone.translate(ox, calf ? 3.3 : 3.63 + h / 2, calf ? 0.92 : 1.15)
-    parts.push(tint(ossicone, old ? '#a8916a' : '#8a6a38', 0.1, 115))
+    ossicone.translate(ox, (calf ? 3.3 : 3.63 + h / 2) + dy, (calf ? 0.92 : 1.15) + dz)
+    parts.push(tint(ossicone, old ? GIRAFFE_ELDER.ossiconeColor : '#8a6a38', 0.1, 115))
   }
   return merge(parts)
 }
@@ -965,17 +1063,37 @@ const LION_SPEC: QuadrupedSpec = {
 }
 
 /** The old lion's mane (research §2.3): darkened, then thinned. Exported for the tests. */
-export const LION_ELDER_MANE = { radius: 0.3, color: '#4e3a24' } as const
+export const LION_ELDER_MANE = {
+  /** Radius (prime 0.42): thinned to a scant ruff (point 1498: reads at game distance). */
+  radius: 0.27,
+  /** Darker than the prime's #7a5228 (manes darken with age). */
+  color: '#3f2f1f',
+  /** Flattened top: a thin, lank mane instead of the prime's full ball. */
+  flatten: 0.75,
+} as const
+
+/** Neck root and head centre of the shared quadruped plan (y, z). */
+function quadrupedNeckHead(s: QuadrupedSpec): { ny: number; nz: number; hy: number; hz: number } {
+  const backY = s.legH + s.bodyR * 0.8
+  const nz = s.bodyLen * 0.5 + Math.sin(s.neckTilt) * s.neckLen * 0.4
+  const ny = backY + Math.cos(s.neckTilt) * s.neckLen * 0.4
+  const hz = nz + Math.sin(s.neckTilt) * s.neckLen * 0.35 + s.headSize * 0.5
+  const hy = ny + Math.cos(s.neckTilt) * s.neckLen * 0.35
+  return { ny, nz, hy, hz }
+}
 
 /** Lion, ~1.3 units at the back, with a mane reaching ~1.7. With `elderly`
  *  (design.md §19.18): the aged schema — gaunt, sway-backed, greyer face —
  *  under a thin, dark mane. */
 export function buildLion(elderly = false): THREE.BufferGeometry {
   const spec = elderly ? elderlyProportions(LION_SPEC) : LION_SPEC
-  const parts = buildQuadruped(elderly ? { ...spec, headColor: greyMuzzle(spec.headColor ?? spec.bodyColor) } : spec)
+  const parts = buildQuadruped(spec)
   const mane = new THREE.SphereGeometry(elderly ? LION_ELDER_MANE.radius : 0.42, ...FAUNA_TESSELLATION.body)
-  mane.scale(1, 1, 0.85)
-  mane.translate(0, elderly ? 1.18 : 1.25, 0.85)
+  mane.scale(1, elderly ? LION_ELDER_MANE.flatten : 1, 0.85)
+  // The mane rides the neck: an elder's dropped head carries it down with it.
+  const p = quadrupedNeckHead(LION_SPEC)
+  const o = quadrupedNeckHead(spec)
+  mane.translate(0, 1.25 + (o.ny + o.hy - p.ny - p.hy) / 2, 0.85 + (o.nz + o.hz - p.nz - p.hz) / 2)
   parts.push(tint(mane, elderly ? LION_ELDER_MANE.color : '#7a5228', 0.14, 142))
   const tail = new THREE.CylinderGeometry(0.03, 0.05, 0.9, FAUNA_TESSELLATION.limb)
   tail.rotateX(1.1)
@@ -1014,7 +1132,7 @@ function buildCatPredator(
   }
   // The aged cat (design.md §19.18, research §2.3 "the lion template minus the
   // mane"): gaunt, sway-backed, the muzzle greyed.
-  const spec = elderly ? { ...elderlyProportions(prime), headColor: greyMuzzle(headColor) } : prime
+  const spec = elderly ? elderlyProportions(prime) : prime
   const parts = buildQuadruped(spec)
   const tail = new THREE.CylinderGeometry(0.025 * scale, 0.04 * scale, 1.0 * scale, FAUNA_TESSELLATION.limb)
   tail.rotateX(1.25)
@@ -1050,7 +1168,7 @@ export function buildHyena(elderly = false): THREE.BufferGeometry {
     headColor: '#5f5442',
     seed: 211,
   }
-  const parts = buildQuadruped(elderly ? { ...elderlyProportions(prime), headColor: greyMuzzle('#5f5442') } : prime)
+  const parts = buildQuadruped(elderly ? elderlyProportions(prime) : prime)
   // Higher shoulders than hindquarters: a raised hump over the front legs.
   const hump = new THREE.SphereGeometry(elderly ? 0.21 : 0.26, ...FAUNA_TESSELLATION.body)
   hump.scale(0.85, 0.7, 1.0)
@@ -1436,28 +1554,6 @@ export function buildCrocodile(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Vulture with spread wings, meant to circle overhead (design.md §19). */
-export function buildVulture(): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = []
-  const body = new THREE.SphereGeometry(0.16, ...FAUNA_TESSELLATION.small)
-  body.scale(0.8, 0.6, 1.4)
-  parts.push(tint(body, '#3f3833', 0.1, 161))
-  const head = new THREE.SphereGeometry(0.06, ...FAUNA_TESSELLATION.small)
-  head.translate(0, 0.03, 0.24)
-  parts.push(tint(head, '#b8a48c', 0.1, 162))
-  for (const side of [-1, 1]) {
-    const wing = new THREE.BoxGeometry(0.85, 0.025, 0.28)
-    wing.translate(side * 0.5, 0.04, -0.02)
-    wing.rotateZ(side * 0.12)
-    parts.push(tint(wing, '#4a423b', 0.12, 163))
-    const tip = new THREE.BoxGeometry(0.3, 0.02, 0.2)
-    tip.translate(side * 1.0, 0.12, -0.04)
-    tip.rotateZ(side * 0.3)
-    parts.push(tint(tip, '#38312c', 0.12, 164))
-  }
-  return merge(parts)
-}
-
 /** Plumage of a bird-hunting raptor (design.md §19.19; research PART B2.1):
  *  back/wings, underparts, head, and the wing shape — `pointed` for the
  *  falcons (long narrow wings), `rounded` for the accipiters and eagles. */
@@ -1617,7 +1713,8 @@ export function buildGiraffeParts(): { body: THREE.BufferGeometry; legs: GoatLeg
   bodyParts.push(giraffePatches(tint(body, '#c89a55', 0.14, 111)))
 
   const neck = new THREE.CylinderGeometry(0.13, 0.2, 1.6, FAUNA_TESSELLATION.limb)
-  neck.rotateX(-0.35)
+  // Positive about X tips the neck top forward (+z), toward the head.
+  neck.rotateX(0.35)
   neck.translate(0, 2.85, 0.85)
   bodyParts.push(giraffePatches(tint(neck, '#c89a55', 0.14, 113)))
 
