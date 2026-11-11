@@ -13,6 +13,10 @@
       "status": "absorbed",
       "why": "Garment clipping fold request; replaced by the single covered-body mask point in 30eb4514f."
     },
+    "1463": {
+      "status": "absorbed",
+      "why": "Parked verbatim in docs/backlog.md by point 1501 on user order 11.11.2026 (b2efed52d); resumes only on explicit user request, its five carried orders travel with it."
+    },
     "1482": {
       "status": "absorbed",
       "why": "Rewritten as the villager clothing closure point (points 1485 and 1486 merged in; user approval \"ja\" 04.11.2026) in bb7b8f664; findings charged to the old garment-driven-builder scope are carried by the rewritten point."
