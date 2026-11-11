@@ -44,7 +44,7 @@ describe('spring body geometry', () => {
     const p = b.geometry.getAttribute('position')
     for (let i = 0; i < p.count; i++) {
       const y = p.getY(i) + 1.0
-      expect(y).toBeGreaterThanOrEqual(groundAbove(p.getX(i), p.getZ(i)) + SHAPE.rimLift - 1e-5) // float32 positions
+      expect(y).toBeGreaterThanOrEqual(groundAbove(p.getX(i)) + SHAPE.rimLift - 1e-5) // float32 positions
     }
   })
 
