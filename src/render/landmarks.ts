@@ -177,6 +177,10 @@ export const KHUFU_STANDING = 0.945
  *  half-extent 1.6, Old-Kingdom slope): the skyline Sphinx is sized against it. */
 export const GIZA_FIELD_KHUFU_HEIGHT = 1.6 * 0.64 * 2 * KHUFU_STANDING
 
+/** The pyramids' weathered core tone in the Giza field symbol: the skyline
+ *  Sphinx's stone is drawn in this family (SPHINX_FORM.emphasis.skyline). */
+export const GIZA_FIELD_CORE_TONE = '#c9a76a'
+
 /** Giza: the three great pyramids in their real southwest-diagonal row —
  *  Khufu NE (largest), Khafre centre, Menkaure SW, flatter-sided than the
  *  steep Nubian tombs (Old-Kingdom ~52° slope, height ≈ 0.64 · base) — with
@@ -189,7 +193,7 @@ export const GIZA_FIELD_KHUFU_HEIGHT = 1.6 * 0.64 * 2 * KHUFU_STANDING
  *  footprint is unchanged. */
 export function buildGizaPyramids(sphinxLod: 'landmark' | 'skyline' = 'landmark'): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
-  const core = '#c9a76a'
+  const core = GIZA_FIELD_CORE_TONE
   // [x, z, base half-extent] per pyramid: the diagonal row, Khufu largest in
   // the NE. Kept compact: the field stands only ~4 world units west of Cairo
   // (the real 13 km), so the symbol must not swallow the port marker or the

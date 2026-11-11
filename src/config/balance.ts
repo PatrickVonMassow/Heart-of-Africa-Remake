@@ -2797,9 +2797,17 @@ export const SPHINX_FORM = {
     'site-full': { rings: 28, rows: 18, headFactor: 1.5, driftCells: 112, faceMarks: true },
     'site-standard': { rings: 20, rows: 12, headFactor: 1.5, driftCells: 72, faceMarks: true },
     'site-reduced': { rings: 12, rows: 8, headFactor: 1.25, driftCells: 40, faceMarks: false },
-    landmark: { rings: 8, rows: 6, headFactor: 1, driftCells: 40, faceMarks: false },
+    landmark: { rings: 10, rows: 8, headFactor: 1, driftCells: 64, faceMarks: false },
     skyline: { rings: 6, rows: 4, headFactor: 1, driftCells: 20, faceMarks: false },
   },
+  /** The bird's-eye drift (owner verdict 11.11.2026, 11:02): coloured in the
+   *  travel ground's own desert tone (src/world/terrainPalette.ts through the
+   *  far-terrain albedo response) times `groundShade`, so it reads as sand,
+   *  not as a pale grey patch; its rim is cut along the drift's zero contour
+   *  (no grid steps) and over its lowest `rimFeather` (body units) the flank
+   *  shading and the normals fade into the flat ground's, so the edge melts
+   *  into the desert (calibratable). */
+  landmarkDrift: { groundShade: 0.94, rimFeather: 0.05 },
   /** TRAVEL-SCALE EMPHASIS (owner verdict 11.11.2026): the bird's-eye landmark
    *  is read from above and far, where the true proportions blur into a pale
    *  lump. The level stays the ONE definition, transformed by these documented
@@ -2810,9 +2818,30 @@ export const SPHINX_FORM = {
    *  `frontBank`: height factor of the front
    *  sand bank (0 = none, so the gap between the paws stays open in plan).
    *  `stoneShade`: the stone tones' multiplier, so the limestone reads darker
-   *  than the sand. `flankShade`: the drift's flank shading (calibratable). */
+   *  than the sand. `flankShade`: the drift's flank shading (calibratable).
+   *  Owner verdict 11.11.2026, 11:02 — the stone must carry the read from
+   *  above: `revealPaws` draws the two forepaws in stone (lifted, lengthened,
+   *  spread and widened by `pawWidth`) instead of raising sand over them, and
+   *  `spineWidth` broadens the back ridge so the body line shows. The SKYLINE
+   *  is drawn true in proportion, but face-on its head read as a round head
+   *  with two hanging lobes: `headBlock` draws the nemes, its wings, lappets
+   *  and back as their one derived tapered block (`sphinxHeadBlock`), the
+   *  flat-topped trapezoid widening to the shoulders, and `stoneShade` lifts
+   *  the stone into the pyramids' core tone family (#c9a76a). */
   emphasis: {
-    landmark: { head: 1.45, pawLift: 1.9, pawReach: 1.25, pawSpread: 1.4, frontBank: 0, stoneShade: 0.66, flankShade: 0.7 },
+    landmark: {
+      head: 1.45,
+      pawLift: 1.9,
+      pawReach: 1.25,
+      pawSpread: 1.4,
+      pawWidth: 1.25,
+      revealPaws: true,
+      spineWidth: 2.2,
+      frontBank: 0,
+      stoneShade: 0.66,
+      flankShade: 0.3,
+    },
+    skyline: { stoneShade: 1.38, headBlock: true },
   },
   /** Walkable site placement (metres, site frame: +x east, +z south). */
   site: { x: 27, z: 3, length: 20 },

@@ -210,31 +210,133 @@ const LOD_REACH: Record<SphinxLod, SphinxReach> = {
 }
 
 /** A level's emphasis (SPHINX_FORM.emphasis): the documented factors that
- *  transform the one definition for a distant view. Neutral (all 1) for a
- *  level that is drawn true, and for no level at all. */
+ *  transform the one definition for a distant view. Neutral (all 1, nothing
+ *  revealed, no block) for a level that is drawn true, and for no level. */
 export interface SphinxEmphasis {
   head: number
   pawLift: number
   pawReach: number
   pawSpread: number
+  /** Width factor of the revealed stone forepaws. */
+  pawWidth: number
+  /** Draw the buried forepaws in stone (transformed by the paw factors)
+   *  instead of raising sand over them. */
+  revealPaws: boolean
+  /** Width factor of the back ridge (the spine's half-width). */
+  spineWidth: number
   frontBank: number
   stoneShade: number
   flankShade: number
+  /** Draw the nemes, its wings, lappets and back as their derived block
+   *  (`sphinxHeadBlock`) — the face-on outline of the distant skyline. */
+  headBlock: boolean
 }
 
 export function sphinxEmphasis(lod?: SphinxLod): SphinxEmphasis {
   const listed = lod ? (SPHINX_FORM.emphasis as Partial<Record<SphinxLod, Partial<SphinxEmphasis>>>)[lod] : undefined
-  return { head: 1, pawLift: 1, pawReach: 1, pawSpread: 1, frontBank: 1, stoneShade: 1, flankShade: SPHINX_FORM.drift.flankShade, ...listed }
+  return {
+    head: 1,
+    pawLift: 1,
+    pawReach: 1,
+    pawSpread: 1,
+    pawWidth: 1,
+    revealPaws: false,
+    spineWidth: 1,
+    frontBank: 1,
+    stoneShade: 1,
+    flankShade: SPHINX_FORM.drift.flankShade,
+    headBlock: false,
+    ...listed,
+  }
+}
+
+/** The nemes parts the skyline's head block stands for. */
+export const SPHINX_HEAD_BLOCK_SOURCES = ['nemes', 'wingR', 'wingL', 'lappetR', 'lappetL', 'nemesBack'] as const
+
+/**
+ * The head-and-nemes block, DERIVED from the nemes parts (SPHINX_HEAD_BLOCK_SOURCES):
+ * one tapered, flat-topped superellipsoid spanning their extent — as high as
+ * the crown down to the lappets' feet, as deep as crown front to nemes back —
+ * whose half-width runs from the crown's at the top to the widest of the wings
+ * and lappets at the bottom. Face-on that is the nemes' flat-topped trapezoid
+ * widening down to the shoulders, the lappets joined to it (the skyline level,
+ * where the separate wings read as two hanging lobes; owner verdict 11.11.2026).
+ */
+export function sphinxHeadBlock(): SphinxPart {
+  const src = SPHINX_CLEAR_PARTS.filter((p) => (SPHINX_HEAD_BLOCK_SOURCES as readonly string[]).includes(p.id))
+  const samples = src.flatMap((p) => sampleSurface(p, 32, 24))
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  let bottomHalf = 0
+  for (const { p } of samples) {
+    minX = Math.min(minX, p[0])
+    maxX = Math.max(maxX, p[0])
+    minY = Math.min(minY, p[1])
+    maxY = Math.max(maxY, p[1])
+    bottomHalf = Math.max(bottomHalf, Math.abs(p[2]))
+  }
+  // The crown's half-width: the widest sample in the top tenth of the block.
+  const band = maxY - (maxY - minY) * 0.1
+  let topHalf = 0
+  for (const { p } of samples) if (p[1] >= band) topHalf = Math.max(topHalf, Math.abs(p[2]))
+  return {
+    id: 'headBlock',
+    group: 'head',
+    centre: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
+    radii: [(maxX - minX) / 2, (maxY - minY) / 2, (topHalf + bottomHalf) / 2],
+    shape: [0.3, 0.5],
+    roll: 0,
+    pitch: 0,
+    taper: (bottomHalf - topHalf) / (bottomHalf + topHalf),
+    tone: 'nemes',
+    band: 'none',
+    burial: 'clear',
+    reach: 'skyline',
+  }
+}
+
+let headBlockCache: SphinxPart | null = null
+
+/** A forepaw at a level: the buried part lengthened (rear end fixed), lifted,
+ *  spread from the axis and widened by the level's emphasis. */
+function pawAt(part: SphinxPart, e: SphinxEmphasis, margin = 0): { c: Vec3; r: Vec3 } {
+  const [cx, cy, cz] = part.centre
+  const rx = part.radii[0] + margin
+  return {
+    c: [cx + rx * (e.pawReach - 1), cy, cz * e.pawSpread],
+    r: [rx * e.pawReach, part.radii[1] * e.pawLift, part.radii[2] * e.pawWidth],
+  }
 }
 
 /** The parts a level DRAWS: the clear ones whose reach covers it, the head
  *  block scaled about the head anchor by the level's emphasis. Buried parts
- *  are never drawn — the drift stands for them at every level. */
+ *  are never drawn — the drift stands for them — except where a level's
+ *  emphasis reveals the forepaws in stone. */
 export function sphinxPartsFor(lod: SphinxLod): SphinxPart[] {
   const reach = REACH_ORDER[LOD_REACH[lod]]
-  const k = sphinxEmphasis(lod).head
+  const e = sphinxEmphasis(lod)
+  const k = e.head
   const a = SPHINX_HEAD_ANCHOR
-  return SPHINX_CLEAR_PARTS.filter((p) => REACH_ORDER[p.reach] <= reach).map((p) =>
+  let parts = SPHINX_CLEAR_PARTS.filter((p) => REACH_ORDER[p.reach] <= reach)
+  if (e.headBlock) {
+    headBlockCache ??= sphinxHeadBlock()
+    const sources = SPHINX_HEAD_BLOCK_SOURCES as readonly string[]
+    parts = [...parts.filter((p) => !sources.includes(p.id)), headBlockCache]
+  }
+  if (e.spineWidth !== 1) {
+    parts = parts.map((p) => (p.id === 'spine' ? { ...p, radii: [p.radii[0], p.radii[1], p.radii[2] * e.spineWidth] as Vec3 } : p))
+  }
+  if (e.revealPaws) {
+    for (const p of SPHINX_BURIED_PARTS.filter((q) => q.id.startsWith('foreleg'))) {
+      const paw = pawAt(p, e)
+      // Lifted from the floor up: the stone's foot no deeper than the drift's.
+      const cy = Math.max(paw.c[1], paw.r[1] - SPHINX_FORM.drift.sink)
+      parts.push({ ...p, centre: [paw.c[0], cy, paw.c[2]], radii: paw.r, reach: 'landmark' })
+    }
+  }
+  return parts.map((p) =>
     p.group !== 'head' || k === 1
       ? p
       : {
@@ -384,8 +486,9 @@ const capCache = new Map<string, DriftCap[]>()
 /**
  * The drift's domes at a level: each buried part's cover ellipsoid (its radii
  * plus the margin and the sand cover), then the wind-blown banks. A level's
- * emphasis lifts, lengthens (rear end fixed) and spreads the domes over the forepaws and
- * scales the front bank; with no level the drift is the site's, drawn true.
+ * emphasis lifts, lengthens (rear end fixed) and spreads the domes over the
+ * forepaws — or drops them where it reveals the paws in stone — and scales the
+ * front bank; with no level the drift is the site's, drawn true.
  */
 function driftCaps(lod?: SphinxLod): DriftCap[] {
   const key = lod ?? ''
@@ -396,17 +499,14 @@ function driftCaps(lod?: SphinxLod): DriftCap[] {
   const caps: DriftCap[] = []
   for (const part of SPHINX_BURIED_PARTS) {
     const [cx, cy, cz] = part.centre
-    let rx = part.radii[0] + d.margin
-    let ry = part.radii[1] + d.cover
-    let ox = cx
-    let oz = cz
     if (part.id.startsWith('foreleg')) {
-      ox = cx + rx * (e.pawReach - 1)
-      oz = cz * e.pawSpread
-      rx *= e.pawReach
-      ry *= e.pawLift
+      // Revealed in stone at this level: no sand over them.
+      if (e.revealPaws) continue
+      const paw = pawAt(part, { ...e, pawWidth: 1 }, d.margin)
+      caps.push({ c: paw.c, rx: paw.r[0], ry: (part.radii[1] + d.cover) * e.pawLift, rz: part.radii[2] + d.margin })
+      continue
     }
-    caps.push({ c: [ox, cy, oz], rx, ry, rz: part.radii[2] + d.margin })
+    caps.push({ c: [cx, cy, cz], rx: part.radii[0] + d.margin, ry: part.radii[1] + d.cover, rz: part.radii[2] + d.margin })
   }
   for (const bank of SPHINX_DRIFT_BANKS) {
     const f = bank.id === 'frontBank' ? e.frontBank : 1

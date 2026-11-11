@@ -10,6 +10,7 @@ import {
   buildGizaPyramids,
   buildFieldSphinx,
   fieldSphinxLength,
+  GIZA_FIELD_CORE_TONE,
   GIZA_FIELD_KHUFU_HEIGHT,
   buildStoneCity,
   buildRockChurches,
@@ -129,10 +130,19 @@ describe('landmark builders', () => {
     // lower than the hex reads: the tawny core peaks ~1.2 with jitter while
     // the pale cap stays above 2.0.
     const khafreH = 1.5 * 0.64 * 2
+    // The bird's-eye Sphinx's drift is drawn in the travel ground's own desert
+    // tone, which is brighter in linear terms than the pyramids' core
+    // (src/render/sphinx.test.ts pins it): its footprint is discounted here.
+    const sphinxGeo = buildFieldSphinx('landmark')
+    sphinxGeo.computeBoundingBox()
+    const sb = sphinxGeo.boundingBox!
+    sphinxGeo.dispose()
+    const inSphinx = (i: number) =>
+      pos.getX(i) >= sb.min.x - 1e-6 && pos.getX(i) <= sb.max.x + 1e-6 && pos.getZ(i) >= sb.min.z - 1e-6 && pos.getZ(i) <= sb.max.z + 1e-6 && pos.getY(i) <= sb.max.y + 1e-6
     let pale = 0
     for (let i = 0; i < pos.count; i++) {
       const bright = col.getX(i) + col.getY(i) + col.getZ(i)
-      if (bright <= 1.6) continue
+      if (bright <= 1.6 || inSphinx(i)) continue
       pale++
       expect(Math.hypot(pos.getX(i), pos.getZ(i)), 'pale casing only on Khafre').toBeLessThan(0.5)
       expect(pos.getY(i), 'pale casing only near the apex').toBeGreaterThan(khafreH * 0.7)
@@ -188,6 +198,16 @@ describe('landmark builders', () => {
     // Smaller than the bird's-eye symbol, which is drawn enlarged.
     expect(fieldSphinxLength('skyline')).toBeLessThan(fieldSphinxLength('landmark'))
     geo.dispose()
+  })
+
+  it("the skyline Sphinx's stone is in the pyramids' tone family, not a darker brown (owner verdict 11.11.2026, 11:02)", () => {
+    // The skyline Sphinx's limestone, shaded by its level's emphasis, against
+    // the pyramids' core: each channel within 15 % (linear), same hue order.
+    const core = new THREE.Color(GIZA_FIELD_CORE_TONE)
+    const stone = new THREE.Color(SPHINX_FORM.tones.limestone).multiplyScalar(SPHINX_FORM.emphasis.skyline.stoneShade)
+    for (const k of ['r', 'g', 'b'] as const) expect(Math.abs(stone[k] - core[k]) / core[k], k).toBeLessThan(0.15)
+    expect(stone.r).toBeGreaterThan(stone.g)
+    expect(stone.g).toBeGreaterThan(stone.b)
   })
 
   it('the Meroë pyramid field is unmistakable at travel zoom (user request)', () => {

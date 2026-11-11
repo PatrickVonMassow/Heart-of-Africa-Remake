@@ -1315,11 +1315,19 @@ touch near-parallel) — so no z-offset is used; in
 `src/render/sphinx.test.ts` that every vertex of every level lies on the
 definition and the levels' parts nest, that the bird's-eye level is the
 definition under its documented travel-scale emphasis (head block enlarged,
-two paw prongs with the notch open between them, stone darker than the sand
-in the limestone hue) and that the skyline level carries its drift with only
-head, neck and back ridge above it; in `src/render/landmarks.test.ts` that the
+the two forepaws revealed as parallel stone tongues reaching a fifth of the
+body ahead of the chest with open ground between them, the back ridge wider
+than at the site, stone darker than the sand in the limestone hue), that its
+drift is the travel ground's desert sand tone (hue within 3 %, never lighter
+than the ground, red at least three times blue) with its rim on the drift's
+zero contour, lit and coloured like the flat ground (no grid steps, owner
+verdict 11.11.2026, 11:02), that the skyline level carries its drift with only
+head, neck and back ridge above it, its nemes drawn as the derived block
+whose face-on outline is a flat-topped trapezoid widening to the shoulders
+with the lappets' foot in the drift and the face in front, and that neither
+distant level has a near-coplanar contact; in `src/render/landmarks.test.ts` that the
 skyline Sphinx's crown stands 0.12-0.17 of Khufu's height (owner verdict
-11.11.2026); in `src/scenes/place/gizaSite.test.ts`
+11.11.2026) and its stone lies in the pyramids' core tone family; in `src/scenes/place/gizaSite.test.ts`
 that the collidable mass is the drawn footprint (point 378's rule). Live
 (owed by the owner's local run, both backends): `polish-panorama` section
 `sphinx` — face on, profile, behind, low along the drift, a moving-camera
