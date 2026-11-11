@@ -39,7 +39,7 @@ describe('spring body geometry', () => {
   })
 
   it('never dips under the ground anywhere, even when the water level lies below it', () => {
-    const groundAbove = (dx: number, dz: number) => 1.2 + dx * 0.2
+    const groundAbove = (dx: number) => 1.2 + dx * 0.2
     const b = buildSpringGeometry({ shape: SHAPE, waterY: 1.0, outflowAngle: 0, segments: 16, rings: 8, groundAt: groundAbove })
     const p = b.geometry.getAttribute('position')
     for (let i = 0; i < p.count; i++) {

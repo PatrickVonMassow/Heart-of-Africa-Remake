@@ -396,7 +396,7 @@ implemented (rivers in carved beds rendering as one continuous,
 unbroken ribbon descending from source to mouth, bridged stray sea
 points, a calm surface with a visible current strengthening at rapids
 and falls, five white waterfall cascades with plunge-pool foam,
-springs in open land as 3D welling water features (a boiling dome, ripple rings, a wet apron on the terrain), flat lake surfaces just above their carved
+springs in open land, flat lake surfaces just above their carved
 beds), the §11.3 mouth-junction and no-interior-notch rules (point
 211: a sea-mouth ribbon carries `MOUTH_BRIDGE` axis points past the
 coast contour into the receiving shelf, so no beach strip parts river
