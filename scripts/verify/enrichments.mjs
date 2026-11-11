@@ -751,23 +751,37 @@ if (section('rivers')) {
         const seed = window.__game.getState().seed
         let maxGap = 0
         let minLift = Infinity
-        for (const r of rim) {
-          const l = geo.worldToLatLon(r.x, r.z)
-          const ground = terr.sampleTerrain(l.lat, l.lon, seed).height
-          maxGap = Math.max(maxGap, r.y - ground)
-          minLift = Math.min(minLift, r.y - ground)
+        let minEdgeLift = Infinity
+        const lift = (x, z, y) => {
+          const l = geo.worldToLatLon(x, z)
+          return y - terr.sampleTerrain(l.lat, l.lon, seed).height
         }
-        return { n: rim.length, maxGap, minLift }
+        rim.forEach((r, i) => {
+          const d = lift(r.x, r.z, r.y)
+          maxGap = Math.max(maxGap, d)
+          minLift = Math.min(minLift, d)
+          // The relief can rise between two rim vertices: sample the edge too.
+          const q = rim[(i + 1) % rim.length]
+          for (const t of [0.25, 0.5, 0.75]) {
+            minEdgeLift = Math.min(minEdgeLift, lift(r.x + (q.x - r.x) * t, r.z + (q.z - r.z) * t, r.y + (q.y - r.y) * t))
+          }
+        })
+        return { n: rim.length, maxGap, minLift, minEdgeLift }
       }, body0.rim)
       check(
         'Spring: the rim sits on the terrain (no gap, no clip)',
-        rimFit.n >= 8 && rimFit.minLift >= 0 && rimFit.maxGap <= 0.06,
+        rimFit.n >= 8 && rimFit.minLift >= 0 && rimFit.minEdgeLift >= 0 && rimFit.maxGap <= 0.06,
         JSON.stringify(rimFit),
       )
       // Animates: two frames of the spring 0.6 s apart differ inside its
       // projected footprint (the boil, the ripples, the bubbles).
       if (stood) {
-        const clip = await page.evaluate(([x, z, y, r]) => {
+        // Only the welling dome: the pool's edge borders the river ribbon,
+        // whose own flow would pass the check without any spring animation.
+        const clip = await page.evaluate(async ([x, z, y]) => {
+          const { balance } = await import('/src/config/balance.ts')
+          const { SPRING_FORM } = await import('/src/scenes/travel/springGeometry.ts')
+          const r = balance.spring.radius * SPRING_FORM.domeFraction
           const VW = window.innerWidth, VH = window.innerHeight
           let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
           for (let a = 0; a < 16; a++) {
@@ -780,7 +794,7 @@ if (section('rivers')) {
           const c = { x: Math.round(minX), y: Math.round(minY), width: Math.round(maxX - minX), height: Math.round(maxY - minY) }
           const on = c.x >= 0 && c.y >= 0 && c.x + c.width <= VW && c.y + c.height <= VH && c.width >= 6 && c.height >= 4
           return on ? c : null
-        }, [body0.x, body0.z, body0.poolY, 0.5])
+        }, [body0.x, body0.z, body0.poolY])
         if (!clip) {
           check('Spring: the spring projects on screen for the animation check', false, 'off screen at zoom 0.5')
         } else {
