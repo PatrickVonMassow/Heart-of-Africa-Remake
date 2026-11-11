@@ -8234,16 +8234,16 @@ if (section('vulture-cluster')) {
       out.aGone = !herds.zebra.includes(a)
       out.bGone = !herds.zebra.includes(b)
     }
+    // Frame the pair BEFORE the flock lands: a fed body dissolves in seconds,
+    // so a camera settle after the landing shot an already eaten carcass.
+    window.__game.setState({ pos: { ...window.__game.getState().pos, x: mid.x, z: mid.z + 3 } })
+    await window.__pollSim(20, () => { step(); return window.__camera.settled() })
     // Hold at the first landing so the shutter sees the one flock on the pair.
     await window.__pollSim(60, () => { step(); return out.landedOn.length > 0 || (out.aGone && out.bGone) })
     window.__vulCluster = { a, b, out, seen, step, mid }
-    if (out.landedOn.length > 0 && !out.aGone) {
-      window.__game.setState({ pos: { ...window.__game.getState().pos, x: mid.x, z: mid.z + 3 } })
-    }
     return { mid, landed: out.landedOn.length > 0 && !out.aGone }
   })
   if (clusterStage.landed) {
-    await page.evaluate(() => window.__pollSim(20, () => window.__camera.settled()))
     await shot('327-vulture-cluster-one-flock', {
       world: clusterStage.mid,
       label: 'two carcasses close together with ONE vulture flock landed on the pair',
