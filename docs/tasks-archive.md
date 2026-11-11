@@ -36355,3 +36355,13 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Acceptance (user front-order 10.11.2026): the user's exact spot judged from the steep overhead camera, and an overhead + kneeling/pounding frame of every covering garment form on both backends.
   Queue position: user front-order 10.11.2026 — the very front of the work order, ahead of every other open point including the 35-point front-order of 09.11.2026; in-flight branches are parked, not discarded.
   Bundle: Dorfleben.
+
+- [x] 1498. Make elderly animals recognisable at game distance, with believable vultures and a readable elephant graveyard
+  User report 10.11.2026 (build 51c7783): the user has never seen or recognised an elderly animal (point 265, landed 10.11.2026 13:13, merge a56504f8d). Point 265 committed only two frames, both of the death drama (verification/265-elder-down-vultures-gather.png, verification/265b-elephant-dies-at-graveyard.png); no frame shows an elder next to a prime adult, so recognisability was never accepted.
+  FINAL STATE
+  1. Elderly animals are recognisable as old at the normal travel-camera height and distance, for every species that has an elder (design.md §19.18; crocodile has none). Levers (calibratable, in src/config/balance.ts and the fauna schema): elderly.fraction (now 0.08), ELDERLY_SCHEMA (bodyR 0.86, swayBack 0.14, coatGrey 0.3, faceGrey 0.5, neckDrop 0.15), the elephant master tusk, the lion elder mane; keep the cues researched (docs/fauna-behaviour-1890.md), only stronger.
+  2. Vulture size: in 265-elder-down-vultures-gather.png the vultures read as flat oversized planks almost a zebra long; bring them to a believable size and shape at that distance.
+  3. Elephant graveyard (user asked explicitly): in 265b-elephant-dies-at-graveyard.png the graveyard shows pale WHOLE elephant bodies that read like plaster casts, not as bones/remains; the graveyard must read as an elephant graveyard (remains, bones, tusks) from the travel camera.
+  ACCEPTANCE: per species one comparison frame, elder beside a prime adult, from the travel camera at game distance; a vulture frame over a downed animal; a graveyard frame; both backends; judged by eye "does it look right to a person".
+  PLACEMENT (user 10.11.2026 23:02): at the front of the work order, directly behind point 1489 (no exposed body parts) and ahead of every other open point, including the 35-point front-order of 09.11.2026. If the owner splits this request (elders/vultures vs. graveyard), both parts sit there, in that order.
+  Bundle: Tierverhalten.
