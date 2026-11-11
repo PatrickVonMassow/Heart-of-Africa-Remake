@@ -14,9 +14,10 @@
 // head, the neck, a little of the chest and the upper back stood clear. So the
 // body parts split into BURIED ones, which are never drawn and only shape the
 // sand, and CLEAR ones, which are drawn and break the surface. The drift is a
-// body UNDER sand: every buried part raises a dome that covers it, and the
-// domes' smooth union is the long couchant swell with the shoulders and the
-// paws showing through, out of which the back ridge breaks.
+// body UNDER sand: every buried part raises a dome that covers it, two
+// wind-blown sand banks fill the front and the rear (SPHINX_DRIFT_BANKS), and
+// the smooth union is the long couchant swell with the shoulders showing
+// through, out of which the back ridge breaks.
 //
 // NO COPLANAR SURFACES BY CONSTRUCTION. Every part is a closed, curved
 // superellipsoid; the drift's toe meets the ground at the repose slope, and
@@ -324,16 +325,34 @@ export function partLevel(part: SphinxPart, x: number, y: number, z: number): nu
 
 // --- The drift ---------------------------------------------------------------
 
+/**
+ * The wind-blown sand banks: drift-only masses, not body parts. Without them
+ * the union of the part domes reads as two round lobes over the forepaws and
+ * two cheeks over the haunches, each pair with a sharp crease between (owner
+ * verdict 11.11.2026). The FRONT bank is one sand bank piled against the chest
+ * that fills the gap between the paws, so only a broad, shallow hint of them
+ * shows; the REAR bank is one long swell over the haunches, tapering to the
+ * tail. Both lie a little to the south (+z), the lee of the prevailing
+ * north wind. Each dome is the bank's ellipsoid cap run down at the repose slope.
+ */
+export const SPHINX_DRIFT_BANKS: ReadonlyArray<{ id: string; centre: Vec3; radii: Vec3 }> = [
+  { id: 'frontBank', centre: [0.38, 0.0, 0.012], radii: [0.2, 0.082, 0.12] },
+  { id: 'rearBank', centre: [-0.27, 0.035, 0.012], radii: [0.24, 0.09, 0.13] },
+]
+
 /** The cover dome over one buried part, at a body-frame (x, z). */
 function domeHeight(part: SphinxPart, x: number, z: number): number {
   const d = SPHINX_FORM.drift
   // The part's cover ellipsoid; its dome follows it until it is as steep as
   // the repose slope, then runs straight down to the floor.
-  const rx = part.radii[0] + d.margin
-  const rz = part.radii[2] + d.margin
-  const ry = part.radii[1] + d.cover
-  const dx = x - part.centre[0]
-  const dz = z - part.centre[2]
+  return capHeight(part.centre, part.radii[0] + d.margin, part.radii[1] + d.cover, part.radii[2] + d.margin, x, z)
+}
+
+/** An ellipsoid cap over a centre, run down at the repose slope where it gets steeper. */
+function capHeight(c: Vec3, rx: number, ry: number, rz: number, x: number, z: number): number {
+  const d = SPHINX_FORM.drift
+  const dx = x - c[0]
+  const dz = z - c[2]
   const t = Math.hypot(dx, dz)
   // Along this ray the ellipse's radius R and the profile y = cy + ry·√(1−(t/R)²).
   const R = t > 1e-9 ? 1 / Math.sqrt((dx / t / rx) ** 2 + (dz / t / rz) ** 2) : Math.min(rx, rz)
@@ -342,7 +361,7 @@ function domeHeight(part: SphinxPart, x: number, z: number): number {
   const q = (k * R) / ry
   const uStar = q / Math.sqrt(1 + q * q)
   const tStar = uStar * R
-  const cy = part.centre[1]
+  const cy = c[1]
   if (t <= tStar) return cy + ry * Math.sqrt(1 - (t / R) ** 2)
   return cy + ry * Math.sqrt(1 - uStar * uStar) - k * (t - tStar)
 }
@@ -360,6 +379,10 @@ export function sphinxDriftHeight(x: number, z: number): number {
   let sum = 1
   for (const part of SPHINX_BURIED_PARTS) {
     const y = domeHeight(part, x, z)
+    if (y > floor) sum += Math.exp((y - floor) / d.blend) - 1
+  }
+  for (const bank of SPHINX_DRIFT_BANKS) {
+    const y = capHeight(bank.centre, bank.radii[0], bank.radii[1], bank.radii[2], x, z)
     if (y > floor) sum += Math.exp((y - floor) / d.blend) - 1
   }
   return floor + d.blend * Math.log(sum)
@@ -388,6 +411,13 @@ export function sphinxDriftBounds(): { minX: number; maxX: number; minZ: number;
     maxX = Math.max(maxX, p.centre[0] + p.radii[0] + reach)
     minZ = Math.min(minZ, p.centre[2] - p.radii[2] - reach)
     maxZ = Math.max(maxZ, p.centre[2] + p.radii[2] + reach)
+  }
+  for (const k of SPHINX_DRIFT_BANKS) {
+    const reach = (k.centre[1] + k.radii[1] + d.sink) / d.slope
+    minX = Math.min(minX, k.centre[0] - k.radii[0] - reach)
+    maxX = Math.max(maxX, k.centre[0] + k.radii[0] + reach)
+    minZ = Math.min(minZ, k.centre[2] - k.radii[2] - reach)
+    maxZ = Math.max(maxZ, k.centre[2] + k.radii[2] + reach)
   }
   return { minX, maxX, minZ, maxZ }
 }
@@ -431,7 +461,7 @@ export function onSphinxFootprint(x: number, z: number): boolean {
 /**
  * The collidable mass (body units) as capsules ACROSS the body: per station
  * along it, one capsule for each contiguous run of the drawn footprint's slice
- * there (so the notch between the paw lobes stays open), its radius three
+ * there (so a notch in the footprint stays open), its radius three
  * quarters of the station step so neighbours overlap into an even rim. The
  * union covers the drawn footprint and overshoots it by at most about a
  * station step (point 378: the collider is the drawn body, nothing more).

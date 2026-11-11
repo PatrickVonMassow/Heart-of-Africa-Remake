@@ -88,12 +88,22 @@ describe('the ~1890 burial (docs/giza-1890.md §1.3)', () => {
   it('models the drift as a body under sand: the shoulders swell and the paws show through', () => {
     // The shoulder swell stands above the mid-back's sand…
     expect(sphinxDriftHeight(part('shoulderR').centre[0], part('shoulderR').centre[2])).toBeGreaterThan(sphinxDriftHeight(-0.05, 0.09))
-    // …and over the forepaws, ahead of the chest, the sand rises in two lobes
-    // with a dip between them.
-    const x = part('forelegR').centre[0] + part('forelegR').radii[0] * 0.6
-    const lobe = sphinxDriftHeight(x, part('forelegR').centre[2])
-    expect(lobe).toBeGreaterThan(sphinxDriftHeight(x, 0) + 0.01)
-    expect(sphinxDriftHeight(x, -part('forelegR').centre[2])).toBeCloseTo(lobe, 6)
+    // …and over the forepaws, ahead of the chest, lies ONE sand bank, not two
+    // lobes with a crease (owner verdict 11.11.2026). RULE: across the paws,
+    // the dip between the two paw swells is at most 15 % of the drift height
+    // there, and the cross-section's slope stays gentle (no V-crease).
+    const f = part('forelegR')
+    for (const k of [0.2, 0.4, 0.6, 0.8]) {
+      const x = f.centre[0] + f.radii[0] * k
+      const zs: number[] = []
+      for (let z = -f.centre[2]; z <= f.centre[2] + 1e-9; z += 0.002) zs.push(sphinxDriftHeight(x, z))
+      const peak = Math.max(sphinxDriftHeight(x, f.centre[2]), sphinxDriftHeight(x, -f.centre[2]))
+      const dip = Math.min(sphinxDriftHeight(x, f.centre[2]), sphinxDriftHeight(x, -f.centre[2])) - Math.min(...zs)
+      expect(dip, `paw dip at ${k}`).toBeLessThanOrEqual(0.15 * peak)
+      for (let i = 1; i < zs.length; i++) expect(Math.abs(zs[i] - zs[i - 1]) / 0.002, `slope at ${k}`).toBeLessThan(0.5)
+    }
+    // The bank is piled against the chest: it falls from the chest toward the paw tips.
+    expect(sphinxDriftHeight(f.centre[0], 0)).toBeGreaterThan(sphinxDriftHeight(f.centre[0] + f.radii[0] * 0.8, 0))
   })
 
   it("does not reach past the body's footprint by more than its skirt", () => {
@@ -261,7 +271,7 @@ describe('the body under the sand reads from every standpoint (owner verdict 11.
     for (const k of ['limestone', 'face', 'nemes'] as const) expect(lum(t.sand) - lum(t[k])).toBeGreaterThan(25)
   })
 
-  it('from behind the head and the nemes back stand above the drift, over two haunch swells', () => {
+  it('from behind the head and the nemes back stand above the drift, over one long haunch swell', () => {
     // The verification standpoint behind the monument, at eye height (1.7 m at a 20 m body).
     const eye = [-0.95, 1.7 / SPHINX_FORM.site.length, 0.15]
     const visible = (target: readonly number[]) => {
@@ -277,9 +287,23 @@ describe('the body under the sand reads from every standpoint (owner verdict 11.
     expect(visible(top('nemes')), 'crown').toBe(true)
     expect(visible(top('nemesBack')), 'nemes back').toBe(true)
     expect(visible([0, crestAt(0), 0]), 'spine crest').toBe(true)
-    // Two haunch swells with a dip between them at the rump.
+    // ONE long swell over the haunches, not two cheeks (owner verdict
+    // 11.11.2026). RULE: across the haunches and behind them, the dip between
+    // the two haunch swells is at most 10 % of the drift height there…
     const h = part('haunchR')
-    expect(sphinxDriftHeight(h.centre[0], h.centre[2])).toBeGreaterThan(sphinxDriftHeight(h.centre[0] - h.radii[0] * 0.5, 0) + 0.003)
+    for (const x of [h.centre[0], h.centre[0] - h.radii[0] * 0.5, h.centre[0] - h.radii[0]]) {
+      let low = Infinity
+      for (let z = -h.centre[2]; z <= h.centre[2] + 1e-9; z += 0.002) low = Math.min(low, sphinxDriftHeight(x, z))
+      const side = Math.min(sphinxDriftHeight(x, h.centre[2]), sphinxDriftHeight(x, -h.centre[2]))
+      expect(side - low, `haunch dip at x=${x.toFixed(3)}`).toBeLessThanOrEqual(0.1 * side)
+    }
+    // …and on the axis it tapers steadily from the haunches toward the tail.
+    let prev = Infinity
+    for (let x = h.centre[0]; x >= h.centre[0] - h.radii[0] * 1.5; x -= 0.01) {
+      const y = sphinxDriftHeight(x, 0)
+      expect(y, `taper at x=${x.toFixed(3)}`).toBeLessThanOrEqual(prev + 1e-4)
+      prev = y
+    }
   })
 })
 

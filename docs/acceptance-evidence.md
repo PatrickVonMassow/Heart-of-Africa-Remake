@@ -1287,9 +1287,13 @@ into the sand at the chest; a narrower face with brow ridge, almond eye
 sockets, cheekbones, the flattened nose stump, lips, rounded chin and no
 beard; the neck, a little of the chest, the shoulder tops under the wings
 and the spine) — and the drift as a body UNDER sand, one cover dome per
-buried part, so the shoulder swell, the two haunch swells and the paw lobes
-show through and the spine rises out of banked sand to the neck (reworked
-after the owner's picture verdict of 11.11.2026);
+buried part plus two wind-blown sand banks (one bank piled against the
+chest over the forepaws, one long swell over the haunches tapering to the
+tail, both a little to the lee side), so the shoulder swell shows through,
+the paws only as a broad shallow hint, and the spine rises out of banked
+sand to the neck (reworked twice after the owner's picture verdicts of
+11.11.2026: the second removed the paw and haunch lobe pairs that read as
+two round mounds with a crease face-on and from behind);
 the walkable site's mesh (three levels, `sphinxSiteDetail` per quality
 preset, the named reduced mesh on low), the bird's-eye landmark and the
 Cairo skyline outline all derive from it (`src/render/sphinx.ts`), and the
@@ -1301,7 +1305,9 @@ clear of the drift while every other body part sits below it, the nemes
 trapezoid wider than the face, the lappets reaching the sand, the face
 features in order, the spine's crest continuously clear from mid-back to
 the shoulders with sand banked against it, crown, nemes back and spine
-visible from the behind standpoint over two haunch swells, the stone one
+visible from the behind standpoint over one long tapering haunch swell
+(dip between the haunch swells at most 10 % of the drift height), the paw
+dip at most 15 % with no V-crease, the stone one
 limestone family and darker than the sand, the drift's footprint within the body's plus its skirt, and no
 coplanar contact anywhere (every clear part leaves the drift at a real
 angle, the drift meets the ground at its repose slope, no two drawn parts

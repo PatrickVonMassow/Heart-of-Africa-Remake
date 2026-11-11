@@ -287,11 +287,11 @@ added.
 
   | Level | Vertices | Triangles |
   | --- | --- | --- |
-  | reduced (low) | 4009 | 5772 |
-  | standard (medium) | 12644 | 20058 |
-  | full (high) | 26606 | 43552 |
-  | landmark (bird's-eye) | 1323 | 1706 |
-  | skyline (Cairo) | 517 | 604 |
+  | reduced (low) | 3927 | 5638 |
+  | standard (medium) | 12425 | 19744 |
+  | full (high) | 26154 | 42772 |
+  | landmark (bird's-eye) | 1298 | 1666 |
+  | skyline (Cairo) | 502 | 584 |
 
   The measured frame cost at the site on both backends at LOW and MEDIUM is
   owed by the owner's local run (`polish-panorama`, section `sphinx`).
