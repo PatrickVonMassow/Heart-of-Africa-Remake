@@ -7167,35 +7167,32 @@ if (section('elderly-natural-death')) {
     const anyMesh = window.__wildlife.meshRefs.current.zebra
     const M4 = anyMesh.matrixWorld.constructor
     const V3 = anyMesh.position.constructor
-    let root = anyMesh
-    while (root.parent) root = root.parent
     const visibleChain = (o) => {
       for (let q = o; q; q = q.parent) if (!q.visible) return false
       return true
     }
     // The drawn object and world matrix of a subject: a herd animal is found
-    // as an instance of a live InstancedMesh whose translation is its x/z.
+    // as a live instance of ITS OWN InstancedMesh (`sub.within`: the elder or
+    // the adult mesh of its species) whose translation is its x/z — never any
+    // other mesh that happens to stand there (cross-review 1498 pass 1).
     const locate = (sub) => {
       if (sub.mesh) {
         sub.mesh.updateMatrixWorld(true)
         return { obj: sub.mesh, m: sub.mesh.matrixWorld.clone() }
       }
       const a = sub.animal
-      let hit = null
+      const o = sub.within
+      if (!o?.isInstancedMesh) return null
       const im = new M4()
-      root.traverse((o) => {
-        if (hit || !o.isInstancedMesh) return
-        for (let i = 0; i < o.count; i++) {
-          o.getMatrixAt(i, im)
-          const e = im.elements
-          if (Math.hypot(e[12] - a.x, e[14] - a.z) < 0.35) {
-            o.updateMatrixWorld(true)
-            hit = { obj: o, m: o.matrixWorld.clone().multiply(im) }
-            return
-          }
+      for (let i = 0; i < o.count; i++) {
+        o.getMatrixAt(i, im)
+        const e = im.elements
+        if (Math.hypot(e[12] - a.x, e[14] - a.z) < 0.35) {
+          o.updateMatrixWorld(true)
+          return { obj: o, m: o.matrixWorld.clone().multiply(im) }
         }
-      })
-      return hit
+      }
+      return null
     }
     const probe = (subs) => subs.map((sub) => {
       const at = locate(sub)
@@ -7263,7 +7260,10 @@ if (section('elderly-natural-death')) {
       }
       hold()
       window.__elderPair = { sp, prime, elder, pin }
-      const subs = [{ name: `prime ${sp}`, animal: prime }, { name: `old ${sp}`, animal: elder }]
+      const subs = [
+        { name: `prime ${sp}`, animal: prime, within: window.__wildlife.meshRefs.current[sp] },
+        { name: `old ${sp}`, animal: elder, within: window.__wildlife.elderMeshes[sp] },
+      ]
       window.__elderPair.subs = subs
       const pre = await window.__elderProbe.settle(subs, 240)
       return { staged: true, x: spot.x, z: spot.z, pre }
