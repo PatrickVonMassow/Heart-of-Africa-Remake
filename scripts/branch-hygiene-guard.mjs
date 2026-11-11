@@ -13,9 +13,10 @@ import { execFileSync } from 'node:child_process'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner, ownsLock } from './batch-singleton.mjs'
-import { assessBranchHygiene, formatBranchHygiene, DEFAULT_GRACE_MS, normBranch } from './branch-hygiene-core.mjs'
+import { assessBranchHygiene, closedPointsOf, formatBranchHygiene, DEFAULT_GRACE_MS, normBranch } from './branch-hygiene-core.mjs'
 import { declarationShields } from './batch-in-flight-core.mjs'
 import { probePid } from './batch-singleton.mjs'
+import { TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 const IN_FLIGHT = repoPath('.claude/batch-in-flight.json')
@@ -103,6 +104,7 @@ export function gatherBranchHygiene({ sessionId = '', now = Date.now(), ignoreOw
   let remoteMerged
   let worktrees
   let mainTip = null
+  let unmerged = []
   try {
     tips = tipDates()
     const at = (name) => tips.get(normBranch(name))?.at ?? null
@@ -110,6 +112,10 @@ export function gatherBranchHygiene({ sessionId = '', now = Date.now(), ignoreOw
     mainTip = shaOf('origin/main')
     localMerged = mergedNames(['branch', '--merged', 'origin/main']).map((name) => ({ name, tipAt: at(name), tipSha: shaOf(name) }))
     remoteMerged = mergedNames(['branch', '-r', '--merged', 'origin/main']).map((name) => ({ name, tipAt: at(name), tipSha: shaOf(name) }))
+    unmerged = [
+      ...mergedNames(['branch', '--no-merged', 'origin/main']),
+      ...mergedNames(['branch', '-r', '--no-merged', 'origin/main']),
+    ].map((name) => ({ name, tipAt: at(name), tipSha: shaOf(name) }))
     // git's FIRST worktree is the main checkout. Deriving the root from it
     // rather than from this module's own path is what keeps the guard right
     // when it runs from an agent worktree — where REPO_ROOT is the worktree.
@@ -143,8 +149,22 @@ export function gatherBranchHygiene({ sessionId = '', now = Date.now(), ignoreOw
       inFlightBranches: declared.branches,
       inFlightPaths: declared.paths,
       mainTip,
+      closedPoints: closedPoints(),
+      unmerged,
     },
   }
+}
+
+/** The closed-point census (point 1504); an unreadable file reads as null. */
+function closedPoints() {
+  const read = (path) => {
+    try {
+      return readFileSync(path, 'utf8')
+    } catch {
+      return null
+    }
+  }
+  return closedPointsOf({ tasksText: read(TASKS_PATH), archiveText: read(ARCHIVE_PATH) })
 }
 
 function headDate(sha) {

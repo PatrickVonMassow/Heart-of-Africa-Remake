@@ -9,6 +9,7 @@ import {
   isBaselineCheckout,
   normBranch,
   stubBranchTree,
+  closedPointsOf,
   DEFAULT_GRACE_MS,
 } from './branch-hygiene-core.mjs'
 
@@ -413,5 +414,103 @@ describe("the setup branch an agent worktree is cut with (point 613)", () => {
     expect(stubBranchTree('worktree-agent-')).toBe(null)
     expect(stubBranchTree('main')).toBe(null)
     expect(stubBranchTree(null)).toBe(null)
+  })
+})
+
+describe('a closed point whose branch was never merged (point 1504)', () => {
+  // feat/1341 (cancelled), feat/1482 (landed through another branch) and
+  // feat/1485 (absorbed) survived for days: containment never sees them.
+  it('reports the local and remote branch of a closed point, archiving before the forced delete', () => {
+    const r = assessBranchHygiene(
+      base({
+        closedPoints: [1485],
+        unmerged: [
+          { name: 'feat/1485-skirt', tipAt: OLD },
+          { name: 'origin/feat/1485-skirt', tipAt: OLD },
+        ],
+      }),
+    )
+    expect(r.block).toBe(true)
+    expect(r.findings.map((f) => f.kind)).toEqual(['local-closed', 'remote-closed'])
+    expect(r.findings[0].command).toMatch(/git bundle create local\/branch-archive\/feat_1485-skirt-[0-9a-f]{10}\.bundle 'feat\/1485-skirt' \^origin\/main && git branch -D 'feat\/1485-skirt'$/)
+    expect(r.findings[1].command).toMatch(/&& git push origin --delete 'feat\/1485-skirt'$/)
+    // Each twin archives into its OWN file, so the second remedy cannot overwrite the first.
+    expect(r.findings[1].command).toMatch(/local\/branch-archive\/origin_feat_1485-skirt-[0-9a-f]{10}\.bundle/)
+  })
+
+  it('refs differing only by slash versus dash, or by case, archive into distinct files', () => {
+    const r = assessBranchHygiene(
+      base({
+        closedPoints: [1485],
+        unmerged: ['feat/1485-a/b', 'feat/1485-a-b', 'feat/1485-A', 'feat/1485-a'].map((name) => ({ name, tipAt: OLD })),
+      }),
+    )
+    const files = r.findings.map((f) => f.command.match(/branch-archive\/(\S+\.bundle)/)[1].toLowerCase())
+    expect(files).toHaveLength(4)
+    expect(new Set(files).size).toBe(4)
+  })
+
+  it('quotes every ref in the remedy so shell metacharacters stay inert', () => {
+    const r = assessBranchHygiene(
+      base({ closedPoints: [1485], unmerged: [{ name: "feat/1485-a(b);x'y", tipAt: OLD }] }),
+    )
+    const cmd = r.findings[0].command
+    expect(cmd).toContain(`git bundle create local/branch-archive/feat_1485-a_b__x_y-`)
+    expect(cmd).toContain(`'feat/1485-a(b);x'\\''y' ^origin/main`)
+    expect(cmd).toMatch(/git branch -D 'feat\/1485-a\(b\);x'\\''y'$/)
+  })
+
+  it('a closed point branch checked out in an UNLOCKED worktree is not offered for deletion', () => {
+    const wt = { path: 'C:/repo/.claude/worktrees/b', branch: 'refs/heads/feat/9-a', locked: false, tipAt: OLD }
+    const r = assessBranchHygiene(
+      base({ closedPoints: [9], worktrees: [...base().worktrees, wt], unmerged: [{ name: 'feat/9-a', tipAt: OLD }] }),
+    )
+    expect(r.findings).toEqual([])
+  })
+
+  it('a remote-qualified in-flight declaration protects that remote ref', () => {
+    const r = assessBranchHygiene(
+      base({ closedPoints: [9], inFlightBranches: ['origin/feat/9-a'], unmerged: [{ name: 'origin/feat/9-a', tipAt: OLD }] }),
+    )
+    expect(r.findings).toEqual([])
+  })
+
+  it('an unmerged branch of an OPEN point stays untouched', () => {
+    const r = assessBranchHygiene(base({ closedPoints: [1485], unmerged: [{ name: 'origin/feat/1463-x', tipAt: OLD }] }))
+    expect(r.block).toBe(false)
+  })
+
+  it('a closed point branch in a living worktree, declared in flight, or inside the grace stays untouched', () => {
+    const wt = { path: 'C:/repo/.claude/worktrees/a', branch: 'refs/heads/feat/9-a', locked: true, tipAt: OLD }
+    const r = assessBranchHygiene(
+      base({
+        closedPoints: [9, 10, 11],
+        worktrees: [...base().worktrees, wt],
+        inFlightBranches: ['feat/10-b'],
+        unmerged: [
+          { name: 'feat/9-a', tipAt: OLD },
+          { name: 'origin/feat/10-b', tipAt: OLD },
+          { name: 'feat/11-c', tipAt: NOW - 1000 },
+        ],
+      }),
+    )
+    expect(r.findings).toEqual([])
+  })
+
+  it('a non-feat branch is never judged by point', () => {
+    const r = assessBranchHygiene(base({ closedPoints: [7], unmerged: [{ name: 'origin/board', tipAt: OLD }] }))
+    expect(r.block).toBe(false)
+  })
+})
+
+describe('closedPointsOf', () => {
+  it('lists archived ticks that TASKS.md does not reopen', () => {
+    const archiveText = '- [x] 3. a\n- [x] 4. b\n'
+    expect(closedPointsOf({ tasksText: '- [ ] 4. b again\n', archiveText })).toEqual([3])
+  })
+
+  it('yields nothing when either file was unreadable — a reopening nobody read is not a closure', () => {
+    expect(closedPointsOf({ tasksText: null, archiveText: '- [x] 3. a\n' })).toEqual([])
+    expect(closedPointsOf({ tasksText: '', archiveText: null })).toEqual([])
   })
 })
