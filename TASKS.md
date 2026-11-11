@@ -77,6 +77,10 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1501. Point 1463 is parked in the backlog, its card stays
+  User order via board chat 11.11.2026 08:40Z: "Schiebe 1463 erstmal ins Backlog. Ich melde mich, falls das umgesetzt werden soll. Die zugehörige Karte unter Von dir zu klären soll bestehen bleiben."
+  Final state: Remove point 1463 from the open work order in TASKS.md and park it in docs/backlog.md (verbatim text, with a note: deferred by user order 11.11.2026, resume only on explicit user request). Keep the matching "Von dir zu klären" card on the board unchanged and visible. Do not start, close or archive 1463 as done.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1463. Drastic zero-based simplification of the whole infrastructure, analysed six-eyes with final cross-vendor check
   Source: User order 28.10.2026 in chat session cf715472: "Wie wäre es mit einer gründlichen Analyse, die feststellt, ob wir nicht drastische Vereinfachungen der gesamten Infrastruktur durchführen können, durch die auch ganz viele der noch offenen Infra-Punkte obsolet würden?" and "Ja, drastisch bedeutet, auch ganze Säulen ersatzlos zu streichen und zahlreiche noch offene Infra-Punkte zu löschen. Reihe einen solchen Punkt vorne in der Queue ein - wie du sagst, mit sechs Augen und Nachkontrolle." Limits on new points were rejected as symptom treatment; the cause is the infrastructure's own complexity. Wording approved by the user: "ja, beide so einreichen".
   Final state: the repository's infrastructure (scripts/ outside the game's verify suites, hooks in .claude/settings.json, guards, lanes, locks, ledgers, board, daemon, launcher, their docs) is drastically simplified from a zero base, and every open infrastructure point made obsolete by it is deleted from the work order.
