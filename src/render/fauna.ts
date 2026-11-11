@@ -743,10 +743,17 @@ function elephantGauntness(): THREE.BufferGeometry[] {
   /** Flank surface x at (y, z) on the barrel. */
   const flankX = (y: number, z: number) => a * Math.sqrt(Math.max(0, 1 - ((y - yc) / b) ** 2 - (z / c) ** 2))
   const out: THREE.BufferGeometry[] = []
-  // Spine ridge: a long, narrow crest following the topline.
+  // Spine ridge: a long, narrow crest bent along the curved topline, so its
+  // ends sit on the barrel instead of floating above it.
   const ridge = new THREE.SphereGeometry(1, 16, 8)
   ridge.scale(0.07, 0.1, c * 0.78)
-  ridge.translate(0, yc + b + E.ridge - 0.1, -0.05)
+  ridge.translate(0, 0, -0.05)
+  const rp = ridge.attributes.position
+  for (let i = 0; i < rp.count; i++) {
+    const z = rp.getZ(i)
+    rp.setY(i, rp.getY(i) + yc + b * Math.sqrt(Math.max(0, 1 - (z / c) ** 2)) + E.ridge - 0.1)
+  }
+  ridge.computeVertexNormals()
   out.push(tint(ridge, '#857e78', 0.05, 109))
   // Hip points: narrow, angular, just proud of the back at the rear.
   for (const side of [-1, 1]) {
@@ -930,7 +937,8 @@ export function buildGiraffe(calf = false, elderly = false): THREE.BufferGeometr
   const neckBase: [number, number] = [neckMid[0] - (neckLen / 2) * Math.cos(0.35), neckMid[1] - (neckLen / 2) * Math.sin(0.35)]
   const baseY = neckBase[0] - (old ? GIRAFFE_ELDER.sag : 0)
   const neck = new THREE.CylinderGeometry(0.13, 0.2, neckLen, FAUNA_TESSELLATION.limb)
-  neck.rotateX(-lean)
+  // Positive about X tips the neck top forward (+z), toward the head.
+  neck.rotateX(lean)
   neck.translate(0, baseY + (neckLen / 2) * Math.cos(lean), neckBase[1] + (neckLen / 2) * Math.sin(lean))
   parts.push(giraffePatches(tint(neck, '#c89a55', 0.14, 113)))
   // Head offset from the neck top, as on the prime build.

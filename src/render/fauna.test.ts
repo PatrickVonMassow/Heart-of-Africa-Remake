@@ -1642,6 +1642,49 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
     expect(ELEPHANT_ELDER.ribs).toBeGreaterThan(0)
   })
 
+  // Cross-review 1498 pass 2: a point is inside the merged build when, in some
+  // direction, the first double-sided hit faces away from the ray (an exit).
+  const insideBuild = (g: THREE.BufferGeometry, y: number, z: number) => {
+    const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }))
+    const dirs = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
+    return dirs.some(([dx, dy, dz]) => {
+      const dir = new THREE.Vector3(dx, dy, dz)
+      const hit = new THREE.Raycaster(new THREE.Vector3(0, y, z), dir).intersectObject(mesh)[0]
+      return !!hit?.face && hit.face.normal.dot(dir) > 0
+    })
+  }
+
+  it('rework: the giraffe head sits on its neck, prime and elder alike', () => {
+    for (const g of [buildGiraffe(), buildGiraffe(false, true)]) {
+      const p = g.attributes.position
+      let maxY = -Infinity
+      for (let i = 0; i < p.count; i++) maxY = Math.max(maxY, p.getY(i))
+      // The head: the forward part of the top 0.6 (the ossicones are thin).
+      let hy = 0, hz = 0, n = 0
+      for (let i = 0; i < p.count; i++) {
+        if (p.getY(i) > maxY - 0.6 && p.getZ(i) > 1.0) { hy += p.getY(i); hz += p.getZ(i); n++ }
+      }
+      expect(n).toBeGreaterThan(0)
+      hy /= n; hz /= n
+      // Walk from the head down the neck into the chest: never outside.
+      const [cy, cz] = [1.95, 0.55]
+      for (let t = 0; t <= 1.0001; t += 0.05) {
+        expect(insideBuild(g, hy + t * (cy - hy), hz + t * (cz - hz))).toBe(true)
+      }
+    }
+  })
+
+  it('rework: the old elephant spine ridge lies on the back along its whole length', () => {
+    const g = buildElephant(false, true)
+    const b = 1.05 * 0.95, c = 1.05 * 1.4, yc = 1.75 - ELEPHANT_ELDER.sag
+    for (let z = -1.1; z <= 1.0001; z += 0.1) {
+      // Just under and just over the barrel top: inside, never a gap under the ridge.
+      const top = yc + b * Math.sqrt(1 - (z / c) ** 2)
+      expect(insideBuild(g, top - 0.02, z)).toBe(true)
+      if (Math.abs(z + 0.05) < 0.8) expect(insideBuild(g, top + 0.02, z)).toBe(true)
+    }
+  })
+
   it('every rendered mammal that ages has an elder build; the crocodile and the birds have none (§2.4)', () => {
     expect(Object.keys(ELDER_BUILDERS).sort()).toEqual(
       ['antelope', 'cheetah', 'elephant', 'giraffe', 'hyena', 'leopard', 'lion', 'warthog', 'wildebeest', 'zebra'],
