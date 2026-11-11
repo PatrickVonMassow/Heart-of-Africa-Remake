@@ -2094,15 +2094,5 @@ export const RED_CHARGES = [
       'MEASURED 11.11.2026 on both backends: recorded enrichments runs before 04:05 carry this LOW preset red; '
       + 'no open point owned it, so it was filed as point 1500. The charge dies with point 1500.',
   },
-  {
-    point: 1498,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^a dying elephant drifts to the graveyard within reach and goes down THERE \(point 265\)/i,
-    why:
-      'MEASURED 10.11.2026 20:38 and 21:03 (WebGL 2, cd11a68e0): offTurned 0.35 failed the < 0.35 check the poll had '
-      + 'just passed, a two-decimal rounding of the raw bearing. feat/1498 judges the raw bearing (green on WebGL 2 at '
-      + 'b4f7c7edb, 11.11.2026 05:58). The charge dies with point 1498.',
-  },
 
 ]
