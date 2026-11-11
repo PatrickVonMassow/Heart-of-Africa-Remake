@@ -916,7 +916,9 @@ export function buildGiraffe(calf = false, elderly = false): THREE.BufferGeometr
   body.rotateX(-0.18)
   body.translate(0, old ? 1.9 - GIRAFFE_ELDER.sag : 1.9, 0)
   parts.push(giraffePatches(tint(body, '#c89a55', 0.14, 111)))
-  if (old) parts.push(...agedBoneKnobs(-0.6, 0.55, 2.3 - GIRAFFE_ELDER.sag / 2, 0.16, 0.09, '#c89a55', 116, 2.5 - GIRAFFE_ELDER.sag / 2))
+  // The hips and withers wear the coat's patch network, or they read as bare
+  // orange balls on the back.
+  if (old) parts.push(...agedBoneKnobs(-0.6, 0.55, 2.3 - GIRAFFE_ELDER.sag / 2, 0.16, 0.09, '#c89a55', 116, 2.5 - GIRAFFE_ELDER.sag / 2).map((k) => giraffePatches(k)))
 
   for (const [lx, lz] of [
     [-0.3, 0.5],
