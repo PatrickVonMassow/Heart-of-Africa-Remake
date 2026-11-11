@@ -8204,10 +8204,16 @@ if (section('vulture-cluster')) {
     // No older bodies anywhere: every flock that flies is one this pair draws.
     for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
     herds.elephant.length = 0
-    const body = (x, chunk) => ({ x, z: spot.z, y: 0.2, rot: 0.4, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk })
-    const a = body(spot.x, 'inject-cluster-a')
-    const b = body(spot.x + gap, 'inject-cluster-b')
-    herds.zebra.push(a, b)
+    // Two adults already inside the drawn herd capacity become the pair: a body
+    // pushed past herdCapacity is simulated but never drawn.
+    const adults = herds.zebra.filter((z) => !z.young && !z.child)
+    if (adults.length < 2) { window.__vulCluster = null; return { landed: false, noZebra: true } }
+    const body = (z, x) => {
+      Object.assign(z, { x, z: spot.z, rot: 0.4, dead: true, deathCause: 'staged', parent: undefined, dissolve: undefined })
+      return z
+    }
+    const a = body(adults[0], spot.x)
+    const b = body(adults[1], spot.x + gap)
     const slots = w.scavengers.current
     for (const f of slots) { f.target = null; f.mode = 'idle'; f.landed = false }
     const out = { staged: true, radius, gap, maxFlocksOut: 0, flocksSeen: 0, overlapFrames: 0, landedOn: [], aGone: false, bGone: false, leftAfter: false }
