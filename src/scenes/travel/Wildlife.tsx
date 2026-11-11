@@ -89,7 +89,7 @@ import {
   crocodileTargetWeight,
   prefersJuvenilePrey,
   killFlockActive,
-  assignPerCarcassFlocks,
+  assignFlockClusters,
   pickOffscreenLandAnchor,
   calvesForGroup,
   deflectedStep,
@@ -2060,10 +2060,11 @@ function Herds() {
   // own flock, so several carcasses draw several concurrent flocks rather than
   // one global set of vultures hopping from the finished carcass to the next.
   // hop: flying from an eaten carcass to the next one of its cluster (design.md §19.6).
-  type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null; hop?: boolean }
+  // queue: the rest of its claimed cluster, persisted so the claim survives a hop.
+  type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null; queue: Animal[]; hop?: boolean }
   const scavengeGroups = useRef<(THREE.Group | null)[]>([])
   const raptorMesh = useRef<THREE.Mesh>(null)
-  const makeScavFlock = (): ScavFlock => ({ mode: 'idle', x: 0, z: 0, y: 14, landed: false, target: null })
+  const makeScavFlock = (): ScavFlock => ({ mode: 'idle', x: 0, z: 0, y: 14, landed: false, target: null, queue: [] })
   // scavenger.current is flock 0 — the dev hook (window.__wildlife.scavenger)
   // and the single-carcass verify checks read/reset it; scavengers.current[0]
   // is the same object so both views stay in sync.
@@ -2083,7 +2084,7 @@ function Herds() {
     herdsRef.current = emptyHerds()
     spawnedChunks.current.clear()
     herdState.current.clear()
-    for (const f of scavengers.current) f.target = null
+    for (const f of scavengers.current) { f.target = null; f.queue = [] }
     // The ground-tint slots are module state (point 267) and outlive a remount:
     // clear them so no blood from the last run shows on the first frame.
     stains.current.length = 0
@@ -2179,7 +2180,7 @@ function Herds() {
       if (h) for (const sp of SPECIES) h[sp].length = 0
       spawnedChunks.current.clear()
       herdState.current.clear()
-      for (const f of scavengers.current) f.target = null
+      for (const f of scavengers.current) { f.target = null; f.queue = [] }
     }
     // meshRefs + colliders (point 378): the verification reads the ADULT instance
     // matrices themselves and the circles the movement loop really collides
@@ -4866,8 +4867,8 @@ function Herds() {
       // carcass; carcasses within the cluster radius of it queue for that same
       // flock, which moves on to the next and flies off only once its cluster
       // is done; a distant carcass draws its own free idle flock.
-      const nextTargets = assignPerCarcassFlocks(
-        flocks.map((f) => ({ target: f.target, available: f.mode === 'idle' })),
+      const nextClaims = assignFlockClusters(
+        flocks.map((f) => ({ target: f.target, queue: f.queue, available: f.mode === 'idle' })),
         eligible,
         (a) => Math.hypot(a.x - pos.x, a.z - pos.z),
         { separation: (a, b) => Math.hypot(a.x - b.x, a.z - b.z), radius: balance.scavenge.clusterRadius },
@@ -4876,7 +4877,8 @@ function Herds() {
       for (let si = 0; si < flocks.length; si++) {
         const sc = flocks[si]
         const prevTarget = sc.target
-        sc.target = nextTargets[si]
+        sc.target = nextClaims[si].target
+        sc.queue = nextClaims[si].queue
         // Moving on within its cluster: the arrived flock lifts off and flies
         // the short hop to the next carcass instead of snapping onto it.
         if (sc.target !== null && prevTarget !== null && sc.target !== prevTarget && sc.mode === 'active') {

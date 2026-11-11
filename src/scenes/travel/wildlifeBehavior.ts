@@ -1273,6 +1273,10 @@ export function killFlockMayDescend(
 export interface ScavengerSlotView<T> {
   /** The carcass this slot currently owns, or null when free. */
   target: T | null
+  /** The further carcasses of this flock's cluster, queued behind `target`
+   *  (persisted by the caller from the previous frame's result, so the claim
+   *  survives a hop even where the queued carcasses no longer chain). */
+  queue?: ReadonlyArray<T>
   /** The slot's flight has fully despawned (idle) — free to take a new carcass.
    *  A slot still flying in/out is NOT available, so it can't hop mid-flight. */
   available: boolean
@@ -1285,83 +1289,139 @@ export interface CarcassClusterRule<T> {
   radius: number
 }
 
+/** One flock's ownership for the next frame: its current carcass and the rest
+ *  of its claimed cluster, which the caller persists into the next slot view. */
+export interface FlockClaim<T> {
+  target: T | null
+  queue: T[]
+}
+
 /**
  * Vulture-flock ownership (design.md §19.6, point 251 + the cluster claim).
  * A distant carcass draws and OWNS its own scavenger flock, so far-apart
  * carcasses draw independent concurrent flocks. Carcasses close together form
  * a CLUSTER that ONE flock claims and works in turn. Rules:
- *  - A slot bound to a carcass KEEPS it while the carcass is still eligible.
- *  - The flock's cluster is every eligible carcass chained to its current
- *    target by steps of at most `cluster.radius` (chained, so a second flock
- *    never lands within the radius of a carcass this flock will still eat).
- *    Those carcasses are queued for it; no other flock takes them.
- *  - When its carcass is gone and its cluster still holds carcasses, the
- *    flock moves on to the cluster member nearest the finished one.
- *  - When its carcass is gone and the cluster is done, the slot is RELEASED
+ *  - A cluster is a connected group of eligible carcasses: two carcasses are
+ *    connected when they lie within `cluster.radius` of each other (boundary
+ *    inclusive) or are already claimed by the same flock (target + queue).
+ *    The claim therefore persists across hops: carcasses once chained through
+ *    an eaten one stay this flock's even when they lie far apart now.
+ *  - A carcass that just left the list still connects, in the frame it leaves,
+ *    to carcasses within the radius of it (its flock moves on, not off).
+ *  - Each cluster has at most ONE flock. Where clusters of two flocks connect
+ *    (a new carcass between them), one flock keeps the merged cluster — a slot
+ *    whose own carcass is still present, the lowest index first — and the
+ *    other is RELEASED and flies off, so no two flocks are active within the
+ *    radius.
+ *  - A slot KEEPS its carcass while it is still eligible; when it is gone and
+ *    the cluster still holds carcasses, the flock moves on to the member
+ *    nearest the finished one. When the cluster is done the slot is RELEASED
  *    (target → null); it flies off and despawns on its own. Only once its
- *    flight has fully left (`available`, idle again) may it take a NEW carcass.
- *  - A free, available slot is assigned the nearest unowned, unclaimed
- *    carcass, which claims its own cluster at once; two slots never share one.
+ *    flight has fully left (`available`, idle again) may it take a NEW cluster.
+ *  - An unowned cluster goes, nearest-first, to a free available slot, which
+ *    targets its member nearest the viewer; two slots never share a carcass.
  * Without `cluster` every carcass is its own cluster (the point-251 rule).
  * The point-162 rule is orthogonal: only real carcasses/remnants are passed
  * in, so a drive-off (no carcass) draws no flock here.
  *
- * Pure over the per-slot view (current target + availability) and the live
- * carcass list; returns the next per-slot target. Carcass identity is by
- * reference (`===`), matching the herd-array Animal objects; `separation`
+ * Pure over the per-slot view and the live carcass list. Carcass identity is
+ * by reference (`===`), matching the herd-array Animal objects; `separation`
  * must still answer for a carcass that has just left the list.
  */
+export function assignFlockClusters<T>(
+  slots: ReadonlyArray<ScavengerSlotView<T>>,
+  carcasses: ReadonlyArray<T>,
+  distanceTo: (carcass: T) => number,
+  cluster?: CarcassClusterRule<T>,
+): FlockClaim<T>[] {
+  const live = new Set(carcasses)
+  // Nodes: the live carcasses, then each slot's just-finished carcass (a ghost
+  // that only links, never becomes a target).
+  const nodes: T[] = carcasses.slice()
+  const ghostOf = new Map<number, number>() // slot -> ghost node index
+  slots.forEach((s, i) => {
+    if (s.target !== null && !live.has(s.target)) {
+      ghostOf.set(i, nodes.length)
+      nodes.push(s.target)
+    }
+  })
+  const index = new Map<T, number>()
+  carcasses.forEach((c, k) => index.set(c, k))
+  const parent = nodes.map((_, k) => k)
+  const find = (k: number): number => {
+    while (parent[k] !== k) k = parent[k] = parent[parent[k]]
+    return k
+  }
+  const union = (a: number, b: number) => {
+    parent[find(a)] = find(b)
+  }
+  if (cluster) {
+    for (let a = 0; a < nodes.length; a++)
+      for (let b = a + 1; b < nodes.length; b++) {
+        if (a >= carcasses.length && b >= carcasses.length) continue // two ghosts link nothing
+        if (cluster.separation(nodes[a], nodes[b]) <= cluster.radius) union(a, b)
+      }
+  }
+  // Each slot's claimed nodes: its live target, its live queue, its ghost.
+  const owned: number[][] = slots.map((s, i) => {
+    const ks: number[] = []
+    if (s.target !== null && live.has(s.target)) ks.push(index.get(s.target) as number)
+    if (cluster) for (const q of s.queue ?? []) if (live.has(q) && q !== s.target) ks.push(index.get(q) as number)
+    const g = ghostOf.get(i)
+    if (g !== undefined) ks.push(g)
+    return ks
+  })
+  for (const ks of owned) for (let k = 1; k < ks.length; k++) union(ks[0], ks[k])
+  // Group the live carcasses into clusters by root.
+  const members = new Map<number, T[]>()
+  carcasses.forEach((c, k) => {
+    const r = find(k)
+    const list = members.get(r)
+    if (list) list.push(c)
+    else members.set(r, [c])
+  })
+  const result: FlockClaim<T>[] = slots.map(() => ({ target: null, queue: [] }))
+  const keeperOf = new Map<number, number>() // cluster root -> slot
+  // Owners whose own carcass is still present choose first, then the movers.
+  const order = slots.map((_, i) => i)
+  const hasLive = (i: number) => slots[i].target !== null && live.has(slots[i].target as T)
+  order.sort((a, b) => Number(hasLive(b)) - Number(hasLive(a)) || a - b)
+  for (const i of order) {
+    if (owned[i].length === 0) continue
+    const root = find(owned[i][0])
+    const group = members.get(root)
+    if (!group || keeperOf.has(root)) continue // cluster done, or merged into another flock
+    keeperOf.set(root, i)
+    const prev = slots[i].target as T
+    let target = group[0]
+    if (live.has(prev)) target = prev
+    else if (cluster) for (const c of group) if (cluster.separation(prev, c) < cluster.separation(prev, target)) target = c
+    result[i] = { target, queue: group.filter((c) => c !== target) }
+  }
+  // Hand out the unowned clusters nearest-first to free available slots.
+  const unowned: T[][] = []
+  for (const [root, group] of members) if (!keeperOf.has(root)) unowned.push(group)
+  const nearest = (g: T[]) => g.reduce((b, c) => (distanceTo(c) < distanceTo(b) ? c : b))
+  unowned.sort((a, b) => distanceTo(nearest(a)) - distanceTo(nearest(b)))
+  let si = 0
+  for (const group of unowned) {
+    while (si < slots.length && (owned[si].length > 0 || result[si].target !== null || !slots[si].available)) si++
+    if (si >= slots.length) break
+    const target = nearest(group)
+    result[si] = { target, queue: group.filter((c) => c !== target) }
+    si++
+  }
+  return result
+}
+
+/** The per-slot targets of assignFlockClusters (callers that persist no queue). */
 export function assignPerCarcassFlocks<T>(
   slots: ReadonlyArray<ScavengerSlotView<T>>,
   carcasses: ReadonlyArray<T>,
   distanceTo: (carcass: T) => number,
   cluster?: CarcassClusterRule<T>,
 ): (T | null)[] {
-  const live = new Set(carcasses)
-  // Keep each slot's carcass while it is still eligible.
-  const next: (T | null)[] = slots.map((s) => (s.target !== null && live.has(s.target) ? s.target : null))
-  const taken = new Set<T>() // owned or queued in some flock's cluster
-  for (const t of next) if (t !== null) taken.add(t)
-  // Claim every untaken carcass chained to `seed` (itself excluded).
-  const claim = (seed: T): T[] => {
-    if (!cluster) return []
-    const members: T[] = []
-    const frontier = [seed]
-    while (frontier.length > 0) {
-      const from = frontier.pop() as T
-      for (const c of carcasses) {
-        if (taken.has(c) || c === seed) continue
-        if (cluster.separation(from, c) > cluster.radius) continue
-        taken.add(c)
-        members.push(c)
-        frontier.push(c)
-      }
-    }
-    return members
-  }
-  for (const kept of next) if (kept !== null) claim(kept)
-  // A flock whose carcass is gone moves on within its cluster, if any is left.
-  for (let i = 0; i < slots.length; i++) {
-    const finished = slots[i].target
-    if (next[i] !== null || finished === null || live.has(finished)) continue
-    const queue = claim(finished)
-    if (queue.length === 0) continue
-    let best = queue[0]
-    for (const c of queue) if (cluster!.separation(finished, c) < cluster!.separation(finished, best)) best = c
-    next[i] = best
-  }
-  // Hand out the remaining carcasses nearest-first to free available slots.
-  const unowned = carcasses.filter((c) => !taken.has(c)).sort((a, b) => distanceTo(a) - distanceTo(b))
-  let si = 0
-  for (const c of unowned) {
-    if (taken.has(c)) continue // claimed by a cluster handed out just before
-    while (si < slots.length && (next[si] !== null || !slots[si].available)) si++
-    if (si >= slots.length) break
-    next[si] = c
-    taken.add(c)
-    claim(c)
-  }
-  return next
+  return assignFlockClusters(slots, carcasses, distanceTo, cluster).map((r) => r.target)
 }
 
 /**

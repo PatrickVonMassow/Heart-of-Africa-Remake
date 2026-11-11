@@ -77,6 +77,8 @@ import {
   killFlockMayDescend,
   killFlockActive,
   assignPerCarcassFlocks,
+  assignFlockClusters,
+  type ScavengerSlotView,
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
@@ -2388,6 +2390,117 @@ describe('assignPerCarcassFlocks cluster claim (design.md §19.6 — nearby carc
     const b2: C = { id: 'b2', x: -43, z: 1 }
     const next = assignPerCarcassFlocks(free(3), [a, a2, b, b2], dist, cluster)
     expect(next).toEqual([a, b, null])
+  })
+
+  // Multi-frame: the caller persists each flock's claim (target + queue) into
+  // the next frame's slot view, as Wildlife.tsx does.
+  const frame = (slots: ScavengerSlotView<C>[], live: C[]) =>
+    assignFlockClusters(slots, live, dist, cluster).map((r, i) => ({
+      target: r.target,
+      queue: r.queue,
+      // A released flock flies off for a while before it is idle again.
+      available: r.target === null && slots[i].target === null && slots[i].available,
+    }))
+  const holders = (slots: ScavengerSlotView<C>[], c: C) =>
+    slots.filter((s) => s.target === c || (s.queue ?? []).includes(c)).length
+
+  it('the flock keeps its WHOLE queued cluster across hops (0, -9, +9: neighbours 18 apart)', () => {
+    const o: C = { id: 'o', x: 30, z: 0 }
+    const l: C = { id: 'l', x: 21, z: 0 }
+    const r: C = { id: 'r', x: 39, z: 0 }
+    let live = [o, l, r]
+    let slots = frame(free(3), live)
+    expect(slots.map((s) => s.target)).toEqual([l, null, null]) // nearest to the viewer first
+    expect(slots[0].queue).toEqual(expect.arrayContaining([o, r]))
+    for (let f = 0; f < 3; f++) slots = frame(slots, live) // the meal runs over several frames
+    expect(slots.map((s) => s.target)).toEqual([l, null, null])
+    live = live.filter((c) => c !== l) // l eaten -> the flock moves on to o
+    slots = frame(slots, live)
+    expect(slots.map((s) => s.target)).toEqual([o, null, null])
+    live = live.filter((c) => c !== o) // o eaten: r lies 18 from l, still the flock's
+    for (let f = 0; f < 4; f++) {
+      slots = frame(slots.map((s, i) => ({ ...s, available: i > 0 })), live)
+      expect(slots.map((s) => s.target)).toEqual([r, null, null])
+      expect(holders(slots, r)).toBe(1)
+    }
+    live = []
+    slots = frame(slots, live)
+    expect(slots.map((s) => s.target)).toEqual([null, null, null]) // cluster done -> flies off
+  })
+
+  it('the centre eaten first: both 18-apart neighbours stay with the ONE flock', () => {
+    const o: C = { id: 'o', x: 30, z: 0 }
+    const l: C = { id: 'l', x: 30, z: -9 }
+    const r: C = { id: 'r', x: 30, z: 9 }
+    let live = [o, l, r]
+    let slots: ScavengerSlotView<C>[] = [{ target: o, available: false }, ...free(2)]
+    slots = frame(slots, live)
+    live = [l, r]
+    for (let f = 0; f < 5; f++) {
+      slots = frame(slots, live)
+      expect(slots.filter((s) => s.target !== null).length).toBe(1)
+      expect(holders(slots, l) + holders(slots, r)).toBe(2)
+      expect(slots[0].target === l || slots[0].target === r).toBe(true)
+    }
+    const first = slots[0].target as C
+    live = live.filter((c) => c !== first)
+    for (let f = 0; f < 3; f++) {
+      slots = frame(slots, live)
+      expect(slots.map((s) => s.target)).toEqual([live[0], null, null])
+    }
+  })
+
+  it('NEAREST across frames: far stays queued for the flock after it moves to near', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const near: C = { id: 'near', x: 23, z: 0 }
+    const far: C = { id: 'far', x: 12, z: 0 } // 11 from near: beyond R once a is gone
+    let slots: ScavengerSlotView<C>[] = [{ target: a, available: false }, ...free(2)]
+    slots = frame(slots, [a, near, far])
+    expect(slots.map((s) => s.target)).toEqual([a, null, null])
+    slots = frame(slots, [far, near])
+    expect(slots.map((s) => s.target)).toEqual([near, null, null])
+    for (let f = 0; f < 4; f++) {
+      slots = frame(slots, [far, near])
+      expect(slots.map((s) => s.target)).toEqual([near, null, null])
+      expect(holders(slots, far)).toBe(1)
+    }
+    slots = frame(slots, [far])
+    expect(slots.map((s) => s.target)).toEqual([far, null, null])
+  })
+
+  it('two flocks whose clusters CONNECT merge: one keeps both, the other flies off', () => {
+    const a: C = { id: 'a', x: 0, z: 30 }
+    const b: C = { id: 'b', x: 20, z: 30 }
+    const mid: C = { id: 'mid', x: 10, z: 30 }
+    let slots = frame(free(3), [a, b])
+    expect(slots.map((s) => s.target)).toEqual([a, b, null]) // 20 apart: two flocks
+    slots = slots.map((s) => ({ ...s, available: false })) // both landed
+    slots = frame(slots, [a, b, mid]) // mid links them
+    expect(slots.map((s) => s.target)).toEqual([a, null, null])
+    expect(slots[0].queue).toEqual(expect.arrayContaining([b, mid]))
+    for (let f = 0; f < 3; f++) {
+      slots = frame(slots, [a, b, mid])
+      expect(slots.filter((s) => s.target !== null).length).toBe(1)
+      for (const c of [a, b, mid]) expect(holders(slots, c)).toBe(1)
+    }
+    // The keeper finishes a; mid and b stay its own, the released flock is not recalled.
+    slots = frame(slots, [b, mid])
+    expect(slots.map((s) => s.target)).toEqual([mid, null, null])
+  })
+
+  it('a merge keeps the flock still on its own carcass over one that is moving on', () => {
+    const a: C = { id: 'a', x: 0, z: 30 }
+    const b: C = { id: 'b', x: 20, z: 30 }
+    const a2: C = { id: 'a2', x: 9, z: 30 } // slot 0 moves a -> a2, which lies 11 from b
+    const mid: C = { id: 'mid', x: 15, z: 30 }
+    const slots: ScavengerSlotView<C>[] = [
+      { target: a, queue: [a2], available: false },
+      { target: b, queue: [], available: false },
+      ...free(1),
+    ]
+    const next = assignFlockClusters(slots, [a2, b, mid], dist, cluster)
+    expect(next.map((r) => r.target)).toEqual([null, b, null])
+    expect(next[1].queue).toEqual(expect.arrayContaining([a2, mid]))
   })
 
   it('no two active flocks ever hold targets within the cluster radius (random sweep)', () => {
