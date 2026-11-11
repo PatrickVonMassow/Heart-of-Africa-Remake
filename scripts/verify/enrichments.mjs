@@ -8165,6 +8165,129 @@ if (section('channel-crossing')) {
     driveOffNoFlock.gathered && driveOffNoFlock.leftAgain, JSON.stringify(driveOffNoFlock))
 }
 
+// --- Vulture cluster claim (design.md §19.6) --------------------------------
+// Two carcasses staged close together (well inside the calibratable cluster
+// radius) draw exactly ONE flock: it lands on the nearer, moves on to the
+// other and flies off only once both are eaten. At no frame are two flocks
+// out over the pair. Natural meals, no dissolve fast-forward.
+if (section('vulture-cluster')) {
+  await page.evaluate(() => { if (window.__game.getState().placeId) window.__game.getState().leavePlace() })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 30000 }).catch(() => {})
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
+  await page.evaluate(() => window.__wildlife.restock())
+  await waitForHerds()
+  const clusterStage = await page.evaluate(async () => {
+    const w = window.__wildlife
+    const herds = w.herdsRef.current
+    const p = window.__game.getState().pos
+    const seed = window.__game.getState().seed
+    const U = 10
+    window.__ui.getState().setTravelZoom(0.5)
+    const lion = window.__lionHunt.state
+    lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
+    const land = (x, z) => {
+      const ty = window.__terrainType(-z / U, x / U, seed)
+      return ty !== 'water' && ty !== 'ocean'
+    }
+    let spot = null
+    for (let r = 6; r <= 24 && !spot; r += 2) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2
+        const x = p.x + Math.sin(a) * r
+        const z = p.z + Math.cos(a) * r
+        if (land(x, z) && land(x + 5, z) && land(x - 5, z) && land(x, z + 5) && land(x, z - 5)) { spot = { x, z }; break }
+      }
+    }
+    if (!spot) { window.__vulCluster = null; return { landed: false } }
+    const radius = window.__balance.scavenge.clusterRadius
+    const gap = Math.min(4, radius * 0.5)
+    // No older bodies anywhere: every flock that flies is one this pair draws.
+    for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+    herds.elephant.length = 0
+    // Two adults already inside the drawn herd capacity become the pair: a body
+    // pushed past herdCapacity is simulated but never drawn.
+    const adults = herds.zebra.filter((z) => !z.young && !z.child)
+    if (adults.length < 2) { window.__vulCluster = null; return { landed: false, noZebra: true } }
+    // A moved body keeps its old height unless re-grounded: the dead-body draw
+    // sits it at groundedBodyY(a.y), so a body from lower ground lay buried
+    // under the new spot (the empty-grass frame). Ground it where it now lies.
+    const body = (z, x) => {
+      const y = Math.max(0.02, window.__terrainHeight(-spot.z / U, x / U, seed))
+      Object.assign(z, {
+        x, z: spot.z, y, rot: 0.4, dead: true, deathCause: 'staged', parent: undefined, dissolve: undefined,
+        inWater: undefined, caught: undefined, dying: undefined, heldPose: undefined,
+      })
+      return z
+    }
+    const a = body(adults[0], spot.x)
+    const b = body(adults[1], spot.x + gap)
+    const slots = w.scavengers.current
+    for (const f of slots) { f.target = null; f.mode = 'idle'; f.landed = false }
+    const out = {
+      staged: true, radius, gap, maxFlocksOut: 0, flocksSeen: 0, overlapFrames: 0, landedOn: [], aGone: false, bGone: false,
+      leftEarlyFrames: 0, leftAfter: false,
+    }
+    const seen = new Set()
+    const mid = { x: spot.x + gap / 2, z: spot.z }
+    const step = () => {
+      herds.elephant.length = 0 // no tramples: only the staged pair is eaten here
+      // Every non-idle flock near the pair, whatever its target.
+      const near = slots.filter((f) => f.mode !== 'idle' && (f.target === a || f.target === b ||
+        (f.target !== null && Math.hypot(f.target.x - mid.x, f.target.z - mid.z) <= radius)))
+      for (const f of near) seen.add(f)
+      out.maxFlocksOut = Math.max(out.maxFlocksOut, near.length)
+      if (near.length > 1) out.overlapFrames++
+      for (const f of near) {
+        const tag = f.target === a ? 'a' : f.target === b ? 'b' : null
+        if (f.landed && tag && out.landedOn[out.landedOn.length - 1] !== tag) out.landedOn.push(tag)
+      }
+      out.aGone = !herds.zebra.includes(a)
+      out.bGone = !herds.zebra.includes(b)
+      // A body still on the ground: present and not yet dissolved away.
+      const remains = (x) => herds.zebra.includes(x) && !x.gone && !(x.dissolve !== undefined && x.dissolve <= 0)
+      // A seen flock that turns away ('out') or has despawned ('idle') while a
+      // body remains left the cluster early, even if it comes back for it.
+      if ((remains(a) || remains(b)) && [...seen].some((f) => f.mode === 'out' || f.mode === 'idle')) out.leftEarlyFrames++
+    }
+    // Frame the pair BEFORE the flock lands: a fed body dissolves in seconds,
+    // so a camera settle after the landing shot an already eaten carcass.
+    window.__game.setState({ pos: { ...window.__game.getState().pos, x: mid.x, z: mid.z + 3 } })
+    await window.__pollSim(20, () => { step(); return window.__camera.settled() })
+    // Hold at the first landing so the shutter sees the one flock on the pair.
+    await window.__pollSim(60, () => { step(); return out.landedOn.length > 0 || (out.aGone && out.bGone) })
+    window.__vulCluster = { a, b, out, seen, step, mid }
+    return { mid, landed: out.landedOn.length > 0 && !out.aGone }
+  })
+  if (clusterStage.landed) {
+    await shot('327-vulture-cluster-one-flock', {
+      world: clusterStage.mid,
+      label: 'two carcasses close together with ONE vulture flock landed on the pair',
+    })
+  }
+  const cluster = await page.evaluate(async () => {
+    const herds = window.__wildlife.herdsRef.current
+    const st = window.__vulCluster
+    if (!st) return { staged: false }
+    const { a, b, out, seen, step } = st
+    await window.__pollSim(120, () => { step(); return out.aGone && out.bGone })
+    out.flocksSeen = seen.size
+    // The one flock leaves after the pair is done.
+    await window.__pollSim(40, () => {
+      if ([...seen].every((f) => f.mode === 'out' || f.mode === 'idle')) { out.leftAfter = true; return true }
+      return false
+    })
+    for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((x) => x !== a && x !== b)
+    return out
+  })
+  check('two close carcasses draw exactly ONE vulture flock, never two over the pair (design.md §19.6)',
+    cluster.staged && cluster.flocksSeen === 1 && cluster.maxFlocksOut === 1 && cluster.overlapFrames === 0,
+    JSON.stringify(cluster))
+  check('that one flock eats BOTH carcasses in turn and leaves only when the cluster is done (design.md §19.6)',
+    cluster.staged && cluster.aGone && cluster.bGone && cluster.landedOn.length === 2 && cluster.leftEarlyFrames === 0 &&
+      cluster.leftAfter,
+    JSON.stringify(cluster))
+}
+
 // --- Point 312: animals are water-shy, not water-barred (design.md §19.5) ----
 // A flight meets a river and goes IN (the along-shore slide is for the ocean
 // only); a player-driven animal left alone swims to the NEAREST bank on a

@@ -556,6 +556,8 @@ export function DebugMenu() {
         (v) => { balance.waterDrama.wetFlowFactor = Math.max(0, v); bump() }, 0.1),
       num(t.debug.vigilPredatorDelay, balance.vigil.predatorDelay,
         (v) => { balance.vigil.predatorDelay = Math.max(0, v); bump() }, 1),
+      num(t.debug.vultureClusterRadius, balance.scavenge.clusterRadius,
+        (v) => { balance.scavenge.clusterRadius = Math.max(0, v); bump() }, 1),
       num(t.debug.rescueBurst, balance.family.rescueBurst,
         (v) => { balance.family.rescueBurst = Math.max(1, v); bump() }, 0.1),
       num(t.debug.calfFraction, balance.family.calfFraction,

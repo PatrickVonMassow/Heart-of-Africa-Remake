@@ -671,6 +671,7 @@ export const de: Strings = {
     drownSeconds: 'Ertrinken: Sekunden in starker Strömung',
     wetFlowFactor: 'Ertrinken: Strömungsfaktor Regenzeit',
     vigilPredatorDelay: 'Totenwache: Sekunden bis ein Räuber kommt',
+    vultureClusterRadius: 'Geier: Radius einer Kadavergruppe',
     rescueBurst: 'Rettungs-Sprint der Elterntiere (Faktor)',
     calfFraction: 'Jungtier-Anteil je Herde',
     calfFollowRadius: 'Jungtier-Leine (Radius)',
