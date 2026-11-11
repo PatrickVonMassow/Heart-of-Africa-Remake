@@ -24,6 +24,8 @@ import {
 import { faunaMarkingColorNode, MARK, markGeometry, silhouetteMarkingColorNode } from './faunaMarkings'
 import { buildAntelopeElder, buildZebraElder } from './faunaUngulates'
 
+export { buildVulture, buildVultureLanded } from './faunaVulture'
+
 export {
   agedColor,
   calfProportions,
@@ -1482,28 +1484,6 @@ export function buildCrocodile(): THREE.BufferGeometry {
       foot.translate(hx * 0.43, 0.03, hz + 0.03)
       parts.push(tint(foot, '#46543a', 0.08, 210))
     }
-  }
-  return merge(parts)
-}
-
-/** Vulture with spread wings, meant to circle overhead (design.md §19). */
-export function buildVulture(): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = []
-  const body = new THREE.SphereGeometry(0.16, ...FAUNA_TESSELLATION.small)
-  body.scale(0.8, 0.6, 1.4)
-  parts.push(tint(body, '#3f3833', 0.1, 161))
-  const head = new THREE.SphereGeometry(0.06, ...FAUNA_TESSELLATION.small)
-  head.translate(0, 0.03, 0.24)
-  parts.push(tint(head, '#b8a48c', 0.1, 162))
-  for (const side of [-1, 1]) {
-    const wing = new THREE.BoxGeometry(0.85, 0.025, 0.28)
-    wing.translate(side * 0.5, 0.04, -0.02)
-    wing.rotateZ(side * 0.12)
-    parts.push(tint(wing, '#4a423b', 0.12, 163))
-    const tip = new THREE.BoxGeometry(0.3, 0.02, 0.2)
-    tip.translate(side * 1.0, 0.12, -0.04)
-    tip.rotateZ(side * 0.3)
-    parts.push(tint(tip, '#38312c', 0.12, 164))
   }
   return merge(parts)
 }
