@@ -264,9 +264,9 @@ export function assessBranchHygiene({
     if (heldBranches.has(bare) || heldBranches.has(name) || checkedOut.has(bare)) continue
     if (fresh(b?.tipAt)) continue
     const remote = name.startsWith('origin/')
-    // One file per ref: a local and a remote twin may have diverged, and a shared
-    // name would let the second remedy overwrite the first one's only archive.
-    const archive = `mkdir -p local/branch-archive && git bundle create local/branch-archive/${name.replace(/\//g, '-')}.bundle ${b.name} ^origin/main`
+    // One file per ref, named by a reversible encoding: diverged local/remote twins
+    // and refs like feat/1-a/b vs feat/1-a-b must never overwrite each other's only archive.
+    const archive = `mkdir -p local/branch-archive && git bundle create local/branch-archive/${encodeURIComponent(name)}.bundle ${b.name} ^origin/main`
     findings.push({
       kind: remote ? 'remote-closed' : 'local-closed',
       name: String(b.name),

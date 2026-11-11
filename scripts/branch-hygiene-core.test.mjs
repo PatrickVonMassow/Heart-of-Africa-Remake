@@ -432,10 +432,25 @@ describe('a closed point whose branch was never merged (point 1504)', () => {
     )
     expect(r.block).toBe(true)
     expect(r.findings.map((f) => f.kind)).toEqual(['local-closed', 'remote-closed'])
-    expect(r.findings[0].command).toMatch(/git bundle create local\/branch-archive\/feat-1485-skirt\.bundle feat\/1485-skirt \^origin\/main && git branch -D feat\/1485-skirt$/)
+    expect(r.findings[0].command).toMatch(/git bundle create local\/branch-archive\/feat%2F1485-skirt\.bundle feat\/1485-skirt \^origin\/main && git branch -D feat\/1485-skirt$/)
     expect(r.findings[1].command).toMatch(/&& git push origin --delete feat\/1485-skirt$/)
     // Each twin archives into its OWN file, so the second remedy cannot overwrite the first.
-    expect(r.findings[1].command).toContain('local/branch-archive/origin-feat-1485-skirt.bundle')
+    expect(r.findings[1].command).toContain('local/branch-archive/origin%2Ffeat%2F1485-skirt.bundle')
+  })
+
+  it('refs differing only by slash versus dash archive into distinct files', () => {
+    const r = assessBranchHygiene(
+      base({
+        closedPoints: [1485],
+        unmerged: [
+          { name: 'feat/1485-a/b', tipAt: OLD },
+          { name: 'feat/1485-a-b', tipAt: OLD },
+        ],
+      }),
+    )
+    const files = r.findings.map((f) => f.command.match(/branch-archive\/(\S+\.bundle)/)[1])
+    expect(files).toHaveLength(2)
+    expect(new Set(files).size).toBe(2)
   })
 
   it('a closed point branch checked out in an UNLOCKED worktree is not offered for deletion', () => {
