@@ -279,9 +279,16 @@ added.
   coarser drift grid and no painted eye and mouth marks; `standard` and
   `full` add tessellation, the face marks and a finer drift. The face's
   modelled features (brow ridge, cheekbones, nose stump, lips, chin) and the
-  shoulder tops are site parts on every site level; the distant levels keep
-  only the nemes trapezoid, face block, lappets, neck, chest and spine. The limestone
-  banding is a per-fragment term of its TSL material on every level. One draw.
+  shoulder tops are site parts on every site level; the bird's-eye landmark
+  keeps the nemes trapezoid, face block, lappets, neck, chest, shoulder tops and
+  spine, the Cairo skyline only the head, the neck and the back ridge above its
+  drift (owner verdict 11.11.2026). The landmark is the one definition under
+  its documented travel-scale emphasis (`SPHINX_FORM.emphasis.landmark`: head
+  block ×1.45, paw lobes lifted, lengthened and spread with the front bank
+  dropped so the notch between the paws stays open in plan, stone tones ×0.66
+  against the sand); the skyline is drawn true and sized so its crown stands
+  20/138.5 of Khufu's standing height. The limestone banding is a per-fragment
+  term of its TSL material on every site level. One draw.
   Counted per level (vertices / triangles; the bird's-eye landmark and the
   Cairo skyline outline are fixed distant levels outside the presets):
 
@@ -290,8 +297,8 @@ added.
   | reduced (low) | 3927 | 5634 |
   | standard (medium) | 12352 | 19642 |
   | full (high) | 26041 | 42616 |
-  | landmark (bird's-eye) | 1298 | 1660 |
-  | skyline (Cairo) | 502 | 584 |
+  | landmark (bird's-eye) | 1736 | 2176 |
+  | skyline (Cairo) | 502 | 582 |
 
   The measured frame cost at the site on both backends at LOW and MEDIUM is
   owed by the owner's local run (`polish-panorama`, section `sphinx`).

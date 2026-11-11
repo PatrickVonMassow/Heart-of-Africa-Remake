@@ -2797,15 +2797,32 @@ export const SPHINX_FORM = {
     'site-full': { rings: 28, rows: 18, headFactor: 1.5, driftCells: 112, faceMarks: true },
     'site-standard': { rings: 20, rows: 12, headFactor: 1.5, driftCells: 72, faceMarks: true },
     'site-reduced': { rings: 12, rows: 8, headFactor: 1.25, driftCells: 40, faceMarks: false },
-    landmark: { rings: 8, rows: 6, headFactor: 1, driftCells: 24, faceMarks: false },
-    skyline: { rings: 6, rows: 4, headFactor: 1, driftCells: 14, faceMarks: false },
+    landmark: { rings: 8, rows: 6, headFactor: 1, driftCells: 40, faceMarks: false },
+    skyline: { rings: 6, rows: 4, headFactor: 1, driftCells: 20, faceMarks: false },
+  },
+  /** TRAVEL-SCALE EMPHASIS (owner verdict 11.11.2026): the bird's-eye landmark
+   *  is read from above and far, where the true proportions blur into a pale
+   *  lump. The level stays the ONE definition, transformed by these documented
+   *  factors (src/world/sphinx.ts `sphinxEmphasis`); a level not listed is
+   *  drawn true. `head`: extra scale of the head-and-nemes block about the head
+   *  anchor. `pawLift` / `pawReach`: height and forward length of the sand
+   *  lobes over the buried forepaws, `pawSpread` their distance from the axis.
+   *  `frontBank`: height factor of the front
+   *  sand bank (0 = none, so the gap between the paws stays open in plan).
+   *  `stoneShade`: the stone tones' multiplier, so the limestone reads darker
+   *  than the sand. `flankShade`: the drift's flank shading (calibratable). */
+  emphasis: {
+    landmark: { head: 1.45, pawLift: 1.9, pawReach: 1.25, pawSpread: 1.4, frontBank: 0, stoneShade: 0.66, flankShade: 0.7 },
   },
   /** Walkable site placement (metres, site frame: +x east, +z south). */
   site: { x: 27, z: 3, length: 20 },
   /** Bird's-eye landmark and Cairo skyline: body length in the Giza field's
    *  own units and the position east of Khafre (calibratable; the field is a
-   *  compressed symbol, so the Sphinx is drawn larger than its true ratio). */
-  field: { x: 2.25, z: 0.35, length: 1.25 },
+   *  compressed symbol, so the landmark Sphinx is drawn larger than its true
+   *  ratio). The SKYLINE level is sized by the real proportion instead: its
+   *  crown stands `skylineCrownRatio` of Khufu's standing height (~20 m head
+   *  height against ~138.5 m, docs/giza-1890.md §1.1/§1.3). */
+  field: { x: 2.25, z: 0.35, length: 1.25, skylineCrownRatio: 20 / 138.5 },
   /** Horizontal weathered limestone courses at the site (metres). */
   banding: { coursePeriod: 0.9, courseAmplitude: 0.12, nemesPeriod: 0.32, nemesAmplitude: 0.22 },
   tones: {

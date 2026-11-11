@@ -1313,7 +1313,13 @@ coplanar contact anywhere (every clear part leaves the drift at a real
 angle, the drift meets the ground at its repose slope, no two drawn parts
 touch near-parallel) — so no z-offset is used; in
 `src/render/sphinx.test.ts` that every vertex of every level lies on the
-definition and the levels' parts nest; in `src/scenes/place/gizaSite.test.ts`
+definition and the levels' parts nest, that the bird's-eye level is the
+definition under its documented travel-scale emphasis (head block enlarged,
+two paw prongs with the notch open between them, stone darker than the sand
+in the limestone hue) and that the skyline level carries its drift with only
+head, neck and back ridge above it; in `src/render/landmarks.test.ts` that the
+skyline Sphinx's crown stands 0.12-0.17 of Khufu's height (owner verdict
+11.11.2026); in `src/scenes/place/gizaSite.test.ts`
 that the collidable mass is the drawn footprint (point 378's rule). Live
 (owed by the owner's local run, both backends): `polish-panorama` section
 `sphinx` — face on, profile, behind, low along the drift, a moving-camera

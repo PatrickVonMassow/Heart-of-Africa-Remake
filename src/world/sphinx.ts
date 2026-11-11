@@ -110,7 +110,9 @@ const BODY: readonly PartSpec[] = [
   { id: 'tail', centre: [-0.36, 0.018, 0.14], radii: [0.11, 0.016, 0.018], burial: 'buried' },
   // Clear: the stone that breaks the surface.
   // The upper chest between the lappets ("a little of the chest clear").
-  { id: 'chest', centre: [0.255, 0.13, 0], radii: [0.042, 0.065, 0.08], shape: [0.8, 0.9], burial: 'clear', reach: 'skyline' },
+  // Not on the skyline: from Cairo only head, neck and back ridge stand above
+  // the drift (owner verdict 11.11.2026).
+  { id: 'chest', centre: [0.255, 0.13, 0], radii: [0.042, 0.065, 0.08], shape: [0.8, 0.9], burial: 'clear', reach: 'landmark' },
   { id: 'neck', centre: [0.232, 0.19, 0], radii: [0.05, 0.07, 0.042], shape: [0.9, 0.9], pitch: 0.2, burial: 'clear', reach: 'skyline' },
   // The spine: a narrow stone ridge, deep in the drift and tilted up toward
   // the neck, whose crest rises out of the sand from the mid-back to the
@@ -147,7 +149,7 @@ const HEAD: readonly PartSpec[] = [
   // The wings: broad flat panels flaring outward and down behind the ears.
   { id: 'wing', centre: [-0.004, -0.017, 0.04], radii: [0.032, 0.044, 0.012], shape: [0.3, 0.45], roll: -0.48, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'skyline', pair: true },
   // The lappets: long flat striped panels falling beside the neck to the chest.
-  { id: 'lappet', centre: [0.012, -0.08, 0.036], radii: [0.0065, 0.038, 0.016], shape: [0.25, 0.4], pitch: 0.05, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'skyline', pair: true },
+  { id: 'lappet', centre: [0.012, -0.08, 0.036], radii: [0.0065, 0.038, 0.016], shape: [0.25, 0.4], pitch: 0.05, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'landmark', pair: true },
   // The back of the nemes: the cloth drawn in behind the head to the nape.
   { id: 'nemesBack', centre: [-0.03, -0.024, 0], radii: [0.022, 0.046, 0.036], shape: [0.5, 0.6], taper: 0.35, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'landmark' },
   // The queue: the nemes gathered behind the head (what the view from behind reads).
@@ -207,11 +209,40 @@ const LOD_REACH: Record<SphinxLod, SphinxReach> = {
   skyline: 'skyline',
 }
 
-/** The parts a level DRAWS: the clear ones whose reach covers it. Buried parts
+/** A level's emphasis (SPHINX_FORM.emphasis): the documented factors that
+ *  transform the one definition for a distant view. Neutral (all 1) for a
+ *  level that is drawn true, and for no level at all. */
+export interface SphinxEmphasis {
+  head: number
+  pawLift: number
+  pawReach: number
+  pawSpread: number
+  frontBank: number
+  stoneShade: number
+  flankShade: number
+}
+
+export function sphinxEmphasis(lod?: SphinxLod): SphinxEmphasis {
+  const listed = lod ? (SPHINX_FORM.emphasis as Partial<Record<SphinxLod, Partial<SphinxEmphasis>>>)[lod] : undefined
+  return { head: 1, pawLift: 1, pawReach: 1, pawSpread: 1, frontBank: 1, stoneShade: 1, flankShade: SPHINX_FORM.drift.flankShade, ...listed }
+}
+
+/** The parts a level DRAWS: the clear ones whose reach covers it, the head
+ *  block scaled about the head anchor by the level's emphasis. Buried parts
  *  are never drawn — the drift stands for them at every level. */
 export function sphinxPartsFor(lod: SphinxLod): SphinxPart[] {
   const reach = REACH_ORDER[LOD_REACH[lod]]
-  return SPHINX_CLEAR_PARTS.filter((p) => REACH_ORDER[p.reach] <= reach)
+  const k = sphinxEmphasis(lod).head
+  const a = SPHINX_HEAD_ANCHOR
+  return SPHINX_CLEAR_PARTS.filter((p) => REACH_ORDER[p.reach] <= reach).map((p) =>
+    p.group !== 'head' || k === 1
+      ? p
+      : {
+          ...p,
+          centre: [a[0] + (p.centre[0] - a[0]) * k, a[1] + (p.centre[1] - a[1]) * k, a[2] + (p.centre[2] - a[2]) * k] as Vec3,
+          radii: [p.radii[0] * k, p.radii[1] * k, p.radii[2] * k] as Vec3,
+        },
+  )
 }
 
 export function sphinxLodSpec(lod: SphinxLod) {
@@ -340,12 +371,50 @@ export const SPHINX_DRIFT_BANKS: ReadonlyArray<{ id: string; centre: Vec3; radii
   { id: 'rearBank', centre: [-0.27, 0.035, 0.012], radii: [0.24, 0.09, 0.13] },
 ]
 
-/** The cover dome over one buried part, at a body-frame (x, z). */
-function domeHeight(part: SphinxPart, x: number, z: number): number {
+/** One dome of the drift: an ellipsoid cap (centre, semi-axes) run down at the repose slope. */
+interface DriftCap {
+  c: Vec3
+  rx: number
+  ry: number
+  rz: number
+}
+
+const capCache = new Map<string, DriftCap[]>()
+
+/**
+ * The drift's domes at a level: each buried part's cover ellipsoid (its radii
+ * plus the margin and the sand cover), then the wind-blown banks. A level's
+ * emphasis lifts, lengthens (rear end fixed) and spreads the domes over the forepaws and
+ * scales the front bank; with no level the drift is the site's, drawn true.
+ */
+function driftCaps(lod?: SphinxLod): DriftCap[] {
+  const key = lod ?? ''
+  const hit = capCache.get(key)
+  if (hit) return hit
   const d = SPHINX_FORM.drift
-  // The part's cover ellipsoid; its dome follows it until it is as steep as
-  // the repose slope, then runs straight down to the floor.
-  return capHeight(part.centre, part.radii[0] + d.margin, part.radii[1] + d.cover, part.radii[2] + d.margin, x, z)
+  const e = sphinxEmphasis(lod)
+  const caps: DriftCap[] = []
+  for (const part of SPHINX_BURIED_PARTS) {
+    const [cx, cy, cz] = part.centre
+    let rx = part.radii[0] + d.margin
+    let ry = part.radii[1] + d.cover
+    let ox = cx
+    let oz = cz
+    if (part.id.startsWith('foreleg')) {
+      ox = cx + rx * (e.pawReach - 1)
+      oz = cz * e.pawSpread
+      rx *= e.pawReach
+      ry *= e.pawLift
+    }
+    caps.push({ c: [ox, cy, oz], rx, ry, rz: part.radii[2] + d.margin })
+  }
+  for (const bank of SPHINX_DRIFT_BANKS) {
+    const f = bank.id === 'frontBank' ? e.frontBank : 1
+    if (f <= 0) continue
+    caps.push({ c: bank.centre, rx: bank.radii[0], ry: bank.radii[1] * f, rz: bank.radii[2] })
+  }
+  capCache.set(key, caps)
+  return caps
 }
 
 /** An ellipsoid cap over a centre, run down at the repose slope where it gets steeper. */
@@ -373,61 +442,51 @@ function capHeight(c: Vec3, rx: number, ry: number, rz: number, x: number, z: nu
  * Each dome adds `e^((y−floor)/blend) − 1`, so a dome at the floor adds
  * nothing and the union stays continuous where a dome's reach ends.
  */
-export function sphinxDriftHeight(x: number, z: number): number {
+export function sphinxDriftHeight(x: number, z: number, lod?: SphinxLod): number {
   const d = SPHINX_FORM.drift
   const floor = -d.sink
   let sum = 1
-  for (const part of SPHINX_BURIED_PARTS) {
-    const y = domeHeight(part, x, z)
-    if (y > floor) sum += Math.exp((y - floor) / d.blend) - 1
-  }
-  for (const bank of SPHINX_DRIFT_BANKS) {
-    const y = capHeight(bank.centre, bank.radii[0], bank.radii[1], bank.radii[2], x, z)
+  for (const cap of driftCaps(lod)) {
+    const y = capHeight(cap.c, cap.rx, cap.ry, cap.rz, x, z)
     if (y > floor) sum += Math.exp((y - floor) / d.blend) - 1
   }
   return floor + d.blend * Math.log(sum)
 }
 
 /** The drift's surface normal (unit), from central differences. */
-export function sphinxDriftNormal(x: number, z: number): [number, number, number] {
+export function sphinxDriftNormal(x: number, z: number, lod?: SphinxLod): [number, number, number] {
   const e = 1e-4
-  const gx = (sphinxDriftHeight(x + e, z) - sphinxDriftHeight(x - e, z)) / (2 * e)
-  const gz = (sphinxDriftHeight(x, z + e) - sphinxDriftHeight(x, z - e)) / (2 * e)
+  const gx = (sphinxDriftHeight(x + e, z, lod) - sphinxDriftHeight(x - e, z, lod)) / (2 * e)
+  const gz = (sphinxDriftHeight(x, z + e, lod) - sphinxDriftHeight(x, z - e, lod)) / (2 * e)
   const len = Math.hypot(gx, 1, gz)
   return [-gx / len, 1 / len, -gz / len]
 }
 
 /** The rectangle outside which the drift is certainly below the ground. */
-export function sphinxDriftBounds(): { minX: number; maxX: number; minZ: number; maxZ: number } {
+export function sphinxDriftBounds(lod?: SphinxLod): { minX: number; maxX: number; minZ: number; maxZ: number } {
   let minX = Infinity
   let maxX = -Infinity
   let minZ = Infinity
   let maxZ = -Infinity
   const d = SPHINX_FORM.drift
-  for (const p of SPHINX_BURIED_PARTS) {
-    // A dome reaches past its part by its margin plus its whole height run down at the repose slope.
-    const reach = d.margin + (p.centre[1] + p.radii[1] + d.cover + d.sink) / d.slope
-    minX = Math.min(minX, p.centre[0] - p.radii[0] - reach)
-    maxX = Math.max(maxX, p.centre[0] + p.radii[0] + reach)
-    minZ = Math.min(minZ, p.centre[2] - p.radii[2] - reach)
-    maxZ = Math.max(maxZ, p.centre[2] + p.radii[2] + reach)
-  }
-  for (const k of SPHINX_DRIFT_BANKS) {
-    const reach = (k.centre[1] + k.radii[1] + d.sink) / d.slope
-    minX = Math.min(minX, k.centre[0] - k.radii[0] - reach)
-    maxX = Math.max(maxX, k.centre[0] + k.radii[0] + reach)
-    minZ = Math.min(minZ, k.centre[2] - k.radii[2] - reach)
-    maxZ = Math.max(maxZ, k.centre[2] + k.radii[2] + reach)
+  for (const k of driftCaps(lod)) {
+    // A dome reaches past its cap by its whole height run down at the repose slope.
+    const reach = (k.c[1] + k.ry + d.sink) / d.slope
+    minX = Math.min(minX, k.c[0] - k.rx - reach)
+    maxX = Math.max(maxX, k.c[0] + k.rx + reach)
+    minZ = Math.min(minZ, k.c[2] - k.rz - reach)
+    maxZ = Math.max(maxZ, k.c[2] + k.rz + reach)
   }
   return { minX, maxX, minZ, maxZ }
 }
 
 // --- The measures the record and the tests speak in --------------------------
 
-/** The crown: the top of the nemes, the highest point of the monument. */
-export function sphinxCrownHeight(): number {
+/** The crown: the top of the nemes, the highest point of the monument (at a
+ *  level, with that level's emphasis; with none, the definition drawn true). */
+export function sphinxCrownHeight(lod?: SphinxLod): number {
   let top = 0
-  for (const part of SPHINX_CLEAR_PARTS) {
+  for (const part of lod ? sphinxPartsFor(lod) : SPHINX_CLEAR_PARTS) {
     for (const s of sampleSurface(part, 16, 16)) top = Math.max(top, s.p[1])
   }
   return top

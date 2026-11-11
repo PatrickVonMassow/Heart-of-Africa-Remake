@@ -3,18 +3,27 @@
 // and the Cairo skyline outline cannot drift apart (the lesson of point 338).
 
 import { describe, expect, it } from 'vitest'
+import * as THREE from 'three/webgpu'
 import { QUALITY_PRESETS, DETAIL_LEVELS } from '../config/quality'
+import { SPHINX_FORM } from '../config/balance'
 import {
+  SPHINX_CLEAR_PARTS,
+  SPHINX_HEAD_ANCHOR,
   SPHINX_LODS,
   SPHINX_PARTS,
   SPHINX_SITE_LOD,
   partLevel,
+  sampleSurface,
+  sphinxEmphasis,
   sphinxCrownHeight,
   sphinxDriftBounds,
   sphinxDriftHeight,
   sphinxPartsFor,
 } from '../world/sphinx'
 import { buildSphinxGeometry, SPHINX_BAND_ATTRIBUTE } from './sphinx'
+
+/** The z of a part's surface samples (its half-width in plan). */
+const sampleSurfaceOf = (p: (typeof SPHINX_PARTS)[number]) => sampleSurface(p, 24, 16).map((s) => s.p[2])
 
 const triangles = (lod: (typeof SPHINX_LODS)[number]) => {
   const g = buildSphinxGeometry(lod)
@@ -34,7 +43,7 @@ describe('three levels of detail, one source', () => {
         const y = pos.getY(i)
         const z = pos.getZ(i)
         const onPart = parts.some((p) => Math.abs(partLevel(p, x, y, z) - 1) < 1e-3)
-        const onDrift = Math.abs(y - sphinxDriftHeight(x, z)) < 1e-6
+        const onDrift = Math.abs(y - sphinxDriftHeight(x, z, lod)) < 1e-6
         expect(onPart || onDrift, `${lod} vertex ${i} (${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)})`).toBe(true)
       }
       geo.dispose()
@@ -42,9 +51,11 @@ describe('three levels of detail, one source', () => {
   })
 
   it('every level draws the same monument: crown, length and footprint agree', () => {
-    const crown = sphinxCrownHeight()
-    const b = sphinxDriftBounds()
     for (const lod of SPHINX_LODS) {
+      // A level's crown and footprint are the definition's under its emphasis
+      // (neutral everywhere but the bird's-eye landmark).
+      const crown = sphinxCrownHeight(lod)
+      const b = sphinxDriftBounds(lod)
       const geo = buildSphinxGeometry(lod)
       geo.computeBoundingBox()
       const bb = geo.boundingBox!
@@ -66,8 +77,95 @@ describe('three levels of detail, one source', () => {
     for (const id of landmark) expect(site.has(id)).toBe(true)
     for (const id of skyline) expect(landmark.has(id)).toBe(true)
     for (const p of SPHINX_PARTS) if (p.burial === 'buried') expect(site.has(p.id)).toBe(false)
-    // The skyline outline still carries a head in its nemes over the back.
-    for (const id of ['face', 'nemes', 'wingR', 'wingL', 'lappetR', 'lappetL', 'neck', 'spine']) expect(skyline.has(id)).toBe(true)
+    // The skyline outline still carries a head in its nemes over the back —
+    // and nothing else: from Cairo only head, neck and back ridge stand above
+    // the drift (owner verdict 11.11.2026).
+    for (const id of ['face', 'nemes', 'wingR', 'wingL', 'neck', 'spine']) expect(skyline.has(id)).toBe(true)
+    for (const p of sphinxPartsFor('skyline')) expect(p.group === 'head' || p.id === 'neck' || p.id === 'spine', p.id).toBe(true)
+  })
+
+  it('the skyline level carries the drift: the mound is present and stands over half the crown height', () => {
+    const geo = buildSphinxGeometry('skyline')
+    const pos = geo.getAttribute('position')
+    let driftTop = 0
+    let driftVerts = 0
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i)
+      if (Math.abs(y - sphinxDriftHeight(pos.getX(i), pos.getZ(i), 'skyline')) > 1e-6) continue
+      driftVerts++
+      driftTop = Math.max(driftTop, y)
+    }
+    expect(driftVerts).toBeGreaterThan(100)
+    expect(driftTop).toBeGreaterThan(sphinxCrownHeight('skyline') * 0.4)
+    // The skyline drift is the site's drift, drawn true.
+    expect(sphinxDriftBounds('skyline')).toEqual(sphinxDriftBounds())
+    geo.dispose()
+  })
+
+  it("the bird's-eye level is the one definition under its documented travel-scale emphasis", () => {
+    const e = sphinxEmphasis('landmark')
+    expect(e).toMatchObject(SPHINX_FORM.emphasis.landmark)
+    expect(e.head).toBeGreaterThan(1)
+    // Every landmark part is a definition part, the head block scaled about the anchor.
+    const a = SPHINX_HEAD_ANCHOR
+    for (const p of sphinxPartsFor('landmark')) {
+      const src = SPHINX_CLEAR_PARTS.find((q) => q.id === p.id)!
+      const k = p.group === 'head' ? e.head : 1
+      for (let i = 0; i < 3; i++) {
+        expect(p.radii[i]).toBeCloseTo(src.radii[i] * k, 9)
+        expect(p.centre[i]).toBeCloseTo(a[i] + (src.centre[i] - a[i]) * k, 9)
+      }
+    }
+    // The site and the skyline are drawn true.
+    expect(sphinxEmphasis('site-full')).toEqual(sphinxEmphasis())
+    expect(sphinxEmphasis('skyline')).toEqual(sphinxEmphasis())
+  })
+
+  it('from above the landmark reads paws, body swell and head: two paw prongs with the notch open between them', () => {
+    const fore = SPHINX_PARTS.find((p) => p.id === 'forelegR')!
+    const z = fore.centre[2] * sphinxEmphasis('landmark').pawSpread
+    // Ahead of the chest, between the paw tips: ground between, sand on both prongs.
+    const x = fore.centre[0] + fore.radii[0]
+    expect(sphinxDriftHeight(x, 0, 'landmark')).toBeLessThan(0)
+    expect(sphinxDriftHeight(x, z, 'landmark')).toBeGreaterThan(0.03)
+    expect(sphinxDriftHeight(x, -z, 'landmark')).toBeGreaterThan(0.03)
+    // The body swell: higher over the shoulders than over the paws.
+    expect(sphinxDriftHeight(0.16, 0.1, 'landmark')).toBeGreaterThan(sphinxDriftHeight(x, z, 'landmark'))
+    // The head-and-nemes block is wider in plan than the neck and the spine.
+    const width = (ids: string[]) => {
+      let w = 0
+      for (const p of sphinxPartsFor('landmark').filter((q) => ids.some((id) => q.id.startsWith(id))))
+        for (const s of sampleSurfaceOf(p)) w = Math.max(w, Math.abs(s))
+      return w
+    }
+    expect(width(['nemes', 'wing'])).toBeGreaterThan(width(['neck', 'spine']) * 2)
+  })
+
+  it('at the landmark the stone reads darker than the sand, in the same limestone hue', () => {
+    const geo = buildSphinxGeometry('landmark')
+    const pos = geo.getAttribute('position')
+    const col = geo.getAttribute('color')
+    let stone = 0
+    let stoneN = 0
+    let sand = 0
+    let sandN = 0
+    for (let i = 0; i < pos.count; i++) {
+      const lum = col.getX(i) + col.getY(i) + col.getZ(i)
+      const onDrift = Math.abs(pos.getY(i) - sphinxDriftHeight(pos.getX(i), pos.getZ(i), 'landmark')) < 1e-6
+      if (onDrift) {
+        sand += lum
+        sandN++
+      } else {
+        stone += lum
+        stoneN++
+      }
+    }
+    expect(stone / stoneN).toBeLessThan((sand / sandN) * 0.6)
+    // A uniform shade: the hue is the site's limestone, not a new colour.
+    const site = new THREE.Color(SPHINX_FORM.tones.limestone)
+    const shaded = site.clone().multiplyScalar(SPHINX_FORM.emphasis.landmark.stoneShade)
+    expect(shaded.r / shaded.b).toBeCloseTo(site.r / site.b, 9)
+    geo.dispose()
   })
 
   it('the skyline outline reads as a crouching figure with a raised head', () => {
@@ -106,7 +204,7 @@ describe('the site levels follow the quality presets (design.md §21)', () => {
     const pos = site.getAttribute('position')
     let banded = 0
     for (let i = 0; i < pos.count; i++) {
-      const onDrift = Math.abs(pos.getY(i) - sphinxDriftHeight(pos.getX(i), pos.getZ(i))) < 1e-6
+      const onDrift = Math.abs(pos.getY(i) - sphinxDriftHeight(pos.getX(i), pos.getZ(i), 'site-reduced')) < 1e-6
       if (onDrift) expect(band.getX(i)).toBe(0)
       else if (band.getX(i) > 0) banded++
     }

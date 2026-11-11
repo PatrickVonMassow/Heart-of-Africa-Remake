@@ -3,7 +3,8 @@
 // the clear stone parts the level reaches, plus the drift that stands for the
 // buried body. Nothing here adds a shape of its own; a level only chooses the
 // tessellation, whether the face carries its painted marks, and whether the
-// vertices carry the site material's banding attribute.
+// vertices carry the site material's banding attribute; the bird's-eye level
+// also takes its documented emphasis (`sphinxEmphasis`, SPHINX_FORM.emphasis).
 //
 // Output is in body units (paw tip to tail = 1), origin on the ground at the
 // middle of the body, facing +x; the callers scale and place it.
@@ -18,6 +19,7 @@ import {
   sphinxDriftBounds,
   sphinxDriftHeight,
   sphinxDriftNormal,
+  sphinxEmphasis,
   sphinxLodSpec,
   sphinxPartsFor,
   type SphinxLod,
@@ -80,8 +82,9 @@ function addPart(buf: Buffers, part: SphinxPart, lod: SphinxLod, seed: number): 
   const detail = (part.group === 'head' ? spec.headFactor : 1) * (PART_DETAIL[part.id] ?? 1)
   const rings = Math.max(6, Math.round(spec.rings * detail))
   const rows = Math.max(4, Math.round(spec.rows * detail))
-  const tone = toneColor(SPHINX_FORM.tones[part.tone])
-  const mark = toneColor(SPHINX_FORM.tones.shadowMark)
+  const shade = sphinxEmphasis(lod).stoneShade
+  const tone = toneColor(SPHINX_FORM.tones[part.tone]).multiplyScalar(shade)
+  const mark = toneColor(SPHINX_FORM.tones.shadowMark).multiplyScalar(shade)
   const rand = mulberry32(seed)
   const [amp, period] = bandOf(part)
   const base = buf.pos.length / 3
@@ -117,7 +120,8 @@ function addPart(buf: Buffers, part: SphinxPart, lod: SphinxLod, seed: number): 
  *  rises above the ground, so its foot crosses the ground at the repose slope. */
 function addDrift(buf: Buffers, lod: SphinxLod): void {
   const spec = sphinxLodSpec(lod)
-  const b = sphinxDriftBounds()
+  const b = sphinxDriftBounds(lod)
+  const flankShade = sphinxEmphasis(lod).flankShade
   const nx = spec.driftCells
   const nz = Math.max(4, Math.round((nx * (b.maxZ - b.minZ)) / (b.maxX - b.minX)))
   const sand = toneColor(SPHINX_FORM.tones.sand)
@@ -128,15 +132,15 @@ function addDrift(buf: Buffers, lod: SphinxLod): void {
     const z = b.minZ + ((b.maxZ - b.minZ) * j) / nz
     for (let i = 0; i <= nx; i++) {
       const x = b.minX + ((b.maxX - b.minX) * i) / nx
-      const y = sphinxDriftHeight(x, z)
+      const y = sphinxDriftHeight(x, z, lod)
       heights.push(y)
-      const n = sphinxDriftNormal(x, z)
+      const n = sphinxDriftNormal(x, z, lod)
       buf.pos.push(x, y, z)
       buf.nor.push(n[0], n[1], n[2])
       buf.uv.push(i / nx, j / nz)
       // Steeper sand is shaded a little darker (a cheap occlusion term), so
       // the body's shape under the drift reads from above as well as aside.
-      const f = (1 + (rand() - 0.5) * 0.06) * (1 - SPHINX_FORM.drift.flankShade * (1 - n[1] * n[1]))
+      const f = (1 + (rand() - 0.5) * 0.06) * (1 - flankShade * (1 - n[1] * n[1]))
       buf.col.push(Math.min(1, sand.r * f), Math.min(1, sand.g * f), Math.min(1, sand.b * f))
       buf.band.push(0, 1)
     }

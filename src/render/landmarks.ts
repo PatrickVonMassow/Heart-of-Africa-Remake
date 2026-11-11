@@ -13,7 +13,7 @@ import { mulberry32 } from '../world/noise'
 import { buildPapyrus } from './flora'
 import { GIZA_PYRAMIDS, GIZA_SPHINX, type GizaPyramid } from '../scenes/place/gizaSite'
 import { SPHINX_FORM } from '../config/balance'
-import { SPHINX_SITE_LOD, type SphinxSiteDetail } from '../world/sphinx'
+import { SPHINX_SITE_LOD, sphinxCrownHeight, type SphinxSiteDetail } from '../world/sphinx'
 import { buildSphinxGeometry } from './sphinx'
 
 /** Paint a geometry with a base color plus deterministic per-vertex jitter. */
@@ -173,6 +173,10 @@ export function buildMeroePyramids(): THREE.BufferGeometry {
  *  platform where the point should be (docs/giza-1890.md §1.1). */
 export const KHUFU_STANDING = 0.945
 
+/** Khufu's standing height in the Giza field symbol's own units (base
+ *  half-extent 1.6, Old-Kingdom slope): the skyline Sphinx is sized against it. */
+export const GIZA_FIELD_KHUFU_HEIGHT = 1.6 * 0.64 * 2 * KHUFU_STANDING
+
 /** Giza: the three great pyramids in their real southwest-diagonal row —
  *  Khufu NE (largest), Khafre centre, Menkaure SW, flatter-sided than the
  *  steep Nubian tombs (Old-Kingdom ~52° slope, height ≈ 0.64 · base) — with
@@ -194,8 +198,7 @@ export function buildGizaPyramids(sphinxLod: 'landmark' | 'skyline' = 'landmark'
     // Khufu: the cone cut at KHUFU_STANDING of its height and closed FLAT —
     // the small summit platform 19th-century visitors climbed to.
     const [x, z, b] = [1.3, -1.3, 1.6]
-    const h = b * 0.64 * 2
-    const stand = h * KHUFU_STANDING
+    const stand = GIZA_FIELD_KHUFU_HEIGHT
     const frustum = new THREE.CylinderGeometry(b * (1 - KHUFU_STANDING), b, stand, 4)
     frustum.rotateY(Math.PI / 4)
     frustum.translate(x, stand / 2, z)
@@ -238,13 +241,23 @@ export function buildGizaPyramids(sphinxLod: 'landmark' | 'skyline' = 'landmark'
   return merge(parts)
 }
 
+/** The Sphinx's body length in the Giza field symbol at a distant level: the
+ *  bird's-eye landmark at the field's compressed length, the Cairo skyline at
+ *  the real proportion to Khufu (SPHINX_FORM.field.skylineCrownRatio). */
+export function fieldSphinxLength(lod: 'landmark' | 'skyline'): number {
+  const f = SPHINX_FORM.field
+  if (lod === 'landmark') return f.length
+  return (f.skylineCrownRatio * GIZA_FIELD_KHUFU_HEIGHT) / sphinxCrownHeight(lod)
+}
+
 /** The Sphinx in the Giza field symbol (bird's-eye landmark, Cairo skyline):
  *  the shared definition at a distant level, scaled and placed east of Khafre
  *  (SPHINX_FORM.field). */
 export function buildFieldSphinx(lod: 'landmark' | 'skyline'): THREE.BufferGeometry {
   const f = SPHINX_FORM.field
   const geo = buildSphinxGeometry(lod)
-  geo.scale(f.length, f.length, f.length)
+  const length = fieldSphinxLength(lod)
+  geo.scale(length, length, length)
   geo.translate(f.x, 0, f.z)
   return geo
 }

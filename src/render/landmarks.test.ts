@@ -9,6 +9,8 @@ import {
   MEROE_PYRAMIDS,
   buildGizaPyramids,
   buildFieldSphinx,
+  fieldSphinxLength,
+  GIZA_FIELD_KHUFU_HEIGHT,
   buildStoneCity,
   buildRockChurches,
   buildCoastalRuins,
@@ -138,15 +140,21 @@ describe('landmark builders', () => {
     expect(pale, 'the casing cap exists').toBeGreaterThan(0)
     // Menkaure (SW, smallest): NO dark red band at skyline scale — the granite
     // casing is a close-range cue only (it read as a floating error stripe out
-    // here). Nothing on the whole skyline is both dark (linear sum < 0.6) and
-    // red-dominant; the tawny cores and the Sphinx face all sit brighter.
-    let redBand = 0
-    for (let i = 0; i < pos.count; i++) {
-      const bright = col.getX(i) + col.getY(i) + col.getZ(i)
-      if (bright >= 0.6) continue
-      if (col.getX(i) > col.getZ(i) * 1.5) redBand++
+    // here). Nothing on the pyramids is both dark (linear sum < 0.6) and
+    // red-dominant; the tawny cores sit brighter. The bird's-eye Sphinx's stone
+    // IS drawn darker on purpose (its travel-scale emphasis, the limestone hue
+    // kept: src/render/sphinx.test.ts), so its own vertices are discounted.
+    const darkRed = (c: THREE.BufferAttribute) => {
+      let n = 0
+      for (let i = 0; i < c.count; i++) {
+        const bright = c.getX(i) + c.getY(i) + c.getZ(i)
+        if (bright < 0.6 && c.getX(i) > c.getZ(i) * 1.5) n++
+      }
+      return n
     }
-    expect(redBand, 'no red granite error band at skyline scale').toBe(0)
+    const sphinx = buildFieldSphinx('landmark')
+    expect(darkRed(col), 'no red granite error band at skyline scale').toBe(darkRed(sphinx.getAttribute('color') as THREE.BufferAttribute))
+    sphinx.dispose()
     geo.dispose()
   })
 
@@ -166,6 +174,20 @@ describe('landmark builders', () => {
       expect(b.min.x).toBeGreaterThan(0)
       geo.dispose()
     }
+  })
+
+  it('the skyline Sphinx stands in its real proportion to Khufu, buried in its drift (owner verdict 11.11.2026)', () => {
+    // ~20 m head height against Khufu's ~138.5 m: the crown within 0.12-0.17 of
+    // Khufu's standing height, measured from the built geometry.
+    const geo = buildFieldSphinx('skyline')
+    geo.computeBoundingBox()
+    const ratio = geo.boundingBox!.max.y / GIZA_FIELD_KHUFU_HEIGHT
+    expect(ratio).toBeGreaterThan(0.12)
+    expect(ratio).toBeLessThan(0.17)
+    expect(ratio).toBeCloseTo(SPHINX_FORM.field.skylineCrownRatio, 2)
+    // Smaller than the bird's-eye symbol, which is drawn enlarged.
+    expect(fieldSphinxLength('skyline')).toBeLessThan(fieldSphinxLength('landmark'))
+    geo.dispose()
   })
 
   it('the Meroë pyramid field is unmistakable at travel zoom (user request)', () => {
