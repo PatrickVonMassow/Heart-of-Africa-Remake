@@ -16,6 +16,7 @@
 //
 // Pure: every input is plain data, so the Vitest layer
 // (branch-hygiene-core.test.mjs) can sweep every branch without a git tree.
+import { pointOfBranch } from './batch-in-flight-core.mjs'
 
 /** Grace, measured from a branch's TIP COMMIT date, before its survival counts
  *  as debris. Wide enough that a session which just committed and merged is not
@@ -106,6 +107,9 @@ export const isBaselineCheckout = (path, repoRoot) => {
  *                   what a LIVE session has declared it is still working on
  *   mainTip         origin/main's sha; a ref whose tipSha equals it was just
  *                   cut and is never debris
+ *   closedPoints    point numbers ticked in docs/tasks-archive.md and not open
+ *   unmerged        [{ name, tipAt, tipSha }] every local and `origin/` ref NOT
+ *                   contained in origin/main (point 1504, see step 4)
  *
  * Returns { block, findings: [{ kind, name, ageMs, command }], reason }.
  *
@@ -127,6 +131,8 @@ export function assessBranchHygiene({
   inFlightBranches = [],
   inFlightPaths = [],
   mainTip = null,
+  closedPoints = [],
+  unmerged = [],
 } = {}) {
   // FAIL-OPEN, as a decision rather than as luck: a git state nobody could read
   // is not evidence of debris, and a guard that blocks on its own blindness
@@ -241,6 +247,28 @@ export function assessBranchHygiene({
     })
   }
 
+  // 4. A CLOSED POINT'S UNMERGED BRANCH (point 1504). Containment cannot see a
+  //    branch whose point closed without merging it — cancelled, absorbed, or
+  //    landed through another branch: feat/1341, feat/1482 and feat/1485 stood
+  //    for days and held every pool slot. The remedy archives the commits first,
+  //    because they exist nowhere else.
+  const closed = new Set((Array.isArray(closedPoints) ? closedPoints : []).filter(Number.isInteger))
+  for (const b of Array.isArray(unmerged) ? unmerged : []) {
+    const name = normBranch(b?.name)
+    const bare = name.replace(/^origin\//, '')
+    if (!closed.has(pointOfBranch(bare))) continue
+    if (heldBranches.has(bare) || protectedByWorktree.has(bare)) continue
+    if (fresh(b?.tipAt)) continue
+    const remote = name.startsWith('origin/')
+    const archive = `mkdir -p local/branch-archive && git bundle create local/branch-archive/${bare.replace(/\//g, '-')}.bundle ${b.name} ^origin/main`
+    findings.push({
+      kind: remote ? 'remote-closed' : 'local-closed',
+      name: String(b.name),
+      ageMs: age(b?.tipAt),
+      command: `${archive} && ${remote ? `git push origin --delete ${bare}` : `git branch -D ${bare}`}`,
+    })
+  }
+
   return {
     block: findings.length > 0,
     findings,
@@ -258,7 +286,7 @@ export function formatBranchHygiene(findings, { limit = 12 } = {}) {
   const shown = findings.slice(0, limit)
   const rest = findings.length - shown.length
   return [
-    `ZWEIG-HYGIENE: ${findings.length} bereits in origin/main enthaltene(r) Rest(e) lebt/leben noch.`,
+    `ZWEIG-HYGIENE: ${findings.length} gemergte(r) oder zu einem abgeschlossenen Punkt gehörende(r) Rest(e) lebt/leben noch.`,
     'CLAUDE.md §6: der Zweig-Ablauf ENDET beim Merge — Zweig, Remote-Zweig und Worktree gehen mit.',
     ...shown.map((f) => `  · [${f.kind}] ${f.name} (${mins(f.ageMs)})  →  ${f.command}`),
     ...(rest > 0 ? [`  … und ${rest} weitere.`] : []),

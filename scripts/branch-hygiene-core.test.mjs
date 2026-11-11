@@ -415,3 +415,50 @@ describe("the setup branch an agent worktree is cut with (point 613)", () => {
     expect(stubBranchTree(null)).toBe(null)
   })
 })
+
+describe('a closed point whose branch was never merged (point 1504)', () => {
+  // feat/1341 (cancelled), feat/1482 (landed through another branch) and
+  // feat/1485 (absorbed) survived for days: containment never sees them.
+  it('reports the local and remote branch of a closed point, archiving before the forced delete', () => {
+    const r = assessBranchHygiene(
+      base({
+        closedPoints: [1485],
+        unmerged: [
+          { name: 'feat/1485-skirt', tipAt: OLD },
+          { name: 'origin/feat/1485-skirt', tipAt: OLD },
+        ],
+      }),
+    )
+    expect(r.block).toBe(true)
+    expect(r.findings.map((f) => f.kind)).toEqual(['local-closed', 'remote-closed'])
+    expect(r.findings[0].command).toMatch(/git bundle create local\/branch-archive\/feat-1485-skirt\.bundle feat\/1485-skirt \^origin\/main && git branch -D feat\/1485-skirt$/)
+    expect(r.findings[1].command).toMatch(/&& git push origin --delete feat\/1485-skirt$/)
+  })
+
+  it('an unmerged branch of an OPEN point stays untouched', () => {
+    const r = assessBranchHygiene(base({ closedPoints: [1485], unmerged: [{ name: 'origin/feat/1463-x', tipAt: OLD }] }))
+    expect(r.block).toBe(false)
+  })
+
+  it('a closed point branch in a living worktree, declared in flight, or inside the grace stays untouched', () => {
+    const wt = { path: 'C:/repo/.claude/worktrees/a', branch: 'refs/heads/feat/9-a', locked: true, tipAt: OLD }
+    const r = assessBranchHygiene(
+      base({
+        closedPoints: [9, 10, 11],
+        worktrees: [...base().worktrees, wt],
+        inFlightBranches: ['feat/10-b'],
+        unmerged: [
+          { name: 'feat/9-a', tipAt: OLD },
+          { name: 'origin/feat/10-b', tipAt: OLD },
+          { name: 'feat/11-c', tipAt: NOW - 1000 },
+        ],
+      }),
+    )
+    expect(r.findings).toEqual([])
+  })
+
+  it('a non-feat branch is never judged by point', () => {
+    const r = assessBranchHygiene(base({ closedPoints: [7], unmerged: [{ name: 'origin/board', tipAt: OLD }] }))
+    expect(r.block).toBe(false)
+  })
+})
