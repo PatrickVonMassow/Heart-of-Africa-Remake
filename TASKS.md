@@ -15113,3 +15113,8 @@ to land than a mechanism that needs a review.
   Final state: under LOW every collidable plant of the full fill is drawn in the thinned fill on the same ground (thinned count equals full count, none missing); only the small dressing (bush, rock, termite, deadtree, papyrus) is thinned.
   Test: Vitest on the density-lever fill (collidable species exempt from thinning); `npm test -- enrichments` LOW section green on both backends with the 310-low-savanna picture.
   Bundle: Steuerung & Performance.
+- [ ] 1502. The Nile panorama water check sits on its own threshold
+  Finding 11.11.2026 (render-verify-guard, covering polish-panorama run on main fe6570d, WebGPU): 'the Nile shows as a water signal in the band' failed with sectors 0.0010/0.0000/0.0002/0.0016 (total 0.0028 against the required > 0.003), while the `travel-panorama-capture` section alone passed it minutes later on the same tree. The capture's water fraction depends on the camera height over the bank dunes, so the check flips at its threshold; no open point owned it. Player impact: none measured, but the red blocks the covering run every render point owes.
+  Final state: the check measures the Nile's presence with a margin the capture reliably clears (e.g. a capture aimed at the river or a threshold calibrated from recorded totals over repeated captures), and it still fails when the band shows no water at all (the 07.08.2026 all-zero signature).
+  Test: `npm test -- polish-panorama --section=travel-panorama-capture` green on both backends across a throttle probe (`node scripts/throttle-probe.mjs polish-panorama --section=travel-panorama-capture --runs 8`).
+  Bundle: Wetter & Wasser.

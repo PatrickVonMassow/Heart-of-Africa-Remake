@@ -2094,5 +2094,15 @@ export const RED_CHARGES = [
       'MEASURED 11.11.2026 on both backends: recorded enrichments runs before 04:05 carry this LOW preset red; '
       + 'no open point owned it, so it was filed as point 1500. The charge dies with point 1500.',
   },
+  {
+    point: 1502,
+    suite: 'polish-panorama',
+    kind: 'check',
+    match: /^the Nile shows as a water signal in the band$/i,
+    why:
+      'MEASURED 11.11.2026 on WebGPU, main fe6570d: the whole pass read sectors 0.0010/0.0000/0.0002/0.0016 '
+      + '(total 0.0028 < 0.003) while --section=travel-panorama-capture passed it on the same tree minutes later; '
+      + 'the threshold sits on the capture\'s spread. Filed as point 1502. The charge dies with point 1502.',
+  },
 
 ]
