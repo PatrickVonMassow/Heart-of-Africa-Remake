@@ -7129,6 +7129,131 @@ if (section('elderly-natural-death')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
   await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
+
+  // Point 1498: is an elder RECOGNISABLE? One frame per species with an elder
+  // (the crocodile has none, §19.18), the elder beside a prime adult, from the
+  // travel camera at its normal zoom. Herd species are injected through the
+  // herds hook; the old cats are the hunt's lone hunter, so their pair is two
+  // static copies of the hunt's own predator mesh carrying its elder and prime
+  // geometry. A page-side rAF pin holds each pair in place, in profile (facing
+  // +x), for the shutter; everything is removed after its frame.
+  const zoomKept = await page.evaluate(() => {
+    const u = window.__ui.getState()
+    const z = u.travelZoom
+    u.setTravelZoom(0.5) // DEFAULT_TRAVEL_ZOOM (src/state/ui.ts): the game distance
+    return z
+  })
+  const ELDER_HERD_SPECIES = { elephant: 6, giraffe: 4, zebra: 3.4, wildebeest: 3.2, antelope: 2.6, warthog: 2.2 }
+  for (const [sp, gap] of Object.entries(ELDER_HERD_SPECIES)) {
+    const at = await page.evaluate(({ sp, gap }) => {
+      const herds = window.__wildlife.herdsRef.current
+      const p = window.__game.getState().pos
+      const seed = window.__game.getState().seed
+      const U = 10
+      const land = (x, z) => {
+        const ty = window.__terrainType(-z / U, x / U, seed)
+        return ty !== 'water' && ty !== 'ocean'
+      }
+      let spot = null
+      for (let r = 7; r <= 20 && !spot; r += 1.5) {
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const x = p.x + Math.sin(a) * r
+          const z = p.z + Math.cos(a) * r
+          if (land(x - gap, z) && land(x + gap, z) && land(x, z)) { spot = { x, z }; break }
+        }
+      }
+      if (!spot) return null
+      const mk = (dx, elderly) => ({
+        x: spot.x + dx, z: spot.z, y: 0.2, rot: Math.PI / 2, heading: Math.PI / 2, scale: 1, phase: 0.3,
+        chunk: undefined, grounded: true, ...(elderly ? { elderly: true } : {}),
+      })
+      const prime = mk(-gap / 2, false)
+      const elder = mk(gap / 2, true)
+      herds[sp].push(prime, elder)
+      const pin = { on: true, list: [[prime, prime.x, prime.z], [elder, elder.x, elder.z]] }
+      const hold = () => {
+        if (!pin.on) return
+        for (const [a, x, z] of pin.list) { a.x = x; a.z = z; a.rot = Math.PI / 2; a.heading = Math.PI / 2 }
+        requestAnimationFrame(hold)
+      }
+      hold()
+      window.__elderPair = { sp, prime, elder, pin }
+      return { x: spot.x, z: spot.z }
+    }, { sp, gap })
+    check(`an elder ${sp} and a prime adult stand side by side for the comparison (point 1498)`, !!at, at ? JSON.stringify(at) : 'no land spot')
+    if (at) {
+      await shot(`1498-elder-vs-prime-${sp}`, {
+        world: at,
+        label: `an old ${sp} (right, +x) beside a prime adult ${sp} (left), travel camera at game distance`,
+      })
+    }
+    await page.evaluate(() => {
+      const pr = window.__elderPair
+      if (!pr) return
+      pr.pin.on = false
+      const herds = window.__wildlife.herdsRef.current
+      herds[pr.sp] = herds[pr.sp].filter((a) => a !== pr.prime && a !== pr.elder)
+      window.__elderPair = undefined
+    })
+  }
+  for (const want of ['lion', 'cheetah', 'leopard']) {
+    const cat = await page.evaluate(async (want) => {
+      const L = window.__lionHunt.state
+      const mesh = window.__lionHunt.predatorMesh.current
+      const p = window.__game.getState().pos
+      const frames = (n) => new Promise((res) => {
+        let i = 0
+        const step = () => (++i >= n ? res() : requestAnimationFrame(step))
+        requestAnimationFrame(step)
+      })
+      const stage = async (elderly) => {
+        for (let k = 0; k < 80; k++) {
+          L.mode = 'idle'; L.timer = 0; L.victim = null; L.victimHunt = false
+          L.force = { x: p.x + 30, z: p.z + 30, kind: 'generic', elderly }
+          await frames(3)
+          if (L.mode !== 'idle' && L.predator === want && L.elderly === elderly) {
+            return { geo: mesh.geometry, scale: mesh.scale.x }
+          }
+        }
+        return null
+      }
+      const old = await stage(true)
+      const young = await stage(false)
+      L.mode = 'idle'; L.timer = 9999; L.victim = null; L.victimHunt = false; L.elderly = false
+      if (!old || !young) return { staged: false, old: !!old, young: !!young }
+      let root = mesh
+      while (root.parent) root = root.parent
+      const gap = 2.6
+      const x = p.x + 6
+      const z = p.z + 2
+      const copies = [[young, x - gap / 2], [old, x + gap / 2]].map(([g, cx]) => {
+        const m = new mesh.constructor(g.geo, mesh.material)
+        m.scale.setScalar(g.scale)
+        m.position.set(cx, window.__wildlife.groundAt(cx, z), z)
+        m.rotation.set(0, Math.PI / 2, 0)
+        m.castShadow = true
+        root.add(m)
+        return m
+      })
+      window.__elderCats = copies
+      return { staged: true, x, z, distinct: old.geo !== young.geo }
+    }, want)
+    check(`an old ${want} and a prime ${want} stand side by side for the comparison (point 1498)`,
+      cat.staged === true && cat.distinct === true, JSON.stringify(cat))
+    if (cat.staged) {
+      await shot(`1498-elder-vs-prime-${want}`, {
+        world: { x: cat.x, z: cat.z },
+        label: `an old ${want} (right, +x) beside a prime ${want} (left), travel camera at game distance`,
+      })
+    }
+    await page.evaluate(() => {
+      for (const m of window.__elderCats ?? []) m.removeFromParent()
+      window.__elderCats = undefined
+    })
+  }
+  await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomKept)
+
   const dying = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const be = window.__balance.elderly
@@ -7207,6 +7332,12 @@ if (section('elderly-natural-death')) {
       world: at,
       label: 'an old zebra down in its natural death, the vulture flock gathering over it',
     })
+    // Point 1498: the same moment, judged for the vultures' size and shape —
+    // true-sized birds with spread, fingered wings over the downed elder.
+    await shot('1498-vultures-over-downed', {
+      world: at,
+      label: 'true-sized vultures (≈2.4 m span) circling low over the downed old zebra',
+    })
   }
   const ended = await page.evaluate(async () => {
     const st = window.__elderDeath
@@ -7247,6 +7378,12 @@ if (section('elderly-natural-death')) {
     const p = window.__game.getState().pos
     return !!window.__wildlife?.herdsRef?.current && Math.hypot(p.x - 366, p.z - 49) < 5
   }, null, { timeout: 30000 }).catch(() => {})
+  // Point 1498: the graveyard reads as remains — skeletons with standing rib
+  // arches, skulls, scattered bones and ivory — from the travel camera.
+  await shot('1498-elephant-graveyard', {
+    world: { lat: -4.9, lon: 36.6 },
+    label: 'the elephant graveyard: skeletons, skulls, bones and tusks, no whole bodies',
+  })
   const tusker = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const be = window.__balance.elderly
