@@ -287,10 +287,10 @@ added.
 
   | Level | Vertices | Triangles |
   | --- | --- | --- |
-  | reduced (low) | 3927 | 5638 |
-  | standard (medium) | 12425 | 19744 |
-  | full (high) | 26154 | 42772 |
-  | landmark (bird's-eye) | 1298 | 1666 |
+  | reduced (low) | 3927 | 5634 |
+  | standard (medium) | 12352 | 19642 |
+  | full (high) | 26041 | 42616 |
+  | landmark (bird's-eye) | 1298 | 1660 |
   | skyline (Cairo) | 502 | 584 |
 
   The measured frame cost at the site on both backends at LOW and MEDIUM is

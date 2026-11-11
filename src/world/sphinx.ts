@@ -336,7 +336,7 @@ export function partLevel(part: SphinxPart, x: number, y: number, z: number): nu
  * north wind. Each dome is the bank's ellipsoid cap run down at the repose slope.
  */
 export const SPHINX_DRIFT_BANKS: ReadonlyArray<{ id: string; centre: Vec3; radii: Vec3 }> = [
-  { id: 'frontBank', centre: [0.38, 0.0, 0.012], radii: [0.2, 0.082, 0.12] },
+  { id: 'frontBank', centre: [0.4, 0.0, 0.012], radii: [0.21, 0.082, 0.12] },
   { id: 'rearBank', centre: [-0.27, 0.035, 0.012], radii: [0.24, 0.09, 0.13] },
 ]
 
