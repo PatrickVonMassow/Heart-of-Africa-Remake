@@ -30,6 +30,7 @@ import {
   gltfPerson,
   gltfShellParts,
   isShellLayer,
+  linesSkin,
 } from './villagerFigureBody'
 import { applyGarmentMask, GARMENT_PUSH_ATTRIBUTE } from './villagerGarmentMask'
 
@@ -751,15 +752,20 @@ describe('the micro-structure kinds on the glTF figure', () => {
     const hairCount = person.hair.reduce((n, h) => n + (h ? 1 : 0), 0)
     expect(hairCount).toBeGreaterThan(0)
     // the merged figure starts with the (masked) body; count its kinds over the
-    // body's own vertices, where the mask keeps the vertex order
+    // body's own vertices, where the mask keeps the vertex order. What a worn
+    // covering garment covers is its lining, in that garment's kind (point 1489).
+    const linedKinds = new Set(layers.filter(linesSkin).map(fibreOf))
     let none = 0
     let skin = 0
+    let lined = 0
     for (let k = 0; k < bodyCount; k++) {
       if (fib.getW(k) === FIGURE_FIBRE.none) none++
       else if (fib.getW(k) === FIGURE_FIBRE.skin) skin++
+      else if (linedKinds.has(fib.getW(k) as (typeof FIGURE_FIBRE)[keyof typeof FIGURE_FIBRE])) lined++
     }
     expect(none).toBe(hairCount)
-    expect(skin).toBe(bodyCount - hairCount)
+    expect(lined).toBeGreaterThan(0)
+    expect(skin + lined).toBe(bodyCount - hairCount)
   })
 
   it('the masked figure binds at most WebGPU’s 8 vertex buffers (the kind adds none)', () => {

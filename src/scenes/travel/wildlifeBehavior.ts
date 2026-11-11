@@ -3,6 +3,7 @@
 // browser (the RAF-driven behaviour itself is covered by the Playwright suites).
 
 import type { RegionId } from '../../world/geo'
+import { vultureLandedBox, vultureLandedCorners } from '../../render/vultureShape'
 
 // Heading convention across the wildlife sim: a heading `h` points in the
 // direction `(sin h, cos h)` in world (x, z), so `Math.atan2(dx, dz)` yields the
@@ -1822,50 +1823,15 @@ export function landedBirdClearance(groupBaseY: number, groundUnderBird: number,
 }
 
 /**
- * The vulture's deep local extents (buildVulture, src/render/fauna.ts), as the
- * bounding-box corners of every part in unit (scale-1) local space: the body
- * ellipsoid and head bboxes plus the two SPREAD WINGS (inner plate + outer tip,
- * both sides). The corners bound the actual rounded/tapered geometry from
- * outside, so a min taken over them can never sit ABOVE a real vertex — the
- * lift it drives always clears the true mesh. Mirrors the fauna.ts numbers; if
- * buildVulture's proportions change, update both (fauna.test.ts pins the wing
- * span these are derived from).
+ * The landed vulture's local extents (buildVultureLanded, src/render/
+ * faunaVulture.ts; point 1498): the eight corners of its conservative
+ * box from the pure shape numbers (src/render/vultureShape.ts). A landed bird
+ * now folds its wings, so the deep end is the feet and, under the peck pose,
+ * the beak or the tail — the corners bound the real mesh from outside (tested
+ * in faunaVulture.test.ts), so the lift they drive always clears it.
  */
-function vultureLowExtents(): [number, number, number][] {
-  const rotZ = (x: number, y: number, a: number): [number, number] => {
-    const c = Math.cos(a)
-    const s = Math.sin(a)
-    return [x * c - y * s, x * s + y * c]
-  }
-  const box = (
-    hx: number,
-    hy: number,
-    hz: number,
-    tx: number,
-    ty: number,
-    tz: number,
-    rz: number,
-  ): [number, number, number][] => {
-    const out: [number, number, number][] = []
-    for (const sx of [-1, 1])
-      for (const sy of [-1, 1])
-        for (const sz of [-1, 1]) {
-          const [x, y] = rotZ(tx + sx * hx, ty + sy * hy, rz)
-          out.push([x, y, tz + sz * hz])
-        }
-    return out
-  }
-  const pts: [number, number, number][] = []
-  pts.push(...box(0.128, 0.096, 0.224, 0, 0, 0, 0)) // body ellipsoid bbox (0.16·(0.8,0.6,1.4))
-  pts.push(...box(0.06, 0.06, 0.06, 0, 0.03, 0.24, 0)) // head sphere bbox
-  for (const side of [-1, 1]) {
-    pts.push(...box(0.425, 0.0125, 0.14, side * 0.5, 0.04, -0.02, side * 0.12)) // wing plate
-    pts.push(...box(0.15, 0.01, 0.1, side * 1.0, 0.12, -0.04, side * 0.3)) // wing tip
-  }
-  return pts
-}
-
-const VULTURE_LOW_EXTENTS: readonly (readonly [number, number, number])[] = vultureLowExtents()
+const VULTURE_LOW_EXTENTS: readonly (readonly [number, number, number])[] = vultureLandedCorners()
+const VULTURE_BOX = vultureLandedBox()
 
 /**
  * The LOWEST point of a landed bird's POSED geometry below its origin (points
@@ -1893,19 +1859,20 @@ export function landedBirdLowestDepth(pitch: number, yaw: number, scale: number)
     const yp = s1 * s2 * x + c1 * y - s1 * c2 * z
     if (yp < minY) minY = yp
   }
-  return Math.max(0.096, -minY) * scale
+  return Math.max(-VULTURE_BOX.minY, -minY) * scale
 }
 
-/** Ground-sample offsets under a landed bird's EXTENTS — centre, both wing tips
- *  (local x ±1.15·scale) and the pecking head (local z 0.24·scale) — rotated by
+/** Ground-sample offsets under a landed bird's EXTENTS — centre, both flanks
+ *  (the folded box's ±x), the pecking head and the tail tip — rotated by
  *  the bird's yaw, so a slope rising under a spread wing or under the head is
  *  seen by the lift (point 202). */
 export function birdExtentOffsets(yaw: number, scale: number): [number, number][] {
   const local: [number, number][] = [
     [0, 0],
-    [1.15 * scale, 0],
-    [-1.15 * scale, 0],
-    [0, 0.24 * scale],
+    [VULTURE_BOX.maxX * scale, 0],
+    [VULTURE_BOX.minX * scale, 0],
+    [0, VULTURE_BOX.maxZ * scale],
+    [0, VULTURE_BOX.minZ * scale],
   ]
   const c = Math.cos(yaw)
   const s = Math.sin(yaw)

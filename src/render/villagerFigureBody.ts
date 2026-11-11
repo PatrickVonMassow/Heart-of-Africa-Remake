@@ -23,7 +23,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
 import { bakeMorphs, legScale, morphInfluences, restBounds, restHeads, stylisePeaks } from './villagerBody'
 import { topoOrder } from './villagerAsset'
-import { applyGarmentMask, COVER_ATTRIBUTE, decodeCover, GARMENT_PUSH_ATTRIBUTE, wornBits } from './villagerGarmentMask'
+import { applyGarmentMask, COVER_ATTRIBUTE, coverLining, decodeCover, GARMENT_PUSH_ATTRIBUTE, wornBits } from './villagerGarmentMask'
 import { buildShells, cutBodyIndex, faceMasks, REGION_ATTRIBUTE, regionWords, shellBits, type BuiltShell } from './villagerShell'
 
 const DOWN = new THREE.Vector3(0, -1, 0)
@@ -702,6 +702,144 @@ export function gltfShellParts(
   })
 }
 
+/** Whether a worn layer lines the skin it covers (work-order point 1489):
+ *  every covering garment of the hip, torso and shoulder slots — breast
+ *  cloth, chest- and waist-worn wraps, skirts, loin and hip cloths, shirts,
+ *  robes, capes, cloaks, the sling. Not the hood (it covers the face's rim)
+ *  nor the head pieces and ornaments, which cover nothing sensitive. */
+export const linesSkin = (l: Pick<DressLayer, 'slot' | 'form'>): boolean =>
+  (l.slot === 'hip' || l.slot === 'torso' || l.slot === 'shoulder') && l.form !== 'hood'
+
+/** The flat hip cloths: a front and a back panel with no volume to hold the
+ *  body, so the cover mask marks nothing under them; they line the pelvis. */
+const FLAT_CLOTH = new Set<DressLayer['form']>(['loinFlap', 'apron', 'girdleTails'])
+/** The pelvis band's bones: what a hanging hand or forearm never is. */
+const PELVIS_BONES = ['hips', 'spine', 'thigh.L', 'thigh.R']
+/** The trunk's bones: the projected lining never reaches a hand, arm or head. */
+const TRUNK_BONES = ['hips', 'spine', 'spine1', 'chest', 'thigh.L', 'thigh.R']
+
+/**
+ * Per vertex of the body positions `pos` (from vertex 0): whether it lies
+ * behind a triangle of the cloth `cloth` seen straight along the body's
+ * depth axis z from its own side (front or back), no lower than `minY` —
+ * the body a hanging front or back panel covers.
+ */
+export function behindCloth(pos: THREE.BufferAttribute, cloth: THREE.BufferGeometry, minY: number, slack: number, only?: Uint8Array): Uint8Array {
+  const out = new Uint8Array(pos.count)
+  const cp = cloth.getAttribute('position') as THREE.BufferAttribute
+  const idx = cloth.index ? (cloth.index.array as ArrayLike<number>) : Array.from({ length: cp.count }, (_, i) => i)
+  // bucket the body points by a coarse xy grid; each triangle visits its box
+  const cell = 0.02
+  const grid = new Map<string, number[]>()
+  const key = (gx: number, gy: number) => `${gx},${gy}`
+  for (let i = 0; i < pos.count; i++) {
+    if (pos.getY(i) < minY || (only && !only[i])) continue
+    const k = key(Math.floor(pos.getX(i) / cell), Math.floor(pos.getY(i) / cell))
+    const b = grid.get(k)
+    if (b) b.push(i)
+    else grid.set(k, [i])
+  }
+  const a = new THREE.Vector3()
+  const b = new THREE.Vector3()
+  const c = new THREE.Vector3()
+  for (let t = 0; t + 2 < idx.length; t += 3) {
+    a.fromBufferAttribute(cp, idx[t])
+    b.fromBufferAttribute(cp, idx[t + 1])
+    c.fromBufferAttribute(cp, idx[t + 2])
+    const side = Math.sign(a.z + b.z + c.z)
+    const det = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y)
+    if (!side || Math.abs(det) < 1e-12) continue
+    for (let gx = Math.floor(Math.min(a.x, b.x, c.x) / cell); gx <= Math.floor(Math.max(a.x, b.x, c.x) / cell); gx++) {
+      for (let gy = Math.floor(Math.min(a.y, b.y, c.y) / cell); gy <= Math.floor(Math.max(a.y, b.y, c.y) / cell); gy++) {
+        for (const i of grid.get(key(gx, gy)) ?? []) {
+          if (out[i]) continue
+          const x = pos.getX(i)
+          const y = pos.getY(i)
+          const z = pos.getZ(i)
+          if (Math.sign(z) !== side) continue
+          const u = ((b.y - c.y) * (x - c.x) + (c.x - b.x) * (y - c.y)) / det
+          const v = ((c.y - a.y) * (x - c.x) + (a.x - c.x) * (y - c.y)) / det
+          const w = 1 - u - v
+          if (u < 0 || v < 0 || w < 0) continue
+          // the cloth's depth over this point; the body lies on its inner side
+          if (side * z <= side * (u * a.z + v * b.z + w * c.z) + slack) out[i] = 1
+        }
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * Per body vertex: in the pelvis band a flat hip cloth lines (balance.ts
+ * VILLAGER_ASSET.liningFlap*), on a pelvis bone.
+ */
+export function pelvisBand(person: GltfPerson, bones: readonly string[]): Uint8Array {
+  const pos = person.geometry.getAttribute('position') as THREE.BufferAttribute
+  const { stature: H, hipY } = person.p
+  const lo = hipY - VILLAGER_ASSET.liningFlapBelowHips * H
+  const hi = hipY + VILLAGER_ASSET.liningFlapAboveHips * H
+  const half = VILLAGER_ASSET.liningFlapHalfWidth * H
+  const on = onBones(person, bones, PELVIS_BONES)
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i)
+    if (!(y >= lo && y <= hi && Math.abs(pos.getX(i)) <= half)) on[i] = 0
+  }
+  return on
+}
+
+/** Per body vertex: its dominant bone is one of `names`. */
+function onBones(person: GltfPerson, bones: readonly string[], names: readonly string[]): Uint8Array {
+  const dom = dominantBones(person.geometry)
+  const ok = new Set(names.map((n) => bones.indexOf(n)))
+  return Uint8Array.from(dom, (b) => (ok.has(b) ? 1 : 0))
+}
+
+/**
+ * Paint every body vertex a worn covering garment covers in that garment's
+ * colour and fibre (the outermost such garment's), as the cloth's lining:
+ * what its cover mask hides or pushes, what of the trunk lies behind its
+ * panels, and for a flat hip cloth the pelvis band (the cloth passed between
+ * the legs). Wherever the cloth stands off the body — a kneeling
+ * or bending figure seen from the steep overhead camera, a flap lifted by the
+ * stride — the view through the gap ends on lining, never on a bare breast,
+ * genital area or buttocks (work-order point 1489, design.md "No sensitive
+ * body part exposed"). `drawn` are the worn garments with their geometry in
+ * the body's frame. Mutates the painted body `body`.
+ */
+export function lineCoveredSkin(
+  body: THREE.BufferGeometry,
+  person: GltfPerson,
+  asset: Pick<VillagerAsset, 'garmentMask' | 'bones'>,
+  drawn: ReadonlyArray<{ l: DressLayer; g: THREE.BufferGeometry }>,
+): void {
+  const lined = drawn.filter(({ l }) => linesSkin(l)).sort((a, b) => garmentLayer(a.l) - garmentLayer(b.l))
+  if (!lined.length) return
+  const pos = body.getAttribute('position') as THREE.BufferAttribute
+  const owner = coverLining(person.cover, asset.garmentMask, lined.map(({ l }) => garmentMeshName(l)), pos.count)
+  // what lies behind a garment's panels on the trunk, and for a flat cloth the
+  // pelvis band, where no outer garment lines it
+  const trunk = onBones(person, asset.bones, TRUNK_BONES)
+  const minY = person.p.hipY - VILLAGER_ASSET.liningFlapBelowHips * person.p.stature
+  const slack = VILLAGER_ASSET.liningProjectSlack * person.frame.scale
+  lined.forEach(({ l, g }, j) => {
+    const behind = behindCloth(pos, g, minY, slack, trunk)
+    const band = FLAT_CLOTH.has(l.form) ? pelvisBand(person, asset.bones) : null
+    for (let i = 0; i < owner.length; i++) if ((behind[i] || band?.[i]) && owner[i] < j) owner[i] = j
+  })
+  const col = body.getAttribute('color') as THREE.BufferAttribute
+  const col2 = body.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
+  const surf = body.getAttribute(SURFACE_ATTRIBUTE) as THREE.BufferAttribute
+  const paints = lined.map(({ l }) => ({ c: new THREE.Color(l.colour), fibre: fibreOf(l), rough: surfaceOf(l, person.p, 0)[3] }))
+  owner.forEach((j, i) => {
+    if (j < 0) return
+    const { c, fibre, rough } = paints[j]
+    col.setXYZ(i, c.r, c.g, c.b)
+    col2.setXYZW(i, c.r, c.g, c.b, fibre)
+    surf.setXYZW(i, 0, 0, 0, rough)
+  })
+}
+
 /**
  * A person's whole figure as ONE geometry skinned to the asset's bones: the
  * glTF body painted (skin, or skin under body paint; the scalp in the hair
@@ -738,6 +876,7 @@ export function gltfFigureGeometry(
     return g ? [{ l, g }] : []
   })
   const worn = drawn.map(({ l }) => garmentMeshName(l))
+  lineCoveredSkin(body, person, asset, drawn)
   const bodyPart = applyGarmentMask(tidy(body), person.cover, asset.garmentMask, worn, depth)
   const parts = [bodyPart]
   for (const s of gltfShellParts(asset, person, shells, bodyPart, worn)) parts.push(s.geometry)

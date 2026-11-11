@@ -63,6 +63,8 @@ import {
   ELDER_BUILDERS,
   ELDERLY_SCHEMA,
   ELEPHANT_ELDER,
+  GIRAFFE_ELDER,
+  greyMuzzle,
   elderlyProportions,
   LION_ELDER_MANE,
   createCrocodileMaterial,
@@ -239,27 +241,11 @@ describe('smooth organic shading (CLAUDE.md §7.1 pt. 12, point 214)', () => {
     }
   })
 
-  it('the vulture keeps its wide spread-wing span (the point-217 clearance model is derived from it)', () => {
-    // The landed-bird clearance (wildlifeBehavior.landedBirdLowestDepth) lifts a
-    // feeding vulture by its posed WING-TIP reach so the tips never clip the
-    // ground (point 217). That reach is derived from these fauna.ts numbers, so
-    // pin the span here: if buildVulture's wings change, both must move together.
+  it('the vulture is built true to size; the clearance reads its folded pose (point 1498, faunaVulture.test.ts)', () => {
     const geo = buildVulture()
-    const pos = geo.attributes.position
-    let maxX = 0
-    let maxY = -Infinity
-    let minY = Infinity
-    for (let i = 0; i < pos.count; i++) {
-      maxX = Math.max(maxX, Math.abs(pos.getX(i)))
-      maxY = Math.max(maxY, pos.getY(i))
-      minY = Math.min(minY, pos.getY(i))
-    }
-    // Outer wing tip reaches ~1.07 in x; the tips ride ABOVE the body (positive y).
-    expect(maxX).toBeGreaterThan(1.0)
-    expect(maxX).toBeLessThan(1.15)
-    expect(maxY).toBeGreaterThan(0.4) // the dihedral lifts the tips well above the origin
-    expect(minY).toBeGreaterThan(-0.11) // body-ellipsoid bottom ~ -0.096 at rest
-    geo.dispose()
+    geo.computeBoundingBox()
+    expect(geo.boundingBox!.max.x).toBeGreaterThan(1.1) // the spread wings stay wide
+    expect(geo.boundingBox!.max.x).toBeLessThan(1.4) // but ~2.4 m tip to tip, not 3.7
   })
 
   it('the built body sphere clearly outresolves the old faceted 8x6 build', () => {
@@ -1573,9 +1559,13 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
     const prime = tuskReach(buildElephant())
     expect(Math.abs(prime.left - prime.right)).toBeLessThan(0.01)
     const old = tuskReach(buildElephant(false, true))
-    expect(old.left).toBeCloseTo(prime.left, 2) // the slave tusk stays whole
-    expect(old.right).toBeLessThan(old.left - 0.1) // the master tusk is visibly shorter
+    // Point 1498: the asymmetry must read at game distance — the slave tusk
+    // grown long, the master broken short, half a metre apart at the tips.
+    expect(old.left).toBeGreaterThan(prime.left + 0.2) // the slave tusk grew on
+    expect(old.right).toBeLessThan(prime.right) // the master tusk is worn below prime
+    expect(old.left - old.right).toBeGreaterThan(0.5)
     expect(ELEPHANT_ELDER.masterTusk).toBeLessThan(1)
+    expect(ELEPHANT_ELDER.slaveTusk).toBeGreaterThan(1)
   })
 
   it('the old lion wears a thin, darker mane: its silhouette top drops', () => {
@@ -1587,6 +1577,112 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
   it('the old giraffe wears its ossicones down; an elder stays adult-sized (not a calf)', () => {
     expect(topY(buildGiraffe(false, true))).toBeLessThan(topY(buildGiraffe()))
     for (const [name, adult, old] of quadrupeds) expect(zExtent(old), name).toBeGreaterThan(zExtent(adult) * 0.9)
+  })
+
+  it('point 1498: the cues are strong enough to read at game distance', () => {
+    // Lean by at least a fifth, a sway-back of a quarter barrel radius, the
+    // head carried a fifth of a radian lower, the coat half-way to grey.
+    expect(ELDERLY_SCHEMA.bodyR).toBeLessThanOrEqual(0.8)
+    expect(ELDERLY_SCHEMA.swayBack).toBeGreaterThanOrEqual(0.25)
+    expect(ELDERLY_SCHEMA.neckDrop).toBeGreaterThanOrEqual(0.2)
+    expect(ELDERLY_SCHEMA.coatGrey).toBeGreaterThanOrEqual(0.4)
+    expect(ELDERLY_SCHEMA.boneKnob).toBeGreaterThan(1)
+    expect(LION_ELDER_MANE.radius).toBeLessThan(0.42 * 0.7)
+    expect(GIRAFFE_ELDER.ossicone).toBeLessThan(1)
+  })
+
+  it('a dark face turns visibly paler with age (the luminance grey alone kept it dark)', () => {
+    const l = (hex: string) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 }).l
+    expect(l(greyMuzzle('#3d3a36')) - l('#3d3a36')).toBeGreaterThan(0.2)
+    expect(l(agedColor('#5b554f', ELDERLY_SCHEMA.coatGrey))).toBeGreaterThan(l('#5b554f'))
+  })
+
+  it('the old giraffe carries its head lower; every elder still stands on the ground', () => {
+    const headTop = (g: THREE.BufferGeometry) => toplineAt(g, 1.25, 0.25)
+    expect(topY(buildGiraffe(false, true))).toBeLessThan(topY(buildGiraffe()) - 0.1)
+    expect(Number.isFinite(headTop(buildGiraffe()))).toBe(true)
+    for (const build of Object.values(ELDER_BUILDERS)) {
+      const g = build()
+      g.computeBoundingBox()
+      expect(g.boundingBox!.min.y).toBeGreaterThan(-0.05)
+      expect(g.boundingBox!.min.y).toBeLessThan(0.05)
+    }
+  })
+
+  it('rework: the old zebra turns a dingy grey between its stripes and its belly tucks up', () => {
+    const meanLum = (g: THREE.BufferGeometry) => {
+      const c = g.attributes.color
+      let sum = 0
+      for (let i = 0; i < c.count; i++) sum += 0.299 * c.getX(i) + 0.587 * c.getY(i) + 0.114 * c.getZ(i)
+      return sum / c.count
+    }
+    expect(meanLum(buildZebra()) - meanLum(buildZebraElder())).toBeGreaterThan(0.15)
+    const bellyAt = (g: THREE.BufferGeometry) => {
+      const p = g.attributes.position
+      let low = Infinity
+      for (let i = 0; i < p.count; i++) if (Math.abs(p.getZ(i)) < 0.25 && Math.abs(p.getX(i)) < 0.15 && p.getY(i) > 0.4) low = Math.min(low, p.getY(i))
+      return low
+    }
+    const [elderBelly, primeBelly] = [bellyAt(buildZebraElder()), bellyAt(buildZebra())]
+    expect(Number.isFinite(elderBelly) && Number.isFinite(primeBelly)).toBe(true)
+    expect(elderBelly).toBeGreaterThan(primeBelly)
+  })
+
+  it('rework: the old elephant back reads as a narrow ridge, not round lumps', () => {
+    const g = buildElephant(false, true)
+    const p = g.attributes.position
+    const backTop = 1.75 - ELEPHANT_ELDER.sag + 1.05 * 0.95
+    let widest = 0
+    for (let i = 0; i < p.count; i++) {
+      if (Math.abs(p.getZ(i)) < 0.6 && p.getY(i) > backTop - 0.01) widest = Math.max(widest, Math.abs(p.getX(i)))
+    }
+    // Only the spine ridge (and the barrel's own crown) reaches the back top;
+    // the old round knobs stood out to |x| ≈ 0.3.
+    expect(widest).toBeLessThanOrEqual(0.12)
+    expect(ELEPHANT_ELDER.ribs).toBeGreaterThan(0)
+  })
+
+  // Cross-review 1498 pass 2: a point is inside the merged build when, in some
+  // direction, the first double-sided hit faces away from the ray (an exit).
+  const insideBuild = (g: THREE.BufferGeometry, y: number, z: number) => {
+    const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }))
+    const dirs = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
+    return dirs.some(([dx, dy, dz]) => {
+      const dir = new THREE.Vector3(dx, dy, dz)
+      const hit = new THREE.Raycaster(new THREE.Vector3(0, y, z), dir).intersectObject(mesh)[0]
+      return !!hit?.face && hit.face.normal.dot(dir) > 0
+    })
+  }
+
+  it('rework: the giraffe head sits on its neck — prime, elder and the split panorama build', () => {
+    for (const g of [buildGiraffe(), buildGiraffe(false, true), buildGiraffeParts().body]) {
+      const p = g.attributes.position
+      let maxY = -Infinity
+      for (let i = 0; i < p.count; i++) maxY = Math.max(maxY, p.getY(i))
+      // The head: the forward part of the top 0.6 (the ossicones are thin).
+      let hy = 0, hz = 0, n = 0
+      for (let i = 0; i < p.count; i++) {
+        if (p.getY(i) > maxY - 0.6 && p.getZ(i) > 1.0) { hy += p.getY(i); hz += p.getZ(i); n++ }
+      }
+      expect(n).toBeGreaterThan(0)
+      hy /= n; hz /= n
+      // Walk from the head down the neck into the chest: never outside.
+      const [cy, cz] = [1.95, 0.55]
+      for (let t = 0; t <= 1.0001; t += 0.05) {
+        expect(insideBuild(g, hy + t * (cy - hy), hz + t * (cz - hz))).toBe(true)
+      }
+    }
+  })
+
+  it('rework: the old elephant spine ridge lies on the back along its whole length', () => {
+    const g = buildElephant(false, true)
+    const b = 1.05 * 0.95, c = 1.05 * 1.4, yc = 1.75 - ELEPHANT_ELDER.sag
+    for (let z = -1.1; z <= 1.0001; z += 0.1) {
+      // Just under and just over the barrel top: inside, never a gap under the ridge.
+      const top = yc + b * Math.sqrt(1 - (z / c) ** 2)
+      expect(insideBuild(g, top - 0.02, z)).toBe(true)
+      if (Math.abs(z + 0.05) < 0.8) expect(insideBuild(g, top + 0.02, z)).toBe(true)
+    }
   })
 
   it('every rendered mammal that ages has an elder build; the crocodile and the birds have none (§2.4)', () => {

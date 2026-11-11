@@ -1802,12 +1802,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1489": {
-      "at": "2026-11-05T17:58:01.535Z",
-      "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
-      "origin": "machine",
-      "place": "last"
-    },
     "1490": {
       "at": "2026-11-05T17:58:01.663Z",
       "why": "user order 05.11.2026; 1488/1489 run inside 1482's closure, 1490 is a standalone defect behind it",
@@ -1855,6 +1849,12 @@
       "why": "user bug report without a front-order; worked inside its Tierverhalten bundle",
       "origin": "machine",
       "place": "last"
+    },
+    "1500": {
+      "at": "2026-11-11T05:37:44.730Z",
+      "why": "LOW-preset tree density defect: low player impact (only under LOW detail), stays behind the front-order points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1883,7 +1883,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-10T22:37:05.541Z",
+    "at": "2026-11-11T05:37:44.738Z",
     "points": [
       184,
       200,
@@ -2334,7 +2334,6 @@
       1483,
       1484,
       1488,
-      1489,
       1490,
       1492,
       1493,
@@ -2343,7 +2342,8 @@
       1496,
       1497,
       1498,
-      1499
+      1499,
+      1500
     ]
   }
 }

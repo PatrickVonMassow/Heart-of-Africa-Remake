@@ -220,6 +220,7 @@ import {
   buildLion,
   buildLionCub,
   buildVulture,
+  buildVultureLanded,
   buildRaptor,
   RAPTOR_PLUMAGE,
   buildWarthog,
@@ -234,6 +235,7 @@ import {
   crocodileBodyY,
   ELDER_BUILDERS,
 } from '../../render/fauna'
+import { VULTURE_SHAPE } from '../../render/vultureShape'
 import { setGroundStains } from '../../render/groundStains'
 import { fireHalfWidth, fireHash, fireLocal, flameSlot, frontAlong, frontPoint, smokeFade, smokePhase } from './grassFireFront'
 import { setBurnScar } from './burnScarNode'
@@ -1117,6 +1119,8 @@ const FEED_FLANK_DIST = Math.hypot(0.7, 0.25)
 /** Fast glide: the flights start beyond the view ring (design.md §19), so the
  *  birds must cover real distance to arrive while their reason still holds. */
 const VULTURE_SCAVENGE_SPEED = 16
+/** Render scale of every vulture: the geometry is built true to size (point 1498). */
+const VULTURE_SCALE = VULTURE_SHAPE.renderScale
 const VULTURE_FLY_SPEED = 16
 
 /** Drift boost of the current close to a fall (mirrors the traveller's drift
@@ -1893,6 +1897,8 @@ interface WildlifeMeshPool {
    *  never bound on WebGL2; see CROCODILE_FADE_BAND in fauna.ts). */
   crocStrike: THREE.InstancedMesh
   vultureGeo: THREE.BufferGeometry
+  /** The folded pose of a vulture on the ground (point 1498). */
+  vultureLandedGeo: THREE.BufferGeometry
   /** The body tessellation the detailed ungulates are currently built at. */
   bodySegments: number
 }
@@ -1971,7 +1977,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.count = 0
     elder[sp] = m
   }
-  wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
+  wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), vultureLandedGeo: buildVultureLanded(), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
   return wildlifeMeshCache
 }
 
@@ -2182,7 +2188,7 @@ function Herds() {
     // debug override), the drama current there and the effective flow against
     // the drown threshold. A staged water-drama check asserts this reading
     // instead of assuming a forced season arrived (point 502).
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, scavengers, restock, meshRefs, calfMeshRefs, herdState,
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, scavengers, restock, meshRefs, calfMeshRefs, elderMeshes: pool.elder, herdState,
       colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, raptor: RAPTOR_STATE, igniteFire: igniteFireAt, groundAt: (x: number, z: number) => { const l = worldToLatLon(x, z); return Math.max(0.02, sampleTerrain(l.lat, l.lon, useGame.getState().seed).height) }, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
       waterDrama: (lat: number, lon: number) => {
         const bw = balance.waterDrama
@@ -4930,6 +4936,8 @@ function Herds() {
         sg.position.set(sc.x, sc.y, sc.z)
         sg.children.forEach((bird, i) => {
           const ph = (i / sg.children.length) * Math.PI * 2 + si // per-flock phase offset
+          // Wings folded on the ground, spread in the air (point 1498).
+          ;(bird as THREE.Mesh).geometry = sc.landed ? pool.vultureLandedGeo : vultureGeo
           if (sc.landed) {
             const r = 0.5 + i * 0.35
             const bx = Math.cos(ph) * r
@@ -4942,20 +4950,20 @@ function Herds() {
             // 217's reported wing-through-ground clip).
             const pitch = 0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3
             let bg = 0
-            for (const [ox, oz] of birdExtentOffsets(ph, 1.5)) {
+            for (const [ox, oz] of birdExtentOffsets(ph, VULTURE_SCALE)) {
               const bll = worldToLatLon(sc.x + bx + ox, sc.z + bz + oz)
               bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, seed).height)
             }
             const hop = Math.abs(Math.sin(t * 3 + ph)) * 0.1
-            bird.position.set(bx, landedBirdYPosed(sc.y, bg, hop, pitch, ph, 1.5), bz)
-            SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearancePosed(sc.y, bg, hop, pitch, ph, 1.5))
+            bird.position.set(bx, landedBirdYPosed(sc.y, bg, hop, pitch, ph, VULTURE_SCALE), bz)
+            SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearancePosed(sc.y, bg, hop, pitch, ph, VULTURE_SCALE))
             bird.rotation.set(pitch, ph, 0) // heads pecking down
           } else {
             const a2 = t * 0.6 + ph
             bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
             bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
           }
-          bird.scale.setScalar(1.5)
+          bird.scale.setScalar(VULTURE_SCALE)
         })
       }
     }
@@ -6973,6 +6981,7 @@ function Vultures() {
   // Geometry/material from the module pool (point 96): no per-mount rebuild,
   // no leak under the travel scene's dispose={null}.
   const geo = getWildlifeMeshes().vultureGeo
+  const landedGeo = getWildlifeMeshes().vultureLandedGeo
   const material = getWildlifeMeshes().material
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
@@ -7003,7 +7012,8 @@ function Vultures() {
       bird.position.set(Math.cos(a) * r, height + Math.sin(t * 0.8 + phase) * 0.6, Math.sin(a) * r)
       bird.rotation.y = -a - Math.PI / 2
       bird.rotation.z = 0.25 // banking into the circle
-      bird.scale.setScalar(1.6)
+      ;(bird as THREE.Mesh).geometry = geo
+      bird.scale.setScalar(VULTURE_SCALE)
     })
   }
 
@@ -7121,20 +7131,23 @@ function Vultures() {
             // than the head; point 217).
             const kPitch = 0.6 + Math.sin(t * 4 + phase) * 0.3
             let bg = 0
-            for (const [ox, oz] of birdExtentOffsets(phase, 1.6)) {
+            for (const [ox, oz] of birdExtentOffsets(phase, VULTURE_SCALE)) {
               const bll = worldToLatLon(f.x + lx + ox, f.z + lz + oz)
               bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, s.seed).height)
             }
             const hop = Math.abs(Math.sin(t * 3 + phase)) * 0.12
-            const ly = landedBirdYPosed(killGroundY, bg, hop, kPitch, phase, 1.6)
+            const ly = landedBirdYPosed(killGroundY, bg, hop, kPitch, phase, VULTURE_SCALE)
             bird.position.set(cx + (lx - cx) * dsc, cy + (ly - cy) * dsc, cz + (lz - cz) * dsc)
-            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearancePosed(killGroundY, bg, hop, kPitch, phase, 1.6))
+            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearancePosed(killGroundY, bg, hop, kPitch, phase, VULTURE_SCALE))
+            // Wings fold as it settles (point 1498): the clearance above is
+            // measured on the folded pose from this same threshold on.
+            ;(bird as THREE.Mesh).geometry = dsc > 0.6 ? landedGeo : geo
             if (dsc > 0.6) {
               bird.rotation.set(kPitch, phase, 0) // pecking down
             } else {
               bird.rotation.set(0, -a - Math.PI / 2, 0.25) // still banking
             }
-            bird.scale.setScalar(1.6)
+            bird.scale.setScalar(VULTURE_SCALE)
           })
         }
         clearance.current = Math.min(killMinClear, SCAV_CLEARANCE.v)

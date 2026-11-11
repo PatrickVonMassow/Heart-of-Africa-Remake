@@ -1,3 +1,5 @@
+import { buildVultureLanded } from '../../render/faunaVulture'
+import { VULTURE_SHAPE, vultureLandedBox } from '../../render/vultureShape'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   channelDriftStep,
@@ -1310,8 +1312,8 @@ describe('landedBirdY / landedBirdClearance (point 128 — a landed vulture stan
     expect(landedBirdY(2, -5, 0)).toBe(LANDED_BIRD_HOVER)
   })
 
-  it('the hover clears the vulture body sphere reach (~0.096 below origin, buildVulture)', () => {
-    expect(LANDED_BIRD_HOVER).toBeGreaterThan(0.096)
+  it('the hover is a positive margin (legacy unposed rule)', () => {
+    expect(LANDED_BIRD_HOVER).toBeGreaterThan(0)
   })
 
   it('the clearance above the bird OWN ground is never below the hover — on any slope', () => {
@@ -1382,57 +1384,41 @@ describe('guardEngagement (point 191 — a passing hunt is guarded only while it
   })
 })
 
-describe('posed landed-bird clearance (points 202 + 217 — the wing span, the yaw and the feeding motion count)', () => {
+describe('posed landed-bird clearance (points 202 + 217 + 1498 — the folded bird, the yaw and the feeding motion count)', () => {
   // The y of a local point under the render pose bird.rotation.set(pitch, yaw, 0)
   // (Euler XYZ, z = 0) — the ACTUAL pose maths the scene applies, not a proxy.
   const posedY = (pitch: number, yaw: number, [x, y, z]: [number, number, number]) =>
     Math.sin(pitch) * Math.sin(yaw) * x + Math.cos(pitch) * y - Math.sin(pitch) * Math.cos(yaw) * z
-  // A real outer WING-TIP corner from buildVulture (fauna.ts): the tip box
-  // (0.3,0.02,0.2) at (±1.0,0.12,-0.04) rotated Z by ±0.3 — outer-bottom corner.
-  const WING_TIP: [number, number, number][] = [
-    [1.066, 0.445, 0.06],
-    [1.066, 0.445, -0.14],
-    [-1.066, 0.445, 0.06],
-    [-1.066, 0.445, -0.14],
-  ]
+  // Every real vertex of the folded landed bird (buildVultureLanded).
+  const landed = buildVultureLanded()
+  const P = landed.attributes.position
+  const VERTS: [number, number, number][] = []
+  for (let i = 0; i < P.count; i++) VERTS.push([P.getX(i), P.getY(i), P.getZ(i)])
+  const S = VULTURE_SHAPE.renderScale
+  const FEET = -vultureLandedBox().minY
 
-  it('the lowest point is the body bottom at rest, for any heading', () => {
-    // Pitch 0: no pose dip at all — the body sphere bottom (0.096·scale) is lowest.
+  it('the lowest point at rest is the feet, for any heading', () => {
     for (const yaw of [0, Math.PI / 2, Math.PI, -1.3]) {
-      expect(landedBirdLowestDepth(0, yaw, 1)).toBeCloseTo(0.096, 9)
+      expect(landedBirdLowestDepth(0, yaw, 1)).toBeCloseTo(FEET, 9)
     }
   })
 
-  it('a spread WING TIP on the yaw low side is the deep end, far past the head-on depth (point 217)', () => {
-    // Facing the carcass (yaw 0) the head/beak leads; broadside (yaw ±90°) swings
-    // a whole wing tip down — much deeper than the head, the reported clip.
-    const headOn = landedBirdLowestDepth(0.9, 0, 1.6)
-    const broadside = landedBirdLowestDepth(0.9, Math.PI / 2, 1.6)
-    expect(broadside).toBeGreaterThan(headOn + 0.3)
-    expect(broadside).toBeGreaterThan(0.8) // the wing tip reaches ~0.9 below origin at 1.6
-    // Deeper with a fuller peck, and symmetric in the yaw sign.
-    expect(broadside).toBeGreaterThan(landedBirdLowestDepth(0.45, Math.PI / 2, 1.6))
-    expect(landedBirdLowestDepth(0.9, -Math.PI / 2, 1.6)).toBeCloseTo(broadside, 9)
+  it('a deep peck dips the beak end below the feet; the depth is symmetric in the yaw sign', () => {
+    const peck = landedBirdLowestDepth(0.9, 0, S)
+    expect(peck).toBeGreaterThan(FEET * S)
+    expect(landedBirdLowestDepth(0.9, -1, S)).toBeCloseTo(landedBirdLowestDepth(0.9, 1, S), 9)
   })
 
-  it('the WING TIP itself (body y − bob dip + wing extent) stays above ground through the bob — both flocks', () => {
-    // The shared rule must clear the actual wing tip, not just the body centre,
-    // at EVERY heading and pitch across the bob — for the ground scavenger (1.5)
-    // AND the kill flock (1.6). On a slope the extent lift adds on top.
-    for (const scale of [1.5, 1.6]) {
-      for (const groupBaseY of [2]) {
-        for (const ground of [2, 2.5, 3.2]) {
-          for (let pi = 0; pi <= 6; pi++) {
-            const pitch = 0.3 + (0.6 * pi) / 6 // 0.3..0.9 covers scav 0.45..0.75 and kill 0.3..0.9
-            for (let yi = 0; yi < 12; yi++) {
-              const yaw = (yi / 12) * Math.PI * 2
-              const originY = groupBaseY + landedBirdYPosed(groupBaseY, ground, 0, pitch, yaw, scale)
-              // World y of the deepest wing-tip corner under this exact pose.
-              let tipWorld = Infinity
-              for (const c of WING_TIP) tipWorld = Math.min(tipWorld, originY + posedY(pitch, yaw, c) * scale)
-              expect(tipWorld).toBeGreaterThanOrEqual(ground - 1e-9)
-            }
-          }
+  it('every vertex of the folded bird stays above ground through the bob — both flocks, any heading', () => {
+    for (const ground of [2, 2.5, 3.2]) {
+      for (let pi = 0; pi <= 6; pi++) {
+        const pitch = 0.3 + (0.6 * pi) / 6 // 0.3..0.9 covers scav 0.45..0.75 and kill 0.3..0.9
+        for (let yi = 0; yi < 12; yi++) {
+          const yaw = (yi / 12) * Math.PI * 2
+          const originY = 2 + landedBirdYPosed(2, ground, 0, pitch, yaw, S)
+          let low = Infinity
+          for (const c of VERTS) low = Math.min(low, originY + posedY(pitch, yaw, c) * S)
+          expect(low).toBeGreaterThanOrEqual(ground - 1e-9)
         }
       }
     }
@@ -1441,32 +1427,32 @@ describe('posed landed-bird clearance (points 202 + 217 — the wing span, the y
   it('the posed y keeps the LOWEST point a margin above flat ground through the whole peck, any heading', () => {
     for (const pitch of [0, 0.45, 0.75, 0.9]) {
       for (const yaw of [0, 1, Math.PI / 2, 2.5, Math.PI]) {
-        for (const scale of [1.5, 1.6]) {
-          const y = landedBirdYPosed(2, 2, 0, pitch, yaw, scale)
-          const lowestWorld = 2 + y - landedBirdLowestDepth(pitch, yaw, scale)
-          expect(lowestWorld - 2).toBeCloseTo(0.06, 9) // exactly the margin above ground
-        }
+        const y = landedBirdYPosed(2, 2, 0, pitch, yaw, S)
+        const lowestWorld = 2 + y - landedBirdLowestDepth(pitch, yaw, S)
+        expect(lowestWorld - 2).toBeCloseTo(0.06, 9) // exactly the margin above ground
       }
     }
   })
 
-  it('ground rising under a WING lifts the whole bird (extent max, never below the margin)', () => {
+  it('ground rising under the bird lifts it (extent max, never below the margin)', () => {
     for (const ground of [2, 2.4, 3.1]) {
       for (const yaw of [0, Math.PI / 2, 2.2]) {
-        expect(landedBirdClearancePosed(2, ground, 0, 0.9, yaw, 1.6)).toBeGreaterThanOrEqual(0.06 - 1e-9)
+        expect(landedBirdClearancePosed(2, ground, 0, 0.9, yaw, S)).toBeGreaterThanOrEqual(0.06 - 1e-9)
       }
     }
     // A point-185-style +0.5 group pre-lift bug still reads as a blown cap.
-    expect(landedBirdClearancePosed(2.5, 2, 0, 0.45, 0, 1.5)).toBeGreaterThan(0.5)
+    expect(landedBirdClearancePosed(2.5, 2, 0, 0.45, 0, S)).toBeGreaterThan(0.5)
   })
 
-  it('birdExtentOffsets rotates the wing tips and head with the yaw', () => {
+  it('birdExtentOffsets rotates the flanks, the head and the tail with the yaw', () => {
+    const b = vultureLandedBox()
     const at0 = birdExtentOffsets(0, 1)
-    expect(at0[1][0]).toBeCloseTo(1.15, 9) // +x wing tip
-    expect(at0[3][1]).toBeCloseTo(0.24, 9) // head forward on z
+    expect(at0[1][0]).toBeCloseTo(b.maxX, 9) // +x flank
+    expect(at0[3][1]).toBeCloseTo(b.maxZ, 9) // head forward on z
+    expect(at0[4][1]).toBeCloseTo(b.minZ, 9) // tail behind
     const at90 = birdExtentOffsets(Math.PI / 2, 1)
-    expect(Math.abs(at90[1][0])).toBeLessThan(1e-9) // tip swung onto the z axis
-    expect(Math.abs(at90[1][1])).toBeCloseTo(1.15, 9)
+    expect(Math.abs(at90[1][0])).toBeLessThan(1e-9) // flank swung onto the z axis
+    expect(Math.abs(at90[1][1])).toBeCloseTo(b.maxX, 9)
   })
 })
 

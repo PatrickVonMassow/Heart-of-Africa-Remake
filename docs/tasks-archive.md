@@ -36343,3 +36343,25 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   project's own verification host, whose absolute milliseconds mean nothing but whose
   RELATIVE drop must confirm the projection rather than contradict it — without a
   visual regression the user rejects.
+
+- [x] 1489. No sensitive body part exposed from any view or pose (user rule 05.11.2026: "allgemein dürfen nie sensible Körperteile exponiert sein")
+  Design rule, to be written into design.md next to "Covered upper body and hip layer (user 06.10.2026)" and mirrored in docs/peoples-1890.md §8.6 where it applies:
+  - No figure ever shows a female breast, the genital area or the buttocks uncovered - from ANY camera angle the game can reach (including the overhead/bird's-eye and close first-person views) and in ANY pose or animation (standing, walking, running, kneeling, bending, pounding, digging, sitting).
+  - A garment that stands off the body must not open a view onto covered skin; coverage is judged by the rendered picture, not by garment presence in the outfit data.
+  - This rule outranks every budget, stop rule and revert rule: an exposure defect is never accepted, frozen or moved to the backlog; it is fixed until it holds.
+  Verification: the final picture check of 1482 includes an overhead view and a kneeling/bending pose for every covering garment form (breast cloth, wraps, tube tops, hip cloths, children's hip layer), both backends.
+  First known case: /backup/hoa/local/BlosseBrueste.zip (kneeling Bambara woman, breast cloth as stiff ring, breast bare from above).
+  Second case (finding 10.11.2026 22:46; 1482's chest RESOLVED verdict for 1489 was false): breast still bare from above on the kneeling Bambara woman. Evidence /backup/hoa/local/BruesteExponiert.zip (seed 3641016855, bambara-village, x/z -59.45/-130.99, webgpu, build 51c7783).
+  Acceptance (user front-order 10.11.2026): the user's exact spot judged from the steep overhead camera, and an overhead + kneeling/pounding frame of every covering garment form on both backends.
+  Queue position: user front-order 10.11.2026 — the very front of the work order, ahead of every other open point including the 35-point front-order of 09.11.2026; in-flight branches are parked, not discarded.
+  Bundle: Dorfleben.
+
+- [x] 1498. Make elderly animals recognisable at game distance, with believable vultures and a readable elephant graveyard
+  User report 10.11.2026 (build 51c7783): the user has never seen or recognised an elderly animal (point 265, landed 10.11.2026 13:13, merge a56504f8d). Point 265 committed only two frames, both of the death drama (verification/265-elder-down-vultures-gather.png, verification/265b-elephant-dies-at-graveyard.png); no frame shows an elder next to a prime adult, so recognisability was never accepted.
+  FINAL STATE
+  1. Elderly animals are recognisable as old at the normal travel-camera height and distance, for every species that has an elder (design.md §19.18; crocodile has none). Levers (calibratable, in src/config/balance.ts and the fauna schema): elderly.fraction (now 0.08), ELDERLY_SCHEMA (bodyR 0.86, swayBack 0.14, coatGrey 0.3, faceGrey 0.5, neckDrop 0.15), the elephant master tusk, the lion elder mane; keep the cues researched (docs/fauna-behaviour-1890.md), only stronger.
+  2. Vulture size: in 265-elder-down-vultures-gather.png the vultures read as flat oversized planks almost a zebra long; bring them to a believable size and shape at that distance.
+  3. Elephant graveyard (user asked explicitly): in 265b-elephant-dies-at-graveyard.png the graveyard shows pale WHOLE elephant bodies that read like plaster casts, not as bones/remains; the graveyard must read as an elephant graveyard (remains, bones, tusks) from the travel camera.
+  ACCEPTANCE: per species one comparison frame, elder beside a prime adult, from the travel camera at game distance; a vulture frame over a downed animal; a graveyard frame; both backends; judged by eye "does it look right to a person".
+  PLACEMENT (user 10.11.2026 23:02): at the front of the work order, directly behind point 1489 (no exposed body parts) and ahead of every other open point, including the 35-point front-order of 09.11.2026. If the owner splits this request (elders/vultures vs. graveyard), both parts sit there, in that order.
+  Bundle: Tierverhalten.

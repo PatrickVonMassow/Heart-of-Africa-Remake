@@ -7033,7 +7033,8 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
   // three-quarter at 3 m. `e0-`: the user's finding, the kneeling Bambara
   // woman's breast cloth seen from above (her wrapper from the waist below,
   // judged at its top edge too); `exp-`: the other covering forms, the
-  // children's hip layer as children wear it.
+  // children's hip layer as children wear it. A woman wears her people's
+  // chest layer with every hip form, as in the game (design §19.15).
   const BEND = [
     ['kneel', 'kneel', 0.25, 'kneeling, held down'],
     ['dig', 'dig', 0.5, 'bent over, dig at mid-stroke'],
@@ -7050,11 +7051,11 @@ if (section('garment-acceptance') && process.env.VERIFY_SECTION === 'garment-acc
     })
   for (const [form, who, w, people, garments, what] of [
     ['wraplong-chest', 'woman', WOMAN, 'hausa', ['wrapLong-chest'], 'long wrapper tied over the chest (tube top), adult woman (Hausa)'],
-    ['skirtknee', 'woman', WOMAN, 'zulu', ['skirtKnee-waist'], 'knee skirt, adult woman (Zulu)'],
-    ['skirtshort', 'woman', WOMAN, 'banda', ['skirtShort-waist'], 'short skirt, adult woman (Banda)'],
-    ['loinflap', 'woman', WOMAN, 'lunda', ['loinFlap-waist'], 'loin flap, adult woman (Lunda)'],
+    ['skirtknee', 'woman', WOMAN, 'zulu', ['skirtKnee-waist', 'breastCloth-chest'], 'knee skirt (her hide breast cloth above), adult woman (Zulu)'],
+    ['skirtshort', 'woman', WOMAN, 'banda', ['skirtShort-waist', 'breastCloth-chest'], 'short skirt (her bark breast cloth above), adult woman (Banda)'],
+    ['loinflap', 'woman', WOMAN, 'lunda', ['loinFlap-waist', 'breastCloth-chest'], 'loin flap (her calico breast cloth above), adult woman (Lunda)'],
     ['loinflap', 'man', MAN, 'wayeyi', ['loinFlap-waist'], 'loin flap, adult man (Wayeyi)'],
-    ['apron', 'woman', WOMAN, 'pedi', ['apron-waist'], 'apron, adult woman (Pedi)'],
+    ['apron', 'woman', WOMAN, 'pedi', ['apron-waist', 'cape-chest'], 'apron (her hide cape tied over the breast), adult woman (Pedi)'],
     ['girdletails', 'man', MAN, 'zulu', ['girdleTails-waist'], 'girdle tails, adult man (Zulu)'],
     ['child-skirtshort', 'girl', GIRL, 'hausa', ['skirtShort-waist', 'waistBeads-waist'], 'Hausa short skirt and waist beads, girl (child)'],
     ['child-loinflap', 'girl', GIRL, 'lunda', ['loinFlap-waist', 'waistBeads-waist'], 'Lunda loin flap and waist beads, girl (child)'],
