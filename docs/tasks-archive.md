@@ -36522,3 +36522,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   2. Find why branch-hygiene-guard (CLAUDE.md §6 "the merge ends the branch") let them survive the landing, and close that gap with the smallest fix (infrastructure freeze: fix only, no new mechanism). A test reproduces the missed case.
   3. batch-in-flight --status then counts only genuinely open branches.
   Bundle: unbundled.
+
+- [x] 1505. Decide point 1463: continue, park or close
+  RANK AT THE VERY FRONT of the work order (user order 11.11.2026, 22:14), directly after the stale-branch cleanup request and ahead of 1490.
+
+  Measured 11.11.2026 22:12: feat/1463-infra-simplification (local, origin, worktree .claude/worktrees/point-1463) has its last commit on 01.11.2026, 10 commits ahead and 855 behind main. No "- [ ] 1463." / "- [x] 1463." line was found in TASKS.md or docs/tasks-archive.md. It occupies one of the three pool slots.
+
+  Final state: one recorded decision on 1463 — continue (rebase onto main and work it), park (recorded park so it no longer counts as a slot), or close (delete branch and worktree, archive the point) — with what/why/veto effect recorded. If 1463 has no work-order line, give it one or record where it is tracked. The decision is presented to the user if it is a genuine choice without a clear recommendation.
+  Bundle: unbundled.

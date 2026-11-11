@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1505. Decide point 1463: continue, park or close
-  RANK AT THE VERY FRONT of the work order (user order 11.11.2026, 22:14), directly after the stale-branch cleanup request and ahead of 1490.
-
-  Measured 11.11.2026 22:12: feat/1463-infra-simplification (local, origin, worktree .claude/worktrees/point-1463) has its last commit on 01.11.2026, 10 commits ahead and 855 behind main. No "- [ ] 1463." / "- [x] 1463." line was found in TASKS.md or docs/tasks-archive.md. It occupies one of the three pool slots.
-
-  Final state: one recorded decision on 1463 — continue (rebase onto main and work it), park (recorded park so it no longer counts as a slot), or close (delete branch and worktree, archive the point) — with what/why/veto effect recorded. If 1463 has no work-order line, give it one or record where it is tracked. The decision is presented to the user if it is a genuine choice without a clear recommendation.
-  Bundle: unbundled.
-
 - [ ] 1506. Board: show why pool slots sit unused
   Rank directly AFTER the two front requests of 11.11.2026 (stale-branch cleanup, 1463 decision), ahead of 1490.
 
