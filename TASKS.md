@@ -77,16 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 327. Two nearby carcasses must share one vulture flock (user 25.07.2026: a
-  second flock spawns and the two overlap). Give the §19.6 flock a claim over a
-  carcass CLUSTER: a new carcass within a calibratable radius of a flock's current
-  target joins that flock's queue instead of drawing a second flock, and the flock
-  works them in turn, leaving only when the cluster is done. No two flocks may be
-  active within the cluster radius. VERIFIABLE: pure test of the cluster claim (a
-  carcass inside joins, one outside draws its own flock; boundary exact); live
-  check with two staged carcasses close together — exactly one flock, both eaten,
-  no overlap; both backends.
-
 - [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
    Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
    Evidence 2: /backup/hoa/local/hoa-state-2026-11-11-1117999851.zip (seed 1117999851, place tangier, x/z -58.71/-356.97, webgpu, build ed95b5b). User text: "Hängt mit Kopf in der Kiste, sodass er nichts sehen kann und läuft sinnlos hin und her und immer wieder gegen die Wände". placeLife shows porters with no errand/target (unlike the errand walkers beside them).

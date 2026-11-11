@@ -36501,3 +36501,13 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   the spring, both backends), and it sits ON the terrain (no gap/clip at the rim —
   ray/heights check); screenshot pair added to the §7.2 evidence set; the picture
   judged on BOTH backends per the render rule.
+
+- [x] 327. Two nearby carcasses must share one vulture flock (user 25.07.2026: a
+  second flock spawns and the two overlap). Give the §19.6 flock a claim over a
+  carcass CLUSTER: a new carcass within a calibratable radius of a flock's current
+  target joins that flock's queue instead of drawing a second flock, and the flock
+  works them in turn, leaving only when the cluster is done. No two flocks may be
+  active within the cluster radius. VERIFIABLE: pure test of the cluster claim (a
+  carcass inside joins, one outside draws its own flock; boundary exact); live
+  check with two staged carcasses close together — exactly one flock, both eaten,
+  no overlap; both backends.
