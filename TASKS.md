@@ -15253,3 +15253,8 @@ to land than a mechanism that needs a review.
   Final state: a feeder at any carcass, the trample/crush death included, has walked there on screen from where it was; no predator is placed or teleported onto a body.
   Test: Vitest on the crush-death carcass path (no feeder spawned at the body); picture on both backends at the evidence spot.
   Bundle: Tierverhalten.
+- [ ] 1500. LOW detail: every collidable tree keeps its body under the density lever
+  Finding 11.11.2026 (render-verify-guard): recorded enrichments runs before 11.11.2026 04:05 on both backends (webgpu and webgl) each carry the red 'LOW: collidable trees draw in full under the density lever' (scripts/verify/enrichments.mjs, LOW preset block); no open point owns it, the LOW preset point was settled in e16d89fe1. Player impact: under the LOW detail level a collidable plant (acacia, jungle, palm, baobab, kopje) of the full fill can be missing from the thinned fill, so the traveller collides with a tree that is not drawn.
+  Final state: under LOW every collidable plant of the full fill is drawn in the thinned fill on the same ground (thinned count equals full count, none missing); only the small dressing (bush, rock, termite, deadtree, papyrus) is thinned.
+  Test: Vitest on the density-lever fill (collidable species exempt from thinning); `npm test -- enrichments` LOW section green on both backends with the 310-low-savanna picture.
+  Bundle: Steuerung & Performance.
