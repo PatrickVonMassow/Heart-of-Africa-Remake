@@ -7133,19 +7133,102 @@ if (section('elderly-natural-death')) {
   // Point 1498: is an elder RECOGNISABLE? One frame per species with an elder
   // (the crocodile has none, §19.18), the elder beside a prime adult, from the
   // travel camera at its normal zoom. Herd species are injected through the
-  // herds hook; the old cats are the hunt's lone hunter, so their pair is two
+  // herds hook AT THE FRONT of their list (the draw loop stops at the
+  // instanced capacity, so a pair pushed behind a full herd was never drawn —
+  // rework 1); the old cats are the hunt's lone hunter, so their pair is two
   // static copies of the hunt's own predator mesh carrying its elder and prime
-  // geometry. A page-side rAF pin holds each pair in place, in profile (facing
-  // +x), for the shutter; everything is removed after its frame.
+  // geometry. A page-side rAF pin holds each pair in place, in profile.
+  //
+  // THE SHUTTER ASSERTION (rework 1): before AND after each frame, both
+  // animals of the pair must be (a) drawn in the colour pass — a spy on the
+  // backend's draw records every object drawn with its own material, which a
+  // shadow pass never uses, so a body whose pipeline is still compiling (the
+  // lion copies cast shadows without bodies) does not count — (b) visible
+  // along their whole parent chain, and (c) on screen with all eight corners
+  // of their world bounding box projected through the live camera. A missing
+  // subject turns the check red; the copies wait up to ~10 s of frames for
+  // their first colour draw before the shutter.
   const zoomKept = await page.evaluate(() => {
     const u = window.__ui.getState()
     const z = u.travelZoom
     u.setTravelZoom(0.5) // DEFAULT_TRAVEL_ZOOM (src/state/ui.ts): the game distance
+    const be = window.__renderer.backend
+    const seen = new Set()
+    const orig = be.draw
+    be.draw = function (ro, info) {
+      if (ro.object && ro.material === ro.object.material) seen.add(ro.object)
+      return orig.call(this, ro, info)
+    }
+    const frames = (n) => new Promise((res) => {
+      let i = 0
+      const step = () => (++i >= n ? res() : requestAnimationFrame(step))
+      requestAnimationFrame(step)
+    })
+    const anyMesh = window.__wildlife.meshRefs.current.zebra
+    const M4 = anyMesh.matrixWorld.constructor
+    const V3 = anyMesh.position.constructor
+    let root = anyMesh
+    while (root.parent) root = root.parent
+    const visibleChain = (o) => {
+      for (let q = o; q; q = q.parent) if (!q.visible) return false
+      return true
+    }
+    // The drawn object and world matrix of a subject: a herd animal is found
+    // as an instance of a live InstancedMesh whose translation is its x/z.
+    const locate = (sub) => {
+      if (sub.mesh) {
+        sub.mesh.updateMatrixWorld(true)
+        return { obj: sub.mesh, m: sub.mesh.matrixWorld.clone() }
+      }
+      const a = sub.animal
+      let hit = null
+      const im = new M4()
+      root.traverse((o) => {
+        if (hit || !o.isInstancedMesh) return
+        for (let i = 0; i < o.count; i++) {
+          o.getMatrixAt(i, im)
+          const e = im.elements
+          if (Math.hypot(e[12] - a.x, e[14] - a.z) < 0.35) {
+            o.updateMatrixWorld(true)
+            hit = { obj: o, m: o.matrixWorld.clone().multiply(im) }
+            return
+          }
+        }
+      })
+      return hit
+    }
+    const probe = (subs) => subs.map((sub) => {
+      const at = locate(sub)
+      if (!at) return { name: sub.name, found: false }
+      const g = at.obj.geometry
+      if (!g.boundingBox) g.computeBoundingBox()
+      const b = g.boundingBox
+      let inside = true
+      const v = new V3()
+      for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+        v.set(x, y, z).applyMatrix4(at.m)
+        const n = window.__camera.ndc(v.x, v.z, v.y)
+        if (!(n.z < 1 && Math.abs(n.x) <= 1 && Math.abs(n.y) <= 1)) inside = false
+      }
+      return { name: sub.name, found: true, obj: at.obj.uuid, drawn: seen.has(at.obj), visible: visibleChain(at.obj), inside }
+    })
+    const settle = async (subs, maxFrames) => {
+      let r = []
+      for (let k = 0; k < maxFrames; k += 2) {
+        seen.clear()
+        await frames(2)
+        r = probe(subs)
+        if (r.every((s) => s.found && s.drawn && s.visible && s.inside)) break
+      }
+      const ok = r.length === 2 && r.every((s) => s.found && s.drawn && s.visible && s.inside) && r[0].obj !== r[1].obj
+      return { ok, subjects: r }
+    }
+    window.__elderProbe = { settle, restore: () => { be.draw = orig } }
     return z
   })
   const ELDER_HERD_SPECIES = { elephant: 6, giraffe: 4, zebra: 3.4, wildebeest: 3.2, antelope: 2.6, warthog: 2.2 }
   for (const [sp, gap] of Object.entries(ELDER_HERD_SPECIES)) {
-    const at = await page.evaluate(({ sp, gap }) => {
+    const at = await page.evaluate(async ({ sp, gap }) => {
       const herds = window.__wildlife.herdsRef.current
       const p = window.__game.getState().pos
       const seed = window.__game.getState().seed
@@ -7154,23 +7237,24 @@ if (section('elderly-natural-death')) {
         const ty = window.__terrainType(-z / U, x / U, seed)
         return ty !== 'water' && ty !== 'ocean'
       }
+      // Nearest land spot first: the pair must sit well inside the frame.
       let spot = null
-      for (let r = 7; r <= 20 && !spot; r += 1.5) {
+      for (let r = 4; r <= 14 && !spot; r += 1) {
         for (let k = 0; k < 16; k++) {
           const a = (k / 16) * Math.PI * 2
           const x = p.x + Math.sin(a) * r
           const z = p.z + Math.cos(a) * r
-          if (land(x - gap, z) && land(x + gap, z) && land(x, z)) { spot = { x, z }; break }
+          if (land(x - gap, z) && land(x + gap, z) && land(x, z) && window.__camera.onScreen(x - gap, z) && window.__camera.onScreen(x + gap, z)) { spot = { x, z }; break }
         }
       }
-      if (!spot) return null
+      if (!spot) return { staged: false }
       const mk = (dx, elderly) => ({
         x: spot.x + dx, z: spot.z, y: 0.2, rot: Math.PI / 2, heading: Math.PI / 2, scale: 1, phase: 0.3,
         chunk: undefined, grounded: true, ...(elderly ? { elderly: true } : {}),
       })
       const prime = mk(-gap / 2, false)
       const elder = mk(gap / 2, true)
-      herds[sp].push(prime, elder)
+      herds[sp].unshift(prime, elder) // inside the drawn capacity, whatever the herd holds
       const pin = { on: true, list: [[prime, prime.x, prime.z], [elder, elder.x, elder.z]] }
       const hold = () => {
         if (!pin.on) return
@@ -7179,15 +7263,21 @@ if (section('elderly-natural-death')) {
       }
       hold()
       window.__elderPair = { sp, prime, elder, pin }
-      return { x: spot.x, z: spot.z }
+      const subs = [{ name: `prime ${sp}`, animal: prime }, { name: `old ${sp}`, animal: elder }]
+      window.__elderPair.subs = subs
+      const pre = await window.__elderProbe.settle(subs, 240)
+      return { staged: true, x: spot.x, z: spot.z, pre }
     }, { sp, gap })
-    check(`an elder ${sp} and a prime adult stand side by side for the comparison (point 1498)`, !!at, at ? JSON.stringify(at) : 'no land spot')
-    if (at) {
+    let post = null
+    if (at.staged) {
       await shot(`1498-elder-vs-prime-${sp}`, {
-        world: at,
+        world: { x: at.x, z: at.z },
         label: `an old ${sp} (right, +x) beside a prime adult ${sp} (left), travel camera at game distance`,
       })
+      post = await page.evaluate(() => window.__elderProbe.settle(window.__elderPair.subs, 2))
     }
+    check(`the comparison frame shows BOTH the old and the prime ${sp}: drawn, visible, wholly on screen at the shutter (point 1498)`,
+      at.staged === true && at.pre?.ok === true && post?.ok === true, JSON.stringify({ at, post }))
     await page.evaluate(() => {
       const pr = window.__elderPair
       if (!pr) return
@@ -7225,34 +7315,51 @@ if (section('elderly-natural-death')) {
       let root = mesh
       while (root.parent) root = root.parent
       const gap = 2.6
-      const x = p.x + 6
-      const z = p.z + 2
-      const copies = [[young, x - gap / 2], [old, x + gap / 2]].map(([g, cx]) => {
+      let spot = null
+      for (let r = 4; r <= 12 && !spot; r += 1) {
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const x = p.x + Math.sin(a) * r
+          const z = p.z + Math.cos(a) * r
+          if (window.__camera.onScreen(x - gap, z) && window.__camera.onScreen(x + gap, z)) { spot = { x, z }; break }
+        }
+      }
+      if (!spot) return { staged: false, offScreen: true }
+      const copies = [[young, spot.x - gap / 2, 'prime'], [old, spot.x + gap / 2, 'old']].map(([g, cx, name]) => {
         const m = new mesh.constructor(g.geo, mesh.material)
         m.scale.setScalar(g.scale)
-        m.position.set(cx, window.__wildlife.groundAt(cx, z), z)
+        m.position.set(cx, window.__wildlife.groundAt(cx, spot.z), spot.z)
         m.rotation.set(0, Math.PI / 2, 0)
         m.castShadow = true
+        m.name = `${name} ${want}`
         root.add(m)
         return m
       })
       window.__elderCats = copies
-      return { staged: true, x, z, distinct: old.geo !== young.geo }
+      // ~10 s of frames: a first-time body waits out its pipeline compile.
+      const pre = await window.__elderProbe.settle(copies.map((m) => ({ name: m.name, mesh: m })), 600)
+      return { staged: true, x: spot.x, z: spot.z, distinct: old.geo !== young.geo, pre }
     }, want)
-    check(`an old ${want} and a prime ${want} stand side by side for the comparison (point 1498)`,
-      cat.staged === true && cat.distinct === true, JSON.stringify(cat))
+    let post = null
     if (cat.staged) {
       await shot(`1498-elder-vs-prime-${want}`, {
         world: { x: cat.x, z: cat.z },
         label: `an old ${want} (right, +x) beside a prime ${want} (left), travel camera at game distance`,
       })
+      post = await page.evaluate(() => window.__elderProbe.settle(window.__elderCats.map((m) => ({ name: m.name, mesh: m })), 2))
     }
+    check(`the comparison frame shows BOTH the old and the prime ${want}: drawn, visible, wholly on screen at the shutter (point 1498)`,
+      cat.staged === true && cat.distinct === true && cat.pre?.ok === true && post?.ok === true, JSON.stringify({ cat, post }))
     await page.evaluate(() => {
       for (const m of window.__elderCats ?? []) m.removeFromParent()
       window.__elderCats = undefined
     })
   }
-  await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomKept)
+  await page.evaluate((z) => {
+    window.__elderProbe?.restore()
+    window.__elderProbe = undefined
+    window.__ui.getState().setTravelZoom(z)
+  }, zoomKept)
 
   const dying = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
