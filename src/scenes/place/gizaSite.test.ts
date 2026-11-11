@@ -288,9 +288,16 @@ describe('Giza site — the site-scale monument geometry', () => {
         return Math.hypot(x - (c.x1 + t * dx), z - (c.z1 + t * dz)) <= c.r
       })
     const drawn = (x: number, z: number) => onSphinxFootprint((x - GIZA_SPHINX.x) / L, (z - GIZA_SPHINX.z) / L)
+    // Sample the UNION of the drift's and the colliders' bounds (plus a margin),
+    // so a collider overshooting the drift rectangle is caught too.
+    const margin = 1
+    const minX = Math.min(GIZA_SPHINX.x + b.minX * L, ...capsules.map((c) => Math.min(c.x1, c.x2) - c.r)) - margin
+    const maxX = Math.max(GIZA_SPHINX.x + b.maxX * L, ...capsules.map((c) => Math.max(c.x1, c.x2) + c.r)) + margin
+    const minZ = Math.min(GIZA_SPHINX.z + b.minZ * L, ...capsules.map((c) => Math.min(c.z1, c.z2) - c.r)) - margin
+    const maxZ = Math.max(GIZA_SPHINX.z + b.maxZ * L, ...capsules.map((c) => Math.max(c.z1, c.z2) + c.r)) + margin
     let covered = 0
-    for (let x = GIZA_SPHINX.x + b.minX * L; x <= GIZA_SPHINX.x + b.maxX * L; x += 0.2) {
-      for (let z = GIZA_SPHINX.z + b.minZ * L; z <= GIZA_SPHINX.z + b.maxZ * L; z += 0.2) {
+    for (let x = minX; x <= maxX; x += 0.2) {
+      for (let z = minZ; z <= maxZ; z += 0.2) {
         if (drawn(x, z)) {
           covered++
           expect(inCollider(x, z), `drawn sand at (${x.toFixed(1)}, ${z.toFixed(1)}) collides`).toBe(true)

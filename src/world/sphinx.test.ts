@@ -197,6 +197,20 @@ describe('no coplanar surfaces: the model has nothing to z-fight (no offset hide
     }
   })
 
+  it('partLevel is homogeneous of degree one, tapered parts included (the contact filter relies on it)', () => {
+    const tapered = SPHINX_PARTS.filter((p) => p.taper !== 0)
+    expect(tapered.length).toBeGreaterThan(0)
+    for (const p of [...tapered, part('face')]) {
+      for (const s of sampleSurface(p, 24, 16)) {
+        expect(partLevel(p, s.p[0], s.p[1], s.p[2]), `${p.id} on its surface`).toBeCloseTo(1, 4)
+        for (const k of [0.5, 2]) {
+          const q = s.p.map((v, i) => p.centre[i] + (v - p.centre[i]) * k)
+          expect(partLevel(p, q[0], q[1], q[2]), `${p.id} scaled by ${k}`).toBeCloseTo(k, 4)
+        }
+      }
+    }
+  })
+
   it('no two drawn parts meet in a near-coplanar contact', () => {
     // A point of A within a hair of B's surface must cross it at an angle.
     const parts = sphinxPartsFor('site-full')

@@ -275,13 +275,31 @@ export function sampleSurface(part: SphinxPart, rings: number, rows: number): Su
  * `|p − c| · (1 − 1/level)` is the radial distance to the surface.
  */
 export function partLevel(part: SphinxPart, x: number, y: number, z: number): number {
-  const [lx, ly, tz] = unrotate(part, x - part.centre[0], y - part.centre[1], z - part.centre[2])
+  const [lx, ly, lz] = unrotate(part, x - part.centre[0], y - part.centre[1], z - part.centre[2])
   const [e1, e2] = part.shape
   const [a, b, c] = part.radii
-  const lz = tz / Math.max(1e-6, 1 - (part.taper * ly) / b)
-  const h = Math.pow(Math.abs(lx / a), 2 / e2) + Math.pow(Math.abs(lz / c), 2 / e2)
-  const f = Math.pow(h, e2 / e1) + Math.pow(Math.abs(ly / b), 2 / e1)
-  return Math.pow(f, e1 / 2)
+  // The untapered superellipsoid's level, homogeneous of degree one.
+  const level0 = (px: number, py: number, pz: number) => {
+    const h = Math.pow(Math.abs(px / a), 2 / e2) + Math.pow(Math.abs(pz / c), 2 / e2)
+    return Math.pow(Math.pow(h, e2 / e1) + Math.pow(Math.abs(py / b), 2 / e1), e1 / 2)
+  }
+  if (part.taper === 0) return level0(lx, ly, lz)
+  // The taper scales z by t(y) = 1 − taper·y/b at the SURFACE height, so the
+  // level is the s at which p/s lies on the tapered surface:
+  // level0(lx, ly, lz / t(ly/s)) = s. g(s) = level0(…) − s is ≥ 0 at the
+  // smallest s that keeps |ly/s| ≤ b and falls without bound, so bisect.
+  const g = (s: number) => level0(lx, ly, lz / Math.max(1e-6, 1 - (part.taper * ly) / (b * s))) - s
+  let lo = Math.abs(ly) / b
+  if (lo === 0) return level0(lx, 0, lz)
+  let hi = Math.max(lo * 2, level0(lx, ly, lz) * 4, 1e-9)
+  while (g(hi) > 0) hi *= 2
+  if (g(lo) <= 0) return lo
+  for (let i = 0; i < 48; i++) {
+    const mid = (lo + hi) / 2
+    if (g(mid) > 0) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
 }
 
 // --- The drift ---------------------------------------------------------------
