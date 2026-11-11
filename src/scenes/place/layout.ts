@@ -108,6 +108,9 @@ export interface PlaceLayout {
    *  monument site keeps its own approach distance, so a disc widened for the
    *  desert does not push the arrival away from the monuments (point 390). */
   spawnZ: number
+  /** East offset of the arrival point (default 0, the centre line). A
+   *  monument site sets it so its whole row fits the north-facing frame. */
+  spawnX?: number
   interactives: Interactive[]
   dwellings: DwellingDef[]
   fences: FenceDef[]

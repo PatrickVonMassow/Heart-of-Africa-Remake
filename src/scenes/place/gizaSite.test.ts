@@ -15,6 +15,7 @@ import {
   type GizaPersonRole,
   GIZA_SCALE,
   GIZA_SITE_RADIUS,
+  GIZA_SPAWN_X,
   GIZA_SPAWN_Z,
   GIZA_SPHINX,
   buildGizaLayout,
@@ -140,11 +141,21 @@ describe('Giza site — the monumental first-person scale (design.md §4.4)', ()
   })
 
   it('shows all three pyramids in one frame from the arrival point, none hidden', () => {
-    const hfov = 2 * Math.atan(Math.tan(((FOV_DEG / 2) * Math.PI) / 180) * (16 / 9))
-    const eye: [number, number, number] = [0, EYE, GIZA_SPAWN_Z]
+    // The arrival view: at the spawn, facing north (yaw 0), glancing up by the
+    // live staging's pitch — level, Khafre's raised apex already tops the frame.
+    const lookUp = 0.12
+    const halfH = Math.atan(Math.tan(((FOV_DEG / 2) * Math.PI) / 180) * (16 / 9))
+    const halfV = ((FOV_DEG / 2) * Math.PI) / 180
+    const eye: [number, number, number] = [GIZA_SPAWN_X, EYE, GIZA_SPAWN_Z]
     const apexOf = (p: (typeof GIZA_PYRAMIDS)[number]): [number, number, number] => [p.x, p.ground + p.standing * p.height, p.z]
-    const bearings = GIZA_PYRAMIDS.map((p) => Math.atan2(p.x - eye[0], eye[2] - p.z))
-    expect(Math.max(...bearings) - Math.min(...bearings)).toBeLessThan(hfov * 0.95)
+    for (const p of GIZA_PYRAMIDS) {
+      const [ax, ay, az] = apexOf(p)
+      const ahead = eye[2] - az
+      expect(ahead, p.id).toBeGreaterThan(0)
+      expect(Math.abs(Math.atan2(ax - eye[0], ahead)), `${p.id} bearing`).toBeLessThan(halfH * 0.9)
+      const elev = Math.atan2(ay - eye[1], Math.hypot(ax - eye[0], ahead)) - lookUp
+      expect(Math.abs(elev), `${p.id} elevation`).toBeLessThan(halfV * 0.95)
+    }
     // Inside a drawn pyramid volume (cone on its ground, plinth below it).
     const inside = (q: (typeof GIZA_PYRAMIDS)[number], x: number, y: number, z: number) => {
       if (y < q.ground) return Math.max(Math.abs(x - q.x), Math.abs(z - q.z)) <= pyramidMassFootprint(q)
@@ -236,9 +247,11 @@ describe('Giza site — collision and the walkable layout', () => {
 
   it('keeps the southern spawn point clear of every monument', () => {
     const layout = buildGizaLayout(7)
-    // PlaceScene spawns the traveller at (0, layout.spawnZ) facing north.
+    // PlaceScene spawns the traveller at (spawnX, spawnZ) facing north.
     expect(layout.spawnZ).toBe(GIZA_SPAWN_Z)
-    expect(standingClear(layout.colliders, 0, layout.spawnZ, 0.35)).toBe(true)
+    expect(layout.spawnX).toBe(GIZA_SPAWN_X)
+    expect(standingClear(layout.colliders, GIZA_SPAWN_X, layout.spawnZ, 0.35)).toBe(true)
+    expect(Math.hypot(GIZA_SPAWN_X, layout.spawnZ)).toBeLessThan(layout.radius - 20)
   })
 
   it('keeps the arrival distance to the pyramid row as the disc grows (point 390)', () => {
@@ -363,7 +376,7 @@ describe('Giza site — the walkable sand reaches as far as the picture offers i
     // The point-390 defect: standing beside a pyramid, the edge fell ~18 m past
     // the outermost mass. The monumental masses (design.md §4.4) now fill the
     // disc's diameter, so the margin is measured exactly — at the farthest
-    // drawn corner — and must stay past that defect's distance. Away from the
+    // drawn corner — and must stay clearly past that defect's distance. Away from the
     // NE/SW corners of the row the open sand runs much farther.
     const cluster = Math.max(
       ...GIZA_PYRAMIDS.map((p) => {
@@ -372,7 +385,7 @@ describe('Giza site — the walkable sand reaches as far as the picture offers i
       }),
       ...gizaSphinxColliders().flatMap((c) => [Math.hypot(c.x1, c.z1) + c.r, Math.hypot(c.x2, c.z2) + c.r]),
     )
-    expect(GIZA_SITE_RADIUS - cluster).toBeGreaterThan(17)
+    expect(GIZA_SITE_RADIUS - cluster).toBeGreaterThan(20)
   })
 })
 

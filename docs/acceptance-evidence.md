@@ -1362,7 +1362,8 @@ immediately past the plate at ANY radius. The binding limit is therefore the
 §2.5 panorama band: the disc takes the LARGEST radius that still leaves the
 outermost drifting silhouette in front of it (`openPlainWalkRadius` in
 `src/scenes/place/backdrop.ts`, derived from `PANORAMA_RADIUS` — 98 m, with
-~56 m of open desert past the monuments), the arrival distance keeps its own
+over 20 m of open desert past the farthest drawn corner of the monumental
+masses of point 391), the arrival distance keeps its own
 value (`spawnZ`) so the approach view of the pyramid row does not widen with
 the disc, and the ground disc's segment count follows its edge so the chord
 never grows into the straight ground line of point 381. The site carries no

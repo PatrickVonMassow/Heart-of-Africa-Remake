@@ -57,9 +57,14 @@ export const GIZA_SITE_RADIUS = openPlainWalkRadius(
 
 /** Distance south of the centre at which the traveller arrives (design.md §2.3
  *  spawns him in the south, facing north): clear of Menkaure's south face and
- *  far enough back that all three masses fit the frame. Held at its own value
- *  rather than `radius − 10`, so the approach view does not drift with the disc. */
-export const GIZA_SPAWN_Z = 77
+ *  20 m inside the rim. Held at its own value rather than `radius − 10`, so the
+ *  approach view does not drift with the disc. */
+export const GIZA_SPAWN_Z = 76
+
+/** East offset of the arrival point: west of the centre line, so all three
+ *  apexes stand inside the north-facing frame (Menkaure's otherwise falls
+ *  off its west edge). */
+export const GIZA_SPAWN_X = -10
 
 /** The one fraction of real size every site monument is drawn at (balance). */
 export const GIZA_SCALE = GIZA_SITE_SCALE.fraction
@@ -117,15 +122,15 @@ function pyramid(
 const REAL = GIZA_SITE_SCALE.real
 
 // The real row, placed north (−z) of the southern spawn point: Khufu NE (+x
-// east, −z north) of Khafre on the true 45° diagonal, Menkaure south-south-west
-// of Khafre (the real offset bends further west; pulled in so the whole row
-// fits one frame from the spawn). Positions are a compression (the real
+// east, −z north) of Khafre near the true 45° diagonal, Menkaure south-south-
+// west of Khafre (the real offset bends further west; pulled in so the whole
+// row fits one frame from the spawn). Positions are a compression (the real
 // centres stand ~475 m apart): the drawn masses, plinth and skirt included,
-// keep ~4 m lanes between them inside the 98 m disc.
+// keep ~4 m lanes between them and ≥20 m of open sand to the 98 m rim.
 export const GIZA_PYRAMIDS: readonly GizaPyramid[] = [
-  pyramid('khufu', 32, -36, REAL.khufu, 0, { standing: 0.945 }),
+  pyramid('khufu', 32, -30, REAL.khufu, 0, { standing: 0.945 }),
   pyramid('khafre', -20, 16, REAL.khafre, REAL.khafre.bedrock * GIZA_SCALE, { cap: true }),
-  pyramid('menkaure', -30, 55, REAL.menkaure, 0, { skirt: true }),
+  pyramid('menkaure', -24, 55, REAL.menkaure, 0, { skirt: true }),
 ]
 
 /** The Great Sphinx east of Khafre, facing east (+x), buried to the shoulders
@@ -272,6 +277,7 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
     radius: GIZA_SITE_RADIUS,
     observed: [],
     spawnZ: GIZA_SPAWN_Z,
+    spawnX: GIZA_SPAWN_X,
     interactives: [],
     dwellings: [],
     fences: [],

@@ -1440,7 +1440,7 @@ if (section('giza-scale')) {
     null, { timeout: 30000 })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   const m = await page.evaluate(() => window.__placeMonuments)
-  const spawnZ = await page.evaluate(() => window.__placeLayout?.spawnZ ?? 0)
+  const spawn = await page.evaluate(() => ({ x: window.__placeLayout?.spawnX ?? 0, z: window.__placeLayout?.spawnZ ?? 0 }))
   const byId = Object.fromEntries(m.pyramidSites.map((p) => [p.id, p]))
   const standAt = (x, z, tx, tz, pitch = 0) =>
     page.evaluate(
@@ -1469,11 +1469,28 @@ if (section('giza-scale')) {
   await frame(shot('391-giza-khufu-base'), { local: { x: k.x, y: k.apex * 0.3, z: k.z }, label: 'the foot of the Great Pyramid, looking level north' })
 
   const mid = m.pyramidSites.reduce((a, p) => ({ x: a.x + p.x / 3, z: a.z + p.z / 3 }), { x: 0, z: 0 })
-  await standAt(0, spawnZ, mid.x, mid.z, 0.12)
+  // The arrival view itself: at the spawn, facing north, glancing up.
+  await standAt(spawn.x, spawn.z, spawn.x, spawn.z - 1, 0.12)
   await waitForStable(page)
   const apexes = await Promise.all(m.pyramidSites.map((p) => project({ x: p.x, y: p.apex, z: p.z })))
   check('from the arrival point all three apexes fall inside the frame', apexes.every((a) => a.z < 1 && Math.abs(a.x) < 1 && Math.abs(a.y) < 1), JSON.stringify(apexes))
-  await frame(shot('391-giza-all-three'), { local: { x: mid.x, y: 10, z: mid.z }, label: 'the three great pyramids from the arrival point' })
+  // In the frame is not in sight: the eye-to-apex ray (just below each summit)
+  // must not pass through another mass, each taken conservatively as a square
+  // pyramid of its whole drawn foot rising to its apex.
+  const eye = await page.evaluate(() => window.__placeCamera.position.toArray())
+  const hidden = []
+  for (const p of m.pyramidSites) {
+    const t0 = [p.x, p.apex - 0.5, p.z]
+    for (let t = 0.02; t < 0.98; t += 0.005) {
+      const [x, y, z] = [0, 1, 2].map((i) => eye[i] + (t0[i] - eye[i]) * t)
+      for (const q of m.pyramidSites) {
+        if (q === p || y >= q.apex) continue
+        if (Math.max(Math.abs(x - q.x), Math.abs(z - q.z)) <= q.foot * (1 - y / q.apex)) hidden.push(`${p.id} behind ${q.id}`)
+      }
+    }
+  }
+  check('from the arrival point no apex is hidden behind another pyramid', hidden.length === 0, JSON.stringify([...new Set(hidden)]))
+  await frame(shot('391-giza-all-three'), { local: { x: mid.x, y: 10, z: mid.z }, label: 'the three great pyramids from the arrival point, facing north' })
 
   const sx = m.sphinx
   await standAt(sx.x + 1.4 * sx.length, sx.z + 0.9 * sx.length, sx.x, sx.z, 0.05)

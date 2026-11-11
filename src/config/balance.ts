@@ -1683,7 +1683,7 @@ export const balance: BalanceConfig = {
     dryShoreMinDrinkers: 4, // the dry season VISIBLY gathers life at the water
     ringInner: 40, // calibratable: nearest ring 40 m past the backdrop rim
     ringSpread: 80, // calibratable: ..120 m, so one species varies ~3x in apparent size
-    openPlainRingSpread: 45, // calibratable: gives Giza's monumental masses a 138 m walkable radius
+    openPlainRingSpread: 45, // calibratable: keeps Giza's walkable radius at 98 m
     giraffeTargetDeg: 1.4, // calibratable: giraffe at mid ring; elephant ~1.07, zebra ~0.54, antelope ~0.47
     speciesHeight: { elephant: 4.2, giraffe: 5.5, zebra: 2.1, antelope: 1.85 }, // calibratable ratios
     maxApparentAngleDeg: 2.5, // safety net; the shared factor stays below it

@@ -2733,7 +2733,7 @@ export function PlaceScene() {
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
-    player.current = { x: 0, z: layout?.spawnZ ?? PLACE_RADIUS - SPAWN_INSET, yaw: 0, pitch: 0 }
+    player.current = { x: layout?.spawnX ?? 0, z: layout?.spawnZ ?? PLACE_RADIUS - SPAWN_INSET, yaw: 0, pitch: 0 }
     walk.current = { velF: 0, velS: 0, phase: 0, roll: 0 }
     stall.current = newStallState(player.current.x, player.current.z)
     // Seed the shared position for the town-plan map marker (point 89).
@@ -2998,7 +2998,7 @@ export function PlaceScene() {
         // is never set down on the far side of something he could not walk through.
         blocked: (x, z) => !standingClear(l.colliders, x, z, 0),
         // Free by construction: the place's own entry point (design.md §2.3).
-        fallback: [0, l.spawnZ],
+        fallback: [l.spawnX ?? 0, l.spawnZ],
       })
       // Say what happened, never more (work-order 610): a search that carried
       // him nowhere may not report a rescue. Here the fallback is the entry
