@@ -16,6 +16,7 @@
 //
 // Pure: every input is plain data, so the Vitest layer
 // (branch-hygiene-core.test.mjs) can sweep every branch without a git tree.
+import { createHash } from 'node:crypto'
 import { pointOfBranch } from './batch-in-flight-core.mjs'
 
 /** Grace, measured from a branch's TIP COMMIT date, before its survival counts
@@ -264,14 +265,18 @@ export function assessBranchHygiene({
     if (heldBranches.has(bare) || heldBranches.has(name) || checkedOut.has(bare)) continue
     if (fresh(b?.tipAt)) continue
     const remote = name.startsWith('origin/')
-    // One file per ref, named by a reversible encoding: diverged local/remote twins
-    // and refs like feat/1-a/b vs feat/1-a-b must never overwrite each other's only archive.
-    const archive = `mkdir -p local/branch-archive && git bundle create local/branch-archive/${encodeURIComponent(name)}.bundle ${b.name} ^origin/main`
+    // One file per RAW ref: diverged local/remote twins, feat/1-a/b vs feat/1-a-b and
+    // case variants must never overwrite each other's only archive, so a hash of the
+    // unnormalized ref joins a readable, shell-safe stem. Every ref is single-quoted.
+    const raw = String(b.name)
+    const rawBare = raw.replace(/^origin\//, '')
+    const file = `${raw.replace(/[^A-Za-z0-9._-]/g, '_')}-${createHash('sha256').update(raw).digest('hex').slice(0, 10)}.bundle`
+    const archive = `mkdir -p local/branch-archive && git bundle create local/branch-archive/${file} ${shq(raw)} ^origin/main`
     findings.push({
       kind: remote ? 'remote-closed' : 'local-closed',
-      name: String(b.name),
+      name: raw,
       ageMs: age(b?.tipAt),
-      command: `${archive} && ${remote ? `git push origin --delete ${bare}` : `git branch -D ${bare}`}`,
+      command: `${archive} && ${remote ? `git push origin --delete ${shq(rawBare)}` : `git branch -D ${shq(rawBare)}`}`,
     })
   }
 
@@ -281,6 +286,9 @@ export function assessBranchHygiene({
     reason: findings.length > 0 ? 'merged-branches-survive' : 'clean',
   }
 }
+
+/** POSIX single-quoting for a ref printed into a remedy command. */
+const shq = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`
 
 /** Points ticked in the archive and not reopened in TASKS.md (point 1504).
  *  Either text missing (null: unreadable) yields none — a reopening nobody could
