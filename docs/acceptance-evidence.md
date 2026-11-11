@@ -1278,20 +1278,31 @@ gated in `scripts/verify/polish-panorama.mjs` (screenshot 139);
 the same period casing cap and half-buried Sphinx carry into Cairo's
 western skyline (point 82).
 The Great Sphinx is ONE definition with three levels of detail (point 315):
-`src/world/sphinx.ts` holds the couchant body — the buried parts (torso,
-shoulders, haunch, breast, legs, forepaws, tail) that only raise the drift,
-and the clear stone (head in the nemes with brow band, lappets, broken nose
-and no beard, the neck, a little of the chest, the back ridge) — and the
-drift as a body UNDER sand, one cover dome per buried part, so the shoulder
-swell and the paw lobes show through and the back ridge breaks the surface;
+`src/world/sphinx.ts` holds the couchant body — the buried parts (torso and
+falling rear torso, shoulders, two haunches, breast, legs, forepaws, tail,
+the bank under the spine) that only raise the drift, and the clear stone
+(the head as the nemes' flaring trapezoid: flat crown with brow band, broad
+flat wings, the lappets as long flat striped panels beside the neck falling
+into the sand at the chest; a narrower face with brow ridge, almond eye
+sockets, cheekbones, the flattened nose stump, lips, rounded chin and no
+beard; the neck, a little of the chest, the shoulder tops under the wings
+and the spine) — and the drift as a body UNDER sand, one cover dome per
+buried part, so the shoulder swell, the two haunch swells and the paw lobes
+show through and the spine rises out of banked sand to the neck (reworked
+after the owner's picture verdict of 11.11.2026);
 the walkable site's mesh (three levels, `sphinxSiteDetail` per quality
 preset, the named reduced mesh on low), the bird's-eye landmark and the
 Cairo skyline outline all derive from it (`src/render/sphinx.ts`), and the
 site mesh's TSL material bands the limestone courses and the nemes stripes.
 Pure-tested in `src/world/sphinx.test.ts`: the burial line at the upper
-chest within the documented ~1890 state (docs/giza-1890.md §1.3), head,
-neck and upper back clear of the drift while every other body part sits
-below it, the drift's footprint within the body's plus its skirt, and no
+chest within the documented ~1890 state (docs/giza-1890.md §1.3, measured
+against the real crown, not the enlarged head), head, neck and upper back
+clear of the drift while every other body part sits below it, the nemes
+trapezoid wider than the face, the lappets reaching the sand, the face
+features in order, the spine's crest continuously clear from mid-back to
+the shoulders with sand banked against it, crown, nemes back and spine
+visible from the behind standpoint over two haunch swells, the stone one
+limestone family and darker than the sand, the drift's footprint within the body's plus its skirt, and no
 coplanar contact anywhere (every clear part leaves the drift at a real
 angle, the drift meets the ground at its repose slope, no two drawn parts
 touch near-parallel) — so no z-offset is used; in
@@ -1300,7 +1311,10 @@ definition and the levels' parts nest; in `src/scenes/place/gizaSite.test.ts`
 that the collidable mass is the drawn footprint (point 378's rule). Live
 (owed by the owner's local run, both backends): `polish-panorama` section
 `sphinx` — face on, profile, behind, low along the drift, a moving-camera
-flicker pass and the frame cost at LOW and MEDIUM.
+flicker pass (four continuous arcs, every consecutive frame captured and
+judged for A-B-A pixel flips by `scripts/verify/flickerSeries.mjs`) and the
+frame cost at LOW and MEDIUM, accepted only on reported, nonzero renderer
+counters.
 The walkable ground of an OPEN-PLAIN place reaches to where the picture
 stops offering ground (point 390): at Giza the desert runs unbroken to the
 horizon, so a 60 m disc ended the world ~18 m past the outermost mass, in

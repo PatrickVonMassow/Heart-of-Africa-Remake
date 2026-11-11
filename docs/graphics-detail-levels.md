@@ -277,18 +277,21 @@ added.
   the monument derives from; `src/render/sphinx.ts` builds it). `reduced` is
   the named frugal mesh of the low level: the same parts, coarser rings, a
   coarser drift grid and no painted eye and mouth marks; `standard` and
-  `full` add tessellation, the face marks and a finer drift. The limestone
+  `full` add tessellation, the face marks and a finer drift. The face's
+  modelled features (brow ridge, cheekbones, nose stump, lips, chin) and the
+  shoulder tops are site parts on every site level; the distant levels keep
+  only the nemes trapezoid, face block, lappets, neck, chest and spine. The limestone
   banding is a per-fragment term of its TSL material on every level. One draw.
   Counted per level (vertices / triangles; the bird's-eye landmark and the
   Cairo skyline outline are fixed distant levels outside the presets):
 
   | Level | Vertices | Triangles |
   | --- | --- | --- |
-  | reduced (low) | 2862 | 4048 |
-  | standard (medium) | 9056 | 13954 |
-  | full (high) | 19492 | 30546 |
-  | landmark (bird's-eye) | 1099 | 1400 |
-  | skyline (Cairo) | 447 | 524 |
+  | reduced (low) | 4009 | 5772 |
+  | standard (medium) | 12644 | 20058 |
+  | full (high) | 26606 | 43552 |
+  | landmark (bird's-eye) | 1323 | 1706 |
+  | skyline (Cairo) | 517 | 604 |
 
   The measured frame cost at the site on both backends at LOW and MEDIUM is
   owed by the owner's local run (`polish-panorama`, section `sphinx`).
