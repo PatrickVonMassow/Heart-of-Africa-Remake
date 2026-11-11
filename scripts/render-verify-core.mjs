@@ -129,6 +129,7 @@ export const NON_RENDER_VERIFY = new Set([
   'report-archive-names.mjs', // the names the F6 archive checks print; report.mjs does the downloading
   'rowStaging.mjs', // when the villager-dress suite stands a row again; polish-villagers.mjs drives the page
   'run-all.mjs',
+  'sphinxSilhouette.mjs', // the field Sphinx's pixel verdicts; polish-panorama hands it the pixels
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged-args.mjs', // pure CLI parsing and output-line caps for the logging wrapper
   'run-green-cache.mjs', // receipt lookup; starts no browser
