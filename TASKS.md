@@ -15106,3 +15106,9 @@ to land than a mechanism that needs a review.
   Final state: the check measures the Nile's presence with a margin the capture reliably clears (e.g. a capture aimed at the river or a threshold calibrated from recorded totals over repeated captures), and it still fails when the band shows no water at all (the 07.08.2026 all-zero signature).
   Test: `npm test -- polish-panorama --section=travel-panorama-capture` green on both backends across a throttle probe (`node scripts/throttle-probe.mjs polish-panorama --section=travel-panorama-capture --runs 8`).
   Bundle: Wetter & Wasser.
+
+- [ ] 1503. The giraffe elder-versus-prime comparison frame misses both giraffes on WebGPU
+  Finding 11.11.2026 (whole enrichments on main ed95b5bd2, WebGPU, 21:13): 'the comparison frame shows BOTH the old and the prime giraffe ... (point 1498)' failed with pre.ok false and the prime giraffe not found. Point 1498 is closed, so no open point owned the red. Player impact: none measured; the red blocks a green whole enrichments run.
+  Final state: the giraffe comparison staging finds and frames both the elder and the prime giraffe on both backends, and the check still fails when either is absent from the frame.
+  Test: `npm test -- enrichments` (the 1498 elder-versus-prime section) green on WebGPU and WebGL 2, with verification/1498-elder-vs-prime-giraffe.png picture-checked.
+  Bundle: Tierverhalten.
