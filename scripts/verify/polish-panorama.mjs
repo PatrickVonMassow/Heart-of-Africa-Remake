@@ -1125,7 +1125,7 @@ if (section('giza-site')) {
   // desert; the view of the pyramid row must not widen with it).
   await page.evaluate(() => {
     const p = window.__placePlayer
-    p.x = 0
+    p.x = window.__placeLayout?.spawnX ?? 0
     p.z = window.__placeLayout?.spawnZ ?? 50
     p.yaw = 0 // yaw 0 faces −Z (north), toward the pyramids
   })
@@ -1410,10 +1410,12 @@ if (section('giza-site')) {
       // camera at the site's geometric centre sits INSIDE the pyramid and the
       // frame came out as a dark slit — a picture that did not show what its
       // name claimed. The standpoint is the open sand just south of the row.
+      // (10, 45): south-east of Khafre's plinth since the masses were drawn at
+      // monumental scale (design.md §4.4), clear of the Sphinx's drift.
       await page.evaluate(() => {
         const p = window.__placePlayer
-        p.x = 0
-        p.z = 30
+        p.x = 10
+        p.z = 45
         p.yaw = Math.PI
         p.pitch = 0
       })
@@ -1421,6 +1423,86 @@ if (section('giza-site')) {
       await frame('390-giza-sand-open', { place: 'giza', label: 'the open sand seen from beside the monument row' })
     }
   }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
+// --- The monumental first-person scale at Giza (design.md §4.4) --------------
+// Three standpoints, both backends: at the foot of Khufu's south face looking
+// level north (the apex must stand far above the frame top), from the arrival
+// point with all three masses in one frame, and beside the Sphinx with the row
+// behind it. The bird's-eye landmark and the Cairo skyline are sections
+// `sphinx-travel` and `giza-skyline`; they must be unchanged.
+if (section('giza-scale')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('giza')
+  await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeMonuments?.pyramidSites,
+    null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  const m = await page.evaluate(() => window.__placeMonuments)
+  const spawn = await page.evaluate(() => ({ x: window.__placeLayout?.spawnX ?? 0, z: window.__placeLayout?.spawnZ ?? 0 }))
+  const byId = Object.fromEntries(m.pyramidSites.map((p) => [p.id, p]))
+  const standAt = (x, z, tx, tz, pitch = 0) =>
+    page.evaluate(
+      ({ x, z, tx, tz, pitch }) => {
+        const p = window.__placePlayer
+        p.x = x
+        p.z = z
+        p.yaw = Math.atan2(tx - x, tz - z) + Math.PI
+        p.pitch = pitch
+      },
+      { x, z, tx, tz, pitch },
+    )
+  // Where a world point lands in the live camera's frame (NDC), and the eye.
+  const project = (pt) =>
+    page.evaluate(({ x, y, z }) => {
+      const cam = window.__placeCamera
+      cam.updateMatrixWorld()
+      const v = cam.position.clone().set(x, y, z).project(cam)
+      return { x: v.x, y: v.y, z: v.z }
+    }, pt)
+  const k = byId.khufu
+  await standAt(k.x, k.z + k.foot + 1.2, k.x, k.z, 0)
+  await waitForStable(page)
+  const kApex = await project({ x: k.x, y: k.apex, z: k.z })
+  check('from the foot of Khufu the apex stands far above the frame top', kApex.z < 1 && kApex.y > 1.5, JSON.stringify(kApex))
+  // The level view is face only; the picture stands near the south-east corner
+  // and looks up, so the edge rising out of frame against the sky reads as scale.
+  const ex = k.x + k.foot * 0.8
+  await standAt(ex, k.z + k.foot + 8, ex, k.z, 0.2)
+  await waitForStable(page)
+  const kApexUp = await project({ x: k.x, y: k.apex, z: k.z })
+  check('looking up from the foot of Khufu the apex is still out of frame', kApexUp.z < 1 && kApexUp.y > 1, JSON.stringify(kApexUp))
+  await frame(shot('391-giza-khufu-base'), { local: { x: ex, y: k.apex * 0.2, z: k.z + k.foot * 0.8 }, label: 'the foot of the Great Pyramid, looking up its south face' })
+
+  const mid = m.pyramidSites.reduce((a, p) => ({ x: a.x + p.x / 3, z: a.z + p.z / 3 }), { x: 0, z: 0 })
+  // The arrival view itself: at the spawn, facing north, glancing up.
+  await standAt(spawn.x, spawn.z, spawn.x, spawn.z - 1, 0.12)
+  await waitForStable(page)
+  const apexes = await Promise.all(m.pyramidSites.map((p) => project({ x: p.x, y: p.apex, z: p.z })))
+  check('from the arrival point all three apexes fall inside the frame', apexes.every((a) => a.z < 1 && Math.abs(a.x) < 1 && Math.abs(a.y) < 1), JSON.stringify(apexes))
+  // In the frame is not in sight: the eye-to-apex ray (just below each summit)
+  // must not pass through another mass, each taken conservatively as a square
+  // pyramid of its whole drawn foot rising to its apex.
+  const eye = await page.evaluate(() => window.__placeCamera.position.toArray())
+  const hidden = []
+  for (const p of m.pyramidSites) {
+    const t0 = [p.x, p.apex - 0.5, p.z]
+    for (let t = 0.02; t < 0.98; t += 0.005) {
+      const [x, y, z] = [0, 1, 2].map((i) => eye[i] + (t0[i] - eye[i]) * t)
+      for (const q of m.pyramidSites) {
+        if (q === p || y >= q.apex) continue
+        if (Math.max(Math.abs(x - q.x), Math.abs(z - q.z)) <= q.foot * (1 - y / q.apex)) hidden.push(`${p.id} behind ${q.id}`)
+      }
+    }
+  }
+  check('from the arrival point no apex is hidden behind another pyramid', hidden.length === 0, JSON.stringify([...new Set(hidden)]))
+  await frame(shot('391-giza-all-three'), { local: { x: mid.x, y: 10, z: mid.z }, label: 'the three great pyramids from the arrival point, facing north' })
+
+  const sx = m.sphinx
+  await standAt(sx.x + 1.4 * sx.length, sx.z + 0.9 * sx.length, sx.x, sx.z, 0.05)
+  await waitForStable(page)
+  await frame(shot('391-giza-at-sphinx'), { local: { x: sx.x, y: 0.15 * sx.length, z: sx.z }, label: 'the Sphinx with the pyramid row behind it' })
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }

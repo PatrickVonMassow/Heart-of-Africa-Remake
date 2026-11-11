@@ -11,7 +11,7 @@ import * as THREE from 'three/webgpu'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { mulberry32 } from '../world/noise'
 import { buildPapyrus } from './flora'
-import { GIZA_PYRAMIDS, GIZA_SPHINX, type GizaPyramid } from '../scenes/place/gizaSite'
+import { GIZA_PLINTH, GIZA_PYRAMIDS, GIZA_SKIRT, GIZA_SPHINX, type GizaPyramid } from '../scenes/place/gizaSite'
 import { SPHINX_FORM } from '../config/balance'
 import { SPHINX_SITE_LOD, sphinxCrownHeight, sphinxDriftHeight, sphinxLodSpec, sphinxPartsFor, type SphinxSiteDetail } from '../world/sphinx'
 import { buildSphinxGeometry } from './sphinx'
@@ -311,14 +311,14 @@ export function buildGizaSiteSphinx(detail: SphinxSiteDetail): THREE.BufferGeome
  *  Menkaure's red-granite skirt, which only this site carries — at site scale so the traveller walks
  *  around the mass as a giant building, and lifted onto its own bedrock plinth
  *  (Khafre stands on higher rock and so reads as tall as Khufu). */
-function gizaSitePyramidParts(p: GizaPyramid, seed: number): THREE.BufferGeometry[] {
+export function gizaSitePyramidParts(p: GizaPyramid, seed: number): THREE.BufferGeometry[] {
   const parts: THREE.BufferGeometry[] = []
   const core = '#c9a76a'
   const { x, z, base: b, height: h, ground: y0 } = p
   if (y0 > 0) {
     // The bedrock plateau Khafre stands on — a low, wide rock plinth so the
     // lifted pyramid does not float and reads as raised on higher ground.
-    const rock = new THREE.CylinderGeometry(b * 1.05, b * 1.14, y0, 4)
+    const rock = new THREE.CylinderGeometry(b * GIZA_PLINTH.top, b * GIZA_PLINTH.foot, y0, 4)
     rock.rotateY(Math.PI / 4)
     rock.translate(x, y0 / 2, z)
     parts.push(tint(rock, '#b0895a', 0.09, seed + 5))
@@ -357,8 +357,8 @@ function gizaSitePyramidParts(p: GizaPyramid, seed: number): THREE.BufferGeometr
     // reads as an error stripe (point 273). This close-range cue is the ONLY
     // place the granite is drawn; the distant skyline/bird's-eye Menkaure omits
     // it (see buildGizaPyramids).
-    const skirtTop = 0.22
-    const skirt = new THREE.CylinderGeometry(b * (1 - skirtTop) * 1.02, b * 1.02, h * skirtTop, 4, 1, false)
+    const { top: skirtTop, flare } = GIZA_SKIRT
+    const skirt = new THREE.CylinderGeometry(b * (1 - skirtTop) * flare, b * flare, h * skirtTop, 4, 1, false)
     skirt.rotateY(Math.PI / 4)
     skirt.translate(x, y0 + (h * skirtTop) / 2, z)
     parts.push(tint(skirt, '#96604b', 0.06, seed + 7))

@@ -1274,7 +1274,15 @@ Thomas-Cook-era ambient anchors (guides, cameleer, donkey-boy,
 tourists) for a free standing spot they can also leave — and the live
 enter-with-SPACE, the three pyramids + buried Sphinx rendering, the
 collidable site with neither trade nor chief, and the warm desert-sand ground
-gated in `scripts/verify/polish-panorama.mjs` (screenshot 139);
+gated in `scripts/verify/polish-panorama.mjs` (screenshot 139); the masses
+stand at a MONUMENTAL first-person scale (point 391): the pyramids at one
+fifth of their real side and height, the Sphinx at its 20 m, each pyramid's
+collider its whole drawn mass (Khafre's plinth, Menkaure's skirt), the apex
+far above the frame from the foot, all three unhidden in one frame from the
+arrival point and the bird's-eye/skyline field unchanged — pure-tested in
+`src/scenes/place/gizaSite.test.ts`; the place map draws a monument site's
+collider masses (`src/ui/MapOverlay.test.tsx`); live frames in section
+`giza-scale` of `scripts/verify/polish-panorama.mjs` (screenshots 391-*);
 the same period casing cap and half-buried Sphinx carry into Cairo's
 western skyline (point 82).
 The Great Sphinx is ONE definition with three levels of detail (point 315):
@@ -1354,7 +1362,8 @@ immediately past the plate at ANY radius. The binding limit is therefore the
 §2.5 panorama band: the disc takes the LARGEST radius that still leaves the
 outermost drifting silhouette in front of it (`openPlainWalkRadius` in
 `src/scenes/place/backdrop.ts`, derived from `PANORAMA_RADIUS` — 98 m, with
-~56 m of open desert past the monuments), the arrival distance keeps its own
+over 20 m of open desert past the farthest drawn corner of the monumental
+masses of point 391), the arrival distance keeps its own
 value (`spawnZ`) so the approach view of the pyramid row does not widen with
 the disc, and the ground disc's segment count follows its edge so the chord
 never grows into the straight ground line of point 381. The site carries no

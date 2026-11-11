@@ -760,6 +760,40 @@ function PlacePlan({ placeId }: { placeId: string }) {
           />
         )}
         <path className="plan-edge" d={edgePath} fill="#e2d3ad" stroke={INK} strokeWidth={1.6} strokeDasharray="7 4" />
+        {/* A place whose plan has no buildings of its own (a monument site)
+            draws its collidable masses instead, so the plan is never blank.
+            Generic over layout.colliders: no place is named here. */}
+        {layout.interactives.length === 0 && layout.dwellings.length === 0 && layout.colliders.length > 0 && (
+          <g className="plan-masses" fill={INK} stroke={INK} opacity={0.35}>
+            {layout.colliders.map((c, i) =>
+              c.kind === 'box' ? (
+                <rect
+                  key={`m${i}`}
+                  className="plan-mass"
+                  x={sx(c.x - c.hx)}
+                  y={sx(c.z - c.hz)}
+                  width={Math.max(3, sx(c.hx * 2))}
+                  height={Math.max(3, sx(c.hz * 2))}
+                  transform={`rotate(${(-c.rot * 180) / Math.PI} ${sx(c.x)} ${sx(c.z)})`}
+                  strokeWidth={0}
+                />
+              ) : c.kind === 'segment' ? (
+                <line
+                  key={`m${i}`}
+                  className="plan-mass"
+                  x1={sx(c.x1)}
+                  y1={sx(c.z1)}
+                  x2={sx(c.x2)}
+                  y2={sx(c.z2)}
+                  strokeWidth={Math.max(2, sx(c.r * 2))}
+                  strokeLinecap="round"
+                />
+              ) : (
+                <circle key={`m${i}`} className="plan-mass" cx={sx(c.x)} cy={sx(c.z)} r={Math.max(1.5, sx(c.r))} strokeWidth={0} />
+              ),
+            )}
+          </g>
+        )}
         {/* Lanes as light strokes */}
         {layout.paths.map((p, i) => (
           <polyline
