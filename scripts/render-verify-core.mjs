@@ -113,6 +113,7 @@ export const NON_RENDER_VERIFY = new Set([
   'rimSeam.mjs', // the river-rim band lines on the camera's forward line; polish-villagers.mjs projects them
   'fixedWaits.mjs',
   'footingSeries.mjs', // the slope-footing verdict; the polish-* suites hands it the samples
+  'flickerSeries.mjs', // the moving-camera flicker verdict; polish-panorama hands it the frames
   'frameSubject-core.mjs',
   'gpu-backend-probe-core.mjs', // the host GPU verdict over a CDP/canvas reading; gpu-backend-probe.mjs does the driving
   'frameSubject.mjs', // the frame shutter's decision layer; the suites hand it their page
