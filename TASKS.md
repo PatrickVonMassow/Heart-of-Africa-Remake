@@ -77,6 +77,46 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1504. Delete the finished branches 1341, 1482, 1485 and close the branch-hygiene gap
+  RANK AT THE VERY FRONT of the work order (user order 11.11.2026, 22:14), ahead of 1490.
+
+  Measured 11.11.2026 22:12: origin carries feat/1341-garment-smooth-surface (tip 08.11., 370 behind main), feat/1482-garment-driven-builder (04.11., 574 behind) and feat/1485-skirt-containment-calibration (04.11., 547 behind). Points 1341, 1482 and 1485 are closed ([x] in docs/tasks-archive.md). Local branches feat/1482-* and feat/1485-* also still exist. Each open feat/* branch occupies a pool slot (POOL_CAP = 3, scripts/batch-in-flight-core.mjs); batch-in-flight --status showed slotsFree 0 with agents 0 — the stale branches block parallel work.
+
+  Final state:
+  1. Confirm each of the three branches has no commit that is missing from main in substance (merged or superseded); then delete them locally and on origin, plus any worktree.
+  2. Find why branch-hygiene-guard (CLAUDE.md §6 "the merge ends the branch") let them survive the landing, and close that gap with the smallest fix (infrastructure freeze: fix only, no new mechanism). A test reproduces the missed case.
+  3. batch-in-flight --status then counts only genuinely open branches.
+  Bundle: not bundled.
+
+- [ ] 1505. Decide point 1463: continue, park or close
+  RANK AT THE VERY FRONT of the work order (user order 11.11.2026, 22:14), directly after the stale-branch cleanup request and ahead of 1490.
+
+  Measured 11.11.2026 22:12: feat/1463-infra-simplification (local, origin, worktree .claude/worktrees/point-1463) has its last commit on 01.11.2026, 10 commits ahead and 855 behind main. No "- [ ] 1463." / "- [x] 1463." line was found in TASKS.md or docs/tasks-archive.md. It occupies one of the three pool slots.
+
+  Final state: one recorded decision on 1463 — continue (rebase onto main and work it), park (recorded park so it no longer counts as a slot), or close (delete branch and worktree, archive the point) — with what/why/veto effect recorded. If 1463 has no work-order line, give it one or record where it is tracked. The decision is presented to the user if it is a genuine choice without a clear recommendation.
+  Bundle: not bundled.
+
+- [ ] 1506. Board: show why pool slots sit unused
+  Rank directly AFTER the two front requests of 11.11.2026 (stale-branch cleanup, 1463 decision), ahead of 1490.
+
+  Keep the point headline / card title short (user, 22:29: a long title is "viel zu lang"), e.g. "Board: show why pool slots sit unused".
+
+  Dashboard extension (user order 11.11.2026, refined in chat 22:17-22:27). User goal, verbatim: "Ich will immer sehen, warum nicht maximal parallel gearbeitet wird."
+
+  Where: next to the section heading "Woran ich gerade arbeite" on the board (scripts/board-core.mjs ~line 646), on the same line.
+
+  Facts that shape it: a pool slot is occupied by an open feat/* branch (local + origin, deduplicated, parked excluded) — scripts/batch-in-flight.mjs ~782-797, POOL_CAP = 3. An agent does not occupy a slot of its own. More branches than the cap is possible (11.11.: 5 branches, cap 3, only 327 actually worked on).
+
+  Final state — the heading line ALWAYS explains why fewer than POOL_CAP points are worked in parallel:
+  - Do NOT repeat the point(s) in active work; the section below already shows them.
+  - Show free slots as "N von 3 Slots frei" (never a misleading x/y above the cap).
+  - List every branch that occupies a slot WITHOUT active work, with its measured state, e.g. "blockiert durch: 1341, 1482, 1485 (erledigt, Branch nicht gelöscht) · 1463 (ruht seit 10 Tagen)".
+  - For free but unused slots, show the measured reason, taken from the same logic batch-in-flight uses for the slot decision (slotReasonDecision / independentOpenPoints / closingFreezeActive etc.), e.g. "kein offener Punkt unabhängig von 327", "Abschluss läuft, Code eingefroren".
+  - When no reason is measurable, show "Grund nicht messbar" visibly and file it as a finding — never a filler text and never agent-written free text (the point-427 reason demand died of boilerplate; see point 1452).
+  - At full use: "3 von 3 Slots in Arbeit".
+  Values are measured at board render time. German visible wording. Board guards and section contract stay valid (update their tests); unit tests for each line variant above.
+  Bundle: not bundled.
+
 - [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
    Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
    Evidence 2: /backup/hoa/local/hoa-state-2026-11-11-1117999851.zip (seed 1117999851, place tangier, x/z -58.71/-356.97, webgpu, build ed95b5b). User text: "Hängt mit Kopf in der Kiste, sodass er nichts sehen kann und läuft sinnlos hin und her und immer wieder gegen die Wände". placeLife shows porters with no errand/target (unlike the errand walkers beside them).
@@ -93,6 +133,14 @@ put it is the mistake this line exists to stop.
    Verify: Playwright pictures of a moving head-load porter in Cairo (seed 1177128818) and Tangier (seed 1117999851), both backends when isBackendSensitivePath applies; plus a test that porters make progress and do not grind against colliders. Related but separate: 1425 (water jar jumps from hip to shoulder).
    Ranked to the front by user order 11.11.2026 ("Ja, so erweitern und 1490 nach vorne ziehen.").
    Bundle: Dorfleben.
+
+- [ ] 1507. Re-rank 31 player-facing points ahead of 1436
+  Re-rank the work order (user order 11.11.2026, 21:32): move the following open points so that they all stand BEFORE point 1436, in exactly this order as the user listed it:
+
+  336, 364, 1063, 1078, 1163, 1164, 1167, 1169, 1205, 1227, 1229, 1269, 1264, 1265, 1290, 1309, 1395, 1396, 1422, 1423, 1425, 1427, 1457, 1458, 1473, 1492, 1494, 1495, 1496, 1499, 205
+
+  Point 1490 stays at the front, as ordered earlier the same evening (it is ranked ahead of this group). No point text changes; only the ranking (.claude/queue-rank.json / work order) changes. All 31 points were measured open in TASKS.md at 21:32.
+  Bundle: not bundled.
 
 - [ ] 328. Vultures do not visibly land (user 25.07.2026: "they seem to fly one
   moment and stand the next — is there a landing at all?"). Add a real landing
