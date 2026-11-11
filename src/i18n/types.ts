@@ -689,6 +689,10 @@ export interface Strings {
     junglePenalty: string
     riverWidthFactor: string
     riverMouthSlackDeg: string
+    springRadius: string
+    springDomeHeight: string
+    springBubbleAmplitude: string
+    springGlow: string
     drownSeconds: string
     wetFlowFactor: string
     vigilPredatorDelay: string

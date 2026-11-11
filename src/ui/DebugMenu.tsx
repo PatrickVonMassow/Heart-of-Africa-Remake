@@ -499,6 +499,15 @@ export function DebugMenu() {
         (v) => { balance.river.widthFactor = Math.max(0.5, v); bump() }, 0.1),
       num(t.debug.riverMouthSlackDeg, balance.river.mouthSlackDeg,
         (v) => { balance.river.mouthSlackDeg = Math.max(0, v); bump() }, 0.1),
+      // The open-land spring (design.md §11.3): shape on reload, animation live.
+      num(t.debug.springRadius, balance.spring.radius,
+        (v) => { balance.spring.radius = Math.max(0.2, v); bump() }, 0.05),
+      num(t.debug.springDomeHeight, balance.spring.domeHeight,
+        (v) => { balance.spring.domeHeight = Math.max(0.02, v); bump() }, 0.02),
+      num(t.debug.springBubbleAmplitude, balance.spring.bubbleAmplitude,
+        (v) => { balance.spring.bubbleAmplitude = Math.max(0, v); bump() }, 0.005),
+      num(t.debug.springGlow, balance.spring.glow,
+        (v) => { balance.spring.glow = Math.max(0, v); bump() }, 0.05),
     ],
     survival: [
       num(t.debug.foodPerDay, balance.foodPerDay, (v) => set('foodPerDay', Math.max(0, v))),

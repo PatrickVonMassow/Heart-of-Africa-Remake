@@ -457,6 +457,8 @@ export const effectiveFigureLimbSegments = (s: UiState): number => currentQualit
 export const effectivePlaceRiverSegments = (s: UiState): number => currentQuality(s).placeRiverSegments
 /** How many items of flotsam ride that current (work-orders 482, 1280). */
 export const effectivePlaceRiverFlotsam = (s: UiState): number => currentQuality(s).placeRiverFlotsam
+export const effectiveSpringSegments = (s: UiState): number => currentQuality(s).springSegments
+export const effectiveSpringBubbles = (s: UiState): number => currentQuality(s).springBubbles
 /** Octaves of the one water detail field both halves of a settlement river read
  *  (work-order 525). */
 export const effectiveWaterDetailOctaves = (s: UiState): number => currentQuality(s).waterDetailOctaves

@@ -127,6 +127,15 @@ export interface QualityPreset {
    *  its vertices; the bird's-eye landmark and the Cairo skyline have their
    *  own fixed distant levels. */
   sphinxSiteDetail: 'reduced' | 'standard' | 'full'
+  /** Radial segments of the 3D spring body at an open-land river source
+   *  (design.md §11.3); its ring count follows at half of it. The surface
+   *  bubbles by vertex displacement, so this decides how round the welling
+   *  dome reads; a handful of springs, one draw each. */
+  springSegments: number
+  /** Bubble spheres rising out of each spring's welling dome. The dome's
+   *  own surface bubbles on every level, so a frugal level drops the
+   *  spheres, never the bubbling. */
+  springBubbles: number
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -165,6 +174,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     grassFireFlames: 16, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 6, // smoke puffs behind the line (overdraw)
     sphinxSiteDetail: 'reduced', // the named reduced Sphinx mesh (calibratable)
+    springSegments: 12, // a coarse dome; its surface still bubbles and rings
+    springBubbles: 0, // no spheres — the dome surface itself still bubbles
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -197,6 +208,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     grassFireFlames: 28, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 14, // smoke puffs behind the line (overdraw)
     sphinxSiteDetail: 'standard', // calibratable
+    springSegments: 24, // calibratable
+    springBubbles: 4, // calibratable
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -228,6 +241,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     grassFireFlames: 40, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 24, // smoke puffs behind the line (overdraw)
     sphinxSiteDetail: 'full', // the fuller Sphinx mesh (calibratable)
+    springSegments: 36, // a round dome at the closest zoom
+    springBubbles: 7, // calibratable
   },
 }
 

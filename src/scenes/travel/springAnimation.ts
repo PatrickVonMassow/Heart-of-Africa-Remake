@@ -1,44 +1,25 @@
-// Spring visual & animation maths (design.md §11.3, point 219).
+// Spring bubble animation maths (design.md §11.3).
 //
-// A river rising in open land wells up as a small NATURAL spring: a shallow
-// water pool at the source with bubbles rising from its centre and concentric
-// ripples spreading over the surface — replacing the former flat symbolic ring.
-// The pool sits exactly at the source's ribbon-surface height, so it reads as
-// the water's origin and never floats above the ground. The layout is
-// region-neutral and cheap (a couple of discs plus a handful of tiny
-// ripple/bubble meshes driven by the shared render clock).
-//
-// These pure, period-looped functions drive the animation; the meshes live in
-// Rivers.tsx's <Spring> component. Kept in their own module so the render file
-// exports only components (fast-refresh clean).
+// The open-land spring is a 3D water feature (springGeometry.ts): a welling
+// dome whose own surface bubbles and rings in its TSL material. On top of that,
+// a few small bubble spheres rise out of the dome's crest (their count is the
+// `springBubbles` quality lever, zero on LOW). This pure, period-looped
+// function drives those spheres; the mesh lives in Rivers.tsx's <Spring>.
+// Kept in its own module so the render file exports only components.
 
-export const SPRING_POOL_RADIUS = 0.6
-export const SPRING_RIPPLE_COUNT = 3
-export const SPRING_BUBBLE_COUNT = 5
+/** How high a bubble climbs above the dome crest before it bursts, world units. */
+export const SPRING_BUBBLE_RISE = 0.22
+const BUBBLE_PERIOD = 1.6
 
-/** Ripple ring i's surface radius and opacity at render time t (seconds): each
- *  ring wells up near the centre and expands to the pool rim on its own
- *  phase-offset loop, fading as it grows. Pure, period-looped (at the loop
- *  boundary a ring restarts at the centre at full opacity as it fades out at
- *  the rim) and cheap — a unit ring mesh is uniformly scaled to `radius`. */
-export function springRipple(i: number, t: number): { radius: number; opacity: number } {
-  const period = 2.8
-  const phase = (((t / period + i / SPRING_RIPPLE_COUNT) % 1) + 1) % 1
+/** Bubble i of `count` at render time t (seconds): its height above the crest
+ *  and its scale — it rises to `SPRING_BUBBLE_RISE` then resets, swelling in
+ *  mid-climb and vanishing at the ends. Phases are staggered over the group.
+ *  Pure and period-looped. */
+export function springBubble(i: number, count: number, t: number): { y: number; scale: number } {
+  const n = Math.max(1, count)
+  const phase = (((t / BUBBLE_PERIOD + i / n) % 1) + 1) % 1
   return {
-    radius: 0.08 + phase * (SPRING_POOL_RADIUS - 0.08),
-    opacity: (1 - phase) * 0.45,
-  }
-}
-
-/** Bubble i's height above the pool surface and scale at render time t: it
- *  rises from the surface up to `rise` then resets, swelling in mid-climb and
- *  vanishing at the ends. Pure and period-looped. */
-export function springBubble(i: number, t: number): { y: number; scale: number } {
-  const period = 1.6
-  const rise = 0.22
-  const phase = (((t / period + i / SPRING_BUBBLE_COUNT) % 1) + 1) % 1
-  return {
-    y: phase * rise,
+    y: phase * SPRING_BUBBLE_RISE,
     scale: Math.sin(phase * Math.PI) * 0.9,
   }
 }
