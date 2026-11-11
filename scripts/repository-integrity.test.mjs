@@ -363,7 +363,8 @@ describe('unit-suite repository integrity guard', () => {
         windowsHide: true,
       }),
     ).toContain('refs/heads/feat/x')
-  }, 20_000)
+    // Cloning and checking out the whole live tree outgrows 20 s under a full unit run.
+  }, 60_000)
 })
 
 // THE WIRING IS PART OF THE MECHANISM, so it is asserted here rather than left to
