@@ -231,11 +231,33 @@ describe('three levels of detail, one source', () => {
     geo.dispose()
   })
 
-  it('at the landmark the stone is the limestone hue under a uniform shade', () => {
+  it('at the landmark the stone is the limestone hue under a uniform shade — in the emitted vertex colours', () => {
     const site = new THREE.Color(SPHINX_FORM.tones.limestone)
-    const shaded = site.clone().multiplyScalar(SPHINX_FORM.emphasis.landmark.stoneShade)
-    expect(shaded.r / shaded.b).toBeCloseTo(site.r / site.b, 9)
-    expect(SPHINX_FORM.emphasis.landmark.stoneShade).toBeLessThan(1)
+    const shade = SPHINX_FORM.emphasis.landmark.stoneShade
+    expect(shade).toBeLessThan(1)
+    const want = site.clone().multiplyScalar(shade)
+    // Read the built geometry: a vertex on a limestone part (and on no part of
+    // another tone) carries the shaded limestone, within the ±5 % jitter.
+    const geo = buildSphinxGeometry('landmark')
+    const pos = geo.getAttribute('position')
+    const col = geo.getAttribute('color')
+    const parts = sphinxPartsFor('landmark')
+    const on = (p: SphinxPart, i: number) => Math.abs(partLevel(p, pos.getX(i), pos.getY(i), pos.getZ(i)) - 1) < 1e-3
+    let n = 0
+    for (let i = 0; i < pos.count; i++) {
+      const tones = new Set(parts.filter((p) => on(p, i)).map((p) => p.tone))
+      if (tones.size !== 1 || !tones.has('limestone')) continue
+      n++
+      const c = [col.getX(i), col.getY(i), col.getZ(i)]
+      const w = [want.r, want.g, want.b]
+      for (let k = 0; k < 3; k++) expect(c[k] / w[k], `vertex ${i} channel ${k}`).toBeGreaterThan(0.949)
+      for (let k = 0; k < 3; k++) expect(c[k] / w[k], `vertex ${i} channel ${k}`).toBeLessThan(1.051)
+      // One factor for all three channels: the hue is the limestone's.
+      expect(c[0] / c[2]).toBeCloseTo(want.r / want.b, 6)
+    }
+    // Paws, spine, chest, neck and shoulder tops: hundreds of stone vertices.
+    expect(n).toBeGreaterThan(300)
+    geo.dispose()
   })
 
   it('the skyline outline reads as a crouching figure with a raised head', () => {
