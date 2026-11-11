@@ -148,6 +148,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 29.10. abends | Vierter Wiedergänger von §3.271/§3.267, diesmal ohne `--gate`: Die Startpflicht `batch-doctor --repair` fand eine einzige geänderte Datei — die Zustandsdatei des Closing-Wächters, die der Vorgänger offen gelassen hatte — und stashte sie, obwohl sie den laufenden Prüflauf erkannt hatte (sie ließ `verification/` ausdrücklich draußen). Der Stash änderte den Index mitten in der Unit-Stufe des zweiten Abschluss-LARGE; die Integritätsprüfung brach den Lauf nach 8 m 41 s ab, bei 18 367 grünen Unit-Tests. Ein Neustart kostete gut zwei Stunden; der Fall steht als Punkt 1467 in der Arbeitsliste |
 | 04.11. nachmittags | Die Kleidungsarbeit konvergierte wochenlang nicht: 407 Kleidungs-Commits seit 01.10., und jede gescheiterte Runde erneuerte sich durch Aufteilung (1482 → 1485 → 1486) statt durch einen begrenzten POC-Rückfall; die siebte Rockrunde maß sogar einen anderen Zustand, als die Kamera fotografierte (§3.308) |
 | 05.11. abends | Der 24-Stunden-Rahmen von 1487 kürzte die Liste, nicht das Ritual: Seit 04.11. 17:00 waren 34 von 57 main-Commits Buchhaltung (Bildurteil, Delegation, Widerruf), der Kinder-Hüftschurz allein brauchte neun Commits. Der Nutzer ersetzte die Methode (Punkt 1488): ein Fix je Defekt, eine einzige Bildprüfung am Schluss (§3.309) |
+| 11.11. abends | Drei Zweige abgeschlossener Punkte (1341 abgebrochen, 1482 über einen anderen Zweig gelandet, 1485 aufgesogen) standen tagelang auf origin und belegten alle drei Pool-Plätze, während kein Agent lief: Der Zweig-Wächter fragte nur »in main enthalten?«, und ein Punkt, der ohne Merge schließt, besteht diese Frage nie. Er prüft jetzt auch den Abschluss im Archiv und sichert die Commits als Bündel vor dem Löschen; die Gegenprüfung fand dabei zweimal überschreibbare Bündelnamen und einen ungequoteten Löschbefehl (Punkt 1504) |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1752,7 +1753,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 11.11.2026, 22:43 · Quellen-Fingerprint: `23fcc345e9db…`
+Zuletzt aktualisiert: Donnerstag, 12.11.2026, 00:04 · Quellen-Fingerprint: `42295358b1f2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1872,8 +1873,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 184 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: 23fcc345e9db30e68da2da466599978154c1fbf04f3de5f43c64cb62561bea9c -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-11T21:43:59.181Z -->
+<!-- RETRO-FINGERPRINT: 42295358b1f22fb855ea03c7f77ebc89f9fa7a7b31d75cb8132f5917f2d0fa98 -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-11T23:04:14.942Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

@@ -131,6 +131,12 @@ put it is the mistake this line exists to stop.
   Point 1490 stays at the front, as ordered earlier the same evening (it is ranked ahead of this group). No point text changes; only the ranking (.claude/queue-rank.json / work order) changes. All 31 points were measured open in TASKS.md at 21:32.
   Bundle: unbundled.
 
+- [ ] 1508. Covering enrichments run owed for the landed points 391 and 327
+  Measured 12.11.2026 00:04: render-verify-guard reports render paths changed since abafa90 (Giza monumental scale 391, vulture cluster 327; src/render/landmarks.ts, src/scenes/place/gizaSite.ts, scripts/verify/enrichments.mjs among them), but the last enrichments runs on webgpu and webgl covered only the section vulture-cluster. The 1504 boundary session recorded a loud deferral instead of a pass.
+
+  Final state: a full covering enrichments run on BOTH backends is recorded, every red is fixed, charged to its owning open point or filed as its own point, and the Giza and vulture frames of both backends are picture-checked.
+  Bundle: unbundled.
+
 - [ ] 328. Vultures do not visibly land (user 25.07.2026: "they seem to fly one
   moment and stand the next — is there a landing at all?"). Add a real landing
   approach to the §19.6 flock AND the lone ground scavenger: a descending glide
