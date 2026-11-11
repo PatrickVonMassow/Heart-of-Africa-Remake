@@ -13,7 +13,10 @@ import { buildFieldSphinx, fieldSphinxAnchors } from './landmarks'
 type Mode = 'normal' | 'hidden' | 'mask'
 
 export interface SphinxProbe {
-  mode: (m: Mode) => void
+  /** Switch the mesh; resolves once the renderer has compiled what it now
+   *  draws (WebGPU builds a new material's pipeline asynchronously and skips
+   *  the mesh until it is ready). */
+  mode: (m: Mode) => Promise<void>
   /** Frame pixels (CSS px from the top left) of the Sphinx's bounding box and head anchors. */
   project: () => {
     width: number
@@ -38,6 +41,8 @@ export function FieldSphinx({ lod, material, probe, castShadow = false }: {
   const mesh = useRef<THREE.Mesh>(null)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -50,10 +55,12 @@ export function FieldSphinx({ lod, material, probe, castShadow = false }: {
       return [((p.x + 1) / 2) * size.width, ((1 - p.y) / 2) * size.height]
     }
     const api: SphinxProbe = {
-      mode: (m) => {
+      mode: async (m) => {
         if (!mesh.current) return
         mesh.current.visible = m !== 'hidden'
         mesh.current.material = m === 'mask' ? MASK_MATERIAL : material
+        const r = gl as unknown as { compileAsync?: (o: THREE.Object3D, c: THREE.Camera, s?: THREE.Scene) => Promise<unknown> }
+        if (m !== 'hidden' && r.compileAsync) await r.compileAsync(mesh.current, camera, scene)
       },
       project: () => {
         mesh.current!.updateWorldMatrix(true, false)
@@ -78,6 +85,6 @@ export function FieldSphinx({ lod, material, probe, castShadow = false }: {
     return () => {
       delete w[probe]
     }
-  }, [camera, size, geometry, lod, material, probe])
+  }, [camera, size, gl, scene, geometry, lod, material, probe])
   return <mesh ref={mesh} geometry={geometry} material={material} castShadow={castShadow} receiveShadow={castShadow} />
 }

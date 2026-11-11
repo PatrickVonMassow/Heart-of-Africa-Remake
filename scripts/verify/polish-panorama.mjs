@@ -35,9 +35,13 @@ async function sphinxLayers(key) {
   const { width: W, height: H, channels: C } = drawn.info
   const k = W / probe.width
   const px = (img, i) => [img.data[i * C], img.data[i * C + 1], img.data[i * C + 2]]
+  // RELATIVE to the hidden layer: haze, grading and bloom shift the mask's
+  // magenta differently per backend, but it always pulls red and blue up
+  // against green where the Sphinx is drawn.
   const isMask = (i) => {
     const [r, g, b] = px(mask, i)
-    return r > 150 && b > 150 && g < 0.6 * Math.min(r, b)
+    const [rh, gh, bh] = px(hidden, i)
+    return r - rh + (b - bh) - 2 * (g - gh) > 90
   }
   return { probe, k, W, H, px, isMask, drawn, hidden }
 }
@@ -1492,35 +1496,58 @@ if (section('sphinx')) {
     // (cross-vendor review of 8879aa7, P2). A step that never settles fails.
     const ARC_FRAMES = 24
     const STEP = (0.35 * Math.PI) / 180
+    // A pose: the rendered camera's position and view direction. "Settled"
+    // is relative to the step: between two frames the camera moves less than
+    // SETTLE_SHARE of one arc step (position and direction) — exact matrix
+    // equality never holds on real hardware (float noise, idle sway).
+    const SETTLE_SHARE = 0.05
+    const stepLen = STEP * 0.8 * L
     const pose = () =>
       page.evaluate(() => {
         const c = window.__scenePass?.camera
-        return c ? Array.from(c.matrixWorld.elements, (v) => Math.round(v * 1e5) / 1e5).join(',') : null
+        if (!c) return null
+        const e = c.matrixWorld.elements
+        return { p: [e[12], e[13], e[14]], f: [-e[8], -e[9], -e[10]] }
       })
+    const moved = (a, b) => {
+      if (!a || !b) return { dp: Infinity, da: Infinity }
+      const dp = Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1], a.p[2] - b.p[2])
+      const dot = (a.f[0] * b.f[0] + a.f[1] * b.f[1] + a.f[2] * b.f[2]) / (Math.hypot(...a.f) * Math.hypot(...b.f))
+      return { dp, da: Math.acos(Math.min(1, Math.max(-1, dot))) }
+    }
+    const still = (m) => m.dp <= SETTLE_SHARE * stepLen && m.da <= SETTLE_SHARE * STEP
     for (let arc = 0; arc < 4; arc++) {
       const a0 = (arc / 4) * Math.PI * 2 - (ARC_FRAMES / 2) * STEP
       const series = []
       let unsettled = 0
       let maxSettle = 0
+      let worstDrift = 0
       for (let k = 0; k < ARC_FRAMES; k++) {
         const a = a0 + k * STEP
         await standAt(sx.x + Math.cos(a) * 0.8 * L, sx.z + Math.sin(a) * 0.8 * L, sx.x + 0.1 * L, sx.z, 0)
-        let prev = null
+        let prev = await pose()
         let settle = 0
-        for (; settle < 12; settle++) {
+        let ok = false
+        for (; settle < 30; settle++) {
           await nextFrames(1)
           const cur = await pose()
-          if (cur !== null && cur === prev) break
+          if (still(moved(prev, cur))) {
+            ok = true
+            prev = cur
+            break
+          }
           prev = cur
         }
         maxSettle = Math.max(maxSettle, settle)
         const png = await capturePixels(page, `Sphinx moving-camera arc ${arc + 1}, frame ${k + 1}`)
-        if (prev === null || (await pose()) !== prev) unsettled++
+        const after = moved(prev, await pose())
+        worstDrift = Math.max(worstDrift, after.dp / stepLen)
+        if (!ok || !still(after)) unsettled++
         const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
         series.push({ data, width: info.width, height: info.height, channels: info.channels })
       }
       check(`the moving-camera arc ${arc + 1} samples settled consecutive poses (no unrecorded pose between captures)`, unsettled === 0,
-        `${unsettled} of ${ARC_FRAMES} captures not on a settled pose; settling took at most ${maxSettle} frame(s)`)
+        `${unsettled} of ${ARC_FRAMES} captures not on a settled pose (motion per frame above ${SETTLE_SHARE * 100} % of a step); settling took at most ${maxSettle} frame(s); worst drift across a capture ${(worstDrift * 100).toFixed(2)} % of a step`)
       const flicker = judgeFlickerSeries(series)
       console.log(`SPHINX FLICKER ${VERIFY_GL ?? 'webgpu'} arc ${arc + 1}: worst ${(flicker.worst * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
       check(`no flicker on the Sphinx while the camera moves (arc ${arc + 1} of 4, ${ARC_FRAMES} consecutive poses)`, flicker.ok,
