@@ -8208,15 +8208,25 @@ if (section('vulture-cluster')) {
     // pushed past herdCapacity is simulated but never drawn.
     const adults = herds.zebra.filter((z) => !z.young && !z.child)
     if (adults.length < 2) { window.__vulCluster = null; return { landed: false, noZebra: true } }
+    // A moved body keeps its old height unless re-grounded: the dead-body draw
+    // sits it at groundedBodyY(a.y), so a body from lower ground lay buried
+    // under the new spot (the empty-grass frame). Ground it where it now lies.
     const body = (z, x) => {
-      Object.assign(z, { x, z: spot.z, rot: 0.4, dead: true, deathCause: 'staged', parent: undefined, dissolve: undefined })
+      const y = Math.max(0.02, window.__terrainHeight(-spot.z / U, x / U, seed))
+      Object.assign(z, {
+        x, z: spot.z, y, rot: 0.4, dead: true, deathCause: 'staged', parent: undefined, dissolve: undefined,
+        inWater: undefined, caught: undefined, dying: undefined, heldPose: undefined,
+      })
       return z
     }
     const a = body(adults[0], spot.x)
     const b = body(adults[1], spot.x + gap)
     const slots = w.scavengers.current
     for (const f of slots) { f.target = null; f.mode = 'idle'; f.landed = false }
-    const out = { staged: true, radius, gap, maxFlocksOut: 0, flocksSeen: 0, overlapFrames: 0, landedOn: [], aGone: false, bGone: false, leftAfter: false }
+    const out = {
+      staged: true, radius, gap, maxFlocksOut: 0, flocksSeen: 0, overlapFrames: 0, landedOn: [], aGone: false, bGone: false,
+      leftEarlyFrames: 0, leftAfter: false,
+    }
     const seen = new Set()
     const mid = { x: spot.x + gap / 2, z: spot.z }
     const step = () => {
@@ -8233,6 +8243,11 @@ if (section('vulture-cluster')) {
       }
       out.aGone = !herds.zebra.includes(a)
       out.bGone = !herds.zebra.includes(b)
+      // A body still on the ground: present and not yet dissolved away.
+      const remains = (x) => herds.zebra.includes(x) && !x.gone && !(x.dissolve !== undefined && x.dissolve <= 0)
+      // A seen flock that turns away ('out') or has despawned ('idle') while a
+      // body remains left the cluster early, even if it comes back for it.
+      if ((remains(a) || remains(b)) && [...seen].some((f) => f.mode === 'out' || f.mode === 'idle')) out.leftEarlyFrames++
     }
     // Frame the pair BEFORE the flock lands: a fed body dissolves in seconds,
     // so a camera settle after the landing shot an already eaten carcass.
@@ -8268,7 +8283,8 @@ if (section('vulture-cluster')) {
     cluster.staged && cluster.flocksSeen === 1 && cluster.maxFlocksOut === 1 && cluster.overlapFrames === 0,
     JSON.stringify(cluster))
   check('that one flock eats BOTH carcasses in turn and leaves only when the cluster is done (design.md §19.6)',
-    cluster.staged && cluster.aGone && cluster.bGone && cluster.landedOn.length === 2 && cluster.leftAfter,
+    cluster.staged && cluster.aGone && cluster.bGone && cluster.landedOn.length === 2 && cluster.leftEarlyFrames === 0 &&
+      cluster.leftAfter,
     JSON.stringify(cluster))
 }
 
