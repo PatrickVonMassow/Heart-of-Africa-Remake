@@ -60,6 +60,9 @@ export interface QuadrupedSpec {
   /** Sag of the topline at mid-back, in bodyR units (an aged sway-back;
    *  design.md §19.18). The body drops between withers and hips. */
   swayBack?: number
+  /** Belly tucked up at the flank, in bodyR units (an aged, herring-gutted
+   *  barrel; design.md §19.18): the underline rises while the topline sags. */
+  bellyTuck?: number
   /** Aged build: adds the prominent hip and shoulder bones (`agedBoneKnobs`). */
   elderly?: boolean
 }
@@ -103,6 +106,16 @@ export const ELDERLY_SCHEMA = {
   swayBack: 0.3,
   /** Coat dulling/greying share (`agedColor`). */
   coatGrey: 0.5,
+  /** The greying share for a PALE coat (luminance above `paleCoatLum`, the
+   *  zebra): a near-white base only reads old when it turns a dingy grey
+   *  between its stripes (point 1498 rework: elder and prime zebra matched). */
+  paleCoatGrey: 0.9,
+  /** Luminance (0..1) above which a coat counts as pale. */
+  paleCoatLum: 0.7,
+  /** Belly tuck at the flank in bodyR units (the gaunt, tucked-up barrel). */
+  bellyTuck: 0.2,
+  /** Mane height share of an old equine's thin, short mane. */
+  maneThin: 0.5,
   /** Share of the coat greying that goes to the ash tone below (`agedColor`). */
   ashPull: 0.5,
   /** The dull ash grey an old coat fades toward. */
@@ -114,6 +127,13 @@ export const ELDERLY_SCHEMA = {
   /** Size factor of the prominent hip and withers bones (`agedBoneKnobs`). */
   boneKnob: 1.6,
 } as const
+
+/** The greying share for a coat: stronger on a pale coat (`paleCoatGrey`). */
+export function coatGreyFor(hex: string): number {
+  const c = new THREE.Color(hex)
+  const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+  return lum > ELDERLY_SCHEMA.paleCoatLum ? ELDERLY_SCHEMA.paleCoatGrey : ELDERLY_SCHEMA.coatGrey
+}
 
 /**
  * The elderly-adult schema (design.md §19.18, research docs/fauna-behaviour-1890.md
@@ -130,8 +150,9 @@ export function elderlyProportions<S extends QuadrupedSpec>(s: S, opts: { grey?:
     bodyR: s.bodyR * ELDERLY_SCHEMA.bodyR,
     legR: s.legR * ELDERLY_SCHEMA.legR,
     neckTilt: s.neckTilt + ELDERLY_SCHEMA.neckDrop,
-    bodyColor: grey ? agedColor(s.bodyColor, ELDERLY_SCHEMA.coatGrey) : s.bodyColor,
-    headColor: grey ? greyMuzzle(agedColor(head, ELDERLY_SCHEMA.coatGrey)) : head,
+    bodyColor: grey ? agedColor(s.bodyColor, coatGreyFor(s.bodyColor)) : s.bodyColor,
+    headColor: grey ? greyMuzzle(agedColor(head, coatGreyFor(head))) : head,
+    bellyTuck: ELDERLY_SCHEMA.bellyTuck,
     swayBack: ELDERLY_SCHEMA.swayBack,
     elderly: true,
   }

@@ -1608,6 +1608,37 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
     }
   })
 
+  it('rework: the old zebra turns a dingy grey between its stripes and its belly tucks up', () => {
+    const meanLum = (g: THREE.BufferGeometry) => {
+      const c = g.attributes.color
+      let sum = 0
+      for (let i = 0; i < c.count; i++) sum += 0.299 * c.getX(i) + 0.587 * c.getY(i) + 0.114 * c.getZ(i)
+      return sum / c.count
+    }
+    expect(meanLum(buildZebra()) - meanLum(buildZebraElder())).toBeGreaterThan(0.15)
+    const bellyAt = (g: THREE.BufferGeometry) => {
+      const p = g.attributes.position
+      let low = Infinity
+      for (let i = 0; i < p.count; i++) if (Math.abs(p.getZ(i)) < 0.25 && Math.abs(p.getX(i)) < 0.15 && p.getY(i) > 0.4) low = Math.min(low, p.getY(i))
+      return low
+    }
+    expect(bellyAt(buildZebraElder())).toBeGreaterThan(bellyAt(buildZebra()))
+  })
+
+  it('rework: the old elephant back reads as a narrow ridge, not round lumps', () => {
+    const g = buildElephant(false, true)
+    const p = g.attributes.position
+    const backTop = 1.75 - ELEPHANT_ELDER.sag + 1.05 * 0.95
+    let widest = 0
+    for (let i = 0; i < p.count; i++) {
+      if (Math.abs(p.getZ(i)) < 0.6 && p.getY(i) > backTop - 0.01) widest = Math.max(widest, Math.abs(p.getX(i)))
+    }
+    // Only the spine ridge (and the barrel's own crown) reaches the back top;
+    // the old round knobs stood out to |x| ≈ 0.3.
+    expect(widest).toBeLessThanOrEqual(0.12)
+    expect(ELEPHANT_ELDER.ribs).toBeGreaterThan(0)
+  })
+
   it('every rendered mammal that ages has an elder build; the crocodile and the birds have none (§2.4)', () => {
     expect(Object.keys(ELDER_BUILDERS).sort()).toEqual(
       ['antelope', 'cheetah', 'elephant', 'giraffe', 'hyena', 'leopard', 'lion', 'warthog', 'wildebeest', 'zebra'],

@@ -719,7 +719,63 @@ export const ELEPHANT_ELDER = {
   skullWidth: 0.82,
   /** How far the old head hangs lower (world units). */
   headDrop: 0.12,
+  /** The spine ridge standing out of the sunken back (world units above the
+   *  barrel top) — a sharp line, not round knobs (point 1498 rework). */
+  ridge: 0.07,
+  /** Shadowed hollows of the sunken flanks and the rib lines (darker skin). */
+  hollowColor: '#66605a',
+  /** Visible rib lines per flank. */
+  ribs: 5,
 } as const
+
+/** The old elephant's gauntness (design.md §19.18; research §2.2): a sharp
+ *  spine ridge along the sunken back with narrow hip points, hollow flanks in
+ *  front of the hips and the rib lines showing — age read as bone under slack
+ *  skin, never as round lumps (point 1498 rework). Built against the aged
+ *  barrel `buildElephant` makes: an ellipsoid of semi-axes (a, b, c) centred
+ *  at height yc. */
+function elephantGauntness(): THREE.BufferGeometry[] {
+  const E = ELEPHANT_ELDER
+  const a = 1.05 * 0.95 * E.bodyWidth
+  const b = 1.05 * 0.95
+  const c = 1.05 * 1.4
+  const yc = 1.75 - E.sag
+  /** Flank surface x at (y, z) on the barrel. */
+  const flankX = (y: number, z: number) => a * Math.sqrt(Math.max(0, 1 - ((y - yc) / b) ** 2 - (z / c) ** 2))
+  const out: THREE.BufferGeometry[] = []
+  // Spine ridge: a long, narrow crest following the topline.
+  const ridge = new THREE.SphereGeometry(1, 16, 8)
+  ridge.scale(0.07, 0.1, c * 0.78)
+  ridge.translate(0, yc + b + E.ridge - 0.1, -0.05)
+  out.push(tint(ridge, '#857e78', 0.05, 109))
+  // Hip points: narrow, angular, just proud of the back at the rear.
+  for (const side of [-1, 1]) {
+    const hip = new THREE.ConeGeometry(0.1, 0.22, 6)
+    hip.rotateZ(-side * 0.5)
+    const z = -0.95
+    const y = yc + b * 0.8
+    hip.translate(side * Math.max(0.12, flankX(y, z) - 0.06), y + 0.06, z)
+    out.push(tint(hip, '#857e78', 0.05, 110 + side))
+    // The hollow flank in front of the hip (paralumbar fossa).
+    const hz = -0.55
+    const hy = yc + 0.15
+    const hollow = new THREE.SphereGeometry(1, 12, 8)
+    hollow.scale(0.05, 0.32, 0.3)
+    hollow.translate(side * (flankX(hy, hz) - 0.025), hy, hz)
+    out.push(tint(hollow, E.hollowColor, 0.04, 112))
+    // Rib lines over the chest.
+    for (let i = 0; i < E.ribs; i++) {
+      const rz = -0.15 + i * 0.2
+      const ry = yc + 0.05
+      const rib = new THREE.SphereGeometry(1, 8, 8)
+      rib.scale(0.03, 0.36, 0.035)
+      rib.rotateX(-0.25)
+      rib.translate(side * (flankX(ry, rz) - 0.012), ry, rz)
+      out.push(tint(rib, E.hollowColor, 0.04, 113 + i))
+    }
+  }
+  return out
+}
 
 /** Savanna elephant, ~2.6 units tall. With `calf`, baby-schema proportions
  *  (design.md §19): a rounder, shorter body, a proportionally bigger head with
@@ -735,7 +791,7 @@ export function buildElephant(calf = false, elderly = false): THREE.BufferGeomet
   body.scale(old ? 0.95 * ELEPHANT_ELDER.bodyWidth : 0.95, 0.95, calf ? 1.15 : 1.4)
   body.translate(0, old ? 1.75 - ELEPHANT_ELDER.sag : 1.75, 0)
   parts.push(tint(body, '#8d8680', 0.06, 101))
-  if (old) parts.push(...agedBoneKnobs(-0.95, 0.75, 2.62, 0.3, 0.17, '#8d8680', 109))
+  if (old) parts.push(...elephantGauntness())
 
   for (const [lx, lz] of [
     [-0.5, 0.85],
