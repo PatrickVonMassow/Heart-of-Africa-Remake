@@ -77,27 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 320. Springs as real 3D bubbling water (user 25.07.2026: the springs still
-  read as a mere symbol — animated now, but flat; they should LOOK like a spring
-  with water bubbling three-dimensionally). Rework the §11.3 spring depiction at
-  travel scale into a small 3D water feature. ANCHOR (25.07, main session): the
-  current spring is built in `src/scenes/travel/Rivers.tsx` as a stack of FLAT discs
-  — circle meshes rotated `-Math.PI / 2` (the pool, a damp-ground ring and the
-  animated ripple), which is exactly why it reads as a symbol however it animates.
-  Replace that stack with: a low dome/upwelling mesh whose
-  surface visibly bubbles (TSL displacement/normal animation — renderer-agnostic,
-  both backends), a bright welling centre with concentric ripple rings, a small
-  wet pool/outflow meeting the terrain (no floating disc, no billboard), sized to
-  read at the default zoom 0.5 without dominating. Calibratable size/intensity
-  under balance (debug-editable); quality-level entries for ALL THREE
-  QUALITY_PRESETS (the completeness gate enforces this) — LOW may use a cheaper
-  variant but the feature stays visible. VERIFIABLE: the existing "at least one
-  spring" check extended: the spring mesh is 3D (non-flat bounding box), its
-  surface animates over sim time (vertex/pixel delta between two sampled frames at
-  the spring, both backends), and it sits ON the terrain (no gap/clip at the rim —
-  ray/heights check); screenshot pair added to the §7.2 evidence set; the picture
-  judged on BOTH backends per the render rule.
-
 - [ ] 327. Two nearby carcasses must share one vulture flock (user 25.07.2026: a
   second flock spawns and the two overlap). Give the §19.6 flock a claim over a
   carcass CLUSTER: a new carcass within a calibratable radius of a flock's current
