@@ -2753,13 +2753,17 @@ export const SPHINX_FORM = {
    *  (crown ~0.27 of the length) so the face reads from across the site and as
    *  a raised head in the skyline (calibratable). */
   headScale: 1.45,
+  /** The real crown height as a fraction of the body length (~20 m of ~73 m,
+   *  docs/giza-1890.md §1.3): the burial line is measured against it, since
+   *  the drawn head is enlarged by `headScale`. */
+  realCrown: 0.27,
   /** The burial line the drift must hit at the chest front, as a fraction of
-   *  the crown height: "buried to roughly the shoulders/upper chest", only
-   *  head, nemes and a little of the chest clear (calibratable; the record
-   *  gives no number). */
-  burialLineFraction: 0.54,
+   *  the real crown height: "buried to roughly the shoulders/upper chest",
+   *  only head, neck, lappets and a little of the chest clear (calibratable;
+   *  the record gives no number). */
+  burialLineFraction: 0.55,
   /** Allowed deviation of the drawn burial line from that target (fraction of
-   *  the crown height). */
+   *  the real crown height). */
   burialLineTolerance: 0.06,
   drift: {
     /** Sand cover over the top of every buried body part. */
@@ -2777,6 +2781,9 @@ export const SPHINX_FORM = {
     sink: 0.03,
     /** Blend radius of the domes' smooth union. */
     blend: 0.012,
+    /** How much darker the drift's steepest sand is drawn than its flat top
+     *  (vertex shading), so the swell reads from above (calibratable). */
+    flankShade: 0.45,
   },
   /** Spacing of the collider capsules laid across the drift's footprint
    *  (0.25 m at the site's 20 m length). */
@@ -2800,12 +2807,12 @@ export const SPHINX_FORM = {
    *  compressed symbol, so the Sphinx is drawn larger than its true ratio). */
   field: { x: 2.25, z: 0.35, length: 1.25 },
   /** Horizontal weathered limestone courses at the site (metres). */
-  banding: { coursePeriod: 0.9, courseAmplitude: 0.16, nemesPeriod: 0.32, nemesAmplitude: 0.22 },
+  banding: { coursePeriod: 0.9, courseAmplitude: 0.12, nemesPeriod: 0.32, nemesAmplitude: 0.22 },
   tones: {
-    limestone: '#b8945e',
-    face: '#c29e68',
-    nemes: '#c7a46c',
-    band: '#a98552',
+    limestone: '#b38e59',
+    face: '#b8935e',
+    nemes: '#ba9660',
+    band: '#b08b58',
     sand: '#dcc48a',
     shadowMark: '#6e5434',
   },

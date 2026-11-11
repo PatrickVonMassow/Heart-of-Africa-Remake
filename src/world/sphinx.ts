@@ -94,52 +94,72 @@ interface PartSpec {
 // Real proportions: ~73 m long, ~20 m to the crown, ~19 m across the haunches
 // (docs/giza-1890.md §1.3), i.e. crown ≈ 0.27 and width ≈ 0.26 of the length.
 const BODY: readonly PartSpec[] = [
-  // Buried: they only raise the drift.
-  { id: 'torso', centre: [-0.05, 0.07, 0], radii: [0.3, 0.08, 0.095], shape: [0.95, 0.95], burial: 'buried' },
-  { id: 'shoulders', centre: [0.17, 0.09, 0], radii: [0.11, 0.095, 0.11], burial: 'buried' },
-  { id: 'haunch', centre: [-0.34, 0.065, 0], radii: [0.13, 0.085, 0.12], burial: 'buried' },
-  { id: 'breast', centre: [0.27, 0.08, 0], radii: [0.05, 0.08, 0.075], burial: 'buried' },
+  // Buried: they only raise the drift. The back falls from the shoulders to
+  // the rump, so the rear torso and the haunches sit lower than the front.
+  { id: 'torso', centre: [0.06, 0.06, 0], radii: [0.17, 0.07, 0.09], shape: [0.95, 0.95], burial: 'buried' },
+  { id: 'rearTorso', centre: [-0.18, 0.048, 0], radii: [0.17, 0.058, 0.065], shape: [0.95, 0.95], burial: 'buried' },
+  { id: 'shoulder', centre: [0.16, 0.07, 0.055], radii: [0.09, 0.08, 0.07], burial: 'buried', pair: true },
+  // The haunches: two swells either side of the spine at the rear.
+  { id: 'haunch', centre: [-0.32, 0.048, 0.07], radii: [0.1, 0.066, 0.065], burial: 'buried', pair: true },
+  { id: 'breast', centre: [0.262, 0.068, 0], radii: [0.05, 0.07, 0.075], burial: 'buried' },
   { id: 'hindLeg', centre: [-0.27, 0.03, 0.115], radii: [0.14, 0.035, 0.035], burial: 'buried', pair: true },
   // The forepaws stretched forward, under the sand in 1890 (the record).
-  { id: 'foreleg', centre: [0.34, 0.03, 0.065], radii: [0.16, 0.032, 0.04], burial: 'buried', pair: true },
+  { id: 'foreleg', centre: [0.36, 0.036, 0.08], radii: [0.17, 0.038, 0.04], burial: 'buried', pair: true },
   // The tail curls round the right haunch.
   { id: 'tail', centre: [-0.36, 0.018, 0.14], radii: [0.11, 0.016, 0.018], burial: 'buried' },
   // Clear: the stone that breaks the surface.
   // The upper chest between the lappets ("a little of the chest clear").
-  { id: 'chest', centre: [0.255, 0.125, 0], radii: [0.055, 0.07, 0.085], shape: [0.8, 0.9], burial: 'clear', reach: 'skyline' },
-  { id: 'neck', centre: [0.21, 0.18, 0], radii: [0.055, 0.045, 0.05], shape: [0.9, 0.9], pitch: 0.25, burial: 'clear', reach: 'skyline' },
-  // The back ridge: a long, squarish strip of the spine breaking the drift,
-  // ending before the shoulder swell rises over it and before the haunch.
-  { id: 'backRidge', centre: [-0.06, 0.145, 0], radii: [0.2, 0.055, 0.075], shape: [0.9, 0.7], burial: 'clear', reach: 'skyline' },
+  { id: 'chest', centre: [0.255, 0.13, 0], radii: [0.042, 0.065, 0.08], shape: [0.8, 0.9], burial: 'clear', reach: 'skyline' },
+  { id: 'neck', centre: [0.232, 0.19, 0], radii: [0.05, 0.07, 0.042], shape: [0.9, 0.9], pitch: 0.2, burial: 'clear', reach: 'skyline' },
+  // The spine: a narrow stone ridge, deep in the drift and tilted up toward
+  // the neck, whose crest rises out of the sand from the mid-back to the
+  // shoulders. A buried core under it banks the sand up against its flanks.
+  { id: 'spine', centre: [-0.01, 0.085, 0], radii: [0.27, 0.105, 0.032], shape: [0.7, 0.8], pitch: 0.06, burial: 'clear', reach: 'skyline' },
+  // The tops of the shoulders behind the lappets, rising out of the sand up
+  // under the nemes wings (the upper back standing clear, the record).
+  { id: 'shoulderTop', centre: [0.19, 0.142, 0.064], radii: [0.075, 0.052, 0.045], shape: [0.65, 0.8], burial: 'clear', reach: 'landmark', pair: true },
+  { id: 'spineBank', centre: [-0.03, 0.065, 0], radii: [0.22, 0.055, 0.04], shape: [0.95, 0.95], pitch: 0.06, burial: 'buried' },
 ]
 
 /** Where the head sits on the neck (body units); head parts scale about it. */
-export const SPHINX_HEAD_ANCHOR: Vec3 = [0.268, 0.236, 0]
+export const SPHINX_HEAD_ANCHOR: Vec3 = [0.272, 0.277, 0]
 
 // --- The head (head-local units, scaled by SPHINX_FORM.headScale) ------------
+// Seen from the front the head is the nemes' flaring trapezoid: a flat crown
+// with the brow band, the cloth widening behind the ears into two broad flat
+// wings, and the lappets falling straight down beside the neck to the chest.
+// The face sits narrower inside it: brow ridge, eye sockets between brow and
+// cheekbones, the flattened stump of the broken nose, lips, a rounded chin.
 const HEAD: readonly PartSpec[] = [
-  // The face: a squarish block, flat in front, chin rounded — and no beard.
-  { id: 'face', centre: [0.028, -0.008, 0], radii: [0.024, 0.035, 0.03], shape: [0.6, 0.6], tone: 'face', band: 'none', burial: 'clear', reach: 'skyline' },
-  // The broken nose: a short stump with a flat break, nothing more.
-  { id: 'noseStump', centre: [0.051, -0.008, 0], radii: [0.007, 0.009, 0.006], shape: [0.5, 0.35], tone: 'face', band: 'none', burial: 'clear', reach: 'site' },
-  // The nemes: the headcloth over skull and forehead, set back from the face
-  // and widening down to the shoulders — the trapezoid that frames the face.
-  { id: 'nemes', centre: [0, -0.008, 0], radii: [0.036, 0.054, 0.047], shape: [0.55, 0.7], taper: 0.35, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'skyline' },
-  // The brow band: the headband across the forehead at the nemes' front edge.
-  { id: 'browBand', centre: [0.04, 0.02, 0], radii: [0.012, 0.005, 0.027], shape: [0.5, 0.6], tone: 'band', band: 'none', burial: 'clear', reach: 'landmark' },
-  // The lappets falling in front of the shoulders onto the chest.
-  { id: 'lappet', centre: [0.024, -0.08, 0.047], radii: [0.008, 0.042, 0.015], shape: [0.45, 0.5], roll: -0.06, pitch: 0.12, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'skyline', pair: true },
-  { id: 'ear', centre: [0.04, 0, 0.033], radii: [0.007, 0.012, 0.009], shape: [1, 1], tone: 'face', band: 'none', burial: 'clear', reach: 'landmark', pair: true },
+  { id: 'face', centre: [0.026, -0.004, 0], radii: [0.026, 0.034, 0.024], shape: [0.55, 0.65], tone: 'face', band: 'none', burial: 'clear', reach: 'skyline' },
+  { id: 'browRidge', centre: [0.046, 0.014, 0], radii: [0.008, 0.0055, 0.021], shape: [0.7, 0.7], tone: 'face', band: 'none', burial: 'clear', reach: 'landmark' },
+  { id: 'cheek', centre: [0.041, -0.007, 0.0165], radii: [0.012, 0.01, 0.0085], tone: 'face', band: 'none', burial: 'clear', reach: 'site', pair: true },
+  // The broken nose: a flattened stump, standing only a little proud.
+  { id: 'noseStump', centre: [0.051, -0.004, 0], radii: [0.0065, 0.011, 0.006], shape: [0.5, 0.4], tone: 'face', band: 'none', burial: 'clear', reach: 'site' },
+  { id: 'upperLip', centre: [0.048, -0.0205, 0], radii: [0.006, 0.0036, 0.0095], shape: [0.8, 0.8], tone: 'face', band: 'none', burial: 'clear', reach: 'site' },
+  { id: 'lowerLip', centre: [0.047, -0.029, 0], radii: [0.0055, 0.0032, 0.0085], shape: [0.8, 0.8], tone: 'face', band: 'none', burial: 'clear', reach: 'site' },
+  { id: 'chin', centre: [0.04, -0.034, 0], radii: [0.011, 0.009, 0.011], tone: 'face', band: 'none', burial: 'clear', reach: 'site' },
+  // The nemes crown: flat on top, widening a little downward.
+  { id: 'nemes', centre: [0, 0.012, 0], radii: [0.042, 0.032, 0.034], shape: [0.45, 0.75], taper: 0.2, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'skyline' },
+  // The brow band across the forehead at the crown's front edge.
+  { id: 'browBand', centre: [0.037, 0.027, 0], radii: [0.007, 0.0045, 0.031], shape: [0.4, 0.5], tone: 'band', band: 'none', burial: 'clear', reach: 'landmark' },
+  // The wings: broad flat panels flaring outward and down behind the ears.
+  { id: 'wing', centre: [-0.004, -0.017, 0.04], radii: [0.032, 0.044, 0.012], shape: [0.3, 0.45], roll: -0.48, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'skyline', pair: true },
+  // The lappets: long flat striped panels falling beside the neck to the chest.
+  { id: 'lappet', centre: [0.012, -0.08, 0.036], radii: [0.0065, 0.038, 0.016], shape: [0.25, 0.4], pitch: 0.05, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'skyline', pair: true },
+  // The back of the nemes: the cloth drawn in behind the head to the nape.
+  { id: 'nemesBack', centre: [-0.03, -0.024, 0], radii: [0.022, 0.046, 0.036], shape: [0.5, 0.6], taper: 0.35, tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'landmark' },
   // The queue: the nemes gathered behind the head (what the view from behind reads).
-  { id: 'nemesQueue', centre: [-0.042, -0.026, 0], radii: [0.01, 0.03, 0.012], shape: [0.7, 0.7], tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'landmark' },
+  { id: 'nemesQueue', centre: [-0.046, -0.03, 0], radii: [0.01, 0.028, 0.011], shape: [0.7, 0.7], tone: 'nemes', band: 'nemes', burial: 'clear', reach: 'site' },
 ]
 
 /** Painted marks on the face's front (head-local y/z centre and radii): the
- *  eye sockets and the mouth line. Drawn only where the level asks for them. */
+ *  almond eye sockets under the brow ridge and the mouth line between the
+ *  lips. Drawn only where the level asks for them. */
 export const SPHINX_FACE_MARKS: ReadonlyArray<{ id: string; y: number; z: number; ry: number; rz: number }> = [
-  { id: 'eyeR', y: 0.006, z: 0.012, ry: 0.0045, rz: 0.0075 },
-  { id: 'eyeL', y: 0.006, z: -0.012, ry: 0.0045, rz: 0.0075 },
-  { id: 'mouth', y: -0.027, z: 0, ry: 0.0025, rz: 0.011 },
+  { id: 'eyeR', y: 0.0055, z: 0.0115, ry: 0.0035, rz: 0.0075 },
+  { id: 'eyeL', y: 0.0055, z: -0.0115, ry: 0.0035, rz: 0.0075 },
+  { id: 'mouth', y: -0.025, z: 0, ry: 0.0018, rz: 0.0085 },
 ]
 
 function expand(spec: PartSpec, group: 'body' | 'head'): SphinxPart[] {
@@ -396,7 +416,9 @@ export function sphinxBurialLine(): number {
 
 /** The documented ~1890 burial line (docs/giza-1890.md §1.3) as a height. */
 export function sphinxBurialTarget(): { line: number; tolerance: number } {
-  const crown = sphinxCrownHeight()
+  // Measured against the REAL crown (body proportion), not the drawn one: the
+  // head is drawn enlarged, and the sand lies against the body, not the head.
+  const crown = SPHINX_FORM.realCrown
   return { line: SPHINX_FORM.burialLineFraction * crown, tolerance: SPHINX_FORM.burialLineTolerance * crown }
 }
 

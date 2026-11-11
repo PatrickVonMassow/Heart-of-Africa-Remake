@@ -67,7 +67,7 @@ describe('three levels of detail, one source', () => {
     for (const id of skyline) expect(landmark.has(id)).toBe(true)
     for (const p of SPHINX_PARTS) if (p.burial === 'buried') expect(site.has(p.id)).toBe(false)
     // The skyline outline still carries a head in its nemes over the back.
-    for (const id of ['face', 'nemes', 'neck', 'backRidge']) expect(skyline.has(id)).toBe(true)
+    for (const id of ['face', 'nemes', 'wingR', 'wingL', 'lappetR', 'lappetL', 'neck', 'spine']) expect(skyline.has(id)).toBe(true)
   })
 
   it('the skyline outline reads as a crouching figure with a raised head', () => {

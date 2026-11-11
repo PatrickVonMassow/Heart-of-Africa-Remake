@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { SPHINX_FORM } from '../config/balance'
 import {
   SPHINX_BURIED_PARTS,
+  SPHINX_FACE_MARKS,
   SPHINX_CLEAR_PARTS,
   SPHINX_HEAD_ANCHOR,
   SPHINX_PARTS,
@@ -60,7 +61,7 @@ describe('the ~1890 burial (docs/giza-1890.md §1.3)', () => {
 
   it('leaves the head, the neck and the upper back standing clear of the drift', () => {
     const clearIds = SPHINX_CLEAR_PARTS.map((p) => p.id)
-    for (const id of ['face', 'nemes', 'neck', 'backRidge', 'chest', 'lappetR', 'lappetL']) {
+    for (const id of ['face', 'nemes', 'wingR', 'wingL', 'neck', 'spine', 'chest', 'lappetR', 'lappetL']) {
       expect(clearIds).toContain(id)
     }
     for (const p of SPHINX_CLEAR_PARTS) {
@@ -73,7 +74,7 @@ describe('the ~1890 burial (docs/giza-1890.md §1.3)', () => {
   it('keeps every other body part below the drift — torso, shoulders, haunches, legs, paws, tail', () => {
     const buried = SPHINX_BURIED_PARTS.map((p) => p.id)
     expect(buried).toEqual(
-      expect.arrayContaining(['torso', 'shoulders', 'haunch', 'breast', 'hindLegR', 'hindLegL', 'forelegR', 'forelegL', 'tail']),
+      expect.arrayContaining(['torso', 'rearTorso', 'shoulderR', 'shoulderL', 'haunchR', 'haunchL', 'breast', 'hindLegR', 'hindLegL', 'forelegR', 'forelegL', 'tail']),
     )
     for (const p of SPHINX_BURIED_PARTS) {
       for (const s of sampleSurface(p, 48, 32)) {
@@ -86,7 +87,7 @@ describe('the ~1890 burial (docs/giza-1890.md §1.3)', () => {
 
   it('models the drift as a body under sand: the shoulders swell and the paws show through', () => {
     // The shoulder swell stands above the mid-back's sand…
-    expect(sphinxDriftHeight(part('shoulders').centre[0], 0)).toBeGreaterThan(sphinxDriftHeight(-0.05, 0.09))
+    expect(sphinxDriftHeight(part('shoulderR').centre[0], part('shoulderR').centre[2])).toBeGreaterThan(sphinxDriftHeight(-0.05, 0.09))
     // …and over the forepaws, ahead of the chest, the sand rises in two lobes
     // with a dip between them.
     const x = part('forelegR').centre[0] + part('forelegR').radii[0] * 0.6
@@ -134,32 +135,84 @@ describe('the head: nemes, brow band, lappets, broken nose, no beard', () => {
     expect(crown).toBeLessThan(0.36)
   })
 
-  it('frames the face with the nemes widening down to the shoulders', () => {
-    const nemes = part('nemes')
-    expect(nemes.taper).toBeGreaterThan(0)
-    const half = (y: number) =>
-      Math.max(...sampleSurface(nemes, 64, 64).filter((s) => Math.abs(s.p[1] - y) < 0.004).map((s) => Math.abs(s.p[2])))
-    const faceHalf = Math.max(...sampleSurface(part('face'), 32, 32).map((s) => Math.abs(s.p[2])))
-    expect(half(part('face').centre[1])).toBeGreaterThan(faceHalf)
-    expect(half(nemes.centre[1] - nemes.radii[1] * 0.8)).toBeGreaterThan(half(nemes.centre[1] + nemes.radii[1] * 0.8))
-    // The brow band runs across the forehead, proud of the face.
+  /** Half-width (max |z|) of a set of parts' surface within a height band. */
+  const halfWidth = (ids: string[], y0: number, y1: number) =>
+    Math.max(
+      0,
+      ...ids.flatMap((id) => sampleSurface(part(id), 64, 64).filter((s) => s.p[1] >= y0 && s.p[1] <= y1).map((s) => Math.abs(s.p[2]))),
+    )
+  const topOf = (p: SphinxPart) => Math.max(...sampleSurface(p, 32, 24).map((s) => s.p[1]))
+
+  it("reads from the front as the nemes' flaring trapezoid framing a narrower face", () => {
+    const nemesIds = ['nemes', 'wingR', 'wingL']
+    const crown = sphinxCrownHeight()
+    const faceHalf = halfWidth(['face', 'cheekR', 'cheekL'], 0, 1)
+    const wingBottom = Math.min(bottomOf(part('wingR')), bottomOf(part('wingL')))
+    // Flat crown on top, widening downward: the top band narrowest, the wings'
+    // lower band widest — and that widest span well over the face's width.
+    const top = halfWidth(nemesIds, crown - 0.01, crown)
+    const low = halfWidth(nemesIds, wingBottom, wingBottom + 0.02)
+    expect(low).toBeGreaterThan(top * 1.5)
+    expect(low).toBeGreaterThan(faceHalf * 1.8)
+    expect(top).toBeGreaterThan(faceHalf * 0.9)
+    // The wings are flat panels (thin across their own plane), not lobes.
+    const w = part('wingR')
+    expect(w.radii[2]).toBeLessThan(Math.min(w.radii[0], w.radii[1]) * 0.4)
+    // The brow band runs across the forehead, proud of the crown.
     const front = (p: SphinxPart) => Math.max(...sampleSurface(p, 32, 32).map((s) => s.p[0]))
     expect(front(part('browBand'))).toBeGreaterThan(front(part('nemes')))
-    // The lappets fall from the head to the chest, below the chin.
-    expect(bottomOf(part('lappetR'))).toBeLessThan(bottomOf(part('face')))
+  })
+
+  it('hangs the lappets as long flat panels beside the neck, from under the wings down into the sand at the chest', () => {
+    for (const id of ['lappetR', 'lappetL']) {
+      const l = part(id)
+      // Long and flat: tall, broad across, thin front to back.
+      expect(l.radii[1]).toBeGreaterThan(l.radii[2] * 2)
+      expect(l.radii[0]).toBeLessThan(l.radii[2] * 0.6)
+      // From the wings' lower edge, past the chin, into the drift at the chest.
+      expect(topOf(l)).toBeGreaterThan(bottomOf(part(id.replace('lappet', 'wing'))))
+      expect(topOf(l)).toBeLessThan(bottomOf(part('face')) + 0.02)
+      expect(bottomOf(l)).toBeLessThan(sphinxBurialLine())
+      // Beside the neck, not at the temples: inside the wings' span, outside the neck.
+      const z = Math.abs(l.centre[2])
+      expect(z).toBeGreaterThan(part('neck').radii[2] * 0.6)
+      expect(z + l.radii[2]).toBeLessThan(halfWidth(['wingR', 'wingL'], 0, 1))
+    }
+  })
+
+  it('gives the face its features: brow ridge, cheekbones, lips, rounded chin, all inside the face', () => {
+    const faceHalf = halfWidth(['face'], 0, 1)
+    for (const id of ['browRidge', 'cheekR', 'cheekL', 'upperLip', 'lowerLip', 'chin']) {
+      const p = part(id)
+      expect(p.tone, id).toBe('face')
+      expect(Math.abs(p.centre[2]) + p.radii[2], `${id} inside the face`).toBeLessThanOrEqual(faceHalf * 1.05)
+    }
+    // Top to bottom: brow ridge over the eyes, cheekbones, lips, chin.
+    const y = (id: string) => part(id).centre[1]
+    expect(y('browRidge')).toBeGreaterThan(y('cheekR'))
+    expect(y('cheekR')).toBeGreaterThan(y('upperLip'))
+    expect(y('upperLip')).toBeGreaterThan(y('lowerLip'))
+    expect(y('lowerLip')).toBeGreaterThan(y('chin'))
+    // The eye sockets lie between brow ridge and cheekbones (recessed by both).
+    const s = SPHINX_FORM.headScale
+    const eye = SPHINX_FACE_MARKS.find((m) => m.id === 'eyeR')!
+    const eyeY = SPHINX_HEAD_ANCHOR[1] + eye.y * s
+    expect(eyeY).toBeLessThan(y('browRidge'))
+    expect(eyeY).toBeGreaterThan(y('cheekR'))
   })
 
   it('has a broken nose and no beard', () => {
     const front = (p: SphinxPart) => Math.max(...sampleSurface(p, 32, 32).map((s) => s.p[0]))
     const face = part('face')
-    // The nose is a stump: it stands only a little proud of the face.
+    // The nose is a flattened stump: it stands only a little proud of the face.
     const stump = front(part('noseStump')) - front(face)
     expect(stump).toBeGreaterThan(0)
     expect(stump).toBeLessThan(face.radii[0] * 0.5)
     // No beard: nothing under the chin reaches forward of the chin.
     expect(SPHINX_PARTS.some((p) => p.id.toLowerCase().includes('beard'))).toBe(false)
-    const chinY = bottomOf(face)
-    const chinFront = Math.max(...sampleSurface(face, 48, 48).filter((s) => s.p[1] < chinY + 0.01).map((s) => s.p[0]))
+    const chin = part('chin')
+    const chinY = bottomOf(chin)
+    const chinFront = front(chin)
     for (const p of SPHINX_CLEAR_PARTS) {
       for (const s of sampleSurface(p, 32, 24)) {
         if (s.p[1] < chinY && Math.abs(s.p[2]) < face.radii[2]) expect(s.p[0], `${p.id} below the chin`).toBeLessThan(chinFront)
@@ -169,10 +222,64 @@ describe('the head: nemes, brow band, lappets, broken nose, no beard', () => {
   })
 
   it('carries horizontal banding on the stone and stripes on the nemes, none on the face', () => {
-    expect(part('backRidge').band).toBe('course')
+    expect(part('spine').band).toBe('course')
     expect(part('chest').band).toBe('course')
     expect(part('nemes').band).toBe('nemes')
     expect(part('face').band).toBe('none')
+  })
+})
+
+describe('the body under the sand reads from every standpoint (owner verdict 11.11.2026)', () => {
+  const crestAt = (x: number) => {
+    const near = sampleSurface(part('spine'), 128, 64).filter((s) => Math.abs(s.p[0] - x) < 0.006)
+    return Math.max(...near.map((s) => s.p[1]))
+  }
+
+  it('the spine rises out of the drift as one continuous ridge from the mid-back to the shoulders', () => {
+    for (let x = -0.15; x <= 0.15; x += 0.025) {
+      expect(crestAt(x) - sphinxDriftHeight(x, 0), `crest clear at x=${x.toFixed(3)}`).toBeGreaterThan(0.02)
+    }
+    // It runs on into the neck: no sand gap between the ridge's front and the neck.
+    const neck = part('neck')
+    expect(part('spine').centre[0] + part('spine').radii[0]).toBeGreaterThan(neck.centre[0] - neck.radii[0])
+    // Sand banks against its flanks: right beside the ridge the drift stands
+    // higher than a little further out.
+    const w = part('spine').radii[2]
+    for (const x of [-0.1, 0, 0.1]) expect(sphinxDriftHeight(x, w * 1.3)).toBeGreaterThan(sphinxDriftHeight(x, w * 3))
+  })
+
+  it('draws the spine in the same limestone family as the head, and the stone darker than the sand', () => {
+    const lum = (hex: string) => {
+      const v = parseInt(hex.slice(1), 16)
+      return 0.299 * (v >> 16) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)
+    }
+    const t = SPHINX_FORM.tones
+    expect(part('spine').tone).toBe('limestone')
+    expect(Math.abs(lum(t.limestone) - lum(t.face))).toBeLessThan(10)
+    expect(Math.abs(lum(t.limestone) - lum(t.nemes))).toBeLessThan(10)
+    // From above the clear stone must stand out against the drift.
+    for (const k of ['limestone', 'face', 'nemes'] as const) expect(lum(t.sand) - lum(t[k])).toBeGreaterThan(25)
+  })
+
+  it('from behind the head and the nemes back stand above the drift, over two haunch swells', () => {
+    // The verification standpoint behind the monument, at eye height (1.7 m at a 20 m body).
+    const eye = [-0.95, 1.7 / SPHINX_FORM.site.length, 0.15]
+    const visible = (target: readonly number[]) => {
+      for (let t = 0.02; t < 0.98; t += 0.005) {
+        const x = eye[0] + (target[0] - eye[0]) * t
+        const y = eye[1] + (target[1] - eye[1]) * t
+        const z = eye[2] + (target[2] - eye[2]) * t
+        if (sphinxDriftHeight(x, z) >= y) return false
+      }
+      return true
+    }
+    const top = (id: string) => sampleSurface(part(id), 32, 32).reduce((a, s) => (s.p[1] > a[1] ? s.p : a), [0, -1, 0])
+    expect(visible(top('nemes')), 'crown').toBe(true)
+    expect(visible(top('nemesBack')), 'nemes back').toBe(true)
+    expect(visible([0, crestAt(0), 0]), 'spine crest').toBe(true)
+    // Two haunch swells with a dip between them at the rump.
+    const h = part('haunchR')
+    expect(sphinxDriftHeight(h.centre[0], h.centre[2])).toBeGreaterThan(sphinxDriftHeight(h.centre[0] - h.radii[0] * 0.5, 0) + 0.003)
   })
 })
 

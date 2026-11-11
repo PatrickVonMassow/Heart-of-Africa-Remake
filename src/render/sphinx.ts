@@ -28,7 +28,17 @@ import {
 export const SPHINX_BAND_ATTRIBUTE = 'sphinxBand'
 
 /** Parts whose surface carries the fine detail (the face marks) get more rows. */
-const PART_DETAIL: Record<string, number> = { face: 2, noseStump: 0.6, earR: 0.5, earL: 0.5, browBand: 0.8 }
+const PART_DETAIL: Record<string, number> = {
+  face: 2,
+  noseStump: 0.6,
+  browBand: 0.8,
+  browRidge: 0.8,
+  cheekR: 0.6,
+  cheekL: 0.6,
+  upperLip: 0.6,
+  lowerLip: 0.6,
+  chin: 0.7,
+}
 
 export interface SphinxBuildOptions {
   /** Carry the banding attribute the site material reads. Its period is in
@@ -124,7 +134,9 @@ function addDrift(buf: Buffers, lod: SphinxLod): void {
       buf.pos.push(x, y, z)
       buf.nor.push(n[0], n[1], n[2])
       buf.uv.push(i / nx, j / nz)
-      const f = 1 + (rand() - 0.5) * 0.06
+      // Steeper sand is shaded a little darker (a cheap occlusion term), so
+      // the body's shape under the drift reads from above as well as aside.
+      const f = (1 + (rand() - 0.5) * 0.06) * (1 - SPHINX_FORM.drift.flankShade * (1 - n[1] * n[1]))
       buf.col.push(Math.min(1, sand.r * f), Math.min(1, sand.g * f), Math.min(1, sand.b * f))
       buf.band.push(0, 1)
     }
