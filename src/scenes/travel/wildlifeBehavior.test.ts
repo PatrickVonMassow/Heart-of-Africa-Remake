@@ -2317,6 +2317,98 @@ describe('assignPerCarcassFlocks (design.md §19.6, point 251 — one flock PER 
   })
 })
 
+describe('assignPerCarcassFlocks cluster claim (design.md §19.6 — nearby carcasses share one flock)', () => {
+  type C = { id: string; x: number; z: number }
+  const R = 10
+  const dist = (c: C) => Math.hypot(c.x, c.z)
+  const cluster = { separation: (a: C, b: C) => Math.hypot(a.x - b.x, a.z - b.z), radius: R }
+  const free = (n: number) => Array.from({ length: n }, () => ({ target: null as C | null, available: true }))
+
+  it('a carcass INSIDE the radius of a flock target joins that flock — no second flock', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const b: C = { id: 'b', x: 26, z: 0 }
+    const busy = [{ target: a as C | null, available: false }, ...free(2)]
+    expect(assignPerCarcassFlocks(busy, [a, b], dist, cluster)).toEqual([a, null, null])
+  })
+
+  it('a carcass OUTSIDE the radius draws its own flock', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const b: C = { id: 'b', x: 40, z: 0 }
+    const busy = [{ target: a as C | null, available: false }, ...free(2)]
+    expect(assignPerCarcassFlocks(busy, [a, b], dist, cluster)).toEqual([a, b, null])
+  })
+
+  it('the boundary is exact: at the radius it joins, just beyond it draws its own flock', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const at: C = { id: 'at', x: 20 + R, z: 0 }
+    const beyond: C = { id: 'beyond', x: 20, z: R + 1e-9 }
+    const busy = [{ target: a as C | null, available: false }, ...free(2)]
+    expect(assignPerCarcassFlocks(busy, [a, at], dist, cluster)).toEqual([a, null, null])
+    expect(assignPerCarcassFlocks(busy, [a, beyond], dist, cluster)).toEqual([a, beyond, null])
+  })
+
+  it('two close carcasses appearing in the same frame draw exactly ONE flock', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const b: C = { id: 'b', x: 24, z: 3 }
+    const next = assignPerCarcassFlocks(free(3), [b, a], dist, cluster)
+    expect(next).toEqual([a, null, null]) // the nearer one first; b is queued behind it
+  })
+
+  it('the flock works the cluster in turn and leaves only when the cluster is done', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const b: C = { id: 'b', x: 26, z: 0 }
+    const mealDone = [{ target: a as C | null, available: false }, ...free(2)]
+    // a is eaten (gone from the list): the SAME flock moves on to b, nobody else.
+    expect(assignPerCarcassFlocks(mealDone, [b], dist, cluster)).toEqual([b, null, null])
+    // b is eaten too: the cluster is done, the flock is released and flies off.
+    const lastDone = [{ target: b as C | null, available: false }, ...free(2)]
+    expect(assignPerCarcassFlocks(lastDone, [], dist, cluster)).toEqual([null, null, null])
+  })
+
+  it('a finished flock moves to the cluster member NEAREST its finished carcass', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const near: C = { id: 'near', x: 23, z: 0 }
+    const far: C = { id: 'far', x: 12, z: 0 }
+    const done = [{ target: a as C | null, available: false }, ...free(2)]
+    expect(assignPerCarcassFlocks(done, [far, near], dist, cluster)).toEqual([near, null, null])
+  })
+
+  it('the claim chains: a carcass within the radius of a queued one never draws a second flock', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const b: C = { id: 'b', x: 28, z: 0 } // within R of a
+    const c: C = { id: 'c', x: 36, z: 0 } // beyond R of a, within R of b
+    const busy = [{ target: a as C | null, available: false }, ...free(2)]
+    expect(assignPerCarcassFlocks(busy, [a, b, c], dist, cluster)).toEqual([a, null, null])
+  })
+
+  it('distant carcasses still draw one flock each, nearby ones collapse onto theirs', () => {
+    const a: C = { id: 'a', x: 20, z: 0 }
+    const a2: C = { id: 'a2', x: 22, z: 2 }
+    const b: C = { id: 'b', x: -40, z: 0 }
+    const b2: C = { id: 'b2', x: -43, z: 1 }
+    const next = assignPerCarcassFlocks(free(3), [a, a2, b, b2], dist, cluster)
+    expect(next).toEqual([a, b, null])
+  })
+
+  it('no two active flocks ever hold targets within the cluster radius (random sweep)', () => {
+    let seed = 7
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (let run = 0; run < 200; run++) {
+      const cs: C[] = Array.from({ length: 1 + Math.floor(rnd() * 6) }, (_, k) => ({ id: String(k), x: rnd() * 60 - 30, z: rnd() * 60 - 30 }))
+      let slots = free(3)
+      let live = cs.slice()
+      for (let step = 0; step < 8; step++) {
+        const next = assignPerCarcassFlocks(slots, live, dist, cluster)
+        const held = next.filter((t): t is C => t !== null)
+        for (let i = 0; i < held.length; i++)
+          for (let j = i + 1; j < held.length; j++) expect(cluster.separation(held[i], held[j])).toBeGreaterThan(R)
+        slots = next.map((t) => ({ target: t, available: t === null }))
+        if (held.length > 0) live = live.filter((c) => c !== held[0]) // one meal finishes per step
+      }
+    }
+  })
+})
+
 describe('vigilBlocksLanding (design.md §19.8, point 121 — the keeper drives the vultures off)', () => {
   it('blocks a landing while the live keeper stands inside the radius', () => {
     expect(vigilBlocksLanding(0)).toBe(true) // standing right on the carcass
