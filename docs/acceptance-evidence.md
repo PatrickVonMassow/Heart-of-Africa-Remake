@@ -1274,7 +1274,15 @@ Thomas-Cook-era ambient anchors (guides, cameleer, donkey-boy,
 tourists) for a free standing spot they can also leave — and the live
 enter-with-SPACE, the three pyramids + buried Sphinx rendering, the
 collidable site with neither trade nor chief, and the warm desert-sand ground
-gated in `scripts/verify/polish-panorama.mjs` (screenshot 139);
+gated in `scripts/verify/polish-panorama.mjs` (screenshot 139); the masses
+stand at a MONUMENTAL first-person scale (point 391): the pyramids at one
+fifth of their real side and height, the Sphinx at its 20 m, each pyramid's
+collider its whole drawn mass (Khafre's plinth, Menkaure's skirt), the apex
+far above the frame from the foot, all three unhidden in one frame from the
+arrival point and the bird's-eye/skyline field unchanged — pure-tested in
+`src/scenes/place/gizaSite.test.ts`; the place map draws a monument site's
+collider masses (`src/ui/MapOverlay.test.tsx`); live frames in section
+`giza-scale` of `scripts/verify/polish-panorama.mjs` (screenshots 391-*);
 the same period casing cap and half-buried Sphinx carry into Cairo's
 western skyline (point 82).
 The Great Sphinx is ONE definition with three levels of detail (point 315):

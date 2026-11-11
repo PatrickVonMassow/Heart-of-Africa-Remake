@@ -1683,7 +1683,7 @@ export const balance: BalanceConfig = {
     dryShoreMinDrinkers: 4, // the dry season VISIBLY gathers life at the water
     ringInner: 40, // calibratable: nearest ring 40 m past the backdrop rim
     ringSpread: 80, // calibratable: ..120 m, so one species varies ~3x in apparent size
-    openPlainRingSpread: 45, // calibratable: keeps Giza's walkable radius at 98 m
+    openPlainRingSpread: 45, // calibratable: gives Giza's monumental masses a 138 m walkable radius
     giraffeTargetDeg: 1.4, // calibratable: giraffe at mid ring; elephant ~1.07, zebra ~0.54, antelope ~0.47
     speciesHeight: { elephant: 4.2, giraffe: 5.5, zebra: 2.1, antelope: 1.85 }, // calibratable ratios
     maxApparentAngleDeg: 2.5, // safety net; the shared factor stays below it
@@ -2740,6 +2740,29 @@ export const GIZA_CAST = {
 } as const
 
 /**
+ * Monumental first-person scale of the walkable Giza site (design.md §4.4):
+ * the pyramids are drawn at ONE fraction of their real side and height, i.e.
+ * on their real ~52° profile (docs/giza-1890.md §1.1). The ceiling is the
+ * walkable disc (98 m, `openPlainWalkRadius`): the fixed §2.5 panorama band and
+ * the backdrop's "no wall over the camera" seam rule both fail beyond it, and
+ * at 0.2 the three masses, plinth and skirt included, already fill its diameter
+ * with ~4 m lanes. The Sphinx keeps its 20 m (it already stood above that
+ * fraction; shrinking it to 0.2 would undo the monument). The bird's-eye
+ * landmark and Cairo skyline do NOT read this. All values calibratable.
+ */
+export const GIZA_SITE_SCALE = {
+  fraction: 0.2, // calibratable: pyramids, one fifth of real
+  sphinxFraction: 20 / 73, // calibratable: ~0.27, the Sphinx's existing 20 m
+  /** Real dimensions in metres (built height; base side). */
+  real: {
+    khufu: { side: 230.3, height: 146.5 },
+    khafre: { side: 215.3, height: 143.5, bedrock: 10 }, // bedrock: how much higher it stands
+    menkaure: { side: 103.4, height: 65.5 },
+    sphinxLength: 73,
+  },
+} as const
+
+/**
  * The Great Sphinx (docs/giza-1890.md §1.3): the tunable estimates the ONE
  * shared definition (src/world/sphinx.ts) reads. The SHAPE of the monument is
  * the definition's; what lives here is every value that is a judgement rather
@@ -2843,7 +2866,7 @@ export const SPHINX_FORM = {
     skyline: { stoneShade: 1.38, headBlock: true, lappetFlare: 1.2 },
   },
   /** Walkable site placement (metres, site frame: +x east, +z south). */
-  site: { x: 27, z: 3, length: 20 },
+  site: { x: 22, z: 20, length: GIZA_SITE_SCALE.real.sphinxLength * GIZA_SITE_SCALE.sphinxFraction },
   /** Bird's-eye landmark and Cairo skyline: body length in the Giza field's
    *  own units and the position east of Khafre (calibratable; the field is a
    *  compressed symbol, so the landmark Sphinx is drawn larger than its true

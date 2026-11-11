@@ -10,13 +10,16 @@
 // (robed guides/dragomen, Bedouin cameleers, donkey-boys, tourists, camels and
 // donkeys) but no trade, no elder and no hints — a walkable monument space.
 //
+// The monuments stand at a MONUMENTAL first-person scale: one fraction of real
+// size (GIZA_SITE_SCALE) on the real ~52° face profile, so from the foot of a
+// pyramid its apex sits far above the frame top.
+//
 // The site is distinct from the game's Meroë (Nubian) pyramids by design: Giza
-// is a FEW HUGE, shallow masses (edges at ~52°, height ≈ 1.28 × the cone's
-// circumradius), Meroë a dense
-// cluster of small, steep ~70° cones — the slope ratio here is far flatter than
+// is a FEW HUGE, shallow masses (faces at ~52°), Meroë a dense cluster of
+// small, steep ~70° cones — the slope ratio here is far flatter than
 // MEROE_PYRAMIDS' (~2.6·base) so the two can never be mistaken.
 
-import { balance, GIZA_CAST, SPHINX_FORM } from '../../config/balance'
+import { balance, GIZA_CAST, GIZA_SITE_SCALE, SPHINX_FORM } from '../../config/balance'
 import { sphinxColliderSegments } from '../../world/sphinx'
 import type { AgeGroup, CastId, Sex } from '../../systems/appearance'
 import { openPlainWalkRadius } from './backdrop'
@@ -53,15 +56,21 @@ export const GIZA_SITE_RADIUS = openPlainWalkRadius(
 )
 
 /** Distance south of the centre at which the traveller arrives (design.md §2.3
- *  spawns him in the south, facing north). Held at its own
- *  value rather than `radius − 10`: the disc grew to give the desert its room,
- *  and the approach view of the pyramid row must not grow with it. */
-export const GIZA_SPAWN_Z = 50
+ *  spawns him in the south, facing north): clear of Menkaure's south face and
+ *  far enough back that all three masses fit the frame. Held at its own value
+ *  rather than `radius − 10`, so the approach view does not drift with the disc. */
+export const GIZA_SPAWN_Z = 77
 
-/** Giza slope ratio: apex height over the cone circumradius. The shallow
- *  Old-Kingdom profile shared with buildGizaPyramids (0.64·2 ≈ 1.28) — clearly
- *  flatter than Meroë's steep ~70° Nubian cones (height ≈ 2.6·base). */
-export const GIZA_SLOPE = 0.64 * 2
+/** The one fraction of real size every site monument is drawn at (balance). */
+export const GIZA_SCALE = GIZA_SITE_SCALE.fraction
+
+/** Khafre's drawn bedrock plinth (design.md §4.4): its top and foot radii as
+ *  multiples of the pyramid's base circumradius. */
+export const GIZA_PLINTH = { top: 1.05, foot: 1.14 } as const
+
+/** Menkaure's drawn red-granite skirt: its outward flare over the core face and
+ *  its height as a fraction of the pyramid's. */
+export const GIZA_SKIRT = { flare: 1.02, top: 0.22 } as const
 
 /** One great pyramid at site scale. `base` is the cone circumradius at the
  *  ground; `ground` lifts the whole pyramid onto its bedrock plinth. */
@@ -82,11 +91,13 @@ export interface GizaPyramid {
   skirt: boolean
 }
 
+/** A pyramid at GIZA_SCALE of its real side and height, i.e. on its real
+ *  ~52° profile (docs/giza-1890.md §1.1). */
 function pyramid(
   id: GizaPyramid['id'],
   x: number,
   z: number,
-  base: number,
+  real: { side: number; height: number },
   ground: number,
   opts: { standing?: number; cap?: boolean; skirt?: boolean } = {},
 ): GizaPyramid {
@@ -94,8 +105,8 @@ function pyramid(
     id,
     x,
     z,
-    base,
-    height: base * GIZA_SLOPE,
+    base: (real.side * GIZA_SCALE) * Math.SQRT1_2,
+    height: real.height * GIZA_SCALE,
     ground,
     standing: opts.standing ?? 1,
     cap: !!opts.cap,
@@ -103,14 +114,18 @@ function pyramid(
   }
 }
 
-// The real SW-diagonal row, placed north (−z) of the southern spawn point:
-// Khufu NE (+x east, −z north), Khafre centre, Menkaure SW (−x, +z). Menkaure's
-// base ≈ 0.44·Khufu's, the real size ratio. Spaced so the collidable masses
-// leave lanes to walk between and around them.
+const REAL = GIZA_SITE_SCALE.real
+
+// The real row, placed north (−z) of the southern spawn point: Khufu NE (+x
+// east, −z north) of Khafre on the true 45° diagonal, Menkaure south-south-west
+// of Khafre (the real offset bends further west; pulled in so the whole row
+// fits one frame from the spawn). Positions are a compression (the real
+// centres stand ~475 m apart): the drawn masses, plinth and skirt included,
+// keep ~4 m lanes between them inside the 98 m disc.
 export const GIZA_PYRAMIDS: readonly GizaPyramid[] = [
-  pyramid('khufu', 22, -22, 15, 0, { standing: 0.945 }),
-  pyramid('khafre', 0, 0, 13.6, 2.4, { cap: true }),
-  pyramid('menkaure', -20, 18, 6.6, 0, { skirt: true }),
+  pyramid('khufu', 32, -36, REAL.khufu, 0, { standing: 0.945 }),
+  pyramid('khafre', -20, 16, REAL.khafre, REAL.khafre.bedrock * GIZA_SCALE, { cap: true }),
+  pyramid('menkaure', -30, 55, REAL.menkaure, 0, { skirt: true }),
 ]
 
 /** The Great Sphinx east of Khafre, facing east (+x), buried to the shoulders
@@ -140,6 +155,16 @@ export function gizaSphinxColliders(): SegmentCollider[] {
  *  half-side of base/√2. */
 export function pyramidFootprint(base: number): number {
   return base * Math.SQRT1_2
+}
+
+/** Half-extent of a pyramid's whole DRAWN mass on the ground (point 378's
+ *  rule: the collider is what the renderer draws): the cone's footprint, or
+ *  Khafre's wider plinth foot, or Menkaure's flared granite skirt. */
+export function pyramidMassFootprint(p: GizaPyramid): number {
+  let reach = 1
+  if (p.ground > 0) reach = Math.max(reach, GIZA_PLINTH.foot)
+  if (p.skirt) reach = Math.max(reach, GIZA_SKIRT.flare)
+  return pyramidFootprint(p.base * reach)
 }
 
 /** Roles for the sparse Thomas-Cook-era ambient life at the plateau. */
@@ -204,15 +229,15 @@ export function gizaFigure(role: GizaPersonRole, sex: Sex = 'male', dragoman = f
 // between the spawn and the monuments so they read in front of the pyramids on
 // approach.
 export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
-  { role: 'guide', x: 12, z: 8 },
-  { role: 'tourist', x: 9, z: 12 },
-  { role: 'camel', x: 15, z: 11 },
-  { role: 'cameleer', x: 4, z: 24 },
-  { role: 'camel', x: 8, z: 26 },
-  { role: 'donkeyboy', x: -7, z: 22 },
-  { role: 'donkey', x: -4, z: 24 },
-  { role: 'tourist', x: -2, z: 30, sex: 'female' },
-  { role: 'guide', x: 16, z: 17, dragoman: true },
+  { role: 'guide', x: 12, z: 50 },
+  { role: 'tourist', x: 9, z: 54 },
+  { role: 'camel', x: 15, z: 53 },
+  { role: 'cameleer', x: 4, z: 64 },
+  { role: 'camel', x: 8, z: 66 },
+  { role: 'donkeyboy', x: -10, z: 60 },
+  { role: 'donkey', x: -7, z: 62 },
+  { role: 'tourist', x: -2, z: 70, sex: 'female' },
+  { role: 'guide', x: 16, z: 58, dragoman: true },
 ]
 
 /** The collidable monument set: an oriented box under each pyramid's footprint
@@ -222,7 +247,7 @@ export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
 export function gizaColliders(): Collider[] {
   const colliders: Collider[] = []
   for (const p of GIZA_PYRAMIDS) {
-    const h = pyramidFootprint(p.base)
+    const h = pyramidMassFootprint(p)
     colliders.push(boxCollider(p.x, p.z, h, h, 0))
   }
   // The buried Sphinx: its drift is a solid mound on the flat site ground, so

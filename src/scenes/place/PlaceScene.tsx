@@ -84,7 +84,7 @@ import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, bui
 import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments, buildGizaSiteSphinx } from '../../render/landmarks'
 import { FieldSphinx } from '../../render/sphinxProbe'
 import { createSphinxSiteMaterial } from '../../render/sphinxMaterial'
-import { GIZA_AMBIENT, GIZA_PYRAMIDS, GIZA_SPHINX, gizaFigure, isGizaPerson, type GizaAmbientRole } from './gizaSite'
+import { GIZA_AMBIENT, GIZA_PYRAMIDS, GIZA_SPHINX, gizaFigure, isGizaPerson, pyramidMassFootprint, type GizaAmbientRole } from './gizaSite'
 import { LadyHat, SunHelmet } from './castHats'
 import {
   buildAntelopeParts,
@@ -2308,6 +2308,8 @@ function GizaSphinx() {
     const bb = geometry.boundingBox
     w.__placeMonuments = {
       pyramids: GIZA_PYRAMIDS.length,
+      // Each pyramid's drawn half-extent and apex, for the scale stagings.
+      pyramidSites: GIZA_PYRAMIDS.map((p) => ({ id: p.id, x: p.x, z: p.z, foot: pyramidMassFootprint(p), apex: p.ground + p.standing * p.height })),
       sphinxDetail: detail,
       sphinx: { x: GIZA_SPHINX.x, z: GIZA_SPHINX.z, length: GIZA_SPHINX.length },
       sphinxTriangles: geometry.index ? geometry.index.count / 3 : 0,

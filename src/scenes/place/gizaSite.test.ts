@@ -13,14 +13,15 @@ import {
   gizaFigure,
   isGizaPerson,
   type GizaPersonRole,
+  GIZA_SCALE,
   GIZA_SITE_RADIUS,
-  GIZA_SLOPE,
   GIZA_SPAWN_Z,
   GIZA_SPHINX,
   buildGizaLayout,
   gizaColliders,
   gizaSphinxColliders,
   pyramidFootprint,
+  pyramidMassFootprint,
 } from './gizaSite'
 import {
   BACKDROP_HEIGHT,
@@ -34,11 +35,11 @@ import {
 } from './backdrop'
 import { ringSpreadWithin } from './panoramaWildlife'
 import { spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
-import { balance } from '../../config/balance'
+import { balance, GIZA_SITE_SCALE } from '../../config/balance'
 import { GIZA_PLATEAU } from '../../world/data/gizaPlateau'
 import { sampleTerrain } from '../../world/terrain'
 import { setupGeodata } from '../../test/geodata'
-import { buildGizaSiteMonuments, buildGizaSiteSphinx, MEROE_PYRAMIDS } from '../../render/landmarks'
+import { buildGizaPyramids, buildGizaSiteMonuments, gizaSitePyramidParts, buildGizaSiteSphinx, fieldSphinxLength, MEROE_PYRAMIDS } from '../../render/landmarks'
 import { onSphinxFootprint, sphinxDriftBounds } from '../../world/sphinx'
 
 const byId = (id: string) => GIZA_PYRAMIDS.find((p) => p.id === id)!
@@ -85,13 +86,98 @@ describe('Giza site — the three great pyramids and the Sphinx (docs/giza-1890.
   })
 
   it('stays clearly flatter than the steep Meroë (Nubian) pyramids', () => {
-    // Giza ~52° (height ≈ 1.28·base) vs Meroë ~70° (height ≈ 2.6·base): the two
-    // must never be mistaken (docs/giza-1890.md §2).
-    expect(GIZA_SLOPE).toBeCloseTo(1.28, 2)
-    for (const p of GIZA_PYRAMIDS) expect(p.height / p.base).toBeCloseTo(GIZA_SLOPE, 5)
+    // Giza on its real ~52-53° faces vs Meroë ~70°: the two must never be
+    // mistaken (docs/giza-1890.md §2).
+    for (const p of GIZA_PYRAMIDS) {
+      const face = (Math.atan(p.height / pyramidFootprint(p.base)) * 180) / Math.PI
+      expect(face).toBeGreaterThan(51)
+      expect(face).toBeLessThan(54)
+    }
     const meroeMin = Math.min(...MEROE_PYRAMIDS.map((m) => m.height / m.base))
     expect(meroeMin).toBeGreaterThan(2) // every Meroë cone steeper than any Giza mass
     expect(Math.max(...GIZA_PYRAMIDS.map((p) => p.height / p.base))).toBeLessThan(meroeMin)
+  })
+})
+
+describe('Giza site — the monumental first-person scale (design.md §4.4)', () => {
+  const real = GIZA_SITE_SCALE.real
+  const EYE = 1.5
+  const FOV_DEG = 50 // the default camera's vertical field of view (App.tsx)
+
+  it('draws each pyramid at the stated fraction of its real side and height', () => {
+    expect(GIZA_SCALE).toBe(0.2)
+    for (const p of GIZA_PYRAMIDS) {
+      const r = real[p.id]
+      expect(2 * pyramidFootprint(p.base)).toBeCloseTo(r.side * GIZA_SCALE, 6)
+      expect(p.height).toBeCloseTo(r.height * GIZA_SCALE, 6)
+    }
+    // Khafre's higher bedrock at the same fraction.
+    expect(byId('khafre').ground).toBeCloseTo(real.khafre.bedrock * GIZA_SCALE, 6)
+  })
+
+  it('keeps the Sphinx at its stated fraction, never smaller than before', () => {
+    expect(GIZA_SPHINX.length).toBeCloseTo(real.sphinxLength * GIZA_SITE_SCALE.sphinxFraction, 6)
+    expect(GIZA_SPHINX.length).toBeGreaterThanOrEqual(20)
+    // Real proportions are the yardstick: the Sphinx never drops below the
+    // pyramids' fraction.
+    expect(GIZA_SITE_SCALE.sphinxFraction).toBeGreaterThanOrEqual(GIZA_SCALE)
+  })
+
+  it('is markedly larger than the former site masses (Khufu 19.2 m on a 21.2 m side)', () => {
+    const khufu = byId('khufu')
+    expect(khufu.height).toBeGreaterThan(19.2 * 1.5)
+    expect(2 * pyramidFootprint(khufu.base)).toBeGreaterThan(21.2 * 2)
+  })
+
+  it('puts every apex far above the frame top from the foot of its face', () => {
+    for (const p of GIZA_PYRAMIDS) {
+      // Standing against the drawn mass (plinth/skirt included) at its face centre.
+      const d = pyramidMassFootprint(p) + 0.15 + WALKER_RADIUS
+      const apex = p.ground + p.standing * p.height
+      const elev = (Math.atan((apex - EYE) / d) * 180) / Math.PI
+      expect(elev, p.id).toBeGreaterThan(FOV_DEG / 2 + 15)
+    }
+  })
+
+  it('shows all three pyramids in one frame from the arrival point, none hidden', () => {
+    const hfov = 2 * Math.atan(Math.tan(((FOV_DEG / 2) * Math.PI) / 180) * (16 / 9))
+    const eye: [number, number, number] = [0, EYE, GIZA_SPAWN_Z]
+    const apexOf = (p: (typeof GIZA_PYRAMIDS)[number]): [number, number, number] => [p.x, p.ground + p.standing * p.height, p.z]
+    const bearings = GIZA_PYRAMIDS.map((p) => Math.atan2(p.x - eye[0], eye[2] - p.z))
+    expect(Math.max(...bearings) - Math.min(...bearings)).toBeLessThan(hfov * 0.95)
+    // Inside a drawn pyramid volume (cone on its ground, plinth below it).
+    const inside = (q: (typeof GIZA_PYRAMIDS)[number], x: number, y: number, z: number) => {
+      if (y < q.ground) return Math.max(Math.abs(x - q.x), Math.abs(z - q.z)) <= pyramidMassFootprint(q)
+      const half = pyramidFootprint(q.base) * (1 - (y - q.ground) / q.height)
+      return half > 0 && Math.max(Math.abs(x - q.x), Math.abs(z - q.z)) <= half
+    }
+    for (const p of GIZA_PYRAMIDS) {
+      const a = apexOf(p)
+      // The apex region (just below the summit) must be in sight.
+      const target: [number, number, number] = [a[0], a[1] - 0.5, a[2]]
+      for (let t = 0.02; t < 0.98; t += 0.005) {
+        const x = eye[0] + (target[0] - eye[0]) * t
+        const y = eye[1] + (target[1] - eye[1]) * t
+        const z = eye[2] + (target[2] - eye[2]) * t
+        for (const q of GIZA_PYRAMIDS) if (q !== p) expect(inside(q, x, y, z), `${p.id} hidden by ${q.id}`).toBe(false)
+      }
+    }
+  })
+
+  it('leaves the bird\'s-eye landmark and the Cairo skyline at their own scale (point 82)', () => {
+    // Recorded from the field symbol before the site was enlarged: neither the
+    // pyramids nor the Sphinx of the distant views may move.
+    const want = {
+      landmark: [-1.7657, -0.0375, -2.4314, 2.9125, 1.9354, 1.7657, 1.25],
+      skyline: [-1.7657, -0.0246, -2.4314, 2.8237, 1.9354, 1.7657, 0.82005],
+    }
+    for (const lod of ['landmark', 'skyline'] as const) {
+      const g = buildGizaPyramids(lod)
+      g.computeBoundingBox()
+      const b = g.boundingBox!
+      const got = [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z, fieldSphinxLength(lod)]
+      got.forEach((v, i) => expect(v, `${lod}[${i}]`).toBeCloseTo(want[lod][i], 3))
+    }
   })
 })
 
@@ -110,6 +196,32 @@ describe('Giza site — collision and the walkable layout', () => {
 
   it('the footprint half-extent matches the 45°-rotated base square', () => {
     expect(pyramidFootprint(10)).toBeCloseTo(10 * Math.SQRT1_2, 6)
+  })
+
+  it("each pyramid's collider is its whole DRAWN mass, plinth and skirt included (point 378)", () => {
+    // The reported bug: the box followed the cone alone, so the traveller
+    // walked into Khafre's plinth and Menkaure's skirt.
+    // Each pyramid's own drawn parts (cone, plinth, skirt), as the renderer builds them.
+    const reach = GIZA_PYRAMIDS.map((p) => {
+      let r = 0
+      for (const part of gizaSitePyramidParts(p, 0)) {
+        const pos = part.attributes.position
+        for (let i = 0; i < pos.count; i++) r = Math.max(r, Math.abs(pos.getX(i) - p.x), Math.abs(pos.getZ(i) - p.z))
+      }
+      return r
+    })
+    const boxes = gizaColliders().filter((c) => c.kind === 'box')
+    GIZA_PYRAMIDS.forEach((p, j) => {
+      const box = boxes[j]
+      expect(box.kind === 'box' && box.x === p.x && box.z === p.z).toBe(true)
+      if (box.kind !== 'box') return
+      // The collider's half extents (less the near-plane margin) are the drawn reach.
+      expect(box.hx - 0.15, p.id).toBeCloseTo(reach[j], 3)
+      expect(box.hz - 0.15, p.id).toBeCloseTo(reach[j], 3)
+    })
+    // Khafre's plinth and Menkaure's skirt really do reach past the bare cone.
+    expect(reach[1]).toBeGreaterThan(pyramidFootprint(byId('khafre').base) * 1.1)
+    expect(reach[2]).toBeGreaterThan(pyramidFootprint(byId('menkaure').base))
   })
 
   it('builds a bare walkable disc: no huts, no lanes, only the monuments', () => {
@@ -137,7 +249,7 @@ describe('Giza site — collision and the walkable layout', () => {
     const layout = buildGizaLayout(7)
     expect(layout.spawnZ).toBeLessThan(layout.radius - 20)
     // Still south of the whole cluster, looking north over the row.
-    const southmost = Math.max(...GIZA_PYRAMIDS.map((p) => p.z + pyramidFootprint(p.base)))
+    const southmost = Math.max(...GIZA_PYRAMIDS.map((p) => p.z + pyramidMassFootprint(p)))
     expect(layout.spawnZ).toBeGreaterThan(southmost + 10)
   })
 
@@ -151,7 +263,8 @@ describe('Giza site — collision and the walkable layout', () => {
 
   it('the whole cluster fits inside the walkable radius with room to walk around', () => {
     for (const p of GIZA_PYRAMIDS) {
-      const reach = Math.hypot(p.x, p.z) + pyramidFootprint(p.base)
+      const h = pyramidMassFootprint(p)
+      const reach = Math.hypot(Math.abs(p.x) + h, Math.abs(p.z) + h) // the farthest corner
       expect(reach).toBeLessThan(GIZA_SITE_RADIUS - 8)
     }
   })
@@ -246,15 +359,20 @@ describe('Giza site — the walkable sand reaches as far as the picture offers i
     )
   })
 
-  it('leaves real desert past the monuments instead of a wall a few strides out', () => {
-    // The reported defect: standing beside a pyramid, the sand ran unbroken to
-    // the horizon while the edge fell ~18 m past the outermost mass — a wall a
-    // few strides out. It is now ~56 m of open desert.
+  it('leaves open desert past the monuments instead of a wall a few strides out', () => {
+    // The point-390 defect: standing beside a pyramid, the edge fell ~18 m past
+    // the outermost mass. The monumental masses (design.md §4.4) now fill the
+    // disc's diameter, so the margin is measured exactly — at the farthest
+    // drawn corner — and must stay past that defect's distance. Away from the
+    // NE/SW corners of the row the open sand runs much farther.
     const cluster = Math.max(
-      ...GIZA_PYRAMIDS.map((p) => Math.hypot(p.x, p.z) + pyramidFootprint(p.base)),
+      ...GIZA_PYRAMIDS.map((p) => {
+        const h = pyramidMassFootprint(p)
+        return Math.hypot(Math.abs(p.x) + h, Math.abs(p.z) + h)
+      }),
       ...gizaSphinxColliders().flatMap((c) => [Math.hypot(c.x1, c.z1) + c.r, Math.hypot(c.x2, c.z2) + c.r]),
     )
-    expect(GIZA_SITE_RADIUS - cluster).toBeGreaterThan(50)
+    expect(GIZA_SITE_RADIUS - cluster).toBeGreaterThan(17)
   })
 })
 
@@ -262,8 +380,8 @@ describe('Giza site — the site-scale monument geometry', () => {
   it('renders the pyramids tall and the Sphinx as its own mesh, its drift running under the ground', () => {
     const geo = buildGizaSiteMonuments()
     geo.computeBoundingBox()
-    // The pyramids stand well above person height (giant masses).
-    expect(geo.boundingBox!.max.y).toBeGreaterThan(15)
+    // The pyramids stand far above person height (giant masses).
+    expect(geo.boundingBox!.max.y).toBeGreaterThan(28)
     const sphinx = buildGizaSiteSphinx('standard')
     sphinx.computeBoundingBox()
     const b = sphinx.boundingBox!
