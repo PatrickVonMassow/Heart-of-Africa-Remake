@@ -36365,3 +36365,7 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   ACCEPTANCE: per species one comparison frame, elder beside a prime adult, from the travel camera at game distance; a vulture frame over a downed animal; a graveyard frame; both backends; judged by eye "does it look right to a person".
   PLACEMENT (user 10.11.2026 23:02): at the front of the work order, directly behind point 1489 (no exposed body parts) and ahead of every other open point, including the 35-point front-order of 09.11.2026. If the owner splits this request (elders/vultures vs. graveyard), both parts sit there, in that order.
   Bundle: Tierverhalten.
+- [x] 1501. Point 1463 is parked in the backlog, its card stays
+  User order via board chat 11.11.2026 08:40Z: "Schiebe 1463 erstmal ins Backlog. Ich melde mich, falls das umgesetzt werden soll. Die zugehörige Karte unter Von dir zu klären soll bestehen bleiben."
+  Final state: Remove point 1463 from the open work order in TASKS.md and park it in docs/backlog.md (verbatim text, with a note: deferred by user order 11.11.2026, resume only on explicit user request). Keep the matching "Von dir zu klären" card on the board unchanged and visible. Do not start, close or archive 1463 as done.
+  Bundle: Session- & Repo-Hygiene.
