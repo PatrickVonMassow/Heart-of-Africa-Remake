@@ -2085,5 +2085,14 @@ export const RED_CHARGES = [
       + 'the front, frontAtShutter 24.05) while --section=burning-grass was green on b2023ba37; the frame crops '
       + 'are computed before the sim advances (review objection 3). Filed in point 1496. The charge dies with point 1496.',
   },
+  {
+    point: 1500,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^LOW: collidable trees draw in full under the density lever\b/i,
+    why:
+      'MEASURED 11.11.2026 on both backends: recorded enrichments runs before 04:05 carry this LOW preset red; '
+      + 'no open point owned it, so it was filed as point 1500. The charge dies with point 1500.',
+  },
 
 ]
