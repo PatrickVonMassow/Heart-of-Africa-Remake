@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner, ownsLock } from './batch-singleton.mjs'
-import { assessBranchHygiene, formatBranchHygiene, DEFAULT_GRACE_MS, normBranch } from './branch-hygiene-core.mjs'
+import { assessBranchHygiene, closedPointsOf, formatBranchHygiene, DEFAULT_GRACE_MS, normBranch } from './branch-hygiene-core.mjs'
 import { declarationShields } from './batch-in-flight-core.mjs'
 import { probePid } from './batch-singleton.mjs'
 import { TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
@@ -155,18 +155,16 @@ export function gatherBranchHygiene({ sessionId = '', now = Date.now(), ignoreOw
   }
 }
 
-/** Points ticked in the archive and not reopened in TASKS.md (point 1504).
- *  Unreadable files yield none — no evidence of debris. */
+/** The closed-point census (point 1504); an unreadable file reads as null. */
 function closedPoints() {
-  const ids = (path, re) => {
+  const read = (path) => {
     try {
-      return [...readFileSync(path, 'utf8').matchAll(re)].map((m) => Number(m[1]))
+      return readFileSync(path, 'utf8')
     } catch {
-      return []
+      return null
     }
   }
-  const open = new Set(ids(TASKS_PATH, /^- \[ \] (\d+)\./gm))
-  return ids(ARCHIVE_PATH, /^- \[x\] (\d+)\./gm).filter((n) => !open.has(n))
+  return closedPointsOf({ tasksText: read(TASKS_PATH), archiveText: read(ARCHIVE_PATH) })
 }
 
 function headDate(sha) {

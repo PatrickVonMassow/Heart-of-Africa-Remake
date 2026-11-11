@@ -9,6 +9,7 @@ import {
   isBaselineCheckout,
   normBranch,
   stubBranchTree,
+  closedPointsOf,
   DEFAULT_GRACE_MS,
 } from './branch-hygiene-core.mjs'
 
@@ -433,6 +434,23 @@ describe('a closed point whose branch was never merged (point 1504)', () => {
     expect(r.findings.map((f) => f.kind)).toEqual(['local-closed', 'remote-closed'])
     expect(r.findings[0].command).toMatch(/git bundle create local\/branch-archive\/feat-1485-skirt\.bundle feat\/1485-skirt \^origin\/main && git branch -D feat\/1485-skirt$/)
     expect(r.findings[1].command).toMatch(/&& git push origin --delete feat\/1485-skirt$/)
+    // Each twin archives into its OWN file, so the second remedy cannot overwrite the first.
+    expect(r.findings[1].command).toContain('local/branch-archive/origin-feat-1485-skirt.bundle')
+  })
+
+  it('a closed point branch checked out in an UNLOCKED worktree is not offered for deletion', () => {
+    const wt = { path: 'C:/repo/.claude/worktrees/b', branch: 'refs/heads/feat/9-a', locked: false, tipAt: OLD }
+    const r = assessBranchHygiene(
+      base({ closedPoints: [9], worktrees: [...base().worktrees, wt], unmerged: [{ name: 'feat/9-a', tipAt: OLD }] }),
+    )
+    expect(r.findings).toEqual([])
+  })
+
+  it('a remote-qualified in-flight declaration protects that remote ref', () => {
+    const r = assessBranchHygiene(
+      base({ closedPoints: [9], inFlightBranches: ['origin/feat/9-a'], unmerged: [{ name: 'origin/feat/9-a', tipAt: OLD }] }),
+    )
+    expect(r.findings).toEqual([])
   })
 
   it('an unmerged branch of an OPEN point stays untouched', () => {
@@ -460,5 +478,17 @@ describe('a closed point whose branch was never merged (point 1504)', () => {
   it('a non-feat branch is never judged by point', () => {
     const r = assessBranchHygiene(base({ closedPoints: [7], unmerged: [{ name: 'origin/board', tipAt: OLD }] }))
     expect(r.block).toBe(false)
+  })
+})
+
+describe('closedPointsOf', () => {
+  it('lists archived ticks that TASKS.md does not reopen', () => {
+    const archiveText = '- [x] 3. a\n- [x] 4. b\n'
+    expect(closedPointsOf({ tasksText: '- [ ] 4. b again\n', archiveText })).toEqual([3])
+  })
+
+  it('yields nothing when either file was unreadable — a reopening nobody read is not a closure', () => {
+    expect(closedPointsOf({ tasksText: null, archiveText: '- [x] 3. a\n' })).toEqual([])
+    expect(closedPointsOf({ tasksText: '', archiveText: null })).toEqual([])
   })
 })

@@ -168,11 +168,15 @@ export function assessBranchHygiene({
   // tying an abandoned setup branch to the tree it was cut for, since the stub
   // is checked out nowhere the moment the agent switches to its feat branch.
   const worktreeDirs = new Set()
+  // Every branch checked out anywhere: git refuses `branch -D` on one, so a
+  // closed point's branch inside a worktree is never offered for deletion.
+  const checkedOut = new Set()
   for (const wt of Array.isArray(worktrees) ? worktrees : []) {
     const path = normPath(wt?.path)
     if (!path) continue
     worktreeDirs.add(path.slice(path.lastIndexOf('/') + 1))
     const branch = normBranch(wt?.branch)
+    if (branch) checkedOut.add(branch)
     const living =
       path === normPath(repoRoot) ||
       (ownPath && path === normPath(ownPath)) ||
@@ -257,10 +261,12 @@ export function assessBranchHygiene({
     const name = normBranch(b?.name)
     const bare = name.replace(/^origin\//, '')
     if (!closed.has(pointOfBranch(bare))) continue
-    if (heldBranches.has(bare) || protectedByWorktree.has(bare)) continue
+    if (heldBranches.has(bare) || heldBranches.has(name) || checkedOut.has(bare)) continue
     if (fresh(b?.tipAt)) continue
     const remote = name.startsWith('origin/')
-    const archive = `mkdir -p local/branch-archive && git bundle create local/branch-archive/${bare.replace(/\//g, '-')}.bundle ${b.name} ^origin/main`
+    // One file per ref: a local and a remote twin may have diverged, and a shared
+    // name would let the second remedy overwrite the first one's only archive.
+    const archive = `mkdir -p local/branch-archive && git bundle create local/branch-archive/${name.replace(/\//g, '-')}.bundle ${b.name} ^origin/main`
     findings.push({
       kind: remote ? 'remote-closed' : 'local-closed',
       name: String(b.name),
@@ -274,6 +280,16 @@ export function assessBranchHygiene({
     findings,
     reason: findings.length > 0 ? 'merged-branches-survive' : 'clean',
   }
+}
+
+/** Points ticked in the archive and not reopened in TASKS.md (point 1504).
+ *  Either text missing (null: unreadable) yields none — a reopening nobody could
+ *  read must not turn into forced-deletion advice. */
+export function closedPointsOf({ tasksText = null, archiveText = null } = {}) {
+  if (typeof tasksText !== 'string' || typeof archiveText !== 'string') return []
+  const ids = (text, re) => [...text.matchAll(re)].map((m) => Number(m[1]))
+  const open = new Set(ids(tasksText, /^- \[ \] (\d+)\./gm))
+  return ids(archiveText, /^- \[x\] (\d+)\./gm).filter((n) => !open.has(n))
 }
 
 const isMergedLocal = (branch, localMerged) =>
