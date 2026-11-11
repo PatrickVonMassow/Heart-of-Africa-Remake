@@ -63,6 +63,8 @@ import {
   ELDER_BUILDERS,
   ELDERLY_SCHEMA,
   ELEPHANT_ELDER,
+  GIRAFFE_ELDER,
+  greyMuzzle,
   elderlyProportions,
   LION_ELDER_MANE,
   createCrocodileMaterial,
@@ -1573,9 +1575,13 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
     const prime = tuskReach(buildElephant())
     expect(Math.abs(prime.left - prime.right)).toBeLessThan(0.01)
     const old = tuskReach(buildElephant(false, true))
-    expect(old.left).toBeCloseTo(prime.left, 2) // the slave tusk stays whole
-    expect(old.right).toBeLessThan(old.left - 0.1) // the master tusk is visibly shorter
+    // Point 1498: the asymmetry must read at game distance — the slave tusk
+    // grown long, the master broken short, half a metre apart at the tips.
+    expect(old.left).toBeGreaterThan(prime.left + 0.2) // the slave tusk grew on
+    expect(old.right).toBeLessThan(prime.right) // the master tusk is worn below prime
+    expect(old.left - old.right).toBeGreaterThan(0.5)
     expect(ELEPHANT_ELDER.masterTusk).toBeLessThan(1)
+    expect(ELEPHANT_ELDER.slaveTusk).toBeGreaterThan(1)
   })
 
   it('the old lion wears a thin, darker mane: its silhouette top drops', () => {
@@ -1587,6 +1593,35 @@ describe('elderly geometries (design.md §19.18 — elders read as old)', () => 
   it('the old giraffe wears its ossicones down; an elder stays adult-sized (not a calf)', () => {
     expect(topY(buildGiraffe(false, true))).toBeLessThan(topY(buildGiraffe()))
     for (const [name, adult, old] of quadrupeds) expect(zExtent(old), name).toBeGreaterThan(zExtent(adult) * 0.9)
+  })
+
+  it('point 1498: the cues are strong enough to read at game distance', () => {
+    // Lean by at least a fifth, a sway-back of a quarter barrel radius, the
+    // head carried a fifth of a radian lower, the coat half-way to grey.
+    expect(ELDERLY_SCHEMA.bodyR).toBeLessThanOrEqual(0.8)
+    expect(ELDERLY_SCHEMA.swayBack).toBeGreaterThanOrEqual(0.25)
+    expect(ELDERLY_SCHEMA.neckDrop).toBeGreaterThanOrEqual(0.2)
+    expect(ELDERLY_SCHEMA.coatGrey).toBeGreaterThanOrEqual(0.4)
+    expect(ELDERLY_SCHEMA.boneKnob).toBeGreaterThan(1)
+    expect(LION_ELDER_MANE.radius).toBeLessThan(0.42 * 0.7)
+    expect(GIRAFFE_ELDER.ossicone).toBeLessThan(1)
+  })
+
+  it('a dark face turns visibly paler with age (the luminance grey alone kept it dark)', () => {
+    const l = (hex: string) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 }).l
+    expect(l(greyMuzzle('#3d3a36')) - l('#3d3a36')).toBeGreaterThan(0.2)
+    expect(l(agedColor('#5b554f', ELDERLY_SCHEMA.coatGrey))).toBeGreaterThan(l('#5b554f'))
+  })
+
+  it('the old giraffe carries its head lower; every elder still stands on the ground', () => {
+    const headTop = (g: THREE.BufferGeometry) => toplineAt(g, 1.25, 0.25)
+    expect(topY(buildGiraffe(false, true))).toBeLessThan(topY(buildGiraffe()) - 0.1)
+    expect(Number.isFinite(headTop(buildGiraffe()))).toBe(true)
+    for (const build of Object.values(ELDER_BUILDERS)) {
+      const g = build()
+      g.computeBoundingBox()
+      expect(g.boundingBox!.min.y).toBeGreaterThan(-0.05)
+    }
   })
 
   it('every rendered mammal that ages has an elder build; the crocodile and the birds have none (§2.4)', () => {

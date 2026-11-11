@@ -65,37 +65,54 @@ export interface QuadrupedSpec {
 }
 
 /** Dull and grey a coat colour by `amount` (0..1): toward the grey of its own
- *  luminance, a little darker — the staring, faded coat of an old animal
- *  (docs/fauna-behaviour-1890.md §2.1). Never applied to the giraffe (§10.2). */
+ *  luminance, a little darker, then part of the way toward the schema's ASH —
+ *  the staring, faded coat of an old animal (docs/fauna-behaviour-1890.md
+ *  §2.1). The ash pull is what makes a DARK coat (wildebeest) or a near-white
+ *  one (zebra) read greyer at game distance; a pure luminance grey left both
+ *  unchanged. Never applied to the giraffe (§10.2). */
 export function agedColor(hex: string, amount: number): string {
   const c = new THREE.Color(hex)
   const k = Math.min(1, Math.max(0, amount))
   const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
   const grey = lum * 0.95
   c.setRGB(c.r + (grey - c.r) * k, c.g + (grey - c.g) * k, c.b + (grey - c.b) * k)
+  c.lerp(new THREE.Color(ELDERLY_SCHEMA.ash), k * ELDERLY_SCHEMA.ashPull)
   return `#${c.getHexString()}`
 }
 
-/** The greying muzzle of an old mammal (§2.1/§2.3): a face colour pulled toward a pale grey. */
-export function greyMuzzle(hex: string, amount = 0.5): string {
-  const c = new THREE.Color(hex).lerp(new THREE.Color('#8f8a84'), Math.min(1, Math.max(0, amount)))
+/** The greying muzzle of an old mammal (§2.1/§2.3): a face colour pulled toward
+ *  the schema's pale face grey — pale on a dark face too, which is what reads
+ *  at distance (a luminance grey of a dark face stays dark). */
+export function greyMuzzle(hex: string, amount: number = ELDERLY_SCHEMA.faceGrey): string {
+  const c = new THREE.Color(hex).lerp(new THREE.Color(ELDERLY_SCHEMA.faceColor), Math.min(1, Math.max(0, amount)))
   return `#${c.getHexString()}`
 }
 
-/** Shares by which the elderly schema changes an adult spec. Exported for the tests. */
+/** Shares by which the elderly schema changes an adult spec. Exported for the
+ *  tests. All values calibratable (CLAUDE.md §2): point 1498 raised every cue
+ *  so an elder reads as OLD at the travel camera's normal distance — the cues
+ *  are the researched ones (docs/fauna-behaviour-1890.md §2/§10.8), only stronger. */
 export const ELDERLY_SCHEMA = {
   /** Barrel radius: a leaner, gaunter body (the strongest cue, research §2.1). */
-  bodyR: 0.86,
+  bodyR: 0.78,
   /** Bonier legs. */
-  legR: 0.9,
+  legR: 0.85,
   /** The head carried lower: added forward tilt of the neck (rad). */
-  neckDrop: 0.15,
+  neckDrop: 0.35,
   /** Topline sag in bodyR units (sway-back, research §2.1, INFERRED for zebra). */
-  swayBack: 0.14,
+  swayBack: 0.3,
   /** Coat dulling/greying share (`agedColor`). */
-  coatGrey: 0.3,
-  /** Face dulling share — the greyer face reads before the coat does. */
-  faceGrey: 0.5,
+  coatGrey: 0.5,
+  /** Share of the coat greying that goes to the ash tone below (`agedColor`). */
+  ashPull: 0.5,
+  /** The dull ash grey an old coat fades toward. */
+  ash: '#9a958d',
+  /** Face greying share (`greyMuzzle`) — the greyer face reads before the coat does. */
+  faceGrey: 0.7,
+  /** The pale grey an old face and muzzle turn toward. */
+  faceColor: '#b9b4ab',
+  /** Size factor of the prominent hip and withers bones (`agedBoneKnobs`). */
+  boneKnob: 1.6,
 } as const
 
 /**
@@ -114,7 +131,7 @@ export function elderlyProportions<S extends QuadrupedSpec>(s: S, opts: { grey?:
     legR: s.legR * ELDERLY_SCHEMA.legR,
     neckTilt: s.neckTilt + ELDERLY_SCHEMA.neckDrop,
     bodyColor: grey ? agedColor(s.bodyColor, ELDERLY_SCHEMA.coatGrey) : s.bodyColor,
-    headColor: grey ? agedColor(head, ELDERLY_SCHEMA.faceGrey) : head,
+    headColor: grey ? greyMuzzle(agedColor(head, ELDERLY_SCHEMA.coatGrey)) : head,
     swayBack: ELDERLY_SCHEMA.swayBack,
     elderly: true,
   }
@@ -141,7 +158,7 @@ export function agedBoneKnobs(
     [halfWidth, topY, hipZ],
     [0, withersY, withersZ],
   ] as const) {
-    const knob = new THREE.SphereGeometry(r, 10, 8)
+    const knob = new THREE.SphereGeometry(r * ELDERLY_SCHEMA.boneKnob, 10, 8)
     knob.scale(1, 0.8, 1.2)
     knob.translate(x, y, z)
     out.push(tint(knob, color, 0.06, seed))
