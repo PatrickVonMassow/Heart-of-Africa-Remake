@@ -5,7 +5,7 @@
 // the water, descending overall from source to mouth — with a calm
 // surface (no wave field), edge foam and a visible downstream current that
 // speeds up at rapids; the waterfall landmarks get white cascades with
-// plunge-pool foam, and rivers rising in open land get a welling spring pool.
+// plunge-pool foam, and rivers rising in open land get a 3D welling spring.
 // Lakes are flat polygon surfaces just above their highest interior bed sample.
 
 import { useEffect, useMemo, useRef } from 'react'
@@ -59,13 +59,11 @@ import {
   BANK_PROBE_DEG,
   type BankAxisSample,
 } from './riverBanks'
-import {
-  SPRING_POOL_RADIUS,
-  SPRING_RIPPLE_COUNT,
-  SPRING_BUBBLE_COUNT,
-  springRipple,
-  springBubble,
-} from './springAnimation'
+import { springBubble } from './springAnimation'
+import { buildSpringGeometry, springShape, type SpringBuild } from './springGeometry'
+import { getSpringMaterial, SPRING_BUBBLE_AMP_U, SPRING_GLOW_U } from './springMaterial'
+import { balance } from '../../config/balance'
+import { useUi, effectiveSpringBubbles, effectiveSpringSegments } from '../../state/ui'
 
 const HALF_WIDTH = RIVER_WIDTH_DEG * 10 // ribbon half width in world units (1° = 10 units)
 
@@ -80,7 +78,10 @@ interface FallDef {
 interface SpringDef {
   x: number
   z: number
+  /** Water level at the source (the ribbon head's surface). */
   y: number
+  /** Downstream heading in the xz plane, radians (atan2(dz, dx)). */
+  outflowAngle: number
 }
 
 function buildRivers(seed: number): {
@@ -179,7 +180,13 @@ function buildRivers(seed: number): {
     // Spring at the source when the river rises in open land — never at a
     // confluence or a lake outflow (point 234; the pure springForRiver).
     if (springForRiver(river, rows)) {
-      springs.push({ x: world[0].x, z: world[0].z, y: surf[0] + 0.06 })
+      const down = world[Math.min(3, world.length - 1)]
+      springs.push({
+        x: world[0].x,
+        z: world[0].z,
+        y: surf[0] + 0.04,
+        outflowAngle: Math.atan2(down.z - world[0].z, down.x - world[0].x),
+      })
     }
 
     // Ribbon strip. Isolated inland points that the domain-warped biome map
@@ -442,76 +449,73 @@ function Waterfall({ fall }: { fall: FallDef }) {
   )
 }
 
-/** Spring: a small welling water pool where a river rises in open land
- *  (point 219). A shallow basin at the source height with rising bubbles and
- *  expanding surface ripples. */
-function Spring({ spring }: { spring: SpringDef }) {
-  const ripples = useRef<(THREE.Mesh | null)[]>([])
+/** Built spring bodies by source, for the dev verification hook. */
+const springBodies = new Map<string, { x: number; z: number; waterY: number; build: SpringBuild }>()
+
+/** Spring: a small 3D water feature where a river rises in open land
+ *  (design.md §11.3) — a welling dome whose surface boils, ripple rings
+ *  running over the wet pool, and a damp apron laid on the terrain with an
+ *  outflow lobe toward the river. One mesh (springGeometry.ts, TSL material in
+ *  springMaterial.ts) plus a few rising bubble spheres where quality allows. */
+function Spring({ spring, seed }: { spring: SpringDef; seed: number }) {
+  const segments = useUi(effectiveSpringSegments)
+  const bubbleCount = useUi(effectiveSpringBubbles)
   const bubbles = useRef<(THREE.Mesh | null)[]>([])
-  const bubbleAngles = useMemo(
-    () => Array.from({ length: SPRING_BUBBLE_COUNT }, (_, i) => (i / SPRING_BUBBLE_COUNT) * Math.PI * 2),
-    [],
+  const material = useMemo(() => getSpringMaterial(), [])
+  const body = useMemo(
+    () =>
+      buildSpringGeometry({
+        shape: springShape(balance.spring.radius, balance.spring.domeHeight),
+        waterY: spring.y,
+        outflowAngle: spring.outflowAngle,
+        segments,
+        rings: Math.round(segments / 2),
+        groundAt: (dx, dz) => {
+          const ll = worldToLatLon(spring.x + dx, spring.z + dz)
+          return sampleTerrain(ll.lat, ll.lon, seed).height
+        },
+      }),
+    [spring, seed, segments],
   )
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-    for (let i = 0; i < SPRING_RIPPLE_COUNT; i++) {
-      const m = ripples.current[i]
-      if (!m) continue
-      const r = springRipple(i, t)
-      m.scale.set(r.radius, r.radius, r.radius)
-      ;(m.material as THREE.MeshStandardMaterial).opacity = r.opacity
+  useEffect(() => {
+    const key = `${spring.x},${spring.z}`
+    springBodies.set(key, { x: spring.x, z: spring.z, waterY: spring.y, build: body })
+    return () => {
+      springBodies.delete(key)
+      body.geometry.dispose()
     }
-    for (let i = 0; i < SPRING_BUBBLE_COUNT; i++) {
+  }, [body, spring])
+  const crest = body.peakY - spring.y
+  useFrame(({ clock }) => {
+    SPRING_BUBBLE_AMP_U.value = balance.spring.bubbleAmplitude
+    SPRING_GLOW_U.value = balance.spring.glow
+    const t = clock.elapsedTime
+    for (let i = 0; i < bubbleCount; i++) {
       const m = bubbles.current[i]
       if (!m) continue
-      const b = springBubble(i, t)
-      m.position.y = b.y
+      const b = springBubble(i, bubbleCount, t)
+      m.position.y = crest + b.y
       const s = Math.max(0.001, b.scale)
       m.scale.set(s, s, s)
     }
   })
+  const ringR = balance.spring.radius * 0.08
   return (
     <group name="river-spring" position={[spring.x, spring.y, spring.z]}>
-      {/* Pool surface — a shallow disc of spring water at the source height. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[SPRING_POOL_RADIUS, 24]} />
-        <meshStandardMaterial color="#2f6c90" transparent opacity={0.92} roughness={0.14} metalness={0.02} />
-      </mesh>
-      {/* Wet gravel rim just below the surface — a soft natural edge, not a symbol. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
-        <circleGeometry args={[SPRING_POOL_RADIUS + 0.14, 24]} />
-        <meshStandardMaterial color="#6b7d74" transparent opacity={0.5} roughness={0.95} />
-      </mesh>
-      {/* Expanding surface ripples (unit rings, uniformly scaled to their radius). */}
-      {Array.from({ length: SPRING_RIPPLE_COUNT }, (_, i) => (
-        <mesh
-          key={i}
-          ref={(m) => { ripples.current[i] = m }}
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, 0.006, 0]}
-        >
-          <ringGeometry args={[0.82, 1, 24]} />
-          <meshStandardMaterial
-            color="#cfeaf0"
-            transparent
-            opacity={0}
-            roughness={0.4}
-            side={THREE.DoubleSide}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-      {/* Bubbles welling up from the centre of the pool. */}
-      {bubbleAngles.map((a, i) => (
-        <mesh
-          key={i}
-          ref={(m) => { bubbles.current[i] = m }}
-          position={[Math.cos(a) * 0.13, 0, Math.sin(a) * 0.13]}
-        >
-          <sphereGeometry args={[0.05, 6, 5]} />
-          <meshStandardMaterial color="#e6f6f9" transparent opacity={0.82} roughness={0.2} depthWrite={false} />
-        </mesh>
-      ))}
+      <mesh name="river-spring-body" geometry={body.geometry} material={material} renderOrder={2} />
+      {Array.from({ length: bubbleCount }, (_, i) => {
+        const a = (i / Math.max(1, bubbleCount)) * Math.PI * 2
+        return (
+          <mesh
+            key={i}
+            ref={(m) => { bubbles.current[i] = m }}
+            position={[Math.cos(a) * ringR, crest, Math.sin(a) * ringR]}
+          >
+            <sphereGeometry args={[0.04, 6, 5]} />
+            <meshStandardMaterial color="#e6f6f9" transparent opacity={0.82} roughness={0.2} depthWrite={false} />
+          </mesh>
+        )
+      })}
     </group>
   )
 }
@@ -563,6 +567,13 @@ export function RiversAndLakes() {
     const lakeInfo = lakes.map((l) => ({ y: l.y, bedMax: l.bedMax }))
     w.__rivers = {
       falls: falls.length, springs: springs.length, lakes: lakes.length, gaps, buried, report, lakeInfo,
+      // The 3D spring bodies (design.md §11.3): centre, water level, dome
+      // peak and the outer rim in ABSOLUTE world coordinates, so a check can
+      // compare the rim against the terrain heights.
+      springBodies: () => [...springBodies.values()].map((b) => ({
+        x: b.x, z: b.z, waterY: b.waterY, peakY: b.build.peakY, poolY: b.build.poolY,
+        rim: b.build.rim.map((r) => ({ x: b.x + r.dx, z: b.z + r.dz, y: r.y })),
+      })),
       // Point 138 — read through the APP's module instance. A probe that
       // dynamic-imports waterSurface.ts by URL can get a FRESH instance after
       // HMR (?t= cache busting) whose NILE_FLOOD is untouched, and then reads a
@@ -595,7 +606,7 @@ export function RiversAndLakes() {
         <Waterfall key={i} fall={f} />
       ))}
       {springs.map((s, i) => (
-        <Spring key={i} spring={s} />
+        <Spring key={i} spring={s} seed={seed} />
       ))}
     </>
   )

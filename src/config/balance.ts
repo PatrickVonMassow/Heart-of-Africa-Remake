@@ -803,6 +803,20 @@ interface BalanceConfig {
     /** TEST-ONLY: pins every strike's outcome for a staged verification. */
     forceStrike?: 'catch' | 'miss'
   }
+  /** The 3D spring at an open-land river source (design.md §11.3): a welling
+   *  dome, a wet pool with ripple rings and a damp apron with an outflow lobe.
+   *  Shape values apply when the spring is next built (reload); the animation
+   *  values are read every frame. All calibratable, debug-editable. */
+  spring: {
+    /** Outer apron radius, world units (1 unit = 0.1°); read at the default zoom 0.5. */
+    radius: number
+    /** Height of the welling dome above the pool, world units. */
+    domeHeight: number
+    /** Vertical amplitude of the dome's boiling surface, world units. */
+    bubbleAmplitude: number
+    /** Brightness of the welling centre and the ripple crests (0 = none). */
+    glow: number
+  }
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -1884,6 +1898,12 @@ export const balance: BalanceConfig = {
     leaveOvertimeSeconds: 45, // calibratable: walk-off overtime before an off-frame retire (point 188) — generous vs the ~20 s a clear walk-off needs
     remnantScale: 0.45, // calibratable: remnant/final-carcass size vs the whole prey (point 453) — 0.35 read as nothing at travel zoom
     remnantYoungFactor: 0.6, // calibratable: calf body vs adult body, so a calf's remnant matches its shrunk carcass (point 453)
+  },
+  spring: {
+    radius: 0.85, // calibratable: reads at zoom 0.5 without dominating the ~1-unit river head
+    domeHeight: 0.16, // calibratable: a low upwelling, clearly 3D from the oblique camera
+    bubbleAmplitude: 0.045, // calibratable: visible boil, never tearing the dome
+    glow: 0.55, // calibratable: bright welling centre, faint ripple crests
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

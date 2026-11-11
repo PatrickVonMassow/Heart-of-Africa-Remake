@@ -58,6 +58,7 @@ const DEFAULTS = {
   canoeSpeedup: balance.canoeSpeedup,
   riverWidthFactor: balance.river.widthFactor,
   riverMouthSlackDeg: balance.river.mouthSlackDeg,
+  spring: { ...balance.spring },
   canteenCapacity: balance.health.canteenCapacity,
   vigilPredatorDelay: balance.vigil.predatorDelay,
   rescueBurst: balance.family.rescueBurst,
@@ -158,6 +159,7 @@ afterEach(() => {
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
   balance.river.widthFactor = DEFAULTS.riverWidthFactor
   balance.river.mouthSlackDeg = DEFAULTS.riverMouthSlackDeg
+  Object.assign(balance.spring, DEFAULTS.spring)
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
   balance.family.rescueBurst = DEFAULTS.rescueBurst
@@ -356,6 +358,11 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     // applies on the next reload — the write-through is what the menu owes.
     { label: en.debug.riverWidthFactor, read: () => balance.river.widthFactor, value: 2 },
     { label: en.debug.riverMouthSlackDeg, read: () => balance.river.mouthSlackDeg, value: 0.9 },
+    // The open-land spring (design.md §11.3).
+    { label: en.debug.springRadius, read: () => balance.spring.radius, value: 1.1 },
+    { label: en.debug.springDomeHeight, read: () => balance.spring.domeHeight, value: 0.22 },
+    { label: en.debug.springBubbleAmplitude, read: () => balance.spring.bubbleAmplitude, value: 0.06 },
+    { label: en.debug.springGlow, read: () => balance.spring.glow, value: 0.8 },
     // The vigil's predator draw delay (design.md §19.8, point 121 (f)).
     { label: en.debug.vigilPredatorDelay, read: () => balance.vigil.predatorDelay, value: 20 },
     // The parental rescue burst (design.md §19.8, point 127).
@@ -886,6 +893,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
   travel: [
     'debug.travelSpeed', 'debug.daysPerUnit', 'debug.canoeSpeedup', 'debug.junglePenalty',
     'debug.mountainPenalty', 'debug.oceanSwimMargin', 'debug.riverWidthFactor', 'debug.riverMouthSlackDeg',
+    'debug.springRadius', 'debug.springDomeHeight', 'debug.springBubbleAmplitude', 'debug.springGlow',
   ],
   survival: [
     'debug.foodPerDay', 'debug.foodUnitDays', 'debug.foodDays', 'debug.canteenDrain',
@@ -1032,12 +1040,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 232 controls in total, and none twice', () => {
+  it('carries all 236 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(232)
+    expect(labels.length).toBe(236)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1084,7 +1092,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(232)
+    expect(rows.length).toBe(236)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1138,7 +1146,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(232)
+    expect(renderedRowLabels().length).toBe(236)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1186,7 +1194,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(232)
+    expect(renderedRowLabels().length).toBe(236)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

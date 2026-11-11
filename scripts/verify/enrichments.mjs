@@ -698,6 +698,136 @@ if (section('rivers')) {
     await page.waitForTimeout(1500) // let the chunks and water surfaces stream in
     await shot(name, { world: { lat, lon }, label: name })
   }
+  // The spring is a 3D water feature, not a flat symbol (design.md §11.3): its
+  // body mesh has a real height, its surface animates over time, and its rim
+  // sits ON the terrain — asserted at the first open-land spring.
+  {
+    const body0 = await page.evaluate(() => window.__rivers?.springBodies?.()?.[0] ?? null)
+    if (!body0) {
+      check('Spring: a built 3D spring body is reported', false, 'no springBodies from __rivers')
+    } else {
+      const lat = -body0.z / 10
+      const lon = body0.x / 10
+      const stood = await jumpBeside(page, lat, lon, 'spring 3D')
+      // Wait on frames the page actually draws, so the time-driven surface has moved.
+      const renderedFrames = (n) => page.evaluate((k) => new Promise((done) => {
+        let left = k
+        const step = () => (--left <= 0 ? done(true) : requestAnimationFrame(step))
+        requestAnimationFrame(step)
+      }), n)
+      await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+      await page.evaluate(() => window.__pollSim(20, () => window.__camera.settled()))
+      await waitForSceneReady(page) // chunks and the spring mesh stream in at the new spot
+      // 3D: the drawn body's bounding box is not flat, and the dome stands
+      // clear of the pool.
+      const solid = await page.evaluate(([x, z]) => {
+        const scene = window.__scenePass?.scene
+        if (!scene) return null
+        let best = null
+        scene.traverse((o) => {
+          if (o.name !== 'river-spring-body' || !o.geometry) return
+          const p = o.parent?.position
+          if (!p) return
+          const d = Math.hypot(p.x - x, p.z - z)
+          if (!best || d < best.d) best = { d, o }
+        })
+        if (!best) return null
+        const g = best.o.geometry
+        g.computeBoundingBox()
+        const b = g.boundingBox
+        return { d: best.d, sx: b.max.x - b.min.x, sy: b.max.y - b.min.y, sz: b.max.z - b.min.z }
+      }, [body0.x, body0.z])
+      const dome = body0.peakY - body0.poolY
+      check(
+        'Spring: the body mesh is 3D (non-flat bounding box, dome above the pool)',
+        !!solid && solid.d < 0.05 && solid.sy >= 0.08 && solid.sy >= solid.sx * 0.05 && dome >= 0.08,
+        JSON.stringify({ solid, dome }),
+      )
+      // ON the terrain: every rim vertex sits just above the sampled ground —
+      // no floating gap, no rim clipped under the relief.
+      const rimFit = await page.evaluate(async (rim) => {
+        const terr = await import('/src/world/terrain.ts')
+        const geo = await import('/src/world/geo.ts')
+        const seed = window.__game.getState().seed
+        let maxGap = 0
+        let minLift = Infinity
+        let minEdgeLift = Infinity
+        const lift = (x, z, y) => {
+          const l = geo.worldToLatLon(x, z)
+          return y - terr.sampleTerrain(l.lat, l.lon, seed).height
+        }
+        rim.forEach((r, i) => {
+          const d = lift(r.x, r.z, r.y)
+          maxGap = Math.max(maxGap, d)
+          minLift = Math.min(minLift, d)
+          // The relief can rise between two rim vertices: sample the edge too.
+          const q = rim[(i + 1) % rim.length]
+          for (const t of [0.25, 0.5, 0.75]) {
+            minEdgeLift = Math.min(minEdgeLift, lift(r.x + (q.x - r.x) * t, r.z + (q.z - r.z) * t, r.y + (q.y - r.y) * t))
+          }
+        })
+        return { n: rim.length, maxGap, minLift, minEdgeLift }
+      }, body0.rim)
+      check(
+        'Spring: the rim sits on the terrain (no gap, no clip)',
+        rimFit.n >= 8 && rimFit.minLift >= 0 && rimFit.minEdgeLift >= 0 && rimFit.maxGap <= 0.06,
+        JSON.stringify(rimFit),
+      )
+      // Animates: two frames of the spring 0.6 s apart differ inside its
+      // projected footprint (the boil, the ripples, the bubbles).
+      if (stood) {
+        // Only the welling dome: the pool's edge borders the river ribbon,
+        // whose own flow would pass the check without any spring animation.
+        const clip = await page.evaluate(async ([x, z, y]) => {
+          const { balance } = await import('/src/config/balance.ts')
+          const { SPRING_FORM } = await import('/src/scenes/travel/springGeometry.ts')
+          const r = balance.spring.radius * SPRING_FORM.domeFraction
+          const VW = window.innerWidth, VH = window.innerHeight
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+          for (let a = 0; a < 16; a++) {
+            const ang = (a / 16) * Math.PI * 2
+            const n = window.__camera.ndc(x + Math.cos(ang) * r, z + Math.sin(ang) * r, y)
+            const sx = (n.x * 0.5 + 0.5) * VW, sy = (0.5 - n.y * 0.5) * VH
+            minX = Math.min(minX, sx); maxX = Math.max(maxX, sx)
+            minY = Math.min(minY, sy); maxY = Math.max(maxY, sy)
+          }
+          const c = { x: Math.round(minX), y: Math.round(minY), width: Math.round(maxX - minX), height: Math.round(maxY - minY) }
+          const on = c.x >= 0 && c.y >= 0 && c.x + c.width <= VW && c.y + c.height <= VH && c.width >= 6 && c.height >= 4
+          return on ? c : null
+        }, [body0.x, body0.z, body0.poolY])
+        if (!clip) {
+          check('Spring: the spring projects on screen for the animation check', false, 'off screen at zoom 0.5')
+        } else {
+          const grab = async () => {
+            const buf = await capturePixels(page, 'spring animation', { clip })
+            return sharp(buf).raw().toBuffer({ resolveWithObject: true })
+          }
+          const a = await grab()
+          await renderedFrames(36) // ~0.6 s of drawn frames, not a wall-clock sleep
+          const b = await grab()
+          let sum = 0
+          let changed = 0
+          const px = a.info.width * a.info.height
+          for (let i = 0; i < px; i++) {
+            const o = i * a.info.channels
+            const d = (Math.abs(a.data[o] - b.data[o]) + Math.abs(a.data[o + 1] - b.data[o + 1]) + Math.abs(a.data[o + 2] - b.data[o + 2])) / 3
+            sum += d
+            if (d > 6) changed++
+          }
+          const meanDelta = sum / px
+          check(
+            `Spring: the surface animates over time (pixel delta between two frames ~36 drawn frames apart, ${VERIFY_GL})`,
+            changed / px >= 0.03 && meanDelta >= 1,
+            JSON.stringify({ clip, meanDelta: +meanDelta.toFixed(2), changedShare: +(changed / px).toFixed(3) }),
+          )
+        }
+        // §7.2 evidence: the spring at the default zoom, two moments apart.
+        await shot('320-spring-3d-a', { world: { lat, lon }, label: 'the 3D welling spring at a river source' })
+        await renderedFrames(42)
+        await shot('320-spring-3d-b', { world: { lat, lon }, label: 'the same spring, a moment later (the boil has moved)' })
+      }
+    }
+  }
 }
 
 // --- Region border labels (§7.1.3) -------------------------------------------

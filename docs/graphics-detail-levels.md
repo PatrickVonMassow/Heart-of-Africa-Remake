@@ -55,6 +55,8 @@ device pixel ratio is kept (no cap).
 | `grassFireFlames` | 16 | 28 | 40 |
 | `grassFireSmoke` | 6 | 14 | 24 |
 | `sphinxSiteDetail` | reduced | standard | full |
+| `springSegments` | 12 | 24 | 36 |
+| `springBubbles` | 0 | 4 | 7 |
 
 ## What each setting does
 
@@ -313,6 +315,15 @@ added.
 
   The measured frame cost at the site on both backends at LOW and MEDIUM is
   owed by the owner's local run (`polish-panorama`, section `sphinx`).
+- **`springSegments`** — Radial segments of the 3D spring body at an
+  open-land river source (design.md §11.3, `src/scenes/travel/springGeometry.ts`);
+  the ring count is half of it. The welling dome, its ripple rings and the
+  wet apron are one mesh whose surface bubbles by TSL vertex displacement, so
+  this decides how round the dome reads. A handful of springs, one draw each.
+  Climbs 12 → 24 → 36.
+- **`springBubbles`** — Bubble spheres rising out of each spring's dome. The
+  dome surface bubbles on every level, so low drops the spheres, never the
+  bubbling. Climbs 0 → 4 → 7.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 
