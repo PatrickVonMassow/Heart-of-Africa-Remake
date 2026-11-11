@@ -25,6 +25,34 @@ describe('flicker judgement of a moving-camera series', () => {
     expect(r.worst).toBe(0)
   })
 
+  it('passes a narrow feature moving across the frame: a one-pixel stripe stepping one column per frame', () => {
+    // Every pixel the stripe crosses goes dark → bright → dark (30 per triple,
+    // 2.5 % of 40×30 — far above the limit if counted); it is motion.
+    const stripe = (col) => {
+      const data = new Uint8Array(W * H * 3).fill(30)
+      for (let y = 0; y < H; y++) data.fill(230, (y * W + col) * 3, (y * W + col) * 3 + 3)
+      return { data, width: W, height: H, channels: 3 }
+    }
+    for (const step of [1, 2]) {
+      const r = judgeFlickerSeries(Array.from({ length: 10 }, (_, k) => stripe(5 + k * step)))
+      expect(r.ok, `step ${step}`).toBe(true)
+      expect(r.worst).toBe(0)
+    }
+  })
+
+  it('still fails a one-pixel fight that toggles in place beside a moving stripe', () => {
+    const frames = Array.from({ length: 8 }, (_, k) => {
+      const data = new Uint8Array(W * H * 3).fill(30)
+      for (let y = 0; y < H; y++) data.fill(230, (y * W + 5 + k) * 3, (y * W + 5 + k) * 3 + 3)
+      // An 8×10 patch toggling between two surfaces.
+      for (let y = 10; y < 20; y++) for (let x = 28; x < 36; x++) data.fill(k % 2 ? 40 : 220, (y * W + x) * 3, (y * W + x) * 3 + 3)
+      return { data, width: W, height: H, channels: 3 }
+    })
+    const r = judgeFlickerSeries(frames)
+    expect(r.ok).toBe(false)
+    expect(r.worst).toBeGreaterThan(0.03)
+  })
+
   it('fails a patch that toggles between two surfaces from frame to frame (a depth fight)', () => {
     const frames = Array.from({ length: 8 }, (_, k) => frame(5 + k * 2, k % 2 ? 40 : 220))
     const r = judgeFlickerSeries(frames)
