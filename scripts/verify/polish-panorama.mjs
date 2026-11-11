@@ -13,6 +13,37 @@ import { judgeFlickerSeries } from './flickerSeries.mjs'
 import sharp from 'sharp'
 import { section, check, probeSilhouetteFooting, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
 
+// --- Field Sphinx pixel layers (work-order point 315) ---------------------------
+// The field Sphinx is its own mesh with a DEV probe (src/render/sphinxProbe.tsx):
+// it projects the Sphinx's bounds and head anchors into the frame and switches
+// the mesh to hidden or to a flat magenta mask. Three captures of the same view
+// — as drawn, masked, hidden — give the Sphinx's own pixels, what it looks like
+// there, and what lies behind it (ground or sky), so a check judges the RENDERED
+// result, not the albedo inputs.
+async function sphinxLayers(key) {
+  const probe = await page.evaluate((k) => window[k]?.project() ?? null, key)
+  if (!probe) return null
+  const shot = async (mode) => {
+    await page.evaluate(([k, m]) => window[k].mode(m), [key, mode])
+    await nextFrames(4)
+    return sharp(await page.screenshot()).raw().toBuffer({ resolveWithObject: true })
+  }
+  const drawn = await shot('normal')
+  const mask = await shot('mask')
+  const hidden = await shot('hidden')
+  await page.evaluate((k) => window[k].mode('normal'), key)
+  const { width: W, height: H, channels: C } = drawn.info
+  const k = W / probe.width
+  const px = (img, i) => [img.data[i * C], img.data[i * C + 1], img.data[i * C + 2]]
+  const isMask = (i) => {
+    const [r, g, b] = px(mask, i)
+    return r > 150 && b > 150 && g < 0.6 * Math.min(r, b)
+  }
+  return { probe, k, W, H, px, isMask, drawn, hidden }
+}
+const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
+const sat = ([r, g, b]) => (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(1, Math.max(r, g, b))
+
 // --- Giza skyline behind Cairo (design.md §4.4, point 82) ----------------------
 // In Cairo the great pyramids stand as the western skyline silhouette
 // (point-69 pattern, like Cape Town's Table Mountain).
@@ -60,6 +91,49 @@ if (section('giza-skyline')) {
   })
   await page.waitForTimeout(700)
   const skyBuf = await frame('100-cairo-giza-skyline', { place: 'cairo', label: 'the Giza skyline over Cairo' })
+
+  // Point 315 (owner picture check 11.11.2026): face-on the skyline Sphinx's
+  // head must read as the nemes — flat-topped and visibly wider at the
+  // shoulders than at the crown — in the FRAME, not only in the geometry. The
+  // head's silhouette is cut out of the frame by the mask capture; per row the
+  // run of Sphinx pixels through the crown's column is its width.
+  {
+    const L = await sphinxLayers('__gizaSkylineSphinx')
+    if (!L) check('the Cairo skyline Sphinx exposes its picture probe', false, 'no __gizaSkylineSphinx')
+    else {
+      const { probe, k, W, isMask } = L
+      const cx = Math.round(probe.crown[0] * k)
+      const baseRow = Math.round(probe.headBase[1] * k)
+      let first = -1
+      const widths = []
+      for (let y = Math.max(0, Math.round(probe.crown[1] * k) - 6); y <= baseRow; y++) {
+        // The run through the crown's column (or its nearest mask pixel within 2 px).
+        let c = -1
+        for (const d of [0, -1, 1, -2, 2]) if (c < 0 && isMask(y * W + cx + d)) c = cx + d
+        if (c < 0) {
+          if (first >= 0) widths.push(0)
+          continue
+        }
+        let a = c
+        let b = c
+        while (a > 0 && isMask(y * W + a - 1)) a--
+        while (b < W - 1 && isMask(y * W + b + 1)) b++
+        if (first < 0) first = y
+        widths.push(b - a + 1)
+      }
+      const h = widths.length
+      const at = (f) => widths[Math.min(h - 1, Math.max(0, Math.round(f * (h - 1))))] ?? 0
+      const crownW = widths[1] ?? 0
+      const quarterW = at(0.25)
+      const shoulderW = Math.max(0, ...widths.slice(Math.round(h * 0.7)))
+      const detail = `head ${h} px tall above its drift; widths crown ${crownW}, quarter ${quarterW}, shoulders ${shoulderW} px; rows ${widths.join(',')}`
+      check('the skyline Sphinx head is large enough in the frame to judge (>= 15 px above the drift)', h >= 15, detail)
+      check('face-on the skyline Sphinx head is flat-topped in the frame (crown row >= 0.6 of the width a quarter down)',
+        h >= 15 && crownW >= 0.6 * quarterW, detail)
+      check('face-on the skyline Sphinx head widens to the shoulders in the frame (shoulders >= 1.4x the upper head)',
+        h >= 15 && shoulderW >= 1.4 * Math.max(crownW, quarterW), detail)
+    }
+  }
 
   // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
   // BAND at this distant skyline scale, so it was removed (kept only at the
@@ -968,6 +1042,41 @@ if (section('sphinx-travel')) {
   // Giza's own position (the marker jumped to in the block below), not the
   // standpoint: the frame claims the field, so the field must be in the picture.
   await frame('103-giza-sphinx-travel', { world: { lat: 29.98, lon: 30.59 }, label: 'the Giza field with the Sphinx' })
+  // Point 315 (owner picture check 11.11.2026): no pale patch. Per pixel of the
+  // Sphinx (mask capture), the frame as drawn against the same pixel with the
+  // Sphinx hidden (the travel ground behind it): a pixel that is lighter AND
+  // less saturated than the ground there is the pale-cream-patch signature.
+  {
+    const L = await sphinxLayers('__gizaTravelSphinx')
+    if (!L) check('the bird\'s-eye Sphinx exposes its picture probe', false, 'no __gizaTravelSphinx')
+    else {
+      const { probe, k, W, isMask, px, drawn, hidden } = L
+      const x0 = Math.max(0, Math.floor(probe.box.minX * k) - 4)
+      const x1 = Math.min(W - 1, Math.ceil(probe.box.maxX * k) + 4)
+      const y0 = Math.max(0, Math.floor(probe.box.minY * k) - 4)
+      const y1 = Math.min(L.H - 1, Math.ceil(probe.box.maxY * k) + 4)
+      let n = 0
+      let pale = 0
+      let lumN = 0
+      let lumG = 0
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = y * W + x
+          if (!isMask(i)) continue
+          n++
+          const d = px(drawn, i)
+          const g = px(hidden, i)
+          lumN += lum(d)
+          lumG += lum(g)
+          if (lum(d) > lum(g) * 1.08 && sat(d) < sat(g) * 0.85) pale++
+        }
+      }
+      const detail = `${n} Sphinx px in box ${x0}-${x1} x ${y0}-${y1}; pale ${pale} (${((100 * pale) / Math.max(1, n)).toFixed(1)} %); mean luminance Sphinx ${(lumN / Math.max(1, n)).toFixed(1)} vs ground behind ${(lumG / Math.max(1, n)).toFixed(1)}`
+      check('the bird\'s-eye Sphinx is visible in the frame (>= 150 px)', n >= 150, detail)
+      check('the bird\'s-eye Sphinx draws no pale patch over the ground (< 5 % of its pixels lighter and greyer than the ground behind)',
+        n >= 150 && pale / n < 0.05, detail)
+    }
+  }
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 }
 
