@@ -496,6 +496,13 @@ interface BalanceConfig {
     /** Seconds of standing vigil after which the carcass draws a predator to the keeper. */
     predatorDelay: number
   }
+  /** The scavenger flocks at carcasses (design.md §19.6). */
+  scavenge: {
+    /** World units around a flock's current carcass within which a further
+     *  carcass joins that flock's queue instead of drawing a second flock
+     *  (boundary inclusive). Calibratable/debug-editable. */
+    clusterRadius: number
+  }
   /** The elephants' mourning vigil (design.md §19.8, point 126): a herd whose
    *  centre passes near the graveyard's bones — or a dead herd-mate — walks
    *  in, lowers its heads over them and holds, then moves on. A vigil, not a
@@ -1726,6 +1733,9 @@ export const balance: BalanceConfig = {
   vigil: {
     seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd
     predatorDelay: 12, // calibratable: vigil seconds until the carcass draws a predator to the keeper
+  },
+  scavenge: {
+    clusterRadius: 15, // calibratable: carcasses this close to a flock's target share that one flock
   },
   mourn: {
     seconds: 30, // calibratable: how long the herd holds at the bones before moving on

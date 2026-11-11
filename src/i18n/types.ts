@@ -696,6 +696,7 @@ export interface Strings {
     drownSeconds: string
     wetFlowFactor: string
     vigilPredatorDelay: string
+    vultureClusterRadius: string
     rescueBurst: string
     calfFraction: string
     calfFollowRadius: string

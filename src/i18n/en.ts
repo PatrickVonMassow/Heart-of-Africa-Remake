@@ -672,6 +672,7 @@ export const en: Strings = {
     drownSeconds: 'Drowning: seconds in a strong current',
     wetFlowFactor: 'Drowning: wet-season current factor',
     vigilPredatorDelay: 'Vigil: seconds until a predator is drawn',
+    vultureClusterRadius: 'Vultures: carcass cluster radius',
     rescueBurst: 'Parent rescue burst (factor)',
     calfFraction: 'Juvenile fraction per herd',
     calfFollowRadius: 'Calf leash radius',
