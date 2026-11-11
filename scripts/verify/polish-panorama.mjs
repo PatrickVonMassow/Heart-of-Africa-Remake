@@ -1125,7 +1125,7 @@ if (section('giza-site')) {
   // desert; the view of the pyramid row must not widen with it).
   await page.evaluate(() => {
     const p = window.__placePlayer
-    p.x = 0
+    p.x = window.__placeLayout?.spawnX ?? 0
     p.z = window.__placeLayout?.spawnZ ?? 50
     p.yaw = 0 // yaw 0 faces −Z (north), toward the pyramids
   })

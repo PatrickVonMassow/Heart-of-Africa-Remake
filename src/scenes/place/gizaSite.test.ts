@@ -144,17 +144,21 @@ describe('Giza site — the monumental first-person scale (design.md §4.4)', ()
     // The arrival view: at the spawn, facing north (yaw 0), glancing up by the
     // live staging's pitch — level, Khafre's raised apex already tops the frame.
     const lookUp = 0.12
-    const halfH = Math.atan(Math.tan(((FOV_DEG / 2) * Math.PI) / 180) * (16 / 9))
-    const halfV = ((FOV_DEG / 2) * Math.PI) / 180
+    const tanV = Math.tan(((FOV_DEG / 2) * Math.PI) / 180)
+    const tanH = tanV * (16 / 9)
     const eye: [number, number, number] = [GIZA_SPAWN_X, EYE, GIZA_SPAWN_Z]
     const apexOf = (p: (typeof GIZA_PYRAMIDS)[number]): [number, number, number] => [p.x, p.ground + p.standing * p.height, p.z]
     for (const p of GIZA_PYRAMIDS) {
       const [ax, ay, az] = apexOf(p)
       const ahead = eye[2] - az
       expect(ahead, p.id).toBeGreaterThan(0)
-      expect(Math.abs(Math.atan2(ax - eye[0], ahead)), `${p.id} bearing`).toBeLessThan(halfH * 0.9)
-      const elev = Math.atan2(ay - eye[1], Math.hypot(ax - eye[0], ahead)) - lookUp
-      expect(Math.abs(elev), `${p.id} elevation`).toBeLessThan(halfV * 0.95)
+      // Into camera space (yaw 0, pitched up by lookUp), then against the frustum.
+      const dy = ay - eye[1]
+      const fwd = ahead * Math.cos(lookUp) + dy * Math.sin(lookUp)
+      const up = dy * Math.cos(lookUp) - ahead * Math.sin(lookUp)
+      expect(fwd, p.id).toBeGreaterThan(0)
+      expect(Math.abs((ax - eye[0]) / fwd), `${p.id} horizontal`).toBeLessThan(tanH * 0.9)
+      expect(Math.abs(up / fwd), `${p.id} vertical`).toBeLessThan(tanV * 0.95)
     }
     // Inside a drawn pyramid volume (cone on its ground, plinth below it).
     const inside = (q: (typeof GIZA_PYRAMIDS)[number], x: number, y: number, z: number) => {
