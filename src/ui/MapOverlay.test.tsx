@@ -96,6 +96,33 @@ describe('settlement plan (design.md §6.1, point 79)', () => {
     expect(document.querySelectorAll('.plan-dwelling').length).toBeGreaterThan(10)
   })
 
+  it('a monument site with no buildings draws its collidable masses, so the plan is not blank', () => {
+    useGame.setState({ placeId: 'giza' })
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    const plan = document.querySelector('.map-place-plan')
+    expect(plan).toBeInTheDocument()
+    const layout = buildLayout('giza', g().seed)
+    expect(layout.interactives).toHaveLength(0)
+    expect(layout.dwellings).toHaveLength(0)
+    // One drawn mass per collider: the three pyramids and the Sphinx's capsules.
+    const masses = plan!.querySelectorAll('.plan-masses .plan-mass')
+    expect(masses.length).toBe(layout.colliders.length)
+    expect(plan!.querySelectorAll('.plan-masses rect.plan-mass').length).toBe(3)
+    // Drawn inside the paper, at a visible size.
+    for (const r of plan!.querySelectorAll('.plan-masses rect.plan-mass')) {
+      expect(Number(r.getAttribute('width'))).toBeGreaterThan(20)
+      expect(Math.abs(Number(r.getAttribute('x')))).toBeLessThan(280)
+    }
+  })
+
+  it('a settlement plan keeps its own buildings and draws no collider layer', () => {
+    useGame.setState({ placeId: 'cairo' })
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    expect(document.querySelector('.map-place-plan .plan-masses')).not.toBeInTheDocument()
+  })
+
   it('the plan draws the WALKABLE EDGE, not a circle of its own (work-order 482)', () => {
     useGame.setState({ placeId: 'bambara-village' })
     useUi.getState().toggleMap()
