@@ -2059,7 +2059,8 @@ function Herds() {
   // of independent flocks (point 251): each eligible carcass draws and OWNS its
   // own flock, so several carcasses draw several concurrent flocks rather than
   // one global set of vultures hopping from the finished carcass to the next.
-  type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null }
+  // hop: flying from an eaten carcass to the next one of its cluster (design.md §19.6).
+  type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null; hop?: boolean }
   const scavengeGroups = useRef<(THREE.Group | null)[]>([])
   const raptorMesh = useRef<THREE.Mesh>(null)
   const makeScavFlock = (): ScavFlock => ({ mode: 'idle', x: 0, z: 0, y: 14, landed: false, target: null })
@@ -4861,18 +4862,27 @@ function Herds() {
         }
       }
       const flocks = scavengers.current
-      // Per-carcass ownership (point 251): keep each flock on its carcass, free
-      // a flock whose carcass is gone (it flies off — no hop), and give a free
-      // idle flock the nearest still-unowned carcass. N carcasses -> N flocks.
+      // Ownership (point 251 + the §19.6 cluster claim): a flock keeps its
+      // carcass; carcasses within the cluster radius of it queue for that same
+      // flock, which moves on to the next and flies off only once its cluster
+      // is done; a distant carcass draws its own free idle flock.
       const nextTargets = assignPerCarcassFlocks(
         flocks.map((f) => ({ target: f.target, available: f.mode === 'idle' })),
         eligible,
         (a) => Math.hypot(a.x - pos.x, a.z - pos.z),
+        { separation: (a, b) => Math.hypot(a.x - b.x, a.z - b.z), radius: balance.scavenge.clusterRadius },
       )
       SCAV_CLEARANCE.v = Infinity
       for (let si = 0; si < flocks.length; si++) {
         const sc = flocks[si]
+        const prevTarget = sc.target
         sc.target = nextTargets[si]
+        // Moving on within its cluster: the arrived flock lifts off and flies
+        // the short hop to the next carcass instead of snapping onto it.
+        if (sc.target !== null && prevTarget !== null && sc.target !== prevTarget && sc.mode === 'active') {
+          sc.mode = 'in'
+          sc.hop = true
+        }
         const sg = scavengeGroups.current[si]
         const target = sc.target
         flightStep(
@@ -4890,6 +4900,7 @@ function Herds() {
         )
         // Only on a body: over a still-living downed elder the flock gathers.
         sc.landed = sc.mode === 'active' && target !== null && target.dead === true
+        if (sc.mode !== 'in') sc.hop = false
         if (!sg) continue
         sg.visible = sc.mode !== 'idle'
         if (sc.mode === 'idle') {
@@ -4928,7 +4939,9 @@ function Herds() {
           // Glide down toward the carcass as the approach closes — over a
           // still-living elder no lower than the gathering circle.
           const d = Math.hypot(target.x - sc.x, target.z - sc.z)
-          sc.y = target.y + 0.4 + Math.min(1, d / 40) * 13
+          const glideY = target.y + 0.4 + Math.min(1, d / 40) * 13
+          // A cluster hop rises from the ground no faster than a climb-away.
+          sc.y = sc.hop ? Math.min(glideY, sc.y + 6 * dt) : glideY
           if (!target.dead) sc.y = Math.max(sc.y, target.y + DYING_FLOCK_CIRCLE_Y)
         } else {
           sc.y = Math.min(14, sc.y + 6 * dt) // climbing away
