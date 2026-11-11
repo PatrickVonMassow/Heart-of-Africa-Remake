@@ -7270,6 +7270,10 @@ if (section('elderly-natural-death')) {
     }, { sp, gap })
     let post = null
     if (at.staged) {
+      // The first settle can run out while the world still streams in (WebGL 2,
+      // 11.11.2026: neither giraffe found in 240 frames, both drawn at the
+      // shutter); settle once more before the shutter, never after it.
+      if (!at.pre?.ok) at.pre2 = await page.evaluate(() => window.__elderProbe.settle(window.__elderPair.subs, 240))
       await shot(`1498-elder-vs-prime-${sp}`, {
         world: { x: at.x, z: at.z },
         label: `an old ${sp} (right, +x) beside a prime adult ${sp} (left), travel camera at game distance`,
@@ -7277,7 +7281,7 @@ if (section('elderly-natural-death')) {
       post = await page.evaluate(() => window.__elderProbe.settle(window.__elderPair.subs, 2))
     }
     check(`the comparison frame shows BOTH the old and the prime ${sp}: drawn, visible, wholly on screen at the shutter (point 1498)`,
-      at.staged === true && at.pre?.ok === true && post?.ok === true, JSON.stringify({ at, post }))
+      at.staged === true && (at.pre?.ok === true || at.pre2?.ok === true) && post?.ok === true, JSON.stringify({ at, post }))
     await page.evaluate(() => {
       const pr = window.__elderPair
       if (!pr) return
