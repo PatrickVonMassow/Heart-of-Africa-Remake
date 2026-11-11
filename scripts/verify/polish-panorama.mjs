@@ -26,7 +26,7 @@ async function sphinxLayers(key) {
   const shot = async (mode) => {
     await page.evaluate(([k, m]) => window[k].mode(m), [key, mode])
     await nextFrames(4)
-    return sharp(await page.screenshot()).raw().toBuffer({ resolveWithObject: true })
+    return sharp(await capturePixels(page, `field Sphinx ${key}, ${mode} layer`)).raw().toBuffer({ resolveWithObject: true })
   }
   const drawn = await shot('normal')
   const mask = await shot('mask')
