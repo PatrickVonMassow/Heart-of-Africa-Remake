@@ -8176,7 +8176,7 @@ if (section('vulture-cluster')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
   await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
-  const cluster = await page.evaluate(async () => {
+  const clusterStage = await page.evaluate(async () => {
     const w = window.__wildlife
     const herds = w.herdsRef.current
     const p = window.__game.getState().pos
@@ -8198,7 +8198,7 @@ if (section('vulture-cluster')) {
         if (land(x, z) && land(x + 5, z) && land(x - 5, z) && land(x, z + 5) && land(x, z - 5)) { spot = { x, z }; break }
       }
     }
-    if (!spot) return { staged: false, noLand: true }
+    if (!spot) { window.__vulCluster = null; return { landed: false } }
     const radius = window.__balance.scavenge.clusterRadius
     const gap = Math.min(4, radius * 0.5)
     // No older bodies anywhere: every flock that flies is one this pair draws.
@@ -8213,7 +8213,7 @@ if (section('vulture-cluster')) {
     const out = { staged: true, radius, gap, maxFlocksOut: 0, flocksSeen: 0, overlapFrames: 0, landedOn: [], aGone: false, bGone: false, leftAfter: false }
     const seen = new Set()
     const mid = { x: spot.x + gap / 2, z: spot.z }
-    await window.__pollSim(120, () => {
+    const step = () => {
       herds.elephant.length = 0 // no tramples: only the staged pair is eaten here
       // Every non-idle flock near the pair, whatever its target.
       const near = slots.filter((f) => f.mode !== 'idle' && (f.target === a || f.target === b ||
@@ -8227,8 +8227,28 @@ if (section('vulture-cluster')) {
       }
       out.aGone = !herds.zebra.includes(a)
       out.bGone = !herds.zebra.includes(b)
-      return out.aGone && out.bGone
+    }
+    // Hold at the first landing so the shutter sees the one flock on the pair.
+    await window.__pollSim(60, () => { step(); return out.landedOn.length > 0 || (out.aGone && out.bGone) })
+    window.__vulCluster = { a, b, out, seen, step, mid }
+    if (out.landedOn.length > 0 && !out.aGone) {
+      window.__game.setState({ pos: { ...window.__game.getState().pos, x: mid.x, z: mid.z + 3 } })
+    }
+    return { mid, landed: out.landedOn.length > 0 && !out.aGone }
+  })
+  if (clusterStage.landed) {
+    await page.evaluate(() => window.__pollSim(20, () => window.__camera.settled()))
+    await shot('327-vulture-cluster-one-flock', {
+      world: clusterStage.mid,
+      label: 'two carcasses close together with ONE vulture flock landed on the pair',
     })
+  }
+  const cluster = await page.evaluate(async () => {
+    const herds = window.__wildlife.herdsRef.current
+    const st = window.__vulCluster
+    if (!st) return { staged: false }
+    const { a, b, out, seen, step } = st
+    await window.__pollSim(120, () => { step(); return out.aGone && out.bGone })
     out.flocksSeen = seen.size
     // The one flock leaves after the pair is done.
     await window.__pollSim(40, () => {
