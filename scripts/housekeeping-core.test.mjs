@@ -1,7 +1,12 @@
 // Pure housekeeping rules (point 1509): every verdict fails closed.
 import { describe, expect, it } from 'vitest'
 import {
+  BRANCH_MAX_AGE_MS,
   DAY_MS,
+  archivedPointNaming,
+  branchKind,
+  branchVerdict,
+  contentContained,
   outputKind,
   busyVerdict,
   createBudget,
@@ -231,5 +236,57 @@ describe('budget, lock, schedule, failures', () => {
     const c = failuresToFile({ reported: b.nextReported, current: [] })
     expect(c.nextReported).toEqual([])
     expect(failuresToFile({ reported: c.nextReported, current: ['proc-unreadable'] }).file).toEqual(['proc-unreadable'])
+  })
+})
+
+describe('rescue/doctor and claude/* branches (point 1513)', () => {
+  const now = Date.UTC(2026, 10, 30)
+  const old = now - BRANCH_MAX_AGE_MS - DAY_MS
+  const archive = ['# Archive', '- [x] 1485. Skirt', '  cloud branch claude/skirt-a ran here', '- [x] 1486. Other', '  text'].join('\n')
+  const workOrder = parseWorkOrder('- [ ] 900. Open\n', archive)
+
+  it('judges only rescue/doctor-* and single-segment claude/* names', () => {
+    expect(branchKind('rescue/doctor-2026-10-26T18-09-42-184Z-1')).toBe('rescue')
+    expect(branchKind('claude/skirt-a')).toBe('cloud')
+    for (const n of ['rescue/parallel-x', 'feat/1-x', 'board', 'claude/a/b', 'main', '']) expect(branchKind(n)).toBe(null)
+  })
+
+  it('names the one archived point whose block mentions the branch exactly', () => {
+    expect(archivedPointNaming('claude/skirt-a', archive)).toBe(1485)
+    expect(archivedPointNaming('claude/skirt', archive)).toBe(null)
+    expect(archivedPointNaming('claude/skirt-a', `${archive}\n  claude/skirt-a again`)).toBe(null)
+    expect(archivedPointNaming('claude/skirt-a', null)).toBe(null)
+  })
+
+  it('content counts as contained only when every added line and every deletion stands on main', () => {
+    const text = { path: 'a', addedLines: ['x', '', 'y'], mainText: 'y\nz\nx' }
+    expect(contentContained([text])).toBe(true)
+    expect(contentContained([{ ...text, mainText: 'y' }])).toBe(false)
+    expect(contentContained([{ ...text, mainText: null }])).toBe(false)
+    expect(contentContained([{ path: 'd', deleted: true, mainText: null }])).toBe(true)
+    expect(contentContained([{ path: 'd', deleted: true, mainText: 'still here' }])).toBe(false)
+    expect(contentContained([{ ...text, mainText: undefined }])).toBe(null)
+    expect(contentContained([{ ...text, binary: true }])).toBe(null)
+    expect(contentContained([{ path: 'a', mainText: 'x' }])).toBe(null)
+    expect(contentContained(null)).toBe(null)
+  })
+
+  it('deletes an old, contained rescue branch and keeps every unproven one', () => {
+    const name = 'rescue/doctor-2026-10-26T18-09-42-184Z-1'
+    expect(branchVerdict({ name, tipAtMs: old, now, contained: true }).act).toBe(true)
+    expect(branchVerdict({ name, tipAtMs: now - DAY_MS, now, contained: true }).reason).toBe('young')
+    expect(branchVerdict({ name, tipAtMs: old, now, contained: false }).reason).toBe('content missing from main')
+    expect(branchVerdict({ name, tipAtMs: old, now, contained: null }).reason).toBe('containment unknown')
+    expect(branchVerdict({ name, tipAtMs: NaN, now, contained: true }).reason).toBe('tip date unknown')
+    expect(branchVerdict({ name: 'feat/1-x', tipAtMs: old, now, contained: true }).act).toBe(false)
+  })
+
+  it('deletes a claude/* branch only when its archived point is closed', () => {
+    const v = (over) => branchVerdict({ name: 'claude/skirt-a', tipAtMs: old, now, contained: true, archiveText: archive, workOrder, ...over })
+    expect(v({})).toEqual({ act: true, rule: 'branch-cloud', point: 1485 })
+    expect(v({ name: 'claude/unnamed' }).act).toBe(false)
+    expect(v({ workOrder: { ok: false } }).act).toBe(false)
+    expect(v({ workOrder: parseWorkOrder('- [ ] 1485. Reopened\n', archive) }).reason).toBe('point 1485 not closed')
+    expect(v({ contained: false }).act).toBe(false)
   })
 })
