@@ -9,6 +9,7 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   utimesSync,
@@ -532,6 +533,29 @@ describe('review regressions', () => {
     expect(existsSync(join(a.tmp, 'hoa-accepted.log'))).toBe(true)
     expect(existsSync(join(a.tmp, 'hoa-open.log'))).toBe(true)
     expect(existsSync(join(a.tmp, 'hoa-free.log'))).toBe(false)
+  })
+
+  it('revalidation follows the per-candidate process scan: a directory replaced during it stays', () => {
+    const a = arena()
+    const c = cache(a, 'Ab12Cd34Ef')
+    let calls = 0
+    const readProcesses = () => {
+      // Call 1 is the step snapshot; call 2 is the per-candidate scan, during
+      // which another process swaps the directory. The original is moved aside
+      // first so the replacement cannot reuse its inode.
+      if (++calls === 2) {
+        renameSync(c, `${c}.aside`)
+        put(join(c, 'ssr/new.js'), 'replacement')
+        put(join(c, 'web/new.js'), 'replacement')
+        age(c)
+        rmSync(`${c}.aside`, { recursive: true })
+      }
+      return { ok: true, openPaths: [], cmdlines: [] }
+    }
+    run(a, { steps: ['tmp'], readProcesses })
+    expect(calls).toBe(2)
+    expect(readFileSync(join(c, 'ssr/new.js'), 'utf8')).toBe('replacement')
+    expect(manifest(a).find((l) => l.path?.endsWith('Ab12Cd34Ef'))?.reason).toBe('replaced')
   })
 
   it('/tmp: unreadable reference docs skip the step', () => {

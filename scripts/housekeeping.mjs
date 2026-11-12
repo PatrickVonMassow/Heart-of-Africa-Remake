@@ -491,11 +491,11 @@ export function runHousekeeping({
     const dfBefore = { repo: freeBytes(repoRoot), tmp: freeBytes(tmpRoot) }
 
     /** Delete (or, dry, plan) one revalidated target. Liveness is read AFRESH
-     *  for every candidate, right before it goes: a step-wide snapshot would be
-     *  minutes old by the last entry. Unknown liveness keeps. */
+     *  for every candidate: a step-wide snapshot would be minutes old by the
+     *  last entry. Unknown liveness keeps. The filesystem revalidation comes
+     *  AFTER that scan, directly before removal: the /proc walk takes time in
+     *  which the target can be replaced. */
     const remove = (path, ident, rootCanonical, rule, size) => {
-      const bad = revalidate(path, ident, rootCanonical)
-      if (bad) return emit({ path, size, rule, outcome: 'kept', reason: bad })
       let fresh
       try {
         fresh = readProcesses()
@@ -507,6 +507,8 @@ export function runHousekeeping({
         return emit({ path, size, rule, outcome: 'kept', reason: 'liveness unknown' })
       }
       if (heldOpen(path, fresh.openPaths)) return emit({ path, size, rule, outcome: 'kept', reason: 'held open by a live process' })
+      const bad = revalidate(path, ident, rootCanonical)
+      if (bad) return emit({ path, size, rule, outcome: 'kept', reason: bad })
       if (dryRun) {
         plannedBytes += size
         return emit({ path, size, rule, outcome: 'would-delete' })
