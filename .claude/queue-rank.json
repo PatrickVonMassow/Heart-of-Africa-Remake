@@ -1862,12 +1862,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1509": {
-      "at": "2026-11-12T15:52:23.631Z",
-      "why": "user order 12.11.2026: ganz vorne in der Queue",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1510": {
       "at": "2026-11-12T16:04:11.746Z",
       "why": "user order 12.11.2026: directly behind 1509",
@@ -1901,7 +1895,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-12T17:37:13.430Z",
+    "at": "2026-11-12T19:24:03.045Z",
     "points": [
       184,
       200,
@@ -2360,7 +2354,6 @@
       1503,
       1507,
       1508,
-      1509,
       1510,
       1511
     ]
