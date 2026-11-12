@@ -77,6 +77,15 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1512. Let the housekeeping run work in the container: unreadable fd tables of foreign-uid processes must not void the process table, then run the one-off pass and report sizes
+  Continuation of user request 12.11.2026 for the landed point 1509 ("Freigegeben"; "ganz vorne in der Queue"). Rank: at the front, directly before 1510.
+  Defect (reproduced 12.11.2026 20:34 on main b3fb2a5): `node scripts/housekeeping.mjs --dry-run --git off` returns outcome failed with failures proc-unreadable x3; every step (tmp, local, logs, git) is skipped. Cause: readProcessTable (scripts/housekeeping.mjs) sets ok:false on any EACCES; the container's root-owned keep-alive shells (uid 0, /bin/sh, e.g. pids 44/50/144) have fd directories the project user (uid 1000) cannot list. The script can therefore never act in its real environment.
+  Fix:
+  1. An EACCES on the fd/cwd of a process whose owner uid differs from the running uid is recorded (count in the manifest) and does not set ok:false; an unreadable /proc listing, an unreadable entry of an own-uid process, or an unreadable cmdline stays fail-closed. Regression test with an injected foreign-uid EACCES entry; existing fail-closed tests stay green. Cross-vendor review of the change.
+  2. After landing, the owner runs the one-off pass on main on a quiet machine: --dry-run first and review the manifest, then the real run with --git full.
+  Final state: before/after sizes per item (/tmp, local/, .git, df) are reported to the user. Measured before on 12.11.2026 20:34: .git 26G, local/ 3.8G, /tmp 7.4G, / 86G used.
+  Bundle: unbundled.
+
 - [ ] 1510. Count freshly commissioned branches as occupied slots: a branch at its main cut point or with unfetched cloud commits holds a slot
   User request 12.11.2026 ("Ja, reihe das ein. Und bei der Gelegenheit noch eine Änderung: Die Angaben zu den Slots sollen in einer neuen Zeile landen - nicht in der gleichen wie der Text "Woran ich gerade arbeite". Zudem soll er verkürzt werden: "3/3" anstatt "3 von 3""). Rank: directly behind 1509.
   Defect (reproduced 12.11.2026 16:59): the board slot line said "3 von 3 Slots frei: Grund nicht messbar (Dateien der laufenden Arbeit nicht lesbar)" while point 1490 was in active work by a cloud author. Cause: openFeatBranches (scripts/batch-in-flight.mjs) lists only `git for-each-ref --no-merged main`. The local and origin-tracking ref of feat/1490-head-load-porter still pointed at its main cut point d98c729aa (cloud commits f516e78 on the remote, not fetched), so git treats the branch as merged and it holds no slot. The same census feeds batch-in-flight's own slot decision, so the batch may also start work into slots that are in truth occupied.
