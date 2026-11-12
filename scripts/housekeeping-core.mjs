@@ -229,16 +229,24 @@ export function heldOpen(path, openPaths) {
   return false
 }
 
+/** The cheap part of the /tmp verdict, before any traversal: rule and shape. */
+export function tmpShapeVerdict({ name, isSymlink, shape }) {
+  if (isSymlink) return { ok: false, reason: 'symlink' }
+  const rule = tmpCandidateRule(name)
+  if (!rule) return { ok: false, reason: 'no rule' }
+  if (rule === 'tmp-vite-cache' && !isViteCacheShape(shape)) return { ok: false, reason: 'not a cache shape' }
+  return { ok: true, rule }
+}
+
 /**
  * The /tmp verdict for one top-level entry.
  *   facts: { name, isSymlink, newestMtimeMs, complete, shape?, canonical }
  *   liveness: { ok, openPaths } — ok=false skips the whole step upstream
  */
 export function tmpVerdict(facts, { now, liveness, maxAgeMs = TMP_MAX_AGE_MS }) {
-  if (facts.isSymlink) return { act: false, reason: 'symlink' }
-  const rule = tmpCandidateRule(facts.name)
-  if (!rule) return { act: false, reason: 'no rule' }
-  if (rule === 'tmp-vite-cache' && !isViteCacheShape(facts.shape)) return { act: false, reason: 'not a cache shape' }
+  const pre = tmpShapeVerdict(facts)
+  if (!pre.ok) return { act: false, reason: pre.reason }
+  const { rule } = pre
   if (!facts.complete) return { act: false, reason: 'scan incomplete' }
   if (!Number.isFinite(facts.newestMtimeMs)) return { act: false, reason: 'mtime unknown' }
   if (now - facts.newestMtimeMs <= maxAgeMs) return { act: false, reason: 'young' }

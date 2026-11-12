@@ -52,6 +52,7 @@ import {
   parseWorktreeList,
   spawnDecision,
   summaryLine,
+  tmpShapeVerdict,
   tmpVerdict,
   toolLogVerdict,
   touchesWorktree,
@@ -445,6 +446,7 @@ export function runHousekeeping({
         fail(`${step}-unreadable`, `${dir}: ${e?.code || e}`)
         return 'unreadable'
       }
+      let first = true
       for (const name of names) {
         if (budget.exhausted()) {
           complete = false
@@ -452,6 +454,16 @@ export function runHousekeeping({
           return 'incomplete'
         }
         visit(name)
+        // A visit the budget cut short kept its entry as "scan incomplete": the
+        // cursor stays before it so the next run sees it again — unless it was
+        // this run's first entry, which alone outgrows the budget and would
+        // otherwise block every later run.
+        if (budget.exhausted() && !first) {
+          complete = false
+          writeState({ cursor })
+          return 'incomplete'
+        }
+        first = false
         cursor[step] = name
       }
       cursor[step] = null
@@ -466,14 +478,16 @@ export function runHousekeeping({
       if (workOrder) return
       let tasks = null
       let archive = null
+      let readOk = false
       try {
         tasks = readFileSync(join(repoRoot, 'TASKS.md'), 'utf8')
         archive = readFileSync(join(repoRoot, 'docs/tasks-archive.md'), 'utf8')
+        readOk = true
       } catch (e) {
         fail('work-order-unreadable', String(e?.code || e))
       }
       workOrder = parseWorkOrder(tasks, archive)
-      if (!workOrder.ok && tasks !== null) fail('work-order-unparseable', workOrder.reason)
+      if (!workOrder.ok && readOk) fail('work-order-unparseable', workOrder.reason)
       try {
         const docs = REFERENCE_DOCS.map((d) => readFileSync(join(repoRoot, d), 'utf8'))
         refTexts = workOrder.ok ? [workOrder.openText, ...docs] : null
@@ -516,11 +530,8 @@ export function runHousekeeping({
           budget.spend(1)
           const isSymlink = st.isSymbolicLink()
           const shape = !isSymlink && st.isDirectory() && !/^(hoa|point)-/.test(name) ? describeShape(path, name) : null
-          const pre = tmpVerdict(
-            { name, isSymlink, shape, complete: true, newestMtimeMs: Infinity, canonical: path },
-            { now: clock(), liveness: live },
-          )
-          if (!pre.act && pre.reason !== 'young') {
+          const pre = tmpShapeVerdict({ name, isSymlink, shape })
+          if (!pre.ok) {
             if (!SILENT.has(pre.reason)) emit({ path, size: st.size, rule: 'tmp', outcome: 'kept', reason: pre.reason })
             return
           }
