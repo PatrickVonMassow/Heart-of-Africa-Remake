@@ -770,6 +770,8 @@ export function runHousekeeping({
           continue
         }
         if (!livenessGate('logs')) continue
+        const logWorktrees = needWorktrees('logs')
+        if (!logWorktrees) continue
         const root = safeRepoRoot('logs', [localRoot, join(localRoot, 'tool-output-logs')])
         if (!root || root === 'absent') {
           stepResults.logs = 'skipped'
@@ -790,6 +792,8 @@ export function runHousekeeping({
             if (!SILENT.has(v.reason)) emit({ path, size: st.size, rule: 'tool-log-age', outcome: 'kept', reason: v.reason })
             return
           }
+          if (touchesWorktree(path, logWorktrees))
+            return emit({ path, size: st.size, rule: v.rule, outcome: 'kept', reason: 'git worktree' })
           remove(path, st, root, v.rule, st.size)
         })
         if (stepResults.logs === 'incomplete') break

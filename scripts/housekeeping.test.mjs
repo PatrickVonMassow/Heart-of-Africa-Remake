@@ -558,6 +558,24 @@ describe('review regressions', () => {
     expect(manifest(a).find((l) => l.path?.endsWith('Ab12Cd34Ef'))?.reason).toBe('replaced')
   })
 
+  it('tool-output-logs: a registered worktree rooted there keeps its old files', () => {
+    const a = arena()
+    put(join(a.local, 'tool-output-logs/old.log'))
+    age(join(a.local, 'tool-output-logs/old.log'))
+    const wt = join(realpathSync(a.local), 'tool-output-logs')
+    run(a, { steps: ['logs'], readWorktrees: () => `worktree ${a.repo}\n\nworktree ${wt}\n` })
+    expect(existsSync(join(wt, 'old.log'))).toBe(true)
+  })
+
+  it('tool-output-logs: an unreadable worktree list skips the step', () => {
+    const a = arena()
+    put(join(a.local, 'tool-output-logs/old.log'))
+    age(join(a.local, 'tool-output-logs/old.log'))
+    const { r } = run(a, { steps: ['logs'], readWorktrees: () => null })
+    expect(r.steps.logs).toBe('skipped')
+    expect(existsSync(join(a.local, 'tool-output-logs/old.log'))).toBe(true)
+  })
+
   it('/tmp: unreadable reference docs skip the step', () => {
     const a = arena({ archive: false })
     put(join(a.tmp, 'hoa-old.log'))
