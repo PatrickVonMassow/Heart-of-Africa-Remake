@@ -130,6 +130,8 @@ change) and 449 last, because the drill is what makes the others more than a cla
   local/, git gc); host housekeeping in the main tree, so no feature bundle shares its files.
 - **#1512** — the housekeeping process-table blocker found on the first real run of point 1509
   (12.11.2026); it edits scripts/housekeeping.mjs only and runs the one-off pass afterwards.
+- **#1513** — the user's origin branch cleanup of 12.11.2026 (rescue/doctor, claude/* and merged
+  feat branches); branch hygiene and housekeeping scripts, so no feature bundle shares its files.
 - **#1510** — the user's slot-census and slot-line order of 12.11.2026; it edits
   `scripts/batch-in-flight.mjs` and the board slot line, so no feature bundle shares its files.
 - **#1511** — the request-drain order finding of 12.11.2026; it edits the point start/claim path
