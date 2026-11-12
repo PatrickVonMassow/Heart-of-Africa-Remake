@@ -52,6 +52,9 @@ import { insideRoot, normPath } from './worktree-cleanup-core.mjs'
  *  checkout. A worktree anywhere else was not created by a delegation. */
 export const AGENT_WORKTREE_DIR = '.claude/worktrees'
 
+/** Where `scripts/verify/baseline-classify.mjs` keeps its detached checkouts. */
+export const BASELINE_WORKTREE_DIR = 'local/verify-baseline'
+
 /** Where git keeps the administrative record of a LINKED worktree of this
  *  repository. A checkout whose `.git` does not point in here is some other
  *  repository that merely sits at that path. */
@@ -101,6 +104,37 @@ export function isAgentWorktree(path, mainRoot) {
   if (!insideRoot(path, dir)) return false
   const rest = normPath(path).slice(dir.length + 1)
   return !rest.includes('/') && AGENT_DIR_NAME.test(baseName(path))
+}
+
+/**
+ * Is this path the owner's worktree of the point being landed? PURE.
+ *
+ * A DIRECT child of `<mainRoot>/.claude/worktrees` named `point-<N>`, checked out
+ * on `feat/<N>-…` of the same N (point 1513: the landings of 1509 and 1512 kept
+ * these, and with them their branches). The death proofs still apply in full.
+ */
+export function isPointWorktree(path, mainRoot, branch) {
+  const root = normPath(mainRoot)
+  if (!root) return false
+  const dir = `${root}/${AGENT_WORKTREE_DIR}`
+  if (!insideRoot(path, dir) || normPath(path).slice(dir.length + 1).includes('/')) return false
+  const n = /^point-(\d+)$/.exec(baseName(path))?.[1]
+  return Boolean(n) && str(branch).startsWith(`feat/${n}-`)
+}
+
+/**
+ * Is this path a verify-baseline checkout? PURE.
+ *
+ * A DIRECT child of `<mainRoot>/local/verify-baseline`, which
+ * `scripts/verify/baseline-classify.mjs` creates `--detach` on a fixed sha and
+ * reuses; it never carries a branch being rebased. Judged as foreign, because as
+ * unproven it kept the branch of every landing while it stood (point 1513).
+ */
+export function isBaselineWorktree(path, mainRoot) {
+  const root = normPath(mainRoot)
+  if (!root) return false
+  const dir = `${root}/${BASELINE_WORKTREE_DIR}`
+  return insideRoot(path, dir) && !normPath(path).slice(dir.length + 1).includes('/') && normPath(path) !== dir
 }
 
 /**
@@ -155,6 +189,7 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
   const want = str(branch)
   const has = str(worktree?.branch)
   const agent = isAgentWorktree(path, mainRoot)
+  const own = agent || isPointWorktree(path, mainRoot, want)
   const at = (disposition, reason) => ({ path, branch: has, disposition, reason })
 
   if (!path) return at(DISPOSITION.unproven, 'git named a worktree without a path')
@@ -176,6 +211,9 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
 
   // ── OWNERSHIP ──────────────────────────────────────────────────────────────
   if (!want) return at(DISPOSITION.unproven, 'the landing named no branch, so nothing can be tied to it')
+  if (!has && isBaselineWorktree(path, mainRoot)) {
+    return at(DISPOSITION.foreign, 'a verify-baseline checkout, detached by construction')
+  }
   if (!has) {
     // A DETACHED TREE IS UNPROVEN WHEREVER IT SITS (whole-branch review, finding 5).
     // A detached HEAD reports no branch, so nothing here can tell a tree that is
@@ -194,12 +232,13 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
     )
   }
   if (has !== want) return at(DISPOSITION.foreign, `checked out on ${has}, not on ${want}`)
-  if (!agent) {
-    // The branch matches, but this is not a tree the isolation harness made, so
-    // removing it is not cleanup — it is deleting someone's checkout.
+  if (!own) {
+    // The branch matches, but this is neither a tree the isolation harness made
+    // nor the point's own `point-<N>` tree, so removing it is not cleanup — it is
+    // deleting someone's checkout.
     return at(
       DISPOSITION.unproven,
-      `on ${want}, but not a direct \`agent-<id>\` child of ${AGENT_WORKTREE_DIR}/ — the harness did not create it`,
+      `on ${want}, but neither an \`agent-<id>\` nor its \`point-<N>\` child of ${AGENT_WORKTREE_DIR}/ — the landing cannot tie it to the point`,
     )
   }
 

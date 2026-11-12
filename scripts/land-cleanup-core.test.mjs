@@ -176,6 +176,50 @@ describe('ownership must be PROVEN', () => {
     expect(v.reason).toContain(AGENT_WORKTREE_DIR)
   })
 
+  it("the point's own dead `point-<N>` tree is removed and its branch deleted (point 1513)", () => {
+    // The landings of 1509 and 1512 kept `.claude/worktrees/point-<N>` as
+    // "not harness-made", and with it both branches, while the verify-baseline
+    // checkout kept the branch of every landing.
+    const own = { path: `${ROOT}/${AGENT_WORKTREE_DIR}/point-608`, branch: 'feat/608-x' }
+    const baseline = { path: `${ROOT}/local/verify-baseline/db74de7ddbe9`, branch: '' }
+    const sel = selectCleanupTargets({
+      ...base,
+      worktrees: [{ path: ROOT, branch: 'main' }, own, baseline],
+      evidence: { [own.path]: deadFor('point-608') },
+    })
+    expect(sel.remove).toEqual([own.path])
+    expect(sel.reported).toEqual([])
+    expect(sel.branch.delete).toBe(true)
+  })
+
+  it('a `point-<N>` tree of another point, nested or on another N, is not the landed one', () => {
+    for (const path of [
+      `${ROOT}/${AGENT_WORKTREE_DIR}/point-609`,
+      `${ROOT}/${AGENT_WORKTREE_DIR}/point-60`,
+      `${ROOT}/${AGENT_WORKTREE_DIR}/point-608/nested`,
+    ]) {
+      const v = judgeCleanupTarget({ ...base, worktree: { path, branch: 'feat/608-x' }, evidence: deadFor('p') })
+      expect(v.disposition).toBe(DISPOSITION.unproven)
+    }
+  })
+
+  it("the point's `point-<N>` tree still has to be proven dead", () => {
+    const own = { path: `${ROOT}/${AGENT_WORKTREE_DIR}/point-608`, branch: 'feat/608-x' }
+    const v = judgeCleanupTarget({ ...base, worktree: own, evidence: { ...deadFor('point-608'), dirty: true } })
+    expect(v.disposition).toBe(DISPOSITION.live)
+  })
+
+  it('only a DIRECT verify-baseline child counts as baseline; one on a branch is judged by its branch', () => {
+    const nested = { path: `${ROOT}/local/verify-baseline/a/b`, branch: '' }
+    expect(judgeCleanupTarget({ ...base, worktree: nested, evidence: deadFor('n') }).disposition).toBe(
+      DISPOSITION.unproven,
+    )
+    const onBranch = { path: `${ROOT}/local/verify-baseline/abc`, branch: 'feat/608-x' }
+    expect(judgeCleanupTarget({ ...base, worktree: onBranch, evidence: deadFor('n') }).disposition).toBe(
+      DISPOSITION.unproven,
+    )
+  })
+
   it('a NESTED checkout under the agent directory is not an agent worktree', () => {
     // Review finding 3: every DESCENDANT used to qualify.
     const nested = { path: `${ROOT}/${AGENT_WORKTREE_DIR}/agent-a/nested`, branch: 'feat/608-x' }
