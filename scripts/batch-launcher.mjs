@@ -51,6 +51,7 @@ import {
 import { initialStallState, judgeSleep, judgeTick, markAlertDelivered } from './launcher-stall-core.mjs'
 import { resumeArmDecision } from './batch-launcher-core.mjs'
 import { notify } from './notify.mjs'
+import { spawnHousekeepingIfDue } from './housekeeping.mjs'
 import { LOCK_PATH, assessOwner, bootTimeMs, readOwnerLock } from './batch-singleton.mjs'
 
 const LAUNCHER_RECORD_PATH = repoPath('.claude/batch-launcher.json')
@@ -252,6 +253,11 @@ export async function runDaemon({
   // its own fetch, but the ladder import and any injected channel do not, and
   // an unbounded await here would stall the very loop this alarm watches over.
   alertTimeoutMs = ALERT_SEND_TIMEOUT_MS,
+  // HOUSEKEEPING (point 1509): after a tick, at most once per 24 h, SPAWN
+  // scripts/housekeeping.mjs detached. Synchronous and never awaited: one small
+  // JSON read and a spawn, no traversal here. Null (the default) does nothing,
+  // so only the real `--daemon` entry wires it and no test daemon cleans a disk.
+  housekeep = null,
 } = {}) {
   const existing = launcherState({ recordPath, tickMs })
   if ((existing.state === 'ready' || existing.state === 'running') && Number(existing.record?.pid) !== process.pid) {
@@ -275,6 +281,7 @@ export async function runDaemon({
   // that could not spawn from waking itself again five seconds later.
   let lastSignal = null
   let lastWakeAt = 0
+  let housekeepingSpawnAt = 0
   /** Ownership as ONE comparable string, or null when the lock could not be read
    *  at all — a watcher that cannot read must never take the launcher down, so
    *  the failure is logged and the 15-minute tick carries on as the backstop. */
@@ -394,6 +401,17 @@ export async function runDaemon({
       if (verdict.recovery) await speak('recovery notice', verdict.recovery)
     }
     lastTickAt = Date.now()
+    if (housekeep) {
+      try {
+        const r = housekeep({ now: Date.now(), lastSpawnAt: housekeepingSpawnAt })
+        if (r && r.spawned) {
+          housekeepingSpawnAt = r.lastSpawnAt
+          appendLog(logPath, `housekeeping spawned (${r.reason})`)
+        }
+      } catch (e) {
+        appendLog(logPath, `housekeeping spawn failed: ${(e && e.message) || e}`)
+      }
+    }
     if (!publish({ tickInFlight: false })) return leave()
     if (stopping) break
     // Interruptible, and WATCHFUL: a stop signal must not have to wait out a whole
@@ -655,7 +673,7 @@ if (isMainModule(import.meta.url)) {
     if (process.platform === 'win32') refuseOnWindows()
     if (inWorktree()) refuseWorktree()
     try {
-      await runDaemon()
+      await runDaemon({ housekeep: spawnHousekeepingIfDue })
     } catch (e) {
       console.error((e && e.message) || String(e))
       process.exit(1)
