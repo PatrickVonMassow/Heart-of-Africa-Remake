@@ -33,7 +33,6 @@ import { applyFigurePose, type FigureLimbs } from '../../render/figurePose'
 import {
   advanceGesture,
   aimAt,
-  armAim,
   digPose,
   fillPose,
   fillSquat,
@@ -62,7 +61,8 @@ import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
+import { PORTER_WALK, START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
+import { planPorterRoutes, startPorter, stepPorter, type PorterState } from './porterWalk'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
@@ -1904,57 +1904,64 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   )
 }
 
-/** Porters carrying crates between the port buildings and the plaza. */
+/** Porters carrying crates on the head between a port building's entrance
+ *  and the plaza, along walkable routes at a steady head-load pace. */
 function Porters({
   seed,
   stops,
   cloth,
   colliders,
+  radius,
+  bank,
+  observed,
   count = 3,
 }: {
   seed: number
   stops: Array<[number, number]>
   cloth: string[]
   colliders: Collider[]
+  radius: number
+  bank: PlaceRiverBank | null
+  observed?: readonly ObservedGround[]
   count?: number
 }) {
   const groundHeight = usePlaceGround()
-  const routes = useMemo(() => {
-    const rand = mulberry32((seed + 4711) >>> 0)
-    const n = Math.min(count, Math.max(1, stops.length))
-    return Array.from({ length: n }, (_, i) => {
-      const a = stops[i % stops.length]
-      // Routes lead across the central plaza so the bustle stays in view.
-      const px = (rand() - 0.5) * 7
-      const pz = (rand() - 0.5) * 7
-      const toCenter = Math.hypot(a[0], a[1]) || 1
-      return {
-        ax: a[0] * (1 - 3.2 / toCenter),
-        az: a[1] * (1 - 3.2 / toCenter),
-        bx: px,
-        bz: pz,
-        phase: rand() * Math.PI * 2,
-        speed: 0.55 + rand() * 0.2,
-      }
-    })
-  }, [seed, stops, count])
+  const nav = useMemo(
+    () => buildPlaceNavGrid({ radius, bank, observed }, colliders, NPC_RADIUS),
+    [radius, bank, observed, colliders],
+  )
+  const routes = useMemo(
+    () => planPorterRoutes(nav, stops, mulberry32((seed + 4711) >>> 0), count),
+    [nav, stops, seed, count],
+  )
+  const states = useRef<PorterState[]>([])
+  if (states.current.length !== routes.length) {
+    const rand = mulberry32((seed + 4712) >>> 0)
+    states.current = routes.map((r) => startPorter(r, rand))
+  }
   const refs = useRef<Array<THREE.Group | null>>([])
-  // The carrying pose (point 479): both arms forward and up, the hands at the
-  // crate's front corners. Constant — a porter holds the load, it does not wave.
-  const carry = useRef<FigurePose | null>({ left: armAim(0.3, 0.45), right: armAim(-0.3, 0.45), lean: 0.05, turn: 0 })
-  // Where each porter actually stands, so its move can be swept from there.
-  const pos = useRef<Array<{ x: number; z: number; yaw?: number; vx?: number; vz?: number } | null>>([])
   // The porters for the bug report's `placeLife` section, in every build.
   usePlaceLifeSource('porters', () => ({
-    inhabitants: pos.current.flatMap((p, i): PlaceLifeInhabitant[] => p ? [{
-      id: `porters/${i}`,
-      kind: 'porter',
-      x: p.x,
-      z: p.z,
-      velocity: p.vx !== undefined && p.vz !== undefined ? { x: p.vx, z: p.vz } : null,
-      yaw: p.yaw ?? null,
-      pose: 'carry',
-    }] : []),
+    inhabitants: states.current.map((p, i): PlaceLifeInhabitant => {
+      const r = routes[i]
+      const goal = p.leg === 0 ? r?.plaza : r?.entrance
+      return {
+        id: `porters/${i}`,
+        kind: 'porter',
+        x: p.x,
+        z: p.z,
+        velocity: { x: p.vx, z: p.vz },
+        yaw: p.yaw,
+        pose: p.pause > 0 ? 'pause' : 'carry',
+        errand: {
+          situation: 'porter',
+          phase: p.leg === 0 ? 'to-plaza' : 'to-entrance',
+          target: goal ? { x: goal.x, z: goal.z } : null,
+          arrived: p.pause > 0,
+          dwellRemaining: p.pause > 0 ? p.pause : null,
+        },
+      }
+    }),
   }))
   // The body each porter presents to the other inhabitants (point 578).
   const bodySet = useContext(InhabitantBodiesContext)
@@ -1963,30 +1970,26 @@ function Porters({
     () => ({ blocked: (px: number, pz: number) => !standingClear(colliders, px, pz, NPC_RADIUS) }),
     [colliders],
   )
-  useFrame(({ clock }, rawDt) => {
+  const walkRand = useMemo(() => mulberry32((seed + 4713) >>> 0), [seed])
+  useFrame((_, rawDt) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
-    const t = clock.elapsedTime
-    refs.current.forEach((g, i) => {
+    states.current.forEach((p, i) => {
+      const g = refs.current[i]
       const r = routes[i]
       if (!g || !r) return
-      // Ping-pong along the route; solid objects push the porter aside.
-      const u = (Math.sin(t * r.speed + r.phase) + 1) / 2
-      const x = r.ax + (r.bx - r.ax) * u
-      const z = r.az + (r.bz - r.az) * u
-      const dir = Math.cos(t * r.speed + r.phase) >= 0 ? 1 : -1
-      const p = (pos.current[i] ??= { x, z })
       const b = bodies[i]
-      // Point 657: where the route's next step lands in another inhabitant, the
-      // porter walks ROUND the body instead of discovering it by collision.
-      const want = b
-        ? stepRoundBodies(bodySet, b, p.x, p.z, x, z, balance.villageLife.separation, separationWorld.blocked)
-        : { x, z }
-      const [px0, pz0] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [p.x, p.z])
-      const fromX = p.x
-      const fromZ = p.z
-      p.x = px0
-      p.z = pz0
+      stepPorter(p, r, {
+        grid: nav,
+        // Point 657: another inhabitant on the way is walked ROUND.
+        move: (fx, fz, tx, tz) => {
+          const want = b
+            ? stepRoundBodies(bodySet, b, fx, fz, tx, tz, balance.villageLife.separation, separationWorld.blocked)
+            : { x: tx, z: tz }
+          return resolveMove(colliders, want.x, want.z, NPC_RADIUS, [fx, fz])
+        },
+        free: (x, z) => escapeToFree(colliders, x, z, NPC_RADIUS, nav, [r.entrance.x, r.entrance.z]).pos,
+      }, dt, walkRand)
       if (b) {
         b.x = p.x
         b.z = p.z
@@ -1994,39 +1997,43 @@ function Porters({
         p.x = b.x
         p.z = b.z
       }
-      // The frame's own displacement, for the bug report's velocity.
-      if (dt > 0) {
-        p.vx = (p.x - fromX) / dt
-        p.vz = (p.z - fromZ) / dt
-      }
-      const px = p.x
-      const pz = p.z
-      g.position.set(px, groundHeight(px, pz), pz)
-      // Turned about at the route's end at the spot-turn rate while the route
-      // carries it on, never flipped in a frame.
-      const heading = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
-      p.yaw = turnToward(p.yaw ?? heading, heading, VILLAGER_MOTION.spotTurnRate * dt)
+      devAssert(p.stalled <= PORTER_WALK.stallEscape + 0.5, 'porter-grinding',
+        () => `porters/${i} without progress for ${p.stalled.toFixed(1)} s at ${p.x.toFixed(2)}/${p.z.toFixed(2)}`)
+      g.position.set(p.x, groundHeight(p.x, p.z), p.z)
       g.rotation.y = p.yaw
     })
-  })
+  }, -1)
+  const crate = PORTER_WALK.crate
+  const pad = PORTER_WALK.pad
   return (
     <>
       {routes.map((r, i) => (
         <group
           key={i}
-          // Born at the start end of its route (point 509); the first frame moves
-          // it on to its phase point along the route.
-          position={figureStance({ x: r.ax, z: r.az })}
+          // Born at its route end (point 509), never at the settlement origin.
+          position={figureStance(states.current[i] ?? r.entrance)}
           ref={(el) => {
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[i % cloth.length]} pose={carry} role="porter" />
-          {/* Carried crate */}
-          <mesh name="porter-crate" position={[0, 1.05, 0.3]} castShadow>
-            <boxGeometry args={[0.45, 0.35, 0.35]} />
-            <meshStandardMaterial color="#7a5a32" roughness={0.9} />
-          </mesh>
+          {/* The crate rests on a folded-cloth pad on the crown, one hand steadying it. */}
+          <Figure
+            cloth={cloth[i % cloth.length]}
+            role="porter"
+            headSteady={steadiedLoad('crate', { bottom: crate.width / 2, top: crate.width / 2, height: pad.height + crate.height })}
+            headProp={
+              <>
+                <mesh name="porter-head-pad" position={[0, pad.height / 2, 0]} castShadow>
+                  <cylinderGeometry args={[pad.radius, pad.radius, pad.height, 10]} />
+                  <meshStandardMaterial color="#b9a27a" roughness={0.95} />
+                </mesh>
+                <mesh name="porter-crate" position={[0, pad.height + crate.height / 2, 0]} castShadow>
+                  <boxGeometry args={[crate.width, crate.height, crate.depth]} />
+                  <meshStandardMaterial color="#7a5a32" roughness={0.9} />
+                </mesh>
+              </>
+            }
+          />
         </group>
       ))}
     </>
@@ -4604,7 +4611,7 @@ export function PlaceLife({
               />
             </PlaceDumpGroup>
             <PlaceDumpGroup id="porters" kind="porters">
-              <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
+              <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} radius={radius} bank={bank} observed={observed} count={1 + size} />
             </PlaceDumpGroup>
             <PlaceDumpGroup id="traders" kind="traders">
               <Traders seed={localSeed} cloth={style.cloth} />
