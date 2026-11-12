@@ -388,7 +388,15 @@ try {
     }
   }
 } catch (e) {
-  console.error(`board-publish: slot line not refreshed (${e.message})`)
+  // A failed measurement is itself the unmeasurable state: shown and filed, never stale.
+  const text = 'Slotbelegung nicht messbar: Grund nicht messbar (Messung fehlgeschlagen)'
+  console.error(`board-publish: slot measurement failed (${e.message})`)
+  repoBytes = applySlotLine(repoBytes, text)
+  try {
+    fileUnmeasurableFinding(text)
+  } catch (f) {
+    console.error(`board-publish: slot finding not filed (${f.message})`)
+  }
 }
 // THE "VERTEILUNG" LINE (user request 24.10.2026): who built and reviewed each
 // card's point, and where, derived from trailers and the review ledger.

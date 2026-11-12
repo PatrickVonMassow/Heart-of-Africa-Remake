@@ -78,7 +78,8 @@ function freeSlotReason({ decision, specs, active, runningFiles }) {
     const ready = decision.candidates.slice(0, 5).map((c) => c.point).join(', ')
     return unmeasurable(`unabhängig bereit: ${ready}`)
   }
-  if (specs.length === 0) return { text: 'kein offener Punkt', unmeasurable: false }
+  // `specs` holds only the points no slot or active work already covers.
+  if (specs.length === 0) return { text: 'kein weiterer offener Punkt', unmeasurable: false }
   if (specs.every((p) => p.gated)) return { text: 'alle offenen Punkte warten auf deine Entscheidung', unmeasurable: false }
   if (!specs.some((p) => !p.gated && p.files.length > 0)) {
     return { text: 'kein offener Punkt nennt seine Dateien, Unabhängigkeit nicht prüfbar', unmeasurable: false }
@@ -171,7 +172,8 @@ export function applySlotLine(html, text) {
   const source = String(html ?? '')
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim()
   const span = clean ? `<span class="${SLOTS_CLASS}">${escapeText(clean)}</span>` : ''
-  return source.replace(NOW_SUMMARY_RE, `${NOW_HEADING}${span}</summary>`)
+  // A callback, so `$&`, `$'` and the like in a branch name stay literal text.
+  return source.replace(NOW_SUMMARY_RE, () => `${NOW_HEADING}${span}</summary>`)
 }
 
 /** The slot line currently shown, unescaped, or null. PURE. */

@@ -75,7 +75,7 @@ describe('slotLine — every variant of the heading line', () => {
   })
 
   it('no open point at all', () => {
-    expect(slotLine({ branches: [] }).text).toBe('3 von 3 Slots frei: kein offener Punkt')
+    expect(slotLine({ branches: [] }).text).toBe('3 von 3 Slots frei: kein weiterer offener Punkt')
   })
 
   it('no open point names its files', () => {
@@ -116,7 +116,7 @@ describe('slotLine — every variant of the heading line', () => {
       specs: [spec(327), spec(1463, ['scripts/elsewhere.mjs'])],
       runningFiles: ['scripts/p327.mjs'],
     })
-    expect(r.text).toBe('1 von 3 Slots frei: kein offener Punkt · blockiert durch: 1463 (ruht seit 2 Tagen)')
+    expect(r.text).toBe('1 von 3 Slots frei: kein weiterer offener Punkt · blockiert durch: 1463 (ruht seit 2 Tagen)')
   })
 
   it('branches without a point or outside the work order keep a measured label', () => {
@@ -172,6 +172,8 @@ describe('applySlotLine — the heading carries the line, the section contract h
   })
 
   it('keeps the board writers working on a heading that carries the line', () => {
+    const tokens = applySlotLine(boardHtml({ nowCards: [210] }), "blockiert durch: feat/$'x · $& · $1")
+    expect(readSlotLine(tokens)).toBe("blockiert durch: feat/$'x · $& · $1")
     const html = applySlotLine(boardHtml({ nowCards: [210] }), '2 von 3 Slots frei: kein offener Punkt')
     const { html: projected } = projectNowForPublish(html, { ok: true, points: [210], focusPoint: 210 }, { stamp: '12:00' })
     expect(readSlotLine(projected)).toBe('2 von 3 Slots frei: kein offener Punkt')
