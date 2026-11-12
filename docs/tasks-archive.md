@@ -36530,3 +36530,24 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
 
   Final state: one recorded decision on 1463 — continue (rebase onto main and work it), park (recorded park so it no longer counts as a slot), or close (delete branch and worktree, archive the point) — with what/why/veto effect recorded. If 1463 has no work-order line, give it one or record where it is tracked. The decision is presented to the user if it is a genuine choice without a clear recommendation.
   Bundle: unbundled.
+
+- [x] 1506. Board: show why pool slots sit unused
+  Rank directly AFTER the two front requests of 11.11.2026 (stale-branch cleanup, 1463 decision), ahead of 1490.
+
+  Keep the point headline / card title short (user, 22:29: a long title is "viel zu lang"), e.g. "Board: show why pool slots sit unused".
+
+  Dashboard extension (user order 11.11.2026, refined in chat 22:17-22:27). User goal, verbatim: "Ich will immer sehen, warum nicht maximal parallel gearbeitet wird."
+
+  Where: next to the section heading "Woran ich gerade arbeite" on the board (scripts/board-core.mjs ~line 646), on the same line.
+
+  Facts that shape it: a pool slot is occupied by an open feat/* branch (local + origin, deduplicated, parked excluded) — scripts/batch-in-flight.mjs ~782-797, POOL_CAP = 3. An agent does not occupy a slot of its own. More branches than the cap is possible (11.11.: 5 branches, cap 3, only 327 actually worked on).
+
+  Final state — the heading line ALWAYS explains why fewer than POOL_CAP points are worked in parallel:
+  - Do NOT repeat the point(s) in active work; the section below already shows them.
+  - Show free slots as "N von 3 Slots frei" (never a misleading x/y above the cap).
+  - List every branch that occupies a slot WITHOUT active work, with its measured state, e.g. "blockiert durch: 1341, 1482, 1485 (erledigt, Branch nicht gelöscht) · 1463 (ruht seit 10 Tagen)".
+  - For free but unused slots, show the measured reason, taken from the same logic batch-in-flight uses for the slot decision (slotReasonDecision / independentOpenPoints / closingFreezeActive etc.), e.g. "kein offener Punkt unabhängig von 327", "Abschluss läuft, Code eingefroren".
+  - When no reason is measurable, show "Grund nicht messbar" visibly and file it as a finding — never a filler text and never agent-written free text (the point-427 reason demand died of boilerplate; see point 1452).
+  - At full use: "3 von 3 Slots in Arbeit".
+  Values are measured at board render time. German visible wording. Board guards and section contract stay valid (update their tests); unit tests for each line variant above.
+  Bundle: unbundled.

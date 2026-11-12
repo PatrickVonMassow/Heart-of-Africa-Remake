@@ -77,27 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1506. Board: show why pool slots sit unused
-  Rank directly AFTER the two front requests of 11.11.2026 (stale-branch cleanup, 1463 decision), ahead of 1490.
-
-  Keep the point headline / card title short (user, 22:29: a long title is "viel zu lang"), e.g. "Board: show why pool slots sit unused".
-
-  Dashboard extension (user order 11.11.2026, refined in chat 22:17-22:27). User goal, verbatim: "Ich will immer sehen, warum nicht maximal parallel gearbeitet wird."
-
-  Where: next to the section heading "Woran ich gerade arbeite" on the board (scripts/board-core.mjs ~line 646), on the same line.
-
-  Facts that shape it: a pool slot is occupied by an open feat/* branch (local + origin, deduplicated, parked excluded) — scripts/batch-in-flight.mjs ~782-797, POOL_CAP = 3. An agent does not occupy a slot of its own. More branches than the cap is possible (11.11.: 5 branches, cap 3, only 327 actually worked on).
-
-  Final state — the heading line ALWAYS explains why fewer than POOL_CAP points are worked in parallel:
-  - Do NOT repeat the point(s) in active work; the section below already shows them.
-  - Show free slots as "N von 3 Slots frei" (never a misleading x/y above the cap).
-  - List every branch that occupies a slot WITHOUT active work, with its measured state, e.g. "blockiert durch: 1341, 1482, 1485 (erledigt, Branch nicht gelöscht) · 1463 (ruht seit 10 Tagen)".
-  - For free but unused slots, show the measured reason, taken from the same logic batch-in-flight uses for the slot decision (slotReasonDecision / independentOpenPoints / closingFreezeActive etc.), e.g. "kein offener Punkt unabhängig von 327", "Abschluss läuft, Code eingefroren".
-  - When no reason is measurable, show "Grund nicht messbar" visibly and file it as a finding — never a filler text and never agent-written free text (the point-427 reason demand died of boilerplate; see point 1452).
-  - At full use: "3 von 3 Slots in Arbeit".
-  Values are measured at board render time. German visible wording. Board guards and section contract stay valid (update their tests); unit tests for each line variant above.
-  Bundle: unbundled.
-
 - [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
    Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
    Evidence 2: /backup/hoa/local/hoa-state-2026-11-11-1117999851.zip (seed 1117999851, place tangier, x/z -58.71/-356.97, webgpu, build ed95b5b). User text: "Hängt mit Kopf in der Kiste, sodass er nichts sehen kann und läuft sinnlos hin und her und immer wieder gegen die Wände". placeLife shows porters with no errand/target (unlike the errand walkers beside them).
