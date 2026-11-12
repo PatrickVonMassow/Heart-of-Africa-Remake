@@ -127,7 +127,7 @@ put it is the mistake this line exists to stop.
   User approved filing ("ja", 12.11.2026 17:50). Measured 12.11.2026: (1) request 'Shrink the project's disk footprint' deposited 16:13, batch owner commissioned 1490 at ~16:14 and queued the request as 1509 only at 16:53. (2) request 'Amend 1509: daily token-free housekeeping script' deposited 17:10, still pending at 17:49 while the next owner session (started 17:28) began 1509 under the old spec and already deleted local/ entries the amendment would have kept (seven local/villager-build-1342*/-1347 Blender isolation builds; parked feat/1342-natural-motion-b waits on such builds). Expected: before pulling or starting any point (and before destructive steps of a point), the owner drains pending user requests from the findings carrier, and a pending request that names the point being worked takes effect first.
   Data risk: user-ordered restrictions were bypassed and unrecoverable local data was deleted.
   Test: a Vitest case where a pending carrier request names the point about to start, and the start/claim path refuses until it is appended.
-  Bundle: Session- & Repo-Hygiene.
+  Bundle: unbundled.
 
 - [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
    Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
