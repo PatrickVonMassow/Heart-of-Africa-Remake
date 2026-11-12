@@ -545,7 +545,10 @@ export function auditDashboard(html, input = {}) {
   // only pins that each wrapper still EXISTS: a republish that dropped one would
   // silently unfold that section again.
   for (const title of COLLAPSIBLE_SECTIONS) {
-    const wrapped = new RegExp(`<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*</summary>`).test(html)
+    // The derived slot line may stand beside the heading inside its summary.
+    const wrapped = new RegExp(
+      `<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*(?:<span class="slots">[^<]*</span>\\s*)?</summary>`,
+    ).test(html)
     if (!wrapped && html.includes(`<h2>${title}</h2>`)) {
       v.push({
         code: 'section-not-collapsible',

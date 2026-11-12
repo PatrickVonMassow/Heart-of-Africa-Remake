@@ -72,6 +72,8 @@ import {
 import { readTasksAll } from './tasks-source.mjs'
 import { applyLivenessBlock } from './board-liveness-core.mjs'
 import { measureLiveness } from './board-liveness.mjs'
+import { applySlotLine } from './board-slots-core.mjs'
+import { fileUnmeasurableFinding, measureSlotLine } from './board-slots.mjs'
 import { renderCardDistributions } from './board-distribution-core.mjs'
 import { cardPoints, gatherDistributionLines } from './board-distribution.mjs'
 import {
@@ -317,8 +319,9 @@ const fail = (reason) => {
   } catch {
     queueData = null
   }
+  const activeWork = gatherActiveWorkSource({ tasksText })
   try {
-    repoBytes = projectNowForPublish(repoBytes, gatherActiveWorkSource({ tasksText }), {
+    repoBytes = projectNowForPublish(repoBytes, activeWork, {
       knownPoints: openPointNumbers(tasksText),
       queueData,
       titles: parseTaskTitles(tasksText),
@@ -370,6 +373,22 @@ try {
   // A publish must never be blocked by the footer; the audit still catches a
   // stale one, and saying why beats failing silently.
   console.error(`board-publish: footer not refreshed (${e.message})`)
+}
+// THE SLOT LINE (user order 11.11.2026): beside "Woran ich gerade arbeite", why
+// fewer than POOL_CAP points are worked in parallel, measured now. An
+// unmeasurable reason is shown as such and filed as a finding, once.
+try {
+  const slots = measureSlotLine({ tasksText, allTasksText: readTasksAll(), activePoints: activeWork.points })
+  repoBytes = applySlotLine(repoBytes, slots.text)
+  if (slots.unmeasurable) {
+    try {
+      fileUnmeasurableFinding(slots.text)
+    } catch (e) {
+      console.error(`board-publish: slot finding not filed (${e.message})`)
+    }
+  }
+} catch (e) {
+  console.error(`board-publish: slot line not refreshed (${e.message})`)
 }
 // THE "VERTEILUNG" LINE (user request 24.10.2026): who built and reviewed each
 // card's point, and where, derived from trailers and the review ledger.

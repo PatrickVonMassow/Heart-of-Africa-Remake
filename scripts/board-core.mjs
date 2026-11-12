@@ -348,6 +348,8 @@ details:not(.sect)[open]>summary::after{content:"▾"}
 .body .desc-missing{font-style:italic;color:var(--warn,#a85f28)}
 .body .dist-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin:8px 0 2px}
 .body .dist{font-size:.85em;color:var(--soft,#7c6c4d)}
+details.sect>summary:has(>.slots){display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.75em;row-gap:0}
+details.sect>summary>.slots{flex:1 1 12rem;min-width:0;font-size:.8em;font-weight:400;color:var(--soft,#7c6c4d);overflow-wrap:anywhere}
 </style>`
 
 const criticalityBadge = (level) =>
@@ -653,6 +655,9 @@ const HEAD = {
 /** The wrapper every section heading lives directly inside. */
 const SECT_OPEN = '<details class="sect">'
 
+/** What may follow a heading's `</h2>`: the derived slot line, then the summary's closer. */
+const SLOT_TAIL_RE = /^(?:<span class="slots">[^<]*<\/span>)?<\/summary>/
+
 /**
  * Where a section's content begins and ends. Throws rather than guessing.
  *
@@ -670,13 +675,16 @@ const SECT_OPEN = '<details class="sect">'
 function sectionBounds(html, key) {
   const head = HEAD[key]
   const text = String(html ?? '')
+  // The heading may carry the derived slot line beside its <h2> (board-slots-core).
+  const open = head.slice(0, -'</summary>'.length)
   const hits = []
-  for (let at = text.indexOf(head); at >= 0; at = text.indexOf(head, at + head.length)) {
-    if (text.slice(0, at).trimEnd().endsWith(SECT_OPEN)) hits.push(at)
+  for (let at = text.indexOf(open); at >= 0; at = text.indexOf(open, at + open.length)) {
+    const rest = SLOT_TAIL_RE.exec(text.slice(at + open.length))
+    if (rest && text.slice(0, at).trimEnd().endsWith(SECT_OPEN)) hits.push({ at, length: open.length + rest[0].length })
   }
   if (hits.length === 0) {
     throw new Error(
-      text.includes(head)
+      text.includes(open)
         ? `board: the ${key} section heading stands outside its <details class="sect"> wrapper — ` +
           'structural damage, refusing to guess the section'
         : `board: section not found: ${key}`,
@@ -685,7 +693,7 @@ function sectionBounds(html, key) {
   if (hits.length > 1) {
     throw new Error(`board: the ${key} section heading appears ${hits.length} times — refusing to guess the section`)
   }
-  const from = hits[0] + head.length
+  const from = hits[0].at + hits[0].length
   // THE SECTION ENDS AT ITS OWN CLOSER, COUNTED (ninth cross-vendor round).
   // Two cheaper answers were tried and both fail open: the next
   // `<details class="sect">` token can stand inside authored prose, and the

@@ -876,6 +876,17 @@ describe('derived now-section membership', () => {
     expect(compareNowProjection(intact, [700]).ok).toBe(true)
   })
 
+  it('reads the section behind a heading that carries the derived slot line, and only that span', () => {
+    const rest = `${sect('Von dir zu klären', '')}${sect('Warteschlange', '')}${sect('Erledigt', '')}`
+    const withTail = (tail) =>
+      `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2>${tail}</summary>\n` +
+      `${nowEntry(700, 'Echt', '20:07')}</details>\n${rest}</main>\n`
+    const slotted = withTail('<span class="slots">2 von 3 Slots frei: kein offener Punkt</span>')
+    expect(compareNowProjection(slotted, [700]).ok).toBe(true)
+    expect(reconcileNowProjection(slotted, [700])).toContain('<span class="slots">2 von 3 Slots frei: kein offener Punkt</span></summary>')
+    expect(() => reconcileNowProjection(withTail('<span class="t">fremd</span>'), [700])).toThrow(/outside its <details class="sect"> wrapper/)
+  })
+
   it('accepts a heading behind ANY amount of whitespace inside its wrapper — depth of indent is not damage', () => {
     // Eighth cross-review: the orphan check capped its lookback at 32
     // characters, so a legitimately deep indent between `<details
