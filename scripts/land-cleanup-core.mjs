@@ -23,7 +23,7 @@
 //
 // A worktree is removed only when BOTH halves are proven:
 //   OWNERSHIP — it is a DIRECT child of the isolation directory, named the way
-//     the harness names one; git's own record says it is a linked worktree OF
+//     the harness names one or as the landed point's `point-<N>`; git's own record says it is a linked worktree OF
 //     THIS repository; it is checked out on the very branch being landed; and its
 //     HEAD is already CONTAINED in what the landing merged. That last one is the
 //     only landing-specific identity that exists — the landing did not create the
@@ -123,18 +123,23 @@ export function isPointWorktree(path, mainRoot, branch) {
 }
 
 /**
- * Is this path a verify-baseline checkout? PURE.
+ * Is this worktree an idle verify-baseline checkout? PURE.
  *
  * A DIRECT child of `<mainRoot>/local/verify-baseline`, which
  * `scripts/verify/baseline-classify.mjs` creates `--detach` on a fixed sha and
- * reuses; it never carries a branch being rebased. Judged as foreign, because as
- * unproven it kept the branch of every landing while it stood (point 1513).
+ * names after that sha's first 12 characters. The path alone proves nothing — the
+ * tree could be rebasing the landed branch — so it counts only while unlocked and
+ * its HEAD still stands on the sha its name records; a rebase moves HEAD off it.
+ * As unproven it kept the branch of every landing while it stood (point 1513).
  */
-export function isBaselineWorktree(path, mainRoot) {
+export function isIdleBaselineWorktree(worktree, mainRoot) {
   const root = normPath(mainRoot)
-  if (!root) return false
+  const path = normPath(worktree?.path)
+  if (!root || !path || str(worktree?.locked)) return false
   const dir = `${root}/${BASELINE_WORKTREE_DIR}`
-  return insideRoot(path, dir) && !normPath(path).slice(dir.length + 1).includes('/') && normPath(path) !== dir
+  if (!insideRoot(path, dir) || path === dir || path.slice(dir.length + 1).includes('/')) return false
+  const name = baseName(path)
+  return /^[0-9a-f]{12}$/.test(name) && str(worktree?.head).startsWith(name)
 }
 
 /**
@@ -211,8 +216,8 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
 
   // ── OWNERSHIP ──────────────────────────────────────────────────────────────
   if (!want) return at(DISPOSITION.unproven, 'the landing named no branch, so nothing can be tied to it')
-  if (!has && isBaselineWorktree(path, mainRoot)) {
-    return at(DISPOSITION.foreign, 'a verify-baseline checkout, detached by construction')
+  if (!has && isIdleBaselineWorktree(worktree, mainRoot)) {
+    return at(DISPOSITION.foreign, 'a verify-baseline checkout, still on the sha its name records')
   }
   if (!has) {
     // A DETACHED TREE IS UNPROVEN WHEREVER IT SITS (whole-branch review, finding 5).

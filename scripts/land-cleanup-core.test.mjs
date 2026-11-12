@@ -181,7 +181,7 @@ describe('ownership must be PROVEN', () => {
     // "not harness-made", and with it both branches, while the verify-baseline
     // checkout kept the branch of every landing.
     const own = { path: `${ROOT}/${AGENT_WORKTREE_DIR}/point-608`, branch: 'feat/608-x' }
-    const baseline = { path: `${ROOT}/local/verify-baseline/db74de7ddbe9`, branch: '' }
+    const baseline = { path: `${ROOT}/local/verify-baseline/db74de7ddbe9`, branch: '', head: 'db74de7ddbe9d552cc10' }
     const sel = selectCleanupTargets({
       ...base,
       worktrees: [{ path: ROOT, branch: 'main' }, own, baseline],
@@ -209,8 +209,22 @@ describe('ownership must be PROVEN', () => {
     expect(v.disposition).toBe(DISPOSITION.live)
   })
 
+  it('a verify-baseline checkout whose HEAD left its sha, or that is locked, still keeps the branch', () => {
+    // Cross-vendor review: the path alone does not prove it is not mid-rebase.
+    const path = `${ROOT}/local/verify-baseline/db74de7ddbe9`
+    for (const tree of [
+      { path, branch: '', head: 'feedfacefeedfacefeed' },
+      { path, branch: '', head: '' },
+      { path, branch: '', head: 'db74de7ddbe9d552cc10', locked: 'manual' },
+    ]) {
+      const sel = selectCleanupTargets({ ...base, worktrees: [tree] })
+      expect(sel.reported.map((r) => r.path)).toEqual([path])
+      expect(sel.branch.delete).toBe(false)
+    }
+  })
+
   it('only a DIRECT verify-baseline child counts as baseline; one on a branch is judged by its branch', () => {
-    const nested = { path: `${ROOT}/local/verify-baseline/a/b`, branch: '' }
+    const nested = { path: `${ROOT}/local/verify-baseline/a/db74de7ddbe9`, branch: '', head: 'db74de7ddbe9d5' }
     expect(judgeCleanupTarget({ ...base, worktree: nested, evidence: deadFor('n') }).disposition).toBe(
       DISPOSITION.unproven,
     )
