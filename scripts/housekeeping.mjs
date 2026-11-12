@@ -165,47 +165,74 @@ export function describeShape(path, name) {
   }
 }
 
+const PROC_IO = { readdir: readdirSync, readFile: readFileSync, readlink: readlinkSync, ownerUid: (p) => statSync(p).uid }
+
 /** Open file paths and command lines of every process. ok=false when /proc or
- *  any live process's fd table cannot be read (fail closed). */
-export function readProcessTable(procRoot = '/proc') {
+ *  any own-uid process's cwd/fd table cannot be read (fail closed). An EACCES
+ *  on the cwd/fd of a FOREIGN-uid process (e.g. a root keep-alive shell) is
+ *  only counted in foreignUnreadable: this user can never read it. Accepted
+ *  residual (point 1512): such a process holding one of this user's old files
+ *  open is not seen; deletion then only unlinks, the holder keeps its fd. */
+export function readProcessTable(procRoot = '/proc', { io = PROC_IO, uid = process.getuid?.() } = {}) {
   let pids
   try {
-    pids = readdirSync(procRoot).filter((n) => /^\d+$/.test(n))
+    pids = io.readdir(procRoot).filter((n) => /^\d+$/.test(n))
   } catch {
-    return { ok: false, openPaths: [], cmdlines: null }
+    return { ok: false, openPaths: [], cmdlines: null, foreignUnreadable: 0 }
   }
-  if (pids.length === 0) return { ok: false, openPaths: [], cmdlines: null }
+  if (pids.length === 0) return { ok: false, openPaths: [], cmdlines: null, foreignUnreadable: 0 }
   const openPaths = []
   const cmdlines = []
   let ok = true
+  let foreignUnreadable = 0
+  const gone = (e) => e?.code === 'ENOENT' || e?.code === 'ESRCH'
   for (const pid of pids) {
     const base = join(procRoot, pid)
-    try {
-      cmdlines.push(readFileSync(join(base, 'cmdline'), 'utf8').split('\0').join(' '))
-    } catch (e) {
-      if (e?.code !== 'ENOENT' && e?.code !== 'ESRCH') ok = false
+    let counted = false
+    /** Re-read per error, never cached: a process may change credentials mid-scan. */
+    const isForeign = () => {
+      try {
+        return uid !== undefined && io.ownerUid(base) !== uid
+      } catch {
+        return false
+      }
+    }
+    /** cwd/fd errors: a foreign-uid EACCES is counted once per process, never fatal. */
+    const onFdError = (e) => {
+      if (gone(e)) return
+      if (e?.code === 'EACCES' && isForeign()) {
+        if (!counted) foreignUnreadable++
+        counted = true
+        return
+      }
+      ok = false
     }
     try {
-      openPaths.push(readlinkSync(join(base, 'cwd')))
+      cmdlines.push(io.readFile(join(base, 'cmdline'), 'utf8').split('\0').join(' '))
     } catch (e) {
-      if (e?.code !== 'ENOENT' && e?.code !== 'ESRCH') ok = false
+      if (!gone(e)) ok = false
+    }
+    try {
+      openPaths.push(io.readlink(join(base, 'cwd')))
+    } catch (e) {
+      onFdError(e)
     }
     let fds
     try {
-      fds = readdirSync(join(base, 'fd'))
+      fds = io.readdir(join(base, 'fd'))
     } catch (e) {
-      if (e?.code !== 'ENOENT' && e?.code !== 'ESRCH') ok = false
+      onFdError(e)
       continue
     }
     for (const fd of fds) {
       try {
-        openPaths.push(readlinkSync(join(base, 'fd', fd)))
+        openPaths.push(io.readlink(join(base, 'fd', fd)))
       } catch (e) {
-        if (e?.code !== 'ENOENT' && e?.code !== 'ESRCH') ok = false
+        onFdError(e)
       }
     }
   }
-  return { ok, openPaths, cmdlines }
+  return { ok, openPaths, cmdlines, foreignUnreadable }
 }
 
 function freeBytes(path) {
@@ -857,6 +884,7 @@ export function runHousekeeping({
       dfAfter,
       failures: kinds,
       steps: stepResults,
+      foreignUnreadable: liveness?.foreignUnreadable ?? 0,
     }
     try {
       appendFileSync(manifestPath, `${summaryLine(summary)}\n`)
