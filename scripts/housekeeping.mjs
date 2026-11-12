@@ -801,6 +801,9 @@ export function runHousekeeping({
       }
 
       if (step === 'git') {
+        // Fresh read: the cached snapshot dates from the first cleanup step, and
+        // a suite may have started since.
+        liveness = null
         const live = needLiveness()
         // ok:false may still carry a PARTIAL cmdline list: a suite may hide in
         // the unread part, so only a fully read table answers "not busy".

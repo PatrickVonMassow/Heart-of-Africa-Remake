@@ -576,6 +576,19 @@ describe('review regressions', () => {
     expect(existsSync(join(a.local, 'tool-output-logs/old.log'))).toBe(true)
   })
 
+  it('git re-reads the process table: a suite started during cleanup prevents gc', () => {
+    const a = arena()
+    let calls = 0
+    const readProcesses = () => ({
+      ok: true,
+      openPaths: [],
+      cmdlines: calls++ === 0 ? [] : ['node scripts/verify/run-all.mjs polish'],
+    })
+    const { r, gitCalls } = run(a, { steps: ['tmp', 'git'], readProcesses })
+    expect(gitCalls.some((c) => c.includes('gc'))).toBe(false)
+    expect(r.steps.git).toBe('skipped')
+  })
+
   it('/tmp: unreadable reference docs skip the step', () => {
     const a = arena({ archive: false })
     put(join(a.tmp, 'hoa-old.log'))
