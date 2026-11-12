@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DAY_MS,
-  artifactKind,
+  outputKind,
   busyVerdict,
   createBudget,
   failuresToFile,
@@ -54,7 +54,7 @@ describe('local/ allowlist and denylist', () => {
   const dir = (name) => ({ name, isDir: true, isFile: false, isSymlink: false })
   const file = (name) => ({ name, isDir: false, isFile: true, isSymlink: false })
 
-  it('deletes only a closed, unreferenced, inventoried artifact', () => {
+  it('deletes only a closed, unreferenced, inventoried output', () => {
     expect(localVerdict(dir('659-evidence'), { workOrder: w, refTexts: refs })).toMatchObject({ act: true, kind: 'evidence' })
     expect(localVerdict(file('700-r2-review.log'), { workOrder: w, refTexts: refs })).toMatchObject({ act: true, kind: 'log' })
   })
@@ -96,11 +96,11 @@ describe('local/ allowlist and denylist', () => {
     expect(localVerdict(dir('659-evidence'), { workOrder: { ok: false }, refTexts: refs }).act).toBe(false)
     expect(localVerdict(dir('659-evidence'), { workOrder: w, refTexts: null }).act).toBe(false)
   })
-  it('artifact kinds', () => {
-    expect(artifactKind('1482-baseline-frames', { isDir: true })).toBe('frames')
-    expect(artifactKind('1002-r2-review.log', { isFile: true })).toBe('log')
-    expect(artifactKind('1045-astra-r2.md', { isFile: true })).toBe('review')
-    expect(artifactKind('1045-plan.md', { isFile: true })).toBe(null)
+  it('output kinds', () => {
+    expect(outputKind('1482-baseline-frames', { isDir: true })).toBe('frames')
+    expect(outputKind('1002-r2-review.log', { isFile: true })).toBe('log')
+    expect(outputKind('1045-astra-r2.md', { isFile: true })).toBe('review')
+    expect(outputKind('1045-plan.md', { isFile: true })).toBe(null)
   })
 })
 

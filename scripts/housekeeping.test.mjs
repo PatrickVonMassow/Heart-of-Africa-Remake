@@ -96,7 +96,7 @@ const manifest = (a) =>
     .map((l) => JSON.parse(l))
 
 describe('local/: allowlist, references, fail-closed reads', () => {
-  it('deletes only closed, unreferenced, inventoried artifacts', () => {
+  it('deletes only closed, unreferenced, inventoried outputs', () => {
     const a = arena()
     put(join(a.local, '659-evidence/shot.png'))
     put(join(a.local, '701-r2-review.log'))

@@ -10,7 +10,7 @@
 //   node scripts/housekeeping.mjs --git full           one-off pass (owner, quiet machine)
 //   options: --git auto|full|off  --budget-entries <n>  --budget-ms <n>
 //
-// Steps: /tmp caches and hoa-*/point-* logs (rule 5), closed-point artifacts in
+// Steps: /tmp caches and hoa-*/point-* logs (rule 5), closed-point outputs in
 // local/ (rules 1-4), local/tool-output-logs (rule 6), git gc (rules 9-10).
 // Writes local/housekeeping/<date>.jsonl (manifest + summary), state.json
 // (last-attempt / last-success stamps, resume cursor), failures.jsonl.
@@ -79,7 +79,7 @@ const SILENT = new Set([
   'not a cache shape',
   'young',
   'not a file',
-  'not an inventoried artifact kind',
+  'not an inventoried output kind',
 ])
 
 export function dataPaths(localRoot) {

@@ -80,7 +80,7 @@ export function parseWorkOrder(tasksText, archiveText) {
 }
 
 // ---------------------------------------------------------------------------
-// Names: denylist, allowlist, artifact kinds.
+// Names: denylist, allowlist, output kinds.
 
 /** Never touched, numbered or not: user material, secrets, tools, baselines. */
 const DENY = [
@@ -116,10 +116,10 @@ export function isDenied(name) {
 const NUMBERED = /^(\d+)-(.+)$/
 
 /**
- * The inventoried artifact kind of a numbered local/ entry, or null (= keep).
+ * The inventoried output kind of a numbered local/ entry, or null (= keep).
  * Only these kinds may ever go: logs, frames, evidence, pics, review/author output.
  */
-export function artifactKind(name, { isDir, isFile }) {
+export function outputKind(name, { isDir, isFile }) {
   const m = NUMBERED.exec(String(name))
   if (!m) return null
   const rest = m[2].toLowerCase()
@@ -165,8 +165,8 @@ export function localVerdict(entry, { workOrder, refTexts }) {
   if (isDenied(name)) return { act: false, reason: 'denylist' }
   const point = pointOf(name)
   if (point === null) return { act: false, reason: 'not numbered' }
-  const kind = artifactKind(name, entry)
-  if (!kind) return { act: false, reason: 'not an inventoried artifact kind' }
+  const kind = outputKind(name, entry)
+  if (!kind) return { act: false, reason: 'not an inventoried output kind' }
   if (!workOrder || !workOrder.ok) return { act: false, reason: 'work order unreadable' }
   if (!Array.isArray(refTexts)) return { act: false, reason: 'reference docs unreadable' }
   if (workOrder.open.has(point)) return { act: false, reason: `point ${point} open` }
