@@ -126,6 +126,8 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **#1504**, **#1505**, **#1506** — user orders of 11.11.2026 on pool-slot hygiene and its board line;
   process work on branches, guards and the board, so no feature bundle shares their files.
 - **#1507** — the user's re-rank order of 11.11.2026; it changes only the ranking, no feature files.
+- **#1509** — the user's disk-footprint cleanup of 12.11.2026 (/tmp caches, closed-point evidence in
+  local/, git gc); host housekeeping in the main tree, so no feature bundle shares its files.
 - **#1508** — the owed covering enrichments run for the already landed points 391 and 327; a
   verification run on main, not a feature branch, so it shares no bundle's files.
 - **#1465** — the uncharged WebGPU reds of polish-speech that the v0.3.1 closing never reached;

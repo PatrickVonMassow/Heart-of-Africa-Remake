@@ -77,6 +77,17 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1509. Shrink the project's disk footprint: stale /tmp caches, closed-point evidence in local/, git gc
+  User request 12.11.2026 ("Freigegeben"; "ganz vorne in der Queue"): the user's C: drive is short on space; WizTree shows docker_data.vhdx at 482 GB, a large part attributed to this project. Measured inside the container on 12.11.2026: .git 29 GB, local/ 16 GB, /tmp ~2-3 GB (~900k stale cache dirs), ~/.claude+npm+node_modules+worktrees ~8 GB.
+  Goal: shrink the project's footprint on the Docker data disk (measured 12.11.2026: project ~55 GB of 203 GB used).
+  Scope:
+  1. /tmp: remove stale random-named Vitest/Vite cache dirs (~900k entries, ssr/ and web/ subdirs, ~2-3 GB) and stale hoa-*/point-* logs older than 7 days; never touch files of live processes (heartbeat, launcher, run-wait of running pids).
+  2. local/: list every evidence/frames/baseline directory with size and the point it belongs to; delete only those whose point is closed (docs/tasks-archive.md) and that no open point, acceptance evidence (docs/acceptance-evidence.md) or picture-stability baseline references. Candidates measured: 659-evidence 3.6 GB, 1482-baseline-frames 1.5 GB, 1482-final-frames 1.6 GB, red-run-evidence 1.2 GB, verify-baseline 1.0 GB, bisect-1347 0.9 GB (detached worktree: remove via git worktree remove), closing-633-frames 0.9 GB.
+  3. .git: 46 packs, 27.6 GB, 5483 prune-packable: run git gc (owner, main tree, no suite running). Report before/after size; if the pack stays large, list the largest blobs and file a backlog finding instead of rewriting history (no history rewrite, no force push).
+  Final state: before/after sizes per item are reported to the user; nothing referenced by an open point or the acceptance evidence is gone.
+  Out of scope: the Windows-side vhdx compaction (user does it by hand: wsl --shutdown + diskpart compact vdisk).
+  Bundle: unbundled.
+
 - [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
    Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
    Evidence 2: /backup/hoa/local/hoa-state-2026-11-11-1117999851.zip (seed 1117999851, place tangier, x/z -58.71/-356.97, webgpu, build ed95b5b). User text: "Hängt mit Kopf in der Kiste, sodass er nichts sehen kann und läuft sinnlos hin und her und immer wieder gegen die Wände". placeLife shows porters with no errand/target (unlike the errand walkers beside them).
