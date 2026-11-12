@@ -36551,3 +36551,37 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   - At full use: "3 von 3 Slots in Arbeit".
   Values are measured at board render time. German visible wording. Board guards and section contract stay valid (update their tests); unit tests for each line variant above.
   Bundle: unbundled.
+
+- [x] 1509. Shrink the project's disk footprint: stale /tmp caches, closed-point evidence in local/, git gc
+  User request 12.11.2026 ("Freigegeben"; "ganz vorne in der Queue"): the user's C: drive is short on space; WizTree shows docker_data.vhdx at 482 GB, a large part attributed to this project. Measured inside the container on 12.11.2026: .git 29 GB, local/ 16 GB, /tmp ~2-3 GB (~900k stale cache dirs), ~/.claude+npm+node_modules+worktrees ~8 GB.
+  Goal: shrink the project's footprint on the Docker data disk (measured 12.11.2026: project ~55 GB of 203 GB used).
+  Scope:
+  1. /tmp: remove stale random-named Vitest/Vite cache dirs (~900k entries, ssr/ and web/ subdirs, ~2-3 GB) and stale hoa-*/point-* logs older than 7 days; never touch files of live processes (heartbeat, launcher, run-wait of running pids).
+  2. local/: list every evidence/frames/baseline directory with size and the point it belongs to; delete only those whose point is closed (docs/tasks-archive.md) and that no open point, acceptance evidence (docs/acceptance-evidence.md) or picture-stability baseline references. Candidates measured: 659-evidence 3.6 GB, 1482-baseline-frames 1.5 GB, 1482-final-frames 1.6 GB, red-run-evidence 1.2 GB, verify-baseline 1.0 GB, bisect-1347 0.9 GB (detached worktree: remove via git worktree remove), closing-633-frames 0.9 GB.
+  3. .git: 46 packs, 27.6 GB, 5483 prune-packable: run git gc (owner, main tree, no suite running). Report before/after size; if the pack stays large, list the largest blobs and file a backlog finding instead of rewriting history (no history rewrite, no force push).
+  Final state: before/after sizes per item are reported to the user; nothing referenced by an open point or the acceptance evidence is gone.
+  Out of scope: the Windows-side vhdx compaction (user does it by hand: wsl --shutdown + diskpart compact vdisk).
+  Amends point 1509 (rank stays FIRST). User orders 12.11.2026: make the cleanup recurring and token-free; the one-off pass obeys exactly the same restrictions. Risk review by GPT-6.1 Sol (ask-lane enumerate, 12.11.2026, verdict RED for the unamended plan, 33 risks); the amendments below are folded in. Full Sol output: local/tool-output-logs/2026-11-12T16-09-56-276-452616.log.
+  Deliverable: scripts/housekeeping.mjs (plain Node, no LLM) + pure core with Vitest tests. ONE rule set for both the one-off pass and the recurring run; the one-off pass is a run of the same script.
+  Safety rules (all fail-closed: any unreadable input, unparseable status or unknown liveness = keep):
+  1. Allowlist, not wildcard. In local/ only entries matching ^<N>-… whose point N is CLOSED in docs/tasks-archive.md and NOT open in TASKS.md (both files must read successfully; conflict = keep), and whose kind is an inventoried artifact type (logs, frames, evidence, pics, review/author output). Never touch non-numbered entries: user material (bugreports*, *.zip, Screenshots/, assets-src/, hoa-state-*.zip, villager-build*/, drafts, MEMORY.*), secrets (codex-auth.json, git-credential-*.sh, *auth*, *credential*, *token*), tools/, dashboard/, branch-archive/, verify-baseline*/.
+  2. Keep anything referenced by any OPEN point's text in TASKS.md, by docs/acceptance-evidence.md, docs/acceptance-criteria-detail.md, docs/backlog.md, or by picture-stability / verify baseline consumers (determine from scripts/verify and scripts/picture-stability.mjs, not by literal path only).
+  3. Never delete a registered git worktree root or anything containing a .git file/dir; worktrees are only removed by hand via git worktree remove (no --force) after checking for uncommitted/untracked changes.
+  4. No symlink traversal; canonical-path containment inside the allowed roots; revalidate each target immediately before removal.
+  5. /tmp: only the random-named Vite/Vitest cache dirs (shape: dir with only ssr/ and/or web/ subdirs of hash-named files) and hoa-*/point-* logs, all older than 7 days by the newest mtime of their contents; skip anything opened by a live process (/proc/*/fd scan), and skip the whole /tmp step if /proc is unreadable.
+  6. local/tool-output-logs: files older than 14 days and not referenced per rule 2.
+  7. Bounded work: per run a traversal/deletion budget (e.g. 50k entries or 10 min), resumable, reports "incomplete" when the budget ends.
+  8. Manifest: every run writes a manifest (path, size, rule, outcome; never file contents) to local/housekeeping/<date>.jsonl, plus one summary line with freed bytes (df before/after).
+  Git:
+  9. Recurring run: only `git gc --auto` in the foreground (gc.autoDetach=false for that call), never while a verify suite or land-point runs, default prune expiry (2 weeks) unchanged, no reflog expiry override. No history rewrite.
+  10. One-off pass (batch owner, by hand, quiet machine): full `git gc` foreground after checking free disk headroom (>= size of .git), same conditions.
+  Scheduling:
+  11. The launcher daemon only SPAWNS the script detached at most once per 24 h; it never awaits it inside its tick and does no traversal itself. The script holds an exclusive lock file (pid + start time, stale-checked) so overlapping runs exit immediately. Separate last-attempt / last-success stamps.
+  12. Failures: one deduplicated finding per failure kind (scripts/finding.mjs), not one per run; local failure record kept regardless.
+  13. After deploying, restart the launcher daemon so it runs the new code; verify singleton + armed state.
+  One-off pass procedure:
+  14. First a DRY RUN that only writes the manifest; the owner reviews it (and shows the user the top entries by size) before the deleting run.
+  Done when: tests cover fail-closed reads, allowlist/denylist, open-point references, worktree/.git exclusion, symlink escape, live-fd skip, budget/incomplete, lock overlap, and that the launcher tick is not delayed; before/after sizes reported to the user; point 1509 is then CLOSED (the recurring job lives in the launcher, not as an open point).
+  Out of scope: Windows-side vhdx compaction (user, by hand).
+  Executed 12.11.2026 17:30-17:50, before this amendment was queued (the pass ran on the old spec; finding 1511): /tmp 111 GB -> ~7 GB (110k Vite/Vitest cache dirs >1 day, every other top-level entry >7 days by its own mtime, old session dirs under /tmp/claude-1000); local/ 16 GB -> 3.8 GB (closed-point dirs of 659, 1482, 633, 1332, 1347, 1398, 1455, the Blender builds villager-build-1342*/-1347, and the unnumbered red-run-evidence, partial-red-frames, comm-webgpu-green-frames, verification-parked; worktree local/bisect-1347 removed with its uncommitted bisect edits); .git 29 GB -> 26 GB (git gc: 46 packs/27.6 GiB -> 1 pack/23.0 GiB + 2.5 GiB unreachable loose objects held by the 2-week prune expiry). Rules 1, 3, 5 and 14 were not honoured by that pass; the script must.
+  Bundle: unbundled.
