@@ -36585,3 +36585,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Out of scope: Windows-side vhdx compaction (user, by hand).
   Executed 12.11.2026 17:30-17:50, before this amendment was queued (the pass ran on the old spec; finding 1511): /tmp 111 GB -> ~7 GB (110k Vite/Vitest cache dirs >1 day, every other top-level entry >7 days by its own mtime, old session dirs under /tmp/claude-1000); local/ 16 GB -> 3.8 GB (closed-point dirs of 659, 1482, 633, 1332, 1347, 1398, 1455, the Blender builds villager-build-1342*/-1347, and the unnumbered red-run-evidence, partial-red-frames, comm-webgpu-green-frames, verification-parked; worktree local/bisect-1347 removed with its uncommitted bisect edits); .git 29 GB -> 26 GB (git gc: 46 packs/27.6 GiB -> 1 pack/23.0 GiB + 2.5 GiB unreachable loose objects held by the 2-week prune expiry). Rules 1, 3, 5 and 14 were not honoured by that pass; the script must.
   Bundle: unbundled.
+
+- [x] 1512. Let the housekeeping run work in the container: unreadable fd tables of foreign-uid processes must not void the process table, then run the one-off pass and report sizes
+  Continuation of user request 12.11.2026 for the landed point 1509 ("Freigegeben"; "ganz vorne in der Queue"). Rank: at the front, directly before 1510.
+  Defect (reproduced 12.11.2026 20:34 on main b3fb2a5): `node scripts/housekeeping.mjs --dry-run --git off` returns outcome failed with failures proc-unreadable x3; every step (tmp, local, logs, git) is skipped. Cause: readProcessTable (scripts/housekeeping.mjs) sets ok:false on any EACCES; the container's root-owned keep-alive shells (uid 0, /bin/sh, e.g. pids 44/50/144) have fd directories the project user (uid 1000) cannot list. The script can therefore never act in its real environment.
+  Fix:
+  1. An EACCES on the fd/cwd of a process whose owner uid differs from the running uid is recorded (count in the manifest) and does not set ok:false; an unreadable /proc listing, an unreadable entry of an own-uid process, or an unreadable cmdline stays fail-closed. Regression test with an injected foreign-uid EACCES entry; existing fail-closed tests stay green. Cross-vendor review of the change.
+  2. After landing, the owner runs the one-off pass on main on a quiet machine: --dry-run first and review the manifest, then the real run with --git full.
+  Final state: before/after sizes per item (/tmp, local/, .git, df) are reported to the user. Measured before on 12.11.2026 20:34: .git 26G, local/ 3.8G, /tmp 7.4G, / 86G used.
+  Bundle: unbundled.
