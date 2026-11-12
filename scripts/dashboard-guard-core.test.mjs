@@ -735,6 +735,19 @@ describe('auditDashboard — the 25.07 witnesses', () => {
     // the wrapper like any card.
     expect(codes(boardHtml().replace('<details class="sect">', '<details class="sect" open>'))).toContain('auto-open')
   })
+
+  it('accepts the derived slot line beside a heading, and nothing else there', () => {
+    const withSlots = boardHtml().replace(
+      '<h2>Woran ich gerade arbeite</h2></summary>',
+      '<h2>Woran ich gerade arbeite</h2><span class="slots">3 von 3 Slots in Arbeit</span></summary>',
+    )
+    expect(codes(withSlots)).not.toContain('section-not-collapsible')
+    const foreign = boardHtml().replace(
+      '<h2>Woran ich gerade arbeite</h2></summary>',
+      '<h2>Woran ich gerade arbeite</h2><span class="t">frei</span></summary>',
+    )
+    expect(codes(foreign)).toContain('section-not-collapsible')
+  })
   it('never counts the section wrapper as a card of the preceding section', () => {
     // The wrapper's opening tag falls just before the <h2> the slice ends at,
     // so a naive split would hand Warteschlange a point-less, body-less card.
