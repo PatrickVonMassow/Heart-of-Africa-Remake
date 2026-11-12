@@ -88,6 +88,18 @@ put it is the mistake this line exists to stop.
   Out of scope: the Windows-side vhdx compaction (user does it by hand: wsl --shutdown + diskpart compact vdisk).
   Bundle: unbundled.
 
+- [ ] 1510. Count freshly commissioned branches as occupied slots: a branch at its main cut point or with unfetched cloud commits holds a slot
+  User request 12.11.2026 ("Ja, reihe das ein. Und bei der Gelegenheit noch eine Änderung: Die Angaben zu den Slots sollen in einer neuen Zeile landen - nicht in der gleichen wie der Text "Woran ich gerade arbeite". Zudem soll er verkürzt werden: "3/3" anstatt "3 von 3""). Rank: directly behind 1509.
+  Defect (reproduced 12.11.2026 16:59): the board slot line said "3 von 3 Slots frei: Grund nicht messbar (Dateien der laufenden Arbeit nicht lesbar)" while point 1490 was in active work by a cloud author. Cause: openFeatBranches (scripts/batch-in-flight.mjs) lists only `git for-each-ref --no-merged main`. The local and origin-tracking ref of feat/1490-head-load-porter still pointed at its main cut point d98c729aa (cloud commits f516e78 on the remote, not fetched), so git treats the branch as merged and it holds no slot. The same census feeds batch-in-flight's own slot decision, so the batch may also start work into slots that are in truth occupied.
+  Fix:
+  1. A feat branch holds a slot when it is unmerged OR its point is open in the work order / in active work (in-flight declaration focusPoint, commission record), even when its tip is an ancestor of main. Unfetched cloud progress must not free a slot.
+  2. Board and batch-in-flight slot decision use the same corrected census; a test for each covers the fresh-cut / unfetched-cloud case.
+  Presentation (user order 12.11.2026, same request):
+  3. The slot information moves to its own line below the heading "Woran ich gerade arbeite", no longer inside the same line as the heading.
+  4. Shorter wording: "3/3" instead of "3 von 3" (e.g. "1/3 Slots frei: ...").
+  Mobile portrait layout must stay clean (board contract).
+  Bundle: unbundled.
+
 - [ ] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
    Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
    Evidence 2: /backup/hoa/local/hoa-state-2026-11-11-1117999851.zip (seed 1117999851, place tangier, x/z -58.71/-356.97, webgpu, build ed95b5b). User text: "Hängt mit Kopf in der Kiste, sodass er nichts sehen kann und läuft sinnlos hin und her und immer wieder gegen die Wände". placeLife shows porters with no errand/target (unlike the errand walkers beside them).
