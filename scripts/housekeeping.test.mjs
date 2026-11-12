@@ -520,6 +520,29 @@ describe('review regressions', () => {
     expect(existsSync(join(a.local, '659-evidence/shot.png'))).toBe(true)
   })
 
+  it('/tmp: an old hoa-* log named by an open point or an acceptance doc stays', () => {
+    const a = arena()
+    for (const n of ['hoa-accepted.log', 'hoa-open.log', 'hoa-free.log']) {
+      put(join(a.tmp, n))
+      age(join(a.tmp, n))
+    }
+    writeFileSync(join(a.repo, 'docs/acceptance-evidence.md'), 'see /tmp/hoa-accepted.log')
+    writeFileSync(join(a.repo, 'TASKS.md'), ['## Checklist', '- [ ] 900. Open', '  log at /tmp/hoa-open.log'].join('\n'))
+    run(a, { steps: ['tmp'] })
+    expect(existsSync(join(a.tmp, 'hoa-accepted.log'))).toBe(true)
+    expect(existsSync(join(a.tmp, 'hoa-open.log'))).toBe(true)
+    expect(existsSync(join(a.tmp, 'hoa-free.log'))).toBe(false)
+  })
+
+  it('/tmp: unreadable reference docs skip the step', () => {
+    const a = arena({ archive: false })
+    put(join(a.tmp, 'hoa-old.log'))
+    age(join(a.tmp, 'hoa-old.log'))
+    const { r } = run(a, { steps: ['tmp'] })
+    expect(r.steps.tmp).toBe('skipped')
+    expect(existsSync(join(a.tmp, 'hoa-old.log'))).toBe(true)
+  })
+
   it('git gc is skipped when the process table is only partly readable (ok:false with cmdlines)', () => {
     const a = arena()
     const { r, gitCalls } = run(a, {

@@ -47,6 +47,7 @@ import {
   failuresToFile,
   gitPlan,
   isContained,
+  isReferenced,
   localVerdict,
   lockVerdict,
   manifestLine,
@@ -670,6 +671,11 @@ export function runHousekeeping({
 
     for (const step of steps) {
       if (step === 'tmp') {
+        needRefs()
+        if (!refTexts) {
+          stepResults.tmp = 'skipped'
+          continue
+        }
         if (!livenessGate('tmp')) continue
         const live = needLiveness()
         const wts = needWorktrees('tmp')
@@ -708,6 +714,7 @@ export function runHousekeeping({
             return
           }
           if (scan.hasGit) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'contains .git' })
+          if (isReferenced(name, refTexts)) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'referenced' })
           remove(path, st, root, v.rule, scan.bytes)
         })
         if (stepResults.tmp === 'incomplete') break
