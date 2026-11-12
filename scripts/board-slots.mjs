@@ -7,7 +7,6 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { POOL_CAP, openBranchSlots, openPointSpecs } from './batch-in-flight-core.mjs'
 import { closingFreeze, openFeatBranches, readCommissionRecord, runningBranchFiles } from './batch-in-flight.mjs'
-import { findPending } from './findings-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { UNMEASURABLE_FINDING_TITLE, slotLine } from './board-slots-core.mjs'
@@ -62,8 +61,9 @@ export function measureSlotLine({ tasksText, allTasksText, activePoints = [], cw
 }
 
 /**
- * File the unmeasurable state as a finding, once: an entry still waiting in the
- * carrier with the same title is the same finding, so nothing is appended.
+ * File the unmeasurable state as a finding, once: any carrier entry with the same
+ * title, waiting or already drained, is the same finding, so nothing is appended
+ * (re-filing a drained one blocked every session end through the findings guard).
  * Returns true when a new entry was recorded.
  */
 export function fileUnmeasurableFinding(text, { carrier = carrierPath(), record = recordFinding } = {}) {
@@ -73,7 +73,7 @@ export function fileUnmeasurableFinding(text, { carrier = carrierPath(), record 
   } catch {
     current = ''
   }
-  if ((findPending(current, UNMEASURABLE_FINDING_TITLE) ?? []).length > 0) return false
+  if (current.includes(UNMEASURABLE_FINDING_TITLE)) return false
   record(
     UNMEASURABLE_FINDING_TITLE,
     `Die Board-Zeile neben "Woran ich gerade arbeite" zeigte: ${text}. ` +

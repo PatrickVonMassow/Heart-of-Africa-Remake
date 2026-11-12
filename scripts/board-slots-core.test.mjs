@@ -200,4 +200,14 @@ describe('the I/O half', () => {
     expect(fileUnmeasurableFinding('x', { carrier, record })).toBe(false)
     expect(calls).toHaveLength(1)
   })
+
+  it('does not re-file a drained entry (every publish re-filed it and blocked the session end)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'slots-'))
+    const carrier = join(dir, 'carrier.md')
+    const calls = []
+    const record = (title, detail) => calls.push({ title, detail })
+    writeFileSync(carrier, `- [x] 2026-11-12T14:45:15.581Z · s · ${UNMEASURABLE_FINDING_TITLE}\n      d\n`)
+    expect(fileUnmeasurableFinding('x', { carrier, record })).toBe(false)
+    expect(calls).toHaveLength(0)
+  })
 })
