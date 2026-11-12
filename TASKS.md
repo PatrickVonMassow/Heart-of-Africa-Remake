@@ -77,6 +77,19 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1513. Clear the 29 non-feat branches on origin and keep them from piling up: triage rescue/doctor and claude/* branches, delete the merged 1509 branch, find why landing left it
+  Rank: front of the work order, behind 1512 (user order 12.11.2026 20:59).
+  Measured 12.11.2026 20:58 (git ls-remote, no fetch): origin has 33 heads. Besides main: 22 rescue/doctor-* (created by batch-doctor since 26.10., ~1 per day; branch-hygiene-core.test.mjs declares them "never debris, even once merged"), 3 claude/skirt-containment-* (cloud-session branches of the closed points 1482/1485; branch-hygiene only knows feat/*), 1 board, feat/1509-housekeeping-script (merged 20:13 as 14a128e1c, still on origin and local — the gap point 1504 closed reappeared at the first landing after it), feat/1463 (parked by the user, keep), feat/1490 (in work, keep). None of the 29 rescue/claude/board tips is an ancestor of main (local objects, unfetched tips counted as not merged), so nothing is deleted blind.
+
+  Final state:
+  1. One-off triage of every rescue/doctor-* branch: diff its content against current main; a branch whose content is superseded is deleted on origin and locally; a branch with genuinely missing content is listed to the user (branch, files, one-line summary) and kept until the user decides.
+  2. The three claude/* branches: delete when their content is superseded by main or by the closed points' archived outcome; otherwise list to the user.
+  3. board: find what uses it; keep if a consumer needs it (state the consumer), else delete.
+  4. Delete feat/1509-housekeeping-script locally and on origin, and measure why land-point left it; fix that gap with the smallest change (infrastructure freeze: fix, no new mechanism) plus a regression test.
+  5. Stop the pile-up with the smallest change: a rescue/doctor branch is deleted after its triage or expires after a fixed period (state it, e.g. 14 days, calibratable) once its content is superseded by main; the daily housekeeping script (scripts/housekeeping.mjs) gets a fail-closed rule that also covers claude/* cloud-session branches whose point is closed and whose content is superseded by main. Unknown or unreadable state = keep. Tests for both.
+  6. Report to the user: before/after branch count on origin, and the list of anything kept for their decision.
+  User approval 12.11.2026: "Freigegeben".
+  Bundle: unbundled.
 - [ ] 1510. Count freshly commissioned branches as occupied slots: a branch at its main cut point or with unfetched cloud commits holds a slot
   User request 12.11.2026 ("Ja, reihe das ein. Und bei der Gelegenheit noch eine Änderung: Die Angaben zu den Slots sollen in einer neuen Zeile landen - nicht in der gleichen wie der Text "Woran ich gerade arbeite". Zudem soll er verkürzt werden: "3/3" anstatt "3 von 3""). Rank: directly behind 1509.
   Defect (reproduced 12.11.2026 16:59): the board slot line said "3 von 3 Slots frei: Grund nicht messbar (Dateien der laufenden Arbeit nicht lesbar)" while point 1490 was in active work by a cloud author. Cause: openFeatBranches (scripts/batch-in-flight.mjs) lists only `git for-each-ref --no-merged main`. The local and origin-tracking ref of feat/1490-head-load-porter still pointed at its main cut point d98c729aa (cloud commits f516e78 on the remote, not fetched), so git treats the branch as merged and it holds no slot. The same census feeds batch-in-flight's own slot decision, so the batch may also start work into slots that are in truth occupied.
