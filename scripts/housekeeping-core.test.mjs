@@ -138,10 +138,17 @@ describe('/tmp rules', () => {
     expect(tmpVerdict({ ...facts, isSymlink: true }, { now, liveness: live }).act).toBe(false)
     expect(
       tmpVerdict(
-        { name: 'hoa-x.log', complete: true, newestMtimeMs: now - 8 * DAY_MS, canonical: '/tmp/hoa-x.log' },
+        { name: 'hoa-x.log', isFile: true, complete: true, newestMtimeMs: now - 8 * DAY_MS, canonical: '/tmp/hoa-x.log' },
         { now, liveness: live },
       ).rule,
     ).toBe('tmp-hoa-log')
+    // A hoa-*/point-* directory is never a log (it may be a worktree).
+    expect(
+      tmpVerdict(
+        { name: 'hoa-wt', isFile: false, complete: true, newestMtimeMs: now - 8 * DAY_MS, canonical: '/tmp/hoa-wt' },
+        { now, liveness: live },
+      ),
+    ).toMatchObject({ act: false, reason: 'not a file' })
   })
   it('heldOpen matches the path and its descendants only', () => {
     expect(heldOpen('/tmp/ab', ['/tmp/ab'])).toBe(true)

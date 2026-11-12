@@ -213,7 +213,7 @@ export function isViteCacheShape(shape) {
 }
 
 /** Which /tmp rule a top-level name may fall under: 'vite-cache' (shape still
- *  required), 'hoa-log', or null. */
+ *  required), 'hoa-log' (regular files only), or null. */
 export function tmpCandidateRule(name) {
   if (/^(hoa|point)-/.test(String(name))) return 'tmp-hoa-log'
   if (CACHE_NAME.test(String(name))) return 'tmp-vite-cache'
@@ -230,17 +230,20 @@ export function heldOpen(path, openPaths) {
 }
 
 /** The cheap part of the /tmp verdict, before any traversal: rule and shape. */
-export function tmpShapeVerdict({ name, isSymlink, shape }) {
+export function tmpShapeVerdict({ name, isSymlink, isFile, shape }) {
   if (isSymlink) return { ok: false, reason: 'symlink' }
   const rule = tmpCandidateRule(name)
   if (!rule) return { ok: false, reason: 'no rule' }
+  // A hoa-*/point-* DIRECTORY may be a worktree or a run's output: unclear
+  // shape, so keep. The log rule covers regular files only.
+  if (rule === 'tmp-hoa-log' && isFile !== true) return { ok: false, reason: 'not a file' }
   if (rule === 'tmp-vite-cache' && !isViteCacheShape(shape)) return { ok: false, reason: 'not a cache shape' }
   return { ok: true, rule }
 }
 
 /**
  * The /tmp verdict for one top-level entry.
- *   facts: { name, isSymlink, newestMtimeMs, complete, shape?, canonical }
+ *   facts: { name, isSymlink, isFile, newestMtimeMs, complete, shape?, canonical }
  *   liveness: { ok, openPaths } — ok=false skips the whole step upstream
  */
 export function tmpVerdict(facts, { now, liveness, maxAgeMs = TMP_MAX_AGE_MS }) {

@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   utimesSync,
@@ -383,5 +384,183 @@ describe('the launcher hook', () => {
     // Three ticks 150 ms apart: well under a second unless something blocked.
     expect(tickTimes[2]).toBeLessThan(3000)
     expect(readFileSync(logPath, 'utf8')).toContain('housekeeping spawned')
+  })
+})
+
+// Cross-vendor review of the first cut: each case reproduced the defect (red)
+// before its fix. A deletion tool fails closed.
+describe('review regressions', () => {
+  const STALE_PID = 2 ** 22 + 7
+  const readLock = (p) => JSON.parse(readFileSync(p, 'utf8'))
+  function cache(a, name) {
+    put(join(a.tmp, name, 'ssr/abc123.js'))
+    put(join(a.tmp, name, 'web/def456.js'))
+    age(join(a.tmp, name))
+    return join(a.tmp, name)
+  }
+
+  it('a symlinked local/ is refused: the step is skipped with a finding, its target stays', () => {
+    const a = arena()
+    const ext = join(a.outside, 'local')
+    put(join(ext, '659-evidence/shot.png'))
+    symlinkSync(ext, a.local, 'dir')
+    const { r, findings } = run(a, { steps: ['local'] })
+    expect(existsSync(join(ext, '659-evidence/shot.png'))).toBe(true)
+    expect(r.steps.local).toBe('skipped')
+    expect(findings.map((f) => f.title)).toContain('Housekeeping failure: local-root-unsafe')
+  })
+
+  it('a symlinked local/tool-output-logs is refused: the step is skipped with a finding', () => {
+    const a = arena()
+    put(join(a.outside, 'logs/old.log'))
+    age(join(a.outside, 'logs/old.log'))
+    mkdirSync(a.local, { recursive: true })
+    symlinkSync(join(a.outside, 'logs'), join(a.local, 'tool-output-logs'), 'dir')
+    const { r, findings } = run(a, { steps: ['logs'] })
+    expect(existsSync(join(a.outside, 'logs/old.log'))).toBe(true)
+    expect(r.steps.logs).toBe('skipped')
+    expect(findings.map((f) => f.title)).toContain('Housekeeping failure: logs-root-unsafe')
+  })
+
+  it('/tmp: a hoa-* directory holding .git (a worktree) is never deleted', () => {
+    const a = arena()
+    put(join(a.tmp, 'hoa-wt/.git'), 'gitdir: /repo/.git/worktrees/x')
+    put(join(a.tmp, 'hoa-wt/src/a.js'))
+    age(join(a.tmp, 'hoa-wt'))
+    run(a, { steps: ['tmp'] })
+    expect(existsSync(join(a.tmp, 'hoa-wt/src/a.js'))).toBe(true)
+  })
+
+  it('/tmp: a point-* directory is kept (the log rule is files only)', () => {
+    const a = arena()
+    put(join(a.tmp, 'point-1509-wt/a.txt'))
+    age(join(a.tmp, 'point-1509-wt'))
+    run(a, { steps: ['tmp'] })
+    expect(existsSync(join(a.tmp, 'point-1509-wt/a.txt'))).toBe(true)
+  })
+
+  it('/tmp: a cache-shaped directory listed by git worktree list is kept', () => {
+    const a = arena()
+    const wt = cache(a, 'Wt12Cache34')
+    const { r } = run(a, { steps: ['tmp'], readWorktrees: () => `worktree ${a.repo}\n\nworktree ${wt}\n` })
+    expect(existsSync(wt)).toBe(true)
+    expect(r.outcome).toBe('complete')
+  })
+
+  it('/tmp: an unreadable worktree list skips the step', () => {
+    const a = arena()
+    const c = cache(a, 'Ab12Cd34Ef')
+    const { r } = run(a, { steps: ['tmp'], readWorktrees: () => null })
+    expect(r.steps.tmp).toBe('skipped')
+    expect(existsSync(c)).toBe(true)
+  })
+
+  it('stale-lock takeover is exclusive: a second contender never removes the winner’s fresh lock', () => {
+    const a = arena()
+    const paths = dataPaths(a.local)
+    mkdirSync(paths.dir, { recursive: true })
+    writeJsonAtomic(paths.lock, { pid: STALE_PID, pidStartedAt: 1, startedAt: 1 })
+    const probe = (pid) => (pid === STALE_PID ? { exists: false } : { exists: true, startedAt: 5 })
+    let first = null
+    // B has read the stale lock and is probing its dead holder when A runs its
+    // whole takeover: the interleaving the review described.
+    const probeB = (pid) => {
+      if (pid === STALE_PID && !first) first = acquireLock(paths.lock, { now: NOW + 1, pid: 1111, probe })
+      return probe(pid)
+    }
+    const second = acquireLock(paths.lock, { now: NOW + 2, pid: 2222, probe: probeB })
+    expect(first.ok).toBe(true)
+    expect(second.ok).toBe(false)
+    expect(readLock(paths.lock)).toMatchObject({ pid: 1111, startedAt: NOW + 1 })
+    expect(readdirSync(paths.dir)).toEqual(['lock.json'])
+  })
+
+  it('local/: an entry held open by a live process stays', () => {
+    const a = arena()
+    put(join(a.local, '659-evidence/shot.png'))
+    const held = join(realpathSync(a.local), '659-evidence/shot.png')
+    run(a, { steps: ['local'], readProcesses: () => ({ ok: true, openPaths: [held], cmdlines: [] }) })
+    expect(existsSync(held)).toBe(true)
+  })
+
+  it('tool-output-logs: a log held open by a live process stays', () => {
+    const a = arena()
+    put(join(a.local, 'tool-output-logs/old.log'))
+    age(join(a.local, 'tool-output-logs/old.log'))
+    const held = join(realpathSync(a.local), 'tool-output-logs/old.log')
+    run(a, { steps: ['logs'], readProcesses: () => ({ ok: true, openPaths: [held], cmdlines: [] }) })
+    expect(existsSync(held)).toBe(true)
+  })
+
+  it('local/ and tool-output-logs: an unreadable process table skips both steps', () => {
+    const a = arena()
+    put(join(a.local, '659-evidence/shot.png'))
+    put(join(a.local, 'tool-output-logs/old.log'))
+    age(join(a.local, 'tool-output-logs/old.log'))
+    const { r } = run(a, {
+      steps: ['local', 'logs'],
+      readProcesses: () => ({ ok: false, openPaths: [], cmdlines: null }),
+    })
+    expect(r.steps).toMatchObject({ local: 'skipped', logs: 'skipped' })
+    expect(existsSync(join(a.local, '659-evidence/shot.png'))).toBe(true)
+    expect(existsSync(join(a.local, 'tool-output-logs/old.log'))).toBe(true)
+  })
+
+  it('liveness is re-read per candidate: a file opened after the step’s snapshot keeps its entry', () => {
+    const a = arena()
+    const c = cache(a, 'Ab12Cd34Ef')
+    put(join(a.local, '659-evidence/shot.png'))
+    let calls = 0
+    const openedLater = [join(realpathSync(a.tmp), 'Ab12Cd34Ef/web/def456.js'), join(realpathSync(a.local), '659-evidence/shot.png')]
+    const readProcesses = () => ({ ok: true, openPaths: calls++ === 0 ? [] : openedLater, cmdlines: [] })
+    run(a, { steps: ['tmp'], readProcesses })
+    expect(existsSync(c)).toBe(true)
+    calls = 0
+    run(a, { steps: ['local'], readProcesses })
+    expect(existsSync(join(a.local, '659-evidence/shot.png'))).toBe(true)
+  })
+
+  it('git gc is skipped when the process table is only partly readable (ok:false with cmdlines)', () => {
+    const a = arena()
+    const { r, gitCalls } = run(a, {
+      steps: ['git'],
+      readProcesses: () => ({ ok: false, openPaths: [], cmdlines: ['node scripts/batch-launcher.mjs --daemon'] }),
+    })
+    expect(gitCalls.some((c) => c.includes('gc'))).toBe(false)
+    expect(r.steps.git).toBe('skipped')
+  })
+
+  describe('the 24 h spawn limit', () => {
+    const spawnerOf = (calls) => (cmd, args, opts) => {
+      calls.push({ cmd, args, opts })
+      return { on() {}, unref() {} }
+    }
+    it('survives a failed child and a daemon restart', () => {
+      const a = arena()
+      const statePath = dataPaths(a.local).state
+      const calls = []
+      expect(spawnHousekeepingIfDue({ now: NOW, lastSpawnAt: 0, statePath, spawner: spawnerOf(calls) }).spawned).toBe(true)
+      // The child died before writing state.json; the daemon restarted (lastSpawnAt lost).
+      expect(spawnHousekeepingIfDue({ now: NOW + 1000, lastSpawnAt: 0, statePath, spawner: spawnerOf(calls) }).spawned).toBe(false)
+      expect(calls).toHaveLength(1)
+    })
+    it('an unreadable state file means "not now", not "never ran"', () => {
+      const a = arena()
+      const statePath = dataPaths(a.local).state
+      put(statePath, '{ torn')
+      const calls = []
+      expect(spawnHousekeepingIfDue({ now: NOW, lastSpawnAt: 0, statePath, spawner: spawnerOf(calls) }).spawned).toBe(false)
+      expect(calls).toHaveLength(0)
+    })
+    it('a launch stamp that cannot be persisted means no spawn', () => {
+      const a = arena()
+      const statePath = dataPaths(a.local).state
+      const calls = []
+      const writeStamp = () => {
+        throw Object.assign(new Error('read-only'), { code: 'EROFS' })
+      }
+      expect(spawnHousekeepingIfDue({ now: NOW, lastSpawnAt: 0, statePath, spawner: spawnerOf(calls), writeStamp }).spawned).toBe(false)
+      expect(calls).toHaveLength(0)
+    })
   })
 })

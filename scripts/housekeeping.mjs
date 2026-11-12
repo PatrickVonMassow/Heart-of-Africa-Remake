@@ -27,13 +27,14 @@ import {
   readdirSync,
   readlinkSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   statfsSync,
   unlinkSync,
   writeSync,
 } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
@@ -42,6 +43,7 @@ import { isMainModule } from './is-main.mjs'
 import {
   busyVerdict,
   createBudget,
+  heldOpen,
   failuresToFile,
   gitPlan,
   isContained,
@@ -88,6 +90,7 @@ export function dataPaths(localRoot) {
     dir,
     lock: join(dir, 'lock.json'),
     state: join(dir, 'state.json'),
+    spawn: join(dir, 'spawn.json'),
     failures: join(dir, 'failures.jsonl'),
     manifest: (now) => join(dir, `${new Date(now).toISOString().slice(0, 10)}.jsonl`),
   }
@@ -258,27 +261,43 @@ export function revalidate(path, ident, rootCanonical) {
 // ---------------------------------------------------------------------------
 // Lock (rule 11).
 
+/** A takeover marker older than this means a taker died inside the critical
+ *  section; the stale lock it guarded then needs a human (finding). */
+const TAKEOVER_MARKER_STUCK_MS = 60 * 60 * 1000
+
+function createLock(lockPath, record) {
+  const fd = openSync(lockPath, 'wx')
+  try {
+    writeSync(fd, JSON.stringify(record))
+  } finally {
+    closeSync(fd)
+  }
+  const back = readJson(lockPath)
+  if (!back || back.pid !== record.pid || back.startedAt !== record.startedAt) return { ok: false, reason: 'lock taken over' }
+  return { ok: true, record }
+}
+
+/**
+ * Exclusive lock. A stale lock is taken over EXCLUSIVELY: the taker first
+ * creates (O_EXCL) a marker named after the stale lock's identity (inode +
+ * ctime), re-checks that the lock file still IS that stale file, moves it aside
+ * and only then creates its own lock. A second contender that judged the same
+ * stale lock either loses the marker or finds a different file at the lock path
+ * and leaves it alone — it can never remove the winner's fresh lock.
+ */
 export function acquireLock(lockPath, { now = Date.now(), pid = process.pid, probe = probePid } = {}) {
   const self = probe(pid)
   const record = { pid, pidStartedAt: self?.startedAt ?? null, startedAt: now }
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const fd = openSync(lockPath, 'wx')
-      try {
-        writeSync(fd, JSON.stringify(record))
-      } finally {
-        closeSync(fd)
-      }
-      const back = readJson(lockPath)
-      if (!back || back.pid !== pid || back.startedAt !== now) return { ok: false, reason: 'lock taken over' }
-      return { ok: true, record }
+      return createLock(lockPath, record)
     } catch (e) {
       if (e?.code !== 'EEXIST') return { ok: false, reason: `lock not writable: ${e?.code || e}` }
     }
+    let ident
     let lock = null
-    let lockMtimeMs = null
     try {
-      lockMtimeMs = statSync(lockPath).mtimeMs
+      ident = lstatSync(lockPath)
       const raw = readFileSync(lockPath, 'utf8')
       try {
         lock = JSON.parse(raw)
@@ -287,15 +306,57 @@ export function acquireLock(lockPath, { now = Date.now(), pid = process.pid, pro
       }
     } catch (e) {
       if (e?.code === 'ENOENT') continue
-      lock = 'unreadable'
+      return { ok: false, reason: `lock unreadable: ${e?.code || e}` }
     }
     const holder = lock && typeof lock === 'object' ? probe(Number(lock.pid)) : null
-    const verdict = lockVerdict({ lock, probe: holder, now, lockMtimeMs })
+    const verdict = lockVerdict({ lock, probe: holder, now, lockMtimeMs: ident.mtimeMs })
     if (verdict !== 'stale') return { ok: false, reason: 'another housekeeping run holds the lock' }
+    const marker = `${lockPath}.takeover-${ident.ino}-${Math.round(ident.ctimeMs * 1000)}`
     try {
-      unlinkSync(lockPath)
-    } catch {
-      /* raced with another remover: the retry decides */
+      closeSync(openSync(marker, 'wx'))
+    } catch (e) {
+      if (e?.code !== 'EEXIST') return { ok: false, reason: `takeover marker not writable: ${e?.code || e}` }
+      let age = 0
+      try {
+        age = now - statSync(marker).mtimeMs
+      } catch {
+        /* the other taker finished meanwhile */
+      }
+      return age > TAKEOVER_MARKER_STUCK_MS
+        ? { ok: false, stuck: true, reason: `stuck takeover marker ${marker}: a taker died; remove it and the lock by hand` }
+        : { ok: false, reason: 'another run is taking the stale lock over' }
+    }
+    let aside = null
+    try {
+      let cur
+      try {
+        cur = lstatSync(lockPath)
+      } catch (e) {
+        if (e?.code === 'ENOENT') return { ok: false, reason: 'lock taken over' }
+        throw e
+      }
+      // Not the file judged stale: another taker already replaced it.
+      if (cur.ino !== ident.ino || cur.ctimeMs !== ident.ctimeMs) return { ok: false, reason: 'lock taken over' }
+      aside = `${lockPath}.stale-${pid}-${now}`
+      renameSync(lockPath, aside)
+      try {
+        return createLock(lockPath, record)
+      } catch (e) {
+        return { ok: false, reason: `lock not writable: ${e?.code || e}` }
+      }
+    } catch (e) {
+      return { ok: false, reason: `lock takeover failed: ${e?.code || e}` }
+    } finally {
+      // The moved-aside file outlives the new lock's creation, so the new lock
+      // can never reuse its inode; the marker goes last.
+      for (const p of [aside, marker]) {
+        if (!p) continue
+        try {
+          unlinkSync(p)
+        } catch {
+          /* already gone */
+        }
+      }
     }
   }
   return { ok: false, reason: 'lock contended' }
@@ -373,7 +434,17 @@ export function runHousekeeping({
     return { outcome: 'refused', reason: `cannot create ${paths.dir}: ${e?.code || e}` }
   }
   const lock = acquireLock(paths.lock, { now: startedAt, pid, probe })
-  if (!lock.ok) return { outcome: 'overlap', reason: lock.reason }
+  if (!lock.ok) {
+    if (lock.stuck) {
+      try {
+        fileFinding('Housekeeping failure: lock-takeover-stuck', `scripts/housekeeping.mjs: ${lock.reason}`)
+      } catch {
+        /* the outcome carries it */
+      }
+      return { outcome: 'failed', reason: lock.reason }
+    }
+    return { outcome: 'overlap', reason: lock.reason }
+  }
   try {
     return runLocked()
   } finally {
@@ -418,10 +489,23 @@ export function runHousekeeping({
     let plannedBytes = 0
     const dfBefore = { repo: freeBytes(repoRoot), tmp: freeBytes(tmpRoot) }
 
-    /** Delete (or, dry, plan) one revalidated target. */
+    /** Delete (or, dry, plan) one revalidated target. Liveness is read AFRESH
+     *  for every candidate, right before it goes: a step-wide snapshot would be
+     *  minutes old by the last entry. Unknown liveness keeps. */
     const remove = (path, ident, rootCanonical, rule, size) => {
       const bad = revalidate(path, ident, rootCanonical)
       if (bad) return emit({ path, size, rule, outcome: 'kept', reason: bad })
+      let fresh
+      try {
+        fresh = readProcesses()
+      } catch {
+        fresh = null
+      }
+      if (!fresh || !fresh.ok) {
+        fail('proc-unreadable', `process table unreadable before removing ${path}`)
+        return emit({ path, size, rule, outcome: 'kept', reason: 'liveness unknown' })
+      }
+      if (heldOpen(path, fresh.openPaths)) return emit({ path, size, rule, outcome: 'kept', reason: 'held open by a live process' })
       if (dryRun) {
         plannedBytes += size
         return emit({ path, size, rule, outcome: 'would-delete' })
@@ -499,18 +583,97 @@ export function runHousekeeping({
 
     let liveness = null
     const needLiveness = () => {
-      if (!liveness) liveness = readProcesses()
+      if (!liveness) {
+        try {
+          liveness = readProcesses() || { ok: false }
+        } catch {
+          liveness = { ok: false }
+        }
+      }
       return liveness
+    }
+    /** Fail closed: a step that deletes needs a readable process table. */
+    const livenessGate = (step) => {
+      if (needLiveness().ok) return true
+      fail('proc-unreadable', `the /proc process table could not be read; ${step} step skipped`)
+      stepResults[step] = 'skipped'
+      return false
+    }
+
+    let repoCanon = null
+    try {
+      repoCanon = realpathSync(repoRoot)
+    } catch {
+      /* every repo-rooted step then refuses its root */
+    }
+    /** Canonical worktree roots other than the main checkout, or null (= skip). */
+    let worktrees
+    const needWorktrees = (step) => {
+      if (worktrees === undefined) {
+        let text = null
+        try {
+          text = readWorktrees()
+        } catch {
+          text = null
+        }
+        const list = parseWorktreeList(text)
+        worktrees = list
+          ? list
+              .map((w) => {
+                try {
+                  return realpathSync(w)
+                } catch {
+                  return w
+                }
+              })
+              .filter((w) => w !== repoCanon)
+          : null
+      }
+      if (!worktrees) {
+        fail('worktree-list-unreadable', `git worktree list failed; ${step} step skipped`)
+        stepResults[step] = 'skipped'
+      }
+      return worktrees
+    }
+    /**
+     * A repo-rooted cleanup root: neither it nor any directory between the repo
+     * and it may be a symlink, and its canonical path must lie inside the repo.
+     * Returns the canonical root, 'absent', or null after filing a failure.
+     */
+    const safeRepoRoot = (step, chain) => {
+      for (const p of chain) {
+        try {
+          if (lstatSync(p).isSymbolicLink()) {
+            fail(`${step}-root-unsafe`, `${p} is a symlink; ${step} step skipped`)
+            return null
+          }
+        } catch (e) {
+          if (e?.code === 'ENOENT') return 'absent'
+          fail(`${step}-unreadable`, `${p}: ${e?.code || e}`)
+          return null
+        }
+      }
+      const target = chain[chain.length - 1]
+      let canon
+      try {
+        canon = realpathSync(target)
+      } catch (e) {
+        fail(`${step}-unreadable`, `${target}: ${e?.code || e}`)
+        return null
+      }
+      if (!repoCanon || !isContained(canon, repoCanon)) {
+        fail(`${step}-root-unsafe`, `${target} resolves to ${canon}, outside the repository; ${step} step skipped`)
+        return null
+      }
+      return canon
     }
 
     for (const step of steps) {
       if (step === 'tmp') {
+        if (!livenessGate('tmp')) continue
         const live = needLiveness()
-        if (!live.ok) {
-          fail('proc-unreadable', 'the /proc process table could not be read; /tmp step skipped')
-          stepResults.tmp = 'skipped'
-          continue
-        }
+        const wts = needWorktrees('tmp')
+        if (!wts) continue
         let root
         try {
           root = realpathSync(tmpRoot)
@@ -529,19 +692,22 @@ export function runHousekeeping({
           }
           budget.spend(1)
           const isSymlink = st.isSymbolicLink()
+          const isFile = st.isFile()
           const shape = !isSymlink && st.isDirectory() && !/^(hoa|point)-/.test(name) ? describeShape(path, name) : null
-          const pre = tmpShapeVerdict({ name, isSymlink, shape })
+          const pre = tmpShapeVerdict({ name, isSymlink, isFile, shape })
           if (!pre.ok) {
             if (!SILENT.has(pre.reason)) emit({ path, size: st.size, rule: 'tmp', outcome: 'kept', reason: pre.reason })
             return
           }
+          if (touchesWorktree(path, wts)) return emit({ path, size: null, rule: pre.rule, outcome: 'kept', reason: 'git worktree' })
           const scan = scanTree(path, budget)
-          const facts = { name, isSymlink, shape, complete: scan.complete, newestMtimeMs: scan.newestMtimeMs, canonical: path }
+          const facts = { name, isSymlink, isFile, shape, complete: scan.complete, newestMtimeMs: scan.newestMtimeMs, canonical: path }
           const v = tmpVerdict(facts, { now: clock(), liveness: live })
           if (!v.act) {
             if (!SILENT.has(v.reason)) emit({ path, size: scan.bytes, rule: 'tmp', outcome: 'kept', reason: v.reason })
             return
           }
+          if (scan.hasGit) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'contains .git' })
           remove(path, st, root, v.rule, scan.bytes)
         })
         if (stepResults.tmp === 'incomplete') break
@@ -554,38 +720,14 @@ export function runHousekeeping({
           stepResults.local = 'skipped'
           continue
         }
-        const wtText = (() => {
-          try {
-            return readWorktrees()
-          } catch {
-            return null
-          }
-        })()
-        const wtList = parseWorktreeList(wtText)
-        if (!wtList) {
-          fail('worktree-list-unreadable', 'git worktree list failed; local/ step skipped')
+        if (!livenessGate('local')) continue
+        const worktrees = needWorktrees('local')
+        if (!worktrees) continue
+        const root = safeRepoRoot('local', [localRoot])
+        if (!root || root === 'absent') {
           stepResults.local = 'skipped'
           continue
         }
-        let root
-        let repoCanon
-        try {
-          root = realpathSync(localRoot)
-          repoCanon = realpathSync(repoRoot)
-        } catch (e) {
-          if (e?.code !== 'ENOENT') fail('local-unreadable', String(e?.code || e))
-          stepResults.local = 'skipped'
-          continue
-        }
-        const worktrees = wtList
-          .map((w) => {
-            try {
-              return realpathSync(w)
-            } catch {
-              return w
-            }
-          })
-          .filter((w) => w !== repoCanon)
         stepResults.local = walk('local', root, (name) => {
           const path = join(root, name)
           let st
@@ -618,11 +760,9 @@ export function runHousekeeping({
           stepResults.logs = 'skipped'
           continue
         }
-        let root
-        try {
-          root = realpathSync(join(localRoot, 'tool-output-logs'))
-        } catch (e) {
-          if (e?.code !== 'ENOENT') fail('logs-unreadable', String(e?.code || e))
+        if (!livenessGate('logs')) continue
+        const root = safeRepoRoot('logs', [localRoot, join(localRoot, 'tool-output-logs')])
+        if (!root || root === 'absent') {
           stepResults.logs = 'skipped'
           continue
         }
@@ -649,7 +789,9 @@ export function runHousekeeping({
 
       if (step === 'git') {
         const live = needLiveness()
-        const busy = live.cmdlines ? busyVerdict(live.cmdlines) : null
+        // ok:false may still carry a PARTIAL cmdline list: a suite may hide in
+        // the unread part, so only a fully read table answers "not busy".
+        const busy = live.ok ? busyVerdict(live.cmdlines) : null
         const before = gitPackBytes(runGit, repoRoot)
         const plan = gitPlan({ mode: gitMode, busy, freeBytes: freeBytes(repoRoot), gitBytes: before })
         if (!plan.run) {
@@ -731,22 +873,54 @@ export function runHousekeeping({
 // ---------------------------------------------------------------------------
 // The launcher's hook (rule 11): spawn detached, never await, never traverse.
 
+/** A stamp file's value: absent = 0 (never), unreadable or malformed = null. */
+function readStamp(path, field) {
+  let raw
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch (e) {
+    return e?.code === 'ENOENT' ? 0 : null
+  }
+  try {
+    const v = JSON.parse(raw)?.[field]
+    if (v === undefined) return 0
+    return Number.isFinite(Number(v)) ? Number(v) : null
+  } catch {
+    return null
+  }
+}
+
 /**
- * Called by the launcher daemon after each tick. Synchronous and cheap: one
- * small JSON read and, at most once per interval, a detached spawn.
+ * Called by the launcher daemon after each tick. Synchronous and cheap: two
+ * small JSON reads and, at most once per interval, a detached spawn.
+ * The launch stamp is PERSISTED (atomic write) BEFORE the spawn, so the 24 h
+ * limit survives a child that dies before writing its own state and a daemon
+ * restart. An unreadable stamp or state, or a stamp that cannot be written,
+ * means "not now" — never "never ran".
  * Returns { spawned, lastSpawnAt, reason }.
  */
 export function spawnHousekeepingIfDue({
   now = Date.now(),
   lastSpawnAt = 0,
   statePath = dataPaths(join(REPO_ROOT, 'local')).state,
+  spawnPath = join(dirname(statePath), 'spawn.json'),
   spawner = spawn,
   cwd = REPO_ROOT,
   scriptPath = SELF_PATH,
+  writeStamp = writeJsonAtomic,
 } = {}) {
-  const state = readJson(statePath)
-  const d = spawnDecision({ now, lastSpawnAt, lastAttemptAt: state?.lastAttemptAt })
+  const lastAttemptAt = readStamp(statePath, 'lastAttemptAt')
+  const persistedSpawnAt = readStamp(spawnPath, 'lastSpawnAt')
+  if (lastAttemptAt === null || persistedSpawnAt === null)
+    return { spawned: false, lastSpawnAt, reason: 'housekeeping state unreadable' }
+  const d = spawnDecision({ now, lastSpawnAt: Math.max(Number(lastSpawnAt) || 0, persistedSpawnAt), lastAttemptAt })
   if (!d.spawn) return { spawned: false, lastSpawnAt, reason: d.reason }
+  try {
+    mkdirSync(dirname(spawnPath), { recursive: true })
+    writeStamp(spawnPath, { lastSpawnAt: now })
+  } catch (e) {
+    return { spawned: false, lastSpawnAt, reason: `launch stamp not writable: ${e?.code || e}` }
+  }
   const child = spawner(process.execPath, [scriptPath], { cwd, detached: true, stdio: 'ignore', windowsHide: true })
   // An asynchronous spawn failure must not crash the daemon.
   child?.on?.('error', () => {})
