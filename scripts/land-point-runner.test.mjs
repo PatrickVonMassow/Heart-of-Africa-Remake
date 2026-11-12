@@ -195,15 +195,25 @@ describe('the cleanup evidence, against a real checkout', () => {
     git(['worktree', 'add', '-q', '--detach', baseline, first], root)
     expect(select(root).branch.delete).toBe(true)
 
-    writeFileSync(join(baseline, 'a.txt'), 'x\n')
-    // No commit happens, so HEAD stays exactly on the sha the name records.
-    try {
-      git(['cherry-pick', '--no-commit', 'side~1', 'side'], baseline)
-    } catch {
-      /* the conflict is the point */
+    // `side` (b -> c) onto a.txt = 'a' conflicts at once; no commit happens,
+    // so HEAD stays exactly on the sha the name records.
+    const conflicted = (picks) => {
+      try {
+        git(['cherry-pick', '--no-commit', ...picks], baseline)
+      } catch (e) {
+        expect(String(e.stderr)).toMatch(/conflict/i)
+        expect(git(['status', '--porcelain'], baseline)).toMatch(/^UU a\.txt/m)
+        expect(git(['rev-parse', 'HEAD'], baseline).trim()).toBe(first)
+        return
+      }
+      throw new Error('the replay did not stop on a conflict')
     }
-    git(['checkout', '--', 'a.txt'], baseline)
-    expect(git(['rev-parse', 'HEAD'], baseline).trim()).toBe(first)
+    conflicted(['side'])
+    expect(select(root).branch.delete).toBe(false)
+    git(['reset', '-q', '--hard'], baseline)
+    git(['cherry-pick', '--quit'], baseline)
+    expect(select(root).branch.delete).toBe(true)
+    conflicted(['side', 'side~1'])
     const linked = cleanupEvidence([{ path: baseline, branch: '', head: first }], {
       branch: 'feat/608-x',
       mainRoot: root,
@@ -1162,7 +1172,7 @@ describe('midOperationIn (point 1513)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mid-op-'))
     try {
       expect(midOperationIn(dir)).toBe(false)
-      for (const marker of ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer']) {
+      for (const marker of ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer', 'AUTO_MERGE', 'MERGE_MSG']) {
         const gitdir = mkdtempSync(join(dir, 'g-'))
         writeFileSync(join(gitdir, marker), '')
         expect(midOperationIn(gitdir)).toBe(true)
