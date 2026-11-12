@@ -348,7 +348,9 @@ details:not(.sect)[open]>summary::after{content:"▾"}
 .body .desc-missing{font-style:italic;color:var(--warn,#a85f28)}
 .body .dist-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin:8px 0 2px}
 .body .dist{font-size:.85em;color:var(--soft,#7c6c4d)}
-details.sect>summary:has(>.slots){display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.75em;row-gap:0}
+details.sect>summary:has(>.slots){display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.75em;row-gap:0;position:relative;margin:26px 0 8px;padding:0 1.6em 5px 0;border-bottom:1px solid var(--rule,#d8c9a8)}
+details.sect>summary:has(>.slots) h2{margin:0;padding-bottom:0;border-bottom:0}
+details.sect>summary:has(>.slots) h2::after{position:absolute;right:0;top:0}
 details.sect>summary>.slots{flex:1 1 12rem;min-width:0;font-size:.8em;font-weight:400;color:var(--soft,#7c6c4d);overflow-wrap:anywhere}
 </style>`
 
