@@ -147,10 +147,13 @@ function linkedGitdirOf(path) {
 }
 
 /**
- * Is a rebase, merge, cherry-pick, revert or bisect in progress in the checkout
+ * Is a rebase, merge, cherry-pick, revert or bisect (also a sequenced
+ * `--no-commit` replay) in progress in the checkout
  * whose admin gitdir is `gitdir`? null when it cannot be established.
  */
-const MID_OPERATION_MARKERS = ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG']
+// `sequencer` alone marks a stopped multi-commit `cherry-pick`/`revert --no-commit`
+// (measured 13.11.2026: no CHERRY_PICK_HEAD is written then).
+const MID_OPERATION_MARKERS = ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer']
 export function midOperationIn(gitdir) {
   if (!gitdir) return null
   for (const marker of MID_OPERATION_MARKERS) {

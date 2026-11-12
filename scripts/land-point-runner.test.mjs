@@ -24,7 +24,7 @@
 // `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
 // WITHOUT its own look becoming the evidence (point 629).
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
@@ -179,6 +179,42 @@ describe('the cleanup evidence, against a real checkout', () => {
     const sel = select(root)
     expect(sel.remove).toEqual([])
     expect(sel.reported[0].reason).toMatch(/not contained in what was merged/)
+  })
+
+  it('lets an idle baseline checkout pass, and keeps the branch while a no-commit cherry-pick is stopped in it', () => {
+    const { root, own } = scene()
+    const first = git(['rev-parse', 'HEAD'], root).trim()
+    // Two commits on a side branch, both touching a.txt, and a main commit that conflicts with them.
+    git(['checkout', '-q', '-b', 'side'], root)
+    for (const v of ['b', 'c']) {
+      writeFileSync(join(root, 'a.txt'), `${v}\n`)
+      git(['commit', '-q', '-am', v], root)
+    }
+    git(['checkout', '-q', 'main'], root)
+    const baseline = join(root, 'local', 'verify-baseline', first.slice(0, 12))
+    git(['worktree', 'add', '-q', '--detach', baseline, first], root)
+    expect(select(root).branch.delete).toBe(true)
+
+    writeFileSync(join(baseline, 'a.txt'), 'x\n')
+    // No commit happens, so HEAD stays exactly on the sha the name records.
+    try {
+      git(['cherry-pick', '--no-commit', 'side~1', 'side'], baseline)
+    } catch {
+      /* the conflict is the point */
+    }
+    git(['checkout', '--', 'a.txt'], baseline)
+    expect(git(['rev-parse', 'HEAD'], baseline).trim()).toBe(first)
+    const linked = cleanupEvidence([{ path: baseline, branch: '', head: first }], {
+      branch: 'feat/608-x',
+      mainRoot: root,
+      mergeTarget: 'main',
+      cwd: root,
+    })[baseline]
+    expect(existsSync(join(linked.linkedTo, 'sequencer'))).toBe(true)
+    expect(existsSync(join(linked.linkedTo, 'CHERRY_PICK_HEAD'))).toBe(false)
+    expect(linked.midOperation).toBe(true)
+    expect(select(root).branch.delete).toBe(false)
+    expect(own).toBeTruthy()
   })
 
   it('keeps a directory in the isolation folder that git never registered', () => {
@@ -1126,7 +1162,7 @@ describe('midOperationIn (point 1513)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mid-op-'))
     try {
       expect(midOperationIn(dir)).toBe(false)
-      for (const marker of ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG']) {
+      for (const marker of ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'sequencer']) {
         const gitdir = mkdtempSync(join(dir, 'g-'))
         writeFileSync(join(gitdir, marker), '')
         expect(midOperationIn(gitdir)).toBe(true)
