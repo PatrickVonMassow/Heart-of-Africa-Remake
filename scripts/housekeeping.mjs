@@ -170,7 +170,9 @@ const PROC_IO = { readdir: readdirSync, readFile: readFileSync, readlink: readli
 /** Open file paths and command lines of every process. ok=false when /proc or
  *  any own-uid process's cwd/fd table cannot be read (fail closed). An EACCES
  *  on the cwd/fd of a FOREIGN-uid process (e.g. a root keep-alive shell) is
- *  only counted in foreignUnreadable: this user can never read it. */
+ *  only counted in foreignUnreadable: this user can never read it. Accepted
+ *  residual (point 1512): such a process holding one of this user's old files
+ *  open is not seen; deletion then only unlinks, the holder keeps its fd. */
 export function readProcessTable(procRoot = '/proc', { io = PROC_IO, uid = process.getuid?.() } = {}) {
   let pids
   try {
@@ -186,17 +188,14 @@ export function readProcessTable(procRoot = '/proc', { io = PROC_IO, uid = proce
   const gone = (e) => e?.code === 'ENOENT' || e?.code === 'ESRCH'
   for (const pid of pids) {
     const base = join(procRoot, pid)
-    let foreign = null
     let counted = false
+    /** Re-read per error, never cached: a process may change credentials mid-scan. */
     const isForeign = () => {
-      if (foreign === null) {
-        try {
-          foreign = uid !== undefined && io.ownerUid(base) !== uid
-        } catch {
-          foreign = false
-        }
+      try {
+        return uid !== undefined && io.ownerUid(base) !== uid
+      } catch {
+        return false
       }
-      return foreign
     }
     /** cwd/fd errors: a foreign-uid EACCES is counted once per process, never fatal. */
     const onFdError = (e) => {

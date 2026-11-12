@@ -687,6 +687,14 @@ describe('readProcessTable: foreign-uid fd tables (point 1512)', () => {
     expect(r.ok).toBe(false)
   })
 
+  it('stays fail-closed when a foreign process turns own-uid between cwd and fd scan', () => {
+    const io = fakeIo({ 44: { ...rootShell } })
+    let calls = 0
+    io.ownerUid = () => (calls++ === 0 ? 0 : 1000)
+    const r = readProcessTable('/proc', { io, uid: 1000 })
+    expect(r.ok).toBe(false)
+  })
+
   it('stays fail-closed for an unreadable own-uid fd entry', () => {
     const r = readProcessTable('/proc', { io: fakeIo({ 99: { ...own, fds: { 3: 'EACCES' } } }), uid: 1000 })
     expect(r.ok).toBe(false)
