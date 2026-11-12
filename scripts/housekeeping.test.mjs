@@ -20,7 +20,7 @@ import { join } from 'node:path'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { runDaemon } from './batch-launcher.mjs'
 import { DAY_MS } from './housekeeping-core.mjs'
-import { acquireLock, dataPaths, runHousekeeping, spawnHousekeepingIfDue } from './housekeeping.mjs'
+import { acquireLock, dataPaths, readProcessTable, runHousekeeping, spawnHousekeepingIfDue } from './housekeeping.mjs'
 
 const NOW = Date.UTC(2026, 10, 12, 12)
 const OLD = (NOW - 30 * DAY_MS) / 1000
@@ -640,5 +640,74 @@ describe('review regressions', () => {
       expect(spawnHousekeepingIfDue({ now: NOW, lastSpawnAt: 0, statePath, spawner: spawnerOf(calls), writeStamp }).spawned).toBe(false)
       expect(calls).toHaveLength(0)
     })
+  })
+})
+
+describe('readProcessTable: foreign-uid fd tables (point 1512)', () => {
+  const eacces = () => Object.assign(new Error('EACCES'), { code: 'EACCES' })
+  /** A fake /proc: pid -> { uid, cwd, fds, cmdline }; the value 'EACCES' throws. */
+  const fakeIo = (procs, { listing = true } = {}) => {
+    const at = (p) => {
+      const [, pid, ...rest] = p.split('/').filter(Boolean)
+      return { proc: procs[pid], rest }
+    }
+    const val = (v) => {
+      if (v === 'EACCES') throw eacces()
+      return v
+    }
+    return {
+      readdir: (p) => {
+        if (p === '/proc') {
+          if (!listing) throw eacces()
+          return Object.keys(procs)
+        }
+        return Object.keys(val(at(p).proc.fds))
+      },
+      readFile: (p) => val(at(p).proc.cmdline),
+      readlink: (p) => {
+        const { proc, rest } = at(p)
+        return rest[0] === 'cwd' ? val(proc.cwd) : val(proc.fds[rest[1]])
+      },
+      ownerUid: (p) => at(p).proc.uid,
+    }
+  }
+  const own = { uid: 1000, cwd: '/workspace/hoa', fds: { 0: '/dev/null', 3: '/tmp/x.log' }, cmdline: 'node\0a.mjs' }
+  const rootShell = { uid: 0, cwd: 'EACCES', fds: 'EACCES', cmdline: '/bin/sh' }
+
+  it('counts an unreadable foreign-uid fd table and stays ok', () => {
+    const r = readProcessTable('/proc', { io: fakeIo({ 44: rootShell, 50: rootShell, 99: own }), uid: 1000 })
+    expect(r.ok).toBe(true)
+    expect(r.foreignUnreadable).toBe(2)
+    expect(r.openPaths).toContain('/tmp/x.log')
+    expect(r.cmdlines).toContain('/bin/sh')
+  })
+
+  it('stays fail-closed for an unreadable own-uid fd table', () => {
+    const r = readProcessTable('/proc', { io: fakeIo({ 99: { ...own, fds: 'EACCES' } }), uid: 1000 })
+    expect(r.ok).toBe(false)
+  })
+
+  it('stays fail-closed for an unreadable own-uid fd entry', () => {
+    const r = readProcessTable('/proc', { io: fakeIo({ 99: { ...own, fds: { 3: 'EACCES' } } }), uid: 1000 })
+    expect(r.ok).toBe(false)
+  })
+
+  it('stays fail-closed for an unreadable cmdline, even of a foreign process', () => {
+    const r = readProcessTable('/proc', { io: fakeIo({ 44: { ...rootShell, cmdline: 'EACCES' } }), uid: 1000 })
+    expect(r.ok).toBe(false)
+  })
+
+  it('stays fail-closed for an unreadable /proc listing', () => {
+    const r = readProcessTable('/proc', { io: fakeIo({ 99: own }, { listing: false }), uid: 1000 })
+    expect(r.ok).toBe(false)
+  })
+
+  it('records the foreign count in the run summary', () => {
+    const { r } = run(arena(), {
+      dryRun: true,
+      readProcesses: () => ({ ok: true, openPaths: [], cmdlines: [], foreignUnreadable: 3 }),
+    })
+    expect(r.failures).toEqual([])
+    expect(r.foreignUnreadable).toBe(3)
   })
 })
