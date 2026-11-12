@@ -35,6 +35,7 @@ import {
   deleteLandedBranch,
   listWorktrees,
   localBranchExists,
+  midOperationIn,
   reproveOne,
   runCommand,
   selectCleanup,
@@ -1117,5 +1118,24 @@ describe('the board audit run by the landing', () => {
     expect(cleanupOk).toBeGreaterThan(publish)
     expect(audit).toBeGreaterThan(cleanupOk)
     if (push > 0) expect(audit).toBeGreaterThan(push)
+  })
+})
+
+describe('midOperationIn (point 1513)', () => {
+  it('reports a stopped rebase, merge, cherry-pick, revert or bisect; nothing else; unknown as null', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mid-op-'))
+    try {
+      expect(midOperationIn(dir)).toBe(false)
+      for (const marker of ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG']) {
+        const gitdir = mkdtempSync(join(dir, 'g-'))
+        writeFileSync(join(gitdir, marker), '')
+        expect(midOperationIn(gitdir)).toBe(true)
+      }
+      expect(midOperationIn(null)).toBe(null)
+      writeFileSync(join(dir, 'file'), '')
+      expect(midOperationIn(join(dir, 'file'))).toBe(null)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

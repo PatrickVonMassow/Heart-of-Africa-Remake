@@ -185,7 +185,7 @@ describe('ownership must be PROVEN', () => {
     const sel = selectCleanupTargets({
       ...base,
       worktrees: [{ path: ROOT, branch: 'main' }, own, baseline],
-      evidence: { [own.path]: deadFor('point-608') },
+      evidence: { [own.path]: deadFor('point-608'), [baseline.path]: { midOperation: false } },
     })
     expect(sel.remove).toEqual([own.path])
     expect(sel.reported).toEqual([])
@@ -217,8 +217,19 @@ describe('ownership must be PROVEN', () => {
       { path, branch: '', head: '' },
       { path, branch: '', head: 'db74de7ddbe9d552cc10', locked: 'manual' },
     ]) {
-      const sel = selectCleanupTargets({ ...base, worktrees: [tree] })
+      const sel = selectCleanupTargets({ ...base, worktrees: [tree], evidence: { [path]: { midOperation: false } } })
       expect(sel.reported.map((r) => r.path)).toEqual([path])
+      expect(sel.branch.delete).toBe(false)
+    }
+  })
+
+  it('a verify-baseline checkout on its sha keeps the branch unless no operation is proven in progress', () => {
+    // Cross-vendor review: a rebase stopped on its first replayed commit leaves
+    // HEAD exactly on the baseline sha.
+    const tree = { path: `${ROOT}/local/verify-baseline/db74de7ddbe9`, branch: '', head: 'db74de7ddbe9d552cc10' }
+    for (const evidence of [null, {}, { midOperation: true }, { midOperation: null }]) {
+      const sel = selectCleanupTargets({ ...base, worktrees: [tree], evidence: evidence && { [tree.path]: evidence } })
+      expect(sel.reported.map((r) => r.path)).toEqual([tree.path])
       expect(sel.branch.delete).toBe(false)
     }
   })

@@ -42,6 +42,7 @@ import {
   branchDeletionBlocker,
   formatCleanupNotes,
   isAgentWorktree,
+  isBaselineCheckoutPath,
   reproveRemoval,
   selectCleanupTargets,
 } from './land-cleanup-core.mjs'
@@ -143,6 +144,24 @@ function linkedGitdirOf(path) {
   } catch {
     return null
   }
+}
+
+/**
+ * Is a rebase, merge, cherry-pick, revert or bisect in progress in the checkout
+ * whose admin gitdir is `gitdir`? null when it cannot be established.
+ */
+const MID_OPERATION_MARKERS = ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG']
+export function midOperationIn(gitdir) {
+  if (!gitdir) return null
+  for (const marker of MID_OPERATION_MARKERS) {
+    try {
+      statSync(join(gitdir, marker))
+      return true
+    } catch (e) {
+      if (e?.code !== 'ENOENT') return null
+    }
+  }
+  return false
 }
 
 /**
@@ -248,7 +267,8 @@ export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT, merge
     // the landed branch. Everything else is refused on ownership alone and its
     // evidence would never be read — probing it would cost a `git status` on every
     // unrelated checkout for nothing.
-    if (!path || (!isAgentWorktree(path, mainRoot) && String(w?.branch ?? '') !== String(branch ?? ''))) continue
+    const baseline = isBaselineCheckoutPath(path, mainRoot)
+    if (!path || (!isAgentWorktree(path, mainRoot) && !baseline && String(w?.branch ?? '') !== String(branch ?? ''))) continue
     const exists = pathExists(path)
     if (exists !== true) {
       // `null` here means the stat FAILED, not that the directory is absent, and
@@ -260,6 +280,7 @@ export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT, merge
         headMerged: null,
         dirty: null,
         activeAt: null,
+        midOperation: null,
         holderAlive: null,
         ino: 0,
         dev: 0,
@@ -279,12 +300,14 @@ export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT, merge
     } catch {
       /* an unreadable checkout answers null — the rule then keeps it */
     }
+    const linkedTo = linkedGitdirOf(path)
     evidence[path] = {
       exists: true,
-      linkedTo: linkedGitdirOf(path),
+      linkedTo,
       headMerged: headContainedIn(String(w?.head ?? ''), mergeTarget, { cwd }),
       dirty,
       activeAt,
+      midOperation: midOperationIn(linkedTo),
       holderAlive: lockHolderAlive(w.locked),
       ...gitFileIdentity(path),
     }

@@ -128,18 +128,25 @@ export function isPointWorktree(path, mainRoot, branch) {
  * A DIRECT child of `<mainRoot>/local/verify-baseline`, which
  * `scripts/verify/baseline-classify.mjs` creates `--detach` on a fixed sha and
  * names after that sha's first 12 characters. The path alone proves nothing — the
- * tree could be rebasing the landed branch — so it counts only while unlocked and
- * its HEAD still stands on the sha its name records; a rebase moves HEAD off it.
- * As unproven it kept the branch of every landing while it stood (point 1513).
+ * tree could be rebasing the landed branch — so it counts only while unlocked, with
+ * its HEAD on the sha its name records, and with no rebase, merge, cherry-pick,
+ * revert or bisect proven absent (`evidence.midOperation === false`): a stopped
+ * rebase can leave HEAD exactly on that sha. As unproven it kept the branch of
+ * every landing while it stood (point 1513).
  */
-export function isIdleBaselineWorktree(worktree, mainRoot) {
+export function isBaselineCheckoutPath(path, mainRoot) {
   const root = normPath(mainRoot)
-  const path = normPath(worktree?.path)
-  if (!root || !path || str(worktree?.locked)) return false
+  const p = normPath(path)
+  if (!root || !p) return false
   const dir = `${root}/${BASELINE_WORKTREE_DIR}`
-  if (!insideRoot(path, dir) || path === dir || path.slice(dir.length + 1).includes('/')) return false
-  const name = baseName(path)
-  return /^[0-9a-f]{12}$/.test(name) && str(worktree?.head).startsWith(name)
+  if (!insideRoot(p, dir) || p === dir || p.slice(dir.length + 1).includes('/')) return false
+  return /^[0-9a-f]{12}$/.test(baseName(p))
+}
+
+export function isIdleBaselineWorktree(worktree, mainRoot, evidence = null) {
+  if (str(worktree?.locked) || evidence?.midOperation !== false) return false
+  if (!isBaselineCheckoutPath(worktree?.path, mainRoot)) return false
+  return str(worktree?.head).startsWith(baseName(normPath(worktree?.path)))
 }
 
 /**
@@ -179,6 +186,8 @@ export function isLinkedWorktreeOf(linkedTo, mainRoot) {
  *               headMerged  — is its HEAD already contained in what was merged?
  *               dirty       — does it hold uncommitted or untracked changes?
  *               activeAt    — epoch ms a working file in it was last written
+ *               midOperation — is a rebase, merge, cherry-pick, revert or
+ *                             bisect in progress in it? (read for baseline trees)
  *               holderAlive — is the process named in the lock still running?
  *                             REPORTED ONLY; a stale lock still keeps the tree,
  *                             because a lock nobody released is not proof that
@@ -216,7 +225,7 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
 
   // ── OWNERSHIP ──────────────────────────────────────────────────────────────
   if (!want) return at(DISPOSITION.unproven, 'the landing named no branch, so nothing can be tied to it')
-  if (!has && isIdleBaselineWorktree(worktree, mainRoot)) {
+  if (!has && isIdleBaselineWorktree(worktree, mainRoot, evidence)) {
     return at(DISPOSITION.foreign, 'a verify-baseline checkout, still on the sha its name records')
   }
   if (!has) {
