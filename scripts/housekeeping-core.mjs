@@ -94,8 +94,9 @@ export function branchKind(name) {
 
 /**
  * The one archived point whose block names `branch` exactly, else null. The
- * name must stand between whitespace, quotes or brackets; only a sentence
- * mark may follow it, so any other continuation is another branch.
+ * name must stand between whitespace, quotes or brackets; a sentence mark may
+ * follow it only before whitespace or the line end, so any other continuation
+ * is another branch.
  */
 export function archivedPointNaming(branch, archiveText) {
   if (!branch || typeof archiveText !== 'string') return null
@@ -105,7 +106,7 @@ export function archivedPointNaming(branch, archiveText) {
     const m = POINT_LINE.exec(line)
     if (m) point = Number(m[2])
     else if (BLOCK_END.test(line)) point = null
-    if (point !== null && new RegExp(`(^|[\\s\`'"(\\[])${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s\`'")\\]]|[.,;:!?]($|[\\s\`'")\\]]))`).test(line)) named.add(point)
+    if (point !== null && new RegExp(`(^|[\\s\`'"(\\[])${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s\`'")\\]]|[.,;:!?]($|\\s))`).test(line)) named.add(point)
   }
   return named.size === 1 ? [...named][0] : null
 }

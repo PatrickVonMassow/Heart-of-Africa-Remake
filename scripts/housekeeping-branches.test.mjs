@@ -229,7 +229,7 @@ describe('the branches step (point 1513)', () => {
 
   it('an unreadable or malformed worktree list skips the step', () => {
     const incomplete = `worktree /repo\nHEAD ${'a'.repeat(40)}\n`
-    for (const readWorktrees of [() => null, () => '', () => 'garbage\n', () => incomplete, () => 'worktree /x\nbare\ndetached\n', () => `${incomplete}detached\nbranch refs/heads/a\n`, () => { throw new Error('x') }]) {
+    for (const readWorktrees of [() => null, () => '', () => 'garbage\n', () => incomplete, () => 'worktree /x\nbare\ndetached\n', () => `${incomplete}detached\nbranch refs/heads/a\n`, () => `worktree /x\nbare\nHEAD ${'a'.repeat(40)}\n`, () => `worktree /x\nHEAD ${'a'.repeat(40)}\nbare\n`, () => { throw new Error('x') }]) {
       const failures = []
       const r = runBranchesStep({ runGit, repoRoot: '/', now: 0, readWorktrees, emit: () => {}, fail: (k) => failures.push(k) })
       expect(r).toBe('skipped')
