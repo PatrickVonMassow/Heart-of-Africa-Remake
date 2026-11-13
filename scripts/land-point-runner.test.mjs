@@ -1244,8 +1244,12 @@ describe('resolveMergeTip against a real remote', () => {
     const before = localTip()
     const reviewed = commitIn(other, 'fix.txt')
     git(['push', '-q', 'origin', 'feat/1514-x'], other)
-    expect(resolveMergeTip({ branch: 'feat/1514-x', cwd: work, apply: false })).toMatchObject({ ok: true, sha: reviewed })
+    const tracking = () => git(['rev-parse', 'refs/remotes/origin/feat/1514-x'], work).trim()
+    const trackingBefore = tracking()
+    expect(resolveMergeTip({ branch: 'feat/1514-x', cwd: work, apply: false })).toMatchObject({ ok: true, action: 'fast-forward', sha: reviewed })
     expect(localTip()).toBe(before)
+    expect(tracking()).toBe(trackingBefore)
+    expect(existsSync(join(work, '.git', 'FETCH_HEAD'))).toBe(false)
   })
 
   it('refuses a branch that has diverged from origin, naming both shas', () => {
@@ -1260,6 +1264,18 @@ describe('resolveMergeTip against a real remote', () => {
     expect(t.reason).toContain(local.slice(0, 8))
     expect(t.reason).toContain(pushed.slice(0, 8))
     expect(localTip()).toBe(local)
+  })
+
+  it('keeps the local tip when origin does not have the branch', () => {
+    const { work, localTip } = tipScene()
+    git(['branch', 'feat/1514-local'], work)
+    expect(resolveMergeTip({ branch: 'feat/1514-local', cwd: work })).toMatchObject({ ok: true, action: 'local', sha: localTip() })
+  })
+
+  it('refuses when origin cannot be reached', () => {
+    const { work } = tipScene()
+    git(['remote', 'set-url', 'origin', join(work, 'no-such-remote.git')], work)
+    expect(resolveMergeTip({ branch: 'feat/1514-x', cwd: work })).toMatchObject({ ok: false, reason: expect.stringMatching(/fetching origin/) })
   })
 
   it('keeps the local tip when origin has not moved', () => {

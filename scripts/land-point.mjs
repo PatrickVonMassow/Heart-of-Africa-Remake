@@ -754,15 +754,16 @@ export function resolveMergeTip({ branch, apply = true, cwd = REPO_ROOT } = {}) 
       return false
     }
   }
+  // The dry plan writes no ref: it asks origin for the tip and fetches only its
+  // objects (`--refmap=` keeps the remote-tracking ref, no FETCH_HEAD).
   let remote = null
   try {
-    run(['fetch', '--quiet', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`])
-    remote = sha(`refs/remotes/origin/${branch}`)
+    remote = run(['ls-remote', 'origin', `refs/heads/${branch}`]).split(/\s/)[0] || null
+    if (remote && apply) run(['fetch', '--quiet', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`])
+    else if (remote) run(['fetch', '--quiet', '--no-write-fetch-head', '--refmap=', 'origin', `refs/heads/${branch}`])
   } catch (e) {
     const why = String(e.stderr ?? e.message)
-    if (!/couldn't find remote ref/i.test(why)) {
-      return { ok: false, reason: `fetching origin/${branch} failed: ${why.trim().split('\n')[0]}`, repair: 'restore access to origin, then re-run' }
-    }
+    return { ok: false, reason: `fetching origin/${branch} failed: ${why.trim().split('\n')[0]}`, repair: 'restore access to origin, then re-run' }
   }
   const local = sha(`refs/heads/${branch}`)
   const tip = decideMergeTip({
@@ -1179,9 +1180,10 @@ async function main(argv) {
     // 1. MERGE. --no-ff always (see MERGE_ARGS in the core for why).
     try {
       if (git(['rev-parse', `refs/heads/${branch}`]) !== tip.sha) throw new Error(`${branch} moved off the planned ${tip.sha.slice(0, 8)} before the merge`)
+      // The planned sha, not the mutable branch name: what was audited is what lands.
       const mergeArgs = batchId
-        ? [...MERGE_ARGS.filter((arg) => arg !== '--no-edit'), branch, '-m', `Merge branch '${branch}'\n\nPublication-Id: ${landingId}`]
-        : [...MERGE_ARGS, branch]
+        ? [...MERGE_ARGS.filter((arg) => arg !== '--no-edit'), tip.sha, '-m', `Merge branch '${branch}'\n\nPublication-Id: ${landingId}`]
+        : [...MERGE_ARGS, '-m', `Merge branch '${branch}'`, tip.sha]
       git(mergeArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
       if (batchId) {
         const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'merge', evidence: { at: Date.now(), mergeSha: git(['rev-parse', 'HEAD']), publicationId: landingId } })
