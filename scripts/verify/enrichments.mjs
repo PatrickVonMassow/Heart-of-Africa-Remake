@@ -8288,6 +8288,147 @@ if (section('vulture-cluster')) {
     JSON.stringify(cluster))
 }
 
+// --- Point 328: vultures visibly land and take off (design.md §19.6) ----------
+// A landing is a descending glide with slowing speed, a flare with raised wings
+// just before touchdown, then the standing pose — never a single-frame switch
+// from flight to standing. Sampled every rendered frame from the drawn meshes:
+// the landing bird's height passes through intermediate values with no
+// per-frame jump, while the point-128 "stands on its own ground" clearance
+// (the shared metric of both vulture systems) stays positive throughout. The
+// flare is photographed from a staged slow landing (calibration stretched for
+// the shutter, restored afterwards).
+if (section('vulture-landing')) {
+  await page.evaluate(() => { if (window.__game.getState().placeId) window.__game.getState().leavePlace() })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 30000 }).catch(() => {})
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
+  await page.evaluate(() => window.__wildlife.restock())
+  await waitForHerds()
+  const stageLanding = async (stretch) =>
+    page.evaluate(async (stretch) => {
+      const w = window.__wildlife
+      const herds = w.herdsRef.current
+      const seed = window.__game.getState().seed
+      const p = window.__game.getState().pos
+      const U = 10
+      window.__ui.getState().setTravelZoom(0.5)
+      const lion = window.__lionHunt.state
+      lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
+      for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+      herds.elephant.length = 0
+      const land = (x, z) => {
+        const ty = window.__terrainType(-z / U, x / U, seed)
+        return ty !== 'water' && ty !== 'ocean'
+      }
+      let spot = null
+      for (let r = 6; r <= 24 && !spot; r += 2) {
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const x = p.x + Math.sin(a) * r
+          const z = p.z + Math.cos(a) * r
+          if (land(x, z) && land(x + 4, z) && land(x - 4, z) && land(x, z + 4) && land(x, z - 4)) { spot = { x, z }; break }
+        }
+      }
+      if (!spot) return { staged: false }
+      const vl = window.__balance.vultureLanding
+      const saved = { landSeconds: vl.landSeconds, flareFraction: vl.flareFraction }
+      if (stretch) { vl.landSeconds = 30; vl.flareFraction = 0.85 }
+      const carcass = { x: spot.x, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk: 'inject-328' }
+      herds.zebra.push(carcass)
+      window.__game.setState({ pos: { ...window.__game.getState().pos, x: spot.x, z: spot.z + 3 } })
+      const sc = w.scavenger.current
+      sc.target = null
+      sc.mode = 'idle'
+      const g = () => w.scavengeGroups.current[0]
+      const out = { staged: true, spot, heights: [], clearances: [], phases: [], landed: false, flareSeen: false, maxJump: 0 }
+      let rec = true
+      let prev = null
+      const frame = () => {
+        if (!rec) return
+        const grp = g()
+        const st = sc.birds[0]
+        if (grp && st && sc.target === carcass && (st.phase === 'landing' || (st.phase === 'ground' && out.heights.length > 0))) {
+          const bird = grp.children[0]
+          const y = grp.position.y + bird.position.y
+          if (prev !== null) out.maxJump = Math.max(out.maxJump, Math.abs(y - prev))
+          prev = y
+          out.heights.push(+y.toFixed(3))
+          out.phases.push(st.phase)
+          const c = window.__vultures.clearance.current
+          if (typeof c === 'number' && Number.isFinite(c)) out.clearances.push(c)
+          if (st.phase === 'landing' && st.t > (1 - vl.flareFraction) * vl.landSeconds) out.flareSeen = true
+        }
+        requestAnimationFrame(frame)
+      }
+      requestAnimationFrame(frame)
+      if (stretch) {
+        // Hold in the flare for the shutter: well into the stretched flare window.
+        const ok = await window.__pollSim(90, () => {
+          herds.elephant.length = 0
+          const st = sc.birds[0]
+          return sc.target === carcass && st.phase === 'landing' && st.t > (1 - vl.flareFraction) * vl.landSeconds + 2
+        })
+        rec = false
+        const grp = g()
+        const bird = grp?.children[0]
+        window.__vulLanding = { carcass, saved }
+        return ok && bird ? { staged: true, flare: true, world: { x: grp.position.x + bird.position.x, z: grp.position.z + bird.position.z } } : { staged: true, flare: false }
+      }
+      await window.__pollSim(90, () => {
+        herds.elephant.length = 0
+        if (sc.target === carcass && sc.landed) { out.landed = true; return true }
+        return false
+      })
+      // Keep sampling the standing flock for a moment (the feeding clearance).
+      await window.__pollSim(1.5, () => false)
+      rec = false
+      carcass.dissolve = 0.02
+      out.samples = out.heights.length
+      const top = out.heights.length ? Math.max(...out.heights) : 0
+      const bottom = out.heights.length ? out.heights[out.heights.length - 1] : 0
+      out.drop = +(top - bottom).toFixed(3)
+      out.distinct = new Set(out.heights.filter((h) => h < top - 1e-3 && h > bottom + 1e-3)).size
+      // The glide never climbs back (the standing bob after touchdown aside).
+      let mono = 0
+      for (let i = 1; i < out.heights.length; i++) {
+        if (out.phases[i] === 'landing' && out.heights[i] > out.heights[i - 1] + 0.05) mono++
+      }
+      out.rises = mono
+      out.minClearance = out.clearances.length ? Math.min(...out.clearances) : null
+      out.heights = out.heights.filter((_, i) => i % 8 === 0)
+      out.phases = undefined
+      out.clearances = undefined
+      return out
+    }, stretch)
+  const landing = await stageLanding(false)
+  check('a landing vulture descends through intermediate heights with no single-frame snap (point 328, design.md §19.6)',
+    landing.staged && landing.landed && landing.samples >= 10 && landing.drop > 1 && landing.distinct >= 8 &&
+      landing.maxJump < landing.drop * 0.25 && landing.rises === 0,
+    JSON.stringify({ ...landing, heights: undefined }))
+  check('the landing bird flares in its last phase before it stands (point 328)',
+    landing.staged && landing.flareSeen, JSON.stringify({ flareSeen: landing.flareSeen }))
+  check('the point-128 clearance holds through the whole landing and the standing meal (point 328)',
+    landing.staged && typeof landing.minClearance === 'number' && landing.minClearance > 0,
+    `min clearance ${landing.minClearance}`)
+  const flare = await stageLanding(true)
+  if (flare.flare) {
+    await shot('328-vulture-landing-flare', {
+      world: flare.world,
+      label: 'a ground scavenger vulture in its landing flare, wings raised, just above its carcass',
+    })
+  }
+  check('the staged slow landing reaches the flare for the evidence frame (point 328)', flare.staged && flare.flare, JSON.stringify(flare))
+  await page.evaluate(() => {
+    const st = window.__vulLanding
+    if (!st) return
+    Object.assign(window.__balance.vultureLanding, st.saved)
+    st.carcass.dissolve = 0.02
+    const sc = window.__wildlife.scavenger.current
+    sc.target = null
+    sc.mode = 'idle'
+    window.__vulLanding = undefined
+  })
+}
+
 // --- Point 312: animals are water-shy, not water-barred (design.md §19.5) ----
 // A flight meets a river and goes IN (the along-shore slide is for the ocean
 // only); a player-driven animal left alone swims to the NEAREST bank on a
