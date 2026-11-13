@@ -25,7 +25,10 @@ function worldOf(grid: PlaceNavGrid, colliders: Collider[], home: [number, numbe
 interface Track {
   maxSpeed: number
   maxStalled: number
+  /** Leg changes at the leg's end (within the arrival radius of it). */
   arrivals: number
+  /** Leg changes anywhere else: a stalled porter freed and turned back. */
+  recoveries: number
   /** Largest angle between the facing and the frame's displacement at full stride. */
   maxHeadingLag: number
   /** Longest stretch near a collider without getting nearer the leg's goal (s). */
@@ -40,7 +43,7 @@ function simulate(route: PorterRoute, colliders: Collider[], grid: PlaceNavGrid,
   const s: PorterState = startPorter(route, rand)
   s.pause = 0
   const world = worldOf(grid, colliders, [route.entrance.x, route.entrance.z])
-  const tr: Track = { maxSpeed: 0, maxStalled: 0, arrivals: 0, maxHeadingLag: 0, maxGrind: 0, overlaps: 0, offGround: 0 }
+  const tr: Track = { maxSpeed: 0, maxStalled: 0, arrivals: 0, recoveries: 0, maxHeadingLag: 0, maxGrind: 0, overlaps: 0, offGround: 0 }
   let grind = 0
   let bestToGoal = Infinity
   let leg = s.leg
@@ -49,7 +52,10 @@ function simulate(route: PorterRoute, colliders: Collider[], grid: PlaceNavGrid,
     const z0 = s.z
     stepPorter(s, route, world, DT, rand)
     if (s.leg !== leg) {
-      tr.arrivals++
+      // The leg just ended: at its goal it is an arrival, elsewhere a recovery.
+      const was = leg === 0 ? route.plaza : route.entrance
+      if (Math.hypot(was.x - x0, was.z - z0) <= PORTER_WALK.arriveRadius + 1e-6) tr.arrivals++
+      else tr.recoveries++
       leg = s.leg
       bestToGoal = Infinity
       grind = 0
@@ -94,6 +100,7 @@ describe('the porter walk on synthetic ground', () => {
     expect(PORTER_WALK.pace + PORTER_WALK.paceSpread).toBeLessThan(1.4)
     expect(a.arrivals).toBeGreaterThanOrEqual(2)
     expect(b.arrivals).toBeGreaterThanOrEqual(2)
+    expect(a.recoveries + b.recoveries).toBe(0)
   })
 
   it('goes round a building that stands on the straight line, facing where it goes', () => {
@@ -103,6 +110,7 @@ describe('the porter walk on synthetic ground', () => {
     const route: PorterRoute = { entrance: { x: 0, z: 16 }, plaza: { x: 0, z: 0 }, pace: PORTER_WALK.pace }
     const tr = simulate(route, house, grid, 120)
     expect(tr.arrivals).toBeGreaterThanOrEqual(4)
+    expect(tr.recoveries).toBe(0)
     expect(tr.maxSpeed).toBeLessThanOrEqual(route.pace * 1.01)
     expect(tr.maxHeadingLag).toBeLessThan(0.5)
     expect(tr.maxGrind).toBeLessThan(PORTER_WALK.stallEscape + 0.5)
@@ -158,6 +166,10 @@ describe('the porter walk on synthetic ground', () => {
     const grid = buildPlaceNavGrid(bounds, ring, R)
     const route: PorterRoute = { entrance: { x: 0, z: 14 }, plaza: { x: 0, z: 0 }, pace: PORTER_WALK.pace }
     const tr = simulate(route, ring, grid, 90)
+    // The sealed plaza goal is never reached: each turn back from it is a
+    // recovery, and only the walk back to the entrance ends in an arrival.
+    expect(tr.recoveries).toBeGreaterThanOrEqual(1)
+    expect(tr.arrivals).toBeLessThanOrEqual(tr.recoveries + 1)
     expect(tr.maxStalled).toBeLessThan(PORTER_WALK.stallEscape + 0.5)
     expect(tr.maxGrind).toBeLessThan(PORTER_WALK.stallEscape * 2)
   })
@@ -175,12 +187,15 @@ function noProgress(route: PorterRoute, world: PorterWorld, seconds: number, pro
   let worst = 0
   let escapes = 0
   for (let t = 0; t < seconds; t += DT) {
+    const x0 = s.x
+    const z0 = s.z
     stepPorter(s, route, world, DT, rand)
     const goal = s.leg === 0 ? route.plaza : route.entrance
     const d = Math.hypot(goal.x - s.x, goal.z - s.z)
     if (s.leg !== leg) {
+      const was = leg === 0 ? route.plaza : route.entrance
+      if (Math.hypot(was.x - x0, was.z - z0) > PORTER_WALK.arriveRadius + 1e-6) escapes++
       leg = s.leg
-      escapes++
       mark = d
       since = 0
     } else if (s.pause > 0 || d <= mark - progress) {
@@ -288,6 +303,8 @@ describe('the porters of the reported ports', () => {
         expect(navPointFree(grid, route.plaza.x, route.plaza.z)).toBe(true)
         const tr = simulate(route, layout.colliders, grid, 120, i + 1)
         expect(tr.arrivals, `porter ${i}`).toBeGreaterThanOrEqual(2)
+        // A walkable route needs no rescue on static ground.
+        expect(tr.recoveries, `porter ${i}`).toBe(0)
         expect(tr.maxSpeed, `porter ${i}`).toBeLessThanOrEqual(route.pace * 1.01)
         expect(tr.maxStalled, `porter ${i}`).toBeLessThan(PORTER_WALK.stallEscape + 0.5)
         expect(tr.maxGrind, `porter ${i}`).toBeLessThan(PORTER_WALK.stallEscape + 0.5)
