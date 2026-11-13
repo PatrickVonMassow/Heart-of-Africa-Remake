@@ -26,6 +26,7 @@ import {
   formatLandingVerdict,
   gateConcurrency,
   landingExit,
+  decideMergeTip,
   markNotReached,
   planLanding,
   resolveBranch,
@@ -731,5 +732,40 @@ describe("the landed point's run records (point 1134)", () => {
         branch: 'b',
       }),
     ).toEqual(['y.log.run.json'])
+  })
+})
+
+// Point 1514: the merge takes the pushed tip, never a stale local branch.
+describe('decideMergeTip', () => {
+  const L = 'a'.repeat(40)
+  const R = 'b'.repeat(40)
+  const branch = 'feat/1514-x'
+
+  it('fast-forwards to origin when origin is ahead of the local branch', () => {
+    expect(decideMergeTip({ branch, local: L, remote: R, remoteContainsLocal: true })).toMatchObject({ ok: true, action: 'fast-forward', sha: R, from: L })
+  })
+
+  it('refuses a diverged branch and names both shas', () => {
+    const t = decideMergeTip({ branch, local: L, remote: R })
+    expect(t.ok).toBe(false)
+    expect(t.reason).toContain(L.slice(0, 8))
+    expect(t.reason).toContain(R.slice(0, 8))
+  })
+
+  it('keeps the local tip when it equals origin, is ahead of it, or origin lacks the branch', () => {
+    expect(decideMergeTip({ branch, local: L, remote: L })).toMatchObject({ ok: true, action: 'local', sha: L })
+    expect(decideMergeTip({ branch, local: L, remote: R, localContainsRemote: true })).toMatchObject({ ok: true, action: 'local', sha: L, note: expect.stringMatching(/unpushed/) })
+    expect(decideMergeTip({ branch, local: L, remote: null })).toMatchObject({ ok: true, action: 'local', sha: L })
+  })
+
+  it('refuses when there is no local branch', () => {
+    expect(decideMergeTip({ branch, local: null, remote: R }).ok).toBe(false)
+  })
+
+  it('the plan names the sha it will merge', () => {
+    const tip = decideMergeTip({ branch, local: L, remote: R, remoteContainsLocal: true })
+    const merge = planLanding({ number: 1514, branch, tip }).steps.find((s) => s.id === 'merge')
+    expect(merge.reason).toContain(`@ ${R.slice(0, 8)}`)
+    expect(merge.reason).toMatch(/fast-forwarded/)
   })
 })
