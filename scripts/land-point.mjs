@@ -65,6 +65,7 @@ import {
   formatLandingVerdict,
   gateConcurrency,
   landingExit,
+  decideMergeTip,
   markNotReached,
   planLanding,
   resolveBranch,
@@ -728,6 +729,65 @@ export function reportCarrierReconciliation(when, { run = runReconcile, say = (l
   return outcome
 }
 
+/**
+ * Fetch the point's branch and settle which commit the merge takes (point 1514):
+ * `decideMergeTip` decides, this performs. A fast-forward moves the branch in the
+ * worktree that has it checked out (`merge --ff-only`, so git refuses rather than
+ * overwrite work there) or, with none, as a compare-and-swap `update-ref`. A
+ * failed fetch refuses — the remote cannot be ruled out ahead. `apply: false`
+ * (the dry plan) decides without moving anything.
+ */
+export function resolveMergeTip({ branch, apply = true, cwd = REPO_ROOT } = {}) {
+  const run = (args) => execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const sha = (ref) => {
+    try {
+      return run(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])
+    } catch {
+      return null
+    }
+  }
+  const contains = (ancestor, descendant) => {
+    try {
+      run(['merge-base', '--is-ancestor', ancestor, descendant])
+      return true
+    } catch {
+      return false
+    }
+  }
+  // The dry plan writes no ref: it asks origin for the tip and fetches only its
+  // objects (`--refmap=` keeps the remote-tracking ref; no FETCH_HEAD, no tags).
+  let remote = null
+  try {
+    remote = run(['ls-remote', 'origin', `refs/heads/${branch}`]).split(/\s/)[0] || null
+    if (remote && apply) run(['fetch', '--quiet', '--no-tags', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`])
+    else if (remote) run(['fetch', '--quiet', '--no-tags', '--no-write-fetch-head', '--refmap=', 'origin', `refs/heads/${branch}`])
+  } catch (e) {
+    const why = String(e.stderr ?? e.message)
+    return { ok: false, reason: `fetching origin/${branch} failed: ${why.trim().split('\n')[0]}`, repair: 'restore access to origin, then re-run' }
+  }
+  const local = sha(`refs/heads/${branch}`)
+  const tip = decideMergeTip({
+    branch,
+    local,
+    remote,
+    remoteContainsLocal: Boolean(local && remote) && contains(local, remote),
+    localContainsRemote: Boolean(local && remote) && contains(remote, local),
+  })
+  if (!tip.ok || tip.action !== 'fast-forward' || !apply) return tip
+  const tree = listWorktrees({ cwd }).find((w) => w.branch === branch)
+  try {
+    if (tree) execFileSync('git', ['merge', '--ff-only', '--quiet', tip.sha], { cwd: tree.path, stdio: ['ignore', 'pipe', 'pipe'] })
+    else run(['update-ref', `refs/heads/${branch}`, tip.sha, tip.from])
+  } catch (e) {
+    return {
+      ok: false,
+      reason: `${branch}: origin ${tip.sha.slice(0, 8)} is ahead of local ${tip.from.slice(0, 8)} and the fast-forward failed (${String(e.stderr ?? e.message).trim().split('\n')[0]})`,
+      repair: `fast-forward ${branch} to origin/${branch}${tree ? ` in ${tree.path}` : ''}, then re-run`,
+    }
+  }
+  return sha(`refs/heads/${branch}`) === tip.sha ? tip : { ok: false, reason: `${branch} did not arrive at origin ${tip.sha.slice(0, 8)} after the fast-forward`, repair: 'inspect the branch, then re-run' }
+}
+
 export function localBranchExists(branch, { cwd = REPO_ROOT } = {}) {
   try {
     git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -1039,12 +1099,15 @@ async function main(argv) {
   let audit
   let board
   let landingClaimant = null
+  let tip
   // WHEN THE LANDING BEGAN. A working file written into a worktree AFTER this
   // instant means somebody is in there right now, whatever else the evidence says.
   const since = Date.now()
   try {
     const branches = git(['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split('\n')
     branch = branchArg || resolveBranch({ branches, number })
+    tip = resolveMergeTip({ branch, apply: !dry })
+    if (!tip.ok) throw new LandingError(tip.reason, { step: 'merge', repair: tip.repair ?? null })
     if (batchId && !dry) {
       const owner = readOwnerLock()
       if (!landingId || !owner?.sessionId || !Number.isInteger(owner.fence)) {
@@ -1061,7 +1124,7 @@ async function main(argv) {
     cleanup = selectCleanup({ branch, since, mergeTarget: branch })
 
     // What the merge will bring in decides whether the audit runs (rider a).
-    const changed = git(['diff', '--name-only', `main...${branch}`]).split('\n').filter(Boolean)
+    const changed = git(['diff', '--name-only', `main...${tip.sha}`]).split('\n').filter(Boolean)
     audit = auditNeeded({ changedFiles: changed })
 
     const probe = probeMachine()
@@ -1078,7 +1141,7 @@ async function main(argv) {
     })
     board = boardDecision(preview.tasks)
 
-    plan = planLanding({ number, branch, audit, board, gate, worktrees: cleanup.remove })
+    plan = planLanding({ number, branch, audit, board, gate, worktrees: cleanup.remove, tip })
   } catch (e) {
     if (e instanceof LandingError) {
       console.error(`land-point: ${e.message}`)
@@ -1116,9 +1179,11 @@ async function main(argv) {
   try {
     // 1. MERGE. --no-ff always (see MERGE_ARGS in the core for why).
     try {
+      if (git(['rev-parse', `refs/heads/${branch}`]) !== tip.sha) throw new Error(`${branch} moved off the planned ${tip.sha.slice(0, 8)} before the merge`)
+      // The planned sha, not the mutable branch name: what was audited is what lands.
       const mergeArgs = batchId
-        ? [...MERGE_ARGS.filter((arg) => arg !== '--no-edit'), branch, '-m', `Merge branch '${branch}'\n\nPublication-Id: ${landingId}`]
-        : [...MERGE_ARGS, branch]
+        ? [...MERGE_ARGS.filter((arg) => arg !== '--no-edit'), tip.sha, '-m', `Merge branch '${branch}'\n\nPublication-Id: ${landingId}`]
+        : [...MERGE_ARGS, '-m', `Merge branch '${branch}'`, tip.sha]
       git(mergeArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
       if (batchId) {
         const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'merge', evidence: { at: Date.now(), mergeSha: git(['rev-parse', 'HEAD']), publicationId: landingId } })
