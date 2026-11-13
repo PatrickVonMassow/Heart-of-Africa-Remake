@@ -4,7 +4,9 @@
 // on the two reported ports (Cairo seed 1177128818, Tangier seed 1117999851).
 
 import { describe, it, expect } from 'vitest'
-import { PORTER_WALK } from '../../config/balance'
+import { PORTER_WALK, VILLAGER_MOTION } from '../../config/balance'
+import { groundStepped } from '../../render/figureWalk'
+import { gaitWeights } from '../../render/villagerRig'
 import { mulberry32 } from '../../world/noise'
 import { escapeToFree, resolveMove, standingClear, WALKER_RADIUS, type Collider } from './collision'
 import { buildLayout } from './layout'
@@ -36,6 +38,9 @@ interface Track {
   overlaps: number
   /** Frames spent on ground the grid refuses without a collider. */
   offGround: number
+  /** Highest ground speed the figure measures for its gait, turns stepped
+   *  included, smoothed as the figure smooths it (m/s at figure scale 1). */
+  maxGaitSpeed: number
 }
 
 function simulate(route: PorterRoute, colliders: Collider[], grid: PlaceNavGrid, seconds: number, seed = 1): Track {
@@ -43,14 +48,21 @@ function simulate(route: PorterRoute, colliders: Collider[], grid: PlaceNavGrid,
   const s: PorterState = startPorter(route, rand)
   s.pause = 0
   const world = worldOf(grid, colliders, [route.entrance.x, route.entrance.z])
-  const tr: Track = { maxSpeed: 0, maxStalled: 0, arrivals: 0, recoveries: 0, maxHeadingLag: 0, maxGrind: 0, overlaps: 0, offGround: 0 }
+  const tr: Track = { maxSpeed: 0, maxStalled: 0, arrivals: 0, recoveries: 0, maxHeadingLag: 0, maxGrind: 0, overlaps: 0, offGround: 0, maxGaitSpeed: 0 }
   let grind = 0
   let bestToGoal = Infinity
   let leg = s.leg
+  let gaitSpeed = 0
   for (let t = 0; t < seconds; t += DT) {
     const x0 = s.x
     const z0 = s.z
+    const yaw0 = s.yaw
     stepPorter(s, route, world, DT, rand)
+    const stepped = groundStepped(s.x - x0, s.z - z0, yaw0, s.yaw)
+    gaitSpeed += (stepped / DT - gaitSpeed) * (1 - Math.exp(-DT / VILLAGER_MOTION.speedSmoothing))
+    // A free-ground escape is a placement, not a walk: the figure lets go there.
+    if (Math.hypot(s.x - x0, s.z - z0) / DT <= VILLAGER_MOTION.teleportSpeed) tr.maxGaitSpeed = Math.max(tr.maxGaitSpeed, gaitSpeed)
+    else gaitSpeed = 0
     if (s.leg !== leg) {
       // The leg just ended: at its goal it is an arrival, elsewhere a recovery.
       const was = leg === 0 ? route.plaza : route.entrance
@@ -310,6 +322,9 @@ describe('the porters of the reported ports', () => {
         expect(tr.maxGrind, `porter ${i}`).toBeLessThan(PORTER_WALK.stallEscape + 0.5)
         expect(tr.maxHeadingLag, `porter ${i}`).toBeLessThan(0.5)
         expect(tr.offGround, `porter ${i}`).toBe(0)
+        // A calm head-load walk, corners included: never any share of the jog,
+        // even on a short-legged body (legScale 0.85).
+        expect(gaitWeights(tr.maxGaitSpeed, 0.85).jog, `porter ${i} at ${tr.maxGaitSpeed.toFixed(2)} m/s`).toBe(0)
       })
     })
   }

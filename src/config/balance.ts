@@ -2950,6 +2950,12 @@ export const PORTER_WALK = {
   /** How much nearer the leg's end, along the remaining route, counts as
    *  progress (m): a step that only slides or circles is not. Calibratable. */
   progressStep: 0.15,
+  /** Share of a turn's stepping (VILLAGER_MOTION.turnStep per radian) the
+   *  porter takes off its pace while it turns. The figure picks walk or jog
+   *  from the ground its feet cover, turns included: a porter rounding a
+   *  corner at full pace measured up to 1.9 m/s and jogged with the load.
+   *  At 1 the measured gait stays at the head-load pace. Calibratable. */
+  turnEase: 1,
   /** Without progress this long the porter replans from where it stands (s). */
   stallReplan: 1.5,
   /** Without progress this long it is placed on free ground and turns back (s). */

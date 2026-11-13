@@ -6,7 +6,7 @@
 // Pure data: no three.js, no scene. The scene hands in the collision resolve
 // (`move`) and the wedge escape (`free`), so the same stepper runs in Vitest.
 
-import { PORTER_WALK } from '../../config/balance'
+import { PORTER_WALK, VILLAGER_MOTION } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
 import { steerHeading, wayHeading } from '../../render/figureWalk'
 import { advancePlaceRoute, findPlaceRoute, navPointFree, navPointOffGround, type NavPoint, type PlaceNavGrid } from './routing'
@@ -214,8 +214,12 @@ export function stepPorter(s: PorterState, route: PorterRoute, world: PorterWorl
   // Turn toward where a full step really goes, then step along the new heading.
   const [px, pz] = world.move(s.x, s.z, s.x + (dx / d) * reach, s.z + (dz / d) * reach)
   const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, px, pz, dx, dz, reach), route.pace, dt)
+  const turned = Math.abs(turn.yaw - s.yaw)
   s.yaw = turn.yaw
-  const [mx, mz] = world.move(s.x, s.z, s.x + Math.sin(s.yaw) * reach * turn.pace, s.z + Math.cos(s.yaw) * reach * turn.pace)
+  // A head-load walk slows into a turn: the feet step the turn as ground, and
+  // the stride the figure measures stays at the steady pace, never a jog.
+  const along = Math.max(0, reach * turn.pace - turned * VILLAGER_MOTION.turnStep * PORTER_WALK.turnEase)
+  const [mx, mz] = world.move(s.x, s.z, s.x + Math.sin(s.yaw) * along, s.z + Math.cos(s.yaw) * along)
   let [nx, nz] = walkableStep(world.grid, s.x, s.z, mx, mz)
   // A heading still swinging round a corner can point off the walkable
   // ground the route runs over: then the step goes along the route instead.
