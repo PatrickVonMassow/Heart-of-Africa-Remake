@@ -36669,3 +36669,16 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
 
   Final state: a full covering enrichments run on BOTH backends is recorded, every red is fixed, charged to its owning open point or filed as its own point, and the Giza and vulture frames of both backends are picture-checked.
   Bundle: unbundled.
+
+- [x] 328. Vultures do not visibly land (user 25.07.2026: "they seem to fly one
+  moment and stand the next — is there a landing at all?"). Add a real landing
+  approach to the §19.6 flock AND the lone ground scavenger: a descending glide
+  along the approach heading with slowing forward speed, a flare with raised wings
+  just before touchdown, then the standing pose — over a calibratable window long
+  enough to read at bird's-eye distance; likewise a visible take-off (run/flap into
+  the climb) instead of an instant switch to flight. VERIFIABLE: pure test of the
+  landing profile (height decreases monotonically to the landed height across the
+  window, forward speed decreases, the flare pose fires in the last phase); live
+  check that a landing bird's sampled height passes through intermediate values (no
+  single-frame snap) while the point-128 "stands on its own ground" clearance still
+  holds; screenshot of the flare; both backends.

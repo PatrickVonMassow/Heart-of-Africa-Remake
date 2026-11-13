@@ -77,19 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 328. Vultures do not visibly land (user 25.07.2026: "they seem to fly one
-  moment and stand the next — is there a landing at all?"). Add a real landing
-  approach to the §19.6 flock AND the lone ground scavenger: a descending glide
-  along the approach heading with slowing forward speed, a flare with raised wings
-  just before touchdown, then the standing pose — over a calibratable window long
-  enough to read at bird's-eye distance; likewise a visible take-off (run/flap into
-  the climb) instead of an instant switch to flight. VERIFIABLE: pure test of the
-  landing profile (height decreases monotonically to the landed height across the
-  window, forward speed decreases, the flare pose fires in the last phase); live
-  check that a landing bird's sampled height passes through intermediate values (no
-  single-frame snap) while the point-128 "stands on its own ground" clearance still
-  holds; screenshot of the flare; both backends.
-
 - [ ] 343. The sun stands where it really stood — elevation from date and latitude
   (user 25.07.2026; design.md §2.7 states the target). Today `SUN_DIR` is a hard
   constant in BOTH scenes — `[0.5, 0.62, 0.38]` in `src/scenes/travel/TravelScene.tsx`
