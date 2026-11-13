@@ -77,18 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1510. Count freshly commissioned branches as occupied slots: a branch at its main cut point or with unfetched cloud commits holds a slot
-  User request 12.11.2026 ("Ja, reihe das ein. Und bei der Gelegenheit noch eine Änderung: Die Angaben zu den Slots sollen in einer neuen Zeile landen - nicht in der gleichen wie der Text "Woran ich gerade arbeite". Zudem soll er verkürzt werden: "3/3" anstatt "3 von 3""). Rank: directly behind 1509.
-  Defect (reproduced 12.11.2026 16:59): the board slot line said "3 von 3 Slots frei: Grund nicht messbar (Dateien der laufenden Arbeit nicht lesbar)" while point 1490 was in active work by a cloud author. Cause: openFeatBranches (scripts/batch-in-flight.mjs) lists only `git for-each-ref --no-merged main`. The local and origin-tracking ref of feat/1490-head-load-porter still pointed at its main cut point d98c729aa (cloud commits f516e78 on the remote, not fetched), so git treats the branch as merged and it holds no slot. The same census feeds batch-in-flight's own slot decision, so the batch may also start work into slots that are in truth occupied.
-  Fix:
-  1. A feat branch holds a slot when it is unmerged OR its point is open in the work order / in active work (in-flight declaration focusPoint, commission record), even when its tip is an ancestor of main. Unfetched cloud progress must not free a slot.
-  2. Board and batch-in-flight slot decision use the same corrected census; a test for each covers the fresh-cut / unfetched-cloud case.
-  Presentation (user order 12.11.2026, same request):
-  3. The slot information moves to its own line below the heading "Woran ich gerade arbeite", no longer inside the same line as the heading.
-  4. Shorter wording: "3/3" instead of "3 von 3" (e.g. "1/3 Slots frei: ...").
-  Mobile portrait layout must stay clean (board contract).
-  Bundle: unbundled.
-
 - [ ] 1511. Drain pending user requests before a point starts and before its destructive steps
   User approved filing ("ja", 12.11.2026 17:50). Measured 12.11.2026: (1) request 'Shrink the project's disk footprint' deposited 16:13, batch owner commissioned 1490 at ~16:14 and queued the request as 1509 only at 16:53. (2) request 'Amend 1509: daily token-free housekeeping script' deposited 17:10, still pending at 17:49 while the next owner session (started 17:28) began 1509 under the old spec and already deleted local/ entries the amendment would have kept (seven local/villager-build-1342*/-1347 Blender isolation builds; parked feat/1342-natural-motion-b waits on such builds). Expected: before pulling or starting any point (and before destructive steps of a point), the owner drains pending user requests from the findings carrier, and a pending request that names the point being worked takes effect first.
   Data risk: user-ordered restrictions were bypassed and unrecoverable local data was deleted.
