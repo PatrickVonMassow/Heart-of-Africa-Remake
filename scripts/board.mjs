@@ -97,6 +97,8 @@ import {
   spanOf,
   timesEndClock,
 } from './board-core.mjs'
+import { carrierPath } from './findings-paths.mjs'
+import { startRefusal } from './findings-request-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
 import { withDerivedState } from './board-state.mjs'
 import { recordDecisionCardKeep } from './decision-card-guard.mjs'
@@ -301,6 +303,22 @@ function applyEdit(fn, done, preparePublish = () => {}) {
   if (!result.published) process.exitCode = 1
 }
 
+/**
+ * Refuse to make `point` current work while user requests wait in the findings
+ * carrier (startRefusal). Only a missing carrier means "none"; any other read
+ * failure stops the start rather than skipping the check.
+ */
+function refuseStartWhileRequestsPending(point) {
+  let text = ''
+  try {
+    text = readFileSync(carrierPath(), 'utf8')
+  } catch (e) {
+    if (e?.code !== 'ENOENT') throw new Error(`board: the findings carrier could not be read (${e?.code ?? e?.message})`)
+  }
+  const refusal = startRefusal(text, point)
+  if (refusal) throw new Error(`board: ${refusal}`)
+}
+
 /** Update the structured active source inside the same board transaction. */
 function prepareActiveTransition({
   focusPoint = undefined,
@@ -421,6 +439,7 @@ try {
   } else if (cmd === 'now') {
     const [point, ...words] = rest
     if (!point || words.length === 0) throw new Error('usage: board.mjs now <point> "<status>"|--text-stdin')
+    refuseStartWhileRequestsPending(point)
     const at = berlinStamp()
     // READ BEFORE THE MOVE: once the queue card is gone, nothing can say whether
     // it carried an estimate — and a now-card promoted without one renders a
@@ -454,6 +473,7 @@ try {
           `(any "<text>" may be ${TEXT_STDIN_FLAG} — including --none's reason)`,
       )
     }
+    if (next != null) refuseStartWhileRequestsPending(next)
     const at = berlinStamp()
     const noEstimate = next == null ? null : promotionEstimateWarning(readFileSync(BOARD, 'utf8'), next)
     editPrepared(
@@ -594,6 +614,7 @@ try {
     if (!point || !times || !title || words.length === 0) {
       throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"|--text-stdin')
     }
+    refuseStartWhileRequestsPending(point)
     editPrepared(
       (html) => {
         // The caller's "<times>" gives the expected end only; the start is the record's.

@@ -13,6 +13,7 @@ import {
 import {
   escapeBodyLine,
   formatRequest,
+  markAppending,
   markBlocked,
   markQueued,
   parseFields,
@@ -22,7 +23,9 @@ import {
   requestEntries,
   requestEntry,
   requestRoute,
+  requestNamesPoint,
   requestWarnings,
+  startRefusal,
   unescapeBodyLine,
 } from './findings-request-core.mjs'
 
@@ -351,5 +354,42 @@ describe('parseRequestDocument — the whole deposit as one stdin document (poin
       expect(parseRequestDocument(`--- spec ---\nA\n--- ${bad} ---\nB`).error).toMatch(new RegExp(`line 3: unknown field "${bad}"`))
     }
     expect(parseRequestDocument('--- spec ---\nA\n----------\nB\n---\n').fields).toEqual({ spec: 'A\n----------\nB\n---' })
+  })
+})
+
+describe('a point does not start while user requests wait (drain before start)', () => {
+  const amend = deposit({
+    title: 'Amend 1509: daily token-free housekeeping script',
+    spec: 'Point 1509 keeps local/ isolation builds; deposited 12.11.2026.',
+    refs: 'TASKS.md point 1509',
+  })
+  const other = deposit({ title: 'Unrelated request', spec: 'Something else, 15.09.2026.', refs: 'scripts/x.mjs' })
+
+  it('names a point only as a whole number, never inside a longer number or a date', () => {
+    const [entry] = requestEntries(amend)
+    expect(requestNamesPoint(entry, 1509)).toBe(true)
+    expect(requestNamesPoint(entry, 150)).toBe(false)
+    expect(requestNamesPoint(entry, 2026)).toBe(false)
+    const [unrelated] = requestEntries(other)
+    expect(requestNamesPoint(unrelated, 1509)).toBe(false)
+    expect(requestNamesPoint(unrelated, 2026)).toBe(false)
+  })
+
+  it('refuses the start of the named point until the request is appended', () => {
+    const text = `# Träger\n\n${amend}\n\n`
+    const refusal = startRefusal(text, 1509)
+    expect(refusal).toMatch(/point 1509 cannot start/)
+    expect(refusal).toMatch(/NAMES 1509: Amend 1509/)
+    const appended = markAppending(text, 'Amend 1509', 1512).text
+    expect(startRefusal(appended, 1509)).toBeNull()
+  })
+
+  it('refuses any start while an unrelated request is pending, and lists the naming one first', () => {
+    const text = `# Träger\n\n${other}\n\n${amend}\n\n`
+    const lines = startRefusal(text, 1509).split('\n')
+    expect(lines[0]).toMatch(/2 pending user request\(s\).*1 of them name point 1509/)
+    expect(lines[1]).toMatch(/NAMES 1509/)
+    expect(startRefusal(`# Träger\n\n${other}\n\n`, 1490)).toMatch(/point 1490 cannot start/)
+    expect(startRefusal('# Träger\n', 1509)).toBeNull()
   })
 })
