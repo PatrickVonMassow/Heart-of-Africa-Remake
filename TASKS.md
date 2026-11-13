@@ -15194,4 +15194,13 @@ to land than a mechanism that needs a review.
   Final state: the cause is measured in game and fixed; `npm test -- enrichments --section=bird-flight-escape` is green on WebGPU and WebGL 2 on a quiet machine, and the take-off frame and the stoop frame (verification/269-raptor-stoop.png) are picture-checked on both backends.
   Test: the section on both backends, plus a Vitest case if the cause lies in the pure bird-flight helpers; the 'check' charge of scripts/render-verify-charges.mjs for the three check titles dies with this point.
   Source: finding of the 1508 session, 13.11.2026 13:15.
+  Measured again 13.11.2026: the whole enrichments pass on feat/1508-covering-enrichments 18d2abc41 ran all three checks green on WebGPU (log 2026-11-13T14-07-33-209) and WebGL 2 (log 2026-11-13T14-34-07-098); their charge was struck. The section run above stays the open evidence.
   Bundle: Tierverhalten.
+
+- [ ] 1516. The hint toast sits inside the status bar over the heading text during play
+  Measured 13.11.2026 in the covering enrichments run (both backends, feat/1508-covering-enrichments 18d2abc41): verification/131-burning-grass.png and verification/327-vulture-cluster-one-flock.png show the canoe hint toast at y≈16 inside the status bar, drawn over the compass heading text so it reads 'Westcanoe…' / 'Eastcanoe…'. docs/backlog.md (20.10.2026, victory frame) held this until an in-play frame showed it; these two do.
+  Player impact: while the toast stands, neither the heading nor the hint is readable.
+  Final state: an in-play hint toast never overlaps the status bar's text; it sits below the bar as on verification/04-chief-hut-meeting.png.
+  Test: a Playwright layout check that the toast's box does not intersect the status bar's box with a hint raised in play, picture-checked on both backends.
+  Source: finding of the 1508 session, 13.11.2026 15:34.
+  Bundle: Steuerung & Performance.
