@@ -8332,8 +8332,16 @@ if (section('vulture-landing')) {
       const vl = window.__balance.vultureLanding
       const saved = { landSeconds: vl.landSeconds, flareFraction: vl.flareFraction }
       if (stretch) { vl.landSeconds = 30; vl.flareFraction = 0.85 }
-      const carcass = { x: spot.x, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, deathCause: 'staged', chunk: 'inject-328' }
-      herds.zebra.push(carcass)
+      // A living adult inside the drawn herd capacity becomes the carcass: a body
+      // pushed past herdCapacity is simulated but never drawn (the frame showed
+      // the flare over empty grass). Grounded where it now lies.
+      const carcass = herds.zebra.find((z) => !z.dead && !z.young && !z.child)
+      if (!carcass) return { staged: false, noZebra: true }
+      Object.assign(carcass, {
+        x: spot.x, z: spot.z, y: Math.max(0.02, window.__terrainHeight(-spot.z / U, spot.x / U, seed)), rot: 0.4,
+        dead: true, deathCause: 'staged', parent: undefined, dissolve: undefined,
+        inWater: undefined, caught: undefined, dying: undefined, heldPose: undefined,
+      })
       window.__game.setState({ pos: { ...window.__game.getState().pos, x: spot.x, z: spot.z + 3 } })
       const sc = w.scavenger.current
       sc.target = null
