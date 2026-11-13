@@ -36632,3 +36632,9 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Data risk: user-ordered restrictions were bypassed and unrecoverable local data was deleted.
   Test: a Vitest case where a pending carrier request names the point about to start, and the start/claim path refuses until it is appended.
   Bundle: unbundled.
+
+- [x] 1514. Landing merges the pushed remote tip, never a stale local branch
+  Finding 13.11.2026 05:32 (point 1511 landing): local feat/1511 stood at 8f24300 while origin had 6bbb05b (the reviewed exit-0 fix) plus a main sync. `scripts/land-point.mjs` merged the local tip; gate, tick and push went green, and only the cleanup noticed the remote had moved. The reviewed fix was missing from main until a manual follow-up merge. Possible false approval: a green landing that does not contain the reviewed commits.
+  Final state: before its merge step land-point fetches the point's branch and, when origin is ahead of the local branch, fast-forwards to the remote tip or refuses with both shas named; a local branch that has diverged from origin refuses. The dry plan names the sha it will merge.
+  Test: Vitest on the land-point planning with a fixture repo where origin is ahead of the local branch (ff or refusal) and where it has diverged (refusal).
+  Bundle: unbundled (infrastructure).
