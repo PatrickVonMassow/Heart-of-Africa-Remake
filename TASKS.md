@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1507. Re-rank 31 player-facing points ahead of 1436
-  Re-rank the work order (user order 11.11.2026, 21:32): move the following open points so that they all stand BEFORE point 1436, in exactly this order as the user listed it:
-
-  336, 364, 1063, 1078, 1163, 1164, 1167, 1169, 1205, 1227, 1229, 1269, 1264, 1265, 1290, 1309, 1395, 1396, 1422, 1423, 1425, 1427, 1457, 1458, 1473, 1492, 1494, 1495, 1496, 1499, 205
-
-  Point 1490 stays at the front, as ordered earlier the same evening (it is ranked ahead of this group). No point text changes; only the ranking (.claude/queue-rank.json / work order) changes. All 31 points were measured open in TASKS.md at 21:32.
-  Bundle: unbundled.
-
 - [ ] 1508. Covering enrichments run owed for the landed points 391 and 327
   Measured 12.11.2026 00:04: render-verify-guard reports render paths changed since abafa90 (Giza monumental scale 391, vulture cluster 327; src/render/landmarks.ts, src/scenes/place/gizaSite.ts, scripts/verify/enrichments.mjs among them), but the last enrichments runs on webgpu and webgl covered only the section vulture-cluster. The 1504 boundary session recorded a loud deferral instead of a pass.
 

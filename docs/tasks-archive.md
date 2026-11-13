@@ -36655,3 +36655,11 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
    Verify: Playwright pictures of a moving head-load porter in Cairo (seed 1177128818) and Tangier (seed 1117999851), both backends when isBackendSensitivePath applies; plus a test that porters make progress and do not grind against colliders. Related but separate: 1425 (water jar jumps from hip to shoulder).
    Ranked to the front by user order 11.11.2026 ("Ja, so erweitern und 1490 nach vorne ziehen.").
    Bundle: Dorfleben.
+
+- [x] 1507. Re-rank 31 player-facing points ahead of 1436
+  Re-rank the work order (user order 11.11.2026, 21:32): move the following open points so that they all stand BEFORE point 1436, in exactly this order as the user listed it:
+
+  336, 364, 1063, 1078, 1163, 1164, 1167, 1169, 1205, 1227, 1229, 1269, 1264, 1265, 1290, 1309, 1395, 1396, 1422, 1423, 1425, 1427, 1457, 1458, 1473, 1492, 1494, 1495, 1496, 1499, 205
+
+  Point 1490 stays at the front, as ordered earlier the same evening (it is ranked ahead of this group). No point text changes; only the ranking (.claude/queue-rank.json / work order) changes. All 31 points were measured open in TASKS.md at 21:32.
+  Bundle: unbundled.
