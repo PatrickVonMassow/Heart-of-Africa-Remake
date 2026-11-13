@@ -15187,3 +15187,11 @@ to land than a mechanism that needs a review.
   Final state: the giraffe comparison staging finds and frames both the elder and the prime giraffe on both backends, and the check still fails when either is absent from the frame.
   Test: `npm test -- enrichments` (the 1498 elder-versus-prime section) green on WebGPU and WebGL 2, with verification/1498-elder-vs-prime-giraffe.png picture-checked.
   Bundle: Tierverhalten.
+
+- [ ] 1515. The bird flight escape section fails: the peregrine never stoops and the flushed flamingos leave the frame
+  Measured 13.11.2026 (covering enrichments run for point 1508 on main 8d18bc787, WebGPU, log local/verify-logs/2026-11-13T12-10-39-535-enrichments.log): the whole pass failed 'a forced peregrine enters high, stoops on a flying bird, strikes, and the hunt resolves (design.md §19.19)' with outcome lost, preyDead false, strikeAirborne null. `--section=bird-flight-escape` alone on a quiet machine (log local/verify-logs/2026-11-13T12-39-04-346-enrichments.log) failed all three checks of the section: the flamingos took off 6/6 but escaped to a spread of 56.4 with airborne 0 and onScreen 0 in the take-off frame, and the forced peregrine never started its stoop. No open point owns design.md §19.19.
+  Player impact: the staged flush scatters the flock out of the frame instead of a flying flock, and a forced peregrine hunt never resolves; the covering run of point 1508 is held red by it.
+  Final state: the cause is measured in game and fixed; `npm test -- enrichments --section=bird-flight-escape` is green on WebGPU and WebGL 2 on a quiet machine, and the take-off frame and the stoop frame (verification/269-raptor-stoop.png) are picture-checked on both backends.
+  Test: the section on both backends, plus a Vitest case if the cause lies in the pure bird-flight helpers; the 'check' charge of scripts/render-verify-charges.mjs for the three check titles dies with this point.
+  Source: finding of the 1508 session, 13.11.2026 13:15.
+  Bundle: Tierverhalten.
