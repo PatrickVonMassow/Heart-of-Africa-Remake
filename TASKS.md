@@ -905,6 +905,603 @@ put it is the mistake this line exists to stop.
   DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
   the pitched-view check beside the existing eye-level one.
 
+- [ ] 336. The whole crocodile staging family is fragile — rebuild it, not one case
+  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
+  crocodile check). History: the lunge case was found resting on an unpinned
+  assumption (its red turned out to be machine load, proven by a quiet-machine
+  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
+  arrived in time after all and the crocodile took it instead of the calf; that was
+  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
+  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
+  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
+  each depend on a different implicit precondition (a distance, an arrival time, a
+  drink state, a lunge that must fire), and every one of them is a separate way for
+  the staging to miss while the GAME behaves correctly.
+  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
+  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
+  reach its precondition" instead of accusing the product; (b) every mode pins its
+  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
+  (c) the seizure itself is established deterministically — poll for the grip with a
+  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
+  (d) each mode gets its own tiny setup helper instead of one branching function, so
+  a change to one ending cannot shift another's timing (the point-311 lesson at test
+  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
+  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
+  a distinct, self-naming failure message; the five §19.16 endings still each assert
+  their real outcome (no masking). RELATED: this is the concrete first slice of point
+  200's flake work, and point 294's auto-classification would have labelled all four
+  reds "staging, not product" without a manual repeat each time.
+  ITS BRANCH IS GONE, DELIBERATELY (user decision 21.08.2026). `feat/336-croc-staging` carried
+  five commits from 04.08.2026 and stood 2,791 commits behind `main`; measured against its merge
+  base it touched TWO files and `main` had since changed BOTH of them, so reviving it meant
+  resolving the whole file surface it owns. The user ruled that where reviving a hopelessly stale
+  branch costs about what a rebuild costs, the branch goes — and this point demands a rebuild of
+  the `crocDrama` helper anyway, so the branch carried exactly what is to be replaced. Deleted
+  locally and on `origin` (tip 4c6d7eec, recorded here so nobody hunts for it). The same
+  measurement cleared every other standing branch: none of the rest reaches that ratio, so nothing
+  else was discarded.
+  QUEUED BEHIND THE RELEASE with the rest of the front block (user decision 21.08.2026).
+
+- [ ] 364. The flood swells the drama current — and can take a calf at the crest
+  (user 26.07.2026; design.md §19.8 states the target). This point fixes a real
+  inconsistency first and adds a drama second; both land together.
+  THE BUG. `seasonFlowFactor(CURRENT_WEATHER.wetness, dryFlowFactor, wetFlowFactor)`
+  (Wildlife.tsx ~2373/2466/2485/3855) keys the drama current on LOCAL wetness alone.
+  The game's own flood model is deliberately REMOTE-fed (design.md §19.9, points
+  138/139): the Nile crests at Cairo in October where it never rains, and the
+  Okavango peaks in July inside Botswana's dry season. So today the water dramas run
+  at their dry-season gentlest exactly when the modelled river is at its most
+  dangerous. THE FIX: the effective factor is the HIGHER of the wetness-fed factor
+  and a flood-fed one — `nileFloodAt`/`okavangoFloodAt` (`src/systems/season.ts`)
+  scaled by a calibratable balance value (§21.2, debug-editable) — so the crest
+  swells the current, shortens the self-rescue and brakes the rescue burst through
+  the paths that already read the factor. Wire it in ONE place (a helper beside
+  `seasonFlowFactor`) so no call site can be forgotten.
+  THE DRAMA. At a swollen crest a crossing (point 362) can lose the calf to the
+  CURRENT rather than to a crocodile: it is carried downstream past its parent's
+  reach, and the parent turns downstream after it — a rescue on the same rolls and
+  the same brake, which the point-122 drowning window may end for BOTH. This is the
+  existing drowning drama reached by a new road, not a new death: reuse
+  `drownSeconds`/`drownFlowThreshold` unchanged.
+  WHAT MUST NOT CHANGE: the flood stays VERTICAL (§19.9) — no ground becomes water,
+  no §4.2 village clearance moves, the ribbon keeps its width. Only the force
+  changes. A test must pin that.
+  SEQUENCING: 362 lands first (this point's drama rides its crossing); the flow-factor
+  fix is independent and may land even if 362 slips.
+  ANCHORS: `src/systems/season.ts` (`nileFloodAt`, `okavangoFloodAt`),
+  `src/scenes/travel/wildlifeBehavior.ts` (`seasonFlowFactor`, `wadeSpeed`, the
+  drowning core ~1745), `Wildlife.tsx` at the four call sites above,
+  `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`.
+  VERIFIABLE: pure — at Cairo in October (wetness 0) the effective factor is
+  significantly above the dry floor and near the wet case, while a rainless
+  non-flood day stays at the floor; the Okavango does the same in July; the factor
+  is never LOWER than today's wetness-fed value anywhere (a pure sweep over the
+  year × both systems); the drowning window and threshold are untouched; the flood
+  changes no water mask, ribbon width or clearance (assert against the existing
+  world sweep). Live (`scripts/verify/wildlife.mjs`, ONE backend): at the October
+  crest a seeded crossing is visibly carried downstream and its rescue is slower
+  than the same seed in the dry season.
+  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
+  acceptance-evidence line under §12.
+
+- [ ] 1063. A wildebeest is hunted in the central African rainforest, and the check that
+  catches it belongs to nobody.
+  WHAT HAPPENS. Measured 06.09.2026 in the LARGE run on feat/689-chief-direction-and-mould
+  (webgl/enrichments, HEAD 8944a52c6): the `predator-food-web` section reports
+  `preyMismatch: [{prey: "wildebeest", region: "central"}]` and
+  `webMismatch: [{predator: "lion", prey: "wildebeest", region: "central"}]` over sixteen
+  hunts. Wildebeest are plains animals; the central region is rainforest. The check
+  `every hunted prey fits the region and the predator food web` is the one that catches it,
+  and it went GREEN on the same run's retry — so the placement is INTERMITTENT, not constant.
+  WHY IT IS NOT ALREADY CHARGED. The ledger entry that looks like this one is point 1013's,
+  and it is anchored on `every predator fits the region and period` — a DIFFERENT, older
+  check. 1013's own `why` records the prey side as clean, which is exactly what this
+  measurement contradicts. The failing check was added later, by the commit "Lions hunt
+  varied, region-appropriate prey; add wildebeest and warthog" (531319528) — the same commit
+  that introduced the wildebeest. So the animal and the check that rejects it arrived
+  together, and nothing owns the red.
+  WHAT IT COSTS. An unowned red makes the whole run neither clean nor accounted for, so no
+  LARGE can be filed as coverage while it stands. It cost this run its verdict.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: 1013 says of the
+  predator side that the check "may read the region where the hunt ENDED rather than where it
+  began". An animal that crosses a region border mid-hunt explains BOTH the red and its
+  disappearance on the retry. Decide that FIRST: log the region at the hunt's start and at
+  its end side by side, for one sample, and see whether they differ.
+  Final state:
+  - The cause is named from the logged sample — wandering across a border, or a genuinely
+    wrong placement — and the fix is made on that side.
+  - The section passes on a quiet host over a run of at least six, on both backends.
+  - If the cause is shared with 1013, both points say so, and only one of them carries the fix.
+  Test: `npm test -- enrichments` unfiltered, plus the throttle probe over
+  `predator-food-web` with the run counts stated.
+  Criticality: medium — it blocks no game work, but it blocks the evidence every render
+  change is filed with, and it is the second unowned red of the same family.
+  Refs: scripts/verify/enrichments.mjs (`predator-food-web`), the food-web table the check
+  reads, scripts/render-verify-charges.mjs (point 1013's entry, prey side NOT covered)
+  Bundle: Tierverhalten (it reads the same food-web table and the same enrichments section as
+  1013, so the two must not run in parallel).
+
+- [ ] 1078. The one solvable puzzle of the PoC fails its own check about half the time, and
+  nobody knows whether the player or only the harness is hit (measured 08.09.2026).
+  WHAT HAPPENS. In the `world` suite the traveller jumps to the talus foot below the
+  Bandiagara escarpment, where the rock relief fits the mould, and presses the use key.
+  In the run of 08.09.2026 07:38:23 the press answered "Nothing here has a hollow that
+  would take this shape." — `said ["…noFit"], spent [], mode travel, dialog null` — and so
+  did the following press at what should by then have been a spent socket. Both checks went
+  red, the suite retried once, and the retry passed 10/0. That retry is what makes this a
+  point rather than a fixed bug: a later green does not close a red (CLAUDE.md §7.2), and the
+  same pair is on record from the SUSPECT run of 07:40:15 that only passed on its second try.
+  WHAT THE EVIDENCE ALREADY RULES OUT. It is not the settle time: the earlier press one
+  degree off the socket, which correctly answered noFit, waits only 600 ms, while the press
+  at the foot waits the default 2500 ms and has a screenshot and two zoom changes behind it.
+  It is not the camera either — the frame `20-worldmodel-bandiagara-talus-foot` between the
+  two presses passed its own shutter, so the talus WAS in the rendered projection at that
+  instant. It is not the toast expiry the probe already guards against (the log records the
+  toast as it is SET), and it is not a random event's dialog: the roulette is switched off
+  around the block and `dialog` reads null. So the press reached the game, the game answered,
+  and the answer was that the traveller was not within reach of `bandiagara-talus`.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the fit
+  test reads a position the PLAYER also has (then `debugJumpTo` leaves the reach computation
+  on a stale or smoothed position and a real traveller walking there can meet the same
+  silence), or whether only the HARNESS jump is at fault. Answer that BEFORE touching either
+  side. Probe: press at the foot in a loop over N runs and log, per attempt, the position the
+  reach test reads next to the socket position, so the distance that decided the answer is
+  named instead of guessed — `node scripts/throttle-probe.mjs world --section=<the block's
+  slug> --runs 8` measures how often it bites.
+  IT IS NOT INTERMITTENT ON MAIN — MEASURED 13.09.2026, and that is cheaper news than the
+  title above. `baseline-classify.mjs world` ran the suite TWICE against 49cef70ee645, main's
+  own tip, on a quiet machine (load 0.35 over sixteen cores), and BOTH presses answered noFit
+  in BOTH runs, word for word as on 08.09.: `said ["Nothing here has a hollow that would take
+  this shape."], spent [], mode travel, dialog null`. The branch it was measured from,
+  feat/1087-carrier-fills-the-jar, had the pair red in only ONE of its two attempts — so
+  "about half the time" is the branch's draw, and on main the defect reproduces every time.
+  The probe this point specifies therefore does not need eight runs to bite: two section runs
+  on main already carry it, which makes the player-versus-harness question above cheap to
+  settle.
+  AND THE FRAME BESIDE IT WAS READ, 13.09.2026, which narrows that question from the other
+  side. `20-worldmodel-bandiagara-talus-foot` — taken between the two presses, at travel zoom
+  0.25 — shows the traveller standing under the "Unknown ruins" label with the rock slab drawn
+  behind him and the Clay Impression in his belt, and it is the same picture as the frame
+  committed before it. So the jump DID put him at the landmark the shutter photographs, while
+  the reach test read a position out of range in the same instant. The two positions are not
+  the same position; that is the measurement this point asked for.
+  WHAT IT COSTS. This is the ONE puzzle the PoC can solve end to end, so a fit that
+  intermittently refuses is player impact, not only suite noise; and while the red stands
+  unowned, `render-verify-guard` blocks every merge in the repository.
+  Final state:
+  - The cause is named in the commit — player path or harness — with the measurement that
+    distinguishes them.
+  - The named side is fixed, and the block passes eight times in a row on a quiet machine
+    without a retry.
+  - Whatever part of the reach decision is pure gets a Vitest that pins it, where no browser
+    is needed to prove the distance.
+  Test: `npm test -- world` unfiltered on both backends, plus Vitest over the pure part of
+  the reach decision.
+  Criticality: medium — intermittent, and the red is CHARGED to this point in
+  `scripts/render-verify-charges.mjs` so it stops blocking merges the moment this point
+  exists; but it sits on acceptance criterion 10 (goal scaffolding) and the closing run will
+  have to report it if it is still open.
+  Refs: scripts/verify/world.mjs (the talus block ~360-460, `jump`, `pressUseKey`),
+  src/world/forms.ts (`FORM_SOCKETS`, `socketPosition`), the use-key reach test and
+  `spentSockets` in src/state/store.ts, docs/acceptance-criteria-detail.md §10.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1163. The leftmost pyramid stands on a red band the other two do not have (seen
+  18.09.2026 in the covering polish frame `verification/139-giza-walkable-site.png`, WebGPU
+  run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN — no check reads the
+  colour, so the suite walks past it).
+  MEASURED STATE: at the monument site the middle and right pyramids meet the ground in a
+  tan sand apron that reads as the site's own plate. The leftmost pyramid's lowest band is
+  a distinctly reddish terracotta instead, the one saturated colour in an otherwise sand
+  and sky picture, and it stops at a hard horizontal line rather than fading into the
+  ground. `src/scenes/place/gizaSite.ts` carries no colour at all, so the band comes from
+  somewhere else — the sand apron, the pyramid material's lower ring, or a plate drawn at
+  the same height as the ground and fighting it for depth.
+  Final state:
+  - The three pyramids meet the ground the same way: whatever the middle one does at its
+    base, the left one does too, and nothing reads as a different material.
+  - The cause is NAMED in the commit — which mesh drew the red, and why only this one —
+    rather than repainted at the symptom.
+  - If the band turns out to be depth fighting rather than a colour, it is fixed as depth
+    fighting; a colour that merely hides it does not close this.
+  Test: `polish --section=giza-site` on both backends, and the frame
+  `139-giza-walkable-site` is INSPECTED, not merely green — the suite has no check for
+  this and a new one is only worth adding if it can read the base band without pinning the
+  art.
+  Criticality: low — it costs nothing but the look of the site the player walks up to.
+  Refs: verification/139-giza-walkable-site.png, src/scenes/place/gizaSite.ts
+  Bundle: Monumente.
+
+- [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
+  18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
+  run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
+  MEASURED STATE: on the open sand right of the near boulder, roughly mid-frame, sits a
+  small dark ellipse with clean edges. Nothing stands over it — no rock, no villager, no
+  animal — so it reads either as a contact shadow whose caster is culled or never drawn,
+  or as a ground decal placed without its object. The same spot on the WebGL 2 pass shows
+  it too, so it is not a backend artefact.
+  Final state:
+  - Either the caster is drawn where its shadow claims it is, or the shadow is gone; no
+    frame of the bank shows a shadow without its object.
+  - Which of the two it was is named in the commit, because a culled caster and a stray
+    decal are different defects and the second one probably has siblings.
+  Test: `polish --section=children-bank-game` on both backends with the frame
+  `687-bank-play-rocks` INSPECTED.
+  Criticality: low — a small wrong thing in a picture the player stands in front of.
+  Refs: verification/687-bank-play-rocks.png
+  Bundle: Siedlungsgeometrie.
+
+- [ ] 1167. The hut wall grows into the doorway as a bright wedge (seen 19.09.2026 in the
+  covering polish frame `verification/1092-bambara-former-well-spot.png`, WebGPU, and in the
+  WebGL 2 frame of the same section — both GREEN runs; the point that took the frame only
+  brought the camera close to a hut).
+  MEASURED STATE, read on the frame at 3x: a family hut's doorway is a FLAT dark recess laid
+  against a CYLINDRICAL wall. The cylinder bulges outward most at the middle of the door's
+  chord, so the wall surface stands IN FRONT of the flat door plane there and is drawn as a
+  bright, wall-textured wedge that rises from the threshold to roughly two thirds of the
+  door's height. The opening reads as a doorway with a spike of wall growing up through it.
+  It is not a backend artefact: both lanes show it, and it is visible at ordinary walking
+  distance in every village, because every family hut carries the same door.
+  Final state:
+  - No hut doorway shows wall surface inside its opening from any angle a walking player
+    can reach: the opening is cut out of the wall geometry, or the door plane sits behind
+    the cylinder's inner radius, whichever the hut's construction makes simpler.
+  - The fix is made where the door is built, once, so every hut kind that uses it follows;
+    no per-village exception list.
+  Test: Vitest over the hut geometry — no point of the door's opening lies inside the wall
+  solid — at several hut radii, mutation-checked.
+  Picture check: one frame standing in front of a hut door at walking distance on BOTH
+  backends, the opening dark through its whole height.
+  Criticality: medium — reproducible player impact in a picture the player walks up to in
+  every settlement.
+  Refs: verification/1092-bambara-former-well-spot.png, src/scenes/place/PlaceLife.tsx and
+  the dwelling/roof geometry in src/scenes/place/roofClearance.ts and layout.ts
+  (`DwellingKind` 'hut', its door at `d.door`)
+  Bundle: Siedlungsgeometrie.
+
+- [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
+  seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
+  reproducible, no browser needed).
+  MEASURED STATE: `shuffleWindows` over `play('bambara-village', seed, 60)` — the very
+  instrument the shipped gate uses (`scripts/verify/childMotionMetric.mjs`) — run over
+  bambara seeds 1-60. Six of the sixty read the WORST child ABOVE the shipped 0.25 % gate:
+  seed 27 at 0.367 %, seed 30 at 1.299 %, seed 33 at 0.282 %, seed 35 at 0.311 %, seed 40 at
+  0.254 % and seed 50 at 0.254 %. Seed 30 is five times the gate. Every other measure of
+  those layouts is healthy — the least judgeable child 0.966-0.983, no carry, no rescue, no
+  overlap — so this is the shuffling itself and not a metric artefact.
+  WHY IT WAS INVISIBLE: the sample that judges this varied the VILLAGE (bambara, maasai,
+  swahili) and pinned the seed. The player learns the language in `ROCK_VILLAGE_ID` alone
+  and is dealt a fresh seed at every start, so the axis that reaches him went unjudged.
+  Point 1094 put the sample on the seed axis and this fell out of it; 1094 deletes test
+  breadth and builds nothing, which is why the fix is its own point.
+  WHAT THE BROWSER ADDED ON 21.09.2026, and what it did NOT: point 690 moved the
+  `children-motion` gate onto the port and the bankless village, and over six runs of that
+  section on its branch, both backends, four went green and two red — WebGPU at `c05d0e205`
+  read maasai-village at 0.25 % and cairo at 0.94 % (group 0.31 %, bursts 0.07 %), WebGL 2
+  earlier read cairo at 2.80 %. Every red carried this class's signature, 1.29 m walked
+  inside a quarter of a metre. It is NOT established that the port shuffles worse than the
+  village: all six reds fell on the SECOND or THIRD settlement of a loop that chained three
+  traces into one browser session and none ever on the first, and giving each settlement a
+  fresh page removed them. That coupling is repaired in 690 and is not this point's; what
+  remains this point's is the shuffling itself, which the seed spread below measures without
+  a browser at all.
+  Final state: no bambara seed of 1-60 reads the worst child above the shipped gate over the
+  judged minute, the same holds for the port and the bankless village, and the sample in
+  `tagShuffle.test.ts` carries at least one of the six seeds above so the repair cannot be
+  read off a lucky layout.
+  Test: Vitest — the six seeds above run inside the gate, mutation-checked; the existing
+  three-seed sample keeps its cases and gains the silent round's two settlement kinds.
+  Refs: src/scenes/place/tagShuffle.test.ts (`PLACES`, `the children never shuffle on the
+  spot`), scripts/verify/childMotionMetric.mjs (`shuffleWindows`, `CHILD_MOTION.shareGate`),
+  src/scenes/place/bankGame.ts (the bank round) and src/scenes/place/tagGame.ts (the silent
+  round the ports and the bankless villages play)
+  Criticality: medium — it is the user's own report of 648/656, alive on about a tenth of
+  the worlds he can be dealt, and it is player-visible wherever it fires.
+  ALSO OWNS THE BROWSER CHARGES (09.11.2026, from point 1068): both children-motion entries in
+  `scripts/render-verify-charges.mjs` now name 1169, because a quiet unthrottled WebGPU probe
+  read the same signature (1.13 m inside 0.27 m, bursts clean); the fix strikes them. Lead from
+  1068: src/scenes/place/tagGame.ts ~1150-1205 documents this composition at catch moments (a
+  cornered runner beside the standing chaser, the ex-chaser's U-turn) — check first whether the
+  red windows coincide with catches; then the catch steering, not the gate, is the repair.
+  Bundle: Dorfleben.
+
+- [ ] 1205. The lion does not move on once the elephant-trampling carcass is consumed.
+  PROBLEM, measured 24.09.2026 by the point-312 author: `npm test -- enrichments
+  --section=elephant-trampling` is 13 pass, 1 fail — "Lion moves on once the carcass is consumed"
+  — and the identical red reproduces with the section alone on main b3c0715bf, so it predates 312.
+  FINAL STATE: once the carcass is consumed the lion leaves the site as §19.8 requires (every
+  drama resolves), and the section is green on WebGPU; if the check rather than the lion is wrong,
+  the check is corrected with the measured reason.
+  Criticality: medium — a predator parked at a spent carcass is visible to the player.
+  Test: `npm test -- enrichments --section=elephant-trampling` green; a Vitest case if the leave
+  decision is a pure helper. Refs: src/scenes/travel/Wildlife.tsx, scripts/verify/enrichments.mjs.
+  Bundle: Tierverhalten.
+
+- [ ] 1227. Settlement rain reaches the ground.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c09.json U4841):
+  `PlaceRain.tsx` places the rain column's base at eye height (1.5 m) with fall in
+  [0, RAIN_HEIGHT), so streaks run from eye height upward and never reach the ground.
+  FINAL STATE: the column is centred on the eye as the comments intend; streaks visibly reach the
+  ground in a settlement.
+  Criticality: medium — visible in every rainy settlement.
+  Test: unit assertion on the column bounds; picture of a rainy settlement on both backends.
+  Refs: src/scenes/place/PlaceRain.tsx.
+  Bundle: Dorfleben.
+
+- [ ] 1229. A predator robbed of its chase victim walks off from where it stands.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c11.json U5474):
+  the crocodile-steal abort in `Wildlife.tsx` sets `s.lx/s.lz` to the kill-site flank although the
+  predator is still chasing elsewhere, so it visibly teleports.
+  FINAL STATE: the walk-off starts from the predator's current position, like the swim-escape
+  give-up.
+  Criticality: medium — a visible teleport in the panorama.
+  Test: unit case for the steal abort keeping the predator's position.
+  Refs: src/scenes/travel/Wildlife.tsx.
+  Bundle: Tierverhalten.
+
+- [ ] 1269. The tag beat's side-on standpoint search finds every stand occluded
+  Source: first measured 02.10.2026 ~19:30 in the WebGL 2 covering run of point 1129 on 001ef76f1
+  (`polish-children`, section `tag-catch`, log
+  `local/verify-logs/2026-10-02T17-08-03-519-polish-speech-polish-settlement-polish-children-polish-villagers.log`);
+  no earlier recorded log holds this signature, the check moved unchanged from
+  `scripts/verify/polish.mjs`, and the section alone was green 47 s later on the same head.
+  THE RED. "a clear side-on standpoint on the beat" read `every standpoint occluded`: after the
+  held catch beat, `standBeside(beat.caughtAt, beat.runnerAt ?? beat.caughtAt, beat.caughtAt)`
+  found no candidate stand whose sight line to the caught child was free, so frame
+  `1176-tag-beat` was not taken. The section stages Cairo itself, so it is not an order effect;
+  the port's walls, stalls and walkers around a beat that happens near a wall are the candidates.
+  Final state:
+  - The cause is measured (which candidates were tried and what occluded each, over repeated
+    `--section=tag-catch` runs on a quiet machine on WebGL 2); a search that gives up while an
+    honest side-on view exists is fixed in the search (more bearings or distances, or a later
+    beat), with no check weakened and no occlusion tolerance wider than the evidence.
+  - `polish-children --section=tag-catch` green on WebGPU and WebGL 2; frame `1176-tag-beat`
+    picture-checked.
+  Tests: the existing Playwright section; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low — test-frame staging only, no player impact; it blocks the green of
+  `polish-children` on WebGL 2.
+
+- [ ] 1264. The village pounder's pestle pounds the air above its mortar
+  Source: cross-vendor review of point 1251 (02.10.2026), same geometry as the fishers' eater.
+  `src/scenes/place/PlaceLife.tsx` `Pounder`: the 1.05 m pestle's centre rests at 1.05 m, so its
+  foot stops at 0.525 m while the mortar is 0.42 m tall — every stroke ends 10 cm above the rim.
+  Final state:
+  - At the bottom of the stroke the pestle's foot is inside the mortar (point 1251 uses a rest of
+    mortar height − 0.12 m + half the pestle), and the pounder's hands still ride the shaft.
+  - A browser check samples the pestle height and asserts the foot reaches the mortar.
+  Tests: the existing village Playwright section that photographs the pounder gains the assertion.
+  Bundle: Dorfleben.
+  Criticality: low — visible at every pounding village, no mechanic affected.
+
+- [ ] 1265. The boatman's first reading comes too late at the mute shore
+  Source: covering WebGPU pass of point 1129 (02.10.2026); reproduced alone on `main` fe28c8bde
+  (log `local/verify-logs/2026-10-02T11-31-07-724-polish.log`) and on feat/1129 (log
+  `2026-10-02T11-28-50-894-polish-villagers.log`), so it is not the split's.
+  THE RED. `polish --section=mute-shore-scene`: "a boatman`s reading appears within a few seconds
+  of entry, without ROCK marked heard" — boat at 9.69 s against `canoe.firstCallSeconds` 4 + 3 s
+  slack; the child reads at 3.24 s and ROCK is not heard. `villager-canoe` was green at 0fac48504
+  on both backends the same morning; candidates are the earshot moves 6e64d0e37, d2c3e690b and
+  eb68d9f3f.
+  Final state:
+  - The commit that delayed the boat's first call is named with the reading on either side.
+  - The boatman's first reading lands within `firstCallSeconds` + 3 s of entry again, or the
+    window's premise is revised with the reason recorded.
+  - `polish(-villagers) --section=mute-shore-scene` green on WebGPU and WebGL 2.
+  Tests: the existing Playwright check; no new mechanism.
+  Bundle: Dorfleben.
+  Criticality: medium — the mute shore's lesson starts with the boatman's call.
+
+- [ ] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
+  Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
+  Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
+  Bundle: Tierverhalten.
+  Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
+
+- [ ] 1309. A hard-edged dark rectangle shows in the burning-grass travel frame
+  Source: findings carrier 05.10.2026 16:35, found on the picture check of point 1287.
+  verification/131-burning-grass.png shows a straight-edged dark rectangle (with horizontal bars) in the lower right of the bird's-eye view, on main (d8a093e50, WebGL 2) and on WebGPU and WebGL 2 at point 1287 alike; not caused by the camera shift. Looks like a shadow or overlay with a rectangular footprint.
+  Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
+  Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
+  Bundle: Wetter & Wasser.
+
+- [ ] 1395. Point gesture release squats the glTF figure (virtual arm longer than the drawn reach)
+  Queue position: with point 1383 (Dorfleben), whose point/reach step touches the same arm.
+  Source: owner measurement 20.10.2026 on feat/1345-child-chaser-teleport (split from point 1345, whose spec named this squat as a related CROUCH_MAX case): in the runtime-pose export (src/render/villagerRuntimePose.test.tsx, subject `point`, adult, bearing 0.6) the hips sit at 0.51 of standing height at t=2.11 s. The cause is not the CROUCH_MAX fallback: while the arm lowers from the point (pitch -1.71 to -1.50) the arm off its rest pose counts as a contact arm (skinnedFigure.tsx `contactArm`, no `extras.reach`), its target is the virtual primitive hand (a straight arm longer than the glTF reach 0.47), the standing shortfall is 0.13-0.37, and the crouch really reaches it (-0.008 at 1.1), so `contactCrouch` picks 0.3 rising to 1.0 over about eight frames.
+  Final state: a gesture arm is no contact for the crouch: a pointing villager on the glTF body never squats at the end of the gesture; low work contacts (the jar fill, the dig) keep their crouch.
+  Verifiable: the export's `point` subject keeps its hips at 0.85 or more of standing height in every frame (Vitest in src/render/villagerRuntimePose.test.tsx); skinnedFigureCrouch.test.tsx stays green.
+  Criticality: medium - every pointing villager on medium/high presets.
+  Bundle: Dorfleben.
+  Further source: user bug report hoa-state-2026-10-21-3318564123 (2).zip (21:05:18Z), user words: "Warum bückt er sich, wenn er zum Häuptlingshütte zeit und warum zeigt seine Hand nicht geradeaus, sondern leicht nach unten." The man in dark blue points toward the chief's hut in a crouch with his arm slightly below horizontal - consistent with the measured release phase (arm pitch -1.71 to -1.50 while the crouch fires).
+  Additional check: after the fix, the pointing hand aims level at the target while the gesture is held (not only at release); if it does not, split a separate point for the aim.
+  Owned browser checks (charged by point 1465, 29.10.2026, bisected to the 1295 glTF merge 2eb4f1384; trace: hand 0.65 -> 0.82 -> 0.34 squat -> rest within a second): polish-speech --section=chief-to-drummer "the drummer's arm is raised in the pointing frame (point 1272)" and "the man and his word offer their keys at the same time (point 1139)" green on both backends; strike both charges in scripts/render-verify-charges.mjs.
+
+- [ ] 1396. Two walking villagers stand inside each other at the village centre
+  Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
+  Source: finding 20.10.2026 10:54 from the point-1330 picture check: verification/1295-village-walker-mid-stride-webgl2.png at f59ddaa0a shows a walking woman and a man behind her standing inside each other at the village centre (WebGL 2). Villager separation, not the planted-soles gait; WebGPU not yet judged for it.
+  Final state: two villagers moving through the village never interpenetrate; their bodies keep a visible gap while walking past or behind each other.
+  Verifiable: a Vitest case on the villager movement layer asserts a minimum body distance between every pair of walking villagers over a simulated village walk; the 1295 walk frame shows no overlapping bodies on both backends.
+  Criticality: medium - visible in the village walk frame.
+  Bundle: Dorfleben.
+
+- [ ] 1422. Villager knee snaps when a walker leaves the walk gait in a corner
+  Source: finding 22.10.2026 09:46 from the point-1402 moving capture (seed 42, walker 0, WebGPU 60 Hz fixed clock): while the walk share drops 1 -> 0 in a ~2.8 rad/s corner the knee jumps 0.49-0.66 rad per frame (shin.L 0.836 -> 1.499) into a deep-knee pose; present on main 9ecb039 before 1402, same on WebGL 2.
+  Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
+  Verifiable: a Vitest on the villager pose layer bounds the per-frame knee change across a gait blend in a turn; a moving capture shows no leg snap on both backends.
+  Criticality: medium - visible leg snap when villagers turn.
+  Bundle: Dorfleben.
+
+- [ ] 1423. Villager heel strike stops the swinging foot dead
+  Also: a flat foot drops its kept heading in sharp curves.
+  Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: the heel is caught while the clip still swings it forward ~2 m/s (foot up to 2.8x clip max speed, shin ~4 rad/s reversal at 144 Hz); at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s). Pre-existing; the 3x margin in villagerClipPose.test.ts exists because of the heel strike.
+  Final state: heel strike decelerates the foot without a dead stop, and a flat foot keeps its heading through sharp curves; the 3x margin in villagerClipPose.test.ts can drop.
+  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; a moving capture on both backends.
+  Criticality: medium - visible foot jerk in village walks.
+  Bundle: Dorfleben.
+
+- [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
+  Source: finding 22.10.2026 19:24 from the point-1404 moving capture (WebGL 2, seed 42, Bambara village, errand villager 1, frames 255-261 at 60 Hz, branch e962c7841): the carried jar swings from hanging low at the hip to raised beside the shoulder within ~6 frames (~0.1 s) while the carrier walks on.
+  Final state: the jar moves from hip to shoulder as a visible lift over a natural duration, never as a pop between two carry poses.
+  Verifiable: a Vitest on the carry-pose transition bounds the jar's per-frame displacement; a moving capture on both backends shows the lift.
+  Criticality: medium - visible pop on every water carrier.
+  Bundle: Dorfleben.
+
+- [ ] 1427. A running child pushed back by separation walks backwards
+  Source: finding 23.10.2026 05:21Z during point 1424 (present on main): a runner pressing against another body at 2.4 m/s is pushed back by the separation step and walks backwards (0.49 m at t 104 s), seen only in chaotic replays of tagShuffle.facing.
+  Final state: separation slows or sidesteps a pressing runner but never moves it against its facing faster than a walk.
+  Verifiable: a Vitest replay in tagShuffle.facing bounds the backwards walk under separation; a moving capture shows no backwards push.
+  Criticality: low - rare, only in crowded moments.
+  Bundle: Dorfleben.
+
+- [ ] 1457. A fleeing child no longer flips to the other rim direction after a wall deflection
+  Final state: in the tag round, a wall deflection of an evader's course no longer feeds
+  `evadeHeading` a deflected `current` that flips the flee to the opposite rim direction
+  (traced at maasai-village/4 child 1, t≈5.95 s: −280° → −69°, then `turnBeforeRun` turns the
+  child on the spot into a playmate), and the side is not locked either (locking it, attempt 1
+  in `docs/1081-steering-trace.md` §5, made the sweep worse). Judged over the 66-pair sweep of
+  point 1081 (maasai, hausa, swahili, zulu, san, tuareg × seeds 1–10, 99) at every cadence:
+  the number of pairs at or above `CHILD_MOTION.shareGate` and the sum of worst shares fall
+  against the recorded baseline (6 pairs, sum 3.50 % native), with no pair worse than it was.
+  Test: Vitest — the traced maasai-village/4 episode as a case: the evader keeps its rim
+  direction through the deflection; plus the sweep numbers in the commit message.
+  Refs: src/scenes/place/tagGame.ts (`evadeHeading`, `moveChild`, `turnBeforeRun`),
+  docs/1081-steering-trace.md §4–§5, docs/1081-probes/ (sweepProbe, sweep.sh, sum.mjs).
+  Bundle: Dorfleben.
+
+- [ ] 1458. Two playmates meeting head-on pass each other, and the crowded case samples more than one settlement
+  Final state: two tag-round children meeting head-on at the floor pace pass each other on a
+  side they keep until they are past, rather than re-deciding every frame (the per-frame and
+  timed veers of `docs/1081-steering-trace.md` §6 lowered the sum by 6–47 % but none held the
+  gate and the best had no robust neighbourhood). Over the 66-pair sweep of point 1081 at every
+  cadence, every pair reads under `CHILD_MOTION.shareGate` (0.25 %), and neighbouring parameter
+  values hold it too, so no lucky constant is pinned. The crowded construction in
+  `tagShuffle.test.ts` then runs at least three tag-round village/seed pairs (including the
+  former worst, maasai-village/4, and mandinka-village/99) at every cadence, and
+  `CROWDED_CADENCE_GATE` is removed or re-derived from what the fix leaves. Not a raised gate on
+  its own. Builds on 1457.
+  Test: Vitest — the crowded construction over the named pairs at every cadence.
+  Refs: src/scenes/place/tagGame.ts (`moveChild`), src/scenes/place/tagShuffle.test.ts,
+  scripts/verify/childMotionMetric.mjs, docs/1081-steering-trace.md §4–§6.
+  Bundle: Dorfleben.
+
+- [ ] 1473. Bambara errand adult lost in the water-back walk during the continuous route
+  Source: communication `continuous-route` alone on aed84aa2f, WebGPU (`local/verify-logs/
+  2026-10-30T09-58-38-857-communication.log`, 30.10.2026), step 9-fit-and-journal: the dev invariant
+  `[ASSERT] adult-atom-lost — bambara-village: water-back pair 2/3/walk: forced after 239.96s; overrun
+  situation water-out pair 3/2 (speaker blocked)`. Not seen in the closing LARGE runs.
+  Final state:
+  - The cause is measured: why pair 2/3's water-back walk never completes while pair 3/2's water-out
+    overruns with a blocked speaker (a mutual block between the two pairs or a lost goal).
+  - The errand completes or releases inside its bound with that reason fixed, with a unit test; the
+    assert stays loud. Green in a whole communication run on both backends; its charge is struck.
+  Tests: Vitest for the errand scheduler; the existing Playwright step.
+  Bundle: Dorfleben.
+  Criticality: medium - a villager stuck on an errand is player-visible.
+
+- [ ] 1492. On the low preset the task walker's head-load cone pierces the bundle at full kneel
+  (measured 09.11.2026 on feat/1301 43d129505, polish-villagers --section=village-walk, WebGPU).
+  With detailLevel low, at the first frame with `inhabitant.userData.kneel === 1` the task
+  walker still holds its bundle at chest height on the body axis, and the blue wrap cone's apex
+  sticks out through the box top, identically from both flanks
+  (verification/1301-village-kneel-low.png of that run). The skinned figure
+  (1432-village-load-set-down) holds it in front of the chest without contact.
+  Player impact: visible on the low preset at every set-down and pick-up.
+  Final state: at full kneel on the low preset no part of the figure's mesh intersects the load.
+  Test: Vitest geometry check of the low-preset kneel pose against the load box; picture on both
+  backends (polish-villagers --section=village-walk).
+  Refs: src/scenes/place/placeFigure.tsx, src/render/figureWalk.ts
+  Criticality: low — cosmetic, low preset only, but player-visible.
+  Bundle: Dorfleben.
+
+- [ ] 1494. An elephant-trampled animal dies on clean ground — no stain is pushed
+  Final state: `npm test -- enrichments --section=elephant-trampling` is green on WebGPU: the trampled animal lies dead over a ground stain ("Elephant tramples a smaller animal (dead over a stain)").
+  Observed problem: the section is red on origin/main 2c9fefacc (WebGPU, fresh detached tree, 09.11.2026 16:42) and twice on feat/453-lion-prey with "zebra, 0 stain(s)". The victim dies but no stain is pushed; the trampled body is the first natural zebra herds.zebra[0]. Point 453's diff touches neither trample nor stain code, so the red is owned by no point. Point 1205 (lion moves on) is a different check in the same section.
+  Player impact: a trampled animal lies on clean ground.
+  Test: the section above green; a Vitest case for the trample-to-stain path if the cause sits in browserless logic.
+  Source: picture check of the 453 landing session, 09.11.2026.
+  Bundle: Tierverhalten.
+
+- [ ] 1495. The continent zoom stops drawing — a TypeError fires every frame
+  Final state: `npm test -- enrichments --section=seasons` is green on both backends: frame 87-continent-zoom is drawn at the unlocked wide zoom, and the page logs no "TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))".
+  Observed problem: at the continent zoom the scene draws nothing ("no frame has been drawn yet (0 draw calls)") and the TypeError repeats every frame. Measured 09.11.2026 on main ca908ee7d (`--section=seasons`, WebGPU, 277 errors, log local/verify-logs/2026-11-09T19-49-07-979-enrichments.log) and on feat/565-buried-drinking-calf 313289975 (full enrichments, WebGPU 5600 and WebGL 2 406 errors). No enrichments run up to 31.10.2026 logged it. Point 565's diff only moves wildlife body heights, so the red is owned by no point. The suite logs only the message text, so the first step is the stack (pageerror `e.stack`).
+  Player impact: zooming out to the whole continent shows a frozen or empty scene.
+  Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
+  Source: picture check of the 565 landing session, 09.11.2026.
+  Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
+  Bundle: Steuerung & Performance.
+
+- [ ] 1496. Grass fire: close the four cross-vendor review objections point 321 landed without
+  Final state: the four objections of the GPT-6.1 Sol review of feat/321 b2023ba (passes 2/6/7, verdict merge-with-fixes) are fixed on main and `npm test -- enrichments --section=burning-grass` is green on both backends with the frame judged: (1) `src/scenes/travel/burnScarNode.ts` uses `1 - smoothstep(0, depth, dFront)` instead of the reversed-edge `smoothstep(depth, 0, dFront)`, which is undefined in GLSL; (2) the scar width derives from the swept curved front, so the flank ground the front passed is sooted too, pinned by a Vitest flank-coverage case; (3) the negative control in `scripts/verify/enrichments.mjs` reuses the positive crop boxes and requires valid on-screen captures instead of accepting off-screen crops after the sim advanced; (4) `src/scenes/travel/Wildlife.tsx` reuses one preallocated record instead of allocating a `setBurnScar` options object every frame.
+  Observed problem: point 321 was landed on 10.11.2026 before these objections were fixed; the review had asked for the fixes and a both-backend rerun before landing.
+  Player impact: (1) can render the scar edge wrongly on a driver that takes the undefined branch; (2) leaves unsooted strips at the flanks of a curved fire; (4) adds per-frame garbage.
+  Test: Vitest for the scar width; the burning-grass section on both backends.
+  Source: cross-vendor review of point 321, 09.11.2026; landing slip 10.11.2026.
+  Measured 10.11.2026: the whole enrichments pass on main 091e97140 failed frame 131 on both backends (no flame at the front, frontAtShutter 24.05) while the burning-grass section alone was green — the crop timing of objection 3; charged to this point in scripts/render-verify-charges.mjs.
+  Bundle: Wetter & Wasser.
+
+- [ ] 1499. A predator appears out of nowhere at a calf crushed by an elephant and eats it
+  User bug report 10.11.2026 23:06, evidence /backup/hoa/local/PredatorErscheintAusDemNichts.zip (seed 1116517146, travel, region north, x/z 290.95/-146.00, day 561.94, webgpu, production build 51c7783). User text: Ein Jungtier wurde unter den Fuessen eines Elefanten zerquetscht und daraufhin ist an seinem toten Koerper ein Praedator erschienen, der es auffrisst. Frame: a spotted cat feeds on a red carcass under the circling vultures beside the traveller, elephant herd below; the predator was not there before and did not walk in. The JSON wildlife section names every animal, carcass and flock. Expected: a scavenger/predator reaching a carcass approaches from outside visibly (or is streamed in out of view), never spawns at the carcass. Also visible again: the plank-like oversized vultures (see request Make elderly animals recognisable at game distance). PLACEMENT (user order 10.11.2026 23:06, verbatim: Das nach Greisentiere und Geier einreihen): as its own point directly behind the elders/vultures part of that request, i.e. after 1489 and elders/vultures, ahead of the elephant graveyard and every other open point.
+  User addition 10.11.2026 23:09 to the finding A predator appears out of nowhere at a calf crushed by an elephant and eats it (same evidence /backup/hoa/local/PredatorErscheintAusDemNichts.zip): the calf had just been crushed under an elephant's feet; the user suspects that this death path itself makes the predator appear. Check first whether the trample/crush death creates its carcass through a path that also places (spawns or teleports) a feeder at the body, unlike the ordinary hunt/old-age carcass; a quick grep for trample+spawn in src/scenes/travel found nothing obvious, so trace it in the runtime. Same point, same placement as the original finding.
+  Final state: a feeder at any carcass, the trample/crush death included, has walked there on screen from where it was; no predator is placed or teleported onto a body.
+  Test: Vitest on the crush-death carcass path (no feeder spawned at the body); picture on both backends at the evidence spot.
+  Bundle: Tierverhalten.
+
+- [ ] 205. A world & functionality plausibility audit — a third audit kind beyond
+  code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its
+  functionality make SENSE and COHERE, not just work? (user request 20.07.2026:
+  there may be systems that work but are pointless, useless, or run counter to
+  others.) For EACH system/feature — walk design.md's feature list AND the §7.1
+  acceptance systems — ask:
+   (1) PURPOSE: does it make sense in-world (~1890 Africa) AND as a mechanic, and
+       would a player grasp why it exists?
+   (2) USE: does it actually affect the game loop, or is it dead weight nobody
+       engages — a building you enter for nothing, an item never needed, a stat
+       shown but never decisive, a mechanic with no consequence?
+   (3) COHERENCE: does it CONTRADICT or undercut another system — one rewards what
+       another punishes, two overlapping mechanics that only confuse, a shortcut
+       that trivialises a challenge?
+   (4) SETTING FIT: consistent with the researched ~1890 world + design.md intent
+       (no anachronism; plausible geography, ecology, economy)?
+   (5) WORTH: does it earn its complexity, or add surface without depth?
+  WORLD PLAUSIBILITY specifically: the ECOLOGY (every predator has prey and every
+  prey a plausible predator in its own region; the herds/dramas are ecologically
+  sensible), the ECONOMY (trade is meaningful — goods have a use, prices force
+  decisions, the ferry/bazaar/village-barter each have a reason, the money-vs-gifts
+  split coheres), EXPLORATION (each region/landmark has a reason to visit; the goal
+  is reachable, motivated, and the hint cascade truly leads there), SURVIVAL
+  (provisions/health/afflictions create real decisions, not noise), and the
+  CROSS-SYSTEM loop (exploration → language → hints → goal; reputation → access;
+  economy → equipment → capability) actually holds together.
+  RESEARCH-BACKED WORLD ACCURACY (added per user 23.07.2026): beyond coherence,
+  run a RESEARCH pass over EVERY concrete element of the game world and check it
+  against the ACTUAL ~1890 record — verified against real sources, NOT free
+  invention. The trigger/exemplar: the Great Sphinx of Giza was BURIED TO THE
+  SHOULDERS in sand until the 1920s excavation, so a ~1890 depiction must show it
+  sand-buried — yet it was built free-standing (fixed within the walkable-pyramids
+  scene, point 273). That is a case of insufficient prior research, and the concern
+  generalises: sweep the whole world for the same class of error — each landmark
+  and monument (its real ~1890 state of construction/ruin/burial), each people's
+  material culture and settlement form, the flora/fauna ranges, the rivers/lakes/
+  ice, the trade goods and their period plausibility, place names and their 1890
+  forms — asking for EACH: is this accurate for the EPOCH (~1890, not modern, not
+  ancient), the REGION, and the SEASON as depicted? Flag every anachronism or
+  unresearched guess with the correct researched state and a source. This is
+  ANALYSIS + PROPOSALS ONLY — change nothing now; because the world keeps evolving
+  until 205 runs, fold this research into 205's pass then so the latest state is
+  audited. Most findings are design judgments for the USER; clear objective
+  inaccuracies (a monument in the wrong physical state for 1890, an anachronistic
+  good, a mis-dated name) are filed. A model-diverse (Fable) research lens is
+  welcome within the point-200 token limits.
+  METHOD: system-by-system + the cross-system matrix, and PLAY the loop end to end
+  asking "why am I doing this / does it matter". OUTPUT: unlike the mechanical
+  audits, most findings here are DESIGN JUDGMENTS — design.md is authoritative and
+  design changes are the USER's call — so each is written up and DISCUSSED WITH THE
+  USER, not autonomously "fixed". Only clear OBJECTIVE incoherences (a predator
+  with no prey in a region, an item with literally no effect, two directly
+  contradictory rules) get filed as points; the rest are a design conversation. A
+  model-diverse pass is welcome (a Fable lens on "does this cohere") within the
+  point-200 token limits.
+
 - [ ] 1436. Evidence that a cloud-authored point landed under the cloud gate flow
   QUEUE POSITION: carried by the next point authored as a cloud session; split from point 1430 item 4 (23.10.2026), which landed the instruction and runbook text.
   FINAL STATE:
@@ -915,6 +1512,7 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
   Evidence so far (26.10.2026, not yet sufficient): point 1388 was cloud-authored via `claude --cloud` (session_015imNh5bGDnvFNbsDpj3JEo; Agent isolation "remote" is retired since 24.10.2026) and landed as 57fd4d782. Its handover named the pushed sha e4f15559c and "npx vitest run scripts/request-approval-guard-core.test.mjs: green, 146/146 · npm run build: green · npm run lint: green", without a full test:unit. Acceptance log: local/1388-land.log (review GPT-6.1 Sol merge; no browser tier or picture owed for a scripts-only test). The owner re-ran that one Vitest file before the merge, so item 2 is not met; point 1416 was the next try. Point 1419 (cloud session_019XD8Qts48RxNzEfjXP9wSR, 27.10.2026) does not meet item 2 either: owner commits after the handover (capture subject fix, review fix) changed the tree, so build, lint and test:unit ran again before the merge; acceptance log local/1419-land.log.
   Evidence 2 (26.10.2026, not yet sufficient): point 1416 was cloud-authored (session_015yN1eEkcEwUPrKLmkMnkF7) and landed as 9d9cb4abd. Handover excerpt: "85b8a6f – Merge von origin/main … gepusht, auf diesem Stand liefen die Gates · npm run build exit 0 · npm run lint exit 0 · npm run test:unit exit 1: 6 Dateien / 19 Tests rot (alle |tooling|)". Locally: covering suites (collision, settings, polish-villagers), picture check on both backends (local/1416-seq-*), cross-vendor review and land-point ran; acceptance log local/1416-land.log. But the owner re-ran 7 Vitest files before the merge to clear the cloud-only reds, so item 2 is again not met. Blocked on point 1451; the next cloud point after it carries the evidence.
+
 - [ ] 1048. The batch crawled through the night while every safeguard reported health:
   the owner waited on stacked watchers that can never return (measured 03.09.2026,
   00:55–01:15, live in the stalled session). Between the communication-point merge at
@@ -1088,6 +1686,7 @@ put it is the mistake this line exists to stop.
   docs/analysis_de/vibe-coding-anleitung.md, scripts/land-point.mjs
   Bundle: Session- & Repo-Hygiene (it edits the board, finding and landing commands
   that bundle already owns).
+
 - [ ] 1049. A user front-order and the communication-first rule both failed to order the
   queue: the bank-round point was filed carrying "worked NEXT, at the FRONT" in its own
   text and still stood LAST of 360 open points (user, 03.09.2026: "Ich hatte zum einen
@@ -1575,6 +2174,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it costs throughput rather than correctness, but it is a full stop during an
   absence.
   Bundle: Urlaubsfestigkeit.
+
 - [ ] 868. The Windows launcher can be re-armed without an attended session. Point 861's inventory
   row G3: when the launcher is disabled or unknown, Linux re-arms its own daemon, but Windows needs an
   elevated user command — so the point and context boundary is blocked and the current owner must keep
@@ -1589,6 +2189,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it is narrow, but it is the only lane where the machine still cannot help
   itself.
   Bundle: Urlaubsfestigkeit.
+
 - [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
   (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
   steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
@@ -2056,6 +2657,7 @@ put it is the mistake this line exists to stop.
   Sol rounds and shorter wall clock per point, NOT a large token saving, and it does not touch
   the Fable pool at all (Fable ran 0 reviews this week; its volume is authoring).
   Bundle: Modell & Wächter.
+
 - [ ] 596. The tail is visible while it runs (point 572's measure 6). A point's running
   cost is measurable DURING the point, not only after it: a hook reports when a branch
   passes three times the median (≈ 17 M weighted), and that report is a DECISION point —
@@ -2250,43 +2852,6 @@ put it is the mistake this line exists to stop.
   can rescue.
   Bundle: unbundled (infrastructure).
 
-- [ ] 336. The whole crocodile staging family is fragile — rebuild it, not one case
-  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
-  crocodile check). History: the lunge case was found resting on an unpinned
-  assumption (its red turned out to be machine load, proven by a quiet-machine
-  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
-  arrived in time after all and the crocodile took it instead of the calf; that was
-  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
-  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
-  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
-  each depend on a different implicit precondition (a distance, an arrival time, a
-  drink state, a lunge that must fire), and every one of them is a separate way for
-  the staging to miss while the GAME behaves correctly.
-  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
-  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
-  reach its precondition" instead of accusing the product; (b) every mode pins its
-  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
-  (c) the seizure itself is established deterministically — poll for the grip with a
-  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
-  (d) each mode gets its own tiny setup helper instead of one branching function, so
-  a change to one ending cannot shift another's timing (the point-311 lesson at test
-  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
-  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
-  a distinct, self-naming failure message; the five §19.16 endings still each assert
-  their real outcome (no masking). RELATED: this is the concrete first slice of point
-  200's flake work, and point 294's auto-classification would have labelled all four
-  reds "staging, not product" without a manual repeat each time.
-  ITS BRANCH IS GONE, DELIBERATELY (user decision 21.08.2026). `feat/336-croc-staging` carried
-  five commits from 04.08.2026 and stood 2,791 commits behind `main`; measured against its merge
-  base it touched TWO files and `main` had since changed BOTH of them, so reviving it meant
-  resolving the whole file surface it owns. The user ruled that where reviving a hopelessly stale
-  branch costs about what a rebuild costs, the branch goes — and this point demands a rebuild of
-  the `crocDrama` helper anyway, so the branch carried exactly what is to be replaced. Deleted
-  locally and on `origin` (tip 4c6d7eec, recorded here so nobody hunts for it). The same
-  measurement cleared every other standing branch: none of the rest reaches that ratio, so nothing
-  else was discarded.
-  QUEUED BEHIND THE RELEASE with the rest of the front block (user decision 21.08.2026).
-
 - [ ] 814. The dictated handover card claims nothing is running while a delegated authoring run
   continues (measured 21.08.2026 at this session's context watermark).
   WHAT WAS MEASURED. `node scripts/batch-boundary.mjs --prepare --context` reported in the same
@@ -2467,6 +3032,7 @@ put it is the mistake this line exists to stop.
   Fable pool — a hypothesis from one observation, and the CLI takes only one `--fallback-model`,
   so it would need a mechanism rather than the flag.
   Bundle: Modell & Wächter.
+
 - [ ] 797. The watermark only speaks at the END of the turn, so it warns after the expensive turn
   has already run (measured 20.08.2026, 22:20).
   WHAT WAS MEASURED. The user had to point at the context level twice within one hour ("du bist
@@ -2706,6 +3272,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — the routing decision is explained to whoever reads the queue, and a suspension
   that cannot be lifted without a red test is not the reversible switch it claims to be.
   Bundle: Modell & Wächter.
+
 - [ ] 777. A decision card published after its answer arrived is never retired (measured
   20.08.2026). The reply of 07:27 asked whether the three priority levels still hold.
   `decision-card-guard` forces every question in a reply into a card, so »Stufenordnung vom 17.08.:
@@ -2730,6 +3297,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — no product defect, but the board asked the user a question he had already
   answered for four hours, which is exactly what the decision section exists to prevent.
   Bundle: Chat & Tafel.
+
 - [ ] 774. `bundle-first-guard --status` reports a stand-down that does not apply to the session
   running it (measured 20.08.2026, 10:52). With the batch lock naming session
   `1e85312a-…` and its own pid, `node scripts/bundle-first-guard.mjs --status` answers
@@ -4554,6 +5122,7 @@ Build order, chosen so no two parallel agents own the same file:
   `continuous-route` "Three dig initiators lapsed without their invitation" (invitation emitted
   unheard) and the point-121 remnant check again (`deadAfter:2`, calf alive) — both green alone
   on a quiet machine at 487ad8d4f; charged here as rotating-flake entries.
+
 - [ ] 309. Serving-model degradation: repair + tripwire (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
   commit trailers) and merged three deliveries that missed their specs; main is RESTORED
@@ -5612,6 +6181,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — (a) is the one that can let a real regression reach `main`.
 
   Recurred 19.10.2026 (findings carrier): run 39281815541 on feat/1384 concluded success while commit status `ci/gate (branch)` stood at failure (shard-2/unit bundle-first-core on a stale branch); `gh run view` showed green, the cause stood only in the commit status.
+
 - [ ] 563. The tag frame's new readability judge has three soft spots (four-eyes
   review of point 524 by the second model, 08.08.2026, verdict merge; bundle
   Testinfrastruktur). `scripts/verify/tagFrameReading.mjs` decides whether the
@@ -5732,48 +6302,6 @@ Build order, chosen so no two parallel agents own the same file:
   outcome→message mapping (every stageable event has success AND failure text in
   both languages, no silent path); settings.mjs live-checks the banner on an unmet
   precondition and a successful stage; both languages.
-
-- [ ] 364. The flood swells the drama current — and can take a calf at the crest
-  (user 26.07.2026; design.md §19.8 states the target). This point fixes a real
-  inconsistency first and adds a drama second; both land together.
-  THE BUG. `seasonFlowFactor(CURRENT_WEATHER.wetness, dryFlowFactor, wetFlowFactor)`
-  (Wildlife.tsx ~2373/2466/2485/3855) keys the drama current on LOCAL wetness alone.
-  The game's own flood model is deliberately REMOTE-fed (design.md §19.9, points
-  138/139): the Nile crests at Cairo in October where it never rains, and the
-  Okavango peaks in July inside Botswana's dry season. So today the water dramas run
-  at their dry-season gentlest exactly when the modelled river is at its most
-  dangerous. THE FIX: the effective factor is the HIGHER of the wetness-fed factor
-  and a flood-fed one — `nileFloodAt`/`okavangoFloodAt` (`src/systems/season.ts`)
-  scaled by a calibratable balance value (§21.2, debug-editable) — so the crest
-  swells the current, shortens the self-rescue and brakes the rescue burst through
-  the paths that already read the factor. Wire it in ONE place (a helper beside
-  `seasonFlowFactor`) so no call site can be forgotten.
-  THE DRAMA. At a swollen crest a crossing (point 362) can lose the calf to the
-  CURRENT rather than to a crocodile: it is carried downstream past its parent's
-  reach, and the parent turns downstream after it — a rescue on the same rolls and
-  the same brake, which the point-122 drowning window may end for BOTH. This is the
-  existing drowning drama reached by a new road, not a new death: reuse
-  `drownSeconds`/`drownFlowThreshold` unchanged.
-  WHAT MUST NOT CHANGE: the flood stays VERTICAL (§19.9) — no ground becomes water,
-  no §4.2 village clearance moves, the ribbon keeps its width. Only the force
-  changes. A test must pin that.
-  SEQUENCING: 362 lands first (this point's drama rides its crossing); the flow-factor
-  fix is independent and may land even if 362 slips.
-  ANCHORS: `src/systems/season.ts` (`nileFloodAt`, `okavangoFloodAt`),
-  `src/scenes/travel/wildlifeBehavior.ts` (`seasonFlowFactor`, `wadeSpeed`, the
-  drowning core ~1745), `Wildlife.tsx` at the four call sites above,
-  `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`.
-  VERIFIABLE: pure — at Cairo in October (wetness 0) the effective factor is
-  significantly above the dry floor and near the wet case, while a rainless
-  non-flood day stays at the floor; the Okavango does the same in July; the factor
-  is never LOWER than today's wetness-fed value anywhere (a pure sweep over the
-  year × both systems); the drowning window and threshold are untouched; the flood
-  changes no water mask, ribbon width or clearance (assert against the existing
-  world sweep). Live (`scripts/verify/wildlife.mjs`, ONE backend): at the October
-  crest a seeded crossing is visibly carried downstream and its rescue is slower
-  than the same seed in the dry season.
-  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
-  acceptance-evidence line under §12.
 
 - [ ] 415. The Tuareg tent reads as a heap of sand (29.07.2026, user in the Tuareg
   village, North: "what are these cones supposed to be? Sand piles? They look more like
@@ -6017,62 +6545,6 @@ to land than a mechanism that needs a review.
   above, and (A) is now held continuously by `branch-hygiene-guard` and `ci-status-guard`
   rather than by a one-off sweep, so a re-run of (A) is a confirmation, not a hunt.
   (C), (D) and (E) are still owed as written.
-
-- [ ] 205. A world & functionality plausibility audit — a third audit kind beyond
-  code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its
-  functionality make SENSE and COHERE, not just work? (user request 20.07.2026:
-  there may be systems that work but are pointless, useless, or run counter to
-  others.) For EACH system/feature — walk design.md's feature list AND the §7.1
-  acceptance systems — ask:
-   (1) PURPOSE: does it make sense in-world (~1890 Africa) AND as a mechanic, and
-       would a player grasp why it exists?
-   (2) USE: does it actually affect the game loop, or is it dead weight nobody
-       engages — a building you enter for nothing, an item never needed, a stat
-       shown but never decisive, a mechanic with no consequence?
-   (3) COHERENCE: does it CONTRADICT or undercut another system — one rewards what
-       another punishes, two overlapping mechanics that only confuse, a shortcut
-       that trivialises a challenge?
-   (4) SETTING FIT: consistent with the researched ~1890 world + design.md intent
-       (no anachronism; plausible geography, ecology, economy)?
-   (5) WORTH: does it earn its complexity, or add surface without depth?
-  WORLD PLAUSIBILITY specifically: the ECOLOGY (every predator has prey and every
-  prey a plausible predator in its own region; the herds/dramas are ecologically
-  sensible), the ECONOMY (trade is meaningful — goods have a use, prices force
-  decisions, the ferry/bazaar/village-barter each have a reason, the money-vs-gifts
-  split coheres), EXPLORATION (each region/landmark has a reason to visit; the goal
-  is reachable, motivated, and the hint cascade truly leads there), SURVIVAL
-  (provisions/health/afflictions create real decisions, not noise), and the
-  CROSS-SYSTEM loop (exploration → language → hints → goal; reputation → access;
-  economy → equipment → capability) actually holds together.
-  RESEARCH-BACKED WORLD ACCURACY (added per user 23.07.2026): beyond coherence,
-  run a RESEARCH pass over EVERY concrete element of the game world and check it
-  against the ACTUAL ~1890 record — verified against real sources, NOT free
-  invention. The trigger/exemplar: the Great Sphinx of Giza was BURIED TO THE
-  SHOULDERS in sand until the 1920s excavation, so a ~1890 depiction must show it
-  sand-buried — yet it was built free-standing (fixed within the walkable-pyramids
-  scene, point 273). That is a case of insufficient prior research, and the concern
-  generalises: sweep the whole world for the same class of error — each landmark
-  and monument (its real ~1890 state of construction/ruin/burial), each people's
-  material culture and settlement form, the flora/fauna ranges, the rivers/lakes/
-  ice, the trade goods and their period plausibility, place names and their 1890
-  forms — asking for EACH: is this accurate for the EPOCH (~1890, not modern, not
-  ancient), the REGION, and the SEASON as depicted? Flag every anachronism or
-  unresearched guess with the correct researched state and a source. This is
-  ANALYSIS + PROPOSALS ONLY — change nothing now; because the world keeps evolving
-  until 205 runs, fold this research into 205's pass then so the latest state is
-  audited. Most findings are design judgments for the USER; clear objective
-  inaccuracies (a monument in the wrong physical state for 1890, an anachronistic
-  good, a mis-dated name) are filed. A model-diverse (Fable) research lens is
-  welcome within the point-200 token limits.
-  METHOD: system-by-system + the cross-system matrix, and PLAY the loop end to end
-  asking "why am I doing this / does it matter". OUTPUT: unlike the mechanical
-  audits, most findings here are DESIGN JUDGMENTS — design.md is authoritative and
-  design changes are the USER's call — so each is written up and DISCUSSED WITH THE
-  USER, not autonomously "fixed". Only clear OBJECTIVE incoherences (a predator
-  with no prey in a region, an item with literally no effect, two directly
-  contradictory rules) get filed as points; the rest are a design conversation. A
-  model-diverse pass is welcome (a Fable lens on "does this cohere") within the
-  point-200 token limits.
 
 - [ ] 203. Extend 184 — a systematic visual + liveness bug-finder (user request
   20.07.2026: "Bugs wie die … sollten leicht für dich zu finden sein … Kannst
@@ -8676,6 +9148,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing is corrupted, but a false alarm halts the whole batch and the halt
   is invisible until someone reads the pause file.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 824. A killed authoring run strands uncommitted work that nothing drains, and the handover
   reports it as still running (measured 21.08.2026, 20:0x). The dispatching session died and took
   its delegated GPT-5.6 Sol run with it as a child process. The handover was half-complete by
@@ -8708,6 +9181,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — no data is corrupted, but delegated work is stranded and the board reports
   a run that no longer exists.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 825. The criticality gate demands a receipt that no command writes (measured 21.08.2026,
   20:1x). The gate offers two ways out of a recorded refusal: fix the finding and record the
   re-review, OR file every finding as an open work-order point and append a
@@ -8740,6 +9214,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it corrupts nothing, but the documented escape is walkable only by hand
   and a malformed receipt fails silently.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 826. The criticality gate measures coverage against the reviewed sha, never against the
   head it is clearing (measured 21.08.2026 while reading point 820). `attachPointFileSets` in
   `scripts/criticality-review-guard.mjs` derives a point's file set as `commission..reviewSha`,
@@ -8809,6 +9284,7 @@ to land than a mechanism that needs a review.
   a firewall that seals the container; the additive top-up and the never-flush rule are what the
   test pins.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 830. The model-policy fingerprint swallows the rest of §6, so seven unrelated rules cannot be
   edited without staling twelve files (filed by the machine 22.08.2026 out of point 768's
   blind-parallel record, `docs/blind-768/README.md`, "The one union entry deliberately not
@@ -9323,6 +9799,7 @@ to land than a mechanism that needs a review.
   against the delivered code.
   Criticality: low — test coverage only; the delivered behaviour itself was reviewed as correct.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 856. The review planner reads a reviewer credit as authorship and calls the commit unreviewable.
   MEASURED 23.08.2026, 10:20: `scripts/review-sol.mjs --sha c54e4615 --since c54e4615~1` refuses with
   "every configured reviewer vendor authored part of this contribution" and keeps
@@ -9361,6 +9838,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it silently turns the reviewer credit the rule now invites into permanent
   review debt on every commit that uses it.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 857. The docs suite's acceptance-pointer checks match nothing and fail vacuously. MEASURED
   23.08.2026 on the merge-base of `feat/854-trailer-separator`, so it is PRE-EXISTING and belongs to
   no point that touched it. Six checks in the `docs` suite report "0 evidence pointers judged" / "0
@@ -9804,6 +10282,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it loses no work, but it blinds the remote for the rest of a run and its
   report sends the reader looking for work that was never lost.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 908. The parallel-session detector counts the session's OWN declared authoring
   child, so every turn of every delegated build pays a doctor gate (measured
   25.08.2026, 09:11–09:14). `author-fable.mjs` and `review-sol.mjs` start their model as
@@ -10052,6 +10531,7 @@ to land than a mechanism that needs a review.
   for each planned pass validates against `validateRecord`.
   Criticality: high — it is the four-eyes gate's own recording path, and its two halves disagree.
   Bundle: Modell & Wächter.
+
 - [ ] 916. A tightened ledger row contract was applied to the whole PAST, so 216 recorded reviews
   read as hand-forged and the entire main line counts as unreviewed. MEASURED 25.08.2026 at the
   point-749 boundary, by running the guard's own predicate over the ledger
@@ -11157,6 +11637,7 @@ to land than a mechanism that needs a review.
   Criticality: med — it costs no correctness in the product, but it forces the emergency valve on an
   ordinary successful landing, and a valve used routinely stops being an alarm.
   Bundle: Chat & Tafel.
+
 - [ ] 978. `done` accepts an empty card text and publishes the internal focus note instead.
   MEASURED 27.08.2026, 22:26, at the landing of point 843. The command line the boundary itself
   prints — `node scripts/board.mjs done <N> --none --text-stdin` — spends the single stdin text on the
@@ -11312,6 +11793,7 @@ to land than a mechanism that needs a review.
   still yields `agreement`.
   Criticality: low — it is fail-closed and misleads only the diagnosis, never the gate.
   Bundle: Modell & Wächter.
+
 - [ ] 989. A current-work card's ESTIMATE has no board command, so changing it costs two focus
   transitions. MEASURED 28.08.2026 while working point 734. `dashboard-guard`'s `now-eta-soon`
   audit refuses the stop until the card carries a realistic new `~HH:MM`, and `scripts/board.mjs`
@@ -11334,6 +11816,7 @@ to land than a mechanism that needs a review.
   case proving the written value satisfies `auditDashboard` where the old one did not.
   Criticality: low — it costs turns and tempts a stale estimate; it hides no defect.
   Bundle: Chat & Tafel.
+
 - [ ] 990. A red charge cannot verify the ROOT its downstream sentence points back to.
   MEASURED 28.08.2026 while answering the eleventh review round of point 734. `chargeFor` in
   `scripts/render-verify-core.mjs` is handed ONE red — name, key, kind, detail — plus the run's
@@ -11357,6 +11840,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it decides whether a lane cascade can be excused without excusing an
   unrelated defect that borrowed its wording.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 991. A run record has no identity of its own, so indistinguishable records share one
   signature. MEASURED 28.08.2026, rounds 11 and 12 of point 734, which refused the argument that
   two real runs always differ in their millisecond stamps and asked for a mechanism.
@@ -11380,6 +11864,7 @@ to land than a mechanism that needs a review.
   it was written for.
   Criticality: low — it costs no coverage and both families it serves are legacy classes.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 992. The compatibility-lane console charge is not scoped to the lane it was measured on.
   MEASURED 28.08.2026 by the twelfth cross-vendor round of point 734. The point-514 entry for
   `enrichments` in `scripts/render-verify-charges.mjs` states in its own evidence that what it
@@ -11401,6 +11886,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — an unscoped charge excuses the defect the player sees with evidence taken
   from a lane the player never runs.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 994. A writer veto with a known expiry does not wake the launcher when it expires, and never
   asks whether the writer is still alive. MEASURED 28.08.2026 on the 12:18-12:48 standstill. The
   predecessor ended its point boundary at 12:18 and point 811's immediate handover DID fire (`early
@@ -11432,6 +11918,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it costs the batch a quarter-hour per handover in the ordinary case, and
   the standstill journal records this as its own class.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 995. Three charge-ledger entries cannot be narrowed to the failure mode their own evidence
   names, because the reds they account for were recorded before the record kept a measurement.
   MEASURED 28.08.2026 by the twenty-second and twenty-fourth cross-vendor rounds of point 734. The
@@ -11456,6 +11943,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it is the last width left in the ledger after point 734 scoped every entry
   to its lane, and it can only be closed by measurement, not by a rewrite.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 996. A result line arriving as malformed bytes is stored under a name the suite never
   printed, and the record still reads complete. MEASURED 28.08.2026 by the twenty-seventh and
   twenty-eighth cross-vendor rounds of point 734. The tap decodes byte writes through a
@@ -11481,6 +11969,7 @@ to land than a mechanism that needs a review.
   Criticality: low — it needs a suite to emit malformed UTF-8, which none has; it is filed because
   the silent rename is exactly what point 734 forbids everywhere else.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 997. The queue order for the context work rests on three readings that do not carry it, and
   the two measurements that would decide it are missing. MEASURED 28.08.2026 from a user question
   (why 73 % of usage still sits above 150k context) and CROSS-READ the same day by GPT-5.6 Sol
@@ -11517,6 +12006,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it decides where a large share of the account's spend goes, and the current
   order rests on readings a cross-vendor audit refuted.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 998. The mechanism gate bills a merged contribution PER COMMIT, so a long branch owes
   hundreds of review calls for work already reviewed at its end state. MEASURED 28.08.2026 after
   point 734 landed: `mechanism-review-guard` names 59 contribution commits, each split into 7
@@ -11602,6 +12092,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it corrupts nothing today, but it is the evidence file the four-eyes gate
   rests on, and its stated order is not the order it has.
   Bundle: Modell & Wächter.
+
 - [ ] 1000. Two waved-red cases still construct a console identity the recorder cannot mint, and
   their names still claim the production pair. MEASURED 28.08.2026 by the cross-vendor pass 3 of 4
   over `5775d7f0` (GPT-5.6 Sol, verdict merge-with-fixes, `.claude/mechanism-reviews.jsonl`):
@@ -11630,6 +12121,7 @@ to land than a mechanism that needs a review.
   reading of the file finds no case name that promises a check/console pair.
   Criticality: low — it is a truthfulness defect in the suite, not a defect in the mechanism.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1001. The Sol authoring lane judges commits it only MERGED IN as its own lane's work.
   MEASURED 28.08.2026 on the point-993 and point-925 runs: `author-sol`'s closing PROBLEMS list
   named `00503eb6`, `8531d597` and `6ed9f73c` — commits authored by Claude Opus 5 on `main`, which
@@ -11652,6 +12144,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it does not corrupt anything, but it is the delegated run's only defect
   report, and today it cries wolf.
   Bundle: Modell & Wächter.
+
 - [ ] 1004. Nineteen review rounds settled the bundle reader and left five findings standing,
   one of them a REFUSAL on the landed range. MEASURED 28./29.08.2026 on branch `feat/1003-explicit-bundle-points`,
   commits `790264d`..`fd0fcf4`, nine cross-vendor rounds by GPT-5.6 Sol. Point 1003 replaced the
@@ -12219,6 +12712,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the board sentence a returning owner reads first, and a false rest
   claim is the one report that cannot be checked against anything else on the page.
   Bundle: Chat & Tafel.
+
 - [ ] 1025. A delegate the boundary named only in prose vetoes its own successor, and the batch
   stands ownerless (measured 31.08.2026 between 14:37 and 15:10, 33 minutes with no worker while
   finished, pushed work waited).
@@ -12267,6 +12761,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the path every unattended handover takes, it fails silently in the
   direction of doing nothing, and the board reports rest while it happens.
   Bundle: Urlaubsfestigkeit.
+
 - [ ] 1027. A launcher that needed two seconds to write its record is disowned forever, and every
   handover with it (measured 31.08.2026 18:1x, on this host, against a demonstrably live daemon).
   `node scripts/batch-boundary.mjs --commit --context` refused the handover with "the launcher is
@@ -12297,6 +12792,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it silently disarms the launcher, and its failure direction is the batch
   standing still unattended.
   Bundle: Urlaubsfestigkeit.
+
 - [ ] 1028. An examination recorded at the old round-4 boundary suppresses the round-9 examination
   the raised threshold exists to add (GPT-5.6 Sol, receipt 8448e11f20d7f429, do-not-merge on
   942ddf0d, 31.08.2026).
@@ -12319,6 +12815,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it governs how the scarcest model lane is spent, and it fails in the
   direction of spending it on a spec nobody re-read.
   Bundle: Modell & Wächter.
+
 - [ ] 1029. The bundle table's shared-file exclusions are one-sided, so the half that reads the
   other entry schedules the collision it was meant to prevent (GPT-5.6 Sol, receipt
   296d4d9355fb3e6a, do-not-merge on 2d47029, 31.08.2026).
@@ -12352,6 +12849,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the record the dispatcher reads before it spends a lane, and it fails
   silently in the direction of commissioning the collision.
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1030. A refusal is consumed as coverage: a recorded `do-not-merge` CLEARS the very file it
   refuses (Opus 5, cross-vendor round on the review ledger's core, 31.08.2026 — the finding stands
   on its own reading; the ledger could not record it, which is point 1008's disagreement measured
@@ -12386,6 +12884,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the gate that decides whether a second model's refusal is answered, and
   it fails in the direction of reporting cleared where it measured refused.
   Bundle: Modell & Wächter.
+
 - [ ] 1032. A blocking Stop guard can refuse the same finding forever, and every refusal spends a
   user-visible answer (measured 31.08.2026, this session).
   WHAT HAPPENED: five Stop guards stood red at once. A red Stop guard does not end the turn; it
@@ -12804,43 +13303,6 @@ to land than a mechanism that needs a review.
   process-exit rows)
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1063. A wildebeest is hunted in the central African rainforest, and the check that
-  catches it belongs to nobody.
-  WHAT HAPPENS. Measured 06.09.2026 in the LARGE run on feat/689-chief-direction-and-mould
-  (webgl/enrichments, HEAD 8944a52c6): the `predator-food-web` section reports
-  `preyMismatch: [{prey: "wildebeest", region: "central"}]` and
-  `webMismatch: [{predator: "lion", prey: "wildebeest", region: "central"}]` over sixteen
-  hunts. Wildebeest are plains animals; the central region is rainforest. The check
-  `every hunted prey fits the region and the predator food web` is the one that catches it,
-  and it went GREEN on the same run's retry — so the placement is INTERMITTENT, not constant.
-  WHY IT IS NOT ALREADY CHARGED. The ledger entry that looks like this one is point 1013's,
-  and it is anchored on `every predator fits the region and period` — a DIFFERENT, older
-  check. 1013's own `why` records the prey side as clean, which is exactly what this
-  measurement contradicts. The failing check was added later, by the commit "Lions hunt
-  varied, region-appropriate prey; add wildebeest and warthog" (531319528) — the same commit
-  that introduced the wildebeest. So the animal and the check that rejects it arrived
-  together, and nothing owns the red.
-  WHAT IT COSTS. An unowned red makes the whole run neither clean nor accounted for, so no
-  LARGE can be filed as coverage while it stands. It cost this run its verdict.
-  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: 1013 says of the
-  predator side that the check "may read the region where the hunt ENDED rather than where it
-  began". An animal that crosses a region border mid-hunt explains BOTH the red and its
-  disappearance on the retry. Decide that FIRST: log the region at the hunt's start and at
-  its end side by side, for one sample, and see whether they differ.
-  Final state:
-  - The cause is named from the logged sample — wandering across a border, or a genuinely
-    wrong placement — and the fix is made on that side.
-  - The section passes on a quiet host over a run of at least six, on both backends.
-  - If the cause is shared with 1013, both points say so, and only one of them carries the fix.
-  Test: `npm test -- enrichments` unfiltered, plus the throttle probe over
-  `predator-food-web` with the run counts stated.
-  Criticality: medium — it blocks no game work, but it blocks the evidence every render
-  change is filed with, and it is the second unowned red of the same family.
-  Refs: scripts/verify/enrichments.mjs (`predator-food-web`), the food-web table the check
-  reads, scripts/render-verify-charges.mjs (point 1013's entry, prey side NOT covered)
-  Bundle: Tierverhalten (it reads the same food-web table and the same enrichments section as
-  1013, so the two must not run in parallel).
-
 - [ ] 1071. The prepared container-restart path is deployed on the host and proven without an
   editor (split off 1069, 07.09.2026).
   Point 1069 landed the repository half: `.devcontainer` carries `--restart=unless-stopped`,
@@ -13030,71 +13492,6 @@ to land than a mechanism that needs a review.
   point decides first.
   Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
   the position-query toast in src/state/store.ts and both language files
-  Bundle: Testinfrastruktur.
-
-- [ ] 1078. The one solvable puzzle of the PoC fails its own check about half the time, and
-  nobody knows whether the player or only the harness is hit (measured 08.09.2026).
-  WHAT HAPPENS. In the `world` suite the traveller jumps to the talus foot below the
-  Bandiagara escarpment, where the rock relief fits the mould, and presses the use key.
-  In the run of 08.09.2026 07:38:23 the press answered "Nothing here has a hollow that
-  would take this shape." — `said ["…noFit"], spent [], mode travel, dialog null` — and so
-  did the following press at what should by then have been a spent socket. Both checks went
-  red, the suite retried once, and the retry passed 10/0. That retry is what makes this a
-  point rather than a fixed bug: a later green does not close a red (CLAUDE.md §7.2), and the
-  same pair is on record from the SUSPECT run of 07:40:15 that only passed on its second try.
-  WHAT THE EVIDENCE ALREADY RULES OUT. It is not the settle time: the earlier press one
-  degree off the socket, which correctly answered noFit, waits only 600 ms, while the press
-  at the foot waits the default 2500 ms and has a screenshot and two zoom changes behind it.
-  It is not the camera either — the frame `20-worldmodel-bandiagara-talus-foot` between the
-  two presses passed its own shutter, so the talus WAS in the rendered projection at that
-  instant. It is not the toast expiry the probe already guards against (the log records the
-  toast as it is SET), and it is not a random event's dialog: the roulette is switched off
-  around the block and `dialog` reads null. So the press reached the game, the game answered,
-  and the answer was that the traveller was not within reach of `bandiagara-talus`.
-  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the fit
-  test reads a position the PLAYER also has (then `debugJumpTo` leaves the reach computation
-  on a stale or smoothed position and a real traveller walking there can meet the same
-  silence), or whether only the HARNESS jump is at fault. Answer that BEFORE touching either
-  side. Probe: press at the foot in a loop over N runs and log, per attempt, the position the
-  reach test reads next to the socket position, so the distance that decided the answer is
-  named instead of guessed — `node scripts/throttle-probe.mjs world --section=<the block's
-  slug> --runs 8` measures how often it bites.
-  IT IS NOT INTERMITTENT ON MAIN — MEASURED 13.09.2026, and that is cheaper news than the
-  title above. `baseline-classify.mjs world` ran the suite TWICE against 49cef70ee645, main's
-  own tip, on a quiet machine (load 0.35 over sixteen cores), and BOTH presses answered noFit
-  in BOTH runs, word for word as on 08.09.: `said ["Nothing here has a hollow that would take
-  this shape."], spent [], mode travel, dialog null`. The branch it was measured from,
-  feat/1087-carrier-fills-the-jar, had the pair red in only ONE of its two attempts — so
-  "about half the time" is the branch's draw, and on main the defect reproduces every time.
-  The probe this point specifies therefore does not need eight runs to bite: two section runs
-  on main already carry it, which makes the player-versus-harness question above cheap to
-  settle.
-  AND THE FRAME BESIDE IT WAS READ, 13.09.2026, which narrows that question from the other
-  side. `20-worldmodel-bandiagara-talus-foot` — taken between the two presses, at travel zoom
-  0.25 — shows the traveller standing under the "Unknown ruins" label with the rock slab drawn
-  behind him and the Clay Impression in his belt, and it is the same picture as the frame
-  committed before it. So the jump DID put him at the landmark the shutter photographs, while
-  the reach test read a position out of range in the same instant. The two positions are not
-  the same position; that is the measurement this point asked for.
-  WHAT IT COSTS. This is the ONE puzzle the PoC can solve end to end, so a fit that
-  intermittently refuses is player impact, not only suite noise; and while the red stands
-  unowned, `render-verify-guard` blocks every merge in the repository.
-  Final state:
-  - The cause is named in the commit — player path or harness — with the measurement that
-    distinguishes them.
-  - The named side is fixed, and the block passes eight times in a row on a quiet machine
-    without a retry.
-  - Whatever part of the reach decision is pure gets a Vitest that pins it, where no browser
-    is needed to prove the distance.
-  Test: `npm test -- world` unfiltered on both backends, plus Vitest over the pure part of
-  the reach decision.
-  Criticality: medium — intermittent, and the red is CHARGED to this point in
-  `scripts/render-verify-charges.mjs` so it stops blocking merges the moment this point
-  exists; but it sits on acceptance criterion 10 (goal scaffolding) and the closing run will
-  have to report it if it is still open.
-  Refs: scripts/verify/world.mjs (the talus block ~360-460, `jump`, `pressUseKey`),
-  src/world/forms.ts (`FORM_SOCKETS`, `socketPosition`), the use-key reach test and
-  `spentSockets` in src/state/store.ts, docs/acceptance-criteria-detail.md §10.
   Bundle: Testinfrastruktur.
 
 - [ ] 1079. The only fix for a live vitest advisory is a semver-major jump, and the
@@ -13419,6 +13816,7 @@ to land than a mechanism that needs a review.
   pass and produces a SUSPECT record that covers no backend, which is how a finished point
   waits an extra hour.
   Bundle: Testinfrastruktur.
+
 - [ ] 1111. Two cases in `scripts/mechanism-review-guard.test.mjs` run 19.4 s against a 20 s
   timeout, so the fast gate fails whenever the machine is not idle.
   MEASURED 11.09.2026 during the landing of point 1106. The landing stopped at its gate with
@@ -13498,6 +13896,7 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs (~4878-4960), scripts/throttle-probe.mjs,
   scripts/render-verify-charges.mjs, point 1106, point 1089, point 1087.
   Bundle: Testinfrastruktur.
+
 - [ ] 1120. The baseline classification reads the branch under load and the baseline after it, so
   a load artefact is promoted to a REAL REGRESSION (measured 13.09.2026 on
   `feat/1072-village-speaks-with-direction`, WebGL 2 lane, in the mechanism point 1089 built).
@@ -13711,125 +14110,6 @@ to land than a mechanism that needs a review.
   and today its only exit is the waiver.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1163. The leftmost pyramid stands on a red band the other two do not have (seen
-  18.09.2026 in the covering polish frame `verification/139-giza-walkable-site.png`, WebGPU
-  run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN — no check reads the
-  colour, so the suite walks past it).
-  MEASURED STATE: at the monument site the middle and right pyramids meet the ground in a
-  tan sand apron that reads as the site's own plate. The leftmost pyramid's lowest band is
-  a distinctly reddish terracotta instead, the one saturated colour in an otherwise sand
-  and sky picture, and it stops at a hard horizontal line rather than fading into the
-  ground. `src/scenes/place/gizaSite.ts` carries no colour at all, so the band comes from
-  somewhere else — the sand apron, the pyramid material's lower ring, or a plate drawn at
-  the same height as the ground and fighting it for depth.
-  Final state:
-  - The three pyramids meet the ground the same way: whatever the middle one does at its
-    base, the left one does too, and nothing reads as a different material.
-  - The cause is NAMED in the commit — which mesh drew the red, and why only this one —
-    rather than repainted at the symptom.
-  - If the band turns out to be depth fighting rather than a colour, it is fixed as depth
-    fighting; a colour that merely hides it does not close this.
-  Test: `polish --section=giza-site` on both backends, and the frame
-  `139-giza-walkable-site` is INSPECTED, not merely green — the suite has no check for
-  this and a new one is only worth adding if it can read the base band without pinning the
-  art.
-  Criticality: low — it costs nothing but the look of the site the player walks up to.
-  Refs: verification/139-giza-walkable-site.png, src/scenes/place/gizaSite.ts
-  Bundle: Monumente.
-
-- [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
-  18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
-  run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
-  MEASURED STATE: on the open sand right of the near boulder, roughly mid-frame, sits a
-  small dark ellipse with clean edges. Nothing stands over it — no rock, no villager, no
-  animal — so it reads either as a contact shadow whose caster is culled or never drawn,
-  or as a ground decal placed without its object. The same spot on the WebGL 2 pass shows
-  it too, so it is not a backend artefact.
-  Final state:
-  - Either the caster is drawn where its shadow claims it is, or the shadow is gone; no
-    frame of the bank shows a shadow without its object.
-  - Which of the two it was is named in the commit, because a culled caster and a stray
-    decal are different defects and the second one probably has siblings.
-  Test: `polish --section=children-bank-game` on both backends with the frame
-  `687-bank-play-rocks` INSPECTED.
-  Criticality: low — a small wrong thing in a picture the player stands in front of.
-  Refs: verification/687-bank-play-rocks.png
-  Bundle: Siedlungsgeometrie.
-
-- [ ] 1167. The hut wall grows into the doorway as a bright wedge (seen 19.09.2026 in the
-  covering polish frame `verification/1092-bambara-former-well-spot.png`, WebGPU, and in the
-  WebGL 2 frame of the same section — both GREEN runs; the point that took the frame only
-  brought the camera close to a hut).
-  MEASURED STATE, read on the frame at 3x: a family hut's doorway is a FLAT dark recess laid
-  against a CYLINDRICAL wall. The cylinder bulges outward most at the middle of the door's
-  chord, so the wall surface stands IN FRONT of the flat door plane there and is drawn as a
-  bright, wall-textured wedge that rises from the threshold to roughly two thirds of the
-  door's height. The opening reads as a doorway with a spike of wall growing up through it.
-  It is not a backend artefact: both lanes show it, and it is visible at ordinary walking
-  distance in every village, because every family hut carries the same door.
-  Final state:
-  - No hut doorway shows wall surface inside its opening from any angle a walking player
-    can reach: the opening is cut out of the wall geometry, or the door plane sits behind
-    the cylinder's inner radius, whichever the hut's construction makes simpler.
-  - The fix is made where the door is built, once, so every hut kind that uses it follows;
-    no per-village exception list.
-  Test: Vitest over the hut geometry — no point of the door's opening lies inside the wall
-  solid — at several hut radii, mutation-checked.
-  Picture check: one frame standing in front of a hut door at walking distance on BOTH
-  backends, the opening dark through its whole height.
-  Criticality: medium — reproducible player impact in a picture the player walks up to in
-  every settlement.
-  Refs: verification/1092-bambara-former-well-spot.png, src/scenes/place/PlaceLife.tsx and
-  the dwelling/roof geometry in src/scenes/place/roofClearance.ts and layout.ts
-  (`DwellingKind` 'hut', its door at `d.door`)
-  Bundle: Siedlungsgeometrie.
-
-- [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
-  seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
-  reproducible, no browser needed).
-  MEASURED STATE: `shuffleWindows` over `play('bambara-village', seed, 60)` — the very
-  instrument the shipped gate uses (`scripts/verify/childMotionMetric.mjs`) — run over
-  bambara seeds 1-60. Six of the sixty read the WORST child ABOVE the shipped 0.25 % gate:
-  seed 27 at 0.367 %, seed 30 at 1.299 %, seed 33 at 0.282 %, seed 35 at 0.311 %, seed 40 at
-  0.254 % and seed 50 at 0.254 %. Seed 30 is five times the gate. Every other measure of
-  those layouts is healthy — the least judgeable child 0.966-0.983, no carry, no rescue, no
-  overlap — so this is the shuffling itself and not a metric artefact.
-  WHY IT WAS INVISIBLE: the sample that judges this varied the VILLAGE (bambara, maasai,
-  swahili) and pinned the seed. The player learns the language in `ROCK_VILLAGE_ID` alone
-  and is dealt a fresh seed at every start, so the axis that reaches him went unjudged.
-  Point 1094 put the sample on the seed axis and this fell out of it; 1094 deletes test
-  breadth and builds nothing, which is why the fix is its own point.
-  WHAT THE BROWSER ADDED ON 21.09.2026, and what it did NOT: point 690 moved the
-  `children-motion` gate onto the port and the bankless village, and over six runs of that
-  section on its branch, both backends, four went green and two red — WebGPU at `c05d0e205`
-  read maasai-village at 0.25 % and cairo at 0.94 % (group 0.31 %, bursts 0.07 %), WebGL 2
-  earlier read cairo at 2.80 %. Every red carried this class's signature, 1.29 m walked
-  inside a quarter of a metre. It is NOT established that the port shuffles worse than the
-  village: all six reds fell on the SECOND or THIRD settlement of a loop that chained three
-  traces into one browser session and none ever on the first, and giving each settlement a
-  fresh page removed them. That coupling is repaired in 690 and is not this point's; what
-  remains this point's is the shuffling itself, which the seed spread below measures without
-  a browser at all.
-  Final state: no bambara seed of 1-60 reads the worst child above the shipped gate over the
-  judged minute, the same holds for the port and the bankless village, and the sample in
-  `tagShuffle.test.ts` carries at least one of the six seeds above so the repair cannot be
-  read off a lucky layout.
-  Test: Vitest — the six seeds above run inside the gate, mutation-checked; the existing
-  three-seed sample keeps its cases and gains the silent round's two settlement kinds.
-  Refs: src/scenes/place/tagShuffle.test.ts (`PLACES`, `the children never shuffle on the
-  spot`), scripts/verify/childMotionMetric.mjs (`shuffleWindows`, `CHILD_MOTION.shareGate`),
-  src/scenes/place/bankGame.ts (the bank round) and src/scenes/place/tagGame.ts (the silent
-  round the ports and the bankless villages play)
-  Criticality: medium — it is the user's own report of 648/656, alive on about a tenth of
-  the worlds he can be dealt, and it is player-visible wherever it fires.
-  ALSO OWNS THE BROWSER CHARGES (09.11.2026, from point 1068): both children-motion entries in
-  `scripts/render-verify-charges.mjs` now name 1169, because a quiet unthrottled WebGPU probe
-  read the same signature (1.13 m inside 0.27 m, bursts clean); the fix strikes them. Lead from
-  1068: src/scenes/place/tagGame.ts ~1150-1205 documents this composition at catch moments (a
-  cornered runner beside the standing chaser, the ex-chaser's U-turn) — check first whether the
-  red windows coincide with catches; then the catch steering, not the gate, is the repair.
-  Bundle: Dorfleben.
-
 - [ ] 1171. A bank-game unit test runs into its 20-second timeout on CI and blocks every main
   push (measured 21.09.2026 while landing the charge for point 1068's WebGPU sighting).
   WHAT FAILED: CI run 35580966090 for `origin/main` 54033d9f0 concluded "failure" on the
@@ -13964,6 +14244,7 @@ to land than a mechanism that needs a review.
   meaning, and it does so silently, which is worse than a red.
   Refs: `scripts/verify/polish.mjs` (`__pickChildVantage`, the `children-motion` frame),
   the shutter's subject check (point 375). Sibling of the frame-aim points 1121 and 1125.
+
 - [ ] 1177. Every full polish run is recorded as died of an uncaught exception after its own
   report, so no full polish pass has counted as a covering picture run since 21.09.2026 (owner
   finding 22.09.2026, while landing 1157).
@@ -14102,6 +14383,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — permits a false approval (CLAUDE.md §2 finding intake).
   Refs: scripts/verify/run-all.mjs:717, scripts/verify/tiers.mjs (`parseArgs`, `suitesFor`).
   Bundle: Modell & Wächter
+
 - [ ] 1197. The loom reads from the plaza in the eight village plans point 1191 left far.
   (Drained from the findings carrier, 23.09.2026; follow-up of point 1191.)
   Bundle: Dorfleben
@@ -14120,6 +14402,7 @@ to land than a mechanism that needs a review.
   Criticality: medium. Test: Vitest over the five seeds; `polish --section=village-loom`.
   Refs: src/scenes/place/layout.ts (displacedBy, affordable, topUpCompounds),
   src/scenes/place/loom.ts (placeLoom passes), point 1191
+
 - [ ] 1203. The voice suite reds on a network hiccup at huggingface.co.
   PROBLEM, measured 23.09.2026 on feat/1174 e5b3b6407, webgl/voice: `TTS assets recorded into
   the local cache` (scripts/verify/voice.mjs) failed with 12 assets served and one
@@ -14135,17 +14418,6 @@ to land than a mechanism that needs a review.
   route for one voice file (soft, labelled); a Vitest case if the classification is a pure helper.
   Refs: scripts/verify/voice.mjs, scripts/render-verify-charges.mjs.
   Bundle: Testinfrastruktur
-- [ ] 1205. The lion does not move on once the elephant-trampling carcass is consumed.
-  PROBLEM, measured 24.09.2026 by the point-312 author: `npm test -- enrichments
-  --section=elephant-trampling` is 13 pass, 1 fail — "Lion moves on once the carcass is consumed"
-  — and the identical red reproduces with the section alone on main b3c0715bf, so it predates 312.
-  FINAL STATE: once the carcass is consumed the lion leaves the site as §19.8 requires (every
-  drama resolves), and the section is green on WebGPU; if the check rather than the lion is wrong,
-  the check is corrected with the measured reason.
-  Criticality: medium — a predator parked at a spent carcass is visible to the player.
-  Test: `npm test -- enrichments --section=elephant-trampling` green; a Vitest case if the leave
-  decision is a pure helper. Refs: src/scenes/travel/Wildlife.tsx, scripts/verify/enrichments.mjs.
-  Bundle: Tierverhalten.
 
 - [ ] 1214. Apply the rule-review findings of 25.09.2026 (deletions and contradiction fixes).
   Fortnightly rule-inventory review of 25.09.2026 (rule-review-guard). Each item deletes or simplifies a stale, redundant, contradictory or never-firing rule; the freeze admits exactly such points. Items touching .claude/settings.json need an attended session.
@@ -14214,6 +14486,7 @@ to land than a mechanism that needs a review.
   three are shown, on WebGL 2 (where the notice appears) and WebGPU; picture check on both backends.
   Refs: src/ui/Hud.tsx, the graphics-notice and place-title components.
   Bundle: Kommunikation.
+
 - [ ] 1217. The gamepad and touch suites still call the Nubian chief out of his hut.
   PROBLEM, measured 26.09.2026 in the closing LARGE on main 5dff420 (WebGL 2 lane):
   gamepad `interact-chief` and touch `prompt-tap` red — the prompt shows, but
@@ -14227,6 +14500,7 @@ to land than a mechanism that needs a review.
   Test: gamepad --section=interact-chief and touch --section=prompt-tap green.
   Refs: scripts/verify/gamepad.mjs, scripts/verify/touch.mjs, scripts/render-verify-charges.mjs.
   Bundle: Kommunikation.
+
 - [ ] 1220. The WebGL 2 notice no longer covers the start journal's title.
   PROBLEM, measured 26.09.2026 on main 96f8c1e: flow frame `verification/06-start-journal.png`
   (WebGL 2) shows the dismissible compatibility notice drawn OVER the open journal panel, its
@@ -14242,6 +14516,7 @@ to land than a mechanism that needs a review.
   way; the fix covers both notices.
   Refs: the compatibility notice component, the journal panel, verification/06-start-journal.png.
   Bundle: Steuerung & Performance.
+
 - [ ] 1221. The Cairo place ground is no longer flat white at the start.
   PROBLEM, measured 26.09.2026 on main 96f8c1e: in flow frame `verification/06-start-journal.png`
   (WebGL 2, 1 FPS at the shutter) the whole foreground floor of the Cairo place is untextured
@@ -14253,6 +14528,7 @@ to land than a mechanism that needs a review.
   Test: flow picture check of 06-start-journal on WebGL 2 and WebGPU.
   Refs: the place scene ground material, scripts/verify/flow.mjs start-journal shutter.
   Bundle: Siedlungsgeometrie.
+
 - [ ] 1222. The WebGPU world suite no longer aborts on a click the dialog backdrop intercepts.
   PROBLEM, measured 27.09.2026 in the closing LARGE on main 4f6c83e (WebGPU pass, log
   `local/verify-logs/2026-09-26T20-55-22-675-large.log`): world ends 7 pass, 0 fail, exit 1 — a
@@ -14264,6 +14540,7 @@ to land than a mechanism that needs a review.
   Test: world suite green on both backends.
   Refs: scripts/verify/world.mjs, the dialog backdrop component.
   Bundle: Testinfrastruktur.
+
 - [ ] 1223. The WebGPU polish suite finishes inside its wall timeout.
   PROBLEM, measured 27.09.2026 in the closing LARGE on main 4f6c83e: polish was KILLED after the
   45-minute wall timeout on WebGPU; the WebGL 2 pass of the same run finished (its reds charged to
@@ -14274,6 +14551,7 @@ to land than a mechanism that needs a review.
   Test: polish on WebGPU ends with its PASS/FAIL line inside the timeout.
   Refs: scripts/verify/polish.mjs, VERIFY_SUITE_TIMEOUT_MS.
   Bundle: Testinfrastruktur.
+
 - [ ] 1224. The Victoria Falls enrichment frame shows its subject on WebGPU.
   PROBLEM, measured 27.09.2026 in the closing LARGE on main 4f6c83e (WebGPU pass): enrichments
   45 pass, 1 fail — frame `72-water-victoria-falls`: its subject is not in the rendered picture
@@ -14284,6 +14562,7 @@ to land than a mechanism that needs a review.
   Test: enrichments green on both backends; picture check of the frame.
   Refs: scripts/verify/enrichments.mjs, the Victoria Falls water scene.
   Bundle: Testinfrastruktur.
+
 - [ ] 1225. The place-scene unit tests pass in a full unit run under load.
   PROBLEM, measured 27.09.2026 by the closing cleanup's chunk authors (branches feat/633-cleanup-c01
   77fae9a1b, -c02 f77a6e33a, -c03 06843b44a, none touching src/): the full `npm run test:unit`
@@ -14296,6 +14575,7 @@ to land than a mechanism that needs a review.
   Test: three consecutive full unit runs with both files green; bankGame alone 10/10.
   Refs: src/scenes/place/layout.test.ts, src/scenes/place/bankGame.test.ts.
   Bundle: Testinfrastruktur.
+
 - [ ] 1226. Worktree cleanup refuses a locked registered worktree without an expectation.
   PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c08.json U4362):
   `scripts/worktree-cleanup.mjs` without `--expect` takes no lock, `git worktree remove --force`
@@ -14307,16 +14587,7 @@ to land than a mechanism that needs a review.
   Test: unit case with a locked registered worktree and no `--expect` → refused, tree intact.
   Refs: scripts/worktree-cleanup.mjs.
   Bundle: Session- & Repo-Hygiene.
-- [ ] 1227. Settlement rain reaches the ground.
-  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c09.json U4841):
-  `PlaceRain.tsx` places the rain column's base at eye height (1.5 m) with fall in
-  [0, RAIN_HEIGHT), so streaks run from eye height upward and never reach the ground.
-  FINAL STATE: the column is centred on the eye as the comments intend; streaks visibly reach the
-  ground in a settlement.
-  Criticality: medium — visible in every rainy settlement.
-  Test: unit assertion on the column bounds; picture of a rainy settlement on both backends.
-  Refs: src/scenes/place/PlaceRain.tsx.
-  Bundle: Dorfleben.
+
 - [ ] 1228. The fire tender faces the fire.
   PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c09.json U4844):
   `PlaceLife.tsx` turns the fire tender toward the hard-coded point (-3.5, 2.5) instead of the fire
@@ -14326,16 +14597,6 @@ to land than a mechanism that needs a review.
   Test: unit assertion on the heading for a moved fire; picture in such a village on both backends.
   Refs: src/scenes/place/PlaceLife.tsx.
   Bundle: Dorfleben.
-- [ ] 1229. A predator robbed of its chase victim walks off from where it stands.
-  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c11.json U5474):
-  the crocodile-steal abort in `Wildlife.tsx` sets `s.lx/s.lz` to the kill-site flank although the
-  predator is still chasing elsewhere, so it visibly teleports.
-  FINAL STATE: the walk-off starts from the predator's current position, like the swim-escape
-  give-up.
-  Criticality: medium — a visible teleport in the panorama.
-  Test: unit case for the steal abort keeping the predator's position.
-  Refs: src/scenes/travel/Wildlife.tsx.
-  Bundle: Tierverhalten.
 
 - [ ] 1231. Cloud authoring may run during a local regression once the cloud offload switch is ON and proven
   Point 1230 is closed, so this amendment stands as its own point.
@@ -14355,6 +14616,7 @@ to land than a mechanism that needs a review.
   Infrastructure freeze (CLAUDE.md §2): admitted as a real blockade — every claim handover can trap the releasing session.
   Bundle: Modell & Wächter.
   Criticality: medium.
+
 - [ ] 1236. The calf crossing fix leaves two wildlife reds on WebGL 2
   MEASURED 01.10.2026 ~12:19, whole `enrichments` on WebGPU (HEAD 933352068 of point 1249, suite-only change): `channel-crossing` red there too with the same `{"staged":true,"sawOnWater":false,"sawLowY":false,"landed":true}` — not WebGL-2-only.
   MEASURED 29.09.2026 ~14:33, full `VERIFY_GL=webgl node scripts/verify/run-all.mjs enrichments` on main after the 1234 landing (machine flagged UNDER LOAD, so timing verdicts are not authoritative; WebGPU full run: only the charged `72-water-victoria-falls` red). Reds:
@@ -14374,6 +14636,7 @@ to land than a mechanism that needs a review.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
   Bundle: Dorfleben.
   Criticality: medium — visible at every village river on the WebGL 2 fallback.
+
 - [ ] 1243. Khartoum confluence: a straight-edged darker water wedge where the two Nile strips overlap
   SEEN 30.09.2026 in `11-worldmodel-khartoum-confluence` (world, landmark-frames) on BOTH WebGPU and
   WebGL 2, and in `126-clearance-khartoum`: from the junction two straight edges run outward and the
@@ -14384,6 +14647,7 @@ to land than a mechanism that needs a review.
   Refs: the world river strip builder, point 1145 (its frames), point 1242.
   Bundle: Dorfleben.
   Criticality: medium — visible at every river junction the player crosses in the bird's-eye view.
+
 - [ ] 1244. 648-village-children misses its subject off the bottom edge only inside a whole polish pass
   Split out of point 1145. MEASURED 22.09.2026 at e1b7d1561: a whole `polish` pass on WebGL 2 refused
   `648-village-children` off the BOTTOM edge twice in a row, while `polish --section=children-tag`
@@ -14396,6 +14660,7 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs, point 1145.
   Bundle: Testinfrastruktur.
   Criticality: medium — one red check per polish pass until fixed.
+
 - [ ] 1253. Picture sections that set a game condition by knob need a player-path counterpart
   Source: request deposited 01.10.2026 05:28 by session d17af0dd (findings carrier), cut from e9515346d.
   Lesson from point 1250: the 1245 polish section `villager-canoe` (scripts/verify/polish.mjs at 733e920) marked ROCK as heard (`g.hearUtterance(g.vocabulary.ROCK)`, justified as "a player standing here has met the rocks already") and cut the children's `roamSeconds` from 55 s to 8 s. Those two "spectator-time knobs" skipped exactly the two gates that left the boatmen and the children mute for over a minute after entry, so the suite was green while the player met a silent scene.
@@ -14410,6 +14675,7 @@ to land than a mechanism that needs a review.
   user 01.10.2026: "Ja, mach das."
   Bundle: Testinfrastruktur.
   Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
+
 - [ ] 1261. Let the answering window remove an answered board card; drop point 1240
   Source: request of session 829c2a2a, deposited 01.10.2026 20:51 through the findings carrier.
   Observed problem: Point 1240 shows the cost: the user answered the card on 29.09. in a non-owner window; that window could only deposit a --request, the owner's drain knows only "TASKS append" or "decision card", so a one-command removal became a queued point and the answered card stood on the board for two days. A whole point (spec, commit, rank, brief, tick, archive) costs more than the single idempotent call it guards against.
@@ -14425,6 +14691,7 @@ to land than a mechanism that needs a review.
   User 01.10.2026 (on the cause): »Ein eigener Task für so eine winzige Aufgabe erzeugt doch mehr Overhead, als die forcierte Einhaltung der 150k-Grenze einspart.«
   Bundle: Chat & Tafel.
   Criticality: medium — an answered card stays on the board until a whole point is worked.
+
 - [ ] 1263. The continuous route's river invitation never targets a speech label on WebGL 2
   Source: covering WebGL 2 pass of point 1262 (02.10.2026).
   THE RED. `VERIFY_GL=webgl npm test -- communication --section=continuous-route` on feat/1262 at
@@ -14442,34 +14709,7 @@ to land than a mechanism that needs a review.
   Bundle: Dorfleben.
   Criticality: medium — a WebGL-2-only red; it blocks the covering WebGL 2 communication proof
   in the next LARGE.
-- [ ] 1264. The village pounder's pestle pounds the air above its mortar
-  Source: cross-vendor review of point 1251 (02.10.2026), same geometry as the fishers' eater.
-  `src/scenes/place/PlaceLife.tsx` `Pounder`: the 1.05 m pestle's centre rests at 1.05 m, so its
-  foot stops at 0.525 m while the mortar is 0.42 m tall — every stroke ends 10 cm above the rim.
-  Final state:
-  - At the bottom of the stroke the pestle's foot is inside the mortar (point 1251 uses a rest of
-    mortar height − 0.12 m + half the pestle), and the pounder's hands still ride the shaft.
-  - A browser check samples the pestle height and asserts the foot reaches the mortar.
-  Tests: the existing village Playwright section that photographs the pounder gains the assertion.
-  Bundle: Dorfleben.
-  Criticality: low — visible at every pounding village, no mechanic affected.
-- [ ] 1265. The boatman's first reading comes too late at the mute shore
-  Source: covering WebGPU pass of point 1129 (02.10.2026); reproduced alone on `main` fe28c8bde
-  (log `local/verify-logs/2026-10-02T11-31-07-724-polish.log`) and on feat/1129 (log
-  `2026-10-02T11-28-50-894-polish-villagers.log`), so it is not the split's.
-  THE RED. `polish --section=mute-shore-scene`: "a boatman`s reading appears within a few seconds
-  of entry, without ROCK marked heard" — boat at 9.69 s against `canoe.firstCallSeconds` 4 + 3 s
-  slack; the child reads at 3.24 s and ROCK is not heard. `villager-canoe` was green at 0fac48504
-  on both backends the same morning; candidates are the earshot moves 6e64d0e37, d2c3e690b and
-  eb68d9f3f.
-  Final state:
-  - The commit that delayed the boat's first call is named with the reading on either side.
-  - The boatman's first reading lands within `firstCallSeconds` + 3 s of entry again, or the
-    window's premise is revised with the reason recorded.
-  - `polish(-villagers) --section=mute-shore-scene` green on WebGPU and WebGL 2.
-  Tests: the existing Playwright check; no new mechanism.
-  Bundle: Dorfleben.
-  Criticality: medium — the mute shore's lesson starts with the boatman's call.
+
 - [ ] 1266. The parked loom reads too small from its plaza stand
   Source: reopened 02.10.2026 from the backlog park of point 1255 (by point 1258), because the
   `village-loom` section switches the loom on for its own checks and its plaza red is identical
@@ -14489,6 +14729,7 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright check is the right layer; no new mechanism.
   Bundle: Dorfleben.
   Criticality: low — the loom is switched off for the player (`loom.placed: false`).
+
 - [ ] 1267. The speech-inaudible assert reads a stale speech bus at the end of a drum message
   Source: first measured 02.10.2026 16:20 in the WebGPU theme run of point 1129 on 9ff47b8f4
   (`polish-speech`, section `artefact-give`); no earlier recorded log holds this signature.
@@ -14533,29 +14774,6 @@ to land than a mechanism that needs a review.
   Bundle: Testinfrastruktur.
   Criticality: low — no player impact measured yet; it blocks the green of `polish-children`.
 
-- [ ] 1269. The tag beat's side-on standpoint search finds every stand occluded
-  Source: first measured 02.10.2026 ~19:30 in the WebGL 2 covering run of point 1129 on 001ef76f1
-  (`polish-children`, section `tag-catch`, log
-  `local/verify-logs/2026-10-02T17-08-03-519-polish-speech-polish-settlement-polish-children-polish-villagers.log`);
-  no earlier recorded log holds this signature, the check moved unchanged from
-  `scripts/verify/polish.mjs`, and the section alone was green 47 s later on the same head.
-  THE RED. "a clear side-on standpoint on the beat" read `every standpoint occluded`: after the
-  held catch beat, `standBeside(beat.caughtAt, beat.runnerAt ?? beat.caughtAt, beat.caughtAt)`
-  found no candidate stand whose sight line to the caught child was free, so frame
-  `1176-tag-beat` was not taken. The section stages Cairo itself, so it is not an order effect;
-  the port's walls, stalls and walkers around a beat that happens near a wall are the candidates.
-  Final state:
-  - The cause is measured (which candidates were tried and what occluded each, over repeated
-    `--section=tag-catch` runs on a quiet machine on WebGL 2); a search that gives up while an
-    honest side-on view exists is fixed in the search (more bearings or distances, or a later
-    beat), with no check weakened and no occlusion tolerance wider than the evidence.
-  - `polish-children --section=tag-catch` green on WebGPU and WebGL 2; frame `1176-tag-beat`
-    picture-checked.
-  Tests: the existing Playwright section; no new mechanism.
-  Bundle: Testinfrastruktur.
-  Criticality: low — test-frame staging only, no player impact; it blocks the green of
-  `polish-children` on WebGL 2.
-
 - [ ] 1270. The two-close-speakers shot finds no pair whose tails sit on their own anchors on WebGL 2
   Source: measured 02.10.2026 ~18:40 in the WebGL 2 covering run of point 1129 on 001ef76f1
   (`polish-speech`, section `speech-owner`, log
@@ -14574,20 +14792,18 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright section; no new mechanism.
   Bundle: Testinfrastruktur.
   Criticality: low — no player impact measured; it blocks the green of `polish-speech` on WebGL 2.
+
 - [ ] 1289. Stop guards keep binding a session whose lock was released to a reserved claimant
   Measured 03.10.2026, about 21:25-21:45: session f865e213 had its batch lock handed back to the reserved claimant 036dac43 (batch-claim --status: released-reserved). Main writes were refused for it, yet render-verify-guard, retro-currency-guard (beginner guide) and ci-status-guard kept blocking its Stop five turns in a row, demanding hour-long suite runs and main commits it may not make.
   Done when: a session whose lock was released to a claimant is treated as a non-owner by every Stop guard (the house rule: every Stop guard stands down for a non-owner), covered by a unit test on the shared ownership predicate the guards read; no guard is switched off for owners.
   Bundle: Session- & Repo-Hygiene.
-- [ ] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
-  Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
-  Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
-  Bundle: Tierverhalten.
-  Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
+
 - [ ] 1291. retro-currency-guard deadlocks a session after a committed context boundary
   Measured 04.10.2026 (session 05e22fce): after `batch-boundary.mjs --commit --context`, retro-currency-guard demanded a beginner-guide addition, which the context watermark forbids as authoring — a Stop loop with no way out.
   Done when: retro-currency-guard stands down once a context boundary is committed (as the other Stop guards do for a session past its boundary), covered by a unit test on the guard core.
   Bundle: Session- & Repo-Hygiene.
   Criticality: low — a real blockade at the boundary, no player impact.
+
 - [ ] 1292. The pounding check counts two strikes against three heard thuds on WebGL 2
   Measured 04.10.2026 on the covering WebGL 2 run of `polish-villagers` after point 1121
   (`local/1121-pv-webgl.log`): FAIL "both women strike the mortar and every strike is heard"
@@ -14605,6 +14821,7 @@ to land than a mechanism that needs a review.
   "back at the mortar both strike again, half a stroke apart" — before [195,194] after [196,194], every
   gap 0.50: the 80-frame window missed the second woman's strike. Same counting race; 1354 only touched
   villager poses. Done-when covers this check too.
+
 - [ ] 1296. The full world suite crashes on WebGPU at the rock-relief click behind an open dialog
   Measured 05.10.2026, 08:40-08:45, on main 69221cd36: `VERIFY_GL=webgpu` world (full suite) exits 1 twice in a row with
   "7 pass, 0 fail" and an uncaught TimeoutError — `page.locator('[data-form="rock-relief"]').click()`
@@ -14616,6 +14833,7 @@ to land than a mechanism that needs a review.
   backends with no check weakened.
   Bundle: Testinfrastruktur.
   Criticality: medium — the world suite cannot cover a render change on WebGPU until it is fixed.
+
 - [ ] 1300. The loom station and the mute-shore boatman reading are red in polish-villagers independent of any branch
   Queue position: end of the open work order.
   MEASURED 05.10.2026, WebGPU full `polish-villagers` pass on feat/1295 b96a04e78, and with near-identical numbers on 85207f7c6 before any 1295 commit: `village-loom` station 52.8 px tall seen from the plaza (check needs 70); `mute-shore-scene` boatman reading taken at 9.7 s (red). Not yet reproduced on a quiet machine.
@@ -14633,13 +14851,6 @@ to land than a mechanism that needs a review.
   2. Vitest in scripts/findings-request-core.test.mjs: each of those literals routes to the TASKS append; a real question still routes to the decision card.
   No new guards, audits or state fields (infrastructure freeze 01.09.2026).
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1309. A hard-edged dark rectangle shows in the burning-grass travel frame
-  Source: findings carrier 05.10.2026 16:35, found on the picture check of point 1287.
-  verification/131-burning-grass.png shows a straight-edged dark rectangle (with horizontal bars) in the lower right of the bird's-eye view, on main (d8a093e50, WebGL 2) and on WebGPU and WebGL 2 at point 1287 alike; not caused by the camera shift. Looks like a shadow or overlay with a rectangular footprint.
-  Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
-  Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
-  Bundle: Wetter & Wasser.
 
 - [ ] 1328. A chat-answer session recorded as batch-lock holder cannot end
   Source: findings carrier 07.10.2026 22:10: answer session ea5bbc16 (started by the chat watcher for one message, told not to hold the batch lock) stood in .claude/batch-lock.json as lock holder, so push-arrival, decision-card, dashboard, dashboard-integrity and batch-progress guards demanded batch work at every stop that its start order forbids; the session could not end. The real batch session was a53218c2.
@@ -14669,6 +14880,7 @@ to land than a mechanism that needs a review.
   Final state: the approval guard decides only on commands that can reach a request deposit (finding.mjs with --request, in any of the obfuscations points 1370-1372 cover); a command naming neither still runs unchanged in owner and non-owner sessions.
   Verifiable: Vitest on request-approval-guard-core with the three quoted commands above: allowed; the 1370-1372 obfuscation cases stay refused.
   Bundle: Modell & Wächter.
+
 - [ ] 1381. The canoe-fish check sees its third fish hidden by an unnamed BoxGeometry on WebGL 2
   Queue position: end of Testinfrastruktur.
   Source: findings carrier 18.10.2026 21:55 (WebGL 2 covering run after point 1354). main 7690109ce,
@@ -14694,6 +14906,7 @@ to land than a mechanism that needs a review.
   (green on WebGPU at that sha and on WebGL 2 at 1d55f9f75), log local/1301-walk-webgl.log.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side occlusion, no player impact measured.
+
 - [ ] 1382. The WebGPU polish-villagers suite finishes inside its wall timeout.
   Queue position: front of Testinfrastruktur — the covering run of point 1380 is owed on both backends.
   Source: findings carrier 19.10.2026 04:01 (covering run after point 1380). main dd8bde59c,
@@ -14712,6 +14925,7 @@ to land than a mechanism that needs a review.
   Recurred 19.10.2026 on BOTH backends at feat/1343 (WebGPU 3f4d620d9, log local/verify-logs/2026-10-19T09-37-31-282-polish-children-polish-villagers.log; WebGL 2 e5fbb1179, log local/verify-logs/2026-10-19T11-17-49-518-polish-children-polish-villagers.log): KILLED at 45 min each, so the fix covers both backends.
   Also owed once green (findings carrier 19.10.2026): the full `polish-villagers` covering run for landed point 1387, which was checked only with `--section villager-canoe` on both backends; its 19:20 run was aborted at the context watermark.
   Also (26.10.2026, feat/1415 d3201e61c): two WebGPU reds appear only in the long full run — "figure micro-structure: walk frame B shows the same walker at the opposite stride phase" (walker moved out of frame B; log local/verify-logs/2026-10-26T06-39-00-663) and "and he is still under it at the shutter" (adult-errands, the 05:21 run that crashed) — green on the merge-base and in three `--section=figure-micro` runs; measure whether full-run load causes them and split them off if not.
+
 - [ ] 1383. Natural villager motion d: turning, point and reach, pick-up, carry, calibration sweep
   Queue position: directly after point 1343.
   Source: split from point 1343 on 19.10.2026 (owner decision under the standing split rule): its author delivered concept steps 15 and 16 only.
@@ -14722,25 +14936,6 @@ to land than a mechanism that needs a review.
   Bundle: Dorfleben.
   Criticality: high - every villager, both backends.
 
-- [ ] 1395. Point gesture release squats the glTF figure (virtual arm longer than the drawn reach)
-  Queue position: with point 1383 (Dorfleben), whose point/reach step touches the same arm.
-  Source: owner measurement 20.10.2026 on feat/1345-child-chaser-teleport (split from point 1345, whose spec named this squat as a related CROUCH_MAX case): in the runtime-pose export (src/render/villagerRuntimePose.test.tsx, subject `point`, adult, bearing 0.6) the hips sit at 0.51 of standing height at t=2.11 s. The cause is not the CROUCH_MAX fallback: while the arm lowers from the point (pitch -1.71 to -1.50) the arm off its rest pose counts as a contact arm (skinnedFigure.tsx `contactArm`, no `extras.reach`), its target is the virtual primitive hand (a straight arm longer than the glTF reach 0.47), the standing shortfall is 0.13-0.37, and the crouch really reaches it (-0.008 at 1.1), so `contactCrouch` picks 0.3 rising to 1.0 over about eight frames.
-  Final state: a gesture arm is no contact for the crouch: a pointing villager on the glTF body never squats at the end of the gesture; low work contacts (the jar fill, the dig) keep their crouch.
-  Verifiable: the export's `point` subject keeps its hips at 0.85 or more of standing height in every frame (Vitest in src/render/villagerRuntimePose.test.tsx); skinnedFigureCrouch.test.tsx stays green.
-  Criticality: medium - every pointing villager on medium/high presets.
-  Bundle: Dorfleben.
-  Further source: user bug report hoa-state-2026-10-21-3318564123 (2).zip (21:05:18Z), user words: "Warum bückt er sich, wenn er zum Häuptlingshütte zeit und warum zeigt seine Hand nicht geradeaus, sondern leicht nach unten." The man in dark blue points toward the chief's hut in a crouch with his arm slightly below horizontal - consistent with the measured release phase (arm pitch -1.71 to -1.50 while the crouch fires).
-  Additional check: after the fix, the pointing hand aims level at the target while the gesture is held (not only at release); if it does not, split a separate point for the aim.
-  Owned browser checks (charged by point 1465, 29.10.2026, bisected to the 1295 glTF merge 2eb4f1384; trace: hand 0.65 -> 0.82 -> 0.34 squat -> rest within a second): polish-speech --section=chief-to-drummer "the drummer's arm is raised in the pointing frame (point 1272)" and "the man and his word offer their keys at the same time (point 1139)" green on both backends; strike both charges in scripts/render-verify-charges.mjs.
-
-- [ ] 1396. Two walking villagers stand inside each other at the village centre
-  Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
-  Source: finding 20.10.2026 10:54 from the point-1330 picture check: verification/1295-village-walker-mid-stride-webgl2.png at f59ddaa0a shows a walking woman and a man behind her standing inside each other at the village centre (WebGL 2). Villager separation, not the planted-soles gait; WebGPU not yet judged for it.
-  Final state: two villagers moving through the village never interpenetrate; their bodies keep a visible gap while walking past or behind each other.
-  Verifiable: a Vitest case on the villager movement layer asserts a minimum body distance between every pair of walking villagers over a simulated village walk; the 1295 walk frame shows no overlapping bodies on both backends.
-  Criticality: medium - visible in the village walk frame.
-  Bundle: Dorfleben.
-
 - [ ] 1397. Village walk: planted-stance and foot-slide checks red on WebGL 2 only
   Queue position: with point 1396 (Dorfleben), after the planted-soles work of point 1330.
   Source: finding 20.10.2026 14:43 from the point-1347 inventory run: `polish-villagers --section=village-walk` red on WebGL 2 (planted-stance and foot-slide checks) and green on WebGPU on feat/1347-garment-rebuild, whose game code equals main 12e60bb30. Not investigated; may share a cause with 1330 or 1396.
@@ -14749,44 +14944,19 @@ to land than a mechanism that needs a review.
   Criticality: medium - a red regression lane on the fallback backend.
   Bundle: Dorfleben.
 
-- [ ] 1422. Villager knee snaps when a walker leaves the walk gait in a corner
-  Source: finding 22.10.2026 09:46 from the point-1402 moving capture (seed 42, walker 0, WebGPU 60 Hz fixed clock): while the walk share drops 1 -> 0 in a ~2.8 rad/s corner the knee jumps 0.49-0.66 rad per frame (shin.L 0.836 -> 1.499) into a deep-knee pose; present on main 9ecb039 before 1402, same on WebGL 2.
-  Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
-  Verifiable: a Vitest on the villager pose layer bounds the per-frame knee change across a gait blend in a turn; a moving capture shows no leg snap on both backends.
-  Criticality: medium - visible leg snap when villagers turn.
-  Bundle: Dorfleben.
-
-- [ ] 1423. Villager heel strike stops the swinging foot dead
-  Also: a flat foot drops its kept heading in sharp curves.
-  Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: the heel is caught while the clip still swings it forward ~2 m/s (foot up to 2.8x clip max speed, shin ~4 rad/s reversal at 144 Hz); at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s). Pre-existing; the 3x margin in villagerClipPose.test.ts exists because of the heel strike.
-  Final state: heel strike decelerates the foot without a dead stop, and a flat foot keeps its heading through sharp curves; the 3x margin in villagerClipPose.test.ts can drop.
-  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; a moving capture on both backends.
-  Criticality: medium - visible foot jerk in village walks.
-  Bundle: Dorfleben.
-
-- [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
-  Source: finding 22.10.2026 19:24 from the point-1404 moving capture (WebGL 2, seed 42, Bambara village, errand villager 1, frames 255-261 at 60 Hz, branch e962c7841): the carried jar swings from hanging low at the hip to raised beside the shoulder within ~6 frames (~0.1 s) while the carrier walks on.
-  Final state: the jar moves from hip to shoulder as a visible lift over a natural duration, never as a pop between two carry poses.
-  Verifiable: a Vitest on the carry-pose transition bounds the jar's per-frame displacement; a moving capture on both backends shows the lift.
-  Criticality: medium - visible pop on every water carrier.
-  Bundle: Dorfleben.
-- [ ] 1427. A running child pushed back by separation walks backwards
-  Source: finding 23.10.2026 05:21Z during point 1424 (present on main): a runner pressing against another body at 2.4 m/s is pushed back by the separation step and walks backwards (0.49 m at t 104 s), seen only in chaotic replays of tagShuffle.facing.
-  Final state: separation slows or sidesteps a pressing runner but never moves it against its facing faster than a walk.
-  Verifiable: a Vitest replay in tagShuffle.facing bounds the backwards walk under separation; a moving capture shows no backwards push.
-  Criticality: low - rare, only in crowded moments.
-  Bundle: Dorfleben.
 - [ ] 1428. Bank-game hands stand off their stones on main
   Source: finding 23.10.2026 09:54 during point 1424 (landing gate 2, present on main e35b98a19, WebGPU, quiet host): polish-children --section=children-bank-game is red on main — tapping hand 34.1 cm off the flank 8.96 s into the hold with the touch gesture 0.04 s old; child 3's hand 38.6 cm off the stone in the word frame (shoulder drawn -0.07 rad against -2.65 rad written); the arriving runner's drawn hand 31.6 cm off the far stone; 7 of 15 frames missing. Log: local/verify-logs/2026-10-23T07-28-33-313-polish-children.log.
   Final state: the tapping hand stays within 5 mm of the flank over the whole hold and is on the stone in the word frame; the arriving runner's drawn hand stays within 5 mm of the far stone; all 15 section frames are written.
   Verifiable: polish-children --section=children-bank-game green on both backends; a Vitest on the touch-pose timing where the cause is browserless.
   Criticality: medium - visible hands off the stone in every bank round.
   Bundle: Dorfleben.
+
 - [ ] 1434. Two unowned WebGL 2 reds in the children suite: a standpoint in the open, and a child walking without getting anywhere
   Final state: the full WebGL 2 polish-children run on main is free of both reds, or each is traced to a named cause and fixed: (a) "the children are photographed from a standpoint in the open" (2 of 5 in the clear, maasai-village); (b) "no child walks without getting anywhere" (worst child 0 at 1.47 % of its own judged time, group 0.29 %, 18 of 5875 1 s windows). Read the log first and decide per red whether it is product or picture fixture; a fixture cause is fixed in scripts/verify, a product cause in the children's paths. Its charges in scripts/render-verify-charges.mjs die with this point.
   Observed problem: both reds came up on the full WebGL 2 run on main ac714e5cf after point 1424 landed (log local/verify-logs/2026-10-23T10-51-21-476-polish-children.log), owned by no point; the predecessor session deferred them with the order to file them as a point (render-verify-guard deferral at fcbf6a1).
   Source: render-verify-guard of 23.10.2026, deferral of the 1424 landing session.
   Bundle: Dorfleben.
+
 - [ ] 1435. WebGL 2 water stand reds: the recorded water errand runs past its window, and the empty jar moves too fast in his first steps
   Final state: polish-villagers --section=water-stand-table is green on WebGL 2 as it is on WebGPU, or each red is traced to a named cause and fixed: (a) "one whole water errand was recorded" timed out (villager 1, 4052 frames in 240 s), which pulls "he sets the full jar down standing at the table" and "his report points at the water he set down" red with it; (b) "the empty jar is taken up from the plank" with the fastest move in his first steps 6.66 m/s (frame 230, 0.296 m in 45 ms, body turned 0.121 rad) against the 6 m/s carry-walk bound. Decide per red whether it is product (the jar pops as he turns off the table, or the carrier stalls on the way) or fixture (wall-clock window, frame pacing); a fixture cause is fixed in scripts/verify, a product cause in the water errand or the carried-prop hand-off. Its charges in scripts/render-verify-charges.mjs die with this point.
   Observed problem: the WebGL 2 section run on feat/1405-water-carrier-table 98049d22b (log local/verify-logs/2026-10-23T16-40-45-147-polish-villagers.log) after the WebGPU run at the same head was green; both WebGL 2 frames (take, report) show the user's three goals met. Split from 1405 so the user's report could land.
@@ -14796,51 +14966,25 @@ to land than a mechanism that needs a review.
   Also on WebGPU (measured 26.10.2026): "the empty jar is taken up from the plank" reds with a third cause — the jar is lifted 0.24-0.28 m off the plank before it is in his hand (plank-to-hand gap <= 0.009 m) — in the full runs on feat/1415 d3201e61c (logs local/verify-logs/2026-10-26T05-52-03-752 and 06-39-00-663) and on its merge-base d034d5550 (local/verify-baseline-logs/polish-villagers-baseline-d034d55502aa-run1.log); the same lift (0.24 m) and "his report points at the water he set down" with the aim 0.102 m off (14 held frames) reddened the full WebGL 2 run on feat/1415 (log local/verify-logs/2026-10-26T09-01-27-566). Charged to this point on both backends.
   Also on WebGPU (measured 26.10.2026): "his report points at the water he set down" red with 9 held frames and the aim 0.137 m off (bound 0.1) in the section run on feat/1417 9bb6e1736, whose diff touches only the fishery (log local/verify-logs/2026-10-26T17-10-17-924-polish-villagers.log); the aim charge now covers both backends.
   Bundle: Dorfleben.
+
 - [ ] 1447. Every settlement visit leaves its render pipelines and heap behind
   Final state: leaving a place releases what it built: after entering and leaving N different villages the renderer's cached pipeline count (`renderer._pipelines.caches.size`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: which materials/objects outlive their place); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
   Observed problem: `polish-villagers --section=villager-dress` on feat/1446 6e1622764, 25.10.2026 05:51-05:58 UTC, 22 villages visited in turn (`gpu-load` rows in local/verify-measure/villager-dress.jsonl): pipelines 64 -> 993 (~40 per village, never falling), JS heap 286 -> 1709 MB, renderer-tracked textures 56 -> 156; Chrome's `--type=gpu-process` RSS 0.4 -> 9.7 GB at ~1.35 GB per minute (host has 15 GB). In the full suite the earlier sections add to it and the GPU process was lost around the 16th village (point 1446). A player who travels village to village grows the same load without bound.
   Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1449. Two unowned calf-in-river reds in the enrichments suite on WebGPU
   Final state: `npm test -- enrichments --section=calf-crossing-flee` and `--section=calf-shield-river` are green on WebGPU on a quiet machine, or each red is charged to its owning open point with the cause named: "the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in" (measured `fallIn: true` at t 5.05 s, `chaseSwim: false`, `bouted: false`) and "a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up (calf-in-water)" (measured: parent killed in the water at frame 34, the lion feeds and leaves, the calf alive on the savanna bank — the shield-ahead swim never staged). The stale charge of "every predator fits the region and period" to point 1013 is removed (it passed). The WebGL 2 run of both sections is recorded.
   Observed problem: full enrichments run on WebGPU, 26.10.2026 03:21-03:42, main 64bed6b45, machine quiet UNVERIFIED: 314 pass, 5 fail; three charged (938, 1236 twice), these two owned by no open point. Both stem from the calf-shield-river work landed with point 1297. Log: local/enrichments-webgpu-run.log.
   Source: findings carrier 26.10.2026 02:43 (enrichments run); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
   Bundle: Tierverhalten.
   Evidence 30.10.2026 23:44 (feat/642 724533d16, WebGPU, quiet unverified): `--section=calf-crossing-flee` ran the shy-ring flee check GREEN; its one red there is charged to 1236. One pass, not yet the final state.
+
 - [ ] 1453. polish-speech speech-distance-scale crashes in the figureScreen test hook
   Final state: `npm test -- polish-speech --section=speech-distance-scale` runs to its 9 frames and is green on WebGPU on a quiet machine, or each remaining red is charged to its owning open point with the cause named. `figureScreen` (src/scenes/place/SpeechLabels.tsx) finds the figure's head geometry for the current figure build instead of assuming the first visible `figure-head` is a Mesh; a Vitest case pins the lookup.
   Observed problem: quiet WebGPU run 27.10.2026 02:54Z on main 9044a6684: RED after 53 s, 0/9 frames, `page.evaluate: TypeError: Cannot read properties of undefined (reading 'getAttribute') at figureScreen (SpeechLabels.tsx:261)`. The head found carries no geometry (likely a Group since a figure/garment rebuild). The suite last ran 03.10.2026, so the break went unseen for over three weeks. Log: local/verify-logs/2026-10-27T02-54-43-744-polish-speech.log.
   Criticality: low — dev test hook, no player impact measured; it blocks the green of `polish-speech`.
   Source: findings carrier 27.10.2026 02:55 (1452 step 5, M3 quiet reference); a red closes only when fixed, charged or filed (CLAUDE.md §7.2).
-  Bundle: Dorfleben.
-- [ ] 1457. A fleeing child no longer flips to the other rim direction after a wall deflection
-  Final state: in the tag round, a wall deflection of an evader's course no longer feeds
-  `evadeHeading` a deflected `current` that flips the flee to the opposite rim direction
-  (traced at maasai-village/4 child 1, t≈5.95 s: −280° → −69°, then `turnBeforeRun` turns the
-  child on the spot into a playmate), and the side is not locked either (locking it, attempt 1
-  in `docs/1081-steering-trace.md` §5, made the sweep worse). Judged over the 66-pair sweep of
-  point 1081 (maasai, hausa, swahili, zulu, san, tuareg × seeds 1–10, 99) at every cadence:
-  the number of pairs at or above `CHILD_MOTION.shareGate` and the sum of worst shares fall
-  against the recorded baseline (6 pairs, sum 3.50 % native), with no pair worse than it was.
-  Test: Vitest — the traced maasai-village/4 episode as a case: the evader keeps its rim
-  direction through the deflection; plus the sweep numbers in the commit message.
-  Refs: src/scenes/place/tagGame.ts (`evadeHeading`, `moveChild`, `turnBeforeRun`),
-  docs/1081-steering-trace.md §4–§5, docs/1081-probes/ (sweepProbe, sweep.sh, sum.mjs).
-  Bundle: Dorfleben.
-- [ ] 1458. Two playmates meeting head-on pass each other, and the crowded case samples more than one settlement
-  Final state: two tag-round children meeting head-on at the floor pace pass each other on a
-  side they keep until they are past, rather than re-deciding every frame (the per-frame and
-  timed veers of `docs/1081-steering-trace.md` §6 lowered the sum by 6–47 % but none held the
-  gate and the best had no robust neighbourhood). Over the 66-pair sweep of point 1081 at every
-  cadence, every pair reads under `CHILD_MOTION.shareGate` (0.25 %), and neighbouring parameter
-  values hold it too, so no lucky constant is pinned. The crowded construction in
-  `tagShuffle.test.ts` then runs at least three tag-round village/seed pairs (including the
-  former worst, maasai-village/4, and mandinka-village/99) at every cadence, and
-  `CROWDED_CADENCE_GATE` is removed or re-derived from what the fix leaves. Not a raised gate on
-  its own. Builds on 1457.
-  Test: Vitest — the crowded construction over the named pairs at every cadence.
-  Refs: src/scenes/place/tagGame.ts (`moveChild`), src/scenes/place/tagShuffle.test.ts,
-  scripts/verify/childMotionMetric.mjs, docs/1081-steering-trace.md §4–§6.
   Bundle: Dorfleben.
 
 - [ ] 1460. Covering enrichments suite run on both backends for the two suite fixes of 27.10.2026
@@ -14958,20 +15102,6 @@ to land than a mechanism that needs a review.
   Bundle: Testinfrastruktur.
   Criticality: medium - possibly a player stuck on water; until measured, a false red costs a full LARGE.
 
-- [ ] 1473. Bambara errand adult lost in the water-back walk during the continuous route
-  Source: communication `continuous-route` alone on aed84aa2f, WebGPU (`local/verify-logs/
-  2026-10-30T09-58-38-857-communication.log`, 30.10.2026), step 9-fit-and-journal: the dev invariant
-  `[ASSERT] adult-atom-lost — bambara-village: water-back pair 2/3/walk: forced after 239.96s; overrun
-  situation water-out pair 3/2 (speaker blocked)`. Not seen in the closing LARGE runs.
-  Final state:
-  - The cause is measured: why pair 2/3's water-back walk never completes while pair 3/2's water-out
-    overruns with a blocked speaker (a mutual block between the two pairs or a lost goal).
-  - The errand completes or releases inside its bound with that reason fixed, with a unit test; the
-    assert stays loud. Green in a whole communication run on both backends; its charge is struck.
-  Tests: Vitest for the errand scheduler; the existing Playwright step.
-  Bundle: Dorfleben.
-  Criticality: medium - a villager stuck on an errand is player-visible.
-
 - [ ] 1474. Backlog-Befunde zur Infrastruktur in die Analyse und das Obsolet-Urteil von 1463 einbeziehen
   Amendment to point 1463 (zero-based infrastructure simplification) — user remark 29.10.2026: "Schaut sich 1463 auch die ganzen Befunde an, die von Problemen angelegt wurden? Ich denke, die sollten berücksichtigt werden. Viele Probleme mit der aktuellen Infrastruktur sind ja wegen des Infra-Freezes nur dort festgehalten."
   Measured 29.10.2026: 1463's raw material names "docs" only generically and its verdict list covers only open TASKS.md points. Under the infrastructure freeze (CLAUDE.md §2) many infrastructure findings were filed only in docs/backlog.md (109 sections; about 22 by title alone are about guards, hooks, lanes, batch, board, launcher, daemon, doctor, review, push or gate). Findings carried through the findings carrier landed in TASKS.md and are already covered.
@@ -14981,6 +15111,7 @@ to land than a mechanism that needs a review.
   3. Result (question 4) also gives, for every infrastructure entry in docs/backlog.md, a verdict "obsolete: yes/no" with reason; obsolete entries are closed in docs/backlog.md with the reason "obsolete by infrastructure simplification"; a non-obsolete entry that shows a real defect of the remaining infrastructure is named in the plan so the user can decide on it.
   No new mechanism.
   Bundle: Session- & Repo-Hygiene (amendment to 1463, rides with it).
+
 - [ ] 1476. The rim water checks stay red after point 568 landed
   Source: owner 31.10.2026, landing point 1202. Point 568 landed (fb3132a95, phase-mean judging of the drifting streaks) and was ticked, but its four entries in scripts/render-verify-charges.mjs stayed, so the shipped-ledger unit test (`charges only points the work order still holds OPEN`) went red on main and stopped the 1202 landing gate.
   MEASURED 31.10.2026 at 9025afa7b (568 merged): `npm test -- polish-villagers --section=adult-errands` red on WebGPU AND WebGL 2, both rim checks — "the water beyond the plate's rim is the SAME water" (far 14/95/106 against near 31/85/95) and "the handover zone itself carries neither band's edge" (rim zone 8/87/100, median step 14.8: 9.5, 14.8, 21.3). Log: local/verify-logs/2026-10-31T12-34-50-156-polish-villagers.log.
@@ -14991,24 +15122,28 @@ to land than a mechanism that needs a review.
   Charged 31.10.2026 (findings carrier, polish-villagers --section=adult-errands, WebGPU, 5f6679479, 1 of 10 runs): the jar-mouth check rotates — 'the jar's mouth is tipped under the water surface — mouth at 0.097 m, surface at -0.25 m (hand 0.107, feet 0, ground -0.348)'; not in the classified baseline. It blocks the same three-green proof, so it is named and fixed or charged here.
   Criticality: medium — a standing red on every adult-errands run.
   Bundle: Dorfleben
+
 - [ ] 1479. Villager far shoulder keeps a flat, corner-topped outline in walk rear-3/4 views
   Source: split from point 1478, owner picture check 02.11.2026 of feat/1478-shoulder-slab dd4538115 (garment-acceptance, cairo, 3 m, WebGPU and WebGL 2 identical): rows trousers-walk-man-rear34 and trousers-walk-child-rear34 show the far shoulder with a flat top edge and a near-right-angled outer corner. Frames: local/1478-after/1347-accept-trousers-walk-{man,child}-rear34-cairo-3m{,-webgl2}.png; before-frames local/1478-before/. The gait clips' shoulder turn is already 0 (VILLAGER_GLTF.clipShoulderKeep), so the clip swing is not the cause.
   FINAL STATE: the far shoulder of a walking man and child reads as a rounded shoulder at 3 m in rear-3/4 views on both backends; the cause (body mesh silhouette at the shoulder cap, skin weights, or shading) is named in the commit.
   Test: Vitest for the cause's layer; picture check of the two named garment-acceptance rows on both backends.
   Criticality: low - a corner on the far shoulder outline at close range from behind.
   Bundle: Dorfleben.
+
 - [ ] 1483. Branch-hygiene guard tells us to delete a remote branch that still carries unmerged commits
   Source: Stop hook 03.11.2026 05:16 (owner session): branch-hygiene-guard listed origin/feat/1344-children-hand-contacts as "bereits in origin/main enthalten" with `git push origin --delete`, but `git cherry origin/main origin/feat/1344-children-hand-contacts` shows 2 unmerged commits (33671ebad, 43fd6e0d3) of open point 1344; only the stale local branch (c5dd0003a) was merged. Following the instruction deletes real work.
   FINAL STATE: the guard judges every remote branch by its own tip against origin/main and never lists a branch with unmerged commits for deletion.
   Test: Vitest for the guard core with a local branch merged and its remote ahead by one commit.
   Criticality: high - a deletion instruction that loses pushed work (data risk, CLAUDE.md §2 intake).
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1484. Agent liveness check permits replacing a live author on an unfetched remote ref
   Source: batch session 03.11.2026 13:53: `node scripts/batch-in-flight.mjs --agent-check --branch refs/remotes/origin/feat/1482-garment-driven-builder` printed "only a 27 min old commit ... A REPLACEMENT IS PERMITTED" from the stale local ref; origin held a 1 min old commit of the live cloud author session_019XD8QtXYcNHmCuQry2keV1. A duplicate author was started and stopped before its checkout.
   FINAL STATE: the agent check fetches a remote branch ref before judging it (or refuses replacement and says the ref is unfetched when the fetch fails).
   Test: Vitest for the check core with a remote ref whose fetched tip is newer than the local tracking ref.
   Criticality: high - a possible false approval to replace a working agent (CLAUDE.md §2 intake).
   Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1488. Villager clothing: one fix per listed defect, one final picture check (user order 05.11.2026; amends the working method of 1482 under 1487)
   The 24-hour budget of 1487 did not limit precision: since 04.11 17:00, 34 of 57 main commits were bookkeeping ("Record the picture judgement / delegation / withdraw verdict ..."); the child hip cloth alone took nine commits on 05.11 morning. A time box cuts the list, it does not cut the per-candidate ritual. Replace the method of 1482:
   1. Each defect on 1482's frozen list gets exactly ONE fix. All fixes land on the one branch; no picture judgement between them.
@@ -15018,48 +15153,13 @@ to land than a mechanism that needs a review.
   5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
   Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
   Bundle: Dorfleben.
-- [ ] 1492. On the low preset the task walker's head-load cone pierces the bundle at full kneel
-  (measured 09.11.2026 on feat/1301 43d129505, polish-villagers --section=village-walk, WebGPU).
-  With detailLevel low, at the first frame with `inhabitant.userData.kneel === 1` the task
-  walker still holds its bundle at chest height on the body axis, and the blue wrap cone's apex
-  sticks out through the box top, identically from both flanks
-  (verification/1301-village-kneel-low.png of that run). The skinned figure
-  (1432-village-load-set-down) holds it in front of the chest without contact.
-  Player impact: visible on the low preset at every set-down and pick-up.
-  Final state: at full kneel on the low preset no part of the figure's mesh intersects the load.
-  Test: Vitest geometry check of the low-preset kneel pose against the load box; picture on both
-  backends (polish-villagers --section=village-walk).
-  Refs: src/scenes/place/placeFigure.tsx, src/render/figureWalk.ts
-  Criticality: low — cosmetic, low preset only, but player-visible.
-  Bundle: Dorfleben.
+
 - [ ] 1493. The tag catcher's hand misses the caught child in the full WebGPU polish-children run under load
   Final state: the full WebGPU polish-children run is free of the tag-catch red "at the catch frame the catcher's drawn hand is ON the caught child" (hand-right 9.0 cm off the trunk, hand radius 3.2 cm, catcher 1 -> caught 3) on a quiet machine, or it is traced to a named cause (fixture timing or product) and fixed. Its charge in scripts/render-verify-charges.mjs dies with this point. It also owns the tag-catch red "inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging" (WebGPU, a17e2f8e1, 09.11.2026 06:38; readied left sweep 0.074 / free right sweep 0.208, NOT HELD in a window from 2.30 m), charged there too.
   Observed problem: full WebGPU polish-children+report run on feat/680-place-life-dump a75df90ca, 09.11.2026 (log local/verify-logs/2026-11-09T12-08-14-648-polish-children-report.log), quiet-machine check "MACHINE NOT QUIET (busy)". The same head ran --section=tag-catch alone (log 2026-11-09T12-53-10-287), GREEN. Point 680 only adds a read-on-dump callback, so the red is owned by no point. The run's two bank-game reds belong to 1268 and 1470.
   Source: picture check of the 680 landing session, 09.11.2026.
   Bundle: Dorfleben.
-- [ ] 1494. An elephant-trampled animal dies on clean ground — no stain is pushed
-  Final state: `npm test -- enrichments --section=elephant-trampling` is green on WebGPU: the trampled animal lies dead over a ground stain ("Elephant tramples a smaller animal (dead over a stain)").
-  Observed problem: the section is red on origin/main 2c9fefacc (WebGPU, fresh detached tree, 09.11.2026 16:42) and twice on feat/453-lion-prey with "zebra, 0 stain(s)". The victim dies but no stain is pushed; the trampled body is the first natural zebra herds.zebra[0]. Point 453's diff touches neither trample nor stain code, so the red is owned by no point. Point 1205 (lion moves on) is a different check in the same section.
-  Player impact: a trampled animal lies on clean ground.
-  Test: the section above green; a Vitest case for the trample-to-stain path if the cause sits in browserless logic.
-  Source: picture check of the 453 landing session, 09.11.2026.
-  Bundle: Tierverhalten.
-- [ ] 1495. The continent zoom stops drawing — a TypeError fires every frame
-  Final state: `npm test -- enrichments --section=seasons` is green on both backends: frame 87-continent-zoom is drawn at the unlocked wide zoom, and the page logs no "TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))".
-  Observed problem: at the continent zoom the scene draws nothing ("no frame has been drawn yet (0 draw calls)") and the TypeError repeats every frame. Measured 09.11.2026 on main ca908ee7d (`--section=seasons`, WebGPU, 277 errors, log local/verify-logs/2026-11-09T19-49-07-979-enrichments.log) and on feat/565-buried-drinking-calf 313289975 (full enrichments, WebGPU 5600 and WebGL 2 406 errors). No enrichments run up to 31.10.2026 logged it. Point 565's diff only moves wildlife body heights, so the red is owned by no point. The suite logs only the message text, so the first step is the stack (pageerror `e.stack`).
-  Player impact: zooming out to the whole continent shows a frozen or empty scene.
-  Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
-  Source: picture check of the 565 landing session, 09.11.2026.
-  Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
-  Bundle: Steuerung & Performance.
-- [ ] 1496. Grass fire: close the four cross-vendor review objections point 321 landed without
-  Final state: the four objections of the GPT-6.1 Sol review of feat/321 b2023ba (passes 2/6/7, verdict merge-with-fixes) are fixed on main and `npm test -- enrichments --section=burning-grass` is green on both backends with the frame judged: (1) `src/scenes/travel/burnScarNode.ts` uses `1 - smoothstep(0, depth, dFront)` instead of the reversed-edge `smoothstep(depth, 0, dFront)`, which is undefined in GLSL; (2) the scar width derives from the swept curved front, so the flank ground the front passed is sooted too, pinned by a Vitest flank-coverage case; (3) the negative control in `scripts/verify/enrichments.mjs` reuses the positive crop boxes and requires valid on-screen captures instead of accepting off-screen crops after the sim advanced; (4) `src/scenes/travel/Wildlife.tsx` reuses one preallocated record instead of allocating a `setBurnScar` options object every frame.
-  Observed problem: point 321 was landed on 10.11.2026 before these objections were fixed; the review had asked for the fixes and a both-backend rerun before landing.
-  Player impact: (1) can render the scar edge wrongly on a driver that takes the undefined branch; (2) leaves unsooted strips at the flanks of a curved fire; (4) adds per-frame garbage.
-  Test: Vitest for the scar width; the burning-grass section on both backends.
-  Source: cross-vendor review of point 321, 09.11.2026; landing slip 10.11.2026.
-  Measured 10.11.2026: the whole enrichments pass on main 091e97140 failed frame 131 on both backends (no flame at the front, frontAtShutter 24.05) while the burning-grass section alone was green — the crop timing of objection 3; charged to this point in scripts/render-verify-charges.mjs.
-  Bundle: Wetter & Wasser.
+
 - [ ] 1497. LOW geometry lever for the travel terrain (split from point 310, 10.11.2026)
   Source: point 310's cloud author (handover 799bbdd, 10.11.2026) named every travel system for F8
   and recomputed the constant unnamed 425,118-triangle group at LOW (docs/bench/310-projection.md):
@@ -15077,17 +15177,13 @@ to land than a mechanism that needs a review.
   Tests: a Vitest case per new preset key; the enrichments river sections and a LOW picture on both
   backends.
   Bundle: Steuerung & Performance.
-- [ ] 1499. A predator appears out of nowhere at a calf crushed by an elephant and eats it
-  User bug report 10.11.2026 23:06, evidence /backup/hoa/local/PredatorErscheintAusDemNichts.zip (seed 1116517146, travel, region north, x/z 290.95/-146.00, day 561.94, webgpu, production build 51c7783). User text: Ein Jungtier wurde unter den Fuessen eines Elefanten zerquetscht und daraufhin ist an seinem toten Koerper ein Praedator erschienen, der es auffrisst. Frame: a spotted cat feeds on a red carcass under the circling vultures beside the traveller, elephant herd below; the predator was not there before and did not walk in. The JSON wildlife section names every animal, carcass and flock. Expected: a scavenger/predator reaching a carcass approaches from outside visibly (or is streamed in out of view), never spawns at the carcass. Also visible again: the plank-like oversized vultures (see request Make elderly animals recognisable at game distance). PLACEMENT (user order 10.11.2026 23:06, verbatim: Das nach Greisentiere und Geier einreihen): as its own point directly behind the elders/vultures part of that request, i.e. after 1489 and elders/vultures, ahead of the elephant graveyard and every other open point.
-  User addition 10.11.2026 23:09 to the finding A predator appears out of nowhere at a calf crushed by an elephant and eats it (same evidence /backup/hoa/local/PredatorErscheintAusDemNichts.zip): the calf had just been crushed under an elephant's feet; the user suspects that this death path itself makes the predator appear. Check first whether the trample/crush death creates its carcass through a path that also places (spawns or teleports) a feeder at the body, unlike the ordinary hunt/old-age carcass; a quick grep for trample+spawn in src/scenes/travel found nothing obvious, so trace it in the runtime. Same point, same placement as the original finding.
-  Final state: a feeder at any carcass, the trample/crush death included, has walked there on screen from where it was; no predator is placed or teleported onto a body.
-  Test: Vitest on the crush-death carcass path (no feeder spawned at the body); picture on both backends at the evidence spot.
-  Bundle: Tierverhalten.
+
 - [ ] 1500. LOW detail: every collidable tree keeps its body under the density lever
   Finding 11.11.2026 (render-verify-guard): recorded enrichments runs before 11.11.2026 04:05 on both backends (webgpu and webgl) each carry the red 'LOW: collidable trees draw in full under the density lever' (scripts/verify/enrichments.mjs, LOW preset block); no open point owns it, the LOW preset point was settled in e16d89fe1. Player impact: under the LOW detail level a collidable plant (acacia, jungle, palm, baobab, kopje) of the full fill can be missing from the thinned fill, so the traveller collides with a tree that is not drawn.
   Final state: under LOW every collidable plant of the full fill is drawn in the thinned fill on the same ground (thinned count equals full count, none missing); only the small dressing (bush, rock, termite, deadtree, papyrus) is thinned.
   Test: Vitest on the density-lever fill (collidable species exempt from thinning); `npm test -- enrichments` LOW section green on both backends with the 310-low-savanna picture.
   Bundle: Steuerung & Performance.
+
 - [ ] 1502. The Nile panorama water check sits on its own threshold
   Finding 11.11.2026 (render-verify-guard, covering polish-panorama run on main fe6570d, WebGPU): 'the Nile shows as a water signal in the band' failed with sectors 0.0010/0.0000/0.0002/0.0016 (total 0.0028 against the required > 0.003), while the `travel-panorama-capture` section alone passed it minutes later on the same tree. The capture's water fraction depends on the camera height over the bank dunes, so the check flips at its threshold; no open point owned it. Player impact: none measured, but the red blocks the covering run every render point owes.
   Final state: the check measures the Nile's presence with a margin the capture reliably clears (e.g. a capture aimed at the river or a threshold calibrated from recorded totals over repeated captures), and it still fails when the band shows no water at all (the 07.08.2026 all-zero signature).
