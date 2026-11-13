@@ -13,9 +13,17 @@ let repo
 let memory
 
 const sect = (name, body) => `<details class="sect"><summary><h2>${name}</h2></summary>\n${body}</details>\n`
+const nowCard = (n, title) =>
+  `<details class="now">\n  <summary><span class="num">${n}</span><span class="t">${title}</span>` +
+  `<span class="right"><span class="meta">12:00</span></span></summary>\n` +
+  `  <div class="body">\n    <p><span class="stamp">Stand 12:00</span> läuft.</p>\n  </div>\n</details>\n`
+const queueCard = (n, title) =>
+  `<details>\n  <summary><span class="num">${n}</span><span class="t">${title}</span>` +
+  `<span class="right"><span class="meta">~2 h</span></span></summary>\n` +
+  `  <div class="body">\n    <p>Warum das ansteht.</p>\n  </div>\n</details>\n`
 const BOARD =
-  `<main>\n${sect('Woran ich gerade arbeite', '')}${sect('Von dir zu klären', '')}` +
-  `${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+  `<main>\n${sect('Woran ich gerade arbeite', nowCard(1490, 'Platz sparen'))}${sect('Von dir zu klären', '')}` +
+  `${sect('Warteschlange', queueCard(1509, 'Lokale Baukopien behalten'))}${sect('Erledigt', '')}</main>\n`
 
 const CARRIER = `# Findings carrier\n\n${requestEntry({
   at: '2026-11-12T16:10:00.000Z',
@@ -53,16 +61,26 @@ afterAll(() => {
 
 beforeEach(() => {
   writeFileSync(boardFile(), BOARD)
-  writeFileSync(resolve(repo, 'TASKS.md'), '- [ ] 1509. Housekeeping\n')
+  writeFileSync(resolve(repo, 'TASKS.md'), '- [x] 1490. Disk footprint\n- [ ] 1509. Housekeeping\n')
   writeFileSync(resolve(repo, '.claude', 'dashboard-state.json'), JSON.stringify({ dashboardPath: '.batch-dashboard.html' }))
   writeFileSync(carrierFile(), CARRIER)
 })
 
+/** The 1509 current-work card in the board file, or null. */
+const nowCardOf1509 = () => {
+  const html = readFileSync(boardFile(), 'utf8')
+  const section = html.slice(html.indexOf('Woran ich gerade arbeite'), html.indexOf('Von dir zu klären'))
+  return /<span class="num">1509<\/span>/.test(section) ? section : null
+}
+
+const STARTS = [
+  ['now', ['now', '1509', 'läuft']],
+  ['promote', ['promote', '1509', '12:00 – ~13:00', 'Lokale Baukopien behalten', 'läuft']],
+  ['done --next', ['done', '1490', 'fertig', '--next', '1509', 'läuft']],
+]
+
 describe('board.mjs start path drains pending requests first (spawned)', () => {
-  it.each([
-    ['now', ['now', '1509', 'läuft']],
-    ['promote', ['promote', '1509', '12:00 – ~13:00', 'Aufräumen', 'läuft']],
-  ])('%s refuses while a request naming the point is pending, board untouched', (_name, args) => {
+  it.each(STARTS)('%s refuses while a request naming the point is pending, board untouched', (_name, args) => {
     const r = runBoard(...args)
     expect(r.status).not.toBe(0)
     expect(r.stderr).toMatch(/point 1509 cannot start/)
@@ -70,9 +88,18 @@ describe('board.mjs start path drains pending requests first (spawned)', () => {
     expect(readFileSync(boardFile(), 'utf8')).toBe(BOARD)
   })
 
-  it('no longer refuses once the request is appended', () => {
+  it.each(STARTS)('%s makes 1509 current work once the request is appended', (_name, args) => {
     writeFileSync(carrierFile(), markAppending(CARRIER, 'Amend 1509', 1512).text)
-    const r = runBoard('now', '1509', 'läuft')
-    expect(r.stdout + r.stderr).not.toMatch(/cannot start/)
+    const r = runBoard(...args)
+    const out = r.stdout + r.stderr
+    // The board edit and the focus update must succeed. Exit 0 would need a
+    // real publish to the live page, which this temp repo must never reach, so
+    // the publish is asserted to be the ONLY failing step.
+    expect(out).toMatch(/BOARD FILE WRITTEN — .*1509 (is|promoted to) current work/)
+    expect(out).toMatch(/focus declared: 1509/)
+    expect(out).toMatch(/The LIVE page was NOT updated/)
+    expect(out).not.toMatch(/cannot start|publish precondition refused|no queue card/)
+    expect(JSON.parse(readFileSync(resolve(repo, '.claude', 'current-focus.json'), 'utf8')).point).toBe(1509)
+    expect(nowCardOf1509()).not.toBeNull()
   })
 })
