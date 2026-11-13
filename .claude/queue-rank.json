@@ -1861,12 +1861,6 @@
       "why": "Test-staging red with no measured player impact; behind the standing order",
       "origin": "machine",
       "place": "last"
-    },
-    "1514": {
-      "at": "2026-11-13T07:05:21.344Z",
-      "why": "Landing-only defect with a known manual guard (fast-forward the worktree to origin before land-point); no player impact, so it waits behind the ranked work",
-      "origin": "machine",
-      "place": "last"
     }
   },
   "boundary": {
@@ -1895,7 +1889,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-13T07:05:21.353Z",
+    "at": "2026-11-13T08:54:10.453Z",
     "points": [
       184,
       200,
@@ -2353,8 +2347,7 @@
       1502,
       1503,
       1507,
-      1508,
-      1514
+      1508
     ]
   }
 }
