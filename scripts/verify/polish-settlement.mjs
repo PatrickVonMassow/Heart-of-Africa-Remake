@@ -4,7 +4,7 @@
 // eaves (design.md §2.6/§6.1/§17/§19).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
-import { waitForStable, waitForReadingStable, waitForSceneBuilt } from './_browser.mjs'
+import { waitForStable, waitForReadingStable, waitForSceneBuilt, VERIFY_GL } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
 import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
@@ -1580,6 +1580,141 @@ if (section('roof-clearance')) {
     thatchSides.total > 0 && thatchSides.solid === thatchSides.total,
     `${thatchSides.solid}/${thatchSides.total} roof meshes double-sided`,
   )
+}
+
+// --- Head-load porters (point 1490) ------------------------------------------
+// Reported in Cairo and Tangier: the porter's head stuck inside his crate, he
+// sprinted (a sine ping-pong whose peak speed grew with the route), faced along
+// the route line instead of his movement, and ground against house walls. Read
+// from the drawn scene: the crate's world bounds against the figure's crown, the
+// holder's displacement and yaw over short windows, and whether any porter
+// stands still far longer than a dwell plus the bounded stall escape. The lane's
+// pinned seed is used, not the reports' seeds: the defects were seed-independent.
+if (section('porter-head-load')) {
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  // Steady head-load pace is PORTER_WALK.pace + paceSpread = 1.1 m/s; the old
+  // sprint peaked at 6-7 m/s. The cap leaves room for the round-body sidestep.
+  const MAX_SPEED = 1.6
+  // Longest legitimate standstill: dwell (1.5 + 2.5 s) plus stallEscape (3 s), with margin.
+  const MAX_STILL = 8.5
+  const SAMPLE_MS = 500
+  const SAMPLES = 40
+  const readPorters = () => page.evaluate(() => {
+    const out = []
+    const scene = window.__placeScene
+    scene.updateMatrixWorld(true)
+    scene.traverse((o) => {
+      if (o.name !== 'porter-crate' || !o.isMesh) return
+      let fig = null
+      for (let q = o.parent; q; q = q.parent) if (q.name === 'inhabitant') { fig = q; break }
+      const holder = fig?.parent
+      if (!holder) return
+      let crown = null
+      fig.traverse((c) => { if (!crown && c.name === 'figure-crown') crown = c })
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+      const box = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)
+      const V = o.position.constructor
+      const at = holder.getWorldPosition(new V())
+      const cw = crown ? crown.getWorldPosition(new V()) : null
+      out.push({
+        x: at.x, z: at.z, yaw: holder.rotation.y,
+        crateBottom: box.min.y, crown: cw ? cw.y : null,
+        center: { x: (box.min.x + box.max.x) / 2, y: (box.min.y + box.max.y) / 2, z: (box.min.z + box.max.z) / 2 },
+      })
+    })
+    return out
+  })
+  for (const placeId of ['cairo', 'tangier']) {
+    await goToPlace(placeId)
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+    const first = await readPorters()
+    check(`${placeId} porters: the port draws head-load porters`, first.length > 0, `${first.length} crate(s)`)
+    if (!first.length) continue
+    // 1. The crate rests on the head: its underside never below the crown.
+    const sunk = first.filter((p) => p.crown == null || p.crateBottom < p.crown - 0.01)
+    check(`${placeId} porters: every crate rests on top of the head`, sunk.length === 0,
+      first.map((p) => `crate ${p.crateBottom.toFixed(2)} / crown ${p.crown?.toFixed(2)}`).join(', '))
+    // 2-4. Pace, heading and progress over 20 s of life.
+    const track = first.map((p) => ({ last: p, stillSince: 0, still: 0, maxSpeed: 0, moved: 0, aligned: 0, steps: 0 }))
+    let prev = first
+    for (let k = 1; k <= SAMPLES; k++) {
+      await page.waitForTimeout(SAMPLE_MS)
+      const now = await readPorters()
+      if (now.length !== prev.length) break
+      now.forEach((p, i) => {
+        const t = track[i]
+        const d = Math.hypot(p.x - prev[i].x, p.z - prev[i].z)
+        t.maxSpeed = Math.max(t.maxSpeed, d / (SAMPLE_MS / 1000))
+        t.moved += d
+        if (d > 0.15) {
+          t.steps++
+          const want = Math.atan2(p.x - prev[i].x, p.z - prev[i].z)
+          const off = Math.abs(Math.atan2(Math.sin(p.yaw - want), Math.cos(p.yaw - want)))
+          if (off < Math.PI / 3) t.aligned++
+        }
+        if (Math.hypot(p.x - t.last.x, p.z - t.last.z) > 0.3) {
+          t.last = p
+          t.stillSince = k
+        }
+        t.still = Math.max(t.still, ((k - t.stillSince) * SAMPLE_MS) / 1000)
+      })
+      prev = now
+    }
+    const fast = track.filter((t) => t.maxSpeed > MAX_SPEED)
+    check(`${placeId} porters: a steady head-load pace (≤ ${MAX_SPEED} m/s)`, fast.length === 0,
+      track.map((t) => `${t.maxSpeed.toFixed(2)} m/s`).join(', '))
+    const steps = track.reduce((a, t) => a + t.steps, 0)
+    const aligned = track.reduce((a, t) => a + t.aligned, 0)
+    check(`${placeId} porters: they walk (at least one covers 3 m)`, track.some((t) => t.moved > 3),
+      track.map((t) => `${t.moved.toFixed(1)} m`).join(', '))
+    check(`${placeId} porters: heading follows the movement (≥ 80 % of steps within 60°)`,
+      steps > 0 && aligned / steps >= 0.8, `${aligned}/${steps}`)
+    const stuck = track.filter((t) => t.still > MAX_STILL)
+    check(`${placeId} porters: none stands without progress longer than ${MAX_STILL} s`, stuck.length === 0,
+      track.map((t) => `${t.still.toFixed(1)} s`).join(', '))
+    // The picture: a walking porter seen from beside, life frozen at the shutter.
+    const pick = await (async () => {
+      for (let tries = 0; tries < 20; tries++) {
+        const a = await readPorters()
+        await page.waitForTimeout(300)
+        const b = await readPorters()
+        const i = b.findIndex((p, j) => a[j] && Math.hypot(p.x - a[j].x, p.z - a[j].z) > 0.15)
+        if (i >= 0) {
+          await page.evaluate(() => window.__placeFreezeLife(true))
+          return (await readPorters())[i]
+        }
+      }
+      return null
+    })()
+    check(`${placeId} porters: a walking porter to photograph`, !!pick)
+    if (!pick) continue
+    let shot = false
+    for (const dist of [3.2, 4.5]) {
+      for (let s = 0; s < 12 && !shot; s++) {
+        // From the porter's side, so crate, head and stride read in profile.
+        const a = pick.yaw + Math.PI / 2 + (s % 2 ? -1 : 1) * Math.floor((s + 1) / 2) * (Math.PI / 6)
+        const placed = await page.evaluate(([c, a, dist]) => {
+          const p = window.__placePlayer
+          p.x = c.x + Math.sin(a) * dist
+          p.z = c.z + Math.cos(a) * dist
+          p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
+          p.pitch = Math.atan2(c.y - 1.6 - 0.5, dist)
+          return { x: p.x, z: p.z }
+        }, [pick.center, a, dist])
+        await nextFrames(3)
+        const drift = await page.evaluate((w) => Math.hypot(window.__placePlayer.x - w.x, window.__placePlayer.z - w.z), placed)
+        if (drift > 0.4) continue
+        await frame(shotName(`1490-porter-${placeId}`), {
+          local: pick.center,
+          label: `a head-load porter walking in ${placeId}: crate on a pad on top of his head, upright stride, one hand steadying the load`,
+        })
+        shot = true
+      }
+      if (shot) break
+    }
+    check(`${placeId} porters: a free standpoint for the picture`, shot)
+    await page.evaluate(() => window.__placeFreezeLife(false))
+  }
 }
 
 await finishPolishSuite()
