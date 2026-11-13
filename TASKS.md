@@ -15185,3 +15185,11 @@ to land than a mechanism that needs a review.
   Test: a Playwright layout check that the toast's box does not intersect the status bar's box with a hint raised in play, picture-checked on both backends.
   Source: finding of the 1508 session, 13.11.2026 15:34.
   Bundle: Steuerung & Performance.
+
+- [ ] 1517. The fleeing adult at the reported Niger bank sometimes flips its heading once
+  Measured 13.11.2026 (covering enrichments run for point 328 on main 2876db78a, WebGPU, log local/verify-logs/2026-11-13T19-18-53-221-enrichments.log): 'at the reported bank the fleeing adult enters the water once, flees once, never as a fall-in, and never flips or zigzags its heading' failed with flips 1, restarts 1, entries 1, the flip at d 1.84 around t 5.3 s with the lion idle. The section alone on the same sha passed 5/5 directly after — intermittent.
+  Player impact: a fleeing animal at a river bank visibly turns back once mid-flight.
+  Final state: the cause is measured (`node scripts/throttle-probe.mjs enrichments --section=water-edge-flee --runs 8` first, to separate load from logic) and fixed in game; the check stays as strict.
+  Test: `npm test -- enrichments --section=water-edge-flee` green on WebGPU and WebGL 2 across a throttle probe, plus a Vitest case if the cause lies in the pure flee helpers; the charge in scripts/render-verify-charges.mjs dies with this point.
+  Source: finding of the 343 session, 13.11.2026 20:47.
+  Bundle: Tierverhalten.
