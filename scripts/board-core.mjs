@@ -351,7 +351,7 @@ details:not(.sect)[open]>summary::after{content:"▾"}
 details.sect>summary:has(>.slots){display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.75em;row-gap:0;position:relative;margin:26px 0 8px;padding:0 1.6em 5px 0;border-bottom:1px solid var(--rule,#d8c9a8)}
 details.sect>summary:has(>.slots) h2{margin:0;padding-bottom:0;border-bottom:0}
 details.sect>summary:has(>.slots) h2::after{position:absolute;right:0;top:0}
-details.sect>summary>.slots{flex:1 1 12rem;min-width:0;font-size:.8em;font-weight:400;color:var(--soft,#7c6c4d);overflow-wrap:anywhere}
+details.sect>summary>.slots{flex:0 0 100%;min-width:0;font-size:.8em;font-weight:400;color:var(--soft,#7c6c4d);overflow-wrap:anywhere}
 </style>`
 
 const criticalityBadge = (level) =>

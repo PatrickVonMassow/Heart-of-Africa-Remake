@@ -1,5 +1,5 @@
-// Pure half of the board's slot line (user order 11.11.2026): beside the heading
-// "Woran ich gerade arbeite" the board ALWAYS says why fewer than POOL_CAP points
+// Pure half of the board's slot line (user order 11.11.2026): on its own line
+// below the heading "Woran ich gerade arbeite" (12.11.2026) the board ALWAYS says why fewer than POOL_CAP points
 // are worked in parallel. Every phrase is derived from measured facts; where no
 // reason can be measured the line says "Grund nicht messbar" and the I/O half
 // files a finding — never filler, never agent-written free text (point 1452).
@@ -130,14 +130,14 @@ export function slotLine({
     .filter((b) => !(b.point != null && activeSet.has(b.point)))
     .map((b) => ({ ...b, state: blockerState(b, { openPoints: open, closedPoints: closed }) }))
   const free = Math.max(0, limit - list.length)
-  if (free === 0 && blockers.length === 0) return { text: `${limit} von ${limit} Slots in Arbeit`, unmeasurable: false }
+  if (free === 0 && blockers.length === 0) return { text: `${limit}/${limit} Slots in Arbeit`, unmeasurable: false }
 
   // A point that already holds a slot is no new candidate for a free one.
   const holding = new Set(list.map((b) => b.point).filter((p) => p != null))
   const candidateSpecs = (Array.isArray(specs) ? specs : [])
     .filter((p) => !holding.has(p.point) && !activeSet.has(p.point))
     .map((p) => ({ ...p, files: Array.isArray(p.files) ? p.files : [] }))
-  const parts = [`${free} von ${limit} Slots frei`]
+  const parts = [`${free}/${limit} Slots frei`]
   let unmeasurable = false
   if (free > 0) {
     const decision = slotReasonDecision({
@@ -164,8 +164,8 @@ function escapeText(text) {
 }
 
 /**
- * Write the slot line into the now-section's heading, on the same line, replacing
- * any earlier one. A null/empty text removes it. A board without the heading is
+ * Write the slot line into the now-section's summary, after the heading (the
+ * board CSS breaks it onto its own line), replacing any earlier one. A null/empty text removes it. A board without the heading is
  * returned unchanged. PURE.
  */
 export function applySlotLine(html, text) {

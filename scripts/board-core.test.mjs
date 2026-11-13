@@ -881,9 +881,9 @@ describe('derived now-section membership', () => {
     const withTail = (tail) =>
       `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2>${tail}</summary>\n` +
       `${nowEntry(700, 'Echt', '20:07')}</details>\n${rest}</main>\n`
-    const slotted = withTail('<span class="slots">2 von 3 Slots frei: kein offener Punkt</span>')
+    const slotted = withTail('<span class="slots">2/3 Slots frei: kein offener Punkt</span>')
     expect(compareNowProjection(slotted, [700]).ok).toBe(true)
-    expect(reconcileNowProjection(slotted, [700])).toContain('<span class="slots">2 von 3 Slots frei: kein offener Punkt</span></summary>')
+    expect(reconcileNowProjection(slotted, [700])).toContain('<span class="slots">2/3 Slots frei: kein offener Punkt</span></summary>')
     expect(() => reconcileNowProjection(withTail('<span class="t">fremd</span>'), [700])).toThrow(/outside its <details class="sect"> wrapper/)
   })
 

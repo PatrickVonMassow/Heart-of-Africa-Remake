@@ -58,7 +58,7 @@ import {
   recordCommissionOverride,
   recordParkedBranch,
 } from './batch-in-flight-core.mjs'
-import { branchTip, openFeatBranches, readCommissionRecord, writeCommissionRecord } from './batch-in-flight.mjs'
+import { branchTip, heldSlotPoints, openFeatBranches, readCommissionRecord, writeCommissionRecord } from './batch-in-flight.mjs'
 
 const PAUSE = repoPath('.claude', 'batch-paused')
 const SETTINGS = repoPath('.claude', 'settings.json')
@@ -136,7 +136,7 @@ export function gatherCommissionInputs({
     return { applicable: false, why: 'no TASKS.md in this checkout' }
   }
   const tasks = tasksText ?? readTasksOpen(tasksPath)
-  const { readable, branches } = branchProbe({ cwd, behind })
+  const { readable, branches } = branchProbe({ cwd, behind, heldPoints: heldSlotPoints(tasks) })
   const rec = record ?? readCommissionRecord()
   const occupied = openBranchSlots({ branches, parked: rec?.parked ?? {} }).open
   const targets = (Array.isArray(points) && points.length ? points : [point])
