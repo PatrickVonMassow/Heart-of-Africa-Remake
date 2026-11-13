@@ -776,7 +776,7 @@ export function resolveMergeTip({ branch, apply = true, cwd = REPO_ROOT } = {}) 
   if (!tip.ok || tip.action !== 'fast-forward' || !apply) return tip
   const tree = listWorktrees({ cwd }).find((w) => w.branch === branch)
   try {
-    if (tree) execFileSync('git', ['merge', '--ff-only', '--quiet', tip.sha], { cwd: tree.path, stdio: ['ignore', 'pipe', 'pipe'] })
+    if (tree) execFileSync('git', ['merge', '--ff-only', '--quiet', tip.sha], { cwd: tree.path, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     else run(['update-ref', `refs/heads/${branch}`, tip.sha, tip.from])
   } catch (e) {
     return {
