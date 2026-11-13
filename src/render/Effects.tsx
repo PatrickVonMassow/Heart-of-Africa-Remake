@@ -26,12 +26,11 @@ import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
 import { createEnvironmentTexture } from './environment'
+import { useSceneSun } from './sceneSun'
 import { createScenePass } from './scenePass'
 import { createSceneFrame } from './sceneFrame'
 import { useUi, effectiveSsao, effectiveTraa, effectiveBloom } from '../state/ui'
 
-/** Sun direction used for the IBL texture (matches the scene suns closely). */
-const IBL_SUN: [number, number, number] = [0.5, 0.65, 0.36]
 
 /** Minimum screen-space AO factor: occlusion never darkens a surface below this
  *  fraction, so the deepest crevice reads as a dark grey rather than crushing an
@@ -43,16 +42,19 @@ export function Effects() {
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
 
-  // Image-based lighting: procedural HDR environment.
+  // Image-based lighting: procedural HDR environment, baked from the one scene
+  // sun (design.md §2.7) and re-baked only when that sun is re-derived (date,
+  // latitude, balance) — never per frame.
+  const iblSun = useSceneSun().disc
   useEffect(() => {
-    const tex = createEnvironmentTexture(IBL_SUN)
+    const tex = createEnvironmentTexture(iblSun)
     scene.environment = tex
     scene.environmentIntensity = 0.45
     return () => {
       scene.environment = null
       tex.dispose()
     }
-  }, [scene])
+  }, [scene, iblSun])
 
   // The effective render levers (design.md §21, F9 / point 276 part B): the
   // graphics level drives SSAO/TRAA/bloom through these selectors — SSAO on only

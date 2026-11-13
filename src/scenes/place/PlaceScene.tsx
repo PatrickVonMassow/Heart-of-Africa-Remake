@@ -71,6 +71,7 @@ import {
   touchMove,
 } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
+import { useSceneSun } from '../../render/sceneSun'
 import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
@@ -217,8 +218,8 @@ import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idl
 import { PAD_LOOK_RATE, applyPitch, mousePitchDelta, padPitchDelta, placeCameraPose } from '../../systems/lookPitch'
 import { getStrings, useStrings } from '../../i18n'
 
-/** Sun direction shared by the sky dome disc and the shadow light. */
-const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
+// The sun direction comes from the one scene sun (render/sceneSun.ts): the
+// SETTLEMENT's own latitude and the current date (design.md §2.7).
 
 // Dry-season baseline of the settlement lighting; the season dims from here
 // (design.md §19.13, point 120g).
@@ -2560,6 +2561,7 @@ function chiefPromptLabel(strings: ReturnType<typeof getStrings>, action: ChiefA
 }
 
 export function PlaceScene() {
+  const sun = useSceneSun()
   const camera = useThree((s) => s.camera)
   const r3fScene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
@@ -3350,7 +3352,7 @@ export function PlaceScene() {
     <PlaceGroundContext.Provider value={ground}>
       <color attach="background" args={[sky.horizon]} />
       <fog attach="fog" args={[sky.horizon, 42, 320]} />
-      <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
+      <SkyDome preset={sky} sunDirection={sun.disc} radius={400} />
       <PlaceRain wetness={placeWetness} />
       <hemisphereLight ref={hemiRef} args={[sandy ? '#cfe2ee' : '#d8e2c2', '#8f7a55', PLACE_HEMI_INTENSITY]} />
       <directionalLight
@@ -3360,7 +3362,7 @@ export function PlaceScene() {
         // side-finding).
         key={shadowsEnabled ? 'sun-shadowed' : 'sun-plain'}
         ref={sunRef}
-        position={[SUN_DIR[0] * 60, SUN_DIR[1] * 60, SUN_DIR[2] * 60]}
+        position={[sun.light[0] * 60, sun.light[1] * 60, sun.light[2] * 60]}
         color="#fff1d8"
         intensity={PLACE_SUN_INTENSITY}
         castShadow={shadowsEnabled}

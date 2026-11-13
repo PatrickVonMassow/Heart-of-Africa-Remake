@@ -750,6 +750,9 @@ export interface Strings {
     waterCrossChance: string
     seasonStrength: string
     wetGroundStrength: string
+    sunHour: string
+    sunShadowFloor: string
+    sunDirection: string
     edgeBandWidth: string
     edgeBandWander: string
     edgeBandStrength: string

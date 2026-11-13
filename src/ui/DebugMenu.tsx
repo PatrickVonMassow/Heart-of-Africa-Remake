@@ -15,6 +15,7 @@
 // driver (the verify suites) can still reach a control without first opening
 // its group; the filter itself works on the row data.
 
+import { useSceneSun } from '../render/sceneSun'
 import { Fragment, useState, type ReactNode } from 'react'
 import { balance } from '../config/balance'
 import { clampWander } from '../render/edgeBand'
@@ -777,6 +778,13 @@ export function DebugMenu() {
         (v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }, 0.1),
       num(t.debug.wetGroundStrength, balance.season.wetGroundStrength,
         (v) => { balance.season.wetGroundStrength = Math.max(0, Math.min(1, v)); bump() }, 0.1),
+      // The fixed solar hour and the shadow-light floor (design.md §2.7), with
+      // the derived sun shown so a tester can walk the range without a date.
+      num(t.debug.sunHour, balance.sun.hour,
+        (v) => { balance.sun.hour = Math.max(6, Math.min(18, v)); bump() }, 0.25),
+      num(t.debug.sunShadowFloor, balance.sun.shadowMinElevationDeg,
+        (v) => { balance.sun.shadowMinElevationDeg = Math.max(0, Math.min(45, v)); bump() }, 1),
+      custom(t.debug.sunDirection, <SunReadout label={t.debug.sunDirection} />),
       // The dry-season crown collapse (§19.13): a SEASON switch, even though
       // it isolates a rendering half — it is the season a tester is forcing.
       check(t.debug.foliageCollapse, seasonCollapseEnabled,
@@ -1002,6 +1010,17 @@ export function DebugMenu() {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** Debug readout of the one scene sun (design.md §2.7, §21.2). */
+function SunReadout({ label }: { label: string }) {
+  const sun = useSceneSun()
+  const v = sun.disc.map((c) => c.toFixed(2)).join(', ')
+  return (
+    <div aria-label={label} data-testid="debug-sun-readout">
+      {label}: {sun.angles.elevation.toFixed(1)}° / {sun.angles.azimuth.toFixed(0)}° ({v}) · {sun.lat.toFixed(2)}°
     </div>
   )
 }

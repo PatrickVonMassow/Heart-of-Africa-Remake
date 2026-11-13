@@ -196,6 +196,11 @@ the next reload). The complete set, grouped as the menu presents it:
 - Strength of the seasonal weather look (0 disables it, 1 full, default 1).
 - Strength of the wet-ground darkening under rain.
 
+**The sun** (§2.7)
+
+- The fixed local solar hour the sun is derived at (default 16:00; noon casts no shadow, 17:00 sets the Cape sun in June). The menu also shows the derived elevation, azimuth and direction.
+- The shadow light's elevation floor: lifts only the shadow-casting light at grazing angles while the visible disc keeps its true angle — a deliberate divergence, off (0) by default.
+
 **Wildlife dramas** (§19.8)
 
 - Herd family-drama values: the parental rescue burst factor, the calf fraction per herd group, the calf leash/play/hop-bout values, the juvenile-prey and drinking-juvenile crocodile preferences, and the orphan adoption radius — the reach within which the nearest eligible adult adopts a juvenile whose parent has died (point 262), so the §19.8 dramas recur for the new pairing — and the escape run of a calf freed by its parent's sacrifice (point 311), the window during which that adoption keeps off so the freed young actually flees the predator. Added by the §19.8 dramas above: the mid-channel crocodile weighting for a swimming calf (point 362), the lameness chance and its healing window (point 363), the flood's scale on the drama current (point 364), and the separation window (point 341) after which a juvenile out of reach of its parent has the bond released to that adoption.
