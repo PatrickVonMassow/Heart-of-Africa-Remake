@@ -982,6 +982,31 @@ export const RED_CHARGES = [
       'these reds so the narrow half becomes reachable at all.',
   },
   {
+    point: 938,
+    suite: 'enrichments',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
+    why:
+      'Measured 26.08.2026: five recorded webgpu/enrichments runs of 17.08.2026 carry this check ' +
+      'red with point=null, because the check names point 278 and 278 is TICKED — a charge dies ' +
+      'with its point, so the red had no owner it could be charged to. Point 938 was opened for ' +
+      'exactly this red and is the owner until it settles whether the check or the dressing is ' +
+      'stale. ' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
+      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
+      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
+      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
+      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
+      'whose level went unrecorded — so the narrowing withdraws no charge that stands. ' +
+      'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
+      'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
+      'recorded before the record kept a detail and carry none, so the narrow half would ' +
+      'withdraw a standing charge today. Measured that day, empty on every one of them. POINT 995 ' +
+      'owns it.',
+  },
+  {
     point: 939,
     suite: 'startup',
     backend: 'webgpu',
@@ -1169,6 +1194,24 @@ export const RED_CHARGES = [
       'MISSED ITS SUBJECT, and a future failure of the same frame for another reason stays a real ' +
       'red. The charge dies with point 521, which replaces the stopwatch with a wait on the ' +
       'camera actually arriving.',
+  },
+  {
+    point: 938,
+    suite: 'enrichments',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
+    why:
+      'THE WebGL 2 HALF OF POINT 938, measured 29.08.2026 and entered because the WebGPU entry ' +
+      'above is scoped to that lane and its compatibility level, so it deliberately excuses ' +
+      'nothing here. Classified with scripts/verify/baseline-classify.mjs enrichments at ' +
+      'VERIFY_GL=webgl against the merge-base 4acf6039abe0: the check is red on the BASELINE and ' +
+      'on the branch with the IDENTICAL detail — {"samples":[0,0,0,0,0],"min":0,"max":0,' +
+      '"spread":0} — over two baseline runs and seven branch observations, so it is pre-existing ' +
+      'and nothing about the bank-round rebuild touches it. Zero samples on both sides says the ' +
+      'dressing does not stream at all here rather than that it grows too little, which is the ' +
+      'same question 938 already owns: whether the CHECK or the dressing is the stale one. The ' +
+      'charge dies with that point.',
   },
   {
     point: 1009,
