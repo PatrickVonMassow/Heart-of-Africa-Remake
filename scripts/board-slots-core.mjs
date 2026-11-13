@@ -136,7 +136,7 @@ function baseFreeSlotReason({ decision, specs, active, runningFiles }) {
  * - `paused`, `closingFreeze`, `cap`;
  * - `owner`: the batch owner, { alive, waitAt?, waitUntil? } (waitAt/waitUntil
  *   only for a running declared wait), or null where unmeasured;
- * - `freshActive`: active points whose branch has no own diff against main.
+ * - `freshActive`: active points whose branch has no commit of its own beyond main.
  *
  * Returns { text, unmeasurable }.
  */

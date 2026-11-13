@@ -252,7 +252,7 @@ describe('the I/O half', () => {
     expect(measureOwner({ now, readLock: () => { throw new Error('torn') } })).toBeNull()
   })
 
-  it('a branch is fresh only when every readable spelling has no own diff', () => {
+  it('a branch is fresh only when every readable spelling has no own commit', () => {
     const verdicts = { 'feat/1-a': true, 'origin/feat/1-a': null, 'feat/2-b': true, 'origin/feat/2-b': false, 'feat/3-c': null, 'origin/feat/3-c': null }
     const isEmpty = (ref) => verdicts[ref]
     const branches = [{ ref: 'feat/1-a', point: 1 }, { ref: 'feat/2-b', point: 2 }, { ref: 'feat/3-c', point: 3 }]

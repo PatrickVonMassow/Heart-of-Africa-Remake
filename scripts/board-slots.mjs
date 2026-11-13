@@ -41,17 +41,17 @@ export function measureOwner({ now = Date.now(), readLock = readOwnerLock, asses
   }
 }
 
-/** Does `ref` have no own diff against main? true/false, null when unreadable. */
-function diffIsEmpty(ref, cwd) {
+/** Does `ref` have no commit of its own beyond main? true/false, null when unreadable. */
+function hasNoOwnCommits(ref, cwd) {
   try {
-    const out = execFileSync('git', ['diff', '--name-only', `main...${ref}`], {
+    const out = execFileSync('git', ['rev-list', '--count', `main..${ref}`], {
       windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 15000,
       stdio: ['ignore', 'pipe', 'ignore'],
     })
-    return out.trim() === ''
+    return out.trim() === '0'
   } catch {
     return null
   }
@@ -59,9 +59,9 @@ function diffIsEmpty(ref, cwd) {
 
 /**
  * The active points whose branch, in every readable spelling (local, origin),
- * has no own diff against main yet: fresh, or cloud commits not fetched.
+ * has no commit of its own beyond main yet: fresh, or cloud commits not fetched.
  */
-export function freshActivePoints(activeBranches, { cwd = REPO_ROOT, isEmpty = diffIsEmpty } = {}) {
+export function freshActivePoints(activeBranches, { cwd = REPO_ROOT, isEmpty = hasNoOwnCommits } = {}) {
   const out = []
   for (const b of activeBranches) {
     const verdicts = [b.ref, `origin/${b.ref}`].map((ref) => isEmpty(ref, cwd)).filter((v) => v !== null)

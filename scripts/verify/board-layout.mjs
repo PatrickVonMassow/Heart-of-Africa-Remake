@@ -823,13 +823,19 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // A control that puts the line beside the heading must fail the same measure.
 {
   const SLOT_TEXT = '2/3 Slots frei: Batch-Session wartet seit 11:49 (bis 15:49) · blockiert durch: 1463 (ruht seit 10 Tagen)'
-  const BESIDE_CONTROL = '<style>details.sect>summary>h2{display:inline-flex!important}details.sect>summary>.slots{display:inline!important}</style>'
-  const source = existsSync(livePath) ? readFileSync(livePath, 'utf8') : null
-  const slotted = source ? applySlotLine(renderCardCriticalities(source, tasks), SLOT_TEXT) : null
-  if (!slotted || !slotted.includes('class="slots"')) {
-    check('slot line: the published board carries the "Woran ich gerade arbeite" heading to measure', false, source ? 'heading not found' : 'no .batch-dashboard.html')
+  const BESIDE_CONTROL = '<style>details.sect>summary>h2{display:inline-flex!important;font-size:12px!important}details.sect>summary>.slots{display:inline!important}</style>'
+  // Without the published board (a clean checkout) a minimal board goes through
+  // the same renderer, so the shipped .slots rule is still what is measured.
+  // The fixture's cards make the renderer inject its style, the .slots rule included.
+  const SLOT_FIXTURE = FIXTURE.replace('<main>', '<main><details class="sect" open>\n<summary><h2>Woran ich gerade arbeite</h2></summary>\n</details>')
+  const live = existsSync(livePath)
+  const slotted = applySlotLine(renderCardCriticalities(live ? readFileSync(livePath, 'utf8') : SLOT_FIXTURE, tasks), SLOT_TEXT)
+  if (!slotted.includes('class="slots"') || !slotted.includes('summary>.slots{display:block')) {
+    check(`slot line: the ${live ? 'published board' : 'fixture'} carries the heading and the shipped slot rule`, false, 'not found')
   } else {
     const quirks = slotted.replace(/^\s*<!doctype[^>]*>/i, '')
+    // The control's line is short, so an inline line fits beside the heading at every width.
+    const quirksShort = applySlotLine(slotted, '2/3 Slots frei').replace(/^\s*<!doctype[^>]*>/i, '')
     const measureSlot = async (page, html) => {
       await page.setContent(html, { waitUntil: 'domcontentloaded' })
       return page.evaluate(() => {
@@ -846,11 +852,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
           const page = await b.newPage({ viewport: { width, height: 900 } })
           const m = await measureSlot(page, quirks)
           check(
-            `slot line (${engine}, ${width}px, viewer quirks mode): on its own line below the heading`,
+            `slot line (${engine}, ${width}px, ${live ? 'published board' : 'fixture'}, viewer quirks mode): on its own line below the heading`,
             m !== null && m.mode === 'BackCompat' && m.slotTop >= m.h2Bottom - EPSILON,
             m ? `${m.mode}, slot top ${m.slotTop.toFixed(1)} / h2 bottom ${m.h2Bottom.toFixed(1)}` : 'not measured',
           )
-          const c = await measureSlot(page, `${quirks}${BESIDE_CONTROL}`)
+          const c = await measureSlot(page, `${quirksShort}${BESIDE_CONTROL}`)
           check(
             `slot line (${engine}, ${width}px): the measure rejects a line beside the heading (control)`,
             c !== null && c.slotTop < c.h2Bottom - EPSILON,
