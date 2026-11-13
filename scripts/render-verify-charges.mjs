@@ -238,16 +238,6 @@ export const RED_CHARGES = [
       + 'the calf ended 0.094 from its target. Point 1236 owns the cause; the charge dies with it.',
   },
   {
-    point: 1468,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^Traveller \((low|medium)\): his head stands at villager height/i,
-    why:
-      'WebGPU enrichments --section=traveller-figure on main 10.11.2026 18:16 read headRise 1.469 m at '
-      + 'medium (helmet 1) against the 1.35 bound (local/verify-logs/2026-11-10T17-16-14-136-enrichments.log); '
-      + '1468 owns the head-height reading and its bound, now also at medium. The charge dies with 1468.',
-  },
-  {
     point: 1469,
     suite: 'touch',
     kind: 'check',
@@ -992,31 +982,6 @@ export const RED_CHARGES = [
       'these reds so the narrow half becomes reachable at all.',
   },
   {
-    point: 938,
-    suite: 'enrichments',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
-    why:
-      'Measured 26.08.2026: five recorded webgpu/enrichments runs of 17.08.2026 carry this check ' +
-      'red with point=null, because the check names point 278 and 278 is TICKED — a charge dies ' +
-      'with its point, so the red had no owner it could be charged to. Point 938 was opened for ' +
-      'exactly this red and is the owner until it settles whether the check or the dressing is ' +
-      'stale. ' +
-      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
-      'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
-      'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
-      'runs: every WebGPU run that recorded a level recorded COMPATIBILITY and no core-level ' +
-      'run has ever been written here, and no red this entry accounts for today sits on a run ' +
-      'whose level went unrecorded — so the narrowing withdraws no charge that stands. ' +
-      'AND THE FAILURE MODE STAYS UNNARROWED for the reason the point-627 entry above states in ' +
-      'full (cross-vendor review, 28.08.2026, round 22): the reds this entry accounts for were ' +
-      'recorded before the record kept a detail and carry none, so the narrow half would ' +
-      'withdraw a standing charge today. Measured that day, empty on every one of them. POINT 995 ' +
-      'owns it.',
-  },
-  {
     point: 939,
     suite: 'startup',
     backend: 'webgpu',
@@ -1204,24 +1169,6 @@ export const RED_CHARGES = [
       'MISSED ITS SUBJECT, and a future failure of the same frame for another reason stays a real ' +
       'red. The charge dies with point 521, which replaces the stopwatch with a wait on the ' +
       'camera actually arriving.',
-  },
-  {
-    point: 938,
-    suite: 'enrichments',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^the streamed dressing does not grow over a session at a fixed anchor/i,
-    why:
-      'THE WebGL 2 HALF OF POINT 938, measured 29.08.2026 and entered because the WebGPU entry ' +
-      'above is scoped to that lane and its compatibility level, so it deliberately excuses ' +
-      'nothing here. Classified with scripts/verify/baseline-classify.mjs enrichments at ' +
-      'VERIFY_GL=webgl against the merge-base 4acf6039abe0: the check is red on the BASELINE and ' +
-      'on the branch with the IDENTICAL detail — {"samples":[0,0,0,0,0],"min":0,"max":0,' +
-      '"spread":0} — over two baseline runs and seven branch observations, so it is pre-existing ' +
-      'and nothing about the bank-round rebuild touches it. Zero samples on both sides says the ' +
-      'dressing does not stream at all here rather than that it grows too little, which is the ' +
-      'same question 938 already owns: whether the CHECK or the dressing is the stale one. The ' +
-      'charge dies with that point.',
   },
   {
     point: 1009,
@@ -1939,29 +1886,6 @@ export const RED_CHARGES = [
       + '(point 1465), so the charge holds on both backends. The charge dies with point 1270.',
   },
   {
-    point: 1449,
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in$/i,
-    why:
-      'FILED AS 1449 ON 26.10.2026: red in the full enrichments run on webgpu, main 64bed6b45, '
-      + 'owned by no open point; from the calf-shield-river work of 1297 (crossing). '
-      + 'The charge dies with point 1449.',
-  },
-  {
-    point: 1449,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up \(calf-in-water\)$/i,
-    why:
-      'FILED AS 1449 ON 26.10.2026: red in the full enrichments run on webgpu, main 64bed6b45, '
-      + 'owned by no open point; from the calf-shield-river work of 1297 (calf-in-water). '
-      + 'Red on WebGL 2 in the full enrichments run on main 9afb575 (09.11.2026), so the entry '
-      + 'names no backend and therefore no feature level. The charge dies with point 1449.',
-  },
-  {
     point: 1395,
     suite: 'polish-speech',
     backend: 'webgl',
@@ -2086,15 +2010,6 @@ export const RED_CHARGES = [
       + 'are computed before the sim advances (review objection 3). Filed in point 1496. The charge dies with point 1496.',
   },
   {
-    point: 1500,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^LOW: collidable trees draw in full under the density lever\b/i,
-    why:
-      'MEASURED 11.11.2026 on both backends: recorded enrichments runs before 04:05 carry this LOW preset red; '
-      + 'no open point owned it, so it was filed as point 1500. The charge dies with point 1500.',
-  },
-  {
     point: 1502,
     suite: 'polish-panorama',
     kind: 'check',
@@ -2113,16 +2028,6 @@ export const RED_CHARGES = [
       'MEASURED 11.11.2026 on WebGPU, main ed95b5bd2: the whole enrichments pass failed the 1498 elder-versus-prime '
       + 'staging with pre.ok false and the prime giraffe not found; point 1498 is closed, so the red was filed as '
       + 'point 1503. The charge dies with point 1503.',
-  },
-  {
-    point: 1515,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^(a forced ground-predator approach makes the flamingos take off and escape, uncaught|the airborne flock stands in the take-off frame at the shutter|a forced peregrine enters high, stoops on a flying bird, strikes, and the hunt resolves)\b/i,
-    why:
-      'MEASURED 13.11.2026 on WebGPU, main 8d18bc787: the whole enrichments pass failed the forced peregrine stoop, and '
-      + '--section=bird-flight-escape alone on a quiet machine failed all three checks (flock onScreen 0, no stoop). '
-      + 'No open point owned design.md §19.19, so the red was filed as point 1515. The charge dies with point 1515.',
   },
 
 ]
