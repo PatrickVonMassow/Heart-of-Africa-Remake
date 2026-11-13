@@ -238,6 +238,16 @@ export const RED_CHARGES = [
       + 'the calf ended 0.094 from its target. Point 1236 owns the cause; the charge dies with it.',
   },
   {
+    point: 1468,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^Traveller \((low|medium)\): his head stands at villager height/i,
+    why:
+      'Red again after its strike: WebGPU enrichments on feat/328-vulture-landing e474b68d4, 13.11.2026 19:11, '
+      + 'read headRise 1.366 m at low against the 1.35 bound (local/verify-logs/2026-11-13T18-11-05-057-enrichments.log); '
+      + 'that branch does not touch the traveller figure. 1468 owns the reading and its bound. The charge dies with 1468.',
+  },
+  {
     point: 1469,
     suite: 'touch',
     kind: 'check',
