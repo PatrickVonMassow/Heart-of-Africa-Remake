@@ -1796,12 +1796,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1490": {
-      "at": "2026-11-11T20:32:08.265Z",
-      "why": "User order 11.11.2026: extend 1490 with the Tangier wall defect and pull it to the front",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1492": {
       "at": "2026-11-09T05:14:09.313Z",
       "why": "cosmetic low-preset clash; behind the open Dorfleben work",
@@ -1889,7 +1883,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-13T08:54:10.453Z",
+    "at": "2026-11-13T10:37:30.060Z",
     "points": [
       184,
       200,
@@ -2335,7 +2329,6 @@
       1483,
       1484,
       1488,
-      1490,
       1492,
       1493,
       1494,

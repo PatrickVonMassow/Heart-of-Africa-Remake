@@ -2104,5 +2104,15 @@ export const RED_CHARGES = [
       + '(total 0.0028 < 0.003) while --section=travel-panorama-capture passed it on the same tree minutes later; '
       + 'the threshold sits on the capture\'s spread. Filed as point 1502. The charge dies with point 1502.',
   },
+  {
+    point: 1503,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^the comparison frame shows BOTH the old and the prime giraffe\b/i,
+    why:
+      'MEASURED 11.11.2026 on WebGPU, main ed95b5bd2: the whole enrichments pass failed the 1498 elder-versus-prime '
+      + 'staging with pre.ok false and the prime giraffe not found; point 1498 is closed, so the red was filed as '
+      + 'point 1503. The charge dies with point 1503.',
+  },
 
 ]
