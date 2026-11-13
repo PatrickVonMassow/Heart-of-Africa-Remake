@@ -60,6 +60,7 @@ export function useSceneSun(): SceneSun {
   const rev = useGame((s) => s.balanceVersion)
   return useMemo(() => {
     current = deriveSceneSun(lat, day)
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sceneSun = current
     return current
     // rev: a debug edit of balance.sun re-derives.
     // eslint-disable-next-line react-hooks/exhaustive-deps

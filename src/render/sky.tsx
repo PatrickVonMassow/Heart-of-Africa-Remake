@@ -44,6 +44,8 @@ export function SkyDome({
   const sunU = useMemo(() => uniform(new THREE.Vector3(0, 1, 0)), [])
   useLayoutEffect(() => {
     sunU.value.set(...sunDirection).normalize()
+    // Live check (enrichments --section=solar-sun): the dome's real sun.
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__skySun = sunU.value
   }, [sunU, sunDirection])
 
   const material = useMemo(() => {

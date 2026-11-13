@@ -2706,6 +2706,11 @@ export function PlaceScene() {
    *  anywhere raises the hint that names the escape key — it never frees him. */
   const stall = useRef(newStallState(0, 0))
   const sunRef = useRef<THREE.DirectionalLight>(null)
+  // Live check (enrichments --section=solar-sun): the light that casts the
+  // settlement's shadows, compared against the dome's sun at eye height.
+  useEffect(() => {
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunLight = sunRef.current
+  })
   const hemiRef = useRef<THREE.HemisphereLight>(null)
   /** This frame's season wetness at the settlement, for the dev hook. */
   const placeWetness = useRef(0)

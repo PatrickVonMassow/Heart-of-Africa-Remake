@@ -987,6 +987,8 @@ function Sun() {
   // Re-derived on date/latitude change only; the per-frame follow below reads
   // the memoised vector.
   const sunDir = useSceneSun().light
+  // Live check (enrichments --section=solar-sun): the light that casts the shadows.
+  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunLight = light
 
   // Give the cascade shadow maps back when the bird's-eye view is left (point
   // 546). The light and its CSM node are singletons, so three never disposes
