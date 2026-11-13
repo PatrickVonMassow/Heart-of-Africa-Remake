@@ -16,9 +16,10 @@ const git = (cwd, args, date) =>
     cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
     env: { ...process.env, ...(date ? { GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date } : {}) },
   })
-const runGit = (args, cwd) => spawnSync('git', args, { cwd, encoding: 'utf8' })
+const runGit = (args, cwd) => spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
 
 /** Commit `text` into `file` on a new branch off main, dated `date`; back to main. */
 function branchWith(repo, name, file, text, date) {
