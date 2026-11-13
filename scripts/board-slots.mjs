@@ -5,8 +5,8 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { POOL_CAP, openBranchSlots, openPointSpecs } from './batch-in-flight-core.mjs'
-import { closingFreeze, openFeatBranches, readCommissionRecord, runningBranchFiles } from './batch-in-flight.mjs'
+import { POOL_CAP, openBranchSlots, openPointNumbers, openPointSpecs } from './batch-in-flight-core.mjs'
+import { closingFreeze, heldSlotPoints, openFeatBranches, readCommissionRecord, runningBranchFiles } from './batch-in-flight.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { UNMEASURABLE_FINDING_TITLE, slotLine } from './board-slots-core.mjs'
@@ -20,13 +20,6 @@ export function closedPointNumbers(allTasksText) {
   return out
 }
 
-/** Open point numbers (`- [ ] N.`). */
-function openNumbers(tasksText) {
-  const out = new Set()
-  for (const m of String(tasksText ?? '').matchAll(/^- \[ \] (\d+)\./gm)) out.add(Number(m[1]))
-  return out
-}
-
 /**
  * Measure the pool and compose the line. Never throws: a failed measurement is
  * itself the unmeasurable state. Returns { text, unmeasurable }.
@@ -34,7 +27,11 @@ function openNumbers(tasksText) {
 export function measureSlotLine({ tasksText, allTasksText, activePoints = [], cwd = REPO_ROOT, now = Date.now() } = {}) {
   try {
     const record = readCommissionRecord()
-    const probe = openFeatBranches({ cwd })
+    // The same corrected census as the batch's slot decision: an open or
+    // actively worked point's branch holds its slot even at its main cut point.
+    const held = heldSlotPoints(tasksText)
+    for (const p of activePoints) held.add(Number(p))
+    const probe = openFeatBranches({ cwd, heldPoints: held })
     const slots = openBranchSlots({ branches: probe.branches, parked: record?.parked ?? {}, now })
     const active = new Set(activePoints.map(Number))
     // The files the actively worked branches touch: local and origin spelling,
@@ -47,7 +44,7 @@ export function measureSlotLine({ tasksText, allTasksText, activePoints = [], cw
       branchesReadable: probe.readable,
       recordReadable: record?.torn !== true,
       activePoints,
-      openPoints: openNumbers(tasksText),
+      openPoints: openPointNumbers(tasksText),
       closedPoints: closedPointNumbers(allTasksText),
       specs: openPointSpecs(tasksText),
       runningFiles: evidence.length ? runningBranchFiles(evidence, { cwd }) : [],
@@ -76,7 +73,7 @@ export function fileUnmeasurableFinding(text, { carrier = carrierPath(), record 
   if (current.includes(UNMEASURABLE_FINDING_TITLE)) return false
   record(
     UNMEASURABLE_FINDING_TITLE,
-    `Die Board-Zeile neben "Woran ich gerade arbeite" zeigte: ${text}. ` +
+    `Die Slot-Zeile unter "Woran ich gerade arbeite" zeigte: ${text}. ` +
       'Keine Messung der Slot-Logik (slotReasonDecision) erklärt die ungenutzten Slots; Ursache klären.',
   )
   return true

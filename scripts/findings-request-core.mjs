@@ -185,6 +185,39 @@ export function pendingRequests(text = '') {
   return requestEntries(text).filter((r) => !r.done && r.state === 'pending')
 }
 
+/** Does this request name point `point` — as a whole number in its title or any field? */
+export function requestNamesPoint(entry, point) {
+  const n = String(point ?? '').trim()
+  if (!/^\d+$/.test(n)) return false
+  // Not inside a longer number and not a date part (12.11.2026).
+  const re = new RegExp(`(?<![\\d.])${n}(?!\\d|\\.\\d)`)
+  return [entry?.title, ...Object.values(entry?.fields ?? {})].some((v) => re.test(String(v ?? '')))
+}
+
+/**
+ * DRAIN BEFORE START (12.11.2026): a request deposited while the owner pulled
+ * the next point was queued forty minutes late, and an amendment naming the
+ * running point was still pending when its destructive steps ran under the old
+ * spec. Starting a point therefore refuses while ANY request is pending; one
+ * that names the point is listed first, because it changes the very spec about
+ * to run. `appending` already counts as carried. Returns the refusal text, or
+ * null when nothing waits.
+ */
+export function startRefusal(text, point) {
+  const waiting = pendingRequests(text)
+  if (waiting.length === 0) return null
+  const naming = waiting.filter((r) => requestNamesPoint(r, point))
+  const rest = waiting.filter((r) => !naming.includes(r))
+  const lines = [
+    `point ${point} cannot start: ${waiting.length} pending user request(s) must be drained first` +
+      (naming.length ? ` — ${naming.length} of them name point ${point} and change its spec` : ''),
+    ...naming.map((r) => `  · NAMES ${point}: ${r.title}`),
+    ...rest.map((r) => `  · ${r.title}`),
+    'drain: node scripts/finding.mjs --requests, then --appending/--queued (or --blocked) per request',
+  ]
+  return lines.join('\n')
+}
+
 /**
  * WHERE DOES THIS REQUEST GO? A non-empty `openQuestions` means the deposit is
  * not decided yet, and an undecided spec appended to the work order would put a

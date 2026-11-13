@@ -102,6 +102,7 @@ import {
   runRecordFor,
   gatherInFlight,
   gatherSlots,
+  heldSlotPoints,
   openFeatBranches,
   registeredFeatureWriters,
   maxAgeMs,
@@ -3770,6 +3771,80 @@ describe('pointOfBranch / describeBranchAge — reading a branch name and an age
     expect(describeBranchAge(NaN)).toBe('age unknown')
     expect(describeBranchAge(null)).toBe('age unknown')
     expect(describeBranchAge(-5)).toBe('age unknown')
+  })
+})
+
+describe('slot census — a fresh or cloud-ahead branch holds its slot (12.11.2026)', () => {
+  // feat/1490 sits at its main cut point locally AND on its origin-tracking
+  // ref (cloud commits not fetched); feat/1341 is merged debris of a closed
+  // point; feat/1500 carries an unmerged commit of its own.
+  function censusRepo() {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-slot-census-'))
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        cwd: dir,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: { ...process.env, LC_ALL: 'C' },
+      })
+    git('init', '-b', 'main')
+    git('config', 'user.email', 'test@example.invalid')
+    git('config', 'user.name', 'Test')
+    writeFileSync(join(dir, 'base.txt'), 'base')
+    git('add', 'base.txt')
+    git('commit', '-m', 'base')
+    git('branch', 'feat/1490-head-load-porter')
+    git('update-ref', 'refs/remotes/origin/feat/1490-head-load-porter', 'main')
+    git('branch', 'feat/1341-done')
+    git('switch', '-c', 'feat/1500-own-work')
+    writeFileSync(join(dir, 'work.txt'), 'work')
+    git('add', 'work.txt')
+    git('commit', '-m', 'work')
+    git('switch', 'main')
+    return dir
+  }
+  const refsOf = (probe) => probe.branches.map((b) => b.ref).sort()
+
+  it('counts the fresh-cut branch of an open point, local and origin spelling, and not closed debris', () => {
+    const dir = censusRepo()
+    try {
+      expect(refsOf(openFeatBranches({ cwd: dir }))).toEqual(['feat/1500-own-work'])
+      const probe = openFeatBranches({ cwd: dir, heldPoints: new Set([1490, 1500]) })
+      expect(probe.readable).toBe(true)
+      expect(refsOf(probe)).toEqual([
+        'feat/1490-head-load-porter',
+        'feat/1500-own-work',
+        'origin/feat/1490-head-load-porter',
+      ])
+      expect(openBranchSlots({ branches: probe.branches }).count).toBe(2)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('the batch slot decision sees the fresh-cut branch as occupied', () => {
+    const dir = censusRepo()
+    try {
+      const tasksPath = join(dir, 'TASKS.md')
+      writeFileSync(tasksPath, '- [ ] 1490. Porter\n- [ ] 1500. Own work\n- [ ] 1600. Other `src/x.ts`\n- [x] 1341. Done\n')
+      const declaration = { evidence: [{ kind: 'branch', ref: 'feat/1500-own-work', point: 1500 }] }
+      const slots = gatherSlots(declaration, {
+        cwd: dir,
+        tasksPath,
+        recordProbe: () => ({ overrides: {}, parked: {} }),
+      })
+      expect(slots.slotsFree).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('holds the open points and the declared active ones', () => {
+    const held = heldSlotPoints('- [ ] 1490. A\n- [x] 1341. B\n- [ ] 1502. C DEFERRED\n', {
+      focusPoint: 1700,
+      evidence: [{ kind: 'branch', ref: 'feat/1701-x' }],
+    })
+    expect([...held].sort()).toEqual([1490, 1502, 1700, 1701])
   })
 })
 

@@ -36,19 +36,19 @@ const ELEVENTH = {
 }
 
 describe('slotLine — every variant of the heading line', () => {
-  it('full use: "3 von 3 Slots in Arbeit"', () => {
+  it('full use: "3/3 Slots in Arbeit"', () => {
     const r = slotLine({
       branches: [branch(1), branch(2), branch(3)],
       activePoints: [1, 2, 3],
       openPoints: [1, 2, 3],
     })
-    expect(r).toEqual({ text: '3 von 3 Slots in Arbeit', unmeasurable: false })
+    expect(r).toEqual({ text: '3/3 Slots in Arbeit', unmeasurable: false })
   })
 
   it('over the cap: no x/y above the cap, idle branches with their measured state, active point not repeated', () => {
     const r = slotLine(ELEVENTH)
     expect(r.text).toBe(
-      '0 von 3 Slots frei · blockiert durch: 1341, 1482, 1485 (erledigt, Branch nicht gelöscht) · 1463 (ruht seit 10 Tagen)',
+      '0/3 Slots frei · blockiert durch: 1341, 1482, 1485 (erledigt, Branch nicht gelöscht) · 1463 (ruht seit 10 Tagen)',
     )
     expect(r.text).not.toMatch(/\b327\b/)
     expect(r.text).not.toMatch(/5 von 3|5\/3/)
@@ -57,30 +57,30 @@ describe('slotLine — every variant of the heading line', () => {
 
   it('a free slot with no independent point names the active work it collides with', () => {
     const r = slotLine({ ...ELEVENTH, branches: [branch(1463, 10), branch(327, 0)] })
-    expect(r.text).toBe('1 von 3 Slots frei: kein offener Punkt unabhängig von 327 · blockiert durch: 1463 (ruht seit 10 Tagen)')
+    expect(r.text).toBe('1/3 Slots frei: kein offener Punkt unabhängig von 327 · blockiert durch: 1463 (ruht seit 10 Tagen)')
   })
 
   it('closing freeze: "Abschluss läuft, Code eingefroren"', () => {
     const r = slotLine({ ...ELEVENTH, branches: [branch(327)], closingFreeze: true })
-    expect(r).toEqual({ text: '2 von 3 Slots frei: Abschluss läuft, Code eingefroren', unmeasurable: false })
+    expect(r).toEqual({ text: '2/3 Slots frei: Abschluss läuft, Code eingefroren', unmeasurable: false })
   })
 
   it('paused batch', () => {
-    expect(slotLine({ ...ELEVENTH, branches: [], paused: true }).text).toBe('3 von 3 Slots frei: Batch pausiert')
+    expect(slotLine({ ...ELEVENTH, branches: [], paused: true }).text).toBe('3/3 Slots frei: Batch pausiert')
   })
 
   it('every open point waits on the user', () => {
     const r = slotLine({ branches: [], specs: [spec(5, ['scripts/a.mjs'], true)], openPoints: [5] })
-    expect(r).toEqual({ text: '3 von 3 Slots frei: alle offenen Punkte warten auf deine Entscheidung', unmeasurable: false })
+    expect(r).toEqual({ text: '3/3 Slots frei: alle offenen Punkte warten auf deine Entscheidung', unmeasurable: false })
   })
 
   it('no open point at all', () => {
-    expect(slotLine({ branches: [] }).text).toBe('3 von 3 Slots frei: kein weiterer offener Punkt')
+    expect(slotLine({ branches: [] }).text).toBe('3/3 Slots frei: kein weiterer offener Punkt')
   })
 
   it('no open point names its files', () => {
     const r = slotLine({ branches: [branch(7)], activePoints: [7], specs: [spec(8, [])], runningFiles: ['x/y.mjs'] })
-    expect(r.text).toBe('2 von 3 Slots frei: kein offener Punkt nennt seine Dateien, Unabhängigkeit nicht prüfbar')
+    expect(r.text).toBe('2/3 Slots frei: kein offener Punkt nennt seine Dateien, Unabhängigkeit nicht prüfbar')
     expect(r.unmeasurable).toBe(false)
   })
 
@@ -92,12 +92,12 @@ describe('slotLine — every variant of the heading line', () => {
       specs: [spec(327), spec(1490, ['scripts/other.mjs'])],
       runningFiles: ['scripts/p327.mjs'],
     })
-    expect(r).toEqual({ text: `2 von 3 Slots frei: ${UNMEASURABLE_TEXT} (unabhängig bereit: 1490)`, unmeasurable: true })
+    expect(r).toEqual({ text: `2/3 Slots frei: ${UNMEASURABLE_TEXT} (unabhängig bereit: 1490)`, unmeasurable: true })
   })
 
   it('running work whose files could not be read is no measurement of independence', () => {
     const r = slotLine({ branches: [branch(327)], activePoints: [327], specs: [spec(1490)], runningFiles: [] })
-    expect(r.text).toBe(`2 von 3 Slots frei: ${UNMEASURABLE_TEXT} (Dateien der laufenden Arbeit nicht lesbar)`)
+    expect(r.text).toBe(`2/3 Slots frei: ${UNMEASURABLE_TEXT} (Dateien der laufenden Arbeit nicht lesbar)`)
     expect(r.unmeasurable).toBe(true)
   })
 
@@ -116,7 +116,7 @@ describe('slotLine — every variant of the heading line', () => {
       specs: [spec(327), spec(1463, ['scripts/elsewhere.mjs'])],
       runningFiles: ['scripts/p327.mjs'],
     })
-    expect(r.text).toBe('1 von 3 Slots frei: kein weiterer offener Punkt · blockiert durch: 1463 (ruht seit 2 Tagen)')
+    expect(r.text).toBe('1/3 Slots frei: kein weiterer offener Punkt · blockiert durch: 1463 (ruht seit 2 Tagen)')
   })
 
   it('branches without a point or outside the work order keep a measured label', () => {
@@ -146,10 +146,10 @@ describe('applySlotLine — the heading carries the line, the section contract h
   const HEADING = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
 
   it('writes the line on the heading row, replaces it on the next render and removes it on empty text', () => {
-    const once = applySlotLine(boardHtml(), '1 von 3 Slots frei: x')
-    expect(once).toContain('<summary><h2>Woran ich gerade arbeite</h2><span class="slots">1 von 3 Slots frei: x</span></summary>')
-    const twice = applySlotLine(once, '3 von 3 Slots in Arbeit')
-    expect(readSlotLine(twice)).toBe('3 von 3 Slots in Arbeit')
+    const once = applySlotLine(boardHtml(), '1/3 Slots frei: x')
+    expect(once).toContain('<summary><h2>Woran ich gerade arbeite</h2><span class="slots">1/3 Slots frei: x</span></summary>')
+    const twice = applySlotLine(once, '3/3 Slots in Arbeit')
+    expect(readSlotLine(twice)).toBe('3/3 Slots in Arbeit')
     expect(twice.match(/class="slots"/g)).toHaveLength(1)
     expect(applySlotLine(twice, '')).toContain(HEADING)
   })
@@ -161,7 +161,7 @@ describe('applySlotLine — the heading carries the line, the section contract h
 
   it('keeps the guards green: structure, collapsible sections, now-card points', () => {
     const plain = boardHtml({ nowCards: [210] })
-    const html = applySlotLine(plain, '0 von 3 Slots frei · blockiert durch: 1341 (erledigt, Branch nicht gelöscht)')
+    const html = applySlotLine(plain, '0/3 Slots frei · blockiert durch: 1341 (erledigt, Branch nicht gelöscht)')
     const codes = (h) => auditDashboard(h, { open: [210, 211, 204], done: [209] }).map((v) => v.code)
     expect(codes(html)).toEqual(codes(plain))
     expect(codes(html)).not.toContain('section-not-collapsible')
@@ -174,12 +174,12 @@ describe('applySlotLine — the heading carries the line, the section contract h
   it('keeps the board writers working on a heading that carries the line', () => {
     const tokens = applySlotLine(boardHtml({ nowCards: [210] }), "blockiert durch: feat/$'x · $& · $1")
     expect(readSlotLine(tokens)).toBe("blockiert durch: feat/$'x · $& · $1")
-    const html = applySlotLine(boardHtml({ nowCards: [210] }), '2 von 3 Slots frei: kein offener Punkt')
+    const html = applySlotLine(boardHtml({ nowCards: [210] }), '2/3 Slots frei: kein offener Punkt')
     const { html: projected } = projectNowForPublish(html, { ok: true, points: [210], focusPoint: 210 }, { stamp: '12:00' })
-    expect(readSlotLine(projected)).toBe('2 von 3 Slots frei: kein offener Punkt')
+    expect(readSlotLine(projected)).toBe('2/3 Slots frei: kein offener Punkt')
     const promoted = promoteToNow(html, 211, { title: 'Task 211', status: 'läuft', stamp: '12:00' })
     expect(parseNowCardPoints(promoted)).toEqual(new Set([211, 210]))
-    expect(readSlotLine(promoted)).toBe('2 von 3 Slots frei: kein offener Punkt')
+    expect(readSlotLine(promoted)).toBe('2/3 Slots frei: kein offener Punkt')
   })
 })
 

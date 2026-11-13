@@ -77,6 +77,7 @@ import {
   successorAgentOrientation,
   declaredAgentCount,
   evidencePoint,
+  openPointNumbers,
   openPointSpecs,
   waitEtaRefusal,
   openBranchSlots,
@@ -356,15 +357,25 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
  * the refusal will print it; the Stop-hook path needs the COUNT alone. Any git
  * failure answers `readable: false` — a branch list nobody could read is not
  * evidence of anything, and the decision fails open on it.
+ *
+ * `heldPoints` (open or actively worked point numbers): a branch whose tip git
+ * calls merged still holds a slot when its point is among them. A freshly cut
+ * branch sits at its main cut point, and cloud commits not fetched yet leave
+ * the origin-tracking ref there too; neither frees the slot (12.11.2026).
  */
-export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = false, behindProbe = commitsBehind } = {}) {
-  let out = ''
-  try {
-    out = execFileSync(
+export function openFeatBranches({
+  cwd = REPO_ROOT,
+  base = 'main',
+  behind = false,
+  behindProbe = commitsBehind,
+  heldPoints = [],
+} = {}) {
+  const listRefs = (filter) =>
+    execFileSync(
       'git',
       [
         'for-each-ref',
-        '--no-merged',
+        filter,
         base,
         '--format=%(refname:short)\t%(committerdate:unix)\t%(objectname)',
         'refs/heads/feat',
@@ -372,11 +383,21 @@ export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = fals
       ],
       { windowsHide: true, cwd, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
     )
+  const held = new Set([...(heldPoints ?? [])].map(Number).filter((n) => Number.isInteger(n) && n > 0))
+  const lines = []
+  try {
+    lines.push(...listRefs('--no-merged').split(/\r?\n/))
+    if (held.size > 0) {
+      for (const line of listRefs('--merged').split(/\r?\n/)) {
+        const ref = line.split('\t')[0]?.trim() ?? ''
+        if (held.has(pointOfBranch(ref.replace(/^origin\//, '')))) lines.push(line)
+      }
+    }
   } catch {
     return { readable: false, branches: [] }
   }
   const branches = []
-  for (const line of out.split(/\r?\n/)) {
+  for (const line of lines) {
     const [ref, stamp, tip] = line.split('\t')
     if (!ref || !ref.trim()) continue
     const secs = Number(stamp)
@@ -760,6 +781,23 @@ export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
 }
 
 /**
+ * The points whose branch holds a slot even where git calls it merged: every
+ * open point of the work order and the declaration's actively worked ones
+ * (focus point and evidence points). Shared by the slot demand, the board's
+ * slot line and the commissioning refusal, so all three count the same pool.
+ */
+export function heldSlotPoints(tasksText, declaration = null) {
+  const held = openPointNumbers(tasksText)
+  const focus = Number(declaration?.focusPoint)
+  if (Number.isInteger(focus) && focus > 0) held.add(focus)
+  for (const item of Array.isArray(declaration?.evidence) ? declaration.evidence : []) {
+    const point = evidencePoint(item)
+    if (point != null) held.add(point)
+  }
+  return held
+}
+
+/**
  * DOES THIS WAIT OWE A REASON FOR ITS IDLE POOL SLOTS (point 427)? The decision is
  * pure (`slotReasonDecision`); this gathers its facts. Anything unreadable ends
  * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
@@ -788,7 +826,8 @@ export function gatherSlots(
     // fed an EMPTY branch list into the decision, so a git that could not be
     // questioned looked exactly like a repository with no open branch and could
     // demand work for slots nobody had counted (Sol, review of 91d88f9a).
-    const branchProbe = openFeatBranches({ cwd })
+    const tasksOpen = readTasksOpen(tasksPath)
+    const branchProbe = openFeatBranches({ cwd, heldPoints: heldSlotPoints(tasksOpen, declaration) })
     return slotReasonDecision({
       agents: declaredAgentCount(evidence),
       openBranches: openBranchSlots({
@@ -797,7 +836,7 @@ export function gatherSlots(
       }).count,
       branchesReadable: branchProbe.readable,
       recordReadable: record?.torn !== true,
-      openPoints: openPointSpecs(readTasksOpen(tasksPath)),
+      openPoints: openPointSpecs(tasksOpen),
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',
       paused: existsSync(PAUSE_PATH),

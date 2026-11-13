@@ -739,7 +739,7 @@ describe('auditDashboard — the 25.07 witnesses', () => {
   it('accepts the derived slot line beside a heading, and nothing else there', () => {
     const withSlots = boardHtml().replace(
       '<h2>Woran ich gerade arbeite</h2></summary>',
-      '<h2>Woran ich gerade arbeite</h2><span class="slots">3 von 3 Slots in Arbeit</span></summary>',
+      '<h2>Woran ich gerade arbeite</h2><span class="slots">3/3 Slots in Arbeit</span></summary>',
     )
     expect(codes(withSlots)).not.toContain('section-not-collapsible')
     const foreign = boardHtml().replace(

@@ -1266,6 +1266,14 @@ export function filesNamedIn(text) {
  * say WHY the queue held nothing, instead of reporting a file overlap that is
  * not there.
  */
+/** Every open point number (`- [ ] N.`) of a work order text, DEFERRED
+ *  included: an open point's branch holds a slot however it is ranked. */
+export function openPointNumbers(tasksText = '') {
+  const out = new Set()
+  for (const m of String(tasksText ?? '').matchAll(/^- \[ \] (\d+)\./gm)) out.add(Number(m[1]))
+  return out
+}
+
 export function openPointSpecs(tasksText = '') {
   const out = []
   let current = null

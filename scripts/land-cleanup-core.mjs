@@ -23,7 +23,7 @@
 //
 // A worktree is removed only when BOTH halves are proven:
 //   OWNERSHIP — it is a DIRECT child of the isolation directory, named the way
-//     the harness names one; git's own record says it is a linked worktree OF
+//     the harness names one or as the landed point's `point-<N>`; git's own record says it is a linked worktree OF
 //     THIS repository; it is checked out on the very branch being landed; and its
 //     HEAD is already CONTAINED in what the landing merged. That last one is the
 //     only landing-specific identity that exists — the landing did not create the
@@ -51,6 +51,9 @@ import { insideRoot, normPath } from './worktree-cleanup-core.mjs'
 /** Where the isolation harness puts an agent worktree, relative to the main
  *  checkout. A worktree anywhere else was not created by a delegation. */
 export const AGENT_WORKTREE_DIR = '.claude/worktrees'
+
+/** Where `scripts/verify/baseline-classify.mjs` keeps its detached checkouts. */
+export const BASELINE_WORKTREE_DIR = 'local/verify-baseline'
 
 /** Where git keeps the administrative record of a LINKED worktree of this
  *  repository. A checkout whose `.git` does not point in here is some other
@@ -104,6 +107,49 @@ export function isAgentWorktree(path, mainRoot) {
 }
 
 /**
+ * Is this path the owner's worktree of the point being landed? PURE.
+ *
+ * A DIRECT child of `<mainRoot>/.claude/worktrees` named `point-<N>`, checked out
+ * on `feat/<N>-…` of the same N (point 1513: the landings of 1509 and 1512 kept
+ * these, and with them their branches). The death proofs still apply in full.
+ */
+export function isPointWorktree(path, mainRoot, branch) {
+  const root = normPath(mainRoot)
+  if (!root) return false
+  const dir = `${root}/${AGENT_WORKTREE_DIR}`
+  if (!insideRoot(path, dir) || normPath(path).slice(dir.length + 1).includes('/')) return false
+  const n = /^point-(\d+)$/.exec(baseName(path))?.[1]
+  return Boolean(n) && str(branch).startsWith(`feat/${n}-`)
+}
+
+/**
+ * Is this worktree an idle verify-baseline checkout? PURE.
+ *
+ * A DIRECT child of `<mainRoot>/local/verify-baseline`, which
+ * `scripts/verify/baseline-classify.mjs` creates `--detach` on a fixed sha and
+ * names after that sha's first 12 characters. The path alone proves nothing — the
+ * tree could be rebasing the landed branch — so it counts only while unlocked, with
+ * its HEAD on the sha its name records, and with no rebase, merge, cherry-pick,
+ * revert or bisect proven absent (`evidence.midOperation === false`): a stopped
+ * rebase can leave HEAD exactly on that sha. As unproven it kept the branch of
+ * every landing while it stood (point 1513).
+ */
+export function isBaselineCheckoutPath(path, mainRoot) {
+  const root = normPath(mainRoot)
+  const p = normPath(path)
+  if (!root || !p) return false
+  const dir = `${root}/${BASELINE_WORKTREE_DIR}`
+  if (!insideRoot(p, dir) || p === dir || p.slice(dir.length + 1).includes('/')) return false
+  return /^[0-9a-f]{12}$/.test(baseName(p))
+}
+
+export function isIdleBaselineWorktree(worktree, mainRoot, evidence = null) {
+  if (str(worktree?.locked) || evidence?.midOperation !== false) return false
+  if (!isBaselineCheckoutPath(worktree?.path, mainRoot)) return false
+  return str(worktree?.head).startsWith(baseName(normPath(worktree?.path)))
+}
+
+/**
  * Does git's own record say this is a linked worktree OF THIS repository? PURE.
  *
  * `linkedTo` is what the checkout's `.git` file points at. For a linked worktree
@@ -140,6 +186,8 @@ export function isLinkedWorktreeOf(linkedTo, mainRoot) {
  *               headMerged  — is its HEAD already contained in what was merged?
  *               dirty       — does it hold uncommitted or untracked changes?
  *               activeAt    — epoch ms a working file in it was last written
+ *               midOperation — is a rebase, merge, cherry-pick, revert or
+ *                             bisect in progress in it? (read for baseline trees)
  *               holderAlive — is the process named in the lock still running?
  *                             REPORTED ONLY; a stale lock still keeps the tree,
  *                             because a lock nobody released is not proof that
@@ -155,6 +203,7 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
   const want = str(branch)
   const has = str(worktree?.branch)
   const agent = isAgentWorktree(path, mainRoot)
+  const own = agent || isPointWorktree(path, mainRoot, want)
   const at = (disposition, reason) => ({ path, branch: has, disposition, reason })
 
   if (!path) return at(DISPOSITION.unproven, 'git named a worktree without a path')
@@ -176,6 +225,9 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
 
   // ── OWNERSHIP ──────────────────────────────────────────────────────────────
   if (!want) return at(DISPOSITION.unproven, 'the landing named no branch, so nothing can be tied to it')
+  if (!has && isIdleBaselineWorktree(worktree, mainRoot, evidence)) {
+    return at(DISPOSITION.foreign, 'a verify-baseline checkout, still on the sha its name records')
+  }
   if (!has) {
     // A DETACHED TREE IS UNPROVEN WHEREVER IT SITS (whole-branch review, finding 5).
     // A detached HEAD reports no branch, so nothing here can tell a tree that is
@@ -194,12 +246,13 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
     )
   }
   if (has !== want) return at(DISPOSITION.foreign, `checked out on ${has}, not on ${want}`)
-  if (!agent) {
-    // The branch matches, but this is not a tree the isolation harness made, so
-    // removing it is not cleanup — it is deleting someone's checkout.
+  if (!own) {
+    // The branch matches, but this is neither a tree the isolation harness made
+    // nor the point's own `point-<N>` tree, so removing it is not cleanup — it is
+    // deleting someone's checkout.
     return at(
       DISPOSITION.unproven,
-      `on ${want}, but not a direct \`agent-<id>\` child of ${AGENT_WORKTREE_DIR}/ — the harness did not create it`,
+      `on ${want}, but neither an \`agent-<id>\` nor its \`point-<N>\` child of ${AGENT_WORKTREE_DIR}/ — the landing cannot tie it to the point`,
     )
   }
 

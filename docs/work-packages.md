@@ -126,6 +126,16 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **#1504**, **#1505**, **#1506** — user orders of 11.11.2026 on pool-slot hygiene and its board line;
   process work on branches, guards and the board, so no feature bundle shares their files.
 - **#1507** — the user's re-rank order of 11.11.2026; it changes only the ranking, no feature files.
+- **#1509** — the user's disk-footprint cleanup of 12.11.2026 (/tmp caches, closed-point evidence in
+  local/, git gc); host housekeeping in the main tree, so no feature bundle shares its files.
+- **#1512** — the housekeeping process-table blocker found on the first real run of point 1509
+  (12.11.2026); it edits scripts/housekeeping.mjs only and runs the one-off pass afterwards.
+- **#1513** — the user's origin branch cleanup of 12.11.2026 (rescue/doctor, claude/* and merged
+  feat branches); branch hygiene and housekeeping scripts, so no feature bundle shares its files.
+- **#1510** — the user's slot-census and slot-line order of 12.11.2026; it edits
+  `scripts/batch-in-flight.mjs` and the board slot line, so no feature bundle shares its files.
+- **#1511** — the request-drain order finding of 12.11.2026; it edits the point start/claim path
+  and the findings carrier check, so no feature bundle shares its files.
 - **#1508** — the owed covering enrichments run for the already landed points 391 and 327; a
   verification run on main, not a feature branch, so it shares no bundle's files.
 - **#1465** — the uncharged WebGPU reds of polish-speech that the v0.3.1 closing never reached;
