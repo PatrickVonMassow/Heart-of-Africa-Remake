@@ -176,6 +176,75 @@ describe('ownership must be PROVEN', () => {
     expect(v.reason).toContain(AGENT_WORKTREE_DIR)
   })
 
+  it("the point's own dead `point-<N>` tree is removed and its branch deleted (point 1513)", () => {
+    // The landings of 1509 and 1512 kept `.claude/worktrees/point-<N>` as
+    // "not harness-made", and with it both branches, while the verify-baseline
+    // checkout kept the branch of every landing.
+    const own = { path: `${ROOT}/${AGENT_WORKTREE_DIR}/point-608`, branch: 'feat/608-x' }
+    const baseline = { path: `${ROOT}/local/verify-baseline/db74de7ddbe9`, branch: '', head: 'db74de7ddbe9d552cc10' }
+    const sel = selectCleanupTargets({
+      ...base,
+      worktrees: [{ path: ROOT, branch: 'main' }, own, baseline],
+      evidence: { [own.path]: deadFor('point-608'), [baseline.path]: { midOperation: false } },
+    })
+    expect(sel.remove).toEqual([own.path])
+    expect(sel.reported).toEqual([])
+    expect(sel.branch.delete).toBe(true)
+  })
+
+  it('a `point-<N>` tree of another point, nested or on another N, is not the landed one', () => {
+    for (const path of [
+      `${ROOT}/${AGENT_WORKTREE_DIR}/point-609`,
+      `${ROOT}/${AGENT_WORKTREE_DIR}/point-60`,
+      `${ROOT}/${AGENT_WORKTREE_DIR}/point-608/nested`,
+    ]) {
+      const v = judgeCleanupTarget({ ...base, worktree: { path, branch: 'feat/608-x' }, evidence: deadFor('p') })
+      expect(v.disposition).toBe(DISPOSITION.unproven)
+    }
+  })
+
+  it("the point's `point-<N>` tree still has to be proven dead", () => {
+    const own = { path: `${ROOT}/${AGENT_WORKTREE_DIR}/point-608`, branch: 'feat/608-x' }
+    const v = judgeCleanupTarget({ ...base, worktree: own, evidence: { ...deadFor('point-608'), dirty: true } })
+    expect(v.disposition).toBe(DISPOSITION.live)
+  })
+
+  it('a verify-baseline checkout whose HEAD left its sha, or that is locked, still keeps the branch', () => {
+    // Cross-vendor review: the path alone does not prove it is not mid-rebase.
+    const path = `${ROOT}/local/verify-baseline/db74de7ddbe9`
+    for (const tree of [
+      { path, branch: '', head: 'feedfacefeedfacefeed' },
+      { path, branch: '', head: '' },
+      { path, branch: '', head: 'db74de7ddbe9d552cc10', locked: 'manual' },
+    ]) {
+      const sel = selectCleanupTargets({ ...base, worktrees: [tree], evidence: { [path]: { midOperation: false } } })
+      expect(sel.reported.map((r) => r.path)).toEqual([path])
+      expect(sel.branch.delete).toBe(false)
+    }
+  })
+
+  it('a verify-baseline checkout on its sha keeps the branch unless no operation is proven in progress', () => {
+    // Cross-vendor review: a rebase stopped on its first replayed commit leaves
+    // HEAD exactly on the baseline sha.
+    const tree = { path: `${ROOT}/local/verify-baseline/db74de7ddbe9`, branch: '', head: 'db74de7ddbe9d552cc10' }
+    for (const evidence of [null, {}, { midOperation: true }, { midOperation: null }]) {
+      const sel = selectCleanupTargets({ ...base, worktrees: [tree], evidence: evidence && { [tree.path]: evidence } })
+      expect(sel.reported.map((r) => r.path)).toEqual([tree.path])
+      expect(sel.branch.delete).toBe(false)
+    }
+  })
+
+  it('only a DIRECT verify-baseline child counts as baseline; one on a branch is judged by its branch', () => {
+    const nested = { path: `${ROOT}/local/verify-baseline/a/db74de7ddbe9`, branch: '', head: 'db74de7ddbe9d5' }
+    expect(judgeCleanupTarget({ ...base, worktree: nested, evidence: deadFor('n') }).disposition).toBe(
+      DISPOSITION.unproven,
+    )
+    const onBranch = { path: `${ROOT}/local/verify-baseline/abc`, branch: 'feat/608-x' }
+    expect(judgeCleanupTarget({ ...base, worktree: onBranch, evidence: deadFor('n') }).disposition).toBe(
+      DISPOSITION.unproven,
+    )
+  })
+
   it('a NESTED checkout under the agent directory is not an agent worktree', () => {
     // Review finding 3: every DESCENDANT used to qualify.
     const nested = { path: `${ROOT}/${AGENT_WORKTREE_DIR}/agent-a/nested`, branch: 'feat/608-x' }

@@ -40,6 +40,7 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { probePid } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
+import { runBranchesStep } from './housekeeping-branches.mjs'
 import {
   busyVerdict,
   createBudget,
@@ -437,7 +438,7 @@ export function runHousekeeping({
   gitMode = 'auto',
   budgetEntries = DEFAULT_BUDGET_ENTRIES,
   budgetMs = DEFAULT_BUDGET_MS,
-  steps = ['tmp', 'local', 'logs', 'git'],
+  steps = ['tmp', 'local', 'logs', 'branches', 'git'],
   runGit = defaultRunGit,
   readWorktrees = () => {
     const r = runGit(['worktree', 'list', '--porcelain'], repoRoot)
@@ -824,6 +825,32 @@ export function runHousekeeping({
           remove(path, st, root, v.rule, st.size)
         })
         if (stepResults.logs === 'incomplete') break
+        continue
+      }
+
+      if (step === 'branches') {
+        needRefs()
+        if (!workOrder) {
+          stepResults.branches = 'skipped'
+          continue
+        }
+        let archiveText = null
+        try {
+          archiveText = readFileSync(join(repoRoot, 'docs/tasks-archive.md'), 'utf8')
+        } catch {
+          /* claude/* branches then stay: no archived point can be read */
+        }
+        stepResults.branches = runBranchesStep({
+          runGit,
+          repoRoot,
+          now: clock(),
+          dryRun,
+          workOrder,
+          archiveText,
+          readWorktrees,
+          emit,
+          fail,
+        })
         continue
       }
 

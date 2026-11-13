@@ -17,6 +17,8 @@ export const DEFAULT_BUDGET_MS = 10 * 60 * 1000
 /** A lock whose content cannot be parsed is treated as held until it is this old. */
 export const UNREADABLE_LOCK_STALE_MS = DAY_MS
 export const PID_START_TOLERANCE_MS = 2000
+/** A rescue/doctor-* or claude/* branch tip younger than this is kept (point 1513, calibratable). */
+export const BRANCH_MAX_AGE_MS = 14 * DAY_MS
 
 // ---------------------------------------------------------------------------
 // Work order: which points are closed, which are open, and the open text.
@@ -77,6 +79,58 @@ export function parseWorkOrder(tasksText, archiveText) {
   if (!sawTasksPoint) return { ok: false, reason: 'TASKS.md carries no point line' }
   if (!sawArchivePoint) return { ok: false, reason: 'docs/tasks-archive.md carries no point line' }
   return { ok: true, open, closed, openText: openBlocks.join('\n'), tickedInTasks }
+}
+
+// ---------------------------------------------------------------------------
+// Branches (point 1513): rescue/doctor-* and claude/* cloud-session branches.
+
+/** 'rescue' | 'cloud' | null — only these two kinds are ever judged. */
+export function branchKind(name) {
+  const n = String(name ?? '')
+  if (/^rescue\/doctor-[^/]+$/.test(n)) return 'rescue'
+  if (/^claude\/[^/]+$/.test(n)) return 'cloud'
+  return null
+}
+
+/**
+ * The one archived point whose block names `branch` exactly, else null. The
+ * name must stand between whitespace, quotes or brackets; a sentence mark may
+ * follow it only before whitespace or the line end, so any other continuation
+ * is another branch.
+ */
+export function archivedPointNaming(branch, archiveText) {
+  if (!branch || typeof archiveText !== 'string') return null
+  const named = new Set()
+  let point = null
+  for (const line of archiveText.split('\n')) {
+    const m = POINT_LINE.exec(line)
+    if (m) point = Number(m[2])
+    else if (BLOCK_END.test(line)) point = null
+    if (point !== null && new RegExp(`(^|[\\s\`'"(\\[])${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s\`'")\\]]|[.,;:!?]($|\\s))`).test(line)) named.add(point)
+  }
+  return named.size === 1 ? [...named][0] : null
+}
+
+/**
+ * The verdict for one rescue/doctor-* or claude/* branch. Deleted only when its
+ * tip is older than `maxAgeMs`, main contains its content (`contained`, true
+ * only when merging the tip into main adds nothing), and — for a claude/*
+ * branch — the one archived point naming it is closed. Unknown = keep.
+ */
+export function branchVerdict({ name, tipAtMs, now, contained, archiveText, workOrder, maxAgeMs = BRANCH_MAX_AGE_MS }) {
+  const kind = branchKind(name)
+  if (!kind) return { act: false, reason: 'not a rescue or cloud branch' }
+  if (!Number.isFinite(tipAtMs) || !Number.isFinite(now)) return { act: false, reason: 'tip date unknown' }
+  if (now - tipAtMs <= maxAgeMs) return { act: false, reason: 'young' }
+  if (contained !== true) return { act: false, reason: contained === false ? 'content missing from main' : 'containment unknown' }
+  if (kind === 'cloud') {
+    if (!workOrder?.ok) return { act: false, reason: 'work order unreadable' }
+    const point = archivedPointNaming(name, archiveText)
+    if (point === null) return { act: false, reason: 'no single archived point names it' }
+    if (workOrder.open.has(point) || !workOrder.closed.has(point)) return { act: false, reason: `point ${point} not closed` }
+    return { act: true, rule: 'branch-cloud', point }
+  }
+  return { act: true, rule: 'branch-rescue' }
 }
 
 // ---------------------------------------------------------------------------
