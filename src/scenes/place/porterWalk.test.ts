@@ -268,10 +268,38 @@ describe('the porter that moves but gets nowhere', () => {
       },
       free: (x, z) => [x, z],
     }
-    const route: PorterRoute = { entrance: { x: 0.4, z: 9 }, plaza: { x: 0, z: 0 }, pace: PORTER_WALK.pace }
-    const r = noProgress(route, world, 30)
-    expect(r.escapes).toBeGreaterThan(0)
-    expect(r.worst).toBeLessThanOrEqual(PORTER_WALK.stallEscape + 2 * DT)
+    // The goal off the body's centre: circling it, the distance to the goal
+    // swings up and down, and a replan must not take a worse distance for a
+    // fresh minimum that the next swing back then "beats".
+    for (const plaza of [{ x: 0, z: 0 }, { x: 0.5, z: -0.3 }, { x: -0.6, z: 0.2 }]) {
+      const route: PorterRoute = { entrance: { x: 0.4, z: 9 }, plaza, pace: PORTER_WALK.pace }
+      const r = noProgress(route, world, 30)
+      expect(r.escapes, `goal ${plaza.x}/${plaza.z}`).toBeGreaterThan(0)
+      expect(r.worst, `goal ${plaza.x}/${plaza.z}`).toBeLessThanOrEqual(PORTER_WALK.stallEscape + 2 * DT)
+    }
+  })
+
+  it('a replan never raises the progress mark', () => {
+    // Stalled into the replan with the porter now FURTHER along the new route
+    // than its best: the clock must run on to the escape, not restart.
+    const world: PorterWorld = { grid, move: (fx, fz) => [fx, fz], free: (x, z) => [x, z] }
+    const route: PorterRoute = { entrance: { x: 0, z: 9 }, plaza: { x: 0, z: 0 }, pace: PORTER_WALK.pace }
+    const rand = mulberry32(2)
+    const s = startPorter(route, rand)
+    s.pause = 0
+    s.leg = 0
+    s.x = 0
+    s.z = 2.4
+    s.yaw = Math.PI
+    s.way = [{ x: 0, z: 0 }]
+    s.mark = 2
+    s.stalled = PORTER_WALK.stallReplan - DT / 2
+    stepPorter(s, route, world, DT, rand)
+    expect(s.mark).toBe(2)
+    // Back to 2.25 m: nearer than the replan's 2.4 m, not nearer than the best.
+    s.z = 2.25
+    stepPorter(s, route, world, DT, rand)
+    expect(s.stalled).toBeGreaterThan(PORTER_WALK.stallReplan)
   })
 })
 

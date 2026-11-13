@@ -248,9 +248,11 @@ export function stepPorter(s: PorterState, route: PorterRoute, world: PorterWorl
       s.stalled = 0
       s.mark = Infinity
     } else if (before < PORTER_WALK.stallReplan && s.stalled >= PORTER_WALK.stallReplan) {
-      // Replan from here; the new route is measured afresh, the clock is not.
+      // Replan from here. The clock runs on, and the mark never rises: a
+      // worse distance taken as the new best would let the next swing back
+      // pass for progress and put the escape off for good.
       s.way = planLeg(s, world.grid, goal)
-      s.mark = routeLeft(s)
+      s.mark = Math.min(s.mark, routeLeft(s))
     }
   }
   done()
