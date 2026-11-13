@@ -1861,6 +1861,12 @@
       "why": "a staged-section red of the covering run, charged like 1503; no player report behind it, so it stands behind the user-ranked player-facing points",
       "origin": "machine",
       "place": "last"
+    },
+    "1516": {
+      "at": "2026-11-13T15:29:22.715Z",
+      "why": "a HUD legibility defect without a blockade; it waits behind the ordered queue",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1889,7 +1895,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-13T13:33:46.850Z",
+    "at": "2026-11-13T15:29:22.723Z",
     "points": [
       184,
       200,
@@ -2346,7 +2352,8 @@
       1502,
       1503,
       1508,
-      1515
+      1515,
+      1516
     ]
   }
 }
