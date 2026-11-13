@@ -8,7 +8,7 @@
 
 import { PORTER_WALK } from '../../config/balance'
 import { steerHeading, wayHeading } from '../../render/figureWalk'
-import { advancePlaceRoute, findPlaceRoute, navPointFree, type NavPoint, type PlaceNavGrid } from './routing'
+import { advancePlaceRoute, findPlaceRoute, navPointFree, navPointOffGround, type NavPoint, type PlaceNavGrid } from './routing'
 
 export interface PorterRoute {
   /** Free ground just outside a building, on its plaza side. */
@@ -49,6 +49,29 @@ export interface PorterWorld {
 function cellCentre(grid: PlaceNavGrid, x: number, z: number): NavPoint {
   const snap = (v: number) => grid.min + Math.round((v - grid.min) / grid.cell) * grid.cell
   return { x: snap(x), z: snap(z) }
+}
+
+/**
+ * A step kept on walkable ground. The collision resolve (`move`) keeps a step
+ * out of every collider but knows nothing of the ground the grid refuses
+ * without one: the bank past the wade limit, outside the observed ground or
+ * the settlement boundary. A step from accepted ground that would end there is
+ * cut back to the last accepted point along it. From refused ground (a shove
+ * or an escape left the porter there) the step is taken as it is, so the
+ * porter can walk back onto its route. Collider cells are left to `move`: the
+ * grid tests them at cell centres only, and refusing them here would wedge a
+ * porter in the diagonal pinch between two such cells.
+ */
+export function walkableStep(grid: PlaceNavGrid, fx: number, fz: number, tx: number, tz: number): [number, number] {
+  if (!navPointOffGround(grid, tx, tz) || navPointOffGround(grid, fx, fz)) return [tx, tz]
+  let lo = 0
+  let hi = 1
+  for (let k = 0; k < 10; k++) {
+    const m = (lo + hi) / 2
+    if (navPointOffGround(grid, fx + (tx - fx) * m, fz + (tz - fz) * m)) hi = m
+    else lo = m
+  }
+  return [fx + (tx - fx) * lo, fz + (tz - fz) * lo]
 }
 
 /** A free point on the line from a building centre toward the plaza. */
@@ -152,7 +175,14 @@ export function stepPorter(s: PorterState, route: PorterRoute, world: PorterWorl
   const [px, pz] = world.move(s.x, s.z, s.x + (dx / d) * reach, s.z + (dz / d) * reach)
   const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, px, pz, dx, dz, reach), route.pace, dt)
   s.yaw = turn.yaw
-  const [nx, nz] = world.move(s.x, s.z, s.x + Math.sin(s.yaw) * reach * turn.pace, s.z + Math.cos(s.yaw) * reach * turn.pace)
+  const [mx, mz] = world.move(s.x, s.z, s.x + Math.sin(s.yaw) * reach * turn.pace, s.z + Math.cos(s.yaw) * reach * turn.pace)
+  let [nx, nz] = walkableStep(world.grid, s.x, s.z, mx, mz)
+  // A heading still swinging round a corner can point off the walkable
+  // ground the route runs over: then the step goes along the route instead.
+  if (nx !== mx || nz !== mz) {
+    const [ax, az] = walkableStep(world.grid, s.x, s.z, px, pz)
+    if (Math.hypot(ax - s.x, az - s.z) > Math.hypot(nx - s.x, nz - s.z)) [nx, nz] = [ax, az]
+  }
   s.x = nx
   s.z = nz
   const moved = Math.hypot(nx - fromX, nz - fromZ)

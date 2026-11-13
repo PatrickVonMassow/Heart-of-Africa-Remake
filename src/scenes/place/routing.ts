@@ -149,6 +149,15 @@ export function navRestrict(grid: PlaceNavGrid, free: (x: number, z: number) => 
   }
 }
 
+/** Whether a world point lies on ground the grid refuses WITHOUT a collider
+ *  there: past the wade limit, outside the observed ground or the boundary,
+ *  or narrowed away by `navRestrict` — ground a resolved step can still
+ *  reach, unlike a collider's. */
+export function navPointOffGround(grid: PlaceNavGrid, x: number, z: number): boolean {
+  const k = cellOf(grid, x) * grid.n + cellOf(grid, z)
+  return grid.free[k] === 0 && grid.solid[k] === 0
+}
+
 /** Whether a mover may stand at a world point, as the grid sees it. */
 export function navPointFree(grid: PlaceNavGrid, x: number, z: number): boolean {
   return grid.free[cellOf(grid, x) * grid.n + cellOf(grid, z)] === 1

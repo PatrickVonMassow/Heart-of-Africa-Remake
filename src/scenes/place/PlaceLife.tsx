@@ -62,7 +62,7 @@ import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { PORTER_WALK, START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
-import { planPorterRoutes, startPorter, stepPorter, type PorterState } from './porterWalk'
+import { planPorterRoutes, startPorter, stepPorter, walkableStep, type PorterState } from './porterWalk'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
@@ -1994,8 +1994,10 @@ function Porters({
         b.x = p.x
         b.z = p.z
         separateBody(bodySet, b, dt, balance.villageLife.separation, separationWorld)
-        p.x = b.x
-        p.z = b.z
+        // The shove too stays on walkable ground.
+        ;[p.x, p.z] = walkableStep(nav, p.x, p.z, b.x, b.z)
+        b.x = p.x
+        b.z = p.z
       }
       devAssert(p.stalled <= PORTER_WALK.stallEscape + 0.5, 'porter-grinding',
         () => `porters/${i} without progress for ${p.stalled.toFixed(1)} s at ${p.x.toFixed(2)}/${p.z.toFixed(2)}`)
