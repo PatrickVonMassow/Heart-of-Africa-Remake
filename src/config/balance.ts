@@ -503,6 +503,34 @@ interface BalanceConfig {
      *  (boundary inclusive). Calibratable/debug-editable. */
     clusterRadius: number
   }
+  /** A vulture's visible landing and take-off (design.md §19.6): the kill
+   *  flock and the ground scavenger glide down along their approach heading
+   *  with slowing forward speed, flare with raised wings just before
+   *  touchdown, and leave by a run/flap into the climb (vultureLanding.ts). */
+  vultureLanding: {
+    /** Seconds from the start of the approach glide to touchdown. */
+    landSeconds: number
+    /** Last share of the landing window spent in the flare (raised wings). */
+    flareFraction: number
+    /** Forward speed at touchdown as a share of the speed at the glide's start (0..1). */
+    touchdownSpeedRatio: number
+    /** Height-over-distance curve exponent (> 1 flattens the glide before touchdown). */
+    glideCurve: number
+    /** World units from its carcass at which an arriving scavenger flock begins its glide. */
+    approachDistance: number
+    /** Nose-up pitch (radians) at full flare. */
+    flarePitch: number
+    /** Wing dihedral (radians) of the raised-wing flare/upstroke pose. */
+    flareDihedral: number
+    /** Seconds from the first stride of the take-off to joining the flight. */
+    takeoffSeconds: number
+    /** First share of the take-off window spent running/flapping on the ground. */
+    takeoffRunFraction: number
+    /** Forward speed at the take-off's start as a share of the speed when it joins the flight (0..1). */
+    liftoffSpeedRatio: number
+    /** Wing beats per second during the take-off run and climb. */
+    flapHz: number
+  }
   /** The elephants' mourning vigil (design.md §19.8, point 126): a herd whose
    *  centre passes near the graveyard's bones — or a dead herd-mate — walks
    *  in, lowers its heads over them and holds, then moves on. A vigil, not a
@@ -1736,6 +1764,19 @@ export const balance: BalanceConfig = {
   },
   scavenge: {
     clusterRadius: 15, // calibratable: carcasses this close to a flock's target share that one flock
+  },
+  vultureLanding: {
+    landSeconds: 3.6, // calibratable: long enough to read the glide at bird's-eye distance
+    flareFraction: 0.25, // calibratable: the flare is the last quarter of the landing
+    touchdownSpeedRatio: 0.15, // calibratable: the bird nearly stops in the air before touchdown
+    glideCurve: 1.4, // calibratable: >1 flattens the descent into the flare
+    approachDistance: 20, // calibratable: glide start distance of an arriving scavenger flock
+    flarePitch: 0.55, // calibratable: nose-up radians at full flare
+    flareDihedral: 0.7, // calibratable: raised-wing angle of the flare/upstroke geometry
+    takeoffSeconds: 2.4, // calibratable: run, flap and climb until the bird joins its flight
+    takeoffRunFraction: 0.35, // calibratable: share of the take-off spent running on the ground
+    liftoffSpeedRatio: 0.2, // calibratable: the run starts slow and accelerates into the climb
+    flapHz: 3, // calibratable: heavy wing beats of a labouring vulture
   },
   mourn: {
     seconds: 30, // calibratable: how long the herd holds at the bones before moving on
