@@ -8340,12 +8340,20 @@ if (section('vulture-landing')) {
       sc.mode = 'idle'
       const g = () => w.scavengeGroups.current[0]
       const out = { staged: true, spot, heights: [], clearances: [], phases: [], landed: false, flareSeen: false, maxJump: 0 }
+      // The flare is judged on the DRAWN mesh: its wing tips stand higher above
+      // the body than the flight geometry's (raised wings), not by elapsed time.
+      const topOf = (geo) => {
+        if (!geo.boundingBox) geo.computeBoundingBox()
+        return geo.boundingBox.max.y
+      }
+      let flightTop = null
       let rec = true
       let prev = null
       const frame = () => {
         if (!rec) return
         const grp = g()
         const st = sc.birds[0]
+        if (grp && st && st.phase === 'air' && flightTop === null) flightTop = topOf(grp.children[0].geometry)
         if (grp && st && sc.target === carcass && (st.phase === 'landing' || (st.phase === 'ground' && out.heights.length > 0))) {
           const bird = grp.children[0]
           const y = grp.position.y + bird.position.y
@@ -8355,7 +8363,10 @@ if (section('vulture-landing')) {
           out.phases.push(st.phase)
           const c = window.__vultures.clearance.current
           if (typeof c === 'number' && Number.isFinite(c)) out.clearances.push(c)
-          if (st.phase === 'landing' && st.t > (1 - vl.flareFraction) * vl.landSeconds) out.flareSeen = true
+          if (
+            st.phase === 'landing' && st.t > (1 - vl.flareFraction) * vl.landSeconds &&
+            flightTop !== null && topOf(bird.geometry) > flightTop + 1e-3
+          ) out.flareSeen = true
         }
         requestAnimationFrame(frame)
       }
@@ -8381,7 +8392,41 @@ if (section('vulture-landing')) {
       // Keep sampling the standing flock for a moment (the feeding clearance).
       await window.__pollSim(1.5, () => false)
       rec = false
+      // The take-off: the meal ends, the bird runs and flaps up into the climb
+      // through intermediate heights — never an instant switch to flight.
+      const up = { heights: [], maxJump: 0, wingsUp: false, airborne: false }
+      let upPrev = null
+      let upRec = true
+      const upFrame = () => {
+        if (!upRec) return
+        const grp = g()
+        const st = sc.birds[0]
+        if (grp && st && st.phase === 'takeoff') {
+          const bird = grp.children[0]
+          const y = grp.position.y + bird.position.y
+          if (upPrev !== null) up.maxJump = Math.max(up.maxJump, Math.abs(y - upPrev))
+          upPrev = y
+          up.heights.push(y)
+          if (flightTop !== null && topOf(bird.geometry) > flightTop + 1e-3) up.wingsUp = true
+        }
+        requestAnimationFrame(upFrame)
+      }
+      requestAnimationFrame(upFrame)
       carcass.dissolve = 0.02
+      await window.__pollSim(30, () => {
+        const st = sc.birds[0]
+        if (up.heights.length > 0 && st.phase === 'air') { up.airborne = true; return true }
+        return sc.mode === 'idle'
+      })
+      upRec = false
+      out.takeoff = {
+        samples: up.heights.length,
+        rise: up.heights.length ? +(up.heights[up.heights.length - 1] - up.heights[0]).toFixed(3) : 0,
+        distinct: new Set(up.heights.map((h) => h.toFixed(3))).size,
+        maxJump: +up.maxJump.toFixed(3),
+        wingsUp: up.wingsUp,
+        airborne: up.airborne,
+      }
       out.samples = out.heights.length
       const top = out.heights.length ? Math.max(...out.heights) : 0
       const bottom = out.heights.length ? out.heights[out.heights.length - 1] : 0
@@ -8406,6 +8451,11 @@ if (section('vulture-landing')) {
     JSON.stringify({ ...landing, heights: undefined }))
   check('the landing bird flares in its last phase before it stands (point 328)',
     landing.staged && landing.flareSeen, JSON.stringify({ flareSeen: landing.flareSeen }))
+  const to = landing.takeoff ?? {}
+  check('a vulture takes off through a visible run and flap into the climb, no instant switch (point 328)',
+    landing.staged && to.airborne && to.samples >= 10 && to.rise > 1 && to.distinct >= 8 &&
+      to.maxJump < to.rise * 0.25 && to.wingsUp,
+    JSON.stringify(to))
   check('the point-128 clearance holds through the whole landing and the standing meal (point 328)',
     landing.staged && typeof landing.minClearance === 'number' && landing.minClearance > 0,
     `min clearance ${landing.minClearance}`)

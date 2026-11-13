@@ -4941,14 +4941,15 @@ function Herds() {
         // The landing approach (design.md §19.6, point 328): within the
         // approach distance of its carcass the arriving flock settles over it
         // and each bird glides down from where it flies, flares and stands —
-        // never a snap from flight to standing. A committed take-off (the
-        // cluster hop's lift-off) finishes first.
+        // never a snap from flight to standing. A cluster hop's lift-off runs
+        // to the end first: the approach waits until every bird is airborne,
+        // or a still-standing flock would switch back and slide along.
         if (
           target !== null &&
           target.dead === true &&
           sc.mode === 'in' &&
           Math.hypot(target.x - sc.x, target.z - sc.z) <= vl.approachDistance &&
-          sc.birds.every((b) => b.phase !== 'takeoff')
+          sc.birds.every((b) => b.phase === 'air')
         ) {
           sc.mode = 'active'
         }
