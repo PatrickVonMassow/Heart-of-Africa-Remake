@@ -12186,7 +12186,14 @@ if (section('solar-sun')) {
       window.__game.setState({ day: d })
       window.__game.getState().debugJumpTo(la, lo)
     }, [lat, lon, day])
-    await page.waitForTimeout(2500)
+    // The scene sun re-derives on the jump; the light follows on the next frame.
+    await page.waitForFunction(([la, lo]) => {
+      const s = window.__sceneSun
+      const l = window.__sunLight
+      const p = window.__game.getState().pos
+      return !!s && !!l && Math.abs(s.lat - la) < 0.3 && Math.abs(l.target.position.x - p.x) < 1e-3 &&
+        Math.abs(p.x / 10 - lo) < 0.5
+    }, [lat, lon], { timeout: 30000 })
     return readSun()
   }
   const meanDiff = async (a, b) => {
@@ -12198,11 +12205,11 @@ if (section('solar-sun')) {
 
   // Same place, June against December (Cairo-latitude plain west of the Nile).
   const june = await travelTo(29.5, 29.5, JUNE_21)
-  const junePix = await capturePixels(page, 'solar sun: June frame')
   await shot('343-sun-june', { world: { lat: 29.5, lon: 29.5 }, label: 'the same place on 21 June at 16:00' })
+  const junePix = await capturePixels(page, 'solar sun: June frame')
   const dec = await travelTo(29.5, 29.5, DEC_21)
-  const decPix = await capturePixels(page, 'solar sun: December frame')
   await shot('343-sun-december', { world: { lat: 29.5, lon: 29.5 }, label: 'the same place on 21 December at 16:00' })
+  const decPix = await capturePixels(page, 'solar sun: December frame')
   const seasonDiff = await meanDiff(junePix, decPix)
   check(
     'solar sun: June and December at one place differ in shadow length, bearing and pixels',
@@ -12247,8 +12254,13 @@ if (section('solar-sun')) {
     window.__game.setState({ day: 171 })
     window.__game.getState().enterPlace('cairo')
   })
-  await page.waitForFunction(() => window.__game.getState().mode === 'place' && !!window.__placeLayout, null, { timeout: 30000 })
-  await page.waitForTimeout(2500)
+  await page.waitForFunction(
+    () => window.__game.getState().mode === 'place' && !!window.__placeLayout &&
+      Math.abs((window.__sceneSun?.lat ?? 99) - 30) < 0.5 && window.__sunLight?.isDirectionalLight === true &&
+      window.__sunLight.position.y < 50,
+    null,
+    { timeout: 30000 },
+  )
   const inPlace = await readSun()
   const cairoLat = await page.evaluate(() => window.__game.getState().placeId === 'cairo' && window.__sceneSun?.lat)
   await shot('343-sun-settlement-eye', { place: 'cairo', label: 'Cairo at eye height under the 16:00 June sun' })

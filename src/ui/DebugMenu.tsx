@@ -1018,9 +1018,11 @@ export function DebugMenu() {
 function SunReadout({ label }: { label: string }) {
   const sun = useSceneSun()
   const v = sun.disc.map((c) => c.toFixed(2)).join(', ')
+  const text = `${sun.angles.elevation.toFixed(1)}° / ${sun.angles.azimuth.toFixed(0)}° (${v}) · ${sun.lat.toFixed(2)}°`
   return (
-    <div aria-label={label} data-testid="debug-sun-readout">
-      {label}: {sun.angles.elevation.toFixed(1)}° / {sun.angles.azimuth.toFixed(0)}° ({v}) · {sun.lat.toFixed(2)}°
-    </div>
+    <label>
+      <span>{label}</span>
+      <input type="text" readOnly value={text} data-testid="debug-sun-readout" />
+    </label>
   )
 }
