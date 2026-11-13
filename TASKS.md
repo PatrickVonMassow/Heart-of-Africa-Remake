@@ -15193,3 +15193,16 @@ to land than a mechanism that needs a review.
   Test: `npm test -- enrichments --section=water-edge-flee` green on WebGPU and WebGL 2 across a throttle probe, plus a Vitest case if the cause lies in the pure flee helpers; the charge in scripts/render-verify-charges.mjs dies with this point.
   Source: finding of the 343 session, 13.11.2026 20:47.
   Bundle: Tierverhalten.
+
+- [ ] 1518. Board slot line: name the real reason for free slots, on its own line
+  User (13.11.2026): the line almost always reads "Grund nicht messbar", so the feature does not help; free slots must show why. Measured 13.11. 11:50: "3/3 Slots frei: Grund nicht messbar (unabhängig bereit: …)" while the owner session had a declaredWait 11:49–15:49 in .claude/batch-lock.json — the line never reads the owner state, so the most frequent case (serial batch, owner busy or waiting) is labelled unmeasurable. The earlier order (point 1506 item 3) to put the slot line on its own line is, per the user, still not visible to them. Explicit user order, overrides the infrastructure freeze for this board line.
+  QUEUE POSITION: user order 13.11.2026 22:40 "ja, vorne einreihen" — rank this point at the FRONT of the work order.
+  1. The slot line (scripts/board-slots-core.mjs freeSlotReason, I/O in scripts/board-slots.mjs) also reads the batch owner's measured state and names it instead of "Grund nicht messbar":
+     - no live batch owner (batch-lock absent/owner not alive) -> "keine Batch-Session aktiv"
+     - owner holds a declaredWait in .claude/batch-lock.json -> "Batch-Session wartet seit HH:MM (bis HH:MM)"
+     - active branch without own diff vs main (fresh, or cloud commits not fetched) -> "<N> hat noch keine Commits, Unabhängigkeit erst danach prüfbar" instead of "Dateien der laufenden Arbeit nicht lesbar"
+  2. The slot information sits on its own line BELOW the heading "Woran ich gerade arbeite", never on the heading's line, in every browser. Measured 13.11.2026 22:37: the published board.html (board branch, fetched by the GitHub Pages viewer via document.write without doctype = quirks mode) carries the :has(>.slots) flex-wrap rule; Chromium renders the line below the h2, but the user's browser (Firefox per the user's screenshot of 22:36) shows it beside the heading. Fix without :has()/flex trick: a plain block element for the slot line under the heading. Acceptance: rendered slot-line top >= h2 bottom in Firefox AND Chromium, on the published viewer path.
+  Test: unit tests for each new reason variant in the board-slots suite; a layout check of the slot line below the h2.
+  Closes the docs/backlog.md entry of 2026-11-12 (board slot line, point 1506) and the carrier finding "Board-Slotzeile: freie Slots fast immer 'Grund nicht messbar'".
+  Source: user request a985cb89, 13.11.2026 21:40 (approved: "ja, vorne einreihen").
+  Bundle: unbundled.
