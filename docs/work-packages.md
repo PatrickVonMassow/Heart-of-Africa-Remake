@@ -136,6 +136,8 @@ change) and 449 last, because the drill is what makes the others more than a cla
   `scripts/batch-in-flight.mjs` and the board slot line, so no feature bundle shares its files.
 - **#1511** — the request-drain order finding of 12.11.2026; it edits the point start/claim path
   and the findings carrier check, so no feature bundle shares its files.
+- **#1514** — the stale-local-tip landing finding of 13.11.2026; it edits the merge step of
+  `scripts/land-point.mjs` only, so no feature bundle shares its files.
 - **#1508** — the owed covering enrichments run for the already landed points 391 and 327; a
   verification run on main, not a feature branch, so it shares no bundle's files.
 - **#1465** — the uncharged WebGPU reds of polish-speech that the v0.3.1 closing never reached;
