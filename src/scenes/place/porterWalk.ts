@@ -7,6 +7,7 @@
 // (`move`) and the wedge escape (`free`), so the same stepper runs in Vitest.
 
 import { PORTER_WALK } from '../../config/balance'
+import { mulberry32 } from '../../world/noise'
 import { steerHeading, wayHeading } from '../../render/figureWalk'
 import { advancePlaceRoute, findPlaceRoute, navPointFree, navPointOffGround, type NavPoint, type PlaceNavGrid } from './routing'
 
@@ -141,6 +142,25 @@ export function startPorter(route: PorterRoute, rand: () => number): PorterState
     vx: 0,
     vz: 0,
   }
+}
+
+/** The porters of a settlement: their routes and the state walking each. */
+export interface PorterCrew {
+  routes: readonly PorterRoute[]
+  states: PorterState[]
+}
+
+/**
+ * The crew for the current routes: kept while the routes are the same plan,
+ * started afresh the moment they are another one — a new seed, other stops or
+ * another nav grid plan new routes, and a state walking an old route (even one
+ * of the same count) would carry its porter from a place that route no longer
+ * has, across ground the new grid may refuse.
+ */
+export function reconcilePorters(crew: PorterCrew | null, routes: readonly PorterRoute[], seed: number): PorterCrew {
+  if (crew && crew.routes === routes) return crew
+  const rand = mulberry32((seed + 4712) >>> 0)
+  return { routes, states: routes.map((r) => startPorter(r, rand)) }
 }
 
 /** The length of the route still ahead: to the next waypoint and on along

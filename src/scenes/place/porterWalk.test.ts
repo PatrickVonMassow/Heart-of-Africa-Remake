@@ -9,7 +9,7 @@ import { mulberry32 } from '../../world/noise'
 import { escapeToFree, resolveMove, standingClear, WALKER_RADIUS, type Collider } from './collision'
 import { buildLayout } from './layout'
 import { buildPlaceNavGrid, navPointFree, navPointOffGround, navRestrict, type PlaceNavGrid } from './routing'
-import { planPorterRoutes, startPorter, stepPorter, walkableStep, type PorterRoute, type PorterState, type PorterWorld } from './porterWalk'
+import { planPorterRoutes, reconcilePorters, startPorter, stepPorter, walkableStep, type PorterRoute, type PorterState, type PorterWorld } from './porterWalk'
 
 const R = WALKER_RADIUS
 const DT = 1 / 60
@@ -245,6 +245,29 @@ describe('the porter that moves but gets nowhere', () => {
     const r = noProgress(route, world, 30)
     expect(r.escapes).toBeGreaterThan(0)
     expect(r.worst).toBeLessThanOrEqual(PORTER_WALK.stallEscape + 2 * DT)
+  })
+})
+
+describe('the porter crew across a re-plan', () => {
+  const pace = PORTER_WALK.pace
+  const a: PorterRoute[] = [{ entrance: { x: 0, z: 8 }, plaza: { x: 0, z: 0 }, pace }]
+  const b: PorterRoute[] = [{ entrance: { x: 6, z: -4 }, plaza: { x: 1, z: 1 }, pace }]
+
+  it('keeps the walking states while the routes are the same plan', () => {
+    const crew = reconcilePorters(null, a, 7)
+    crew.states[0].x = 3.3
+    expect(reconcilePorters(crew, a, 7)).toBe(crew)
+    expect(crew.states[0].x).toBe(3.3)
+  })
+
+  it('starts afresh on another plan of the same count', () => {
+    const crew = reconcilePorters(null, a, 7)
+    const next = reconcilePorters(crew, b, 7)
+    expect(next).not.toBe(crew)
+    expect(next.states).toHaveLength(1)
+    const at = next.states[0]
+    const onEnd = [b[0].entrance, b[0].plaza].some((p) => p.x === at.x && p.z === at.z)
+    expect(onEnd).toBe(true)
   })
 })
 

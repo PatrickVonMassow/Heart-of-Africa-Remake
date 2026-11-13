@@ -62,7 +62,7 @@ import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { PORTER_WALK, START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_POSE, balance } from '../../config/balance'
-import { planPorterRoutes, startPorter, stepPorter, walkableStep, type PorterState } from './porterWalk'
+import { planPorterRoutes, reconcilePorters, stepPorter, walkableStep, type PorterCrew, type PorterState } from './porterWalk'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
@@ -1934,11 +1934,11 @@ function Porters({
     () => planPorterRoutes(nav, stops, mulberry32((seed + 4711) >>> 0), count),
     [nav, stops, seed, count],
   )
-  const states = useRef<PorterState[]>([])
-  if (states.current.length !== routes.length) {
-    const rand = mulberry32((seed + 4712) >>> 0)
-    states.current = routes.map((r) => startPorter(r, rand))
-  }
+  // Reset whenever the routes are another plan, not only another count.
+  const crew = useRef<PorterCrew | null>(null)
+  crew.current = reconcilePorters(crew.current, routes, seed)
+  const states = useRef<PorterState[]>(crew.current.states)
+  states.current = crew.current.states
   const refs = useRef<Array<THREE.Group | null>>([])
   // The porters for the bug report's `placeLife` section, in every build.
   usePlaceLifeSource('porters', () => ({
