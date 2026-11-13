@@ -132,8 +132,9 @@ function covertOutline(): [number, number][] {
 
 const mirror = (pts: [number, number][]): [number, number][] => pts.map(([x, z]) => [-x, z])
 
-/** Vulture with spread wings, circling or arriving (design.md §19). */
-export function buildVulture(): THREE.BufferGeometry {
+/** Vulture with spread wings, circling or arriving (design.md §19). A larger
+ *  `dihedral` raises the wings into the landing flare / take-off upstroke. */
+export function buildVulture(dihedral = 0.08): THREE.BufferGeometry {
   const v = VULTURE_SHAPE
   const parts: THREE.BufferGeometry[] = []
   const body = new THREE.SphereGeometry(1, ...SEG)
@@ -171,7 +172,7 @@ export function buildVulture(): THREE.BufferGeometry {
       [wing, VULTURE_TONES.flight, 166],
       [coverts, VULTURE_TONES.coverts, 167],
     ] as const) {
-      g.rotateZ(side * 0.08)
+      g.rotateZ(side * dihedral)
       g.translate(0, 0.03, 0)
       parts.push(tint(g, tone, 0.1, seed))
     }

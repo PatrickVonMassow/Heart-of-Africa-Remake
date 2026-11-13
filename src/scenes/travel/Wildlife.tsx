@@ -133,6 +133,7 @@ import {
   PREY_WALK_SPEED,
   landedBirdYPosed,
   landedBirdClearancePosed,
+  landedBirdLowestDepth,
   birdExtentOffsets,
   CROCODILE_REGIONS,
   crocodileAllowedAt,
@@ -236,6 +237,7 @@ import {
   ELDER_BUILDERS,
 } from '../../render/fauna'
 import { VULTURE_SHAPE } from '../../render/vultureShape'
+import { birdLandStep, flockLandProgress, makeBirdLandState, type BirdLandPose, type BirdLandState, type Vec3 } from './vultureLanding'
 import { setGroundStains } from '../../render/groundStains'
 import { fireHalfWidth, fireHash, fireLocal, flameSlot, frontAlong, frontPoint, smokeFade, smokePhase } from './grassFireFront'
 import { setBurnScar } from './burnScarNode'
@@ -336,8 +338,6 @@ const MAX_ELDER_INSTANCES = 24
 const DYING_ARRIVE_DIST = 3
 /** Height over the downed animal at which its gathering flock circles. */
 const DYING_FLOCK_CIRCLE_Y = 3.2
-/** How fast (units/s) that flock comes down onto the body once it has died. */
-const DYING_FLOCK_DESCEND_SPEED = 3
 /** A failing grazer's stagger (units/s) before the elder and slowdown factors:
  *  a few body lengths over the whole decline, so it stays where it was seen. */
 const DYING_WALK_SPEED = 0.8
@@ -832,6 +832,41 @@ const GRAVEYARD_POS = latLonToWorld(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.l
  *  written by the Wildlife frame and folded into the Vultures component's
  *  `clearance` dev hook so the verify metric covers BOTH vulture systems. */
 const SCAV_CLEARANCE = { v: Infinity }
+
+/**
+ * Draw one vulture in its landing glide or take-off (design.md §19.6, point
+ * 328) from the shared per-bird machine's world pose: the raised-wing geometry
+ * in the flare and on each upstroke, nose up in the flare, turning into its
+ * standing facing `groundYaw` as it flares (and out of it as it runs off), so
+ * touchdown snaps neither height nor heading. The point-128/217 rule holds
+ * through the whole transition: the bird never dips below its own ground plus
+ * the posed lowest point. Returns that clearance for the verify metric.
+ */
+function drawTransitionBird(bird: THREE.Object3D, pose: BirdLandPose, g: Vec3, groundYaw: number, seed: number): number {
+  const vl = balance.vultureLanding
+  const pool = getWildlifeMeshes()
+  ;(bird as THREE.Mesh).geometry = pose.flare > 0 || pose.wingsUp ? pool.vultureFlareGeo : pool.vultureGeo
+  const landing = pose.phase === 'landing'
+  const pitch = landing ? -vl.flarePitch * pose.flare : -0.2
+  let dh = groundYaw - pose.yaw
+  while (dh > Math.PI) dh -= Math.PI * 2
+  while (dh < -Math.PI) dh += Math.PI * 2
+  const run = Math.max(1e-3, vl.takeoffRunFraction)
+  const toGround = landing ? pose.flare : 1 - Math.min(1, pose.progress / run)
+  const yaw = pose.yaw + dh * toGround
+  let bg = 0
+  for (const [ox, oz] of birdExtentOffsets(yaw, VULTURE_SCALE)) {
+    const ll = worldToLatLon(pose.x + ox, pose.z + oz)
+    bg = Math.max(bg, sampleTerrain(ll.lat, ll.lon, seed).height)
+  }
+  const depth = Math.max(landedBirdLowestDepth(pitch, 0, VULTURE_SCALE), landedBirdLowestDepth(-pitch, 0, VULTURE_SCALE))
+  const y = Math.max(pose.y, bg + depth + 0.06)
+  bird.position.set(pose.x - g.x, y - g.y, pose.z - g.z)
+  bird.rotation.order = 'YXZ' // body pitch about the bird's own wing axis
+  bird.rotation.set(pitch, yaw, 0)
+  bird.scale.setScalar(VULTURE_SCALE)
+  return y - depth - bg
+}
 
 /** The burning of the steppe (design.md §19.8/§19.13, point 145a): in the
  *  cured dry-season grass of the Sahel and congo-north belts the inhabitants
@@ -1899,6 +1934,8 @@ interface WildlifeMeshPool {
   vultureGeo: THREE.BufferGeometry
   /** The folded pose of a vulture on the ground (point 1498). */
   vultureLandedGeo: THREE.BufferGeometry
+  /** Raised wings: the landing flare and the take-off upstroke (point 328). */
+  vultureFlareGeo: THREE.BufferGeometry
   /** The body tessellation the detailed ungulates are currently built at. */
   bodySegments: number
 }
@@ -1977,7 +2014,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.count = 0
     elder[sp] = m
   }
-  wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), vultureLandedGeo: buildVultureLanded(), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
+  wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), vultureLandedGeo: buildVultureLanded(), vultureFlareGeo: buildVulture(balance.vultureLanding.flareDihedral), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
   return wildlifeMeshCache
 }
 
@@ -2061,10 +2098,10 @@ function Herds() {
   // one global set of vultures hopping from the finished carcass to the next.
   // hop: flying from an eaten carcass to the next one of its cluster (design.md §19.6).
   // queue: the rest of its claimed cluster, persisted so the claim survives a hop.
-  type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null; queue: Animal[]; hop?: boolean }
+  type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null; queue: Animal[]; hop?: boolean; birds: BirdLandState[] }
   const scavengeGroups = useRef<(THREE.Group | null)[]>([])
   const raptorMesh = useRef<THREE.Mesh>(null)
-  const makeScavFlock = (): ScavFlock => ({ mode: 'idle', x: 0, z: 0, y: 14, landed: false, target: null, queue: [] })
+  const makeScavFlock = (): ScavFlock => ({ mode: 'idle', x: 0, z: 0, y: 14, landed: false, target: null, queue: [], birds: [makeBirdLandState(), makeBirdLandState(), makeBirdLandState()] })
   // scavenger.current is flock 0 — the dev hook (window.__wildlife.scavenger)
   // and the single-carcass verify checks read/reset it; scavengers.current[0]
   // is the same object so both views stay in sync.
@@ -4900,37 +4937,44 @@ function Herds() {
           0.6,
           (x, z) => !isOnScreen(x, z), // spawn OFF the rendered frame, fly in (point 178)
         )
+        const vl = balance.vultureLanding
+        // The landing approach (design.md §19.6, point 328): within the
+        // approach distance of its carcass the arriving flock settles over it
+        // and each bird glides down from where it flies, flares and stands —
+        // never a snap from flight to standing. A committed take-off (the
+        // cluster hop's lift-off) finishes first.
+        if (
+          target !== null &&
+          target.dead === true &&
+          sc.mode === 'in' &&
+          Math.hypot(target.x - sc.x, target.z - sc.z) <= vl.approachDistance &&
+          sc.birds.every((b) => b.phase !== 'takeoff')
+        ) {
+          sc.mode = 'active'
+        }
         // Only on a body: over a still-living downed elder the flock gathers.
-        sc.landed = sc.mode === 'active' && target !== null && target.dead === true
+        const wantGround = sc.mode === 'active' && target !== null && target.dead === true
         if (sc.mode !== 'in') sc.hop = false
-        if (!sg) continue
+        if (!sg) {
+          sc.landed = wantGround
+          continue
+        }
         sg.visible = sc.mode !== 'idle'
         if (sc.mode === 'idle') {
           sc.landed = false
+          for (let i = 0; i < sc.birds.length; i++) sc.birds[i] = makeBirdLandState()
           continue
         }
-        if (sc.landed && target) {
+        if (wantGround && target) {
           sc.x = target.x
           sc.z = target.z
           // Group origin ON the carcass ground (point 185) — exactly the kill
           // flock's killGroundY. The shared landedBirdY rule below lifts each
-          // bird to its OWN sampled ground and adds LANDED_BIRD_HOVER to clear
-          // the pecking body; the old +0.5 group pre-lift DOUBLED that clearance
-          // and floated the flock ~0.5 above the carcass it feeds on.
+          // bird to its OWN sampled ground and adds the posed clearance; the
+          // birds' own landing glide carries them down from the sky (a downed
+          // elder's gathered flock included, design.md §19.18).
           const scll = worldToLatLon(sc.x, sc.z)
-          const groundY = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
-          if (target.deathCause === 'old-age' && sc.y > groundY + 0.05 && sc.y < groundY + DYING_FLOCK_CIRCLE_Y + 1) {
-            // The flock that gathered over the dying elder DESCENDS onto the
-            // body (design.md §19.18) rather than snapping down; it feeds once
-            // it stands on the ground.
-            sc.y = Math.max(groundY, sc.y - DYING_FLOCK_DESCEND_SPEED * dt)
-            sc.landed = false
-          } else {
-            sc.y = groundY
-            if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
-            target.dissolve -= dt
-            if (import.meta.env.DEV) SHRINK_FED.add(target) // the landed flock is this shrink's actor (point 319)
-          }
+          sc.y = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
         } else if (target && sc.mode === 'active') {
           // Gathered over a downed, still-living elder (design.md §19.18):
           // circling low over the body, following it, until it dies.
@@ -4949,37 +4993,62 @@ function Herds() {
           sc.y = Math.min(14, sc.y + 6 * dt) // climbing away
         }
         sg.position.set(sc.x, sc.y, sc.z)
+        const G: Vec3 = { x: sc.x, y: sc.y, z: sc.z }
         sg.children.forEach((bird, i) => {
+          const st = sc.birds[i] ?? (sc.birds[i] = makeBirdLandState())
           const ph = (i / sg.children.length) * Math.PI * 2 + si // per-flock phase offset
-          // Wings folded on the ground, spread in the air (point 1498).
-          ;(bird as THREE.Mesh).geometry = sc.landed ? pool.vultureLandedGeo : vultureGeo
-          if (sc.landed) {
+          const a2 = t * 0.6 + ph
+          const air: Vec3 = { x: G.x + Math.cos(a2) * 2.4, y: G.y + 1.6 + i * 0.6, z: G.z + Math.sin(a2) * 2.4 }
+          let ground = air
+          let pitch = 0
+          let bg = 0
+          let hop = 0
+          let bx = 0
+          let bz = 0
+          if (wantGround || st.phase === 'landing' || st.phase === 'ground') {
             const r = 0.5 + i * 0.35
-            const bx = Math.cos(ph) * r
-            const bz = Math.sin(ph) * r
+            bx = Math.cos(ph) * r
+            bz = Math.sin(ph) * r
             // The shared landed-bird rule (points 128 + 202 + 217): positive-only
             // lift onto the HIGHEST ground under the bird's EXTENTS (wing tips +
             // pecking head, not just the centre), clearance from the POSED lowest
             // point — head AND the spread WING TIPS under the pitch/yaw pose (a
             // wing tip on the yaw's low side swings deeper than the head; point
             // 217's reported wing-through-ground clip).
-            const pitch = 0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3
-            let bg = 0
+            pitch = 0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3
             for (const [ox, oz] of birdExtentOffsets(ph, VULTURE_SCALE)) {
               const bll = worldToLatLon(sc.x + bx + ox, sc.z + bz + oz)
               bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, seed).height)
             }
-            const hop = Math.abs(Math.sin(t * 3 + ph)) * 0.1
-            bird.position.set(bx, landedBirdYPosed(sc.y, bg, hop, pitch, ph, VULTURE_SCALE), bz)
-            SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearancePosed(sc.y, bg, hop, pitch, ph, VULTURE_SCALE))
-            bird.rotation.set(pitch, ph, 0) // heads pecking down
-          } else {
-            const a2 = t * 0.6 + ph
-            bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
-            bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
+            hop = Math.abs(Math.sin(t * 3 + ph)) * 0.1
+            ground = { x: G.x + bx, y: G.y + landedBirdYPosed(sc.y, bg, hop, pitch, ph, VULTURE_SCALE), z: G.z + bz }
           }
-          bird.scale.setScalar(VULTURE_SCALE)
+          const pose = birdLandStep(st, wantGround, air, ground, dt, vl)
+          if (pose.phase === 'ground') {
+            // Wings folded on the ground (point 1498), heads pecking down.
+            ;(bird as THREE.Mesh).geometry = pool.vultureLandedGeo
+            bird.position.set(bx, ground.y - G.y, bz)
+            SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearancePosed(sc.y, bg, hop, pitch, ph, VULTURE_SCALE))
+            bird.rotation.order = 'XYZ'
+            bird.rotation.set(pitch, ph, 0)
+            bird.scale.setScalar(VULTURE_SCALE)
+          } else if (pose.phase === 'air') {
+            ;(bird as THREE.Mesh).geometry = vultureGeo
+            bird.position.set(air.x - G.x, air.y - G.y, air.z - G.z)
+            bird.rotation.order = 'XYZ'
+            bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
+            bird.scale.setScalar(VULTURE_SCALE)
+          } else {
+            SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, drawTransitionBird(bird, pose, G, ph, seed))
+          }
         })
+        // Only standing birds eat: the carcass shrinks once the flock is down.
+        sc.landed = wantGround && sc.birds.every((b) => b.phase === 'ground')
+        if (sc.landed && target) {
+          if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
+          target.dissolve -= dt
+          if (import.meta.env.DEV) SHRINK_FED.add(target) // the landed flock is this shrink's actor (point 319)
+        }
       }
     }
 
@@ -6989,8 +7058,10 @@ function Vultures() {
   // and despawn only off-frame beyond the view ring (design.md §19).
   const playerFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
   const killFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
-  /** 0 = circling overhead, 1 = landed on the remnant and feeding. */
+  /** Derived each frame: 0 = circling overhead, 1 = landed on the remnant and feeding. */
   const killDescend = useRef(0)
+  /** The kill flock's per-bird landing machines (point 328). */
+  const killBirds = useRef<BirdLandState[]>([makeBirdLandState(), makeBirdLandState(), makeBirdLandState()])
   /** Dev/verify: this frame's minimum landed-bird clearance above ground. */
   const clearance = useRef(Infinity)
   // Geometry/material from the module pool (point 96): no per-mount rebuild,
@@ -7101,72 +7172,90 @@ function Vultures() {
         remnant !== null &&
         f.mode === 'active' &&
         Math.hypot(f.x - remnant.x, f.z - remnant.z) < 2.2
+      const vl = balance.vultureLanding
+      const states = killBirds.current
       if (consuming && remnant) {
         f.x += (remnant.x - f.x) * Math.min(1, dt * 3)
         f.z += (remnant.z - f.z) * Math.min(1, dt * 3)
-        // Only landed birds eat; the scrap dissolves like a scavenged carcass.
-        feedRemnant(remnant, dt, killDescend.current > 0.7, CARCASS_DISSOLVE_SECONDS)
+        // Only birds standing on the scrap eat; it dissolves like a scavenged carcass.
+        feedRemnant(remnant, dt, states.every((b) => b.phase === 'ground'), CARCASS_DISSOLVE_SECONDS)
         if (import.meta.env.DEV) SHRINK_FED.add(remnant) // the kill flock is the scrap's actor (point 319)
       }
-      killDescend.current = Math.max(
-        0,
-        Math.min(1, killDescend.current + (consuming ? dt / 1.4 : -dt / 1.4)),
-      )
       killGroup.current.visible = f.mode !== 'idle'
       // The clearance metric covers BOTH vulture systems (point 128): the
       // kill flock measured below, the ground scavenger folded in from the
       // Wildlife frame via SCAV_CLEARANCE.
       let killMinClear = Infinity
       clearance.current = SCAV_CLEARANCE.v
-      if (f.mode !== 'idle') {
+      if (f.mode === 'idle') {
+        for (let i = 0; i < states.length; i++) states[i] = makeBirdLandState()
+      } else {
         const kll = worldToLatLon(f.x, f.z)
         const killGroundY = Math.max(0, sampleTerrain(kll.lat, kll.lon, s.seed).height)
         killGroup.current.position.set(f.x, killGroundY, f.z)
-        const dsc = killDescend.current
-        if (dsc <= 0) {
-          circle(killGroup.current, t * 1.15, 3.2, 4.6)
-        } else {
-          // Blend the circling pose down into the scavenger-style meal
-          // cluster: the flock spirals in, lands and pecks.
-          const g = killGroup.current
-          g.children.forEach((bird, i) => {
-            const phase = (i / g.children.length) * Math.PI * 2
-            const a = t * 1.15 * 0.45 + phase
-            const r = 3.2 + i * 0.9
-            const cx = Math.cos(a) * r
-            const cy = 4.6 + Math.sin(t * 1.15 * 0.8 + phase) * 0.6
-            const cz = Math.sin(a) * r
+        const G: Vec3 = { x: f.x, y: killGroundY, z: f.z }
+        // The circling flock lands on the scrap by the shared landing machine
+        // (design.md §19.6, point 328): each bird glides down from its place in
+        // the circle along its own approach heading, slowing, flares with raised
+        // wings and stands; when the meal or the reason ends it runs and flaps
+        // back up into the circle.
+        const g = killGroup.current
+        g.children.forEach((bird, i) => {
+          const st = states[i] ?? (states[i] = makeBirdLandState())
+          const phase = (i / g.children.length) * Math.PI * 2
+          const a = t * 1.15 * 0.45 + phase
+          const r = 3.2 + i * 0.9
+          const air: Vec3 = {
+            x: G.x + Math.cos(a) * r,
+            y: G.y + 4.6 + Math.sin(t * 1.15 * 0.8 + phase) * 0.6,
+            z: G.z + Math.sin(a) * r,
+          }
+          let ground = air
+          let kPitch = 0
+          let bg = 0
+          let hop = 0
+          let lx = 0
+          let lz = 0
+          if (consuming || st.phase === 'landing' || st.phase === 'ground') {
             const lr = 0.5 + i * 0.35
-            const lx = Math.cos(phase) * lr
-            const lz = Math.sin(phase) * lr
+            lx = Math.cos(phase) * lr
+            lz = Math.sin(phase) * lr
             // The shared landed-bird rule (points 128 + 202 + 217): positive-only
             // lift onto the highest ground under the bird's EXTENTS, with the
             // clearance derived from the POSED lowest point — head AND the spread
             // WING TIPS under the pitch/yaw pose (a low-side wing tip dips deeper
             // than the head; point 217).
-            const kPitch = 0.6 + Math.sin(t * 4 + phase) * 0.3
-            let bg = 0
+            kPitch = 0.6 + Math.sin(t * 4 + phase) * 0.3
             for (const [ox, oz] of birdExtentOffsets(phase, VULTURE_SCALE)) {
               const bll = worldToLatLon(f.x + lx + ox, f.z + lz + oz)
               bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, s.seed).height)
             }
-            const hop = Math.abs(Math.sin(t * 3 + phase)) * 0.12
-            const ly = landedBirdYPosed(killGroundY, bg, hop, kPitch, phase, VULTURE_SCALE)
-            bird.position.set(cx + (lx - cx) * dsc, cy + (ly - cy) * dsc, cz + (lz - cz) * dsc)
-            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearancePosed(killGroundY, bg, hop, kPitch, phase, VULTURE_SCALE))
-            // Wings fold as it settles (point 1498): the clearance above is
-            // measured on the folded pose from this same threshold on.
-            ;(bird as THREE.Mesh).geometry = dsc > 0.6 ? landedGeo : geo
-            if (dsc > 0.6) {
-              bird.rotation.set(kPitch, phase, 0) // pecking down
-            } else {
-              bird.rotation.set(0, -a - Math.PI / 2, 0.25) // still banking
-            }
+            hop = Math.abs(Math.sin(t * 3 + phase)) * 0.12
+            ground = { x: G.x + lx, y: G.y + landedBirdYPosed(killGroundY, bg, hop, kPitch, phase, VULTURE_SCALE), z: G.z + lz }
+          }
+          const pose = birdLandStep(st, consuming, air, ground, dt, vl)
+          if (pose.phase === 'ground') {
+            // Wings folded on the ground (point 1498), pecking down.
+            ;(bird as THREE.Mesh).geometry = landedGeo
+            bird.position.set(lx, ground.y - G.y, lz)
+            killMinClear = Math.min(killMinClear, landedBirdClearancePosed(killGroundY, bg, hop, kPitch, phase, VULTURE_SCALE))
+            bird.rotation.order = 'XYZ'
+            bird.rotation.set(kPitch, phase, 0)
             bird.scale.setScalar(VULTURE_SCALE)
-          })
-        }
+          } else if (pose.phase === 'air') {
+            ;(bird as THREE.Mesh).geometry = geo
+            bird.position.set(air.x - G.x, air.y - G.y, air.z - G.z)
+            bird.rotation.order = 'XYZ'
+            bird.rotation.set(0, -a - Math.PI / 2, 0.25) // banking into the circle
+            bird.scale.setScalar(VULTURE_SCALE)
+          } else {
+            killMinClear = Math.min(killMinClear, drawTransitionBird(bird, pose, G, phase, s.seed))
+          }
+        })
         clearance.current = Math.min(killMinClear, SCAV_CLEARANCE.v)
       }
+      // Dev/verify: 0 = all circling, 1 = all standing on the scrap.
+      killDescend.current = flockLandProgress(states, vl)
     }
   })
 

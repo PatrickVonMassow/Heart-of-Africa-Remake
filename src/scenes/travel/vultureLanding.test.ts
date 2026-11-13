@@ -73,7 +73,10 @@ describe('takeoffProfile', () => {
       expect(s.along).toBeGreaterThan(prev.along)
       expect(s.speed).toBeGreaterThan(prev.speed)
       expect(s.height).toBeGreaterThanOrEqual(prev.height)
-      if (s.phase !== 'air') (s.wingsUp ? up++ : down++)
+      if (s.phase !== 'air') {
+        if (s.wingsUp) up++
+        else down++
+      }
       prev = s
     }
     expect(prev.phase).toBe('air')

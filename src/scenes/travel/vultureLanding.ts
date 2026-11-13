@@ -120,6 +120,8 @@ export interface BirdLandPose extends Vec3 {
   wingsUp: boolean
   /** Heading (radians, three.js yaw of a bird whose head points along +z). */
   yaw: number
+  /** Share of the current landing or take-off window elapsed (0..1; 0 in air/ground). */
+  progress: number
 }
 
 /**
@@ -162,12 +164,14 @@ export function birdLandStep(
   let z: number
   let flare = 0
   let wingsUp = false
+  let progress = 0
   if (s.phase === 'landing') {
     const p = landingProfile(s.t, cfg)
     x = ground.x + (s.sx - ground.x) * p.rem
     z = ground.z + (s.sz - ground.z) * p.rem
     y = ground.y + (s.sy - ground.y) * p.height
     flare = p.flare
+    progress = cfg.landSeconds > 0 ? clamp01(s.t / cfg.landSeconds) : 1
     if (Math.hypot(ground.x - s.sx, ground.z - s.sz) > 1e-3) s.yaw = Math.atan2(ground.x - s.sx, ground.z - s.sz)
     if (p.phase === 'landed') s.phase = 'ground'
   } else if (s.phase === 'takeoff') {
@@ -176,6 +180,7 @@ export function birdLandStep(
     z = s.sz + (air.z - s.sz) * p.along
     y = s.sy + (air.y - s.sy) * p.height
     wingsUp = p.wingsUp
+    progress = cfg.takeoffSeconds > 0 ? clamp01(s.t / cfg.takeoffSeconds) : 1
     const mx = x - s.ox
     const mz = z - s.oz
     if (Math.hypot(mx, mz) > 1e-4) s.yaw = Math.atan2(mx, mz)
@@ -192,7 +197,7 @@ export function birdLandStep(
   s.ox = x
   s.oy = y
   s.oz = z
-  return { x, y, z, phase: s.phase, flare, wingsUp, yaw: s.yaw }
+  return { x, y, z, phase: s.phase, flare, wingsUp, yaw: s.yaw, progress }
 }
 
 /** Shared progress of a flock (0 = all in the air, 1 = all standing): a
