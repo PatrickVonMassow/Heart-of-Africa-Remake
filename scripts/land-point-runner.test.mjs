@@ -1243,13 +1243,15 @@ describe('resolveMergeTip against a real remote', () => {
     const { work, other, commitIn, localTip } = tipScene()
     const before = localTip()
     const reviewed = commitIn(other, 'fix.txt')
-    git(['push', '-q', 'origin', 'feat/1514-x'], other)
+    git(['tag', 'v-dry', reviewed], other)
+    git(['push', '-q', 'origin', 'feat/1514-x', 'v-dry'], other)
     const tracking = () => git(['rev-parse', 'refs/remotes/origin/feat/1514-x'], work).trim()
     const trackingBefore = tracking()
     expect(resolveMergeTip({ branch: 'feat/1514-x', cwd: work, apply: false })).toMatchObject({ ok: true, action: 'fast-forward', sha: reviewed })
     expect(localTip()).toBe(before)
     expect(tracking()).toBe(trackingBefore)
     expect(existsSync(join(work, '.git', 'FETCH_HEAD'))).toBe(false)
+    expect(git(['tag', '--list'], work).trim()).toBe('')
   })
 
   it('refuses a branch that has diverged from origin, naming both shas', () => {

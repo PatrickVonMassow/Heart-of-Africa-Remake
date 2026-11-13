@@ -755,12 +755,12 @@ export function resolveMergeTip({ branch, apply = true, cwd = REPO_ROOT } = {}) 
     }
   }
   // The dry plan writes no ref: it asks origin for the tip and fetches only its
-  // objects (`--refmap=` keeps the remote-tracking ref, no FETCH_HEAD).
+  // objects (`--refmap=` keeps the remote-tracking ref; no FETCH_HEAD, no tags).
   let remote = null
   try {
     remote = run(['ls-remote', 'origin', `refs/heads/${branch}`]).split(/\s/)[0] || null
-    if (remote && apply) run(['fetch', '--quiet', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`])
-    else if (remote) run(['fetch', '--quiet', '--no-write-fetch-head', '--refmap=', 'origin', `refs/heads/${branch}`])
+    if (remote && apply) run(['fetch', '--quiet', '--no-tags', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`])
+    else if (remote) run(['fetch', '--quiet', '--no-tags', '--no-write-fetch-head', '--refmap=', 'origin', `refs/heads/${branch}`])
   } catch (e) {
     const why = String(e.stderr ?? e.message)
     return { ok: false, reason: `fetching origin/${branch} failed: ${why.trim().split('\n')[0]}`, repair: 'restore access to origin, then re-run' }
