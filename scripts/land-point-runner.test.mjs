@@ -40,6 +40,7 @@ import {
   runCommand,
   selectCleanup,
   settleActiveWork,
+  resolveMergeTip,
 } from './land-point.mjs'
 import { childWords } from './land-point-core.mjs'
 import { gatherActiveWorkSource } from './active-work-source.mjs'
@@ -1183,5 +1184,86 @@ describe('midOperationIn (point 1513)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+// Point 1514: before its merge the landing fetches the branch and lands the
+// pushed tip — measured against a real bare remote.
+describe('resolveMergeTip against a real remote', () => {
+  function tipScene() {
+    const root = mkdtempSync(join(tmpdir(), 'land-tip-'))
+    roots.push(root)
+    const remote = join(root, 'remote.git')
+    const work = join(root, 'work')
+    const other = join(root, 'other')
+    git(['init', '-q', '--bare', remote], root)
+    git(['init', '-q', '--initial-branch=main', 'work'], root)
+    for (const [k, v] of [['user.email', 't@example.com'], ['user.name', 'T']]) git(['config', k, v], work)
+    writeFileSync(join(work, 'a.txt'), 'a\n')
+    git(['add', '.'], work)
+    git(['commit', '-q', '-m', 'first'], work)
+    git(['remote', 'add', 'origin', remote], work)
+    git(['push', '-q', 'origin', 'main'], work)
+    git(['branch', 'feat/1514-x'], work)
+    git(['push', '-q', 'origin', 'feat/1514-x'], work)
+    git(['clone', '-q', remote, other], root)
+    for (const [k, v] of [['user.email', 't@example.com'], ['user.name', 'T']]) git(['config', k, v], other)
+    git(['checkout', '-q', 'feat/1514-x'], other)
+    const commitIn = (dir, file) => {
+      writeFileSync(join(dir, file), `${file}\n`)
+      git(['add', '.'], dir)
+      git(['commit', '-q', '-m', file], dir)
+      return git(['rev-parse', 'HEAD'], dir).trim()
+    }
+    const localTip = () => git(['rev-parse', 'refs/heads/feat/1514-x'], work).trim()
+    return { root, work, other, commitIn, localTip }
+  }
+
+  it('fast-forwards a branch with no worktree to the pushed remote tip', () => {
+    const { work, other, commitIn, localTip } = tipScene()
+    const reviewed = commitIn(other, 'fix.txt')
+    git(['push', '-q', 'origin', 'feat/1514-x'], other)
+    const t = resolveMergeTip({ branch: 'feat/1514-x', cwd: work })
+    expect(t).toMatchObject({ ok: true, action: 'fast-forward', sha: reviewed })
+    expect(localTip()).toBe(reviewed)
+  })
+
+  it('fast-forwards inside the worktree that has the branch checked out', () => {
+    const { root, work, other, commitIn, localTip } = tipScene()
+    const tree = join(root, 'tree')
+    git(['worktree', 'add', '-q', tree, 'feat/1514-x'], work)
+    const reviewed = commitIn(other, 'fix.txt')
+    git(['push', '-q', 'origin', 'feat/1514-x'], other)
+    expect(resolveMergeTip({ branch: 'feat/1514-x', cwd: work })).toMatchObject({ ok: true, sha: reviewed })
+    expect(localTip()).toBe(reviewed)
+    expect(existsSync(join(tree, 'fix.txt'))).toBe(true)
+  })
+
+  it('the dry plan names the remote tip but moves nothing', () => {
+    const { work, other, commitIn, localTip } = tipScene()
+    const before = localTip()
+    const reviewed = commitIn(other, 'fix.txt')
+    git(['push', '-q', 'origin', 'feat/1514-x'], other)
+    expect(resolveMergeTip({ branch: 'feat/1514-x', cwd: work, apply: false })).toMatchObject({ ok: true, sha: reviewed })
+    expect(localTip()).toBe(before)
+  })
+
+  it('refuses a branch that has diverged from origin, naming both shas', () => {
+    const { work, other, commitIn, localTip } = tipScene()
+    git(['checkout', '-q', 'feat/1514-x'], work)
+    const local = commitIn(work, 'local.txt')
+    git(['checkout', '-q', 'main'], work)
+    const pushed = commitIn(other, 'fix.txt')
+    git(['push', '-q', 'origin', 'feat/1514-x'], other)
+    const t = resolveMergeTip({ branch: 'feat/1514-x', cwd: work })
+    expect(t.ok).toBe(false)
+    expect(t.reason).toContain(local.slice(0, 8))
+    expect(t.reason).toContain(pushed.slice(0, 8))
+    expect(localTip()).toBe(local)
+  })
+
+  it('keeps the local tip when origin has not moved', () => {
+    const { work, localTip } = tipScene()
+    expect(resolveMergeTip({ branch: 'feat/1514-x', cwd: work })).toMatchObject({ ok: true, action: 'local', sha: localTip() })
   })
 })

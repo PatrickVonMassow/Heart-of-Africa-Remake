@@ -488,11 +488,13 @@ export function transitionAccepted({ before = null, after = null, verdict = null
  * shows the plan as known at that moment; the real run re-judges the board and
  * cleanup decisions when it reaches them.
  */
-export function planLanding({ number, branch, audit, board, gate, worktrees = [] } = {}) {
+export function planLanding({ number, branch, audit, board, gate, worktrees = [], tip = null } = {}) {
   const steps = LANDING_STEPS.map((s) => ({ id: s.id, label: s.label, run: true, reason: '' }))
   const at = (id) => steps.find((s) => s.id === id)
 
-  at('merge').reason = `${branch} -> main, --no-ff`
+  at('merge').reason = tip?.sha
+    ? `${branch} @ ${tip.sha.slice(0, 8)} -> main, --no-ff${tip.note ? ` (${tip.note})` : ''}`
+    : `${branch} -> main, --no-ff`
   at('gate').reason = gate?.mode
     ? `${gate.mode}${audit?.run ? ' + audit' : ''} — ${gate.reason}`
     : 'build, lint, unit'
@@ -507,6 +509,33 @@ export function planLanding({ number, branch, audit, board, gate, worktrees = []
   at('cleanup').reason = worktrees.length ? `branch + ${worktrees.length} worktree(s)` : 'branch (no worktree to remove)'
 
   return { number: Number(number), branch, steps, audit, gate, board }
+}
+
+/**
+ * WHICH COMMIT THE MERGE TAKES (point 1514). On 13.11.2026 a landing merged the
+ * LOCAL tip of a branch while origin held the reviewed fix on top of it; every
+ * step went green and main lacked the reviewed commit. So the merge tip is
+ * decided against the freshly fetched remote branch:
+ *   - origin equal, absent, or behind (unpushed local work): the local tip;
+ *   - origin ahead: fast-forward the local branch to the remote tip first;
+ *   - diverged: refuse, naming both shas.
+ * `remoteContainsLocal` / `localContainsRemote` are the two `merge-base
+ * --is-ancestor` answers.
+ */
+export function decideMergeTip({ branch, local, remote = null, remoteContainsLocal = false, localContainsRemote = false } = {}) {
+  const short = (sha) => String(sha).slice(0, 8)
+  if (!local) return { ok: false, reason: `${branch}: no local branch to merge` }
+  if (!remote) return { ok: true, action: 'local', sha: local, note: 'origin has no such branch' }
+  if (local === remote) return { ok: true, action: 'local', sha: local, note: '' }
+  if (remoteContainsLocal) {
+    return { ok: true, action: 'fast-forward', sha: remote, from: local, note: `fast-forwarded from local ${short(local)} to origin` }
+  }
+  if (localContainsRemote) return { ok: true, action: 'local', sha: local, note: `ahead of origin ${short(remote)}, unpushed` }
+  return {
+    ok: false,
+    reason: `${branch} has diverged: local ${short(local)}, origin ${short(remote)} — refusing to land either one blind`,
+    repair: `reconcile ${branch} with origin/${branch} in its worktree, push, review the result, then re-run`,
+  }
 }
 
 /**
