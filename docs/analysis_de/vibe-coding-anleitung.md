@@ -674,6 +674,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Gemergt heißt nicht laufend.** Ein Dauerprozess läuft nach dem Merge mit altem Code weiter.
   → *Prompt:* „Vor einer **Live**-Messung: Startete der Prozess **nach** dem Merge? Sonst neu
   starten — und die Aufsicht tut das künftig selbst.“
+- **Grün gelandet, die geprüfte Korrektur fehlt trotzdem.** Gemergt wurde die veraltete lokale
+  Kopie des Branches, die geprüfte Fassung lag nur auf dem Server.
+  → *Prompt:* „Vor dem Merge: Steht der lokale Branch auf **genau dem gepushten Stand**, den
+  das Review gesehen hat? Sonst erst nachziehen — und die Landung prüft das künftig selbst.“
 - **Dein Auftrag gilt als eingereiht, lag aber nur ungespeichert da** — Aufräumen schob ihn weg.
   → *Prompt:* „**Eingereiht** heißt **committet und gepusht**. Aufräumen **sichert und meldet**
   fremde ungespeicherte Arbeit, statt sie wegzuschieben.“
@@ -716,4 +720,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 20627964fb12165545c605b61a336ecc047798c7fdb7101b8a2f63b9bb1f89e0 -->
+<!-- GUIDE-FINGERPRINT: 219135f4a702390eaa5969a9039387af4c1e20b61ab8538927ae111deb314850 -->
