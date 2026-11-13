@@ -105,6 +105,28 @@ describe('the branches step (point 1513)', () => {
     expect(mainHeldBranch(runGit, repo, 'no-such-ref')).toBe(null)
   })
 
+  it('reads only main\'s own snapshots, never a side branch merged in', () => {
+    const { repo } = scene()
+    writeFileSync(join(repo, 'f.txt'), 'top\nmid\nbottom\n')
+    git(repo, ['add', 'f.txt'])
+    git(repo, ['commit', '-q', '-m', 'fork'])
+    const fork = git(repo, ['rev-parse', 'main']).trim()
+    // Main gains line L; the rescue branch removes it again.
+    writeFileSync(join(repo, 'f.txt'), 'top\nL\nmid\nbottom\n')
+    git(repo, ['commit', '-q', '-am', 'main adds L'])
+    git(repo, ['checkout', '-q', '-b', 'rescue/doctor-drops-l', 'main'])
+    writeFileSync(join(repo, 'f.txt'), 'top\nmid\nbottom\n')
+    git(repo, ['commit', '-q', '-am', 'drop L'])
+    // A side branch from before L edits the same file elsewhere; main merges it and keeps L.
+    git(repo, ['checkout', '-q', '-b', 'side', fork])
+    writeFileSync(join(repo, 'f.txt'), 'top\nmid\nbottom\nside\n')
+    git(repo, ['commit', '-q', '-am', 'side'])
+    git(repo, ['checkout', '-q', 'main'])
+    git(repo, ['merge', '-q', '--no-edit', 'side'])
+    expect(git(repo, ['show', 'main:f.txt'])).toBe('top\nL\nmid\nbottom\nside\n')
+    expect(mainHeldBranch(runGit, repo, git(repo, ['rev-parse', 'rescue/doctor-drops-l']).trim())).toBe(false)
+  })
+
   it('a dry run plans exactly the old contained branches and deletes nothing', () => {
     const { repo, origin } = scene()
     const before = { local: heads(repo), origin: heads(origin) }
@@ -200,19 +222,21 @@ describe('the branches step (point 1513)', () => {
       return { status: 128, stdout: '' }
     }
     const lines = []
-    runBranchesStep({ runGit: fake, repoRoot: '/', now: Date.now(), dryRun: false, readWorktrees: () => 'worktree /x\n', contained: () => true, emit: (l) => lines.push(l), fail: () => {} })
+    runBranchesStep({ runGit: fake, repoRoot: '/', now: Date.now(), dryRun: false, readWorktrees: () => 'worktree /x\nbare\n', contained: () => true, emit: (l) => lines.push(l), fail: () => {} })
     const outcome = Object.fromEntries(lines.map((l) => [l.path, l.outcome]))
     expect(outcome).toEqual({ 'origin:refs/heads/rescue/doctor-a': 'failed', 'origin:refs/heads/rescue/doctor-a-b': 'deleted' })
   })
 
   it('an unreadable or malformed worktree list skips the step', () => {
-    for (const readWorktrees of [() => null, () => '', () => 'garbage\n', () => { throw new Error('x') }]) {
+    const incomplete = `worktree /repo\nHEAD ${'a'.repeat(40)}\n`
+    for (const readWorktrees of [() => null, () => '', () => 'garbage\n', () => incomplete, () => { throw new Error('x') }]) {
       const failures = []
       const r = runBranchesStep({ runGit, repoRoot: '/', now: 0, readWorktrees, emit: () => {}, fail: (k) => failures.push(k) })
       expect(r).toBe('skipped')
       expect(failures).toEqual(['branches-worktrees-unreadable'])
     }
-    expect(checkedOutBranches('worktree /x\nbranch refs/heads/rescue/doctor-a\n')).toEqual(new Set(['rescue/doctor-a']))
-    expect(checkedOutBranches('worktree /x\nHEAD abc\ndetached\n\nworktree /y\nbare\n')).toEqual(new Set())
+    const head = `HEAD ${'a'.repeat(40)}`
+    expect(checkedOutBranches(`worktree /x\n${head}\nbranch refs/heads/rescue/doctor-a\n`)).toEqual(new Set(['rescue/doctor-a']))
+    expect(checkedOutBranches(`worktree /x\n${head}\ndetached\nlocked\n\nworktree /y\nbare\n`)).toEqual(new Set())
   })
 })

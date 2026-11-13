@@ -257,6 +257,9 @@ describe('rescue/doctor and claude/* branches (point 1513)', () => {
     expect(archivedPointNaming('claude/skirt-a', null)).toBe(null)
     // A dotted continuation names another branch; a sentence full stop does not.
     expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a.v2 ran'))).toBe(null)
+    expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a.+v2 ran'))).toBe(null)
+    expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a@x ran'))).toBe(null)
+    expect(archivedPointNaming('claude/skirt-a', archive.replace('claude/skirt-a ran', '(`claude/skirt-a`) ran'))).toBe(1485)
     expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran here', 'skirt-a.'))).toBe(1485)
   })
 

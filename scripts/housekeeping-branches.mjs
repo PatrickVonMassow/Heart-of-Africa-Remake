@@ -13,18 +13,27 @@ const PATTERNS = ['refs/heads/rescue/', 'refs/heads/claude/']
 const ok = (r) => r && r.status === 0
 
 /**
- * Names checked out in any worktree, or null when the list is unreadable: it
- * must carry a `worktree` record and nothing outside the porcelain grammar.
+ * Names checked out in any worktree, or null when the list is unreadable:
+ * every record needs `worktree <path>` and either `bare` or `HEAD <sha>` with
+ * `branch refs/heads/<name>` or `detached`; anything else is malformed.
  */
 export function checkedOutBranches(porcelain) {
-  if (typeof porcelain !== 'string' || !/^worktree \S/m.test(porcelain)) return null
+  if (typeof porcelain !== 'string') return null
   const out = new Set()
-  for (const raw of porcelain.split('\n')) {
-    const line = raw.trim()
-    if (!line) continue
-    const m = /^branch refs\/heads\/(.+)$/.exec(line)
-    if (m) out.add(m[1])
-    else if (!/^(worktree|HEAD|detached|bare|locked|prunable)( |$)/.test(line)) return null
+  const records = porcelain.split(/\n\s*\n/).map((r) => r.split('\n').map((l) => l.trim()).filter(Boolean)).filter((r) => r.length)
+  if (!records.length) return null
+  for (const rec of records) {
+    if (!/^worktree \S/.test(rec[0])) return null
+    let head = false
+    let state = null
+    for (const line of rec.slice(1)) {
+      const m = /^branch refs\/heads\/(\S+)$/.exec(line)
+      if (m) (state = 'branch'), out.add(m[1])
+      else if (/^HEAD [0-9a-f]{40}$/.test(line)) head = true
+      else if (line === 'detached' || line === 'bare') state = state ?? line
+      else if (!/^(locked|prunable)( |$)/.test(line)) return null
+    }
+    if (state !== 'bare' && !(head && state)) return null
   }
   return out
 }
@@ -68,7 +77,8 @@ export function mainHeldBranch(runGit, repoRoot, sha, mainRef = 'main') {
   if (!ok(paths)) return null
   const list = String(paths.stdout).split('\0').filter(Boolean)
   if (!list.length) return true
-  const since = runGit(['rev-list', `--max-count=${CONTAINMENT_MAX_COMMITS}`, mainRef, `^${b}`, '--', ...list], repoRoot)
+  // First parent only: main's own snapshots, never a side branch merged in.
+  const since = runGit(['rev-list', '--first-parent', `--max-count=${CONTAINMENT_MAX_COMMITS}`, mainRef, `^${b}`, '--', ...list], repoRoot)
   if (!ok(since)) return null
   const tip = runGit(['rev-parse', '--verify', `${mainRef}^{commit}`], repoRoot)
   if (!ok(tip)) return null

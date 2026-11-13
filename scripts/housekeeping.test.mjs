@@ -79,7 +79,7 @@ function run(a, extra = {}) {
     repoRoot: a.repo,
     tmpRoot: a.tmp,
     clock: () => NOW,
-    readWorktrees: () => `worktree ${a.repo}\nHEAD abc\n`,
+    readWorktrees: () => `worktree ${a.repo}\nHEAD ${'a'.repeat(40)}\nbranch refs/heads/main\n`,
     readProcesses: () => ({ ok: true, openPaths: [], cmdlines: [] }),
     runGit: (args) => {
       gitCalls.push(args)
