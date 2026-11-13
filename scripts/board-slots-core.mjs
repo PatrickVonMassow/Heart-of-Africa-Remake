@@ -1,5 +1,6 @@
 // Pure half of the board's slot line (user order 11.11.2026): on its own line
-// below the heading "Woran ich gerade arbeite" (12.11.2026) the board ALWAYS says why fewer than POOL_CAP points
+// below the heading "Woran ich gerade arbeite" (12.11.2026, a plain block since
+// point 1518) the board ALWAYS says why fewer than POOL_CAP points
 // are worked in parallel. Every phrase is derived from measured facts; where no
 // reason can be measured the line says "Grund nicht messbar" and the I/O half
 // files a finding — never filler, never agent-written free text (point 1452).
@@ -53,11 +54,44 @@ function blockerText(blockers) {
   return [...groups].map(([state, labels]) => `${labels.join(', ')} (${state})`).join(' · ')
 }
 
+/** "00:41" in Berlin time, the board's clock. */
+function berlinClock(ms) {
+  return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(new Date(ms))
+}
+
+/**
+ * The batch owner's measured state as a reason (point 1518), or null where the
+ * owner state names none: no live owner, or a declared wait on the lock.
+ */
+function ownerReason(owner) {
+  if (!owner || typeof owner !== 'object') return null
+  if (owner.alive === false) return 'keine Batch-Session aktiv'
+  const { waitAt, waitUntil } = owner
+  if (owner.alive === true && Number.isFinite(waitAt) && Number.isFinite(waitUntil)) {
+    return `Batch-Session wartet seit ${berlinClock(waitAt)} (bis ${berlinClock(waitUntil)})`
+  }
+  return null
+}
+
 /**
  * The free-slot reason, from the same decision batch-in-flight uses for the slot
- * question (`slotReasonDecision`). Returns { text, unmeasurable }.
+ * question (`slotReasonDecision`). A reason that would otherwise read
+ * unmeasurable is first explained by the owner state, then by active branches
+ * without own commits. Returns { text, unmeasurable }.
  */
-function freeSlotReason({ decision, specs, active, runningFiles }) {
+function freeSlotReason({ decision, specs, active, runningFiles, owner, freshActive }) {
+  const base = baseFreeSlotReason({ decision, specs, active, runningFiles })
+  if (!base.unmeasurable || ['branches-unreadable', 'record-unreadable'].includes(decision.why)) return base
+  const byOwner = ownerReason(owner)
+  if (byOwner) return { text: byOwner, unmeasurable: false }
+  const fresh = (freshActive ?? []).filter((p) => active.includes(p))
+  if (active.length > 0 && runningFiles.length === 0 && fresh.length > 0) {
+    return { text: `${fresh.join(', ')} hat noch keine Commits, Unabhängigkeit erst danach prüfbar`, unmeasurable: false }
+  }
+  return base
+}
+
+function baseFreeSlotReason({ decision, specs, active, runningFiles }) {
   const unmeasurable = (cause) => ({ text: `${UNMEASURABLE_TEXT} (${cause})`, unmeasurable: true })
   switch (decision.why) {
     case 'paused':
@@ -99,7 +133,10 @@ function freeSlotReason({ decision, specs, active, runningFiles }) {
  * - `openPoints` / `closedPoints`: the work order's open and closed numbers;
  * - `specs`: `openPointSpecs(tasksText)`;
  * - `runningFiles`: the files the actively worked branches touch;
- * - `paused`, `closingFreeze`, `cap`.
+ * - `paused`, `closingFreeze`, `cap`;
+ * - `owner`: the batch owner, { alive, waitAt?, waitUntil? } (waitAt/waitUntil
+ *   only for a running declared wait), or null where unmeasured;
+ * - `freshActive`: active points whose branch has no own diff against main.
  *
  * Returns { text, unmeasurable }.
  */
@@ -115,6 +152,8 @@ export function slotLine({
   paused = false,
   closingFreeze = false,
   cap = POOL_CAP,
+  owner = null,
+  freshActive = [],
 } = {}) {
   const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
   if (branchesReadable !== true || recordReadable !== true) {
@@ -150,7 +189,8 @@ export function slotLine({
       closingFreeze,
       cap: limit,
     })
-    const reason = freeSlotReason({ decision, specs: candidateSpecs, active, runningFiles })
+    const fresh = [...(freshActive ?? [])].map(Number)
+    const reason = freeSlotReason({ decision, specs: candidateSpecs, active, runningFiles, owner, freshActive: fresh })
     parts[0] += `: ${reason.text}`
     unmeasurable = reason.unmeasurable
   }
