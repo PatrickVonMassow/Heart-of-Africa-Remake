@@ -840,12 +840,6 @@ export function runHousekeeping({
         } catch {
           /* claude/* branches then stay: no archived point can be read */
         }
-        let worktreesText = null
-        try {
-          worktreesText = readWorktrees()
-        } catch {
-          /* unreadable = skipped below */
-        }
         stepResults.branches = runBranchesStep({
           runGit,
           repoRoot,
@@ -853,7 +847,7 @@ export function runHousekeeping({
           dryRun,
           workOrder,
           archiveText,
-          worktreesText,
+          readWorktrees,
           emit,
           fail,
         })

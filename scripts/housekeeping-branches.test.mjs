@@ -4,8 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { branchChanges, checkedOutBranches, runBranchesStep } from './housekeeping-branches.mjs'
-import { contentContained } from './housekeeping-core.mjs'
+import { checkedOutBranches, mainHeldBranch, runBranchesStep } from './housekeeping-branches.mjs'
 
 const DAY = 24 * 60 * 60 * 1000
 const roots = []
@@ -43,13 +42,15 @@ function scene() {
   writeFileSync(join(repo, 'a.txt'), 'a\n')
   git(repo, ['add', '.'])
   git(repo, ['commit', '-q', '-m', 'first'], OLD)
-  // Contained: the same line later reaches main by another commit.
+  // Contained: main carries the same content by another commit, then edits it on.
   branchWith(repo, 'rescue/doctor-old', 'b.txt', 'rescued\n', OLD)
   branchWith(repo, 'claude/cloud-done', 'c.txt', 'cloud\n', OLD)
-  writeFileSync(join(repo, 'b.txt'), 'rescued\nmore\n')
+  writeFileSync(join(repo, 'b.txt'), 'rescued\n')
   writeFileSync(join(repo, 'c.txt'), 'cloud\n')
   git(repo, ['add', '.'])
   git(repo, ['commit', '-q', '-m', 'main takes both'])
+  writeFileSync(join(repo, 'b.txt'), 'rescued\nmore\n')
+  git(repo, ['commit', '-q', '-am', 'main edits on'])
   branchWith(repo, 'rescue/doctor-lost', 'd.txt', 'only here\n', OLD)
   branchWith(repo, 'rescue/doctor-young', 'b.txt', 'rescued\n')
   branchWith(repo, 'rescue/doctor-busy', 'c.txt', 'cloud\nbusy\n', OLD)
@@ -72,7 +73,7 @@ function run(repo, dryRun) {
     dryRun,
     workOrder,
     archiveText,
-    worktreesText: git(repo, ['worktree', 'list', '--porcelain']),
+    readWorktrees: () => git(repo, ['worktree', 'list', '--porcelain']),
     emit: (l) => lines.push(l),
     fail: (kind, detail) => failures.push({ kind, detail }),
   })
@@ -80,11 +81,28 @@ function run(repo, dryRun) {
 }
 
 describe('the branches step (point 1513)', () => {
-  it('reads containment from real diffs: contained, missing', () => {
+  it('reads containment from real merges: carried, missing, removed, reordered', () => {
     const { repo } = scene()
     const sha = (n) => git(repo, ['rev-parse', n]).trim()
-    expect(contentContained(branchChanges(runGit, repo, sha('rescue/doctor-old')))).toBe(true)
-    expect(contentContained(branchChanges(runGit, repo, sha('rescue/doctor-lost')))).toBe(false)
+    expect(mainHeldBranch(runGit, repo, sha('rescue/doctor-old'))).toBe(true)
+    expect(mainHeldBranch(runGit, repo, sha('rescue/doctor-lost'))).toBe(false)
+    // Removal only: main still has the line the branch removed.
+    git(repo, ['checkout', '-q', '-b', 'rescue/doctor-removes', 'main'])
+    git(repo, ['rm', '-q', 'a.txt'])
+    git(repo, ['commit', '-q', '-m', 'remove'])
+    // A line `++ counter;` shows as `+++ counter;` in a patch.
+    git(repo, ['checkout', '-q', '-b', 'rescue/doctor-plus', 'main'])
+    writeFileSync(join(repo, 'a.txt'), 'a\n++ counter;\n')
+    git(repo, ['commit', '-q', '-am', 'plus'])
+    // Same lines, other order.
+    git(repo, ['checkout', '-q', '-b', 'rescue/doctor-order', 'main'])
+    writeFileSync(join(repo, 'b.txt'), 'more\nrescued\n')
+    git(repo, ['commit', '-q', '-am', 'order'])
+    git(repo, ['checkout', '-q', 'main'])
+    for (const n of ['rescue/doctor-removes', 'rescue/doctor-plus', 'rescue/doctor-order']) {
+      expect(mainHeldBranch(runGit, repo, sha(n)), n).toBe(false)
+    }
+    expect(mainHeldBranch(runGit, repo, 'no-such-ref')).toBe(null)
   })
 
   it('a dry run plans exactly the old contained branches and deletes nothing', () => {
@@ -140,7 +158,7 @@ describe('the branches step (point 1513)', () => {
       dryRun: false,
       workOrder,
       archiveText,
-      worktreesText: git(repo, ['worktree', 'list', '--porcelain']),
+      readWorktrees: () => git(repo, ['worktree', 'list', '--porcelain']),
       emit: () => {},
       fail: (kind, detail) => failures.push({ kind, detail }),
     })
@@ -148,11 +166,53 @@ describe('the branches step (point 1513)', () => {
     expect(failures.map((f) => f.kind)).toContain('branch-delete-failed')
   })
 
-  it('an unreadable worktree list skips the step', () => {
-    const failures = []
-    const r = runBranchesStep({ runGit, repoRoot: '/', now: 0, worktreesText: null, emit: () => {}, fail: (k) => failures.push(k) })
-    expect(r).toBe('skipped')
-    expect(failures).toEqual(['branches-worktrees-unreadable'])
+  it('keeps a branch a worktree checks out between the judgement and the deletion', () => {
+    const { repo } = scene()
+    let reads = 0
+    const lines = []
+    runBranchesStep({
+      runGit,
+      repoRoot: repo,
+      now: Date.now(),
+      dryRun: false,
+      workOrder,
+      archiveText,
+      readWorktrees: () => {
+        if (++reads === 2) git(repo, ['worktree', 'add', '-q', `${repo}-late`, 'rescue/doctor-old'])
+        return git(repo, ['worktree', 'list', '--porcelain'])
+      },
+      emit: (l) => lines.push(l),
+      fail: () => {},
+    })
+    expect(heads(repo)).toContain('rescue/doctor-old')
+    expect(lines.find((l) => l.path === 'refs/heads/rescue/doctor-old')?.reason).toBe('checked out in a worktree')
+  })
+
+  it('reads the push result by the exact ref, not a prefix', () => {
+    const old = String(Math.floor((Date.now() - 30 * DAY) / 1000))
+    const fake = (args) => {
+      if (args[0] === 'for-each-ref') return { status: 0, stdout: '' }
+      if (args[0] === 'ls-remote')
+        return { status: 0, stdout: `${'a'.repeat(40)}\trefs/heads/rescue/doctor-a\n${'b'.repeat(40)}\trefs/heads/rescue/doctor-a-b\n` }
+      if (args[0] === 'log') return { status: 0, stdout: `${old}\n` }
+      if (args[0] === 'push')
+        return { status: 1, stdout: '-\t:refs/heads/rescue/doctor-a-b\t[deleted]\n!\t:refs/heads/rescue/doctor-a\t[rejected] (stale info)\nDone\n' }
+      return { status: 128, stdout: '' }
+    }
+    const lines = []
+    runBranchesStep({ runGit: fake, repoRoot: '/', now: Date.now(), dryRun: false, readWorktrees: () => 'worktree /x\n', contained: () => true, emit: (l) => lines.push(l), fail: () => {} })
+    const outcome = Object.fromEntries(lines.map((l) => [l.path, l.outcome]))
+    expect(outcome).toEqual({ 'origin:refs/heads/rescue/doctor-a': 'failed', 'origin:refs/heads/rescue/doctor-a-b': 'deleted' })
+  })
+
+  it('an unreadable or malformed worktree list skips the step', () => {
+    for (const readWorktrees of [() => null, () => '', () => 'garbage\n', () => { throw new Error('x') }]) {
+      const failures = []
+      const r = runBranchesStep({ runGit, repoRoot: '/', now: 0, readWorktrees, emit: () => {}, fail: (k) => failures.push(k) })
+      expect(r).toBe('skipped')
+      expect(failures).toEqual(['branches-worktrees-unreadable'])
+    }
     expect(checkedOutBranches('worktree /x\nbranch refs/heads/rescue/doctor-a\n')).toEqual(new Set(['rescue/doctor-a']))
+    expect(checkedOutBranches('worktree /x\nHEAD abc\ndetached\n\nworktree /y\nbare\n')).toEqual(new Set())
   })
 })

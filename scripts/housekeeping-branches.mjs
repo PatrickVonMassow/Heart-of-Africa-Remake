@@ -3,22 +3,28 @@
  * claude/* branches, local and on origin, whose content main already holds.
  *
  * Facts are read here, the verdict is `branchVerdict` (housekeeping-core.mjs).
- * A branch checked out in any worktree is kept. A local branch is deleted with
+ * A branch checked out in any worktree is kept, re-read right before deletion. A local branch is deleted with
  * its old sha as the guard (`update-ref -d`); origin branches go in ONE push,
  * each guarded by --force-with-lease on the sha this run judged.
  */
-import { branchKind, branchVerdict, contentContained } from './housekeeping-core.mjs'
+import { branchKind, branchVerdict } from './housekeeping-core.mjs'
 
 const PATTERNS = ['refs/heads/rescue/', 'refs/heads/claude/']
 const ok = (r) => r && r.status === 0
 
-/** Names checked out in any worktree, or null when the list is unreadable. */
+/**
+ * Names checked out in any worktree, or null when the list is unreadable: it
+ * must carry a `worktree` record and nothing outside the porcelain grammar.
+ */
 export function checkedOutBranches(porcelain) {
-  if (typeof porcelain !== 'string') return null
+  if (typeof porcelain !== 'string' || !/^worktree \S/m.test(porcelain)) return null
   const out = new Set()
-  for (const line of porcelain.split('\n')) {
-    const m = /^branch refs\/heads\/(.+)$/.exec(line.trim())
+  for (const raw of porcelain.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    const m = /^branch refs\/heads\/(.+)$/.exec(line)
     if (m) out.add(m[1])
+    else if (!/^(worktree|HEAD|detached|bare|locked|prunable)( |$)/.test(line)) return null
   }
   return out
 }
@@ -45,53 +51,55 @@ function tipAt(runGit, repoRoot, sha) {
   return Number.isFinite(s) && s > 0 ? s * 1000 : null
 }
 
-/** The change list `contentContained` judges, or null (= unknown, keep). */
-export function branchChanges(runGit, repoRoot, sha, mainRef = 'main') {
+/** Main commits since the fork a branch is checked against (newest first). */
+export const CONTAINMENT_MAX_COMMITS = 200
+
+/**
+ * Did main take the branch's content? true when merging `sha` into main, or
+ * into a main commit since the fork that touched the branch's paths, yields
+ * that commit's own tree (main carried it; later edits are main's own).
+ * false when none does, null when git cannot answer (= unknown, keep).
+ */
+export function mainHeldBranch(runGit, repoRoot, sha, mainRef = 'main') {
   const base = runGit(['merge-base', mainRef, sha], repoRoot)
   if (!ok(base)) return null
   const b = String(base.stdout).trim()
-  const numstat = runGit(['diff', '--numstat', '--no-renames', '-z', b, sha], repoRoot)
-  const status = runGit(['diff', '--name-status', '--no-renames', '-z', b, sha], repoRoot)
-  const patch = runGit(['diff', '-U0', '--no-renames', '--no-color', '--no-ext-diff', b, sha], repoRoot)
-  if (!ok(numstat) || !ok(status) || !ok(patch)) return null
-  const binary = new Set()
-  for (const rec of String(numstat.stdout).split('\0')) {
-    const m = /^(-|\d+)\t(-|\d+)\t(.+)$/.exec(rec)
-    if (m && m[1] === '-') binary.add(m[3])
+  const paths = runGit(['diff', '--name-only', '--no-renames', '-z', b, sha], repoRoot)
+  if (!ok(paths)) return null
+  const list = String(paths.stdout).split('\0').filter(Boolean)
+  if (!list.length) return true
+  const since = runGit(['rev-list', `--max-count=${CONTAINMENT_MAX_COMMITS}`, mainRef, `^${b}`, '--', ...list], repoRoot)
+  if (!ok(since)) return null
+  const tip = runGit(['rev-parse', '--verify', `${mainRef}^{commit}`], repoRoot)
+  if (!ok(tip)) return null
+  const candidates = [String(tip.stdout).trim(), ...String(since.stdout).split('\n').map((l) => l.trim()).filter(Boolean)]
+  for (const c of new Set(candidates)) {
+    const tree = runGit(['rev-parse', '--verify', `${c}^{tree}`], repoRoot)
+    if (!ok(tree)) return null
+    const merged = runGit(['merge-tree', '--write-tree', '--no-messages', c, sha], repoRoot)
+    // Exit 1 = conflicts: not held at this commit.
+    if (merged?.status === 1) continue
+    if (!ok(merged)) return null
+    const first = String(merged.stdout).split('\n')[0].trim()
+    if (!/^[0-9a-f]{40}$/.test(first)) return null
+    if (first === String(tree.stdout).trim()) return true
   }
-  const st = String(status.stdout).split('\0')
-  const added = new Map()
-  let cur = null
-  for (const line of String(patch.stdout).split('\n')) {
-    if (line.startsWith('diff --git ')) cur = null
-    else if (line.startsWith('+++ ')) cur = line === '+++ /dev/null' ? null : line.slice(6)
-    else if (cur !== null && line.startsWith('+')) {
-      if (!added.has(cur)) added.set(cur, [])
-      added.get(cur).push(line.slice(1))
-    }
-  }
-  const changes = []
-  for (let i = 0; i + 1 < st.length; i += 2) {
-    const [code, path] = [st[i], st[i + 1]]
-    if (!code || !path) continue
-    const shown = runGit(['cat-file', '-p', `${mainRef}:${path}`], repoRoot)
-    let mainText
-    if (ok(shown)) mainText = String(shown.stdout)
-    else {
-      const listed = runGit(['ls-tree', '--name-only', mainRef, '--', path], repoRoot)
-      mainText = ok(listed) && !String(listed.stdout).trim() ? null : undefined
-    }
-    changes.push({ path, binary: binary.has(path), deleted: code === 'D', addedLines: added.get(path) ?? [], mainText })
-  }
-  return changes
+  return false
 }
 
 /**
  * Judge every branch and (unless dry) delete the ones the rule frees.
  * `emit` writes manifest lines, `fail` records a failure kind. Returns the step result.
  */
-export function runBranchesStep({ runGit, repoRoot, now, dryRun, workOrder, archiveText, worktreesText, emit, fail, contained }) {
-  const held = checkedOutBranches(worktreesText)
+export function runBranchesStep({ runGit, repoRoot, now, dryRun, workOrder, archiveText, readWorktrees, emit, fail, contained }) {
+  const readHeld = () => {
+    try {
+      return checkedOutBranches(readWorktrees())
+    } catch {
+      return null
+    }
+  }
+  const held = readHeld()
   if (!held) {
     fail('branches-worktrees-unreadable', 'git worktree list unreadable; branches step skipped')
     return 'skipped'
@@ -99,7 +107,7 @@ export function runBranchesStep({ runGit, repoRoot, now, dryRun, workOrder, arch
   const { local, origin } = listBranches(runGit, repoRoot)
   if (!local) fail('branches-local-unreadable', 'for-each-ref failed')
   if (!origin) fail('branches-origin-unreadable', 'ls-remote origin failed')
-  const judge = contained ?? ((sha) => contentContained(branchChanges(runGit, repoRoot, sha)))
+  const judge = contained ?? ((sha) => mainHeldBranch(runGit, repoRoot, sha))
   const doomedOrigin = []
   for (const b of [...(local ?? []), ...(origin ?? [])]) {
     const path = b.where === 'origin' ? `origin:refs/heads/${b.name}` : `refs/heads/${b.name}`
@@ -120,6 +128,13 @@ export function runBranchesStep({ runGit, repoRoot, now, dryRun, workOrder, arch
       doomedOrigin.push({ ...b, path, rule: v.rule })
       continue
     }
+    // A worktree may have checked it out since the first read; the sha guard
+    // alone would not notice, as checkout leaves the ref where it was.
+    const heldNow = readHeld()
+    if (!heldNow || heldNow.has(b.name)) {
+      emit({ path, size: 0, rule: 'branch', outcome: 'kept', reason: heldNow ? 'checked out in a worktree' : 'worktree list unreadable' })
+      continue
+    }
     const r = runGit(['update-ref', '-d', `refs/heads/${b.name}`, b.sha], repoRoot)
     if (!ok(r)) fail('branch-delete-failed', `${path}: ${String(r?.stderr || '').slice(0, 200)}`)
     emit({ path, size: 0, rule: v.rule, outcome: ok(r) ? 'deleted' : 'failed', reason: b.sha })
@@ -129,10 +144,14 @@ export function runBranchesStep({ runGit, repoRoot, now, dryRun, workOrder, arch
     for (const b of doomedOrigin) args.push(`--force-with-lease=refs/heads/${b.name}:${b.sha}`)
     for (const b of doomedOrigin) args.push(`:refs/heads/${b.name}`)
     const r = runGit(args, repoRoot)
-    // --porcelain marks each ref: '-' deleted, '!' rejected.
-    const lines = String(r?.stdout ?? '').split('\n')
+    // --porcelain: `<flag>\t<from>:<to>\t<summary>`; '-' deleted, '!' rejected.
+    const deleted = new Set()
+    for (const l of String(r?.stdout ?? '').split('\n')) {
+      const f = l.split('\t')
+      if (f[0] === '-' && f.length >= 2) deleted.add(f[1].slice(f[1].indexOf(':') + 1))
+    }
     for (const b of doomedOrigin) {
-      const gone = lines.some((l) => l.startsWith('-\t') && l.includes(`refs/heads/${b.name}`))
+      const gone = deleted.has(`refs/heads/${b.name}`)
       if (!gone) fail('branch-delete-failed', `${b.path}: push did not delete it`)
       emit({ path: b.path, size: 0, rule: b.rule, outcome: gone ? 'deleted' : 'failed', reason: b.sha })
     }

@@ -92,7 +92,10 @@ export function branchKind(name) {
   return null
 }
 
-/** The one archived point whose block names `branch` exactly, else null. */
+/**
+ * The one archived point whose block names `branch` exactly, else null. A
+ * name continued by a word character, '/', '-' or '.x' is another branch.
+ */
 export function archivedPointNaming(branch, archiveText) {
   if (!branch || typeof archiveText !== 'string') return null
   const named = new Set()
@@ -101,43 +104,15 @@ export function archivedPointNaming(branch, archiveText) {
     const m = POINT_LINE.exec(line)
     if (m) point = Number(m[2])
     else if (BLOCK_END.test(line)) point = null
-    if (point !== null && new RegExp(`(^|[^\\w/-])${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w/-])`).test(line)) named.add(point)
+    if (point !== null && new RegExp(`(^|[^\\w/.-])${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w/-]|\\.[\\w/-])`).test(line)) named.add(point)
   }
   return named.size === 1 ? [...named][0] : null
 }
 
 /**
- * Does main already contain a branch's content? PURE. `changes` lists every
- * path the branch changed since its merge-base with main:
- *   { path, binary, deleted, addedLines: string[], mainText: string|null|undefined }
- * `mainText` null = absent on main, undefined = unreadable. A deleted path is
- * contained when main lacks it too; a changed text path when every non-blank
- * added line stands in main's version. true | false | null (unknown = keep).
- */
-export function contentContained(changes) {
-  if (!Array.isArray(changes)) return null
-  let missing = false
-  for (const c of changes) {
-    if (!c || typeof c.path !== 'string' || c.binary) return null
-    if (c.mainText === undefined) return null
-    if (c.deleted) {
-      if (c.mainText !== null) missing = true
-      continue
-    }
-    if (!Array.isArray(c.addedLines)) return null
-    if (c.mainText === null) {
-      missing = true
-      continue
-    }
-    const have = new Set(c.mainText.split('\n'))
-    if (c.addedLines.some((l) => l.trim() && !have.has(l))) missing = true
-  }
-  return !missing
-}
-
-/**
  * The verdict for one rescue/doctor-* or claude/* branch. Deleted only when its
- * tip is older than `maxAgeMs`, main contains its content, and — for a claude/*
+ * tip is older than `maxAgeMs`, main contains its content (`contained`, true
+ * only when merging the tip into main adds nothing), and — for a claude/*
  * branch — the one archived point naming it is closed. Unknown = keep.
  */
 export function branchVerdict({ name, tipAtMs, now, contained, archiveText, workOrder, maxAgeMs = BRANCH_MAX_AGE_MS }) {

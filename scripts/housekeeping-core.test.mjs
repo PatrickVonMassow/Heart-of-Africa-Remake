@@ -6,7 +6,6 @@ import {
   archivedPointNaming,
   branchKind,
   branchVerdict,
-  contentContained,
   outputKind,
   busyVerdict,
   createBudget,
@@ -256,19 +255,9 @@ describe('rescue/doctor and claude/* branches (point 1513)', () => {
     expect(archivedPointNaming('claude/skirt', archive)).toBe(null)
     expect(archivedPointNaming('claude/skirt-a', `${archive}\n  claude/skirt-a again`)).toBe(null)
     expect(archivedPointNaming('claude/skirt-a', null)).toBe(null)
-  })
-
-  it('content counts as contained only when every added line and every deletion stands on main', () => {
-    const text = { path: 'a', addedLines: ['x', '', 'y'], mainText: 'y\nz\nx' }
-    expect(contentContained([text])).toBe(true)
-    expect(contentContained([{ ...text, mainText: 'y' }])).toBe(false)
-    expect(contentContained([{ ...text, mainText: null }])).toBe(false)
-    expect(contentContained([{ path: 'd', deleted: true, mainText: null }])).toBe(true)
-    expect(contentContained([{ path: 'd', deleted: true, mainText: 'still here' }])).toBe(false)
-    expect(contentContained([{ ...text, mainText: undefined }])).toBe(null)
-    expect(contentContained([{ ...text, binary: true }])).toBe(null)
-    expect(contentContained([{ path: 'a', mainText: 'x' }])).toBe(null)
-    expect(contentContained(null)).toBe(null)
+    // A dotted continuation names another branch; a sentence full stop does not.
+    expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a.v2 ran'))).toBe(null)
+    expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran here', 'skirt-a.'))).toBe(1485)
   })
 
   it('deletes an old, contained rescue branch and keeps every unproven one', () => {
