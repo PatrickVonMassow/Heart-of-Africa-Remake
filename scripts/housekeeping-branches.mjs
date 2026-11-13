@@ -28,12 +28,14 @@ export function checkedOutBranches(porcelain) {
     let state = null
     for (const line of rec.slice(1)) {
       const m = /^branch refs\/heads\/(\S+)$/.exec(line)
-      if (m) (state = 'branch'), out.add(m[1])
-      else if (/^HEAD [0-9a-f]{40}$/.test(line)) head = true
-      else if (line === 'detached' || line === 'bare') state = state ?? line
+      if (m || line === 'detached' || line === 'bare') {
+        if (state) return null // two states in one record
+        state = m ? 'branch' : line
+        if (m) out.add(m[1])
+      } else if (/^HEAD [0-9a-f]{40}$/.test(line)) head = true
       else if (!/^(locked|prunable)( |$)/.test(line)) return null
     }
-    if (state !== 'bare' && !(head && state)) return null
+    if (state === 'bare' ? head : !(head && state)) return null
   }
   return out
 }

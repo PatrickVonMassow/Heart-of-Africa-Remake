@@ -259,6 +259,8 @@ describe('rescue/doctor and claude/* branches (point 1513)', () => {
     expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a.v2 ran'))).toBe(null)
     expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a.+v2 ran'))).toBe(null)
     expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a@x ran'))).toBe(null)
+    for (const m of ['!', ',', ';', ':', '?']) expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', `skirt-a${m}v2 ran`)), m).toBe(null)
+    expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran', 'skirt-a, ran'))).toBe(1485)
     expect(archivedPointNaming('claude/skirt-a', archive.replace('claude/skirt-a ran', '(`claude/skirt-a`) ran'))).toBe(1485)
     expect(archivedPointNaming('claude/skirt-a', archive.replace('skirt-a ran here', 'skirt-a.'))).toBe(1485)
   })

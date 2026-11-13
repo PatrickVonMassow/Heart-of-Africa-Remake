@@ -105,7 +105,7 @@ export function archivedPointNaming(branch, archiveText) {
     const m = POINT_LINE.exec(line)
     if (m) point = Number(m[2])
     else if (BLOCK_END.test(line)) point = null
-    if (point !== null && new RegExp(`(^|[\\s\`'"(\\[])${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s\`'")\\],;:!?]|\\.(\\s|$))`).test(line)) named.add(point)
+    if (point !== null && new RegExp(`(^|[\\s\`'"(\\[])${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s\`'")\\]]|[.,;:!?]($|[\\s\`'")\\]]))`).test(line)) named.add(point)
   }
   return named.size === 1 ? [...named][0] : null
 }
