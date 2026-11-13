@@ -8372,17 +8372,20 @@ if (section('vulture-landing')) {
       }
       requestAnimationFrame(frame)
       if (stretch) {
-        // Hold in the flare for the shutter: well into the stretched flare window.
+        // Hold in the flare for the shutter: late in the stretched flare window,
+        // just above the carcass (early in it the bird is still far out and high).
         const ok = await window.__pollSim(90, () => {
           herds.elephant.length = 0
           const st = sc.birds[0]
-          return sc.target === carcass && st.phase === 'landing' && st.t > (1 - vl.flareFraction) * vl.landSeconds + 2
+          return sc.target === carcass && st.phase === 'landing' && st.t > vl.landSeconds - 3
         })
         rec = false
         const grp = g()
         const bird = grp?.children[0]
         window.__vulLanding = { carcass, saved }
-        return ok && bird ? { staged: true, flare: true, world: { x: grp.position.x + bird.position.x, z: grp.position.z + bird.position.z } } : { staged: true, flare: false }
+        return ok && bird
+          ? { staged: true, flare: true, world: { x: grp.position.x + bird.position.x, y: grp.position.y + bird.position.y, z: grp.position.z + bird.position.z } }
+          : { staged: true, flare: false }
       }
       await window.__pollSim(90, () => {
         herds.elephant.length = 0
