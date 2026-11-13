@@ -36638,3 +36638,20 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Final state: before its merge step land-point fetches the point's branch and, when origin is ahead of the local branch, fast-forwards to the remote tip or refuses with both shas named; a local branch that has diverged from origin refuses. The dry plan names the sha it will merge.
   Test: Vitest on the land-point planning with a fixture repo where origin is ahead of the local branch (ff or refusal) and where it has diverged (refusal).
   Bundle: unbundled (infrastructure).
+
+- [x] 1490. Head-load porter: crate in the head, sprint, and grinding against walls (user reports 05.11.2026 Cairo and 11.11.2026 Tangier)
+   Evidence: /backup/hoa/local/RennenderBoxkopf.zip (seed 1177128818, place cairo, x/z 316.64/-300.59, webgpu, build 39e8ab8). User text: "Warum rennt der mit der Box, als würde er von einem Löwen gejagt werden und warum hängt sein Kopf in der Box?"
+   Evidence 2: /backup/hoa/local/hoa-state-2026-11-11-1117999851.zip (seed 1117999851, place tangier, x/z -58.71/-356.97, webgpu, build ed95b5b). User text: "Hängt mit Kopf in der Kiste, sodass er nichts sehen kann und läuft sinnlos hin und her und immer wieder gegen die Wände". placeLife shows porters with no errand/target (unlike the errand walkers beside them).
+   Defects:
+   1. The carried crate sits too low: the carrier's head is inside the crate. The load must rest on top of the head (with its pad, if any), never intersecting it.
+   2. The carrier moves in a sprint gait with arms flung out. A head-load carrier walks at a steady, upright pace with at least one hand steadying the load or arms close to the body.
+   3. The porter grinds against walls. Cause in src/scenes/place/PlaceLife.tsx, function Porters: the route is a straight line from a point 3.2 m in front of a building centre (toward the plaza centre) to a random plaza point, with no path finding. In a dense place like Tangier the line runs through houses (the end point can lie inside one); resolveMove only pushes the porter to the wall, and the sine ping-pong rubs him against the same wall again and again. Heading comes from the route line, not from the actual movement, so he walks sideways or faces the wall.
+   Shared cause of defect 2 (sprint): the position follows sin(t*speed) along the line, so peak speed = speed * routeLength / 2 — a 20 m route gives about 6-7 m/s. The pace scales with route length.
+   Final state:
+   1. The crate rests on top of the head (with its pad, if any), never intersecting it.
+   2. Porters walk walkable routes between a building entrance and the plaza (as the errand walkers do) at a steady head-load walking pace independent of route length; upright gait, at least one hand steadying the load or arms close to the body.
+   3. Heading follows the actual movement.
+   4. No porter stands at a wall without progress for longer than a bounded time (dev-mode invariant or test assertion).
+   Verify: Playwright pictures of a moving head-load porter in Cairo (seed 1177128818) and Tangier (seed 1117999851), both backends when isBackendSensitivePath applies; plus a test that porters make progress and do not grind against colliders. Related but separate: 1425 (water jar jumps from hip to shoulder).
+   Ranked to the front by user order 11.11.2026 ("Ja, so erweitern und 1490 nach vorne ziehen.").
+   Bundle: Dorfleben.
