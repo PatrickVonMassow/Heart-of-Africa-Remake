@@ -470,6 +470,19 @@ export function hipJointAt(j: HipJoint, yaw: number): FootOffset {
 }
 
 /**
+ * The ground a figure's feet step for one frame's move (figure units): the
+ * step along the facing is the stride; a sideways shove and a turn are stepped
+ * too (the held foot cannot follow them far), in the sense the body moves
+ * along its facing. Its rate is the speed the gait is chosen from.
+ */
+export function groundStepped(dx: number, dz: number, fromYaw: number, yaw: number, unit = 1): number {
+  const ahead = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / unit
+  const aside = Math.abs(dx * Math.cos(yaw) - dz * Math.sin(yaw)) / unit
+  const turned = Math.abs(Math.atan2(Math.sin(yaw - fromYaw), Math.cos(yaw - fromYaw)))
+  return ahead + Math.sign(ahead || 1) * (aside + turned * M.turnStep)
+}
+
+/**
  * One frame of a figure's walk, from where it is drawn (`body`, world): every
  * walker gets its stride from how fast it really goes, whoever moves it. The
  * phase advances with the step along the facing; a pace change rephases it;
@@ -494,13 +507,7 @@ export function stepWalk(
     const dx = body.x - m.last.x
     const dz = body.z - m.last.z
     if (Math.hypot(dx, dz) / unit / dt <= M.teleportSpeed) {
-      // The step along the facing is the stride; a sideways shove and a turn
-      // are stepped too (the held foot cannot follow them far), in the sense the
-      // body moves along its facing.
-      const ahead = (dx * Math.sin(body.yaw) + dz * Math.cos(body.yaw)) / unit
-      const aside = Math.abs(dx * Math.cos(body.yaw) - dz * Math.sin(body.yaw)) / unit
-      const turned = Math.abs(Math.atan2(Math.sin(body.yaw - m.last.yaw), Math.cos(body.yaw - m.last.yaw)))
-      walked = ahead + Math.sign(ahead || 1) * (aside + turned * M.turnStep)
+      walked = groundStepped(dx, dz, m.last.yaw, body.yaw, unit)
     } else m.plants = [freePlant(), freePlant()] // placed, not walked: let go
   }
   m.last = { x: body.x, z: body.z, yaw: body.yaw }

@@ -60,6 +60,11 @@ export interface PlaceNavGrid {
    *  One byte per cell, filled once with `free` and never narrowed after: a
    *  restriction takes ground away, it does not build a wall. */
   solid: Uint8Array
+  /** 1 where the GROUND itself is walkable, colliders aside: inside the
+   *  boundary with its margin and allowed by every `navRestrict` rule. Kept
+   *  apart from `free` and `solid`, so a position clear of a collider whose
+   *  cell centre is not still answers for the ground it stands on. */
+  ground: Uint8Array
   /** Search scratch, reused across calls: a settlement's grid is tens of
    *  thousands of cells, and allocating two arrays of it per route would hand
    *  the render loop a megabyte a second of garbage for nothing. */
@@ -109,6 +114,7 @@ export function buildPlaceNavGrid(
     min: -reach,
     free: new Uint8Array(n * n),
     solid: new Uint8Array(n * n),
+    ground: new Uint8Array(n * n),
     parent: new Int32Array(n * n),
     queue: new Int32Array(n * n),
   }
@@ -119,6 +125,7 @@ export function buildPlaceNavGrid(
       const clear = standingClear(colliders, x, z, moverRadius)
       if (!clear) grid.solid[i * n + j] = 1
       if (!insidePlace(bounds, x, z, margin + slack)) continue
+      grid.ground[i * n + j] = 1
       if (!clear) continue
       grid.free[i * n + j] = 1
     }
@@ -144,9 +151,20 @@ export function navRestrict(grid: PlaceNavGrid, free: (x: number, z: number) => 
     const x = worldOf(grid, i)
     for (let j = 0; j < grid.n; j++) {
       const k = i * grid.n + j
-      if (grid.free[k] === 1 && !free(x, worldOf(grid, j))) grid.free[k] = 0
+      if (grid.ground[k] === 1 && !free(x, worldOf(grid, j))) {
+        grid.ground[k] = 0
+        grid.free[k] = 0
+      }
     }
   }
+}
+
+/** Whether a world point lies on ground the grid refuses as GROUND: past the
+ *  wade limit, outside the observed ground or the boundary, or narrowed away
+ *  by `navRestrict` — whatever collider stands there or not. A resolved step
+ *  can reach such ground; a collider is the collision resolve's business. */
+export function navPointOffGround(grid: PlaceNavGrid, x: number, z: number): boolean {
+  return grid.ground[cellOf(grid, x) * grid.n + cellOf(grid, z)] === 0
 }
 
 /** Whether a mover may stand at a world point, as the grid sees it. */

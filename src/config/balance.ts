@@ -2926,6 +2926,47 @@ export const TRAVELLER_LOOK = {
 } as const
 
 /**
+ * The port porters' head-load walk between a building entrance and the
+ * plaza. Every value is a CALIBRATABLE educated guess.
+ */
+export const PORTER_WALK = {
+  /** Steady head-load walking pace (m/s): slower than an unladen walker. */
+  pace: 0.95,
+  /** Per-porter pace spread added on top (m/s, 0 … this). */
+  paceSpread: 0.15,
+  /** Half-width of the square around the plaza centre the far end is drawn from (m). */
+  plazaHalf: 3.5,
+  /** Distance from a building centre toward the plaza where the entrance end starts (m). */
+  entranceOffset: 3.2,
+  /** Further search along that line for free ground (m). */
+  entranceSearch: 4,
+  /** Rest at each end of the route (s, min … min + spread). */
+  dwell: 1.5,
+  dwellSpread: 2.5,
+  /** How close counts as arrived at the route's end (m). */
+  arriveRadius: 0.35,
+  /** How close a corner waypoint counts as passed (m). */
+  waypointRadius: 0.6,
+  /** How much nearer the leg's end, along the remaining route, counts as
+   *  progress (m): a step that only slides or circles is not. Calibratable. */
+  progressStep: 0.15,
+  /** Share of a turn's stepping (VILLAGER_MOTION.turnStep per radian) the
+   *  porter takes off its pace while it turns. The figure picks walk or jog
+   *  from the ground its feet cover, turns included: a porter rounding a
+   *  corner at full pace measured up to 1.9 m/s and jogged with the load.
+   *  At 1 the measured gait stays at the head-load pace. Calibratable. */
+  turnEase: 1,
+  /** Without progress this long the porter replans from where it stands (s). */
+  stallReplan: 1.5,
+  /** Without progress this long it is placed on free ground and turns back (s). */
+  stallEscape: 3,
+  /** Crate drawn on the head (m): width, height, depth. */
+  crate: { width: 0.45, height: 0.32, depth: 0.35 },
+  /** Folded-cloth head pad under the crate (m): radius and thickness. */
+  pad: { radius: 0.11, height: 0.035 },
+} as const
+
+/**
  * How a villager walks, kneels and carries on the head (work-order "walking
  * villagers"). Units are the figure's own (an adult man is FIGURE_STATURE
  * tall), seconds and radians. Every value is a CALIBRATABLE educated guess,
@@ -2977,6 +3018,8 @@ export const VILLAGER_MOTION = {
     jar: { steady: true },
     basket: { steady: false },
     bundle: { steady: false },
+    // The port porter's crate: wide and hard-edged, one hand steadies it.
+    crate: { steady: true },
   },
   /** How far up a steadied load the hand grips, as a fraction of its height
    *  (lowered further where the arm cannot reach — never a straight arm). */
