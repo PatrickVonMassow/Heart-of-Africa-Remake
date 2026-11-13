@@ -1676,7 +1676,17 @@ if (section('porter-head-load')) {
     const pick = await (async () => {
       for (let tries = 0; tries < 20; tries++) {
         const a = await readPorters()
-        await page.waitForTimeout(300)
+        // Wait for a porter's own motion (the life clock), not the wall clock.
+        await page.waitForFunction((a0) => {
+          const out = []
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'porter-crate' || !o.isMesh) return
+            let fig = null
+            for (let q = o.parent; q; q = q.parent) if (q.name === 'inhabitant') { fig = q; break }
+            if (fig?.parent) out.push(fig.parent.getWorldPosition(new o.position.constructor()))
+          })
+          return out.some((p, j) => a0[j] && Math.hypot(p.x - a0[j].x, p.z - a0[j].z) > 0.15)
+        }, a, { timeout: 2000, polling: 'raf' }).catch(() => {})
         const b = await readPorters()
         const i = b.findIndex((p, j) => a[j] && Math.hypot(p.x - a[j].x, p.z - a[j].z) > 0.15)
         if (i >= 0) {
