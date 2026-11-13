@@ -238,16 +238,6 @@ export const RED_CHARGES = [
       + 'the calf ended 0.094 from its target. Point 1236 owns the cause; the charge dies with it.',
   },
   {
-    point: 1468,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^Traveller \((low|medium)\): his head stands at villager height/i,
-    why:
-      'WebGPU enrichments --section=traveller-figure on main 10.11.2026 18:16 read headRise 1.469 m at '
-      + 'medium (helmet 1) against the 1.35 bound (local/verify-logs/2026-11-10T17-16-14-136-enrichments.log); '
-      + '1468 owns the head-height reading and its bound, now also at medium. The charge dies with 1468.',
-  },
-  {
     point: 1469,
     suite: 'touch',
     kind: 'check',
@@ -1939,29 +1929,6 @@ export const RED_CHARGES = [
       + '(point 1465), so the charge holds on both backends. The charge dies with point 1270.',
   },
   {
-    point: 1449,
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in$/i,
-    why:
-      'FILED AS 1449 ON 26.10.2026: red in the full enrichments run on webgpu, main 64bed6b45, '
-      + 'owned by no open point; from the calf-shield-river work of 1297 (crossing). '
-      + 'The charge dies with point 1449.',
-  },
-  {
-    point: 1449,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up \(calf-in-water\)$/i,
-    why:
-      'FILED AS 1449 ON 26.10.2026: red in the full enrichments run on webgpu, main 64bed6b45, '
-      + 'owned by no open point; from the calf-shield-river work of 1297 (calf-in-water). '
-      + 'Red on WebGL 2 in the full enrichments run on main 9afb575 (09.11.2026), so the entry '
-      + 'names no backend and therefore no feature level. The charge dies with point 1449.',
-  },
-  {
     point: 1395,
     suite: 'polish-speech',
     backend: 'webgl',
@@ -2084,15 +2051,6 @@ export const RED_CHARGES = [
       'MEASURED 10.11.2026 on both backends: whole enrichments on main 091e97140 failed frame 131 (no flame at '
       + 'the front, frontAtShutter 24.05) while --section=burning-grass was green on b2023ba37; the frame crops '
       + 'are computed before the sim advances (review objection 3). Filed in point 1496. The charge dies with point 1496.',
-  },
-  {
-    point: 1500,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^LOW: collidable trees draw in full under the density lever\b/i,
-    why:
-      'MEASURED 11.11.2026 on both backends: recorded enrichments runs before 04:05 carry this LOW preset red; '
-      + 'no open point owned it, so it was filed as point 1500. The charge dies with point 1500.',
   },
   {
     point: 1502,
