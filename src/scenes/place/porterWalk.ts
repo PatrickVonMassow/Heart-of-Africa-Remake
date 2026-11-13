@@ -223,8 +223,15 @@ export function stepPorter(s: PorterState, route: PorterRoute, world: PorterWorl
   let [nx, nz] = walkableStep(world.grid, s.x, s.z, mx, mz)
   // A heading still swinging round a corner can point off the walkable
   // ground the route runs over: then the step goes along the route instead.
+  // That step keeps the turn's easing: it is as long as the eased step along
+  // the heading, shortened by how far off the heading it goes, so the feet
+  // (which step the part off the facing as well) measure no more than it.
   if (nx !== mx || nz !== mz) {
-    const [ax, az] = walkableStep(world.grid, s.x, s.z, px, pz)
+    const off = Math.atan2(dx, dz) - s.yaw
+    const skew = Math.abs(Math.cos(off)) + Math.abs(Math.sin(off))
+    const len = along / skew
+    const [rx, rz] = world.move(s.x, s.z, s.x + (dx / d) * len, s.z + (dz / d) * len)
+    const [ax, az] = walkableStep(world.grid, s.x, s.z, rx, rz)
     if (Math.hypot(ax - s.x, az - s.z) > Math.hypot(nx - s.x, nz - s.z)) [nx, nz] = [ax, az]
   }
   s.x = nx

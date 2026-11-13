@@ -156,6 +156,34 @@ describe('the porter walk on synthetic ground', () => {
     expect(nearest).toBeLessThan(8)
   })
 
+  it('steps along the route where its heading points off the ground, no faster than its pace', () => {
+    // Ground refused for z < 0. The porter stands on the edge, facing off it,
+    // its next waypoint along the edge: the heading's step is cut, and the
+    // step along the route must keep the turn's easing.
+    const grid = buildPlaceNavGrid(bounds, [], R)
+    navRestrict(grid, (_x, z) => z >= 0)
+    const route: PorterRoute = { entrance: { x: -6, z: 0.6 }, plaza: { x: 6, z: 0.6 }, pace: PORTER_WALK.pace }
+    const world = worldOf(grid, [], [route.entrance.x, route.entrance.z])
+    const cap = Math.max(route.pace, VILLAGER_MOTION.spotTurnRate * VILLAGER_MOTION.turnStep) * 1.01
+    // The edge as the grid draws it: a hair inside the last accepted cell.
+    let edge = 2
+    while (!navPointOffGround(grid, 0, edge - 0.001)) edge -= 0.001
+    for (const facing of [Math.PI * 0.6, Math.PI * 0.75, Math.PI, Math.PI * 1.25, Math.PI * 1.4]) {
+      const rand = mulberry32(4)
+      const s: PorterState = startPorter(route, rand)
+      Object.assign(s, { x: 0, z: edge + 0.002, yaw: facing, leg: 0, pause: 0, way: [{ x: 6, z: edge + 0.002 }] })
+      for (let k = 0; k < 90; k++) {
+        const x0 = s.x
+        const z0 = s.z
+        const yaw0 = s.yaw
+        stepPorter(s, route, world, DT, rand)
+        const walked = groundStepped(s.x - x0, s.z - z0, yaw0, s.yaw) / DT
+        expect(walked, `facing ${facing.toFixed(2)}, frame ${k}`).toBeLessThanOrEqual(cap)
+        expect(navPointOffGround(grid, s.x, s.z)).toBe(false)
+      }
+    }
+  })
+
   it('cuts a step back to the last walkable point, and lets a stray walk back', () => {
     const grid = buildPlaceNavGrid(bounds, [], R)
     navRestrict(grid, (_x, z) => z < 2)
