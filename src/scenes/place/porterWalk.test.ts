@@ -184,6 +184,20 @@ describe('the porter walk on synthetic ground', () => {
     }
   })
 
+  it('refuses ground beyond the walkable edge even where a collider stands on it', () => {
+    // A post past the restriction: its cell is solid AND refused ground. A
+    // position clear of the post but in its cell must still read off ground.
+    const post: Collider[] = [{ x: 0, z: -3, r: 0.3 }]
+    const grid = buildPlaceNavGrid(bounds, post, R)
+    navRestrict(grid, (_x, z) => z > -1)
+    expect(navPointOffGround(grid, 0, -3)).toBe(true)
+    // The same post on accepted ground is no refusal of the ground.
+    expect(navPointOffGround(buildPlaceNavGrid(bounds, post, R), 0, -3)).toBe(false)
+    // A step from accepted ground into the post's cell is cut at the edge.
+    const [, z] = walkableStep(grid, 0, -0.5, 0, -3)
+    expect(z).toBeGreaterThan(-1.5)
+  })
+
   it('cuts a step back to the last walkable point, and lets a stray walk back', () => {
     const grid = buildPlaceNavGrid(bounds, [], R)
     navRestrict(grid, (_x, z) => z < 2)
