@@ -53,6 +53,9 @@ beforeAll(() => {
   })
   mkdirSync(resolve(repo, '.claude'), { recursive: true })
   mkdirSync(memory, { recursive: true })
+  // The live publish goes to the real page; in the temp repo it is a stub that
+  // succeeds, so the start commands can be asserted to exit 0.
+  writeFileSync(resolve(repo, 'scripts', 'board-publish.mjs'), "console.log('published (test stub)')\n")
 })
 
 afterAll(() => {
@@ -61,6 +64,7 @@ afterAll(() => {
 
 beforeEach(() => {
   writeFileSync(boardFile(), BOARD)
+  writeFileSync(resolve(repo, '.batch-dashboard-archive.html'), `<main>\n${sect('Erledigt', '')}</main>\n`)
   writeFileSync(resolve(repo, 'TASKS.md'), '- [x] 1490. Disk footprint\n- [ ] 1509. Housekeeping\n')
   writeFileSync(resolve(repo, '.claude', 'dashboard-state.json'), JSON.stringify({ dashboardPath: '.batch-dashboard.html' }))
   writeFileSync(carrierFile(), CARRIER)
@@ -92,12 +96,11 @@ describe('board.mjs start path drains pending requests first (spawned)', () => {
     writeFileSync(carrierFile(), markAppending(CARRIER, 'Amend 1509', 1512).text)
     const r = runBoard(...args)
     const out = r.stdout + r.stderr
-    // The board edit and the focus update must succeed. Exit 0 would need a
-    // real publish to the live page, which this temp repo must never reach, so
-    // the publish is asserted to be the ONLY failing step.
-    expect(out).toMatch(/BOARD FILE WRITTEN — .*1509 (is|promoted to) current work/)
+    expect(r.status, out).toBe(0)
+    expect(out).toMatch(/1509 (is|promoted to) current work/)
+    expect(out).toMatch(/published \(test stub\)/)
+    expect(out).toMatch(/The live page is updated/)
     expect(out).toMatch(/focus declared: 1509/)
-    expect(out).toMatch(/The LIVE page was NOT updated/)
     expect(out).not.toMatch(/cannot start|publish precondition refused|no queue card/)
     expect(JSON.parse(readFileSync(resolve(repo, '.claude', 'current-focus.json'), 'utf8')).point).toBe(1509)
     expect(nowCardOf1509()).not.toBeNull()
