@@ -2114,5 +2114,15 @@ export const RED_CHARGES = [
       + 'staging with pre.ok false and the prime giraffe not found; point 1498 is closed, so the red was filed as '
       + 'point 1503. The charge dies with point 1503.',
   },
+  {
+    point: 1515,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^(a forced ground-predator approach makes the flamingos take off and escape, uncaught|the airborne flock stands in the take-off frame at the shutter|a forced peregrine enters high, stoops on a flying bird, strikes, and the hunt resolves)\b/i,
+    why:
+      'MEASURED 13.11.2026 on WebGPU, main 8d18bc787: the whole enrichments pass failed the forced peregrine stoop, and '
+      + '--section=bird-flight-escape alone on a quiet machine failed all three checks (flock onScreen 0, no stoop). '
+      + 'No open point owned design.md §19.19, so the red was filed as point 1515. The charge dies with point 1515.',
+  },
 
 ]
