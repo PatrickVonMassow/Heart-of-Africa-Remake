@@ -163,6 +163,91 @@ describe('the porter walk on synthetic ground', () => {
   })
 })
 
+/** Longest stretch (s) a porter goes without getting `progress` metres nearer
+ *  its leg's goal and without being turned back — out of rest. */
+function noProgress(route: PorterRoute, world: PorterWorld, seconds: number, progress = 0.15): { worst: number; escapes: number } {
+  const rand = mulberry32(5)
+  const s = startPorter(route, rand)
+  s.pause = 0
+  let leg = s.leg
+  let mark = Infinity
+  let since = 0
+  let worst = 0
+  let escapes = 0
+  for (let t = 0; t < seconds; t += DT) {
+    stepPorter(s, route, world, DT, rand)
+    const goal = s.leg === 0 ? route.plaza : route.entrance
+    const d = Math.hypot(goal.x - s.x, goal.z - s.z)
+    if (s.leg !== leg) {
+      leg = s.leg
+      escapes++
+      mark = d
+      since = 0
+    } else if (s.pause > 0 || d <= mark - progress) {
+      mark = d
+      since = 0
+    } else {
+      since += DT
+      worst = Math.max(worst, since)
+    }
+  }
+  return { worst, escapes }
+}
+
+describe('the porter that moves but gets nowhere', () => {
+  const bounds = { radius: 30 }
+  // Grids blind to the obstruction: the plan runs straight through it, as a
+  // route does through another inhabitant or a wall the grid cell missed.
+  const grid = buildPlaceNavGrid(bounds, [], R)
+
+  it('sliding along a wall at full step length replans and is freed within the stall bound', () => {
+    // The wall turns every step into a full-length slide along it, the way a
+    // walk round another body keeps the step's length: the porter moves every
+    // frame and never gets nearer the goal behind the wall.
+    const wallZ = 4
+    const world: PorterWorld = {
+      grid,
+      move: (fx, fz, tx, tz) => {
+        if (tz >= wallZ + R) return [tx, tz]
+        const len = Math.hypot(tx - fx, tz - fz)
+        const side = Math.sign(tx - fx) || 1
+        return [fx + side * len, Math.max(fz, wallZ + R)]
+      },
+      free: (x, z) => [x, z],
+    }
+    const route: PorterRoute = { entrance: { x: 3, z: 10 }, plaza: { x: 0, z: 0 }, pace: PORTER_WALK.pace }
+    const r = noProgress(route, world, 30)
+    expect(r.escapes).toBeGreaterThan(0)
+    expect(r.worst).toBeLessThanOrEqual(PORTER_WALK.stallEscape + 2 * DT)
+  })
+
+  it('circling another body that holds its goal replans and is freed within the stall bound', () => {
+    const body = { x: 0, z: 0, r: 0.8 }
+    const world: PorterWorld = {
+      grid,
+      move: (fx, fz, tx, tz) => {
+        const ox = tx - body.x
+        const oz = tz - body.z
+        const d = Math.hypot(ox, oz)
+        if (d >= body.r + R) return [tx, tz]
+        // Walked round: the full step along the tangent, kept at the body's edge.
+        const len = Math.hypot(tx - fx, tz - fz)
+        const ax = (fx - body.x) / (Math.hypot(fx - body.x, fz - body.z) || 1)
+        const az = (fz - body.z) / (Math.hypot(fx - body.x, fz - body.z) || 1)
+        const nx = fx - az * len
+        const nz = fz + ax * len
+        const k = (body.r + R) / (Math.hypot(nx - body.x, nz - body.z) || 1)
+        return [body.x + (nx - body.x) * k, body.z + (nz - body.z) * k]
+      },
+      free: (x, z) => [x, z],
+    }
+    const route: PorterRoute = { entrance: { x: 0.4, z: 9 }, plaza: { x: 0, z: 0 }, pace: PORTER_WALK.pace }
+    const r = noProgress(route, world, 30)
+    expect(r.escapes).toBeGreaterThan(0)
+    expect(r.worst).toBeLessThanOrEqual(PORTER_WALK.stallEscape + 2 * DT)
+  })
+})
+
 describe('the porters of the reported ports', () => {
   const cases: Array<[string, number]> = [['cairo', 1177128818], ['tangier', 1117999851]]
   for (const [placeId, seed] of cases) {

@@ -2947,6 +2947,9 @@ export const PORTER_WALK = {
   arriveRadius: 0.35,
   /** How close a corner waypoint counts as passed (m). */
   waypointRadius: 0.6,
+  /** How much nearer the leg's end, along the remaining route, counts as
+   *  progress (m): a step that only slides or circles is not. Calibratable. */
+  progressStep: 0.15,
   /** Without progress this long the porter replans from where it stands (s). */
   stallReplan: 1.5,
   /** Without progress this long it is placed on free ground and turns back (s). */

@@ -29,8 +29,10 @@ export interface PorterState {
   way: NavPoint[]
   /** Rest left at a route end (s). */
   pause: number
-  /** Time without progress (s). */
+  /** Time without progress along the route (s). */
   stalled: number
+  /** Remaining route length at the last progress (m; Infinity: not yet measured). */
+  mark: number
   /** Last displacement per second (m/s). */
   vx: number
   vz: number
@@ -135,9 +137,25 @@ export function startPorter(route: PorterRoute, rand: () => number): PorterState
     way: [],
     pause: rand() * (PORTER_WALK.dwell + PORTER_WALK.dwellSpread),
     stalled: 0,
+    mark: Infinity,
     vx: 0,
     vz: 0,
   }
+}
+
+/** The length of the route still ahead: to the next waypoint and on along
+ *  the rest. Passing a waypoint never lengthens it; a slide along a wall or a
+ *  circle round another body does not shorten it. */
+function routeLeft(s: PorterState): number {
+  if (s.way.length === 0) return 0
+  let d = Math.hypot(s.way[0].x - s.x, s.way[0].z - s.z)
+  for (let i = 1; i < s.way.length; i++) d += Math.hypot(s.way[i].x - s.way[i - 1].x, s.way[i].z - s.way[i - 1].z)
+  return d
+}
+
+/** The route from where the porter stands to its leg's end. */
+function planLeg(s: PorterState, grid: PlaceNavGrid, goal: NavPoint): NavPoint[] {
+  return findPlaceRoute(grid, s, goal) ?? [{ x: goal.x, z: goal.z }]
 }
 
 /** One frame of the round. Mutates `s`. */
@@ -151,6 +169,7 @@ export function stepPorter(s: PorterState, route: PorterRoute, world: PorterWorl
   if (s.pause > 0) {
     s.pause -= dt
     s.stalled = 0
+    s.mark = Infinity
     done()
     return
   }
@@ -160,10 +179,11 @@ export function stepPorter(s: PorterState, route: PorterRoute, world: PorterWorl
     s.way = []
     s.pause = PORTER_WALK.dwell + rand() * PORTER_WALK.dwellSpread
     s.stalled = 0
+    s.mark = Infinity
     done()
     return
   }
-  if (s.way.length === 0) s.way = findPlaceRoute(world.grid, s, goal) ?? [{ x: goal.x, z: goal.z }]
+  if (s.way.length === 0) s.way = planLeg(s, world.grid, goal)
   advancePlaceRoute(world.grid, s, s.way, PORTER_WALK.waypointRadius)
   const target = s.way[0]
   const dx = target.x - s.x
@@ -185,20 +205,28 @@ export function stepPorter(s: PorterState, route: PorterRoute, world: PorterWorl
   }
   s.x = nx
   s.z = nz
-  const moved = Math.hypot(nx - fromX, nz - fromZ)
-  // Turning nearly on the spot is not a stall.
-  if (moved >= reach * 0.3 || turn.pace < 0.3) {
+  // Progress is the route getting shorter, not displacement: a porter that
+  // slides along a wall or circles a body holding its goal moves every frame
+  // and gets nowhere. A turn on the spot is no progress either; it takes far
+  // less than the replan bound. The deadline runs on from the last progress
+  // through a replan, so the escape is never put off.
+  const left = routeLeft(s)
+  if (left <= s.mark - PORTER_WALK.progressStep) {
+    s.mark = left
     s.stalled = 0
   } else {
     const before = s.stalled
     s.stalled += dt
-    if (before < PORTER_WALK.stallReplan && s.stalled >= PORTER_WALK.stallReplan) {
-      s.way = []
-    } else if (s.stalled >= PORTER_WALK.stallEscape) {
+    if (s.stalled >= PORTER_WALK.stallEscape) {
       ;[s.x, s.z] = world.free(s.x, s.z)
       s.leg = s.leg === 0 ? 1 : 0
       s.way = []
       s.stalled = 0
+      s.mark = Infinity
+    } else if (before < PORTER_WALK.stallReplan && s.stalled >= PORTER_WALK.stallReplan) {
+      // Replan from here; the new route is measured afresh, the clock is not.
+      s.way = planLeg(s, world.grid, goal)
+      s.mark = routeLeft(s)
     }
   }
   done()
