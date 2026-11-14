@@ -930,6 +930,8 @@ interface BalanceConfig {
     nileFloodRise: number
     /** How strongly rain darkens/glosses the ground, 0 dry .. 1 full (point 225). */
     wetGroundStrength: number
+    /** The overcast grayMix at which the sky dome reads fully heavy (point 354). */
+    overcastFullAt: number
   }
   /** Rain on the settlement ground under cover (src/render/shelterWetness.ts):
    *  roofs and tree crowns keep the ground below them drier, never dry. */
@@ -2065,6 +2067,8 @@ export const balance: BalanceConfig = {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
     nileFloodRise: 0.55, // the unregulated 1890 flood is dramatic; calibratable
     wetGroundStrength: 1, // rain fully darkens/glosses the ground (point 225); calibratable, debug-editable
+    // Rain starts at wetness 0.45 (grayMix 0.34): the dome must read heavy by then. Calibratable.
+    overcastFullAt: 0.4,
   },
   rain: {
     // Educated guesses, all calibratable; the mask is baked when the place is

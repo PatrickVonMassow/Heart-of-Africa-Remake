@@ -127,8 +127,29 @@ if (section('settlement-season')) {
   // An UNMEASURED settle leaves a partial reading; every season check below is
   // built on it, so it reports UNMEASURED too instead of asserting on it.
   let seasonSkip = null
-  const settle = async (label) => {
-    const r = await waitForReadingStable(page, () => window.__placeSeason(), { settleMs: 500, samples: 3, requireChange: true, timeout: 60000 })
+  const settle = async (label, requireChange = true) => {
+    // Point 354: settle by RENDERED frames, not wall time. The light lerps per
+    // frame (k = 0.8·dt, dt ≤ 0.1 s); at the 1-5 fps of the headless lane a
+    // 3 × 500 ms quiet window fell between frames and read the wet sun half-lerped
+    // (2.18 for a target of 1.44) — the red charged to this point.
+    const r = await (async () => {
+      const t0 = Date.now()
+      const read = () => page.evaluate(() => window.__placeSeason())
+      const nums = (v) => [v.sun, v.hemi, v.sky.grayMix, v.sky.cloudBoost, v.rain, v.tint]
+      let prev = await read()
+      let quiet = 0
+      let moved = false
+      while (Date.now() - t0 < 120000) {
+        await nextFrames(8)
+        const cur = await read()
+        const still = nums(prev).every((n, i) => Math.abs(n - nums(cur)[i]) <= 1e-3)
+        if (!still) moved = true
+        quiet = still ? quiet + 1 : 0
+        prev = cur
+        if ((moved || !requireChange) && quiet >= 3) return { value: cur, settled: true, waitedMs: Date.now() - t0 }
+      }
+      return { value: prev, settled: false, waitedMs: Date.now() - t0 }
+    })()
     // A TIMING check (point 642): a 60 s settle deadline over a per-frame lerp.
     // It declares the rate it needs; a settle that fails below it is UNMEASURED
     // (the software lane read it after 60176 ms), one that succeeds passes on any
@@ -195,6 +216,49 @@ if (section('settlement-season')) {
   await frame('114-village-rain', { place: 'maasai-village', label: 'the rain inside the settlement' })
   // Leave no forced weather behind for the checks below.
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+
+  // Point 354: the checks above read the VALUES behind the dome and stayed green
+  // while the player saw rain fall from a blue sky (the Zulu village, 03.01.1890).
+  // The evidence is the PICTURE: the same sky crop at the same settlement on the
+  // real calendar, its dry month against its wet month (the point-147 remedy).
+  const skyCrop = async (month, label) => {
+    await page.evaluate((m) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      g.debugJumpToMonth(m)
+    }, month)
+    await goToPlace('zulu-village')
+    await settle(label, false)
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await nextFrames(4)
+    // Upper sky only: above the huts and the hills, below the HUD bar.
+    const buf = await capturePixels(page, `${label} sky crop`, { clip: { x: 40, y: 60, width: 1360, height: 160 } })
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+    const lum = []
+    const sat = []
+    for (let i = 0; i < info.width * info.height; i++) {
+      const r = data[i * info.channels], g = data[i * info.channels + 1], b = data[i * info.channels + 2]
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
+      lum.push(0.2126 * r + 0.7152 * g + 0.0722 * b)
+      sat.push(mx > 0 ? (mx - mn) / mx : 0)
+    }
+    // Medians, so the thin rain streaks cannot carry the reading.
+    const median = (a) => a.sort((x, y) => x - y)[a.length >> 1]
+    return { lum: median(lum), sat: median(sat) }
+  }
+  const skyDry = await skyCrop(7, 'Zulu July')
+  await frame('354-village-sky-dry', { place: 'zulu-village', label: 'the Zulu village sky in July' })
+  const skyWet = await skyCrop(1, 'Zulu January')
+  await frame('354-village-sky-wet', { place: 'zulu-village', label: 'the Zulu village sky in January, under the rains' })
+  // Bars: a person calls a sky overcast when its blue is gone and it has darkened.
+  // Calibratable: the first measured runs read sat 0.30 -> 0.09 under the deck.
+  // The crops settle after `seasonCheck` was chosen, so their skip is re-read here.
+  ;(seasonSkip ? (name) => unmeasured(name, seasonSkip) : check)(
+    'the settlement sky reads overcast on screen in its wet month (point 354, pixels)',
+    skyWet.sat < skyDry.sat * 0.5 && skyWet.lum < skyDry.lum * 0.85,
+    `sky crop dry ${JSON.stringify(skyDry)} -> wet ${JSON.stringify(skyWet)}`,
+  )
+  await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
 
   // A desert PORT never rains, on the real calendar, in any month — Cairo is
   // hyper-arid and wetnessAt returns 0 there. (The debug override deliberately
