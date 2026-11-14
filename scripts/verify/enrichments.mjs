@@ -12283,6 +12283,93 @@ if (section('solar-sun')) {
   check('solar sun: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 }
 
+// Horizon maps (design.md §2.7 "The land shades itself", point 346): at a
+// massif under the 16:00 June sun the ground in its lee reads darker in PIXELS
+// than the ground on its sun-facing side in the same elevation band — and that
+// contrast goes flat when the level steps to low, where the maps are neither
+// fetched nor applied. Judged on the image, never on the flag.
+if (section('horizon-maps')) {
+  const PEAK = { lat: -3.07, lon: 37.35 } // Kilimanjaro: lee 0 % lit, sun side 100 % in the bake
+  const JUNE_21 = 171
+  const BAND = [1.0, 2.1] // world height band (~740-1560 m) both sides share
+  await page.evaluate(([d]) => {
+    const g = window.__game.getState()
+    if (g.mode === 'place') g.leavePlace()
+    window.__ui.getState().setDetailLevel('medium')
+    window.__game.setState({ day: d })
+    window.__game.getState().debugJumpTo(-3.6, 37.35)
+  }, [JUNE_21])
+  await page.waitForFunction(() => window.__horizonMaps?.enabled === 1 && window.__sceneSun?.dayOfYear === 171, null, { timeout: 60000 })
+  // Sample points along the sun's azimuth through the peak, 0.2-0.6° out on
+  // either side, inside the shared elevation band.
+  const pts = await page.evaluate(([peak, band]) => {
+    const seed = window.__game.getState().seed
+    const az = (window.__sceneSun.angles.azimuth * Math.PI) / 180
+    const ux = Math.sin(az)
+    const uy = Math.cos(az)
+    const out = []
+    for (const side of [1, -1]) {
+      for (let d = 0.2; d <= 0.601; d += 0.05) {
+        for (let l = -0.1; l <= 0.101; l += 0.05) {
+          const lon = peak.lon + side * d * ux - l * uy
+          const lat = peak.lat + side * d * uy + l * ux
+          const y = window.__terrainHeight(lat, lon, seed)
+          if (y < band[0] || y > band[1]) continue
+          out.push({ x: lon * 10, z: -lat * 10, y, sun: side === 1 })
+        }
+      }
+    }
+    return out
+  }, [PEAK, BAND])
+  const read = async (label) => {
+    await page.waitForFunction(() => window.__camera?.settled?.(), null, { timeout: 30000 }).catch(() => {})
+    const proj = await page.evaluate((ps) => ps.map((p) => {
+      const n = window.__camera.ndc(p.x, p.z, p.y)
+      return [(n.x * 0.5 + 0.5) * window.innerWidth, (0.5 - n.y * 0.5) * window.innerHeight, n.z]
+    }), pts)
+    const png = await capturePixels(page, `horizon maps: ${label}`)
+    const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
+    const sx = info.width / (await page.evaluate(() => window.innerWidth))
+    const acc = { sun: [0, 0], lee: [0, 0] }
+    proj.forEach(([px, py, pz], k) => {
+      const cx = Math.round(px * sx)
+      const cy = Math.round(py * sx)
+      if (pz >= 1 || cx < 8 || cx >= info.width - 8 || cy < 70 * sx || cy >= info.height - 80 * sx) return
+      let lum = 0
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const i = ((cy + dy) * info.width + cx + dx) * info.channels
+          lum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]
+        }
+      }
+      const a = acc[pts[k].sun ? 'sun' : 'lee']
+      a[0] += lum / 25
+      a[1]++
+    })
+    const sun = acc.sun[1] ? acc.sun[0] / acc.sun[1] : NaN
+    const lee = acc.lee[1] ? acc.lee[0] / acc.lee[1] : NaN
+    return { sun, lee, nSun: acc.sun[1], nLee: acc.lee[1], ratio: lee / sun }
+  }
+  await shot('346-horizon-medium', { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, horizon maps on (medium)' })
+  const med = await read('medium')
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
+  await page.waitForFunction(() => window.__horizonMaps?.enabled === 0, null, { timeout: 30000 })
+  await shot('346-horizon-low', { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, low level: no horizon maps' })
+  const low = await read('low')
+  check(
+    'horizon maps: both sides of the massif are in frame in the shared elevation band',
+    med.nSun >= 6 && med.nLee >= 6 && low.nSun >= 6 && low.nLee >= 6,
+    JSON.stringify({ points: pts.length, med, low }),
+  )
+  check(
+    'horizon maps: the lee reads darker than the sun side at medium, and that contrast is flat at low',
+    med.ratio < low.ratio * 0.9,
+    JSON.stringify({ med, low }),
+  )
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  check('horizon maps: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
+}
+
 // Eye adaptation and sun glare (design.md §2.7, point 344; highest level).
 // Everything is measured in RENDERED PIXELS, never in a uniform (§7.2): the
 // exposure in the mean brightness of the frame, the glare in the difference it

@@ -175,7 +175,11 @@ depth-dependent absorption over real bathymetry, shore/crest foam). Its shader p
 build OFF the startup critical path: the first frames draw the ready set and the rest
 links behind them, so the loading picture stands still no longer than the calibratable
 `balance.startup.pictureFreezeBudgetMs`, which counts the WHOLE standstill — a renderer
-busy inside one long frame included.
+busy inside one long frame included. At medium and high the bird's-eye terrain shades
+itself from horizon maps baked offline from the DEM (`scripts/build-horizon-maps.mjs`, six
+sun slices of the 16:00 arc plus a mean-horizon sky occlusion): its lee darkens where the
+land toward the sun rises above the sun, its hollows see less sky, and a debug hour outside
+the baked arc clamps to the nearest slice and says so. At low the maps are never fetched.
 
 ## 15. Lively, densely built settlements.
 
