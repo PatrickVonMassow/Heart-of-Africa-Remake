@@ -12399,6 +12399,7 @@ if (section('eye-adaptation-glare')) {
   // (b) GLARE: its contribution is the difference glare-on minus glare-off in
   // a box around the sun's screen position, at a held exposure.
   const glareDiff = async (label) => {
+    await frames(2) // the glare state is written by the frame after a pose
     const g = await glareAt()
     const box = g ? [g.u - 0.2, g.v - 0.2, g.u + 0.2, g.v + 0.2] : null
     await page.evaluate(() => { window.__balance.exposure.compensation = 0 })
@@ -12458,14 +12459,20 @@ if (section('eye-adaptation-glare')) {
   await page.waitForFunction(() => window.__game.getState().mode === 'travel' && window.__postFeatures !== undefined)
   const start = { lat: 29.5, lon: 31.0 }
   await page.evaluate((p) => window.__game.getState().debugJumpTo(p.lat, p.lon), start)
+  // The clock runs in travel; the after-capture is taken at the same day so
+  // the sun is the same and only the exposure could differ.
+  const passDay = await page.evaluate(() => window.__game.getState().day)
   await frames(60)
   const before = await capturePixels(page, "bird's-eye: before the pass")
   for (const p of [{ lat: 25, lon: 28 }, { lat: 20, lon: 25 }, { lat: 5, lon: 22 }, { lat: 15, lon: 30 }]) {
     await page.evaluate((q) => window.__game.getState().debugJumpTo(q.lat, q.lon), p)
     await frames(20)
   }
-  await page.evaluate((p) => window.__game.getState().debugJumpTo(p.lat, p.lon), start)
-  await frames(10)
+  await page.evaluate(([p, d]) => {
+    window.__game.getState().debugJumpTo(p.lat, p.lon)
+    window.__game.setState({ day: d })
+  }, [start, passDay])
+  await frames(60)
   const after = await capturePixels(page, "bird's-eye: right after the pass")
   await shot('344-birdseye-after-pass', { world: start, label: "the bird's-eye view at high, right after a driven pass" })
   const features = await page.evaluate(() => window.__postFeatures)
