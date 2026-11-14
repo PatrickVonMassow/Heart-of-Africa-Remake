@@ -931,6 +931,24 @@ interface BalanceConfig {
     /** How strongly rain darkens/glosses the ground, 0 dry .. 1 full (point 225). */
     wetGroundStrength: number
   }
+  /** Rain on the settlement ground under cover (src/render/shelterWetness.ts):
+   *  roofs and tree crowns keep the ground below them drier, never dry. */
+  rain: {
+    /** How much FULL cover cuts the ground wetness, 0 (none) .. strictly below 1
+     *  (wind-blown rain and splash reach under every eave; clamped below 1). */
+    shelterStrength: number
+    /** Cover a tree crown gives relative to a roof (leaves let rain through). */
+    crownCover: number
+    /** Half-width (m) of the soft ramp centred on a roof's rim or a crown's edge. */
+    edgeSoftM: number
+    /** Extra wetness of the drip band just outside the eaves, as a fraction of the
+     *  open ground's (0 drops the drip line). */
+    dripBoost: number
+    /** Where the drip band peaks, metres outside the eave line. */
+    dripOffsetM: number
+    /** Half-width (m) of the drip band around that peak. */
+    dripHalfWidthM: number
+  }
   /** The village cooking fire's response to rain (design.md §19.10, point 256). */
   fire: {
     /** How much full rain damps the SHELTERED flame under the cook-shelter (0..1, small: it burns on). */
@@ -2047,6 +2065,16 @@ export const balance: BalanceConfig = {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
     nileFloodRise: 0.55, // the unregulated 1890 flood is dramatic; calibratable
     wetGroundStrength: 1, // rain fully darkens/glosses the ground (point 225); calibratable, debug-editable
+  },
+  rain: {
+    // Educated guesses, all calibratable; the mask is baked when the place is
+    // built, so an edit lands on the next visit.
+    shelterStrength: 0.6, // full cover keeps 40 % of the open ground's wetness — less wet, not dry
+    crownCover: 0.75, // a crown intercepts less than thatch
+    edgeSoftM: 0.45, // soft edge: a hard dry disc reads worse than uniform wetness
+    dripBoost: 0.35, // the runoff band reads a third wetter than the open yard
+    dripOffsetM: 0.3,
+    dripHalfWidthM: 0.35,
   },
   fire: {
     // The cooking fire keeps burning through the rains under its thatch cook-shelter

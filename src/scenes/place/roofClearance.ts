@@ -105,6 +105,9 @@ export interface PlaceRoof {
   /** Half extents of the footprint in the local frame (sampling bounds). */
   hx: number
   hz: number
+  /** Footprint shape: a disc of radius `rimRadius`, or an hx × hz rectangle
+   *  in the local frame (the shelter-mask bake measures its edge distance). */
+  shape: 'disc' | 'rect'
   /** Farthest the footprint reaches from (x, z). */
   rimRadius: number
   /** The roof's lowest underside anywhere over its footprint. */
@@ -125,6 +128,7 @@ function discRoof(what: string, x: number, z: number, radius: number, underside:
     rot: 0,
     hx: radius,
     hz: radius,
+    shape: 'disc',
     rimRadius: radius,
     lowest: underside(radius),
     covers: (lx, lz) => Math.hypot(lx, lz) <= radius,
@@ -142,6 +146,7 @@ function slabRoof(what: string, x: number, z: number, rot: number, hx: number, h
     rot,
     hx,
     hz,
+    shape: 'rect',
     rimRadius: Math.hypot(hx, hz),
     lowest: low,
     covers: (lx, lz) => Math.abs(lx) <= hx && Math.abs(lz) <= hz,

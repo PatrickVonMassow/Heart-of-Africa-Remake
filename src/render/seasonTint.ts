@@ -41,17 +41,20 @@ export function setGroundWetness(w: number) {
 // without a second render pass. The typings on a colour/roughness node are
 // narrower than the runtime (the same gap materials.ts bridges with `unknown`).
 
+// `wet` defaults to the shared uniform; the settlement ground passes its
+// SPATIAL wetness instead (shelterWetness.ts — sheltered ground stays less wet).
+
 /** Darken a ground albedo node toward damp as it soaks (point 225). */
-export function wetGroundColor(col: unknown) {
+export function wetGroundColor(col: unknown, wet: unknown = GROUND_WET_U) {
   return (col as ReturnType<typeof float>).mul(
-    float(1).sub((GROUND_WET_U as unknown as ReturnType<typeof float>).mul(0.4)),
+    float(1).sub((wet as ReturnType<typeof float>).mul(0.4)),
   )
 }
 
 /** Lower a ground roughness node toward a wet sheen as it soaks (point 225). */
-export function wetGroundRoughness(rough: unknown) {
+export function wetGroundRoughness(rough: unknown, wet: unknown = GROUND_WET_U) {
   return (rough as ReturnType<typeof float>).mul(
-    float(1).sub((GROUND_WET_U as unknown as ReturnType<typeof float>).mul(0.55)),
+    float(1).sub((wet as ReturnType<typeof float>).mul(0.55)),
   )
 }
 
