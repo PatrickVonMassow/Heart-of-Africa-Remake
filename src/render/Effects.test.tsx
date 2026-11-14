@@ -5,6 +5,8 @@ import { velocity } from 'three/tsl'
 import { Effects } from './Effects'
 import { createScenePass } from './scenePass'
 import { useUi } from '../state/ui'
+import { useGame } from '../state/store'
+import { EyeAdaptationNode } from './eyeAdaptation'
 
 const fiber = vi.hoisted(() => ({ state: {} as Record<string, unknown>, frame: () => {} }))
 vi.mock('@react-three/fiber', () => ({
@@ -16,7 +18,11 @@ vi.mock('./environment', () => ({ createEnvironmentTexture: () => new Texture() 
 const initialUi = useUi.getState()
 const currentPass = () => (window as unknown as { __scenePass: ReturnType<typeof createScenePass> }).__scenePass
 
-afterEach(() => { useUi.setState(initialUi, true) })
+const initialMode = useGame.getState().mode
+afterEach(() => {
+  useUi.setState(initialUi, true)
+  useGame.setState({ mode: initialMode })
+})
 
 function mountEffects() {
   const gl = new WebGPURenderer({ forceWebGL: true })
@@ -141,5 +147,32 @@ describe('post chain ownership', () => {
     view.unmount()
     expect(finalDispose).toHaveBeenCalledTimes(1)
     expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  // design.md §2.7: the adapting exposure is first-person only, at high only;
+  // the bird's-eye view never builds it, whatever the level.
+  const features = () => (window as unknown as { __postFeatures?: { eyeAdaptation: boolean } }).__postFeatures
+  it.each([
+    ['place', 'high', true], ['place', 'medium', false], ['place', 'low', false],
+    ['travel', 'high', false], ['travel', 'medium', false],
+  ] as const)('%s at %s: eye adaptation in the chain = %s', (mode, detailLevel, expected) => {
+    useGame.setState({ mode })
+    useUi.setState({ detailLevel })
+    const view = mountEffects()
+    expect(features()?.eyeAdaptation).toBe(expected)
+    view.unmount()
+  })
+
+  it('switching to the bird\'s-eye view drops the adaptation node and frees it', () => {
+    useGame.setState({ mode: 'place' })
+    useUi.setState({ detailLevel: 'high' })
+    const dispose = vi.spyOn(EyeAdaptationNode.prototype, 'dispose')
+    const view = mountEffects()
+    expect(features()?.eyeAdaptation).toBe(true)
+    act(() => useGame.setState({ mode: 'travel' }))
+    expect(features()?.eyeAdaptation).toBe(false)
+    expect(dispose).toHaveBeenCalledTimes(1)
+    view.unmount()
+    dispose.mockRestore()
   })
 })
