@@ -343,9 +343,11 @@ added.
   the real number comes from F8.
 - **`godrays`** — Sun shafts (design.md §2.7, point 345,
   `src/render/sunShafts.ts`): a mask keeps the open sky in a lobe around the
-  sun's screen position (`maskRadius`, sky pixels capped at `brightnessCap`);
-  the upstream `radialBlur` smears it toward the sun and the blur alone is
-  added before TRAA and bloom. A palm crown, a roof edge or a minaret in front
+  sun's screen position (`maskRadius`); the upstream `radialBlur` smears it
+  toward the sun, the same blur of an unobstructed sky (computed analytically)
+  is subtracted except for `beamShare` of it, and the difference is added
+  before TRAA and bloom. Without the subtraction every ray averaged the bright
+  sky by the sun into a milky veil over the whole frame. A palm crown, a roof edge or a minaret in front
   of the sun cut gaps into the mask, so the result is bright beams and dark
   wedges converging on the sun; the frame away from the lobe gets nothing.
   Fades out as the sun leaves the frame. Chosen over the upstream

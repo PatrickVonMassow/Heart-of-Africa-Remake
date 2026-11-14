@@ -139,9 +139,10 @@ export function Effects() {
     // blur's dither and the bright beams bloom (render/sunShafts.ts).
     let shafts: ReturnType<typeof createSunShafts> | null = null
     if (shaftsEnabled) {
-      shafts = createSunShafts(color, depth)
+      shafts = createSunShafts(depth)
       disposables.push(shafts)
-      aoComposed = aoComposed.add(vec4(shafts.node, 0))
+      // The wedges darken, so floor the sum at black.
+      aoComposed = max(aoComposed.add(vec4(shafts.node, 0)), vec4(0))
     }
 
     // Temporal resolve over the AO-composed image, so the accumulation also

@@ -906,14 +906,17 @@ interface BalanceConfig {
     ghostIntensity: number
   }
   /** Sun shafts (design.md §2.7, quality key `godrays`, render/sunShafts.ts):
-   *  the open sky around the sun, radially blurred toward it and added. */
+   *  the open sky around the sun, radially blurred toward it, minus the same
+   *  blur of an unobstructed sky, so only what an occluder cuts shows. */
   godrays: {
-    /** HDR strength of the added shafts. */
+    /** HDR strength of the shafts (wedge darkening and beam lift). */
     intensity: number
     /** Radius (screen height share) of the sky lobe around the sun that feeds them. */
     maskRadius: number
-    /** HDR ceiling of a sky pixel in the mask, so the sun disc cannot dominate. */
-    brightnessCap: number
+    /** Share of the unobstructed blur kept as lift: 0 = wedges only, 1 = the full veil. */
+    beamShare: number
+    /** Linear RGB tint of the scattered sunlight. */
+    tint: [number, number, number]
     /** Per-sample decay along the blur toward the sun: the shafts' length. */
     decay: number
   }
@@ -2029,7 +2032,8 @@ export const balance: BalanceConfig = {
   godrays: {
     intensity: 0.6, // educated guess; calibratable, debug-editable
     maskRadius: 0.3, // calibratable
-    brightnessCap: 3, // calibratable
+    beamShare: 0.15, // calibratable; 1 drew a milky veil over the whole frame (14.11.2026)
+    tint: [1, 0.86, 0.66], // warm low sun; calibratable
     decay: 0.97, // calibratable, debug-editable
   },
   season: {
