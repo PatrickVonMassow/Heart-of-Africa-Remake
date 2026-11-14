@@ -473,6 +473,13 @@ export const effectiveFigureGltfBody = (s: UiState): boolean => currentQuality(s
 /** Flame billboards and smoke puffs of the grass fire (design.md §19.8/§19.13). */
 export const effectiveGrassFireFlames = (s: UiState): number => currentQuality(s).grassFireFlames
 export const effectiveGrassFireSmoke = (s: UiState): number => currentQuality(s).grassFireSmoke
+/** First-person eye adaptation at this level (design.md §2.7); the consumer
+ *  additionally limits it to the settlement scene. */
+export const effectiveEyeAdaptation = (s: UiState): boolean => currentQuality(s).eyeAdaptation
+/** Sun glare at this level: it is built on the bloom, so it needs bloom too. */
+export const effectiveSunGlare = (s: UiState): boolean => currentQuality(s).sunGlare && currentQuality(s).bloom
+/** Sky-dome sun-disc gain at this level. */
+export const effectiveSunDiscGain = (s: UiState): number => currentQuality(s).sunDiscGain
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

@@ -57,6 +57,9 @@ device pixel ratio is kept (no cap).
 | `sphinxSiteDetail` | reduced | standard | full |
 | `springSegments` | 12 | 24 | 36 |
 | `springBubbles` | 0 | 4 | 7 |
+| `eyeAdaptation` | off | off | on |
+| `sunGlare` | off | off | on |
+| `sunDiscGain` | 3 | 3 | 14 |
 
 ## What each setting does
 
@@ -324,6 +327,23 @@ added.
 - **`springBubbles`** — Bubble spheres rising out of each spring's dome. The
   dome surface bubbles on every level, so low drops the spheres, never the
   bubbling. Climbs 0 → 4 → 7.
+- **`eyeAdaptation`** — First-person eye adaptation (design.md §2.7, point
+  344). The exposure follows the mean luminance of the HDR frame, measured on
+  the GPU from a 128² luminance mip chain (no CPU readback), inside the bounded
+  `balance.exposure` range around today's 1.05; adapting to bright light is
+  fast, to the dark slow. Settlement scenes only — the bird's-eye view keeps its
+  fixed exposure at every level, a readability rule, not a cost choice. High
+  only.
+- **`sunGlare`** — The sun's glare (design.md §2.7, point 344): the upstream
+  `LensflareNode` ghosts over the bloom plus a glare star, both multiplied by a
+  depth occlusion test at the sun's projected position, so a wall or roof edge in
+  front of the sun kills the glare in the same frame. Needs bloom; settlement
+  scenes only. High only. Estimated cost of both effects together ~0.3-0.8 ms;
+  the real number comes from F8.
+- **`sunDiscGain`** — Gain of the sky dome's sun disc. 3 (the disc before point
+  344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
+  blooms on its own and feeds the glare. The same dome serves the bird's-eye
+  view, where the camera rarely sees the sun. Climbs 3 → 3 → 14.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 
