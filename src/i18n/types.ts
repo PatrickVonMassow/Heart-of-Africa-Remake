@@ -762,6 +762,9 @@ export interface Strings {
     glareStar: string
     glareStarLength: string
     glareGhosts: string
+    godrays: string
+    godraysDensity: string
+    godraysIntensity: string
     edgeBandWidth: string
     edgeBandWander: string
     edgeBandStrength: string

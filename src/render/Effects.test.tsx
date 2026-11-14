@@ -1,6 +1,8 @@
 import { act, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PerspectiveCamera, RenderPipeline, Scene, Texture, WebGPURenderer } from 'three/webgpu'
+import { DepthTexture, DirectionalLight, PerspectiveCamera, RenderPipeline, RenderTarget, Scene, Texture, WebGPURenderer } from 'three/webgpu'
+import GodraysNode from 'three/addons/tsl/display/GodraysNode.js'
+import { publishGodraysLight } from './godraysLight'
 import { velocity } from 'three/tsl'
 import { Effects } from './Effects'
 import { createScenePass } from './scenePass'
@@ -173,6 +175,52 @@ describe('post chain ownership', () => {
     expect(features()?.eyeAdaptation).toBe(true)
     act(() => useGame.setState({ mode: 'travel' }))
     expect(features()?.eyeAdaptation).toBe(false)
+    expect(dispose).toHaveBeenCalledTimes(1)
+    view.unmount()
+    dispose.mockRestore()
+  })
+
+  // Point 345: the sun shafts march the settlement sun's shadow map — first
+  // person only, high only, and only once that map exists.
+  const shadowedSun = () => {
+    const light = new DirectionalLight()
+    light.castShadow = true
+    const map = new RenderTarget(4, 4)
+    map.depthTexture = new DepthTexture(4, 4)
+    light.shadow.map = map as typeof light.shadow.map
+    return light
+  }
+  const shaftsAfterPoll = () => {
+    act(() => fiber.frame())
+    return (window as unknown as { __postFeatures?: { godrays: boolean } }).__postFeatures?.godrays
+  }
+  afterEach(() => publishGodraysLight(null))
+  it.each([
+    ['place', 'high', true, true], ['place', 'medium', true, false], ['place', 'low', true, false],
+    ['travel', 'high', true, false], ['place', 'high', false, false],
+  ] as const)('%s at %s (debug toggle %s): sun shafts in the chain = %s', (mode, detailLevel, godraysEnabled, expected) => {
+    useGame.setState({ mode })
+    useUi.setState({ detailLevel, godraysEnabled })
+    publishGodraysLight(shadowedSun())
+    const view = mountEffects()
+    expect(shaftsAfterPoll()).toBe(expected)
+    view.unmount()
+  })
+
+  it('builds no shafts before the sun has a shadow map, and frees them on leaving', () => {
+    useGame.setState({ mode: 'place' })
+    useUi.setState({ detailLevel: 'high' })
+    const light = shadowedSun()
+    const map = light.shadow.map
+    light.shadow.map = null as unknown as typeof map
+    publishGodraysLight(light)
+    const dispose = vi.spyOn(GodraysNode.prototype, 'dispose')
+    const view = mountEffects()
+    expect(shaftsAfterPoll()).toBe(false)
+    light.shadow.map = map
+    expect(shaftsAfterPoll()).toBe(true)
+    act(() => useGame.setState({ mode: 'travel' }))
+    expect(shaftsAfterPoll()).toBe(false)
     expect(dispose).toHaveBeenCalledTimes(1)
     view.unmount()
     dispose.mockRestore()

@@ -72,6 +72,7 @@ import {
 } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { useSceneSun } from '../../render/sceneSun'
+import { publishGodraysLight } from '../../render/godraysLight'
 import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
@@ -2730,6 +2731,12 @@ export function PlaceScene() {
   const shadowSize = useUi(effectiveShadowResolution)
   const shadowsEnabled = useUi(effectiveShadows)
   const fireShadowsEnabled = useUi(effectiveFireShadows)
+  // The sun shafts (render/godraysLight.ts) march this light's shadow map; the
+  // light remounts when shadows toggle, so republish it with that key.
+  useEffect(() => {
+    publishGodraysLight(sunRef.current)
+    return () => publishGodraysLight(null)
+  }, [shadowsEnabled])
   useEffect(() => {
     const map = sunRef.current?.shadow.map
     if (map) {

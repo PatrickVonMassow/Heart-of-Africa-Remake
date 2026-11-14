@@ -905,6 +905,18 @@ interface BalanceConfig {
     /** Lens-flare ghost strength (three/addons LensflareNode over the bloom). */
     ghostIntensity: number
   }
+  /** Sun shafts (design.md §2.7, quality key `godrays`): the upstream
+   *  GodraysNode's lit-air term, added onto the settlement frame in the sun's tint. */
+  godrays: {
+    /** Accumulation rate along a view ray (upstream `density`; humid air = higher). */
+    density: number
+    /** Ceiling of the lit-air term, 0..1 (upstream `maxDensity`). */
+    maxDensity: number
+    /** Fall-off of the accumulation away from the light (upstream `distanceAttenuation`). */
+    distanceAttenuation: number
+    /** HDR strength of the term added onto the frame. */
+    intensity: number
+  }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
@@ -2013,6 +2025,12 @@ export const balance: BalanceConfig = {
     starIntensity: 0.7, // calibratable, debug-editable
     starLength: 0.1, // calibratable, debug-editable; 0.22 streaked the rays across the foreground
     ghostIntensity: 0.6, // calibratable, debug-editable
+  },
+  godrays: {
+    density: 0.5, // educated guess for dry afternoon air; calibratable, debug-editable
+    maxDensity: 0.45, // calibratable
+    distanceAttenuation: 2, // upstream default; calibratable
+    intensity: 0.6, // educated guess against the 2.4 settlement sun; calibratable, debug-editable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

@@ -18,22 +18,24 @@
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
+import { color as tslColor, float, max, mix, smoothstep, uniform, vec3, vec4, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
+import { godrays } from 'three/addons/tsl/display/GodraysNode.js'
 import { createEnvironmentTexture } from './environment'
 import { useSceneSun } from './sceneSun'
 import { createScenePass } from './scenePass'
 import { createSceneFrame } from './sceneFrame'
-import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation, effectiveSunGlare } from '../state/ui'
+import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation, effectiveSunGlare, effectiveGodrays } from '../state/ui'
 import { useGame } from '../state/store'
 import { balance } from '../config/balance'
 import { eyeAdaptation, type EyeAdaptationNode } from './eyeAdaptation'
 import { createSunGlare } from './sunGlare'
+import { godraysShadowTexture, readyGodraysLight } from './godraysLight'
 
 
 /** Minimum screen-space AO factor: occlusion never darkens a surface below this
@@ -79,6 +81,15 @@ export function Effects() {
   const eyeEnabled = useUi(effectiveEyeAdaptation) && firstPerson
   // Sun glare (design.md §2.7): built on the bloom, first person only.
   const glareEnabled = useUi(effectiveSunGlare) && bloomEnabled && firstPerson
+  // Sun shafts (design.md §2.7): first person only — screen-space shafts need
+  // the light in the frame, and the bird's-eye camera (~60° down, sun <= ~37°
+  // up) never has it there. They march the settlement sun's shadow map, so the
+  // pass is built only once that light and its map exist (render/godraysLight.ts);
+  // the per-frame poll below rebuilds the chain when either appears or changes.
+  const godraysWanted = useUi(effectiveGodrays) && firstPerson
+  const [godraysLight, setGodraysLight] = useState<THREE.DirectionalLight | null>(null)
+  const [godraysMap, setGodraysMap] = useState<unknown>(null)
+  const godraysLive = godraysWanted ? godraysLight : null
 
   // Keep the render target and MRT identity across every graphics toggle. A
   // changed fragment-output layout relinks scene/shadow materials as well as
@@ -129,6 +140,18 @@ export function Effects() {
       aoComposed = color.mul(max(float(AO_FLOOR), aoPass.getTextureNode().r))
     }
 
+    // Sun shafts: the upstream pass's lit-air term (grey, half resolution) in
+    // the sun's tint, added BEFORE TRAA and bloom so the temporal resolve
+    // settles its raymarch noise and the shafts bloom with the sun.
+    let shafts: ReturnType<typeof godrays> | null = null
+    const shaftsIntensity = uniform(balance.godrays.intensity)
+    if (godraysLive) {
+      shafts = godrays(depth, camera, godraysLive)
+      disposables.push(shafts)
+      const term = shafts.getTextureNode().r.mul(shaftsIntensity)
+      aoComposed = aoComposed.add(vec4(tslColor(godraysLive.color).mul(term), 0))
+    }
+
     // Temporal resolve over the AO-composed image, so the accumulation also
     // settles the (jittered) AO term instead of re-aliasing it afterwards.
     // Consumed via its pass texture node (like GTAO/bloom); the casts cover
@@ -148,7 +171,7 @@ export function Effects() {
       // the SSAO-on branch (and pre-276 main) always did — the `.mul(1)` is a
       // no-op tint whose only purpose is that materialisation; the RTT it
       // yields is disposed as `traaNode.beautyNode.renderTarget` below.
-      const beauty = ssaoEnabled ? aoComposed : color.mul(float(1))
+      const beauty = ssaoEnabled || shafts ? aoComposed : color.mul(float(1))
       const traaNode = traa(beauty, depth, scenePass.getTextureNode('velocity'), camera)
       temporal = sceneFrame.bindTemporal(traaNode)
       disposables.push(traaNode)
@@ -243,6 +266,13 @@ export function Effects() {
     const size = new THREE.Vector2()
     const render = (dt: number) => {
       adaptation?.sync(balance.exposure, dt, gl.toneMappingExposure)
+      if (shafts) {
+        const b = balance.godrays
+        shafts.density.value = b.density
+        shafts.maxDensity.value = b.maxDensity
+        shafts.distanceAttenuation.value = b.distanceAttenuation
+        shaftsIntensity.value = b.intensity
+      }
       if (glare) {
         gl.getDrawingBufferSize(size)
         const sun = glare.sync(camera, sunDirRef.current, balance.sunGlare, size.x / Math.max(size.y, 1))
@@ -251,8 +281,10 @@ export function Effects() {
       }
       sceneFrame.render(processing, temporal)
     }
-    return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled, sunGlare: glareEnabled } }
-  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled])
+    return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled, sunGlare: glareEnabled, godrays: shafts !== null } }
+    // godraysMap: a new shadow depth texture means a rebuild (the pass captures it).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled, godraysLive, godraysMap])
 
   // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
   // at commit, the instant a rebuild replaces it. A passive effect defers the
@@ -276,6 +308,11 @@ export function Effects() {
 
   // Priority render: replaces R3F's default render with the post pipeline.
   useFrame((_, delta) => {
+    // The shafts' light and shadow map appear after the first shadowed draw.
+    const light = godraysWanted ? readyGodraysLight() : null
+    const map = godraysShadowTexture(light)
+    if (light !== godraysLight) setGodraysLight(light)
+    if (map !== godraysMap) setGodraysMap(map)
     post.render(delta)
   }, 1)
 

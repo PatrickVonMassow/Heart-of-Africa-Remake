@@ -59,6 +59,7 @@ device pixel ratio is kept (no cap).
 | `springBubbles` | 0 | 4 | 7 |
 | `eyeAdaptation` | off | off | on |
 | `sunGlare` | off | off | on |
+| `godrays` | off | off | on |
 | `sunDiscGain` | 3 | 3 | 14 |
 
 ## What each setting does
@@ -340,6 +341,18 @@ added.
   front of the sun kills the glare in the same frame. Needs bloom; settlement
   scenes only. High only. Estimated cost of both effects together ~0.3-0.8 ms;
   the real number comes from F8.
+- **`godrays`** — Sun shafts (design.md §2.7, point 345): the upstream
+  `GodraysNode` raymarches the settlement sun's shadow map along every view ray
+  at half resolution and adds the lit-air term, tinted like the sun, onto the
+  frame before TRAA and bloom, so the shafts resolve and bloom with the sun. A
+  roof edge, palm crown, minaret or pyramid in the light's path cuts dark
+  wedges into it. Needs the sun's shadow map (no shafts where shadows are off).
+  Settlement scenes only: the bird's-eye camera looks ~60° down while the sun
+  stands at most ~37° up, so it never has the light in its frame. The only
+  effect of the family with a real per-pixel cost (estimated +1.5-3 ms); kept
+  only if the F8 before/after on the same build says it is worth the picture —
+  the debug menu's render-tuning toggle switches it off for that comparison.
+  Strength in `balance.godrays`. High only.
 - **`sunDiscGain`** — Gain of the sky dome's sun disc. 3 (the disc before point
   344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
   blooms on its own and feeds the glare. Settlement scenes only: the same dome
