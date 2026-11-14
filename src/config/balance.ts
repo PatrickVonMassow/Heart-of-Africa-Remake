@@ -910,7 +910,8 @@ interface BalanceConfig {
   godrays: {
     /** Accumulation rate along a view ray (upstream `density`; humid air = higher). */
     density: number
-    /** Ceiling of the lit-air term, 0..1 (upstream `maxDensity`). */
+    /** Ceiling of the full ray's air light that scales the shaft structure, 0..1
+     *  (the upstream `maxDensity` itself is held invertible, Effects.tsx). */
     maxDensity: number
     /** Fall-off of the accumulation away from the light (upstream `distanceAttenuation`). */
     distanceAttenuation: number
@@ -920,6 +921,9 @@ interface BalanceConfig {
     forwardScatter: number
     /** Share of the term kept away from the sun (0 = shafts only toward it). */
     ambientShare: number
+    /** Angular step (degrees, about the sun's screen position) of the taps
+     *  whose mean the lit share is compared against: about one shaft width. */
+    structureAngleDeg: number
     /** Raymarch samples per pixel (upstream `raymarchSteps`, default 60): the cost knob. */
     raymarchSteps: number
     /** Resolution of the pass against the drawing buffer (upstream default 0.5). */
@@ -2038,11 +2042,14 @@ export const balance: BalanceConfig = {
     density: 0.5, // educated guess for dry afternoon air; calibratable, debug-editable
     maxDensity: 0.45, // calibratable
     distanceAttenuation: 2, // upstream default; calibratable
-    intensity: 2.2, // educated guess against the 2.4 settlement sun; calibratable, debug-editable
+    // The added term is now a signed DEVIATION of the lit share (beams up,
+    // wedges down), far smaller than the old raw term, hence the higher gain.
+    intensity: 6, // educated guess, NOT yet calibrated on a frame; calibratable, debug-editable
     // A tight lobe: at 6 / 0.25 the term read as a uniform veil (picture
     // check 14.11.2026). 24 halves at ~14° and is ~3 % at 30° off the sun.
     forwardScatter: 24, // calibratable
     ambientShare: 0, // no veil away from the sun; calibratable
+    structureAngleDeg: 2.5, // ~a palm-leaf gap seen from under the crown; calibratable
     raymarchSteps: 40, // upstream 60; calibratable against F8
     resolutionScale: 0.375, // upstream 0.5; the shafts are soft; calibratable against F8
   },

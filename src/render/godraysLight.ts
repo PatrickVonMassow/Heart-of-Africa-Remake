@@ -5,16 +5,12 @@
 // The upstream GodraysNode samples `light.shadow.map.depthTexture`, captured
 // when its shader is built, so the pass may only be built once that map
 // exists. three's ShadowNode creates it on the first shadowed draw and keeps
-// it for the light's lifetime (resizing in place); the place scene nulls the
-// light's public reference when the shadow resolution changes, while the
-// ShadowNode keeps drawing into the same render target. The first map seen is
-// therefore remembered per light and restored, so a level round trip does not
-// silently drop the shafts.
+// it for the light's lifetime, resizing it in place on a resolution change
+// (the place scene no longer nulls the reference, point 345).
 
-import type { DirectionalLight, RenderTarget } from 'three/webgpu'
+import type { DirectionalLight } from 'three/webgpu'
 
 let published: DirectionalLight | null = null
-const seenMaps = new WeakMap<DirectionalLight, RenderTarget>()
 
 /** The place scene publishes its sun on mount and clears it on unmount. */
 export function publishGodraysLight(light: DirectionalLight | null): void {
@@ -25,14 +21,6 @@ export function publishGodraysLight(light: DirectionalLight | null): void {
 export function readyGodraysLight(): DirectionalLight | null {
   const light = published
   if (!light || !light.castShadow) return null
-  const map = light.shadow.map as RenderTarget | null
-  if (map) {
-    seenMaps.set(light, map)
-  } else {
-    const seen = seenMaps.get(light)
-    if (!seen) return null
-    light.shadow.map = seen as typeof light.shadow.map
-  }
   return light.shadow.map?.depthTexture ? light : null
 }
 
@@ -45,4 +33,12 @@ export function godraysShadowTexture(light: DirectionalLight | null) {
  *  the TSL in Effects.tsx): `ambient` away from the sun, 1 looking into it. */
 export function shaftsPhase(cosToSun: number, power: number, ambient: number): number {
   return ambient + (1 - ambient) * Math.pow(Math.max(cosToSun, 0), power)
+}
+
+/** The shaft structure the post chain adds (CPU mirror of the TSL in
+ *  Effects.tsx, before gain and lobe): the pixel's lit share minus the mean of
+ *  its taps rotated about the sun, scaled by the full ray's air light. */
+export function shaftsStructure(litShare: number, taps: readonly number[], airLight: number): number {
+  const mean = taps.reduce((a, b) => a + b, 0) / Math.max(taps.length, 1)
+  return (litShare - mean) * airLight
 }

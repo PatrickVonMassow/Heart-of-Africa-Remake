@@ -812,7 +812,7 @@ export function DebugMenu() {
       num(t.debug.godraysDensity, balance.godrays.density,
         (v) => { balance.godrays.density = Math.max(0, Math.min(5, v)); bump() }, 0.05),
       num(t.debug.godraysIntensity, balance.godrays.intensity,
-        (v) => { balance.godrays.intensity = Math.max(0, Math.min(5, v)); bump() }, 0.05),
+        (v) => { balance.godrays.intensity = Math.max(0, Math.min(20, v)); bump() }, 0.05),
       // The dry-season crown collapse (§19.13): a SEASON switch, even though
       // it isolates a rendering half — it is the season a tester is forcing.
       check(t.debug.foliageCollapse, seasonCollapseEnabled,

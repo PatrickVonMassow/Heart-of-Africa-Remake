@@ -2738,13 +2738,12 @@ export function PlaceScene() {
     publishGodraysLight(sunRef.current)
     return () => publishGodraysLight(null)
   }, [shadowsEnabled])
-  useEffect(() => {
-    const map = sunRef.current?.shadow.map
-    if (map) {
-      map.dispose()
-      sunRef.current!.shadow.map = null as unknown as typeof map
-    }
-  }, [shadowSize])
+  // No reset of the sun's shadow map on a resolution change: three's
+  // ShadowNode resizes its own render target from `shadow.mapSize` on every
+  // shadow draw. Nulling the public `shadow.map` (the old WebGLRenderer idiom)
+  // only orphaned the reference — nothing recreates it — so the sun shafts,
+  // which march that map, could never come up after a level change made
+  // before they were first enabled (point 345).
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {

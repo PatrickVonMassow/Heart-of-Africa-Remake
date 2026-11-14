@@ -21,7 +21,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { color as tslColor, dot, float, max, mix, normalize, pow, screenUV, smoothstep, uniform, vec2, vec3, vec4, velocity, viewportUV } from 'three/tsl'
+import { clamp, color as tslColor, cos, dot, exp, float, getViewPosition, length, log, max, min, mix, normalize, pow, screenUV, sin, smoothstep, uniform, vec2, vec3, vec4, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
@@ -140,26 +140,84 @@ export function Effects() {
       aoComposed = color.mul(max(float(AO_FLOOR), aoPass.getTextureNode().r))
     }
 
-    // Sun shafts: the upstream pass's lit-air term (grey, half resolution) in
-    // the sun's tint, added BEFORE TRAA and bloom so the temporal resolve
-    // settles its raymarch noise and the shafts bloom with the sun.
+    // Sun shafts: STRUCTURE, not haze (picture checks 14.11.2026). The
+    // upstream term is lit air along the view ray; added as is it lifts every
+    // pixel whose ray runs through lit air — the whole open frame, a veil.
+    // What a person reads as shafts is the VARIATION of lit air across
+    // neighbouring rays around the sun: beams through the gaps of a crown,
+    // wedges behind its leaves. So per pixel the term is turned back into the
+    // LIT SHARE of the ray (actual lit-air optical depth over the depth a
+    // fully lit ray to the same point would have — exact mirror of the
+    // upstream march, render/godraysLight.ts), high-passed tangentially
+    // around the sun (taps rotated about the sun's screen position), and only
+    // that signed deviation is added, scaled by the full ray's air light and
+    // the forward-scatter lobe. Uniformly lit air (open ground, walls, the
+    // open sky) has a flat lit share and receives nothing. Added BEFORE TRAA
+    // and bloom so the temporal resolve settles the raymarch noise.
     let shafts: ReturnType<typeof godrays> | null = null
     const shaftsIntensity = uniform(balance.godrays.intensity)
     const shaftsPower = uniform(balance.godrays.forwardScatter)
     const shaftsAmbient = uniform(balance.godrays.ambientShare)
+    const shaftsCap = uniform(balance.godrays.maxDensity)
+    const shaftsAngle = uniform((balance.godrays.structureAngleDeg * Math.PI) / 180)
     const shaftsSunView = uniform(new THREE.Vector3(0, 0, -1))
     const shaftsTan = uniform(new THREE.Vector2(1, 1))
+    const shaftsProjInv = uniform(new THREE.Matrix4())
+    const shaftsViewToLight = uniform(new THREE.Matrix4())
+    const shaftsBoxMin = uniform(new THREE.Vector3(-1, -1, -2))
+    const shaftsBoxMax = uniform(new THREE.Vector3(1, 1, -1))
+    const shaftsNearFar = uniform(new THREE.Vector2(1, 2))
+    const shaftsDensity = uniform(balance.godrays.density)
+    const shaftsAtten = uniform(balance.godrays.distanceAttenuation)
     if (godraysLive) {
       shafts = godrays(depth, camera, godraysLive)
       disposables.push(shafts)
-      // Forward scatter: the upstream term has no phase function, so on its
-      // own it is a flat veil over the whole frame. Weight it by the angle
-      // between the pixel's view ray and the sun (shaftsPhase, godraysLight.ts).
+      const termTex = shafts.getTextureNode()
+      // Lit share r and full-ray optical depth of the shaft texel at `at`.
+      const litShare = (at: THREE.Node<'vec2'>) => {
+        const texel = termTex.sample(at)
+        const viewPos = getViewPosition(at, texel.a, shaftsProjInv)
+        const o = shaftsViewToLight.mul(vec4(0, 0, 0, 1)).xyz.toConst()
+        const dir = shaftsViewToLight.mul(vec4(viewPos, 1)).xyz.sub(o).add(1e-5).toConst()
+        const ta = shaftsBoxMin.sub(o).div(dir)
+        const tb = shaftsBoxMax.sub(o).div(dir)
+        const exitT = max(ta, tb)
+        const tEnd = clamp(min(min(exitT.x, exitT.y), exitT.z), 0, 1).toConst()
+        const near = shaftsNearFar.x
+        const far = shaftsNearFar.y
+        // Mean attenuation over the clipped segment, mirroring the upstream
+        // pow(1 - viewZ / far, k) with its perspective viewZ conversion.
+        const atten = float(0).toVar()
+        for (const f of [0.125, 0.375, 0.625, 0.875]) {
+          const p = o.add(dir.mul(tEnd.mul(f)))
+          const zc = p.z.negate().sub(near).div(far.sub(near))
+          const vz = near.mul(far).div(far.sub(far.sub(near).mul(zc)))
+          atten.addAssign(pow(max(float(1).sub(vz.div(far)), 0), shaftsAtten).mul(0.25))
+        }
+        const full = length(dir).mul(tEnd).mul(shaftsDensity.div(100)).mul(atten)
+        const actual = log(float(1).sub(min(texel.r, 0.999))).negate()
+        return vec2(clamp(actual.div(max(full, 1e-4)), 0, 1), full)
+      }
       const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)))
-      const ray = normalize(vec3(ndc.mul(shaftsTan), -1))
+      const q = ndc.mul(shaftsTan)
+      const ray = normalize(vec3(q, -1))
       const phase = mix(shaftsAmbient, float(1), pow(max(dot(ray, shaftsSunView), 0), shaftsPower))
-      const term = shafts.getTextureNode().r.mul(shaftsIntensity).mul(phase)
-      aoComposed = aoComposed.add(vec4(tslColor(godraysLive.color).mul(term), 0))
+      // Tangent-plane position of the sun: radial lines through it are the
+      // shafts' directions, so a rotation about it steps ACROSS the shafts.
+      const sunQ = shaftsSunView.xy.div(max(shaftsSunView.z.negate(), 1e-3))
+      const rel = q.sub(sunQ)
+      const tap = (a: THREE.Node<'float'>) => {
+        const c = cos(a)
+        const s = sin(a)
+        const p = sunQ.add(vec2(rel.x.mul(c).sub(rel.y.mul(s)), rel.x.mul(s).add(rel.y.mul(c)))).div(shaftsTan)
+        return litShare(vec2(p.x.mul(0.5).add(0.5), float(1).sub(p.y).mul(0.5))).x
+      }
+      const centre = litShare(screenUV)
+      const around = tap(shaftsAngle).add(tap(shaftsAngle.negate()))
+        .add(tap(shaftsAngle.mul(2))).add(tap(shaftsAngle.mul(-2))).mul(0.25)
+      const airLight = min(float(1).sub(exp(centre.y.negate())), shaftsCap)
+      const term = centre.x.sub(around).mul(airLight).mul(shaftsIntensity).mul(phase)
+      aoComposed = max(aoComposed.add(vec4(tslColor(godraysLive.color).mul(term), 0)), vec4(0))
     }
 
     // Temporal resolve over the AO-composed image, so the accumulation also
@@ -279,8 +337,14 @@ export function Effects() {
       if (shafts) {
         const b = balance.godrays
         shafts.density.value = b.density
-        shafts.maxDensity.value = b.maxDensity
+        // Kept invertible (the lit share is read back from it); the
+        // brightness cap is applied to the air light instead (shaftsCap).
+        shafts.maxDensity.value = 0.999
         shafts.distanceAttenuation.value = b.distanceAttenuation
+        shaftsDensity.value = b.density
+        shaftsAtten.value = b.distanceAttenuation
+        shaftsCap.value = b.maxDensity
+        shaftsAngle.value = (b.structureAngleDeg * Math.PI) / 180
         shaftsIntensity.value = b.intensity
         shaftsPower.value = b.forwardScatter
         shafts.raymarchSteps.value = Math.max(8, Math.round(b.raymarchSteps))
@@ -289,6 +353,13 @@ export function Effects() {
         const sd = sunDirRef.current
         camera.updateMatrixWorld()
         shaftsSunView.value.set(sd[0], sd[1], sd[2]).normalize().transformDirection(camera.matrixWorldInverse)
+        const sc = godraysLive!.shadow.camera as THREE.OrthographicCamera
+        sc.updateMatrixWorld()
+        shaftsViewToLight.value.copy(sc.matrixWorldInverse).multiply(camera.matrixWorld)
+        shaftsProjInv.value.copy(camera.projectionMatrixInverse)
+        shaftsBoxMin.value.set(sc.left, sc.bottom, -sc.far)
+        shaftsBoxMax.value.set(sc.right, sc.top, -sc.near)
+        shaftsNearFar.value.set(sc.near, sc.far)
         const e = camera.projectionMatrix.elements
         shaftsTan.value.set(1 / e[0], 1 / e[5])
       }

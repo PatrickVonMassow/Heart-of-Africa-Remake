@@ -26,16 +26,24 @@ describe('sun-shaft light channel', () => {
     expect(godraysShadowTexture(light)).toBe(light.shadow.map!.depthTexture)
   })
 
-  it('restores the shadow map the place scene nulled on a resolution change', () => {
+  it('stays ready through a level change made before the shafts were ever enabled', () => {
+    // The order local/godrays-cost.mjs hit: the level (and with it the shadow
+    // resolution) changes BEFORE anything asked for the shafts. three's
+    // ShadowNode resizes its map in place; the reference must survive it.
     const { light, map } = sunWithMap()
     publishGodraysLight(light)
+    map.setSize(8, 8) // what ShadowNode.renderShadow does for a new mapSize
     expect(readyGodraysLight()).toBe(light)
-    light.shadow.map = null as unknown as typeof light.shadow.map
-    expect(readyGodraysLight()).toBe(light)
-    expect(light.shadow.map).toBe(map)
+    expect(godraysShadowTexture(light)).toBe(map.depthTexture)
   })
 
-  it('never returns a light whose map was never seen', () => {
+  it('the place scene never orphans the sun\'s shadow-map reference on a resolution change', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(`${process.cwd()}/src/scenes/place/PlaceScene.tsx`, 'utf8')
+    expect(src).not.toMatch(/sunRef\.current!?\.shadow\.map\s*=\s*null/)
+  })
+
+  it('never returns a light without a shadow map', () => {
     const { light } = sunWithMap()
     light.shadow.map = null as unknown as typeof light.shadow.map
     publishGodraysLight(light)
@@ -55,5 +63,19 @@ describe('sun-shaft forward scatter', () => {
     expect(shaftsPhase(-1, k, a)).toBeCloseTo(a)
     expect(a).toBeGreaterThanOrEqual(0)
     expect(a).toBeLessThan(0.05)
+  })
+})
+
+describe('sun-shaft structure term', () => {
+  it('adds nothing where the lit share is flat, and a signed deviation across shafts', async () => {
+    const { shaftsStructure } = await import('./godraysLight')
+    // Open frame: every ray fully lit — no veil, however much air light.
+    expect(shaftsStructure(1, [1, 1, 1, 1], 0.4)).toBe(0)
+    // A beam between two leaves: brighter than its neighbours.
+    expect(shaftsStructure(1, [0.4, 0.5, 0.6, 0.5], 0.4)).toBeGreaterThan(0)
+    // A wedge behind a leaf: darker.
+    expect(shaftsStructure(0.3, [0.9, 1, 0.8, 1], 0.4)).toBeLessThan(0)
+    // Uniformly shadowed air (a wall in shade) is flat too.
+    expect(shaftsStructure(0.2, [0.2, 0.2, 0.2, 0.2], 0.4)).toBe(0)
   })
 })
