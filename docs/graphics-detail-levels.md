@@ -364,7 +364,7 @@ added.
   sun's elevation (slices interpolated by the current azimuth; a debug hour
   outside the arc clamps to the nearest slice and reports it on the console),
   and its hollows lose ambient light by their mean horizon. Tuning in
-  `balance.horizonMaps`. Cost: one lookup per terrain fragment, but a
+  `balance.horizonMaps`. Cost: two lookups per terrain fragment, but a
   4.85 MB download (2.58 + 2.27 MB PNG) and ~17.5 MB of video memory — so at
   low the maps are NOT FETCHED at all: the request is gated on the effective
   level (`src/render/horizonMapGate.ts`), and raising the level at runtime
