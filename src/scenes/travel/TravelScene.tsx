@@ -460,7 +460,15 @@ export function buildChunkGeometry(
 // synchronously (~7-10 s main-thread freeze, CDP-profiled).
 let terrainMaterialCache: THREE.MeshStandardNodeMaterial | null = null
 let waterHandleCache: ReturnType<typeof createWaterMaterial> | null = null
-const FAR_TERRAIN_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
+// The far ring carries the same horizon-map terms as the near chunks (design.md
+// §2.7), or a shadowed slope would change brightness at the ring's seam when the
+// debug zoom shows it. Both terms are exactly 1 until the maps apply.
+const FAR_TERRAIN_MATERIAL = (() => {
+  const m = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 1 })
+  m.colorNode = vertexColor().rgb.mul(horizonShadeNode())
+  m.aoNode = horizonSkyOcclusionNode()
+  return m
+})()
 const REMAINS_MATERIAL = new THREE.MeshStandardMaterial({ roughness: 1, vertexColors: true })
 const REMAINS_IVORY_MATERIAL = new THREE.MeshStandardMaterial({ roughness: 0.65, vertexColors: true })
 const LANDMARK_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
