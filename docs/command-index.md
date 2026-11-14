@@ -105,7 +105,7 @@
 | `board-queue.mjs` | THE QUEUE GENERATOR (point 400, delta C) — rebuild the Warteschlange from the work order plus the board's own prose, instead of maintaining it card by card. | usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--if-estimate "~old h"] [--text-stdin]<br>usage: board-queue.mjs [--check] \| set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] [--text-stdin] \| import |
 | `board-refresher-core.mjs` | The board's self-refresh, as VERSIONED source (point 419 b). | — |
 | `board-remedy.mjs` | The board's remedy text, in ONE place (point 435). | — |
-| `board-slots-core.mjs` | Pure half of the board's slot line (user order 11.11.2026): on its own line below the heading "Woran ich gerade arbeite" (12.11.2026) the board ALWAYS says why fewer than POOL_CAP points are worked in parallel. | — |
+| `board-slots-core.mjs` | Pure half of the board's slot line (user order 11.11.2026): on its own line below the heading "Woran ich gerade arbeite" (12.11.2026, a plain block since point 1518) the board ALWAYS says why fewer than POOL_CAP points are worked in parallel. | — |
 | `board-slots.mjs` | I/O half of the board's slot line (user order 11.11.2026): measures the pool at render time with the very probes batch-in-flight uses for its slot decision, and files a finding when the line has to say "Grund nicht messbar". | — |
 | `board-state-core.mjs` | DERIVED BATCH STATE FOR THE BOARD (point 749). | — |
 | `board-state.mjs` | THE READER SIDE OF THE DERIVED BOARD STATE (point 749). | — |

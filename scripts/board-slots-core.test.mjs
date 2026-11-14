@@ -15,7 +15,7 @@ import {
   readSlotLine,
   slotLine,
 } from './board-slots-core.mjs'
-import { closedPointNumbers, fileUnmeasurableFinding } from './board-slots.mjs'
+import { closedPointNumbers, fileUnmeasurableFinding, freshActivePoints, measureOwner } from './board-slots.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { auditDashboard, parseNowCardPoints, sliceSections } from './dashboard-guard-core.mjs'
 import { boardHtml } from './dashboard-guard-fixtures.mjs'
@@ -119,6 +119,50 @@ describe('slotLine — every variant of the heading line', () => {
     expect(r.text).toBe('1/3 Slots frei: kein weiterer offener Punkt · blockiert durch: 1463 (ruht seit 2 Tagen)')
   })
 
+  // Point 1518: the owner's measured state and fresh branches replace "Grund nicht messbar".
+  const READY = {
+    branches: [branch(327)],
+    activePoints: [327],
+    openPoints: [327, 1490],
+    specs: [spec(327), spec(1490, ['scripts/other.mjs'])],
+    runningFiles: ['scripts/p327.mjs'],
+  }
+  // 13.11.2026 11:49 and 15:49 Berlin (CET, UTC+1).
+  const WAIT_AT = Date.UTC(2026, 10, 13, 10, 49)
+  const WAIT_UNTIL = Date.UTC(2026, 10, 13, 14, 49)
+
+  it('no live batch owner: "keine Batch-Session aktiv"', () => {
+    const r = slotLine({ ...READY, owner: { alive: false } })
+    expect(r).toEqual({ text: '2/3 Slots frei: keine Batch-Session aktiv', unmeasurable: false })
+  })
+
+  it('the owner holds a declared wait: "Batch-Session wartet seit HH:MM (bis HH:MM)"', () => {
+    const r = slotLine({ ...READY, owner: { alive: true, waitAt: WAIT_AT, waitUntil: WAIT_UNTIL } })
+    expect(r).toEqual({ text: '2/3 Slots frei: Batch-Session wartet seit 11:49 (bis 15:49)', unmeasurable: false })
+  })
+
+  it('a live owner without a wait names nothing, and an unmeasured owner changes nothing', () => {
+    const flagged = { text: `2/3 Slots frei: ${UNMEASURABLE_TEXT} (unabhängig bereit: 1490)`, unmeasurable: true }
+    expect(slotLine({ ...READY, owner: { alive: true } })).toEqual(flagged)
+    expect(slotLine({ ...READY, owner: null })).toEqual(flagged)
+  })
+
+  it('an active branch without own commits: "<N> hat noch keine Commits, …"', () => {
+    const r = slotLine({ branches: [branch(327)], activePoints: [327], specs: [spec(1490)], runningFiles: [], freshActive: [327] })
+    expect(r).toEqual({ text: '2/3 Slots frei: 327 hat noch keine Commits, Unabhängigkeit erst danach prüfbar', unmeasurable: false })
+  })
+
+  it('a fresh branch beside active work with read files is still named', () => {
+    const r = slotLine({ branches: [branch(327), branch(1490)], activePoints: [327, 1490], specs: [spec(1507)], runningFiles: ['scripts/p1490.mjs'], freshActive: [327] })
+    expect(r).toEqual({ text: '1/3 Slots frei: 327 hat noch keine Commits, Unabhängigkeit erst danach prüfbar', unmeasurable: false })
+  })
+
+  it('a measured reason is not overwritten by the owner state', () => {
+    const r = slotLine({ branches: [], owner: { alive: false } })
+    expect(r.text).toBe('3/3 Slots frei: kein weiterer offener Punkt')
+    expect(slotLine({ branchesReadable: false, owner: { alive: false } }).unmeasurable).toBe(true)
+  })
+
   it('branches without a point or outside the work order keep a measured label', () => {
     const r = slotLine({
       branches: [branch(null, 1, 'feat/cleanup'), branch(999, 1)],
@@ -199,6 +243,25 @@ describe('the I/O half', () => {
     writeFileSync(carrier, `${carrierEntry({ at: '2026-11-12T00:00:00Z', session: 's', title: UNMEASURABLE_FINDING_TITLE, detail: 'd' })}\n`)
     expect(fileUnmeasurableFinding('x', { carrier, record })).toBe(false)
     expect(calls).toHaveLength(1)
+  })
+
+  it('measures the owner: no lock, dead owner, live owner, declared wait', () => {
+    const now = 1000
+    const alive = () => ({ alive: true })
+    expect(measureOwner({ now, readLock: () => null })).toEqual({ alive: false })
+    expect(measureOwner({ now, readLock: () => ({}), assess: () => ({ alive: false }) })).toEqual({ alive: false })
+    expect(measureOwner({ now, readLock: () => ({}), assess: alive })).toEqual({ alive: true })
+    const waiting = { declaredWait: { at: 500, until: 2000 } }
+    expect(measureOwner({ now, readLock: () => waiting, assess: alive })).toEqual({ alive: true, waitAt: 500, waitUntil: 2000 })
+    expect(measureOwner({ now: 3000, readLock: () => waiting, assess: alive })).toEqual({ alive: true })
+    expect(measureOwner({ now, readLock: () => { throw new Error('torn') } })).toBeNull()
+  })
+
+  it('a branch is fresh only when every readable spelling has no own commit', () => {
+    const verdicts = { 'feat/1-a': true, 'origin/feat/1-a': null, 'feat/2-b': true, 'origin/feat/2-b': false, 'feat/3-c': null, 'origin/feat/3-c': null }
+    const isEmpty = (ref) => verdicts[ref]
+    const branches = [{ ref: 'feat/1-a', point: 1 }, { ref: 'feat/2-b', point: 2 }, { ref: 'feat/3-c', point: 3 }]
+    expect(freshActivePoints(branches, { isEmpty })).toEqual([1])
   })
 
   it('does not re-file a drained entry (every publish re-filed it and blocked the session end)', () => {

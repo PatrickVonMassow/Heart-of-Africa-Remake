@@ -348,10 +348,7 @@ details:not(.sect)[open]>summary::after{content:"▾"}
 .body .desc-missing{font-style:italic;color:var(--warn,#a85f28)}
 .body .dist-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin:8px 0 2px}
 .body .dist{font-size:.85em;color:var(--soft,#7c6c4d)}
-details.sect>summary:has(>.slots){display:flex;flex-wrap:wrap;align-items:baseline;column-gap:.75em;row-gap:0;position:relative;margin:26px 0 8px;padding:0 1.6em 5px 0;border-bottom:1px solid var(--rule,#d8c9a8)}
-details.sect>summary:has(>.slots) h2{margin:0;padding-bottom:0;border-bottom:0}
-details.sect>summary:has(>.slots) h2::after{position:absolute;right:0;top:0}
-details.sect>summary>.slots{flex:0 0 100%;min-width:0;font-size:.8em;font-weight:400;color:var(--soft,#7c6c4d);overflow-wrap:anywhere}
+details.sect>summary>.slots{display:block;margin:0 0 8px;font-size:.8em;font-weight:400;color:var(--soft,#7c6c4d);overflow-wrap:anywhere}
 </style>`
 
 const criticalityBadge = (level) =>
@@ -677,7 +674,7 @@ const SLOT_TAIL_RE = /^(?:<span class="slots">[^<]*<\/span>)?<\/summary>/
 function sectionBounds(html, key) {
   const head = HEAD[key]
   const text = String(html ?? '')
-  // The heading may carry the derived slot line beside its <h2> (board-slots-core).
+  // The heading may carry the derived slot line below its <h2> (board-slots-core).
   const open = head.slice(0, -'</summary>'.length)
   const hits = []
   for (let at = text.indexOf(open); at >= 0; at = text.indexOf(open, at + open.length)) {
