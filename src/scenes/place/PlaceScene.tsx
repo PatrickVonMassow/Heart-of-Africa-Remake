@@ -76,6 +76,7 @@ import { useSceneSun } from '../../render/sceneSun'
 import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
+import { floraSlotScale, floraSlotSpecies, type FloraSpecies } from './floraSpecies'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
 import { FIGURE_STATURE } from '../../render/figureBody'
@@ -168,6 +169,8 @@ import { PLAY_ROCK_SEEDS, playRockYaw } from './playRockSurface'
 import { bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
+import { clearShelterMask, setShelterLook, setShelterMask, SHELTER_MASK_SIZE } from '../../render/shelterWetness'
+import { bakeShelterMask, placeShelters } from './shelterMask'
 import { devAssert } from '../../systems/devAssert'
 import {
   GUESS_KEY_CODE,
@@ -1118,21 +1121,6 @@ function Fences({ fences, mats }: { fences: FenceDef[]; mats: PlaceMaterials }) 
   )
 }
 
-type FloraSpecies = 'palm' | 'acacia' | 'jungle' | 'bush'
-
-/** Pick the species for a flora slot from the region's weight mix. */
-function pickFlora(style: RegionPlaceStyle, t: number): FloraSpecies {
-  const { palm, acacia, jungle } = style.flora
-  if (t < palm) return 'palm'
-  if (t < palm + acacia) return 'acacia'
-  if (t < palm + acacia + jungle) return 'jungle'
-  return 'bush'
-}
-
-// First-person plants reuse the travel-scale geometries, scaled up to
-// walkable proportions.
-const FLORA_SCALE: Record<FloraSpecies, number> = { palm: 1, acacia: 2.1, jungle: 1.7, bush: 2.4 }
-
 function PlaceFlora({
   slots,
   style,
@@ -1147,8 +1135,8 @@ function PlaceFlora({
   return (
     <>
       {slots.map((t, i) => {
-        const species = pickFlora(style, ((i * 0.37 + t.h * 0.11) % 1 + 1) % 1)
-        const s = (t.h / 4.4) * FLORA_SCALE[species]
+        const species = floraSlotSpecies(style, i, t.h)
+        const s = floraSlotScale(species, t.h)
         return (
           <mesh
             key={i}
@@ -2664,6 +2652,23 @@ export function PlaceScene() {
   // its own desert sand (usePlaceMaterials).
   const sandy = isPort || isMonument
   const style = REGION_PLACE_STYLES[place?.region ?? 'west']
+  // Sheltered ground stays less wet: the cover of the roofs (eaves included) and
+  // tree crowns is baked ONCE per layout into the ground's shelter mask — they
+  // never move — and the ground material reads it at one texture lookup.
+  useEffect(() => {
+    if (!layout || !place) return
+    const shelters = placeShelters(
+      layout,
+      style,
+      place.kind,
+      fireHasCookShelter(place.peopleId),
+      sandy ? REGION_PLACE_STYLES.north : style,
+    )
+    setShelterMask(
+      bakeShelterMask(shelters.roofs, shelters.crowns, layout.radius + GROUND_DISC_OVERHANG, SHELTER_MASK_SIZE, balance.rain),
+    )
+    return () => clearShelterMask()
+  }, [layout, place, style, sandy])
   // The settlement's cold-weather dress (§19.13). Shared with PlaceLife so the
   // chief and the villagers dress for the same season.
   const dress = useColdCloaks(placeId, style.cloth)
@@ -3125,6 +3130,7 @@ export function PlaceScene() {
       // The edge band's look, driven per frame like the season tint so a debug
       // edit lands live (the band's PLACE comes from the boundary effect above).
       setEdgeBandLook(place.kind, balance.placeEdgeBand)
+      setShelterLook(balance.rain)
       const wet = effectiveWetness(
         useGame.getState().day, place.lat, place.lon, START_YEAR,
         elevationAt(place.lat, place.lon), useUi.getState().seasonWetnessOverride,

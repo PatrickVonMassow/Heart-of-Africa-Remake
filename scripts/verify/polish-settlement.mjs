@@ -513,6 +513,193 @@ if (section('fire-rain')) {
   )
 }
 
+// --- Sheltered ground stays less wet (src/render/shelterWetness.ts): in a village
+// forced into rain, the ground under a hut's eaves reads measurably LIGHTER in
+// pixels than it would without the shelter mask, while an open-yard crop does
+// not move; in dry weather the mask changes no pixel. Attributed ON/OFF/ON on
+// the shelter strength (the edge band's method): a plain under-eave vs open-yard
+// comparison would also measure the roof's own sun shadow, which darkens the
+// eave strip in every weather. Both raw lumas are logged beside it.
+if (section('shelter-wetness')) {
+  // Keep in sync with HUT_CONE_EAVE in src/scenes/place/roofClearance.ts (the
+  // Zulu village is in the south region: cone roofs).
+  const HUT_CONE_EAVE = 1.45
+  const PLACE = 'zulu-village'
+  const configured = await page.evaluate(() => ({ ...window.__balance.rain }))
+  const enterWith = async (wet) => {
+    await page.evaluate(() => { const g = window.__game.getState(); g.setJournalOpen(false); if (g.placeId) g.leavePlace() })
+    await page.evaluate((id) => window.__game.getState().enterPlace(id), PLACE)
+    await page.waitForFunction(
+      (id) => window.__game.getState().placeId === id && !!window.__placeLayout && !!window.__placeCamera && !!window.__placeSeason,
+      PLACE,
+      { timeout: 40000 },
+    )
+    await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wet)
+    // The soak and the light settle before any crop is read (the edge band's
+    // load-proof budget, point 641).
+    const s = await waitForReadingStable(
+      page,
+      () => {
+        const v = window.__placeSeason()
+        return { wetness: v.wetness, groundWet: v.groundWet, sun: v.sun, hemi: v.hemi }
+      },
+      { settleMs: 400, samples: 3, timeout: 240000 },
+    )
+    check(`${PLACE} (wet=${wet}): the ground's wet state settles before the crops are read`, s.settled, `after ${s.waitedMs} ms — ${JSON.stringify(s.value)}`)
+  }
+  const groundPixel = (x, z) =>
+    page.evaluate(([px, pz]) => {
+      const cam = window.__placeCamera
+      if (!cam) return null
+      const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+      const clip = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [px, 0, pz, 1]))
+      return clip[3] > 0 ? { x: clip[0] / clip[3], y: clip[1] / clip[3] } : null
+    }, [x, z])
+  /** Stand at (sx, sz), face (tx, tz) and bisect the pitch on the projection. */
+  const aimAt = async (sx, sz, tx, tz) => {
+    await page.evaluate(([a, b, c, d]) => {
+      const p = window.__placePlayer
+      p.x = a
+      p.z = b
+      p.yaw = Math.atan2(-(c - a), -(d - b)) // forward is -Z rotated by yaw
+      p.pitch = -0.2
+    }, [sx, sz, tx, tz])
+    let lo = -1.4
+    let hi = 0.2
+    let ndc = null
+    for (let i = 0; i < 22; i++) {
+      const mid = (lo + hi) / 2
+      await page.evaluate((v) => { window.__placePlayer.pitch = v }, mid)
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+      ndc = await groundPixel(tx, tz)
+      if (!ndc) { hi = mid; continue }
+      if (ndc.y > 0) lo = mid
+      else hi = mid
+      if (Math.abs(ndc.y) < 0.01) break
+    }
+    return ndc
+  }
+  const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
+    page.evaluate(([wait, n, netMs]) => new Promise((res) => {
+      const t0 = performance.now()
+      let i = 0
+      let done = false
+      const finish = (ok) => { if (!done) { done = true; res(ok) } }
+      const net = setTimeout(() => finish(false), netMs)
+      const step = () => {
+        if (done) return
+        if (++i >= n && performance.now() - t0 >= wait) { clearTimeout(net); return finish(true) }
+        requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    }), [ms, frames, READ_GAP_NET_MS])
+  /** The shelter's OWN effect on a crop: luminance with the configured strength
+   *  over luminance with strength and drip at 0, ON/OFF/ON. Also returns the ON
+   *  luminance, for the logged raw comparison. */
+  const shelterRatio = async (ndc, what) => {
+    let onLuma = null
+    const shot = async (on) => {
+      await page.evaluate(([s, d]) => {
+        window.__balance.rain.shelterStrength = s
+        window.__balance.rain.dripBoost = d
+      }, on ? [configured.shelterStrength, configured.dripBoost] : [0, 0])
+      const r = await settledEdgeShot({
+        gap: readGap,
+        read: async () => readGroundSamples(await capturePixels(page, `shelter-wetness ${what} luma`), ndc, page.viewportSize(), 24, 12),
+      })
+      if (on && r.value !== null) onLuma = r.value
+      return r
+    }
+    const ratio = await readBandRatio(shot)
+    await page.evaluate((c) => Object.assign(window.__balance.rain, c), configured)
+    return { ...ratio, onLuma }
+  }
+  /** A hut and a bearing whose corridor from under its eave out to the
+   *  standing spot is clear of every other building, fence, rock and plant. */
+  const pickHut = () => page.evaluate((eaveK) => {
+    const L = window.__placeLayout
+    const near = (x, z, ax, az, d) => Math.hypot(x - ax, z - az) < d
+    for (const h of L.dwellings.filter((d) => d.kind === 'hut')) {
+      const eave = h.r * eaveK
+      const blocked = (ax, az) => {
+        for (const c of L.colliders ?? []) {
+          if (c.kind === 'segment') {
+            if (near(c.x1, c.z1, ax, az, 1.5) || near(c.x2, c.z2, ax, az, 1.5)) return true
+          } else if (!near(c.x, c.z, h.x, h.z, 0.5) && near(c.x, c.z, ax, az, (c.r ?? Math.hypot(c.hx ?? 0, c.hz ?? 0)) + 1.5)) return true
+        }
+        for (const d of L.dwellings) if (d !== h && near(d.x, d.z, ax, az, d.r * 1.6 + 1.5)) return true
+        for (const f of L.flora ?? []) if (near(f.x, f.z, ax, az, 4)) return true
+        for (const rk of L.rocks ?? []) if (near(rk[0], rk[1], ax, az, 1.5)) return true
+        return false
+      }
+      for (let i = 0; i < 24; i++) {
+        const b = (i / 24) * Math.PI * 2
+        const stand = eave + 6
+        const sx = h.x + Math.cos(b) * stand
+        const sz = h.z + Math.sin(b) * stand
+        if (Math.hypot(sx, sz) > L.radius - 3) continue
+        let ok = true
+        for (let d = h.r * 1.1; d <= stand && ok; d += 0.5) if (blocked(h.x + Math.cos(b) * d, h.z + Math.sin(b) * d)) ok = false
+        if (ok) return { x: h.x, z: h.z, r: h.r, eave, b, stand }
+      }
+    }
+    return null
+  }, HUT_CONE_EAVE)
+
+  const measure = async (wet, shoot) => {
+    await enterWith(wet)
+    const hut = await pickHut()
+    if (!hut) {
+      check(`${PLACE} (wet=${wet}): a hut with a clear approach exists`, false, 'every hut and bearing blocked')
+      return null
+    }
+    const along = (d) => [hut.x + Math.cos(hut.b) * d, hut.z + Math.sin(hut.b) * d]
+    const [sx, sz] = along(hut.stand)
+    // Under the eave: midway between the wall and the eave line. Open yard: on
+    // the same ray, clear of the soft rim and the drip band.
+    const crops = { eave: along((hut.r + hut.eave) / 2), open: along(hut.eave + 3) }
+    const out = {}
+    for (const [name, [tx, tz]] of Object.entries(crops)) {
+      const ndc = await aimAt(sx, sz, tx, tz)
+      if (!ndc || Math.abs(ndc.y) > 0.35 || Math.abs(ndc.x) > 0.5) {
+        check(`${PLACE} (wet=${wet}): the ${name} ground crop is in the picture`, false, `ndc ${JSON.stringify(ndc)}`)
+        return null
+      }
+      const r = await shelterRatio(ndc, name)
+      if (r.value === null) {
+        check(`${PLACE} (wet=${wet}): the ${name} ground crop could be measured`, false, r.detail)
+        return null
+      }
+      out[name] = r
+      if (name === 'eave' && shoot) await frame(shoot.name, { place: PLACE, label: shoot.label })
+    }
+    return out
+  }
+
+  const rain = await measure(1, { name: '353-shelter-wet-rain', label: 'the ground under a Zulu hut eave in heavy rain' })
+  if (rain) {
+    check(
+      'in heavy rain the ground under a hut eave reads lighter for the shelter mask',
+      rain.eave.value > 1.05,
+      `eave ON/OFF ×${rain.eave.value.toFixed(3)} (bar >1.05); raw ON luma eave ${rain.eave.onLuma?.toFixed(1)} vs open ${rain.open.onLuma?.toFixed(1)}`,
+    )
+    check(
+      'in heavy rain the open-yard crop does not move with the shelter mask',
+      Math.abs(rain.open.value - 1) < 0.03,
+      `open ON/OFF ×${rain.open.value.toFixed(3)} (bar |×−1|<0.03)`,
+    )
+  }
+  const dry = await measure(0, { name: '353-shelter-wet-dry', label: 'the ground under a Zulu hut eave in dry weather' })
+  if (dry) {
+    check(
+      'in dry weather the shelter mask changes no pixel under the eave or in the open',
+      Math.abs(dry.eave.value - 1) < 0.02 && Math.abs(dry.open.value - 1) < 0.02,
+      `eave ×${dry.eave.value.toFixed(3)}, open ×${dry.open.value.toFixed(3)} (bar |×−1|<0.02); raw ON luma eave ${dry.eave.onLuma?.toFixed(1)} vs open ${dry.open.onLuma?.toFixed(1)}`,
+    )
+  }
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+}
+
 // --- Campfire shadows (design.md §19.10): with the debug toggle ON, an occluder
 // between the fire and the ground measurably darkens the ground behind it -------
 if (section('campfire-shadows')) {

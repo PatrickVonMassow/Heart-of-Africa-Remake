@@ -13,6 +13,7 @@ import * as THREE from 'three/webgpu'
 import { FIGURE_MICRO } from '../config/balance'
 import { SWEPT_PATCH_MEAN, edgeBandUniforms, sweptNode } from './edgeBand'
 import { seasonTintNode, wetGroundColor, wetGroundRoughness } from './seasonTint'
+import { shelteredWetNode } from './shelterWetness'
 import {
   cameraViewMatrix,
   color,
@@ -548,8 +549,11 @@ export function createGroundMaterial(
   const dust = tinted.r.mul(0.35).add(tinted.g.mul(0.5)).add(tinted.b.mul(0.15))
   const dusted = mix(tinted, vec3(dust, dust, dust), swept.mul(edgeBandUniforms.desat))
   // Rain wets the settlement ground (design.md §19.13, point 225): darker and
-  // glossier as the storm soaks it, driven by the shared GROUND_WET_U uniform.
-  m.colorNode = wetGroundColor(dusted.mul(sweptTone).mul(surfaceStructure('ground')))
+  // glossier as the storm soaks it, driven by the shared GROUND_WET_U uniform —
+  // SPATIALLY: ground under a roof or a crown stays less wet, and a drip band
+  // just outside the eaves wetter (shelterWetness.ts). Dry weather is 0 · mask = 0.
+  const wet = shelteredWetNode()
+  m.colorNode = wetGroundColor(dusted.mul(sweptTone).mul(surfaceStructure('ground')), wet)
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
   // fades where the mask is strong). Sand keeps a softer grain (weaker relief,
   // same tile) so the open plateau reads as smooth desert sand rather than a
@@ -564,6 +568,6 @@ export function createGroundMaterial(
   // Wet gloss: the base roughness (1) pulls down toward a sheen with the wet
   // factor, so the micro-relief normals catch a highlight. `m.roughness` stays
   // its scalar default — the node overrides it.
-  m.roughnessNode = wetGroundRoughness(float(1))
+  m.roughnessNode = wetGroundRoughness(float(1), wet)
   return m
 }
