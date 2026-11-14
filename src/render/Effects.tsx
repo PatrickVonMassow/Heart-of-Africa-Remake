@@ -159,6 +159,7 @@ export function Effects() {
     const shaftsPower = uniform(balance.godrays.forwardScatter)
     const shaftsAmbient = uniform(balance.godrays.ambientShare)
     const shaftsCap = uniform(balance.godrays.maxDensity)
+    const shaftsWedge = uniform(balance.godrays.wedgeShare)
     const shaftsAngle = uniform((balance.godrays.structureAngleDeg * Math.PI) / 180)
     const shaftsSunView = uniform(new THREE.Vector3(0, 0, -1))
     const shaftsTan = uniform(new THREE.Vector2(1, 1))
@@ -216,7 +217,11 @@ export function Effects() {
       const around = tap(shaftsAngle).add(tap(shaftsAngle.negate()))
         .add(tap(shaftsAngle.mul(2))).add(tap(shaftsAngle.mul(-2))).mul(0.25)
       const airLight = min(float(1).sub(exp(centre.y.negate())), shaftsCap)
-      const term = centre.x.sub(around).mul(airLight).mul(shaftsIntensity).mul(phase)
+      // Beams brighten fully; wedges darken at a share, so the air toward the
+      // sun still reads brighter overall (shaftsStructure, godraysLight.ts).
+      const dev = centre.x.sub(around)
+      const signed = max(dev, 0).add(min(dev, 0).mul(shaftsWedge))
+      const term = signed.mul(airLight).mul(shaftsIntensity).mul(phase)
       aoComposed = max(aoComposed.add(vec4(tslColor(godraysLive.color).mul(term), 0)), vec4(0))
     }
 
@@ -344,6 +349,7 @@ export function Effects() {
         shaftsDensity.value = b.density
         shaftsAtten.value = b.distanceAttenuation
         shaftsCap.value = b.maxDensity
+        shaftsWedge.value = b.wedgeShare
         shaftsAngle.value = (b.structureAngleDeg * Math.PI) / 180
         shaftsIntensity.value = b.intensity
         shaftsPower.value = b.forwardScatter

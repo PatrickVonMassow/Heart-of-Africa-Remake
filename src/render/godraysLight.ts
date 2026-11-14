@@ -37,8 +37,10 @@ export function shaftsPhase(cosToSun: number, power: number, ambient: number): n
 
 /** The shaft structure the post chain adds (CPU mirror of the TSL in
  *  Effects.tsx, before gain and lobe): the pixel's lit share minus the mean of
- *  its taps rotated about the sun, scaled by the full ray's air light. */
-export function shaftsStructure(litShare: number, taps: readonly number[], airLight: number): number {
+ *  its taps rotated about the sun (a wedge's darkening kept at `wedgeShare`),
+ *  scaled by the full ray's air light. */
+export function shaftsStructure(litShare: number, taps: readonly number[], airLight: number, wedgeShare = 1): number {
   const mean = taps.reduce((a, b) => a + b, 0) / Math.max(taps.length, 1)
-  return (litShare - mean) * airLight
+  const dev = litShare - mean
+  return (dev > 0 ? dev : dev * wedgeShare) * airLight
 }

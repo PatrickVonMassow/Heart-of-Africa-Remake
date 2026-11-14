@@ -69,6 +69,7 @@ describe('sun-shaft forward scatter', () => {
 describe('sun-shaft structure term', () => {
   it('adds nothing where the lit share is flat, and a signed deviation across shafts', async () => {
     const { shaftsStructure } = await import('./godraysLight')
+    const { balance } = await import('../config/balance')
     // Open frame: every ray fully lit — no veil, however much air light.
     expect(shaftsStructure(1, [1, 1, 1, 1], 0.4)).toBe(0)
     // A beam between two leaves: brighter than its neighbours.
@@ -77,5 +78,8 @@ describe('sun-shaft structure term', () => {
     expect(shaftsStructure(0.3, [0.9, 1, 0.8, 1], 0.4)).toBeLessThan(0)
     // Uniformly shadowed air (a wall in shade) is flat too.
     expect(shaftsStructure(0.2, [0.2, 0.2, 0.2, 0.2], 0.4)).toBe(0)
+    // Wedges are damped against beams, so the air toward the sun brightens on balance.
+    const w = balance.godrays.wedgeShare
+    expect(-shaftsStructure(0.5, [1, 1, 1, 1], 1, w)).toBeLessThan(shaftsStructure(1, [0.5, 0.5, 0.5, 0.5], 1, w))
   })
 })

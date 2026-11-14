@@ -924,6 +924,8 @@ interface BalanceConfig {
     /** Angular step (degrees, about the sun's screen position) of the taps
      *  whose mean the lit share is compared against: about one shaft width. */
     structureAngleDeg: number
+    /** Share of a wedge's darkening kept (0 = beams only, 1 = symmetric). */
+    wedgeShare: number
     /** Raymarch samples per pixel (upstream `raymarchSteps`, default 60): the cost knob. */
     raymarchSteps: number
     /** Resolution of the pass against the drawing buffer (upstream default 0.5). */
@@ -2050,6 +2052,7 @@ export const balance: BalanceConfig = {
     forwardScatter: 24, // calibratable
     ambientShare: 0, // no veil away from the sun; calibratable
     structureAngleDeg: 2.5, // ~a palm-leaf gap seen from under the crown; calibratable
+    wedgeShare: 0.4, // calibratable
     raymarchSteps: 40, // upstream 60; calibratable against F8
     resolutionScale: 0.375, // upstream 0.5; the shafts are soft; calibratable against F8
   },

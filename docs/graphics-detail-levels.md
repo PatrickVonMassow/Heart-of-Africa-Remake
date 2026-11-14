@@ -343,13 +343,15 @@ added.
   the real number comes from F8.
 - **`godrays`** — Sun shafts (design.md §2.7, point 345): the upstream
   `GodraysNode` raymarches the settlement sun's shadow map along every view ray
-  at half resolution and adds the lit-air term, tinted like the sun, onto the
-  frame before TRAA and bloom, so the shafts resolve and bloom with the sun. A
-  roof edge, palm crown, minaret or pyramid in the light's path cuts dark
-  wedges into it. The upstream term has no phase function, so the chain
-  weights it by a tight forward-scatter lobe around the sun (`forwardScatter`,
-  `ambientShare` 0), so the frame away from the sun stays as it was and the
-  shafts form only around occluder silhouettes near the sun. Cost knobs:
+  at reduced resolution. The raw lit-air term would lift every pixel whose ray
+  runs through lit air (a veil), so the chain reads it back as the ray's lit
+  share, high-passes that tangentially about the sun's screen position
+  (`structureAngleDeg`) and adds only the deviation, tinted like the sun,
+  before TRAA and bloom: beams through a palm crown's or a lane's gaps
+  brighten, wedges behind leaves and roofs darken (`wedgeShare`), uniformly
+  lit or uniformly shaded air gets nothing. A tight forward-scatter lobe
+  (`forwardScatter`, `ambientShare` 0) keeps the result near the sun, so the
+  frame away from the sun stays as it was. Cost knobs:
   `raymarchSteps` (40) and `resolutionScale` (0.375). Needs the sun's shadow map (no shafts where shadows are
   off) and only marches inside its box, which therefore reaches well past the
   sunward settlement edge (`src/scenes/place/sunShadowBox.ts`).
