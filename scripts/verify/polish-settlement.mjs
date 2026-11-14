@@ -127,8 +127,29 @@ if (section('settlement-season')) {
   // An UNMEASURED settle leaves a partial reading; every season check below is
   // built on it, so it reports UNMEASURED too instead of asserting on it.
   let seasonSkip = null
-  const settle = async (label) => {
-    const r = await waitForReadingStable(page, () => window.__placeSeason(), { settleMs: 500, samples: 3, requireChange: true, timeout: 60000 })
+  const settle = async (label, requireChange = true) => {
+    // Point 354: settle by RENDERED frames, not wall time. The light lerps per
+    // frame (k = 0.8·dt, dt ≤ 0.1 s); at the 1-5 fps of the headless lane a
+    // 3 × 500 ms quiet window fell between frames and read the wet sun half-lerped
+    // (2.18 for a target of 1.44) — the red charged to this point.
+    const r = await (async () => {
+      const t0 = Date.now()
+      const read = () => page.evaluate(() => window.__placeSeason())
+      const nums = (v) => [v.sun, v.hemi, v.sky.grayMix, v.sky.cloudBoost, v.rain, v.tint]
+      let prev = await read()
+      let quiet = 0
+      let moved = false
+      while (Date.now() - t0 < 120000) {
+        await nextFrames(8)
+        const cur = await read()
+        const still = nums(prev).every((n, i) => Math.abs(n - nums(cur)[i]) <= 1e-3)
+        if (!still) moved = true
+        quiet = still ? quiet + 1 : 0
+        prev = cur
+        if ((moved || !requireChange) && quiet >= 3) return { value: cur, settled: true, waitedMs: Date.now() - t0 }
+      }
+      return { value: prev, settled: false, waitedMs: Date.now() - t0 }
+    })()
     // A TIMING check (point 642): a 60 s settle deadline over a per-frame lerp.
     // It declares the rate it needs; a settle that fails below it is UNMEASURED
     // (the software lane read it after 60176 ms), one that succeeds passes on any
@@ -207,7 +228,7 @@ if (section('settlement-season')) {
       g.debugJumpToMonth(m)
     }, month)
     await goToPlace('zulu-village')
-    await settle(label)
+    await settle(label, false)
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     await nextFrames(4)
     // Upper sky only: above the huts and the hills, below the HUD bar.
