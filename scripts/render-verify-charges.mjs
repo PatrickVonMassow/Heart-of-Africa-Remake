@@ -2110,4 +2110,23 @@ export const RED_CHARGES = [
       'MEASURED 14.11.2026 on WebGL 2, feat/344 b9082f151: congo swing 7.2 vs savanna 10.7 in the whole pass; point 1495 '
       + 'owns the seasons section until it is green on both backends. The charge dies with point 1495.',
   },
+  {
+    point: 354,
+    suite: 'polish-settlement',
+    kind: 'check',
+    match: /^the rains dim the settlement sun and sky light\b/i,
+    why:
+      'MEASURED 14.11.2026 on WebGPU, main cfe6b27f1: dry sun 2.4 vs wet 2.277 (needs a drop above 0.5); the settlement '
+      + 'rain light reads nearly dry — the same symptom point 354 owns (rain under a bright sky, settlement-season checks). '
+      + 'The charge dies with point 354.',
+  },
+  {
+    point: 1520,
+    suite: 'polish-settlement',
+    kind: 'console',
+    match: /^console error: \[ASSERT\] render-resource-leak — renderTargets grew back at place:/i,
+    why:
+      'MEASURED 14.11.2026 on WebGPU, main cfe6b27f1: renderTargets 52 -> 58 at place:bambara-village|medium bloom/sun '
+      + 'band — the same rebuild leak since the solar sun that point 1520 owns at travel. The charge dies with point 1520.',
+  },
 ]
