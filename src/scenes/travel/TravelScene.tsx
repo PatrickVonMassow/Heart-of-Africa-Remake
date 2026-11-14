@@ -33,6 +33,7 @@ import {
   effectiveFloraDensity,
   effectiveFloraCastShadow,
   effectiveFigureLimbSegments,
+  effectiveHorizonMaps,
 } from '../../state/ui'
 import { balance, START_YEAR, TRAVELLER_LOOK } from '../../config/balance'
 import {
@@ -99,6 +100,7 @@ import { SunHelmet } from '../place/castHats'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
 import { useSceneSun } from '../../render/sceneSun'
+import { horizonShadeNode, horizonSkyOcclusionNode, setHorizonMapsWanted, setHorizonSun } from '../../render/horizonMaps'
 import { TRAVEL_SKY } from '../../render/skyPresets'
 import { createWaterMaterial } from '../../render/water'
 import { SEA_PLANE_SEGMENTS, SEA_PLANE_SIZE, seaPlaneOrigin } from '../../render/seaPlaneLattice'
@@ -458,7 +460,17 @@ export function buildChunkGeometry(
 // synchronously (~7-10 s main-thread freeze, CDP-profiled).
 let terrainMaterialCache: THREE.MeshStandardNodeMaterial | null = null
 let waterHandleCache: ReturnType<typeof createWaterMaterial> | null = null
-const FAR_TERRAIN_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
+// The far ring carries the same horizon-map terms as the near chunks (design.md
+// §2.7), or a shadowed slope would change brightness at the ring's seam when the
+// debug zoom shows it. Both terms are exactly 1 until the maps apply. The
+// colorNode reads the vertex colour itself, so vertexColors stays off or the
+// material would multiply it in a second time.
+const FAR_TERRAIN_MATERIAL = (() => {
+  const m = new THREE.MeshStandardNodeMaterial({ vertexColors: false, roughness: 1 })
+  m.colorNode = vertexColor().rgb.mul(horizonShadeNode())
+  m.aoNode = horizonSkyOcclusionNode()
+  return m
+})()
 const REMAINS_MATERIAL = new THREE.MeshStandardMaterial({ roughness: 1, vertexColors: true })
 const REMAINS_IVORY_MATERIAL = new THREE.MeshStandardMaterial({ roughness: 0.65, vertexColors: true })
 const LANDMARK_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
@@ -557,10 +569,14 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
   // §19.8/§19.13): like the blood it is a term of the terrain itself, so it
   // follows the relief; the ember band at the burning line glows emissive.
   const scarMask = burnScarMask()
+  // The land's own shadow and the sky its hollows cannot see (design.md §2.7,
+  // render/horizonMaps.ts): both exactly 1 until the baked maps are loaded,
+  // and never loaded at the low level.
   mat.colorNode = bloodGroundColor(
     burnScarColor(wetGroundColor(mat.colorNode.mul(macro.mul(0.3).add(0.85))), scarMask),
     stainMask,
-  )
+  ).mul(horizonShadeNode())
+  mat.aoNode = horizonSkyOcclusionNode()
   mat.emissiveNode = burnEmberEmissive()
   terrainMaterialCache = mat
   return mat
@@ -604,6 +620,15 @@ function TerrainChunks() {
   const activeSig = useRef('')
   const lastCenter = useRef<string | null>(null)
   const material = useMemo(() => createTerrainMaterial(), [])
+  // Horizon maps (design.md §2.7): the fetch follows the EFFECTIVE level — none
+  // at low, one when it rises — and the shading follows the scene sun.
+  const horizonWanted = useUi(effectiveHorizonMaps)
+  const sceneSun = useSceneSun()
+  const balanceRev = useGame((s) => s.balanceVersion)
+  useEffect(() => setHorizonMapsWanted(horizonWanted), [horizonWanted])
+  useEffect(() => {
+    setHorizonSun(sceneSun.angles.azimuth, (Math.asin(sceneSun.light[1]) * 180) / Math.PI)
+  }, [sceneSun, balanceRev])
   // Budgeted build queue (docs/perf-driving-hitches.md): the boundary crossing
   // used to build every changed chunk of the window synchronously in one frame
   // (~40-60 geometries, the tallest driving hitch). It now enqueues the missing

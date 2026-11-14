@@ -880,6 +880,24 @@ interface BalanceConfig {
      *  cascade artefacts; 0 = the light follows the true sun down to 2°. */
     shadowMinElevationDeg: number
   }
+  /** Horizon maps (design.md §2.7 "The land shades itself"): the baked horizon
+   *  slopes (real geometry, scripts/build-horizon-maps.mjs) as the travel
+   *  terrain reads them. Medium and high only (quality key `horizonMaps`). */
+  horizonMaps: {
+    /** Factor on the baked real-geometry slopes before they meet the sun.
+     *  The rendered relief is exaggerated (terrain.ts METERS_TO_UNITS against
+     *  geo.ts UNITS_PER_DEGREE, ~15x); matching it keeps the shadow true to
+     *  the relief the player sees. 1 = the real Earth's shadows. */
+    reliefScale: number
+    /** Share of the ground's brightness the sun's direct light supplies, i.e.
+     *  how far a fully shadowed texel darkens (0 = no shadow, 1 = black). */
+    shadowStrength: number
+    /** Half-width (degrees) of the soft shadow edge around the horizon angle. */
+    shadowSoftnessDeg: number
+    /** Ambient-light loss of a texel whose surroundings rise 90 degrees all
+     *  round; real hollows lose this times sin^2 of their mean horizon. */
+    skyOcclusionStrength: number
+  }
   /** First-person eye adaptation (design.md §2.7, render/exposureControl.ts):
    *  the exposure follows the frame's mean luminance inside a bounded range.
    *  Highest quality level, settlement scenes only; the bird's-eye view keeps
@@ -1997,6 +2015,12 @@ export const balance: BalanceConfig = {
   sun: {
     hour: 16, // 16:00 local solar time, 7°-37° over the map and year; calibratable, debug-editable
     shadowMinElevationDeg: 0, // no extra floor until the grazing end is judged ugly; calibratable, debug-editable
+  },
+  horizonMaps: {
+    reliefScale: 15, // ≈ the rendered relief's exaggeration (1.35 units/km ÷ 10 units/111.32 km); calibratable, debug-editable
+    shadowStrength: 0.45, // educated guess: low afternoon sun, strong sky light; calibratable, debug-editable
+    shadowSoftnessDeg: 1.5, // ~one texel's worth of soft edge at the low sun; calibratable, debug-editable
+    skyOcclusionStrength: 0.7, // calibratable, debug-editable
   },
   exposure: {
     base: 1.05, // today's fixed toneMappingExposure (src/App.tsx); calibratable, debug-editable
