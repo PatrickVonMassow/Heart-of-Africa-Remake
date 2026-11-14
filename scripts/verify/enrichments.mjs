@@ -12264,7 +12264,7 @@ if (section('solar-sun')) {
   await page.waitForFunction(
     () => window.__game.getState().mode === 'place' && !!window.__placeLayout &&
       Math.abs((window.__sceneSun?.lat ?? 99) - 30) < 0.5 && window.__sunLight?.isDirectionalLight === true &&
-      window.__sunLight.name === 'place-sun',
+      window.__sunLight.position.y < 50,
     null,
     { timeout: 30000 },
   )

@@ -341,26 +341,22 @@ added.
   front of the sun kills the glare in the same frame. Needs bloom; settlement
   scenes only. High only. Estimated cost of both effects together ~0.3-0.8 ms;
   the real number comes from F8.
-- **`godrays`** — Sun shafts (design.md §2.7, point 345): the upstream
-  `GodraysNode` raymarches the settlement sun's shadow map along every view ray
-  at reduced resolution. The raw lit-air term would lift every pixel whose ray
-  runs through lit air (a veil), so the chain reads it back as the ray's lit
-  share, high-passes that tangentially about the sun's screen position
-  (`structureAngleDeg`) and adds only the deviation, tinted like the sun,
-  before TRAA and bloom: beams through a palm crown's or a lane's gaps
-  brighten, wedges behind leaves and roofs darken (`wedgeShare`), uniformly
-  lit or uniformly shaded air gets nothing. A tight forward-scatter lobe
-  (`forwardScatter`, `ambientShare` 0) keeps the result near the sun, so the
-  frame away from the sun stays as it was. Cost knobs:
-  `raymarchSteps` (40) and `resolutionScale` (0.375). Needs the sun's shadow map (no shafts where shadows are
-  off) and only marches inside its box, which therefore reaches well past the
-  sunward settlement edge (`src/scenes/place/sunShadowBox.ts`).
-  Settlement scenes only: the bird's-eye camera looks ~60° down while the sun
-  stands at most ~37° up, so it never has the light in its frame. The only
-  effect of the family with a real per-pixel cost (estimated +1.5-3 ms); kept
-  only if the F8 before/after on the same build says it is worth the picture —
-  the debug menu's render-tuning toggle switches it off for that comparison.
-  Strength in `balance.godrays`. High only.
+- **`godrays`** — Sun shafts (design.md §2.7, point 345,
+  `src/render/sunShafts.ts`): a mask keeps the open sky in a lobe around the
+  sun's screen position (`maskRadius`, sky pixels capped at `brightnessCap`);
+  the upstream `radialBlur` smears it toward the sun and the blur alone is
+  added before TRAA and bloom. A palm crown, a roof edge or a minaret in front
+  of the sun cut gaps into the mask, so the result is bright beams and dark
+  wedges converging on the sun; the frame away from the lobe gets nothing.
+  Fades out as the sun leaves the frame. Chosen over the upstream
+  `GodraysNode`, whose shadow-map raymarch resolved a palm frond at one or two
+  shadow texels and read as a veil or as silhouette seams (picture checks
+  14.11.2026). Settlement scenes only: the bird's-eye camera looks ~60° down
+  while the sun stands at most ~37° up, so it never has the sun in its frame.
+  Cost: one full-resolution mask pass plus 48 blur taps per pixel; the F8
+  before/after on the same build decides whether it stays — the debug menu's
+  render-tuning toggle switches it off for that comparison. Strength in
+  `balance.godrays`. High only.
 - **`sunDiscGain`** — Gain of the sky dome's sun disc. 3 (the disc before point
   344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
   blooms on its own and feeds the glare. Settlement scenes only: the same dome

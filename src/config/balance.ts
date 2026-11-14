@@ -905,31 +905,17 @@ interface BalanceConfig {
     /** Lens-flare ghost strength (three/addons LensflareNode over the bloom). */
     ghostIntensity: number
   }
-  /** Sun shafts (design.md §2.7, quality key `godrays`): the upstream
-   *  GodraysNode's lit-air term, added onto the settlement frame in the sun's tint. */
+  /** Sun shafts (design.md §2.7, quality key `godrays`, render/sunShafts.ts):
+   *  the open sky around the sun, radially blurred toward it and added. */
   godrays: {
-    /** Accumulation rate along a view ray (upstream `density`; humid air = higher). */
-    density: number
-    /** Ceiling of the full ray's air light that scales the shaft structure, 0..1
-     *  (the upstream `maxDensity` itself is held invertible, Effects.tsx). */
-    maxDensity: number
-    /** Fall-off of the accumulation away from the light (upstream `distanceAttenuation`). */
-    distanceAttenuation: number
-    /** HDR strength of the term added onto the frame (toward the sun). */
+    /** HDR strength of the added shafts. */
     intensity: number
-    /** Exponent of the forward-scatter lobe around the sun direction. */
-    forwardScatter: number
-    /** Share of the term kept away from the sun (0 = shafts only toward it). */
-    ambientShare: number
-    /** Angular step (degrees, about the sun's screen position) of the taps
-     *  whose mean the lit share is compared against: about one shaft width. */
-    structureAngleDeg: number
-    /** Share of a wedge's darkening kept (0 = beams only, 1 = symmetric). */
-    wedgeShare: number
-    /** Raymarch samples per pixel (upstream `raymarchSteps`, default 60): the cost knob. */
-    raymarchSteps: number
-    /** Resolution of the pass against the drawing buffer (upstream default 0.5). */
-    resolutionScale: number
+    /** Radius (screen height share) of the sky lobe around the sun that feeds them. */
+    maskRadius: number
+    /** HDR ceiling of a sky pixel in the mask, so the sun disc cannot dominate. */
+    brightnessCap: number
+    /** Per-sample decay along the blur toward the sun: the shafts' length. */
+    decay: number
   }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
@@ -2041,20 +2027,10 @@ export const balance: BalanceConfig = {
     ghostIntensity: 0.6, // calibratable, debug-editable
   },
   godrays: {
-    density: 0.5, // educated guess for dry afternoon air; calibratable, debug-editable
-    maxDensity: 0.45, // calibratable
-    distanceAttenuation: 2, // upstream default; calibratable
-    // The added term is now a signed DEVIATION of the lit share (beams up,
-    // wedges down), far smaller than the old raw term, hence the higher gain.
-    intensity: 6, // educated guess, NOT yet calibrated on a frame; calibratable, debug-editable
-    // A tight lobe: at 6 / 0.25 the term read as a uniform veil (picture
-    // check 14.11.2026). 24 halves at ~14° and is ~3 % at 30° off the sun.
-    forwardScatter: 24, // calibratable
-    ambientShare: 0, // no veil away from the sun; calibratable
-    structureAngleDeg: 2.5, // ~a palm-leaf gap seen from under the crown; calibratable
-    wedgeShare: 0.4, // calibratable
-    raymarchSteps: 40, // upstream 60; calibratable against F8
-    resolutionScale: 0.375, // upstream 0.5; the shafts are soft; calibratable against F8
+    intensity: 0.6, // educated guess; calibratable, debug-editable
+    maskRadius: 0.3, // calibratable
+    brightnessCap: 3, // calibratable
+    decay: 0.97, // calibratable, debug-editable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

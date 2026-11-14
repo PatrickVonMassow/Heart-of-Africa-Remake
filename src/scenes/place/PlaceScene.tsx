@@ -72,8 +72,6 @@ import {
 } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { useSceneSun } from '../../render/sceneSun'
-import { publishGodraysLight } from '../../render/godraysLight'
-import { SUN_SHADOW_BIAS, SUN_SHADOW_DISTANCE, SUN_SHADOW_FAR, SUN_SHADOW_HALF, SUN_SHADOW_NEAR } from './sunShadowBox'
 import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
@@ -2732,18 +2730,13 @@ export function PlaceScene() {
   const shadowSize = useUi(effectiveShadowResolution)
   const shadowsEnabled = useUi(effectiveShadows)
   const fireShadowsEnabled = useUi(effectiveFireShadows)
-  // The sun shafts (render/godraysLight.ts) march this light's shadow map; the
-  // light remounts when shadows toggle, so republish it with that key.
   useEffect(() => {
-    publishGodraysLight(sunRef.current)
-    return () => publishGodraysLight(null)
-  }, [shadowsEnabled])
-  // No reset of the sun's shadow map on a resolution change: three's
-  // ShadowNode resizes its own render target from `shadow.mapSize` on every
-  // shadow draw. Nulling the public `shadow.map` (the old WebGLRenderer idiom)
-  // only orphaned the reference — nothing recreates it — so the sun shafts,
-  // which march that map, could never come up after a level change made
-  // before they were first enabled (point 345).
+    const map = sunRef.current?.shadow.map
+    if (map) {
+      map.dispose()
+      sunRef.current!.shadow.map = null as unknown as typeof map
+    }
+  }, [shadowSize])
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
@@ -3374,19 +3367,18 @@ export function PlaceScene() {
         // side-finding).
         key={shadowsEnabled ? 'sun-shadowed' : 'sun-plain'}
         ref={sunRef}
-        name="place-sun"
-        position={[sun.light[0] * SUN_SHADOW_DISTANCE, sun.light[1] * SUN_SHADOW_DISTANCE, sun.light[2] * SUN_SHADOW_DISTANCE]}
+        position={[sun.light[0] * 60, sun.light[1] * 60, sun.light[2] * 60]}
         color="#fff1d8"
         intensity={PLACE_SUN_INTENSITY}
         castShadow={shadowsEnabled}
         shadow-mapSize={[shadowSize, shadowSize]}
-        shadow-camera-left={-SUN_SHADOW_HALF}
-        shadow-camera-right={SUN_SHADOW_HALF}
-        shadow-camera-top={SUN_SHADOW_HALF}
-        shadow-camera-bottom={-SUN_SHADOW_HALF}
-        shadow-camera-near={SUN_SHADOW_NEAR}
-        shadow-camera-far={SUN_SHADOW_FAR}
-        shadow-bias={SUN_SHADOW_BIAS}
+        shadow-camera-left={-55}
+        shadow-camera-right={55}
+        shadow-camera-top={55}
+        shadow-camera-bottom={-55}
+        shadow-camera-near={5}
+        shadow-camera-far={160}
+        shadow-bias={-0.0004}
         shadow-normalBias={VILLAGER_ASSET.sunShadowNormalBias}
       />
 

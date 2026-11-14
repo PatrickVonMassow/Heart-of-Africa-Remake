@@ -954,7 +954,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandStall',
     'debug.adultErrandPace', 'debug.adultErrandCount',
   ],
-  weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.sunHour', 'debug.sunShadowFloor', 'debug.sunDirection', 'debug.exposureMin', 'debug.exposureMax', 'debug.exposureKey', 'debug.exposureCompensation', 'debug.exposureToBright', 'debug.exposureToDark', 'debug.glareStar', 'debug.glareStarLength', 'debug.glareGhosts', 'debug.godrays', 'debug.godraysDensity', 'debug.godraysIntensity', 'debug.foliageCollapse'],
+  weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.sunHour', 'debug.sunShadowFloor', 'debug.sunDirection', 'debug.exposureMin', 'debug.exposureMax', 'debug.exposureKey', 'debug.exposureCompensation', 'debug.exposureToBright', 'debug.exposureToDark', 'debug.glareStar', 'debug.glareStarLength', 'debug.glareGhosts', 'debug.godrays', 'debug.godraysDecay', 'debug.godraysIntensity', 'debug.foliageCollapse'],
   economy: [
     'debug.cash', 'debug.giftsTotal', 'debug.inventoryCapacity', 'debug.digRadius',
     'debug.addEquipment', 'debug.addGift', 'debug.addTreasure',

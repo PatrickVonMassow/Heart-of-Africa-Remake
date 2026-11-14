@@ -1,8 +1,6 @@
 import { act, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DepthTexture, DirectionalLight, PerspectiveCamera, RenderPipeline, RenderTarget, Scene, Texture, WebGPURenderer } from 'three/webgpu'
-import GodraysNode from 'three/addons/tsl/display/GodraysNode.js'
-import { publishGodraysLight } from './godraysLight'
+import { PerspectiveCamera, RenderPipeline, Scene, Texture, WebGPURenderer } from 'three/webgpu'
 import { velocity } from 'three/tsl'
 import { Effects } from './Effects'
 import { createScenePass } from './scenePass'
@@ -180,49 +178,29 @@ describe('post chain ownership', () => {
     dispose.mockRestore()
   })
 
-  // Point 345: the sun shafts march the settlement sun's shadow map — first
-  // person only, high only, and only once that map exists.
-  const shadowedSun = () => {
-    const light = new DirectionalLight()
-    light.castShadow = true
-    const map = new RenderTarget(4, 4)
-    map.depthTexture = new DepthTexture(4, 4)
-    light.shadow.map = map as typeof light.shadow.map
-    return light
-  }
-  const shaftsAfterPoll = () => {
+  // Point 345: the sun shafts — first person only, high only, debug A/B off.
+  const shaftsInChain = () => {
     act(() => fiber.frame())
     return (window as unknown as { __postFeatures?: { godrays: boolean } }).__postFeatures?.godrays
   }
-  afterEach(() => publishGodraysLight(null))
   it.each([
     ['place', 'high', true, true], ['place', 'medium', true, false], ['place', 'low', true, false],
     ['travel', 'high', true, false], ['place', 'high', false, false],
   ] as const)('%s at %s (debug toggle %s): sun shafts in the chain = %s', (mode, detailLevel, godraysEnabled, expected) => {
     useGame.setState({ mode })
     useUi.setState({ detailLevel, godraysEnabled })
-    publishGodraysLight(shadowedSun())
     const view = mountEffects()
-    expect(shaftsAfterPoll()).toBe(expected)
+    expect(shaftsInChain()).toBe(expected)
     view.unmount()
   })
 
-  it('builds no shafts before the sun has a shadow map, and frees them on leaving', () => {
+  it('drops the shafts from the chain on leaving the settlement', () => {
     useGame.setState({ mode: 'place' })
-    useUi.setState({ detailLevel: 'high' })
-    const light = shadowedSun()
-    const map = light.shadow.map
-    light.shadow.map = null as unknown as typeof map
-    publishGodraysLight(light)
-    const dispose = vi.spyOn(GodraysNode.prototype, 'dispose')
+    useUi.setState({ detailLevel: 'high', godraysEnabled: true })
     const view = mountEffects()
-    expect(shaftsAfterPoll()).toBe(false)
-    light.shadow.map = map
-    expect(shaftsAfterPoll()).toBe(true)
+    expect(shaftsInChain()).toBe(true)
     act(() => useGame.setState({ mode: 'travel' }))
-    expect(shaftsAfterPoll()).toBe(false)
-    expect(dispose).toHaveBeenCalledTimes(1)
+    expect(shaftsInChain()).toBe(false)
     view.unmount()
-    dispose.mockRestore()
   })
 })

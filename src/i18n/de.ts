@@ -735,7 +735,7 @@ export const de: Strings = {
     glareStarLength: 'Sonnenblendung: Strahllänge',
     glareGhosts: 'Sonnenblendung: Linsenreflexe',
     godrays: 'Lichtstrahlen (A/B)',
-    godraysDensity: 'Lichtstrahlen: Dichte',
+    godraysDecay: 'Lichtstrahlen: Länge',
     godraysIntensity: 'Lichtstrahlen: Stärke',
     edgeBandWidth: 'Ortsrand: Breite (m)',
     edgeBandWander: 'Ortsrand: Mäander (m)',

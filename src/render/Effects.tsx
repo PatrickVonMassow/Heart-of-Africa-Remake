@@ -18,14 +18,13 @@
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { clamp, color as tslColor, cos, dot, exp, float, getViewPosition, length, log, max, min, mix, normalize, pow, screenUV, sin, smoothstep, uniform, vec2, vec3, vec4, velocity, viewportUV } from 'three/tsl'
+import { float, max, mix, smoothstep, vec3, vec4, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
-import { godrays } from 'three/addons/tsl/display/GodraysNode.js'
 import { createEnvironmentTexture } from './environment'
 import { useSceneSun } from './sceneSun'
 import { createScenePass } from './scenePass'
@@ -35,7 +34,7 @@ import { useGame } from '../state/store'
 import { balance } from '../config/balance'
 import { eyeAdaptation, type EyeAdaptationNode } from './eyeAdaptation'
 import { createSunGlare } from './sunGlare'
-import { godraysShadowTexture, readyGodraysLight } from './godraysLight'
+import { createSunShafts } from './sunShafts'
 
 
 /** Minimum screen-space AO factor: occlusion never darkens a surface below this
@@ -82,14 +81,9 @@ export function Effects() {
   // Sun glare (design.md §2.7): built on the bloom, first person only.
   const glareEnabled = useUi(effectiveSunGlare) && bloomEnabled && firstPerson
   // Sun shafts (design.md §2.7): first person only — screen-space shafts need
-  // the light in the frame, and the bird's-eye camera (~60° down, sun <= ~37°
-  // up) never has it there. They march the settlement sun's shadow map, so the
-  // pass is built only once that light and its map exist (render/godraysLight.ts);
-  // the per-frame poll below rebuilds the chain when either appears or changes.
-  const godraysWanted = useUi(effectiveGodrays) && firstPerson
-  const [godraysLight, setGodraysLight] = useState<THREE.DirectionalLight | null>(null)
-  const [godraysMap, setGodraysMap] = useState<unknown>(null)
-  const godraysLive = godraysWanted ? godraysLight : null
+  // the sun in the frame, and the bird's-eye camera (~60° down, sun <= ~37°
+  // up) never has it there (render/sunShafts.ts).
+  const shaftsEnabled = useUi(effectiveGodrays) && firstPerson
 
   // Keep the render target and MRT identity across every graphics toggle. A
   // changed fragment-output layout relinks scene/shadow materials as well as
@@ -140,91 +134,14 @@ export function Effects() {
       aoComposed = color.mul(max(float(AO_FLOOR), aoPass.getTextureNode().r))
     }
 
-    // Sun shafts: STRUCTURE, not haze (picture checks 14.11.2026). The
-    // upstream term is lit air along the view ray; added as is it lifts every
-    // pixel whose ray runs through lit air — the whole open frame, a veil.
-    // What a person reads as shafts is the VARIATION of lit air across
-    // neighbouring rays around the sun: beams through the gaps of a crown,
-    // wedges behind its leaves. So per pixel the term is turned back into the
-    // LIT SHARE of the ray (actual lit-air optical depth over the depth a
-    // fully lit ray to the same point would have — exact mirror of the
-    // upstream march, render/godraysLight.ts), high-passed tangentially
-    // around the sun (taps rotated about the sun's screen position), and only
-    // that signed deviation is added, scaled by the full ray's air light and
-    // the forward-scatter lobe. Uniformly lit air (open ground, walls, the
-    // open sky) has a flat lit share and receives nothing. Added BEFORE TRAA
-    // and bloom so the temporal resolve settles the raymarch noise.
-    let shafts: ReturnType<typeof godrays> | null = null
-    const shaftsIntensity = uniform(balance.godrays.intensity)
-    const shaftsPower = uniform(balance.godrays.forwardScatter)
-    const shaftsAmbient = uniform(balance.godrays.ambientShare)
-    const shaftsCap = uniform(balance.godrays.maxDensity)
-    const shaftsWedge = uniform(balance.godrays.wedgeShare)
-    const shaftsAngle = uniform((balance.godrays.structureAngleDeg * Math.PI) / 180)
-    const shaftsSunView = uniform(new THREE.Vector3(0, 0, -1))
-    const shaftsTan = uniform(new THREE.Vector2(1, 1))
-    const shaftsProjInv = uniform(new THREE.Matrix4())
-    const shaftsViewToLight = uniform(new THREE.Matrix4())
-    const shaftsBoxMin = uniform(new THREE.Vector3(-1, -1, -2))
-    const shaftsBoxMax = uniform(new THREE.Vector3(1, 1, -1))
-    const shaftsNearFar = uniform(new THREE.Vector2(1, 2))
-    const shaftsDensity = uniform(balance.godrays.density)
-    const shaftsAtten = uniform(balance.godrays.distanceAttenuation)
-    if (godraysLive) {
-      shafts = godrays(depth, camera, godraysLive)
+    // Sun shafts: the open sky around the sun, radially blurred toward it
+    // and added before TRAA and bloom, so the temporal resolve settles the
+    // blur's dither and the bright beams bloom (render/sunShafts.ts).
+    let shafts: ReturnType<typeof createSunShafts> | null = null
+    if (shaftsEnabled) {
+      shafts = createSunShafts(color, depth)
       disposables.push(shafts)
-      const termTex = shafts.getTextureNode()
-      // Lit share r and full-ray optical depth of the shaft texel at `at`.
-      const litShare = (at: THREE.Node<'vec2'>) => {
-        const texel = termTex.sample(at)
-        const viewPos = getViewPosition(at, texel.a, shaftsProjInv)
-        const o = shaftsViewToLight.mul(vec4(0, 0, 0, 1)).xyz
-        const dir = shaftsViewToLight.mul(vec4(viewPos, 1)).xyz.sub(o).add(1e-5)
-        const ta = shaftsBoxMin.sub(o).div(dir)
-        const tb = shaftsBoxMax.sub(o).div(dir)
-        const exitT = max(ta, tb)
-        const tEnd = clamp(min(min(exitT.x, exitT.y), exitT.z), 0, 1)
-        const near = shaftsNearFar.x
-        const far = shaftsNearFar.y
-        // Mean attenuation over the clipped segment, mirroring the upstream
-        // pow(1 - viewZ / far, k) with its perspective viewZ conversion.
-        // A plain node sum: this helper runs outside an Fn(), where a toVar()
-        // assign has no stack and three throws at build time.
-        let atten: THREE.Node<'float'> = float(0)
-        for (const f of [0.125, 0.375, 0.625, 0.875]) {
-          const p = o.add(dir.mul(tEnd.mul(f)))
-          const zc = p.z.negate().sub(near).div(far.sub(near))
-          const vz = near.mul(far).div(far.sub(far.sub(near).mul(zc)))
-          atten = atten.add(pow(max(float(1).sub(vz.div(far)), 0), shaftsAtten).mul(0.25))
-        }
-        const full = length(dir).mul(tEnd).mul(shaftsDensity.div(100)).mul(atten)
-        const actual = log(float(1).sub(min(texel.r, 0.999))).negate()
-        return vec2(clamp(actual.div(max(full, 1e-4)), 0, 1), full)
-      }
-      const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)))
-      const q = ndc.mul(shaftsTan)
-      const ray = normalize(vec3(q, -1))
-      const phase = mix(shaftsAmbient, float(1), pow(max(dot(ray, shaftsSunView), 0), shaftsPower))
-      // Tangent-plane position of the sun: radial lines through it are the
-      // shafts' directions, so a rotation about it steps ACROSS the shafts.
-      const sunQ = shaftsSunView.xy.div(max(shaftsSunView.z.negate(), 1e-3))
-      const rel = q.sub(sunQ)
-      const tap = (a: THREE.Node<'float'>) => {
-        const c = cos(a)
-        const s = sin(a)
-        const p = sunQ.add(vec2(rel.x.mul(c).sub(rel.y.mul(s)), rel.x.mul(s).add(rel.y.mul(c)))).div(shaftsTan)
-        return litShare(vec2(p.x.mul(0.5).add(0.5), float(1).sub(p.y).mul(0.5))).x
-      }
-      const centre = litShare(screenUV)
-      const around = tap(shaftsAngle).add(tap(shaftsAngle.negate()))
-        .add(tap(shaftsAngle.mul(2))).add(tap(shaftsAngle.mul(-2))).mul(0.25)
-      const airLight = min(float(1).sub(exp(centre.y.negate())), shaftsCap)
-      // Beams brighten fully; wedges darken at a share, so the air toward the
-      // sun still reads brighter overall (shaftsStructure, godraysLight.ts).
-      const dev = centre.x.sub(around)
-      const signed = max(dev, 0).add(min(dev, 0).mul(shaftsWedge))
-      const term = signed.mul(airLight).mul(shaftsIntensity).mul(phase)
-      aoComposed = max(aoComposed.add(vec4(tslColor(godraysLive.color).mul(term), 0)), vec4(0))
+      aoComposed = aoComposed.add(vec4(shafts.node, 0))
     }
 
     // Temporal resolve over the AO-composed image, so the accumulation also
@@ -341,38 +258,12 @@ export function Effects() {
     const size = new THREE.Vector2()
     const render = (dt: number) => {
       adaptation?.sync(balance.exposure, dt, gl.toneMappingExposure)
+      if (shafts || glare) gl.getDrawingBufferSize(size)
       if (shafts) {
-        const b = balance.godrays
-        shafts.density.value = b.density
-        // Kept invertible (the lit share is read back from it); the
-        // brightness cap is applied to the air light instead (shaftsCap).
-        shafts.maxDensity.value = 0.999
-        shafts.distanceAttenuation.value = b.distanceAttenuation
-        shaftsDensity.value = b.density
-        shaftsAtten.value = b.distanceAttenuation
-        shaftsCap.value = b.maxDensity
-        shaftsWedge.value = b.wedgeShare
-        shaftsAngle.value = (b.structureAngleDeg * Math.PI) / 180
-        shaftsIntensity.value = b.intensity
-        shaftsPower.value = b.forwardScatter
-        shafts.raymarchSteps.value = Math.max(8, Math.round(b.raymarchSteps))
-        shafts.resolutionScale = Math.min(1, Math.max(0.125, b.resolutionScale))
-        shaftsAmbient.value = b.ambientShare
-        const sd = sunDirRef.current
-        camera.updateMatrixWorld()
-        shaftsSunView.value.set(sd[0], sd[1], sd[2]).normalize().transformDirection(camera.matrixWorldInverse)
-        const sc = godraysLive!.shadow.camera as THREE.OrthographicCamera
-        sc.updateMatrixWorld()
-        shaftsViewToLight.value.copy(sc.matrixWorldInverse).multiply(camera.matrixWorld)
-        shaftsProjInv.value.copy(camera.projectionMatrixInverse)
-        shaftsBoxMin.value.set(sc.left, sc.bottom, -sc.far)
-        shaftsBoxMax.value.set(sc.right, sc.top, -sc.near)
-        shaftsNearFar.value.set(sc.near, sc.far)
-        const e = camera.projectionMatrix.elements
-        shaftsTan.value.set(1 / e[0], 1 / e[5])
+        const sun = shafts.sync(camera, sunDirRef.current, balance.godrays, size.x / Math.max(size.y, 1))
+        if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunShafts = sun
       }
       if (glare) {
-        gl.getDrawingBufferSize(size)
         const sun = glare.sync(camera, sunDirRef.current, balance.sunGlare, size.x / Math.max(size.y, 1))
         // Where the glare is centred this frame (live check, pixels measured there).
         if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunGlare = sun
@@ -380,9 +271,7 @@ export function Effects() {
       sceneFrame.render(processing, temporal)
     }
     return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled, sunGlare: glareEnabled, godrays: shafts !== null } }
-    // godraysMap: a new shadow depth texture means a rebuild (the pass captures it).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled, godraysLive, godraysMap])
+  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled, shaftsEnabled])
 
   // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
   // at commit, the instant a rebuild replaces it. A passive effect defers the
@@ -406,11 +295,6 @@ export function Effects() {
 
   // Priority render: replaces R3F's default render with the post pipeline.
   useFrame((_, delta) => {
-    // The shafts' light and shadow map appear after the first shadowed draw.
-    const light = godraysWanted ? readyGodraysLight() : null
-    const map = godraysShadowTexture(light)
-    if (light !== godraysLight) setGodraysLight(light)
-    if (map !== godraysMap) setGodraysMap(map)
     post.render(delta)
   }, 1)
 

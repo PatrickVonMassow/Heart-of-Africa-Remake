@@ -736,7 +736,7 @@ export const en: Strings = {
     glareStarLength: 'Sun glare: ray length',
     glareGhosts: 'Sun glare: lens ghosts',
     godrays: 'Sun shafts (A/B)',
-    godraysDensity: 'Sun shafts: density',
+    godraysDecay: 'Sun shafts: length',
     godraysIntensity: 'Sun shafts: strength',
     edgeBandWidth: 'Settlement edge: width (m)',
     edgeBandWander: 'Settlement edge: wander (m)',
