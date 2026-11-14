@@ -150,7 +150,7 @@ export function SkyDome({
     // eased LOOK, not the linear grayMix, drives it (a 48 % mix toward gray
     // still read blue under the rain), and the deck is mottled by the same
     // noise as the clouds, so it reads as cloud rather than as a flat tint.
-    const deck = mix(color(RAIN_GRAY).mul(0.48), color(RAIN_GRAY).mul(0.74), n)
+    const deck = mix(color(RAIN_GRAY).mul(0.4), color(RAIN_GRAY).mul(0.62), n)
     col = mix(col, deck, OVERCAST_LOOK_U.mul(0.94))
     // The harmattan pall (point 140): a whitish-ochre dust wash, NOT the wet
     // gray — the sky loses its blue into a milky pall. Applied after the rain
