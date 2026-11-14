@@ -12480,7 +12480,9 @@ if (section('eye-adaptation-glare')) {
   const meanAfter = await meanOf(after)
   check(
     "bird's-eye: a driven pass at high leaves the exposure unchanged",
-    features?.eyeAdaptation === false && features?.sunGlare === false && Math.abs(meanAfter - meanBefore) < 1.5,
+    // 3 %: clouds, water and wildlife move between the captures (measured
+    // 2.46 of 132 with adaptation off); an adaptation step is >= 5 % (above).
+    features?.eyeAdaptation === false && features?.sunGlare === false && Math.abs(meanAfter - meanBefore) < meanBefore * 0.03,
     JSON.stringify({ features, meanBefore, meanAfter }),
   )
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
