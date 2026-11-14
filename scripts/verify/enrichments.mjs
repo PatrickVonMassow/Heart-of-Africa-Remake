@@ -22,6 +22,8 @@ import { snowFraction } from './snowMetric.mjs'
 import { boxOf, readFireFrame, regionStats } from './grassFireReading.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
+import { decodePng } from '../png.mjs'
 import sharp from 'sharp'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -12290,44 +12292,83 @@ if (section('solar-sun')) {
 // fetched nor applied. Judged on the image, never on the flag.
 if (section('horizon-maps')) {
   const backend = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
-  const PEAK = { lat: -3.07, lon: 37.35 } // Kilimanjaro: lee 0 % lit, sun side 100 % in the bake
+  const PEAK = { lat: -3.07, lon: 37.35 } // Kilimanjaro: an isolated massif over a lowland plain
   const JUNE_21 = 171
-  const BAND = [1.0, 2.1] // world height band (~740-1560 m) both sides share
+  const MARGIN_DEG = 3 // a sample is lit/shadowed only this far from the soft edge, its 3x3 texels agreeing
+  const BAND_HALF = 0.35 // world height half-band both sample sets share (~260 m)
   await page.evaluate(([d]) => {
     const g = window.__game.getState()
     if (g.mode === 'place') g.leavePlace()
     window.__ui.getState().setDetailLevel('medium')
     window.__game.setState({ day: d })
-    window.__game.getState().debugJumpTo(-3.6, 37.35)
+    window.__game.getState().debugJumpTo(-3.4, 37.6)
   }, [JUNE_21])
   await page.waitForFunction(() => window.__horizonMaps?.enabled === 1 && window.__sceneSun?.dayOfYear === 171, null, { timeout: 60000 })
-  // Sample points along the sun's azimuth through the peak, 0.2-0.6° out on
-  // either side, inside the shared elevation band.
-  const pts = await page.evaluate(([peak, band]) => {
-    const seed = window.__game.getState().seed
-    const az = (window.__sceneSun.angles.azimuth * Math.PI) / 180
-    const ux = Math.sin(az)
-    const uy = Math.cos(az)
-    const out = []
-    for (const side of [1, -1]) {
-      for (let d = 0.2; d <= 0.601; d += 0.05) {
-        for (let l = -0.1; l <= 0.101; l += 0.05) {
-          const lon = peak.lon + side * d * ux - l * uy
-          const lat = peak.lat + side * d * uy + l * ux
-          const y = window.__terrainHeight(lat, lon, seed)
-          if (y < band[0] || y > band[1]) continue
-          out.push({ x: lon * 10, z: -lat * 10, y, sun: side === 1 })
+  // Classify the samples from the BAKE itself (Node side, the committed maps
+  // decoded exactly), with the sun and relief scale the page actually shades
+  // with: lit = horizon well below the sun, shadowed = well above it.
+  const sunNow = await page.evaluate(() => ({
+    az: window.__sceneSun.angles.azimuth,
+    el: (Math.asin(window.__sceneSun.light[1]) * 180) / Math.PI,
+    k: window.__balance.horizonMaps.reliefScale,
+  }))
+  const geo = (f) => new URL(`../../public/geodata/${f}`, import.meta.url)
+  const hMeta = JSON.parse(readFileSync(geo('horizon.json'), 'utf8'))
+  const mapA = decodePng(readFileSync(geo('horizon-a.png')))
+  const mapB = decodePng(readFileSync(geo('horizon-b.png')))
+  const azs = hMeta.sunAzimuths
+  let si = 0
+  while (si < azs.length - 2 && sunNow.az > azs[si + 1]) si++
+  const st = Math.min(1, Math.max(0, (sunNow.az - azs[si]) / (azs[si + 1] - azs[si])))
+  const sliceW = azs.map((_, j) => (j === si ? 1 - st : j === si + 1 ? st : 0))
+  const texDeg = (hMeta.lonMax - hMeta.lonMin) / hMeta.width
+  const horizonDeg = (x, y) => {
+    const o = (y * hMeta.width + x) * 4
+    const bytes = [mapA.data[o], mapA.data[o + 1], mapA.data[o + 2], mapA.data[o + 3], mapB.data[o], mapB.data[o + 1]]
+    const slope = bytes.reduce((acc, b, j) => acc + sliceW[j] * (b / 255) ** 2 * hMeta.slopeMax, 0)
+    return (Math.atan(sunNow.k * slope) * 180) / Math.PI
+  }
+  const classified = []
+  for (let y = Math.floor((hMeta.latMax - PEAK.lat) / texDeg) - 2; y <= Math.floor((hMeta.latMax - (PEAK.lat - 1.2)) / texDeg); y++) {
+    for (let x = Math.floor((PEAK.lon - 1.2 - hMeta.lonMin) / texDeg); x <= Math.floor((PEAK.lon + 1.2 - hMeta.lonMin) / texDeg); x++) {
+      let cls = null
+      for (let dy = -1; dy <= 1 && cls !== 'edge'; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const h = horizonDeg(x + dx, y + dy)
+          const c = h > sunNow.el + MARGIN_DEG ? 'shade' : h < sunNow.el - MARGIN_DEG ? 'lit' : 'edge'
+          if (cls === null) cls = c
+          else if (c !== cls) { cls = 'edge'; break }
         }
       }
+      if (cls === 'edge') continue
+      classified.push({ lat: hMeta.latMax - (y + 0.5) * texDeg, lon: hMeta.lonMin + (x + 0.5) * texDeg, sun: cls === 'lit' })
     }
-    return out
-  }, [PEAK, BAND])
+  }
+  // One elevation band round the shadowed samples' median; lit samples from the
+  // same band and the shadow's neighbourhood (within 0.6° of its centroid).
+  const pts = await page.evaluate(([cands, half]) => {
+    const seed = window.__game.getState().seed
+    const withY = cands.map((c) => ({ ...c, x: c.lon * 10, z: -c.lat * 10, y: window.__terrainHeight(c.lat, c.lon, seed) }))
+    const shade = withY.filter((c) => !c.sun)
+    if (shade.length === 0) return { pts: [], band: null }
+    const ys = shade.map((c) => c.y).sort((a, b) => a - b)
+    const mid = ys[ys.length >> 1]
+    const cLat = shade.reduce((a, c) => a + c.lat, 0) / shade.length
+    const cLon = shade.reduce((a, c) => a + c.lon, 0) / shade.length
+    const keep = withY.filter((c) => Math.abs(c.y - mid) <= half && (!c.sun || Math.hypot(c.lat - cLat, c.lon - cLon) <= 0.6))
+    return { pts: keep, band: [mid - half, mid + half], centroid: [cLat, cLon] }
+  }, [classified, BAND_HALF])
+  const bakeCounts = { lit: classified.filter((c) => c.sun).length, shade: classified.filter((c) => !c.sun).length }
+  // Frame the shadowed ground: the traveller (and the follow camera) at its centroid.
+  if (pts.centroid) {
+    await page.evaluate(([la, lo]) => window.__game.getState().debugJumpTo(la, lo), pts.centroid)
+  }
   const read = async (label) => {
     await page.waitForFunction(() => window.__camera?.settled?.(), null, { timeout: 30000 }).catch(() => {})
     const proj = await page.evaluate((ps) => ps.map((p) => {
       const n = window.__camera.ndc(p.x, p.z, p.y)
       return [(n.x * 0.5 + 0.5) * window.innerWidth, (0.5 - n.y * 0.5) * window.innerHeight, n.z]
-    }), pts)
+    }), pts.pts)
     const png = await capturePixels(page, `horizon maps: ${label}`)
     const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
     const sx = info.width / (await page.evaluate(() => window.innerWidth))
@@ -12343,7 +12384,7 @@ if (section('horizon-maps')) {
           lum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]
         }
       }
-      const a = acc[pts[k].sun ? 'sun' : 'lee']
+      const a = acc[pts.pts[k].sun ? 'sun' : 'lee']
       a[0] += lum / 25
       a[1]++
     })
@@ -12360,12 +12401,12 @@ if (section('horizon-maps')) {
   check(
     'horizon maps: both sides of the massif are in frame in the shared elevation band',
     med.nSun >= 6 && med.nLee >= 6 && low.nSun >= 6 && low.nLee >= 6,
-    JSON.stringify({ points: pts.length, med, low }),
+    JSON.stringify({ bake: bakeCounts, sun: sunNow, band: pts.band, inBand: pts.pts.length, med, low }),
   )
   check(
     'horizon maps: the lee reads darker than the sun side at medium, and that contrast is flat at low',
     med.ratio < low.ratio * 0.9,
-    JSON.stringify({ med, low }),
+    JSON.stringify({ med, low, contrastDrop: +(1 - med.ratio / low.ratio).toFixed(3) }),
   )
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   check('horizon maps: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
