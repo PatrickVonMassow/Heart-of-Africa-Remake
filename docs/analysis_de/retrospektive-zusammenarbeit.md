@@ -1753,7 +1753,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 14.11.2026, 10:33 · Quellen-Fingerprint: `07a4b6c20cb5…`
+Zuletzt aktualisiert: Samstag, 14.11.2026, 11:17 · Quellen-Fingerprint: `dfd013b724be…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1779,7 +1779,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
-| before starting a point, list worktrees and branches — a live delegated author is invisible to the board and TASKS.md | 1 | niedrig | branch-hygiene-guard.mjs | ✔ Mechanismus |
+| before starting a point, list worktrees and branches — a live delegated author is invisible to the board and TASKS.md | 2 | mittel | branch-hygiene-guard.mjs | ✔ Mechanismus |
 | A side window that claims the batch only queues the user's point and hands over at once — never propose or do further work after the claim | 2 | mittel | clear-claim-guard.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -1873,8 +1873,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 185 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: 07a4b6c20cb56a27153ca9ad8e843026f7accf9dd11ad3689b89e4f159e4e1ac -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-14T09:33:24.484Z -->
+<!-- RETRO-FINGERPRINT: dfd013b724be150391b36be42bb0e34449b07f9a6bbb06df910a82e74e7960f7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-14T10:17:24.415Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
