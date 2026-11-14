@@ -77,32 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 345. Sun shafts through what stands in the way, highest quality level (user
-  25.07.2026). With the low afternoon sun of point 343, a palm crown, a roof edge, the
-  Djinguereber minaret or the Giza pyramids finally have something to cast shafts
-  through. Wire the upstream `three/addons/tsl/display/GodraysNode.js`
-  (`godrays(depthNode, camera, light)`) into the post chain in `src/render/Effects.tsx`
-  beside the existing GTAO/bloom/TRAA nodes.
-  FIRST PERSON ONLY, and for a reason worth writing down: screen-space godrays need
-  the light IN the frame, and the bird's-eye camera looks ~60° down while the sun
-  stands at most 37° up — it is never in that frame. Wiring the pass there would cost
-  milliseconds for an effect nobody can see. Do not enable it in the travel scene.
-  QUALITY: highest level only, entries for all three levels in `QUALITY_PRESETS` plus
-  `docs/graphics-detail-levels.md` in the same commit.
-  THIS ONE IS PRICED BEFORE IT IS KEPT. It is the only effect in this family with a
-  real per-pixel cost (estimated +1.5-3 ms; on the measured S25 baseline of ~12.6 ms
-  GPU that is +12-25 %). Run F8 on the user's hardware BEFORE and AFTER on the same
-  build and record both digests in the commit. If the cost is not worth the picture,
-  the point is closed by REMOVING the pass and recording the measurement — that is a
-  legitimate outcome, exactly as the SSR removal was, and it must not drag point 344
-  with it.
-  VERIFIABLE: pure — the preset completeness gate and the doc-sync test cover the new
-  key; the pass is absent from the travel scene's chain by construction. Live (BOTH
-  backends, screenshots): in a settlement with the sun behind a roof edge, the pixels
-  along the sun direction brighten measurably against the same frame with the level
-  stepped down — judged on the image, not on the flag; no console errors; the F8
-  before/after numbers are recorded.
-
 - [ ] 346. Horizon maps baked from the DEM — self-shadowing and sky occlusion at
   PLANETARY RANGE (user 25.07.2026; design.md §2.7 states the target). A new offline
   step beside `scripts/build-geodata.mjs` measures, per DEM texel, the HORIZON ANGLE —

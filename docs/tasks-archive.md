@@ -36808,3 +36808,29 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
   behaviour when this lands.
   Also (14.11.2026): the full WebGPU enrichments covering run on feat/344 b9082f151 (log local/verify-logs/2026-11-14T05-34-10-777-enrichments.log, 54 min) logged 9x [ASSERT] render-resource-leak at travel|medium (renderTargets 46 -> 397); solar-sun and eye-adaptation-glare are green alone on main and on the branch, and the last full main run (f7f328b10, before 343 landed) had none. Before landing, attribute it with one full WebGPU enrichments run on main (VERIFY_SUITE_TIMEOUT_MS=5400000): leak on main -> new point against 343; leak only on the branch -> fix here. ATTRIBUTED 14.11.2026: the same leak shows on main 33db311fd (log local/verify-logs/2026-11-14T06-43-15-751-enrichments.log, 45 -> 370), so it is not this point's; filed as its own finding. Remaining before landing: the WebGL 2 covering run and the picture check.
+
+- [x] 345. Sun shafts through what stands in the way, highest quality level (user
+  25.07.2026). With the low afternoon sun of point 343, a palm crown, a roof edge, the
+  Djinguereber minaret or the Giza pyramids finally have something to cast shafts
+  through. Wire the upstream `three/addons/tsl/display/GodraysNode.js`
+  (`godrays(depthNode, camera, light)`) into the post chain in `src/render/Effects.tsx`
+  beside the existing GTAO/bloom/TRAA nodes.
+  FIRST PERSON ONLY, and for a reason worth writing down: screen-space godrays need
+  the light IN the frame, and the bird's-eye camera looks ~60° down while the sun
+  stands at most 37° up — it is never in that frame. Wiring the pass there would cost
+  milliseconds for an effect nobody can see. Do not enable it in the travel scene.
+  QUALITY: highest level only, entries for all three levels in `QUALITY_PRESETS` plus
+  `docs/graphics-detail-levels.md` in the same commit.
+  THIS ONE IS PRICED BEFORE IT IS KEPT. It is the only effect in this family with a
+  real per-pixel cost (estimated +1.5-3 ms; on the measured S25 baseline of ~12.6 ms
+  GPU that is +12-25 %). Run F8 on the user's hardware BEFORE and AFTER on the same
+  build and record both digests in the commit. If the cost is not worth the picture,
+  the point is closed by REMOVING the pass and recording the measurement — that is a
+  legitimate outcome, exactly as the SSR removal was, and it must not drag point 344
+  with it.
+  VERIFIABLE: pure — the preset completeness gate and the doc-sync test cover the new
+  key; the pass is absent from the travel scene's chain by construction. Live (BOTH
+  backends, screenshots): in a settlement with the sun behind a roof edge, the pixels
+  along the sun direction brighten measurably against the same frame with the level
+  stepped down — judged on the image, not on the flag; no console errors; the F8
+  before/after numbers are recorded.
