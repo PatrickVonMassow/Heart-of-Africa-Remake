@@ -59,7 +59,6 @@ device pixel ratio is kept (no cap).
 | `springBubbles` | 0 | 4 | 7 |
 | `eyeAdaptation` | off | off | on |
 | `sunGlare` | off | off | on |
-| `godrays` | off | off | on |
 | `sunDiscGain` | 3 | 3 | 14 |
 
 ## What each setting does
@@ -341,24 +340,16 @@ added.
   front of the sun kills the glare in the same frame. Needs bloom; settlement
   scenes only. High only. Estimated cost of both effects together ~0.3-0.8 ms;
   the real number comes from F8.
-- **`godrays`** — Sun shafts (design.md §2.7, point 345,
-  `src/render/sunShafts.ts`): a mask keeps the open sky in a lobe around the
-  sun's screen position (`maskRadius`); the upstream `radialBlur` smears it
-  toward the sun, the same blur of an unobstructed sky (computed analytically)
-  is subtracted except for `beamShare` of it, and the difference is added
-  before TRAA and bloom. Without the subtraction every ray averaged the bright
-  sky by the sun into a milky veil over the whole frame. A palm crown, a roof edge or a minaret in front
-  of the sun cut gaps into the mask, so the result is bright beams and dark
-  wedges converging on the sun; the frame away from the lobe gets nothing.
-  Fades out as the sun leaves the frame. Chosen over the upstream
-  `GodraysNode`, whose shadow-map raymarch resolved a palm frond at one or two
-  shadow texels and read as a veil or as silhouette seams (picture checks
-  14.11.2026). Settlement scenes only: the bird's-eye camera looks ~60° down
-  while the sun stands at most ~37° up, so it never has the sun in its frame.
-  Cost: one full-resolution mask pass plus 48 blur taps per pixel; the F8
-  before/after on the same build decides whether it stays — the debug menu's
-  render-tuning toggle switches it off for that comparison. Strength in
-  `balance.godrays`. High only.
+- **Sun shafts — tried and removed** (design.md §2.7, point 345, 14.11.2026).
+  No `godrays` key: five picture-checked rounds drew no shaft worth its cost.
+  The upstream `GodraysNode` (three rounds) raymarched the sun's shadow map,
+  which resolves a palm frond at one or two texels, and drew a uniform veil or
+  seams along silhouettes. A screen-space radial blur of the open sky around
+  the sun averaged that sky into a milky veil over the whole frame; with the
+  unobstructed blur subtracted the veil was gone, but so was the effect — the
+  sun box changed by 0.02 levels while buildings in the lower half of the lobe
+  darkened the ground by 7.5 (WebGPU, Cairo, sun behind a palm crown). The
+  glare's occlusion cut and the eye adaptation carry the dazzle without it.
 - **`sunDiscGain`** — Gain of the sky dome's sun disc. 3 (the disc before point
   344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
   blooms on its own and feeds the glare. Settlement scenes only: the same dome

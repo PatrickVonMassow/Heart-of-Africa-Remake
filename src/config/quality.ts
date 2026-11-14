@@ -145,12 +145,6 @@ export interface QualityPreset {
    *  glare star, both cut by a depth occlusion test at the sun's screen
    *  position. Needs bloom; settlement scenes only. */
   sunGlare: boolean
-  /** Sun shafts (design.md §2.7): the upstream GodraysNode raymarches the sun's
-   *  shadow map along every view ray at half resolution, so a roof edge or a
-   *  palm crown casts visible shafts. Settlement scenes only (the bird's-eye
-   *  camera never has the sun in its frame); the one per-pixel-priced effect
-   *  of the family, so highest level only and measured by F8. */
-  godrays: boolean
   /** Gain of the sky dome's sun disc. Above the bloom threshold on every level;
    *  the glare level lifts it so the disc blooms on its own. */
   sunDiscGain: number
@@ -196,7 +190,6 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     springBubbles: 0, // no spheres — the dome surface itself still bubbles
     eyeAdaptation: false, // fixed exposure
     sunGlare: false, // no bloom to build it on
-    godrays: false, // per-pixel raymarch: high only
     sunDiscGain: 3, // the disc before point 344
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
@@ -234,7 +227,6 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     springBubbles: 4, // calibratable
     eyeAdaptation: false, // fixed exposure
     sunGlare: false,
-    godrays: false, // per-pixel raymarch: high only
     sunDiscGain: 3, // the disc before point 344
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
@@ -271,7 +263,6 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     springBubbles: 7, // calibratable
     eyeAdaptation: true, // first person only (design.md §2.7)
     sunGlare: true, // first person only
-    godrays: true, // first person only; priced by F8 before it is kept
     sunDiscGain: 14, // calibratable: well above the 0.88 bloom threshold
   },
 }

@@ -21,7 +21,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { float, max, mix, smoothstep, vec3, vec4, velocity, viewportUV } from 'three/tsl'
+import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
@@ -29,12 +29,11 @@ import { createEnvironmentTexture } from './environment'
 import { useSceneSun } from './sceneSun'
 import { createScenePass } from './scenePass'
 import { createSceneFrame } from './sceneFrame'
-import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation, effectiveSunGlare, effectiveGodrays } from '../state/ui'
+import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation, effectiveSunGlare } from '../state/ui'
 import { useGame } from '../state/store'
 import { balance } from '../config/balance'
 import { eyeAdaptation, type EyeAdaptationNode } from './eyeAdaptation'
 import { createSunGlare } from './sunGlare'
-import { createSunShafts } from './sunShafts'
 
 
 /** Minimum screen-space AO factor: occlusion never darkens a surface below this
@@ -80,10 +79,6 @@ export function Effects() {
   const eyeEnabled = useUi(effectiveEyeAdaptation) && firstPerson
   // Sun glare (design.md §2.7): built on the bloom, first person only.
   const glareEnabled = useUi(effectiveSunGlare) && bloomEnabled && firstPerson
-  // Sun shafts (design.md §2.7): first person only — screen-space shafts need
-  // the sun in the frame, and the bird's-eye camera (~60° down, sun <= ~37°
-  // up) never has it there (render/sunShafts.ts).
-  const shaftsEnabled = useUi(effectiveGodrays) && firstPerson
 
   // Keep the render target and MRT identity across every graphics toggle. A
   // changed fragment-output layout relinks scene/shadow materials as well as
@@ -134,17 +129,6 @@ export function Effects() {
       aoComposed = color.mul(max(float(AO_FLOOR), aoPass.getTextureNode().r))
     }
 
-    // Sun shafts: the open sky around the sun, radially blurred toward it
-    // and added before TRAA and bloom, so the temporal resolve settles the
-    // blur's dither and the bright beams bloom (render/sunShafts.ts).
-    let shafts: ReturnType<typeof createSunShafts> | null = null
-    if (shaftsEnabled) {
-      shafts = createSunShafts(depth)
-      disposables.push(shafts)
-      // The wedges darken, so floor the sum at black.
-      aoComposed = max(aoComposed.add(vec4(shafts.node, 0)), vec4(0))
-    }
-
     // Temporal resolve over the AO-composed image, so the accumulation also
     // settles the (jittered) AO term instead of re-aliasing it afterwards.
     // Consumed via its pass texture node (like GTAO/bloom); the casts cover
@@ -164,7 +148,7 @@ export function Effects() {
       // the SSAO-on branch (and pre-276 main) always did — the `.mul(1)` is a
       // no-op tint whose only purpose is that materialisation; the RTT it
       // yields is disposed as `traaNode.beautyNode.renderTarget` below.
-      const beauty = ssaoEnabled || shafts ? aoComposed : color.mul(float(1))
+      const beauty = ssaoEnabled ? aoComposed : color.mul(float(1))
       const traaNode = traa(beauty, depth, scenePass.getTextureNode('velocity'), camera)
       temporal = sceneFrame.bindTemporal(traaNode)
       disposables.push(traaNode)
@@ -259,20 +243,16 @@ export function Effects() {
     const size = new THREE.Vector2()
     const render = (dt: number) => {
       adaptation?.sync(balance.exposure, dt, gl.toneMappingExposure)
-      if (shafts || glare) gl.getDrawingBufferSize(size)
-      if (shafts) {
-        const sun = shafts.sync(camera, sunDirRef.current, balance.godrays, size.x / Math.max(size.y, 1))
-        if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunShafts = sun
-      }
       if (glare) {
+        gl.getDrawingBufferSize(size)
         const sun = glare.sync(camera, sunDirRef.current, balance.sunGlare, size.x / Math.max(size.y, 1))
         // Where the glare is centred this frame (live check, pixels measured there).
         if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunGlare = sun
       }
       sceneFrame.render(processing, temporal)
     }
-    return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled, sunGlare: glareEnabled, godrays: shafts !== null } }
-  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled, shaftsEnabled])
+    return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled, sunGlare: glareEnabled } }
+  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled])
 
   // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
   // at commit, the instant a rebuild replaces it. A passive effect defers the

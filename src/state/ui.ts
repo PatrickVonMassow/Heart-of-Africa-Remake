@@ -198,9 +198,6 @@ interface UiState {
    *  keeps the flora at its full shape (the season colour stays) to isolate
    *  whether that per-instance vertex deformation causes a WebGPU-only jump. */
   seasonCollapseEnabled: boolean
-  /** Debug A/B (point 345): the sun shafts at the levels that enable them.
-   *  Default on; off removes the pass so F8 can price it on one build. */
-  godraysEnabled: boolean
   /** F6 state-dump popup (design.md §21.1): the full game state for bug reports. */
   stateDumpOpen: boolean
   /** Live in-game benchmark (design.md §21.1, F8); null while none runs. */
@@ -265,7 +262,6 @@ interface UiState {
   setOffscreenThrottleEnabled: (enabled: boolean) => void
   setGroundDebugFlat: (flat: boolean) => void
   setSeasonCollapseEnabled: (enabled: boolean) => void
-  setGodraysEnabled: (enabled: boolean) => void
   toggleStateDump: () => void
   setBenchProgress: (progress: BenchProgress | null) => void
   setBenchReport: (report: BenchReportFile | null) => void
@@ -311,7 +307,6 @@ export const useUi = create<UiState>()((set) => ({
   offscreenThrottleEnabled: true,
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
-  godraysEnabled: true,
   stateDumpOpen: false,
   benchProgress: null,
   benchReport: null,
@@ -394,7 +389,6 @@ export const useUi = create<UiState>()((set) => ({
   setOffscreenThrottleEnabled: (offscreenThrottleEnabled) => set({ offscreenThrottleEnabled }),
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
   setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
-  setGodraysEnabled: (godraysEnabled) => set({ godraysEnabled }),
   toggleStateDump: () => set((s) => ({ stateDumpOpen: !s.stateDumpOpen })),
   setBenchProgress: (benchProgress) => set({ benchProgress }),
   setBenchReport: (benchReport) => set({ benchReport }),
@@ -484,9 +478,6 @@ export const effectiveGrassFireSmoke = (s: UiState): number => currentQuality(s)
 export const effectiveEyeAdaptation = (s: UiState): boolean => currentQuality(s).eyeAdaptation
 /** Sun glare at this level: it is built on the bloom, so it needs bloom too. */
 export const effectiveSunGlare = (s: UiState): boolean => currentQuality(s).sunGlare && currentQuality(s).bloom
-/** Sun shafts at this level, unless the debug A/B switched them off; the
- *  consumer additionally limits them to the settlement scene. */
-export const effectiveGodrays = (s: UiState): boolean => currentQuality(s).godrays && s.godraysEnabled
 /** The sun disc's gain before point 344; the bird's-eye view keeps it at every level. */
 export const BIRDSEYE_SUN_DISC_GAIN = 3
 /** Sky-dome sun-disc gain at this level; the raised gain feeds the glare and

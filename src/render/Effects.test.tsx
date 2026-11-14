@@ -177,30 +177,4 @@ describe('post chain ownership', () => {
     view.unmount()
     dispose.mockRestore()
   })
-
-  // Point 345: the sun shafts — first person only, high only, debug A/B off.
-  const shaftsInChain = () => {
-    act(() => fiber.frame())
-    return (window as unknown as { __postFeatures?: { godrays: boolean } }).__postFeatures?.godrays
-  }
-  it.each([
-    ['place', 'high', true, true], ['place', 'medium', true, false], ['place', 'low', true, false],
-    ['travel', 'high', true, false], ['place', 'high', false, false],
-  ] as const)('%s at %s (debug toggle %s): sun shafts in the chain = %s', (mode, detailLevel, godraysEnabled, expected) => {
-    useGame.setState({ mode })
-    useUi.setState({ detailLevel, godraysEnabled })
-    const view = mountEffects()
-    expect(shaftsInChain()).toBe(expected)
-    view.unmount()
-  })
-
-  it('drops the shafts from the chain on leaving the settlement', () => {
-    useGame.setState({ mode: 'place' })
-    useUi.setState({ detailLevel: 'high', godraysEnabled: true })
-    const view = mountEffects()
-    expect(shaftsInChain()).toBe(true)
-    act(() => useGame.setState({ mode: 'travel' }))
-    expect(shaftsInChain()).toBe(false)
-    view.unmount()
-  })
 })

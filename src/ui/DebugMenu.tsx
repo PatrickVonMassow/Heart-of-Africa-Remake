@@ -345,7 +345,6 @@ export function DebugMenu() {
   const setSpeechConceptLabels = useUi((s) => s.setSpeechConceptLabels)
   const detailLevel = useUi((s) => s.detailLevel)
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
-  const godraysEnabled = useUi((s) => s.godraysEnabled)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
   const invertLook = useUi((s) => s.invertLook)
   const labelModifier = useUi((s) => s.labelModifier)
@@ -806,13 +805,6 @@ export function DebugMenu() {
         (v) => { balance.sunGlare.starLength = Math.max(0.01, Math.min(2, v)); bump() }, 0.02),
       num(t.debug.glareGhosts, balance.sunGlare.ghostIntensity,
         (v) => { balance.sunGlare.ghostIntensity = Math.max(0, Math.min(10, v)); bump() }, 0.1),
-      // Sun shafts (point 345, high level, settlements only): the toggle is the
-      // F8 A/B on one build; the values are read by the pass every frame.
-      check(t.debug.godrays, godraysEnabled, (v) => useUi.getState().setGodraysEnabled(v)),
-      num(t.debug.godraysDecay, balance.godrays.decay,
-        (v) => { balance.godrays.decay = Math.max(0.5, Math.min(0.999, v)); bump() }, 0.005),
-      num(t.debug.godraysIntensity, balance.godrays.intensity,
-        (v) => { balance.godrays.intensity = Math.max(0, Math.min(10, v)); bump() }, 0.05),
       // The dry-season crown collapse (§19.13): a SEASON switch, even though
       // it isolates a rendering half — it is the season a tester is forcing.
       check(t.debug.foliageCollapse, seasonCollapseEnabled,

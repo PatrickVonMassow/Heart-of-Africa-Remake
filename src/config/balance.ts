@@ -905,21 +905,6 @@ interface BalanceConfig {
     /** Lens-flare ghost strength (three/addons LensflareNode over the bloom). */
     ghostIntensity: number
   }
-  /** Sun shafts (design.md §2.7, quality key `godrays`, render/sunShafts.ts):
-   *  the open sky around the sun, radially blurred toward it, minus the same
-   *  blur of an unobstructed sky, so only what an occluder cuts shows. */
-  godrays: {
-    /** HDR strength of the shafts (wedge darkening and beam lift). */
-    intensity: number
-    /** Radius (screen height share) of the sky lobe around the sun that feeds them. */
-    maskRadius: number
-    /** Share of the unobstructed blur kept as lift: 0 = wedges only, 1 = the full veil. */
-    beamShare: number
-    /** Linear RGB tint of the scattered sunlight. */
-    tint: [number, number, number]
-    /** Per-sample decay along the blur toward the sun: the shafts' length. */
-    decay: number
-  }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
@@ -2028,13 +2013,6 @@ export const balance: BalanceConfig = {
     starIntensity: 0.7, // calibratable, debug-editable
     starLength: 0.1, // calibratable, debug-editable; 0.22 streaked the rays across the foreground
     ghostIntensity: 0.6, // calibratable, debug-editable
-  },
-  godrays: {
-    intensity: 0.6, // educated guess; calibratable, debug-editable
-    maskRadius: 0.3, // calibratable
-    beamShare: 0.15, // calibratable; 1 drew a milky veil over the whole frame (14.11.2026)
-    tint: [1, 0.86, 0.66], // warm low sun; calibratable
-    decay: 0.97, // calibratable, debug-editable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
