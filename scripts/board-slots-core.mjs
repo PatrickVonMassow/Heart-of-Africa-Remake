@@ -85,7 +85,9 @@ function freeSlotReason({ decision, specs, active, runningFiles, owner, freshAct
   const byOwner = ownerReason(owner)
   if (byOwner) return { text: byOwner, unmeasurable: false }
   const fresh = (freshActive ?? []).filter((p) => active.includes(p))
-  if (active.length > 0 && runningFiles.length === 0 && fresh.length > 0) {
+  // Also beside other active work whose files were read: the fresh point's
+  // independence stays unmeasured until it has commits.
+  if (fresh.length > 0) {
     return { text: `${fresh.join(', ')} hat noch keine Commits, Unabhängigkeit erst danach prüfbar`, unmeasurable: false }
   }
   return base

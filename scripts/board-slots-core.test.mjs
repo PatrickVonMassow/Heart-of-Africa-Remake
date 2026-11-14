@@ -152,6 +152,11 @@ describe('slotLine — every variant of the heading line', () => {
     expect(r).toEqual({ text: '2/3 Slots frei: 327 hat noch keine Commits, Unabhängigkeit erst danach prüfbar', unmeasurable: false })
   })
 
+  it('a fresh branch beside active work with read files is still named', () => {
+    const r = slotLine({ branches: [branch(327), branch(1490)], activePoints: [327, 1490], specs: [spec(1507)], runningFiles: ['scripts/p1490.mjs'], freshActive: [327] })
+    expect(r).toEqual({ text: '1/3 Slots frei: 327 hat noch keine Commits, Unabhängigkeit erst danach prüfbar', unmeasurable: false })
+  })
+
   it('a measured reason is not overwritten by the owner state', () => {
     const r = slotLine({ branches: [], owner: { alive: false } })
     expect(r.text).toBe('3/3 Slots frei: kein weiterer offener Punkt')
