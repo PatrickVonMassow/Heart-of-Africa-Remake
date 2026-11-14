@@ -2111,16 +2111,6 @@ export const RED_CHARGES = [
       + 'owns the seasons section until it is green on both backends. The charge dies with point 1495.',
   },
   {
-    point: 354,
-    suite: 'polish-settlement',
-    kind: 'check',
-    match: /^the rains dim the settlement sun and sky light\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGPU, main cfe6b27f1: dry sun 2.4 vs wet 2.277 (needs a drop above 0.5); the settlement '
-      + 'rain light reads nearly dry — the same symptom point 354 owns (rain under a bright sky, settlement-season checks). '
-      + 'The charge dies with point 354.',
-  },
-  {
     point: 1520,
     suite: 'polish-settlement',
     kind: 'console',
