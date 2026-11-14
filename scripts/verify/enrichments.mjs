@@ -12289,6 +12289,7 @@ if (section('solar-sun')) {
 // contrast goes flat when the level steps to low, where the maps are neither
 // fetched nor applied. Judged on the image, never on the flag.
 if (section('horizon-maps')) {
+  const backend = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   const PEAK = { lat: -3.07, lon: 37.35 } // Kilimanjaro: lee 0 % lit, sun side 100 % in the bake
   const JUNE_21 = 171
   const BAND = [1.0, 2.1] // world height band (~740-1560 m) both sides share
@@ -12350,11 +12351,11 @@ if (section('horizon-maps')) {
     const lee = acc.lee[1] ? acc.lee[0] / acc.lee[1] : NaN
     return { sun, lee, nSun: acc.sun[1], nLee: acc.lee[1], ratio: lee / sun }
   }
-  await shot('346-horizon-medium', { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, horizon maps on (medium)' })
+  await shot(backend('346-horizon-medium'), { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, horizon maps on (medium)' })
   const med = await read('medium')
   await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
   await page.waitForFunction(() => window.__horizonMaps?.enabled === 0, null, { timeout: 30000 })
-  await shot('346-horizon-low', { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, low level: no horizon maps' })
+  await shot(backend('346-horizon-low'), { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, low level: no horizon maps' })
   const low = await read('low')
   check(
     'horizon maps: both sides of the massif are in frame in the shared elevation band',
