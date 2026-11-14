@@ -22,7 +22,7 @@ import {
   vec3,
 } from 'three/tsl'
 import { HARMATTAN_PALE, RAIN_GRAY } from '../systems/season'
-import { HARMATTAN_DUST_U, OVERCAST_CLOUDS_U, OVERCAST_GRAY_U } from './skyOvercast'
+import { HARMATTAN_DUST_U, OVERCAST_CLOUDS_U, OVERCAST_LOOK_U } from './skyOvercast'
 import type { SkyPreset } from './skyPresets'
 import { useUi, effectiveSunDiscGain, BIRDSEYE_SUN_DISC_GAIN } from '../state/ui'
 import { useGame } from '../state/store'
@@ -121,19 +121,20 @@ export function SkyDome({
     // sunRedden, keeping the halo factor >= 0.25.
     const halo = pow(s, float(6)).mul(0.22).mul(float(1).sub(HARMATTAN_DUST_U.mul(0.75 / 0.7)))
     const sunCol = mix(color(preset.sun), color('#c4502a'), HARMATTAN_DUST_U.mul(0.8 / 0.7).clamp(0, 1))
-    col = col.add(sunCol.mul(disc.add(halo)))
+    // The disc goes behind a full overcast deck (point 354).
+    col = col.add(sunCol.mul(disc.mul(float(1).sub(OVERCAST_LOOK_U)).add(halo)))
 
     // Slow drifting cloud bank, faded out toward the horizon. Built
     // unconditionally so the wet season can thicken the deck over any preset;
     // the presence factor fades a very thin deck out.
+    const cuv = dir.xz.div(y.abs().add(0.22)).mul(0.9)
+    // Remap the signed MaterialX noise to [0, 1] before thresholding.
+    const n = mx_fractal_noise_float(vec3(cuv.x.add(time.mul(0.006)), cuv.y, 3.7), 4)
+      .mul(0.5)
+      .add(0.5)
     {
       const effClouds = float(preset.clouds).add(OVERCAST_CLOUDS_U).clamp(0, 1)
       const presence = effClouds.mul(4).clamp(0, 1)
-      const cuv = dir.xz.div(y.abs().add(0.22)).mul(0.9)
-      // Remap the signed MaterialX noise to [0, 1] before thresholding.
-      const n = mx_fractal_noise_float(vec3(cuv.x.add(time.mul(0.006)), cuv.y, 3.7), 4)
-        .mul(0.5)
-        .add(0.5)
       const cover = smoothstep(float(0.62).sub(effClouds.mul(0.22)), float(0.85), n)
         .mul(smoothstep(float(0.02), float(0.18), y))
         .mul(presence)
@@ -144,9 +145,13 @@ export function SkyDome({
       col = mix(col, cloudCol, cover.mul(0.9))
     }
 
-    // Overcast (§19.13): the whole dome, sun disc included, washes toward the
-    // rain tone — a dimmed sun under a bright blue sky would read as a bug.
-    col = mix(col, color(RAIN_GRAY).mul(0.62), OVERCAST_GRAY_U)
+    // Overcast (§19.13): the whole dome washes toward a heavy rain deck — a
+    // dimmed sun under a bright blue sky would read as a bug. Point 354: the
+    // eased LOOK, not the linear grayMix, drives it (a 48 % mix toward gray
+    // still read blue under the rain), and the deck is mottled by the same
+    // noise as the clouds, so it reads as cloud rather than as a flat tint.
+    const deck = mix(color(RAIN_GRAY).mul(0.48), color(RAIN_GRAY).mul(0.74), n)
+    col = mix(col, deck, OVERCAST_LOOK_U.mul(0.94))
     // The harmattan pall (point 140): a whitish-ochre dust wash, NOT the wet
     // gray — the sky loses its blue into a milky pall. Applied after the rain
     // mix; the two never fire together (the dust season is the dry season).
