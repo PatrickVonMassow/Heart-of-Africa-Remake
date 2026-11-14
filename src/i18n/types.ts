@@ -753,6 +753,15 @@ export interface Strings {
     sunHour: string
     sunShadowFloor: string
     sunDirection: string
+    exposureMin: string
+    exposureMax: string
+    exposureKey: string
+    exposureCompensation: string
+    exposureToBright: string
+    exposureToDark: string
+    glareStar: string
+    glareStarLength: string
+    glareGhosts: string
     edgeBandWidth: string
     edgeBandWander: string
     edgeBandStrength: string

@@ -21,6 +21,8 @@ import {
   effectiveOffscreenBehaviourInterval,
   effectiveFloraCastShadow,
   effectiveWeatherIntensity,
+  effectiveSunDiscGain,
+  BIRDSEYE_SUN_DISC_GAIN,
 } from './ui'
 import { QUALITY_PRESETS } from '../config/quality'
 
@@ -307,5 +309,16 @@ describe('speechConceptLabels (the debug view on the speech labels)', () => {
     expect(useUi.getState().speechConceptLabels).toBe(true)
     useUi.getState().setSpeechConceptLabels(false)
     expect(useUi.getState().speechConceptLabels).toBe(false)
+  })
+})
+
+describe('the sun-disc gain (design.md §2.7, point 344)', () => {
+  it('raises the disc at high in the first-person view only; the bird\'s-eye view keeps the old gain', () => {
+    for (const level of ['low', 'medium', 'high'] as const) {
+      useUi.getState().setDetailLevel(level)
+      expect(effectiveSunDiscGain(useUi.getState(), true)).toBe(QUALITY_PRESETS[level].sunDiscGain)
+      expect(effectiveSunDiscGain(useUi.getState(), false)).toBe(BIRDSEYE_SUN_DISC_GAIN)
+    }
+    expect(QUALITY_PRESETS.high.sunDiscGain).toBeGreaterThan(BIRDSEYE_SUN_DISC_GAIN)
   })
 })

@@ -24,6 +24,8 @@ import {
 import { HARMATTAN_PALE, RAIN_GRAY } from '../systems/season'
 import { HARMATTAN_DUST_U, OVERCAST_CLOUDS_U, OVERCAST_GRAY_U } from './skyOvercast'
 import type { SkyPreset } from './skyPresets'
+import { useUi, effectiveSunDiscGain, BIRDSEYE_SUN_DISC_GAIN } from '../state/ui'
+import { useGame } from '../state/store'
 
 /**
  * Sky dome centered on the camera. `sunDirection` must match the scene's
@@ -42,6 +44,15 @@ export function SkyDome({
 }) {
   const ref = useRef<THREE.Mesh>(null)
   const sunU = useMemo(() => uniform(new THREE.Vector3(0, 1, 0)), [])
+  // Disc gain per quality level (design.md §2.7): the glare level lifts the
+  // disc well above the bloom threshold so it blooms on its own. A uniform, so
+  // an F9 change never rebuilds the dome.
+  const firstPerson = useGame((s) => s.mode) === 'place'
+  const discGain = useUi((s) => effectiveSunDiscGain(s, firstPerson))
+  const discGainU = useMemo(() => uniform(BIRDSEYE_SUN_DISC_GAIN), [])
+  useLayoutEffect(() => {
+    discGainU.value = discGain
+  }, [discGainU, discGain])
   useLayoutEffect(() => {
     sunU.value.set(...sunDirection).normalize()
     // Live check (enrichments --section=solar-sun): the dome's real sun.
@@ -104,7 +115,7 @@ export function SkyDome({
     // lustre; haloes may disappear altogether". Do not make the dust sunset
     // spectacular; the phenomenon is the opposite.
     const s = max(mu, 0)
-    const disc = pow(s, float(1200)).mul(3.0)
+    const disc = pow(s, float(1200)).mul(discGainU)
     // HARMATTAN_DUST_U carries paleMix = 0.7·d (harmattanSkyParams), so /0.7
     // recovers the dust d; 0.75 and 0.8 are that function's haloMute and
     // sunRedden, keeping the halo factor >= 0.25.
@@ -143,7 +154,7 @@ export function SkyDome({
 
     m.colorNode = col
     return m
-  }, [preset, sunU])
+  }, [preset, sunU, discGainU])
 
   // Keep the dome glued to the camera so it behaves like a far sky.
   useFrame(({ camera }) => {

@@ -880,6 +880,31 @@ interface BalanceConfig {
      *  cascade artefacts; 0 = the light follows the true sun down to 2°. */
     shadowMinElevationDeg: number
   }
+  /** First-person eye adaptation (design.md §2.7, render/exposureControl.ts):
+   *  the exposure follows the frame's mean luminance inside a bounded range.
+   *  Highest quality level, settlement scenes only; the bird's-eye view keeps
+   *  the fixed `base`. Field meanings: ExposureParams. */
+  exposure: {
+    base: number
+    min: number
+    max: number
+    keyLuminance: number
+    compensation: number
+    sampleCeiling: number
+    toBrightSeconds: number
+    toDarkSeconds: number
+    maxStepSeconds: number
+  }
+  /** The sun's glare (design.md §2.7): disc gain at the levels that enable it
+   *  (quality key `sunDiscGain`) is a preset; these shape the glare star. */
+  sunGlare: {
+    /** Brightness of the glare star's rays at full sun visibility. */
+    starIntensity: number
+    /** Ray length as a fraction of the screen height. */
+    starLength: number
+    /** Lens-flare ghost strength (three/addons LensflareNode over the bloom). */
+    ghostIntensity: number
+  }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
@@ -1972,6 +1997,22 @@ export const balance: BalanceConfig = {
   sun: {
     hour: 16, // 16:00 local solar time, 7°-37° over the map and year; calibratable, debug-editable
     shadowMinElevationDeg: 0, // no extra floor until the grazing end is judged ugly; calibratable, debug-editable
+  },
+  exposure: {
+    base: 1.05, // today's fixed toneMappingExposure (src/App.tsx); calibratable, debug-editable
+    min: 0.62, // facing the sun; calibratable, debug-editable
+    max: 1.45, // deep lane shade; calibratable, debug-editable
+    keyLuminance: 0.55, // educated guess for an average sunlit settlement frame; calibratable, debug-editable
+    compensation: 0.6, // partial: the sun still reads brighter than shade; calibratable, debug-editable
+    sampleCeiling: 12, // per-texel cap before averaging; calibratable, debug-editable
+    toBrightSeconds: 0.35, // the eye adapts to bright light fast; calibratable, debug-editable
+    toDarkSeconds: 2.8, // and opens up to the shade slowly; calibratable, debug-editable
+    maxStepSeconds: 0.1, // a hitch advances at most this far; calibratable
+  },
+  sunGlare: {
+    starIntensity: 0.7, // calibratable, debug-editable
+    starLength: 0.1, // calibratable, debug-editable; 0.22 streaked the rays across the foreground
+    ghostIntensity: 0.6, // calibratable, debug-editable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

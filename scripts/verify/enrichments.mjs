@@ -12283,6 +12283,212 @@ if (section('solar-sun')) {
   check('solar sun: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 }
 
+// Eye adaptation and sun glare (design.md §2.7, point 344; highest level).
+// Everything is measured in RENDERED PIXELS, never in a uniform (§7.2): the
+// exposure in the mean brightness of the frame, the glare in the difference it
+// makes around the sun's screen position, the bird's-eye guard in the mean
+// brightness of the same view before and after a driven pass.
+if (section('eye-adaptation-glare')) {
+  const DEC_21 = 354 // Cairo in December: the 16:00 sun stands ~11° high, inside the 50° frame
+  const frames = (n) => page.evaluate((k) => new Promise((done) => {
+    let left = k
+    const tick = () => (--left <= 0 ? done() : requestAnimationFrame(tick))
+    requestAnimationFrame(tick)
+  }), n)
+  const meanOf = async (png, box) => {
+    const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    const [x0, y0, x1, y1] = box
+      ? [Math.max(0, Math.floor(box[0] * info.width)), Math.max(0, Math.floor(box[1] * info.height)),
+        Math.min(info.width, Math.ceil(box[2] * info.width)), Math.min(info.height, Math.ceil(box[3] * info.height))]
+      : [0, 0, info.width, info.height]
+    let sum = 0
+    let n = 0
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = (y * info.width + x) * 3
+      sum += data[i] + data[i + 1] + data[i + 2]
+      n += 3
+    }
+    return n ? sum / n : 0
+  }
+  const pose = (x, z, yaw, pitch = 0) => page.evaluate(([px, pz, py, pp]) => {
+    const p = window.__placePlayer
+    p.x = px
+    p.z = pz
+    p.yaw = py
+    p.pitch = pp
+  }, [x, z, yaw, pitch])
+  const glareAt = () => page.evaluate(() => window.__sunGlare ?? null)
+
+  await page.evaluate((d) => {
+    window.__ui.getState().setDetailLevel('high')
+    window.__game.setState({ day: d })
+    window.__game.getState().enterPlace('cairo')
+  }, DEC_21)
+  await page.waitForFunction(
+    () => window.__game.getState().mode === 'place' && !!window.__placeLayout && !!window.__placePlayer &&
+      window.__postFeatures?.eyeAdaptation === true && window.__postFeatures?.sunGlare === true && !!window.__sunGlare,
+    null,
+    { timeout: 60000 },
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForFunction(() => !window.__game.getState().journalOpen)
+
+  // The open stand: near the walkable edge on the sun's side, looking out.
+  const stand = await page.evaluate(() => {
+    const d = window.__sceneSun.disc
+    const angle = Math.atan2(d[2], d[0])
+    const r = (window.__placeBoundaryRadius(angle) ?? 20) * 0.85
+    return { x: Math.cos(angle) * r, z: Math.sin(angle) * r }
+  })
+  // Find the yaw that centres the sun horizontally — read back from the
+  // CPU-projected sun the glare itself uses, so no yaw convention is assumed.
+  let towardSun = null
+  for (let i = 0; i < 32; i++) {
+    const yaw = (i / 32) * Math.PI * 2
+    await pose(stand.x, stand.z, yaw)
+    await frames(2)
+    const g = await glareAt()
+    if (g && g.fade > 0 && (towardSun === null || Math.abs(g.u - 0.5) < towardSun.off)) towardSun = { yaw, off: Math.abs(g.u - 0.5), g }
+  }
+  check('eye adaptation: a yaw puts the December sun inside the settlement frame', towardSun !== null && towardSun.off < 0.1,
+    JSON.stringify(towardSun))
+  const sunYaw = towardSun?.yaw ?? 0
+  const awayYaw = sunYaw + Math.PI
+
+  // (a) EYE ADAPTATION. Settle facing away (into the settlement and its
+  // shade), turn into the sun and watch the SAME view darken within a bounded
+  // number of frames; then turn away and watch it open up again.
+  const exposure = await page.evaluate(() => ({ ...window.__balance.exposure }))
+  await pose(stand.x, stand.z, awayYaw)
+  await frames(Math.ceil(60 * exposure.toDarkSeconds * 3))
+  await pose(stand.x, stand.z, sunYaw)
+  // Hold the adaptation for the first look so the capture latency cannot
+  // already include the fall; the calibrated constant is restored right after.
+  await page.evaluate(() => { window.__balance.exposure.toBrightSeconds = 1e6 })
+  await frames(3)
+  const intoSunFirst = await capturePixels(page, 'eye adaptation: first frame into the sun')
+  await page.evaluate((t) => { window.__balance.exposure.toBrightSeconds = t }, exposure.toBrightSeconds)
+  const FALL_FRAMES = 120 // bounded: ~2 s at 60 fps, about six fast time constants
+  await frames(FALL_FRAMES)
+  const intoSunAdapted = await capturePixels(page, 'eye adaptation: into the sun, adapted')
+  await shot('344-eye-adapted-into-sun', { place: 'cairo', label: 'facing the low December sun after adapting' })
+  const firstMean = await meanOf(intoSunFirst)
+  const adaptedMean = await meanOf(intoSunAdapted)
+  check(
+    `eye adaptation: facing the sun the frame's mean brightness falls within ${FALL_FRAMES} frames`,
+    adaptedMean < firstMean * 0.95,
+    JSON.stringify({ firstMean, adaptedMean }),
+  )
+  await pose(stand.x, stand.z, awayYaw)
+  await page.evaluate(() => { window.__balance.exposure.toDarkSeconds = 1e6 })
+  await frames(3)
+  const awayFirst = await capturePixels(page, 'eye adaptation: first frame turned away')
+  await page.evaluate((t) => { window.__balance.exposure.toDarkSeconds = t }, exposure.toDarkSeconds)
+  const RISE_FRAMES = Math.ceil(60 * exposure.toDarkSeconds * 3)
+  await frames(RISE_FRAMES)
+  const awayAdapted = await capturePixels(page, 'eye adaptation: turned away, recovered')
+  await shot('344-eye-recovered-away', { place: 'cairo', label: 'turned away from the sun, the shade opened up again' })
+  const awayFirstMean = await meanOf(awayFirst)
+  const awayAdaptedMean = await meanOf(awayAdapted)
+  check(
+    `eye adaptation: turned away the frame recovers its brightness within ${RISE_FRAMES} frames`,
+    awayAdaptedMean > awayFirstMean * 1.05,
+    JSON.stringify({ awayFirstMean, awayAdaptedMean }),
+  )
+
+  // (b) GLARE: its contribution is the difference glare-on minus glare-off in
+  // a box around the sun's screen position, at a held exposure.
+  const glareDiff = async (label) => {
+    await frames(2) // the glare state is written by the frame after a pose
+    const g = await glareAt()
+    const box = g ? [g.u - 0.2, g.v - 0.2, g.u + 0.2, g.v + 0.2] : null
+    await page.evaluate(() => { window.__balance.exposure.compensation = 0 })
+    await frames(Math.ceil(60 * exposure.toDarkSeconds * 3))
+    const on = await capturePixels(page, `${label}: glare on`)
+    const saved = await page.evaluate(() => {
+      const b = window.__balance.sunGlare
+      const keep = { ...b }
+      b.starIntensity = 0
+      b.ghostIntensity = 0
+      return keep
+    })
+    await frames(3)
+    const off = await capturePixels(page, `${label}: glare off`)
+    await page.evaluate(([keep, c]) => {
+      Object.assign(window.__balance.sunGlare, keep)
+      window.__balance.exposure.compensation = c
+    }, [saved, exposure.compensation])
+    await frames(3)
+    return { g, box, diff: box ? (await meanOf(on, box)) - (await meanOf(off, box)) : 0 }
+  }
+  await pose(stand.x, stand.z, sunYaw)
+  const open = await glareDiff('glare in the open')
+  await shot('344-glare-open', { place: 'cairo', label: 'the low sun in the open, with its glare' })
+  check('glare: present with the sun in the open', open.g?.fade > 0.5 && open.diff > 2, JSON.stringify(open))
+
+  // Behind a building: stand close in front of a dwelling on its far side
+  // from the sun, so its wall rises above the sun's 11°.
+  const behind = await page.evaluate(() => {
+    const d = window.__sceneSun.disc
+    const h = Math.hypot(d[0], d[2])
+    const sx = d[0] / h
+    const sz = d[2] / h
+    const tall = window.__placeLayout.dwellings.filter((w) => w.h >= 2.6).sort((a, b) => b.h - a.h)
+    const w = tall[0]
+    if (!w) return null
+    const back = w.r + 1.6
+    return { x: w.x - sx * back, z: w.z - sz * back, kind: w.kind, h: w.h, r: w.r }
+  })
+  check('glare: the settlement has a dwelling tall enough to hide the sun', behind !== null, JSON.stringify(behind))
+  if (behind) {
+    await pose(behind.x, behind.z, sunYaw)
+    await frames(3)
+    const hidden = await glareDiff('glare behind a building')
+    await shot('344-glare-behind-building', { place: 'cairo', label: 'the sun hidden behind a building: no glare' })
+    check(
+      'glare: gone with a building between the traveller and the sun',
+      hidden.g?.fade > 0.5 && Math.abs(hidden.diff) < 0.5 && open.diff > 4 * Math.abs(hidden.diff),
+      JSON.stringify({ hidden, openDiff: open.diff }),
+    )
+  }
+
+  // (c) THE BIRD'S-EYE GUARD: the travel scene carries neither effect at the
+  // same level, and the same view before and after a driven pass across bright
+  // and dark land shows the same mean brightness.
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => window.__game.getState().mode === 'travel' && window.__postFeatures !== undefined)
+  const start = { lat: 29.5, lon: 31.0 }
+  await page.evaluate((p) => window.__game.getState().debugJumpTo(p.lat, p.lon), start)
+  // The clock runs in travel; the after-capture is taken at the same day so
+  // the sun is the same and only the exposure could differ.
+  const passDay = await page.evaluate(() => window.__game.getState().day)
+  await frames(60)
+  const before = await capturePixels(page, "bird's-eye: before the pass")
+  for (const p of [{ lat: 25, lon: 28 }, { lat: 20, lon: 25 }, { lat: 5, lon: 22 }, { lat: 15, lon: 30 }]) {
+    await page.evaluate((q) => window.__game.getState().debugJumpTo(q.lat, q.lon), p)
+    await frames(20)
+  }
+  await page.evaluate(([p, d]) => {
+    window.__game.getState().debugJumpTo(p.lat, p.lon)
+    window.__game.setState({ day: d })
+  }, [start, passDay])
+  await frames(60)
+  const after = await capturePixels(page, "bird's-eye: right after the pass")
+  await shot('344-birdseye-after-pass', { world: start, label: "the bird's-eye view at high, right after a driven pass" })
+  const features = await page.evaluate(() => window.__postFeatures)
+  const meanBefore = await meanOf(before)
+  const meanAfter = await meanOf(after)
+  check(
+    "bird's-eye: a driven pass at high leaves the exposure unchanged",
+    // 3 %: clouds, water and wildlife move between the captures (measured
+    // 2.46 of 132 with adaptation off); an adaptation step is >= 5 % (above).
+    features?.eyeAdaptation === false && features?.sunGlare === false && Math.abs(meanAfter - meanBefore) < meanBefore * 0.03,
+    JSON.stringify({ features, meanBefore, meanAfter }),
+  )
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  check('eye adaptation and glare: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()

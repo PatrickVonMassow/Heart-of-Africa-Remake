@@ -136,6 +136,18 @@ export interface QualityPreset {
    *  own surface bubbles on every level, so a frugal level drops the
    *  spheres, never the bubbling. */
   springBubbles: number
+  /** First-person eye adaptation (design.md §2.7): the exposure follows the
+   *  frame's mean luminance inside the bounded balance.exposure range. Never in
+   *  the bird's-eye view, whatever the level (a readability rule, not a cost
+   *  choice). Prices a 128² luminance mip chain and a 1² feedback pass. */
+  eyeAdaptation: boolean
+  /** The sun's glare (design.md §2.7): lens-flare ghosts over the bloom plus a
+   *  glare star, both cut by a depth occlusion test at the sun's screen
+   *  position. Needs bloom; settlement scenes only. */
+  sunGlare: boolean
+  /** Gain of the sky dome's sun disc. Above the bloom threshold on every level;
+   *  the glare level lifts it so the disc blooms on its own. */
+  sunDiscGain: number
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -176,6 +188,9 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sphinxSiteDetail: 'reduced', // the named reduced Sphinx mesh (calibratable)
     springSegments: 12, // a coarse dome; its surface still bubbles and rings
     springBubbles: 0, // no spheres — the dome surface itself still bubbles
+    eyeAdaptation: false, // fixed exposure
+    sunGlare: false, // no bloom to build it on
+    sunDiscGain: 3, // the disc before point 344
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -210,6 +225,9 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sphinxSiteDetail: 'standard', // calibratable
     springSegments: 24, // calibratable
     springBubbles: 4, // calibratable
+    eyeAdaptation: false, // fixed exposure
+    sunGlare: false,
+    sunDiscGain: 3, // the disc before point 344
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -243,6 +261,9 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sphinxSiteDetail: 'full', // the fuller Sphinx mesh (calibratable)
     springSegments: 36, // a round dome at the closest zoom
     springBubbles: 7, // calibratable
+    eyeAdaptation: true, // first person only (design.md §2.7)
+    sunGlare: true, // first person only
+    sunDiscGain: 14, // calibratable: well above the 0.88 bloom threshold
   },
 }
 

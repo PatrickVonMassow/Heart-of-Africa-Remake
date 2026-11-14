@@ -18,7 +18,7 @@
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
@@ -29,7 +29,11 @@ import { createEnvironmentTexture } from './environment'
 import { useSceneSun } from './sceneSun'
 import { createScenePass } from './scenePass'
 import { createSceneFrame } from './sceneFrame'
-import { useUi, effectiveSsao, effectiveTraa, effectiveBloom } from '../state/ui'
+import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation, effectiveSunGlare } from '../state/ui'
+import { useGame } from '../state/store'
+import { balance } from '../config/balance'
+import { eyeAdaptation, type EyeAdaptationNode } from './eyeAdaptation'
+import { createSunGlare } from './sunGlare'
 
 
 /** Minimum screen-space AO factor: occlusion never darkens a surface below this
@@ -46,6 +50,9 @@ export function Effects() {
   // sun (design.md §2.7) and re-baked only when that sun is re-derived (date,
   // latitude, balance) — never per frame.
   const iblSun = useSceneSun().disc
+  // The glare projects the same sun every frame without rebuilding the chain.
+  const sunDirRef = useRef(iblSun)
+  sunDirRef.current = iblSun
   useEffect(() => {
     const tex = createEnvironmentTexture(iblSun)
     scene.environment = tex
@@ -64,6 +71,14 @@ export function Effects() {
   const traaEnabled = useUi(effectiveTraa)
   const ssaoEnabled = useUi(effectiveSsao)
   const bloomEnabled = useUi(effectiveBloom)
+  // Eye adaptation (design.md §2.7) is a FIRST-PERSON effect: the bird's-eye
+  // travel scene never builds it and keeps the renderer's fixed exposure — a
+  // map whose brightness breathes while driving is the readability loss §2.7
+  // forbids. A rule, not a cost choice: do not unify the two scenes.
+  const firstPerson = useGame((s) => s.mode) === 'place'
+  const eyeEnabled = useUi(effectiveEyeAdaptation) && firstPerson
+  // Sun glare (design.md §2.7): built on the bloom, first person only.
+  const glareEnabled = useUi(effectiveSunGlare) && bloomEnabled && firstPerson
 
   // Keep the render target and MRT identity across every graphics toggle. A
   // changed fragment-output layout relinks scene/shadow materials as well as
@@ -170,10 +185,20 @@ export function Effects() {
     // (point 276): the pass is skipped entirely so it costs nothing on a weak
     // GPU, and the composite passes the plain image straight through.
     let withBloom = composed
+    let glare: ReturnType<typeof createSunGlare> | null = null
     if (bloomEnabled) {
       const bloomNode = bloom(composed, 0.25, 0.35, 0.88)
       disposables.push(bloomNode)
       withBloom = composed.add(bloomNode)
+      // Glare: lens-flare ghosts over the bloom plus a glare star, gated by a
+      // depth occlusion test at the projected sun (render/sunGlare.ts).
+      if (glareEnabled) {
+        // r185 has getTextureNode() at runtime; its declaration omits it.
+        const bloomTexture = (bloomNode as unknown as { getTextureNode: () => typeof depth }).getTextureNode()
+        glare = createSunGlare(bloomTexture, depth)
+        disposables.push(glare)
+        withBloom = withBloom.add(glare.node)
+      }
     }
 
     // Color grading: gentle saturation lift and a warm tint over the whole image.
@@ -184,6 +209,17 @@ export function Effects() {
     // Subtle vignette that keeps the map view readable (design.md §2).
     const d = viewportUV.sub(0.5).length()
     const vignette = smoothstep(0.95, 0.45, d).mul(0.18).add(0.82)
+    let finalImage = graded.mul(vignette)
+
+    // Eye adaptation: the mean luminance of the raw HDR frame drives a bounded,
+    // GPU-side exposure (render/eyeAdaptation.ts), applied as a multiplier
+    // before the renderer's own tone mapping.
+    let adaptation: EyeAdaptationNode | null = null
+    if (eyeEnabled) {
+      adaptation = eyeAdaptation(color)
+      disposables.push(adaptation)
+      finalImage = finalImage.mul(adaptation as unknown as ReturnType<typeof float>)
+    }
 
     // RenderPipeline is r185's name for the former PostProcessing (which now
     // only lives on as a deprecation alias that warns on construction).
@@ -191,7 +227,7 @@ export function Effects() {
     // The frame owner applies jitter before the eager scene draw and clears it
     // after post. Disable TRAA's lazy RenderPipeline jitter callbacks so neither
     // the first frame nor a rebuild applies a second jitter or advances twice.
-    processing.outputNode = graded.mul(vignette).context({ renderPipeline: null })
+    processing.outputNode = finalImage.context({ renderPipeline: null })
 
     const dispose = () => {
       processing.dispose()
@@ -204,8 +240,19 @@ export function Effects() {
         velocity.setProjectionMatrix(null)
       }
     }
-    return { processing, dispose, render: () => sceneFrame.render(processing, temporal) }
-  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled])
+    const size = new THREE.Vector2()
+    const render = (dt: number) => {
+      adaptation?.sync(balance.exposure, dt, gl.toneMappingExposure)
+      if (glare) {
+        gl.getDrawingBufferSize(size)
+        const sun = glare.sync(camera, sunDirRef.current, balance.sunGlare, size.x / Math.max(size.y, 1))
+        // Where the glare is centred this frame (live check, pixels measured there).
+        if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunGlare = sun
+      }
+      sceneFrame.render(processing, temporal)
+    }
+    return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled, sunGlare: glareEnabled } }
+  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled])
 
   // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
   // at commit, the instant a rebuild replaces it. A passive effect defers the
@@ -217,8 +264,10 @@ export function Effects() {
     // A committed rebuild is the condition the browser suite waits on instead
     // of a wall-clock pause: it counts up exactly when the new pipeline is live.
     if (import.meta.env.DEV) {
-      const hooks = window as unknown as { __postBuilds?: number }
+      const hooks = window as unknown as { __postBuilds?: number; __postFeatures?: unknown }
       hooks.__postBuilds = (hooks.__postBuilds ?? 0) + 1
+      // Which optional post effects the live chain carries (live checks).
+      hooks.__postFeatures = post.features
     }
     return () => {
       post.dispose()
@@ -226,8 +275,8 @@ export function Effects() {
   }, [post])
 
   // Priority render: replaces R3F's default render with the post pipeline.
-  useFrame(() => {
-    post.render()
+  useFrame((_, delta) => {
+    post.render(delta)
   }, 1)
 
   return null

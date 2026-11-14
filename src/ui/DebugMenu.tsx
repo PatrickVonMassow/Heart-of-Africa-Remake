@@ -785,6 +785,26 @@ export function DebugMenu() {
       num(t.debug.sunShadowFloor, balance.sun.shadowMinElevationDeg,
         (v) => { balance.sun.shadowMinElevationDeg = Math.max(0, Math.min(45, v)); bump() }, 1),
       custom(t.debug.sunDirection, <SunReadout label={t.debug.sunDirection} />),
+      // First-person eye adaptation (design.md §2.7, high level, settlements
+      // only): read by the GPU node every frame; the bump only refreshes the menu.
+      num(t.debug.exposureMin, balance.exposure.min,
+        (v) => { balance.exposure.min = Math.max(0.1, Math.min(balance.exposure.base, v)); bump() }, 0.05),
+      num(t.debug.exposureMax, balance.exposure.max,
+        (v) => { balance.exposure.max = Math.max(balance.exposure.base, Math.min(4, v)); bump() }, 0.05),
+      num(t.debug.exposureKey, balance.exposure.keyLuminance,
+        (v) => { balance.exposure.keyLuminance = Math.max(0.01, Math.min(10, v)); bump() }, 0.05),
+      num(t.debug.exposureCompensation, balance.exposure.compensation,
+        (v) => { balance.exposure.compensation = Math.max(0, Math.min(1, v)); bump() }, 0.1),
+      num(t.debug.exposureToBright, balance.exposure.toBrightSeconds,
+        (v) => { balance.exposure.toBrightSeconds = Math.max(0.01, Math.min(30, v)); bump() }, 0.05),
+      num(t.debug.exposureToDark, balance.exposure.toDarkSeconds,
+        (v) => { balance.exposure.toDarkSeconds = Math.max(0.01, Math.min(30, v)); bump() }, 0.25),
+      num(t.debug.glareStar, balance.sunGlare.starIntensity,
+        (v) => { balance.sunGlare.starIntensity = Math.max(0, Math.min(10, v)); bump() }, 0.1),
+      num(t.debug.glareStarLength, balance.sunGlare.starLength,
+        (v) => { balance.sunGlare.starLength = Math.max(0.01, Math.min(2, v)); bump() }, 0.02),
+      num(t.debug.glareGhosts, balance.sunGlare.ghostIntensity,
+        (v) => { balance.sunGlare.ghostIntensity = Math.max(0, Math.min(10, v)); bump() }, 0.1),
       // The dry-season crown collapse (§19.13): a SEASON switch, even though
       // it isolates a rendering half — it is the season a tester is forcing.
       check(t.debug.foliageCollapse, seasonCollapseEnabled,
