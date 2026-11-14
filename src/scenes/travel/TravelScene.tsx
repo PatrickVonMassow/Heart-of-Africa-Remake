@@ -462,9 +462,11 @@ let terrainMaterialCache: THREE.MeshStandardNodeMaterial | null = null
 let waterHandleCache: ReturnType<typeof createWaterMaterial> | null = null
 // The far ring carries the same horizon-map terms as the near chunks (design.md
 // §2.7), or a shadowed slope would change brightness at the ring's seam when the
-// debug zoom shows it. Both terms are exactly 1 until the maps apply.
+// debug zoom shows it. Both terms are exactly 1 until the maps apply. The
+// colorNode reads the vertex colour itself, so vertexColors stays off or the
+// material would multiply it in a second time.
 const FAR_TERRAIN_MATERIAL = (() => {
-  const m = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 1 })
+  const m = new THREE.MeshStandardNodeMaterial({ vertexColors: false, roughness: 1 })
   m.colorNode = vertexColor().rgb.mul(horizonShadeNode())
   m.aoNode = horizonSkyOcclusionNode()
   return m
