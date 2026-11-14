@@ -196,6 +196,48 @@ if (section('settlement-season')) {
   // Leave no forced weather behind for the checks below.
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 
+  // Point 354: the checks above read the VALUES behind the dome and stayed green
+  // while the player saw rain fall from a blue sky (the Zulu village, 03.01.1890).
+  // The evidence is the PICTURE: the same sky crop at the same settlement on the
+  // real calendar, its dry month against its wet month (the point-147 remedy).
+  const skyCrop = async (month, label) => {
+    await page.evaluate((m) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      g.debugJumpToMonth(m)
+    }, month)
+    await goToPlace('zulu-village')
+    await settle(label)
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await nextFrames(4)
+    // Upper sky only: above the huts and the hills, below the HUD bar.
+    const buf = await capturePixels(page, `${label} sky crop`, { clip: { x: 40, y: 60, width: 1360, height: 160 } })
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+    const lum = []
+    const sat = []
+    for (let i = 0; i < info.width * info.height; i++) {
+      const r = data[i * info.channels], g = data[i * info.channels + 1], b = data[i * info.channels + 2]
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
+      lum.push(0.2126 * r + 0.7152 * g + 0.0722 * b)
+      sat.push(mx > 0 ? (mx - mn) / mx : 0)
+    }
+    // Medians, so the thin rain streaks cannot carry the reading.
+    const median = (a) => a.sort((x, y) => x - y)[a.length >> 1]
+    return { lum: median(lum), sat: median(sat) }
+  }
+  const skyDry = await skyCrop(7, 'Zulu July')
+  await frame('354-village-sky-dry', { place: 'zulu-village', label: 'the Zulu village sky in July' })
+  const skyWet = await skyCrop(1, 'Zulu January')
+  await frame('354-village-sky-wet', { place: 'zulu-village', label: 'the Zulu village sky in January, under the rains' })
+  // Bars: a person calls a sky overcast when its blue is gone and it has darkened.
+  // OPEN: calibrated on the first measured run, see the commit.
+  seasonCheck(
+    'the settlement sky reads overcast on screen in its wet month (point 354, pixels)',
+    skyWet.sat < skyDry.sat * 0.5 && skyWet.lum < skyDry.lum * 0.85,
+    `sky crop dry ${JSON.stringify(skyDry)} -> wet ${JSON.stringify(skyWet)}`,
+  )
+  await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+
   // A desert PORT never rains, on the real calendar, in any month — Cairo is
   // hyper-arid and wetnessAt returns 0 there. (The debug override deliberately
   // forces a season everywhere to test the renderer, so this uses real months.)
