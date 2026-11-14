@@ -89,7 +89,10 @@ export function SkyDome({
     // sun, a faint glow opposite — and the zenith loses some of its noon blue.
     // sin(elevation) runs ~0.12 (7°) .. ~0.6 (37°) at the default hour.
     const lowSun = float(1).sub(smoothstep(float(0.1), float(0.62), sun.y))
-    const towardSun = max(dot(dir.xz.normalize(), sun.xz.normalize()), 0).mul(0.75).add(0.25)
+    // Horizontal directions divided by a floored length, not normalize(): an
+    // overhead sun (or the view straight up) has a zero xz and would yield NaN.
+    const flatDir = (v: typeof sun) => v.xz.div(max(v.xz.length(), 1e-4))
+    const towardSun = max(dot(flatDir(dir), flatDir(sun)), 0).mul(0.75).add(0.25)
     const band = float(1).sub(smoothstep(float(0.0), float(0.42), y)).mul(smoothstep(float(-0.02), float(0.01), y))
     const warmCol = mix(color('#f2b27a'), color('#e0703c'), lowSun.mul(towardSun))
     col = mix(col, warmCol, band.mul(towardSun).mul(lowSun).mul(0.62))
