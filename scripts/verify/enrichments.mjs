@@ -12614,7 +12614,7 @@ if (section('godrays')) {
       await frames(4)
       const g = await glareAt()
       if (!g) continue
-      const share = await brightShare(await page.screenshot(), g.u, g.v)
+      const share = await brightShare(await capturePixels(page, 'godrays: sideways scan for a partly covered sun'), g.u, g.v)
       if (share > 0.15 && share < 0.85 && (edge === null || Math.abs(share - 0.5) < Math.abs(edge.share - 0.5))) {
         edge = { x: behind.x + px * off, z: behind.z + pz * off, share }
       }
