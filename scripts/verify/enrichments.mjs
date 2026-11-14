@@ -12270,6 +12270,9 @@ if (section('solar-sun')) {
   )
   const inPlace = await readSun()
   const cairoLat = await page.evaluate(() => window.__game.getState().placeId === 'cairo' && window.__sceneSun?.lat)
+  // Arrival opens the journal over a third of the frame; the subject is the street.
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForFunction(() => !window.__game.getState().journalOpen)
   await shot('343-sun-settlement-eye', { place: 'cairo', label: 'Cairo at eye height under the 16:00 June sun' })
   check(
     'solar sun: the settlement sun uses the settlement latitude and its shadows agree with the dome disc',
