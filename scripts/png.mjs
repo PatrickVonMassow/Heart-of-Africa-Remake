@@ -1,6 +1,6 @@
 // Minimal dependency-free PNG codec for the geodata preprocessing scripts.
 // Decode: 8-bit, color types 0 (gray), 2 (RGB), 4 (gray+alpha), 6 (RGBA), non-interlaced.
-// Encode: 8-bit RGB with per-scanline "Up" filter (good for smooth data).
+// Encode: 8-bit RGB or RGBA with per-scanline "Up" filter (good for smooth data).
 // Uses node:zlib for DEFLATE.
 
 import zlib from 'node:zlib'
@@ -111,7 +111,16 @@ function chunk(type, data) {
 
 /** Encode 8-bit RGB pixels (Uint8Array, length width*height*3) as a PNG. */
 export function encodePngRgb(width, height, pixels, level = 9) {
-  const stride = width * 3
+  return encodePng(width, height, pixels, 3, level)
+}
+
+/** Encode 8-bit RGBA pixels (Uint8Array, length width*height*4, straight alpha) as a PNG. */
+export function encodePngRgba(width, height, pixels, level = 9) {
+  return encodePng(width, height, pixels, 4, level)
+}
+
+function encodePng(width, height, pixels, channels, level) {
+  const stride = width * channels
   const raw = Buffer.alloc((stride + 1) * height)
   for (let y = 0; y < height; y++) {
     const o = y * (stride + 1)
@@ -126,7 +135,7 @@ export function encodePngRgb(width, height, pixels, level = 9) {
   ihdr.writeUInt32BE(width, 0)
   ihdr.writeUInt32BE(height, 4)
   ihdr[8] = 8 // bit depth
-  ihdr[9] = 2 // color type RGB
+  ihdr[9] = channels === 4 ? 6 : 2 // color type RGBA / RGB
   const idat = zlib.deflateSync(raw, { level })
   return Buffer.concat([
     Buffer.from(SIGNATURE),

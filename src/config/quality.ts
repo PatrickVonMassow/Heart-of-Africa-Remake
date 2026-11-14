@@ -145,6 +145,11 @@ export interface QualityPreset {
    *  glare star, both cut by a depth occlusion test at the sun's screen
    *  position. Needs bloom; settlement scenes only. */
   sunGlare: boolean
+  /** Horizon maps (design.md §2.7): the bird's-eye terrain shades itself and
+   *  its hollows see less sky, from two baked RGBA maps (~4.9 MB download,
+   *  ~17.5 MB video memory). Off means the maps are never FETCHED — the gate
+   *  sits at the request (render/horizonMapGate.ts), not at their use. */
+  horizonMaps: boolean
   /** Gain of the sky dome's sun disc. Above the bloom threshold on every level;
    *  the glare level lifts it so the disc blooms on its own. */
   sunDiscGain: number
@@ -191,6 +196,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     eyeAdaptation: false, // fixed exposure
     sunGlare: false, // no bloom to build it on
     sunDiscGain: 3, // the disc before point 344
+    horizonMaps: false, // not even fetched: the download and video memory are what a weak device cannot afford
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -228,6 +234,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     eyeAdaptation: false, // fixed exposure
     sunGlare: false,
     sunDiscGain: 3, // the disc before point 344
+    horizonMaps: true, // one texture lookup per terrain fragment
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -264,6 +271,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     eyeAdaptation: true, // first person only (design.md §2.7)
     sunGlare: true, // first person only
     sunDiscGain: 14, // calibratable: well above the 0.88 bloom threshold
+    horizonMaps: true,
   },
 }
 

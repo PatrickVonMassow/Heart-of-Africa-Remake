@@ -175,7 +175,8 @@ depth-dependent absorption over real bathymetry, shore/crest foam). Its shader p
 build OFF the startup critical path: the first frames draw the ready set and the rest
 links behind them, so the loading picture stands still no longer than the calibratable
 `balance.startup.pictureFreezeBudgetMs`, which counts the WHOLE standstill — a renderer
-busy inside one long frame included.
+busy inside one long frame included. At medium/high the bird's-eye terrain shades itself
+and its hollows see less sky from DEM-baked horizon maps; at low they are never fetched.
 
 ## 15. Lively, densely built settlements.
 

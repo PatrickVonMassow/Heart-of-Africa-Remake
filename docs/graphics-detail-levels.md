@@ -60,6 +60,7 @@ device pixel ratio is kept (no cap).
 | `eyeAdaptation` | off | off | on |
 | `sunGlare` | off | off | on |
 | `sunDiscGain` | 3 | 3 | 14 |
+| `horizonMaps` | off | on | on |
 
 ## What each setting does
 
@@ -340,10 +341,36 @@ added.
   front of the sun kills the glare in the same frame. Needs bloom; settlement
   scenes only. High only. Estimated cost of both effects together ~0.3-0.8 ms;
   the real number comes from F8.
+- **Sun shafts — tried and removed** (design.md §2.7, point 345, 14.11.2026).
+  No `godrays` key: five picture-checked rounds drew no shaft worth its cost.
+  The upstream `GodraysNode` (three rounds) raymarched the sun's shadow map,
+  which resolves a palm frond at one or two texels, and drew a uniform veil or
+  seams along silhouettes. A screen-space radial blur of the open sky around
+  the sun averaged that sky into a milky veil over the whole frame; with the
+  unobstructed blur subtracted the veil was gone, but so was the effect — the
+  sun box changed by 0.02 levels while buildings in the lower half of the lobe
+  darkened the ground by 7.5 (WebGPU, Cairo, sun behind a palm crown). The
+  glare's occlusion cut and the eye adaptation carry the dazzle without it.
 - **`sunDiscGain`** — Gain of the sky dome's sun disc. 3 (the disc before point
   344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
   blooms on its own and feeds the glare. Settlement scenes only: the same dome
   serves the bird's-eye view, which keeps 3 at every level. Climbs 3 → 3 → 14.
+- **`horizonMaps`** — The land shades itself over hundreds of kilometres
+  (design.md §2.7, point 346). Two RGBA maps baked offline from the DEM
+  (`scripts/build-horizon-maps.mjs`, half DEM resolution, 1460×1500 texels of
+  ~5.6 km) hold, per texel, the horizon toward six sun directions of the
+  16:00 arc (233°–307°) plus the mean horizon round the full circle. The
+  bird's-eye terrain darkens where the land toward the sun rises above the
+  sun's elevation (slices interpolated by the current azimuth; a debug hour
+  outside the arc clamps to the nearest slice and reports it on the console),
+  and its hollows lose ambient light by their mean horizon. Tuning in
+  `balance.horizonMaps`. Cost: two lookups per terrain fragment, but a
+  4.85 MB download (2.58 + 2.27 MB PNG) and ~17.5 MB of video memory — so at
+  low the maps are NOT FETCHED at all: the request is gated on the effective
+  level (`src/render/horizonMapGate.ts`), and raising the level at runtime
+  fetches them once and applies them when they arrive. Settlements are
+  untouched. Quarter resolution (`--scale 4`, 0.65 + 0.57 MB) is the fallback
+  if the download budget bites; the picture decides.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 

@@ -252,7 +252,10 @@ export const DOC_BUDGETS = [
     // and cannot be read off the ones it did.
     // RAISED by the 46 measured words of the inventory-answer rule above
     // (work-order 1170).
-    maxWords: 5681,
+    // RAISED by the 22 measured words criterion 14 owes the horizon maps: the
+    // bird's-eye terrain shades itself from DEM-baked maps at medium/high and
+    // never fetches them at low (work-order 346) — a rule the criterion did not carry.
+    maxWords: 5703,
     // Forty words for thirty-two criteria — the destination of the §7.1 cut edits one
     // criterion at a time, and one criterion's rewording is well inside that.
     slackWords: 40,
