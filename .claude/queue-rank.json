@@ -1873,6 +1873,18 @@
       "why": "intermittent test-only red, charged; no player report, so it waits behind the ranked animal-behaviour work",
       "origin": "machine",
       "place": "last"
+    },
+    "1519": {
+      "at": "2026-11-14T08:49:58.283Z",
+      "why": "board infrastructure under the freeze; behind the game points is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1520": {
+      "at": "2026-11-14T08:50:30.597Z",
+      "why": "Sonne & Himmel bundle member; worked after 344-346, leak is not player-visible short-term",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1901,7 +1913,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-14T01:50:01.559Z",
+    "at": "2026-11-14T08:50:30.606Z",
     "points": [
       184,
       200,
@@ -2357,7 +2369,9 @@
       1503,
       1515,
       1516,
-      1517
+      1517,
+      1519,
+      1520
     ]
   }
 }
