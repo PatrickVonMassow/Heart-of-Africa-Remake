@@ -2129,4 +2129,25 @@ export const RED_CHARGES = [
       'MEASURED 14.11.2026 on WebGPU, main cfe6b27f1: renderTargets 52 -> 58 at place:bambara-village|medium bloom/sun '
       + 'band — the same rebuild leak since the solar sun that point 1520 owns at travel. The charge dies with point 1520.',
   },
+  {
+    point: 1520,
+    suite: 'polish-settlement',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^frame 1490-porter-tangier-webgl2 — the scene never finished drawing\b/i,
+    why:
+      'MEASURED 14.11.2026 on WebGL 2, feat/353 251379676: after 24 min of settlement rebuilds (renderTargets 63 -> 69, '
+      + 'textures 176 -> 200) the WebGL device is lost and the last frame draws nothing; the porter section is green '
+      + 'alone (16 pass). The cumulative rebuild leak is point 1520\'s. The charge dies with point 1520.',
+  },
+  {
+    point: 1520,
+    suite: 'polish-settlement',
+    backend: 'webgl',
+    kind: 'console',
+    match: /^console error: THREE\.THREE\.WebGPURenderer: WebGL Device Lost\b/i,
+    why:
+      'MEASURED 14.11.2026 on WebGL 2, feat/353 251379676: the device loss at the end of the full suite that follows the '
+      + 'rebuild leak point 1520 owns; the porter section is green alone. The charge dies with point 1520.',
+  },
 ]
