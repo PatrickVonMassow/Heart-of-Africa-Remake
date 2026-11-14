@@ -18,7 +18,7 @@
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
@@ -29,10 +29,11 @@ import { createEnvironmentTexture } from './environment'
 import { useSceneSun } from './sceneSun'
 import { createScenePass } from './scenePass'
 import { createSceneFrame } from './sceneFrame'
-import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation } from '../state/ui'
+import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation, effectiveSunGlare } from '../state/ui'
 import { useGame } from '../state/store'
 import { balance } from '../config/balance'
 import { eyeAdaptation, type EyeAdaptationNode } from './eyeAdaptation'
+import { createSunGlare } from './sunGlare'
 
 
 /** Minimum screen-space AO factor: occlusion never darkens a surface below this
@@ -49,6 +50,9 @@ export function Effects() {
   // sun (design.md §2.7) and re-baked only when that sun is re-derived (date,
   // latitude, balance) — never per frame.
   const iblSun = useSceneSun().disc
+  // The glare projects the same sun every frame without rebuilding the chain.
+  const sunDirRef = useRef(iblSun)
+  sunDirRef.current = iblSun
   useEffect(() => {
     const tex = createEnvironmentTexture(iblSun)
     scene.environment = tex
@@ -73,6 +77,8 @@ export function Effects() {
   // forbids. A rule, not a cost choice: do not unify the two scenes.
   const firstPerson = useGame((s) => s.mode) === 'place'
   const eyeEnabled = useUi(effectiveEyeAdaptation) && firstPerson
+  // Sun glare (design.md §2.7): built on the bloom, first person only.
+  const glareEnabled = useUi(effectiveSunGlare) && bloomEnabled && firstPerson
 
   // Keep the render target and MRT identity across every graphics toggle. A
   // changed fragment-output layout relinks scene/shadow materials as well as
@@ -179,10 +185,20 @@ export function Effects() {
     // (point 276): the pass is skipped entirely so it costs nothing on a weak
     // GPU, and the composite passes the plain image straight through.
     let withBloom = composed
+    let glare: ReturnType<typeof createSunGlare> | null = null
     if (bloomEnabled) {
       const bloomNode = bloom(composed, 0.25, 0.35, 0.88)
       disposables.push(bloomNode)
       withBloom = composed.add(bloomNode)
+      // Glare: lens-flare ghosts over the bloom plus a glare star, gated by a
+      // depth occlusion test at the projected sun (render/sunGlare.ts).
+      if (glareEnabled) {
+        // r185 has getTextureNode() at runtime; its declaration omits it.
+        const bloomTexture = (bloomNode as unknown as { getTextureNode: () => typeof depth }).getTextureNode()
+        glare = createSunGlare(bloomTexture, depth)
+        disposables.push(glare)
+        withBloom = withBloom.add(glare.node)
+      }
     }
 
     // Color grading: gentle saturation lift and a warm tint over the whole image.
@@ -224,12 +240,19 @@ export function Effects() {
         velocity.setProjectionMatrix(null)
       }
     }
+    const size = new THREE.Vector2()
     const render = (dt: number) => {
       adaptation?.sync(balance.exposure, dt, gl.toneMappingExposure)
+      if (glare) {
+        gl.getDrawingBufferSize(size)
+        const sun = glare.sync(camera, sunDirRef.current, balance.sunGlare, size.x / Math.max(size.y, 1))
+        // Where the glare is centred this frame (live check, pixels measured there).
+        if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunGlare = sun
+      }
       sceneFrame.render(processing, temporal)
     }
-    return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled } }
-  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled])
+    return { processing, dispose, render, features: { eyeAdaptation: eyeEnabled, sunGlare: glareEnabled } }
+  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled, eyeEnabled, glareEnabled])
 
   // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
   // at commit, the instant a rebuild replaces it. A passive effect defers the

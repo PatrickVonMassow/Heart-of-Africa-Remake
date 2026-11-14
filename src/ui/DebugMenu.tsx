@@ -799,6 +799,12 @@ export function DebugMenu() {
         (v) => { balance.exposure.toBrightSeconds = Math.max(0.01, Math.min(30, v)); bump() }, 0.05),
       num(t.debug.exposureToDark, balance.exposure.toDarkSeconds,
         (v) => { balance.exposure.toDarkSeconds = Math.max(0.01, Math.min(30, v)); bump() }, 0.25),
+      num(t.debug.glareStar, balance.sunGlare.starIntensity,
+        (v) => { balance.sunGlare.starIntensity = Math.max(0, Math.min(10, v)); bump() }, 0.1),
+      num(t.debug.glareStarLength, balance.sunGlare.starLength,
+        (v) => { balance.sunGlare.starLength = Math.max(0.01, Math.min(2, v)); bump() }, 0.02),
+      num(t.debug.glareGhosts, balance.sunGlare.ghostIntensity,
+        (v) => { balance.sunGlare.ghostIntensity = Math.max(0, Math.min(10, v)); bump() }, 0.1),
       // The dry-season crown collapse (§19.13): a SEASON switch, even though
       // it isolates a rendering half — it is the season a tester is forcing.
       check(t.debug.foliageCollapse, seasonCollapseEnabled,

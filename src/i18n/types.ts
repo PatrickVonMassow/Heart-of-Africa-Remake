@@ -759,6 +759,9 @@ export interface Strings {
     exposureCompensation: string
     exposureToBright: string
     exposureToDark: string
+    glareStar: string
+    glareStarLength: string
+    glareGhosts: string
     edgeBandWidth: string
     edgeBandWander: string
     edgeBandStrength: string

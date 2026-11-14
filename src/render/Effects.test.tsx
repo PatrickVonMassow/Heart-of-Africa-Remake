@@ -151,15 +151,17 @@ describe('post chain ownership', () => {
 
   // design.md §2.7: the adapting exposure is first-person only, at high only;
   // the bird's-eye view never builds it, whatever the level.
-  const features = () => (window as unknown as { __postFeatures?: { eyeAdaptation: boolean } }).__postFeatures
+  const features = () =>
+    (window as unknown as { __postFeatures?: { eyeAdaptation: boolean; sunGlare: boolean } }).__postFeatures
   it.each([
     ['place', 'high', true], ['place', 'medium', false], ['place', 'low', false],
     ['travel', 'high', false], ['travel', 'medium', false],
-  ] as const)('%s at %s: eye adaptation in the chain = %s', (mode, detailLevel, expected) => {
+  ] as const)('%s at %s: eye adaptation and glare in the chain = %s', (mode, detailLevel, expected) => {
     useGame.setState({ mode })
     useUi.setState({ detailLevel })
     const view = mountEffects()
     expect(features()?.eyeAdaptation).toBe(expected)
+    expect(features()?.sunGlare).toBe(expected)
     view.unmount()
   })
 

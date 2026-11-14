@@ -895,6 +895,16 @@ interface BalanceConfig {
     toDarkSeconds: number
     maxStepSeconds: number
   }
+  /** The sun's glare (design.md §2.7): disc gain at the levels that enable it
+   *  (quality key `sunDiscGain`) is a preset; these shape the glare star. */
+  sunGlare: {
+    /** Brightness of the glare star's rays at full sun visibility. */
+    starIntensity: number
+    /** Ray length as a fraction of the screen height. */
+    starLength: number
+    /** Lens-flare ghost strength (three/addons LensflareNode over the bloom). */
+    ghostIntensity: number
+  }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
@@ -1998,6 +2008,11 @@ export const balance: BalanceConfig = {
     toBrightSeconds: 0.35, // the eye adapts to bright light fast; calibratable, debug-editable
     toDarkSeconds: 2.8, // and opens up to the shade slowly; calibratable, debug-editable
     maxStepSeconds: 0.1, // a hitch advances at most this far; calibratable
+  },
+  sunGlare: {
+    starIntensity: 0.9, // calibratable, debug-editable
+    starLength: 0.22, // calibratable, debug-editable
+    ghostIntensity: 0.6, // calibratable, debug-editable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
