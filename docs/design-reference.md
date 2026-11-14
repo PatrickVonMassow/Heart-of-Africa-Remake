@@ -198,7 +198,7 @@ the next reload). The complete set, grouped as the menu presents it:
 
 **The sun** (§2.7)
 
-- The fixed local solar hour the sun is derived at (default 16:00; noon casts no shadow, 17:00 sets the Cape sun in June). The menu also shows the derived elevation, azimuth and direction.
+- The fixed local solar hour the sun is derived at (default 16:00; at solar noon the tropical sun stands nearly overhead and shadows shrink to stubs, 17:00 sets the Cape sun in June). The menu also shows the derived elevation, azimuth and direction.
 - The shadow light's elevation floor: lifts only the shadow-casting light at grazing angles while the visible disc keeps its true angle — a deliberate divergence, off (0) by default.
 
 **Wildlife dramas** (§19.8)

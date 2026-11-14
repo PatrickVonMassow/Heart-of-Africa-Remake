@@ -12186,14 +12186,21 @@ if (section('solar-sun')) {
       window.__game.setState({ day: d })
       window.__game.getState().debugJumpTo(la, lo)
     }, [lat, lon, day])
-    // The scene sun re-derives on the jump; the light follows on the next frame.
-    await page.waitForFunction(([la, lo]) => {
+    // The scene sun re-derives on the jump (game day 0 is 1 January, so the
+    // requested day is its day of year); the light follows on the next frame,
+    // so wait until its direction matches the derived one, not just its place.
+    await page.waitForFunction(([la, lo, d]) => {
       const s = window.__sceneSun
       const l = window.__sunLight
       const p = window.__game.getState().pos
-      return !!s && !!l && Math.abs(s.lat - la) < 0.3 && Math.abs(l.target.position.x - p.x) < 1e-3 &&
-        Math.abs(p.x / 10 - lo) < 0.5
-    }, [lat, lon], { timeout: 30000 })
+      if (!s || !l || s.dayOfYear !== d || Math.abs(s.lat - la) >= 0.3) return false
+      const t = l.target.getWorldPosition(l.position.clone())
+      const w = l.getWorldPosition(l.position.clone())
+      const v = [w.x - t.x, w.y - t.y, w.z - t.z]
+      const n = Math.hypot(...v)
+      const aligned = v.every((c, i) => Math.abs(c / n - s.light[i]) < 1e-3)
+      return aligned && Math.abs(l.target.position.x - p.x) < 1e-3 && Math.abs(p.x / 10 - lo) < 0.5
+    }, [lat, lon, day], { timeout: 30000 })
     return readSun()
   }
   const meanDiff = async (a, b) => {

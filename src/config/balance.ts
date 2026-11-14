@@ -873,7 +873,7 @@ interface BalanceConfig {
   }
   sun: {
     /** Fixed local solar hour the sun is derived at (design.md §2.7). 16 is
-     *  load-bearing: noon casts no shadow, 17 sets the Cape sun in June. */
+     *  load-bearing: at solar noon the tropical sun stands nearly overhead and shadows shrink to stubs, 17 sets the Cape sun in June. */
     hour: number
     /** Elevation floor (degrees) for the SHADOW light only; the visible disc
      *  keeps its true angle. A deliberate divergence against grazing-angle
