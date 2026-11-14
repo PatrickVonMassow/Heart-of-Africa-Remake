@@ -2010,8 +2010,8 @@ export const balance: BalanceConfig = {
     maxStepSeconds: 0.1, // a hitch advances at most this far; calibratable
   },
   sunGlare: {
-    starIntensity: 0.9, // calibratable, debug-editable
-    starLength: 0.22, // calibratable, debug-editable
+    starIntensity: 0.7, // calibratable, debug-editable
+    starLength: 0.1, // calibratable, debug-editable; 0.22 streaked the rays across the foreground
     ghostIntensity: 0.6, // calibratable, debug-editable
   },
   season: {

@@ -58,8 +58,8 @@ export function createSunGlare(bloomTexture: Tex, depth: Tex) {
     aspect: uniform(16 / 9),
     near: uniform(0.1),
     far: uniform(2000),
-    starIntensity: uniform(0.9),
-    starLength: uniform(0.22),
+    starIntensity: uniform(0.7),
+    starLength: uniform(0.1),
     ghostIntensity: uniform(0.6),
   }
 
