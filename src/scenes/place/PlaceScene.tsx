@@ -1265,7 +1265,7 @@ function FirePit({
           Out in the rain (point 348) the flame and its light are gone: the
           household cooks at the hearth inside the hut; stones and logs stay. */}
       {!out && (
-        <mesh ref={flame} position={[0, HEARTH_TOP, 0]} geometry={flameGeo}>
+        <mesh ref={flame} name="village-flame" position={[0, HEARTH_TOP, 0]} geometry={flameGeo}>
           <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
         </mesh>
       )}
@@ -2865,6 +2865,9 @@ export function PlaceScene() {
       // fire under a cook-shelter canopy, and the resulting rain-damping factor.
       fireSheltered: fireShelterResponse(place?.peopleId, 0).sheltered,
       fireRainFactor: fireShelterResponse(place?.peopleId, rainAmount(placeWetness.current, balance.season.weatherStrength)).rainFactor,
+      // Point 348: the indoor-hearth people's yard fire is out under rain.
+      fireOut: yardFireOutRef.current,
+      fire: VILLAGE_FIRE,
     })
     return () => {
       delete w.__placeSeason

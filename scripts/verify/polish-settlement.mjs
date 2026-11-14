@@ -423,6 +423,86 @@ if (section('cold-weather-dress')) {
   )
 }
 
+// --- The village fire in the rain (design.md §19.10, point 348): an indoor-
+// hearth people's yard fire is out under heavy rain and lit again in dry
+// weather; an open fire that the rain damps still stands ON its hearth; the
+// hearth collider is in the set walkers path against, and no walker crosses it.
+if (section('fire-rain')) {
+  const enterWith = async (placeId, wet) => {
+    await page.evaluate(() => { const g = window.__game.getState(); if (g.placeId) g.leavePlace() })
+    await page.evaluate((id) => window.__game.getState().enterPlace(id), placeId)
+    await page.waitForFunction(() => !!window.__placeSeason, null, { timeout: 30000 })
+    await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wet)
+  }
+  const fireOutIs = (want) =>
+    page.waitForFunction((v) => window.__placeSeason?.().fireOut === v, want, { timeout: 15000 }).then(() => true, () => false)
+  const flameBase = () => page.evaluate(() => {
+    const o = window.__placeScene?.getObjectByName('village-flame')
+    if (!o) return null
+    o.updateWorldMatrix(true, false)
+    o.parent.updateWorldMatrix(true, false)
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+    const box = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)
+    return { baseAbovePit: box.min.y - o.parent.matrixWorld.elements[13], scaleY: o.scale.y }
+  })
+
+  // Dry Zulu village: the yard fire burns, unchanged from before the rain driver.
+  await enterWith('zulu-village', 0)
+  const dryLit = await fireOutIs(false)
+  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
+  const dryFlame = await flameBase()
+  await frame('348-zulu-fire-dry', { place: 'zulu-village', label: 'the Zulu yard fire in dry weather' })
+  check('the dry Zulu village keeps its yard fire lit (point 348)', dryLit && dryFlame !== null, `out=${!dryLit} flame=${JSON.stringify(dryFlame)}`)
+
+  // The hearth collider joins the layout's collider set, and over a stretch of
+  // village life no walker stands inside the drawn hearth.
+  const hearth = await page.evaluate(() => {
+    const [fx, fz] = window.__placeSeason().fire
+    const c = (window.__placeColliders ?? []).find((k) => Math.hypot(k.x - fx, k.z - fz) < 0.05 && k.r !== undefined)
+    return { fx, fz, r: c?.r ?? null }
+  })
+  check('the hearth collider stands in the place collider set (point 348 (b))', hearth.r !== null && hearth.r > 1.11, `r=${hearth.r}`)
+  const walk = await page.evaluate(async ({ fx, fz }) => {
+    let min = Infinity, near = 0
+    const end = performance.now() + 20000
+    while (performance.now() < end) {
+      const w = window.__placeWalkers
+      for (const s of w?.states ?? []) {
+        const d = Math.hypot(s.x - fx, s.z - fz)
+        if (d < min) min = d
+        if (d < 3.5) near++
+      }
+      await new Promise((r) => setTimeout(r, 100))
+    }
+    return { min, near }
+  }, hearth)
+  check('no walker crosses the hearth (point 348 (b))', walk.min > 1.11, `closest walker ${walk.min.toFixed(2)} m from the fire centre, ${walk.near} samples within 3.5 m`)
+
+  // Heavy rain: the yard fire is out and its life is inside; dry again, relit.
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+  const rainOut = await fireOutIs(true)
+  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
+  const rainFlame = await flameBase()
+  await frame('348-zulu-fire-out-rain', { place: 'zulu-village', label: 'the Zulu yard fire out under heavy rain' })
+  check('under heavy rain the Zulu yard fire is out — no flame drawn (point 348)', rainOut && rainFlame === null, `out=${rainOut} flame=${JSON.stringify(rainFlame)}`)
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
+  const relit = await fireOutIs(false)
+  check('the Zulu yard fire is lit again when the rain passes (point 348)', relit, `relit=${relit}`)
+
+  // An open fire the rain damps (the San): the smaller flame still stands on its pit.
+  await enterWith('san-village', 1)
+  await page.waitForFunction(() => window.__placeSeason().rain > 0.5, null, { timeout: 15000 }).catch(() => {})
+  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
+  const sanFlame = await flameBase()
+  await frame('348-san-flame-on-hearth-rain', { place: 'san-village', label: 'the rain-damped San fire standing on its hearth' })
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+  check(
+    'the rain-damped flame stands on the hearth, not above it (point 348 (a))',
+    sanFlame !== null && sanFlame.scaleY < 0.99 && Math.abs(sanFlame.baseAbovePit - 0.045) < 0.01,
+    `flame=${JSON.stringify(sanFlame)}`,
+  )
+}
+
 // --- Campfire shadows (design.md §19.10): with the debug toggle ON, an occluder
 // between the fire and the ground measurably darkens the ground behind it -------
 if (section('campfire-shadows')) {
