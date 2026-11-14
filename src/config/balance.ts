@@ -2031,9 +2031,11 @@ export const balance: BalanceConfig = {
     shelteredRainDamp: 0.25, // calibratable, debug-editable
     openRainDamp: 0.7, // calibratable, debug-editable
     // Point 348: where the people keep the hearth indoors (docs/peoples-1890.md
-    // §9.2/§9.6), steady rain past this amount puts the yard fire out; light
-    // drizzle does not. Educated guess, calibratable, debug-editable.
-    indoorRainThreshold: 0.35,
+    // §9.2/§9.6), rain past this amount puts the yard fire out; the faintest
+    // drizzle does not. Set below the Zulu village's own wet-season peak (~0.30)
+    // and the Maasai's (~0.18), so the screenshot case answers without a forced
+    // season. Educated guess, calibratable, debug-editable.
+    indoorRainThreshold: 0.15,
     // 1.11 m drawn hearth + 0.19 m = the 1.3 m keep-out the fire always had, so
     // no layout moves; calibratable, debug-editable (applies on the next visit).
     hearthClearance: 0.19,

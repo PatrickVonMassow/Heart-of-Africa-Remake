@@ -750,6 +750,10 @@ export interface Strings {
     waterCrossChance: string
     seasonStrength: string
     wetGroundStrength: string
+    fireShelteredRainDamp: string
+    fireOpenRainDamp: string
+    fireIndoorRainThreshold: string
+    fireHearthClearance: string
     sunHour: string
     sunShadowFloor: string
     sunDirection: string

@@ -2946,3 +2946,45 @@ evidence only, §9.4). Rain-response rule: under the canopy the fire
 burns on through rain, a touch lower and steamier; an UNSHELTERED flame (the
 dome-dweller villages, or any fire outside a canopy) is visibly damped by rain;
 the rainless desert settlements are unaffected.
+
+### 9.6 Where the cook-fire sat in the rain — the decision per people (point 348)
+
+The point-256 rule left the dome-dwellers' open yard fire burning, only
+damped, under rain. The user's screenshots (Zulu village 25.07.2026, Mbuti
+village 27.07.2026) showed why that reads wrong: §9.2 says these peoples keep
+the hearth INSIDE the dwelling, and in wet weather the household gathers round
+it there (Grout, quoted above: "if the weather is cold or wet, gathered around
+this fire-place"). The answer is therefore not a smaller yard fire but no yard
+fire: the fire is out, its life is indoors, and it is lit again when the rain
+passes. No canopy is added for these peoples — none is attested (§9.5).
+
+The decision follows the §19.13 dress rule: a change only where the record
+carries it. Four peoples move indoors on the evidence; the THIN/INFERRED
+indoor-hearth entries (Pedi, Sidama, Berber) and the GAP peoples are NOT moved —
+their fire keeps the point-256 damped open behaviour, recorded as such rather
+than guessed.
+
+| People | Rain behaviour (game) | Rests on |
+| --- | --- | --- |
+| Baganda, Hausa, Bambara, Mandinka, Bemba, Lunda, Swahili | **shelter** — cook-shelter canopy, burns on (point 256) | §9.1/§9.4 |
+| Zulu | **indoor** — yard fire out, cook and tender inside | PERIOD, Grout 1864 pp. 98–99 |
+| Maasai | **indoor** | PERIOD, Thomson pp. 242–3; Hollis 1905 |
+| Fang | **indoor** | PERIOD construction (Kingsley); Tessmann located |
+| Mbuti | **indoor** — a hearth at each leaf hut | RETRO-APPLIED (Schebesta, Turnbull); the CONTESTED ember-carrying claim is not used |
+| San | **open** — open hearth, damped | PERIOD open hearth (Passarge); no roof in any source |
+| Pedi, Sidama, Berber | **open** — damped, unchanged | indoor hearth THIN/INFERRED only — OPEN: a period source would move them |
+| Somali, Mongo, Banda, Bambundu, Wayeyi | **open** — damped, unchanged | GAP — do not assume |
+| Tuareg, Nubian | **moot** — no rain at the village | `climate-1890.md` |
+
+**Implementation (kept in step with this table).** `src/systems/cookShelter.ts`
+`FIRE_RAIN_DECISIONS` holds exactly this table; a unit sweep fails on a roster
+people without a decision. `yardFireOut` puts an indoor people's yard fire out
+at and above `balance.fire.indoorRainThreshold` (0.15 of the rain amount,
+calibratable, debug-editable — below the Zulu village's own wet-season peak of
+~0.30, so the answer shows without a forced season); deterministic, relit as
+soon as the rain drops back. While it is out the flame and fire light are gone
+(stones and logs stay) and the cook, the fire tender and the bundle-carrier are
+not in the yard. The dry-weather fire and the point-142 cold/harmattan/karif
+blaze are unchanged. No indoor people has a riverside fishers' fire, so a
+village never shows two answers. ⚠️ The vignette moves INSIDE (out of sight),
+not under the eaves — the eaves reading is not attested (§9.3).

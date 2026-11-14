@@ -87,6 +87,10 @@ const DEFAULTS = {
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
   crocMouthOffset: balance.crocodile.mouthOffsetLocal,
   wetGroundStrength: balance.season.wetGroundStrength,
+  fireShelteredRainDamp: balance.fire.shelteredRainDamp,
+  fireOpenRainDamp: balance.fire.openRainDamp,
+  fireIndoorRainThreshold: balance.fire.indoorRainThreshold,
+  fireHearthClearance: balance.fire.hearthClearance,
   edgeBandWidth: balance.placeEdgeBand.widthM,
   edgeBandWander: balance.placeEdgeBand.wanderM,
   edgeBandStrength: balance.placeEdgeBand.strength,
@@ -189,6 +193,10 @@ afterEach(() => {
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
   balance.crocodile.mouthOffsetLocal = DEFAULTS.crocMouthOffset
   balance.season.wetGroundStrength = DEFAULTS.wetGroundStrength
+  balance.fire.shelteredRainDamp = DEFAULTS.fireShelteredRainDamp
+  balance.fire.openRainDamp = DEFAULTS.fireOpenRainDamp
+  balance.fire.indoorRainThreshold = DEFAULTS.fireIndoorRainThreshold
+  balance.fire.hearthClearance = DEFAULTS.fireHearthClearance
   balance.placeEdgeBand.widthM = DEFAULTS.edgeBandWidth
   balance.placeEdgeBand.wanderM = DEFAULTS.edgeBandWander
   balance.placeEdgeBand.strength = DEFAULTS.edgeBandStrength
@@ -408,6 +416,11 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.crocMouthOffset, read: () => balance.crocodile.mouthOffsetLocal, value: 1.4 },
     // The wet-ground strength (design.md §19.13, point 225).
     { label: en.debug.wetGroundStrength, read: () => balance.season.wetGroundStrength, value: 0.5 },
+    // The village fire in the rain (design.md §19.10, points 256/348).
+    { label: en.debug.fireShelteredRainDamp, read: () => balance.fire.shelteredRainDamp, value: 0.4 },
+    { label: en.debug.fireOpenRainDamp, read: () => balance.fire.openRainDamp, value: 0.5 },
+    { label: en.debug.fireIndoorRainThreshold, read: () => balance.fire.indoorRainThreshold, value: 0.6 },
+    { label: en.debug.fireHearthClearance, read: () => balance.fire.hearthClearance, value: 0.5 },
     // The settlement edge painted on the ground (design.md §2.6, point 352/488).
     { label: en.debug.edgeBandWidth, read: () => balance.placeEdgeBand.widthM, value: 4.5 },
     { label: en.debug.edgeBandWander, read: () => balance.placeEdgeBand.wanderM, value: 0.4 },
@@ -954,7 +967,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandStall',
     'debug.adultErrandPace', 'debug.adultErrandCount',
   ],
-  weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.sunHour', 'debug.sunShadowFloor', 'debug.sunDirection', 'debug.exposureMin', 'debug.exposureMax', 'debug.exposureKey', 'debug.exposureCompensation', 'debug.exposureToBright', 'debug.exposureToDark', 'debug.glareStar', 'debug.glareStarLength', 'debug.glareGhosts', 'debug.foliageCollapse'],
+  weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.fireShelteredRainDamp', 'debug.fireOpenRainDamp', 'debug.fireIndoorRainThreshold', 'debug.fireHearthClearance', 'debug.sunHour', 'debug.sunShadowFloor', 'debug.sunDirection', 'debug.exposureMin', 'debug.exposureMax', 'debug.exposureKey', 'debug.exposureCompensation', 'debug.exposureToBright', 'debug.exposureToDark', 'debug.glareStar', 'debug.glareStarLength', 'debug.glareGhosts', 'debug.foliageCollapse'],
   economy: [
     'debug.cash', 'debug.giftsTotal', 'debug.inventoryCapacity', 'debug.digRadius',
     'debug.addEquipment', 'debug.addGift', 'debug.addTreasure',
@@ -1045,12 +1058,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 249 controls in total, and none twice', () => {
+  it('carries all 253 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(249)
+    expect(labels.length).toBe(253)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1097,7 +1110,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(249)
+    expect(rows.length).toBe(253)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1151,7 +1164,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(249)
+    expect(renderedRowLabels().length).toBe(253)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1199,7 +1212,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(249)
+    expect(renderedRowLabels().length).toBe(253)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 
