@@ -42,3 +42,17 @@ describe('sun-shaft light channel', () => {
     expect(readyGodraysLight()).toBeNull()
   })
 })
+
+describe('sun-shaft forward scatter', () => {
+  it('is full toward the sun, falls off with the angle, and keeps the ambient share behind', async () => {
+    const { shaftsPhase } = await import('./godraysLight')
+    const { balance } = await import('../config/balance')
+    const { forwardScatter: k, ambientShare: a } = balance.godrays
+    expect(shaftsPhase(1, k, a)).toBeCloseTo(1)
+    expect(shaftsPhase(Math.cos((20 * Math.PI) / 180), k, a)).toBeGreaterThan(0.6)
+    expect(shaftsPhase(Math.cos((60 * Math.PI) / 180), k, a)).toBeLessThan(0.3)
+    expect(shaftsPhase(-1, k, a)).toBeCloseTo(a)
+    expect(a).toBeGreaterThanOrEqual(0)
+    expect(a).toBeLessThan(1)
+  })
+})

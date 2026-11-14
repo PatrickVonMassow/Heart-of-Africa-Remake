@@ -914,8 +914,12 @@ interface BalanceConfig {
     maxDensity: number
     /** Fall-off of the accumulation away from the light (upstream `distanceAttenuation`). */
     distanceAttenuation: number
-    /** HDR strength of the term added onto the frame. */
+    /** HDR strength of the term added onto the frame (toward the sun). */
     intensity: number
+    /** Exponent of the forward-scatter lobe around the sun direction. */
+    forwardScatter: number
+    /** Share of the term kept away from the sun (0 = shafts only toward it). */
+    ambientShare: number
   }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
@@ -2030,7 +2034,9 @@ export const balance: BalanceConfig = {
     density: 0.5, // educated guess for dry afternoon air; calibratable, debug-editable
     maxDensity: 0.45, // calibratable
     distanceAttenuation: 2, // upstream default; calibratable
-    intensity: 0.6, // educated guess against the 2.4 settlement sun; calibratable, debug-editable
+    intensity: 1.5, // educated guess against the 2.4 settlement sun; calibratable, debug-editable
+    forwardScatter: 6, // lobe halves at ~28° from the sun; calibratable
+    ambientShare: 0.25, // calibratable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

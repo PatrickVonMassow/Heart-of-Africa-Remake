@@ -21,7 +21,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { color as tslColor, float, max, mix, smoothstep, uniform, vec3, vec4, velocity, viewportUV } from 'three/tsl'
+import { color as tslColor, dot, float, max, mix, normalize, pow, screenUV, smoothstep, uniform, vec2, vec3, vec4, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
@@ -145,10 +145,20 @@ export function Effects() {
     // settles its raymarch noise and the shafts bloom with the sun.
     let shafts: ReturnType<typeof godrays> | null = null
     const shaftsIntensity = uniform(balance.godrays.intensity)
+    const shaftsPower = uniform(balance.godrays.forwardScatter)
+    const shaftsAmbient = uniform(balance.godrays.ambientShare)
+    const shaftsSunView = uniform(new THREE.Vector3(0, 0, -1))
+    const shaftsTan = uniform(new THREE.Vector2(1, 1))
     if (godraysLive) {
       shafts = godrays(depth, camera, godraysLive)
       disposables.push(shafts)
-      const term = shafts.getTextureNode().r.mul(shaftsIntensity)
+      // Forward scatter: the upstream term has no phase function, so on its
+      // own it is a flat veil over the whole frame. Weight it by the angle
+      // between the pixel's view ray and the sun (shaftsPhase, godraysLight.ts).
+      const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)))
+      const ray = normalize(vec3(ndc.mul(shaftsTan), -1))
+      const phase = mix(shaftsAmbient, float(1), pow(max(dot(ray, shaftsSunView), 0), shaftsPower))
+      const term = shafts.getTextureNode().r.mul(shaftsIntensity).mul(phase)
       aoComposed = aoComposed.add(vec4(tslColor(godraysLive.color).mul(term), 0))
     }
 
@@ -272,6 +282,13 @@ export function Effects() {
         shafts.maxDensity.value = b.maxDensity
         shafts.distanceAttenuation.value = b.distanceAttenuation
         shaftsIntensity.value = b.intensity
+        shaftsPower.value = b.forwardScatter
+        shaftsAmbient.value = b.ambientShare
+        const sd = sunDirRef.current
+        camera.updateMatrixWorld()
+        shaftsSunView.value.set(sd[0], sd[1], sd[2]).normalize().transformDirection(camera.matrixWorldInverse)
+        const e = camera.projectionMatrix.elements
+        shaftsTan.value.set(1 / e[0], 1 / e[5])
       }
       if (glare) {
         gl.getDrawingBufferSize(size)

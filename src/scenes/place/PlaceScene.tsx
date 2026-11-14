@@ -73,6 +73,7 @@ import {
 import { SkyDome } from '../../render/sky'
 import { useSceneSun } from '../../render/sceneSun'
 import { publishGodraysLight } from '../../render/godraysLight'
+import { SUN_SHADOW_BIAS, SUN_SHADOW_DISTANCE, SUN_SHADOW_FAR, SUN_SHADOW_HALF, SUN_SHADOW_NEAR } from './sunShadowBox'
 import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
@@ -3374,18 +3375,19 @@ export function PlaceScene() {
         // side-finding).
         key={shadowsEnabled ? 'sun-shadowed' : 'sun-plain'}
         ref={sunRef}
-        position={[sun.light[0] * 60, sun.light[1] * 60, sun.light[2] * 60]}
+        name="place-sun"
+        position={[sun.light[0] * SUN_SHADOW_DISTANCE, sun.light[1] * SUN_SHADOW_DISTANCE, sun.light[2] * SUN_SHADOW_DISTANCE]}
         color="#fff1d8"
         intensity={PLACE_SUN_INTENSITY}
         castShadow={shadowsEnabled}
         shadow-mapSize={[shadowSize, shadowSize]}
-        shadow-camera-left={-55}
-        shadow-camera-right={55}
-        shadow-camera-top={55}
-        shadow-camera-bottom={-55}
-        shadow-camera-near={5}
-        shadow-camera-far={160}
-        shadow-bias={-0.0004}
+        shadow-camera-left={-SUN_SHADOW_HALF}
+        shadow-camera-right={SUN_SHADOW_HALF}
+        shadow-camera-top={SUN_SHADOW_HALF}
+        shadow-camera-bottom={-SUN_SHADOW_HALF}
+        shadow-camera-near={SUN_SHADOW_NEAR}
+        shadow-camera-far={SUN_SHADOW_FAR}
+        shadow-bias={SUN_SHADOW_BIAS}
         shadow-normalBias={VILLAGER_ASSET.sunShadowNormalBias}
       />
 

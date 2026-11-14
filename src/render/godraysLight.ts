@@ -40,3 +40,9 @@ export function readyGodraysLight(): DirectionalLight | null {
 export function godraysShadowTexture(light: DirectionalLight | null) {
   return light?.shadow.map?.depthTexture ?? null
 }
+
+/** The forward-scatter weight the post chain gives the shafts (CPU mirror of
+ *  the TSL in Effects.tsx): `ambient` away from the sun, 1 looking into it. */
+export function shaftsPhase(cosToSun: number, power: number, ambient: number): number {
+  return ambient + (1 - ambient) * Math.pow(Math.max(cosToSun, 0), power)
+}
