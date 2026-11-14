@@ -117,6 +117,7 @@ put it is the mistake this line exists to stop.
   UNCHANGED, which is the readability guard's own witness.
   DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
   behaviour when this lands.
+  Also (14.11.2026): the full WebGPU enrichments covering run on feat/344 b9082f151 (log local/verify-logs/2026-11-14T05-34-10-777-enrichments.log, 54 min) logged 9x [ASSERT] render-resource-leak at travel|medium (renderTargets 46 -> 397); solar-sun and eye-adaptation-glare are green alone on main and on the branch, and the last full main run (f7f328b10, before 343 landed) had none. Before landing, attribute it with one full WebGPU enrichments run on main (VERIFY_SUITE_TIMEOUT_MS=5400000): leak on main -> new point against 343; leak only on the branch -> fix here.
 
 - [ ] 345. Sun shafts through what stands in the way, highest quality level (user
   25.07.2026). With the low afternoon sun of point 343, a palm crown, a roof edge, the
@@ -1330,6 +1331,7 @@ put it is the mistake this line exists to stop.
   Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
   Source: picture check of the 565 landing session, 09.11.2026.
   Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
+  Also (14.11.2026): --section=seasons alone takes ~14 min on WebGPU (main 15c896340 14m 21s, Congo swing 12.2 vs savanna 9.3; feat/344 14m 39s) and pushes the full enrichments suite past its 45 min wall timeout (killed at 64 frames); a covering run needs VERIFY_SUITE_TIMEOUT_MS=5400000 until this is fixed.
   Bundle: Steuerung & Performance.
 
 - [ ] 1496. Grass fire: close the four cross-vendor review objections point 321 landed without
