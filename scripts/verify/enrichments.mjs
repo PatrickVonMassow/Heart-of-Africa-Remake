@@ -12585,8 +12585,45 @@ if (section('godrays')) {
   })
   check('godrays: the settlement has a dwelling tall enough to stand the sun behind its roof', behind !== null, JSON.stringify(behind))
 
+  // Beams need a PARTLY covered sun: scan sideways across the dwelling until
+  // the sun's neighbourhood holds both open sky and roof (bright share ~0.5).
+  const brightShare = async (png, u, v) => {
+    const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    const r = Math.round(0.04 * info.height)
+    const cx = Math.round(u * info.width)
+    const cy = Math.round(v * info.height)
+    let bright = 0
+    let n = 0
+    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
+      if (x < 0 || y < 0 || x >= info.width || y >= info.height) continue
+      const i = (y * info.width + x) * 3
+      if (data[i] + data[i + 1] + data[i + 2] > 600) bright++
+      n++
+    }
+    return n ? bright / n : 0
+  }
+  let edge = null
   if (behind) {
-    await pose(behind.x, behind.z, sunYaw, 0.15)
+    const d = await page.evaluate(() => window.__sceneSun.disc)
+    const h = Math.hypot(d[0], d[2])
+    const px = -d[2] / h
+    const pz = d[0] / h
+    for (let k = -8; k <= 8; k++) {
+      const off = (k / 8) * (behind.r + 1.5)
+      await pose(behind.x + px * off, behind.z + pz * off, sunYaw, 0.15)
+      await frames(4)
+      const g = await glareAt()
+      if (!g) continue
+      const share = await brightShare(await page.screenshot(), g.u, g.v)
+      if (share > 0.15 && share < 0.85 && (edge === null || Math.abs(share - 0.5) < Math.abs(edge.share - 0.5))) {
+        edge = { x: behind.x + px * off, z: behind.z + pz * off, share }
+      }
+    }
+  }
+  check('godrays: a sideways scan finds a pose with the sun disc partly behind the roof edge', edge !== null, JSON.stringify(edge))
+
+  if (behind) {
+    await pose(edge?.x ?? behind.x, edge?.z ?? behind.z, sunYaw, 0.15)
     await frames(60) // TRAA settles the raymarch noise
     const g = await glareAt()
     const box = g ? [g.u - 0.2, g.v - 0.25, g.u + 0.2, g.v + 0.2] : [0.3, 0.2, 0.7, 0.65]
@@ -12603,7 +12640,7 @@ if (section('godrays')) {
 
     await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
     await waitShafts(false)
-    await pose(behind.x, behind.z, sunYaw, 0.15)
+    await pose(edge?.x ?? behind.x, edge?.z ?? behind.z, sunYaw, 0.15)
     await frames(60)
     const stepped = await capturePixels(page, 'godrays: same frame, level stepped down')
     await shot('345-godrays-medium', { place: 'cairo', label: 'the same frame one graphics level lower, no sun shafts' })
@@ -12617,6 +12654,36 @@ if (section('godrays')) {
       onMean - offMean > 2, JSON.stringify({ box, onMean, offMean }))
     check('godrays: pixels along the sun direction brighter at high than with the level stepped down',
       onMean - steppedMean > 1, JSON.stringify({ box, onMean, steppedMean }))
+
+    // STRUCTURE, not fog (picture check 14.11.2026): away from the sun the
+    // frame keeps its off-image; around the sun the brightening VARIES (beams
+    // through the open sky, wedges behind the roof), measured on a ring.
+    const lum = async (png) => sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    const [a, b] = await Promise.all([lum(on), lum(off)])
+    const W = a.info.width
+    const H = a.info.height
+    const at = (buf, x, y) => { const i = (y * W + x) * 3; return (buf[i] + buf[i + 1] + buf[i + 2]) / 3 }
+    const su = g?.u ?? 0.5
+    const sv = g?.v ?? 0.4
+    const farBox = su < 0.5 ? [0.88, 0.3, 1, 0.8] : [0, 0.3, 0.12, 0.8]
+    const farOn = await meanOf(on, farBox)
+    const farOff = await meanOf(off, farBox)
+    check('godrays: the frame far from the sun (~30°+) keeps its off-image — no veil',
+      Math.abs(farOn - farOff) < 3, JSON.stringify({ farBox, farOn, farOff }))
+    const diffs = []
+    for (let k = 0; k < 360; k += 3) {
+      const t = (k * Math.PI) / 180
+      for (const r of [0.06, 0.1, 0.14]) {
+        const x = Math.round((su + (Math.cos(t) * r * H) / W) * W)
+        const y = Math.round((sv + Math.sin(t) * r) * H)
+        if (x < 0 || y < 0 || x >= W || y >= H) continue
+        diffs.push(at(a.data, x, y) - at(b.data, x, y))
+      }
+    }
+    diffs.sort((p, q) => p - q)
+    const q = (f) => diffs[Math.min(diffs.length - 1, Math.floor(f * diffs.length))] ?? 0
+    check('godrays: around the sun the shafts are structured — beams and wedges, not a flat lift',
+      diffs.length > 50 && q(0.9) - q(0.1) > 8 && q(0.9) > 6, JSON.stringify({ n: diffs.length, p10: q(0.1), p50: q(0.5), p90: q(0.9) }))
 
     // A level round trip resizes the shadow map; the shafts must come back.
     await page.evaluate(() => window.__ui.getState().setDetailLevel('high'))

@@ -920,6 +920,10 @@ interface BalanceConfig {
     forwardScatter: number
     /** Share of the term kept away from the sun (0 = shafts only toward it). */
     ambientShare: number
+    /** Raymarch samples per pixel (upstream `raymarchSteps`, default 60): the cost knob. */
+    raymarchSteps: number
+    /** Resolution of the pass against the drawing buffer (upstream default 0.5). */
+    resolutionScale: number
   }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
@@ -2034,9 +2038,13 @@ export const balance: BalanceConfig = {
     density: 0.5, // educated guess for dry afternoon air; calibratable, debug-editable
     maxDensity: 0.45, // calibratable
     distanceAttenuation: 2, // upstream default; calibratable
-    intensity: 1.5, // educated guess against the 2.4 settlement sun; calibratable, debug-editable
-    forwardScatter: 6, // lobe halves at ~28° from the sun; calibratable
-    ambientShare: 0.25, // calibratable
+    intensity: 2.2, // educated guess against the 2.4 settlement sun; calibratable, debug-editable
+    // A tight lobe: at 6 / 0.25 the term read as a uniform veil (picture
+    // check 14.11.2026). 24 halves at ~14° and is ~3 % at 30° off the sun.
+    forwardScatter: 24, // calibratable
+    ambientShare: 0, // no veil away from the sun; calibratable
+    raymarchSteps: 40, // upstream 60; calibratable against F8
+    resolutionScale: 0.375, // upstream 0.5; the shafts are soft; calibratable against F8
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

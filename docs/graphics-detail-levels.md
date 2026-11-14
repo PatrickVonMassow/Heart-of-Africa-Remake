@@ -347,8 +347,10 @@ added.
   frame before TRAA and bloom, so the shafts resolve and bloom with the sun. A
   roof edge, palm crown, minaret or pyramid in the light's path cuts dark
   wedges into it. The upstream term has no phase function, so the chain
-  weights it by a forward-scatter lobe around the sun (`forwardScatter`,
-  `ambientShare`). Needs the sun's shadow map (no shafts where shadows are
+  weights it by a tight forward-scatter lobe around the sun (`forwardScatter`,
+  `ambientShare` 0), so the frame away from the sun stays as it was and the
+  shafts form only around occluder silhouettes near the sun. Cost knobs:
+  `raymarchSteps` (40) and `resolutionScale` (0.375). Needs the sun's shadow map (no shafts where shadows are
   off) and only marches inside its box, which therefore reaches well past the
   sunward settlement edge (`src/scenes/place/sunShadowBox.ts`).
   Settlement scenes only: the bird's-eye camera looks ~60° down while the sun

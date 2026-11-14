@@ -49,10 +49,11 @@ describe('sun-shaft forward scatter', () => {
     const { balance } = await import('../config/balance')
     const { forwardScatter: k, ambientShare: a } = balance.godrays
     expect(shaftsPhase(1, k, a)).toBeCloseTo(1)
-    expect(shaftsPhase(Math.cos((20 * Math.PI) / 180), k, a)).toBeGreaterThan(0.6)
-    expect(shaftsPhase(Math.cos((60 * Math.PI) / 180), k, a)).toBeLessThan(0.3)
+    expect(shaftsPhase(Math.cos((10 * Math.PI) / 180), k, a)).toBeGreaterThan(0.6)
+    // No veil: 30° off the sun (a frame edge) keeps almost nothing of the term.
+    expect(shaftsPhase(Math.cos((30 * Math.PI) / 180), k, a)).toBeLessThan(0.05)
     expect(shaftsPhase(-1, k, a)).toBeCloseTo(a)
     expect(a).toBeGreaterThanOrEqual(0)
-    expect(a).toBeLessThan(1)
+    expect(a).toBeLessThan(0.05)
   })
 })

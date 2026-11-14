@@ -283,6 +283,8 @@ export function Effects() {
         shafts.distanceAttenuation.value = b.distanceAttenuation
         shaftsIntensity.value = b.intensity
         shaftsPower.value = b.forwardScatter
+        shafts.raymarchSteps.value = Math.max(8, Math.round(b.raymarchSteps))
+        shafts.resolutionScale = Math.min(1, Math.max(0.125, b.resolutionScale))
         shaftsAmbient.value = b.ambientShare
         const sd = sunDirRef.current
         camera.updateMatrixWorld()
