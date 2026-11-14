@@ -15011,3 +15011,11 @@ to land than a mechanism that needs a review.
   Test: a full WebGPU enrichments run (VERIFY_SUITE_TIMEOUT_MS=5400000) without render-resource-leak asserts, plus a Vitest case for the disposal if the cause lies in browserless pipeline code.
   Source: finding of the 344 session, 14.11.2026 07:35.
   Bundle: Sonne & Himmel.
+
+- [ ] 1521. The San village is built of Zulu-style beehive huts
+  Seen 14.11.2026 on the point-348 fire-rain frame 348-san-flame-on-hearth-rain (WebGPU, feat/348 d1805cbbb): the San village shows large thatched beehive huts with doorways and a Market Hut and Chief's Hut in a ring like the Zulu village, while design.md §2.6/§4.5 give each people its own period organising principle (dispersed camps without lanes) and the San journal entry itself speaks of "shelters of bent grass".
+  Player impact: a people's settlement shows another people's architecture.
+  Final state: the San village is built from the dwellings and arrangement docs/peoples-1890.md records for the San around 1890; if that record is silent, it gains the evidence first.
+  Test: a Vitest sweep that the San layout uses its own dwelling type and plan, plus one first-person frame of the San village.
+  Source: finding of the 348 session, 14.11.2026 18:43.
+  Bundle: Siedlungsgeometrie.
