@@ -478,8 +478,12 @@ export const effectiveGrassFireSmoke = (s: UiState): number => currentQuality(s)
 export const effectiveEyeAdaptation = (s: UiState): boolean => currentQuality(s).eyeAdaptation
 /** Sun glare at this level: it is built on the bloom, so it needs bloom too. */
 export const effectiveSunGlare = (s: UiState): boolean => currentQuality(s).sunGlare && currentQuality(s).bloom
-/** Sky-dome sun-disc gain at this level. */
-export const effectiveSunDiscGain = (s: UiState): number => currentQuality(s).sunDiscGain
+/** The sun disc's gain before point 344; the bird's-eye view keeps it at every level. */
+export const BIRDSEYE_SUN_DISC_GAIN = 3
+/** Sky-dome sun-disc gain at this level; the raised gain feeds the glare and
+ *  so applies in the first-person view only (design.md §2.7). */
+export const effectiveSunDiscGain = (s: UiState, firstPerson: boolean): number =>
+  firstPerson ? currentQuality(s).sunDiscGain : BIRDSEYE_SUN_DISC_GAIN
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

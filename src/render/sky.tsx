@@ -24,7 +24,8 @@ import {
 import { HARMATTAN_PALE, RAIN_GRAY } from '../systems/season'
 import { HARMATTAN_DUST_U, OVERCAST_CLOUDS_U, OVERCAST_GRAY_U } from './skyOvercast'
 import type { SkyPreset } from './skyPresets'
-import { useUi, effectiveSunDiscGain } from '../state/ui'
+import { useUi, effectiveSunDiscGain, BIRDSEYE_SUN_DISC_GAIN } from '../state/ui'
+import { useGame } from '../state/store'
 
 /**
  * Sky dome centered on the camera. `sunDirection` must match the scene's
@@ -46,8 +47,9 @@ export function SkyDome({
   // Disc gain per quality level (design.md §2.7): the glare level lifts the
   // disc well above the bloom threshold so it blooms on its own. A uniform, so
   // an F9 change never rebuilds the dome.
-  const discGain = useUi(effectiveSunDiscGain)
-  const discGainU = useMemo(() => uniform(3), [])
+  const firstPerson = useGame((s) => s.mode) === 'place'
+  const discGain = useUi((s) => effectiveSunDiscGain(s, firstPerson))
+  const discGainU = useMemo(() => uniform(BIRDSEYE_SUN_DISC_GAIN), [])
   useLayoutEffect(() => {
     discGainU.value = discGain
   }, [discGainU, discGain])

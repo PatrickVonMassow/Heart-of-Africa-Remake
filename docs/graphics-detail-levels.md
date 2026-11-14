@@ -342,8 +342,8 @@ added.
   the real number comes from F8.
 - **`sunDiscGain`** — Gain of the sky dome's sun disc. 3 (the disc before point
   344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
-  blooms on its own and feeds the glare. The same dome serves the bird's-eye
-  view, where the camera rarely sees the sun. Climbs 3 → 3 → 14.
+  blooms on its own and feeds the glare. Settlement scenes only: the same dome
+  serves the bird's-eye view, which keeps 3 at every level. Climbs 3 → 3 → 14.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 
