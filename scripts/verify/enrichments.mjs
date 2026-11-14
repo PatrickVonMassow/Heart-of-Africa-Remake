@@ -12489,6 +12489,154 @@ if (section('eye-adaptation-glare')) {
   check('eye adaptation and glare: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 }
 
+// Sun shafts (design.md §2.7, point 345; highest level, settlements only).
+// Measured in RENDERED PIXELS (§7.2): the mean brightness in a box around the
+// sun's screen position, the sun standing behind a roof edge, with the pass on
+// against the same frame with the pass toggled off and with the level stepped
+// down. The exposure is pinned for every capture so eye adaptation (also a
+// high-only effect) cannot pass for or hide the shafts.
+if (section('godrays')) {
+  const DEC_21 = 354 // Cairo in December: the 16:00 sun stands ~11° high, inside the frame
+  const frames = (n) => page.evaluate((k) => new Promise((done) => {
+    let left = k
+    const tick = () => (--left <= 0 ? done() : requestAnimationFrame(tick))
+    requestAnimationFrame(tick)
+  }), n)
+  const meanOf = async (png, box) => {
+    const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    const x0 = Math.max(0, Math.floor(box[0] * info.width))
+    const y0 = Math.max(0, Math.floor(box[1] * info.height))
+    const x1 = Math.min(info.width, Math.ceil(box[2] * info.width))
+    const y1 = Math.min(info.height, Math.ceil(box[3] * info.height))
+    let sum = 0
+    let n = 0
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = (y * info.width + x) * 3
+      sum += data[i] + data[i + 1] + data[i + 2]
+      n += 3
+    }
+    return n ? sum / n : 0
+  }
+  const pose = (x, z, yaw, pitch = 0) => page.evaluate(([px, pz, py, pp]) => {
+    const p = window.__placePlayer
+    p.x = px
+    p.z = pz
+    p.yaw = py
+    p.pitch = pp
+  }, [x, z, yaw, pitch])
+  const glareAt = () => page.evaluate(() => window.__sunGlare ?? null)
+  const waitShafts = (on) => page.waitForFunction((v) => window.__postFeatures?.godrays === v, on, { timeout: 60000 })
+
+  await page.evaluate((d) => {
+    const ui = window.__ui.getState()
+    ui.setDetailLevel('high')
+    ui.setGodraysEnabled(true)
+    window.__game.setState({ day: d })
+    window.__game.getState().enterPlace('cairo')
+  }, DEC_21)
+  await page.waitForFunction(
+    () => window.__game.getState().mode === 'place' && !!window.__placeLayout && !!window.__placePlayer &&
+      window.__postFeatures?.godrays === true && !!window.__sunGlare,
+    null,
+    { timeout: 60000 },
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForFunction(() => !window.__game.getState().journalOpen)
+  // Pin the exposure at its base for the whole section (restored at the end).
+  const exposure = await page.evaluate(() => {
+    const e = window.__balance.exposure
+    const keep = { ...e }
+    e.min = e.base
+    e.max = e.base
+    return keep
+  })
+
+  // The yaw that centres the sun, read back from the CPU-projected sun the
+  // glare uses (no yaw convention assumed), from an open stand on its side.
+  const stand = await page.evaluate(() => {
+    const d = window.__sceneSun.disc
+    const angle = Math.atan2(d[2], d[0])
+    const r = (window.__placeBoundaryRadius(angle) ?? 20) * 0.85
+    return { x: Math.cos(angle) * r, z: Math.sin(angle) * r }
+  })
+  let towardSun = null
+  for (let i = 0; i < 32; i++) {
+    const yaw = (i / 32) * Math.PI * 2
+    await pose(stand.x, stand.z, yaw)
+    await frames(2)
+    const g = await glareAt()
+    if (g && g.fade > 0 && (towardSun === null || Math.abs(g.u - 0.5) < towardSun.off)) towardSun = { yaw, off: Math.abs(g.u - 0.5) }
+  }
+  check('godrays: a yaw puts the December sun inside the settlement frame', towardSun !== null && towardSun.off < 0.1,
+    JSON.stringify(towardSun))
+  const sunYaw = towardSun?.yaw ?? 0
+
+  // The sun behind a roof edge: in front of the tallest dwelling on its far
+  // side from the sun, far enough back that the roof line sits near the sun.
+  const behind = await page.evaluate(() => {
+    const d = window.__sceneSun.disc
+    const h = Math.hypot(d[0], d[2])
+    const sx = d[0] / h
+    const sz = d[2] / h
+    const w = window.__placeLayout.dwellings.filter((x) => x.h >= 2.6).sort((a, b) => b.h - a.h)[0]
+    if (!w) return null
+    const back = w.r + 2.5
+    return { x: w.x - sx * back, z: w.z - sz * back, kind: w.kind, h: w.h, r: w.r }
+  })
+  check('godrays: the settlement has a dwelling tall enough to stand the sun behind its roof', behind !== null, JSON.stringify(behind))
+
+  if (behind) {
+    await pose(behind.x, behind.z, sunYaw, 0.15)
+    await frames(60) // TRAA settles the raymarch noise
+    const g = await glareAt()
+    const box = g ? [g.u - 0.2, g.v - 0.25, g.u + 0.2, g.v + 0.2] : [0.3, 0.2, 0.7, 0.65]
+    const on = await capturePixels(page, 'godrays: pass on, sun behind a roof edge')
+    await shot('345-godrays-on', { place: 'cairo', label: 'the low December sun behind a roof edge, sun shafts on' })
+
+    await page.evaluate(() => window.__ui.getState().setGodraysEnabled(false))
+    await waitShafts(false)
+    await frames(60)
+    const off = await capturePixels(page, 'godrays: pass toggled off, same frame')
+    await shot('345-godrays-off', { place: 'cairo', label: 'the same frame with the sun shafts toggled off' })
+    await page.evaluate(() => window.__ui.getState().setGodraysEnabled(true))
+    await waitShafts(true)
+
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    await waitShafts(false)
+    await pose(behind.x, behind.z, sunYaw, 0.15)
+    await frames(60)
+    const stepped = await capturePixels(page, 'godrays: same frame, level stepped down')
+    await shot('345-godrays-medium', { place: 'cairo', label: 'the same frame one graphics level lower, no sun shafts' })
+
+    const onMean = await meanOf(on, box)
+    const offMean = await meanOf(off, box)
+    const steppedMean = await meanOf(stepped, box)
+    // Thresholds on the 0..255 scale; first estimates, calibratable with the
+    // owner's first local run.
+    check('godrays: pixels along the sun direction brighter with the pass on than toggled off',
+      onMean - offMean > 2, JSON.stringify({ box, onMean, offMean }))
+    check('godrays: pixels along the sun direction brighter at high than with the level stepped down',
+      onMean - steppedMean > 1, JSON.stringify({ box, onMean, steppedMean }))
+
+    // A level round trip resizes the shadow map; the shafts must come back.
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('high'))
+    const back = await waitShafts(true).then(() => true, () => false)
+    check('godrays: back at high after a level round trip the pass is rebuilt', back, '')
+  }
+
+  // The bird's-eye chain never carries the pass, whatever the level.
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => window.__game.getState().mode === 'travel' && window.__postFeatures !== undefined)
+  await frames(30)
+  const travel = await page.evaluate(() => window.__postFeatures)
+  check("godrays: the bird's-eye chain at high contains no sun shafts", travel?.godrays === false, JSON.stringify(travel))
+  await page.evaluate((e) => {
+    Object.assign(window.__balance.exposure, e)
+    window.__ui.getState().setDetailLevel('medium')
+  }, exposure)
+  check('godrays: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()

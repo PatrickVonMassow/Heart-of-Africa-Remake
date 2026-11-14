@@ -1,3 +1,4 @@
+// Live check: enrichments --section=godrays (pixels around the sun, pass on vs off vs level stepped down).
 import { afterEach, describe, expect, it } from 'vitest'
 import { DepthTexture, DirectionalLight, RenderTarget } from 'three/webgpu'
 import { godraysShadowTexture, publishGodraysLight, readyGodraysLight } from './godraysLight'
