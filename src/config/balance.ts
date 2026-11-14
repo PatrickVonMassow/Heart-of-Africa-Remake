@@ -937,6 +937,11 @@ interface BalanceConfig {
     shelteredRainDamp: number
     /** How much full rain damps an UNSHELTERED open flame (0..1, large: rain drowns it toward embers). */
     openRainDamp: number
+    /** Rain amount (0..1, `rainAmount`) at and above which an indoor-hearth
+     *  people's yard fire is out and its fire life is indoors (point 348). */
+    indoorRainThreshold: number
+    /** Clearance (m) the hearth collider adds around the drawn stone ring (point 348). */
+    hearthClearance: number
   }
   /** The burning of the steppe (design.md §19.8/§19.13): the grass fire's
    *  front, its smoke and the burn scar it leaves (src/scenes/travel/grassFireFront.ts). */
@@ -2049,6 +2054,15 @@ export const balance: BalanceConfig = {
     // only dips a touch (steamier), the unsheltered flame is drowned toward embers.
     shelteredRainDamp: 0.25, // calibratable, debug-editable
     openRainDamp: 0.7, // calibratable, debug-editable
+    // Point 348: where the people keep the hearth indoors (docs/peoples-1890.md
+    // §9.2/§9.6), rain past this amount puts the yard fire out; the faintest
+    // drizzle does not. Set below the Zulu village's own wet-season peak (~0.30)
+    // and the Maasai's (~0.18), so the screenshot case answers without a forced
+    // season. Educated guess, calibratable, debug-editable.
+    indoorRainThreshold: 0.15,
+    // 1.11 m drawn hearth + 0.19 m = the 1.3 m keep-out the fire always had, so
+    // no layout moves; calibratable, debug-editable (applies on the next visit).
+    hearthClearance: 0.19,
   },
   grassFire: {
     // Educated guesses (§14), all calibratable. The speed and burn-out extent

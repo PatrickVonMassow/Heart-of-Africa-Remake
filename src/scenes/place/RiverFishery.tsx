@@ -40,6 +40,7 @@ import { crownIn, HEAD_CARRY_POSE, SpeechFloorContext, useInhabitantBodies, useS
 import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryMovers } from './fisheryColliders'
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
+import { FISHERY_FLAME_HEIGHT, fisheryFlameScale, flameGeometryLift, HEARTH_TOP } from './hearth'
 import { rainAmount } from '../../systems/season'
 import { CARRIER_BASKET_Y, carrierPose, carrierWalkPose, copyPose, GUT_FISH_SCALE, holdGutFish, netFishRotation, netManAshore, netManBasketAt, ownPose, placeNetMan, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
@@ -350,6 +351,11 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
   // beaten down by the rain where it does not (design.md §19.10).
   const sheltered = fireHasCookShelter(fireEnv?.peopleId)
   const fireRain = useRef({ sheltered, rainFactor: 1 })
+  const flameGeo = useMemo(
+    () => new THREE.ConeGeometry(0.28, FISHERY_FLAME_HEIGHT, 8).translate(0, flameGeometryLift(FISHERY_FLAME_HEIGHT), 0),
+    [],
+  )
+  useEffect(() => () => flameGeo.dispose(), [flameGeo])
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
   // The griller kneels at his fire: a body the passers-by go round.
   useStandingBody(sites.griller.x, sites.griller.z)
@@ -608,7 +614,7 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     fireRain.current = fireShelterResponse(fireEnv?.peopleId, rain)
     const rainFactor = fireRain.current.rainFactor
     // Rain lowers the flame cone and its light as at the village fire pit.
-    if (flame.current) flame.current.scale.set(1, (0.8 + 0.25 * Math.sin(t * 9) + 0.1 * Math.sin(t * 23.7)) * (0.7 + 0.3 * rainFactor), 1)
+    if (flame.current) flame.current.scale.set(1, fisheryFlameScale(t, rainFactor), 1)
     if (fireLight.current) fireLight.current.intensity = FISH_FIRE_LIGHT * rainFactor
 
     // THE POUNDING PAIR, held at their mortar by the dev life freeze like
@@ -899,8 +905,8 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
             <meshStandardMaterial color="#4a3018" roughness={1} />
           </mesh>
         ))}
-        <mesh ref={flame} position={[0, 0.42, 0]}>
-          <coneGeometry args={[0.28, 0.7, 8]} />
+        {/* On the pit, scaled about its base (point 348 (a)). */}
+        <mesh ref={flame} position={[0, HEARTH_TOP, 0]} geometry={flameGeo}>
           <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
         </mesh>
         {[-FISHERY_PROPS.grillPostOffset, FISHERY_PROPS.grillPostOffset].map((x, i) => (

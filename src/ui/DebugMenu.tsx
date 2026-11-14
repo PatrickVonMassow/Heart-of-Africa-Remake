@@ -778,6 +778,15 @@ export function DebugMenu() {
         (v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }, 0.1),
       num(t.debug.wetGroundStrength, balance.season.wetGroundStrength,
         (v) => { balance.season.wetGroundStrength = Math.max(0, Math.min(1, v)); bump() }, 0.1),
+      // The village fire in the rain (design.md §19.10, points 256/348).
+      num(t.debug.fireShelteredRainDamp, balance.fire.shelteredRainDamp,
+        (v) => { balance.fire.shelteredRainDamp = Math.max(0, Math.min(1, v)); bump() }, 0.05),
+      num(t.debug.fireOpenRainDamp, balance.fire.openRainDamp,
+        (v) => { balance.fire.openRainDamp = Math.max(0, Math.min(1, v)); bump() }, 0.05),
+      num(t.debug.fireIndoorRainThreshold, balance.fire.indoorRainThreshold,
+        (v) => { balance.fire.indoorRainThreshold = Math.max(0.01, Math.min(1, v)); bump() }, 0.05),
+      num(t.debug.fireHearthClearance, balance.fire.hearthClearance,
+        (v) => { balance.fire.hearthClearance = Math.max(0, Math.min(2, v)); bump() }, 0.05),
       // The fixed solar hour and the shadow-light floor (design.md §2.7), with
       // the derived sun shown so a tester can walk the range without a date.
       num(t.debug.sunHour, balance.sun.hour,

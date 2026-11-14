@@ -37,9 +37,10 @@ import {
 import { balance, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
-import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
+import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor, yardFireOut } from '../../systems/cookShelter'
 import { withFisheryMovers } from './fisheryColliders'
 import { CookShelter } from './CookShelter'
+import { flameGeometryLift, HEARTH_STONE_RADIUS, HEARTH_STONE_RING, HEARTH_TOP, VILLAGE_FLAME_HEIGHT, villageFlameScale } from './hearth'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
 import { placeById, type RegionId } from '../../world/geo'
@@ -1182,6 +1183,7 @@ function FirePit({
   rainRef,
   thatchMat,
   sheltered = false,
+  out = false,
 }: {
   x: number
   z: number
@@ -1189,9 +1191,17 @@ function FirePit({
   rainRef: MutableRefObject<number>
   thatchMat: THREE.Material
   sheltered?: boolean
+  /** The yard fire is out: an indoor-hearth people under rain (point 348). */
+  out?: boolean
 }) {
   const light = useRef<THREE.PointLight>(null)
   const flame = useRef<THREE.Mesh>(null)
+  // The cone lifted so its base is local 0: it scales about the base (point 348).
+  const flameGeo = useMemo(
+    () => new THREE.ConeGeometry(0.3, VILLAGE_FLAME_HEIGHT, 8).translate(0, flameGeometryLift(VILLAGE_FLAME_HEIGHT), 0),
+    [],
+  )
+  useEffect(() => () => flameGeo.dispose(), [flameGeo])
   // Campfire shadows (design.md §19.10, point 289): level-driven — off on low,
   // the 256² variant on medium, the softer 512² variant on high — and also
   // behind the global shadow switch (the fire is one more cast-shadow source).
@@ -1207,7 +1217,7 @@ function FirePit({
   // and how hard, after the rain.
   usePlaceDumpProvider('village-fire', () => ({
     kind: 'fire',
-    state: { blaze, sheltered, rainFactor: shelteredFireRainFactor(rainAmount(rainRef.current, balance.season.weatherStrength), sheltered), light: light.current?.intensity ?? null },
+    state: { blaze, sheltered, out, rainFactor: shelteredFireRainFactor(rainAmount(rainRef.current, balance.season.weatherStrength), sheltered), light: light.current?.intensity ?? null },
     figures: [],
     objects: [{ id: 'village-fire/pit', kind: 'fire-pit', holder: 'ground', pos: { x, y: 0, z } }],
   }))
@@ -1226,8 +1236,7 @@ function FirePit({
     }
     if (flame.current) {
       // Rain lowers the flame cone too, so a rainy fire visibly steams down.
-      const s = 0.7 + 0.3 * rainFactor
-      flame.current.scale.set(1, s, 1)
+      flame.current.scale.set(1, villageFlameScale(rainFactor), 1)
     }
   })
   return (
@@ -1239,8 +1248,8 @@ function FirePit({
       {Array.from({ length: 7 }, (_, i) => {
         const a = (i / 7) * Math.PI * 2
         return (
-          <mesh key={i} position={[Math.cos(a) * 0.95, 0.12, Math.sin(a) * 0.95]} castShadow>
-            <dodecahedronGeometry args={[0.16, 0]} />
+          <mesh key={i} position={[Math.cos(a) * HEARTH_STONE_RING, 0.12, Math.sin(a) * HEARTH_STONE_RING]} castShadow>
+            <dodecahedronGeometry args={[HEARTH_STONE_RADIUS, 0]} />
             <meshStandardMaterial color="#79706a" roughness={1} />
           </mesh>
         )
@@ -1251,11 +1260,16 @@ function FirePit({
           <meshStandardMaterial color="#4a3018" roughness={1} />
         </mesh>
       ))}
-      <mesh ref={flame} position={[0, 0.42, 0]}>
-        <coneGeometry args={[0.3, 0.75, 8]} />
-        <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
-      </mesh>
-      <pointLight
+      {/* The flame stands ON the pit and scales about its base (point 348 (a)):
+          the cone is lifted so its base is local 0, the mesh sits at HEARTH_TOP.
+          Out in the rain (point 348) the flame and its light are gone: the
+          household cooks at the hearth inside the hut; stones and logs stay. */}
+      {!out && (
+        <mesh ref={flame} name="village-flame" position={[0, HEARTH_TOP, 0]} geometry={flameGeo}>
+          <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
+        </mesh>
+      )}
+      {!out && <pointLight
         // Remounted on toggle like the sun light (point 111): flipping
         // castShadow on a mounted light leaves the WebGPU shadow pipeline in a
         // broken state, so the key swap rebuilds the light from scratch. The
@@ -1272,7 +1286,7 @@ function FirePit({
         shadow-radius={fireShadowSoft ? 4 : 1}
         shadow-camera-near={0.2}
         shadow-bias={FIRE_SHADOW_BIAS}
-      />
+      />}
       {sheltered && <CookShelter thatchMat={thatchMat} />}
     </group>
   )
@@ -2716,6 +2730,11 @@ export function PlaceScene() {
   const placeWetness = useRef(0)
   /** Accumulated ground soak (point 225): rises while it rains, decays when dry. */
   const placeGroundWet = useRef(0)
+  // The yard fire put out by rain where the people keep the hearth indoors
+  // (design.md §19.10, point 348): React state, flipped only when the decision
+  // changes, so the fire's vignette can move indoors and come back.
+  const [yardFireIsOut, setYardFireIsOut] = useState(false)
+  const yardFireOutRef = useRef(false)
   /** Lightning flash (0..1) and its strike scheduler at the settlement (point 166).
    *  The dimmed light BASE is tracked separately from the flash so the additive
    *  burst is not amplified by the slow season lerp. */
@@ -2846,6 +2865,9 @@ export function PlaceScene() {
       // fire under a cook-shelter canopy, and the resulting rain-damping factor.
       fireSheltered: fireShelterResponse(place?.peopleId, 0).sheltered,
       fireRainFactor: fireShelterResponse(place?.peopleId, rainAmount(placeWetness.current, balance.season.weatherStrength)).rainFactor,
+      // Point 348: the indoor-hearth people's yard fire is out under rain.
+      fireOut: yardFireOutRef.current,
+      fire: VILLAGE_FIRE,
     })
     return () => {
       delete w.__placeSeason
@@ -3113,6 +3135,11 @@ export function PlaceScene() {
       // and glosses as it rains — more the harder AND the longer — through the
       // shared GROUND_WET_U uniform, exactly like the travel terrain.
       const placeRain = rainAmount(wet, balance.season.weatherStrength)
+      const fireOut = place.kind === 'village' && yardFireOut(place.peopleId, placeRain)
+      if (fireOut !== yardFireOutRef.current) {
+        yardFireOutRef.current = fireOut
+        setYardFireIsOut(fireOut)
+      }
       placeGroundWet.current = advanceGroundWetness(placeGroundWet.current, placeRain, dt)
       setGroundWetness(groundWetnessFactor(placeRain, placeGroundWet.current, balance.season.wetGroundStrength))
       const dim = sunDimFactor(wet, balance.season.weatherStrength)
@@ -3469,6 +3496,7 @@ export function PlaceScene() {
           rainRef={placeWetness}
           thatchMat={mats.thatch}
           sheltered={fireHasCookShelter(place.peopleId)}
+          out={yardFireIsOut}
         />
       )}
       {/* The player's own occluder body, only while campfire shadows are on
@@ -3517,6 +3545,7 @@ export function PlaceScene() {
           observed={layout.observed}
           onDigProgress={onDigProgress}
           fisheryFire={{ thatchMat: mats.thatch, rainRef: placeWetness, peopleId: place.peopleId }}
+          fireOut={yardFireIsOut}
         />
       )}
 

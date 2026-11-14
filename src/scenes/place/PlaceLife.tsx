@@ -4342,6 +4342,7 @@ export function PlaceLife({
   observed,
   onDigProgress,
   fisheryFire,
+  fireOut = false,
 }: {
   kind: 'port' | 'village'
   /** Settlement size (design.md §4.1): big cities show more bustle. */
@@ -4398,6 +4399,9 @@ export function PlaceLife({
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
   /** The fishers' fire's thatch, rain and people (point 1275). */
   fisheryFire?: FisheryFireEnv
+  /** The yard fire is out under rain (point 348): its cook, tender and the
+   *  bundle-carrier are inside, at the hearth in the hut, until it is relit. */
+  fireOut?: boolean
 }) {
   const speechTime = useRef(0)
   useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
@@ -4636,9 +4640,11 @@ export function PlaceLife({
       <FigureLookContext.Provider value={figureLook}>
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
-          <PlaceDumpGroup id="cook" kind="cook">
-            <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
-          </PlaceDumpGroup>
+          {!fireOut && (
+            <PlaceDumpGroup id="cook" kind="cook">
+              <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+            </PlaceDumpGroup>
+          )}
           <DressLineup cloth={style.cloth} />
           {loom && (
             <PlaceDumpGroup id="loom" kind="loom">
@@ -4693,9 +4699,11 @@ export function PlaceLife({
           </PlaceDumpGroup>
           <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           {/* Inhabitant/prop interactions (design.md §19). */}
-          <PlaceDumpGroup id="fire-tender" kind="fire-tender">
-            <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
-          </PlaceDumpGroup>
+          {!fireOut && (
+            <PlaceDumpGroup id="fire-tender" kind="fire-tender">
+              <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
+            </PlaceDumpGroup>
+          )}
           <PlaceDumpGroup id="talkers" kind="talkers">
             <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
           </PlaceDumpGroup>
@@ -4705,7 +4713,7 @@ export function PlaceLife({
             <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
           </PlaceDumpGroup>
           {hasWell && <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />}
-          {homes.length > 0 && (
+          {homes.length > 0 && !fireOut && (
             <PlaceDumpGroup id="task-walker-bundle" kind="task-walker-bundle">
               <TaskWalker
                 home={homes[0]}
