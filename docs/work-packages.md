@@ -140,6 +140,8 @@ change) and 449 last, because the drill is what makes the others more than a cla
   `scripts/land-point.mjs` only, so no feature bundle shares its files.
 - **#1518** — the user's board slot line order of 13.11.2026 (real reason, own line); it edits
   `scripts/board-slots-core.mjs`, `scripts/board-slots.mjs` and the board CSS, so no feature bundle shares its files.
+- **#1519** — the user's slot line follow-up of 14.11.2026 (named cause for unstarted ready points);
+  it edits `scripts/board-slots-core.mjs` only, so no feature bundle shares its files.
 - **#1508** — the owed covering enrichments run for the already landed points 391 and 327; a
   verification run on main, not a feature branch, so it shares no bundle's files.
 - **#1465** — the uncharged WebGPU reds of polish-speech that the v0.3.1 closing never reached;

@@ -15124,3 +15124,12 @@ to land than a mechanism that needs a review.
   Test: `npm test -- enrichments --section=water-edge-flee` green on WebGPU and WebGL 2 across a throttle probe, plus a Vitest case if the cause lies in the pure flee helpers; the charge in scripts/render-verify-charges.mjs dies with this point.
   Source: finding of the 343 session, 13.11.2026 20:47.
   Bundle: Tierverhalten.
+
+- [ ] 1519. The board's slot line names why independently ready points are not started
+  User message on the board chat, 14.11.2026 07:32 UTC: "1518 ist erledigt und trotzdem steht auf dem Dashboard \"2/3 Slots frei: Grund nicht messbar (unabhängig bereit: 348, 353, 354, 356, 357)\"."
+  Measured 14.11.2026 08:33: after 1518 landed the board still says "2/3 Slots frei: Grund nicht messbar (unabhängig bereit: 348, 353, 354, 356, 357)". freeSlotReason in scripts/board-slots-core.mjs (~line 115) returns unmeasurable whenever free slots meet independent candidates, so 1518 never covered the most common state: room and ready points, but nothing started.
+  Player impact: none in game; the board gives a non-answer to the main throughput question.
+  Final state: in that state the line names the measured cause the batch is not filling the slot (e.g. batch lock held by a message responder/chat claim, no live batch session, context fence armed, serving-model or lane pause, CI wait, verify run holding the quiet machine, launcher not due), each read from its existing record (no new ledger fields, infrastructure freeze); only when none is measurable does "Grund nicht messbar" remain, and the finding then names the sources read.
+  Test: Vitest cases in scripts/board-slots-core.test.mjs for each cause plus the residual case; a board-publish dry run on main shows a named reason for the current state.
+  Source: user request f7555192, 14.11.2026.
+  Bundle: unbundled.
