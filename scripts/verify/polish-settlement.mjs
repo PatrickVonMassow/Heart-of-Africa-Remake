@@ -472,7 +472,7 @@ if (section('fire-rain')) {
         if (d < min) min = d
         if (d < 3.5) near++
       }
-      await new Promise((r) => setTimeout(r, 100))
+      await new Promise((r) => requestAnimationFrame(r))
     }
     return { min, near }
   }, hearth)
