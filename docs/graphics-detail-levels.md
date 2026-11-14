@@ -340,6 +340,16 @@ added.
   front of the sun kills the glare in the same frame. Needs bloom; settlement
   scenes only. High only. Estimated cost of both effects together ~0.3-0.8 ms;
   the real number comes from F8.
+- **Sun shafts — tried and removed** (design.md §2.7, point 345, 14.11.2026).
+  No `godrays` key: five picture-checked rounds drew no shaft worth its cost.
+  The upstream `GodraysNode` (three rounds) raymarched the sun's shadow map,
+  which resolves a palm frond at one or two texels, and drew a uniform veil or
+  seams along silhouettes. A screen-space radial blur of the open sky around
+  the sun averaged that sky into a milky veil over the whole frame; with the
+  unobstructed blur subtracted the veil was gone, but so was the effect — the
+  sun box changed by 0.02 levels while buildings in the lower half of the lobe
+  darkened the ground by 7.5 (WebGPU, Cairo, sun behind a palm crown). The
+  glare's occlusion cut and the eye adaptation carry the dazzle without it.
 - **`sunDiscGain`** — Gain of the sky dome's sun disc. 3 (the disc before point
   344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
   blooms on its own and feeds the glare. Settlement scenes only: the same dome
