@@ -188,6 +188,7 @@ function apply(): void {
       loaded,
       wanted,
       enabled: v.enabled,
+      shadowStrength: shadowStrengthU.value,
       clamped: v.clamped,
       shadedAzimuth: v.shadedAzimuth,
     }

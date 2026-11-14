@@ -12394,19 +12394,43 @@ if (section('horizon-maps')) {
   }
   await shot(backend('346-horizon-medium'), { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, horizon maps on (medium)' })
   const med = await read('medium')
+  // The ISOLATED comparison (cross-review): same level, same pipeline — only the
+  // horizon terms are zeroed through the debug balance, so ordinary shadows,
+  // bloom, refinement and resolution are identical in both frames.
+  const saved = await page.evaluate(() => {
+    const h = window.__balance.horizonMaps
+    const was = { shadowStrength: h.shadowStrength, skyOcclusionStrength: h.skyOcclusionStrength }
+    h.shadowStrength = 0
+    h.skyOcclusionStrength = 0
+    window.__game.getState().bumpBalance()
+    return was
+  })
+  await page.waitForFunction(() => window.__horizonMaps?.shadowStrength === 0 && window.__horizonMaps?.enabled === 1, null, { timeout: 30000 })
+  await shot(backend('346-horizon-medium-off'), { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, medium with the horizon terms zeroed' })
+  const off = await read('medium, horizon terms zeroed')
+  await page.evaluate((was) => {
+    Object.assign(window.__balance.horizonMaps, was)
+    window.__game.getState().bumpBalance()
+  }, saved)
   await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
   await page.waitForFunction(() => window.__horizonMaps?.enabled === 0, null, { timeout: 30000 })
   await shot(backend('346-horizon-low'), { world: PEAK, label: 'Kilimanjaro on 21 June at 16:00, low level: no horizon maps' })
   const low = await read('low')
+  const frames = { med, off, low }
   check(
     'horizon maps: both sides of the massif are in frame in the shared elevation band',
-    med.nSun >= 6 && med.nLee >= 6 && low.nSun >= 6 && low.nLee >= 6,
-    JSON.stringify({ bake: bakeCounts, sun: sunNow, band: pts.band, inBand: pts.pts.length, med, low }),
+    Object.values(frames).every((f) => f.nSun >= 6 && f.nLee >= 6),
+    JSON.stringify({ bake: bakeCounts, sun: sunNow, band: pts.band, inBand: pts.pts.length, ...frames }),
   )
   check(
-    'horizon maps: the lee reads darker than the sun side at medium, and that contrast is flat at low',
-    med.ratio < low.ratio * 0.9,
-    JSON.stringify({ med, low, contrastDrop: +(1 - med.ratio / low.ratio).toFixed(3) }),
+    'horizon maps: the lee reads darker than the sun side with the maps on than with their terms zeroed at the same level',
+    med.ratio < off.ratio * 0.9,
+    JSON.stringify({ med, off, contrastDrop: +(1 - med.ratio / off.ratio).toFixed(3) }),
+  )
+  check(
+    'horizon maps: at low the lee shows no horizon darkening against the sun side',
+    low.ratio >= off.ratio * 0.95,
+    JSON.stringify({ low, off, lowVsOff: +(low.ratio / off.ratio).toFixed(3) }),
   )
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   check('horizon maps: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
