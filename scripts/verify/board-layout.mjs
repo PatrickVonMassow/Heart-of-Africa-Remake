@@ -19,9 +19,10 @@
 // each of them is proved against a restored control below.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { chromium } from 'playwright'
+import { chromium, firefox } from 'playwright'
 import { commonRepoPath, REPO_ROOT } from '../repo-paths.mjs'
 import { RESTORE_CLOSED_AFTER, RESTORE_CLOSED_BEFORE, renderCardCriticalities, rotateBoardArchives } from '../board-core.mjs'
+import { applySlotLine } from '../board-slots-core.mjs'
 import { applyLivenessBlock, livenessVerdict, progressLine, renderLivenessBlock } from '../board-liveness-core.mjs'
 
 // The portrait widths the complaint names, plus the narrowest phone the board
@@ -814,6 +815,60 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   }
 } finally {
   await browser.close()
+}
+
+// POINT 1518: the slot line sits on its own line BELOW the heading "Woran ich
+// gerade arbeite" in Chromium AND Firefox, on the published viewer path: the
+// Pages viewer document.writes board.html without a doctype, i.e. quirks mode.
+// A control that puts the line beside the heading must fail the same measure.
+{
+  const SLOT_TEXT = '2/3 Slots frei: Batch-Session wartet seit 11:49 (bis 15:49) · blockiert durch: 1463 (ruht seit 10 Tagen)'
+  const BESIDE_CONTROL = '<style>details.sect>summary>h2{display:inline-flex!important;font-size:12px!important}details.sect>summary>.slots{display:inline!important}</style>'
+  // Without the published board (a clean checkout) a minimal board goes through
+  // the same renderer, so the shipped .slots rule is still what is measured.
+  // The fixture's cards make the renderer inject its style, the .slots rule included.
+  const SLOT_FIXTURE = FIXTURE.replace('<main>', '<main><details class="sect" open>\n<summary><h2>Woran ich gerade arbeite</h2></summary>\n</details>')
+  const live = existsSync(livePath)
+  const slotted = applySlotLine(renderCardCriticalities(live ? readFileSync(livePath, 'utf8') : SLOT_FIXTURE, tasks), SLOT_TEXT)
+  if (!slotted.includes('class="slots"') || !slotted.includes('summary>.slots{display:block')) {
+    check(`slot line: the ${live ? 'published board' : 'fixture'} carries the heading and the shipped slot rule`, false, 'not found')
+  } else {
+    const quirks = slotted.replace(/^\s*<!doctype[^>]*>/i, '')
+    // The control's line is short, so an inline line fits beside the heading at every width.
+    const quirksShort = applySlotLine(slotted, '2/3 Slots frei').replace(/^\s*<!doctype[^>]*>/i, '')
+    const measureSlot = async (page, html) => {
+      await page.setContent(html, { waitUntil: 'domcontentloaded' })
+      return page.evaluate(() => {
+        const span = document.querySelector('details.sect>summary>.slots')
+        const h2 = span?.parentElement?.querySelector('h2')
+        if (!span || !h2) return null
+        return { mode: document.compatMode, h2Bottom: h2.getBoundingClientRect().bottom, slotTop: span.getBoundingClientRect().top }
+      })
+    }
+    for (const [engine, type] of [['Chromium', chromium], ['Firefox', firefox]]) {
+      const b = await type.launch()
+      try {
+        for (const width of [360, 1280]) {
+          const page = await b.newPage({ viewport: { width, height: 900 } })
+          const m = await measureSlot(page, quirks)
+          check(
+            `slot line (${engine}, ${width}px, ${live ? 'published board' : 'fixture'}, viewer quirks mode): on its own line below the heading`,
+            m !== null && m.mode === 'BackCompat' && m.slotTop >= m.h2Bottom - EPSILON,
+            m ? `${m.mode}, slot top ${m.slotTop.toFixed(1)} / h2 bottom ${m.h2Bottom.toFixed(1)}` : 'not measured',
+          )
+          const c = await measureSlot(page, `${quirksShort}${BESIDE_CONTROL}`)
+          check(
+            `slot line (${engine}, ${width}px): the measure rejects a line beside the heading (control)`,
+            c !== null && c.slotTop < c.h2Bottom - EPSILON,
+            c ? `slot top ${c.slotTop.toFixed(1)} / h2 bottom ${c.h2Bottom.toFixed(1)}` : 'not measured',
+          )
+          await page.close()
+        }
+      } finally {
+        await b.close()
+      }
+    }
+  }
 }
 
 console.log('console errors: 0')

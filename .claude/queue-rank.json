@@ -1867,6 +1867,12 @@
       "why": "a HUD legibility defect without a blockade; it waits behind the ordered queue",
       "origin": "machine",
       "place": "last"
+    },
+    "1517": {
+      "at": "2026-11-13T21:12:59.298Z",
+      "why": "intermittent test-only red, charged; no player report, so it waits behind the ranked animal-behaviour work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1895,7 +1901,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-13T16:31:39.717Z",
+    "at": "2026-11-14T00:26:33.351Z",
     "points": [
       184,
       200,
@@ -1906,7 +1912,6 @@
       303,
       309,
       322,
-      328,
       330,
       333,
       336,
@@ -2352,7 +2357,8 @@
       1502,
       1503,
       1515,
-      1516
+      1516,
+      1517
     ]
   }
 }

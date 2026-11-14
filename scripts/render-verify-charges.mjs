@@ -2073,6 +2073,15 @@ export const RED_CHARGES = [
       + 'the threshold sits on the capture\'s spread. Filed as point 1502. The charge dies with point 1502.',
   },
   {
+    point: 1517,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^at the reported bank the fleeing adult enters the water once, flees once, never as a fall-in, and never flips or zigzags its heading$/i,
+    why:
+      'MEASURED 13.11.2026 on WebGPU, main 2876db78a: the whole pass failed with flips 1 (lion idle) while '
+      + '--section=water-edge-flee passed 5/5 on the same tree minutes later. Filed as point 1517. The charge dies with point 1517.',
+  },
+  {
     point: 1503,
     suite: 'enrichments',
     kind: 'check',
