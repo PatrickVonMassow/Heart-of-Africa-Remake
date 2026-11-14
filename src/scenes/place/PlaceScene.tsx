@@ -40,6 +40,7 @@ import { marketPlentyAt } from '../../systems/seasonalLife'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
 import { withFisheryMovers } from './fisheryColliders'
 import { CookShelter } from './CookShelter'
+import { flameGeometryLift, HEARTH_STONE_RADIUS, HEARTH_STONE_RING, HEARTH_TOP, VILLAGE_FLAME_HEIGHT, villageFlameScale } from './hearth'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
 import { placeById, type RegionId } from '../../world/geo'
@@ -1192,6 +1193,12 @@ function FirePit({
 }) {
   const light = useRef<THREE.PointLight>(null)
   const flame = useRef<THREE.Mesh>(null)
+  // The cone lifted so its base is local 0: it scales about the base (point 348).
+  const flameGeo = useMemo(
+    () => new THREE.ConeGeometry(0.3, VILLAGE_FLAME_HEIGHT, 8).translate(0, flameGeometryLift(VILLAGE_FLAME_HEIGHT), 0),
+    [],
+  )
+  useEffect(() => () => flameGeo.dispose(), [flameGeo])
   // Campfire shadows (design.md §19.10, point 289): level-driven — off on low,
   // the 256² variant on medium, the softer 512² variant on high — and also
   // behind the global shadow switch (the fire is one more cast-shadow source).
@@ -1226,8 +1233,7 @@ function FirePit({
     }
     if (flame.current) {
       // Rain lowers the flame cone too, so a rainy fire visibly steams down.
-      const s = 0.7 + 0.3 * rainFactor
-      flame.current.scale.set(1, s, 1)
+      flame.current.scale.set(1, villageFlameScale(rainFactor), 1)
     }
   })
   return (
@@ -1239,8 +1245,8 @@ function FirePit({
       {Array.from({ length: 7 }, (_, i) => {
         const a = (i / 7) * Math.PI * 2
         return (
-          <mesh key={i} position={[Math.cos(a) * 0.95, 0.12, Math.sin(a) * 0.95]} castShadow>
-            <dodecahedronGeometry args={[0.16, 0]} />
+          <mesh key={i} position={[Math.cos(a) * HEARTH_STONE_RING, 0.12, Math.sin(a) * HEARTH_STONE_RING]} castShadow>
+            <dodecahedronGeometry args={[HEARTH_STONE_RADIUS, 0]} />
             <meshStandardMaterial color="#79706a" roughness={1} />
           </mesh>
         )
@@ -1251,8 +1257,9 @@ function FirePit({
           <meshStandardMaterial color="#4a3018" roughness={1} />
         </mesh>
       ))}
-      <mesh ref={flame} position={[0, 0.42, 0]}>
-        <coneGeometry args={[0.3, 0.75, 8]} />
+      {/* The flame stands ON the pit and scales about its base (point 348 (a)):
+          the cone is lifted so its base is local 0, the mesh sits at HEARTH_TOP. */}
+      <mesh ref={flame} position={[0, HEARTH_TOP, 0]} geometry={flameGeo}>
         <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
       </mesh>
       <pointLight

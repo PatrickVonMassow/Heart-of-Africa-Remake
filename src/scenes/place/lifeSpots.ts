@@ -4,6 +4,7 @@
 
 import { balance } from '../../config/balance'
 import { WALKER_RADIUS } from './collision'
+import { hearthColliderRadius } from './hearth'
 import { mulberry32 } from '../../world/noise'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import { PLACES } from '../../world/geo'
@@ -153,7 +154,8 @@ export function villageAdultStations(
 /** Solid props, shared by layout collision and the keep-clear footprints. */
 export function villageLifeProps(fire: readonly [number, number], placeId: string) {
   return [
-    { x: fire[0], z: fire[1], r: 1.3 },
+    // The hearth collider (point 348 (b)): drawn hearth + calibratable clearance.
+    { x: fire[0], z: fire[1], r: hearthColliderRadius() },
     { x: LOOM_SPOT[0], z: LOOM_SPOT[1], r: 1 },
     { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
     ...(villagePoundsAtCentre(placeId) ? [{ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 }] : []),
