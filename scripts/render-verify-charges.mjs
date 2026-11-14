@@ -2092,4 +2092,22 @@ export const RED_CHARGES = [
       + 'point 1503. The charge dies with point 1503.',
   },
 
+  {
+    point: 1520,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^(solar sun|eye adaptation and glare): no console errors\b/i,
+    why:
+      'MEASURED 14.11.2026 on WebGPU (main 33db311fd) and WebGL 2 (feat/344 b9082f151): render-resource-leak asserts '
+      + 'at travel|medium, renderTargets 45 -> 370; both sections are green alone. Filed as point 1520. The charge dies with point 1520.',
+  },
+  {
+    point: 1495,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^the Congo basin does NOT swing\b/i,
+    why:
+      'MEASURED 14.11.2026 on WebGL 2, feat/344 b9082f151: congo swing 7.2 vs savanna 10.7 in the whole pass; point 1495 '
+      + 'owns the seasons section until it is green on both backends. The charge dies with point 1495.',
+  },
 ]
