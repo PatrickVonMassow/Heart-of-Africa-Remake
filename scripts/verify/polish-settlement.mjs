@@ -251,8 +251,9 @@ if (section('settlement-season')) {
   const skyWet = await skyCrop(1, 'Zulu January')
   await frame('354-village-sky-wet', { place: 'zulu-village', label: 'the Zulu village sky in January, under the rains' })
   // Bars: a person calls a sky overcast when its blue is gone and it has darkened.
-  // OPEN: calibrated on the first measured run, see the commit.
-  seasonCheck(
+  // Calibratable: the first measured runs read sat 0.30 -> 0.09 under the deck.
+  // The crops settle after `seasonCheck` was chosen, so their skip is re-read here.
+  ;(seasonSkip ? (name) => unmeasured(name, seasonSkip) : check)(
     'the settlement sky reads overcast on screen in its wet month (point 354, pixels)',
     skyWet.sat < skyDry.sat * 0.5 && skyWet.lum < skyDry.lum * 0.85,
     `sky crop dry ${JSON.stringify(skyDry)} -> wet ${JSON.stringify(skyWet)}`,
