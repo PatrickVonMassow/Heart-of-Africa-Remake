@@ -476,7 +476,14 @@ if (section('fire-rain')) {
     }
     return { min, near }
   }, hearth)
-  check('no walker crosses the hearth (point 348 (b))', walk.min > 1.11, `closest walker ${walk.min.toFixed(2)} m from the fire centre, ${walk.near} samples within 3.5 m`)
+  // The bound is the DRAWN hearth (stone ring plus stone, 1.11 m): the visible
+  // claim. The wider clearance radius is a pathing margin pinned in Vitest.
+  // Walkers must actually come near, or the check proves nothing.
+  check(
+    'no walker crosses the hearth (point 348 (b))',
+    Number.isFinite(walk.min) && walk.near > 0 && walk.min > 1.11,
+    `closest walker ${walk.min.toFixed(2)} m from the fire centre (collider r=${hearth.r}), ${walk.near} samples within 3.5 m`,
+  )
 
   // Heavy rain: the yard fire is out and its life is inside; dry again, relit.
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
@@ -487,7 +494,10 @@ if (section('fire-rain')) {
   check('under heavy rain the Zulu yard fire is out — no flame drawn (point 348)', rainOut && rainFlame === null, `out=${rainOut} flame=${JSON.stringify(rainFlame)}`)
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
   const relit = await fireOutIs(false)
-  check('the Zulu yard fire is lit again when the rain passes (point 348)', relit, `relit=${relit}`)
+  const relitFlame = await page
+    .waitForFunction(() => !!window.__placeScene?.getObjectByName('village-flame'), null, { timeout: 15000 })
+    .then(() => flameBase(), () => null)
+  check('the Zulu yard fire is lit again when the rain passes (point 348)', relit && relitFlame !== null, `relit=${relit} flame=${JSON.stringify(relitFlame)}`)
 
   // An open fire the rain damps (the San): the smaller flame still stands on its pit.
   await enterWith('san-village', 1)
