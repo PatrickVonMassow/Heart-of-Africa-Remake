@@ -12423,8 +12423,8 @@ if (section('horizon-maps')) {
     JSON.stringify({ bake: bakeCounts, sun: sunNow, band: pts.band, inBand: pts.pts.length, ...frames }),
   )
   check(
-    'horizon maps: the lee reads darker than the sun side with the maps on than with their terms zeroed at the same level',
-    med.ratio < off.ratio * 0.9,
+    'horizon maps: the lee reads darker than the sun side with the maps on, and darker than with their terms zeroed at the same level',
+    med.ratio < 1 && med.ratio < off.ratio * 0.9,
     JSON.stringify({ med, off, contrastDrop: +(1 - med.ratio / off.ratio).toFixed(3) }),
   )
   check(
