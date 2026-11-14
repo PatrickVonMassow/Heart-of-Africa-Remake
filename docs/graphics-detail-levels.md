@@ -60,6 +60,7 @@ device pixel ratio is kept (no cap).
 | `eyeAdaptation` | off | off | on |
 | `sunGlare` | off | off | on |
 | `sunDiscGain` | 3 | 3 | 14 |
+| `horizonMaps` | off | on | on |
 
 ## What each setting does
 
@@ -354,6 +355,22 @@ added.
   344) already passes the 0.88 bloom threshold; high lifts it to 14 so the disc
   blooms on its own and feeds the glare. Settlement scenes only: the same dome
   serves the bird's-eye view, which keeps 3 at every level. Climbs 3 → 3 → 14.
+- **`horizonMaps`** — The land shades itself over hundreds of kilometres
+  (design.md §2.7, point 346). Two RGBA maps baked offline from the DEM
+  (`scripts/build-horizon-maps.mjs`, half DEM resolution, 1460×1500 texels of
+  ~5.6 km) hold, per texel, the horizon toward six sun directions of the
+  16:00 arc (233°–307°) plus the mean horizon round the full circle. The
+  bird's-eye terrain darkens where the land toward the sun rises above the
+  sun's elevation (slices interpolated by the current azimuth; a debug hour
+  outside the arc clamps to the nearest slice and reports it on the console),
+  and its hollows lose ambient light by their mean horizon. Tuning in
+  `balance.horizonMaps`. Cost: one lookup per terrain fragment, but a
+  4.85 MB download (2.58 + 2.27 MB PNG) and ~17.5 MB of video memory — so at
+  low the maps are NOT FETCHED at all: the request is gated on the effective
+  level (`src/render/horizonMapGate.ts`), and raising the level at runtime
+  fetches them once and applies them when they arrive. Settlements are
+  untouched. Quarter resolution (`--scale 4`, 0.65 + 0.57 MB) is the fallback
+  if the download budget bites; the picture decides.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 

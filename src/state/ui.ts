@@ -477,6 +477,8 @@ export const effectiveGrassFireSmoke = (s: UiState): number => currentQuality(s)
  *  additionally limits it to the settlement scene. */
 export const effectiveEyeAdaptation = (s: UiState): boolean => currentQuality(s).eyeAdaptation
 /** Sun glare at this level: it is built on the bloom, so it needs bloom too. */
+/** Horizon maps (design.md §2.7): fetched and applied only where this holds. */
+export const effectiveHorizonMaps = (s: UiState): boolean => currentQuality(s).horizonMaps
 export const effectiveSunGlare = (s: UiState): boolean => currentQuality(s).sunGlare && currentQuality(s).bloom
 /** The sun disc's gain before point 344; the bird's-eye view keeps it at every level. */
 export const BIRDSEYE_SUN_DISC_GAIN = 3
