@@ -1,7 +1,7 @@
 // Shared sky dome: TSL gradient sky with sun disc, halo and drifting
 // clouds. TSL keeps it renderer-agnostic (WebGPU / WebGL 2, CLAUDE.md §3).
 
-import { useMemo, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import {
@@ -18,6 +18,7 @@ import {
   pow,
   smoothstep,
   time,
+  uniform,
   vec3,
 } from 'three/tsl'
 import { HARMATTAN_PALE, RAIN_GRAY } from '../systems/season'
@@ -26,7 +27,9 @@ import type { SkyPreset } from './skyPresets'
 
 /**
  * Sky dome centered on the camera. `sunDirection` must match the scene's
- * directional light so the sun disc and the shadows agree.
+ * directional light so the sun disc and the shadows agree; both come from
+ * the one scene sun (render/sceneSun.ts). It is a uniform, so a new date or
+ * latitude moves the disc without rebuilding the material.
  */
 export function SkyDome({
   preset,
@@ -38,6 +41,12 @@ export function SkyDome({
   radius?: number
 }) {
   const ref = useRef<THREE.Mesh>(null)
+  const sunU = useMemo(() => uniform(new THREE.Vector3(0, 1, 0)), [])
+  useLayoutEffect(() => {
+    sunU.value.set(...sunDirection).normalize()
+    // Live check (enrichments --section=solar-sun): the dome's real sun.
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__skySun = sunU.value
+  }, [sunU, sunDirection])
 
   const material = useMemo(() => {
     const m = new THREE.MeshBasicNodeMaterial()
@@ -47,7 +56,7 @@ export function SkyDome({
 
     const dir = normalize(positionLocal)
     const y = dir.y
-    const sun = normalize(vec3(...sunDirection))
+    const sun = normalize(sunU)
     const mu = dot(dir, sun)
 
     // Single-scatter atmosphere (design.md §2): Rayleigh extinction over a
@@ -74,6 +83,20 @@ export function SkyDome({
     // Muted ground tone below the horizon.
     const below = mix(color(preset.horizon), color(preset.ground), clamp(y.negate().mul(4), 0, 1))
     let col = mix(below, tinted, smoothstep(float(-0.015), float(0.01), y))
+
+    // Low afternoon sun (design.md §2.7): the presets are authored for a high
+    // sun, so as it drops the horizon warms and reddens — strongest under the
+    // sun, a faint glow opposite — and the zenith loses some of its noon blue.
+    // sin(elevation) runs ~0.12 (7°) .. ~0.6 (37°) at the default hour.
+    const lowSun = float(1).sub(smoothstep(float(0.1), float(0.62), sun.y))
+    // Horizontal directions divided by a floored length, not normalize(): an
+    // overhead sun (or the view straight up) has a zero xz and would yield NaN.
+    const flatDir = (v: typeof sun) => v.xz.div(max(v.xz.length(), 1e-4))
+    const towardSun = max(dot(flatDir(dir), flatDir(sun)), 0).mul(0.75).add(0.25)
+    const band = float(1).sub(smoothstep(float(0.0), float(0.42), y)).mul(smoothstep(float(-0.02), float(0.01), y))
+    const warmCol = mix(color('#f2b27a'), color('#e0703c'), lowSun.mul(towardSun))
+    col = mix(col, warmCol, band.mul(towardSun).mul(lowSun).mul(0.62))
+    col = col.mul(float(1).sub(lowSun.mul(0.18).mul(smoothstep(float(0.3), float(1), y))))
 
     // Sun disc plus a wide warm halo. Under the harmattan (point 140) the
     // disc shows Dobson's "mild red" through the pall, and the HALO is MUTED —
@@ -120,7 +143,7 @@ export function SkyDome({
 
     m.colorNode = col
     return m
-  }, [preset, sunDirection])
+  }, [preset, sunU])
 
   // Keep the dome glued to the camera so it behaves like a far sky.
   useFrame(({ camera }) => {

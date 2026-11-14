@@ -871,6 +871,15 @@ interface BalanceConfig {
      */
     mouthSlackDeg: number
   }
+  sun: {
+    /** Fixed local solar hour the sun is derived at (design.md §2.7). 16 is
+     *  load-bearing: at solar noon the tropical sun stands nearly overhead and shadows shrink to stubs, 17 sets the Cape sun in June. */
+    hour: number
+    /** Elevation floor (degrees) for the SHADOW light only; the visible disc
+     *  keeps its true angle. A deliberate divergence against grazing-angle
+     *  cascade artefacts; 0 = the light follows the true sun down to 2°. */
+    shadowMinElevationDeg: number
+  }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
@@ -1959,6 +1968,10 @@ export const balance: BalanceConfig = {
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
     mouthSlackDeg: 0.6, // calibratable: ~65 km of slack water at a sea mouth (point 316)
+  },
+  sun: {
+    hour: 16, // 16:00 local solar time, 7°-37° over the map and year; calibratable, debug-editable
+    shadowMinElevationDeg: 0, // no extra floor until the grazing end is judged ugly; calibratable, debug-editable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

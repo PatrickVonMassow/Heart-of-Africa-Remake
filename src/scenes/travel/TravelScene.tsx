@@ -98,6 +98,7 @@ import { useFigureLook } from '../place/useFigureLook'
 import { SunHelmet } from '../place/castHats'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
+import { useSceneSun } from '../../render/sceneSun'
 import { TRAVEL_SKY } from '../../render/skyPresets'
 import { createWaterMaterial } from '../../render/water'
 import { SEA_PLANE_SEGMENTS, SEA_PLANE_SIZE, seaPlaneOrigin } from '../../render/seaPlaneLattice'
@@ -215,8 +216,8 @@ const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 // per chunk there so a crossing never re-probes long-known ground
 // (docs/perf-driving-hitches.md).
 
-/** Sun direction shared by the sky dome disc and the shadow light. */
-const SUN_DIR: [number, number, number] = [0.5, 0.62, 0.38]
+// The sun direction is no longer a constant here: the one scene sun
+// (render/sceneSun.ts) derives it from the date and latitude (design.md §2.7).
 
 function chunkKey(cx: number, cz: number): string {
   return `${cx},${cz}`
@@ -983,6 +984,11 @@ function getSun() {
  */
 function Sun() {
   const { light, target, csm } = getSun()
+  // Re-derived on date/latitude change only; the per-frame follow below reads
+  // the memoised vector.
+  const sunDir = useSceneSun().light
+  // Live check (enrichments --section=solar-sun): the light that casts the shadows.
+  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sunLight = light
 
   // Give the cascade shadow maps back when the bird's-eye view is left (point
   // 546). The light and its CSM node are singletons, so three never disposes
@@ -1022,7 +1028,7 @@ function Sun() {
 
   useFrame(() => {
     const pos = useGame.getState().pos
-    light.position.set(pos.x + SUN_DIR[0] * 130, SUN_DIR[1] * 130, pos.z + SUN_DIR[2] * 130)
+    light.position.set(pos.x + sunDir[0] * 130, sunDir[1] * 130, pos.z + sunDir[2] * 130)
     target.position.set(pos.x, 0, pos.z)
     // Overcast dims the sun with the season (design.md §19, point 120c). The
     // wetness is Climate's per-frame scratch — one derivation for the whole
@@ -2791,6 +2797,7 @@ function Player() {
 }
 
 export function TravelScene() {
+  const sun = useSceneSun()
   const camera = useThree((s) => s.camera)
   const setPrompt = useUi((s) => s.setPrompt)
   /** Stall watch (work-order 604): a held input that gets nowhere raises the
@@ -3175,7 +3182,7 @@ export function TravelScene() {
       {/* Named so the panorama capture can hide sky and weather: the band
           keeps alpha-0 sky, and the place scene's own dome shows through. */}
       <group name="travel-sky">
-        <SkyDome preset={TRAVEL_SKY} sunDirection={SUN_DIR} />
+        <SkyDome preset={TRAVEL_SKY} sunDirection={sun.disc} />
       </group>
       <group name="travel-climate">
         <Climate />

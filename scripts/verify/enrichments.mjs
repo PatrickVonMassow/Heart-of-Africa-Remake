@@ -12153,6 +12153,136 @@ if (section('bird-flight-escape')) {
   )
 }
 
+// === The real sun (design.md §2.7) ===========================================
+// The sun follows date and latitude at the fixed solar hour. Measured on the
+// light that actually casts the shadows (window.__sunLight) and the dome's own
+// sun uniform (window.__skySun), plus pixels: June vs December at one place, a
+// three-latitude traverse at one date, and the settlement at eye height.
+if (section('solar-sun')) {
+  const JUNE_21 = 171
+  const DEC_21 = 354
+  const readSun = () => page.evaluate(() => {
+    const l = window.__sunLight
+    const t = l.target.getWorldPosition(l.position.clone())
+    const p = l.getWorldPosition(l.position.clone())
+    const v = { x: p.x - t.x, y: p.y - t.y, z: p.z - t.z }
+    const n = Math.hypot(v.x, v.y, v.z)
+    const el = (Math.asin(v.y / n) * 180) / Math.PI
+    const sky = window.__skySun
+    const dot = sky ? (v.x * sky.x + v.y * sky.y + v.z * sky.z) / n : null
+    return {
+      el,
+      // Compass bearing the shadows point to (north = -z), and their length per unit height.
+      shadowBearing: ((Math.atan2(-v.x, v.z) * 180) / Math.PI + 360) % 360,
+      shadowLen: 1 / Math.tan((el * Math.PI) / 180),
+      lightToDiscDeg: dot === null ? null : (Math.acos(Math.min(1, dot)) * 180) / Math.PI,
+      derived: window.__sceneSun ? { ...window.__sceneSun.angles, lat: window.__sceneSun.lat } : null,
+    }
+  })
+  const travelTo = async (lat, lon, day) => {
+    await page.evaluate(([la, lo, d]) => {
+      const g = window.__game.getState()
+      if (g.mode === 'place') g.leavePlace()
+      window.__game.setState({ day: d })
+      window.__game.getState().debugJumpTo(la, lo)
+    }, [lat, lon, day])
+    // The scene sun re-derives on the jump (game day 0 is 1 January, so the
+    // requested day is its day of year); the light follows on the next frame,
+    // so wait until its direction matches the derived one, not just its place.
+    await page.waitForFunction(([la, lo, d]) => {
+      const s = window.__sceneSun
+      const l = window.__sunLight
+      const p = window.__game.getState().pos
+      if (!s || !l || s.dayOfYear !== d || Math.abs(s.lat - la) >= 0.3) return false
+      const t = l.target.getWorldPosition(l.position.clone())
+      const w = l.getWorldPosition(l.position.clone())
+      const v = [w.x - t.x, w.y - t.y, w.z - t.z]
+      const n = Math.hypot(...v)
+      const aligned = v.every((c, i) => Math.abs(c / n - s.light[i]) < 1e-3)
+      return aligned && Math.abs(l.target.position.x - p.x) < 1e-3 && Math.abs(p.x / 10 - lo) < 0.5
+    }, [lat, lon, day], { timeout: 30000 })
+    return readSun()
+  }
+  const meanDiff = async (a, b) => {
+    const [ra, rb] = await Promise.all([a, b].map((x) => sharp(x).removeAlpha().raw().toBuffer()))
+    let sum = 0
+    for (let i = 0; i < Math.min(ra.length, rb.length); i++) sum += Math.abs(ra[i] - rb[i])
+    return sum / Math.min(ra.length, rb.length)
+  }
+
+  // Same place, June against December (Cairo-latitude plain west of the Nile).
+  const june = await travelTo(29.5, 29.5, JUNE_21)
+  await shot('343-sun-june', { world: { lat: 29.5, lon: 29.5 }, label: 'the same place on 21 June at 16:00' })
+  const junePix = await capturePixels(page, 'solar sun: June frame')
+  const dec = await travelTo(29.5, 29.5, DEC_21)
+  await shot('343-sun-december', { world: { lat: 29.5, lon: 29.5 }, label: 'the same place on 21 December at 16:00' })
+  const decPix = await capturePixels(page, 'solar sun: December frame')
+  const seasonDiff = await meanDiff(junePix, decPix)
+  check(
+    'solar sun: June and December at one place differ in shadow length, bearing and pixels',
+    june.el > dec.el + 15 && Math.abs(june.shadowBearing - dec.shadowBearing) > 5 && seasonDiff > 2,
+    JSON.stringify({ june, dec, seasonDiff }),
+  )
+  check(
+    'solar sun: the afternoon light stands in the west, shadows fall east',
+    june.shadowBearing > 0 && june.shadowBearing < 180 && dec.shadowBearing > 0 && dec.shadowBearing < 180,
+    JSON.stringify({ june: june.shadowBearing, dec: dec.shadowBearing }),
+  )
+
+  // A Mediterranean-to-Cape traverse at one date: the shadows must visibly turn and lengthen.
+  const stops = [
+    { name: 'tunis', lat: 36.5, lon: 9.5 },
+    { name: 'congo', lat: 0.5, lon: 24 },
+    { name: 'cape', lat: -32.5, lon: 20 },
+  ]
+  const traverse = []
+  for (const st of stops) {
+    traverse.push({ ...st, ...(await travelTo(st.lat, st.lon, JUNE_21)) })
+    await shot(`343-sun-traverse-${st.name}`, { world: { lat: st.lat, lon: st.lon }, label: `the traverse stop ${st.name} on 21 June` })
+  }
+  const pairs = [[0, 1], [1, 2], [0, 2]]
+  check(
+    'solar sun: a three-latitude traverse yields different shadow lengths and bearings at every stop',
+    traverse.every((s) => s.el > 3) &&
+      pairs.every(([a, b]) =>
+        Math.abs(traverse[a].shadowLen - traverse[b].shadowLen) / Math.min(traverse[a].shadowLen, traverse[b].shadowLen) > 0.15 &&
+        Math.abs(traverse[a].shadowBearing - traverse[b].shadowBearing) > 3),
+    JSON.stringify(traverse),
+  )
+  check(
+    'solar sun: the travel shadow light agrees with the dome disc',
+    traverse.every((s) => s.lightToDiscDeg !== null && s.lightToDiscDeg < 0.5),
+    JSON.stringify(traverse.map((s) => s.lightToDiscDeg)),
+  )
+
+  // Inside a settlement at eye height: the settlement's own latitude, and the
+  // shadow light agrees with the dome's sun disc.
+  await page.evaluate(() => {
+    window.__game.setState({ day: 171 })
+    window.__game.getState().enterPlace('cairo')
+  })
+  await page.waitForFunction(
+    () => window.__game.getState().mode === 'place' && !!window.__placeLayout &&
+      Math.abs((window.__sceneSun?.lat ?? 99) - 30) < 0.5 && window.__sunLight?.isDirectionalLight === true &&
+      window.__sunLight.position.y < 50,
+    null,
+    { timeout: 30000 },
+  )
+  const inPlace = await readSun()
+  const cairoLat = await page.evaluate(() => window.__game.getState().placeId === 'cairo' && window.__sceneSun?.lat)
+  // Arrival opens the journal over a third of the frame; the subject is the street.
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForFunction(() => !window.__game.getState().journalOpen)
+  await shot('343-sun-settlement-eye', { place: 'cairo', label: 'Cairo at eye height under the 16:00 June sun' })
+  check(
+    'solar sun: the settlement sun uses the settlement latitude and its shadows agree with the dome disc',
+    typeof cairoLat === 'number' && Math.abs(cairoLat - 30) < 0.5 &&
+      inPlace.lightToDiscDeg !== null && inPlace.lightToDiscDeg < 0.5 && inPlace.el > 30 && inPlace.el < 42,
+    JSON.stringify({ inPlace, cairoLat }),
+  )
+  check('solar sun: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
