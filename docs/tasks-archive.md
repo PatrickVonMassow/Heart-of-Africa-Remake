@@ -36695,3 +36695,74 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Closes the docs/backlog.md entry of 2026-11-12 (board slot line, point 1506) and the carrier finding "Board-Slotzeile: freie Slots fast immer 'Grund nicht messbar'".
   Source: user request a985cb89, 13.11.2026 21:40 (approved: "ja, vorne einreihen").
   Bundle: unbundled.
+
+- [x] 343. The sun stands where it really stood — elevation from date and latitude
+  (user 25.07.2026; design.md §2.7 states the target). Today `SUN_DIR` is a hard
+  constant in BOTH scenes — `[0.5, 0.62, 0.38]` in `src/scenes/travel/TravelScene.tsx`
+  and `[0.52, 0.68, 0.34]` in `src/scenes/place/PlaceScene.tsx`, an elevation of ~45°
+  for the whole continent and the whole five-year window. The season only dims and
+  reddens it. That is why the relief reads flat: at that angle a 3000 m massif throws
+  ~3 km of shadow, about ONE DEM texel.
+  TARGET: derive the sun's elevation and azimuth from the real solar geometry —
+  declination from the DATE (the same date that drives §19.13) and the traveller's own
+  LATITUDE — at a FIXED local solar hour. There is no time of day in this game and
+  none is being added; the hour is a calibratable constant, `balance.sun.hour`,
+  DEFAULT 16:00. That default is load-bearing and must not be "tidied" to noon: at
+  local noon the sun stands 90° over the equator in March and 83° over Cairo in June,
+  which casts no usable shadow at all, while at 16:00 the elevation runs about 7°-37°
+  across the entire map and year (Cairo 37° June / 11° December, Cape Town 9° in its
+  June winter). One hour later breaks it — at 17:00 the Cape sun in June is BELOW the
+  horizon, and a fixed hour must never put the sun under the horizon anywhere in the
+  world window (lat -37..38, all 365 days).
+  ONE DEFINITION, READ BY BOTH SCENES. The two constants above are not merely stale,
+  they DISAGREE (~45° against ~48°) — the same sun stands at two heights depending on
+  which view holds the camera. The derivation therefore lands in ONE place that travel
+  and settlement both read; neither scene keeps a sun of its own, or they drift apart
+  again the first time one of them is touched.
+  EVERYTHING THE SUN FEEDS MUST FOLLOW IT, or the picture contradicts itself: the
+  directional light AND its shadow camera in both scenes, the sky dome's disc and halo
+  (`src/render/sky.tsx`, whose `sunDirection` must keep agreeing with the light — its
+  own comment says so), and the baked environment light
+  (`createEnvironmentTexture`/`IBL_SUN` in `src/render/Effects.tsx`), re-derived when
+  the date or the position changes and NEVER per frame.
+  THE SETTLEMENT IS THE STRICTER OF THE TWO (user 28.07.2026). Point 344's eye
+  adaptation and sun glare build DIRECTLY on this angle, and at eye height a wrong sun
+  is not a subtlety — it decides whether the traveller is dazzled turning west, and
+  where every wall's shadow falls in a lane he walks through. The settlement sun is
+  therefore derived from the SETTLEMENT's own latitude and the current date, never from
+  a scene default, and the acceptance below judges it at eye height.
+  AND THE JOURNEY MUST SHOW IT (user 28.07.2026). The bird's-eye view is where the
+  change becomes legible: walking the continent from the Mediterranean to the Cape at
+  one date, the shadows must visibly turn and lengthen as the latitude runs out — and
+  the same place in June and in December must not look alike. A sun that is merely
+  CORRECT per frame but whose change no traveller notices misses the point of this
+  ticket; the live acceptance therefore measures a TRAVERSE, not only a single spot.
+  THE SKY PRESETS ARE THE REAL WORK, not the arithmetic. They are authored for a high
+  sun; a low sun under an unchanged noon-blue dome reads as a bug — the same failure
+  the overcast handling already guards against (a dimmed sun under a bright blue sky,
+  sky.tsx). The horizon must warm and redden as the sun drops. Judge this by the
+  PICTURE on both backends, not by the uniform.
+  WATCH THE SHADOW QUALITY at the low end: cascaded shadow maps degrade at grazing sun
+  angles (long shadows, peter-panning, cascade seams). If the 7° end proves ugly, clamp
+  the elevation used for the SHADOW camera to a calibratable floor while the visible
+  sun keeps its true angle — and record that as a deliberate divergence, never silently.
+  NOT A QUALITY LEVER: this is world model like the seasons and applies at EVERY
+  graphics level. It adds no per-frame cost and gets no `QUALITY_PRESETS` key.
+  DEBUG: the sun direction stays inspectable and the hour editable in the debug menu
+  (§21.2), so a tester can walk the whole range without waiting for a date.
+  VERIFIABLE: pure (`src/systems/`) — declination and hour angle produce the known
+  elevations above (Cairo June/December, the equator at equinox, Cape Town June), the
+  hemispheres invert across the year, and a SWEEP over the full world bounds × all 365
+  days asserts the sun never falls to or below the horizon at the default hour (the
+  17:00 counter-case is pinned as the witness that the bound is real); the azimuth is
+  westerly in the afternoon for both hemispheres; and a NORTH-SOUTH SWEEP at one date
+  returns a monotonically changing elevation, so the traverse below has something to
+  show. Live (`scripts/verify/enrichments.mjs` + `polish.mjs`, BOTH backends,
+  screenshots): the same place rendered in June and in December differs measurably in
+  pixels and in shadow direction; a TRAVERSE of at least three widely separated
+  latitudes at one date yields shadows whose measured direction and length differ
+  between the stops — the check the user's "you should notice it while walking" asks
+  for; inside a settlement, at EYE HEIGHT, the shadows agree with the sky-dome sun disc
+  rather than pointing elsewhere; no console errors.
+  DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
+  behaviour when this lands.
