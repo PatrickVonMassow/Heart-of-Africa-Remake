@@ -178,22 +178,24 @@ export function Effects() {
       const litShare = (at: THREE.Node<'vec2'>) => {
         const texel = termTex.sample(at)
         const viewPos = getViewPosition(at, texel.a, shaftsProjInv)
-        const o = shaftsViewToLight.mul(vec4(0, 0, 0, 1)).xyz.toConst()
-        const dir = shaftsViewToLight.mul(vec4(viewPos, 1)).xyz.sub(o).add(1e-5).toConst()
+        const o = shaftsViewToLight.mul(vec4(0, 0, 0, 1)).xyz
+        const dir = shaftsViewToLight.mul(vec4(viewPos, 1)).xyz.sub(o).add(1e-5)
         const ta = shaftsBoxMin.sub(o).div(dir)
         const tb = shaftsBoxMax.sub(o).div(dir)
         const exitT = max(ta, tb)
-        const tEnd = clamp(min(min(exitT.x, exitT.y), exitT.z), 0, 1).toConst()
+        const tEnd = clamp(min(min(exitT.x, exitT.y), exitT.z), 0, 1)
         const near = shaftsNearFar.x
         const far = shaftsNearFar.y
         // Mean attenuation over the clipped segment, mirroring the upstream
         // pow(1 - viewZ / far, k) with its perspective viewZ conversion.
-        const atten = float(0).toVar()
+        // A plain node sum: this helper runs outside an Fn(), where a toVar()
+        // assign has no stack and three throws at build time.
+        let atten: THREE.Node<'float'> = float(0)
         for (const f of [0.125, 0.375, 0.625, 0.875]) {
           const p = o.add(dir.mul(tEnd.mul(f)))
           const zc = p.z.negate().sub(near).div(far.sub(near))
           const vz = near.mul(far).div(far.sub(far.sub(near).mul(zc)))
-          atten.addAssign(pow(max(float(1).sub(vz.div(far)), 0), shaftsAtten).mul(0.25))
+          atten = atten.add(pow(max(float(1).sub(vz.div(far)), 0), shaftsAtten).mul(0.25))
         }
         const full = length(dir).mul(tEnd).mul(shaftsDensity.div(100)).mul(atten)
         const actual = log(float(1).sub(min(texel.r, 0.999))).negate()
