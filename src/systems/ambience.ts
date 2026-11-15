@@ -110,8 +110,10 @@ function setTarget(name: string, value: number) {
   if (!ctx) return
   const l = layer(name)
   // Silence is always applied: a quiet layer's last step may sit under the
-  // tolerance, and dropping it would leave the fade standing above zero.
-  if (Math.abs(l.target - value) < 0.001 && !(value === 0 && l.target !== 0)) return
+  // tolerance, and dropping it would leave the fade standing above zero. So is
+  // the first step OUT of silence: a quiet target (a low slider) would
+  // otherwise never leave zero.
+  if (Math.abs(l.target - value) < 0.001 && (value === 0) === (l.target === 0)) return
   l.target = value
   l.gain.gain.cancelScheduledValues(ctx.currentTime)
   l.gain.gain.setValueAtTime(l.gain.gain.value, ctx.currentTime)
@@ -194,15 +196,39 @@ function envOsc(
   osc.stop(t0 + dur + 0.05)
 }
 
+/** Whether a layer's emitters schedule (point 357): while its target is
+ *  audible at all, however quiet — a low per-source slider or the fire near its
+ *  reach — and on through a fade-out until the live gain is all but silent.
+ *  A fixed gain floor (0.005) used to mute every target beneath it outright. */
+export const EMITTER_SILENT_GAIN = 1e-4
+function emitterAudible(l: Layer): boolean {
+  return l.target > 0 || l.gain.gain.value > EMITTER_SILENT_GAIN
+}
+
+const emitters: Array<{ name: string; emit: (dest: GainNode) => void }> = []
+
 /** Repeating randomized emitter, silent while its layer is faded out. */
 function emitter(name: string, minDelay: number, maxDelay: number, emit: (dest: GainNode) => void) {
+  emitters.push({ name, emit })
   const tick = () => {
-    if (ctx && layers[name] && layers[name].gain.gain.value > 0.005) {
+    if (ctx && layers[name] && emitterAudible(layers[name])) {
       emit(layers[name].gain)
     }
     setTimeout(tick, (minDelay + Math.random() * (maxDelay - minDelay)) * 1000)
   }
   setTimeout(tick, Math.random() * maxDelay * 1000)
+}
+
+/** Test hook: run one gated tick of every emitter on a layer, outside its
+ *  timer loop, and report how many emitted. */
+export function tickLayerEmitters(name: string): number {
+  let n = 0
+  for (const e of emitters) {
+    if (e.name !== name || !ctx || !layers[name] || !emitterAudible(layers[name])) continue
+    e.emit(layers[name].gain)
+    n++
+  }
+  return n
 }
 
 /** Insect ticks: short bursts of high clicks. */

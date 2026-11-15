@@ -24,6 +24,7 @@ import {
   refreshAmbienceVolume,
   setAmbienceAnimals,
   setAmbienceFire,
+  tickLayerEmitters,
   setAmbienceScene,
   villageBedTargets,
   startAmbience,
@@ -1695,6 +1696,47 @@ describe('the village sound bed (point 357)', () => {
       const ramps = p.events.filter((e) => e.type === 'lin')
       return ramps.length ? ramps[ramps.length - 1].value ?? 0 : 0
     }
+
+    // The emitter gate (point 357): a quiet but audible target still SCHEDULES
+    // sound. The fixed 0.005 gain floor muted a low slider and the fire near
+    // its reach outright, though their targets were above zero.
+    it('a goat slider turned low still schedules bleats, and zero schedules none', () => {
+      balance.ambienceVolume = 0.1
+      ctx.currentTime = 960
+      setAmbienceScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false, villageId: 'bed-quiet' })
+      balance.villageBed.goatVolume = 0.02 // target 0.0008: under the old 0.005 floor
+      refreshAmbienceVolume()
+      expect(villageBedTargets(true, Infinity).goats).toBeLessThan(0.005)
+      expect(villageBedTargets(true, Infinity).goats).toBeGreaterThan(0)
+      const before = ctx.oscillators.length
+      expect(tickLayerEmitters('goats')).toBeGreaterThan(0)
+      const made = ctx.oscillators.slice(before)
+      expect(made.some((o) => o.type === 'sawtooth' && o.startedAt !== null)).toBe(true)
+      balance.villageBed.goatVolume = 0
+      refreshAmbienceVolume()
+      const after = ctx.oscillators.length
+      expect(tickLayerEmitters('goats')).toBe(0)
+      expect(ctx.oscillators.length).toBe(after)
+    })
+
+    it('the fire just inside its reach still schedules crackles, and none beyond it', () => {
+      balance.ambienceVolume = 0.1
+      ctx.currentTime = 980
+      setAmbienceScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false, villageId: 'bed-edge' })
+      const reach = balance.villageBed.fireAudible
+      setAmbienceFire(reach - 0.2)
+      const target = villageBedTargets(true, reach - 0.2).fire
+      expect(target).toBeGreaterThan(0)
+      expect(target).toBeLessThan(0.005)
+      const before = ctx.sources.length
+      expect(tickLayerEmitters('fire')).toBeGreaterThan(0)
+      expect(ctx.sources.length).toBeGreaterThan(before)
+      setAmbienceFire(reach + 1)
+      const after = ctx.sources.length
+      expect(tickLayerEmitters('fire')).toBe(0)
+      expect(ctx.sources.length).toBe(after)
+      setAmbienceFire(Infinity)
+    })
 
     it('drives the fire layer with the reported distance and silences it on leaving the village', () => {
       balance.ambienceVolume = 1
