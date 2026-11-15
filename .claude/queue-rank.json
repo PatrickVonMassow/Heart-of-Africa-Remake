@@ -1897,35 +1897,22 @@
       "why": "Pre-existing settings reds without player report; behind the open feature work, unbundled",
       "origin": "machine",
       "place": "last"
+    },
+    "1523": {
+      "at": "2026-11-15T10:07:27.850Z",
+      "why": "User: P1 blocker, 'ja, beide ganz vorne einreihen' (15.11.2026)",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1524": {
+      "at": "2026-11-15T10:07:27.950Z",
+      "why": "User: 'ja, beide ganz vorne einreihen' (15.11.2026), after 1523",
+      "origin": "user",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-11-15T05:43:40.867Z",
+    "at": "2026-11-15T09:55:52.379Z",
     "points": [
       184,
       200,
@@ -1939,7 +1926,6 @@
       330,
       333,
       336,
-      357,
       358,
       359,
       360,
@@ -2380,5 +2366,30 @@
       1521,
       1522
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
