@@ -1704,5 +1704,21 @@ describe('the village sound bed (point 357)', () => {
       setAmbienceScene({ region: 'west', mode: 'travel', placeKind: null, nearVillage: true, villageId: 'bed-test' })
       expect(rampTarget(fire)).toBe(0)
     })
+
+    it('reaches true silence even when the last audible step is under the re-target tolerance', () => {
+      balance.ambienceVolume = 0.01 // so quiet that the faint edge of the reach targets < 0.001
+      ctx.currentTime = 1000
+      setAmbienceFire(Infinity)
+      setAmbienceScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false, villageId: 'bed-test' })
+      const before = ctx.gains.map((g) => g.gain.events.length)
+      setAmbienceFire(0)
+      const fire = ctx.gains.filter((g, i) => g.gain.events.length > before[i])[0].gain
+      setAmbienceFire(balance.villageBed.fireAudible * 0.97)
+      const faint = rampTarget(fire)
+      expect(faint).toBeGreaterThan(0)
+      expect(faint).toBeLessThan(0.001)
+      setAmbienceFire(Infinity)
+      expect(rampTarget(fire)).toBe(0)
+    })
   })
 })

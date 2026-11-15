@@ -97,7 +97,9 @@ function layer(name: string): Layer {
 function setTarget(name: string, value: number) {
   if (!ctx) return
   const l = layer(name)
-  if (Math.abs(l.target - value) < 0.001) return
+  // Silence is always applied: a quiet layer's last step may sit under the
+  // tolerance, and dropping it would leave the fade standing above zero.
+  if (Math.abs(l.target - value) < 0.001 && !(value === 0 && l.target !== 0)) return
   l.target = value
   l.gain.gain.cancelScheduledValues(ctx.currentTime)
   l.gain.gain.setValueAtTime(l.gain.gain.value, ctx.currentTime)
