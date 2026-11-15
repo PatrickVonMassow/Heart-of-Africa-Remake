@@ -1236,6 +1236,131 @@ if (section('wedged-adults')) {
   await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
 
+// THE INHABITANTS TAKE NOTICE OF EACH OTHER (point 360, design.md §19.10). Over a
+// sampled interval in a village at least one pair of errand walkers meets: both
+// turn to face each other, they part when the window ends, the errands still
+// arrive afterwards, and no meeting outlasts its window. The meeting CHANCE is
+// staged to 1 for the interval (the game's own knob, read from the running build
+// and put back): the claim is what a meeting does, not how often the dice fall.
+// The pure rules (partner choice, cooldown, the exactly-once handover) are
+// asserted in src/scenes/place/encounters.test.ts.
+if (section('villager-encounters')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('bambara-village')
+  const live = await page
+    .waitForFunction(() => !!window.__placeWalkers?.encounters, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('the village publishes its walkers\' encounters', live)
+  if (live) {
+    const knob = await page.evaluate(() => {
+      const e = window.__balance.villageLife.encounters
+      const was = e.meetChance
+      e.meetChance = 1
+      return { was, meetSeconds: e.meetSeconds }
+    })
+    try {
+      // 1. A pair meets. Wait for a meeting already past its turn-to-face phase.
+      const met = await waitForMoment(
+        () => {
+          const e = window.__placeWalkers.encounters()
+          const m = e.meetings.find((x) => x.progress >= 0.6)
+          return m ? { a: m.a, b: m.b, ea: e.facingError(m.a), eb: e.facingError(m.b), arrivals: e.arrivals } : null
+        },
+        { frames: 12000, minMs: 180000, wallCapMs: 240000 },
+      )
+      if (met.wallCapped) unmeasured('villager-encounters: a pair meets', 'the lane could not deliver the frame budget')
+      check('over the sampled interval at least one pair of walkers meets', !!met.value, met.value ? `walkers ${met.value.a} and ${met.value.b} after ${met.frames} frames` : `${met.frames} frames, no meeting`)
+      if (met.value) {
+        const { a, b } = met.value
+        check(
+          'both yaws turn toward each other',
+          met.value.ea !== null && met.value.eb !== null && met.value.ea < 0.35 && met.value.eb < 0.35,
+          `heading errors ${met.value.ea?.toFixed(2)} / ${met.value.eb?.toFixed(2)} rad`,
+        )
+        // The picture: the pair from four metres off its side, life held so
+        // the shutter's pipeline wait cannot outlast the meeting.
+        await page.evaluate(() => window.__placeFreezeLife?.(true))
+        const at = await page.evaluate(({ a, b }) => {
+          const s = window.__placeWalkers.states
+          const mx = (s[a].x + s[b].x) / 2
+          const mz = (s[a].z + s[b].z) / 2
+          // Square to the line between them, on the side nearer the village middle.
+          let nx = -(s[b].z - s[a].z)
+          let nz = s[b].x - s[a].x
+          const len = Math.hypot(nx, nz) || 1
+          nx /= len
+          nz /= len
+          if (nx * -mx + nz * -mz < 0) { nx = -nx; nz = -nz }
+          const p = window.__placePlayer
+          p.x = mx + nx * 4
+          p.z = mz + nz * 4
+          // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+          p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
+          p.pitch = -0.08
+          return { x: mx, z: mz }
+        }, { a, b })
+        await nextFrames(2)
+        await frame(shot('360-villager-meeting'), {
+          local: { x: at.x, y: 0.9, z: at.z },
+          label: 'two errand walkers stopped in a meeting, turned to face each other',
+        })
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+        // 2. They part, inside the window.
+        await page.evaluate((pair) => { window.__encounterPair = pair }, [a, b])
+        const parted = await waitForMoment(
+          () => {
+            const e = window.__placeWalkers.encounters()
+            const [a, b] = window.__encounterPair
+            const part = e.log.find((x) => x.kind === 'part' && ((x.a === a && x.b === b) || (x.a === b && x.b === a)))
+            const meet = [...e.log].reverse().find((x) => x.kind === 'meet' && ((x.a === a && x.b === b) || (x.a === b && x.b === a)))
+            return part && meet ? { span: part.t - meet.t, at: part.t, arrivals: e.arrivals } : null
+          },
+          { frames: 1200, minMs: (knob.meetSeconds + 4) * 1000, wallCapMs: 60000 },
+        ).catch(() => ({ value: null, frames: 0 }))
+        check('the pair parts', !!parted.value, parted.value ? `after ${parted.value.span.toFixed(2)} s` : 'still standing')
+        if (parted.value) {
+          check('the meeting held no longer than its window', parted.value.span <= knob.meetSeconds + 0.25, `${parted.value.span.toFixed(2)} s against ${knob.meetSeconds} s`)
+          // 3. The errands still arrive: each of the pair reaches an errand
+          // point or completes its round home after the meeting.
+          await page.evaluate(({ a, b, base }) => {
+            window.__encounterAfter = { a, b, base, home: { [a]: false, [b]: false } }
+          }, { a, b, base: parted.value.arrivals })
+          const arrived = await waitForMoment(
+            () => {
+              const w = window.__placeWalkers
+              const after = window.__encounterAfter
+              const e = w.encounters()
+              for (const k of [after.a, after.b]) if (w.states[k].mode === 'inside') after.home[k] = true
+              return [after.a, after.b].every((k) => e.arrivals[k] > after.base[k] || after.home[k]) ? true : null
+            },
+            { frames: 9000, minMs: 90000, wallCapMs: 150000 },
+          )
+          check('after the meeting both reach their errand point or home again', !!arrived.value, `${arrived.frames} frames`)
+        }
+      }
+      // 4. Nobody stands past its window: every logged meeting parted within it,
+      // and every meeting still open is inside it.
+      const audit = await page.evaluate((limit) => {
+        const e = window.__placeWalkers.encounters()
+        const late = []
+        for (const m of e.log.filter((x) => x.kind === 'meet')) {
+          const part = e.log.find((x) => x.kind === 'part' && x.t >= m.t && x.a === m.a && x.b === m.b)
+          if (part && part.t - m.t > limit) late.push(`${m.a}/${m.b} ${(part.t - m.t).toFixed(2)} s`)
+        }
+        for (const m of e.meetings) if (m.remaining > m.total || m.remaining <= -0.05) late.push(`open ${m.a}/${m.b} remaining ${m.remaining.toFixed(2)}`)
+        return { late, meetings: e.log.filter((x) => x.kind === 'meet').length, handovers: e.log.filter((x) => x.kind === 'handover').length }
+      }, knob.meetSeconds + 0.25)
+      check('no walker is left standing past its meeting window', audit.late.length === 0, `${audit.meetings} meetings, ${audit.handovers} handovers; late: ${audit.late.join(', ') || 'none'}`)
+    } finally {
+      await page.evaluate((was) => {
+        window.__balance.villageLife.encounters.meetChance = was
+        window.__placeFreezeLife?.(false)
+      }, knob.was)
+    }
+  }
+}
+
 // THE WELL LEFT ONE VILLAGE (point 1092). The communication village fetches its
 // water from the river, so its well is gone — prop, collider and jar carrier —
 // while every other village keeps its own. A CONTROL VILLAGE is visited first:
