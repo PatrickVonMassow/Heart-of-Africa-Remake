@@ -1050,6 +1050,16 @@ interface BalanceConfig {
     /** Extra distance before an in-range caster switches off (no flicker). */
     hysteresis: number
   }
+  /** Sun-shadow cascades no visible pixel samples keep their last map
+   *  instead of re-rendering (docs/perf-1524-findings.md). */
+  shadowCascadeSkip: {
+    enabled: boolean
+    /** The visible-ground plane sits this far below the traveller's ground
+     *  (world units), so lower relief in view stays inside the kept cascades. */
+    groundDrop: number
+    /** Extra share of a cascade's start kept as margin before it is skipped. */
+    safety: number
+  }
   /** Travel-view frame-time guards (docs/perf-1523-findings.md). */
   travelFrame: {
     /** A frame interval in the travel view at or above this (ms) is reported by
@@ -2219,6 +2229,14 @@ export const balance: BalanceConfig = {
     // 5 units at a 3.5° sun: below that the sun has set into the dusk dim.
     maxShadowReach: 80, // calibratable
     hysteresis: 10, // calibratable
+  },
+  shadowCascadeSkip: {
+    enabled: true,
+    // The plane is sea level (the lowest travel ground) minus this: at the
+    // default zoom the deepest visible ground then lies 36.1 units deep against
+    // cascade 1's first sampled depth of 39.9 (fade margin included).
+    groundDrop: 2, // calibratable
+    safety: 0.05, // calibratable
   },
   travelFrame: {
     // The point-1523 report: ~0.5 s stalls on a strong PC; 100 ms is the brief's
