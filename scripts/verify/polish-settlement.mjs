@@ -2250,11 +2250,28 @@ if (section('fire-smoke')) {
   const rise = CROP_Y - 0.6
   const midX = fx + Math.sin((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * rise
   const midZ = fz + Math.cos((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * rise
-  const clip = await clipAround(midX, CROP_Y, midZ, 50)
-  check('the crop above the fire is on screen (fire-smoke staging)', clip !== null, JSON.stringify({ fx, fz, clip }))
+  // A handful of billboards leaves gaps: aim at the drawn puff nearest CROP_Y.
+  await freezeLife(true)
+  const puff = await page.evaluate((cy) => {
+    const o = window.__placeScene?.getObjectByName('village-fire-smoke')
+    if (!o || !o.visible) return null
+    o.updateMatrixWorld(true)
+    const m = new o.matrixWorld.constructor()
+    const v = o.position.clone()
+    let best = null
+    for (let i = 0; i < o.count; i++) {
+      o.getMatrixAt(i, m)
+      v.setFromMatrixPosition(m.premultiply(o.matrixWorld))
+      if (v.y < 1.3) continue
+      if (!best || Math.abs(v.y - cy) < Math.abs(best.y - cy)) best = { x: v.x, y: v.y, z: v.z }
+    }
+    return best
+  }, CROP_Y)
+  const clip = puff ? await clipAround(puff.x, puff.y, puff.z, 40) : await clipAround(midX, CROP_Y, midZ, 50)
+  check('the crop above the fire is on screen (fire-smoke staging)', clip !== null, JSON.stringify({ fx, fz, puff, clip }))
+  if (!clip) await freezeLife(false)
   if (clip) {
     // Frozen so a villager crossing the crop between the two OFF shots is no noise.
-    await freezeLife(true)
     const r = await attributeCrop(clip, (on) => page.evaluate((v) => { window.__balance.fireSmoke.opacity = v }, on ? configured : 0), 'fire-smoke')
     await freezeLife(false)
     check(

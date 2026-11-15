@@ -76,9 +76,12 @@ export function FireSmoke({ rainRef, sheltered, out }: { rainRef: MutableRefObje
   const scl = useMemo(() => new THREE.Vector3(), [])
   const parentQ = useMemo(() => new THREE.Quaternion(), [])
   const q = useMemo(() => new THREE.Quaternion(), [])
+  // The column's clock; the dev life freeze holds it so a proof crop compares one instant.
+  const plumeTime = useRef(0)
   useFrame(({ camera, clock }) => {
     const m = mesh.current
     if (!m) return
+    if (!isLifeFrozen()) plumeTime.current = clock.elapsedTime
     const t = balance.fireSmoke
     SMOKE_OPACITY_U.value = Math.min(1, Math.max(0, t.opacity))
     const weather = out ? 0 : shelteredFireRainFactor(rainAmount(rainRef.current, balance.season.weatherStrength), sheltered)
@@ -90,7 +93,7 @@ export function FireSmoke({ rainRef, sheltered, out }: { rainRef: MutableRefObje
     q.copy(parentQ).invert().multiply(camera.quaternion)
     const shape = { ...t, opacity: 1 }
     for (let i = 0; i < n; i++) {
-      const p = plumePuff(plumeAge(i, n, clock.elapsedTime, t.life), weather, shape)
+      const p = plumePuff(plumeAge(i, n, plumeTime.current, t.life), weather, shape)
       pos.set(p.x, SMOKE_BASE_Y + p.y, p.z)
       scl.set(p.size, p.size, 1)
       mtx.compose(pos, q, scl)
