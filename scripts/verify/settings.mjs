@@ -1827,9 +1827,11 @@ if (section('village-bed')) {
   const besideMortar = await standNearMortar()
   check('the traveller can stand beside the village mortar (point 357)', besideMortar)
   const pestle = await watchPestle(3)
-  check('the mortar thuds come from the animated pestle, one per impact frame, at the stroke\'s strike (point 357)',
+  // ONE dispatch per impact, exactly: a doubled dispatch, or a frame whose
+  // several impacts were heard as one, breaks the coupling either way.
+  check('the mortar thuds come from the animated pestle, one per impact, at the stroke\'s strike (point 357)',
     pestle.mounted && pestle.thuds.length === 3 && pestle.impactsWithoutThud === 0 &&
-      pestle.thuds.every((t) => t.struck >= 1 && t.sinceImpact !== null && t.sinceImpact <= 0.35),
+      pestle.thuds.every((t) => t.struck >= 1 && t.calls === t.struck && t.sinceImpact !== null && t.sinceImpact <= 0.35),
     JSON.stringify(pestle))
   check('the pestle\'s thuds schedule a positive level beside the mortar (point 357)',
     pestle.mounted && pestle.scheduled >= 1 && pestle.lastPeak > 0, JSON.stringify(pestle))
