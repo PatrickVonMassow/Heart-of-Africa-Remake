@@ -378,6 +378,17 @@ class FakeSource extends FakeNode {
     this.stoppedAt = t
   }
 }
+class FakeConstant extends FakeNode {
+  offset = new FakeParam()
+  startedAt: number | null = null
+  stoppedAt: number | null = null
+  start(t = 0) {
+    this.startedAt = t
+  }
+  stop(t = 0) {
+    this.stoppedAt = t
+  }
+}
 class FakeCtx {
   static last: FakeCtx | null = null
   currentTime = 0
@@ -418,6 +429,12 @@ class FakeCtx {
     const w = new FakeShaper()
     this.shapers.push(w)
     return w
+  }
+  constants: FakeConstant[] = []
+  createConstantSource() {
+    const c = new FakeConstant()
+    this.constants.push(c)
+    return c
   }
   /** Every oscillator the engine ever built — the spoken syllables among them. */
   oscillators: FakeOscillator[] = []
@@ -1703,6 +1720,24 @@ describe('the village sound bed (point 357)', () => {
       // Into travel: the whole bed goes silent.
       setAmbienceScene({ region: 'west', mode: 'travel', placeKind: null, nearVillage: true, villageId: 'bed-test' })
       expect(rampTarget(fire)).toBe(0)
+    })
+
+    it('keeps every layer gain fed by a silent running source, so a sparse layer\'s fade completes', () => {
+      balance.ambienceVolume = 1
+      ctx.currentTime = 950
+      setAmbienceScene({ region: 'west', mode: 'travel', placeKind: null, nearVillage: false })
+      const before = ctx.gains.map((g) => g.gain.events.length)
+      setAmbienceScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false, villageId: 'bed-test' })
+      const goats = ctx.gains.find(
+        (g, i) => g.gain.events.length > before[i] && rampTarget(g.gain) === villageBedTargets(true, Infinity, 1).goats,
+      )
+      expect(goats).toBeDefined()
+      expect(ctx.constants).toHaveLength(1)
+      const keepAlive = ctx.constants[0]
+      expect(keepAlive.offset.value).toBe(0)
+      expect(keepAlive.startedAt).not.toBeNull()
+      expect(keepAlive.stoppedAt).toBeNull()
+      expect(keepAlive.connected).toContain(goats)
     })
 
     it('reaches true silence even when the last audible step is under the re-target tolerance', () => {

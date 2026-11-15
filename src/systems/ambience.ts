@@ -81,6 +81,12 @@ let drumPreviousPattern: number | null = null
 let drumBarOrdinal = 0
 let drumVisitStartedAt = 0
 
+// A silent, never-stopped source feeding every layer gain (point 357): Chromium
+// stops advancing a GainNode's automation while no input is active, so a
+// sparse emitter's fade to silence (the goats) stood mid-ramp and stayed
+// audible after the layer was switched off.
+let layerKeepAlive: ConstantSourceNode | null = null
+
 function layer(name: string): Layer {
   if (!ctx || !master) throw new Error('audio not started')
   let l = layers[name]
@@ -88,6 +94,12 @@ function layer(name: string): Layer {
     const gain = ctx.createGain()
     gain.gain.value = 0
     gain.connect(ambientBus ?? master)
+    if (!layerKeepAlive) {
+      layerKeepAlive = ctx.createConstantSource()
+      layerKeepAlive.offset.value = 0
+      layerKeepAlive.start()
+    }
+    layerKeepAlive.connect(gain)
     l = { gain, target: 0 }
     layers[name] = l
   }
