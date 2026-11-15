@@ -2244,9 +2244,13 @@ if (section('fire-smoke')) {
   // Stand nine metres off the fire, looking at the column's middle height.
   await standFacing(fx, fz + 9, fx, 2.6, fz)
   const lean = await page.evaluate(() => window.__balance.fireSmoke)
-  const midX = fx + Math.sin((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * 1.6
-  const midZ = fz + Math.cos((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * 1.6
-  const clip = await clipAround(midX, 2.6, midZ, 90)
+  // The crop sits on the column's dense lower part, clear of the flame tip and
+  // below the hut eave: the striped thatch shimmers frame to frame.
+  const CROP_Y = 1.9
+  const rise = CROP_Y - 0.6
+  const midX = fx + Math.sin((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * rise
+  const midZ = fz + Math.cos((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * rise
+  const clip = await clipAround(midX, CROP_Y, midZ, 50)
   check('the crop above the fire is on screen (fire-smoke staging)', clip !== null, JSON.stringify({ fx, fz, clip }))
   if (clip) {
     // Frozen so a villager crossing the crop between the two OFF shots is no noise.
