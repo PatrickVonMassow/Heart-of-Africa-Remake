@@ -1801,7 +1801,13 @@ if (section('village-bed')) {
   })
   const besideOk = await standBesideFire()
   check('the traveller can stand beside the village fire ring (point 357)', besideOk)
-  await settleBed()
+  // A reading is only compared once the crossfade has really run out.
+  const bedSnapshot = () => page.evaluate(() => {
+    const a = window.__ambience
+    return Object.fromEntries(['goats', 'fire'].map((n) => [n, { gain: a.layerGain(n), target: a.layerTarget(n) }]))
+  })
+  const nearSettled = await settleBed()
+  check('beside the fire the bed layers settle on their targets (point 357)', nearSettled, JSON.stringify(await bedSnapshot()))
   const audible = await page.evaluate(() => {
     const a = window.__ambience
     return { fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire') }
@@ -1815,13 +1821,14 @@ if (section('village-bed')) {
   const midMetres = Math.round(reach * 0.6 * 10) / 10
   const midOk = await standNearFire(midMetres)
   check('the traveller can stand part-way out from the fire, inside its reach (point 357)', midOk)
-  await settleBed()
+  const midSettled = await settleBed()
+  check('part-way out the bed layers settle on their targets (point 357)', midSettled, JSON.stringify(await bedSnapshot()))
   const mid = await page.evaluate(() => {
     const a = window.__ambience
     return { fireDistance: a.fireDistance(), fire: a.layerGain('fire'), goats: a.layerGain('goats') }
   })
   check('the fire crackle is louder near its ring than part-way out, audible at both (point 357)',
-    audible.fireDistance < mid.fireDistance && mid.fireDistance < reach &&
+    nearSettled && midSettled && audible.fireDistance < mid.fireDistance && mid.fireDistance < reach &&
       mid.fire > 0 && audible.fire > mid.fire && mid.goats > 0,
     JSON.stringify({ near: audible, mid }))
   const besideMortar = await standNearMortar()
