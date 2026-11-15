@@ -2838,7 +2838,12 @@ function Walkers({
   const board = useRef<EncounterBoard>(createEncounterBoard())
   const bows = useRef<Array<{ current: FigurePose | null }>>([])
   if (bows.current.length !== defs.length) bows.current = defs.map(() => ({ current: null }))
-  const encounterLog = useRef<Array<EncounterEvent & { t: number }>>([])
+  // Each entry carries the render clock `t` AND `sim`, the life clock the
+  // meeting window really runs on: the capped frame step summed over unfrozen
+  // frames. The render clock also runs through a frozen shutter and past the
+  // 0.1 s step cap on a slow lane, so a span read off `t` overstates a window.
+  const encounterLog = useRef<Array<EncounterEvent & { t: number; sim: number }>>([])
+  const lifeClock = useRef(0)
   const encounterWorld = useMemo<EncounterWorld>(
     () => ({ standClear: (px, pz) => standingClear(colliders, px, pz, NPC_RADIUS), doorways: homes.map((h) => h.door) }),
     [colliders, homes],
@@ -2927,6 +2932,7 @@ function Walkers({
         pairCooldown: Object.fromEntries(board.current.pairCooldown),
         rest: Object.fromEntries(board.current.rest),
         log: [...encounterLog.current],
+        lifeClock: lifeClock.current,
         arrivals: states.current.map((s) => s.arrivals),
         // Each meeting party's heading error to its partner (rad, 0 = facing).
         facingError: (who: number) => {
@@ -2989,6 +2995,7 @@ function Walkers({
     // The encounters (design.md §19.10): only a walker out on a lane — not
     // indoors, not lingering at its errand, not on a door segment — may meet.
     const tuning = balance.villageLife.encounters
+    lifeClock.current += dt
     const view: EncounterWalker[] = states.current.map((s, i) => ({
       x: s.x,
       z: s.z,
@@ -2998,7 +3005,7 @@ function Walkers({
         !(import.meta.env.DEV && heldWalker.current === i),
     }))
     for (const e of stepEncounters(board.current, view, loads.current, encounterWorld, tuning, dt, Math.random)) {
-      encounterLog.current.push({ ...e, t })
+      encounterLog.current.push({ ...e, t, sim: lifeClock.current })
       if (encounterLog.current.length > 64) encounterLog.current.shift()
     }
     // The basket is drawn on whoever carries it now: one carrier, never two or none.

@@ -159,3 +159,51 @@ describe('the turn toward the partner', () => {
     expect(turnYawToward(0.9, 1, 0.25)).toBe(1)
   })
 })
+
+describe('the window clock (the live 10.49 s overstay of 16.11.2026)', () => {
+  // Walkers steps the encounters with the CAPPED frame step, min(rawDt, 0.1),
+  // and not at all while life is frozen; the live probe read the span off the
+  // render clock instead. This replays a slow lane plus a frozen shutter.
+  it('runs on the life clock: the render clock overstates the window on a slow, frozen lane', () => {
+    const board = createEncounterBoard()
+    const ws = [walker(0, 0), walker(1, 0)]
+    const loads = [false, false]
+    let render = 0
+    let life = 0
+    let meet: { render: number; life: number } | null = null
+    let part: { render: number; life: number } | null = null
+    for (let f = 0; f < 400 && !part; f++) {
+      const rawDt = 0.18 // ~5.5 fps
+      render += rawDt
+      if (f >= 15 && f < 40) continue // the shutter: life frozen, the render clock runs on
+      const dt = Math.min(rawDt, 0.1)
+      life += dt
+      for (const e of stepEncounters(board, ws, loads, open, tuning, dt, always)) {
+        if (e.kind === 'meet') meet = { render, life }
+        if (e.kind === 'part') part = { render, life }
+      }
+    }
+    expect(meet && part).toBeTruthy()
+    // The window itself is exact on the life clock …
+    expect(part!.life - meet!.life).toBeCloseTo(tuning.meetSeconds, 5)
+    // … while the same meeting spans well over twice that on the render clock.
+    expect(part!.render - meet!.render).toBeGreaterThan(2.5 * tuning.meetSeconds)
+  })
+
+  it('expires on time whatever the pair does meanwhile: unavailable, separated or moved apart', () => {
+    const board = createEncounterBoard()
+    const ws = [walker(0, 0), walker(1, 0)]
+    stepEncounters(board, ws, [false, false], open, tuning, 0.1, always)
+    ws[1] = walker(30, 0, { available: false })
+    ws[0] = walker(0, 0, { available: false })
+    let life = 0.1
+    let parted = false
+    while (!parted && life < 3 * tuning.meetSeconds) {
+      parted = stepEncounters(board, ws, [false, false], open, tuning, 0.1, always).some((e) => e.kind === 'part')
+      life += 0.1
+    }
+    expect(parted).toBe(true)
+    expect(life).toBeCloseTo(tuning.meetSeconds + 0.1, 5)
+    expect(board.meetings).toHaveLength(0)
+  })
+})

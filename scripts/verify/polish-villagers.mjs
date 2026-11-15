@@ -1314,13 +1314,17 @@ if (section('villager-encounters')) {
             const [a, b] = window.__encounterPair
             const part = e.log.find((x) => x.kind === 'part' && ((x.a === a && x.b === b) || (x.a === b && x.b === a)))
             const meet = [...e.log].reverse().find((x) => x.kind === 'meet' && ((x.a === a && x.b === b) || (x.a === b && x.b === a)))
-            return part && meet ? { span: part.t - meet.t, at: part.t, arrivals: e.arrivals } : null
+            // The window runs on the LIFE clock (`sim`), not the render clock
+            // `t`: the shutter above froze life while `t` ran on, and a lane
+            // under 10 fps caps every step at 0.1 s (PlaceLife.tsx, Walkers).
+            return part && meet ? { span: part.sim - meet.sim, clock: part.t - meet.t, arrivals: e.arrivals } : null
           },
           { frames: 1200, minMs: (knob.meetSeconds + 4) * 1000, wallCapMs: 60000 },
         ).catch(() => ({ value: null, frames: 0 }))
-        check('the pair parts', !!parted.value, parted.value ? `after ${parted.value.span.toFixed(2)} s` : 'still standing')
+        check('the pair parts', !!parted.value, parted.value ? `after ${parted.value.span.toFixed(2)} s of life (${parted.value.clock.toFixed(2)} s render clock, shutter included)` : 'still standing')
         if (parted.value) {
-          check('the meeting held no longer than its window', parted.value.span <= knob.meetSeconds + 0.25, `${parted.value.span.toFixed(2)} s against ${knob.meetSeconds} s`)
+          // Non-vacuous both ways: a life clock that stood still would pass "no longer".
+          check('the meeting held its window and no longer', parted.value.span >= knob.meetSeconds - 0.25 && parted.value.span <= knob.meetSeconds + 0.25, `${parted.value.span.toFixed(2)} s against ${knob.meetSeconds} s`)
           // 3. The errands still arrive: each of the pair reaches an errand
           // point or completes its round home after the meeting.
           await page.evaluate(({ a, b, base }) => {
@@ -1345,8 +1349,9 @@ if (section('villager-encounters')) {
         const e = window.__placeWalkers.encounters()
         const late = []
         for (const m of e.log.filter((x) => x.kind === 'meet')) {
-          const part = e.log.find((x) => x.kind === 'part' && x.t >= m.t && x.a === m.a && x.b === m.b)
-          if (part && part.t - m.t > limit) late.push(`${m.a}/${m.b} ${(part.t - m.t).toFixed(2)} s`)
+          // Life clock, as above: the render clock runs on through a frozen shutter.
+          const part = e.log.find((x) => x.kind === 'part' && x.sim >= m.sim && x.a === m.a && x.b === m.b)
+          if (part && part.sim - m.sim > limit) late.push(`${m.a}/${m.b} ${(part.sim - m.sim).toFixed(2)} s`)
         }
         for (const m of e.meetings) if (m.remaining > m.total || m.remaining <= -0.05) late.push(`open ${m.a}/${m.b} remaining ${m.remaining.toFixed(2)}`)
         return { late, meetings: e.log.filter((x) => x.kind === 'meet').length, handovers: e.log.filter((x) => x.kind === 'handover').length }
