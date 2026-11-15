@@ -473,6 +473,9 @@ export const effectiveFigureGltfBody = (s: UiState): boolean => currentQuality(s
 /** Flame billboards and smoke puffs of the grass fire (design.md §19.8/§19.13). */
 export const effectiveGrassFireFlames = (s: UiState): number => currentQuality(s).grassFireFlames
 export const effectiveGrassFireSmoke = (s: UiState): number => currentQuality(s).grassFireSmoke
+/** Smoke billboards over the village fire and the walker-dust pool (design.md §19.10). */
+export const effectiveFireSmokePuffs = (s: UiState): number => currentQuality(s).fireSmokePuffs
+export const effectiveWalkerDustPuffs = (s: UiState): number => currentQuality(s).walkerDustPuffs
 /** First-person eye adaptation at this level (design.md §2.7); the consumer
  *  additionally limits it to the settlement scene. */
 export const effectiveEyeAdaptation = (s: UiState): boolean => currentQuality(s).eyeAdaptation

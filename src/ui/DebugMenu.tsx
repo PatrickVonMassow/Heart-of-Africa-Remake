@@ -808,6 +808,15 @@ export function DebugMenu() {
         (v) => { balance.fire.indoorRainThreshold = Math.max(0.01, Math.min(1, v)); bump() }, 0.05),
       num(t.debug.fireHearthClearance, balance.fire.hearthClearance,
         (v) => { balance.fire.hearthClearance = Math.max(0, Math.min(2, v)); bump() }, 0.05),
+      // Smoke over the fire and dust under the feet (design.md §19.10).
+      num(t.debug.fireSmokeDrift, balance.fireSmoke.driftPerM,
+        (v) => { balance.fireSmoke.driftPerM = Math.max(0, Math.min(2, v)); bump() }, 0.05),
+      num(t.debug.fireSmokeOpacity, balance.fireSmoke.opacity,
+        (v) => { balance.fireSmoke.opacity = Math.max(0, Math.min(1, v)); bump() }, 0.05),
+      num(t.debug.walkerDustDryBelow, balance.walkerDust.dryBelow,
+        (v) => { balance.walkerDust.dryBelow = Math.max(0, Math.min(1, v)); bump() }, 0.05),
+      num(t.debug.walkerDustOpacity, balance.walkerDust.opacity,
+        (v) => { balance.walkerDust.opacity = Math.max(0, Math.min(1, v)); bump() }, 0.05),
       // The fixed solar hour and the shadow-light floor (design.md §2.7), with
       // the derived sun shown so a tester can walk the range without a date.
       num(t.debug.sunHour, balance.sun.hour,
