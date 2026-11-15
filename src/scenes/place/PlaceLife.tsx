@@ -164,7 +164,7 @@ import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
-import { glanceActive, glanceYaw, noticeStep, placeNoticeBoard, shyWeight } from './noticeGlance'
+import { createNoticeBoard, glanceActive, glanceYaw, noticeStep, placeNoticeBoard, shyWeight } from './noticeGlance'
 import { animalAnchors, animalBodies, animalScene, liveFigureColliders, setAnimalFigures, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import {
   createInhabitantSet,
@@ -1722,6 +1722,9 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   const steer = useRef<Array<{ x: number; z: number } | null>>([])
   // Per-goat shy weight (0 … 1) for the step away from the traveller (§19.10).
   const shy = useRef<number[]>([])
+  // The herd's own board: a goat shying is not a villager's glance, so it
+  // takes nothing from the settlement's cap on figures turning at once.
+  const herdNotice = useMemo(() => createNoticeBoard(), [])
   // Per-goat leg-pivot groups (four each) and gait state (last position, walked
   // distance, held facing and each stance's world contact) so the swing rides
   // distance, the body faces travel and a planted foot does not follow either.
@@ -1791,7 +1794,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       // §19.10): the grazing target is offset away from the player, eased so
       // the step rides the ordinary swept goat stepping and its capped turn.
       const shyCfg = balance.villageLife.notice
-      const shyNotice = noticeStep(placeNoticeBoard, `goat:${i}`, s, placePlayerPosition, { exempt: !!goal }, shyCfg, dt)
+      const shyNotice = noticeStep(herdNotice, `goat:${i}`, s, placePlayerPosition, { exempt: !!goal }, shyCfg, dt)
       const w = shy.current[i] = shyWeight(shy.current[i] ?? 0, shyNotice.glance > 0, shyCfg, dt)
       tx += shyNotice.awayX * shyCfg.goatShyStep * w
       tz += shyNotice.awayZ * shyCfg.goatShyStep * w

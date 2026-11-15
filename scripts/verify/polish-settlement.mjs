@@ -2068,4 +2068,75 @@ if (section('porter-head-load')) {
   }
 }
 
+// --- The inhabitants notice the traveller (design.md §19.10, src/scenes/place/
+// noticeGlance.ts): the player walks past the conversing pair in a village; at
+// least one of the two turns its yaw measurably toward the player (on the capped
+// spot turn rate, never a snap) and returns to its partner afterwards, while the
+// settlement's errands go on moving. The shot is a local/place subject: the pair.
+if (section('inhabitants-glance')) {
+  const PLACE = 'maasai-village'
+  await goToPlace(PLACE)
+  const live = await page
+    .waitForFunction(() => !!window.__placeTalkers && !!window.__placeTalkerYaws && !!window.__placeNotice && !!window.__placePlayer && !!window.__placeBodies, null, { timeout: 40000 })
+    .then(() => true, () => false)
+  check(`${PLACE}: the pair publishes its glance read-back`, live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    const cfg = await page.evaluate(() => ({ ...window.__balance.villageLife.notice }))
+    const pair = await page.evaluate(() => window.__placeTalkers.map((t) => ({ x: t.x, z: t.z, yaw: t.yaw })))
+    const cx = (pair[0].x + pair[1].x) / 2
+    const cz = (pair[0].z + pair[1].z) / 2
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a))
+    const place = (x, z) => page.evaluate(([a, b]) => { const p = window.__placePlayer; p.x = a; p.z = b }, [x, z])
+    // Far off first, so neither has a glance or a cooldown running.
+    await place(cx, cz + cfg.radius + 12)
+    await nextFrames(Math.ceil((cfg.cooldownSeconds + cfg.glanceSeconds * 2) * 60))
+    const rest = await page.evaluate(() => window.__placeTalkerYaws())
+    const bodiesBefore = await page.evaluate(() => window.__placeBodies().map((b) => ({ x: b.x, z: b.z })))
+    // Walk past the pair on a line 3 m to its side, at walking pace.
+    const side = 3
+    let best = { turn: 0, toward: Infinity, who: -1 }
+    let maxStep = 0
+    let prev = rest
+    let shotAt = null
+    for (let t = -cfg.radius - 2; t <= cfg.radius + 2; t += 0.04) {
+      await place(cx + side, cz + t)
+      await nextFrames(1)
+      const now = await page.evaluate(() => window.__placeTalkerYaws())
+      for (let k = 0; k < 2; k++) {
+        maxStep = Math.max(maxStep, Math.abs(wrap(now[k] - prev[k])))
+        const turn = Math.abs(wrap(now[k] - rest[k]))
+        const bearing = Math.atan2(cx + side - pair[k].x, cz + t - pair[k].z)
+        const toward = Math.abs(wrap(bearing - now[k]))
+        if (turn > best.turn) best = { turn, toward, who: k }
+        if (shotAt === null && turn > 0.5) shotAt = { k, t }
+      }
+      prev = now
+    }
+    if (shotAt) {
+      const k = shotAt.k
+      await page.evaluate(([x, z, tx, tz]) => {
+        const p = window.__placePlayer
+        p.x = x; p.z = z
+        p.yaw = Math.atan2(-(tx - x), -(tz - z))
+        p.pitch = -0.1
+      }, [cx + side, cz + shotAt.t, pair[k].x, pair[k].z])
+      await nextFrames(2)
+      await frame('356-inhabitant-glance', { local: { x: pair[k].x, y: 1.2, z: pair[k].z }, label: `a ${PLACE} inhabitant of the conversing pair turned toward the passing traveller` })
+    }
+    check('walking past the pair, an inhabitant turns measurably toward the player (point 356)', best.turn > 0.5, JSON.stringify(best))
+    // 60 fps budget plus one frame of jitter: the capped spot turn, never a snap.
+    check('the glance turns at a capped rate, never a snap (point 356)', maxStep < 0.2, `largest per-frame step ${maxStep.toFixed(3)} rad`)
+    // Off again: both return to their partner within the glance plus a turn.
+    await place(cx, cz + cfg.radius + 12)
+    await nextFrames(Math.ceil((cfg.glanceSeconds * cfg.childFactor + 3) * 60))
+    const after = await page.evaluate(() => window.__placeTalkerYaws())
+    const back = Math.max(...after.map((y, k) => Math.abs(wrap(y - pair[k].yaw))))
+    check('after the traveller has passed, the pair faces each other again (point 356)', back < 0.02, `largest offset ${back.toFixed(3)} rad`)
+    const bodiesAfter = await page.evaluate(() => window.__placeBodies().map((b) => ({ x: b.x, z: b.z })))
+    const moved = bodiesAfter.filter((b, i) => bodiesBefore[i] && Math.hypot(b.x - bodiesBefore[i].x, b.z - bodiesBefore[i].z) > 0.5).length
+    check('the errands go on while the traveller is glanced at (point 356)', moved > 0, `${moved}/${bodiesAfter.length} inhabitants moved`)
+  }
+}
+
 await finishPolishSuite()
