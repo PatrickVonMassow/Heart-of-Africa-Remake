@@ -720,4 +720,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b6ae63528630edb0bed414c1630d313d2ef2369da69e289456e4bc8a0d5e7f1b -->
+<!-- GUIDE-FINGERPRINT: a23d3dd766ec522d599a500d1623089e7e4e2b8c6f02b4d9639d4e56c0b0dcb6 -->
