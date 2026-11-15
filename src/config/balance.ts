@@ -2201,7 +2201,7 @@ export const balance: BalanceConfig = {
     // reporting line, far above an ordinary frame on any supported machine.
     longFrameMs: 100, // calibratable
     ownerShare: 0.25, // calibratable
-    // Measured ~0.3-0.6 ms per 128x64 re-bake in node; 4 ms leaves headroom
+    // Measured 0.4-1.4 ms per 128x64 re-bake (dev browser); 4 ms leaves headroom
     // for a loaded CI machine while still catching a return to per-step work.
     envRebakeBudgetMs: 4, // calibratable
   },
