@@ -2204,6 +2204,22 @@ const standFacing = async (sx, sz, tx, ty, tz) => {
   }, [sx, sz, tx, ty, tz])
   await nextFrames(3)
 }
+/**
+ * Stand 4.5 m from (x, z) looking at height y, trying eight bearings and keeping
+ * the first whose sight line reaches the point: a fixed bearing can put a hut
+ * wall or a fence between camera and target. `through` names a mesh the ray may hit.
+ */
+const standWithSight = async (x, y, z, through = null) => {
+  const tries = []
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4
+    await standFacing(x + Math.sin(a) * 4.5, z + Math.cos(a) * 4.5, x, y, z)
+    const ray = await page.evaluate(([px, py, pz]) => window.__placeRayHit?.(px, py, pz) ?? null, [x, y, z])
+    if (ray && (ray.hitDistance === null || (through && ray.hitName === through) || ray.hitDistance >= ray.targetDistance - 0.5)) return { ok: true, k }
+    tries.push({ k, hit: ray?.hitName, d: ray?.hitDistance?.toFixed(2), t: ray?.targetDistance?.toFixed(2) })
+  }
+  return { ok: false, tries }
+}
 /** OFF/ON/OFF crops of `clip` with `set(on)` switching the effect. */
 const attributeCrop = async (clip, set, what) => {
   const shots = []
@@ -2279,16 +2295,19 @@ if (section('walker-dust')) {
   const fresh = await page
     .waitForFunction((n0) => {
       const d = window.__placeDust?.()
-      return d && d.spawned > n0 && d.puffs.some((p) => p.age > 0.1 && p.age < 0.35) ? d.puffs.find((p) => p.age > 0.1 && p.age < 0.35) : null
+      // Walkers also step through hut doors; a puff on an indoor floor is hidden.
+      const outdoors = (p) => !(window.__placeColliders ?? []).some((c) => Math.hypot(p.x - c.x, p.z - c.z) < c.r + 0.5)
+      const pick = d && d.spawned > n0 ? d.puffs.find((p) => p.age > 0.1 && p.age < 0.35 && outdoors(p)) : null
+      return pick ?? null
     }, dry0?.spawned ?? 0, { timeout: 30000, polling: 'raf' })
     .then((h) => h.jsonValue(), () => null)
   if (fresh) await freezeLife(true)
   const dry1 = await dustStats()
   check('in dry weather a walking inhabitant raises dust (design.md §19.10)', fresh !== null && dry1 && dry1.spawned > (dry0?.spawned ?? 0), JSON.stringify({ before: dry0?.spawned, after: dry1?.spawned, puff: fresh }))
   if (fresh) {
-    await standFacing(fresh.x, fresh.z + 4.5, fresh.x, fresh.y + 0.3, fresh.z)
-    const clip = await clipAround(fresh.x, fresh.y + 0.3, fresh.z, 70)
-    check('the crop at the walker\'s feet is on screen (walker-dust staging)', clip !== null, JSON.stringify({ fresh, clip }))
+    const sight = await standWithSight(fresh.x, fresh.y + 0.3, fresh.z, 'walker-dust')
+    const clip = sight.ok ? await clipAround(fresh.x, fresh.y + 0.3, fresh.z, 70) : null
+    check('the crop at the walker\'s feet is on screen with a clear sight line (walker-dust staging)', clip !== null, JSON.stringify({ fresh, sight, clip }))
     if (clip) {
       const r = await attributeCrop(clip, (on) => page.evaluate((v) => { window.__balance.walkerDust.opacity = v }, on ? configured : 0), 'walker-dust')
       check(
@@ -2308,10 +2327,16 @@ if (section('walker-dust')) {
   const raised = (wet1?.spawned ?? 0) - (wet0?.spawned ?? 0)
   const due = (wet1?.suppressed ?? 0) - (wet0?.suppressed ?? 0)
   check('in rain walking inhabitants raise no dust (design.md §19.10)', wet1 !== null && raised === 0 && due > 0 && wet1.puffs.length === 0, `raised ${raised}, strides on wet ground ${due}, live puffs ${wet1?.puffs.length}`)
-  const walker = await page.evaluate(() => (window.__placeWalkers?.states ?? []).find((s) => s.mode === 'walk' && s.pause <= 0) ?? null)
+  const walker = await page
+    .waitForFunction(() => (window.__placeWalkers?.states ?? []).find((s) =>
+      s.mode === 'walk' && s.pause <= 0 && !(window.__placeColliders ?? []).some((c) => Math.hypot(s.x - c.x, s.z - c.z) < c.r + 1.5)) ?? null,
+    null, { timeout: 30000, polling: 'raf' })
+    .then((h) => h.jsonValue(), () => null)
+  check('in rain an inhabitant walks in the open for the no-dust frame (walker-dust staging)', walker !== null, JSON.stringify(walker))
   if (walker) {
     await freezeLife(true)
-    await standFacing(walker.x, walker.z + 4.5, walker.x, 0.4, walker.z)
+    const sight = await standWithSight(walker.x, 0.3, walker.z)
+    check('a walker\'s feet in the rain are in view with a clear sight line (walker-dust staging)', sight.ok, JSON.stringify({ walker, sight }))
     await frame('358-walker-dust-rain', { place: PLACE, label: 'a walking inhabitant on wet ground, no dust' })
     await freezeLife(false)
   }
