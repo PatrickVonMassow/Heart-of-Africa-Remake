@@ -257,6 +257,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Beleg nach jeder Fernwirkung den **Zielzustand** statt des Versuchs, und melde beim
   Start, was **lokal fertig, aber nirgends angekommen** ist.“
 
+- **Gemessen, aber nichts unterschieden.** Ein Wert, der unter jeder Erklärung gleich ausfällt,
+  belegt keine; und ein Erfolg, zu dem du selbst geklickt haben könntest, sagt nichts über die Automatik.
+  → *Prompt:* „Nenn **vor** der Messung, welches Ergebnis welche Hypothese **ausschließt**, und
+  zähl eine Probe mit möglichem Nutzerklick erst, wenn ich bestätige, nicht geklickt zu haben.“
+
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
   sieht dabei wie Sorgfalt aus.
@@ -720,4 +725,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a23d3dd766ec522d599a500d1623089e7e4e2b8c6f02b4d9639d4e56c0b0dcb6 -->
+<!-- GUIDE-FINGERPRINT: 11e418e105f8c56b4ad46ab7a79f3285cb55e59e46635a188ed95880eaf8d2a1 -->
