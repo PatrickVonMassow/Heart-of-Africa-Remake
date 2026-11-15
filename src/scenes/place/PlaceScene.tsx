@@ -172,6 +172,7 @@ import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../rende
 import { clearShelterMask, setShelterLook, setShelterMask, SHELTER_MASK_SIZE } from '../../render/shelterWetness'
 import { bakeShelterMask, placeShelters } from './shelterMask'
 import { FireSmoke, WalkerDust } from './SmokeDust'
+import { isLifeFrozen } from './lifeFreeze'
 import { devAssert } from '../../systems/devAssert'
 import {
   GUESS_KEY_CODE,
@@ -1223,7 +1224,9 @@ function FirePit({
     // down by rain (point 256, the two branches of shelteredFireRainFactor).
     const rain = rainAmount(rainRef.current, balance.season.weatherStrength)
     const rainFactor = shelteredFireRainFactor(rain, sheltered)
-    if (light.current) {
+    // The dev life freeze holds the flicker too: a crop compared across frames
+    // must not see the hut wall pulse in the firelight.
+    if (light.current && !isLifeFrozen()) {
       // The fire burns harder in the cold months (point 142, the §4.9 "fire
       // image": warming fires, not just cooking fires) — and 120g already made
       // its glow carry further under the season's dimmed sun.
