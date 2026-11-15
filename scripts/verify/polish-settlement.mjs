@@ -2220,6 +2220,7 @@ const standWithSight = async (x, y, z, through = null) => {
   }
   return { ok: false, tries }
 }
+const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
 /** OFF/ON/OFF crops of `clip` with `set(on)` switching the effect. */
 const attributeCrop = async (clip, set, what) => {
   const shots = []
@@ -2248,7 +2249,10 @@ if (section('fire-smoke')) {
   const clip = await clipAround(midX, 2.6, midZ, 90)
   check('the crop above the fire is on screen (fire-smoke staging)', clip !== null, JSON.stringify({ fx, fz, clip }))
   if (clip) {
+    // Frozen so a villager crossing the crop between the two OFF shots is no noise.
+    await freezeLife(true)
     const r = await attributeCrop(clip, (on) => page.evaluate((v) => { window.__balance.fireSmoke.opacity = v }, on ? configured : 0), 'fire-smoke')
+    await freezeLife(false)
     check(
       'above the dry fire the pixels differ from the same crop with the smoke disabled (design.md §19.10)',
       r.effect > Math.max(1, 2 * r.noise),
@@ -2274,7 +2278,6 @@ if (section('fire-smoke')) {
 if (section('walker-dust')) {
   const PLACE = 'zulu-village'
   const configured = await page.evaluate(() => window.__balance.walkerDust.opacity)
-  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
   const dustStats = () => page.evaluate(() => window.__placeDust?.() ?? null)
   const settleWetness = async (wet, label) => {
     await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wet)
