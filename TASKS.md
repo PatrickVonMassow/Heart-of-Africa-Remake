@@ -77,40 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 357. The village sounds inhabited (user 25.07.2026). Checked: the settlement
-  soundscape in `src/systems/ambience.ts` runs exactly ONE layer for a village —
-  `setTarget('drums', 0.5)`. No voices, no pestle, no goats, no fire. Sound carries
-  "inhabited" further than any visual, and its absence is not noticed until it is there.
-  TARGET, as layers over the existing master ambience volume (§20), each with its own
-  calibratable level like `balance.birdsongVolume`: a low murmur of VOICES at
-  conversational distance; the thud of the mortar, timed to the pestle that is already
-  animated rather than looping free; goats; and the fire's crackle rising as the
-  traveller nears the fire ring (the §19.1 proximity model already exists for animal
-  calls — reuse it, do not build a second one).
-  THE VOICES STAY WORDLESS, and that is a decision, not a shortcut: the language
-  mechanic of §13.4 is explicitly undecided and under review, so anything resembling
-  speech would commit the game to an answer this point has no business giving. A murmur
-  commits to nothing and can be replaced when §13 is settled.
-  KEEP: the drums as they are, the port and travel soundscapes untouched, and the single
-  master volume in charge of everything (§20).
-  THE WORDLESS-VOICES CLAUSE IS OVERTAKEN (carried 20.08.2026 from the 10.08.2026 four-eyes
-  work-order analysis, not a fresh finding): it rests on §13.4 being undecided, and the
-  communication PoC has since answered it for a playable slice — `docs/communication-poc-spec.md`
-  from the user's brief of 03.08.2026, built as the village speech in `src/systems/ambience.ts`,
-  which plans tonal syllables on their own speech bus under `balance.communication.speechVolume`.
-  Villages therefore already have voices and they are NOT wordless, so the murmur layer is
-  not this point's to add and would sit on top of the speech rather than beside it. What this
-  point still owes is the rest of the bed — the mortar's thud timed to the animated pestle,
-  the goats, and the fire's crackle rising with proximity — and its levels must be judged
-  against the speech that is now in the mix, not against drums alone.
-  VERIFIABLE: pure (`src/systems/ambience.test.ts`) — each new layer's gain follows its
-  own slider and the master, is zero outside a village, and the fire layer rises and
-  falls with distance across a swept range. Live (`scripts/verify/settings.mjs`): inside
-  a village the new layers are audible in the graph's gain values and fall silent when
-  the master is muted; no console errors.
-  DOCS: design.md §19.10/§20 name the village layers.
-  Owed before landing (15.11.2026, branch @ cffefc587, all 7 end-state review passes recorded): (1) `scripts/verify/fixedWaits.test.mjs` reds — settings.mjs fixed waits 22 -> 24, also the CI shard-2 gate failure; wait on a condition instead; (2) the live mortar check calls `a.poundThud(2)` directly — observe strikes from the animated pestle and their timing; (3) the live fire check passes a binary on/off — compare settled gains at two audible distances; (4) `emitter()` in `ambience.ts` schedules only above gain 0.005, so quiet goat/fire settings and the fire near its reach fall silent — adjust the floor and unit-test real scheduling there. Then confirming review passes for the changed files and the village-bed section.
-
 - [ ] 358. Smoke over the fire, dust under the feet (user 25.07.2026). A thin smoke
   column drifting from the §19.10 fire reads as "someone lives here" from further away
   than any figure does, and dust kicked up where a walker crosses dry ground makes the
