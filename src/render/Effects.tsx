@@ -74,9 +74,13 @@ export function Effects() {
     const tex = envTexRef.current
     if (!tex) return
     if (bakedSunRef.current !== iblSun) {
-      const t0 = performance.now()
-      updateEnvironmentTexture(tex, iblSun)
-      markFrameWork('environment-rebake', performance.now() - t0)
+      if (import.meta.env.DEV) {
+        const t0 = performance.now()
+        updateEnvironmentTexture(tex, iblSun)
+        markFrameWork('environment-rebake', performance.now() - t0)
+      } else {
+        updateEnvironmentTexture(tex, iblSun)
+      }
     }
     bakedSunRef.current = iblSun
   }, [iblSun])
