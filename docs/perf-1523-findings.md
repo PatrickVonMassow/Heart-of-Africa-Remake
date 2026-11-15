@@ -90,3 +90,24 @@ The baked data is identical to a fresh texture's, so the picture is unchanged.
 The acceptance numbers (savanna-driving frame p99 ≤ 33 ms, max ≤ 50 ms on LOW
 and the default preset; driving p99 within 2x of standing p99) need the F8
 benchmark on real hardware, both backends — not measurable here.
+
+## Owner re-measurement on hardware (15.11.2026)
+
+The verify host has a real GPU (RTX 4070 Ti through WSL/ANGLE, headless
+Chrome, 1440x900, Vite dev build, seed 42). F8 benchmark `?bench=short`, same
+host and route, `main` before the fix against this branch:
+
+| savanna-driving | before: frame max / cpu p99 | after: frame max / cpu p99 |
+| --- | --- | --- |
+| baseline (WebGPU) | 595.7 / 592.7 ms | 86.2 / 26.0 ms |
+| all-off (WebGPU) | 500.2 / 497.0 ms | 55.6 / 7.0 ms |
+| low-preset (WebGPU) | 452.2 / 449.4 ms | 52.7 / 6.4 ms |
+| every other config (WebGPU) | 528-577 / 525-574 ms | 59-67 / 6.5-40 ms |
+| baseline / low-preset (WebGL 2, after only) | — | 72.4 / 23.6, 58.9 / 9.1 ms |
+
+The full (non-short) sweep on `main` did not finish within 15 min; on this
+branch it took about 6 min, with savanna-driving cpu p99 6-27 ms and driving
+p99 within 2x of standing p99 in every config. Frame totals on this headless
+lane stay GPU-bound (standing medians 17-58 ms), so the absolute goal
+(frame p99 <= 33 ms, max <= 50 ms on LOW and default) is judged by the user's
+benchmark on the reference profile, not here.
