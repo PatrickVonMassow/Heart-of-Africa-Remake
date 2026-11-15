@@ -171,6 +171,7 @@ import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { clearShelterMask, setShelterLook, setShelterMask, SHELTER_MASK_SIZE } from '../../render/shelterWetness'
 import { bakeShelterMask, placeShelters } from './shelterMask'
+import { FireSmoke, WalkerDust } from './SmokeDust'
 import { devAssert } from '../../systems/devAssert'
 import {
   GUESS_KEY_CODE,
@@ -1281,6 +1282,8 @@ function FirePit({
         shadow-camera-near={0.2}
         shadow-bias={FIRE_SHADOW_BIAS}
       />}
+      {/* The thin smoke column, on the flame's own rain factor (design.md §19.10). */}
+      <FireSmoke rainRef={rainRef} sheltered={sheltered} out={out} />
       {sheltered && <CookShelter thatchMat={thatchMat} />}
     </group>
   )
@@ -3529,6 +3532,8 @@ export function PlaceScene() {
 
       {/* Ambient settlement life — ports and villages only; a monument has its
           own sparse crowd (above) and no bustle/hints. */}
+      {/* Dust at a walker's feet on dry ground (design.md §19.10). */}
+      {(isPort || isVillage) && <WalkerDust />}
       {(isPort || isVillage) && (
         <PlaceLife
           kind={isPort ? 'port' : 'village'}

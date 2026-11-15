@@ -2163,4 +2163,162 @@ if (section('inhabitants-glance')) {
   }
 }
 
+// --- Smoke over the fire, dust under the feet (design.md §19.10,
+// src/scenes/place/SmokeDust.tsx). Both are attributed OFF/ON/OFF on their own
+// balance opacity: the ON crop must differ from the OFF crop by clearly more
+// than the two OFF crops differ from each other (the flame's flicker, the
+// drifting light). Screenshots are local/place subjects.
+
+/** Mean absolute RGB difference (0..255) of two equal-size PNG crops. */
+const cropDiff = async (a, b) => {
+  const [ra, rb] = await Promise.all([a, b].map((png) => sharp(png).removeAlpha().raw().toBuffer()))
+  let sum = 0
+  for (let k = 0; k < ra.length; k++) sum += Math.abs(ra[k] - rb[k])
+  return sum / ra.length
+}
+/** The viewport clip of a `half`-pixel square centred on world point (x, y, z), or null off screen. */
+const clipAround = (x, y, z, half) =>
+  page.evaluate(([px, py, pz, h]) => {
+    const cam = window.__placeCamera
+    if (!cam) return null
+    cam.updateMatrixWorld(true)
+    const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+    const c = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [px, py, pz, 1]))
+    if (c[3] <= 0) return null
+    const W = window.innerWidth
+    const H = window.innerHeight
+    const sx = ((c[0] / c[3] + 1) / 2) * W
+    const sy = ((1 - c[1] / c[3]) / 2) * H
+    if (sx - h < 0 || sy - h < 0 || sx + h > W || sy + h > H) return null
+    return { x: Math.round(sx - h), y: Math.round(sy - h), width: 2 * h, height: 2 * h }
+  }, [x, y, z, half])
+/** Stand at (sx, sz) facing (tx, tz), pitched so world height ty sits mid-screen. */
+const standFacing = async (sx, sz, tx, ty, tz) => {
+  await page.evaluate(([a, b, c, d, e]) => {
+    const p = window.__placePlayer
+    p.x = a
+    p.z = b
+    p.yaw = Math.atan2(-(c - a), -(e - b)) // forward is -Z rotated by yaw
+    const eye = window.__placeCamera?.position.y ?? 1.6
+    p.pitch = Math.max(-1.2, Math.min(1.2, Math.atan2(d - eye, Math.hypot(c - a, e - b))))
+  }, [sx, sz, tx, ty, tz])
+  await nextFrames(3)
+}
+/** OFF/ON/OFF crops of `clip` with `set(on)` switching the effect. */
+const attributeCrop = async (clip, set, what) => {
+  const shots = []
+  for (const on of [false, true, false]) {
+    await set(on)
+    await nextFrames(4)
+    shots.push(await capturePixels(page, `${what} crop`, { clip }))
+  }
+  await set(true)
+  return { effect: await cropDiff(shots[1], shots[0]), noise: await cropDiff(shots[2], shots[0]) }
+}
+
+if (section('fire-smoke')) {
+  const PLACE = 'zulu-village'
+  const configured = await page.evaluate(() => window.__balance.fireSmoke.opacity)
+  await goToPlace(PLACE)
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
+  await page.waitForFunction(() => window.__placeSeason?.().fireOut === false, null, { timeout: 15000 }).catch(() => {})
+  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
+  const [fx, fz] = await page.evaluate(() => window.__placeSeason().fire)
+  // Stand nine metres off the fire, looking at the column's middle height.
+  await standFacing(fx, fz + 9, fx, 2.6, fz)
+  const lean = await page.evaluate(() => window.__balance.fireSmoke)
+  const midX = fx + Math.sin((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * 1.6
+  const midZ = fz + Math.cos((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * 1.6
+  const clip = await clipAround(midX, 2.6, midZ, 90)
+  check('the crop above the fire is on screen (fire-smoke staging)', clip !== null, JSON.stringify({ fx, fz, clip }))
+  if (clip) {
+    const r = await attributeCrop(clip, (on) => page.evaluate((v) => { window.__balance.fireSmoke.opacity = v }, on ? configured : 0), 'fire-smoke')
+    check(
+      'above the dry fire the pixels differ from the same crop with the smoke disabled (design.md §19.10)',
+      r.effect > Math.max(1, 2 * r.noise),
+      `ON-vs-OFF ${r.effect.toFixed(2)} against OFF-vs-OFF ${r.noise.toFixed(2)} (mean |ΔRGB|)`,
+    )
+  }
+  await frame('358-fire-smoke-dry', { place: PLACE, label: 'the thin smoke column over the Zulu yard fire' })
+  // Heavy rain puts this indoor-hearth people's yard fire out: no smoke drawn.
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+  await page.waitForFunction(() => window.__placeSeason?.().fireOut === true, null, { timeout: 15000 }).catch(() => {})
+  await nextFrames(4)
+  const rainSmoke = await page.evaluate(() => {
+    const o = window.__placeScene?.getObjectByName('village-fire-smoke')
+    return o ? { visible: o.visible, count: o.count } : null
+  })
+  check('with the Zulu yard fire out in the rain, no smoke column is drawn (design.md §19.10)', rainSmoke === null || rainSmoke.visible === false, JSON.stringify(rainSmoke))
+  await page.evaluate((v) => {
+    window.__balance.fireSmoke.opacity = v
+    window.__ui.getState().setSeasonWetnessOverride(null)
+  }, configured)
+}
+
+if (section('walker-dust')) {
+  const PLACE = 'zulu-village'
+  const configured = await page.evaluate(() => window.__balance.walkerDust.opacity)
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  const dustStats = () => page.evaluate(() => window.__placeDust?.() ?? null)
+  const settleWetness = async (wet, label) => {
+    await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wet)
+    const s = await waitForReadingStable(
+      page,
+      () => {
+        const v = window.__placeSeason()
+        return { wetness: v.wetness, groundWet: v.groundWet }
+      },
+      { settleMs: 400, samples: 3, timeout: 240000 },
+    )
+    check(`${PLACE} (${label}): the ground's wet state settles before dust is read`, s.settled, `after ${s.waitedMs} ms — ${JSON.stringify(s.value)}`)
+  }
+  await goToPlace(PLACE)
+  await settleWetness(0, 'dry')
+  // Dry weather: within half a minute some walker's stride raises a puff.
+  const dry0 = await dustStats()
+  const fresh = await page
+    .waitForFunction((n0) => {
+      const d = window.__placeDust?.()
+      return d && d.spawned > n0 && d.puffs.some((p) => p.age > 0.1 && p.age < 0.35) ? d.puffs.find((p) => p.age > 0.1 && p.age < 0.35) : null
+    }, dry0?.spawned ?? 0, { timeout: 30000, polling: 'raf' })
+    .then((h) => h.jsonValue(), () => null)
+  if (fresh) await freezeLife(true)
+  const dry1 = await dustStats()
+  check('in dry weather a walking inhabitant raises dust (design.md §19.10)', fresh !== null && dry1 && dry1.spawned > (dry0?.spawned ?? 0), JSON.stringify({ before: dry0?.spawned, after: dry1?.spawned, puff: fresh }))
+  if (fresh) {
+    await standFacing(fresh.x, fresh.z + 4.5, fresh.x, fresh.y + 0.3, fresh.z)
+    const clip = await clipAround(fresh.x, fresh.y + 0.3, fresh.z, 70)
+    check('the crop at the walker\'s feet is on screen (walker-dust staging)', clip !== null, JSON.stringify({ fresh, clip }))
+    if (clip) {
+      const r = await attributeCrop(clip, (on) => page.evaluate((v) => { window.__balance.walkerDust.opacity = v }, on ? configured : 0), 'walker-dust')
+      check(
+        'the dust is visible: its crop differs from the same crop with the dust disabled (design.md §19.10)',
+        r.effect > Math.max(1, 2 * r.noise),
+        `ON-vs-OFF ${r.effect.toFixed(2)} against OFF-vs-OFF ${r.noise.toFixed(2)} (mean |ΔRGB|)`,
+      )
+    }
+    await frame('358-walker-dust-dry', { place: PLACE, label: 'dust at a walking inhabitant\'s feet on dry ground' })
+    await freezeLife(false)
+  }
+  // Rain: the walkers keep walking, their strides fall due, and none raises dust.
+  await settleWetness(1, 'rain')
+  const wet0 = await dustStats()
+  await nextFrames(20 * 60)
+  const wet1 = await dustStats()
+  const raised = (wet1?.spawned ?? 0) - (wet0?.spawned ?? 0)
+  const due = (wet1?.suppressed ?? 0) - (wet0?.suppressed ?? 0)
+  check('in rain walking inhabitants raise no dust (design.md §19.10)', wet1 !== null && raised === 0 && due > 0 && wet1.puffs.length === 0, `raised ${raised}, strides on wet ground ${due}, live puffs ${wet1?.puffs.length}`)
+  const walker = await page.evaluate(() => (window.__placeWalkers?.states ?? []).find((s) => s.mode === 'walk' && s.pause <= 0) ?? null)
+  if (walker) {
+    await freezeLife(true)
+    await standFacing(walker.x, walker.z + 4.5, walker.x, 0.4, walker.z)
+    await frame('358-walker-dust-rain', { place: PLACE, label: 'a walking inhabitant on wet ground, no dust' })
+    await freezeLife(false)
+  }
+  await page.evaluate((v) => {
+    window.__balance.walkerDust.opacity = v
+    window.__ui.getState().setSeasonWetnessOverride(null)
+  }, configured)
+}
+
 await finishPolishSuite()

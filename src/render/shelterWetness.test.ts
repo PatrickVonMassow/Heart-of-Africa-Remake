@@ -8,9 +8,11 @@ import {
   setShelterMask,
   SHELTER_MASK_SIZE,
   shelteredWetNode,
+  shelteredGroundWetnessAt,
   shelteredWetness,
   shelterWetState,
 } from './shelterWetness'
+import { setGroundWetness } from './seasonTint'
 
 const S = balance.rain.shelterStrength
 const D = balance.rain.dripBoost
@@ -81,5 +83,26 @@ describe('shelter mask upload and look', () => {
     setShelterLook(balance.rain)
     expect(shelterWetState().strength).toBe(S)
     expect(shelteredWetNode()).toBeTruthy()
+  })
+})
+
+describe('shelteredGroundWetnessAt — the wetness a walker\'s foot reads (design.md §19.10)', () => {
+  it('reads open ground in full, covered ground less wet, and dry ground dry', () => {
+    const n = SHELTER_MASK_SIZE
+    const cover = new Float32Array(n * n)
+    const drip = new Float32Array(n * n)
+    // Cover the cell at the origin of a 10 m mask.
+    const c = Math.round(0.5 * n - 0.5)
+    cover[c * n + c] = 1
+    setShelterMask({ size: n, extent: 10, cover, drip })
+    setShelterLook({ shelterStrength: 0.8, dripBoost: 0 })
+    setGroundWetness(0.6)
+    expect(shelteredGroundWetnessAt(5, 5)).toBeCloseTo(0.6, 6)
+    expect(shelteredGroundWetnessAt(50, 50)).toBeCloseTo(0.6, 6)
+    expect(shelteredGroundWetnessAt(0, 0)).toBeCloseTo(0.6 * (1 - 0.8), 6)
+    setGroundWetness(0)
+    expect(shelteredGroundWetnessAt(5, 5)).toBe(0)
+    clearShelterMask()
+    setShelterLook(balance.rain)
   })
 })

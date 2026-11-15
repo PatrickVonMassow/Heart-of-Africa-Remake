@@ -90,6 +90,20 @@ export function setShelterLook(cfg: { shelterStrength: number; dripBoost: number
   DRIP_BOOST_U.value = Math.max(0, cfg.dripBoost)
 }
 
+/** CPU read of `shelteredWetNode` at a world point (nearest mask cell, open
+ *  ground outside it): the ground wetness a walker's foot stands on. */
+export function shelteredGroundWetnessAt(x: number, z: number): number {
+  const extent = SHELTER_EXTENT_U.value as number
+  const i = Math.round(((x + extent) / (2 * extent)) * SHELTER_MASK_SIZE - 0.5)
+  const j = Math.round(((z + extent) / (2 * extent)) * SHELTER_MASK_SIZE - 0.5)
+  const inside = i >= 0 && j >= 0 && i < SHELTER_MASK_SIZE && j < SHELTER_MASK_SIZE
+  const data = SHELTER_TEX.image.data as Uint8Array
+  const k = (j * SHELTER_MASK_SIZE + i) * 4
+  const cover = inside ? data[k] / 255 : 0
+  const drip = inside ? data[k + 1] / 255 : 0
+  return shelteredWetness(GROUND_WET_U.value as number, cover, drip, SHELTER_STRENGTH_U.value as number, DRIP_BOOST_U.value as number)
+}
+
 /** Read-only view of the driven state, for tests. */
 export function shelterWetState() {
   return {
