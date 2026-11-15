@@ -81,8 +81,11 @@ export function noticeStep(
   e.lastZ = at.z
   e.glance = Math.max(0, e.glance - dt)
   e.cooldown = Math.max(0, e.cooldown - dt)
-  if (options.exempt || !player.active) {
+  // Exempt, gone, or moving on its own errand: the glance ends and its own
+  // steering owns the facing again, with nothing to turn back to.
+  if (options.exempt || !player.active || speed > cfg.childMaxSpeed) {
     e.glance = 0
+    e.rest = null
     return e
   }
   if (e.glance > 0 || e.cooldown > 0) return e
@@ -90,7 +93,6 @@ export function noticeStep(
   const dz = at.z - player.z
   const d = Math.hypot(dx, dz)
   if (d > cfg.radius || d < 1e-6) return e
-  if (speed > cfg.childMaxSpeed) return e
   if (glancingCount(board) >= cfg.maxAtOnce) return e
   e.glance = cfg.glanceSeconds * (options.child ? cfg.childFactor : 1)
   e.cooldown = e.glance + cfg.cooldownSeconds
