@@ -303,7 +303,8 @@ export const DOC_BUDGETS = [
     // RAISED by 2 measured lines for the §19.15 open outer garment rule (user 11.10.2026).
     // RAISED by 5 measured lines for the new §19.18 elderly animals subsection (work-order 265).
     // RAISED by 5 measured lines for the new §19.19 bird flight and raptor subsection (work-order 269).
-    maxLines: 868,
+    // RAISED by 2 measured lines for the §19.10 glance at the traveller (point 356).
+    maxLines: 870,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -511,7 +512,10 @@ export const DOC_BUDGETS = [
     // 1489, user 05.11.2026): no breast, genital area or buttocks bare from any
     // camera or pose, judged by the picture, outranking every budget — a new
     // rule the point orders written next to the covered-body rule; no new line.
-    maxWords: 30637,
+    // RAISED by the 87 measured words of the §19.10 glance paragraph (point 356):
+    // a genuinely new behaviour rule (who notices the player, cooldown, cap,
+    // exemptions) the document did not carry in any form.
+    maxWords: 30724,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
