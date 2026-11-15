@@ -2,6 +2,9 @@
 // top-down oriented movement, camera following from above. Visuals: TSL sky
 // dome, sun with soft shadows, animated ocean, instanced biome vegetation.
 
+import { registerRangedCaster, updateRangedCasters } from '../../render/shadowCasterRange'
+import { CASCADE_SELECT_PRIORITY, updateCascadeSkip } from '../../render/cascadeSkip'
+import { monumentGlyph, villageGlyph, type GlyphPart } from '../../render/placeMarkerGlyphs'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
@@ -1056,8 +1059,17 @@ function Sun() {
     }
   }, [light, shadowSize])
 
+  // Only the cascades the view can sample re-render (point 1524), selected on
+  // THIS frame's camera: after the follow (priority 0), before the post render.
+  // The travel ground never lies below sea level, the plane measured against.
+  useFrame(({ camera }) => {
+    const cascadesInUse = updateCascadeSkip(csm, camera as THREE.PerspectiveCamera, 0)
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__cascadesInUse = cascadesInUse
+  }, CASCADE_SELECT_PRIORITY)
+
   useFrame(() => {
     const pos = useGame.getState().pos
+    updateRangedCasters(pos.x, pos.z, useUi.getState().travelZoom, sunDir[1] / Math.max(1e-6, Math.hypot(sunDir[0], sunDir[2])))
     light.position.set(pos.x + sunDir[0] * 130, sunDir[1] * 130, pos.z + sunDir[2] * 130)
     target.position.set(pos.x, 0, pos.z)
     // Overcast dims the sun with the season (design.md §19, point 120c). The
@@ -1393,6 +1405,7 @@ function getVegetationMeshes(): VegetationMeshes {
     mesh.receiveShadow = true
     mesh.frustumCulled = false
     mesh.count = 0
+    mesh.visible = false // shown by the first fill that gives it plants
     return mesh
   }
   for (const sp of SPECIES) {
@@ -1538,6 +1551,9 @@ function swapFloraFill(fill: FloraFill, meshes: VegetationMeshes): void {
     const apply = (mesh: THREE.InstancedMesh, source: Float32Array) => {
       ;(mesh.instanceMatrix.array as Float32Array).set(source.subarray(0, nInst * 16))
       mesh.count = nInst
+      // An empty instanced mesh still costs a draw in the main pass and in
+      // each shadow cascade (point 1524), so it is hidden until it has plants.
+      mesh.visible = nInst > 0
       mesh.instanceMatrix.needsUpdate = true
       const tintAttr = mesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute
       ;(tintAttr.array as Float32Array).set(s.tint.subarray(0, nInst))
@@ -1710,9 +1726,9 @@ function Vegetation() {
     if (hide !== hiddenRef.current) {
       hiddenRef.current = hide
       for (const sp of SPECIES) {
-        meshes.base[sp].visible = !hide
+        meshes.base[sp].visible = !hide && meshes.base[sp].count > 0
         const cm = meshes.crown[sp]
-        if (cm) cm.visible = !hide
+        if (cm) cm.visible = !hide && cm.count > 0
       }
     }
     if (hide) return
@@ -1861,45 +1877,23 @@ function PortMarker() {
   )
 }
 
+/** Village glyph: three huts, merged into one wall and one roof mesh shared by
+ *  every village marker (render/placeMarkerGlyphs.ts, point 1524). */
 function VillageMarker() {
-  const huts: Array<[number, number, number]> = [
-    [0, -0.2, 0.72],
-    [-0.95, 0.5, 0.5],
-    [0.95, 0.55, 0.52],
-  ]
-  return (
-    <group>
-      {huts.map(([hx, hz, r], i) => (
-        <group key={i} position={[hx, 0, hz]}>
-          <mesh position={[0, r * 0.5, 0]} castShadow>
-            <cylinderGeometry args={[r, r * 1.06, r, 9]} />
-            <meshStandardMaterial color="#b0803f" roughness={0.95} />
-          </mesh>
-          <mesh position={[0, r + r * 0.42, 0]} castShadow>
-            <coneGeometry args={[r * 1.4, r * 1.05, 9]} />
-            <meshStandardMaterial color="#8f7340" roughness={1} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  )
+  return <GlyphMeshes parts={villageGlyph()} />
 }
 
 /** Marker for a monument site (design.md §4.4, point 273): a small three-pyramid
  *  glyph in the SW-diagonal row, so Giza reads as the pyramids on the map. */
 function MonumentMarker() {
-  const pyramids: Array<[number, number, number]> = [
-    [0.7, -0.7, 0.95], // Khufu, largest, NE
-    [0, 0, 0.85], // Khafre, centre
-    [-0.7, 0.7, 0.55], // Menkaure, smallest, SW
-  ]
+  return <GlyphMeshes parts={monumentGlyph()} />
+}
+
+function GlyphMeshes({ parts }: { parts: GlyphPart[] }) {
   return (
     <group>
-      {pyramids.map(([px, pz, r], i) => (
-        <mesh key={i} position={[px, r * 0.5, pz]} rotation={[0, Math.PI / 4, 0]} castShadow>
-          <coneGeometry args={[r, r * 1.28, 4]} />
-          <meshStandardMaterial color="#cdb079" roughness={0.95} />
-        </mesh>
+      {parts.map((p, i) => (
+        <mesh key={i} geometry={p.geometry} material={p.material} castShadow dispose={null} />
       ))}
     </group>
   )
@@ -1983,8 +1977,12 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   const enterHintShown = useUi((s) => s.enterPlaceId === place.id)
   const p = latLonToWorld(place.lat, place.lon)
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
+  // Casts the sun shadow only near the traveller (point 1524): far markers sat
+  // in the cascades' sunward beam and cost three draws per mesh for nothing.
+  const groupRef = useRef<THREE.Group>(null)
+  useEffect(() => (groupRef.current ? registerRangedCaster(groupRef.current) : undefined), [y])
   return (
-    <group position={[p.x, y, p.z]} name={`place-marker-${place.id}`}>
+    <group ref={groupRef} position={[p.x, y, p.z]} name={`place-marker-${place.id}`}>
       {mapPointGlyphHiddenByLandmark(place.id) ? null : place.kind === 'port' ? (
         <PortMarker />
       ) : place.kind === 'monument' ? (

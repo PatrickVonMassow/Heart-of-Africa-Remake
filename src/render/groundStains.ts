@@ -38,6 +38,7 @@ import {
   mix,
   mx_fractal_noise_float,
   positionWorld,
+  renderGroup,
   uniform,
   uniformArray,
   vec3,
@@ -217,11 +218,13 @@ const WARP_COS_SLOTS = Array.from({ length: MAX_GROUND_STAINS }, () => new THREE
 const WARP_SIN_SLOTS = Array.from({ length: MAX_GROUND_STAINS }, () => new THREE.Vector4(0, 0, 0, 0))
 
 /** The uniform array the terrain material samples (one vec4 per slot). */
-const GROUND_STAIN_U = uniformArray(SLOTS, 'vec4')
+// One upload per render, not per terrain chunk (point 1524): in the default
+// object group each of the ~15 chunk draws re-wrote all three arrays.
+const GROUND_STAIN_U = uniformArray(SLOTS, 'vec4').setGroup(renderGroup)
 
 /** The matching outline packing (one vec4 per slot, per component). */
-const GROUND_STAIN_WARP_COS_U = uniformArray(WARP_COS_SLOTS, 'vec4')
-const GROUND_STAIN_WARP_SIN_U = uniformArray(WARP_SIN_SLOTS, 'vec4')
+const GROUND_STAIN_WARP_COS_U = uniformArray(WARP_COS_SLOTS, 'vec4').setGroup(renderGroup)
+const GROUND_STAIN_WARP_SIN_U = uniformArray(WARP_SIN_SLOTS, 'vec4').setGroup(renderGroup)
 
 /** The calibrated outline swing — one value for every patch on screen. */
 const GROUND_STAIN_IRREGULARITY_U = uniform(STAIN_LOOK_DEFAULT.irregularity)

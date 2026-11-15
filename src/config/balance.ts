@@ -1036,6 +1036,30 @@ interface BalanceConfig {
      *  acceptable, never to quieten a regression. */
     pictureFreezeBudgetMs: number
   }
+  /** Range-limited sun-shadow casters (docs/perf-1524-findings.md): small
+   *  static travel casters cast only within `viewReach * zoom` plus their
+   *  shadow length at the current sun of the traveller. */
+  shadowCasterRange: {
+    /** Farthest visible ground from the traveller at zoom 1 (world units). */
+    viewReach: number
+    /** Height of the tallest ranged caster (world units); its shadow length
+     *  at the current sun is added to the radius. */
+    casterHeight: number
+    /** Cap on that shadow length (world units), for a sun at the horizon. */
+    maxShadowReach: number
+    /** Extra distance before an in-range caster switches off (no flicker). */
+    hysteresis: number
+  }
+  /** Sun-shadow cascades no visible pixel samples keep their last map
+   *  instead of re-rendering (docs/perf-1524-findings.md). */
+  shadowCascadeSkip: {
+    enabled: boolean
+    /** The visible-ground plane sits this far below the traveller's ground
+     *  (world units), so lower relief in view stays inside the kept cascades. */
+    groundDrop: number
+    /** Extra share of a cascade's start kept as margin before it is skipped. */
+    safety: number
+  }
   /** Travel-view frame-time guards (docs/perf-1523-findings.md). */
   travelFrame: {
     /** A frame interval in the travel view at or above this (ms) is reported by
@@ -2195,6 +2219,24 @@ export const balance: BalanceConfig = {
     // a loaded machine while still catching the defect this guards, which was
     // 21 s of blocked thread and 20 s without a painted frame.
     pictureFreezeBudgetMs: 4000, // calibratable, debug-editable
+  },
+  shadowCasterRange: {
+    // groundReach of the zoom-1 follow camera (42 up, 24 back, fov 50): ~35
+    // north of the aim and ~120 to the side at a 32:9 screen — 130 covers it.
+    viewReach: 130, // calibratable
+    // The tallest settlement marker glyph stands ~3 units; 5 leaves margin.
+    casterHeight: 5, // calibratable
+    // 5 units at a 3.5° sun: below that the sun has set into the dusk dim.
+    maxShadowReach: 80, // calibratable
+    hysteresis: 10, // calibratable
+  },
+  shadowCascadeSkip: {
+    enabled: true,
+    // The plane is sea level (the lowest travel ground) minus this: at the
+    // default zoom the deepest visible ground then lies 36.1 units deep against
+    // cascade 1's first sampled depth of 39.9 (fade margin included).
+    groundDrop: 2, // calibratable
+    safety: 0.05, // calibratable
   },
   travelFrame: {
     // The point-1523 report: ~0.5 s stalls on a strong PC; 100 ms is the brief's

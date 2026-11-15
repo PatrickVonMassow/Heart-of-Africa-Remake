@@ -18,7 +18,7 @@
 // frame varies. Math.random is seeded once per sweep, so the rolls repeat run
 // to run, though not config to config within a sweep.
 
-import { QUALITY_PRESETS, type QualityPreset } from '../config/quality'
+import { QUALITY_PRESETS, type DetailLevel, type QualityPreset } from '../config/quality'
 
 /** Simulation timestep every benchmark frame is stepped with (seconds). */
 export const BENCH_DT = 1 / 60
@@ -103,6 +103,29 @@ export const BENCH_CONFIGS: readonly BenchConfig[] = [
  * the low profile can be picked apart from one another.
  */
 export const LOW_CONFIG_NAME = 'low-preset'
+
+/**
+ * The row names of the preset passes (point 1524): every graphics level is
+ * measured with its REAL `QUALITY_PRESETS` values after the forced-HIGH lever
+ * sweep, so each preset reads against the same baseline. Ordered high→low;
+ * the low pass keeps its point-293 name so its profile stays comparable.
+ */
+export const PRESET_CONFIG_NAMES: Readonly<Record<DetailLevel, string>> = {
+  high: 'high-preset',
+  medium: 'medium-preset',
+  low: LOW_CONFIG_NAME,
+}
+
+/**
+ * The NATIVE renderer pixel ratio: R3F's default `dpr={[1, 2]}` clamp of the
+ * display ratio, which is what an uncapped level (medium/high) renders at.
+ */
+export function benchNativePixelRatio(devicePixelRatio: number | undefined): number {
+  return Math.min(Math.max(1, devicePixelRatio || 1), 2)
+}
+
+/** The preset passes in run order (high → medium → low). */
+export const BENCH_PRESET_LEVELS: readonly DetailLevel[] = ['high', 'medium', 'low']
 
 export type BenchPhaseName = 'savanna-standing' | 'desert-standing' | 'savanna-driving'
 
@@ -360,6 +383,10 @@ export interface BenchRow {
   vsyncLikely: boolean
   drawCalls: number
   triangles: number
+  /** Renderer pixel ratio the row was measured at (point 1524: the baseline
+   *  inherits the ratio active when F8 was pressed, so it is recorded rather
+   *  than assumed). Absent in reports from older builds. */
+  pixelRatio?: number
   /** Scene-graph triangles per system at the end of the sample. */
   sceneTriangles: Record<string, BenchTriGroup>
 }
@@ -532,7 +559,7 @@ export function benchSummaryLines(report: BenchReport): string[] {
     `${e.startedAt} · ${e.backend} · ${e.viewport.width}x${e.viewport.height} @dpr ${e.devicePixelRatio} · build ${e.build} ${e.commit}`,
     `fixed timestep ${report.dt.toFixed(5)}s · ${report.frames.sample} sampled frames per phase · seed ${report.seed} · day ${report.day}`,
     headlineNote(report.headline, report.gpuTiming.reason),
-    `${pad('config', 20)}${pad('phase', 18)}${padStart('fps', 7)}${padStart('gpu', 8)}${padStart('gpu95', 8)}${padStart('cpu', 8)}${padStart('frame', 8)}${padStart('f95', 8)}${padStart('draws', 8)}${padStart('tris', 10)}`,
+    `${pad('config', 20)}${pad('phase', 18)}${padStart('fps', 7)}${padStart('gpu', 8)}${padStart('gpu95', 8)}${padStart('cpu', 8)}${padStart('frame', 8)}${padStart('f95', 8)}${padStart('draws', 8)}${padStart('tris', 10)}${padStart('dpr', 6)}`,
   ]
   for (const r of report.rows) {
     lines.push(
@@ -546,6 +573,7 @@ export function benchSummaryLines(report: BenchReport): string[] {
         padStart(num(r.frame.p95), 8) +
         padStart(String(r.drawCalls), 8) +
         padStart(String(r.triangles), 10) +
+        padStart(r.pixelRatio === undefined ? '—' : r.pixelRatio.toFixed(2), 6) +
         (r.vsyncLikely ? '  [vsync-capped]' : ''),
     )
   }

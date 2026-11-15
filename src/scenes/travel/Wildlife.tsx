@@ -1987,6 +1987,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.castShadow = sp !== 'crocodile'
     m.frustumCulled = false
     m.count = 0
+    m.visible = false // shown once the herd update gives it animals
     adult[sp] = m
   }
   // STRIKING crocodiles ride fully out of the water and draw through the
@@ -1998,12 +1999,14 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   crocStrike.castShadow = false
   crocStrike.frustumCulled = false
   crocStrike.count = 0
+  crocStrike.visible = false
   const calf = {} as Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
   for (const sp of CALF_SPECIES) {
     const m = new THREE.InstancedMesh(calfGeometries[sp], material, MAX_CALF_INSTANCES)
     m.castShadow = true
     m.frustumCulled = false
     m.count = 0
+    m.visible = false
     calf[sp] = m
   }
   const elder = {} as Record<ElderRenderSpecies, THREE.InstancedMesh>
@@ -2012,6 +2015,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.castShadow = true
     m.frustumCulled = false
     m.count = 0
+    m.visible = false
     elder[sp] = m
   }
   wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), vultureLandedGeo: buildVultureLanded(), vultureFlareGeo: buildVulture(balance.vultureLanding.flareDihedral), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
@@ -6308,18 +6312,23 @@ function Herds() {
         write(a)
       }
       mesh.count = aIdx
+      // An empty pool still costs a draw per pass and cascade (point 1524).
+      mesh.visible = aIdx > 0
       mesh.instanceMatrix.needsUpdate = true
       if (sp === 'crocodile') {
         // The strike mesh (point 274): whatever diverted out of the hidden pool.
         pool.crocStrike.count = sIdx
+        pool.crocStrike.visible = sIdx > 0
         pool.crocStrike.instanceMatrix.needsUpdate = true
       }
       if (calfMesh) {
         calfMesh.count = cIdx
+        calfMesh.visible = cIdx > 0
         calfMesh.instanceMatrix.needsUpdate = true
       }
       if (elderMesh) {
         elderMesh.count = oIdx
+        elderMesh.visible = oIdx > 0
         elderMesh.instanceMatrix.needsUpdate = true
       }
     }
