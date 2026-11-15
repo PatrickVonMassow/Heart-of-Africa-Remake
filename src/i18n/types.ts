@@ -765,6 +765,10 @@ export interface Strings {
     fireOpenRainDamp: string
     fireIndoorRainThreshold: string
     fireHearthClearance: string
+    fireSmokeDrift: string
+    fireSmokeOpacity: string
+    walkerDustDryBelow: string
+    walkerDustOpacity: string
     sunHour: string
     sunShadowFloor: string
     sunDirection: string

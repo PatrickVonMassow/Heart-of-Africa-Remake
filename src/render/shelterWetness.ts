@@ -90,6 +90,31 @@ export function setShelterLook(cfg: { shelterStrength: number; dripBoost: number
   DRIP_BOOST_U.value = Math.max(0, cfg.dripBoost)
 }
 
+/** CPU read of `shelteredWetNode` at a world point, sampled the way the GPU
+ *  does: bilinear between the four nearest cells, clamped to the edge. */
+export function shelteredGroundWetnessAt(x: number, z: number): number {
+  const extent = SHELTER_EXTENT_U.value as number
+  const n = SHELTER_MASK_SIZE
+  const data = SHELTER_TEX.image.data as Uint8Array
+  const fx = ((x + extent) / (2 * extent)) * n - 0.5
+  const fz = ((z + extent) / (2 * extent)) * n - 0.5
+  const i0 = Math.floor(fx)
+  const j0 = Math.floor(fz)
+  const tx = fx - i0
+  const tz = fz - j0
+  const at = (i: number, j: number, ch: number) => {
+    const ci = Math.min(n - 1, Math.max(0, i))
+    const cj = Math.min(n - 1, Math.max(0, j))
+    return data[(cj * n + ci) * 4 + ch] / 255
+  }
+  const lerp = (ch: number) => {
+    const a = at(i0, j0, ch) * (1 - tx) + at(i0 + 1, j0, ch) * tx
+    const b = at(i0, j0 + 1, ch) * (1 - tx) + at(i0 + 1, j0 + 1, ch) * tx
+    return a * (1 - tz) + b * tz
+  }
+  return shelteredWetness(GROUND_WET_U.value as number, lerp(0), lerp(1), SHELTER_STRENGTH_U.value as number, DRIP_BOOST_U.value as number)
+}
+
 /** Read-only view of the driven state, for tests. */
 export function shelterWetState() {
   return {

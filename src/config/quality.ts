@@ -121,6 +121,13 @@ export interface QualityPreset {
   /** Smoke puffs rising behind the grass fire's line; alpha-blended sprites,
    *  so this prices overdraw. */
   grassFireSmoke: number
+  /** Soft smoke billboards over the village fire (design.md §19.10): the thin
+   *  column that reads as "someone lives here". Alpha-blended, so it prices a
+   *  little overdraw over one spot. */
+  fireSmokePuffs: number
+  /** Pool of dust puffs a walker kicks up on dry ground (design.md §19.10):
+   *  the most that can hang in the air at once across the settlement. */
+  walkerDustPuffs: number
   /** Level of the Great Sphinx's site mesh (src/world/sphinx.ts, one
    *  definition for every view): `reduced` is the named frugal mesh, `full`
    *  the finest. Drawn every frame at the walkable Giza site, so this prices
@@ -190,6 +197,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureGltfBody: false, // the primitive figure stays: no glTF body is loaded at all
     grassFireFlames: 16, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 6, // smoke puffs behind the line (overdraw)
+    fireSmokePuffs: 4, // calibratable: the village fire's smoke column
+    walkerDustPuffs: 8, // calibratable: dust puffs in the air at once
     sphinxSiteDetail: 'reduced', // the named reduced Sphinx mesh (calibratable)
     springSegments: 12, // a coarse dome; its surface still bubbles and rings
     springBubbles: 0, // no spheres — the dome surface itself still bubbles
@@ -228,6 +237,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureGltfBody: true, // the CC0 glTF body under the dress
     grassFireFlames: 28, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 14, // smoke puffs behind the line (overdraw)
+    fireSmokePuffs: 7, // calibratable: the village fire's smoke column
+    walkerDustPuffs: 16, // calibratable: dust puffs in the air at once
     sphinxSiteDetail: 'standard', // calibratable
     springSegments: 24, // calibratable
     springBubbles: 4, // calibratable
@@ -265,6 +276,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureGltfBody: true, // the CC0 glTF body under the dress
     grassFireFlames: 40, // the burning line's tongues; the ground ember edge draws on every level
     grassFireSmoke: 24, // smoke puffs behind the line (overdraw)
+    fireSmokePuffs: 10, // calibratable: the village fire's smoke column
+    walkerDustPuffs: 24, // calibratable: dust puffs in the air at once
     sphinxSiteDetail: 'full', // the fuller Sphinx mesh (calibratable)
     springSegments: 36, // a round dome at the closest zoom
     springBubbles: 7, // calibratable

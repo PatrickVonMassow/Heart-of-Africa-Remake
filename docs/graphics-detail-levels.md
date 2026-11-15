@@ -54,6 +54,8 @@ device pixel ratio is kept (no cap).
 | `figureGltfBody` | off | on | on |
 | `grassFireFlames` | 16 | 28 | 40 |
 | `grassFireSmoke` | 6 | 14 | 24 |
+| `fireSmokePuffs` | 4 | 7 | 10 |
+| `walkerDustPuffs` | 8 | 16 | 24 |
 | `sphinxSiteDetail` | reduced | standard | full |
 | `springSegments` | 12 | 24 | 36 |
 | `springBubbles` | 0 | 4 | 7 |
@@ -278,6 +280,13 @@ added.
 - **`grassFireSmoke`** — Smoke puffs rising behind the line: alpha-blended,
   camera-facing sprites, so it prices overdraw while a fire burns in view, and
   nothing otherwise. One instanced draw. Climbs 6 → 14 → 24.
+- **`fireSmokePuffs`** — Soft billboards of the thin smoke column over the
+  village fire (design.md §19.10, `src/scenes/place/SmokeDust.tsx`); it thins
+  and gutters with the fire's own rain factor. One instanced draw over one
+  spot. Climbs 4 → 7 → 10.
+- **`walkerDustPuffs`** — The pool of dust puffs walkers kick up on dry ground
+  (design.md §19.10); wet ground raises none. One instanced draw. Climbs
+  8 → 16 → 24.
 - **`sphinxSiteDetail`** — The level of the Great Sphinx's mesh at the
   walkable Giza site (`src/world/sphinx.ts`, the ONE definition every view of
   the monument derives from; `src/render/sphinx.ts` builds it). `reduced` is

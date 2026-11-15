@@ -982,6 +982,30 @@ interface BalanceConfig {
     /** Clearance (m) the hearth collider adds around the drawn stone ring (point 348). */
     hearthClearance: number
   }
+  /** The thin smoke column over the village fire (design.md §19.10,
+   *  src/scenes/place/smokeDust.ts `PlumeTuning`). */
+  fireSmoke: {
+    height: number
+    driftPerM: number
+    driftDirDeg: number
+    startSize: number
+    endSize: number
+    opacity: number
+    thinning: number
+    /** Seconds one puff takes from the hearth to the top of the column. */
+    life: number
+  }
+  /** Dust kicked up at a walker's feet on dry ground (design.md §19.10,
+   *  src/scenes/place/smokeDust.ts `DustTuning`). */
+  walkerDust: {
+    dryBelow: number
+    life: number
+    size: number
+    growth: number
+    lift: number
+    opacity: number
+    spacing: number
+  }
   /** The burning of the steppe (design.md §19.8/§19.13): the grass fire's
    *  front, its smoke and the burn scar it leaves (src/scenes/travel/grassFireFront.ts). */
   grassFire: {
@@ -2184,6 +2208,31 @@ export const balance: BalanceConfig = {
     // 1.11 m drawn hearth + 0.19 m = the 1.3 m keep-out the fire always had, so
     // no layout moves; calibratable, debug-editable (applies on the next visit).
     hearthClearance: 0.19,
+  },
+  fireSmoke: {
+    // Educated guesses (§14), all calibratable: a slow, thin column that reads
+    // from across the village without hiding it. Drift and opacity are
+    // debug-editable; rain thins and shortens it by the fire's own rain factor.
+    height: 6,
+    driftPerM: 0.35, // calibratable, debug-editable
+    driftDirDeg: 60,
+    startSize: 0.5,
+    endSize: 2.6,
+    opacity: 0.32, // calibratable, debug-editable
+    thinning: 1.3,
+    life: 9,
+  },
+  walkerDust: {
+    // Educated guesses (§14), all calibratable: a small, short-lived puff per
+    // stride or so. Dry below a fifth of the wet-ground scale; the debug menu
+    // edits the threshold and the opacity.
+    dryBelow: 0.15, // calibratable, debug-editable
+    life: 0.9,
+    size: 0.35,
+    growth: 1.6,
+    lift: 0.3,
+    opacity: 0.35, // calibratable, debug-editable
+    spacing: 0.9,
   },
   grassFire: {
     // Educated guesses (§14), all calibratable. The speed and burn-out extent

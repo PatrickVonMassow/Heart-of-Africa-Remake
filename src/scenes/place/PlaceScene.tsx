@@ -171,6 +171,8 @@ import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { clearShelterMask, setShelterLook, setShelterMask, SHELTER_MASK_SIZE } from '../../render/shelterWetness'
 import { bakeShelterMask, placeShelters } from './shelterMask'
+import { FireSmoke, WalkerDust } from './SmokeDust'
+import { isLifeFrozen } from './lifeFreeze'
 import { devAssert } from '../../systems/devAssert'
 import {
   GUESS_KEY_CODE,
@@ -1222,7 +1224,9 @@ function FirePit({
     // down by rain (point 256, the two branches of shelteredFireRainFactor).
     const rain = rainAmount(rainRef.current, balance.season.weatherStrength)
     const rainFactor = shelteredFireRainFactor(rain, sheltered)
-    if (light.current) {
+    // The dev life freeze holds the flicker too: a crop compared across frames
+    // must not see the hut wall pulse in the firelight.
+    if (light.current && !isLifeFrozen()) {
       // The fire burns harder in the cold months (point 142, the §4.9 "fire
       // image": warming fires, not just cooking fires) — and 120g already made
       // its glow carry further under the season's dimmed sun.
@@ -1281,6 +1285,8 @@ function FirePit({
         shadow-camera-near={0.2}
         shadow-bias={FIRE_SHADOW_BIAS}
       />}
+      {/* The thin smoke column, on the flame's own rain factor (design.md §19.10). */}
+      <FireSmoke rainRef={rainRef} sheltered={sheltered} out={out} />
       {sheltered && <CookShelter thatchMat={thatchMat} />}
     </group>
   )
@@ -3529,6 +3535,8 @@ export function PlaceScene() {
 
       {/* Ambient settlement life — ports and villages only; a monument has its
           own sparse crowd (above) and no bustle/hints. */}
+      {/* Dust at a walker's feet on dry ground (design.md §19.10). */}
+      {(isPort || isVillage) && <WalkerDust />}
       {(isPort || isVillage) && (
         <PlaceLife
           kind={isPort ? 'port' : 'village'}

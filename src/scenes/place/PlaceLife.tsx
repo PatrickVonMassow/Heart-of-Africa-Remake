@@ -81,6 +81,7 @@ import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
 import { isLifeFrozen } from './lifeFreeze'
+import { useDustFeet } from './dustFeet'
 import { figureSnapshot, loadsUnder, objectSnapshot, shownInScene, usePlaceDumpProvider, usePlaceLifeSource } from './placeDumpRead'
 import type { PlaceLifeInhabitant, PlaceLifeTagRole } from '../../systems/placeLifeDump'
 import { PlaceDumpGroup } from './PlaceDumpGroup'
@@ -2749,6 +2750,8 @@ function Walkers({
     }))
   }
   const refs = useRef<Array<THREE.Group | null>>([])
+  // Their steps raise dust on dry ground (design.md §19.10, SmokeDust.tsx).
+  useDustFeet(() => states.current)
 
   // The body each walker presents to every other inhabitant (point 578) — it
   // counts only while the walker is actually out: one asleep in its hut must not

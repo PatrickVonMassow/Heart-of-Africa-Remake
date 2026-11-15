@@ -2163,4 +2163,228 @@ if (section('inhabitants-glance')) {
   }
 }
 
+// --- Smoke over the fire, dust under the feet (design.md §19.10,
+// src/scenes/place/SmokeDust.tsx). Both are attributed OFF/ON/OFF on their own
+// balance opacity: the ON crop must differ from the OFF crop by clearly more
+// than the two OFF crops differ from each other (the flame's flicker, the
+// drifting light). Screenshots are local/place subjects.
+
+/** Mean absolute RGB difference (0..255) of two equal-size PNG crops, blurred
+ *  first: the smoke is a soft veil, the noise a sub-pixel shimmer of thatch stripes. */
+const cropDiff = async (a, b) => {
+  const [ra, rb] = await Promise.all([a, b].map((png) => sharp(png).removeAlpha().blur(4).raw().toBuffer()))
+  let sum = 0
+  for (let k = 0; k < ra.length; k++) sum += Math.abs(ra[k] - rb[k])
+  return sum / ra.length
+}
+/** The viewport clip of a `half`-pixel square centred on world point (x, y, z), or null off screen. */
+const clipAround = (x, y, z, half) =>
+  page.evaluate(([px, py, pz, h]) => {
+    const cam = window.__placeCamera
+    if (!cam) return null
+    cam.updateMatrixWorld(true)
+    const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+    const c = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [px, py, pz, 1]))
+    if (c[3] <= 0) return null
+    const W = window.innerWidth
+    const H = window.innerHeight
+    const sx = ((c[0] / c[3] + 1) / 2) * W
+    const sy = ((1 - c[1] / c[3]) / 2) * H
+    if (sx - h < 0 || sy - h < 0 || sx + h > W || sy + h > H) return null
+    return { x: Math.round(sx - h), y: Math.round(sy - h), width: 2 * h, height: 2 * h }
+  }, [x, y, z, half])
+/** Stand at (sx, sz) facing (tx, tz), pitched so world height ty sits mid-screen. */
+const standFacing = async (sx, sz, tx, ty, tz) => {
+  await page.evaluate(([a, b, c, d, e]) => {
+    const p = window.__placePlayer
+    p.x = a
+    p.z = b
+    p.yaw = Math.atan2(-(c - a), -(e - b)) // forward is -Z rotated by yaw
+    const eye = window.__placeCamera?.position.y ?? 1.6
+    p.pitch = Math.max(-1.2, Math.min(1.2, Math.atan2(d - eye, Math.hypot(c - a, e - b))))
+  }, [sx, sz, tx, ty, tz])
+  await nextFrames(3)
+}
+/**
+ * Stand 4.5 m from (x, z) looking at height y, trying eight bearings and keeping
+ * the first whose sight line reaches the point: a fixed bearing can put a hut
+ * wall or a fence between camera and target. `through` names a mesh the ray may hit.
+ */
+const standWithSight = async (x, y, z, through = null) => {
+  const tries = []
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4
+    await standFacing(x + Math.sin(a) * 4.5, z + Math.cos(a) * 4.5, x, y, z)
+    const ray = await page.evaluate(([px, py, pz]) => window.__placeRayHit?.(px, py, pz) ?? null, [x, y, z])
+    if (ray && (ray.hitDistance === null || (through && ray.hitName === through) || ray.hitDistance >= ray.targetDistance - 0.5)) return { ok: true, k }
+    tries.push({ k, hit: ray?.hitName, d: ray?.hitDistance?.toFixed(2), t: ray?.targetDistance?.toFixed(2) })
+  }
+  return { ok: false, tries }
+}
+/**
+ * Step rendered frames until the sun, sky light, wetness and ground wetness hold
+ * still. They ease per RENDERED frame (k = dt·0.8, the ground linearly), and on
+ * WebGL 2 the loop stalled 3.6 s after a wetness switch (frame counter stuck): a
+ * wall-clock quiet read the half-lerped sun as settled, and it then brightened
+ * the attribution crop between its two OFF shots (measured: sun 1.90 → 2.40).
+ */
+const settleSeasonLight = async (maxSteps = 120) => {
+  const read = () => page.evaluate(() => {
+    const v = window.__placeSeason()
+    return [v.sun, v.hemi, v.wetness, v.groundWet]
+  })
+  let value = await read()
+  for (let i = 1; i <= maxSteps; i++) {
+    await nextFrames(30)
+    const next = await read()
+    const still = next.every((n, j) => Math.abs(n - value[j]) <= 1e-3)
+    value = next
+    if (still) return { settled: true, frames: i * 30, value }
+  }
+  return { settled: false, frames: maxSteps * 30, value }
+}
+const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+/** OFF/ON/OFF crops of `clip` with `set(on)` switching the effect. */
+const attributeCrop = async (clip, set, what) => {
+  const shots = []
+  for (const on of [false, true, false]) {
+    await set(on)
+    await nextFrames(4)
+    shots.push(await capturePixels(page, `${what} crop`, { clip }))
+  }
+  await set(true)
+  return { effect: await cropDiff(shots[1], shots[0]), noise: await cropDiff(shots[2], shots[0]) }
+}
+
+if (section('fire-smoke')) {
+  const PLACE = 'zulu-village'
+  const configured = await page.evaluate(() => window.__balance.fireSmoke.opacity)
+  await goToPlace(PLACE)
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
+  await page.waitForFunction(() => window.__placeSeason?.().fireOut === false, null, { timeout: 15000 }).catch(() => {})
+  const lit = await settleSeasonLight()
+  check(`${PLACE} (dry): the light on the fire yard settles over rendered frames before the smoke is read`, lit.settled, JSON.stringify(lit))
+  const [fx, fz] = await page.evaluate(() => window.__placeSeason().fire)
+  // Stand nine metres off the fire, looking at the column's middle height.
+  await standFacing(fx, fz + 9, fx, 2.6, fz)
+  const lean = await page.evaluate(() => window.__balance.fireSmoke)
+  // The crop sits on the column's dense lower part, clear of the flame tip and
+  // below the hut eave: the striped thatch shimmers frame to frame.
+  const CROP_Y = 1.9
+  const rise = CROP_Y - 0.6
+  const midX = fx + Math.sin((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * rise
+  const midZ = fz + Math.cos((lean.driftDirDeg * Math.PI) / 180) * lean.driftPerM * rise
+  // A handful of billboards leaves gaps: aim at the drawn puff nearest CROP_Y.
+  await freezeLife(true)
+  const puff = await page.evaluate((cy) => {
+    const o = window.__placeScene?.getObjectByName('village-fire-smoke')
+    if (!o || !o.visible) return null
+    o.updateMatrixWorld(true)
+    const m = new o.matrixWorld.constructor()
+    const v = o.position.clone()
+    let best = null
+    for (let i = 0; i < o.count; i++) {
+      o.getMatrixAt(i, m)
+      v.setFromMatrixPosition(m.premultiply(o.matrixWorld))
+      if (v.y < 1.3) continue
+      if (!best || Math.abs(v.y - cy) < Math.abs(best.y - cy)) best = { x: v.x, y: v.y, z: v.z }
+    }
+    return best
+  }, CROP_Y)
+  const clip = puff ? await clipAround(puff.x, puff.y, puff.z, 40) : await clipAround(midX, CROP_Y, midZ, 50)
+  check('the crop above the fire is on screen (fire-smoke staging)', clip !== null, JSON.stringify({ fx, fz, puff, clip }))
+  if (!clip) await freezeLife(false)
+  if (clip) {
+    // Frozen so a villager crossing the crop between the two OFF shots is no noise.
+    const r = await attributeCrop(clip, (on) => page.evaluate((v) => { window.__balance.fireSmoke.opacity = v }, on ? configured : 0), 'fire-smoke')
+    await freezeLife(false)
+    check(
+      'above the dry fire the pixels differ from the same crop with the smoke disabled (design.md §19.10)',
+      r.effect > Math.max(1, 2 * r.noise),
+      `ON-vs-OFF ${r.effect.toFixed(2)} against OFF-vs-OFF ${r.noise.toFixed(2)} (mean |ΔRGB|)`,
+    )
+  }
+  await frame('358-fire-smoke-dry', { place: PLACE, label: 'the thin smoke column over the Zulu yard fire' })
+  // Heavy rain puts this indoor-hearth people's yard fire out: no smoke drawn.
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+  await page.waitForFunction(() => window.__placeSeason?.().fireOut === true, null, { timeout: 15000 }).catch(() => {})
+  await nextFrames(4)
+  const rainSmoke = await page.evaluate(() => {
+    const o = window.__placeScene?.getObjectByName('village-fire-smoke')
+    return o ? { visible: o.visible, count: o.count } : null
+  })
+  check('with the Zulu yard fire out in the rain, no smoke column is drawn (design.md §19.10)', rainSmoke === null || rainSmoke.visible === false, JSON.stringify(rainSmoke))
+  await page.evaluate((v) => {
+    window.__balance.fireSmoke.opacity = v
+    window.__ui.getState().setSeasonWetnessOverride(null)
+  }, configured)
+}
+
+if (section('walker-dust')) {
+  const PLACE = 'zulu-village'
+  const configured = await page.evaluate(() => window.__balance.walkerDust.opacity)
+  const dustStats = () => page.evaluate(() => window.__placeDust?.() ?? null)
+  const settleWetness = async (wet, label) => {
+    await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wet)
+    const s = await settleSeasonLight()
+    check(`${PLACE} (${label}): the ground's wet state and the light settle over rendered frames before dust is read`, s.settled, JSON.stringify(s))
+  }
+  await goToPlace(PLACE)
+  await settleWetness(0, 'dry')
+  // Dry weather: within half a minute some walker's stride raises a puff.
+  const dry0 = await dustStats()
+  const fresh = await page
+    .waitForFunction((n0) => {
+      const d = window.__placeDust?.()
+      // Walkers also step through hut doors; a puff on an indoor floor is hidden.
+      const outdoors = (p) => !(window.__placeColliders ?? []).some((c) => Math.hypot(p.x - c.x, p.z - c.z) < c.r + 0.5)
+      const pick = d && d.spawned > n0 ? d.puffs.find((p) => p.age > 0.1 && p.age < 0.35 && outdoors(p)) : null
+      return pick ?? null
+    }, dry0?.spawned ?? 0, { timeout: 30000, polling: 'raf' })
+    .then((h) => h.jsonValue(), () => null)
+  if (fresh) await freezeLife(true)
+  const dry1 = await dustStats()
+  check('in dry weather a walking inhabitant raises dust (design.md §19.10)', fresh !== null && dry1 && dry1.spawned > (dry0?.spawned ?? 0), JSON.stringify({ before: dry0?.spawned, after: dry1?.spawned, puff: fresh }))
+  if (fresh) {
+    const sight = await standWithSight(fresh.x, fresh.y + 0.3, fresh.z, 'walker-dust')
+    const clip = sight.ok ? await clipAround(fresh.x, fresh.y + 0.3, fresh.z, 70) : null
+    check('the crop at the walker\'s feet is on screen with a clear sight line (walker-dust staging)', clip !== null, JSON.stringify({ fresh, sight, clip }))
+    if (clip) {
+      const r = await attributeCrop(clip, (on) => page.evaluate((v) => { window.__balance.walkerDust.opacity = v }, on ? configured : 0), 'walker-dust')
+      check(
+        'the dust is visible: its crop differs from the same crop with the dust disabled (design.md §19.10)',
+        r.effect > Math.max(1, 2 * r.noise),
+        `ON-vs-OFF ${r.effect.toFixed(2)} against OFF-vs-OFF ${r.noise.toFixed(2)} (mean |ΔRGB|)`,
+      )
+    }
+    await frame('358-walker-dust-dry', { place: PLACE, label: 'dust at a walking inhabitant\'s feet on dry ground' })
+    await freezeLife(false)
+  }
+  // Rain: the walkers keep walking, their strides fall due, and none raises dust.
+  await settleWetness(1, 'rain')
+  const wet0 = await dustStats()
+  await nextFrames(20 * 60)
+  const wet1 = await dustStats()
+  const raised = (wet1?.spawned ?? 0) - (wet0?.spawned ?? 0)
+  const due = (wet1?.suppressed ?? 0) - (wet0?.suppressed ?? 0)
+  check('in rain walking inhabitants raise no dust (design.md §19.10)', wet1 !== null && raised === 0 && due > 0 && wet1.puffs.length === 0, `raised ${raised}, strides on wet ground ${due}, live puffs ${wet1?.puffs.length}`)
+  const walker = await page
+    .waitForFunction(() => (window.__placeWalkers?.states ?? []).find((s) =>
+      s.mode === 'walk' && s.pause <= 0 && !(window.__placeColliders ?? []).some((c) => Math.hypot(s.x - c.x, s.z - c.z) < c.r + 1.5)) ?? null,
+    null, { timeout: 30000, polling: 'raf' })
+    .then((h) => h.jsonValue(), () => null)
+  check('in rain an inhabitant walks in the open for the no-dust frame (walker-dust staging)', walker !== null, JSON.stringify(walker))
+  if (walker) {
+    await freezeLife(true)
+    const sight = await standWithSight(walker.x, 0.3, walker.z)
+    check('a walker\'s feet in the rain are in view with a clear sight line (walker-dust staging)', sight.ok, JSON.stringify({ walker, sight }))
+    await frame('358-walker-dust-rain', { place: PLACE, label: 'a walking inhabitant on wet ground, no dust' })
+    await freezeLife(false)
+  }
+  await page.evaluate((v) => {
+    window.__balance.walkerDust.opacity = v
+    window.__ui.getState().setSeasonWetnessOverride(null)
+  }, configured)
+}
+
 await finishPolishSuite()
