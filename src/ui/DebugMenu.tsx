@@ -925,6 +925,14 @@ export function DebugMenu() {
         set('birdsongVolume', Math.max(0, v))
         refreshAmbienceVolume()
       }, 0.1),
+      // The village sound bed's per-source sliders (point 357).
+      ...(['mortarVolume', 'goatVolume', 'fireVolume'] as const).map((key) =>
+        num(t.debug[key], balance.villageBed[key], (v) => {
+          balance.villageBed[key] = Math.max(0, v)
+          refreshAmbienceVolume()
+          bump()
+        }, 0.1),
+      ),
       // The village speech's OWN level (point 577): its bus sits beside the
       // ambient one, so this raises the syllables over the drums without
       // touching them. It belongs among the volumes, where a player looking for

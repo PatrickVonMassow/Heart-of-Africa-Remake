@@ -1665,6 +1665,307 @@ if (section('river-current')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
+// --- The village sound bed (point 357, design.md §19.10/§20) -----------------
+// In a REAL village (Bambara, the scene the river-current block above leaves
+// standing): the goats and the fire's crackle are audible in the GRAPH's gain
+// values (the live node after its fade, not only the target); the fire pit's own
+// distance report makes the crackle louder near its ring than part-way out,
+// audible at both; the mortar thuds the animated pestle dispatches fall on its
+// strikes and schedule a positive level; and the master ambience
+// volume at zero silences all three. Last in the file, so it disturbs no block.
+if (section('village-bed')) {
+  const VILLAGE_FIRE = [-3.5, 2.5] // src/scenes/place/layout.ts VILLAGE_FIRE
+  if (await page.evaluate(() => window.__game.getState().placeId !== 'bambara-village')) {
+    await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  }
+  await page.waitForFunction(
+    () => window.__game.getState().placeId === 'bambara-village' && window.__placePlayer,
+    null,
+    { timeout: 60000 },
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await waitForSceneBuilt(page)
+  const errsBeforeBed = errors.length
+  const standFromFire = (metres, bearing = 0) => page.evaluate(([fire, m, a]) => {
+    const p = window.__placePlayer
+    p.x = fire[0] + Math.cos(a) * m
+    p.z = fire[1] + Math.sin(a) * m
+  }, [VILLAGE_FIRE, metres, bearing])
+  // Waits on CONDITIONS, never a fixed delay (scripts/verify/fixedWaits.mjs):
+  // the fire pit reports its distance every frame, so a placement is first
+  // seen there; a refused spot is undone by the stuck-escape a few frames
+  // later, so the stand is judged only after the audio clock has run on.
+  const settleStand = async (metres) => {
+    await page
+      .waitForFunction((m) => Math.abs(window.__ambience.fireDistance() - m) < 0.5, metres, { timeout: 5000, polling: 'raf' })
+      .catch(() => {})
+    const t0 = await page.evaluate(() => window.__ambience.context()?.currentTime ?? 0)
+    await page
+      .waitForFunction((t) => (window.__ambience.context()?.currentTime ?? 0) > t + 0.4, t0, { timeout: 5000, polling: 'raf' })
+      .catch(() => {})
+  }
+  // The ring is crowded (cooks, stools, stations): a spot inside a collider is
+  // undone by the stuck-escape back to the entry. Try bearings until the fire
+  // pit's own report says the traveller stayed beside it.
+  const standNearFire = async (metres) => {
+    for (let k = 0; k < 12; k++) {
+      await standFromFire(metres, (k * Math.PI) / 6)
+      await settleStand(metres)
+      if (await page.evaluate((m) => Math.abs(window.__ambience.fireDistance() - m) < 0.5, metres)) return true
+    }
+    return false
+  }
+  const standBesideFire = () => standNearFire(2.2)
+  // The engine's crossfade has run out when every bed layer's live gain sits on
+  // its target: a condition, so a slow lane is waited for and a fast one is not.
+  const settleBed = () => page
+    .waitForFunction(() => ['goats', 'fire'].every((n) => Math.abs(window.__ambience.layerGain(n) - window.__ambience.layerTarget(n)) < 1e-4),
+      null, { timeout: 12000, polling: 100 })
+    .then(() => true)
+    .catch(() => false)
+  // The mortar is heard ONLY through the animated pestle (no direct call): stand
+  // beside the mortar the scene placed, then watch frame by frame what the
+  // pestle dispatches. Every dispatched thud must coincide with a pestle impact
+  // in the same frame (the impact counter moves with it, and never without
+  // it), and land at the start of a stroke — some pounding woman's time since
+  // her impact within one slow frame.
+  const standNearMortar = async () => {
+    for (let k = 0; k < 12; k++) {
+      await page.evaluate((a) => {
+        const m = window.__placePounding?.().mortar
+        if (!m) return
+        const p = window.__placePlayer
+        p.x = m.x + Math.cos(a) * 1.6
+        p.z = m.z + Math.sin(a) * 1.6
+      }, (k * Math.PI) / 6)
+      const t0 = await page.evaluate(() => window.__ambience.context()?.currentTime ?? 0)
+      await page
+        .waitForFunction((t) => (window.__ambience.context()?.currentTime ?? 0) > t + 0.4, t0, { timeout: 5000, polling: 'raf' })
+        .catch(() => {})
+      const near = await page.evaluate(() => {
+        const m = window.__placePounding?.().mortar
+        const p = window.__placePlayer
+        return !!m && Math.hypot(p.x - m.x, p.z - m.z) < 2.4
+      })
+      if (near) return true
+    }
+    return false
+  }
+  const watchPestle = (want) => page.evaluate(async (n) => {
+    const a = window.__ambience
+    const stroke = window.__balance.villageLife.mortar.strokeSeconds
+    const impactsOf = (pd) => pd.women.reduce((sum, w) => sum + w.impacts, 0)
+    if (!window.__placePounding?.()) return { mounted: false }
+    const budgetMs = 45000 // the duo also walks to its rack
+    const deadline = performance.now() + budgetMs
+    // A stalled headless rAF must not leave the observation pending forever:
+    // each frame wait races a timer set to the REST of the budget, so the
+    // watch always ends by its deadline and reports the stall.
+    let stalled = false
+    const nextFrame = () => new Promise((r) => {
+      const timer = setTimeout(() => r(false), Math.max(0, deadline - performance.now()))
+      requestAnimationFrame(() => {
+        clearTimeout(timer)
+        r(true)
+      })
+    })
+    // The pose counts an impact a frame before its thud reaches the probe, so
+    // impacts queue (first in, first out) until a thud consumes them; one
+    // unheard after lagFrames is an impact without a thud, and a thud with
+    // nothing queued is an extra dispatch.
+    const lagFrames = 3
+    let probe = { ...a.thudProbe() }
+    let impacts = impactsOf(window.__placePounding())
+    let frame = 0
+    let pd = null
+    let now = null
+    const step = async () => {
+      if (performance.now() >= deadline || !(await nextFrame())) {
+        stalled = true
+        return false
+      }
+      pd = window.__placePounding?.()
+      if (!pd) return false
+      now = { ...a.thudProbe() }
+      frame++
+      return true
+    }
+    // Warm-up: the window opens only after lagFrames frames with neither an
+    // impact nor a thud, so no thud in it can belong to an earlier impact.
+    let quiet = 0
+    while (quiet <= lagFrames) {
+      if (!(await step())) return { mounted: true, stalled, warmup: true }
+      const busy = impactsOf(pd) !== impacts || now.calls !== probe.calls
+      quiet = busy ? 0 : quiet + 1
+      probe = now
+      impacts = impactsOf(pd)
+    }
+    const start = { ...probe }
+    const thuds = []
+    const queued = [] // the frame each unheard impact was counted in
+    let impactsWithoutThud = 0
+    let extraCalls = 0
+    const observe = () => {
+      const nowImpacts = impactsOf(pd)
+      for (let i = 0; i < nowImpacts - impacts; i++) queued.push(frame)
+      while (queued.length && frame - queued[0] > lagFrames) {
+        queued.shift()
+        impactsWithoutThud++
+      }
+      const calls = now.calls - probe.calls
+      if (calls > 0) {
+        const struck = Math.min(calls, queued.length)
+        queued.splice(0, struck)
+        if (thuds.length < n) {
+          const since = pd.women.filter((w) => w.phase >= 0).map((w) => w.phase * stroke)
+          thuds.push({
+            calls,
+            struck,
+            sinceImpact: since.length ? Math.min(...since) : null,
+            scheduled: now.scheduled - probe.scheduled,
+            peak: now.lastPeak,
+            at: a.context()?.currentTime ?? null,
+          })
+        } else {
+          extraCalls += calls - struck
+        }
+      }
+      probe = now
+      impacts = nowImpacts
+    }
+    while (thuds.length < n && (await step())) observe()
+    // Drain until the queue is empty: every impact is heard or expires, so a
+    // later impact's thud cannot hide an earlier unheard one, and an extra
+    // dispatch is still counted.
+    const until = frame + lagFrames + 1
+    while (!stalled && (frame < until || queued.length) && (await step())) observe()
+    return {
+      mounted: true,
+      stalled,
+      thuds,
+      impactsWithoutThud,
+      extraCalls,
+      scheduled: probe.scheduled - start.scheduled,
+      lastPeak: probe.lastPeak,
+    }
+  }, want)
+  await page.evaluate(() => {
+    window.__ambience.start()
+    window.__balance.ambienceVolume = 0.5
+    window.__ambience.refresh()
+  })
+  const besideOk = await standBesideFire()
+  check('the traveller can stand beside the village fire ring (point 357)', besideOk)
+  // A reading is only compared once the crossfade has really run out.
+  const bedSnapshot = () => page.evaluate(() => {
+    const a = window.__ambience
+    return Object.fromEntries(['goats', 'fire'].map((n) => [n, { gain: a.layerGain(n), target: a.layerTarget(n) }]))
+  })
+  const nearSettled = await settleBed()
+  check('beside the fire the bed layers settle on their targets (point 357)', nearSettled, JSON.stringify(await bedSnapshot()))
+  const audible = await page.evaluate(() => {
+    const a = window.__ambience
+    return { fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire') }
+  })
+  check('inside a village the goats and the fire are audible in the graph (point 357)',
+    audible.fireDistance < 3 && audible.goats > 0 && audible.fire > 0, JSON.stringify(audible))
+  const reach = await page.evaluate(() => window.__balance.villageBed.fireAudible)
+  // The crackle FOLLOWS the distance, not an on/off switch: compared at two
+  // distances that are both inside its reach, the nearer stand is louder and
+  // both are audible. The near reading is the settled one taken above.
+  const midMetres = Math.round(reach * 0.6 * 10) / 10
+  const midOk = await standNearFire(midMetres)
+  check('the traveller can stand part-way out from the fire, inside its reach (point 357)', midOk)
+  const midSettled = await settleBed()
+  check('part-way out the bed layers settle on their targets (point 357)', midSettled, JSON.stringify(await bedSnapshot()))
+  const mid = await page.evaluate(() => {
+    const a = window.__ambience
+    return { fireDistance: a.fireDistance(), fire: a.layerGain('fire'), goats: a.layerGain('goats') }
+  })
+  check('the fire crackle is louder near its ring than part-way out, audible at both (point 357)',
+    nearSettled && midSettled && audible.fireDistance < mid.fireDistance && mid.fireDistance < reach &&
+      mid.fire > 0 && audible.fire > mid.fire && mid.goats > 0,
+    JSON.stringify({ near: audible, mid }))
+  const besideMortar = await standNearMortar()
+  check('the traveller can stand beside the village mortar (point 357)', besideMortar)
+  const pestle = await watchPestle(3)
+  // ONE dispatch per impact, exactly: a doubled dispatch, or a frame whose
+  // several impacts were heard as one, breaks the coupling either way.
+  check('the mortar thuds come from the animated pestle, one per impact frame, at the stroke\'s strike (point 357)',
+    pestle.mounted && !pestle.stalled && pestle.thuds.length === 3 && pestle.impactsWithoutThud === 0 &&
+      pestle.extraCalls === 0 &&
+      pestle.thuds.every((t) => t.struck >= 1 && t.calls === t.struck && t.sinceImpact !== null && t.sinceImpact <= 0.35),
+    JSON.stringify(pestle))
+  check('the pestle\'s thuds schedule a positive level beside the mortar (point 357)',
+    pestle.mounted && pestle.scheduled >= 1 && pestle.lastPeak > 0, JSON.stringify(pestle))
+  await standBesideFire()
+  await page.evaluate(() => {
+    window.__balance.ambienceVolume = 0 // the master muted
+    window.__ambience.refresh()
+  })
+  // A bounded settle, not one fixed crossfade: a slow lane runs the fade late.
+  await page
+    .waitForFunction(() => window.__ambience.layerGain('goats') === 0 && window.__ambience.layerGain('fire') === 0, null, { timeout: 12000, polling: 100 })
+    .catch(() => {})
+  const muted = await page.evaluate(() => {
+    const a = window.__ambience
+    return { fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire') }
+  })
+  check('the muted master silences the goats and the fire (point 357)',
+    muted.fireDistance < 3 && muted.goats === 0 && muted.fire === 0, JSON.stringify(muted))
+  // The pestle keeps pounding under the mute; its thuds are dispatched and
+  // schedule nothing.
+  await standNearMortar()
+  const mutedPestle = await watchPestle(2)
+  check('the muted master silences the pestle\'s thuds while it keeps pounding (point 357)',
+    mutedPestle.mounted && !mutedPestle.stalled && mutedPestle.thuds.length === 2 && mutedPestle.scheduled === 0, JSON.stringify(mutedPestle))
+  // Out of the village (master audible again): the whole bed must settle to
+  // silence on the travel map, the fire pit's unmount included.
+  // The goats are audible again first, so the departure wait below cannot
+  // resolve on the mute's own zeros.
+  await page.evaluate(() => {
+    window.__balance.ambienceVolume = 0.5
+    window.__ambience.refresh()
+  })
+  const reAudible = await page
+    .waitForFunction(() => window.__ambience.layerGain('goats') > 0, null, { timeout: 12000, polling: 100 })
+    .then(() => true)
+    .catch(() => false)
+  check('unmuted in the village, the goats are audible again before leaving (point 357)', reAudible)
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // The scene switch waits for the travel map to take over, so the fade is
+  // given a bounded settle rather than one fixed crossfade.
+  const leftAt = Date.now()
+  const audioAtLeave = await page.evaluate(() => window.__ambience.context()?.currentTime ?? null)
+  const settled = await page
+    .waitForFunction(() => window.__ambience.layerGain('goats') === 0 && window.__ambience.layerGain('fire') === 0, null, { timeout: 12000, polling: 100 })
+    .then(() => true)
+    .catch(() => false)
+  const left = await page.evaluate(([ok, ms, t0]) => {
+    const a = window.__ambience
+    const ac = a.context()
+    return {
+      settled: ok,
+      afterMs: ms,
+      fireDistance: a.fireDistance(),
+      goats: a.layerGain('goats'),
+      fire: a.layerGain('fire'),
+      goatTarget: a.layerTarget('goats'),
+      fireTarget: a.layerTarget('fire'),
+      audioState: ac?.state ?? null,
+      audioAdvanced: ac && t0 != null ? ac.currentTime - t0 : null,
+    }
+  }, [settled, Date.now() - leftAt, audioAtLeave])
+  check('leaving the village silences the goats and the fire (point 357)',
+    left.settled && left.goats === 0 && left.fire === 0 && !(left.fireDistance <= reach), JSON.stringify(left))
+  await page.evaluate(() => {
+    window.__balance.ambienceVolume = 0.1
+    window.__ambience.refresh()
+  })
+  check('village bed: no new console errors', errors.length === errsBeforeBed, errors.slice(errsBeforeBed).join(' | ').slice(0, 300))
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()

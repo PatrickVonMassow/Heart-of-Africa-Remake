@@ -171,7 +171,7 @@ the next reload). The complete set, grouped as the menu presents it:
 **Audio** (§19.1)
 
 - Ambience volume (default 0.1): the master control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale under it.
-- Per-source volumes sitting over that master: footsteps, the general ambient bed and the birdsong.
+- Per-source volumes sitting over that master: footsteps, the general ambient bed, the birdsong, and the village bed's mortar, goats and fire crackle (point 357). The village bed also carries its goat and fire base gains and the fire crackle's audible reach.
 - The coastal surf fade: the near radius within which the surf plays at full gain and the cutoff distance from the coast beyond which it is exactly silent, so the sea is heard at the shore and in seaside ports but never inland.
 - Village speech (§13.4): syllable duration and the constant inter-atom pause; TALK/CALL reach, level and falloff shared by sound, observation, notes and gestures; adult and child pitch pairs with a shared interval; camera-relative stereo width; the speech bus volume under the ambience master. The speech floor keeps one audible exchange speaking through its visible consequence, releases deferred words and yields while a situation cannot speak. Bank calls reach the spectator's stand. Tag in ports and bankless villages is silent. The final master limiter bounds coincident speech and drum peaks.
 

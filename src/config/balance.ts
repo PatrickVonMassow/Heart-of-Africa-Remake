@@ -150,6 +150,22 @@ interface BalanceConfig {
    *  slider over the single ambience volume, so the birds can be turned down on
    *  their own. 1 = the design gain, 0 = silent. */
   birdsongVolume: number
+  /** The village sound bed (design.md §19.10/§20, point 357): the mortar's
+   *  thud (timed to the animated pestle), the goats and the fire's crackle.
+   *  Each layer sits under the single ambience volume and carries its own
+   *  per-source slider like `birdsongVolume` (1 = design gain, 0 = silent). */
+  villageBed: {
+    mortarVolume: number
+    goatVolume: number
+    fireVolume: number
+    /** Goat-layer gain at volume 1, before the ambience volume. */
+    goatBase: number
+    /** Fire-crackle gain right at the fire ring, before the ambience volume. */
+    fireBase: number
+    /** Distance (m) from the fire at which its crackle has faded to silence,
+     *  over the shared §19.1 proximity curve. */
+    fireAudible: number
+  }
   /** The last stage of the audio graph (design.md §19.1): a fixed transfer
    *  curve between the master gain and the destination, so no coincidence of
    *  buses can leave the mix above full scale. Both values are ESTIMATES
@@ -162,7 +178,10 @@ interface BalanceConfig {
    *  0.018 between it and the ceiling and turn the stage into the hard clipper
    *  it exists to prevent. A lone drum strike (0.249) or footstep is under it
    *  outright. `ceiling` keeps 0.45 dB under full scale, which is where a mix
-   *  is mastered to and the most the destination may then be handed. */
+   *  is mastered to and the most the destination may then be handed.
+   *  The village sound bed (point 357), with the fire at its ring, lifts those
+   *  measures to 1.359 and 0.954; the single voice then gives up under 0.25 dB
+   *  (ambience.test.ts, the headroom cases). */
   mixLimiter: {
     threshold: number
     ceiling: number
@@ -1694,6 +1713,20 @@ export const balance: BalanceConfig = {
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)
   birdsongVolume: 1, // per-source birdsong slider (point 153); 1 = design gain
+  villageBed: {
+    // Estimates (calibratable, CLAUDE.md §2), judged against the village speech
+    // (speechVolume 3 on its own bus) and the drums: the bed sits well under a
+    // close voice, so it reads as life around the words, never over them. The
+    // two bases are capped by the mix limiter's knee: with the fire at its
+    // ring, a single close called voice still gives up under 0.25 dB
+    // (ambience.test.ts, the headroom cases).
+    mortarVolume: 1, // calibratable
+    goatVolume: 1, // calibratable
+    fireVolume: 1, // calibratable
+    goatBase: 0.4, // calibratable
+    fireBase: 0.5, // calibratable
+    fireAudible: 14, // calibratable
+  },
   mixLimiter: {
     // Estimates (calibratable): a knee with 0.1 of room to bend in, under a
     // ceiling 0.45 dB below full scale. Point 1156.

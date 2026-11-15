@@ -48,6 +48,7 @@ const DEFAULTS = {
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   labelOverlayMax: balance.labelOverlay.maxLabels,
   birdsongVolume: balance.birdsongVolume,
+  villageBed: { ...balance.villageBed },
   speechVolume: balance.communication.speechVolume,
   communication: structuredClone(balance.communication),
   speechChildPitchHz: balance.communication.speechChildPitchHz,
@@ -154,6 +155,7 @@ afterEach(() => {
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.labelOverlay.maxLabels = DEFAULTS.labelOverlayMax
   balance.birdsongVolume = DEFAULTS.birdsongVolume
+  Object.assign(balance.villageBed, DEFAULTS.villageBed)
   Object.assign(balance.communication, structuredClone(DEFAULTS.communication))
   balance.communication.speechVolume = DEFAULTS.speechVolume
   balance.communication.speechChildPitchHz = DEFAULTS.speechChildPitchHz
@@ -323,6 +325,10 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.labelOverlayMax, read: () => balance.labelOverlay.maxLabels, value: 12 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).
     { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
+    // The village sound bed's per-source sliders (point 357).
+    { label: en.debug.mortarVolume, read: () => balance.villageBed.mortarVolume, value: 0.5 },
+    { label: en.debug.goatVolume, read: () => balance.villageBed.goatVolume, value: 0.5 },
+    { label: en.debug.fireVolume, read: () => balance.villageBed.fireVolume, value: 0.5 },
     { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },
     { label: en.debug.surfCutoff, read: () => balance.surf.cutoff, value: 5 },
     // Village speech (design.md §13.4/§21.2): pace, phrase pause and the short
@@ -978,7 +984,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
   graphics: [
     'debug.detailLevel', 'debug.flatGround', 'debug.startupFreezeBudget', 'debug.labelOverlayMax',
     'debug.ambienceVolume',
-    'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume', 'debug.speechVolume',
+    'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume',
+    'debug.mortarVolume', 'debug.goatVolume', 'debug.fireVolume', 'debug.speechVolume',
     'debug.drumBedEnabled',
     'debug.drumBedStep', 'debug.drumBedPhraseBars', 'debug.drumBedGapMin', 'debug.drumBedGapMax',
     'debug.drumBedTempoSpread', 'debug.drumBedPitchSpread', 'debug.drumBedPitchStart',
@@ -1060,12 +1067,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 261 controls in total, and none twice', () => {
+  it('carries all 264 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(261)
+    expect(labels.length).toBe(264)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1101,7 +1108,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   // it is found by scanning the sound group for "volume"/"Lautstärke".
   it.each(dicts)('labels the speech level as a volume, in the wording family of its neighbours — %s', (_name, dict) => {
     const word = dict === de ? 'lautstärke' : 'volume'
-    const neighbours = ['ambienceVolume', 'footstepVolume', 'ambientVolume', 'birdsongVolume'] as const
+    const neighbours = ['ambienceVolume', 'footstepVolume', 'ambientVolume', 'birdsongVolume', 'mortarVolume', 'goatVolume', 'fireVolume'] as const
     for (const key of neighbours) expect(dict.debug[key].toLowerCase()).toContain(word)
     expect(dict.debug.speechVolume.toLowerCase()).toContain(word)
     // …and it still names the VILLAGE SPEECH, not a "voice" (point 577): the
@@ -1112,7 +1119,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(261)
+    expect(rows.length).toBe(264)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1166,7 +1173,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(261)
+    expect(renderedRowLabels().length).toBe(264)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1214,7 +1221,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(261)
+    expect(renderedRowLabels().length).toBe(264)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 
