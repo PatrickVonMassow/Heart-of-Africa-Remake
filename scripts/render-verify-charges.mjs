@@ -2102,6 +2102,24 @@ export const RED_CHARGES = [
       + 'at travel|medium, renderTargets 45 -> 370; both sections are green alone. Filed as point 1520. The charge dies with point 1520.',
   },
   {
+    point: 1520,
+    suite: 'settings',
+    kind: 'check',
+    match: /^a normal session of switches, detail levels and toggles trips nothing\b/i,
+    why:
+      'MEASURED 15.11.2026 on WebGPU, main d4be6047b: renderTargets 24 -> 28 at travel|medium|traa/-/bloom/sun/fire/band, '
+      + 'the same rebuild leak point 1520 owns (remeasured there with the render-leak-watch section). The charge dies with point 1520.',
+  },
+  {
+    point: 1522,
+    suite: 'settings',
+    kind: 'check',
+    match: /^a nearby animal raises its proximity call\b/i,
+    why:
+      'MEASURED 15.11.2026 on WebGPU, main dcf4949c7 and d4be6047b: every proximity level reads 0; filed as point 1522 '
+      + 'before this run. The charge dies with point 1522.',
+  },
+  {
     point: 1495,
     suite: 'enrichments',
     kind: 'check',
