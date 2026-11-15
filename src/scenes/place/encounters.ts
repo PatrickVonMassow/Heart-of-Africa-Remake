@@ -227,3 +227,9 @@ export function gatheringSlots(
   }
   return out
 }
+
+/** Turns `from` toward `to` by at most `maxStep` (rad), the short way round. */
+export function turnYawToward(from: number, to: number, maxStep: number): number {
+  const d = Math.atan2(Math.sin(to - from), Math.cos(to - from))
+  return Math.abs(d) <= maxStep ? to : from + Math.sign(d) * maxStep
+}

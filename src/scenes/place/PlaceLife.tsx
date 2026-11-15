@@ -65,6 +65,20 @@ import { PORTER_WALK, START_YEAR, TASK_LOAD_HANDLING, VILLAGER_MOTION, VILLAGER_
 import { planPorterRoutes, reconcilePorters, stepPorter, walkableStep, type PorterCrew, type PorterState } from './porterWalk'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
+import {
+  bowLean,
+  createEncounterBoard,
+  facingYaw,
+  gatheringSlots,
+  meetingOf,
+  meetingProgress,
+  stepEncounters,
+  turnYawToward,
+  type EncounterBoard,
+  type EncounterEvent,
+  type EncounterWalker,
+  type EncounterWorld,
+} from './encounters'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace, type ObservedGround } from './boundary'
@@ -2349,6 +2363,64 @@ function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   )
 }
 
+/**
+ * The fire gathering (design.md §19.10): more than the lone tender at the fire —
+ * companions standing round it beside the kneeling tender, facing the flames.
+ * Their places come from `gatheringSlots` (encounters.ts): on free ground, clear
+ * of the tender, the cook, the bundle-carrier's stop and every doorway, so the
+ * gathering never stands in a collider or blocks an entrance. Fewer stand where
+ * the ground is crowded.
+ */
+function FireGathering({
+  fire,
+  tender,
+  avoid,
+  doorways,
+  colliders,
+  cloth,
+}: {
+  fire: [number, number]
+  tender: [number, number]
+  avoid: ReadonlyArray<readonly [number, number]>
+  doorways: ReadonlyArray<readonly [number, number]>
+  colliders: Collider[]
+  cloth: string[]
+}) {
+  const groundHeight = usePlaceGround()
+  const tuning = balance.villageLife.encounters
+  const slots = useMemo(
+    () =>
+      gatheringSlots(fire, tuning.gatherCompanions, {
+        ring: tuning.gatherRing,
+        avoid: [tender, ...avoid],
+        avoidRadius: tuning.gatherAvoid,
+        standClear: (px, pz) =>
+          standingClear(colliders, px, pz, NPC_RADIUS) && doorways.every(([dx, dz]) => Math.hypot(px - dx, pz - dz) >= tuning.doorClearance),
+        startAngle: Math.atan2(tender[0] - fire[0], tender[1] - fire[1]),
+      }),
+    [fire, tender, avoid, doorways, colliders, tuning],
+  )
+  // Bodies the passers-by go round (point 578).
+  useStandingBodies(slots)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeFireGathering = { fire, tender, slots }
+    return () => {
+      delete w.__placeFireGathering
+    }
+  }, [fire, tender, slots])
+  return (
+    <>
+      {slots.map((sl, k) => (
+        <group key={k} position={[sl.x, groundHeight(sl.x, sl.z), sl.z]} rotation={[0, sl.yaw, 0]}>
+          <Figure cloth={cloth[(k + 3) % cloth.length]} age={k === 1 ? 'elder' : 'adult'} sex={k === 0 ? 'female' : 'male'} />
+        </group>
+      ))}
+    </>
+  )
+}
+
 /** Village well: stone ring with a wooden frame and bucket. Named so a scene
  *  check can tell the prop's presence from its absence (point 1092). */
 function Well({ x, z }: { x: number; z: number }) {
@@ -2684,6 +2756,9 @@ interface WalkerState {
    *  teleport-nudge to free ground when it exceeds the calibratable window
    *  (point 155). */
   pinned: number
+  /** Errand points reached so far (design.md §19.10: the meetings must not
+   *  keep the errands from arriving). */
+  arrivals: number
 }
 
 /**
@@ -2750,9 +2825,24 @@ function Walkers({
       yaw: 0,
       stuck: 0,
       pinned: 0,
+      arrivals: 0,
     }))
   }
   const refs = useRef<Array<THREE.Group | null>>([])
+  // THE INHABITANTS TAKE NOTICE OF EACH OTHER (design.md §19.10, encounters.ts):
+  // who carries the basket NOW (a meeting may hand it over), the meeting board,
+  // each walker's greeting bow, and the encounter log the dev hook exposes.
+  const loads = useRef<boolean[]>([])
+  if (loads.current.length !== defs.length) loads.current = defs.map((d) => d.carries)
+  const baskets = useRef<Array<THREE.Object3D | null>>([])
+  const board = useRef<EncounterBoard>(createEncounterBoard())
+  const bows = useRef<Array<{ current: FigurePose | null }>>([])
+  if (bows.current.length !== defs.length) bows.current = defs.map(() => ({ current: null }))
+  const encounterLog = useRef<Array<EncounterEvent & { t: number }>>([])
+  const encounterWorld = useMemo<EncounterWorld>(
+    () => ({ standClear: (px, pz) => standingClear(colliders, px, pz, NPC_RADIUS), doorways: homes.map((h) => h.door) }),
+    [colliders, homes],
+  )
   // Their steps raise dust on dry ground (design.md §19.10, SmokeDust.tsx).
   useDustFeet(() => states.current)
 
@@ -2785,8 +2875,8 @@ function Walkers({
         id,
         role: 'walker',
         phase: st.mode,
-        action: st.pause > 0 ? 'pause' : st.mode === 'inside' ? null : 'walk',
-        extra: { carries: defs[i]?.carries ?? false, seg: st.seg, route: st.route.length, timer: st.timer, stuck: st.stuck },
+        action: meetingOf(board.current, i) ? 'meet' : st.pause > 0 ? 'pause' : st.mode === 'inside' ? null : 'walk',
+        extra: { carries: loads.current[i] ?? false, meeting: meetingOf(board.current, i) !== null, seg: st.seg, route: st.route.length, timer: st.timer, stuck: st.stuck },
       }))
       objects.push(...loadsUnder(g, id))
     })
@@ -2806,7 +2896,7 @@ function Walkers({
         // The commanded walking speed along the facing.
         velocity: { x: Math.sin(st.yaw) * sp, z: Math.cos(st.yaw) * sp },
         yaw: st.yaw,
-        pose: st.mode === 'inside' ? 'inside' : st.pause > 0 ? 'pause' : 'walk',
+        pose: st.mode === 'inside' ? 'inside' : meetingOf(board.current, i) ? 'meet' : st.pause > 0 ? 'pause' : 'walk',
         errand: {
           situation: 'round',
           phase: st.mode,
@@ -2827,6 +2917,27 @@ function Walkers({
       states: states.current,
       homes: defs.map((d) => d.home),
       carries: defs.map((d) => d.carries),
+      // Who carries the basket NOW, after any handover (design.md §19.10).
+      loads: () => [...loads.current],
+      // The meetings in progress, the pair cooldowns and the encounter log
+      // (meet / handover / part, each with the clock time), so a live check can
+      // see a pair meet, face each other, part, and the errands still arrive.
+      encounters: () => ({
+        meetings: board.current.meetings.map((m) => ({ ...m, progress: meetingProgress(m) })),
+        pairCooldown: Object.fromEntries(board.current.pairCooldown),
+        rest: Object.fromEntries(board.current.rest),
+        log: [...encounterLog.current],
+        arrivals: states.current.map((s) => s.arrivals),
+        // Each meeting party's heading error to its partner (rad, 0 = facing).
+        facingError: (who: number) => {
+          const m = meetingOf(board.current, who)
+          const me = states.current[who]
+          const other = m ? states.current[m.a === who ? m.b : m.a] : null
+          if (!m || !me || !other) return null
+          const d = me.yaw - facingYaw(me, other)
+          return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))
+        },
+      }),
       // Each walker's cruise pace (world units per second), so the walk probe
       // can tell a walker at pace from one still easing up to it.
       speeds: defs.map((d) => d.speed),
@@ -2875,6 +2986,25 @@ function Walkers({
       s.x = b.x
       s.z = b.z
     }
+    // The encounters (design.md §19.10): only a walker out on a lane — not
+    // indoors, not lingering at its errand, not on a door segment — may meet.
+    const tuning = balance.villageLife.encounters
+    const view: EncounterWalker[] = states.current.map((s, i) => ({
+      x: s.x,
+      z: s.z,
+      carries: loads.current[i] ?? false,
+      available:
+        s.mode === 'walk' && s.pause <= 0 && s.seg >= 1 && s.seg <= s.route.length - 3 &&
+        !(import.meta.env.DEV && heldWalker.current === i),
+    }))
+    for (const e of stepEncounters(board.current, view, loads.current, encounterWorld, tuning, dt, Math.random)) {
+      encounterLog.current.push({ ...e, t })
+      if (encounterLog.current.length > 64) encounterLog.current.shift()
+    }
+    // The basket is drawn on whoever carries it now: one carrier, never two or none.
+    baskets.current.forEach((m, i) => {
+      if (m) m.visible = loads.current[i] ?? false
+    })
     defs.forEach((def, i) => {
       const s = states.current[i]
       const g = refs.current[i]
@@ -2910,6 +3040,24 @@ function Walkers({
       }
 
       g.visible = true
+      const bow = bows.current[i]
+      const meeting = meetingOf(board.current, i)
+      if (meeting) {
+        // A MEETING: stopped, turned toward the partner at the villagers' spot
+        // turn rate, the greeting carried by the facing, a brief bow and the
+        // pause itself. Standing still is no wedge: the unstuck clocks hold.
+        const other = states.current[meeting.a === i ? meeting.b : meeting.a]
+        settleBody(i, s, true)
+        if (other) s.yaw = turnYawToward(s.yaw, facingYaw(s, other), VILLAGER_MOTION.spotTurnRate * dt)
+        const lean = bowLean(meeting, tuning.bowLean)
+        if (bow) bow.current = lean > 0 ? { ...REST_POSE, lean } : null
+        s.pinned = 0
+        s.stuck = 0
+        g.position.set(s.x, groundHeight(s.x, s.z), s.z)
+        g.rotation.y = s.yaw
+        return
+      }
+      if (bow) bow.current = null
       if (s.pause > 0) {
         // Linger at the errand: slight idle sway, no bob.
         s.pause -= dt
@@ -2940,7 +3088,10 @@ function Walkers({
         // Close enough (the exact point may sit inside a collider).
         s.seg++
         s.stuck = 0
-        if (s.seg === 3) s.pause = 2.5 + Math.random() * 4 // linger at the errand
+        if (s.seg === 3) {
+          s.pause = 2.5 + Math.random() * 4 // linger at the errand
+          s.arrivals++
+        }
       } else if (throughDoor) {
         // Turned toward the way, never snapped (a planted foot rides a snap).
         const turn = steerHeading(s.yaw, Math.atan2(dx, dz), def.speed, dt)
@@ -3014,17 +3165,27 @@ function Walkers({
             refs.current[i] = el
           }}
         >
-          {/* Some carry a basket on the head, resting on the crown. */}
+          {/* Some carry a basket on the head, resting on the crown. Every walker
+              has one mounted and the frame loop shows it on whoever carries it
+              now, so a handover moves the one basket (design.md §19.10); the
+              steadying hand follows the shown load. */}
           <Figure
             cloth={def.cloth}
-            headSteady={def.carries ? steadiedLoad('basket', { ...WALKER_BASKET }) : null}
+            pose={bows.current[i]}
+            headSteady={steadiedLoad('basket', { ...WALKER_BASKET })}
             headProp={
-              def.carries ? (
-                <mesh name="head-basket" position={[0, WALKER_BASKET.height / 2, 0]} castShadow>
-                  <cylinderGeometry args={[WALKER_BASKET.top, WALKER_BASKET.bottom, WALKER_BASKET.height, 8]} />
-                  <meshStandardMaterial color="#a3702e" roughness={0.95} />
-                </mesh>
-              ) : undefined
+              <mesh
+                ref={(el) => {
+                  baskets.current[i] = el
+                }}
+                name="head-basket"
+                visible={loads.current[i] ?? false}
+                position={[0, WALKER_BASKET.height / 2, 0]}
+                castShadow
+              >
+                <cylinderGeometry args={[WALKER_BASKET.top, WALKER_BASKET.bottom, WALKER_BASKET.height, 8]} />
+                <meshStandardMaterial color="#a3702e" roughness={0.95} />
+              </mesh>
             }
           />
         </group>
@@ -4655,6 +4816,22 @@ export function PlaceLife({
     return out
   }, [homes, firePos, errands, buildings, placeId])
   useUnplacedInhabitantWatch(placeId, placementAnchors)
+  // The fire gathering's fixed neighbours (design.md §19.10): the kneeling
+  // tender it forms round, the cook, the bundle-carrier's stop, the adults'
+  // stations and the standing vignettes nearby, and every doorway.
+  const gatherTender = useMemo<[number, number]>(() => [firePos[0] - 1.3, firePos[1] - 0.7], [firePos])
+  const gatherAvoid = useMemo<Array<readonly [number, number]>>(
+    () => [
+      [firePos[0] + 1.2, firePos[1] + 1.0],
+      [firePos[0] + 0.7, firePos[1] + 1.8],
+      ...villageAdultStations(firePos, placeId),
+      VILLAGE_SPOTS.talkers,
+      VILLAGE_SPOTS.pounder,
+      VILLAGE_SPOTS.drummer,
+    ],
+    [firePos, placeId],
+  )
+  const gatherDoorways = useMemo(() => homes.map((h) => h.door), [homes])
   // The glance at the traveller (design.md §19.10): one board per settlement,
   // so its cap counts every inhabitant of this place and nobody of the last one.
   useEffect(() => {
@@ -4780,6 +4957,18 @@ export function PlaceLife({
           {!fireOut && (
             <PlaceDumpGroup id="fire-tender" kind="fire-tender">
               <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
+            </PlaceDumpGroup>
+          )}
+          {!fireOut && (
+            <PlaceDumpGroup id="fire-gathering" kind="fire-gathering">
+              <FireGathering
+                fire={firePos}
+                tender={gatherTender}
+                avoid={gatherAvoid}
+                doorways={gatherDoorways}
+                colliders={colliders}
+                cloth={style.cloth}
+              />
             </PlaceDumpGroup>
           )}
           <PlaceDumpGroup id="talkers" kind="talkers">

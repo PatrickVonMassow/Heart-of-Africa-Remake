@@ -10,6 +10,7 @@ import {
   meetingOf,
   pairKey,
   stepEncounters,
+  turnYawToward,
   type EncounterTuning,
   type EncounterWalker,
   type EncounterWorld,
@@ -148,5 +149,13 @@ describe('the fire gathering', () => {
 
   it('gives fewer where the ground is crowded, never one in a collider', () => {
     expect(gatheringSlots([0, 0], 2, { ring: 1.5, avoid: [], avoidRadius: 0.9, standClear: () => false, startAngle: 0 })).toEqual([])
+  })
+})
+
+describe('the turn toward the partner', () => {
+  it('steps at most the cap, the short way round, and lands exactly', () => {
+    expect(turnYawToward(0, 1, 0.25)).toBeCloseTo(0.25, 9)
+    expect(turnYawToward(3, -3, 0.1)).toBeCloseTo(3.1, 9)
+    expect(turnYawToward(0.9, 1, 0.25)).toBe(1)
   })
 })
