@@ -27,6 +27,7 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
 import { createEnvironmentTexture, updateEnvironmentTexture } from './environment'
 import { useSceneSun } from './sceneSun'
+import { markFrameWork } from '../systems/longFrame'
 import { createScenePass } from './scenePass'
 import { createSceneFrame } from './sceneFrame'
 import { useUi, effectiveSsao, effectiveTraa, effectiveBloom, effectiveEyeAdaptation, effectiveSunGlare } from '../state/ui'
@@ -72,7 +73,11 @@ export function Effects() {
   useEffect(() => {
     const tex = envTexRef.current
     if (!tex) return
-    if (bakedSunRef.current !== iblSun) updateEnvironmentTexture(tex, iblSun)
+    if (bakedSunRef.current !== iblSun) {
+      const t0 = performance.now()
+      updateEnvironmentTexture(tex, iblSun)
+      markFrameWork('environment-rebake', performance.now() - t0)
+    }
     bakedSunRef.current = iblSun
   }, [iblSun])
 
