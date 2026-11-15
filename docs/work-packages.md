@@ -146,6 +146,8 @@ change) and 449 last, because the drill is what makes the others more than a cla
   verification run on main, not a feature branch, so it shares no bundle's files.
 - **#1465** — the uncharged WebGPU reds of polish-speech that the v0.3.1 closing never reached;
   they gate the release, so they travel with point 1462 rather than any feature bundle.
+- **#1522** — the settings reds of 15.11.2026 that fail identically on main (silent animal
+  proximity call, ?quality=HIGH never builds); their cause is unknown, so no bundle's files are named yet.
 
 - **#184, #200, #203, #205, #207** — the big audits. They sweep the whole codebase and would
   swallow any bundle they were put in.

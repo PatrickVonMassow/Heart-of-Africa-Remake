@@ -109,6 +109,7 @@ put it is the mistake this line exists to stop.
   a village the new layers are audible in the graph's gain values and fall silent when
   the master is muted; no console errors.
   DOCS: design.md §19.10/§20 name the village layers.
+  Owed before landing (15.11.2026, branch @ cffefc587, all 7 end-state review passes recorded): (1) `scripts/verify/fixedWaits.test.mjs` reds — settings.mjs fixed waits 22 -> 24, also the CI shard-2 gate failure; wait on a condition instead; (2) the live mortar check calls `a.poundThud(2)` directly — observe strikes from the animated pestle and their timing; (3) the live fire check passes a binary on/off — compare settled gains at two audible distances; (4) `emitter()` in `ambience.ts` schedules only above gain 0.005, so quiet goat/fire settings and the fire near its reach fall silent — adjust the floor and unit-test real scheduling there. Then confirming review passes for the changed files and the village-bed section.
 
 - [ ] 358. Smoke over the fire, dust under the feet (user 25.07.2026). A thin smoke
   column drifting from the §19.10 fire reads as "someone lives here" from further away
@@ -14858,6 +14859,7 @@ to land than a mechanism that needs a review.
   Final state: a rebuild at travel|medium disposes what it replaces; renderTargets stay within the +2 allowance across the full enrichments run.
   Test: a full WebGPU enrichments run (VERIFY_SUITE_TIMEOUT_MS=5400000) without render-resource-leak asserts, plus a Vitest case for the disposal if the cause lies in browserless pipeline code.
   Source: finding of the 344 session, 14.11.2026 07:35.
+  Remeasured 15.11.2026: `npm test -- settings --section=render-leak-watch` reds identically on main dcf4949c7 and feat/357 6a1071735 (travel|medium|traa/-/bloom/sun/fire/band 25 -> 29, +4, allowed +2), so the settings leak watch shows the same leak.
   Bundle: Sonne & Himmel.
 
 - [ ] 1521. The San village is built of Zulu-style beehive huts
@@ -14867,3 +14869,11 @@ to land than a mechanism that needs a review.
   Test: a Vitest sweep that the San layout uses its own dwelling type and plan, plus one first-person frame of the San village.
   Source: finding of the 348 session, 14.11.2026 18:43.
   Bundle: Siedlungsgeometrie.
+
+- [ ] 1522. Settings suite: animal proximity call stays silent and ?quality=HIGH never builds the scene
+  Measured 15.11.2026 on a quiet machine, WebGPU, identically on main dcf4949c7 and feat/357 6a1071735: `npm test -- settings --section=animal-calls` fails "a nearby animal raises its proximity call" with every level 0 ({"started":true,"baseline":0,"near":0,"prox":0,...}); `--section=quality-url` fails "?quality=HIGH opens at high on the first frame" because the scene reports triangles 0 / built false after 120 s, although level and shadows read high.
+  Player impact: a nearby animal may make no sound; a session opened with ?quality=HIGH may never show its world.
+  Final state: both sections pass on WebGPU on main; if either is a test-harness fault rather than a product defect, the check is repaired and the cause recorded.
+  Test: the two named settings sections green on WebGPU, plus a Vitest case for the cause if it lies in browserless code.
+  Source: classification of the settings reds of the 357 session, 15.11.2026.
+  Bundle: unbundled.
