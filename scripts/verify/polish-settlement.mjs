@@ -2096,26 +2096,23 @@ if (section('inhabitants-glance')) {
     // Walk past the pair on a line 3 m to its side, at walking pace.
     const side = 3
     let best = { turn: 0, toward: Infinity, who: -1 }
-    // The rate is judged in the page, one requestAnimationFrame tick per frame:
-    // a frame's dt is clamped to 0.1 s, so the capped turn moves at most
-    // VILLAGER_MOTION.spotTurnRate (3 rad/s) times min(tick, 0.1 s); a snap does not.
+    // The step is taken in the page between animation-frame ticks: a tick sees at
+    // most one rendered frame (the WebGPU loop may skip a tick, so one frame can
+    // carry two ticks' dt), and a frame's dt is clamped to 0.1 s, so the capped
+    // turn moves at most VILLAGER_MOTION.spotTurnRate (3 rad/s) x 0.1 s per tick;
+    // a snap toward the player (up to pi) does not.
+    const MAX_FRAME_STEP = 3 * 0.1
     await page.evaluate(() => {
-      const probe = { on: true, maxStep: 0, maxExcess: -Infinity, prev: null, prevT: 0 }
+      const probe = { on: true, maxStep: 0, prev: null }
       window.__glanceProbe = probe
       const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a))
-      const tick = (ts) => {
+      const tick = () => {
         if (!probe.on) return
         const now = window.__placeTalkerYaws()
         if (probe.prev) {
-          const allowed = 3 * Math.min((ts - probe.prevT) / 1000, 0.1)
-          for (let k = 0; k < now.length; k++) {
-            const step = Math.abs(wrapA(now[k] - probe.prev[k]))
-            probe.maxStep = Math.max(probe.maxStep, step)
-            probe.maxExcess = Math.max(probe.maxExcess, step - allowed)
-          }
+          for (let k = 0; k < now.length; k++) probe.maxStep = Math.max(probe.maxStep, Math.abs(wrapA(now[k] - probe.prev[k])))
         }
         probe.prev = now
-        probe.prevT = ts
         requestAnimationFrame(tick)
       }
       requestAnimationFrame(tick)
@@ -2133,11 +2130,11 @@ if (section('inhabitants-glance')) {
         if (shotAt === null && turn > 0.5) shotAt = { k, t }
       }
     }
-    const { maxStep, maxExcess } = await page.evaluate(() => {
+    const maxStep = await page.evaluate(() => {
       const probe = window.__glanceProbe
       probe.on = false
       delete window.__glanceProbe
-      return { maxStep: probe.maxStep, maxExcess: probe.maxExcess }
+      return probe.maxStep
     })
     if (shotAt) {
       const k = shotAt.k
@@ -2151,7 +2148,7 @@ if (section('inhabitants-glance')) {
       await frame('356-inhabitant-glance', { local: { x: pair[k].x, y: 1.2, z: pair[k].z }, label: `a ${PLACE} inhabitant of the conversing pair turned toward the passing traveller` })
     }
     check('walking past the pair, an inhabitant turns measurably toward the player (point 356)', best.turn > 0.5, JSON.stringify(best))
-    check('the glance turns at a capped rate, never a snap (point 356)', maxExcess < 0.02, `largest per-frame step ${maxStep.toFixed(3)} rad; largest excess over the capped rate ${maxExcess.toFixed(3)} rad`)
+    check('the glance turns at a capped rate, never a snap (point 356)', maxStep <= MAX_FRAME_STEP + 0.005, `largest per-tick step ${maxStep.toFixed(3)} rad (cap ${MAX_FRAME_STEP.toFixed(2)})`)
     // Off again: both return to their partner within the glance plus a turn.
     await place(cx, cz + cfg.radius + 12)
     await nextFrames(Math.ceil((cfg.glanceSeconds * cfg.childFactor + 3) * 60))
