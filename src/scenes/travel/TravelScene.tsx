@@ -3,6 +3,7 @@
 // dome, sun with soft shadows, animated ocean, instanced biome vegetation.
 
 import { registerRangedCaster, updateRangedCasters } from '../../render/shadowCasterRange'
+import { monumentGlyph, villageGlyph, type GlyphPart } from '../../render/placeMarkerGlyphs'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
@@ -1867,45 +1868,23 @@ function PortMarker() {
   )
 }
 
+/** Village glyph: three huts, merged into one wall and one roof mesh shared by
+ *  every village marker (render/placeMarkerGlyphs.ts, point 1524). */
 function VillageMarker() {
-  const huts: Array<[number, number, number]> = [
-    [0, -0.2, 0.72],
-    [-0.95, 0.5, 0.5],
-    [0.95, 0.55, 0.52],
-  ]
-  return (
-    <group>
-      {huts.map(([hx, hz, r], i) => (
-        <group key={i} position={[hx, 0, hz]}>
-          <mesh position={[0, r * 0.5, 0]} castShadow>
-            <cylinderGeometry args={[r, r * 1.06, r, 9]} />
-            <meshStandardMaterial color="#b0803f" roughness={0.95} />
-          </mesh>
-          <mesh position={[0, r + r * 0.42, 0]} castShadow>
-            <coneGeometry args={[r * 1.4, r * 1.05, 9]} />
-            <meshStandardMaterial color="#8f7340" roughness={1} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  )
+  return <GlyphMeshes parts={villageGlyph()} />
 }
 
 /** Marker for a monument site (design.md §4.4, point 273): a small three-pyramid
  *  glyph in the SW-diagonal row, so Giza reads as the pyramids on the map. */
 function MonumentMarker() {
-  const pyramids: Array<[number, number, number]> = [
-    [0.7, -0.7, 0.95], // Khufu, largest, NE
-    [0, 0, 0.85], // Khafre, centre
-    [-0.7, 0.7, 0.55], // Menkaure, smallest, SW
-  ]
+  return <GlyphMeshes parts={monumentGlyph()} />
+}
+
+function GlyphMeshes({ parts }: { parts: GlyphPart[] }) {
   return (
     <group>
-      {pyramids.map(([px, pz, r], i) => (
-        <mesh key={i} position={[px, r * 0.5, pz]} rotation={[0, Math.PI / 4, 0]} castShadow>
-          <coneGeometry args={[r, r * 1.28, 4]} />
-          <meshStandardMaterial color="#cdb079" roughness={0.95} />
-        </mesh>
+      {parts.map((p, i) => (
+        <mesh key={i} geometry={p.geometry} material={p.material} castShadow dispose={null} />
       ))}
     </group>
   )
