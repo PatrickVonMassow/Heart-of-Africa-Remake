@@ -37137,3 +37137,29 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   differ from the same crop with the effect disabled, in dry weather a walking
   inhabitant raises visible dust and in rain it does not.
   DOCS: design.md §19.10.
+
+- [x] 359. The cattle peoples' kraal is empty (user 25.07.2026, from the Zulu village
+  screenshot: the enclosure stands there with nothing in it — `PlaceLife.tsx` puts GOATS
+  in a pen, cattle do not exist). For a Zulu umuzi the cattle enclosure is not scenery
+  but the centre of the homestead, and an empty one is a conspicuous absence.
+  EVIDENCE FIRST, as with every people question here: establish from
+  `docs/peoples-1890.md` which of the 22 peoples kept CATTLE around 1890 and in what
+  arrangement — a central kraal, a herd out at pasture, none at all — and extend the
+  research section where it is silent. The cattle-less peoples (the Bemba among them,
+  per the existing rinderpest text) get NO cattle; the camel peoples keep camels.
+  THEN THE HERD, and this is what makes it more than decoration: the game already models
+  the great rinderpest panzootic of 1888-1897 (`rinderpestPhase`, docs/peoples-1890.md
+  §5) and already tells it in the first-visit vignettes. The kraal must agree with that
+  text — full in 1890, devastated from 1891/92, slowly recovering afterwards, with the
+  phase read from the VISIT DATE exactly as the vignette reads it. A village whose
+  journal entry speaks of the emutai while its kraal stands full would contradict itself.
+  KEEP: the goats and their pen as they are; the §19.10 life, the layout and the
+  colliders otherwise untouched; cattle are collidable like any other solid body.
+  VERIFIABLE: pure — every people resolves to a decided cattle arrangement (the sweep
+  fails on an undecided one, as the dress sweep does); the herd size falls across the
+  rinderpest phases for a cattle people and stays zero for a cattle-less one, boundary-
+  tested at the phase dates; the animals stay inside the pen and out of its fence. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Zulu kraal holds cattle
+  in 1890 and visibly fewer in 1893, and the Bemba village has none in either year.
+  DOCS in the same commit: design.md §19.10 and the implementation section of
+  `docs/peoples-1890.md` (the standing rule that research and game table never drift).
