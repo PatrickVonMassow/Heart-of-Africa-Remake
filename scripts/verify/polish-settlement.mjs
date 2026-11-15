@@ -2169,9 +2169,10 @@ if (section('inhabitants-glance')) {
 // than the two OFF crops differ from each other (the flame's flicker, the
 // drifting light). Screenshots are local/place subjects.
 
-/** Mean absolute RGB difference (0..255) of two equal-size PNG crops. */
+/** Mean absolute RGB difference (0..255) of two equal-size PNG crops, blurred
+ *  first: the smoke is a soft veil, the noise a sub-pixel shimmer of thatch stripes. */
 const cropDiff = async (a, b) => {
-  const [ra, rb] = await Promise.all([a, b].map((png) => sharp(png).removeAlpha().raw().toBuffer()))
+  const [ra, rb] = await Promise.all([a, b].map((png) => sharp(png).removeAlpha().blur(4).raw().toBuffer()))
   let sum = 0
   for (let k = 0; k < ra.length; k++) sum += Math.abs(ra[k] - rb[k])
   return sum / ra.length
