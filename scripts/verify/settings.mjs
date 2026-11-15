@@ -1669,12 +1669,11 @@ if (section('river-current')) {
 // In a REAL village (Bambara, the scene the river-current block above leaves
 // standing): the goats and the fire's crackle are audible in the GRAPH's gain
 // values (the live node after its fade, not only the target); the fire pit's own
-// distance report raises the crackle at its ring and silences it beyond its
-// reach; the mortar's thud schedules a positive level; and the master ambience
+// distance report makes the crackle louder near its ring than part-way out,
+// audible at both; the mortar's thud schedules a positive level; and the master ambience
 // volume at zero silences all three. Last in the file, so it disturbs no block.
 if (section('village-bed')) {
   const VILLAGE_FIRE = [-3.5, 2.5] // src/scenes/place/layout.ts VILLAGE_FIRE
-  const FADE_WAIT = 1800 // the engine's 1.6 s crossfade, with room to settle
   if (await page.evaluate(() => window.__game.getState().placeId !== 'bambara-village')) {
     await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   }
@@ -1707,14 +1706,22 @@ if (section('village-bed')) {
   // The ring is crowded (cooks, stools, stations): a spot inside a collider is
   // undone by the stuck-escape back to the entry. Try bearings until the fire
   // pit's own report says the traveller stayed beside it.
-  const standBesideFire = async () => {
+  const standNearFire = async (metres) => {
     for (let k = 0; k < 12; k++) {
-      await standFromFire(2.2, (k * Math.PI) / 6)
-      await settleStand(2.2)
-      if (await page.evaluate(() => window.__ambience.fireDistance() < 3)) return true
+      await standFromFire(metres, (k * Math.PI) / 6)
+      await settleStand(metres)
+      if (await page.evaluate((m) => Math.abs(window.__ambience.fireDistance() - m) < 0.5, metres)) return true
     }
     return false
   }
+  const standBesideFire = () => standNearFire(2.2)
+  // The engine's crossfade has run out when every bed layer's live gain sits on
+  // its target: a condition, so a slow lane is waited for and a fast one is not.
+  const settleBed = () => page
+    .waitForFunction(() => ['goats', 'fire'].every((n) => Math.abs(window.__ambience.layerGain(n) - window.__ambience.layerTarget(n)) < 1e-4),
+      null, { timeout: 12000, polling: 100 })
+    .then(() => true)
+    .catch(() => false)
   await page.evaluate(() => {
     window.__ambience.start()
     window.__balance.ambienceVolume = 0.5
@@ -1722,7 +1729,7 @@ if (section('village-bed')) {
   })
   const besideOk = await standBesideFire()
   check('the traveller can stand beside the village fire ring (point 357)', besideOk)
-  await page.waitForTimeout(FADE_WAIT)
+  await settleBed()
   const audible = await page.evaluate(() => {
     const a = window.__ambience
     const before = { ...a.thudProbe() }
@@ -1741,22 +1748,21 @@ if (section('village-bed')) {
   check('the mortar thud schedules a positive level inside a village (point 357)',
     audible.thudScheduled === 1 && audible.thudPeak > 0, JSON.stringify(audible))
   const reach = await page.evaluate(() => window.__balance.villageBed.fireAudible)
-  // Same search beyond the reach: a spot outside the walkable ground or in a
-  // dwelling is refused, so the bearing that keeps him there is taken.
-  let awayOk = false
-  for (let k = 0; k < 12 && !awayOk; k++) {
-    await standFromFire(reach + 2, (k * Math.PI) / 6)
-    await settleStand(reach + 2)
-    awayOk = await page.evaluate((r) => window.__ambience.fireDistance() > r, reach)
-  }
-  check('the traveller can stand beyond the fire crackle\'s reach (point 357)', awayOk)
-  await page.waitForTimeout(FADE_WAIT)
-  const away = await page.evaluate(() => {
+  // The crackle FOLLOWS the distance, not an on/off switch: compared at two
+  // distances that are both inside its reach, the nearer stand is louder and
+  // both are audible. The near reading is the settled one taken above.
+  const midMetres = Math.round(reach * 0.6 * 10) / 10
+  const midOk = await standNearFire(midMetres)
+  check('the traveller can stand part-way out from the fire, inside its reach (point 357)', midOk)
+  await settleBed()
+  const mid = await page.evaluate(() => {
     const a = window.__ambience
     return { fireDistance: a.fireDistance(), fire: a.layerGain('fire'), goats: a.layerGain('goats') }
   })
-  check('the fire falls silent beyond its reach while the goats stay (point 357)',
-    away.fireDistance > reach && away.fire === 0 && away.goats > 0, JSON.stringify(away))
+  check('the fire crackle is louder near its ring than part-way out, audible at both (point 357)',
+    audible.fireDistance < mid.fireDistance && mid.fireDistance < reach &&
+      mid.fire > 0 && audible.fire > mid.fire && mid.goats > 0,
+    JSON.stringify({ near: audible, mid }))
   await standBesideFire()
   await page.evaluate(() => {
     window.__balance.ambienceVolume = 0 // the master muted
