@@ -1897,12 +1897,6 @@
       "why": "Pre-existing settings reds without player report; behind the open feature work, unbundled",
       "origin": "machine",
       "place": "last"
-    },
-    "1524": {
-      "at": "2026-11-15T10:07:27.950Z",
-      "why": "User: 'ja, beide ganz vorne einreihen' (15.11.2026), after 1523",
-      "origin": "user",
-      "place": "ahead"
     }
   },
   "boundary": {
@@ -1931,7 +1925,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-15T12:35:39.679Z",
+    "at": "2026-11-15T16:23:08.718Z",
     "points": [
       184,
       200,
@@ -2383,8 +2377,7 @@
       1519,
       1520,
       1521,
-      1522,
-      1524
+      1522
     ]
   }
 }
