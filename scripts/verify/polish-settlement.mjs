@@ -2407,14 +2407,16 @@ if (section('kraal-cattle')) {
       for (let i = 0; i < n; i++) window.__game.getState().debugJumpYear(1)
     }, years)
     await goToPlace(placeId)
-    // A pen village mounts the herd and publishes it at mount; a village with no
-    // pen never mounts it, so the read-back stays absent there.
+    // A pen village mounts the herd and publishes it at mount (an empty herd
+    // included); a village with no pen never mounts it, so the read-back stays
+    // absent there. `published` lets the kraal checks refuse a missing read-back
+    // instead of reading it as zero head.
     await page.waitForFunction(() => !!window.__placeCattle, null, { timeout: 8000 }).catch(() => {})
     return page.evaluate(() => {
       const g = window.__game.getState()
       const year = new Date(Date.UTC(1890, 0, 1) + Math.floor(g.day) * 86400000).getUTCFullYear()
       const c = window.__placeCattle
-      return c ? { year, count: c.count, pen: c.pen, hold: c.hold, cattle: c.cattle } : { year, count: 0, pen: null, hold: 0, cattle: [] }
+      return c ? { published: true, year, count: c.count, pen: c.pen, hold: c.hold, cattle: c.cattle } : { published: false, year, count: 0, pen: null, hold: 0, cattle: [] }
     })
   }
   /** Stand outside the pen on the side toward the village centre and look in. */
@@ -2459,12 +2461,14 @@ if (section('kraal-cattle')) {
   await frame('359-bemba-village-1893', { place: 'bemba-village', label: 'the cattle-less Bemba village in 1893' })
 
   const seen = (r) => `${r.year}: ${r.count} head`
+  const kraals = [zulu1890, zulu1893, maasai1890, maasai1893]
+  check('both kraal villages published their herd in both years (point 359)', kraals.every((r) => r.published && r.pen), kraals.map((r) => `${r.year}:${r.published ? 'pen' : 'absent'}`).join(','))
   check('the calendar stood in the years asked (1890 and 1893)', [zulu1890, maasai1890, bemba1890].every((r) => r.year === 1890) && [zulu1893, maasai1893, bemba1893].every((r) => r.year === 1893), [zulu1890, zulu1893, maasai1890, maasai1893, bemba1890, bemba1893].map((r) => r.year).join(','))
   check('the Zulu kraal holds cattle in 1890 (point 359)', zulu1890.count > 0 && zulu1890.cattle.length === zulu1890.count, seen(zulu1890))
   check('and the same herd in 1893 — the plague reaches Zululand only in 1896 (point 359)', zulu1893.count === zulu1890.count, `${seen(zulu1890)} vs ${seen(zulu1893)}`)
   check('the Maasai kraal holds cattle in 1890 and visibly fewer in 1893 (point 359)', maasai1890.count > 0 && maasai1893.count < maasai1890.count, `${seen(maasai1890)} vs ${seen(maasai1893)}`)
   check('the Bemba village has no cattle in either year (point 359)', bemba1890.count === 0 && bemba1893.count === 0, `${seen(bemba1890)}, ${seen(bemba1893)}`)
-  check('every beast stands inside its pen, clear of the fence (point 359)', [zulu1890, zulu1893, maasai1890, maasai1893].every((r) => !r.pen || inside(r)), JSON.stringify([zulu1890, maasai1890].map((r) => ({ hold: r.hold, at: r.cattle }))))
+  check('every beast stands inside its pen, clear of the fence (point 359)', kraals.every((r) => r.published && r.pen && inside(r)), JSON.stringify([zulu1890, maasai1890].map((r) => ({ hold: r.hold, at: r.cattle }))))
 }
 
 await finishPolishSuite()

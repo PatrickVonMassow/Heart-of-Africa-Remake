@@ -67,8 +67,11 @@ export function KraalCattle({ seed, placeId, pen, colliders }: { seed: number; p
       ),
     [anchors],
   )
-  const state = useRef<Array<{ x: number; z: number; yaw: number; dist: number }>>([])
-  if (state.current.length !== anchors.length) state.current = anchors.map((a) => ({ x: a.x, z: a.z, yaw: a.yaw, dist: 0 }))
+  // Movement state follows the anchors: a same-count replacement (new seed, pen
+  // or colliders) must not keep the old positions, or the next frame writes them
+  // back over the fresh body circles.
+  const state = useRef<{ for: typeof anchors | null; beasts: Array<{ x: number; z: number; yaw: number; dist: number }> }>({ for: null, beasts: [] })
+  if (state.current.for !== anchors) state.current = { for: anchors, beasts: anchors.map((a) => ({ x: a.x, z: a.z, yaw: a.yaw, dist: 0 })) }
   const refs = useRef<Array<THREE.Group | null>>([])
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
   // The scene each beast resolves against: the others' circles, then the layout.
@@ -89,7 +92,7 @@ export function KraalCattle({ seed, placeId, pen, colliders }: { seed: number; p
     const dt = Math.min(rawDt, 0.1)
     const maxStep = VILLAGE_CATTLE.maxSpeed * dt
     anchors.forEach((a, i) => {
-      const s = state.current[i]
+      const s = state.current.beasts[i]
       const g = refs.current[i]
       if (!s || !g) return
       // A slow shift about the anchor: cattle in a kraal mostly stand.
@@ -131,7 +134,7 @@ export function KraalCattle({ seed, placeId, pen, colliders }: { seed: number; p
         pen,
         hold,
         reach,
-        cattle: state.current.map((s) => ({ x: s.x, z: s.z, yaw: s.yaw })),
+        cattle: state.current.beasts.map((s) => ({ x: s.x, z: s.z, yaw: s.yaw })),
       }
     }
   })
