@@ -515,7 +515,11 @@ export const DOC_BUDGETS = [
     // RAISED by the 87 measured words of the §19.10 glance paragraph (point 356):
     // a genuinely new behaviour rule (who notices the player, cooldown, cap,
     // exemptions) the document did not carry in any form.
-    maxWords: 30724,
+    // RAISED by the 78 measured words of the §19.10 village sound bed (point
+    // 357): mortar thud timed to the pestle, goats and the fire's proximity
+    // crackle, each on its own slider — layers the document did not name — plus
+    // the re-measured §19.1 headroom figures; no new line.
+    maxWords: 30802,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
