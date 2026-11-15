@@ -677,6 +677,14 @@ export interface Strings {
     separationSpeed: string
     separationWedge: string
     separationPasses: string
+    noticeRadius: string
+    noticeGlance: string
+    noticeChildFactor: string
+    noticeCooldown: string
+    noticeMaxAtOnce: string
+    noticeGoatStep: string
+    noticeGoatSeconds: string
+    noticeWalkerSpeed: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

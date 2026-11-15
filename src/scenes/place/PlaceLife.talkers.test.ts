@@ -27,10 +27,12 @@ describe('conversing pair', () => {
   it('keeps both roots still: no per-frame swivel or hop of the figure groups', () => {
     // The 21.10.2026 fidget was a useFrame that swung each root ±0.18 rad and
     // lifted it 3 cm in turn. The roots are placed once from the stances; only
-    // the skinned body's idle clip and real gestures move the pair now.
+    // the skinned body's idle clip, real gestures and the capped glance at the
+    // traveller (design.md §19.10, noticeGlance.ts) move the pair now.
     const body = talkersSource()
-    expect(body).not.toMatch(/useFrame\s*\(/)
-    expect(body).not.toMatch(/\.rotation\.y\s*=/)
+    expect(body.match(/useFrame\s*\(/g) ?? []).toHaveLength(1)
+    expect(body).toMatch(/glanceYaw\(/)
+    expect(body.match(/\.rotation\.y\s*=[^\n]*/g) ?? []).toEqual(['.rotation.y = pairYaws.current[k]'])
     expect(body).not.toMatch(/\.position\.y\s*=/)
     expect(body).toMatch(/rotation=\{\[0, stances\[0\]\.yaw, 0\]\}/)
     expect(body).toMatch(/rotation=\{\[0, stances\[1\]\.yaw, 0\]\}/)

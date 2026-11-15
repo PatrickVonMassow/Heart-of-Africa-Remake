@@ -164,6 +164,7 @@ import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
+import { createNoticeBoard, glanceActive, glanceYaw, noticeStep, placeNoticeBoard, settleYaw, shyWeight } from './noticeGlance'
 import { animalAnchors, animalBodies, animalScene, liveFigureColliders, setAnimalFigures, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import {
   createInhabitantSet,
@@ -937,6 +938,9 @@ function Kids({
     )
   }
 
+  // Each child's drawn facing while it glances at the traveller (§19.10).
+  const childYaws = useRef<number[]>([])
+  const childSettling = useRef<boolean[]>([])
   // One gait phase ref per child, handed to its Figure.
   const gaits = useRef<Array<RefObject<number>>>([])
   if (gaits.current.length !== count) {
@@ -1155,8 +1159,25 @@ function Kids({
       // the wrong tool.
       const slumped = (c as BankChild).slumped === true
       // The eased FACING, not the raw travel heading: the body turns into a new
-      // direction rather than snapping about-face inside one frame.
-      g.rotation.y = c.facing
+      // direction rather than snapping about-face inside one frame. A child
+      // that stands may stare a moment longer at the traveller (design.md
+      // §19.10) on the game's own turn rate; one caught, up on a stone or
+      // speaking is exempt, and a running one keeps running.
+      const stare = noticeStep(placeNoticeBoard, `child:${i}`, c, placePlayerPosition,
+        { child: true, exempt: slumped || lift > 0 || isGesturing(gestures.current[i].current) }, balance.villageLife.notice, dt)
+      // A glance cut off by an exemption eases back on the same rate (settleYaw).
+      const childTurn = balance.villageLife.tag.turnRate * dt
+      let drawn: number
+      if (glanceActive(stare)) {
+        drawn = glanceYaw(stare, childYaws.current[i] ?? c.facing, c, placePlayerPosition, childTurn, c.facing)
+        childSettling.current[i] = true
+      } else {
+        const settled = settleYaw(childYaws.current[i], c.facing, childSettling.current[i] === true, childTurn)
+        drawn = settled.yaw
+        childSettling.current[i] = settled.easing
+      }
+      childYaws.current[i] = drawn
+      g.rotation.y = drawn
       const pose = poses.current[i].current
       if (!pose) return
       // The chase's posture and the speaker's arms on ONE body: the gesture owns
@@ -1708,6 +1729,11 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   const refs = useRef<Array<THREE.Group | null>>([])
   // DEV capture steer per goat (see `__placeGoatSteer` below); null = graze.
   const steer = useRef<Array<{ x: number; z: number } | null>>([])
+  // Per-goat shy weight (0 … 1) for the step away from the traveller (§19.10).
+  const shy = useRef<number[]>([])
+  // The herd's own board: a goat shying is not a villager's glance, so it
+  // takes nothing from the settlement's cap on figures turning at once.
+  const herdNotice = useMemo(() => createNoticeBoard(), [])
   // Per-goat leg-pivot groups (four each) and gait state (last position, walked
   // distance, held facing and each stance's world contact) so the swing rides
   // distance, the body faces travel and a planted foot does not follow either.
@@ -1773,6 +1799,14 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       // position-only test resolved the raw wobble point, so the moment that
       // point crossed the ridge between two post circles the goat was pushed
       // out on the FAR side of the fence.
+      // THE GOAT SHIES A STEP AWAY from a traveller who comes close (design.md
+      // §19.10): the grazing target is offset away from the player, eased so
+      // the step rides the ordinary swept goat stepping and its capped turn.
+      const shyCfg = balance.villageLife.notice
+      const shyNotice = noticeStep(herdNotice, `goat:${i}`, s, placePlayerPosition, { exempt: !!goal }, shyCfg, dt)
+      const w = shy.current[i] = shyWeight(shy.current[i] ?? 0, shyNotice.glance > 0, shyCfg, dt)
+      tx += shyNotice.awayX * shyCfg.goatShyStep * w
+      tz += shyNotice.awayZ * shyCfg.goatShyStep * w
       const [px, pz] = stepAnimal(scene, bodies, i, tx, tz, s.x, s.z)
       const vx = px - s.x
       const vz = pz - s.z
@@ -2112,6 +2146,22 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   // apart, well clear of the separation distance, so it never pushes itself.
   useStandingBodies(stances)
 
+  // THE GLANCE AT THE TRAVELLER (design.md §19.10): each of the pair may turn
+  // toward a passing player on the spot, at the villagers' capped turn rate,
+  // and back to its partner afterwards.
+  const pairRefs = useRef<Array<THREE.Group | null>>([null, null])
+  const pairYaws = useRef<number[]>(stances.map((st) => st.yaw))
+  useFrame((_, rawDt) => {
+    if (isLifeFrozen()) return
+    const dt = Math.min(rawDt, 0.1)
+    stances.forEach((st, k) => {
+      const e = noticeStep(placeNoticeBoard, `talker:${x},${z}:${k}`, st, placePlayerPosition, {}, balance.villageLife.notice, dt)
+      pairYaws.current[k] = glanceYaw(e, pairYaws.current[k] ?? st.yaw, st, placePlayerPosition, VILLAGER_MOTION.spotTurnRate * dt, st.yaw)
+      const g = pairRefs.current[k]
+      if (g) g.rotation.y = pairYaws.current[k]
+    })
+  })
+
   // Dev hook for the headless verification (CLAUDE.md §7.2): the live gesture
   // state and the pose it draws, plus a way to hold one pose for a screenshot.
   // It is the ONLY thing that poses this pair — in a real run the two stand and
@@ -2135,7 +2185,9 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
       else gestureB.current = next
     }
     w.__placeTalkers = stances
+    w.__placeTalkerYaws = () => [...pairYaws.current]
     return () => {
+      delete w.__placeTalkerYaws
       delete w.__placeGestures
       delete w.__placeForceGesture
       delete w.__placeTalkers
@@ -2144,12 +2196,12 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 
   return (
     <group position={[x, groundHeight(x, z), z]}>
-      <group position={[stances[0].x - x, 0, stances[0].z - z]} rotation={[0, stances[0].yaw, 0]}>
+      <group ref={(g) => { pairRefs.current[0] = g }} position={[stances[0].x - x, 0, stances[0].z - z]} rotation={[0, stances[0].yaw, 0]}>
         {/* The conversing pair: the notable elder and a young man (work-order
             "villager dress": the pair the age-readability judgement compares). */}
         <Figure cloth={cloth[0]} gesture={gestureA} sex="male" age="elder" />
       </group>
-      <group position={[stances[1].x - x, 0, stances[1].z - z]} rotation={[0, stances[1].yaw, 0]}>
+      <group ref={(g) => { pairRefs.current[1] = g }} position={[stances[1].x - x, 0, stances[1].z - z]} rotation={[0, stances[1].yaw, 0]}>
         <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} sex="male" age="youth" />
       </group>
     </group>
@@ -3611,7 +3663,12 @@ function ErrandVillagers({
         g.position.set(me.x, groundHeight(me.x, me.z), me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
         const aim = faceTo.current[i]
+        // The glance (design.md §19.10): only a figure with no aim of its own
+        // this frame — a fill, a take, a dig or a word aims it and is exempt.
+        const busy = facing !== null || (aim !== null && aim !== undefined) || filling !== null || taking !== null || figureWork.dig
+        const notice = noticeStep(placeNoticeBoard, `errand:${i}`, me, placePlayerPosition, { exempt: busy }, balance.villageLife.notice, dt)
         if (facing !== null) yaws.current[i] = facing
+        else if (!busy && glanceActive(notice)) yaws.current[i] = glanceYaw(notice, yaws.current[i], me, placePlayerPosition, VILLAGER_MOTION.spotTurnRate * dt)
         else if (aim !== null && aim !== undefined) {
           yaws.current[i] = turnToward(yaws.current[i], aim, VILLAGER_MOTION.spotTurnRate * dt)
           if (yaws.current[i] === aim) faceTo.current[i] = null
@@ -4592,6 +4649,15 @@ export function PlaceLife({
     return out
   }, [homes, firePos, errands, buildings, placeId])
   useUnplacedInhabitantWatch(placeId, placementAnchors)
+  // The glance at the traveller (design.md §19.10): one board per settlement,
+  // so its cap counts every inhabitant of this place and nobody of the last one.
+  useEffect(() => {
+    placeNoticeBoard.entries.clear()
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeNotice = () => [...placeNoticeBoard.entries].map(([id, e]) => ({ id, glance: e.glance, cooldown: e.cooldown, returning: e.rest !== null }))
+    return () => { delete w.__placeNotice }
+  }, [placeId])
 
   if (kind === 'port') {
     return (

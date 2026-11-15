@@ -261,6 +261,24 @@ const SEPARATION_FIELDS: ReadonlyArray<{
   { key: 'passes', label: 'separationPasses', step: 1, min: 1, max: 8 },
 ]
 
+/** The glance at the traveller (design.md §19.10). */
+const NOTICE_FIELDS: ReadonlyArray<{
+  key: keyof typeof balance.villageLife.notice
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+}> = [
+  { key: 'radius', label: 'noticeRadius', step: 0.5, min: 0 },
+  { key: 'glanceSeconds', label: 'noticeGlance', step: 0.25, min: 0 },
+  { key: 'childFactor', label: 'noticeChildFactor', step: 0.1, min: 1 },
+  { key: 'cooldownSeconds', label: 'noticeCooldown', step: 1, min: 0 },
+  { key: 'maxAtOnce', label: 'noticeMaxAtOnce', step: 1, min: 0 },
+  { key: 'goatShyStep', label: 'noticeGoatStep', step: 0.1, min: 0 },
+  { key: 'goatShySeconds', label: 'noticeGoatSeconds', step: 0.1, min: 0.1 },
+  { key: 'childMaxSpeed', label: 'noticeWalkerSpeed', step: 0.1, min: 0 },
+]
+
 /** Every numeric choice in the non-semantic village drum bed. The patterns
  *  themselves are musical figures; all timing, dynamics, voice and variation
  *  around those figures are live calibration values. */
@@ -755,6 +773,9 @@ export function DebugMenu() {
       // The body every inhabitant presents to every other (point 578).
       ...tableRows(SEPARATION_FIELDS, (f) => balance.villageLife.separation[f.key],
         (f, v) => { balance.villageLife.separation[f.key] = v }),
+      // The glance at the traveller (design.md §19.10).
+      ...tableRows(NOTICE_FIELDS, (f) => balance.villageLife.notice[f.key],
+        (f, v) => { balance.villageLife.notice[f.key] = v }),
     ],
     weather: [
       custom(t.debug.season, (
