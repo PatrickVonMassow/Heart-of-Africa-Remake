@@ -25,7 +25,7 @@ import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/t
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
-import { createEnvironmentTexture } from './environment'
+import { createEnvironmentTexture, updateEnvironmentTexture } from './environment'
 import { useSceneSun } from './sceneSun'
 import { createScenePass } from './scenePass'
 import { createSceneFrame } from './sceneFrame'
@@ -53,15 +53,28 @@ export function Effects() {
   // The glare projects the same sun every frame without rebuilding the chain.
   const sunDirRef = useRef(iblSun)
   sunDirRef.current = iblSun
+  // ONE texture per scene, re-baked in place (point-1523 findings): a fresh
+  // texture per sun step rebuilt every lit material's node program — a ~0.5 s
+  // main-thread stall each 0.25° of latitude walked.
+  const envTexRef = useRef<THREE.DataTexture | null>(null)
   useEffect(() => {
-    const tex = createEnvironmentTexture(iblSun)
+    const tex = createEnvironmentTexture(sunDirRef.current)
+    envTexRef.current = tex
     scene.environment = tex
     scene.environmentIntensity = 0.45
     return () => {
+      envTexRef.current = null
       scene.environment = null
       tex.dispose()
     }
-  }, [scene, iblSun])
+  }, [scene])
+  const bakedSunRef = useRef(iblSun)
+  useEffect(() => {
+    const tex = envTexRef.current
+    if (!tex) return
+    if (bakedSunRef.current !== iblSun) updateEnvironmentTexture(tex, iblSun)
+    bakedSunRef.current = iblSun
+  }, [iblSun])
 
   // The effective render levers (design.md §21, F9 / point 276 part B): the
   // graphics level drives SSAO/TRAA/bloom through these selectors — SSAO on only

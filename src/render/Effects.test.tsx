@@ -13,7 +13,7 @@ vi.mock('@react-three/fiber', () => ({
   useThree: (selector: (state: Record<string, unknown>) => unknown) => selector(fiber.state),
   useFrame: (callback: () => void) => { fiber.frame = callback },
 }))
-vi.mock('./environment', () => ({ createEnvironmentTexture: () => new Texture() }))
+vi.mock('./environment', () => ({ createEnvironmentTexture: () => new Texture(), updateEnvironmentTexture: () => {} }))
 
 const initialUi = useUi.getState()
 const currentPass = () => (window as unknown as { __scenePass: ReturnType<typeof createScenePass> }).__scenePass
