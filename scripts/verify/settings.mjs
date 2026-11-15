@@ -1755,72 +1755,95 @@ if (section('village-bed')) {
     const a = window.__ambience
     const stroke = window.__balance.villageLife.mortar.strokeSeconds
     const impactsOf = (pd) => pd.women.reduce((sum, w) => sum + w.impacts, 0)
-    const first = window.__placePounding?.()
-    if (!first) return { mounted: false }
-    let probe = { ...a.thudProbe() }
-    let impacts = impactsOf(first)
-    const start = { ...probe }
-    const thuds = []
-    let impactsWithoutThud = 0
-    const queued = [] // the frame each unheard impact was counted in
-    const lagFrames = 3
-    let frame = 0
+    if (!window.__placePounding?.()) return { mounted: false }
     const budgetMs = 45000 // the duo also walks to its rack
     const deadline = performance.now() + budgetMs
     // A stalled headless rAF must not leave the observation pending forever:
     // each frame wait races a timer set to the REST of the budget, so the
     // watch always ends by its deadline and reports the stall.
     let stalled = false
-    while (thuds.length < n && performance.now() < deadline) {
-      const rest = Math.max(0, deadline - performance.now())
-      const framed = await new Promise((r) => {
-        const timer = setTimeout(() => r(false), rest)
-        requestAnimationFrame(() => {
-          clearTimeout(timer)
-          r(true)
-        })
+    const nextFrame = () => new Promise((r) => {
+      const timer = setTimeout(() => r(false), Math.max(0, deadline - performance.now()))
+      requestAnimationFrame(() => {
+        clearTimeout(timer)
+        r(true)
       })
-      if (!framed) {
+    })
+    // The pose counts an impact a frame before its thud reaches the probe, so
+    // impacts queue (first in, first out) until a thud consumes them; one
+    // unheard after lagFrames is an impact without a thud, and a thud with
+    // nothing queued is an extra dispatch.
+    const lagFrames = 3
+    let probe = { ...a.thudProbe() }
+    let impacts = impactsOf(window.__placePounding())
+    let frame = 0
+    let pd = null
+    let now = null
+    const step = async () => {
+      if (performance.now() >= deadline || !(await nextFrame())) {
         stalled = true
-        break
+        return false
       }
-      const pd = window.__placePounding?.()
-      if (!pd) break
-      const now = { ...a.thudProbe() }
-      const nowImpacts = impactsOf(pd)
-      // The pose counts an impact a frame before its thud reaches the probe,
-      // so impacts queue (first in, first out) until a thud consumes them; an
-      // impact unheard after a few frames is one without a thud. A thud in the
-      // first frames may belong to an impact counted before the watch began.
+      pd = window.__placePounding?.()
+      if (!pd) return false
+      now = { ...a.thudProbe() }
       frame++
-      const fresh = nowImpacts - impacts
-      for (let i = 0; i < fresh; i++) queued.push(frame)
+      return true
+    }
+    // Warm-up: the window opens only after lagFrames frames with neither an
+    // impact nor a thud, so no thud in it can belong to an earlier impact.
+    let quiet = 0
+    while (quiet <= lagFrames) {
+      if (!(await step())) return { mounted: true, stalled, warmup: true }
+      const busy = impactsOf(pd) !== impacts || now.calls !== probe.calls
+      quiet = busy ? 0 : quiet + 1
+      probe = now
+      impacts = impactsOf(pd)
+    }
+    const start = { ...probe }
+    const thuds = []
+    const queued = [] // the frame each unheard impact was counted in
+    let impactsWithoutThud = 0
+    let extraCalls = 0
+    const observe = () => {
+      const nowImpacts = impactsOf(pd)
+      for (let i = 0; i < nowImpacts - impacts; i++) queued.push(frame)
       while (queued.length && frame - queued[0] > lagFrames) {
         queued.shift()
         impactsWithoutThud++
       }
       const calls = now.calls - probe.calls
-      if (calls > 0 && !(frame <= lagFrames && queued.length === 0)) {
+      if (calls > 0) {
         const struck = Math.min(calls, queued.length)
         queued.splice(0, struck)
-        const since = pd.women.filter((w) => w.phase >= 0).map((w) => w.phase * stroke)
-        thuds.push({
-          calls,
-          struck,
-          sinceImpact: since.length ? Math.min(...since) : null,
-          scheduled: now.scheduled - probe.scheduled,
-          peak: now.lastPeak,
-          at: a.context()?.currentTime ?? null,
-        })
+        if (thuds.length < n) {
+          const since = pd.women.filter((w) => w.phase >= 0).map((w) => w.phase * stroke)
+          thuds.push({
+            calls,
+            struck,
+            sinceImpact: since.length ? Math.min(...since) : null,
+            scheduled: now.scheduled - probe.scheduled,
+            peak: now.lastPeak,
+            at: a.context()?.currentTime ?? null,
+          })
+        } else {
+          extraCalls += calls - struck
+        }
       }
       probe = now
       impacts = nowImpacts
     }
+    while (thuds.length < n && (await step())) observe()
+    // Drain: an impact queued before it is watched to its thud or expiry, and
+    // an extra dispatch is still counted; later impacts lie outside the watch.
+    const until = frame + lagFrames + 1
+    while (!stalled && frame < until && (await step())) observe()
     return {
       mounted: true,
       stalled,
       thuds,
       impactsWithoutThud,
+      extraCalls,
       scheduled: probe.scheduled - start.scheduled,
       lastPeak: probe.lastPeak,
     }
@@ -1869,6 +1892,7 @@ if (section('village-bed')) {
   // several impacts were heard as one, breaks the coupling either way.
   check('the mortar thuds come from the animated pestle, one per impact frame, at the stroke\'s strike (point 357)',
     pestle.mounted && !pestle.stalled && pestle.thuds.length === 3 && pestle.impactsWithoutThud === 0 &&
+      pestle.extraCalls === 0 &&
       pestle.thuds.every((t) => t.struck >= 1 && t.calls === t.struck && t.sinceImpact !== null && t.sinceImpact <= 0.35),
     JSON.stringify(pestle))
   check('the pestle\'s thuds schedule a positive level beside the mortar (point 357)',
