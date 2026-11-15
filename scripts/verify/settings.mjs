@@ -1762,7 +1762,9 @@ if (section('village-bed')) {
     const start = { ...probe }
     const thuds = []
     let impactsWithoutThud = 0
-    let pending = 0
+    const queued = [] // the frame each unheard impact was counted in
+    const lagFrames = 3
+    let frame = 0
     const budgetMs = 45000 // the duo also walks to its rack
     const deadline = performance.now() + budgetMs
     // A stalled headless rAF must not leave the observation pending forever:
@@ -1787,20 +1789,23 @@ if (section('village-bed')) {
       const now = { ...a.thudProbe() }
       const nowImpacts = impactsOf(pd)
       // The pose counts an impact a frame before its thud reaches the probe,
-      // so impacts carry until the next thud; a second one still unheard is
-      // an impact without a thud.
+      // so impacts queue (first in, first out) until a thud consumes them; an
+      // impact unheard after a few frames is one without a thud. A thud in the
+      // first frames may belong to an impact counted before the watch began.
+      frame++
       const fresh = nowImpacts - impacts
-      if (fresh > 0 && pending > 0 && now.calls === probe.calls) {
-        impactsWithoutThud += pending
-        pending = 0
+      for (let i = 0; i < fresh; i++) queued.push(frame)
+      while (queued.length && frame - queued[0] > lagFrames) {
+        queued.shift()
+        impactsWithoutThud++
       }
-      pending += fresh
-      const struck = pending
-      if (now.calls > probe.calls) {
-        pending = 0
+      const calls = now.calls - probe.calls
+      if (calls > 0 && !(frame <= lagFrames && queued.length === 0)) {
+        const struck = Math.min(calls, queued.length)
+        queued.splice(0, struck)
         const since = pd.women.filter((w) => w.phase >= 0).map((w) => w.phase * stroke)
         thuds.push({
-          calls: now.calls - probe.calls,
+          calls,
           struck,
           sinceImpact: since.length ? Math.min(...since) : null,
           scheduled: now.scheduled - probe.scheduled,
