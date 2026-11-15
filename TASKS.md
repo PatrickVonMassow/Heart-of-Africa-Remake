@@ -14797,3 +14797,19 @@ to land than a mechanism that needs a review.
   Source: classification of the settings reds of the 357 session, 15.11.2026.
   Bundle: unbundled.
 
+
+- [ ] 1525. The full polish-settlement suite hangs on WebGPU
+  Measured 15.11.2026: `VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish-settlement` on main 7e60e49 (21:31-22:16) was killed by the 45-min wall timeout; it was started bare, so the hanging section is unknown. The preceding WebGL 2 run on feat/358 da7219770 lost its device (0 draw calls in 8 frames). Points 358 and 359 therefore landed on section runs only (359: `--section=kraal-cattle` green on both backends at fecd77446); the render-verify guard has no covering full run since.
+  Player impact: none directly; it blocks the covering settlement check for every village render change.
+  Final state: the hanging section is named from a logged run (`npm test -- polish-settlement`, with progress) and fixed or charged; a full polish-settlement run completes on WebGPU and on WebGL 2.
+  Test: one full polish-settlement run per backend, completed within the suite timeout, with its frames inspected.
+  Source: finding of the 358 session, 15.11.2026 21:16; restated at the 359 landing.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1526. Kraal cattle read as antelope
+  Seen 15.11.2026 on the point-359 frames 359-zulu-kraal-1890/1893 (WebGPU and WebGL 2, main e56c8f28c): several cattle carry long, straight, upright horns and a narrow head; they read as oryx or eland rather than Sanga/Nguni cattle (lyre-curved horns, broad head, hump). The Zulu pen's east side also shows an open stretch where a cow stands at the edge.
+  Player impact: a village herd looks like wild antelope standing in a pen.
+  Final state: the cattle in `src/render/cattle.ts` show curved horns, a broad head and a hump per the breeds docs/peoples-1890.md names; the pen reads closed or shows a deliberate gate.
+  Test: a Vitest case on the cattle geometry parameters, plus the kraal-cattle frames of polish-settlement on both backends.
+  Source: picture check of the 359 session, 15.11.2026 21:34.
+  Bundle: Dorfleben.
