@@ -199,6 +199,8 @@ import { FOLDED_STRIP, LOOM_BUILD, loomClothTransform, loomStackPosition, loomWe
 import { drummerFacing } from './chiefWalk'
 import { chiefStandingPosition, DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { fisheryLiveColliders } from './fisheryColliders'
+import { cattleLiveColliders } from './cattleSpots'
+import { KraalCattle } from './KraalCattle'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
@@ -1762,6 +1764,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
     extraMovers.length = 0
     if (chiefStandingPosition.active) extraMovers.push(chiefStandingPosition)
     for (const c of fisheryLiveColliders) extraMovers.push(c)
+    for (const c of cattleLiveColliders) extraMovers.push(c)
     liveFigureColliders(
       figures,
       figurePool,
@@ -4766,6 +4769,12 @@ export function PlaceLife({
           <PlaceDumpGroup id="goats" kind="goats">
             <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
           </PlaceDumpGroup>
+          {/* The kraal herd, sized by the rinderpest phase of the visit date (point 359). */}
+          {pen && (
+            <PlaceDumpGroup id="cattle" kind="cattle">
+              <KraalCattle seed={localSeed} placeId={placeId} pen={pen} colliders={colliders} />
+            </PlaceDumpGroup>
+          )}
           <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           {/* Inhabitant/prop interactions (design.md §19). */}
           {!fireOut && (

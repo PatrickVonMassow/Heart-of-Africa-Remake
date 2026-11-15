@@ -39,6 +39,7 @@ import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness,
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor, yardFireOut } from '../../systems/cookShelter'
 import { withFisheryMovers } from './fisheryColliders'
+import { withCattleBodies } from './cattleSpots'
 import { CookShelter } from './CookShelter'
 import { flameGeometryLift, HEARTH_STONE_RADIUS, HEARTH_STONE_RING, HEARTH_TOP, VILLAGE_FLAME_HEIGHT, villageFlameScale } from './hearth'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
@@ -3039,7 +3040,7 @@ export function PlaceScene() {
         // Free ground here is the full rule: no collider touches his footprint
         // (the dugout and the walking fishers included, as for his walking),
         // and the spot lies inside the settlement, on the drawn ground.
-        accept: (x, z) => standingClear(withFisheryMovers(chiefMovementColliders(l.colliders)), x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
+        accept: (x, z) => standingClear(withCattleBodies(withFisheryMovers(chiefMovementColliders(l.colliders))), x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
         // A POINT inside a collider is a wall between him and a candidate, so he
         // is never set down on the far side of something he could not walk through.
         blocked: (x, z) => !standingClear(l.colliders, x, z, 0),
@@ -3266,7 +3267,7 @@ export function PlaceScene() {
     const dx = (-sin * w.velF + cos * w.velS) * dt
     const dz = (-cos * w.velF - sin * w.velS) * dt
     const [rx, rz] = resolveMove(
-      withFisheryMovers(chiefMovementColliders(layout.colliders)), p.x + dx, p.z + dz, PLAYER_RADIUS, [p.x, p.z],
+      withCattleBodies(withFisheryMovers(chiefMovementColliders(layout.colliders))), p.x + dx, p.z + dz, PLAYER_RADIUS, [p.x, p.z],
     )
     p.x = rx
     p.z = rz

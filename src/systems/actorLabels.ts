@@ -26,7 +26,7 @@ export type ActorRoleKind =
   | 'donkeyboy'
   | 'tourist'
 /** Animals kept by people: the village stock and the Giza mounts. */
-type ActorTameKind = 'goat' | 'camel' | 'donkey'
+type ActorTameKind = 'goat' | 'cattle' | 'camel' | 'donkey'
 /** Objects the player can use where they stand. */
 type ActorObjectKind = 'camp' | 'canoe'
 
@@ -49,6 +49,7 @@ export const ACTOR_KINDS: readonly ActorKind[] = [
   'donkeyboy',
   'tourist',
   'goat',
+  'cattle',
   'camel',
   'donkey',
   'camp',

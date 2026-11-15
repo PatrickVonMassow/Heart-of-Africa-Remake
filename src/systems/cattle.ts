@@ -10,7 +10,8 @@
 // function the first-visit vignette reads (`rinderpestPhaseAtDay`), so the kraal
 // can never stand full while the journal speaks of the emutai.
 
-import { VILLAGE_CATTLE } from '../config/balance'
+import { START_YEAR, VILLAGE_CATTLE } from '../config/balance'
+import { placeById } from '../world/geo'
 import { rinderpestPhase, rinderpestPhaseAtDay } from './rinderpest'
 
 export type CattleArrangement = 'kraal' | 'herded' | 'camels' | 'none'
@@ -107,4 +108,11 @@ export function kraalHerdSizeAtDay(peopleId: string, day: number, startYear: num
 export function kraalPhaseAtDay(peopleId: string, day: number, startYear: number): ReturnType<typeof rinderpestPhaseAtDay> {
   const { year, month } = dateOfDay(day, startYear)
   return rinderpestPhase(peopleId, year, month)
+}
+
+/** Head of cattle in a place's kraal on an in-game day; zero for a place with
+ *  no people and for every non-kraal people. */
+export function kraalHerdForPlace(placeId: string, day: number): number {
+  const peopleId = placeById(placeId)?.peopleId
+  return peopleId ? kraalHerdSizeAtDay(peopleId, day, START_YEAR) : 0
 }
