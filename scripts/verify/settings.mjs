@@ -1762,9 +1762,25 @@ if (section('village-bed')) {
     const start = { ...probe }
     const thuds = []
     let impactsWithoutThud = 0
-    const deadline = performance.now() + 45000 // the duo also walks to its rack
+    const budgetMs = 45000 // the duo also walks to its rack
+    const deadline = performance.now() + budgetMs
+    // A stalled headless rAF must not leave the observation pending forever:
+    // each frame wait races a timer set to the REST of the budget, so the
+    // watch always ends by its deadline and reports the stall.
+    let stalled = false
     while (thuds.length < n && performance.now() < deadline) {
-      await new Promise((r) => requestAnimationFrame(r))
+      const rest = Math.max(0, deadline - performance.now())
+      const framed = await new Promise((r) => {
+        const timer = setTimeout(() => r(false), rest)
+        requestAnimationFrame(() => {
+          clearTimeout(timer)
+          r(true)
+        })
+      })
+      if (!framed) {
+        stalled = true
+        break
+      }
       const pd = window.__placePounding?.()
       if (!pd) break
       const now = { ...a.thudProbe() }
@@ -1788,6 +1804,7 @@ if (section('village-bed')) {
     }
     return {
       mounted: true,
+      stalled,
       thuds,
       impactsWithoutThud,
       scheduled: probe.scheduled - start.scheduled,
@@ -1837,7 +1854,7 @@ if (section('village-bed')) {
   // ONE dispatch per impact, exactly: a doubled dispatch, or a frame whose
   // several impacts were heard as one, breaks the coupling either way.
   check('the mortar thuds come from the animated pestle, one per impact, at the stroke\'s strike (point 357)',
-    pestle.mounted && pestle.thuds.length === 3 && pestle.impactsWithoutThud === 0 &&
+    pestle.mounted && !pestle.stalled && pestle.thuds.length === 3 && pestle.impactsWithoutThud === 0 &&
       pestle.thuds.every((t) => t.struck >= 1 && t.calls === t.struck && t.sinceImpact !== null && t.sinceImpact <= 0.35),
     JSON.stringify(pestle))
   check('the pestle\'s thuds schedule a positive level beside the mortar (point 357)',
@@ -1862,7 +1879,7 @@ if (section('village-bed')) {
   await standNearMortar()
   const mutedPestle = await watchPestle(2)
   check('the muted master silences the pestle\'s thuds while it keeps pounding (point 357)',
-    mutedPestle.mounted && mutedPestle.thuds.length === 2 && mutedPestle.scheduled === 0, JSON.stringify(mutedPestle))
+    mutedPestle.mounted && !mutedPestle.stalled && mutedPestle.thuds.length === 2 && mutedPestle.scheduled === 0, JSON.stringify(mutedPestle))
   // Out of the village (master audible again): the whole bed must settle to
   // silence on the travel map, the fire pit's unmount included.
   // The goats are audible again first, so the departure wait below cannot
