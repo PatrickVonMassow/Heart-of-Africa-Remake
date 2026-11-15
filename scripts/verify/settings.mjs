@@ -1853,7 +1853,7 @@ if (section('village-bed')) {
   const pestle = await watchPestle(3)
   // ONE dispatch per impact, exactly: a doubled dispatch, or a frame whose
   // several impacts were heard as one, breaks the coupling either way.
-  check('the mortar thuds come from the animated pestle, one per impact, at the stroke\'s strike (point 357)',
+  check('the mortar thuds come from the animated pestle, one per impact frame, at the stroke\'s strike (point 357)',
     pestle.mounted && !pestle.stalled && pestle.thuds.length === 3 && pestle.impactsWithoutThud === 0 &&
       pestle.thuds.every((t) => t.struck >= 1 && t.calls === t.struck && t.sinceImpact !== null && t.sinceImpact <= 0.35),
     JSON.stringify(pestle))
