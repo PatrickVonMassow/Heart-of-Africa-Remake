@@ -1691,13 +1691,26 @@ if (section('village-bed')) {
     p.x = fire[0] + Math.cos(a) * m
     p.z = fire[1] + Math.sin(a) * m
   }, [VILLAGE_FIRE, metres, bearing])
+  // Waits on CONDITIONS, never a fixed delay (scripts/verify/fixedWaits.mjs):
+  // the fire pit reports its distance every frame, so a placement is first
+  // seen there; a refused spot is undone by the stuck-escape a few frames
+  // later, so the stand is judged only after the audio clock has run on.
+  const settleStand = async (metres) => {
+    await page
+      .waitForFunction((m) => Math.abs(window.__ambience.fireDistance() - m) < 0.5, metres, { timeout: 5000, polling: 'raf' })
+      .catch(() => {})
+    const t0 = await page.evaluate(() => window.__ambience.context()?.currentTime ?? 0)
+    await page
+      .waitForFunction((t) => (window.__ambience.context()?.currentTime ?? 0) > t + 0.4, t0, { timeout: 5000, polling: 'raf' })
+      .catch(() => {})
+  }
   // The ring is crowded (cooks, stools, stations): a spot inside a collider is
   // undone by the stuck-escape back to the entry. Try bearings until the fire
   // pit's own report says the traveller stayed beside it.
   const standBesideFire = async () => {
     for (let k = 0; k < 12; k++) {
       await standFromFire(2.2, (k * Math.PI) / 6)
-      await page.waitForTimeout(400)
+      await settleStand(2.2)
       if (await page.evaluate(() => window.__ambience.fireDistance() < 3)) return true
     }
     return false
@@ -1733,7 +1746,7 @@ if (section('village-bed')) {
   let awayOk = false
   for (let k = 0; k < 12 && !awayOk; k++) {
     await standFromFire(reach + 2, (k * Math.PI) / 6)
-    await page.waitForTimeout(400)
+    await settleStand(reach + 2)
     awayOk = await page.evaluate((r) => window.__ambience.fireDistance() > r, reach)
   }
   check('the traveller can stand beyond the fire crackle\'s reach (point 357)', awayOk)
