@@ -565,6 +565,9 @@ export interface Strings {
     footstepVolume: string
     ambientVolume: string
     birdsongVolume: string
+    mortarVolume: string
+    goatVolume: string
+    fireVolume: string
     speechVolume: string
     drumBedEnabled: string
     drumBedStep: string
