@@ -2240,7 +2240,23 @@ if (section('fire-smoke')) {
   await goToPlace(PLACE)
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
   await page.waitForFunction(() => window.__placeSeason?.().fireOut === false, null, { timeout: 15000 }).catch(() => {})
-  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
+  // The sun, sky light and drying ground ease per RENDERED frame (k = dt·0.8). On
+  // WebGL 2 the loop stalled 3.6 s after the dry switch (frame counter stuck), so a
+  // wall-clock quiet read the half-lerped sun as settled and it then brightened the
+  // crop between the two OFF shots (measured: sun 1.90 → 2.40). Settle by frames.
+  const readLight = () => page.evaluate(() => {
+    const v = window.__placeSeason()
+    return [v.sun, v.hemi, v.wetness, v.groundWet]
+  })
+  let light = await readLight()
+  let lit = false
+  for (let i = 0; i < 40 && !lit; i++) {
+    await nextFrames(30)
+    const next = await readLight()
+    lit = next.every((n, j) => Math.abs(n - light[j]) <= 1e-3)
+    light = next
+  }
+  check(`${PLACE} (dry): the light on the fire yard settles over rendered frames before the smoke is read`, lit, JSON.stringify(light))
   const [fx, fz] = await page.evaluate(() => window.__placeSeason().fire)
   // Stand nine metres off the fire, looking at the column's middle height.
   await standFacing(fx, fz + 9, fx, 2.6, fz)
