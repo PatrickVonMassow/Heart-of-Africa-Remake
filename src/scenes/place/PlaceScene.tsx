@@ -138,7 +138,7 @@ import { VILLAGE_SPOTS } from './lifeSpots'
 import { forgetSpeechLabel, speechClock, speechUseCandidate } from './speechChannel'
 import type { SpeechLabel } from '../../communication/speechLabel'
 import { currentDrumMessage } from '../../communication/drumMessage'
-import { playThunder } from '../../systems/ambience'
+import { playThunder, setAmbienceFire } from '../../systems/ambience'
 import { createPlacePointerLock, mouseLookApplies, releasePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
@@ -1209,8 +1209,14 @@ function FirePit({
     figures: [],
     objects: [{ id: 'village-fire/pit', kind: 'fire-pit', holder: 'ground', pos: { x, y: 0, z } }],
   }))
+  // The fire's crackle (point 357) rises as the traveller nears the ring; an
+  // out fire, or one the traveller is not standing beside, is silent.
+  useEffect(() => () => setAmbienceFire(Infinity), [])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
+    setAmbienceFire(
+      !out && placePlayerPosition.active ? Math.hypot(x - placePlayerPosition.x, z - placePlayerPosition.z) : Infinity,
+    )
     // Under the cook-shelter the fire burns on through the rain — only a touch
     // lower/steamier; an unsheltered fire (the dome-dweller villages) is beaten
     // down by rain (point 256, the two branches of shelteredFireRainFactor).

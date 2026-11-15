@@ -456,6 +456,100 @@ function emitFlock(dest: GainNode) {
 // setAmbienceCoast.
 let coastProx = 0
 
+/** Goat bleat (point 357): a nasal sawtooth with the fast vibrato that makes
+ *  a bleat, through a bandpass, one or two calls a time. */
+function emitGoat(dest: GainNode) {
+  if (!ctx) return
+  const ac = ctx
+  const calls = Math.random() < 0.35 ? 2 : 1
+  for (let c = 0; c < calls; c++) {
+    const t0 = ac.currentTime + c * (0.7 + Math.random() * 0.4)
+    const dur = 0.45 + Math.random() * 0.4
+    const f = 360 + Math.random() * 180
+    const osc = ac.createOscillator()
+    osc.type = 'sawtooth'
+    osc.frequency.setValueAtTime(f, t0)
+    osc.frequency.linearRampToValueAtTime(f * 0.88, t0 + dur)
+    const vib = ac.createOscillator()
+    vib.frequency.value = 9 + Math.random() * 4
+    const vibDepth = ac.createGain()
+    vibDepth.gain.value = f * 0.06
+    vib.connect(vibDepth)
+    vibDepth.connect(osc.frequency)
+    const band = ac.createBiquadFilter()
+    band.type = 'bandpass'
+    band.frequency.value = f * 2.4
+    band.Q.value = 1.6
+    const g = ac.createGain()
+    g.gain.setValueAtTime(0.0001, t0)
+    g.gain.linearRampToValueAtTime(0.5, t0 + 0.05)
+    g.gain.setValueAtTime(0.5, t0 + dur * 0.6)
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+    osc.connect(band)
+    band.connect(g)
+    g.connect(dest)
+    osc.start(t0)
+    vib.start(t0)
+    osc.stop(t0 + dur + 0.05)
+    vib.stop(t0 + dur + 0.05)
+  }
+}
+
+/** Fire crackle (point 357): a few dry snaps of highpassed noise, each a few
+ *  milliseconds long, at irregular gaps. */
+function emitCrackle(dest: GainNode) {
+  if (!ctx) return
+  const ac = ctx
+  const snaps = 1 + Math.floor(Math.random() * 4)
+  let at = ac.currentTime
+  for (let i = 0; i < snaps; i++) {
+    const dur = 0.006 + Math.random() * 0.02
+    const buffer = ac.createBuffer(1, Math.max(1, Math.ceil(ac.sampleRate * dur)), ac.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let k = 0; k < data.length; k++) data[k] = (Math.random() * 2 - 1) * (1 - k / data.length)
+    const src = ac.createBufferSource()
+    src.buffer = buffer
+    const hp = ac.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 1600 + Math.random() * 2400
+    const g = ac.createGain()
+    g.gain.value = 0.35 + Math.random() * 0.45
+    src.connect(hp)
+    hp.connect(g)
+    g.connect(dest)
+    src.start(at)
+    src.stop(at + dur + 0.01)
+    at += 0.03 + Math.random() * 0.12
+  }
+}
+
+/** The village sound bed's two looped layers (design.md §19.10/§20, point
+ *  357): the goats, heard anywhere in the village, and the fire's crackle,
+ *  rising as the traveller nears the fire ring over the shared §19.1
+ *  proximity curve. Both are scaled by their own per-source slider and the
+ *  single ambience volume, and both are zero outside a village. Pure, so the
+ *  curves are unit-tested. The mortar's thud is the third layer; it is timed
+ *  to the animated pestle and planned per strike (`poundThudPlan`). */
+export function villageBedTargets(
+  village: boolean,
+  fireDistance: number,
+  volume = balance.ambienceVolume,
+  cfg = balance.villageBed,
+): { goats: number; fire: number } {
+  if (!village) return { goats: 0, fire: 0 }
+  const vol = Math.max(0, volume)
+  return {
+    goats: cfg.goatBase * Math.max(0, cfg.goatVolume) * vol,
+    fire: cfg.fireBase * proximityGain(fireDistance, cfg.fireAudible) * Math.max(0, cfg.fireVolume) * vol,
+  }
+}
+
+// Distance (m) from the traveller to the burning village fire, reported by the
+// place scene's fire pit (point 357); Infinity when there is none, it is out,
+// or the traveller is not standing in the place.
+let fireDistance = Infinity
+let fireProxApplied = 0
+
 // Nearby-animal proximity (0 = none/far, 1 = right beside the player), set each
 // frame by the travel scene; re-applied on a volume change (design.md §19/§21).
 const animalProx: Record<'elephant' | 'lion' | 'grazer' | 'flock', number> = {
@@ -544,6 +638,8 @@ function buildGraph() {
   layer('aniLion')
   layer('aniGrazer')
   layer('aniFlock')
+  layer('goats')
+  layer('fire')
   emitter('insects', 0.4, 1.6, emitInsects)
   emitter('birds', 1.8, 6, emitBird)
   emitter('birds', 7, 18, emitMonkey)
@@ -553,6 +649,8 @@ function buildGraph() {
   emitter('aniLion', 4, 11, emitRoar)
   emitter('aniGrazer', 1.6, 5, emitGrazer)
   emitter('aniFlock', 2, 6, emitFlock)
+  emitter('goats', 3, 10, emitGoat)
+  emitter('fire', 0.12, 0.7, emitCrackle)
 }
 
 /** Gain targets per scene (region × perspective). */
@@ -591,6 +689,16 @@ function applyScene() {
   )
   setTarget('music', inPlace ? 0.16 : 0.1)
   applyAnimalTargets()
+  applyVillageBed()
+}
+
+/** Goat and fire targets of the village bed (point 357). */
+function applyVillageBed() {
+  if (!ctx) return
+  const bed = villageBedTargets(scene.mode === 'place' && scene.placeKind === 'village', fireDistance)
+  fireProxApplied = proximityGain(fireDistance, balance.villageBed.fireAudible)
+  setTarget('goats', bed.goats)
+  setTarget('fire', bed.fire)
 }
 
 /**
@@ -1175,7 +1283,13 @@ export function playLoomBeat(distance: number, bearing = 0): void {
 export function poundThudPlan(distance: number, bearing = 0, volume = balance.ambienceVolume) {
   const cfg = balance.villageLife.mortar
   return {
-    peak: cfg.thudPeak * hearingGain(distance, balance.communication.call.reach, balance.communication.call.falloff) * Math.max(0, volume),
+    // The mortar is a village-bed layer (point 357): its own slider over the
+    // single ambience volume.
+    peak:
+      cfg.thudPeak *
+      hearingGain(distance, balance.communication.call.reach, balance.communication.call.falloff) *
+      Math.max(0, balance.villageBed.mortarVolume) *
+      Math.max(0, volume),
     pan: speechPan(bearing),
     attack: cfg.thudAttack,
     duration: cfg.thudDuration,
@@ -1348,6 +1462,18 @@ export function setAmbienceCoast(prox: number) {
   if (ctx) applySurfTarget()
 }
 
+/** Report the distance (m) from the traveller to the burning village fire
+ *  (point 357); Infinity when it is out or not in reach. The fire's crackle
+ *  follows it over the §19.1 proximity curve. */
+export function setAmbienceFire(distance: number) {
+  const d = Number.isFinite(distance) ? Math.max(0, distance) : Infinity
+  fireDistance = d
+  // Re-target only on an audible change against what was last APPLIED: the pit
+  // reports every frame, and a slow walk moves the curve a hair per frame.
+  const prox = proximityGain(d, balance.villageBed.fireAudible)
+  if (ctx && Math.abs(prox - fireProxApplied) > 0.01) applyVillageBed()
+}
+
 /** Start the engine on the first user gesture; safe to call repeatedly. */
 export function startAmbience() {
   if (started) {
@@ -1422,6 +1548,8 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     animalProx: () => ({ ...animalProx }),
     setCoast: (prox: number) => setAmbienceCoast(prox),
     coastProx: () => coastProx,
+    setFire: (distance: number) => setAmbienceFire(distance),
+    fireDistance: () => fireDistance,
     setScene: (next: AmbienceScene) => setAmbienceScene(next),
     // The live gain of one sub-bus (point 577): the browser gate reads them to
     // prove `ambientVolume` moves the bed WITHOUT touching the speech.
