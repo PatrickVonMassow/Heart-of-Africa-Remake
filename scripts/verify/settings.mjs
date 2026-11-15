@@ -1665,8 +1665,6 @@ if (section('river-current')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
-// A selected section that never executed is a FAILURE, not a quiet pass: it is
-// the one way a --section run could report green having verified nothing.
 // --- The village sound bed (point 357, design.md §19.10/§20) -----------------
 // In a REAL village (Bambara, the scene the river-current block above leaves
 // standing): the goats and the fire's crackle are audible in the GRAPH's gain
@@ -1688,17 +1686,29 @@ if (section('village-bed')) {
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await waitForSceneBuilt(page)
   const errsBeforeBed = errors.length
-  const standFromFire = (metres) => page.evaluate(([fire, m]) => {
+  const standFromFire = (metres, bearing = 0) => page.evaluate(([fire, m, a]) => {
     const p = window.__placePlayer
-    p.x = fire[0] + m
-    p.z = fire[1]
-  }, [VILLAGE_FIRE, metres])
+    p.x = fire[0] + Math.cos(a) * m
+    p.z = fire[1] + Math.sin(a) * m
+  }, [VILLAGE_FIRE, metres, bearing])
+  // The ring is crowded (cooks, stools, stations): a spot inside a collider is
+  // undone by the stuck-escape back to the entry. Try bearings until the fire
+  // pit's own report says the traveller stayed beside it.
+  const standBesideFire = async () => {
+    for (let k = 0; k < 12; k++) {
+      await standFromFire(2.2, (k * Math.PI) / 6)
+      await page.waitForTimeout(400)
+      if (await page.evaluate(() => window.__ambience.fireDistance() < 3)) return true
+    }
+    return false
+  }
   await page.evaluate(() => {
     window.__ambience.start()
     window.__balance.ambienceVolume = 0.5
     window.__ambience.refresh()
   })
-  await standFromFire(1.6) // beside the ring, clear of the hearth
+  const besideOk = await standBesideFire()
+  check('the traveller can stand beside the village fire ring (point 357)', besideOk)
   await page.waitForTimeout(FADE_WAIT)
   const audible = await page.evaluate(() => {
     const a = window.__ambience
@@ -1718,7 +1728,15 @@ if (section('village-bed')) {
   check('the mortar thud schedules a positive level inside a village (point 357)',
     audible.thudScheduled === 1 && audible.thudPeak > 0, JSON.stringify(audible))
   const reach = await page.evaluate(() => window.__balance.villageBed.fireAudible)
-  await standFromFire(reach + 2)
+  // Same search beyond the reach: a spot outside the walkable ground or in a
+  // dwelling is refused, so the bearing that keeps him there is taken.
+  let awayOk = false
+  for (let k = 0; k < 12 && !awayOk; k++) {
+    await standFromFire(reach + 2, (k * Math.PI) / 6)
+    await page.waitForTimeout(400)
+    awayOk = await page.evaluate((r) => window.__ambience.fireDistance() > r, reach)
+  }
+  check('the traveller can stand beyond the fire crackle\'s reach (point 357)', awayOk)
   await page.waitForTimeout(FADE_WAIT)
   const away = await page.evaluate(() => {
     const a = window.__ambience
@@ -1726,7 +1744,7 @@ if (section('village-bed')) {
   })
   check('the fire falls silent beyond its reach while the goats stay (point 357)',
     away.fireDistance > reach && away.fire === 0 && away.goats > 0, JSON.stringify(away))
-  await standFromFire(1.6)
+  await standBesideFire()
   await page.evaluate(() => {
     window.__balance.ambienceVolume = 0 // the master muted
     window.__ambience.refresh()
@@ -1748,6 +1766,8 @@ if (section('village-bed')) {
   check('village bed: no new console errors', errors.length === errsBeforeBed, errors.slice(errsBeforeBed).join(' | ').slice(0, 300))
 }
 
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)
 
