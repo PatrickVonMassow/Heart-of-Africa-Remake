@@ -109,6 +109,7 @@ put it is the mistake this line exists to stop.
   a village the new layers are audible in the graph's gain values and fall silent when
   the master is muted; no console errors.
   DOCS: design.md §19.10/§20 name the village layers.
+  Owed before landing (15.11.2026, branch @ cffefc587, all 7 end-state review passes recorded): (1) `scripts/verify/fixedWaits.test.mjs` reds — settings.mjs fixed waits 22 -> 24, also the CI shard-2 gate failure; wait on a condition instead; (2) the live mortar check calls `a.poundThud(2)` directly — observe strikes from the animated pestle and their timing; (3) the live fire check passes a binary on/off — compare settled gains at two audible distances; (4) `emitter()` in `ambience.ts` schedules only above gain 0.005, so quiet goat/fire settings and the fire near its reach fall silent — adjust the floor and unit-test real scheduling there. Then confirming review passes for the changed files and the village-bed section.
 
 - [ ] 358. Smoke over the fire, dust under the feet (user 25.07.2026). A thin smoke
   column drifting from the §19.10 fire reads as "someone lives here" from further away
