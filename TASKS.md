@@ -77,27 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 358. Smoke over the fire, dust under the feet (user 25.07.2026). A thin smoke
-  column drifting from the §19.10 fire reads as "someone lives here" from further away
-  than any figure does, and dust kicked up where a walker crosses dry ground makes the
-  ground feel walked on rather than walked over.
-  TARGET: a slow, thin smoke plume above the fire that leans with a calibratable drift
-  and thins with height; and a small, short-lived dust puff at a walker's feet on DRY
-  ground only. Both tie into what already exists: the smoke thins or gutters under rain
-  the way the fire itself already answers to weather (point 142), and the dust is
-  suppressed once the ground is wet (the wetness the season already drives, and the
-  sheltered-ground mask of point 353 where that lands first).
-  QUALITY: declare all three levels in `QUALITY_PRESETS` with the doc kept in sync —
-  this is the kind of small optical addition the §21 convention exists for. Keep it
-  cheap: a handful of soft billboards, not a particle system with a budget.
-  VERIFIABLE: pure — the plume's drift and thinning are a function of height and the
-  weather factor, and the dust predicate is false on wet ground and true on dry; the
-  preset completeness and doc-sync gates cover the new keys. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshots): above the fire the pixels
-  differ from the same crop with the effect disabled, in dry weather a walking
-  inhabitant raises visible dust and in rain it does not.
-  DOCS: design.md §19.10.
-
 - [ ] 359. The cattle peoples' kraal is empty (user 25.07.2026, from the Zulu village
   screenshot: the enclosure stands there with nothing in it — `PlaceLife.tsx` puts GOATS
   in a pen, cattle do not exist). For a Zulu umuzi the cattle enclosure is not scenery

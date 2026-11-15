@@ -37116,3 +37116,24 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Player impact: the game runs slower than it did weeks ago on every preset.
   Source: user request, 15.11.2026 ("ja, beide ganz vorne einreihen"); spec cut from 3c06fa8d0.
   Bundle: unbundled.
+
+- [x] 358. Smoke over the fire, dust under the feet (user 25.07.2026). A thin smoke
+  column drifting from the §19.10 fire reads as "someone lives here" from further away
+  than any figure does, and dust kicked up where a walker crosses dry ground makes the
+  ground feel walked on rather than walked over.
+  TARGET: a slow, thin smoke plume above the fire that leans with a calibratable drift
+  and thins with height; and a small, short-lived dust puff at a walker's feet on DRY
+  ground only. Both tie into what already exists: the smoke thins or gutters under rain
+  the way the fire itself already answers to weather (point 142), and the dust is
+  suppressed once the ground is wet (the wetness the season already drives, and the
+  sheltered-ground mask of point 353 where that lands first).
+  QUALITY: declare all three levels in `QUALITY_PRESETS` with the doc kept in sync —
+  this is the kind of small optical addition the §21 convention exists for. Keep it
+  cheap: a handful of soft billboards, not a particle system with a budget.
+  VERIFIABLE: pure — the plume's drift and thinning are a function of height and the
+  weather factor, and the dust predicate is false on wet ground and true on dry; the
+  preset completeness and doc-sync gates cover the new keys. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshots): above the fire the pixels
+  differ from the same crop with the effect disabled, in dry weather a walking
+  inhabitant raises visible dust and in rain it does not.
+  DOCS: design.md §19.10.
