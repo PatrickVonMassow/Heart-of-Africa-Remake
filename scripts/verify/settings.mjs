@@ -1834,10 +1834,11 @@ if (section('village-bed')) {
       impacts = nowImpacts
     }
     while (thuds.length < n && (await step())) observe()
-    // Drain: an impact queued before it is watched to its thud or expiry, and
-    // an extra dispatch is still counted; later impacts lie outside the watch.
+    // Drain until the queue is empty: every impact is heard or expires, so a
+    // later impact's thud cannot hide an earlier unheard one, and an extra
+    // dispatch is still counted.
     const until = frame + lagFrames + 1
-    while (!stalled && frame < until && (await step())) observe()
+    while (!stalled && (frame < until || queued.length) && (await step())) observe()
     return {
       mounted: true,
       stalled,
