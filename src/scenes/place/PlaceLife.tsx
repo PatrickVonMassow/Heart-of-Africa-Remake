@@ -164,7 +164,7 @@ import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
-import { createNoticeBoard, glanceActive, glanceYaw, noticeStep, placeNoticeBoard, shyWeight } from './noticeGlance'
+import { createNoticeBoard, glanceActive, glanceYaw, noticeStep, placeNoticeBoard, settleYaw, shyWeight } from './noticeGlance'
 import { animalAnchors, animalBodies, animalScene, liveFigureColliders, setAnimalFigures, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import {
   createInhabitantSet,
@@ -940,6 +940,7 @@ function Kids({
 
   // Each child's drawn facing while it glances at the traveller (§19.10).
   const childYaws = useRef<number[]>([])
+  const childSettling = useRef<boolean[]>([])
   // One gait phase ref per child, handed to its Figure.
   const gaits = useRef<Array<RefObject<number>>>([])
   if (gaits.current.length !== count) {
@@ -1164,9 +1165,17 @@ function Kids({
       // speaking is exempt, and a running one keeps running.
       const stare = noticeStep(placeNoticeBoard, `child:${i}`, c, placePlayerPosition,
         { child: true, exempt: slumped || lift > 0 || isGesturing(gestures.current[i].current) }, balance.villageLife.notice, dt)
-      const drawn = glanceActive(stare)
-        ? glanceYaw(stare, childYaws.current[i] ?? c.facing, c, placePlayerPosition, balance.villageLife.tag.turnRate * dt, c.facing)
-        : c.facing
+      // A glance cut off by an exemption eases back on the same rate (settleYaw).
+      const childTurn = balance.villageLife.tag.turnRate * dt
+      let drawn: number
+      if (glanceActive(stare)) {
+        drawn = glanceYaw(stare, childYaws.current[i] ?? c.facing, c, placePlayerPosition, childTurn, c.facing)
+        childSettling.current[i] = true
+      } else {
+        const settled = settleYaw(childYaws.current[i], c.facing, childSettling.current[i] === true, childTurn)
+        drawn = settled.yaw
+        childSettling.current[i] = settled.easing
+      }
       childYaws.current[i] = drawn
       g.rotation.y = drawn
       const pose = poses.current[i].current

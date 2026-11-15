@@ -2126,7 +2126,8 @@ if (section('inhabitants-glance')) {
         const turn = Math.abs(wrap(now[k] - rest[k]))
         const bearing = Math.atan2(cx + side - pair[k].x, cz + t - pair[k].z)
         const toward = Math.abs(wrap(bearing - now[k]))
-        if (turn > best.turn) best = { turn, toward, who: k }
+        const towardAtRest = Math.abs(wrap(bearing - rest[k]))
+        if (turn > best.turn) best = { turn, toward, towardAtRest, who: k }
         if (shotAt === null && turn > 0.5) shotAt = { k, t }
       }
     }
@@ -2147,7 +2148,8 @@ if (section('inhabitants-glance')) {
       await nextFrames(2)
       await frame('356-inhabitant-glance', { local: { x: pair[k].x, y: 1.2, z: pair[k].z }, label: `a ${PLACE} inhabitant of the conversing pair turned toward the passing traveller` })
     }
-    check('walking past the pair, an inhabitant turns measurably toward the player (point 356)', best.turn > 0.5, JSON.stringify(best))
+    // Toward, not merely away: at its widest turn it faces the player clearly closer than at rest.
+    check('walking past the pair, an inhabitant turns measurably toward the player (point 356)', best.turn > 0.5 && best.toward < best.towardAtRest - 0.3, JSON.stringify(best))
     check('the glance turns at a capped rate, never a snap (point 356)', maxStep <= MAX_FRAME_STEP + 0.005, `largest per-tick step ${maxStep.toFixed(3)} rad (cap ${MAX_FRAME_STEP.toFixed(2)})`)
     // Off again: both return to their partner within the glance plus a turn.
     await place(cx, cz + cfg.radius + 12)

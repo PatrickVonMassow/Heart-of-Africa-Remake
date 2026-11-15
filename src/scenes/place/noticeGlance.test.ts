@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
-import { bearingTo, createNoticeBoard, glanceYaw, glancingCount, noticeStep, type NoticeConfig } from './noticeGlance'
+import { bearingTo, createNoticeBoard, glanceYaw, glancingCount, noticeStep, settleYaw, type NoticeConfig } from './noticeGlance'
 
 const CFG: NoticeConfig = { ...balance.villageLife.notice }
 const DT = 1 / 60
@@ -55,6 +55,25 @@ describe('notice predicate', () => {
     }
     expect(CFG.maxAtOnce).toBeGreaterThan(0)
   })
+
+  it('counts a figure still turning back against the cap', () => {
+    const board = createNoticeBoard()
+    const at = (i: number) => ({ x: Math.cos(i), z: Math.sin(i) })
+    const yaws: number[] = []
+    let frames = 0
+    // Glance until every glance has run out while some are still turning back.
+    for (; frames < 6000; frames++) {
+      for (let i = 0; i < 20; i++) {
+        const e = noticeStep(board, `v${i}`, at(i), PLAYER, {}, CFG, DT)
+        // A slow turn, so a figure is still returning after its glance ends.
+        yaws[i] = glanceYaw(e, yaws[i] ?? i, at(i), PLAYER, 0.2 * DT, i)
+        expect(glancingCount(board)).toBeLessThanOrEqual(CFG.maxAtOnce)
+      }
+      const returning = [...board.entries.values()].filter((e) => e.glance === 0 && e.rest !== null).length
+      if (returning > 0 && frames > CFG.glanceSeconds * 60) break
+    }
+    expect(frames).toBeLessThan(6000)
+  })
 })
 
 describe('glance facing', () => {
@@ -84,5 +103,26 @@ describe('glance facing', () => {
     }
     expect(yaw).toBeCloseTo(start, 9)
     expect(e.rest).toBeNull()
+  })
+})
+
+describe('settling back after a glance', () => {
+  it('eases a cut-off glance back to the own facing by bounded steps', () => {
+    const maxStep = 3 * DT
+    let state = { yaw: Math.PI / 2, easing: true }
+    let frames = 0
+    while (state.easing) {
+      const next = settleYaw(state.yaw, 0, state.easing, maxStep)
+      expect(Math.abs(next.yaw - state.yaw)).toBeLessThanOrEqual(maxStep + 1e-12)
+      state = next
+      frames++
+    }
+    expect(state.yaw).toBe(0)
+    expect(frames).toBeGreaterThan(1)
+  })
+
+  it('follows the own facing directly when no glance is behind it', () => {
+    expect(settleYaw(2, 0.5, false, 0.01)).toEqual({ yaw: 0.5, easing: false })
+    expect(settleYaw(undefined, 0.5, true, 0.01)).toEqual({ yaw: 0.5, easing: false })
   })
 })

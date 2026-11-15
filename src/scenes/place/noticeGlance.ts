@@ -48,10 +48,10 @@ export function createNoticeBoard(): NoticeBoard {
 /** The settlement's own board; PlaceLife clears it when a place opens. */
 export const placeNoticeBoard: NoticeBoard = createNoticeBoard()
 
-/** How many inhabitants are glancing right now. */
+/** How many inhabitants are turned by a glance right now, returning ones included. */
 export function glancingCount(board: NoticeBoard): number {
   let n = 0
-  for (const e of board.entries.values()) if (e.glance > 0) n++
+  for (const e of board.entries.values()) if (glanceActive(e)) n++
   return n
 }
 
@@ -134,6 +134,23 @@ export function glanceYaw(
 /** True while the figure is still turned away from its own facing by the glance. */
 export function glanceActive(e: NoticeEntry): boolean {
   return e.glance > 0 || e.rest !== null
+}
+
+/**
+ * The drawn facing of a figure whose own steering owns `target` again: a glance
+ * that ended or was cut off (an exemption clears it at once) eases back by at
+ * most `maxStep` instead of snapping; with no glance behind it, `target` itself.
+ * `easing` is true while the figure is still on its way back.
+ */
+export function settleYaw(
+  drawn: number | undefined,
+  target: number,
+  easing: boolean,
+  maxStep: number,
+): { yaw: number; easing: boolean } {
+  if (!easing || drawn === undefined) return { yaw: target, easing: false }
+  const yaw = turnToward(drawn, target, maxStep)
+  return { yaw, easing: yaw !== target }
 }
 
 /** The goat's shy weight (0 … 1), eased so the step away takes `goatShySeconds`. */
