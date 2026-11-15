@@ -1483,6 +1483,26 @@ interface BalanceConfig {
       thudDuration: number
       thudFrequency: number
     }
+    /** The glance at the traveller (design.md §19.10): an inhabitant inside
+     *  the radius turns its facing toward the player for a few seconds. */
+    notice: {
+      /** Distance (m) inside which an inhabitant may notice the traveller. */
+      radius: number
+      /** Seconds an adult's glance holds before it returns to its errand. */
+      glanceSeconds: number
+      /** A child's glance is this many times an adult's. */
+      childFactor: number
+      /** Seconds after a glance before the same inhabitant may glance again. */
+      cooldownSeconds: number
+      /** Most inhabitants of one settlement glancing at the same moment. */
+      maxAtOnce: number
+      /** Distance (m) a goat shies away from the traveller. */
+      goatShyStep: number
+      /** Seconds the goat takes for that step. */
+      goatShySeconds: number
+      /** A child moving faster than this (m/s) is in the chase and stays in it. */
+      childMaxSpeed: number
+    }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {
       /** Body radius of a figure drawn at scale 1; a child's is this times its
@@ -2700,6 +2720,20 @@ export const balance: BalanceConfig = {
       maxSpeed: 8,
       wedgeSeconds: 1.5,
       passes: 4,
+    },
+    // The glance at the traveller (design.md §19.10). Calibratable starting
+    // values (educated guess, CLAUDE.md §2): the radius a little over a
+    // conversation distance, a glance of a few seconds, a cooldown long enough
+    // that nobody tracks the player, and a cap so a village never turns in unison.
+    notice: {
+      radius: 7,
+      glanceSeconds: 2.5,
+      childFactor: 1.6,
+      cooldownSeconds: 14,
+      maxAtOnce: 3,
+      goatShyStep: 0.6,
+      goatShySeconds: 0.8,
+      childMaxSpeed: 0.6,
     },
   },
   communication: {
