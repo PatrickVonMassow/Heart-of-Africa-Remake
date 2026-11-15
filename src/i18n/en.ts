@@ -148,6 +148,7 @@ export const en: Strings = {
       donkeyboy: { noun: 'donkey boy', gender: 'n' },
       tourist: { noun: 'tourist', gender: 'n' },
       goat: { noun: 'goat', gender: 'n' },
+      cattle: { noun: 'cow', gender: 'n' },
       camel: { noun: 'camel', gender: 'n' },
       donkey: { noun: 'donkey', gender: 'n' },
       camp: { noun: 'camp', gender: 'n' },

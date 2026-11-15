@@ -2743,6 +2743,58 @@ figure without them; far away (the bird's-eye traveller) the mip chain averages
 the structure out. Picture evidence: `polish-villagers --section=figure-micro`
 (`verification/1380-figure-micro-*.png`).
 
+### 8.8 The village herd: who kept cattle, and the kraal across the rinderpest years (work-order 359)
+
+The question the Zulu screenshot raised (25.07.2026: a kraal with nothing in
+it) is answered per people from the sections above; where they were silent
+this pass extends them, each verdict labelled. No new source was fetched in
+this pass: the labels say what rests on the cited sections, what is general
+ethnographic record (MODERN, standard, not re-verified here) and what is a
+GUESS with its reason. The game table is `PEOPLE_CATTLE` in
+`src/systems/cattle.ts`; the test sweep refuses a people without a decision.
+
+**Four arrangements.** *Kraal* — the cattle stand at night in an enclosure
+inside the village the player walks. *Herded* — the people owned cattle, but
+they stood elsewhere (with hired herdsmen, out at pasture, in a house byre),
+so the village shows none. *Camels* — the herd is camels, immune to
+rinderpest (§5.1). *None* — no cattle to speak of.
+
+| People | Arrangement | Basis |
+|---|---|---|
+| Zulu | kraal | the *isibaya* at the centre of the *umuzi* — the Central Cattle Pattern of the southern Bantu homestead (Kuper 1980, MODERN, standard); the game's ring plan already draws it |
+| Pedi | kraal | §1: the vignette's "round huts about the cattle kraal" is "a sound Sotho-Tswana picture"; same pattern |
+| Maasai | kraal | §4.0: the *enkang* thorn ring with the cattle inside at night (regionStyles: "a central cattle pen") |
+| Somali, Tuareg | camels | §5.1 (FAO: camels are not infected); §4.0.1 (Tuareg camel caravans) |
+| Hausa, Bambara, Mandinka | herded | §4.0.1: settled farmers' cattle went out with Fulani herdsmen — MODERN; the herd is not in the compound |
+| Nubians | herded | §5.1: Sanat Sitta and the 1889 epizootic took the herds before the window; the riverstrip keeps a few draught oxen at the waterwheel at most |
+| Sidama | herded | §5: the Kifu Qen; the enset–cattle highland household keeps its cattle in the house at night (MODERN ethnography, indicium); the game's compound plan has no pen |
+| Baganda | herded | §5.1: banana-based, cattle mainly for the groves' manure; the herds were tended by Hima herdsmen (MODERN, standard), not in the compound |
+| Berbers | herded | GUESS: High Atlas agro-pastoralists, sheep and goats on the hill pastures, a few cattle stabled in the house |
+| Wayeyi | herded | GUESS: cattle held largely as Batawana loan (*mafisa*) cattle on the flood-plain grazing |
+| Bemba | none | §5.1: "not a cattle people" — the tsetse belt and citemene millet |
+| Fang, Mongo, Banda, Lunda | none | §5.1: Sunseri's rule, "tsetse-belt regions had few cattle anyway"; Lunda also §4.0.5 |
+| Mbuti | none | §4.1: forest hunters |
+| San | none | §4.1: client herding for Tswana cattle-holders is someone else's herd, away from the camp |
+| Bambundu | none | GUESS: the Kwanza valley lies in the tsetse belt; small stock only; the record is silent |
+| Swahili | none | GUESS: Lamu is a coral-stone trading town; cattle are not part of its street |
+
+**The herd across the years.** Only a *kraal* people shows cattle, and its
+head count follows the rinderpest phase of the VISIT DATE through the same
+function the first-visit vignette reads (`rinderpestPhase`, §5). So the Zulu
+and Pedi kraals stand full for the whole window (southern Africa is clean
+until the Zambezi crossing of March 1896), and the Maasai kraal tells the
+emutai: thinned in 1890 by the 1883–87 lung-sickness ("the kraals are wider
+than the herds"), empty in 1891–92, and a slow regrowth from 1893 (recovery
+took about ten years, §4.0). The counts are calibratable guesses in
+`VILLAGE_CATTLE` (`src/config/balance.ts`): four head in a clean year, the
+shipped pen (r 3.4 m, shared with the goats) being the ceiling.
+
+**What the game simplifies.** The beast is one small lyre-horned Sanga type
+for all three peoples, in four coat colours; the Sanga hump is not modelled.
+The goats keep their pen as before. The camel peoples' camels are not drawn
+in the village: no village camel exists (only Giza's standing camel), so that
+stays an open item rather than a new system.
+
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)
 
 When this was written the game's §19.10 village fire burned unprotected

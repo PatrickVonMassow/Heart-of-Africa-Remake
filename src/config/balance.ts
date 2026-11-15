@@ -3069,6 +3069,39 @@ export const VILLAGER_DRESS = {
 } as const
 
 /**
+ * The cattle in a kraal people's village pen (work-order 359; docs/peoples-1890.md
+ * §8.8, design.md §19.10). Every value is a CALIBRATABLE educated guess: the
+ * research gives the direction (80–90 % mortality, a decade to recover, §4.0/§5)
+ * but no head count for one homestead, and the shipped pen (r 3.4 m, shared with
+ * the goats) sets the ceiling.
+ */
+export const VILLAGE_CATTLE = {
+  /** Head of cattle in the pen in a clean year. */
+  fullHerd: 4,
+  /** Share of the full herd left per rinderpest phase. `preDamaged` is the
+   *  Maasai 1890 kraal thinned by the 1883–87 lung-sickness ("the kraals are
+   *  wider than the herds"); `struck` is the emptied ground of the vignette. */
+  phaseShare: { clean: 1, preDamaged: 0.5, struck: 0 },
+  /** The aftermath: the share in its first year, and what each later year adds
+   *  back — the slow regrowth (recovery took ~10 years, §4.0). */
+  aftermath: { firstYear: 1893, share: 0.25, perYear: 0.1 },
+  /** Body radius one animal presents to the traveller, the goats and the other
+   *  cattle: two circles on its long axis, fore and hind (m). */
+  bodyCircleRadius: 0.36,
+  /** Offset of the fore and hind circle from the body centre along the facing (m). */
+  bodyCircleOffset: 0.42,
+  /** Radius a cow moves with among the herd (m). */
+  moverRadius: 0.45,
+  /** Clear gap between the animal's farthest point and the pen fence's
+   *  collision panel (m). */
+  fenceClearance: 0.08,
+  /** Wander amplitude about the grazing anchor (m) — cattle in a kraal mostly stand. */
+  wanderAmp: 0.35,
+  /** Walking pace cap (m/s) — a slow kraal shuffle. */
+  maxSpeed: 0.35,
+} as const
+
+/**
  * Micro-structure of the figures' surfaces (villagers and the traveller, design
  * line 64): the baked cloth / leather / skin maps (scripts/textureFields.mjs)
  * projected triplanar in the body's BIND-POSE space (render/materials.ts

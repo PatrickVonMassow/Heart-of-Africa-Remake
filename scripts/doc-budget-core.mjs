@@ -304,7 +304,8 @@ export const DOC_BUDGETS = [
     // RAISED by 5 measured lines for the new §19.18 elderly animals subsection (work-order 265).
     // RAISED by 5 measured lines for the new §19.19 bird flight and raptor subsection (work-order 269).
     // RAISED by 2 measured lines for the §19.10 glance at the traveller (point 356).
-    maxLines: 870,
+    // RAISED by 2 measured lines for the §19.10 kraal cattle paragraph (point 359).
+    maxLines: 872,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -519,7 +520,11 @@ export const DOC_BUDGETS = [
     // 357): mortar thud timed to the pestle, goats and the fire's proximity
     // crackle, each on its own slider — layers the document did not name — plus
     // the re-measured §19.1 headroom figures; no new line.
-    maxWords: 30802,
+    // RAISED by the 103 measured words of the §19.10 kraal cattle paragraph
+    // (point 359): which peoples show cattle, the herd following the rinderpest
+    // phase of the visit date, and the cattle as solid bodies inside the pen —
+    // a new rule the document did not carry; the point orders it written here.
+    maxWords: 30905,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
