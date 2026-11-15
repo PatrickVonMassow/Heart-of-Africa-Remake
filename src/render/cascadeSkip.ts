@@ -57,6 +57,19 @@ export function deepestGroundDepth(camera: THREE.Camera, groundY: number): numbe
   return deepest
 }
 
+/**
+ * useFrame priority of the cascade selection: AFTER every default-priority
+ * callback (the travel camera follow moves the camera and its near plane at
+ * priority 0) and BEFORE the post pipeline's render at priority 1
+ * (render/Effects.tsx, which already owns rendering, so this positive priority
+ * takes nothing over). Selecting on the previous frame's camera could expose a
+ * cascade whose update is still off for one frame.
+ */
+export const CASCADE_SELECT_PRIORITY = 0.5
+
+/** The render priority of the post pipeline in render/Effects.tsx. */
+export const POST_RENDER_PRIORITY = 1
+
 /** The CSM internals this needs (three r185 CSMShadowNode, untyped there). */
 interface CascadeNode {
   breaks: number[]
@@ -73,6 +86,8 @@ export function updateCascadeSkip(csm: unknown, camera: THREE.PerspectiveCamera,
   const node = csm as CascadeNode
   if (!Array.isArray(node.breaks) || !Array.isArray(node.lights) || node.breaks.length !== node.lights.length) return 0
   const cfg = balance.shadowCascadeSkip
+  // The pose set this frame (lookAt leaves matrixWorld stale until the render).
+  camera.updateMatrixWorld()
   let inUse = node.lights.length
   if (cfg.enabled) {
     const far = Math.min(camera.far, node.maxFar)

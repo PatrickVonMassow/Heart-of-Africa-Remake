@@ -1,7 +1,7 @@
 // Skipping the sun-shadow cascades no visible pixel samples (point 1524).
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three/webgpu'
-import { cascadesInUse, deepestGroundDepth, updateCascadeSkip } from './cascadeSkip'
+import { CASCADE_SELECT_PRIORITY, POST_RENDER_PRIORITY, cascadesInUse, deepestGroundDepth, updateCascadeSkip } from './cascadeSkip'
 import { CAMERA_OFFSET, TRAVEL_CAMERA_FOV_DEG, followAt, followPose, southReachShift } from '../scenes/travel/followCamera'
 import { balance } from '../config/balance'
 import { DEFAULT_TRAVEL_ZOOM } from '../state/ui'
@@ -59,6 +59,12 @@ describe('shadow cascade skip', () => {
     const far = csmStub()
     expect(updateCascadeSkip(far, travelCamera(8, 16 / 9), 0)).toBe(3)
     expect(far.lights.every((l) => l.shadow.autoUpdate)).toBe(true)
+  })
+
+  it('selects after the default-priority camera follow and before the post render', () => {
+    // R3F runs useFrame subscribers in ascending priority; the follow is 0.
+    expect(CASCADE_SELECT_PRIORITY).toBeGreaterThan(0)
+    expect(CASCADE_SELECT_PRIORITY).toBeLessThan(POST_RENDER_PRIORITY)
   })
 
   it('renders every cascade when switched off', () => {

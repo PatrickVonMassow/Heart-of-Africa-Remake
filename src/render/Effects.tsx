@@ -18,6 +18,7 @@
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
+import { POST_RENDER_PRIORITY } from './cascadeSkip'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
@@ -299,7 +300,7 @@ export function Effects() {
   // Priority render: replaces R3F's default render with the post pipeline.
   useFrame((_, delta) => {
     post.render(delta)
-  }, 1)
+  }, POST_RENDER_PRIORITY)
 
   return null
 }

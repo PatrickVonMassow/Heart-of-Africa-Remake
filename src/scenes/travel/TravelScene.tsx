@@ -3,7 +3,7 @@
 // dome, sun with soft shadows, animated ocean, instanced biome vegetation.
 
 import { registerRangedCaster, updateRangedCasters } from '../../render/shadowCasterRange'
-import { updateCascadeSkip } from '../../render/cascadeSkip'
+import { CASCADE_SELECT_PRIORITY, updateCascadeSkip } from '../../render/cascadeSkip'
 import { monumentGlyph, villageGlyph, type GlyphPart } from '../../render/placeMarkerGlyphs'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -1059,12 +1059,16 @@ function Sun() {
     }
   }, [light, shadowSize])
 
+  // Only the cascades the view can sample re-render (point 1524), selected on
+  // THIS frame's camera: after the follow (priority 0), before the post render.
+  // The travel ground never lies below sea level, the plane measured against.
   useFrame(({ camera }) => {
-    const pos = useGame.getState().pos
-    // Only the cascades the view can sample re-render (point 1524); the travel
-    // ground never lies below sea level, the plane the check measures against.
     const cascadesInUse = updateCascadeSkip(csm, camera as THREE.PerspectiveCamera, 0)
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__cascadesInUse = cascadesInUse
+  }, CASCADE_SELECT_PRIORITY)
+
+  useFrame(() => {
+    const pos = useGame.getState().pos
     updateRangedCasters(pos.x, pos.z, useUi.getState().travelZoom, sunDir[1] / Math.max(1e-6, Math.hypot(sunDir[0], sunDir[2])))
     light.position.set(pos.x + sunDir[0] * 130, sunDir[1] * 130, pos.z + sunDir[2] * 130)
     target.position.set(pos.x, 0, pos.z)
