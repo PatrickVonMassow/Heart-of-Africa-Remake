@@ -2221,6 +2221,28 @@ const standWithSight = async (x, y, z, through = null) => {
   }
   return { ok: false, tries }
 }
+/**
+ * Step rendered frames until the sun, sky light, wetness and ground wetness hold
+ * still. They ease per RENDERED frame (k = dt·0.8, the ground linearly), and on
+ * WebGL 2 the loop stalled 3.6 s after a wetness switch (frame counter stuck): a
+ * wall-clock quiet read the half-lerped sun as settled, and it then brightened
+ * the attribution crop between its two OFF shots (measured: sun 1.90 → 2.40).
+ */
+const settleSeasonLight = async (maxSteps = 120) => {
+  const read = () => page.evaluate(() => {
+    const v = window.__placeSeason()
+    return [v.sun, v.hemi, v.wetness, v.groundWet]
+  })
+  let value = await read()
+  for (let i = 1; i <= maxSteps; i++) {
+    await nextFrames(30)
+    const next = await read()
+    const still = next.every((n, j) => Math.abs(n - value[j]) <= 1e-3)
+    value = next
+    if (still) return { settled: true, frames: i * 30, value }
+  }
+  return { settled: false, frames: maxSteps * 30, value }
+}
 const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
 /** OFF/ON/OFF crops of `clip` with `set(on)` switching the effect. */
 const attributeCrop = async (clip, set, what) => {
@@ -2240,23 +2262,8 @@ if (section('fire-smoke')) {
   await goToPlace(PLACE)
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
   await page.waitForFunction(() => window.__placeSeason?.().fireOut === false, null, { timeout: 15000 }).catch(() => {})
-  // The sun, sky light and drying ground ease per RENDERED frame (k = dt·0.8). On
-  // WebGL 2 the loop stalled 3.6 s after the dry switch (frame counter stuck), so a
-  // wall-clock quiet read the half-lerped sun as settled and it then brightened the
-  // crop between the two OFF shots (measured: sun 1.90 → 2.40). Settle by frames.
-  const readLight = () => page.evaluate(() => {
-    const v = window.__placeSeason()
-    return [v.sun, v.hemi, v.wetness, v.groundWet]
-  })
-  let light = await readLight()
-  let lit = false
-  for (let i = 0; i < 40 && !lit; i++) {
-    await nextFrames(30)
-    const next = await readLight()
-    lit = next.every((n, j) => Math.abs(n - light[j]) <= 1e-3)
-    light = next
-  }
-  check(`${PLACE} (dry): the light on the fire yard settles over rendered frames before the smoke is read`, lit, JSON.stringify(light))
+  const lit = await settleSeasonLight()
+  check(`${PLACE} (dry): the light on the fire yard settles over rendered frames before the smoke is read`, lit.settled, JSON.stringify(lit))
   const [fx, fz] = await page.evaluate(() => window.__placeSeason().fire)
   // Stand nine metres off the fire, looking at the column's middle height.
   await standFacing(fx, fz + 9, fx, 2.6, fz)
@@ -2319,15 +2326,8 @@ if (section('walker-dust')) {
   const dustStats = () => page.evaluate(() => window.__placeDust?.() ?? null)
   const settleWetness = async (wet, label) => {
     await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wet)
-    const s = await waitForReadingStable(
-      page,
-      () => {
-        const v = window.__placeSeason()
-        return { wetness: v.wetness, groundWet: v.groundWet }
-      },
-      { settleMs: 400, samples: 3, timeout: 240000 },
-    )
-    check(`${PLACE} (${label}): the ground's wet state settles before dust is read`, s.settled, `after ${s.waitedMs} ms — ${JSON.stringify(s.value)}`)
+    const s = await settleSeasonLight()
+    check(`${PLACE} (${label}): the ground's wet state and the light settle over rendered frames before dust is read`, s.settled, JSON.stringify(s))
   }
   await goToPlace(PLACE)
   await settleWetness(0, 'dry')
