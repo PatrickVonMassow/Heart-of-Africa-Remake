@@ -1764,11 +1764,18 @@ if (section('village-bed')) {
     muted.fireDistance < 3 && muted.goats === 0 && muted.fire === 0 && muted.thudScheduled === 0, JSON.stringify(muted))
   // Out of the village (master audible again): the whole bed must settle to
   // silence on the travel map, the fire pit's unmount included.
+  // The goats are audible again first, so the departure wait below cannot
+  // resolve on the mute's own zeros.
   await page.evaluate(() => {
     window.__balance.ambienceVolume = 0.5
     window.__ambience.refresh()
-    window.__game.getState().leavePlace()
   })
+  const reAudible = await page
+    .waitForFunction(() => window.__ambience.layerGain('goats') > 0, null, { timeout: 12000, polling: 100 })
+    .then(() => true)
+    .catch(() => false)
+  check('unmuted in the village, the goats are audible again before leaving (point 357)', reAudible)
+  await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
   // The scene switch waits for the travel map to take over, so the fade is
   // given a bounded settle rather than one fixed crossfade.
