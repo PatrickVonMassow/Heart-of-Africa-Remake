@@ -2387,8 +2387,6 @@ if (section('walker-dust')) {
   }, configured)
 }
 
-await finishPolishSuite()
-
 // --- The kraal's cattle across the rinderpest years (design.md §19.10,
 // work-order 359; docs/peoples-1890.md §8.8). The herd is the rinderpest phase
 // of the visit date, read as the first-visit vignette reads it. The Zulu kraal
@@ -2468,3 +2466,5 @@ if (section('kraal-cattle')) {
   check('the Bemba village has no cattle in either year (point 359)', bemba1890.count === 0 && bemba1893.count === 0, `${seen(bemba1890)}, ${seen(bemba1893)}`)
   check('every beast stands inside its pen, clear of the fence (point 359)', [zulu1890, zulu1893, maasai1890, maasai1893].every((r) => !r.pen || inside(r)), JSON.stringify([zulu1890, maasai1890].map((r) => ({ hold: r.hold, at: r.cattle }))))
 }
+
+await finishPolishSuite()
