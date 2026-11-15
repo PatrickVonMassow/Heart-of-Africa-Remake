@@ -77,23 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1523. P1 blocker: periodic ~0.5 s main-thread stall while walking in the travel view, all presets including LOW
-  User report 15.11.2026: on a strong PC (NVIDIA Lovelace, Chrome 157, WebGPU, 2752x1152 @dpr 1.25) the outdoor view is unplayable; walking produces a heavy hitch about once per second, even on the LOW preset.
-  Evidence (user benchmark hoa-bench-2026-11-15-webgpu.json, build production 3c06fa8, seed 18900701, day 181, fixed dt 1/60, 150 sampled frames per phase):
-  - savanna-driving, every config: frame p95 52-95 ms, p99 510-655 ms, max 514-653 ms. low-preset: frame median 6.3 / p95 95.1 / p99 509.7 / max 514.8 ms.
-  - cpu p99 equals frame p99 (e.g. low-preset cpu p99 508.2 ms) while gpu p95 stays 5-7 ms -> the stall is CPU/main-thread work, not GPU.
-  - savanna-standing and desert-standing show no hitch (p99 <= 11 ms) -> triggered by movement.
-  - It persists with all-off and shadows-off -> not shadows, SSAO, TRAA, post or terrain refine.
-  - travel-dressing triangle counts differ between runs of the same phase (653k-678k), hinting that dressing (flora/props) is rebuilt as the traveller moves.
-  Required work:
-  1. Analysis: reproduce in the benchmark's savanna-driving phase and in a Playwright perf trace; attribute every frame > 33 ms to its call stack (long-task / performance.mark around per-frame systems: dressing streaming, terrain tile / refine rebuild, wildlife spawn, river/spring, pipeline/shader compile on first use of a material, GC pressure from per-frame allocations). Record the culprit(s) with measured ms in the point's notes.
-  2. Fix: move the offending work off the critical frame (incremental/time-sliced rebuild with a per-frame ms budget, worker, precomputation, pipeline pre-warm, or pooling) - no visible quality loss, no popping that a person would notice.
-  3. Regression guard: the benchmark (or a Playwright perf suite) asserts for savanna-driving on LOW and the default preset: frame p99 <= 33 ms and max <= 50 ms on the reference profile; add a dev-mode long-frame detector that reports frames > 100 ms in travel view with the owning system.
-  4. Acceptance: re-run the full benchmark on WebGPU and WebGL 2; savanna-driving p99 within 2x of savanna-standing p99 for every config. Picture check that dressing/terrain still look the same.
-  Player impact: the core travel loop is unplayable (heavy hitch about once per second).
-  Source: user request, 15.11.2026 ("ja, beide ganz vorne einreihen"); spec cut from 3c06fa8d0.
-  Bundle: unbundled.
-
 - [ ] 1524. Make the MEDIUM and LOW graphics presets measurably faster, HIGH where possible without noticeable quality loss
   Separate from the periodic walking hitch, which has its own P1 point (1523) and must land first.
   User report 15.11.2026: overall performance has degraded over recent weeks. Reference benchmark hoa-bench-2026-11-15-webgpu.json (build 3c06fa8, NVIDIA Lovelace, Chrome 157, WebGPU, 2752x1152 @dpr 1.25):
