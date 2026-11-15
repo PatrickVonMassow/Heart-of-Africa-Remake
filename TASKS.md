@@ -77,23 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1524. Make the MEDIUM and LOW graphics presets measurably faster, HIGH where possible without noticeable quality loss
-  Separate from the periodic walking hitch, which has its own P1 point (1523) and must land first.
-  User report 15.11.2026: overall performance has degraded over recent weeks. Reference benchmark hoa-bench-2026-11-15-webgpu.json (build 3c06fa8, NVIDIA Lovelace, Chrome 157, WebGPU, 2752x1152 @dpr 1.25):
-  - Standing frames are CPU-bound, not GPU-bound: baseline savanna-standing cpu 8.3 ms vs gpu 2.5 ms, 375 draws, 3.23M rendered tris (scene holds ~1.1M -> shadow passes roughly triple the triangles).
-  - shadows-off: cpu 8.3 -> 4.9 ms, draws 375 -> 72. The sun shadow pass costs ~300 extra draw calls and ~3.4 ms CPU -> largest single lever. shadow-half resolution changes nothing (cost is per-draw, not per-texel).
-  - low-preset: cpu 4.1 ms, gpu 1.7 ms, still ~958k scene tris; at LOW travel-dressing = 470k tris (49 %) in 44 meshes, travel-terrain = 353k (37 %) in 169 meshes.
-  - Anomalies to explain: post-off is SLOWER on CPU than baseline (9.2 vs 8.3 ms); dpr-1 costs more GPU than baseline (3.8 vs 2.5 ms), so the baseline's effective DPR cap must be documented.
-  - The benchmark has no explicit medium-preset or high-preset rows: add them (and keep low-preset), so every preset is measured against this baseline.
-  Required work:
-  1. Profile per preset (low/medium/high) with CPU per-system timings and draw-call breakdown per pass; record in the point notes, and bisect the recent weeks' regressions by benchmarking older main commits to name what made it slower.
-  2. Levers to evaluate in balance/preset config (calibratable values in src/config/balance.ts or the preset table): shadow caster culling (small/distant dressing does not cast), fewer/cheaper cascades or a shadow map refreshed every N frames while the sun barely moves, instancing/merging of dressing and terrain tiles to cut draw calls, dressing LOD/impostors at distance, terrain tile count/LOD at LOW/MEDIUM, avoiding per-frame CPU work that does not change (matrix updates on static objects, uniform rebuilds).
-  3. Targets on the reference profile, standing and driving: LOW cpu median <= 3 ms; MEDIUM frame median at least 30 % below its current value; HIGH any gain only if a side-by-side picture check shows no noticeable loss. Both backends.
-  4. Picture check per preset before/after (same seed/day/camera), judged by a person's eye; no visible popping or shadow flicker.
-  Player impact: the game runs slower than it did weeks ago on every preset.
-  Source: user request, 15.11.2026 ("ja, beide ganz vorne einreihen"); spec cut from 3c06fa8d0.
-  Bundle: unbundled.
-
 - [ ] 358. Smoke over the fire, dust under the feet (user 25.07.2026). A thin smoke
   column drifting from the §19.10 fire reads as "someone lives here" from further away
   than any figure does, and dust kicked up where a walker crosses dry ground makes the
