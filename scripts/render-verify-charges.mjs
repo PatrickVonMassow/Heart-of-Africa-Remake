@@ -2140,4 +2140,22 @@ export const RED_CHARGES = [
       'MEASURED 14.11.2026 on WebGL 2, feat/353 251379676: the device loss at the end of the full suite that follows the '
       + 'rebuild leak point 1520 owns; the porter section is green alone. The charge dies with point 1520.',
   },
+  ...[
+    { kind: 'check', match: /^frame 1490-porter-(cairo|tangier) — the scene never finished drawing\b/i },
+    { kind: 'check', match: /^the cook-shelter roof is still standable AND reads as a surface from below — no hut-roof\b/i },
+    { kind: 'console', match: /^console error: THREE\.THREE\.WebGPURenderer: WebGPU Device Lost\b/i },
+    { kind: 'console', match: /^console error: OperationError: Instance dropped in popErrorScope\b/i },
+    { kind: 'console', match: /^console error: An error occurred during model execution: "RangeError: Failed to execute 'createBuffer' on 'GPUDevice'/i },
+    { kind: 'console', match: /^console error: Inputs given to model:/i },
+  ].map((charge) => ({
+    point: 1520,
+    suite: 'polish-settlement',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    ...charge,
+    why:
+      'MEASURED 15.11.2026 on WebGPU, main 7b1a2d8a5: after 45 min of settlement rebuilds (renderTargets 53 -> 67) the '
+      + 'WebGPU device is lost; roof-clearance (8 pass) and porter-head-load (16 pass) are green alone. The cumulative '
+      + 'rebuild leak is point 1520\'s. The charge dies with point 1520.',
+  })),
 ]
