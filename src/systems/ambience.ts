@@ -1568,9 +1568,8 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     setFire: (distance: number) => setAmbienceFire(distance),
     fireDistance: () => fireDistance,
     // The live gain one layer's node really carries (point 357), beside the
-    // target it is ramping to, and a pestle thud from a given distance.
+    // target it is ramping to.
     layerGain: (name: string) => layers[name]?.gain.gain.value ?? 0,
-    poundThud: (distance: number) => playPoundThud(distance),
     setScene: (next: AmbienceScene) => setAmbienceScene(next),
     // The live gain of one sub-bus (point 577): the browser gate reads them to
     // prove `ambientVolume` moves the bed WITHOUT touching the speech.

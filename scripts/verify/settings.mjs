@@ -1670,7 +1670,8 @@ if (section('river-current')) {
 // standing): the goats and the fire's crackle are audible in the GRAPH's gain
 // values (the live node after its fade, not only the target); the fire pit's own
 // distance report makes the crackle louder near its ring than part-way out,
-// audible at both; the mortar's thud schedules a positive level; and the master ambience
+// audible at both; the mortar thuds the animated pestle dispatches fall on its
+// strikes and schedule a positive level; and the master ambience
 // volume at zero silences all three. Last in the file, so it disturbs no block.
 if (section('village-bed')) {
   const VILLAGE_FIRE = [-3.5, 2.5] // src/scenes/place/layout.ts VILLAGE_FIRE
@@ -1722,6 +1723,77 @@ if (section('village-bed')) {
       null, { timeout: 12000, polling: 100 })
     .then(() => true)
     .catch(() => false)
+  // The mortar is heard ONLY through the animated pestle (no direct call): stand
+  // beside the mortar the scene placed, then watch frame by frame what the
+  // pestle dispatches. Every dispatched thud must coincide with a pestle impact
+  // in the same frame (the impact counter moves with it, and never without
+  // it), and land at the start of a stroke — some pounding woman's time since
+  // her impact within one slow frame.
+  const standNearMortar = async () => {
+    for (let k = 0; k < 12; k++) {
+      await page.evaluate((a) => {
+        const m = window.__placePounding?.().mortar
+        if (!m) return
+        const p = window.__placePlayer
+        p.x = m.x + Math.cos(a) * 1.6
+        p.z = m.z + Math.sin(a) * 1.6
+      }, (k * Math.PI) / 6)
+      const t0 = await page.evaluate(() => window.__ambience.context()?.currentTime ?? 0)
+      await page
+        .waitForFunction((t) => (window.__ambience.context()?.currentTime ?? 0) > t + 0.4, t0, { timeout: 5000, polling: 'raf' })
+        .catch(() => {})
+      const near = await page.evaluate(() => {
+        const m = window.__placePounding?.().mortar
+        const p = window.__placePlayer
+        return !!m && Math.hypot(p.x - m.x, p.z - m.z) < 2.4
+      })
+      if (near) return true
+    }
+    return false
+  }
+  const watchPestle = (want) => page.evaluate(async (n) => {
+    const a = window.__ambience
+    const stroke = window.__balance.villageLife.mortar.strokeSeconds
+    const impactsOf = (pd) => pd.women.reduce((sum, w) => sum + w.impacts, 0)
+    const first = window.__placePounding?.()
+    if (!first) return { mounted: false }
+    let probe = { ...a.thudProbe() }
+    let impacts = impactsOf(first)
+    const start = { ...probe }
+    const thuds = []
+    let impactsWithoutThud = 0
+    const deadline = performance.now() + 45000 // the duo also walks to its rack
+    while (thuds.length < n && performance.now() < deadline) {
+      await new Promise((r) => requestAnimationFrame(r))
+      const pd = window.__placePounding?.()
+      if (!pd) break
+      const now = { ...a.thudProbe() }
+      const nowImpacts = impactsOf(pd)
+      const struck = nowImpacts - impacts
+      if (now.calls > probe.calls) {
+        const since = pd.women.filter((w) => w.phase >= 0).map((w) => w.phase * stroke)
+        thuds.push({
+          calls: now.calls - probe.calls,
+          struck,
+          sinceImpact: since.length ? Math.min(...since) : null,
+          scheduled: now.scheduled - probe.scheduled,
+          peak: now.lastPeak,
+          at: a.context()?.currentTime ?? null,
+        })
+      } else if (struck > 0) {
+        impactsWithoutThud++
+      }
+      probe = now
+      impacts = nowImpacts
+    }
+    return {
+      mounted: true,
+      thuds,
+      impactsWithoutThud,
+      scheduled: probe.scheduled - start.scheduled,
+      lastPeak: probe.lastPeak,
+    }
+  }, want)
   await page.evaluate(() => {
     window.__ambience.start()
     window.__balance.ambienceVolume = 0.5
@@ -1732,21 +1804,10 @@ if (section('village-bed')) {
   await settleBed()
   const audible = await page.evaluate(() => {
     const a = window.__ambience
-    const before = { ...a.thudProbe() }
-    a.poundThud(2)
-    const thud = { ...a.thudProbe() }
-    return {
-      fireDistance: a.fireDistance(),
-      goats: a.layerGain('goats'),
-      fire: a.layerGain('fire'),
-      thudScheduled: thud.scheduled - before.scheduled,
-      thudPeak: thud.lastPeak,
-    }
+    return { fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire') }
   })
   check('inside a village the goats and the fire are audible in the graph (point 357)',
     audible.fireDistance < 3 && audible.goats > 0 && audible.fire > 0, JSON.stringify(audible))
-  check('the mortar thud schedules a positive level inside a village (point 357)',
-    audible.thudScheduled === 1 && audible.thudPeak > 0, JSON.stringify(audible))
   const reach = await page.evaluate(() => window.__balance.villageBed.fireAudible)
   // The crackle FOLLOWS the distance, not an on/off switch: compared at two
   // distances that are both inside its reach, the nearer stand is louder and
@@ -1763,6 +1824,15 @@ if (section('village-bed')) {
     audible.fireDistance < mid.fireDistance && mid.fireDistance < reach &&
       mid.fire > 0 && audible.fire > mid.fire && mid.goats > 0,
     JSON.stringify({ near: audible, mid }))
+  const besideMortar = await standNearMortar()
+  check('the traveller can stand beside the village mortar (point 357)', besideMortar)
+  const pestle = await watchPestle(3)
+  check('the mortar thuds come from the animated pestle, one per impact frame, at the stroke\'s strike (point 357)',
+    pestle.mounted && pestle.thuds.length === 3 && pestle.impactsWithoutThud === 0 &&
+      pestle.thuds.every((t) => t.struck >= 1 && t.sinceImpact !== null && t.sinceImpact <= 0.35),
+    JSON.stringify(pestle))
+  check('the pestle\'s thuds schedule a positive level beside the mortar (point 357)',
+    pestle.mounted && pestle.scheduled >= 1 && pestle.lastPeak > 0, JSON.stringify(pestle))
   await standBesideFire()
   await page.evaluate(() => {
     window.__balance.ambienceVolume = 0 // the master muted
@@ -1774,13 +1844,16 @@ if (section('village-bed')) {
     .catch(() => {})
   const muted = await page.evaluate(() => {
     const a = window.__ambience
-    const before = { ...a.thudProbe() }
-    a.poundThud(2)
-    const thud = { ...a.thudProbe() }
-    return { fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire'), thudScheduled: thud.scheduled - before.scheduled }
+    return { fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire') }
   })
-  check('the muted master silences every village-bed layer (point 357)',
-    muted.fireDistance < 3 && muted.goats === 0 && muted.fire === 0 && muted.thudScheduled === 0, JSON.stringify(muted))
+  check('the muted master silences the goats and the fire (point 357)',
+    muted.fireDistance < 3 && muted.goats === 0 && muted.fire === 0, JSON.stringify(muted))
+  // The pestle keeps pounding under the mute; its thuds are dispatched and
+  // schedule nothing.
+  await standNearMortar()
+  const mutedPestle = await watchPestle(2)
+  check('the muted master silences the pestle\'s thuds while it keeps pounding (point 357)',
+    mutedPestle.mounted && mutedPestle.thuds.length === 2 && mutedPestle.scheduled === 0, JSON.stringify(mutedPestle))
   // Out of the village (master audible again): the whole bed must settle to
   // silence on the travel map, the fire pit's unmount included.
   // The goats are audible again first, so the departure wait below cannot
