@@ -1749,7 +1749,10 @@ if (section('village-bed')) {
     window.__balance.ambienceVolume = 0 // the master muted
     window.__ambience.refresh()
   })
-  await page.waitForTimeout(FADE_WAIT)
+  // A bounded settle, not one fixed crossfade: a slow lane runs the fade late.
+  await page
+    .waitForFunction(() => window.__ambience.layerGain('goats') === 0 && window.__ambience.layerGain('fire') === 0, null, { timeout: 12000, polling: 100 })
+    .catch(() => {})
   const muted = await page.evaluate(() => {
     const a = window.__ambience
     const before = { ...a.thudProbe() }
@@ -1759,6 +1762,27 @@ if (section('village-bed')) {
   })
   check('the muted master silences every village-bed layer (point 357)',
     muted.fireDistance < 3 && muted.goats === 0 && muted.fire === 0 && muted.thudScheduled === 0, JSON.stringify(muted))
+  // Out of the village (master audible again): the whole bed must settle to
+  // silence on the travel map, the fire pit's unmount included.
+  await page.evaluate(() => {
+    window.__balance.ambienceVolume = 0.5
+    window.__ambience.refresh()
+    window.__game.getState().leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // The scene switch waits for the travel map to take over, so the fade is
+  // given a bounded settle rather than one fixed crossfade.
+  const leftAt = Date.now()
+  const settled = await page
+    .waitForFunction(() => window.__ambience.layerGain('goats') === 0 && window.__ambience.layerGain('fire') === 0, null, { timeout: 12000, polling: 100 })
+    .then(() => true)
+    .catch(() => false)
+  const left = await page.evaluate(([ok, ms]) => {
+    const a = window.__ambience
+    return { settled: ok, afterMs: ms, fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire') }
+  }, [settled, Date.now() - leftAt])
+  check('leaving the village silences the goats and the fire (point 357)',
+    left.settled && left.goats === 0 && left.fire === 0 && !(left.fireDistance <= reach), JSON.stringify(left))
   await page.evaluate(() => {
     window.__balance.ambienceVolume = 0.1
     window.__ambience.refresh()
