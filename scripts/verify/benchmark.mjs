@@ -201,6 +201,16 @@ check(
   /^hoa-bench-\d{4}-\d{2}-\d{2}-(webgpu|webgl2)\.json$/.test(result.filename),
   result.filename,
 )
+// --- point 1524: every graphics level measured, each row naming its pixel ratio
+for (const name of ['high-preset', 'medium-preset']) {
+  const n = report.rows.filter((r) => r.config === name).length
+  check(`the sweep includes the ${name} pass (one row per phase)`, n === phases.length, `${n} ${name} rows`)
+}
+check(
+  'every row records the pixel ratio it was measured at',
+  report.rows.every((r) => typeof r.pixelRatio === 'number' && r.pixelRatio > 0),
+  JSON.stringify([...new Set(report.rows.map((r) => r.pixelRatio))]),
+)
 // --- point 293: the LOW-preset per-system cost ranking -----------------------
 const low = report.lowProfile
 const lowRows = report.rows.filter((r) => r.config === 'low-preset')

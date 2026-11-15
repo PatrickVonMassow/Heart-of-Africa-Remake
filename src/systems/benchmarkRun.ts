@@ -23,13 +23,13 @@
 
 import { addAfterEffect, addEffect } from '@react-three/fiber'
 import { balance } from '../config/balance'
-import { QUALITY_PRESETS } from '../config/quality'
+import { QUALITY_PRESETS, type DetailLevel } from '../config/quality'
 import { getStrings } from '../i18n'
 import { describeBackend } from '../render/backendInfo'
 import { getRenderContext } from '../render/renderContext'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
 import { useGame } from '../state/store'
-import { useUi } from '../state/ui'
+import { effectiveDprCap, useUi } from '../state/ui'
 import { mulberry32 } from '../world/noise'
 import {
   BENCH_APP,
@@ -40,7 +40,9 @@ import {
   BENCH_SEED,
   BENCH_TRAVEL_SPEED,
   BENCH_ZOOM,
-  LOW_CONFIG_NAME,
+  BENCH_PRESET_LEVELS,
+  benchNativePixelRatio,
+  PRESET_CONFIG_NAMES,
   benchFilename,
   benchFrameCounts,
   benchRemainingMs,
@@ -281,19 +283,19 @@ function applyConfig(config: BenchConfig, defaultPixelRatio: number): void {
 }
 
 /**
- * Apply the actual LOW `QUALITY_PRESETS` values for the point-293 profiling
- * pass. Unlike `applyConfig` (which forces HIGH so every lever stays isolable),
- * this drops the graphics level to 'low' so the effective* selectors read the
- * low preset for everything reactive (post off, 1024 sun shadows, no campfire
- * shadows, the tighter flora radius), and applies the two imperative levers the
- * scene does not re-read on its own — the dpr cap and the terrain refinement —
- * from the same low preset. The individual debug flags are set neutral so the
- * preset's own AND-gates decide, and no leaked flag distorts the low picture.
+ * Apply one graphics level's actual `QUALITY_PRESETS` values for a preset pass
+ * (point 293 for low, point 1524 for medium/high). Unlike `applyConfig` (which
+ * forces HIGH so every lever stays isolable), this sets the graphics level so
+ * the effective* selectors read the preset for everything reactive (post,
+ * shadows, campfire shadows, flora radius), and applies the two imperative
+ * levers the scene does not re-read on its own — the pixel ratio (the level's
+ * EFFECTIVE dpr cap, else the native ratio) and the terrain refinement. The
+ * individual debug flags are set neutral so the preset's own AND-gates decide.
  */
-function applyLowPreset(defaultPixelRatio: number): void {
-  const low = QUALITY_PRESETS.low
+function applyPreset(level: DetailLevel, nativePixelRatio: number): void {
+  const preset = QUALITY_PRESETS[level]
   useUi.setState({
-    detailLevel: 'low',
+    detailLevel: level,
     traaEnabled: true,
     ssaoEnabled: true,
     shadowsEnabled: true,
@@ -301,11 +303,10 @@ function applyLowPreset(defaultPixelRatio: number): void {
     fireShadowsEnabled: true,
   })
   resetTerrainRefine()
-  setTerrainRefine({ enabled: low.terrainRefine })
+  setTerrainRefine({ enabled: preset.terrainRefine })
   const ctx = getRenderContext()
-  ctx?.gl.setPixelRatio(low.dprCap ?? defaultPixelRatio)
+  ctx?.gl.setPixelRatio(effectiveDprCap(useUi.getState()) ?? nativePixelRatio)
 }
-
 
 /**
  * Run the whole sweep. Resolves once the report is in the UI store (or the run
@@ -324,7 +325,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   const counts = benchFrameCounts(short)
   // The sweep configs PLUS the point-293 low-preset profiling pass — one extra
   // measured config, so the progress bar and the estimate cover it.
-  const measuredConfigs = BENCH_CONFIGS.length + 1
+  const measuredConfigs = BENCH_CONFIGS.length + BENCH_PRESET_LEVELS.length
   const framesTotal = benchTotalFrames(short, measuredConfigs)
 
   // --- everything restored in the finally below ---
@@ -337,7 +338,12 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     deadlineEnabled: balance.deadline.enabled,
   }
   const terrainSnapshot = getTerrainRefine()
+  // The ratio active when F8 was pressed — restored afterwards. It is NOT the
+  // sweep's ratio: started from LOW it is the 0.8 cap, which made the
+  // reference's forced-HIGH baseline cheaper than `dpr-1` (point 1524). The
+  // sweep and the uncapped presets render at the NATIVE ratio instead.
   const defaultPixelRatio = ctx.gl.getPixelRatio()
+  const nativePixelRatio = benchNativePixelRatio(window.devicePixelRatio)
   const restoreClock = installFixedClock(ctx.clock, BENCH_DT)
   // Real GPU milliseconds where the backend can measure them — the only series
   // that answers the geometry question under vsync.
@@ -406,6 +412,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
         gpu: gpu.available && gpuSamples.length > 0 ? frameStats(gpuSamples) : null,
         vsyncLikely: vsyncLikely(frame),
         drawCalls: render?.drawCalls ?? 0,
+        pixelRatio: ctx.gl.getPixelRatio(),
         triangles: render?.triangles ?? 0,
         sceneTriangles: sceneTriangleBreakdown(ctx.scene as unknown as BenchSceneNode),
       })
@@ -420,22 +427,25 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     // Warm-up pass: DISCARDED. The first pass pays the cold caches (terrain
     // geometry, flora instances, shader compiles) and that cost must not land
     // on whichever config happens to run first.
-    applyConfig(BENCH_CONFIGS[0], defaultPixelRatio)
+    applyConfig(BENCH_CONFIGS[0], nativePixelRatio)
     for (const phase of BENCH_PHASES) await runPhase(BENCH_CONFIGS[0], 0, phase, false)
 
     for (let i = 0; i < BENCH_CONFIGS.length; i++) {
       const config = BENCH_CONFIGS[i]
-      applyConfig(config, defaultPixelRatio)
+      applyConfig(config, nativePixelRatio)
       for (const phase of BENCH_PHASES) await runPhase(config, i + 1, phase, true)
     }
 
-    // The point-293 LOW-preset profiling pass: the sweep above forced HIGH to
-    // keep every lever isolable — this last measured config applies the real
-    // low QUALITY_PRESETS values, so `buildLowProfile` below can rank WHERE the
-    // frame cost still sits at the low graphics level.
-    const lowConfig: BenchConfig = { name: LOW_CONFIG_NAME, flags: {} }
-    applyLowPreset(defaultPixelRatio)
-    for (const phase of BENCH_PHASES) await runPhase(lowConfig, measuredConfigs, phase, true)
+    // The preset passes (point 293 for low, point 1524 for medium/high): the
+    // sweep above forced HIGH to keep every lever isolable — these apply each
+    // level's real QUALITY_PRESETS values, so every preset reads against the
+    // same baseline and `buildLowProfile` can rank where LOW's cost still sits.
+    for (let i = 0; i < BENCH_PRESET_LEVELS.length; i++) {
+      const level = BENCH_PRESET_LEVELS[i]
+      applyPreset(level, nativePixelRatio)
+      const presetConfig: BenchConfig = { name: PRESET_CONFIG_NAMES[level], flags: {} }
+      for (const phase of BENCH_PHASES) await runPhase(presetConfig, BENCH_CONFIGS.length + i + 1, phase, true)
+    }
   } catch (error) {
     aborted = true
     if (!(error instanceof BenchAborted)) {

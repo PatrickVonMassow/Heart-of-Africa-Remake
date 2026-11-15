@@ -12,8 +12,11 @@ import {
   BENCH_PHASES,
   BENCH_SEED,
   BENCH_ZOOM,
+  BENCH_PRESET_LEVELS,
   LOW_CONFIG_NAME,
+  PRESET_CONFIG_NAMES,
   benchFilename,
+  benchNativePixelRatio,
   benchFrameCounts,
   benchRemainingMs,
   benchReportJson,
@@ -35,7 +38,31 @@ import {
   type BenchRow,
   type BenchSceneNode,
 } from './benchmark'
-import { QUALITY_PRESETS } from '../config/quality'
+import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
+
+describe('benchmark preset passes (point 1524)', () => {
+  it('measures every graphics level once, high to low, under names distinct from the sweep', () => {
+    expect([...BENCH_PRESET_LEVELS].sort()).toEqual([...DETAIL_LEVELS].sort())
+    expect(BENCH_PRESET_LEVELS).toEqual(['high', 'medium', 'low'])
+    const names = BENCH_PRESET_LEVELS.map((l) => PRESET_CONFIG_NAMES[l])
+    expect(new Set(names).size).toBe(names.length)
+    for (const n of names) expect(BENCH_CONFIGS.some((c) => c.name === n)).toBe(false)
+    // The low pass keeps its point-293 name, so its profile stays comparable.
+    expect(PRESET_CONFIG_NAMES.low).toBe(LOW_CONFIG_NAME)
+  })
+
+  it('renders an uncapped level at R3F\'s native [1, 2] clamp of the display ratio', () => {
+    expect(benchNativePixelRatio(1.25)).toBe(1.25)
+    expect(benchNativePixelRatio(0.5)).toBe(1)
+    expect(benchNativePixelRatio(3)).toBe(2)
+    expect(benchNativePixelRatio(undefined)).toBe(1)
+  })
+
+  it('keeps the full run with all preset passes under ~3 min at 60 Hz', () => {
+    const total = benchTotalFrames(false, BENCH_CONFIGS.length + BENCH_PRESET_LEVELS.length)
+    expect(total / 60).toBeLessThan(180)
+  })
+})
 
 describe('benchmark sweep plan (design.md §21.1)', () => {
   it('sweeps every lever of the point-276 findings, baseline first', () => {
@@ -454,6 +481,14 @@ describe('report shaping', () => {
     lowProfile: null,
     durationMs: 12345,
     aborted: false,
+  })
+
+  it('prints the measured pixel ratio per row, a dash for an older report', () => {
+    const r = report()
+    expect(benchSummaryLines(r).at(-1)).toMatch(/—$/)
+    r.rows[0].pixelRatio = 1.25
+    expect(benchSummaryLines(r).at(-1)).toMatch(/1\.25$/)
+    expect(benchSummaryLines(r)[4]).toMatch(/dpr$/)
   })
 
   it('names the file with the date and the backend', () => {
