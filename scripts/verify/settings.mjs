@@ -1667,6 +1667,87 @@ if (section('river-current')) {
 
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
+// --- The village sound bed (point 357, design.md §19.10/§20) -----------------
+// In a REAL village (Bambara, the scene the river-current block above leaves
+// standing): the goats and the fire's crackle are audible in the GRAPH's gain
+// values (the live node after its fade, not only the target); the fire pit's own
+// distance report raises the crackle at its ring and silences it beyond its
+// reach; the mortar's thud schedules a positive level; and the master ambience
+// volume at zero silences all three. Last in the file, so it disturbs no block.
+if (section('village-bed')) {
+  const VILLAGE_FIRE = [-3.5, 2.5] // src/scenes/place/layout.ts VILLAGE_FIRE
+  const FADE_WAIT = 1800 // the engine's 1.6 s crossfade, with room to settle
+  if (await page.evaluate(() => window.__game.getState().placeId !== 'bambara-village')) {
+    await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  }
+  await page.waitForFunction(
+    () => window.__game.getState().placeId === 'bambara-village' && window.__placePlayer,
+    null,
+    { timeout: 60000 },
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await waitForSceneBuilt(page)
+  const errsBeforeBed = errors.length
+  const standFromFire = (metres) => page.evaluate(([fire, m]) => {
+    const p = window.__placePlayer
+    p.x = fire[0] + m
+    p.z = fire[1]
+  }, [VILLAGE_FIRE, metres])
+  await page.evaluate(() => {
+    window.__ambience.start()
+    window.__balance.ambienceVolume = 0.5
+    window.__ambience.refresh()
+  })
+  await standFromFire(1.6) // beside the ring, clear of the hearth
+  await page.waitForTimeout(FADE_WAIT)
+  const audible = await page.evaluate(() => {
+    const a = window.__ambience
+    const before = { ...a.thudProbe() }
+    a.poundThud(2)
+    const thud = { ...a.thudProbe() }
+    return {
+      fireDistance: a.fireDistance(),
+      goats: a.layerGain('goats'),
+      fire: a.layerGain('fire'),
+      thudScheduled: thud.scheduled - before.scheduled,
+      thudPeak: thud.lastPeak,
+    }
+  })
+  check('inside a village the goats and the fire are audible in the graph (point 357)',
+    audible.fireDistance < 3 && audible.goats > 0 && audible.fire > 0, JSON.stringify(audible))
+  check('the mortar thud schedules a positive level inside a village (point 357)',
+    audible.thudScheduled === 1 && audible.thudPeak > 0, JSON.stringify(audible))
+  const reach = await page.evaluate(() => window.__balance.villageBed.fireAudible)
+  await standFromFire(reach + 2)
+  await page.waitForTimeout(FADE_WAIT)
+  const away = await page.evaluate(() => {
+    const a = window.__ambience
+    return { fireDistance: a.fireDistance(), fire: a.layerGain('fire'), goats: a.layerGain('goats') }
+  })
+  check('the fire falls silent beyond its reach while the goats stay (point 357)',
+    away.fireDistance > reach && away.fire === 0 && away.goats > 0, JSON.stringify(away))
+  await standFromFire(1.6)
+  await page.evaluate(() => {
+    window.__balance.ambienceVolume = 0 // the master muted
+    window.__ambience.refresh()
+  })
+  await page.waitForTimeout(FADE_WAIT)
+  const muted = await page.evaluate(() => {
+    const a = window.__ambience
+    const before = { ...a.thudProbe() }
+    a.poundThud(2)
+    const thud = { ...a.thudProbe() }
+    return { fireDistance: a.fireDistance(), goats: a.layerGain('goats'), fire: a.layerGain('fire'), thudScheduled: thud.scheduled - before.scheduled }
+  })
+  check('the muted master silences every village-bed layer (point 357)',
+    muted.fireDistance < 3 && muted.goats === 0 && muted.fire === 0 && muted.thudScheduled === 0, JSON.stringify(muted))
+  await page.evaluate(() => {
+    window.__balance.ambienceVolume = 0.1
+    window.__ambience.refresh()
+  })
+  check('village bed: no new console errors', errors.length === errsBeforeBed, errors.slice(errsBeforeBed).join(' | ').slice(0, 300))
+}
+
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)
 
