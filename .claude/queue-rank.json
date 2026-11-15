@@ -1897,6 +1897,18 @@
       "why": "Pre-existing settings reds without player report; behind the open feature work, unbundled",
       "origin": "machine",
       "place": "last"
+    },
+    "1525": {
+      "at": "2026-11-15T22:14:29.314Z",
+      "why": "test-infrastructure blockade, ranks behind the open game points like its bundle peers",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1526": {
+      "at": "2026-11-15T22:14:29.422Z",
+      "why": "visual polish of a landed feature; no blocker",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1925,7 +1937,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-15T20:10:15.953Z",
+    "at": "2026-11-15T22:14:29.430Z",
     "points": [
       184,
       200,
@@ -1939,7 +1951,6 @@
       330,
       333,
       336,
-      359,
       360,
       362,
       363,
@@ -2376,7 +2387,9 @@
       1519,
       1520,
       1521,
-      1522
+      1522,
+      1525,
+      1526
     ]
   }
 }
