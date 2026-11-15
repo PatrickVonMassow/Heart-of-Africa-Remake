@@ -1036,6 +1036,18 @@ interface BalanceConfig {
      *  acceptable, never to quieten a regression. */
     pictureFreezeBudgetMs: number
   }
+  /** Travel-view frame-time guards (docs/perf-1523-findings.md). */
+  travelFrame: {
+    /** A frame interval in the travel view at or above this (ms) is reported by
+     *  the dev-mode long-frame detector, with the system that owned most of it. */
+    longFrameMs: number
+    /** Share of a long frame a single instrumented system must own to be named
+     *  its owner; below it the frame is reported as unattributed. */
+    ownerShare: number
+    /** Budget (ms) for one in-place re-bake of the environment map on a sun step
+     *  — the work that replaced the per-step program rebuild. */
+    envRebakeBudgetMs: number
+  }
   /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
    *  gameplay speeds and sensitivities are unchanged. */
   touch: {
@@ -2183,6 +2195,15 @@ export const balance: BalanceConfig = {
     // a loaded machine while still catching the defect this guards, which was
     // 21 s of blocked thread and 20 s without a painted frame.
     pictureFreezeBudgetMs: 4000, // calibratable, debug-editable
+  },
+  travelFrame: {
+    // The point-1523 report: ~0.5 s stalls on a strong PC; 100 ms is the brief's
+    // reporting line, far above an ordinary frame on any supported machine.
+    longFrameMs: 100, // calibratable
+    ownerShare: 0.25, // calibratable
+    // Measured 0.4-1.4 ms per 128x64 re-bake (dev browser); 4 ms leaves headroom
+    // for a loaded CI machine while still catching a return to per-step work.
+    envRebakeBudgetMs: 4, // calibratable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection

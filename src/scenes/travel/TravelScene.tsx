@@ -131,6 +131,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
 import { PERF, maxFrameMs, recordBurst, recordFrame, resetPerf } from './perfProbe'
+import { closeFrameWindow, markFrameWork, resetFrameWindow } from '../../systems/longFrame'
 import { Climate } from './Climate'
 import { FRAME_EDGE_MARGIN, pointOnScreen, setFrameVisibilityTest } from './frameVisibility'
 import { FLORA_SPECIES, type FloraSpecies } from './floraSpecies'
@@ -799,7 +800,11 @@ function TerrainChunks() {
         }
         setActive(resolved)
       }
-      if (import.meta.env.DEV) recordBurst(PERF.terrain, performance.now() - t0)
+      if (import.meta.env.DEV) {
+        const ms = performance.now() - t0
+        recordBurst(PERF.terrain, ms)
+        markFrameWork('terrain-stream', ms)
+      }
     }
   })
 
@@ -1796,7 +1801,11 @@ function Vegetation() {
       }
       worked = true
     }
-    if (worked && import.meta.env.DEV) recordBurst(PERF.flora, performance.now() - t0)
+    if (worked && import.meta.env.DEV) {
+      const ms = performance.now() - t0
+      recordBurst(PERF.flora, ms)
+      markFrameWork('flora-stream', ms)
+    }
   })
 
   return (
@@ -2970,6 +2979,7 @@ export function TravelScene() {
     }
     return () => {
       delete w.__perf
+      resetFrameWindow()
     }
   }, [])
 
@@ -3045,7 +3055,13 @@ export function TravelScene() {
   }, [])
 
   useFrame((_, rawDt) => {
-    if (import.meta.env.DEV) recordFrame(performance.now(), rawDt * 1000)
+    if (import.meta.env.DEV) {
+      const now = performance.now()
+      recordFrame(now, rawDt * 1000)
+      // Long-frame detector (docs/perf-1523-findings.md): closes the frame
+      // window and reports a long one with its owning system.
+      closeFrameWindow(now)
+    }
     const dt = Math.min(rawDt, 0.1)
     const s = useGame.getState()
 

@@ -122,6 +122,9 @@ export default function App() {
               // effect toggle of the session is watched. Imported dynamically so
               // the watch never enters the shipped bundle.
               void import('./render/renderLeak').then((m) => m.armRenderLeakWatch())
+              // Long-frame attribution (docs/perf-1523-findings.md): node-program
+              // builds are booked as 'shader-programs' frame work.
+              void import('./render/programBuildWatch').then((m) => m.watchProgramBuilds(renderer))
             }
             // Filmic look: soft shadows + ACES tone mapping.
             renderer.shadowMap.enabled = true
