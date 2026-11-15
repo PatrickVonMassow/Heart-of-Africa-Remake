@@ -56,7 +56,7 @@ function softPuffMaterial(core: THREE.Color, rim: THREE.Color, peak: typeof SMOK
   return m
 }
 
-const smoke = puffGeometry(SMOKE_MAX)
+// Smoke geometry is per emitter (its fade buffer is per-instance state); one dust pool serves all walkers.
 const dust = puffGeometry(DUST_MAX)
 // Wood smoke: a cool pale grey, a touch darker in its core.
 const smokeMat = softPuffMaterial(new THREE.Color(0.44, 0.44, 0.46), new THREE.Color(0.66, 0.66, 0.68), SMOKE_OPACITY_U, 0.15)
@@ -71,6 +71,8 @@ const dustMat = softPuffMaterial(new THREE.Color(0.6, 0.5, 0.37), new THREE.Colo
 export function FireSmoke({ rainRef, sheltered, out }: { rainRef: MutableRefObject<number>; sheltered: boolean; out: boolean }) {
   const mesh = useRef<THREE.InstancedMesh>(null)
   const puffs = useUi(effectiveFireSmokePuffs)
+  const smoke = useMemo(() => puffGeometry(SMOKE_MAX), [])
+  useEffect(() => () => smoke.geo.dispose(), [smoke])
   const mtx = useMemo(() => new THREE.Matrix4(), [])
   const pos = useMemo(() => new THREE.Vector3(), [])
   const scl = useMemo(() => new THREE.Vector3(), [])
