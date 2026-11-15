@@ -178,7 +178,10 @@ interface BalanceConfig {
    *  0.018 between it and the ceiling and turn the stage into the hard clipper
    *  it exists to prevent. A lone drum strike (0.249) or footstep is under it
    *  outright. `ceiling` keeps 0.45 dB under full scale, which is where a mix
-   *  is mastered to and the most the destination may then be handed. */
+   *  is mastered to and the most the destination may then be handed.
+   *  The village sound bed (point 357), with the fire at its ring, lifts those
+   *  measures to 1.359 and 0.954; the single voice then gives up under 0.25 dB
+   *  (ambience.test.ts, the headroom cases). */
   mixLimiter: {
     threshold: number
     ceiling: number
@@ -1713,12 +1716,15 @@ export const balance: BalanceConfig = {
   villageBed: {
     // Estimates (calibratable, CLAUDE.md §2), judged against the village speech
     // (speechVolume 3 on its own bus) and the drums: the bed sits well under a
-    // close voice, so it reads as life around the words, never over them.
+    // close voice, so it reads as life around the words, never over them. The
+    // two bases are capped by the mix limiter's knee: with the fire at its
+    // ring, a single close called voice still gives up under 0.25 dB
+    // (ambience.test.ts, the headroom cases).
     mortarVolume: 1, // calibratable
     goatVolume: 1, // calibratable
     fireVolume: 1, // calibratable
-    goatBase: 0.35, // calibratable
-    fireBase: 0.6, // calibratable
+    goatBase: 0.4, // calibratable
+    fireBase: 0.5, // calibratable
     fireAudible: 14, // calibratable
   },
   mixLimiter: {

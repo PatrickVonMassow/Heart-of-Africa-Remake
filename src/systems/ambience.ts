@@ -1471,7 +1471,10 @@ export function setAmbienceFire(distance: number) {
   // Re-target only on an audible change against what was last APPLIED: the pit
   // reports every frame, and a slow walk moves the curve a hair per frame.
   const prox = proximityGain(d, balance.villageBed.fireAudible)
-  if (ctx && Math.abs(prox - fireProxApplied) > 0.01) applyVillageBed()
+  // Reaching silence (or the ring) is always applied, or the last hair of the
+  // fade would stand above zero.
+  const edge = (prox === 0 || prox === 1) && prox !== fireProxApplied
+  if (ctx && (edge || Math.abs(prox - fireProxApplied) > 0.01)) applyVillageBed()
 }
 
 /** Start the engine on the first user gesture; safe to call repeatedly. */

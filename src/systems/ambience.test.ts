@@ -23,7 +23,9 @@ import {
   proximityGain,
   refreshAmbienceVolume,
   setAmbienceAnimals,
+  setAmbienceFire,
   setAmbienceScene,
+  villageBedTargets,
   startAmbience,
   thunderClapPlan,
   trampleCrunchFires,
@@ -1106,12 +1108,21 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
      *  standing IN a village from hearing it from outside — no assumption about
      *  the graph's build order. */
     const drumLayerGain = (): number => {
-      setAmbienceScene({ region: 'central', mode: 'place', placeKind: null, nearVillage: true })
-      const before = ctx.gains.map((g) => g.gain.events.length)
-      setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
-      const moved = ctx.gains.filter((g, i) => g.gain.events.length > before[i])
-      expect(moved, 'exactly one layer separates the two scenes: the drums').toHaveLength(1)
-      return moved[0].gain.value
+      // The village bed's goats separate the two scenes too (point 357); held
+      // silent here so the one layer left to move is the drums.
+      const goats = balance.villageBed.goatVolume
+      balance.villageBed.goatVolume = 0
+      try {
+        setAmbienceScene({ region: 'central', mode: 'place', placeKind: null, nearVillage: true })
+        const before = ctx.gains.map((g) => g.gain.events.length)
+        setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+        const moved = ctx.gains.filter((g, i) => g.gain.events.length > before[i])
+        expect(moved, 'exactly one layer separates the two scenes: the drums').toHaveLength(1)
+        return moved[0].gain.value
+      } finally {
+        balance.villageBed.goatVolume = goats
+        refreshAmbienceVolume()
+      }
     }
     /** One syllable spoken right beside the player, at the default volume — no
      *  option override, so the plan reads the shipped balance. */
@@ -1169,6 +1180,9 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
   }
 
   const villageFloor = () => {
+    // The traveller stands AT the fire ring (point 357): its crackle is the
+    // loudest the village bed gets, so the conservative floor carries it.
+    setAmbienceFire(0)
     // Find the ambient bus through a real ambient emitter, then select layer
     // nodes by their setTarget ramps rather than assuming graph build order.
     const beforeProbe = ctx.gains.length
@@ -1248,28 +1262,30 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     // voices, the whole ambience floor and a footstep on one sample, and reads
     // speech at the 2.8 UPPER bound of the four rendered carriers (1.99-2.67).
     if (register === 'talk') {
-      expect(output).toBeCloseTo(1.33605117094, 5)
-      expect(deployed).toBeCloseTo(1.24155117094, 5)
-      // 2.52 dB over full scale with the debug bed, 1.88 dB without it — the
-      // two overages the limiter had to absorb.
-      expect(20 * Math.log10(output)).toBeCloseTo(2.5165, 3)
-      expect(20 * Math.log10(deployed)).toBeCloseTo(1.879, 3)
+      // RE-MEASURED with the village bed (point 357): the goats and the fire
+      // at its ring add 0.0225 past the master; it was 1.336 / 1.242 before.
+      expect(output).toBeCloseTo(1.35855117094, 5)
+      expect(deployed).toBeCloseTo(1.26405117094, 5)
+      // 2.66 dB over full scale with the debug bed, 2.04 dB without it — the
+      // two overages the limiter has to absorb (2.52 / 1.88 before the bed).
+      expect(20 * Math.log10(output)).toBeCloseTo(2.6615, 3)
+      expect(20 * Math.log10(deployed)).toBeCloseTo(2.0353, 3)
       // AND WHAT LEAVES THE GRAPH, measured through the deployed stage: both
       // are under full scale again, with the ceiling's true-peak room to spare.
       expect(throughLimiter(master, output)).toBeCloseTo(0.94999, 5)
-      expect(throughLimiter(master, deployed)).toBeCloseTo(0.94992, 5)
+      expect(throughLimiter(master, deployed)).toBeCloseTo(0.94995, 5)
       expect(throughLimiter(master, output)).toBeLessThan(1)
       expect(throughLimiter(master, deployed)).toBeLessThan(1)
       // WHAT THE COINCIDENCE PAYS, which design.md §19.1 states as "some 3 dB
       // down": the stage is not transparent here and does not claim to be.
-      expect(-20 * Math.log10(throughLimiter(master, output) / output)).toBeCloseTo(2.962, 3)
+      expect(-20 * Math.log10(throughLimiter(master, output) / output)).toBeCloseTo(3.107, 3) // 2.962 before the village bed (point 357)
     }
     // One voice — the reachable everyday case — cleared full scale before the
     // limiter and must not be pulled DOWN by it: what the curve takes off it is
     // an order of magnitude under the ~1 dB a listener can hear at all, so the
     // stage is not a loudness change in disguise.
     if (register === 'call') {
-      expect(output).toBeCloseTo(0.93187573184, 5)
+      expect(output).toBeCloseTo(0.95437573184, 5) // 0.932 before the village bed (point 357)
       expect(output).toBeLessThan(1)
       const limited = throughLimiter(master, output)
       expect(limited).toBeLessThan(output)
@@ -1333,10 +1349,11 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const message = strike * ambientBus.gain.value
     const output = (message + ambienceFloor) * master.gain.value
     // MEASURED at drumMessagePeak 4.5: the loudest strike carries 0.135 past
-    // the master over a 0.11375 village floor, so the message alone clears full
+    // the master over a 0.13625 village floor (0.11375 before the village bed
+    // of point 357, which adds its goats and the fire at its ring), so the message alone clears full
     // scale with room to spare — it was 0.054 at the former literal 1.8.
     expect(message * master.gain.value).toBeCloseTo(0.135, 10)
-    expect(output).toBeCloseTo(0.24875, 8)
+    expect(output).toBeCloseTo(0.27125, 8)
     expect(output).toBeLessThan(1)
     // A strike on its own does not reach the limiter's threshold at all, so
     // the message is not shaped — the user's 2.5x on the drums stays untouched.
@@ -1346,9 +1363,9 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     expect(Math.abs(throughLimiter(master, output) - output) / output).toBeLessThan(1e-6)
     // It does NOT clear full scale in coincidence: the strikes and the speech
     // bus meet at this same master, so a strike landing on the two-voice worst
-    // case above adds its 0.135 to that 1.242. THAT is the sum the limiter
+    // case above adds its 0.135 to that 1.264. THAT is the sum the limiter
     // exists for, and it leaves the graph under full scale.
-    const coincidence = output + 1.24155117094
+    const coincidence = output + 1.26405117094
     expect(coincidence).toBeGreaterThan(1)
     expect(throughLimiter(master, coincidence)).toBeLessThan(1)
     expect(throughLimiter(master, coincidence)).toBeCloseTo(0.95, 4)
@@ -1382,7 +1399,9 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     // sum of every deployed layer, and exceeds the former falloff-24 mix.
     // RE-MEASURED at speechVolume 3 (user 18.09.2026, 07:50): each figure is
     // exactly 1.5× its value at speechVolume 2 (0.323 / 0.2375 / 0.0646).
-    expect(ambienceFloor).toBeCloseTo(0.2275, 10)
+    // RE-MEASURED with the village bed (point 357): 0.2725, of which 0.045 is
+    // the goats and the fire at its ring.
+    expect(ambienceFloor).toBeCloseTo(0.2725, 10)
     const expected = new Map([[0, 0.4845], [3, 0.35625], [10, 0.0969]])
     expect(speechPeak).toBeCloseTo(expected.get(distance)!, 8)
     const master = speechBus.connected[0] as FakeGain
@@ -1577,5 +1596,113 @@ describe('the pestle thud reaches the ambient bus through its placed route', () 
     } finally {
       ctx.state = was
     }
+  })
+})
+
+// The village sound bed (point 357, design.md §19.10/§20): the mortar's thud,
+// the goats and the fire's crackle, each under its own slider and the single
+// ambience volume, silent outside a village; the fire rises and falls with the
+// distance to its ring over the shared §19.1 proximity curve.
+describe('the village sound bed (point 357)', () => {
+  const saved = { ...balance.villageBed }
+  afterEach(() => Object.assign(balance.villageBed, saved))
+  const cfg = () => balance.villageBed
+
+  it('is zero outside a village whatever the sliders and the distance', () => {
+    for (const d of [0, 2, 8, Infinity]) expect(villageBedTargets(false, d, 1)).toEqual({ goats: 0, fire: 0 })
+  })
+
+  it('scales every layer linearly with its own slider and with the master volume', () => {
+    const base = villageBedTargets(true, 0, 1)
+    expect(base.goats).toBeGreaterThan(0)
+    expect(base.fire).toBeGreaterThan(0)
+    // The master: half the ambience volume halves both, zero silences both.
+    expect(villageBedTargets(true, 0, 0.5).goats).toBeCloseTo(base.goats / 2, 12)
+    expect(villageBedTargets(true, 0, 0.5).fire).toBeCloseTo(base.fire / 2, 12)
+    expect(villageBedTargets(true, 0, 0)).toEqual({ goats: 0, fire: 0 })
+    // Each slider moves its own layer and no other.
+    balance.villageBed.goatVolume = 0.25
+    expect(villageBedTargets(true, 0, 1).goats).toBeCloseTo(base.goats / 4, 12)
+    expect(villageBedTargets(true, 0, 1).fire).toBeCloseTo(base.fire, 12)
+    balance.villageBed.goatVolume = saved.goatVolume
+    balance.villageBed.fireVolume = 0
+    expect(villageBedTargets(true, 0, 1).fire).toBe(0)
+    expect(villageBedTargets(true, 0, 1).goats).toBeCloseTo(base.goats, 12)
+  })
+
+  it('the mortar thud follows its own slider and the master', () => {
+    const near = poundThudPlan(2, 0, 1).peak
+    expect(near).toBeGreaterThan(0)
+    expect(poundThudPlan(2, 0, 0.5).peak).toBeCloseTo(near / 2, 12)
+    expect(poundThudPlan(2, 0, 0).peak).toBe(0)
+    balance.villageBed.mortarVolume = 0.5
+    expect(poundThudPlan(2, 0, 1).peak).toBeCloseTo(near / 2, 12)
+    balance.villageBed.mortarVolume = 0
+    expect(poundThudPlan(2, 0, 1).peak).toBe(0)
+  })
+
+  it('the fire rises as the traveller nears the ring and falls as he leaves, silent beyond its reach', () => {
+    const reach = cfg().fireAudible
+    const sweep: number[] = []
+    for (let d = reach + 4; d >= 0; d -= 0.25) sweep.push(villageBedTargets(true, d, 1).fire)
+    // Approaching: never quieter, from exact silence to the full ring level.
+    for (let i = 1; i < sweep.length; i++) expect(sweep[i]).toBeGreaterThanOrEqual(sweep[i - 1] - 1e-12)
+    expect(sweep[0]).toBe(0)
+    expect(sweep[sweep.length - 1]).toBeCloseTo(cfg().fireBase, 12)
+    // The SAME shared proximity curve, not a second one.
+    for (const d of [1, reach / 3, reach / 2, reach - 1]) {
+      expect(villageBedTargets(true, d, 1).fire / sweep[sweep.length - 1]).toBeCloseTo(proximityGain(d, reach), 12)
+    }
+    // Leaving retraces the curve back to silence; the goats do not follow it.
+    expect(villageBedTargets(true, reach, 1).fire).toBe(0)
+    expect(villageBedTargets(true, Infinity, 1).fire).toBe(0)
+    expect(villageBedTargets(true, reach, 1).goats).toBeCloseTo(villageBedTargets(true, 0, 1).goats, 12)
+  })
+
+  describe('in the engine', () => {
+    let ctx: FakeCtx
+    const defaultVolume = balance.ambienceVolume
+    beforeAll(() => {
+      vi.useFakeTimers()
+      ;(window as unknown as { AudioContext: unknown }).AudioContext = FakeCtx
+      startAmbience()
+      ctx = FakeCtx.last!
+    })
+    afterAll(() => {
+      vi.useRealTimers()
+      balance.ambienceVolume = defaultVolume
+      setAmbienceFire(Infinity)
+      setAmbienceScene({ region: 'east', mode: 'travel', placeKind: null, nearVillage: false })
+    })
+    const rampTarget = (p: FakeParam): number => {
+      const ramps = p.events.filter((e) => e.type === 'lin')
+      return ramps.length ? ramps[ramps.length - 1].value ?? 0 : 0
+    }
+
+    it('drives the fire layer with the reported distance and silences it on leaving the village', () => {
+      balance.ambienceVolume = 1
+      ctx.currentTime = 900
+      setAmbienceFire(Infinity)
+      setAmbienceScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false, villageId: 'bed-test' })
+      const before = ctx.gains.map((g) => g.gain.events.length)
+      setAmbienceFire(0)
+      const moved = ctx.gains.filter((g, i) => g.gain.events.length > before[i])
+      expect(moved).toHaveLength(1) // the fire layer alone
+      const fire = moved[0].gain
+      expect(rampTarget(fire)).toBeCloseTo(balance.villageBed.fireBase, 6)
+      // A slow walk away, a hair per frame, still fades it the whole way.
+      let prev = rampTarget(fire)
+      for (let d = 0; d <= balance.villageBed.fireAudible + 1; d += 0.05) {
+        setAmbienceFire(d)
+        expect(rampTarget(fire)).toBeLessThanOrEqual(prev + 1e-12)
+        prev = rampTarget(fire)
+      }
+      expect(prev).toBe(0)
+      setAmbienceFire(1)
+      expect(rampTarget(fire)).toBeGreaterThan(0)
+      // Into travel: the whole bed goes silent.
+      setAmbienceScene({ region: 'west', mode: 'travel', placeKind: null, nearVillage: true, villageId: 'bed-test' })
+      expect(rampTarget(fire)).toBe(0)
+    })
   })
 })
