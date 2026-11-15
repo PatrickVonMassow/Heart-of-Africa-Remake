@@ -77,32 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 356. The inhabitants notice the traveller (user 25.07.2026). Today they do not:
-  in `src/scenes/place/PlaceLife.tsx` the player appears ONLY as a collision radius, so
-  a settlement is a diorama that happens to be occupied. Being SEEN is the strongest
-  signal that a place is inhabited, and for a European walking into an African village
-  in 1890 it is also the historically obvious reaction.
-  TARGET: within a calibratable notice radius an inhabitant turns its head — the whole
-  figure's facing, since these figures have no separate head — toward the traveller for
-  a few seconds, then returns to its errand. Children break off what they are doing and
-  stare a moment longer; the goats shy a step away. Everyone keeps their task: this is a
-  glance, never a state that stops the village.
-  RULES THAT KEEP IT FROM BECOMING CREEPY OR MECHANICAL: a cooldown per inhabitant so
-  the same figure does not track the player continuously; a cap on how many notice at
-  once (a whole village turning in unison reads as a horror film, not a place); the turn
-  rides the existing capped turn rate rather than snapping; and a drama or errand that
-  must not be interrupted (the elder in an audience, a walker inside a building) is
-  exempt. Values in `balance.villageLife.*`, debug-editable.
-  VERIFIABLE: pure — the notice predicate fires inside the radius and not outside,
-  respects the cooldown, and never selects more than the cap; the resulting facing is a
-  bounded step toward the player, never a snap. Live (`scripts/verify/polish.mjs`, BOTH
-  backends, screenshot): walking past a group, at least one inhabitant's yaw turns
-  measurably toward the player and returns afterwards, while the errands continue.
-  DOCS: design.md §19.10 gains the glance beside the existing village vignettes.
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
-
 - [ ] 357. The village sounds inhabited (user 25.07.2026). Checked: the settlement
   soundscape in `src/systems/ambience.ts` runs exactly ONE layer for a village —
   `setTarget('drums', 0.5)`. No voices, no pestle, no goats, no fire. Sound carries
