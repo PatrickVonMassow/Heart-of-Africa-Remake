@@ -99,9 +99,37 @@ describe('shelteredGroundWetnessAt — the wetness a walker\'s foot reads (desig
     setGroundWetness(0.6)
     expect(shelteredGroundWetnessAt(5, 5)).toBeCloseTo(0.6, 6)
     expect(shelteredGroundWetnessAt(50, 50)).toBeCloseTo(0.6, 6)
-    expect(shelteredGroundWetnessAt(0, 0)).toBeCloseTo(0.6 * (1 - 0.8), 6)
+    expect(shelteredGroundWetnessAt(0, 0)).toBeCloseTo(0.6 * (1 - 0.8 * 0.25), 6)
+    // The covered cell's own centre reads it in full.
+    const centre = ((c + 0.5) / n) * 20 - 10
+    expect(shelteredGroundWetnessAt(centre, centre)).toBeCloseTo(0.6 * (1 - 0.8), 6)
     setGroundWetness(0)
     expect(shelteredGroundWetnessAt(5, 5)).toBe(0)
+    clearShelterMask()
+    setShelterLook(balance.rain)
+  })
+
+  it('blends the four nearest cells like the linear-filtered texture, clamped at the edge', () => {
+    const n = SHELTER_MASK_SIZE
+    const cover = new Float32Array(n * n)
+    const drip = new Float32Array(n * n)
+    // A covered 2x2 block left of a cell boundary, and the mask's last column covered.
+    const c = Math.round(0.5 * n - 0.5)
+    for (const [i, j] of [[c, c], [c, c + 1], [c - 1, c], [c - 1, c + 1]]) cover[j * n + i] = 1
+    for (let j = 0; j < n; j++) cover[j * n + n - 1] = 1
+    setShelterMask({ size: n, extent: 10, cover, drip })
+    setShelterLook({ shelterStrength: 0.8, dripBoost: 0 })
+    setGroundWetness(0.6)
+    const cell = 20 / n
+    const centreX = ((c + 0.5) / n) * 20 - 10
+    const centreZ = ((c + 1) / n) * 20 - 10
+    // Halfway from the covered column c to the open column c + 1: half the cover.
+    expect(shelteredGroundWetnessAt(centreX + cell / 2, centreZ)).toBeCloseTo(0.6 * (1 - 0.8 * 0.5), 2)
+    // A quarter of the way: three quarters of the cover.
+    expect(shelteredGroundWetnessAt(centreX + cell / 4, centreZ)).toBeCloseTo(0.6 * (1 - 0.8 * 0.75), 2)
+    // Past the mask's edge the edge cells hold, as ClampToEdge does on the GPU.
+    expect(shelteredGroundWetnessAt(50, 0)).toBeCloseTo(0.6 * (1 - 0.8), 6)
+    setGroundWetness(0)
     clearShelterMask()
     setShelterLook(balance.rain)
   })
