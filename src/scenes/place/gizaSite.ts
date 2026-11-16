@@ -232,7 +232,8 @@ export function gizaFigure(role: GizaPersonRole, sex: Sex = 'male', dragoman = f
 // Bedouin cameleer with his camel on the approach, a lone camel by the Sphinx,
 // a donkey-boy with his donkey, and a few 1890s tourists — a man and a woman —
 // between the spawn and the monuments so they read in front of the pyramids on
-// approach.
+// approach. These are their starting places; what they do from there (the
+// parties and their ways between the monuments) is gizaActivity.ts.
 export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
   { role: 'guide', x: 12, z: 50 },
   { role: 'tourist', x: 9, z: 54 },
