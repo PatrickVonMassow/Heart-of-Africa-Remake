@@ -129,6 +129,42 @@ put it is the mistake this line exists to stop.
   content), `docs/graphics-detail-levels.md`, and CLAUDE.md §7.1 pt 12 with its evidence
   section.
 
+- [ ] 1529. Give the Giza plateau's people something to do: guides lead tourists, the cameleer tends his camel, the donkey-boy walks his donkey
+  User 16.11.2026: "Bei den Pyramiden stehen die Leute untätig rum"; queued at the front ("ja, beide vorne einreihen").
+  Measured: every `GizaAmbient` figure (src/scenes/place/PlaceScene.tsx ~2398-2466; anchors `GIZA_AMBIENT` in src/scenes/place/gizaSite.ts ~231-245) stands on its anchor and only turns on the spot; seen in verification/1378-giza-ambient.png. The villages' PlaceLife/adultWork walkers and talkers are not used here.
+  Player impact: the plateau reads as a set of statues next to lively villages.
+  Final state: within docs/giza-1890.md §4 (no throng, no new roles) guides/dragomen lead or walk with tourists between monument viewpoints, the cameleer tends or leads his camel, the donkey-boy walks his donkey, tourists stroll, stop and look. Movement stays on free ground clear of monuments with settlement collision respected; mounts move with their handlers. Reuse PlaceLife/adultWork where it fits, no new framework; speeds and pauses calibratable in src/config/balance.ts.
+  Test: Vitest for routing and role behaviour (positions change over time, stay off monuments); a Playwright polish frame of the Giza site showing figures in activity, both backends.
+  Source: user request 16.11.2026 16:16 (eb44b158).
+  Bundle: Monumente.
+
+- [ ] 1530. Replace the Giza camel's box primitives with a proper camel model
+  User 16.11.2026: "dem für das Kamel fehlt noch das Modell"; queued at the front ("ja, beide vorne einreihen").
+  Measured: `Camel()` in src/scenes/place/PlaceScene.tsx ~2319 is a box body, a sphere hump, a cylinder neck, a box head and four straight stick legs; in verification/1378-giza-ambient.png it reads as a crate on stilts.
+  Player impact: the camel is visibly a box primitive beside shaped villager bodies.
+  Final state: a dromedary (one hump, Egypt 1890) with a rounded body, a hump growing out of the back, an S-curved neck, a head with muzzle and ears, jointed legs with knees and wide pads, and a tail; detail level and low-preset fallback like the villager figures; a simple head/neck/tail idle; used everywhere `Camel()` is used now (check panoramaWildlife for a shared camel). The donkey is not part of this point. Colours and proportions calibratable in src/config/balance.ts.
+  Test: Vitest for the model builder (parts present, height fits the existing label height 2.4); a Playwright close-up frame of the Giza camel, both backends, picture-checked.
+  Source: user request 16.11.2026 16:16 (eb44b158).
+  Bundle: Monumente.
+
+- [ ] 1531. Smooth the bird's-eye horizon shadow so its 5.6 km texels no longer show as stair-step blocks
+  User 16.11.2026 with screenshot: "Warum sieht das so klötzchenhaft aus?"; recommendation (options 1 + 3) approved and queued at the front.
+  Measured from code and data, not yet in the running game: the horizon maps (src/render/horizonMaps.ts) have a ~5.6 km texel (public/geodata/horizon.json, cellMeters 5566); the linearly filtered slope is thresholded by smoothstep over only ±1.5° (balance.horizonMaps.shadowSoftnessDeg) after a ×15 reliefScale, so the shadow flips texel by texel along dune ridges at close zoom over Nile-valley sand under a low sun.
+  Player impact: the bird's-eye ground shows blocky stair-step shadows at close zoom.
+  Final state: (1) the shadow transition is widened (softness scaling with reliefScale) and/or the shadow term blurred across neighbouring texels, so no texel edge shows as a step at any zoom; (2) when one horizon texel covers more than a calibratable number of screen pixels, the shadow and sky-occlusion terms fade toward 1, far and overview zooms unchanged. No re-bake at higher resolution. New constants calibratable in src/config/balance.ts.
+  Test: Vitest for the fade factor (texel-to-pixel ratio to weight) and the softened curve; Playwright frames of the bird's-eye view at close zoom over Egyptian ground under a low sun (no stair steps) and at an overview zoom (land shading still present), both backends, picture-checked.
+  Source: user request 16.11.2026 16:21 (eb44b158).
+  Bundle: Sonne & Himmel.
+
+- [ ] 1532. Fade the backdrop hills' rock noise with distance so backlit ridges stop aliasing and trembling
+  User 16.11.2026: "Bei Gegenlicht sehen die Berge nicht gut aus und außerdem zittern sie." (report /backup/hoa/local/hoa-state-2026-11-16-2226741265.zip: seed 2226741265, giza, 15.01.1890 14:00, high, WebGPU); queued at the front ("ja").
+  Measured from code, not yet in the running game: in src/scenes/place/backdropMaterial.ts ~73-83 the `fine` octave is distance-faded (detailFade(70, 200)) but the 4-octave `rock` fractal (freq 0.16/0.28/0.16) is not; it drives colour and bump normal, so its upper octaves alias far below a pixel and TRAA turns them into frame-to-frame trembling on the dark backlit flanks. Side finding in the same picture: a bright yellow sand band at left with stair-stepped edges (likely the backdrop heightfield's coarse biome vertex colour).
+  Player impact: backlit panorama hills are covered in streak noise and tremble.
+  Final state: the rock noise's upper octaves fade with distance or screen frequency like `fine`, the low-frequency banding stays; no sub-pixel noise reaches colour or bump. The yellow band's edge reads smooth or its cause is named and fixed. Constants calibratable in src/config/balance.ts.
+  Test: Vitest for the fade weights; a Playwright backlit frame at the report's spot on both backends, picture-checked, plus two consecutive still-camera frames whose backdrop difference stays below a stated threshold.
+  Source: user request 16.11.2026 16:26 (eb44b158).
+  Bundle: Siedlungsgeometrie.
+
 - [ ] 385. Rain with depth and weather — layers, streak shape, dimmed sun (user
   27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
   point 379). Point 384 makes the rain touch the world; this makes the rain itself read
@@ -14601,6 +14637,7 @@ to land than a mechanism that needs a review.
   Final state: the hanging section is named from a logged run (`npm test -- polish-settlement`, with progress) and fixed or charged; a full polish-settlement run completes on WebGPU and on WebGL 2.
   Test: one full polish-settlement run per backend, completed within the suite timeout, with its frames inspected.
   Source: finding of the 358 session, 15.11.2026 21:16; restated at the 359 landing.
+  Measured 16.11.2026 on feat/384 9e30eb37d (WebGPU, logged): one run KILLED at 45m07s with 35 frames while still writing (kraal-cattle: 359-zulu-kraal-1890 at 21:06, -1893 at 21:16); the re-run with VERIFY_SUITE_TIMEOUT_MS=7200000 wrote its last frame 356-inhabitant-glance at 21:43 and then nothing for 35 min with a 4 GB Chrome renderer — the hang sits at the start of `fire-smoke` (after `inhabitants-glance`); killed by hand. Logs local/verify-logs/2026-11-16T19-31-52-913- and 2026-11-16T20-18-07-151-polish-settlement.log.
   Bundle: Testinfrastruktur.
 
 - [ ] 1526. Kraal cattle read as antelope

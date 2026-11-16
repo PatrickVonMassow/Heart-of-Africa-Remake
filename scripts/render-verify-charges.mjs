@@ -2186,8 +2186,11 @@ export const RED_CHARGES = [
     kind: 'check',
     match,
     detailMatch: /"survivorsOnBank":false/,
+    detailReadsPrefix: true,
     why:
       'MEASURED 16.11.2026 on WebGL 2, main 8945769b5: both crossing-turned-back checks fail with survivorsOnBank=false, '
-      + 'survivors=2, parentAlive=true; WebGPU at the same HEAD green. The defect is point 1528\'s. The charge dies with it.',
+      + 'survivors=2, parentAlive=true; WebGPU at the same HEAD green. The defect is point 1528\'s. The charge dies with it. '
+      + 'detailReadsPrefix: the measurement is cut at the 200-character bound; what the bound removes is the trailing '
+      + 'death, calf and settle fields. The signature sits at character ~150, clear of the bound.',
   })),
 ]
