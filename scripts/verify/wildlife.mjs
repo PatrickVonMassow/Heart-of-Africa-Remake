@@ -167,14 +167,16 @@ if (section('crossing-turned-back')) {
     const lion = window.__lionHunt.state
     lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
     const fam = window.__balance.family
-    const pf = window.__balance.parentDefense.predatorFlight
-    window.__crossPrev = { adoption: fam.adoptionRadius, croc: pf.crocodile, strike: window.__balance.crocodile.strikeRadius }
+    window.__crossPrev = { adoption: fam.adoptionRadius, strike: window.__balance.crocodile.strikeRadius }
     fam.adoptionRadius = 0.001
     // The defence is forced to the drive-off (the deterministic roll otherwise
     // decides per spot): the reversal must complete to be judged, and the
     // drive-off leaves BOTH parent and calf to swim for a bank — the longest
     // of the endings, so "every animal ends on a bank" is tested where it is hardest.
-    pf.crocodile = 100
+    // forceOutcome, not a raised flight weight: defendChance caps at 0.95 and
+    // the hashed |sin| roll crowds near 1, so a weight alone let 'taken' through.
+    window.__crossPrev.force = window.__balance.parentDefense.forceOutcome
+    window.__balance.parentDefense.forceOutcome = 'driveOff'
     // A short strike reach, so the ambush fires only once the calf is IN the
     // channel and its parent, which entered ahead of it, is well out ahead.
     window.__balance.crocodile.strikeRadius = 1.6
@@ -361,6 +363,8 @@ if (section('crossing-turned-back')) {
         survivorsOnBank: survivors.every((a) => !wet(a)),
         survivors: survivors.length,
         parentAlive: !s.parent.dead,
+        // What ended the parent, and when relative to the seizure, so a red names its killer.
+        parentDeath: s.parent.dead ? { cause: s.parent.deathCause ?? null, at: (() => { const k = rec.findIndex((r) => r.parent.dead); return k < 0 ? null : +(rec[k].t - (after[0]?.t ?? 0)).toFixed(2) })(), p: (() => { const k = rec.findIndex((r) => r.parent.dead); return k < 0 ? null : +rec[k].parent.p.toFixed(2) })() } : null,
         calfAlive: !s.calf.dead,
       }
     })
@@ -389,7 +393,7 @@ if (section('crossing-turned-back')) {
     const prev = window.__crossPrev
     if (prev) {
       window.__balance.family.adoptionRadius = prev.adoption
-      window.__balance.parentDefense.predatorFlight.crocodile = prev.croc
+      window.__balance.parentDefense.forceOutcome = prev.force
       window.__balance.crocodile.strikeRadius = prev.strike
     }
     if (window.__crossPrevDrift !== undefined) window.__balance.currentDrift = window.__crossPrevDrift
