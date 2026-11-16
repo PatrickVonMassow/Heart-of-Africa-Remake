@@ -62,6 +62,9 @@ describe('impact: one shape, ring on water, puff on ground', () => {
     expect(impactFlag(dropArrival(WITH_BANK, 40, 2), 0)).toBe(1)
     expect(impactFlag(dropArrival(WITH_BANK, 2, 2), 0)).toBe(0)
     expect(impactFlag(dropArrival(WITH_BANK, 2, 2), 1)).toBe(-1)
+    // covered water: a roof over the bank water blooms no ring either
+    expect(impactFlag(dropArrival(WITH_BANK, 40, 2), 1)).toBe(-1)
+    expect(impactFlag({ y: 0, water: 1 }, ROOF_COVER)).toBe(-1)
     // a tree crown lets the rain through: it still splashes under one
     expect(balance.rain.crownCover).toBeLessThan(ROOF_COVER)
     expect(impactFlag(dropArrival(FLAT, 2, 2), balance.rain.crownCover)).toBe(0)

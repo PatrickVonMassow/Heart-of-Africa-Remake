@@ -34,11 +34,11 @@ export const ROOF_COVER = 0.9
 
 /**
  * The spot's impact flag the shader reads: 1 a ring (water), 0 a puff
- * (ground), −1 none — the drop came down through a roof onto a dry floor.
+ * (ground), −1 none — the drop came down through a roof (water or not).
  */
 export function impactFlag(arrival: DropArrival, roofCover: number): -1 | 0 | 1 {
-  if (arrival.water) return 1
-  return roofCover >= ROOF_COVER ? -1 : 0
+  if (roofCover >= ROOF_COVER) return -1
+  return arrival.water ? 1 : 0
 }
 
 /** The drop's world coordinate on one axis: its base tiled by `period`,
