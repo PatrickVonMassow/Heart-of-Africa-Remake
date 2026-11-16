@@ -19,17 +19,14 @@ import {
   time,
   uniform,
   uv,
-  vec2,
   vec3,
   vec4,
 } from 'three/tsl'
 import { balance } from '../../config/balance'
 
-type FloatNode = ReturnType<typeof float>
-
 // The column rises from the ground under each drop, so it is 1.5 m (the eye
-// height) taller than the old eye-based 15 m one, with 10 % more drops: the
-// sky above the eye keeps the old 700 drops over the same 15 m span.
+// height) taller than the old eye-based 15 m one. RAIN_COUNT is the low
+// preset's count (and the tests' default); a preset's `rainDrops` sets it.
 export const RAIN_COUNT = 770
 export const RAIN_RADIUS = 16 // a tight column around the head, not the travel 55
 export const RAIN_HEIGHT = 16.5 // from the ground under each drop upward
@@ -37,7 +34,6 @@ export const RAIN_FALL_SPEED = 22
 const STREAK_WIDTH = 0.02
 const STREAK_LENGTH = balance.rain.dropLengthM
 const RAIN_COLOR: [number, number, number] = [0.66, 0.72, 0.8]
-const PUFF_COLOR: [number, number, number] = [0.55, 0.47, 0.37] // splashed wet earth
 const RING_LIFT = 0.012 // the ring sits just above the water, never inside it
 
 /** Two crossed slim quads with the lower tip at y = 0, so a streak reads from
@@ -71,16 +67,16 @@ export type RainUniforms = ReturnType<typeof createRainUniforms>
 
 /** The per-drop spot attribute (x, arrival y, z, water flag), shared by the
  *  drops and their impacts. */
-function createRainSpots(): THREE.InstancedBufferAttribute {
-  const a = new THREE.InstancedBufferAttribute(new Float32Array(RAIN_COUNT * 4), 4)
+function createRainSpots(count: number): THREE.InstancedBufferAttribute {
+  const a = new THREE.InstancedBufferAttribute(new Float32Array(count * 4), 4)
   a.setUsage(THREE.DynamicDrawUsage)
   return a
 }
 
 /** Drop and impact materials and geometries over one fresh spot buffer (so a
  *  rebuild disposes its own buffer only); `lit` is the quality lever. */
-export function buildRainMaterials(uniforms: RainUniforms, lit: boolean) {
-  const spots = createRainSpots()
+export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count = RAIN_COUNT) {
+  const spots = createRainSpots(count)
   const spot = attribute('rainSpot', 'vec4') as unknown as ReturnType<typeof vec4>
   const i = instanceIndex.toFloat()
   const phase = hash(i.mul(3))
@@ -125,35 +121,40 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean) {
   const dg = crossedStreak()
   dg.setAttribute('rainSpot', spots)
 
-  // The impact: ONE quad, parameterised by the water flag — flat and ringed
-  // on water, a standing soft puff (turned to the eye) on ground.
+  // The impact: ONE flat ring just above the surface, tinted by the water flag
+  // — pale on water, dark wet earth on ground (a faint crown, never a bright
+  // disc); it shrinks to a few pixels and fades out near the eye
+  // (rainTouch.ts impactSizeScale, dropNearFade).
   const im = new THREE.MeshBasicNodeMaterial()
   im.transparent = true
   im.depthWrite = false
   im.side = THREE.DoubleSide
   im.fog = false
-  // w: 1 ring (water), 0 puff (ground), −1 none (under a roof).
+  // w: 1 water ring, 0 ground crown, −1 none (under a roof).
   const water = spot.w.max(0)
   const splashes = spot.w.greaterThanEqual(0).select(float(1), float(0))
   const age = float(RAIN_HEIGHT).sub(fall).div(RAIN_FALL_SPEED)
   const life = balance.rain.impactLife
   const t = age.div(life).clamp(0, 1)
-  const radius = t.mul(0.75).add(0.25).mul(balance.rain.impactRadiusM)
-  const toEye = vec2(cameraPosition.x.sub(spot.x), cameraPosition.z.sub(spot.z))
-  // (the tiny x bias keeps it finite with the eye straight above the spot)
-  const right = normalize(vec3(toEye.y.add(1e-4), float(0), toEye.x.negate()))
+  const eyeDist = vec3(spot.x, spot.y, spot.z).sub(cameraPosition).length()
+  const impactFit = float(2 * balance.rain.impactRadiusM).div(
+    uniforms.tanHalfFov.mul(2 * balance.rain.impactMaxFrameFraction),
+  )
+  const sizeCap = eyeDist.div(impactFit).clamp(0, 1)
+  const radius = t.mul(0.75).add(0.25).mul(balance.rain.impactRadiusM).mul(sizeCap)
   const p = positionLocal // a unit quad in x/y, [-1, 1]
-  const flat = vec3(p.x, float(0), p.y)
-  const puff = right.mul(p.x).add(vec3(0, p.y.add(1).mul(0.6), 0))
-  const shapeOffset = mix(puff, flat, water).mul(radius)
-  im.positionNode = vec3(spot.x, spot.y.add(water.mul(RING_LIFT)), spot.z).add(shapeOffset)
+  im.positionNode = vec3(spot.x, spot.y.add(RING_LIFT), spot.z).add(vec3(p.x, float(0), p.y).mul(radius))
   const d = uv().sub(0.5).length().mul(2)
   const ring = smoothstep(float(0.6), float(0.82), d).mul(smoothstep(float(1), float(0.84), d))
-  const disc = smoothstep(float(1), float(0.15), d)
-  const shape = mix(disc, ring, water) as unknown as FloatNode
+  const eyeFade = smoothstep(float(balance.rain.impactNearFadeM), float(balance.rain.impactNearFullM), eyeDist)
   const fade = float(1).sub(t).pow(2).mul(age.lessThan(life).select(float(1), float(0))).mul(splashes)
-  im.colorNode = mix(vec3(...PUFF_COLOR), rainCol, water).mul(uniforms.light)
-  im.opacityNode = shape.mul(fade).mul(edgeFade).mul(uniforms.opacity).mul(balance.rain.impactOpacity)
+  im.colorNode = mix(vec3(...balance.rain.impactGroundColor), rainCol.mul(0.7), water).mul(uniforms.light)
+  im.opacityNode = ring
+    .mul(fade)
+    .mul(eyeFade)
+    .mul(edgeFade)
+    .mul(uniforms.opacity)
+    .mul(balance.rain.impactOpacity)
   const ig = new THREE.PlaneGeometry(2, 2)
   ig.setAttribute('rainSpot', spots)
   return { spots, dropMaterial: dm, dropGeometry: dg, impactMaterial: im, impactGeometry: ig }

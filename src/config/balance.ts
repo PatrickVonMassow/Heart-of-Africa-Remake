@@ -1027,6 +1027,17 @@ interface BalanceConfig {
     dropWidthCapM: number
     /** Peak opacity of one streak (low: rain reads as many faint threads). */
     dropOpacity: number
+    /** Share of the preset's drops drawn at the faintest rain; it climbs to all
+     *  of them at full rain (`rainAmount` 1), so light rain stays sparse. */
+    dropDensityMinFraction: number
+    /** Largest projected impact diameter as a fraction of the frame height. */
+    impactMaxFrameFraction: number
+    /** Eye distance (m) at and inside which an impact is fully faded out. */
+    impactNearFadeM: number
+    /** Eye distance (m) at and beyond which an impact is at full strength. */
+    impactNearFullM: number
+    /** Linear colour of a ground impact's crown: wet earth, near the ground's own. */
+    impactGroundColor: [number, number, number]
   }
   /** The village cooking fire's response to rain (design.md §19.10, point 256). */
   fire: {
@@ -2296,9 +2307,10 @@ export const balance: BalanceConfig = {
     fabricDarken: 0.22, // "slightly" darker — less than the ground's 0.4
     fabricGloss: 0.5, // thatch 0.95 → ~0.48 soaked: the fire catches it
     impactLife: 0.3,
-    impactRadiusM: 0.16,
-    impactOpacity: 0.55,
-    dropSkyVisibility: 0.25, // nearly vanishing against the bright sky
+    // A faint, dark crown, never a bright disc (owner picture check).
+    impactRadiusM: 0.08,
+    impactOpacity: 0.3,
+    dropSkyVisibility: 0.5, // fainter against the bright sky, but still a veil
     dropSunGlint: 1.4,
     dropVariation: 0.45,
     // A near streak read as a post (owner picture check). 0.35 m ≈ the blur of a
@@ -2310,6 +2322,11 @@ export const balance: BalanceConfig = {
     dropNearFadeM: 1.5,
     dropWidthCapM: 6, // 2 cm wide: ≤ ~3 px at 900 px
     dropOpacity: 0.45,
+    dropDensityMinFraction: 0.25,
+    impactMaxFrameFraction: 10 / 900, // a 10 px crown at most on a 900 px frame
+    impactNearFadeM: 1,
+    impactNearFullM: 3,
+    impactGroundColor: [0.09, 0.07, 0.05], // linear: a dark wet-earth tint
   },
   fire: {
     // The cooking fire keeps burning through the rains under its thatch cook-shelter

@@ -1111,7 +1111,7 @@ Verifiable (`scripts/verify/settings.mjs`,
   `src/render/seasonTint.test.ts`). Each drop holds a fixed world x/z tiled
   by the column and ends on the footing sampler's ground — or the river's
   water surface — under it, never the column's edge; its impact (one quad:
-  ring on water, puff on ground, none on a roofed floor) replays the fall in
+  faint ring, pale on water, dark on ground, none on a roofed floor) replays the fall in
   the shader (`src/scenes/place/rainTouch.test.ts`). Lit drops (sun/view
   angle, per-drop spread) and impacts are the medium/high levers
   `rainLitDrops`/`rainImpacts`; low keeps the plain streak. Both materials

@@ -479,6 +479,7 @@ export const effectiveWalkerDustPuffs = (s: UiState): number => currentQuality(s
 /** Settlement rain impacts and lit drops (design.md §19.13). */
 export const effectiveRainImpacts = (s: UiState): number => currentQuality(s).rainImpacts
 export const effectiveRainLitDrops = (s: UiState): boolean => currentQuality(s).rainLitDrops
+export const effectiveRainDrops = (s: UiState): number => currentQuality(s).rainDrops
 /** First-person eye adaptation at this level (design.md §2.7); the consumer
  *  additionally limits it to the settlement scene. */
 export const effectiveEyeAdaptation = (s: UiState): boolean => currentQuality(s).eyeAdaptation

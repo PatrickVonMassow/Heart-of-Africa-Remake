@@ -1,6 +1,6 @@
 // Settlement rain that touches the world (design.md §19.13): drops end on the
 // surface under their own x/z, never at the column's lower edge, and their
-// impact is one shape — a ring on water, a puff on ground.
+// impact is one shape — a faint ring, water- or earth-tinted.
 import { describe, expect, it } from 'vitest'
 import { placeGroundHeight, type PlaceGround } from './placeGround'
 import { BANK_WATER_DROP, bankGroundHeight, type PlaceRiverBank } from './riverBank'
@@ -11,6 +11,10 @@ import {
   dropLengthScale,
   dropNearFade,
   dropWidthScale,
+  impactSizeScale,
+  rainDropCount,
+  createRainSpotState,
+  stepRainSpots,
   streakFitDistance,
   streakFrameFraction,
   impactAge,
@@ -165,5 +169,89 @@ describe('a drop near the eye shortens, thins and fades out (no streak reads as 
       expect(dropWidthScale(d, cap) / d).toBeLessThanOrEqual(1 / cap + 1e-9)
     }
     expect(balance.rain.dropOpacity).toBeLessThanOrEqual(0.5)
+  })
+})
+
+describe('heavy rain is a dense veil, light rain stays sparse', () => {
+  const min = balance.rain.dropDensityMinFraction
+  it('draws the minimum share at the faintest rain, all at full rain, monotone between', () => {
+    expect(min).toBeGreaterThan(0)
+    expect(min).toBeLessThan(1)
+    expect(rainDropCount(3300, 0, min)).toBe(Math.round(3300 * min))
+    expect(rainDropCount(3300, 1, min)).toBe(3300)
+    expect(rainDropCount(3300, 2, min)).toBe(3300)
+    let prev = 0
+    for (let a = 0; a <= 1; a += 0.05) {
+      const n = rainDropCount(3300, a, min)
+      expect(n).toBeGreaterThanOrEqual(prev)
+      prev = n
+    }
+  })
+})
+
+describe('an impact is a small crown that fades out near the eye', () => {
+  const { impactRadiusM: r, impactMaxFrameFraction: frac, impactNearFadeM: near, impactNearFullM: full } = balance.rain
+  const tanHalfFov = Math.tan((25 * Math.PI) / 180)
+  it('never projects wider than its frame fraction (≤ ~10 px of 900) at any distance', () => {
+    for (let d = 0.2; d <= 40; d += 0.1) {
+      const px = streakFrameFraction(2 * r * impactSizeScale(d, r, tanHalfFov, frac), d, tanHalfFov) * 900
+      expect(px).toBeLessThanOrEqual(frac * 900 + 1e-6)
+    }
+    expect(frac * 900).toBeLessThanOrEqual(12)
+  })
+  it('fades 0 inside the near distance, 1 beyond the full one, monotone between', () => {
+    expect(full).toBeGreaterThan(near)
+    expect(dropNearFade(near, near, full)).toBe(0)
+    expect(dropNearFade(full, near, full)).toBe(1)
+    let prev = 0
+    for (let d = near; d <= full; d += 0.05) {
+      const f = dropNearFade(d, near, full)
+      expect(f).toBeGreaterThanOrEqual(prev)
+      prev = f
+    }
+  })
+  it('is tinted dark like wet earth, never a pale disc', () => {
+    const [cr, cg, cb] = balance.rain.impactGroundColor
+    expect(Math.max(cr, cg, cb)).toBeLessThanOrEqual(0.15) // linear
+    expect(balance.rain.impactOpacity).toBeLessThanOrEqual(0.35)
+  })
+})
+
+describe('arrival sampling is spread over the frames, never a once-a-second spike', () => {
+  const n = 800
+  const bases = dropBases(n, RAIN_RADIUS)
+  const period = RAIN_RADIUS * 2
+  it('samples all drops on a fresh start, then only wraps plus a rolling share', () => {
+    const st = createRainSpotState(n)
+    const spots = new Float32Array(n * 4)
+    let calls = 0
+    const sample = (x: number, z: number) => {
+      calls++
+      return { y: x * 0 + z * 0 + 0.5, flag: 0 }
+    }
+    stepRainSpots(st, spots, bases, n, 0, 0, period, 1 / 60, 2, sample)
+    expect(calls).toBe(n)
+    for (let k = 0; k < n; k++) expect(spots[k * 4 + 1]).toBe(0.5)
+    let worst = 0
+    for (let f = 1; f <= 240; f++) {
+      calls = 0
+      stepRainSpots(st, spots, bases, n, 0, 0, period, 1 / 60, 2, sample)
+      worst = Math.max(worst, calls)
+    }
+    expect(worst).toBe(Math.ceil((n * (1 / 60)) / 2)) // a still eye: the rolling share only
+  })
+  it('re-reads every drop within the refresh period and keeps each spot at its wrapped tile', () => {
+    const st = createRainSpotState(n)
+    const spots = new Float32Array(n * 4)
+    let h = 0
+    const sample = () => ({ y: h, flag: 0 })
+    stepRainSpots(st, spots, bases, n, 3, -2, period, 1 / 60, 2, sample)
+    h = 1
+    for (let f = 0; f < 120; f++) stepRainSpots(st, spots, bases, n, 3, -2, period, 1 / 60, 2, sample)
+    for (let k = 0; k < n; k++) {
+      expect(spots[k * 4 + 1]).toBe(1)
+      expect(spots[k * 4]).toBeCloseTo(wrapToColumn(bases[k * 2], 3, period), 4)
+      expect(spots[k * 4 + 2]).toBeCloseTo(wrapToColumn(bases[k * 2 + 1], -2, period), 4)
+    }
   })
 })

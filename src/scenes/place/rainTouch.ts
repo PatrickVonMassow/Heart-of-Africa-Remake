@@ -4,7 +4,7 @@
 // when it wraps across the column's edge, where its opacity is already zero.
 // Its fall ends on the surface under that x/z — the settlement ground the
 // footing reads, or the river's water — and that end is where its impact (one
-// shape: a ring on water, a puff on dust) blooms. The shader replays the same
+// shape: a faint ring, water-tinted on water, earth-tinted on ground) blooms. The shader replays the same
 // fall from the drop's index and time; `dropFall`/`impactAge` are its mirror.
 
 import { BANK_WATER_DROP, bankWaterDepth } from './riverBank'
@@ -14,7 +14,7 @@ import { placeGroundHeight, type PlaceGround } from './placeGround'
 export interface DropArrival {
   /** World y of the surface the drop ends on. */
   y: number
-  /** 1 on the river's water (the impact is a ring), 0 on ground (a puff). */
+  /** 1 on the river's water (a water-tinted ring), 0 on ground (an earth-tinted crown). */
   water: 0 | 1
 }
 
@@ -33,8 +33,8 @@ export function dropArrival(ground: PlaceGround, x: number, z: number): DropArri
 export const ROOF_COVER = 0.9
 
 /**
- * The spot's impact flag the shader reads: 1 a ring (water), 0 a puff
- * (ground), −1 none — the drop came down through a roof (water or not).
+ * The spot's impact flag the shader reads: 1 a water ring, 0 a ground
+ * crown, −1 none — the drop came down through a roof (water or not).
  */
 export function impactFlag(arrival: DropArrival, roofCover: number): -1 | 0 | 1 {
   if (roofCover >= ROOF_COVER) return -1
@@ -75,7 +75,7 @@ export function impactAge(phase: number, time: number, height: number, speed: nu
 }
 
 /** The one impact shape at age `age` of `life`: an expanding radius and a
- *  fading alpha; `water` only chooses ring vs filled puff in the shader. */
+ *  fading alpha; `water` only chooses the ring's tint in the shader. */
 export function impactShape(age: number, life: number, radius: number): { radius: number; alpha: number } {
   const t = Math.min(1, Math.max(0, age / life))
   return { radius: radius * (0.25 + 0.75 * t), alpha: age < life ? (1 - t) * (1 - t) : 0 }
@@ -113,4 +113,85 @@ export function dropNearFade(d: number, near: number, far: number): number {
  *  `cap`. The shader's `clamp(d / cap, 0.05, 1)` (the floor keeps it finite). */
 export function dropWidthScale(d: number, cap: number): number {
   return Math.min(1, Math.max(0.05, d / cap))
+}
+
+/** Drops drawn at rain amount `amount` (0..1) of the preset's `total`: from
+ *  `minFraction` of them at the faintest rain to all at full rain, linearly,
+ *  so light rain stays sparse and heavy rain is a dense veil. */
+export function rainDropCount(total: number, amount: number, minFraction: number): number {
+  const a = Math.min(1, Math.max(0, amount))
+  return Math.min(total, Math.max(0, Math.round(total * (minFraction + (1 - minFraction) * a))))
+}
+
+/** An impact's size factor by eye distance `d`: its projected diameter never
+ *  exceeds `maxFraction` of the frame height (the streak's length cap, applied
+ *  to the diameter 2·radius). */
+export function impactSizeScale(d: number, radius: number, tanHalfFov: number, maxFraction: number): number {
+  return dropLengthScale(d, streakFitDistance(2 * radius, tanHalfFov, maxFraction))
+}
+
+/** The CPU side of the drops' arrivals, kept across frames. */
+export interface RainSpotState {
+  /** Each drop's current column tile (x, z); an impossible value forces a sample. */
+  tiles: Int32Array
+  /** Next drop the rolling refresh re-samples. */
+  cursor: number
+  /** False after a fresh start: every drawn drop is sampled once. */
+  live: boolean
+}
+
+export function createRainSpotState(count: number): RainSpotState {
+  return { tiles: new Int32Array(count * 2).fill(-0x7fffffff), cursor: 0, live: false }
+}
+
+/**
+ * One frame of arrival sampling into `spots` (x, arrival y, z, impact flag per
+ * drop). A drop is sampled when it wraps to a new tile; on top, a rolling
+ * refresh re-samples `drawn · dt / refreshS` drops per frame, so every drop is
+ * re-read once per `refreshS` (growing dig spoil is followed) without a
+ * once-a-second spike. Returns whether any spot changed.
+ */
+export function stepRainSpots(
+  st: RainSpotState,
+  spots: Float32Array,
+  bases: Float32Array,
+  drawn: number,
+  eyeX: number,
+  eyeZ: number,
+  period: number,
+  dt: number,
+  refreshS: number,
+  sample: (x: number, z: number) => { y: number; flag: number },
+): boolean {
+  const tiles = st.tiles
+  const all = !st.live
+  st.live = true
+  let dirty = false
+  const put = (k: number, x: number, z: number) => {
+    const s = sample(x, z)
+    spots[k * 4] = x
+    spots[k * 4 + 1] = s.y
+    spots[k * 4 + 2] = z
+    spots[k * 4 + 3] = s.flag
+    dirty = true
+  }
+  for (let k = 0; k < drawn; k++) {
+    const bx = bases[k * 2]
+    const bz = bases[k * 2 + 1]
+    const tx = Math.round((eyeX - bx) / period)
+    const tz = Math.round((eyeZ - bz) / period)
+    if (!all && tiles[k * 2] === tx && tiles[k * 2 + 1] === tz) continue
+    tiles[k * 2] = tx
+    tiles[k * 2 + 1] = tz
+    put(k, bx + period * tx, bz + period * tz)
+  }
+  if (!all && drawn > 0) {
+    const n = Math.min(drawn, Math.ceil((drawn * Math.max(0, dt)) / refreshS))
+    for (let i = 0; i < n; i++) {
+      const k = st.cursor % drawn
+      st.cursor = k + 1
+      put(k, bases[k * 2] + period * tiles[k * 2], bases[k * 2 + 1] + period * tiles[k * 2 + 1])
+    }
+  }
+  return dirty
 }

@@ -25,30 +25,35 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { useSceneSun } from '../../render/sceneSun'
-import { effectiveRainImpacts, effectiveRainLitDrops, useUi } from '../../state/ui'
+import { effectiveRainDrops, effectiveRainImpacts, effectiveRainLitDrops, useUi } from '../../state/ui'
 import { rainAmount, sunDimFactor } from '../../systems/season'
 import { PlaceGroundContext } from './PlaceGroundContext'
-import { buildRainMaterials, createRainUniforms, RAIN_COUNT, RAIN_RADIUS } from './rainMaterials'
+import { buildRainMaterials, createRainUniforms, RAIN_RADIUS } from './rainMaterials'
 import { shelterCoverAt } from '../../render/shelterWetness'
-import { dropArrival, dropBases, impactFlag, wrapToColumn } from './rainTouch'
+import { createRainSpotState, dropArrival, dropBases, impactFlag, rainDropCount, stepRainSpots } from './rainTouch'
 
-/** Seconds between full arrival refreshes (dig spoil grows under the rain). */
-const ARRIVAL_REFRESH_S = 1
+/** Seconds over which a rolling refresh re-reads every arrival (dig spoil grows
+ *  slowly under the rain); spread over the frames, never one spike. */
+const ARRIVAL_REFRESH_S = 2
 
 export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number> }) {
   const ground = useContext(PlaceGroundContext)
   const sun = useSceneSun()
   const lit = useUi(effectiveRainLitDrops)
-  const impacts = Math.min(RAIN_COUNT, Math.max(0, useUi(effectiveRainImpacts)))
+  // The preset's drop count at full rain; fewer are drawn in lighter rain.
+  const count = Math.max(1, Math.round(useUi(effectiveRainDrops)))
+  const impacts = Math.min(count, Math.max(0, useUi(effectiveRainImpacts)))
   const group = useRef<THREE.Group>(null)
-  const state = useRef({ refreshIn: 0, live: false, tiles: new Int32Array(RAIN_COUNT * 2) })
+  const dropMesh = useRef<THREE.InstancedMesh>(null)
+  const impactMesh = useRef<THREE.InstancedMesh>(null)
+  const state = useRef(createRainSpotState(0))
 
-  const bases = useMemo(() => dropBases(RAIN_COUNT, RAIN_RADIUS), [])
+  const bases = useMemo(() => dropBases(count, RAIN_RADIUS), [count])
   const uniforms = useMemo(createRainUniforms, [])
   // `spots`: per-drop world spot (x, arrival y, z, water flag), shared by drops and impacts.
   const { spots, dropMaterial, dropGeometry, impactMaterial, impactGeometry } = useMemo(
-    () => buildRainMaterials(uniforms, lit),
-    [lit, uniforms],
+    () => buildRainMaterials(uniforms, lit, count),
+    [lit, uniforms, count],
   )
 
   useEffect(
@@ -64,59 +69,49 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
   // A new ground record (place change, dig layout) or a fresh spot buffer
   // re-samples every arrival.
   useEffect(() => {
-    state.current.live = false
-  }, [ground, spots])
+    state.current = createRainSpotState(count)
+  }, [ground, spots, count])
+  const sample = useMemo(
+    () => (x: number, z: number) => {
+      const arrival = dropArrival(ground, x, z)
+      return { y: arrival.y, flag: impactFlag(arrival, shelterCoverAt(x, z)) }
+    },
+    [ground],
+  )
 
   useFrame(({ camera }, dt) => {
     const target = rainAmount(wetness.current, balance.season.weatherStrength)
     uniforms.opacity.value += (target - uniforms.opacity.value) * Math.min(1, dt * 1.5)
     const on = uniforms.opacity.value > 0.01
     if (group.current) group.current.visible = on
-    if (!on) {
-      state.current.live = false
-      return
-    }
+    // Off, the sampled arrivals stay valid (a new ground resets them).
+    if (!on) return
     uniforms.eye.value.set(camera.position.x, camera.position.z)
     uniforms.sun.value.set(sun.light[0], sun.light[1], sun.light[2]).normalize()
     uniforms.light.value = sunDimFactor(wetness.current, balance.season.weatherStrength)
     if (camera instanceof THREE.PerspectiveCamera) {
       uniforms.tanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
     }
-    // Arrivals: a drop is re-sampled when it wraps to a new tile, and all of
-    // them once a second (or on a fresh start) so growing spoil is followed.
+    // Density follows the rain: the drawn prefix of the (uniformly scattered)
+    // drops grows with the rain amount; impacts stay within it.
+    const drawn = rainDropCount(count, uniforms.opacity.value, balance.rain.dropDensityMinFraction)
+    if (dropMesh.current) dropMesh.current.count = drawn
+    if (impactMesh.current) impactMesh.current.count = Math.min(impacts, drawn)
+    // Arrivals: sampled when a drop wraps to a new tile, plus a rolling refresh.
     const st = state.current
-    st.refreshIn -= dt
-    const all = !st.live || st.refreshIn <= 0
-    if (all) st.refreshIn = ARRIVAL_REFRESH_S
-    st.live = true
+    if (st.tiles.length < drawn * 2) return // the reset effect has not run yet
     const a = spots.array as Float32Array
-    const period = RAIN_RADIUS * 2
-    let dirty = false
-    const tiles = st.tiles
-    for (let k = 0; k < RAIN_COUNT; k++) {
-      const x = wrapToColumn(bases[k * 2], camera.position.x, period)
-      const z = wrapToColumn(bases[k * 2 + 1], camera.position.z, period)
-      const tx = Math.round((x - bases[k * 2]) / period)
-      const tz = Math.round((z - bases[k * 2 + 1]) / period)
-      if (!all && tiles[k * 2] === tx && tiles[k * 2 + 1] === tz) continue
-      tiles[k * 2] = tx
-      tiles[k * 2 + 1] = tz
-      const arrival = dropArrival(ground, x, z)
-      a[k * 4] = x
-      a[k * 4 + 1] = arrival.y
-      a[k * 4 + 2] = z
-      a[k * 4 + 3] = impactFlag(arrival, shelterCoverAt(x, z))
-      dirty = true
-    }
+    const dirty = stepRainSpots(st, a, bases, drawn, camera.position.x, camera.position.z, RAIN_RADIUS * 2, dt, ARRIVAL_REFRESH_S, sample)
     if (dirty) spots.needsUpdate = true
   })
 
   return (
     <group ref={group} name="place-rain">
-      <instancedMesh args={[dropGeometry, dropMaterial, RAIN_COUNT]} frustumCulled={false} />
+      <instancedMesh ref={dropMesh} args={[dropGeometry, dropMaterial, count]} frustumCulled={false} />
       {impacts > 0 && (
         <instancedMesh
           key={impacts}
+          ref={impactMesh}
           name="place-rain-impacts"
           args={[impactGeometry, impactMaterial, impacts]}
           frustumCulled={false}
