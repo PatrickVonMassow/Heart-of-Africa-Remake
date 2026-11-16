@@ -9,6 +9,7 @@
 
 import { BANK_WATER_DROP, bankWaterDepth } from './riverBank'
 import { placeGroundHeight, type PlaceGround } from './placeGround'
+import { balance } from '../../config/balance'
 
 /** Where a drop's fall ends and what it lands in. */
 export interface DropArrival {
@@ -123,10 +124,6 @@ export function rainDropCount(total: number, amount: number, minFraction: number
   return Math.min(total, Math.max(0, Math.round(total * (minFraction + (1 - minFraction) * a))))
 }
 
-/** An impact's size factor by eye distance `d`: its projected diameter never
- *  exceeds `maxFraction` of the frame height (the streak's length cap, applied
- *  to the diameter 2·radius). */
-
 /** The CPU side of the drops' arrivals, kept across frames. */
 export interface RainSpotState {
   /** Each drop's current column tile (x, z); an impossible value forces a sample. */
@@ -228,7 +225,6 @@ export function projectPoint(cam: StreakCamera, p: readonly [number, number, num
 export function screenFraction(a: readonly [number, number, number], b: readonly [number, number, number], aspect: number): number {
   return Math.hypot((b[0] - a[0]) * aspect, b[1] - a[1]) / 2
 }
-
 
 /** A world point in clip-like coordinates (X, Y, W): linear in the point, so
  *  NDC = (X/W, Y/W) and W is the view depth — the shader's clip position. */

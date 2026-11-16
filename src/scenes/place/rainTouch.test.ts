@@ -196,12 +196,41 @@ describe('heavy rain is a dense veil, light rain stays sparse', () => {
 describe('an impact is a small crown that fades out near the eye', () => {
   const { impactRadiusM: r, impactMaxFrameFraction: frac, impactNearFadeM: near, impactNearFullM: full } = balance.rain
   const tanHalfFov = Math.tan((25 * Math.PI) / 180)
-  it('never projects wider than its frame fraction (≤ ~10 px of 900) at any distance', () => {
-    for (let d = 0.2; d <= 40; d += 0.1) {
-      const px = streakFrameFraction(2 * r * impactSizeScale(d, r, tanHalfFov, frac), d, tanHalfFov) * 900
-      expect(px).toBeLessThanOrEqual(frac * 900 + 1e-6)
+  it('never projects wider than its frame fraction (≤ ~10 px of 900), off-axis and pitched', () => {
+    // A flat ring on the ground and on raised surfaces, projected point by
+    // point: its widest screen chord stays within the cap at every pitch,
+    // heading and position, the frame's corners included.
+    let worst = 0
+    let capped = 0
+    for (const pitch of [-0.6, -0.25, 0, 0.3]) {
+      for (const yaw of [0, 1.3]) {
+        const cam: StreakCamera = { eye: [0, 1.6, 0], yaw, pitch, tanHalfFov, aspect: 1440 / 900 }
+        for (let i = -20; i <= 20; i++) {
+          for (let j = -20; j <= 20; j++) {
+            for (const y of [0, 0.8, 1.4]) {
+              const c: [number, number, number] = [i * 0.3, y, j * 0.3]
+              const s = impactSizeScale(cam, c, r, frac)
+              if (s === 0) continue
+              if (s < 1) capped++
+              const ring = Array.from({ length: 32 }, (_, k) => {
+                const a = (k / 32) * 2 * Math.PI
+                return projectPoint(cam, [c[0] + Math.cos(a) * r * s, y, c[2] + Math.sin(a) * r * s])
+              })
+              if (ring.some((q) => q[2] <= 0)) continue
+              for (let k = 0; k < 16; k++) worst = Math.max(worst, screenFraction(ring[k], ring[k + 16], cam.aspect) * 900)
+            }
+          }
+        }
+      }
     }
+    expect(capped).toBeGreaterThan(0)
+    expect(worst).toBeLessThanOrEqual(frac * 900 * 1.02)
     expect(frac * 900).toBeLessThanOrEqual(12)
+  })
+  it('draws no impact whose centre lies behind or at the eye', () => {
+    const cam: StreakCamera = { eye: [0, 1.6, 0], yaw: 0, pitch: 0, tanHalfFov, aspect: 1440 / 900 }
+    expect(impactSizeScale(cam, [0, 0, 0.5], r, frac)).toBe(0)
+    expect(impactSizeScale(cam, [0, 0, -30], r, frac)).toBe(1)
   })
   it('fades 0 inside the near distance, 1 beyond the full one, monotone between', () => {
     expect(full).toBeGreaterThan(near)
