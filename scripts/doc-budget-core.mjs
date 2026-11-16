@@ -538,10 +538,7 @@ export const DOC_BUDGETS = [
     // RAISED by the 148 measured words of Abu Simbel (point 379): a ninth built
     // landmark in the §4.4 list with its 1890 state, and the enterable,
     // discovery-gated monument site — a genuine addition the point orders here.
-    // RAISED by 31 measured words (81 new, 50 absorbed by the existing headroom)
-    // for the §2.5 horizon-neighbour rule (point 380): the panorama now shows the
-    // settlements and monuments within sight, which the section did not describe.
-    maxWords: 31223,
+    maxWords: 31192,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
