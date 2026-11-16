@@ -14782,7 +14782,7 @@ to land than a mechanism that needs a review.
 - [ ] 1527. Herds never start a water crossing on their own
   Measured 16.11.2026: `roamCrossing` / `balance.waterCross.chance` (`src/scenes/travel/wildlifeBehavior.ts`, point 192) has no caller in the game; `crossingTarget` is reached only from the staged path in `src/scenes/travel/Wildlife.tsx`. The family crossing of point 362 therefore occurs only when `scripts/verify/wildlife.mjs` stages it.
   Player impact: a player never sees a herd swim a river, nor the crocodile take a calf mid-channel.
-  Final state: the roaming herd mover calls `roamCrossing` with the calibratable chance, so a herd near water crosses on its own and point 362's family crossing follows from it.
+  Final state: the roaming herd mover calls `roamCrossing` with the calibratable chance, so a herd near water crosses on its own; the start goes through 362's `startFamilyCrossing`, so a parent takes its calf and the mid-channel ambush can follow (cross review of 362, pass 5 P1).
   Test: a Vitest case that the herd mover starts a crossing at the configured chance near water and never far from it, plus one unstaged live wildlife frame of a herd in open water.
   Source: finding of the 362 session, 16.11.2026 01:24.
-  Bundle: unbundled.
+  Bundle: Tierverhalten.
