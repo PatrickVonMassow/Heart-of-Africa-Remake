@@ -14778,3 +14778,11 @@ to land than a mechanism that needs a review.
   Test: a Vitest case on the cattle geometry parameters, plus the kraal-cattle frames of polish-settlement on both backends.
   Source: picture check of the 359 session, 15.11.2026 21:34.
   Bundle: Dorfleben.
+
+- [ ] 1527. Herds never start a water crossing on their own
+  Measured 16.11.2026: `roamCrossing` / `balance.waterCross.chance` (`src/scenes/travel/wildlifeBehavior.ts`, point 192) has no caller in the game; `crossingTarget` is reached only from the staged path in `src/scenes/travel/Wildlife.tsx`. The family crossing of point 362 therefore occurs only when `scripts/verify/wildlife.mjs` stages it.
+  Player impact: a player never sees a herd swim a river, nor the crocodile take a calf mid-channel.
+  Final state: the roaming herd mover calls `roamCrossing` with the calibratable chance, so a herd near water crosses on its own and point 362's family crossing follows from it.
+  Test: a Vitest case that the herd mover starts a crossing at the configured chance near water and never far from it, plus one unstaged live wildlife frame of a herd in open water.
+  Source: finding of the 362 session, 16.11.2026 01:24.
+  Bundle: unbundled.
