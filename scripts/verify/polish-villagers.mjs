@@ -1244,6 +1244,38 @@ if (section('wedged-adults')) {
 // and put back): the claim is what a meeting does, not how often the dice fall.
 // The pure rules (partner choice, cooldown, the exactly-once handover) are
 // asserted in src/scenes/place/encounters.test.ts.
+// encounter-readings:start — pure readings of the encounter log, put into the
+// page below and unit-tested in polishVillageEncounters.test.mjs. Both run on
+// the LIFE clock (`sim`): the render clock `t` runs on through a frozen shutter.
+const encounterReadings = {
+  samePair: (x, a, b) => (x.a === a && x.b === b) || (x.a === b && x.b === a),
+  // The pair's LATEST meeting and the parting that followed it — never a
+  // parting of an earlier meeting of the same pair.
+  latestParting(log, a, b) {
+    const meet = [...log].reverse().find((x) => x.kind === 'meet' && this.samePair(x, a, b))
+    const part = meet && log.find((x) => x.kind === 'part' && x.sim >= meet.sim && this.samePair(x, a, b))
+    return meet && part ? { meet, part } : null
+  },
+  // Every meeting that outlasted `limit` seconds of life: a parted one by its
+  // span, an open one by the life time since its start, so a countdown that
+  // stalls while life runs on is caught.
+  late(e, limit) {
+    const late = []
+    const meets = e.log.filter((x) => x.kind === 'meet')
+    for (const m of meets) {
+      const part = e.log.find((x) => x.kind === 'part' && x.sim >= m.sim && this.samePair(x, m.a, m.b))
+      if (part && part.sim - m.sim > limit) late.push(`${m.a}/${m.b} ${(part.sim - m.sim).toFixed(2)} s`)
+    }
+    for (const m of e.meetings) {
+      const start = [...meets].reverse().find((x) => this.samePair(x, m.a, m.b))
+      if (!start) late.push(`open ${m.a}/${m.b} without a logged start`)
+      else if (e.lifeClock - start.sim > limit) late.push(`open ${m.a}/${m.b} for ${(e.lifeClock - start.sim).toFixed(2)} s`)
+      else if (m.remaining > m.total || m.remaining <= -0.05) late.push(`open ${m.a}/${m.b} remaining ${m.remaining.toFixed(2)}`)
+    }
+    return late
+  },
+}
+// encounter-readings:end
 if (section('villager-encounters')) {
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   await goToPlace('bambara-village')
@@ -1253,6 +1285,7 @@ if (section('villager-encounters')) {
     .catch(() => false)
   check('the village publishes its walkers\' encounters', live)
   if (live) {
+    await page.evaluate((src) => { window.__encounterReadings = new Function('return (' + src + ')')() }, `{ ${Object.entries(encounterReadings).map(([k, f]) => (k === 'samePair' ? `samePair: ${f}` : `${f}`)).join(',\n')} }`)
     const knob = await page.evaluate(() => {
       const e = window.__balance.villageLife.encounters
       const was = e.meetChance
@@ -1312,12 +1345,11 @@ if (section('villager-encounters')) {
           () => {
             const e = window.__placeWalkers.encounters()
             const [a, b] = window.__encounterPair
-            const part = e.log.find((x) => x.kind === 'part' && ((x.a === a && x.b === b) || (x.a === b && x.b === a)))
-            const meet = [...e.log].reverse().find((x) => x.kind === 'meet' && ((x.a === a && x.b === b) || (x.a === b && x.b === a)))
             // The window runs on the LIFE clock (`sim`), not the render clock
             // `t`: the shutter above froze life while `t` ran on, and a lane
             // under 10 fps caps every step at 0.1 s (PlaceLife.tsx, Walkers).
-            return part && meet ? { span: part.sim - meet.sim, clock: part.t - meet.t, arrivals: e.arrivals } : null
+            const r = window.__encounterReadings.latestParting(e.log, a, b)
+            return r ? { span: r.part.sim - r.meet.sim, clock: r.part.t - r.meet.t, arrivals: e.arrivals } : null
           },
           { frames: 1200, minMs: (knob.meetSeconds + 4) * 1000, wallCapMs: 60000 },
         ).catch(() => ({ value: null, frames: 0 }))
@@ -1347,13 +1379,7 @@ if (section('villager-encounters')) {
       // and every meeting still open is inside it.
       const audit = await page.evaluate((limit) => {
         const e = window.__placeWalkers.encounters()
-        const late = []
-        for (const m of e.log.filter((x) => x.kind === 'meet')) {
-          // Life clock, as above: the render clock runs on through a frozen shutter.
-          const part = e.log.find((x) => x.kind === 'part' && x.sim >= m.sim && x.a === m.a && x.b === m.b)
-          if (part && part.sim - m.sim > limit) late.push(`${m.a}/${m.b} ${(part.sim - m.sim).toFixed(2)} s`)
-        }
-        for (const m of e.meetings) if (m.remaining > m.total || m.remaining <= -0.05) late.push(`open ${m.a}/${m.b} remaining ${m.remaining.toFixed(2)}`)
+        const late = window.__encounterReadings.late(e, limit)
         return { late, meetings: e.log.filter((x) => x.kind === 'meet').length, handovers: e.log.filter((x) => x.kind === 'handover').length }
       }, knob.meetSeconds + 0.25)
       check('no walker is left standing past its meeting window', audit.late.length === 0, `${audit.meetings} meetings, ${audit.handovers} handovers; late: ${audit.late.join(', ') || 'none'}`)
