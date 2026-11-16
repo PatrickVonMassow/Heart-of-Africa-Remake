@@ -1116,7 +1116,9 @@ Verifiable (`scripts/verify/settings.mjs`,
   angle, per-drop spread) and impacts are the medium/high levers
   `rainLitDrops`/`rainImpacts`; low keeps the plain streak. Both materials
   generate on WebGPU and WebGL 2 (`src/scenes/place/rainMaterials.test.ts`).
-  Picture check owed: no browser run in the authoring session. OPEN: a drop
+  Picture-checked 16.11.2026 on WebGPU and WebGL 2 (polish-settlement
+  fire-rain, shelter-wetness, settlement-season, settlement-fabric green;
+  frames 114-village-rain, 348-*-rain, 353-shelter-wet-rain). OPEN: a drop
   still falls through a roof (only its impact is withheld there).
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item).
 The seasonal-dress reading the primitive figure could not show — a wrap
