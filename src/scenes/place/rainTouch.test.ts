@@ -4,7 +4,18 @@
 import { describe, expect, it } from 'vitest'
 import { placeGroundHeight, type PlaceGround } from './placeGround'
 import { BANK_WATER_DROP, bankGroundHeight, type PlaceRiverBank } from './riverBank'
-import { dropArrival, dropBases, dropFall, impactAge, impactFlag, impactShape, ROOF_COVER, wrapToColumn } from './rainTouch'
+import {
+  dropArrival,
+  dropBases,
+  dropFall,
+  dropNearFade,
+  dropWidthScale,
+  impactAge,
+  impactFlag,
+  impactShape,
+  ROOF_COVER,
+  wrapToColumn,
+} from './rainTouch'
 import { balance } from '../../config/balance'
 import { RAIN_FALL_SPEED, RAIN_HEIGHT, RAIN_RADIUS } from './rainMaterials'
 
@@ -111,5 +122,31 @@ describe('drops keep a fixed world x/z while the column follows the eye', () => 
     expect(Math.min(...a)).toBeGreaterThanOrEqual(-RAIN_RADIUS)
     expect(Math.max(...a)).toBeGreaterThan(RAIN_RADIUS * 0.9)
     expect(Math.min(...a)).toBeLessThan(-RAIN_RADIUS * 0.9)
+  })
+})
+
+describe('a drop near the eye thins and fades out (no streak reads as a pole)', () => {
+  const { dropNearFadeM: near, dropNearFullM: far, dropWidthCapM: cap } = balance.rain
+
+  it('fades 0 at and inside the near distance, 1 beyond the far one, monotone between', () => {
+    expect(near).toBeGreaterThan(0)
+    expect(far).toBeGreaterThan(near)
+    for (const d of [0, near / 2, near]) expect(dropNearFade(d, near, far)).toBe(0)
+    for (const d of [far, far + 0.5, 40]) expect(dropNearFade(d, near, far)).toBe(1)
+    let prev = 0
+    for (let d = near; d <= far; d += (far - near) / 50) {
+      const f = dropNearFade(d, near, far)
+      expect(f).toBeGreaterThanOrEqual(prev)
+      expect(f).toBeLessThanOrEqual(1)
+      prev = f
+    }
+  })
+
+  it('never projects wider than at the cap distance', () => {
+    expect(dropWidthScale(cap * 2, cap)).toBe(1)
+    for (const d of [0.3, 1, 2.5, cap * 0.9]) {
+      // projected width ∝ scale / d stays at or below its value at the cap
+      expect(dropWidthScale(d, cap) / d).toBeLessThanOrEqual(1 / cap + 1e-9)
+    }
   })
 })

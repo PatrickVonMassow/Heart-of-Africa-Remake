@@ -27,9 +27,12 @@ import { balance } from '../../config/balance'
 
 type FloatNode = ReturnType<typeof float>
 
-export const RAIN_COUNT = 700
+// The column rises from the ground under each drop, so it is 1.5 m (the eye
+// height) taller than the old eye-based 15 m one, with 10 % more drops: the
+// sky above the eye keeps the old 700 drops over the same 15 m span.
+export const RAIN_COUNT = 770
 export const RAIN_RADIUS = 16 // a tight column around the head, not the travel 55
-export const RAIN_HEIGHT = 15 // from the ground under each drop upward
+export const RAIN_HEIGHT = 16.5 // from the ground under each drop upward
 export const RAIN_FALL_SPEED = 22
 const STREAK_WIDTH = 0.03
 const STREAK_LENGTH = 1.1 // longer than the travel scene's so they read at eye height
@@ -92,7 +95,17 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean) {
   dm.depthWrite = false
   dm.side = THREE.DoubleSide
   dm.fog = false
-  dm.positionNode = positionLocal.add(vec3(spot.x, spot.y.add(fall), spot.z))
+  // Near the eye a streak thins (its projected width capped at the width it has
+  // at dropWidthCapM) and fades out (rainTouch.ts dropWidthScale/dropNearFade).
+  const base = vec3(spot.x, spot.y.add(fall), spot.z)
+  const centreDist = base.add(vec3(0, STREAK_LENGTH / 2, 0)).sub(cameraPosition).length()
+  const thin = centreDist.div(balance.rain.dropWidthCapM).clamp(0.05, 1)
+  dm.positionNode = positionLocal.mul(vec3(thin, 1, thin)).add(base)
+  const nearFade = smoothstep(
+    float(balance.rain.dropNearFadeM),
+    float(balance.rain.dropNearFullM),
+    positionWorld.sub(cameraPosition).length(),
+  )
   if (lit) {
     // Lit streak: dim against the bright sky behind an upward glance, bright
     // against the dark huts and ground at eye level, glinting toward the sun.
@@ -101,10 +114,15 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean) {
     const visible = mix(float(1), float(balance.rain.dropSkyVisibility), skyBehind)
     const glint = max(dot(view, uniforms.sun), float(0)).pow(6).mul(balance.rain.dropSunGlint)
     dm.colorNode = rainCol.mul(uniforms.light).mul(glint.add(0.8)).mul(variation)
-    dm.opacityNode = uniforms.opacity.mul(edgeFade).mul(0.8).mul(visible).mul(variation.mul(0.4).add(0.6))
+    dm.opacityNode = uniforms.opacity
+      .mul(edgeFade)
+      .mul(nearFade)
+      .mul(0.8)
+      .mul(visible)
+      .mul(variation.mul(0.4).add(0.6))
   } else {
     dm.colorNode = rainCol
-    dm.opacityNode = uniforms.opacity.mul(edgeFade).mul(0.8)
+    dm.opacityNode = uniforms.opacity.mul(edgeFade).mul(nearFade).mul(0.8)
   }
   const dg = crossedStreak()
   dg.setAttribute('rainSpot', spots)

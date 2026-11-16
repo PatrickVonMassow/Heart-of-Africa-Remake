@@ -383,7 +383,7 @@ added.
   untouched. Quarter resolution (`--scale 4`, 0.65 + 0.57 MB) is the fallback
   if the download budget bites; the picture decides.
 - **`rainImpacts`** — Settlement rain impacts (design.md §19.13,
-  `src/scenes/place/rainMaterials.ts`): how many of the 700 drops bloom a
+  `src/scenes/place/rainMaterials.ts`): how many of the 770 drops bloom a
   short-lived splash where they arrive — one quad shape, a flat ring on the
   river's water, a small standing puff on ground, none on a roofed floor. The
   impact replays the drop's own fall in the shader (no CPU spawn); one
@@ -394,7 +394,9 @@ added.
   spread. Off keeps the plain one-colour streak. On every level, unpriced: the
   drops end on the ground or water under their own x/z (sampled on the CPU
   once per wrap of the column, plus a full refresh per second while it rains)
-  and the built fabric takes the ground's wetness (one uniform read).
+  and the built fabric takes the ground's wetness (one uniform read); near
+  the eye a streak thins and fades out (`balance.rain.dropNear*`,
+  `dropWidthCapM`), so none reads as a solid pole.
   Low off, medium and high on.
 
 ## Profiling the low preset (F8 benchmark, point 293)

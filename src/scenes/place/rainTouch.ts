@@ -80,3 +80,19 @@ export function impactShape(age: number, life: number, radius: number): { radius
   const t = Math.min(1, Math.max(0, age / life))
   return { radius: radius * (0.25 + 0.75 * t), alpha: age < life ? (1 - t) * (1 - t) : 0 }
 }
+
+/** A drop's opacity factor by its eye distance `d` (m): 0 at and inside
+ *  `near`, 1 at and beyond `far`, a smoothstep between — the shader's
+ *  `smoothstep(near, far, d)`, so a streak at the eye fades instead of
+ *  standing as an opaque bar. */
+export function dropNearFade(d: number, near: number, far: number): number {
+  const t = Math.min(1, Math.max(0, (d - near) / Math.max(1e-6, far - near)))
+  return t * t * (3 - 2 * t)
+}
+
+/** A drop's width factor by its eye distance `d` (m): 1 beyond `cap`, else
+ *  d / cap, so the projected width (∝ width / d) never exceeds its width at
+ *  `cap`. The shader's `clamp(d / cap, 0.05, 1)` (the floor keeps it finite). */
+export function dropWidthScale(d: number, cap: number): number {
+  return Math.min(1, Math.max(0.05, d / cap))
+}

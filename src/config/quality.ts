@@ -256,7 +256,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sunGlare: false,
     sunDiscGain: 3, // the disc before point 344
     horizonMaps: true, // one texture lookup per terrain fragment
-    rainImpacts: 250, // calibratable: of the 700 drops
+    rainImpacts: 250, // calibratable: of the 770 drops
     rainLitDrops: true,
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
@@ -297,7 +297,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sunGlare: true, // first person only
     sunDiscGain: 14, // calibratable: well above the 0.88 bloom threshold
     horizonMaps: true,
-    rainImpacts: 500, // calibratable: of the 700 drops
+    rainImpacts: 500, // calibratable: of the 770 drops
     rainLitDrops: true,
   },
 }

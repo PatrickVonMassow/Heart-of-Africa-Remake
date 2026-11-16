@@ -1015,6 +1015,13 @@ interface BalanceConfig {
     dropSunGlint: number
     /** Per-drop brightness spread, 0 (all alike) .. 1. */
     dropVariation: number
+    /** Eye distance (m) at and inside which a drop streak is fully faded out. */
+    dropNearFadeM: number
+    /** Eye distance (m) at and beyond which a drop streak is fully opaque. */
+    dropNearFullM: number
+    /** Eye distance (m) inside which a streak thins: its projected width never
+     *  exceeds the width it has at this distance (no streak reads as a pole). */
+    dropWidthCapM: number
   }
   /** The village cooking fire's response to rain (design.md §19.10, point 256). */
   fire: {
@@ -2289,6 +2296,11 @@ export const balance: BalanceConfig = {
     dropSkyVisibility: 0.25, // nearly vanishing against the bright sky
     dropSunGlint: 1.4,
     dropVariation: 0.45,
+    // Near the eye a 3 cm streak projects ~10 px wide and reads as a post:
+    // fade it out inside ~1–3.5 m and cap its width at the 6 m width (~4 px).
+    dropNearFadeM: 1,
+    dropNearFullM: 3.5,
+    dropWidthCapM: 6,
   },
   fire: {
     // The cooking fire keeps burning through the rains under its thatch cook-shelter
