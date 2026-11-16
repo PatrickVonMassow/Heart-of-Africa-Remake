@@ -195,3 +195,77 @@ export function stepRainSpots(
   }
   return dirty
 }
+
+/** A pinhole camera for the CPU mirror of the streak's screen-space cap. */
+export interface StreakCamera {
+  eye: readonly [number, number, number]
+  /** Heading (rad, 0 looks down −z) and pitch (rad, + looks up). */
+  yaw: number
+  pitch: number
+  tanHalfFov: number
+  aspect: number
+}
+
+/** A world point in NDC (x, y) and its view depth (+ in front), like the
+ *  shader's `cameraProjectionMatrix · cameraViewMatrix` divided by w. */
+export function projectPoint(cam: StreakCamera, p: readonly [number, number, number]): [number, number, number] {
+  const vx = p[0] - cam.eye[0]
+  const vy = p[1] - cam.eye[1]
+  const vz = p[2] - cam.eye[2]
+  const cy = Math.cos(cam.yaw)
+  const sy = Math.sin(cam.yaw)
+  const cp = Math.cos(cam.pitch)
+  const sp = Math.sin(cam.pitch)
+  // forward, right, up of a yaw/pitch camera (three's: yaw about +y, pitch about x)
+  const f = [-sy * cp, sp, -cy * cp]
+  const r = [cy, 0, -sy]
+  const u = [sy * sp, cp, cy * sp]
+  const depth = vx * f[0] + vy * f[1] + vz * f[2]
+  const x = vx * r[0] + vy * r[1] + vz * r[2]
+  const y = vx * u[0] + vy * u[1] + vz * u[2]
+  return [x / (depth * cam.tanHalfFov * cam.aspect), y / (depth * cam.tanHalfFov), depth]
+}
+
+/** Screen length of the segment a→b as a fraction of the frame height (NDC
+ *  spans 2 per frame height; x is scaled by the aspect into height units). */
+export function screenFraction(a: readonly [number, number, number], b: readonly [number, number, number], aspect: number): number {
+  return Math.hypot((b[0] - a[0]) * aspect, b[1] - a[1]) / 2
+}
+
+/** Minimum view depth (m) both tips must have for a streak to be drawn. */
+export const STREAK_MIN_DEPTH = 0.15
+
+/** A world point in clip-like coordinates (X, Y, W): linear in the point, so
+ *  NDC = (X/W, Y/W) and W is the view depth — the shader's clip position. */
+export function clipPoint(cam: StreakCamera, p: readonly [number, number, number]): [number, number, number] {
+  const [nx, ny, depth] = projectPoint(cam, p)
+  return [nx * depth, ny * depth, depth]
+}
+
+/**
+ * Length factor that keeps a streak from its lower tip `base` upward at most
+ * `maxFraction` of the frame height AFTER the full perspective projection
+ * (off-axis position and pitch included). Clip space is linear along the
+ * streak, c(s) = c0 + s·d, so its screen length is f(s) = s·K / (w0·(w0 + s·dw))
+ * with K = |(dx·w0 − x0·dw)·aspect, dy·w0 − y0·dw| / 2, and f(s) = max solves
+ * exactly to s = max·w0² / (K − max·w0·dw). 0 when a tip is at or behind the
+ * eye. The shader evaluates the same closed form in clip space.
+ */
+export function streakScreenScale(
+  cam: StreakCamera,
+  base: readonly [number, number, number],
+  len: number,
+  maxFraction: number,
+): number {
+  const c0 = clipPoint(cam, base)
+  const c1 = clipPoint(cam, [base[0], base[1] + len, base[2]])
+  if (c0[2] < STREAK_MIN_DEPTH || c1[2] < STREAK_MIN_DEPTH) return 0
+  const dx = c1[0] - c0[0]
+  const dy = c1[1] - c0[1]
+  const dw = c1[2] - c0[2]
+  const w0 = c0[2]
+  const k = Math.hypot((dx * w0 - c0[0] * dw) * cam.aspect, dy * w0 - c0[1] * dw) / 2
+  const den = k - maxFraction * w0 * dw
+  if (den <= 0) return 1
+  return Math.min(1, Math.max(0, (maxFraction * w0 * w0) / den))
+}

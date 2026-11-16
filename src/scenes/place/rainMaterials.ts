@@ -4,6 +4,8 @@
 import * as THREE from 'three/webgpu'
 import {
   attribute,
+  cameraProjectionMatrix,
+  cameraViewMatrix,
   cameraPosition,
   dot,
   float,
@@ -23,6 +25,7 @@ import {
   vec4,
 } from 'three/tsl'
 import { balance } from '../../config/balance'
+import { STREAK_MIN_DEPTH } from './rainTouch'
 
 // The column rises from the ground under each drop, so it is 1.5 m (the eye
 // height) taller than the old eye-based 15 m one. RAIN_COUNT is the low
@@ -61,6 +64,8 @@ export function createRainUniforms() {
     light: uniform(1),
     /** tan of the camera's vertical half-FOV (the place camera's fov 50). */
     tanHalfFov: uniform(Math.tan((25 * Math.PI) / 180)),
+    /** The camera's aspect (width / height), to measure screen length in frame heights. */
+    aspect: uniform(16 / 9),
   }
 }
 export type RainUniforms = ReturnType<typeof createRainUniforms>
@@ -93,14 +98,27 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count =
   dm.depthWrite = false
   dm.side = THREE.DoubleSide
   dm.fog = false
-  // Near the eye a streak shortens to at most dropMaxFrameFraction of the frame,
-  // thins to its width at dropWidthCapM and fades out before its full length
-  // fits (rainTouch.ts: streakFitDistance, dropLengthScale, dropWidthScale,
-  // dropNearFade), so none reads as a pole.
+  // Near the eye a streak shortens to at most dropMaxFrameFraction of the frame
+  // AFTER the full projection (off-axis and pitch included: both tips in clip
+  // space, rainTouch.ts streakScreenScale's closed form), thins to its width at
+  // dropWidthCapM and fades out before its full length fits by depth alone
+  // (streakFitDistance, dropNearFade), so none reads as a pole.
   const base = vec3(spot.x, spot.y.add(fall), spot.z)
   const centreDist = base.add(vec3(0, STREAK_LENGTH / 2, 0)).sub(cameraPosition).length()
   const fit = float(STREAK_LENGTH).div(uniforms.tanHalfFov.mul(2 * balance.rain.dropMaxFrameFraction))
-  const shorten = centreDist.div(fit).clamp(0, 1)
+  const viewProj = cameraProjectionMatrix.mul(cameraViewMatrix)
+  const c0 = viewProj.mul(vec4(base, 1))
+  const c1 = viewProj.mul(vec4(base.add(vec3(0, STREAK_LENGTH, 0)), 1))
+  const dc = c1.sub(c0)
+  const w0 = c0.w
+  const maxFrac = float(balance.rain.dropMaxFrameFraction)
+  const kx = dc.x.mul(w0).sub(c0.x.mul(dc.w)).mul(uniforms.aspect)
+  const ky = dc.y.mul(w0).sub(c0.y.mul(dc.w))
+  const k = kx.mul(kx).add(ky.mul(ky)).sqrt().mul(0.5)
+  const den = k.sub(maxFrac.mul(w0).mul(dc.w))
+  const solved = maxFrac.mul(w0).mul(w0).div(max(den, float(1e-9))).clamp(0, 1)
+  const inFront = c0.w.greaterThan(STREAK_MIN_DEPTH).and(c1.w.greaterThan(STREAK_MIN_DEPTH))
+  const shorten = inFront.select(den.greaterThan(0).select(solved, float(1)), float(0))
   const thin = centreDist.div(balance.rain.dropWidthCapM).clamp(0.05, 1)
   dm.positionNode = positionLocal.mul(vec3(thin, shorten, thin)).add(base)
   const nearFade = smoothstep(float(balance.rain.dropNearFadeM), fit, centreDist)

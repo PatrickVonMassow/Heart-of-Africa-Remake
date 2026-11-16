@@ -399,7 +399,9 @@ added.
   2 s spread over the frames while it rains)
   and the built fabric takes the ground's wetness (one uniform read). Each
   streak is faint (`balance.rain.dropOpacity`); near the eye it shortens to at
-  most `dropMaxFrameFraction` of the frame, thins and fades out
+  most `dropMaxFrameFraction` of the frame, measured on screen after the full
+  projection (both tips in clip space, so off-axis and pitched views hold
+  too), thins and fades out
   (`dropNearFadeM` to its FOV-derived fit distance), so none reads as a pole.
   Low off, medium and high on.
 - **`rainDrops`** — Settlement rain streaks drawn at full rain (one instanced

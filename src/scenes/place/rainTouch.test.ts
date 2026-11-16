@@ -15,6 +15,10 @@ import {
   rainDropCount,
   createRainSpotState,
   stepRainSpots,
+  projectPoint,
+  screenFraction,
+  streakScreenScale,
+  type StreakCamera,
   streakFitDistance,
   streakFrameFraction,
   impactAge,
@@ -253,5 +257,54 @@ describe('arrival sampling is spread over the frames, never a once-a-second spik
       expect(spots[k * 4]).toBeCloseTo(wrapToColumn(bases[k * 2], 3, period), 4)
       expect(spots[k * 4 + 2]).toBeCloseTo(wrapToColumn(bases[k * 2 + 1], -2, period), 4)
     }
+  })
+})
+
+describe('a streak is capped on SCREEN after the full projection (off-axis and pitch)', () => {
+  const { dropLengthM: len, dropMaxFrameFraction: frac } = balance.rain
+  const tanHalfFov = Math.tan((25 * Math.PI) / 180)
+  const cams: StreakCamera[] = [-0.5, -0.2, 0, 0.3].flatMap((pitch) =>
+    [0, 1.3].map((yaw) => ({ eye: [0, 1.6, 0] as const, yaw, pitch, tanHalfFov, aspect: 1440 / 900 })),
+  )
+  const px = (cam: StreakCamera, base: [number, number, number], s: number) =>
+    screenFraction(projectPoint(cam, base), projectPoint(cam, [base[0], base[1] + len * s, base[2]]), cam.aspect) * 900
+
+  it('keeps a near, low, off-axis drop at the bottom-left edge within ~60 px of a 900 px frame', () => {
+    // Looking slightly down; the drop stands 1.2 m ahead, far left and low, so
+    // it projects near the frame's bottom-left corner, where a depth-only cap
+    // let a 70 px bar through.
+    const cam: StreakCamera = { eye: [0, 1.6, 0], yaw: 0, pitch: -0.25, tanHalfFov, aspect: 1440 / 900 }
+    const base: [number, number, number] = [-1.4, 0.05, -1.2]
+    const ndc = projectPoint(cam, base)
+    expect(ndc[0]).toBeLessThan(-0.6)
+    expect(ndc[1]).toBeLessThan(-0.6)
+    expect(px(cam, base, 1)).toBeGreaterThan(60) // uncapped it is a bar
+    expect(px(cam, base, streakScreenScale(cam, base, len, frac))).toBeLessThanOrEqual(60 + 1e-6)
+  })
+
+  it('holds for every drop of a dense column, at every pitch and heading', () => {
+    let worst = 0
+    let capped = 0
+    for (const cam of cams) {
+      for (let i = -24; i <= 24; i++) {
+        for (let j = -24; j <= 24; j++) {
+          for (const y of [0, 0.8, 1.5, 2.5, 6]) {
+            const base: [number, number, number] = [i * 0.33, y, j * 0.33]
+            const s = streakScreenScale(cam, base, len, frac)
+            if (s === 0) continue
+            if (s < 1) capped++
+            worst = Math.max(worst, px(cam, base, s))
+          }
+        }
+      }
+    }
+    expect(capped).toBeGreaterThan(0)
+    expect(worst).toBeLessThanOrEqual(60 + 1e-6)
+  })
+
+  it('draws nothing whose tip lies behind or at the eye', () => {
+    const cam = cams[2]
+    expect(streakScreenScale(cam, [0, 1.5, 0.5], len, frac)).toBe(0) // behind
+    expect(streakScreenScale(cam, [0, 1.5, -10], len, frac)).toBe(1) // far ahead: uncapped
   })
 })

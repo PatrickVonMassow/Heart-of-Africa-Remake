@@ -47,6 +47,7 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
   const dropMesh = useRef<THREE.InstancedMesh>(null)
   const impactMesh = useRef<THREE.InstancedMesh>(null)
   const state = useRef(createRainSpotState(0))
+  const entered = useRef(false)
 
   const bases = useMemo(() => dropBases(count, RAIN_RADIUS), [count])
   const uniforms = useMemo(createRainUniforms, [])
@@ -81,6 +82,10 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
 
   useFrame(({ camera }, dt) => {
     const target = rainAmount(wetness.current, balance.season.weatherStrength)
+    // Entering a place in rain shows the rain at once; only a change while
+    // here eases in.
+    if (!entered.current) uniforms.opacity.value = target
+    entered.current = true
     uniforms.opacity.value += (target - uniforms.opacity.value) * Math.min(1, dt * 1.5)
     const on = uniforms.opacity.value > 0.01
     if (group.current) group.current.visible = on
@@ -91,6 +96,7 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
     uniforms.light.value = sunDimFactor(wetness.current, balance.season.weatherStrength)
     if (camera instanceof THREE.PerspectiveCamera) {
       uniforms.tanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+      uniforms.aspect.value = camera.aspect
     }
     // Density follows the rain: the drawn prefix of the (uniformly scattered)
     // drops grows with the rain amount; impacts stay within it.

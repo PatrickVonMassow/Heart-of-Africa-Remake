@@ -2310,7 +2310,7 @@ export const balance: BalanceConfig = {
     // A faint, dark crown, never a bright disc (owner picture check).
     impactRadiusM: 0.08,
     impactOpacity: 0.3,
-    dropSkyVisibility: 0.5, // fainter against the bright sky, but still a veil
+    dropSkyVisibility: 0.6, // fainter against the bright sky, but still a veil
     dropSunGlint: 1.4,
     dropVariation: 0.45,
     // A near streak read as a post (owner picture check). 0.35 m ≈ the blur of a
