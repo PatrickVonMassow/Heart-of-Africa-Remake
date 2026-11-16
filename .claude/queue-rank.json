@@ -1915,35 +1915,34 @@
       "why": "a WebGL-2-only defect may wait (CLAUDE.md §7.2); it ranks behind the queued bundle work",
       "origin": "machine",
       "place": "last"
+    },
+    "1529": {
+      "at": "2026-11-16T16:42:31.015Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1530": {
+      "at": "2026-11-16T16:42:31.123Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1531": {
+      "at": "2026-11-16T16:42:31.236Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1532": {
+      "at": "2026-11-16T16:42:31.343Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-11-16T14:27:41.953Z",
+    "at": "2026-11-16T16:42:31.023Z",
     "points": [
       184,
       200,
@@ -2391,7 +2390,36 @@
       1522,
       1525,
       1526,
-      1528
+      1528,
+      1529,
+      1530,
+      1531,
+      1532
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
