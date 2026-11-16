@@ -1030,8 +1030,11 @@ interface BalanceConfig {
     /** Share of the preset's drops drawn at the faintest rain; it climbs to all
      *  of them at full rain (`rainAmount` 1), so light rain stays sparse. */
     dropDensityMinFraction: number
-    /** Largest projected impact diameter as a fraction of the frame height. */
+    /** Largest projected impact diameter as a fraction of the frame height,
+     *  after the full projection (off-axis position and pitch included). */
     impactMaxFrameFraction: number
+    /** View depth (m) a streak's tips or an impact's centre must exceed to be drawn. */
+    streakMinDepthM: number
     /** Eye distance (m) at and inside which an impact is fully faded out. */
     impactNearFadeM: number
     /** Eye distance (m) at and beyond which an impact is at full strength. */
@@ -2324,6 +2327,7 @@ export const balance: BalanceConfig = {
     dropOpacity: 0.45,
     dropDensityMinFraction: 0.25,
     impactMaxFrameFraction: 10 / 900, // a 10 px crown at most on a 900 px frame
+    streakMinDepthM: 0.15,
     impactNearFadeM: 1,
     impactNearFullM: 3,
     impactGroundColor: [0.09, 0.07, 0.05], // linear: a dark wet-earth tint

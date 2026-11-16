@@ -126,9 +126,6 @@ export function rainDropCount(total: number, amount: number, minFraction: number
 /** An impact's size factor by eye distance `d`: its projected diameter never
  *  exceeds `maxFraction` of the frame height (the streak's length cap, applied
  *  to the diameter 2·radius). */
-export function impactSizeScale(d: number, radius: number, tanHalfFov: number, maxFraction: number): number {
-  return dropLengthScale(d, streakFitDistance(2 * radius, tanHalfFov, maxFraction))
-}
 
 /** The CPU side of the drops' arrivals, kept across frames. */
 export interface RainSpotState {
@@ -232,8 +229,6 @@ export function screenFraction(a: readonly [number, number, number], b: readonly
   return Math.hypot((b[0] - a[0]) * aspect, b[1] - a[1]) / 2
 }
 
-/** Minimum view depth (m) both tips must have for a streak to be drawn. */
-export const STREAK_MIN_DEPTH = 0.15
 
 /** A world point in clip-like coordinates (X, Y, W): linear in the point, so
  *  NDC = (X/W, Y/W) and W is the view depth — the shader's clip position. */
@@ -259,7 +254,7 @@ export function streakScreenScale(
 ): number {
   const c0 = clipPoint(cam, base)
   const c1 = clipPoint(cam, [base[0], base[1] + len, base[2]])
-  if (c0[2] < STREAK_MIN_DEPTH || c1[2] < STREAK_MIN_DEPTH) return 0
+  if (c0[2] < balance.rain.streakMinDepthM || c1[2] < balance.rain.streakMinDepthM) return 0
   const dx = c1[0] - c0[0]
   const dy = c1[1] - c0[1]
   const dw = c1[2] - c0[2]
@@ -268,4 +263,35 @@ export function streakScreenScale(
   const den = k - maxFraction * w0 * dw
   if (den <= 0) return 1
   return Math.min(1, Math.max(0, (maxFraction * w0 * w0) / den))
+}
+
+/**
+ * Radius factor that keeps a flat horizontal impact ring of `radius` within
+ * `maxFraction` of the frame height AFTER the full projection. Its screen
+ * extent per metre is bounded by the Frobenius norm of the projection's
+ * Jacobian over the world x and z axes at its centre (clip space is linear, so
+ * an axis' image is d = c(centre + e) − c(centre), its NDC rate
+ * (d.xy·w0 − c0.xy·d.w) / w0²). 0 when the centre is at or behind the eye.
+ * The shader evaluates the same bound.
+ */
+export function impactSizeScale(
+  cam: StreakCamera,
+  centre: readonly [number, number, number],
+  radius: number,
+  maxFraction: number,
+): number {
+  const c0 = clipPoint(cam, centre)
+  const w0 = c0[2]
+  if (w0 < balance.rain.streakMinDepthM) return 0
+  let sum = 0
+  for (const e of [[1, 0, 0], [0, 0, 1]] as const) {
+    const c1 = clipPoint(cam, [centre[0] + e[0], centre[1] + e[1], centre[2] + e[2]])
+    const dw = c1[2] - w0
+    const jx = (((c1[0] - c0[0]) * w0 - c0[0] * dw) / (w0 * w0)) * cam.aspect
+    const jy = ((c1[1] - c0[1]) * w0 - c0[1] * dw) / (w0 * w0)
+    sum += (jx * jx + jy * jy) / 4
+  }
+  const perMetre = Math.sqrt(sum)
+  if (perMetre <= 0) return 1
+  return Math.min(1, Math.max(0, maxFraction / (2 * radius * perMetre)))
 }

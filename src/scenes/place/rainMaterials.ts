@@ -25,7 +25,6 @@ import {
   vec4,
 } from 'three/tsl'
 import { balance } from '../../config/balance'
-import { STREAK_MIN_DEPTH } from './rainTouch'
 
 // The column rises from the ground under each drop, so it is 1.5 m (the eye
 // height) taller than the old eye-based 15 m one. RAIN_COUNT is the low
@@ -117,7 +116,7 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count =
   const k = kx.mul(kx).add(ky.mul(ky)).sqrt().mul(0.5)
   const den = k.sub(maxFrac.mul(w0).mul(dc.w))
   const solved = maxFrac.mul(w0).mul(w0).div(max(den, float(1e-9))).clamp(0, 1)
-  const inFront = c0.w.greaterThan(STREAK_MIN_DEPTH).and(c1.w.greaterThan(STREAK_MIN_DEPTH))
+  const inFront = c0.w.greaterThan(balance.rain.streakMinDepthM).and(c1.w.greaterThan(balance.rain.streakMinDepthM))
   const shorten = inFront.select(den.greaterThan(0).select(solved, float(1)), float(0))
   const thin = centreDist.div(balance.rain.dropWidthCapM).clamp(0.05, 1)
   dm.positionNode = positionLocal.mul(vec3(thin, shorten, thin)).add(base)
@@ -155,10 +154,20 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count =
   const life = balance.rain.impactLife
   const t = age.div(life).clamp(0, 1)
   const eyeDist = vec3(spot.x, spot.y, spot.z).sub(cameraPosition).length()
-  const impactFit = float(2 * balance.rain.impactRadiusM).div(
-    uniforms.tanHalfFov.mul(2 * balance.rain.impactMaxFrameFraction),
-  )
-  const sizeCap = eyeDist.div(impactFit).clamp(0, 1)
+  // Projected-size bound (rainTouch.ts impactSizeScale): the Frobenius norm of
+  // the projection's Jacobian over world x and z at the ring's centre.
+  const ivp = cameraProjectionMatrix.mul(cameraViewMatrix)
+  const ic0 = ivp.mul(vec4(spot.x, spot.y, spot.z, 1))
+  const iw = ic0.w
+  const ax = ivp.mul(vec4(1, 0, 0, 0))
+  const az = ivp.mul(vec4(0, 0, 1, 0))
+  const jxx = ax.x.mul(iw).sub(ic0.x.mul(ax.w)).mul(uniforms.aspect)
+  const jxy = ax.y.mul(iw).sub(ic0.y.mul(ax.w))
+  const jzx = az.x.mul(iw).sub(ic0.x.mul(az.w)).mul(uniforms.aspect)
+  const jzy = az.y.mul(iw).sub(ic0.y.mul(az.w))
+  const perMetre = jxx.mul(jxx).add(jxy.mul(jxy)).add(jzx.mul(jzx)).add(jzy.mul(jzy)).sqrt().mul(0.5).div(iw.mul(iw))
+  const fits = float(balance.rain.impactMaxFrameFraction).div(max(perMetre.mul(2 * balance.rain.impactRadiusM), float(1e-9)))
+  const sizeCap = iw.greaterThan(balance.rain.streakMinDepthM).select(fits.clamp(0, 1), float(0))
   const radius = t.mul(0.75).add(0.25).mul(balance.rain.impactRadiusM).mul(sizeCap)
   const p = positionLocal // a unit quad in x/y, [-1, 1]
   im.positionNode = vec3(spot.x, spot.y.add(RING_LIFT), spot.z).add(vec3(p.x, float(0), p.y).mul(radius))
