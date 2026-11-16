@@ -1258,24 +1258,21 @@ export function familyCrossing<A extends CrossingFamilyMember>(
     const sz = (target.tz - starter.z) / (span || 1)
     let own: { tx: number; tz: number } | null = null
     let wet = false
-    let sea = false
     for (let i = 1; i * 0.5 <= span + maxUnits; i++) {
       const px = c.x + sx * i * 0.5
       const pz = c.z + sz * i * 0.5
       const t = terrainTypeAt(px, pz)
-      if (t === 'ocean') {
-        sea = true
-        break
-      }
+      if (t === 'ocean') break
       if (t === 'water') wet = true
       else if (wet) {
         own = { tx: px, tz: pz }
         break
       }
     }
-    // Its flank meets the sea: the calf follows the parent's own line instead,
-    // never a route through ocean — if that line meets the sea too, it stays.
-    if (own !== null || !sea || !segmentMeetsOcean(c.x, c.z, target.tx, target.tz, terrainTypeAt))
+    // No far bank on its flank (sea or a dry probe): the calf follows the
+    // parent's target instead, never a route through ocean — if that line
+    // meets the sea, it stays.
+    if (own !== null || !segmentMeetsOcean(c.x, c.z, target.tx, target.tz, terrainTypeAt))
       out.push({ animal: c, tx: own?.tx ?? target.tx, tz: own?.tz ?? target.tz })
   }
   return out

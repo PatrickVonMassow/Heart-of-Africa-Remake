@@ -5361,6 +5361,11 @@ describe('the crossing turned back (point 362)', () => {
     const deep = (x: number, z: number) => (x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
     const calf2 = { x: 0.4, z: -1.5, young: true }
     expect(familyCrossing({ x: 0, z: 0, child: calf2 }, { tx: 5.5, tz: 0 }, deep, 6)).toHaveLength(1)
+    // Its flank stays dry (no water, no sea) but the diagonal to the parent's
+    // target crosses ocean: the fallback is checked too, so the calf stays.
+    const diag = (x: number, z: number) => (z > 1 && z < 3 && x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 && z < 1 ? 'water' : 'grass')
+    const calf3 = { x: 0.4, z: 4, young: true }
+    expect(familyCrossing({ x: 0, z: 0, child: calf3 }, { tx: 5.5, tz: 0 }, diag, 6)).toHaveLength(1)
   })
 
   it('the mid-channel weight beats every bank case', () => {
