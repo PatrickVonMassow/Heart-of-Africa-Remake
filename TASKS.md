@@ -77,58 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 384. Rain that touches the world — wet roofs and walls, impacts, lit drops (user 27.07.2026,
-  after looking at the settlement rain on the deployed build: "the rain is simply painted
-  over the picture — it has no effect on the optics at all"). Measured against the code,
-  that reading is nearly right: `src/scenes/place/PlaceRain.tsx` draws 700 instanced
-  quads in an UNLIT `MeshBasicNodeMaterial` of one constant colour (0.66/0.72/0.8), fog
-  off, depth-write off, inside a 15-unit column centred on the eye. The streaks do stand
-  in the world and are occluded by huts. This point closes the remaining gap with the
-  cheapest steps, in the order of effect per cost; point 385 carries the two dearer ones.
-  STRUCK 20.08.2026 — "NOTHING ELSE IN THE SCENE KNOWS IT IS RAINING" IS NO LONGER TRUE,
-  and neither is the ground half of step (1). Verified in the code today: point 225's
-  `GROUND_WET_U` uniform in `src/render/seasonTint.ts` drives `wetGroundColor` (albedo
-  down 40 % at full soak) and `wetGroundRoughness` (roughness down 55 %), BOTH ground
-  materials read it — the travel terrain in `TravelScene.tsx` and the settlement ground
-  in `materials.ts` — and `PlaceScene.tsx` feeds it each frame from
-  `groundWetnessFactor`. The same scene also computes `skyOvercastParams` and calls
-  `setSkyOvercast` every frame, and the village fire already dims with the live wetness.
-  So the wet EARTH, its specular sheen and the overcast sky are built; what this point
-  still owes is everything above the ground.
-  (1) WET SURFACES ABOVE THE GROUND — roofs, walls and the rest of the built fabric take
-  the same wetness the earth already takes: roughness down, albedo slightly darkened,
-  specular response up, so the village fire reflects off wet thatch and daub and not only
-  off wet earth. It is driven from the SAME single value, never a second one. Sheltered
-  ground is EXEMPT — work-order point 353 owns that rule and is the spatial refinement of
-  the effect that now exists; this point must not fight it, so read it first.
-  (2) THE RAIN REACHES THE GROUND, AND ARRIVES. Today the column is a fixed box around
-  the head and drops recycle at its lower edge — which is why the player sees them stop
-  in mid-air. A drop ends at the GROUND under it (the terrain/settlement height at its
-  own x/z), and its end is an IMPACT: a short-lived, small ring or splash quad at that
-  spot, alpha-fading, instanced like the drops themselves. On water the impact is a
-  ring; on dust it is a puff — one shape parameterised, not two systems.
-  (3) LIT DROPS INSTEAD OF ONE FLAT COLOUR. A streak's brightness follows the sun/sky
-  direction and the view angle, so it reads bright against a dark hut and nearly
-  vanishes against a bright sky, and the drops of one gust no longer look identical.
-  QUALITY LEVELS ARE PART OF THE POINT, not an afterthought (§21 convention): every new
-  lever gets a low/medium/high entry in `QUALITY_PRESETS` (`src/config/quality.ts`) and a
-  row in `docs/graphics-detail-levels.md` — the completeness gate in
-  `src/config/quality.test.ts` fails otherwise. Rain that costs frames on LOW is a
-  regression, so low keeps the plain streaks and the wetness value at most; impacts and
-  lit drops are medium/high.
-  BOTH BACKENDS, ONE PATH: TSL only, no WebGPU-only branch (CLAUDE.md §3) — the
-  reverted TRAA attempt is the precedent for what a second code path costs.
-  VERIFIABLE: pure Vitest on the wetness mapping for the built fabric (dry → today's
-  values, wet → the darkened/glossier set, read from the same uniform the ground
-  materials already read) and on the impact placement (a
-  drop's end equals the ground height under it, never the column's lower edge); the
-  quality-preset completeness and doc-sync gates green; live, one first-person frame in
-  the rain on BOTH backends showing wet ground and drops that arrive, judged by the
-  picture, plus the §21 detail levels stepped through without a red.
-  DOCS in the same commit: design.md §19.13 (what rain does to the picture is design
-  content), `docs/graphics-detail-levels.md`, and CLAUDE.md §7.1 pt 12 with its evidence
-  section.
-
 - [ ] 1529. Give the Giza plateau's people something to do: guides lead tourists, the cameleer tends his camel, the donkey-boy walks his donkey
   User 16.11.2026: "Bei den Pyramiden stehen die Leute untätig rum"; queued at the front ("ja, beide vorne einreihen").
   Measured: every `GizaAmbient` figure (src/scenes/place/PlaceScene.tsx ~2398-2466; anchors `GIZA_AMBIENT` in src/scenes/place/gizaSite.ts ~231-245) stands on its anchor and only turns on the spot; seen in verification/1378-giza-ambient.png. The villages' PlaceLife/adultWork walkers and talkers are not used here.
