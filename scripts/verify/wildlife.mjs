@@ -300,10 +300,15 @@ if (section('crossing-turned-back')) {
       const s = window.__crossScene
       const left = budget - (window.__simTime() - s.t0)
       if (left <= 0) return false
+      // __pollSim checks once more after its budget runs out, so the settle
+      // time itself is held against the budget: an overdue finish fails.
+      let doneAt = Infinity
       return window.__pollSim(left, () => {
         const all = [...s.mates, s.parent, s.calf].filter((a) => !a.dead)
-        return all.every((a) => a.crossing === undefined && a.caught === undefined && a.channelReturn === undefined)
-      })
+        const done = all.every((a) => a.crossing === undefined && a.caught === undefined && a.channelReturn === undefined)
+        if (done && doneAt === Infinity) doneAt = window.__simTime() - s.t0
+        return done
+      }).then((ok) => ok && doneAt <= budget)
     }, deadlineBudget)
     const settledAfter = await page.evaluate(() => +(window.__simTime() - window.__crossScene.t0).toFixed(2))
     const verdict = await page.evaluate(() => {
