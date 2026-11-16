@@ -63,6 +63,9 @@ device pixel ratio is kept (no cap).
 | `sunGlare` | off | off | on |
 | `sunDiscGain` | 3 | 3 | 14 |
 | `horizonMaps` | off | on | on |
+| `rainImpacts` | 0 | 250 | 500 |
+| `rainLitDrops` | off | on | on |
+| `rainDrops` | 770 | 2200 | 3300 |
 
 ## What each setting does
 
@@ -380,6 +383,34 @@ added.
   fetches them once and applies them when they arrive. Settlements are
   untouched. Quarter resolution (`--scale 4`, 0.65 + 0.57 MB) is the fallback
   if the download budget bites; the picture decides.
+- **`rainImpacts`** — Settlement rain impacts (design.md §19.13,
+  `src/scenes/place/rainMaterials.ts`): how many of the drawn drops bloom a
+  short-lived splash where they arrive — one flat, faint ring, pale on the
+  river's water, dark wet earth on ground, none on a roofed floor; it is
+  capped at ~10 px and fades out near the eye. The
+  impact replays the drop's own fall in the shader (no CPU spawn); one
+  instanced, alpha-blended draw. Low draws none. Climbs 0 → 250 → 500.
+- **`rainLitDrops`** — Lit settlement rain drops: a streak's brightness
+  follows the sun and the view angle (bright against dark walls and ground,
+  nearly gone against the bright sky, glinting toward the sun) with a per-drop
+  spread. Off keeps the plain one-colour streak. On every level, unpriced: the
+  drops end on the ground or water under their own x/z (sampled on the CPU
+  once per wrap of the column, plus a rolling refresh of all of them every
+  2 s spread over the frames while it rains)
+  and the built fabric takes the ground's wetness (one uniform read). Each
+  streak is faint (`balance.rain.dropOpacity`); near the eye it shortens to at
+  most `dropMaxFrameFraction` of the frame, measured on screen after the full
+  projection (both tips in clip space, so off-axis and pitched views hold
+  too), thins and fades out
+  (`dropNearFadeM` to its FOV-derived fit distance), so none reads as a pole.
+  Low off, medium and high on.
+- **`rainDrops`** — Settlement rain streaks drawn at full rain (one instanced
+  draw; the CPU samples each drop's arrival when it wraps, plus the rolling
+  refresh: ~0.5 ms a frame at 3300 in a Node benchmark).
+  Lighter rain draws fewer (`balance.rain.dropDensityMinFraction` at the
+  faintest), so heavy rain is a dense veil of faint short streaks and light
+  rain stays sparse. Low keeps the earlier 770, so it pays nothing extra.
+  Climbs 770 → 2200 → 3300.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 

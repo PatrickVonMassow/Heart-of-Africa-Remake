@@ -527,9 +527,16 @@ if (section('fire-rain')) {
   })
   check('the hearth collider stands in the place collider set (point 348 (b))', hearth.r !== null && hearth.r > 1.11, `r=${hearth.r}`)
   const walk = await page.evaluate(async ({ fx, fz }) => {
-    let min = Infinity, near = 0
-    const end = performance.now() + 20000
-    while (performance.now() < end) {
+    let min = Infinity, near = 0, frames = 0
+    // Diagnostics for a red verdict: how much village-life time passed (a
+    // stalled frame loop or a dt clamp shows here), and the errands reached.
+    const enc0 = window.__placeWalkers?.encounters?.()
+    // At least 20 s, extended up to 60 s until a walker has come near: where the
+    // window starts in the village's errand cycle depends on how long the
+    // staging before it took, so a fixed window can miss every approach.
+    const t0 = performance.now()
+    while (performance.now() - t0 < 20000 || (near === 0 && performance.now() - t0 < 60000)) {
+      frames++
       const w = window.__placeWalkers
       for (const s of w?.states ?? []) {
         const d = Math.hypot(s.x - fx, s.z - fz)
@@ -538,7 +545,15 @@ if (section('fire-rain')) {
       }
       await new Promise((r) => requestAnimationFrame(r))
     }
-    return { min, near }
+    const enc1 = window.__placeWalkers?.encounters?.()
+    const sum = (a) => (a ?? []).reduce((x, y) => x + y, 0)
+    return {
+      min, near, frames,
+      span: (performance.now() - t0) / 1000,
+      life: enc0 && enc1 ? enc1.lifeClock - enc0.lifeClock : null,
+      arrivals: enc0 && enc1 ? sum(enc1.arrivals) - sum(enc0.arrivals) : null,
+      modes: (window.__placeWalkers?.states ?? []).map((s) => s.mode).join(','),
+    }
   }, hearth)
   // The bound is the DRAWN hearth (stone ring plus stone, 1.11 m): the visible
   // claim. The wider clearance radius is a pathing margin pinned in Vitest.
@@ -546,7 +561,8 @@ if (section('fire-rain')) {
   check(
     'no walker crosses the hearth (point 348 (b))',
     Number.isFinite(walk.min) && walk.near > 0 && walk.min > 1.11,
-    `closest walker ${walk.min.toFixed(2)} m from the fire centre (collider r=${hearth.r}), ${walk.near} samples within 3.5 m`,
+    `closest walker ${walk.min.toFixed(2)} m from the fire centre (collider r=${hearth.r}), ${walk.near} samples within 3.5 m; ` +
+      `${walk.frames} frames, ${walk.life?.toFixed(1)} s village life in ${walk.span.toFixed(1)} s, ${walk.arrivals} errand arrivals, modes ${walk.modes}`,
   )
 
   // Heavy rain: the yard fire is out and its life is inside; dry again, relit.

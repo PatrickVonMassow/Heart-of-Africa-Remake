@@ -999,6 +999,48 @@ interface BalanceConfig {
     dripOffsetM: number
     /** Half-width (m) of the drip band around that peak. */
     dripHalfWidthM: number
+    /** Albedo darkening of the built fabric (roofs, walls, wood, cloth) at full soak, 0..1. */
+    fabricDarken: number
+    /** Roughness reduction of the built fabric at full soak, 0..1 (the wet sheen). */
+    fabricGloss: number
+    /** Seconds an impact ring/puff lives after its drop arrives. */
+    impactLife: number
+    /** Radius (m) an impact reaches by the end of its life. */
+    impactRadiusM: number
+    /** Peak opacity of an impact. */
+    impactOpacity: number
+    /** Drop visibility looking up into the bright sky, relative to against the ground (0..1). */
+    dropSkyVisibility: number
+    /** Extra brightness of a drop seen toward the sun (forward glint). */
+    dropSunGlint: number
+    /** Per-drop brightness spread, 0 (all alike) .. 1. */
+    dropVariation: number
+    /** World length (m) of a drop streak (its motion blur). */
+    dropLengthM: number
+    /** Longest projected streak as a fraction of the frame height: a nearer
+     *  drop is shortened to it, and fully opaque only where its full length fits. */
+    dropMaxFrameFraction: number
+    /** Eye distance (m) at and inside which a drop streak is fully faded out. */
+    dropNearFadeM: number
+    /** Eye distance (m) inside which a streak thins: its projected width never
+     *  exceeds the width it has at this distance (no streak reads as a pole). */
+    dropWidthCapM: number
+    /** Peak opacity of one streak (low: rain reads as many faint threads). */
+    dropOpacity: number
+    /** Share of the preset's drops drawn at the faintest rain; it climbs to all
+     *  of them at full rain (`rainAmount` 1), so light rain stays sparse. */
+    dropDensityMinFraction: number
+    /** Largest projected impact diameter as a fraction of the frame height,
+     *  after the full projection (off-axis position and pitch included). */
+    impactMaxFrameFraction: number
+    /** View depth (m) a streak's tips or an impact's centre must exceed to be drawn. */
+    streakMinDepthM: number
+    /** Eye distance (m) at and inside which an impact is fully faded out. */
+    impactNearFadeM: number
+    /** Eye distance (m) at and beyond which an impact is at full strength. */
+    impactNearFullM: number
+    /** Linear colour of a ground impact's crown: wet earth, near the ground's own. */
+    impactGroundColor: [number, number, number]
   }
   /** The village cooking fire's response to rain (design.md §19.10, point 256). */
   fire: {
@@ -2263,6 +2305,32 @@ export const balance: BalanceConfig = {
     dripBoost: 0.35, // the runoff band reads a third wetter than the open yard
     dripOffsetM: 0.3,
     dripHalfWidthM: 0.35,
+    // Rain touching the world (design.md §19.13): educated guesses, all
+    // calibratable; read when the place's materials are built (next visit).
+    fabricDarken: 0.22, // "slightly" darker — less than the ground's 0.4
+    fabricGloss: 0.5, // thatch 0.95 → ~0.48 soaked: the fire catches it
+    impactLife: 0.3,
+    // A faint, dark crown, never a bright disc (owner picture check).
+    impactRadiusM: 0.08,
+    impactOpacity: 0.3,
+    dropSkyVisibility: 0.6, // fainter against the bright sky, but still a veil
+    dropSunGlint: 1.4,
+    dropVariation: 0.45,
+    // A near streak read as a post (owner picture check). 0.35 m ≈ the blur of a
+    // 22 m/s drop over 1/60 s. At fov 50 / 900 px a streak spans 60 px at
+    // d = 0.35 / (2·tan 25° · 60/900) ≈ 5.6 m: nearer it is shortened to 60 px
+    // and fades out between dropNearFadeM and that distance (rainTouch.ts).
+    dropLengthM: 0.35,
+    dropMaxFrameFraction: 60 / 900,
+    dropNearFadeM: 1.5,
+    dropWidthCapM: 6, // 2 cm wide: ≤ ~3 px at 900 px
+    dropOpacity: 0.45,
+    dropDensityMinFraction: 0.25,
+    impactMaxFrameFraction: 10 / 900, // a 10 px crown at most on a 900 px frame
+    streakMinDepthM: 0.15,
+    impactNearFadeM: 1,
+    impactNearFullM: 3,
+    impactGroundColor: [0.09, 0.07, 0.05], // linear: a dark wet-earth tint
   },
   fire: {
     // The cooking fire keeps burning through the rains under its thatch cook-shelter
