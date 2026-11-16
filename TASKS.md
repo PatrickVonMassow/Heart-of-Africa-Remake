@@ -77,6 +77,13 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1527. Herds never start a water crossing on their own
+  Measured 16.11.2026: `roamCrossing` / `balance.waterCross.chance` (`src/scenes/travel/wildlifeBehavior.ts`, point 192) has no caller in the game; `crossingTarget` is reached only from the staged path in `src/scenes/travel/Wildlife.tsx`. The family crossing of point 362 therefore occurs only when `scripts/verify/wildlife.mjs` stages it.
+  Player impact: a player never sees a herd swim a river, nor the crocodile take a calf mid-channel.
+  Final state: the roaming herd mover calls `roamCrossing` with the calibratable chance, so a herd near water crosses on its own; the start goes through 362's `startFamilyCrossing`, so a parent takes its calf and the mid-channel ambush can follow (cross review of 362, pass 5 P1).
+  Test: a Vitest case that the herd mover starts a crossing at the configured chance near water and never far from it, plus one unstaged live wildlife frame of a herd in open water.
+  Source: finding of the 362 session, 16.11.2026 01:24.
+  Bundle: Tierverhalten.
 - [ ] 363. The straggler — a lame calf the herd leaves behind (user 26.07.2026;
   design.md §19.8 states the target). Every §19 drama is fast: a charge, a seizure,
   a plunge. This one is slow, and nothing is scripted to kill — it is the only
@@ -14738,10 +14745,3 @@ to land than a mechanism that needs a review.
   Source: picture check of the 359 session, 15.11.2026 21:34.
   Bundle: Dorfleben.
 
-- [ ] 1527. Herds never start a water crossing on their own
-  Measured 16.11.2026: `roamCrossing` / `balance.waterCross.chance` (`src/scenes/travel/wildlifeBehavior.ts`, point 192) has no caller in the game; `crossingTarget` is reached only from the staged path in `src/scenes/travel/Wildlife.tsx`. The family crossing of point 362 therefore occurs only when `scripts/verify/wildlife.mjs` stages it.
-  Player impact: a player never sees a herd swim a river, nor the crocodile take a calf mid-channel.
-  Final state: the roaming herd mover calls `roamCrossing` with the calibratable chance, so a herd near water crosses on its own; the start goes through 362's `startFamilyCrossing`, so a parent takes its calf and the mid-channel ambush can follow (cross review of 362, pass 5 P1).
-  Test: a Vitest case that the herd mover starts a crossing at the configured chance near water and never far from it, plus one unstaged live wildlife frame of a herd in open water.
-  Source: finding of the 362 session, 16.11.2026 01:24.
-  Bundle: Tierverhalten.
