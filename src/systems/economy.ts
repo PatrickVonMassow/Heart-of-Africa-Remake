@@ -120,6 +120,7 @@ interface LandmarkPoint extends LatLon {
     | 'grave'
     | 'pyramids'
     | 'giza-pyramids'
+    | 'rock-temples'
     | 'stone-city'
     | 'rock-churches'
     | 'coastal-ruins'

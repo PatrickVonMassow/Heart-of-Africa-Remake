@@ -4,7 +4,7 @@
 // proof.
 import * as THREE from 'three'
 import { describe, it, expect, beforeAll } from 'vitest'
-import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById, landmarkLabelHiddenByMapPoint } from './geo'
+import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById, landmarkLabelHiddenByMapPoint, placeDiscovered } from './geo'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
 import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
 import { lakeContains } from './hydro'
@@ -162,14 +162,36 @@ describe('one site, one label (design.md §4.4/§17.2)', () => {
     expect(landmarkLabelHiddenByMapPoint('no-such-id')).toBe(false)
   })
 
-  it('keeps the rule general: Giza is the ONLY landmark that is also a map point', () => {
+  it('keeps the rule general: Giza and Abu Simbel are the ONLY landmarks that are also map points', () => {
     const shared = [...CULTURAL_LANDMARKS, ...NATURAL_SITES, ...MOUNTAINS, ...WATERFALLS]
       .map((l) => l.id)
       .filter((id) => PLACES.some((p) => p.id === id))
-    expect(shared).toEqual(['giza'])
-    // The suppressed landmark keeps its membership in the §4.4 built eight.
-    expect(CULTURAL_LANDMARKS).toHaveLength(8)
-    expect(CULTURAL_LANDMARKS.map((c) => c.id)).toContain('giza')
+    expect(shared).toEqual(['giza', 'abu-simbel'])
+    // The suppressed landmarks keep their membership in the §4.4 built nine.
+    expect(CULTURAL_LANDMARKS).toHaveLength(9)
+    expect(CULTURAL_LANDMARKS.map((c) => c.id)).toEqual(expect.arrayContaining(['giza', 'abu-simbel']))
+  })
+
+  // Point 379: Abu Simbel is entered ONCE — one landmark record and one map
+  // point sharing an id and a coordinate, of which exactly one label renders.
+  it('gives Abu Simbel exactly one record per form, one position and one label', () => {
+    const landmarkRecords = [...CULTURAL_LANDMARKS, ...NATURAL_SITES, ...MOUNTAINS, ...WATERFALLS]
+      .filter((l) => l.id === 'abu-simbel')
+    const placeRecords = PLACES.filter((p) => p.id === 'abu-simbel')
+    expect(landmarkRecords).toHaveLength(1)
+    expect(placeRecords).toHaveLength(1)
+    expect(placeRecords[0].kind).toBe('monument')
+    expect(placeRecords[0].lat).toBe(landmarkRecords[0].lat)
+    expect(placeRecords[0].lon).toBe(landmarkRecords[0].lon)
+    // Only the map point's label renders; the landmark's is suppressed.
+    expect(landmarkLabelHiddenByMapPoint('abu-simbel')).toBe(true)
+  })
+
+  it('names the Abu Simbel map point once its landmark is sighted, before any visit', () => {
+    expect(placeDiscovered('abu-simbel', [], [])).toBe(false)
+    expect(placeDiscovered('abu-simbel', [], ['abu-simbel'])).toBe(true)
+    expect(placeDiscovered('abu-simbel', ['abu-simbel'], [])).toBe(true)
+    expect(placeDiscovered('abu-simbel', [], ['giza'])).toBe(false)
   })
 })
 
@@ -583,14 +605,15 @@ describe('world data invariants (design.md §4)', () => {
 
 describe('one site, one shape (point 338)', () => {
   it('hides the schematic marker where a landmark draws the real masses', () => {
-    // Giza is the one site declared twice; its map point must not add a
-    // stand-in glyph inside the pyramid field it shares a coordinate with.
+    // Giza and Abu Simbel are the sites declared twice; their map points must
+    // not add a stand-in glyph inside the field they share a coordinate with.
     expect(mapPointGlyphHiddenByLandmark('giza')).toBe(true)
+    expect(mapPointGlyphHiddenByLandmark('abu-simbel')).toBe(true)
   })
 
   it('keeps the marker for every place that is not also a landmark', () => {
     for (const place of PLACES) {
-      if (place.id === 'giza') continue
+      if (place.id === 'giza' || place.id === 'abu-simbel') continue
       expect(mapPointGlyphHiddenByLandmark(place.id)).toBe(false)
     }
   })

@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useGame, exploreCellKey, EXPLORE_CELL_DEG } from '../state/store'
 import { useUi } from '../state/ui'
-import { PLACES, REGION_BORDERS, landmarkLabelHiddenByMapPoint, regionAt, worldToLatLon } from '../world/geo'
+import { PLACES, REGION_BORDERS, landmarkLabelHiddenByMapPoint, placeDiscovered, regionAt, worldToLatLon } from '../world/geo'
 import { useStrings } from '../i18n'
 import { LAND_POLYGONS } from '../world/data/coastline'
 import { RIVERS_DATA } from '../world/data/rivers'
@@ -419,9 +419,9 @@ export function MapOverlay() {
     ctx.font = '11px Georgia, serif'
     ctx.fillStyle = INK
     ctx.textAlign = 'left'
-    for (const id of visitedPlaces) {
-      const place = PLACES.find((p) => p.id === id)
-      if (!place) continue
+    // A map point that is also a landmark (Abu Simbel) is known once sighted.
+    for (const place of PLACES) {
+      if (!placeDiscovered(place.id, visitedPlaces, landmarksSeen)) continue
       const [x, y] = project(place.lon, place.lat)
       ctx.globalAlpha = 0.95
       if (place.kind === 'port') {
