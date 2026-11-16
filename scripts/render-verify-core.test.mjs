@@ -2977,8 +2977,14 @@ describe('the shipped charge ledger', () => {
         'order at frame 47, off the stand at 84, walking checked to 114; 27 take frames; jar lifted ' +
         '0.28 m off the plank before it is in his hand; plank-to-hand gap 0.009 m; fastest take move ' +
         '2.44 m/s (frame 81, hand, 0.134 m in 55 ms, body turned 0.000 rad and moved 0.000 m, phase take, gesture none)',
+      // The real WebGL 2 text, from local/verify-logs/2026-11-16T08-13-29-780-wildlife.log; both
+      // crossing checks of point 1528 share this id.
+      '1528/wildlife/webgl':
+        '{"samples":458,"herdReversed":0,"matesAcross":true,"parentBack":2.94,"herdGainWhileBack":1.76,' +
+        '"worstRate":7,"turnedThrough":3.04,"survivorsOnBank":false,"survivors":2,"parentAlive":true,' +
+        '"parentDeath":null,"calfAlive":true,"settledAfter":7.47,"deadlineBudget":32}',
     }
-    expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`).sort()).toEqual(
+    expect([...new Set(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`))].sort()).toEqual(
       Object.keys(measuredFor).sort(),
     )
     for (const c of declaring) {
