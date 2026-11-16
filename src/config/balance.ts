@@ -3304,6 +3304,37 @@ export const GIZA_CAST = {
 } as const
 
 /**
+ * What the Giza plateau's people do (src/scenes/place/gizaActivity.ts): the
+ * guides walk their tourists between monument viewpoints, the cameleer leads
+ * and tends his camel, the donkey-boy walks his donkey. Paces in m/s, pauses
+ * and lags in s and m. Every value is a CALIBRATABLE educated guess
+ * (docs/giza-1890.md §4 names the cast, not its timing).
+ */
+export const GIZA_ACTIVITY = {
+  /** Walking pace of each party (m/s): a tourist's stroll, a led camel's
+   *  slow step, a donkey's quicker one. */
+  pace: { stroll: 0.7, camel: 0.6, donkey: 0.8 },
+  /** Stand at a stop (s) by its kind: a monument viewpoint, the cameleer or
+   *  donkey-boy seeing to the animal, a passing corner (no stop). */
+  pause: { view: 11, tend: 7, pass: 0 },
+  /** Per-stop pause spread, as a fraction of the pause (0 … this, fixed per
+   *  stop so the parties never fall into step). */
+  pauseSpread: 0.5,
+  /** How far behind its leader along the way a companion walks (m): a
+   *  tourist at the guide's elbow, a mount on its lead rope. */
+  lag: { companion: 1.3, mount: 1.9 },
+  /** Sideways offset off the way (m): the tourist walks beside, the led
+   *  animal a little to the side of the handler's track. */
+  side: { companion: 0.7, mount: 0.4 },
+  /** How much faster than its party's pace a companion or mount may close on
+   *  its place beside the leader (factor): it swings round a corner by
+   *  walking, never by a jump. */
+  catchUp: 1.6,
+  /** How fast a figure turns toward its heading or what it looks at (rad/s). */
+  turnRate: 2.2,
+} as const
+
+/**
  * The walkable Abu Simbel site (design.md §4.4, point 379; research:
  * docs/205-world-accuracy-findings.md §F). Built in a CLIFF frame — `u` along
  * the rock face (+u downstream = north-east), `v` out of it toward the river —
