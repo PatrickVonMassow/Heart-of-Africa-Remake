@@ -1937,10 +1937,13 @@ if (section('giza-figures')) {
     })
     await waitForStable(page)
     await frame(shot('1378-giza-ambient'), { place: 'giza', label: "the plateau's ambient life on the villagers' dressed body" })
-    // Closer: the tourist man in his sun helmet beside a guide in galabiya and turban.
+    // Closer: the tourist man in his sun helmet beside a guide in galabiya and
+    // turban — where they stand NOW (they walk, work-order 1529), held still.
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
     const near = await page.evaluate(() => {
-      const [gx, gz] = window.__placeLayout.errands[0]
-      const [tx, tz] = window.__placeLayout.errands[1]
+      const live = window.__gizaActivity()
+      const [gx, gz] = [live[0].x, live[0].z]
+      const [tx, tz] = [live[1].x, live[1].z]
       const cx = (gx + tx) / 2
       const cz = (gz + tz) / 2
       const p = window.__placePlayer
@@ -1956,7 +1959,66 @@ if (section('giza-figures')) {
       label: 'the tourist in suit and sun helmet beside a guide in galabiya and turban',
     })
   } finally {
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
     await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
+// --- The plateau's people at work (work-order 1529) -----------------------------
+// The guides walk their tourists between monument viewpoints, the cameleer
+// leads his camel, the donkey-boy walks his donkey (gizaActivity.ts). The live
+// poses must change over a few seconds and every mount must stay beside its
+// handler; one frame catches the guide's party mid-walk, held by the life freeze.
+if (section('giza-activity')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('giza')
+  await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeScene && !!window.__gizaActivity,
+    null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  try {
+    const before = await page.evaluate(() => window.__gizaActivity())
+    await page.waitForTimeout(4000)
+    const after = await page.evaluate(() => window.__gizaActivity())
+    const moved = after.filter((p, i) => Math.hypot(p.x - before[i].x, p.z - before[i].z) > 0.5).length
+    check('Giza activity: the plateau\'s figures move over four seconds (not statues)', moved >= 4, JSON.stringify({ moved, before, after }))
+    // Mounts beside their handlers (gizaActivity.ts GIZA_PARTIES: camel 2 with
+    // guide 0, camel 4 with the cameleer 3, donkey 6 with the donkey-boy 5).
+    const pairs = [[2, 0], [4, 3], [6, 5]]
+    const gaps = pairs.map(([m, h]) => +Math.hypot(after[m].x - after[h].x, after[m].z - after[h].z).toFixed(2))
+    check('Giza activity: every mount walks beside its handler', gaps.every((d) => d > 1 && d < 3.5), JSON.stringify(gaps))
+    // Mid-walk: wait for the guide's party to be under way, then hold it.
+    const walking = await page
+      .waitForFunction(() => {
+        const live = window.__gizaActivity()
+        return live[0].moving && live[1].moving ? live : null
+      }, null, { timeout: 60000, polling: 250 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('Giza activity: the guide\'s party is caught walking', !!walking, 'no walking moment within 60 s')
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    const party = await page.evaluate(() => {
+      const live = window.__gizaActivity()
+      const [g, t, c] = [live[0], live[1], live[2]]
+      const cx = (g.x + t.x + c.x) / 3
+      const cz = (g.z + t.z + c.z) / 3
+      // Stand off to the party's side, a few metres out, looking at it.
+      const side = g.yaw + Math.PI / 2
+      const p = window.__placePlayer
+      p.x = cx + Math.sin(side) * 7
+      p.z = cz + Math.cos(side) * 7
+      p.yaw = Math.atan2(cx - p.x, cz - p.z) + Math.PI
+      p.pitch = -0.1
+      return { x: cx, z: cz }
+    })
+    await waitForStable(page)
+    await frame(shot('1529-giza-activity'), {
+      local: { x: party.x, y: 1.0, z: party.z },
+      label: "the guide walking the tourist and his camel between the monuments, mid-stride",
+    })
+  } finally {
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
