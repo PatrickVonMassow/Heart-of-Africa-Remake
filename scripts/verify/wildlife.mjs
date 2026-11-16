@@ -467,22 +467,27 @@ if (section('herd-crosses-on-its-own')) {
     }
     return out
   })
-  // Every animal ever seen crossing, by herd: the frame proves one swimmer,
-  // this proves the herd and its calves went with it (cross review, P2).
+  // Every animal seen crossing within one full drink window (75 s) plus slack,
+  // by herd, and every parent seen in the water together with its own calf:
+  // the frame proves one swimmer, this proves the herd and its calves went with
+  // it (cross review, P2). A page timer records through the screenshot too.
   await page.evaluate(() => {
+    window.__ownT0 = window.__simTime()
     window.__ownCrossers = new Map()
+    window.__ownPairs = new Set()
     window.__ownNoteCrossers = () => {
+      if (window.__simTime() > window.__ownT0 + 90) return
       for (const [sp, l] of Object.entries(window.__wildlife.herdsRef.current)) {
         if (sp === 'elephant' || sp === 'crocodile') continue
         for (const a of l) {
           if (a.dead || a.crossing === undefined || (a.origin ?? a.chunk) === undefined) continue
           window.__ownCrossers.set(a, `${a.origin ?? a.chunk}:${sp}`)
+          if (!a.young && a.child && !a.child.dead && a.child.crossing !== undefined) window.__ownPairs.add(a)
         }
       }
     }
+    window.__ownTimer = setInterval(window.__ownNoteCrossers, 80)
   })
-  // One full drink window (75 s) plus slack: every drinker reaches its bank in it.
-  await page.evaluate(() => { window.__ownT0 = window.__simTime() })
   const found = await page.evaluate(() => window.__pollSim(90, () => {
     const seed = window.__game.getState().seed
     const U = 10
@@ -544,21 +549,18 @@ if (section('herd-crosses-on-its-own')) {
     // The rest of the drink window, anchored at its start rather than at the
     // swimmer: herd-mates reach their bank spots at their own pace and share
     // the herd's roll.
-    await page.evaluate(() => window.__pollSim(Math.max(5, window.__ownT0 + 90 - window.__simTime()),
-      () => { window.__ownNoteCrossers(); return false }))
+    await page.evaluate(() => window.__pollSim(Math.max(0, window.__ownT0 + 90 - window.__simTime()), () => false))
     const herd = await page.evaluate(() => {
       const s = window.__ownSwimmer.a
       const group = window.__ownCrossers.get(s)
       const crossers = [...window.__ownCrossers].filter(([, g]) => g === group).map(([a]) => a)
-      const parents = [...window.__ownCrossers.keys()].filter((a) => !a.young && a.child && !a.child.dead)
       const perHerd = {}
       for (const [a, g] of window.__ownCrossers) if (!a.young) perHerd[g] = (perHerd[g] ?? 0) + 1
       return {
         group,
         mostAdultsOneHerd: Math.max(0, ...Object.values(perHerd)),
         adults: crossers.filter((a) => !a.young).length,
-        parents: parents.length,
-        calvesAlong: parents.filter((a) => window.__ownCrossers.has(a.child)).length,
+        parentsWithCalfInWater: window.__ownPairs.size,
       }
     })
     // Only a herd's drinkers at a wet bank share its roll (design.md §19.5
@@ -567,14 +569,17 @@ if (section('herd-crosses-on-its-own')) {
     check('a herd shares its roll: two of its grown drinkers cross in one window (point 1527)',
       herd.mostAdultsOneHerd >= 2, JSON.stringify(herd))
     check('a crossing parent takes its calf along (point 1527 via 362)',
-      herd.parents >= 1 && herd.calvesAlong >= 1, JSON.stringify(herd))
+      herd.parentsWithCalfInWater >= 1, JSON.stringify(herd))
   }
   await page.evaluate(() => {
+    clearInterval(window.__ownTimer)
     window.__balance.waterCross.chance = window.__ownPrev.chance
     window.__balance.currentDrift = window.__ownPrev.drift
     window.__ownSwimmer = undefined
     window.__ownCrossers = undefined
+    window.__ownPairs = undefined
     window.__ownNoteCrossers = undefined
+    window.__ownTimer = undefined
     window.__ownT0 = undefined
   })
 }
