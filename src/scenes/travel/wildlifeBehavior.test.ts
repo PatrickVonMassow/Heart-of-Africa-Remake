@@ -5393,7 +5393,7 @@ describe('the crossing turned back (point 362)', () => {
     const plan = familyCrossing({ x: 0, z: 0, child: calf }, { tx: 5.5, tz: 0 }, coast, 6)
     expect(plan[1]).toMatchObject({ animal: calf, tx: 5.5, tz: 0 })
     // The parent's line meets the sea too: the calf stays ashore.
-    const deep = (x: number, z: number) => (x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
+    const deep = (x: number, _z: number) => (x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
     const calf2 = { x: 0.4, z: -1.5, young: true }
     expect(familyCrossing({ x: 0, z: 0, child: calf2 }, { tx: 5.5, tz: 0 }, deep, 6)).toHaveLength(1)
     // Its flank stays dry (no water, no sea) but the diagonal to the parent's
