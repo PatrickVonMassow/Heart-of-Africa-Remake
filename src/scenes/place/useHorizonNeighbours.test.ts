@@ -21,4 +21,12 @@ describe('horizon neighbour dwelling cache', () => {
     dwellingsFor(1, 0)('cairo')
     expect(built).toEqual(['cairo', 'cairo', 'cairo'])
   })
+
+  it('holds only the current world seed', () => {
+    built.length = 0
+    dwellingsFor(2, 0)('cairo')
+    dwellingsFor(3, 0)('cairo')
+    dwellingsFor(2, 0)('cairo')
+    expect(built).toEqual(['cairo', 'cairo', 'cairo'])
+  })
 })
