@@ -2176,4 +2176,18 @@ export const RED_CHARGES = [
       + 'WebGPU device is lost; roof-clearance (8 pass) and porter-head-load (16 pass) are green alone. The cumulative '
       + 'rebuild leak is point 1520\'s. The charge dies with point 1520.',
   })),
+  ...[
+    /^every ending resolves on a bank within the crossing deadline\b/i,
+    /^the forced drive-off leaves parent and calf alive, both on a bank\b/i,
+  ].map((match) => ({
+    point: 1528,
+    suite: 'wildlife',
+    backend: 'webgl',
+    kind: 'check',
+    match,
+    detailMatch: /"survivorsOnBank":false/,
+    why:
+      'MEASURED 16.11.2026 on WebGL 2, main 8945769b5: both crossing-turned-back checks fail with survivorsOnBank=false, '
+      + 'survivors=2, parentAlive=true; WebGPU at the same HEAD green. The defect is point 1528\'s. The charge dies with it.',
+  })),
 ]
