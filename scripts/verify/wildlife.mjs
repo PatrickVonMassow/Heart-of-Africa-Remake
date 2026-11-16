@@ -76,8 +76,10 @@ if (section('crossing-turned-back')) {
     window.__game.getState().debugJumpTo(-17.9, 25.9)
     window.__ui.getState().setWheelZoomEnabled(true)
     window.__ui.getState().setTravelZoom(2)
-    window.__wildlife.restock()
   })
+  // The wildlife dev hook exists only once the travel view has mounted.
+  await page.waitForFunction(() => !!window.__wildlife?.restock, null, { timeout: 60000 })
+  await page.evaluate(() => window.__wildlife.restock())
   await page.waitForFunction(() => {
     const h = window.__wildlife?.herdsRef?.current
     return !!h && Object.values(h).some((l) => l.some((a) => a.chunk && !a.dead))
