@@ -10,6 +10,7 @@
 
 import { attribute, float, mix, positionLocal, uniform, vec3 } from 'three/tsl'
 import type { vertexColor } from 'three/tsl'
+import { balance } from '../config/balance'
 
 // 0.5 = the untouched mid-year colour, 0 = full straw (dry), 1 = full green
 // (lush). Deserts stay unchanged on their own: their sand carries no green
@@ -55,6 +56,37 @@ export function wetGroundColor(col: unknown, wet: unknown = GROUND_WET_U) {
 export function wetGroundRoughness(rough: unknown, wet: unknown = GROUND_WET_U) {
   return (rough as ReturnType<typeof float>).mul(
     float(1).sub((wet as ReturnType<typeof float>).mul(0.55)),
+  )
+}
+
+// The built fabric (roofs, walls, wood, cloth) takes the SAME wetness: its
+// albedo darkens a little and its roughness drops, so the sun and the village
+// fire put a sharper, brighter highlight on wet thatch and daub (the standard
+// material's fixed F0 means the lower roughness IS the specular rise). The
+// factors are calibratable in `balance.rain`; the CPU mirrors below are the
+// same formulas, kept in lock-step for the pure tests.
+
+/** Wet-fabric albedo factor: 1 dry, 1 − darken at full soak. */
+export function wetFabricColorFactor(wet: number, darken = balance.rain.fabricDarken): number {
+  return 1 - Math.min(1, Math.max(0, wet)) * darken
+}
+
+/** Wet-fabric roughness: `rough` dry, `rough · (1 − gloss)` at full soak. */
+export function wetFabricRoughnessCpu(rough: number, wet: number, gloss = balance.rain.fabricGloss): number {
+  return rough * (1 - Math.min(1, Math.max(0, wet)) * gloss)
+}
+
+/** Darken a fabric albedo node with the shared ground wetness. */
+export function wetFabricColor(col: unknown, wet: unknown = GROUND_WET_U) {
+  return (col as ReturnType<typeof float>).mul(
+    float(1).sub((wet as ReturnType<typeof float>).mul(balance.rain.fabricDarken)),
+  )
+}
+
+/** Lower a fabric roughness node with the shared ground wetness. */
+export function wetFabricRoughness(rough: unknown, wet: unknown = GROUND_WET_U) {
+  return (rough as ReturnType<typeof float>).mul(
+    float(1).sub((wet as ReturnType<typeof float>).mul(balance.rain.fabricGloss)),
   )
 }
 

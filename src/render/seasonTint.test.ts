@@ -4,7 +4,8 @@
 // exercised live in the running scene, not unit-testable without a renderer.
 import { describe, expect, it } from 'vitest'
 import { float } from 'three/tsl'
-import { crownCollapse, drynessFromTint, GROUND_WET_U, groundSprout, setGroundWetness, setSeasonCollapse, setSeasonTint, SEASON_COLLAPSE_U, SEASON_TINT_U, wetGroundColor, wetGroundRoughness } from './seasonTint'
+import { crownCollapse, drynessFromTint, GROUND_WET_U, groundSprout, setGroundWetness, setSeasonCollapse, setSeasonTint, SEASON_COLLAPSE_U, SEASON_TINT_U, wetFabricColor, wetFabricColorFactor, wetFabricRoughness, wetFabricRoughnessCpu, wetGroundColor, wetGroundRoughness } from './seasonTint'
+import { balance } from '../config/balance'
 
 describe('setSeasonTint (design.md §19.13)', () => {
   it('clamps an out-of-range greenness to 0 before mixing at full strength', () => {
@@ -35,6 +36,43 @@ describe('setGroundWetness — wet ground uniform (point 225)', () => {
   it('wetGroundColor and wetGroundRoughness build nodes fed by the wet uniform', () => {
     expect(wetGroundColor(float(1))).toBeTruthy()
     expect(wetGroundRoughness(float(1))).toBeTruthy()
+  })
+})
+
+/** Whether a node graph reads `target` (identity on the node's id). */
+function readsNode(root: unknown, target: unknown): boolean {
+  const want = (target as { id: number }).id
+  let found = false
+  ;(root as { traverse(cb: (n: { id: number }) => void): void }).traverse((n) => {
+    if (n.id === want) found = true
+  })
+  return found
+}
+
+describe('wet built fabric — roofs, walls, wood, cloth (design.md §19.13)', () => {
+  it('dry leaves today\'s albedo and roughness exactly unchanged', () => {
+    expect(wetFabricColorFactor(0)).toBe(1)
+    for (const r of [0.85, 0.9, 0.95]) expect(wetFabricRoughnessCpu(r, 0)).toBe(r)
+  })
+
+  it('soaked darkens the albedo slightly and lowers the roughness (a sharper highlight)', () => {
+    const c = wetFabricColorFactor(1)
+    expect(c).toBeCloseTo(1 - balance.rain.fabricDarken)
+    expect(c).toBeLessThan(1)
+    // "slightly": less darkening than the ground's 40 %
+    expect(c).toBeGreaterThan(0.6)
+    expect(wetFabricRoughnessCpu(0.95, 1)).toBeLessThan(0.95 * 0.7)
+    // monotone in the soak, clamped outside 0..1
+    expect(wetFabricColorFactor(0.5)).toBeGreaterThan(c)
+    expect(wetFabricColorFactor(3)).toBe(c)
+    expect(wetFabricRoughnessCpu(0.95, -1)).toBe(0.95)
+  })
+
+  it('the fabric nodes read the SAME uniform the ground does (no second wetness)', () => {
+    expect(readsNode(wetFabricColor(float(1)), GROUND_WET_U)).toBe(true)
+    expect(readsNode(wetFabricRoughness(float(0.95)), GROUND_WET_U)).toBe(true)
+    expect(readsNode(wetGroundColor(float(1)), GROUND_WET_U)).toBe(true)
+    expect(readsNode(wetFabricColor(float(1), float(0.5)), GROUND_WET_U)).toBe(false)
   })
 })
 

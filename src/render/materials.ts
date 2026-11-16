@@ -12,7 +12,7 @@
 import * as THREE from 'three/webgpu'
 import { FIGURE_MICRO } from '../config/balance'
 import { SWEPT_PATCH_MEAN, edgeBandUniforms, sweptNode } from './edgeBand'
-import { seasonTintNode, wetGroundColor, wetGroundRoughness } from './seasonTint'
+import { seasonTintNode, wetFabricColor, wetFabricRoughness, wetGroundColor, wetGroundRoughness } from './seasonTint'
 import { shelteredWetNode } from './shelterWetness'
 import {
   cameraViewMatrix,
@@ -395,7 +395,10 @@ export function createSurfaceMaterial(
     col = col.mul(base.mul(-0.18).add(1))
     col = col.mul(streaks.mul(0.12).add(0.94))
   }
-  m.colorNode = col
+  // Rain wets the built fabric with the ground's one wetness value (design.md
+  // §19.13): a uniform read, so a storm never relinks the program (point 96).
+  m.colorNode = wetFabricColor(col)
+  m.roughnessNode = wetFabricRoughness(float(m.roughness))
   m.normalNode = surfaceNormal(kind, float(opts.bump ?? 1))
   return m
 }
@@ -441,7 +444,8 @@ export function createNoisyMaterial(opts: NoisyMaterialOptions): THREE.MeshStand
     col = col.mul(base.mul(-0.18).add(1))
     col = col.mul(streaks.mul(0.12).add(0.94))
   }
-  m.colorNode = col
+  m.colorNode = wetFabricColor(col)
+  m.roughnessNode = wetFabricRoughness(float(m.roughness))
   // Micro-relief from the same field, weighted toward the fine grain: the
   // bump strength works on screen-space derivatives, so the high-frequency
   // octave carries the visible structure at eye height.

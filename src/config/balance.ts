@@ -999,6 +999,22 @@ interface BalanceConfig {
     dripOffsetM: number
     /** Half-width (m) of the drip band around that peak. */
     dripHalfWidthM: number
+    /** Albedo darkening of the built fabric (roofs, walls, wood, cloth) at full soak, 0..1. */
+    fabricDarken: number
+    /** Roughness reduction of the built fabric at full soak, 0..1 (the wet sheen). */
+    fabricGloss: number
+    /** Seconds an impact ring/puff lives after its drop arrives. */
+    impactLife: number
+    /** Radius (m) an impact reaches by the end of its life. */
+    impactRadiusM: number
+    /** Peak opacity of an impact. */
+    impactOpacity: number
+    /** Drop visibility looking up into the bright sky, relative to against the ground (0..1). */
+    dropSkyVisibility: number
+    /** Extra brightness of a drop seen toward the sun (forward glint). */
+    dropSunGlint: number
+    /** Per-drop brightness spread, 0 (all alike) .. 1. */
+    dropVariation: number
   }
   /** The village cooking fire's response to rain (design.md §19.10, point 256). */
   fire: {
@@ -2263,6 +2279,16 @@ export const balance: BalanceConfig = {
     dripBoost: 0.35, // the runoff band reads a third wetter than the open yard
     dripOffsetM: 0.3,
     dripHalfWidthM: 0.35,
+    // Rain touching the world (design.md §19.13): educated guesses, all
+    // calibratable; read when the place's materials are built (next visit).
+    fabricDarken: 0.22, // "slightly" darker — less than the ground's 0.4
+    fabricGloss: 0.5, // thatch 0.95 → ~0.48 soaked: the fire catches it
+    impactLife: 0.3,
+    impactRadiusM: 0.16,
+    impactOpacity: 0.55,
+    dropSkyVisibility: 0.25, // nearly vanishing against the bright sky
+    dropSunGlint: 1.4,
+    dropVariation: 0.45,
   },
   fire: {
     // The cooking fire keeps burning through the rains under its thatch cook-shelter

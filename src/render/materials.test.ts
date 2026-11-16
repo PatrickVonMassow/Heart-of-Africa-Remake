@@ -81,6 +81,13 @@ describe('createSurfaceMaterial', () => {
     expect(m.normalNode).toBeTruthy()
     expect(m.roughness).toBe(0.8)
   })
+
+  it('wires the wet-fabric roughness node (rain glosses roofs and walls)', () => {
+    for (const kind of ['plaster', 'mud', 'thatch', 'wood'] as const) {
+      expect(createSurfaceMaterial(kind, { base: '#aa8855', alt: '#886633' }).roughnessNode).toBeTruthy()
+    }
+    expect(createNoisyMaterial({ base: '#aa8855', alt: '#886633', scale: 1 }).roughnessNode).toBeTruthy()
+  })
 })
 
 describe('loadSurfaceTexture', () => {
