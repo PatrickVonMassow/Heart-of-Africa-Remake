@@ -2184,6 +2184,20 @@ visible silhouette's azimuth lies inside the Giza skyline span
 the azimuth-exclusion helper (span from placement, margin, inside/
 outside with ±π wrap-around) pure-tested in the same file.
 
+Horizon neighbours (point 380): `src/scenes/place/horizonNeighbours.test.ts`
+pins the sight rule as properties, not examples — over random point sets a
+neighbour is present exactly within the sight distance and absent beyond it,
+presence is mutual, the bearing back is the bearing out turned by 180°, the
+apparent size falls with distance under the looming bound, the whole footprint
+sits between the disc edge and the band, and the base never stands above
+`panoramaStandY` under any footprint sample; on the real map Cairo and Giza
+see each other. `scripts/verify/polish-panorama.mjs` keeps `giza-skyline`
+(`__placeSkyline === 'giza-pyramids'`, now set by the derived Cairo→Giza
+neighbour) and adds `giza-sees-cairo`: at the Giza site the Cairo neighbour
+(`__placeNeighbours`) is PROJECTED through the live camera and must land on
+screen, east of the site, with its base on the drawn ground and a visible
+height, framed as a place subject.
+
 ## 32. Render pipeline upgrades.
 
 Verifiable:

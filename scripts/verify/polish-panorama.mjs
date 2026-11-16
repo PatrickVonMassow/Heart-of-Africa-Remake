@@ -83,6 +83,14 @@ if (section('giza-skyline')) {
 
   const sky = await page.evaluate(() => window.__placeSkyline ?? 'none')
   check('Cairo mounts the Giza pyramid skyline', sky === 'giza-pyramids', `${sky}`)
+  // Point 380: the skyline is no longer a hand-written Cairo row but the
+  // derived neighbour rule — Giza is in sight and seated WEST of the town.
+  const gizaN = await page.evaluate(() => (window.__placeNeighbours ?? []).find((n) => n.id === 'giza') ?? null)
+  check(
+    'the Giza skyline is the derived horizon neighbour, seated west of Cairo (point 380)',
+    !!gizaN && gizaN.bearingDeg > 225 && gizaN.bearingDeg < 315,
+    JSON.stringify(gizaN),
+  )
   await page.evaluate(() => {
     const p = window.__placePlayer
     p.x = -(window.__placeLayout.radius - 8)
@@ -180,6 +188,106 @@ if (section('giza-skyline')) {
     JSON.stringify(gizaExcl),
   )
   await frame('105-cairo-panorama-giza-clear', { place: 'cairo', label: 'the Cairo panorama with the Giza skyline' })
+}
+
+// --- Giza sees Cairo (design.md §2.5, point 380) ------------------------------
+// The reverse of the skyline above, by the same symmetric rule: standing at the
+// Giza site, Cairo stands on the EASTERN horizon. Judged by PROJECTING the
+// neighbour's own meshes through the live camera (§7.2), never by a radius.
+if (section('giza-sees-cairo')) {
+  await goToPlace('giza')
+  await page.waitForFunction(() => (window.__placeNeighbours ?? []).some((n) => n.id === 'cairo'), null, { timeout: 20000 }).catch(() => {})
+  const cairoN = await page.evaluate(() => (window.__placeNeighbours ?? []).find((n) => n.id === 'cairo') ?? null)
+  check(
+    'Giza seats Cairo as a horizon neighbour, EAST of the site (point 380)',
+    !!cairoN && cairoN.bearingDeg > 45 && cairoN.bearingDeg < 135 && cairoN.kind === 'port',
+    JSON.stringify(cairoN),
+  )
+  if (cairoN) {
+    // Stand inside the east rim, level, facing the neighbour.
+    await page.evaluate((n) => {
+      window.__game.getState().setJournalOpen(false)
+      const p = window.__placePlayer
+      const r = (window.__placeLayout?.radius ?? 90) - 10
+      const d = Math.hypot(n.x, n.z) || 1
+      p.x = (n.x / d) * r
+      p.z = (n.z / d) * r
+      p.pitch = 0
+      p.yaw = Math.atan2(-(n.x - p.x), -(n.z - p.z))
+    }, cairoN)
+    await nextFrames(3)
+    const seen = await page.evaluate(() => {
+      const scene = window.__placeScene
+      const camera = window.__placeCamera
+      const n = (window.__placeNeighbours ?? []).find((m) => m.id === 'cairo')
+      if (!scene || !camera || !n) return null
+      scene.updateMatrixWorld(true)
+      const root = scene.getObjectByName('horizon-neighbour-cairo')
+      if (!root || !root.visible) return { drawn: false }
+      const pts = []
+      root.traverseVisible((o) => {
+        if (!o.isMesh) return
+        o.geometry.computeBoundingBox()
+        const b = o.geometry.boundingBox
+        for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+          pts.push(camera.position.clone().set(x, y, z).applyMatrix4(o.matrixWorld).project(camera))
+        }
+      })
+      if (!pts.length) return { drawn: false }
+      const xs = pts.map((p) => p.x)
+      const ys = pts.map((p) => p.y)
+      const box = { left: Math.min(...xs), right: Math.max(...xs), bottom: Math.min(...ys), top: Math.max(...ys) }
+      const front = pts.every((p) => p.z > -1 && p.z < 1)
+      // The base, as drawn: the first surface on the sight line to the base
+      // point must be no further than the base itself (the point-181 gate).
+      const hit = window.__placeRayHit ? window.__placeRayHit(n.x, n.y, n.z) : null
+      return {
+        drawn: true,
+        front,
+        box,
+        heightPx: ((box.top - box.bottom) * window.innerHeight) / 2,
+        widthPx: ((box.right - box.left) * window.innerWidth) / 2,
+        baseRatio: hit && hit.hitDistance != null ? hit.hitDistance / hit.targetDistance : Infinity,
+        baseHit: hit?.hitName ?? 'sky',
+      }
+    })
+    const onScreen = !!seen?.drawn && seen.front &&
+      seen.box.right > -1 && seen.box.left < 1 && seen.box.top > -1 && seen.box.bottom < 1 &&
+      (seen.box.left + seen.box.right) / 2 > -1 && (seen.box.left + seen.box.right) / 2 < 1
+    check('from the Giza rim the Cairo neighbour PROJECTS onto the screen, in front of the camera (point 380)', onScreen, JSON.stringify(seen))
+    check(
+      'the projected Cairo neighbour is a readable band, not a sliver (>= 6 px tall, >= 40 px wide)',
+      !!seen?.drawn && seen.heightPx >= 6 && seen.widthPx >= 40,
+      JSON.stringify(seen && { heightPx: seen.heightPx, widthPx: seen.widthPx }),
+    )
+    check(
+      'the Cairo neighbour stands on drawn ground — the surface at its base is no further than the base (point 181/380)',
+      !!seen?.drawn && seen.baseRatio <= 1.05,
+      JSON.stringify(seen && { baseRatio: seen.baseRatio, baseHit: seen.baseHit }),
+    )
+    const buf = await frame('100b-giza-sees-cairo', { place: 'giza', label: 'Cairo on the eastern horizon of the Giza site' })
+    // Not a black sliver: the neighbour's pixels read as lit, hazed plaster.
+    if (buf && seen?.drawn) {
+      const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+      const px = (nx, ny) => [Math.round(((nx + 1) / 2) * (info.width - 1)), Math.round(((1 - ny) / 2) * (info.height - 1))]
+      const [x0, y1] = px(Math.max(-1, seen.box.left), Math.max(-1, seen.box.bottom))
+      const [x1, y0] = px(Math.min(1, seen.box.right), Math.min(1, seen.box.top))
+      let dark = 0
+      let n = 0
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        const i = (y * info.width + x) * info.channels
+        if (lum([data[i], data[i + 1], data[i + 2]]) < 25) dark++
+        n++
+      }
+      const frac = n ? dark / n : 1
+      check('the Cairo neighbour is not a black sliver (< 25 % near-black pixels in its projected box)', n > 0 && frac < 0.25, `${dark} of ${n} px near-black`)
+    }
+    await page.evaluate(() => {
+      const p = window.__placePlayer
+      p.x = 0
+      p.z = 0
+    })
+  }
 }
 
 // --- Panorama wildlife (design.md §2) ---------------------------------------------

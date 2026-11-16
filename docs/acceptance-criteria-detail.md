@@ -567,7 +567,9 @@ DERIVED from the ring velocity tangent (`panoramaDriftYaw`, the codebase's atan2
 convention), so a silhouette can never reverse, and the stride phase rides the arc
 expressed in the silhouette's OWN rendered frame (`panoramaGaitDistance`, the world arc ÷
 its enlargement `scale`), so the leg cadence stays consistent with the rendered body's
-slow horizon crawl.
+slow horizon crawl. Ports, villages and monument sites within the calibratable sight distance
+stand on each other's horizon at map bearing and distance-scaled size on `panoramaStandY`
+(Giza sees Cairo as Cairo sees Giza; one symmetric rule, point 380).
 
 ## 32. Render pipeline upgrades.
 

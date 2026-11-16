@@ -765,6 +765,8 @@ export const en: Strings = {
     edgeBandWander: 'Settlement edge: wander (m)',
     edgeBandStrength: 'Settlement edge: strength',
     bankWadeDepth: 'River bank: wading depth (m)',
+    horizonSight: 'Horizon neighbours: sight distance (°)',
+    horizonSize: 'Horizon neighbours: apparent size',
     bloodStainSize: 'Blood stain: size',
     bloodStainIrregularity: 'Blood stain: ragged outline',
     grassFireDrawn: 'Grass fire: drawn',

@@ -789,6 +789,8 @@ export interface Strings {
     edgeBandWander: string
     edgeBandStrength: string
     bankWadeDepth: string
+    horizonSight: string
+    horizonSize: string
     bloodStainSize: string
     bloodStainIrregularity: string
     grassFireDrawn: string

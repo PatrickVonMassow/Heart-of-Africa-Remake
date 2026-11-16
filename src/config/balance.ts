@@ -479,6 +479,20 @@ interface BalanceConfig {
      *  minimum presence is guaranteed (≈ 1.5× the default-zoom view ring). */
     vicinityRadius: number
   }
+  /** Neighbours on the first-person horizon (design.md §2.5): a port, village
+   *  or monument site within sight of the place stands on its horizon. */
+  horizonNeighbours: {
+    /** Sight distance in map degrees; symmetric — A sees B iff B sees A. */
+    sightDistanceDeg: number
+    /** Symbolic compaction of the apparent size: a silhouette of true height
+     *  h (m) at map distance D (place units) rises atan(apparentScale·h/D). */
+    apparentScale: number
+    /** Looming bound: no neighbour rises above this elevation (deg). */
+    maxElevationDeg: number
+    /** Gap (place units) between the walkable disc's edge and a silhouette's
+     *  near side. */
+    seatMargin: number
+  }
   /** Calf/parent water drama (design.md §19.8, point 122). */
   waterDrama: {
     /** Seconds a strong current may carry an animal before it drowns. */
@@ -1976,6 +1990,12 @@ export const balance: BalanceConfig = {
     landmarkMarginDeg: 8, // clearance around Giza / Table Mountain
     vicinityMinAnimals: 6, // region-typical animals guaranteed near a settlement
     vicinityRadius: 75, // ≈ 1.5× the default-zoom view ring (VIEW_AT_ZOOM1·0.5)
+  },
+  horizonNeighbours: {
+    sightDistanceDeg: 1.2, // calibratable: Cairo↔Giza (1.08°) and Nubian village↔Abu Simbel (1.15°) in sight, Berbera↔Somali village (1.30°) not
+    apparentScale: 1.36, // calibratable: keeps the Giza field over Cairo at its accepted ~11° (point 82)
+    maxElevationDeg: 12, // calibratable: §2.5 looming bound
+    seatMargin: 6, // calibratable
   },
   waterDrama: {
     drownSeconds: 30, // calibratable: how long the current may carry an animal
