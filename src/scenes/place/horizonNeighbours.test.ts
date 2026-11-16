@@ -165,12 +165,17 @@ describe('horizon neighbours: apparent size and seat', () => {
       const half = seat.footprint * seat.depth
       expect(seat.radius + half).toBeLessThanOrEqual(PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE + 1e-9)
       expect(seat.radius - half).toBeGreaterThanOrEqual(disc + hn.seatMargin - 1e-9)
-      // Every footprint sample lies inside the room too.
+      // Every footprint sample lies inside the room too. One assertion per seat
+      // on the sample extremes: an expect per dense sample timed out on CI.
+      let lo = Infinity
+      let hi = -Infinity
       for (const [x, z] of footprintSamples(seat)) {
         const rr = Math.hypot(x, z)
-        expect(rr).toBeLessThanOrEqual(PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE + 1e-6)
-        expect(rr).toBeGreaterThanOrEqual(disc + hn.seatMargin - 1e-6)
+        lo = Math.min(lo, rr)
+        hi = Math.max(hi, rr)
       }
+      expect(hi).toBeLessThanOrEqual(PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE + 1e-6)
+      expect(lo).toBeGreaterThanOrEqual(disc + hn.seatMargin - 1e-6)
       expect(Math.hypot(seat.x, seat.z)).toBeCloseTo(seat.radius, 9)
     }
   })
