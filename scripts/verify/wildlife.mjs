@@ -488,7 +488,8 @@ if (section('herd-crosses-on-its-own')) {
     }
     window.__ownTimer = setInterval(window.__ownNoteCrossers, 80)
   })
-  const found = await page.evaluate(() => window.__pollSim(90, () => {
+  const found = await page.evaluate(() => window.__pollSim(Math.max(0, window.__ownT0 + 90 - window.__simTime()), () => {
+    if (window.__simTime() > window.__ownT0 + 90) return false
     const seed = window.__game.getState().seed
     const U = 10
     const h = window.__wildlife.herdsRef.current
