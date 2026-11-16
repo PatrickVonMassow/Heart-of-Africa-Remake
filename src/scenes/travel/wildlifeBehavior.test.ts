@@ -5,6 +5,11 @@ import {
   channelDriftStep,
   drinkCatchment,
   mireFate,
+  lamenessRoll,
+  herdCentroid,
+  lamePaceFactor,
+  lameFate,
+  LAME_SPEED_MAX,
   mireRoll,
   vicinitySeedBounds,
   vicinityAttemptSeed,
@@ -5503,5 +5508,48 @@ describe('the crossing turned back (point 362)', () => {
     expect(channelReturnExpired(r, resolve)).toBe(true)
     expect(channelReturnExpired(undefined, resolve)).toBe(false)
     expect(channelReturnExpired({ time: resolve - 1, heading: 0 }, resolve)).toBe(false)
+  })
+})
+
+describe('the straggler (design.md §19.8, point 363)', () => {
+  it('lameness fires only after a SURVIVED hunt, and only on its chance', () => {
+    expect(lamenessRoll(false, 1, 0)).toBe(false)
+    expect(lamenessRoll(true, 0.12, 0.11)).toBe(true)
+    expect(lamenessRoll(true, 0.12, 0.12)).toBe(false)
+    expect(lamenessRoll(true, 0, 0)).toBe(false)
+    expect(lamenessRoll(true, 1, 0.999)).toBe(true)
+    expect(lamenessRoll(true, 5, 0.999)).toBe(true) // clamped to 1
+  })
+  it('the penalty slows the calf and the parent mirrors it; never frozen, never full pace', () => {
+    expect(lamePaceFactor(false, 0.45)).toBe(1)
+    const calf = lamePaceFactor(true, balance.straggler.speedFactor)
+    expect(calf).toBeLessThan(1)
+    expect(calf).toBeGreaterThan(0)
+    expect(lamePaceFactor(true, 2)).toBe(LAME_SPEED_MAX)
+    expect(lamePaceFactor(true, 0)).toBe(0.05)
+  })
+  it('the window heals; no window leaves a calf lame for good', () => {
+    expect(lameFate(0, 90)).toBe('lame')
+    expect(lameFate(89.9, 90)).toBe('lame')
+    expect(lameFate(90, 90)).toBe('healed')
+    expect(lameFate(0, 0)).toBe('healed')
+    expect(lameFate(0, -1)).toBe('healed')
+    expect(lameFate(0, Number.NaN)).toBe('healed')
+    expect(lameFate(0, Number.POSITIVE_INFINITY)).toBe('healed')
+  })
+  it('the default values keep the chance low and the window finite', () => {
+    expect(balance.straggler.lameChance).toBeGreaterThan(0)
+    expect(balance.straggler.lameChance).toBeLessThanOrEqual(0.25)
+    expect(Number.isFinite(balance.straggler.healSeconds)).toBe(true)
+    expect(balance.straggler.healSeconds).toBeGreaterThan(0)
+  })
+  it('the limp aims at the living herd-mates in reach, never at the pair itself', () => {
+    const calf = { x: 0, z: 0 }
+    const parent = { x: 1, z: 0 }
+    const mates = [calf, parent, { x: 20, z: 0 }, { x: 30, z: 10 }, { x: 25, z: 0, dead: true }, { x: 500, z: 0 }]
+    const c = herdCentroid(mates, 0, 0, 80, (m) => m === calf || m === parent)
+    expect(c).toEqual({ x: 25, z: 5 })
+    // No mate in reach: the pair stands (null), it never limps at nothing.
+    expect(herdCentroid([calf, parent, { x: 500, z: 0 }], 0, 0, 80, (m) => m === calf || m === parent)).toBeNull()
   })
 })

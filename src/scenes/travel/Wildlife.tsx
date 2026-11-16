@@ -111,6 +111,10 @@ import {
   drinkCatchment,
   mireFate,
   mireRoll,
+  lamenessRoll,
+  lamePaceFactor,
+  lameFate,
+  herdCentroid,
   REGION_PREDATORS,
   parentAttackOutcome,
   findAdopter,
@@ -439,6 +443,10 @@ interface Animal {
    *  it struggles in place, cannot free itself, and the mud releases it
    *  only after balance.waterDrama.mireSeconds — unless a predator ends it. */
   mired?: number
+  /** Seconds a calf has been LAME after surviving a hunt (point 363): it limps
+   *  after its herd at balance.straggler.speedFactor, its parent stays beside
+   *  it, and the limp heals after balance.straggler.healSeconds. */
+  lame?: number
   /** This calf is currently inside a gambol bout (per-bout mire roll). */
   bouted?: boolean
   /** Seeded by the dry-shore guarantee (point 135) — counted by tag. */
@@ -1043,6 +1051,16 @@ const RAPTOR_STATE: {
  *  predator and its calf to guard it, standing off a short distance in front
  *  of the young. */
 const YOUNG_FOLLOW_SPEED = 4.5
+/** The straggler's roll (design.md §19.8, point 363): a calf that SURVIVED a
+ *  hunt aimed at it may be left lame. Deterministic per event, hashed from
+ *  phase and position like the defence roll. */
+function lameAfterHunt(calf: Animal) {
+  if (calf.dead || !calf.young) return
+  // fract(sin·43758) spreads near-uniformly on [0, 1); |sin| alone would skew the chance low.
+  const h = Math.sin(calf.phase * 91.3 + calf.x * 57.1 + calf.z * 211.9) * 43758.5453
+  const roll = h - Math.floor(h)
+  if (lamenessRoll(true, balance.straggler.lameChance, roll)) calf.lame = 0
+}
 const GUARD_RADIUS = 12
 const GUARD_STANDOFF = 2.2
 /** Calf predation (design.md §19): while the hunt runs, the parent does not
@@ -2991,6 +3009,7 @@ function Herds() {
               // resumes herd behaviour — an attacker never stands vigil.
               calf.caught = undefined
               a.kick = PARENT_KICK_SECONDS
+              lameAfterHunt(calf) // the straggler (point 363)
               if (channelCroc) {
                 // Driven off mid-channel (point 362): both swim for the nearest bank.
                 swimToChannelBank(calf)
@@ -3124,6 +3143,7 @@ function Herds() {
               // point (the point-121 claim rule).
               a.kick = PARENT_KICK_SECONDS
               LION_STATE.victim = null
+              lameAfterHunt(calf) // the straggler (point 363)
               if (outcome === 'kill') {
                 // Revenge (point 146): the hunter drops where it stands and
                 // becomes an ordinary herd carcass; straight to idle hides
@@ -3166,6 +3186,12 @@ function Herds() {
           continue
         }
         if (a.young) {
+          // The straggler's limp always heals (point 363, the point-118 lesson).
+          if (a.lame !== undefined) {
+            a.lame += dt
+            if (lameFate(a.lame, balance.straggler.healSeconds) === 'healed') a.lame = undefined
+            else devAssert(a.lame < balance.straggler.healSeconds + 1, 'lame-window-bounded', () => `${sp} lame=${a.lame}`)
+          }
           const isChaseVictim = LION_STATE.mode === 'chase' && LION_STATE.victim === a
           // The drying waterhole (point 123): a mired calf struggles in
           // place — no drift, no self-rescue — until a predator ends it or
@@ -5790,7 +5816,48 @@ function Herds() {
             yaw = a.face ?? a.rot
             pitch = 0.2 // head straining up out of the mud
             familyHeld = true
-          } else if (a.child && !a.child.dead && a.child.mired !== undefined) {
+          } else if (
+            a.young && a.lame !== undefined && a.caught === undefined && a.inWater === undefined &&
+            LION_STATE.victim !== a
+          ) {
+            // The straggler (design.md §19.8, point 363): the lame calf limps
+            // after its herd-mates' centroid at the calibratable lame pace, so
+            // a herd that drew away (a post-hunt flight) leaves the pair behind
+            // in the open. A hunt that targets it falls through to the ordinary
+            // chase grammar above (LION_STATE.victim). No mate in reach: it stands.
+            const sr = balance.straggler
+            const goal = herdCentroid(herds[sp], a.x, a.z, sr.herdRadius, (m) => m === a || m === a.parent || !!(m as Animal).young)
+            const dxl = goal ? goal.x - a.x : 0
+            const dzl = goal ? goal.z - a.z : 0
+            const dl = Math.hypot(dxl, dzl)
+            if (goal && dl > YOUNG_FOLLOW_RADIUS) {
+              const pace = YOUNG_FOLLOW_SPEED * lamePaceFactor(true, sr.speedFactor) * dt
+              const nx = a.x + (dxl / dl) * pace
+              const nz = a.z + (dzl / dl) * pace
+              const ntype = terrainTypeAtWorld(nx, nz)
+              // It limps on land only: water ahead holds it (no fall-in path).
+              if (ntype !== 'water' && ntype !== 'ocean') {
+                a.x = nx
+                a.z = nz
+                const gfl = worldToLatLon(a.x, a.z)
+                a.y = groundedBodyY(sampleTerrain(gfl.lat, gfl.lon, seed).height)
+              }
+              yaw = Math.atan2(dxl, dzl)
+            } else yaw = a.face ?? a.rot
+            px = a.x
+            pz = a.z
+            // The limp: an uneven hitch on every other step.
+            bodyY = a.y - Math.max(0, Math.sin(t * 6 + a.phase)) * 0.05
+            pitch = 0.08
+            familyHeld = true
+          } else if (
+            a.child && !a.child.dead &&
+            (a.child.mired !== undefined ||
+              // The straggler's stay-behind (point 363) IS the mire watch: the
+              // parent keeps beside its lame calf at the calf's own pace, until
+              // a hunt for the calf hands it to the ordinary shield below.
+              (a.child.lame !== undefined && LION_STATE.victim !== a.child))
+          ) {
             // The mire watch (point 123): the parent walks to its mired calf and
             // STANDS beside it while the herd moves on — and does not flee
             // the predator the last water draws (familyHeld suppresses the
@@ -6911,6 +6978,7 @@ function LionHunt() {
           // land again — it got away across the water and the hunter gives up
           // into the ordinary walk-off. The hunt resolves; nothing re-chases.
           v.chaseSwim = undefined
+          lameAfterHunt(v) // the straggler (point 363): the chase broke off
           s.mode = 'leave'
           s.heading = leaveHeading(s.lx, s.lz, pos.x, pos.z)
           s.leaveHeading = undefined

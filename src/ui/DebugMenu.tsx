@@ -573,6 +573,13 @@ export function DebugMenu() {
         (v) => { balance.waterDrama.drownSeconds = Math.max(1, v); bump() }, 5),
       num(t.debug.wetFlowFactor, balance.waterDrama.wetFlowFactor,
         (v) => { balance.waterDrama.wetFlowFactor = Math.max(0, v); bump() }, 0.1),
+      // The straggler (design.md §19.8, point 363).
+      num(t.debug.stragglerLameChance, balance.straggler.lameChance,
+        (v) => { balance.straggler.lameChance = Math.max(0, Math.min(1, v)); bump() }, 0.05),
+      num(t.debug.stragglerSpeedFactor, balance.straggler.speedFactor,
+        (v) => { balance.straggler.speedFactor = Math.max(0.05, Math.min(0.95, v)); bump() }, 0.05),
+      num(t.debug.stragglerHealSeconds, balance.straggler.healSeconds,
+        (v) => { balance.straggler.healSeconds = Math.max(1, v); bump() }, 5),
       num(t.debug.vigilPredatorDelay, balance.vigil.predatorDelay,
         (v) => { balance.vigil.predatorDelay = Math.max(0, v); bump() }, 1),
       num(t.debug.vultureClusterRadius, balance.scavenge.clusterRadius,

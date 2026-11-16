@@ -10,6 +10,12 @@
 // does, its steered heading never turns faster than the cap) plus one
 // screenshot taken while the parent is turned back; every animal ends on a
 // bank within the crossing deadline.
+//
+// straggler (point 363, design.md §19.8): a calf whose parent drives a lion off
+// its catch is left lame (chance forced to 1). The pair is then set down behind
+// its herd: the calf limps after the herd's centroid at the lame pace, its
+// parent stays beside it, and once the window heals the limp ends and the pair
+// is back with the herd — never left detached.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
@@ -582,6 +588,136 @@ if (section('herd-crosses-on-its-own')) {
     window.__ownNoteCrossers = undefined
     window.__ownTimer = undefined
     window.__ownT0 = undefined
+  })
+}
+
+if (section('straggler')) {
+  await page.evaluate(() => {
+    const B = window.__balance
+    window.__strPrev = { drift: B.currentDrift, chance: B.straggler.lameChance, heal: B.straggler.healSeconds, force: B.parentDefense.forceOutcome }
+    B.currentDrift = 0
+    B.straggler.lameChance = 1 // forced: the roll is not under test, the limp is
+    B.straggler.healSeconds = 14 // debug-editable; short enough to watch it heal
+    B.parentDefense.forceOutcome = 'driveOff' // the point-177 determinism precedent
+    window.__game.getState().debugJumpTo(-17.9, 25.9)
+    window.__ui.getState().setWheelZoomEnabled(true)
+    window.__ui.getState().setTravelZoom(1)
+  })
+  await page.waitForFunction(() => !!window.__wildlife?.restock, null, { timeout: 60000 })
+  await page.evaluate(() => {
+    const lion = window.__lionHunt.state
+    lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
+    window.__wildlife.restock()
+  })
+  await page.waitForFunction(() => {
+    const h = window.__wildlife?.herdsRef?.current
+    return !!h && Object.values(h).some((l) => l.some((a) => a.chunk && !a.dead))
+  }, null, { timeout: 60000 }).catch(() => {})
+
+  // 1) The survived hunt: a lion holds the calf, the parent charges and drives it off.
+  const hunt = await page.evaluate(async () => {
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    const ter = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const land = (x, z) => { const t = ter(x, z); return t !== 'water' && t !== 'ocean' }
+    const R = window.__balance.straggler.herdRadius
+    const p0 = window.__game.getState().pos
+    let pick = null
+    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+      for (const calf of herds[sp] ?? []) {
+        const parent = calf.parent
+        if (!calf.young || calf.dead || !parent || parent.dead || calf.inWater !== undefined || parent.inWater !== undefined) continue
+        if (!land(calf.x, calf.z) || Math.hypot(calf.x - p0.x, calf.z - p0.z) < 10) continue
+        const mates = (herds[sp] ?? []).filter((m) => m !== parent && !m.dead && !m.young && Math.hypot(m.x - calf.x, m.z - calf.z) < R * 0.6)
+        // The camera follows the traveller: the nearest qualifying calf keeps the scene in view.
+        const dp = Math.hypot(calf.x - p0.x, calf.z - p0.z)
+        if (mates.length >= 2 && (!pick || dp < pick.dp)) pick = { sp, calf, parent, mates, dp }
+      }
+    }
+    if (!pick) return { error: 'no calf with a parent and two herd-mates in reach' }
+    const { calf, parent } = pick
+    window.__strScene = pick
+    parent.x = calf.x + 1; parent.z = calf.z // inside the charge reach
+    calf.caught = 5
+    const s = window.__lionHunt.state
+    s.predator = 'lion'; s.victim = calf; s.victimHunt = true; s.px = calf.x; s.pz = calf.z; s.lx = calf.x + 0.7; s.lz = calf.z; s.mode = 'feed'; s.timer = 30
+    const ok = await window.__pollSim(6, () => calf.caught === undefined || calf.dead)
+    // Calm the scene: the walk-off is not under test, and a fleeing herd would move the yardstick.
+    s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
+    return { sp: pick.sp, resolved: ok, calfAlive: !calf.dead, parentAlive: !parent.dead, lame: calf.lame !== undefined }
+  })
+  check('a calf whose parent drives the hunter off is left lame on the forced chance (point 363)',
+    !hunt.error && hunt.resolved && hunt.calfAlive && hunt.parentAlive && hunt.lame, JSON.stringify(hunt))
+
+  if (!hunt.error && hunt.lame) {
+    // 2) The herd has drawn away: set the pair down well behind its herd's
+    //    centroid on open land and record the limp.
+    const behind = await page.evaluate(async () => {
+      const { calf, parent, mates } = window.__strScene
+      const seed = window.__game.getState().seed
+      const ter = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+      const land = (x, z) => { const t = ter(x, z); return t !== 'water' && t !== 'ocean' }
+      const p0 = window.__game.getState().pos
+      const live = () => mates.filter((m) => !m.dead)
+      const centroid = () => { const l = live(); return { x: l.reduce((a, m) => a + m.x, 0) / l.length, z: l.reduce((a, m) => a + m.z, 0) / l.length } }
+      const c0 = centroid()
+      const GAP = 14
+      // The camera follows the traveller, so the pair goes down on the open
+      // line whose end lies nearest a near-view distance from the traveller.
+      let spot = null
+      let best = Infinity
+      for (let k = 0; k < 24; k++) {
+        const h = (k / 24) * Math.PI * 2
+        const tx = c0.x + Math.sin(h) * GAP, tz = c0.z + Math.cos(h) * GAP
+        const dp = Math.hypot(tx - p0.x, tz - p0.z)
+        if (dp < 8) continue
+        let clear = true
+        for (let f = 0; f <= 1.0001; f += 0.05) if (!land(c0.x + Math.sin(h) * GAP * f, c0.z + Math.cos(h) * GAP * f)) { clear = false; break }
+        if (clear && Math.abs(dp - 10) < best) { best = Math.abs(dp - 10); spot = { x: tx, z: tz } }
+      }
+      if (!spot) return { error: 'no open land line behind the herd' }
+      calf.x = spot.x; calf.z = spot.z
+      parent.x = spot.x + 1; parent.z = spot.z
+      const gap = () => { const c = centroid(); return Math.hypot(calf.x - c.x, calf.z - c.z) }
+      const g0 = gap()
+      const t0 = window.__simTime()
+      const p = { x: calf.x, z: calf.z }
+      await window.__pollSim(2, () => false)
+      const dtSim = window.__simTime() - t0
+      const pace = Math.hypot(calf.x - p.x, calf.z - p.z) / Math.max(0.01, dtSim)
+      return { gap0: +g0.toFixed(2), gap2: +gap().toFixed(2), pace: +pace.toFixed(2), parentBeside: +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2), lame: calf.lame !== undefined, world: { x: calf.x, z: calf.z } }
+    })
+    if (!behind.error) await shot('363-straggler-behind-herd', { world: behind.world, label: 'a lame calf and its parent limping behind their herd', settle: false })
+    const follow = await page.evaluate(() => window.__balance.family.followRadius)
+    // The ordinary follow pace is 4.5 u/s; the lame pace is that times the factor.
+    check('the lame pair falls measurably behind its herd and limps at the lame pace (point 363)',
+      !behind.error && behind.lame && behind.gap2 > follow && behind.pace > 0.3 && behind.pace < 4.5 * 0.8, JSON.stringify(behind))
+    check('the parent stays beside its lame calf — the mire watch\'s stay-behind (point 363)',
+      !behind.error && behind.parentBeside < 3.5, JSON.stringify(behind))
+
+    // 3) It always resolves: the window heals and the pair is back with the herd.
+    const healed = await page.evaluate(async () => {
+      const { calf, parent, mates } = window.__strScene
+      const heal = window.__balance.straggler.healSeconds
+      const ok = await window.__pollSim(heal + 4, () => calf.lame === undefined)
+      const live = mates.filter((m) => !m.dead)
+      const gapNow = () => { const c = { x: live.reduce((a, m) => a + m.x, 0) / live.length, z: live.reduce((a, m) => a + m.z, 0) / live.length }; return Math.hypot(calf.x - c.x, calf.z - c.z) }
+      // Healed is not enough: the pair must actually close on the herd.
+      const follow = window.__balance.family.followRadius
+      const back = ok && await window.__pollSim(12, () => gapNow() < follow)
+      return { healed: ok, back, calfAlive: !calf.dead, parentAlive: !parent.dead, gap: +gapNow().toFixed(2), follow, parentBeside: +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2) }
+    })
+    check('the limp heals on its window and the pair is back with its herd (point 363)',
+      healed.healed && healed.back && healed.calfAlive && healed.parentAlive && healed.gap < healed.follow && healed.parentBeside < 3.5, JSON.stringify({ healed, gap0: behind.gap0 }))
+  }
+  await page.evaluate(() => {
+    const B = window.__balance
+    const prev = window.__strPrev
+    B.currentDrift = prev.drift
+    B.straggler.lameChance = prev.chance
+    B.straggler.healSeconds = prev.heal
+    B.parentDefense.forceOutcome = prev.force
+    window.__strScene = undefined
   })
 }
 

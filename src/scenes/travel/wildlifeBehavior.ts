@@ -2690,6 +2690,69 @@ export function mireFate(secondsMired: number, mireSeconds: number): 'mired' | '
 }
 
 /**
+ * The straggler's lameness roll (design.md §19.8, point 363): only a calf that
+ * SURVIVED a hunt aimed at it — its parent drove the predator off, or the chase
+ * broke off — may be left lame, and only on the calibratable chance. A calf
+ * that was taken never rolls. The caller passes its own deterministic roll.
+ */
+export function lamenessRoll(calfSurvivedHunt: boolean, chance: number, roll: number): boolean {
+  if (!calfSurvivedHunt) return false
+  return roll < Math.min(1, Math.max(0, chance))
+}
+
+/** The highest lame speed factor: a lame calf is ALWAYS strictly slower than
+ *  the herd's pace, whatever a debug edit sets (mirrors ELDER_SPEED_MAX). */
+export const LAME_SPEED_MAX = 0.95
+
+/**
+ * The pace of a lame pair (point 363): the lame calf moves at the calibratable
+ * factor, and its parent's stay-behind MIRRORS that pace — it does not leave
+ * the calf (§19.8's constant), so both take the same factor. 1 when the calf is
+ * not lame. Clamped into (0.05, LAME_SPEED_MAX] so the pair neither freezes nor
+ * keeps the herd's pace.
+ */
+export function lamePaceFactor(lame: boolean, factor: number): number {
+  if (!lame) return 1
+  return Math.min(LAME_SPEED_MAX, Math.max(0.05, factor))
+}
+
+/**
+ * The lameness always resolves (the point-118 lesson): after `healSeconds` the
+ * limp ends and the pair rejoins the herd. A non-finite or negative window heals
+ * at once, so no debug edit can leave a calf lame for good.
+ */
+export function lameFate(secondsLame: number, healSeconds: number): 'lame' | 'healed' {
+  if (!Number.isFinite(healSeconds) || healSeconds <= 0) return 'healed'
+  return secondsLame >= healSeconds ? 'healed' : 'lame'
+}
+
+/**
+ * Where a lame calf limps to (point 363): the centroid of its LIVING herd-mates
+ * within `radius`, skipping itself and its own parent (the stay-behind pair must
+ * not chase its own position). Null when no mate is in reach — the pair then
+ * stands; a streamed-away herd is the existing adoption/regroup case.
+ */
+export function herdCentroid(
+  mates: readonly { x: number; z: number; dead?: boolean }[],
+  x: number,
+  z: number,
+  radius: number,
+  skip: (m: { x: number; z: number; dead?: boolean }) => boolean,
+): { x: number; z: number } | null {
+  let sx = 0
+  let sz = 0
+  let n = 0
+  for (const m of mates) {
+    if (m.dead || skip(m)) continue
+    if (Math.hypot(m.x - x, m.z - z) > radius) continue
+    sx += m.x
+    sz += m.z
+    n++
+  }
+  return n === 0 ? null : { x: sx / n, z: sz / n }
+}
+
+/**
  * The vicinity-seeding bounds (point 102 hardened by point 135a): the seeder
  * counts and places against a radius SHRUNK by `margin`, so the guarantee
  * "at least N region-typical animals within `radius`" keeps holding when

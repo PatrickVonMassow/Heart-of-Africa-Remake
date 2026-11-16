@@ -1092,6 +1092,18 @@ Verifiable (`scripts/verify/settings.mjs`,
   starts in play — `roamCrossing` (`balance.waterCross.chance`) is not
   wired into the herd movement, so the scene is reached only through the
   staged start.
+  The straggler (§19.8, point 363): a calf that survives a hunt (drive-off,
+  kill of the hunter, a chase broken off across water) is left lame on the
+  calibratable `balance.straggler.lameChance` (debug-editable), limps after
+  its herd-mates' centroid at `speedFactor`, its parent keeps beside it
+  through the mire watch's stay-behind, and the limp always heals after
+  `healSeconds` (`lamenessRoll`, `lamePaceFactor`, `lameFate`,
+  `herdCentroid`, pure-tested in `src/scenes/travel/wildlifeBehavior.test.ts`).
+  Live in `scripts/verify/wildlife.mjs` (one backend, section `straggler`):
+  the forced chance leaves a driven-off calf lame, the pair limps behind its
+  herd at the lame pace with the parent beside it, and heals back to the
+  herd, with screenshot 363. OPEN: grazer herds do not roam, so the gap
+  behind the herd arises from a post-hunt scatter and is staged in the check.
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item).
 The seasonal-dress reading the primitive figure could not show — a wrap
 worn DIFFERENTLY in the cold rather than in greater number (§19.13) —
