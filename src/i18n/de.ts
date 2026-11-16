@@ -764,6 +764,8 @@ export const de: Strings = {
     edgeBandWander: 'Ortsrand: Mäander (m)',
     edgeBandStrength: 'Ortsrand: Stärke',
     bankWadeDepth: 'Flussufer: Tiefe zum Waten (m)',
+    horizonSight: 'Horizontnachbarn: Sichtweite (°)',
+    horizonSize: 'Horizontnachbarn: scheinbare Größe',
     bloodStainSize: 'Blutfleck: Größe',
     bloodStainIrregularity: 'Blutfleck: ausgefranster Rand',
     grassFireDrawn: 'Grasbrand: gezeichnet',

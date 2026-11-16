@@ -717,6 +717,12 @@ export function DebugMenu() {
       // walkable region on the water, so the layout is rebuilt with it.
       num(t.debug.bankWadeDepth, balance.bankWadeDepth,
         (v) => { balance.bankWadeDepth = Math.max(0, v); bump() }, 0.1),
+      // Neighbours on the horizon (design.md §2.5): how far a place sees
+      // another, and the symbolic compaction of their apparent size.
+      num(t.debug.horizonSight, balance.horizonNeighbours.sightDistanceDeg,
+        (v) => { balance.horizonNeighbours.sightDistanceDeg = Math.max(0, v); bump() }, 0.1),
+      num(t.debug.horizonSize, balance.horizonNeighbours.apparentScale,
+        (v) => { balance.horizonNeighbours.apparentScale = Math.max(0, v); bump() }, 0.1),
       // Village speech (design.md §13.4/§21.2): the pace of the syllables, the
       // pause between the atoms of a phrase and the short, sharply falling
       // hearing range.

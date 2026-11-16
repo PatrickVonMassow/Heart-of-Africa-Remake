@@ -85,8 +85,10 @@ import { Figure } from './placeFigure'
 import { ColdCloaksContext, FigureLookContext, LimbDetailContext } from './placeFigureContext'
 import { useFigureLook } from './useFigureLook'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildPlayRock, buildRock } from '../../render/flora'
-import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments, buildGizaSiteSphinx } from '../../render/landmarks'
-import { FieldSphinx } from '../../render/sphinxProbe'
+import { buildTableMountain, buildGizaSiteMonuments, buildGizaSiteSphinx } from '../../render/landmarks'
+import { HorizonNeighbours } from './HorizonNeighbours'
+import { useHorizonNeighbours } from './useHorizonNeighbours'
+import { neighbourExclusionSpans } from './horizonNeighbours'
 import { createSphinxSiteMaterial } from '../../render/sphinxMaterial'
 import { GIZA_AMBIENT, GIZA_PYRAMIDS, GIZA_SPHINX, gizaFigure, isGizaPerson, pyramidMassFootprint, type GizaAmbientRole } from './gizaSite'
 import { LadyHat, SunHelmet } from './castHats'
@@ -1440,14 +1442,16 @@ function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
 
 // --- Distant panorama wildlife (design.md §2) -----------------------------------
 
-// Fixed skyline landmarks per settlement (point 102): each excludes an azimuth
-// arc on the panorama ring so no drifting silhouette crosses the monument (the
-// Cairo "animals next to the pyramids" report). A future third skyline is just
-// another row; the in-town Timbuktu mosque is NOT here (a horizon silhouette
-// behind town buildings is a normal depth relationship, not a crossing). The
-// positions/scaleX mirror the <GizaSkyline>/<TableMountainSkyline> meshes below.
+// Fixed NATURAL skyline landmarks per settlement (point 102): each excludes an
+// azimuth arc on the panorama ring so no drifting silhouette crosses it. Built
+// neighbours (Cairo's Giza field, and Cairo seen from Giza) are not rows here:
+// they follow the general sight rule (./HorizonNeighbours, design.md §2.5),
+// which supplies its own arcs. Table Mountain is a natural massif, not a
+// settlement or monument neighbour, so it keeps its row. The in-town Timbuktu
+// mosque is NOT here (a horizon silhouette behind town buildings is a normal
+// depth relationship, not a crossing). Position/scaleX mirror
+// <TableMountainSkyline> below.
 const PLACE_SKYLINES: Record<string, Array<{ build: () => THREE.BufferGeometry; x: number; z: number; scaleX: number }>> = {
-  cairo: [{ build: () => buildGizaPyramids('skyline'), x: -130, z: 10, scaleX: 13 }],
   capetown: [{ build: buildTableMountain, x: 0, z: -118, scaleX: 1 }],
 }
 
@@ -1526,11 +1530,14 @@ function PanoramaWildlife({
   lat,
   lon,
   skyHorizon,
+  neighbourSpans,
 }: {
   region: RegionId
   placeId: string
   seed: number
   innerRadius: number
+  /** Azimuth arcs of the horizon neighbours (./HorizonNeighbours). */
+  neighbourSpans: readonly AzimuthSpan[]
   /** Where the backdrop's rim is pushed out with the drawn disc (work-order
    *  1237), so a silhouette's footing reads the surface actually built. */
   bounds: PlaceBounds
@@ -1566,7 +1573,7 @@ function PanoramaWildlife({
   )
   // Azimuth arcs of this settlement's skyline landmarks: a silhouette drifting
   // into one is hidden so it never crosses the monument (point 102, part a).
-  const exclusionSpans = useMemo(() => skylineExclusionSpans(placeId), [placeId])
+  const exclusionSpans = useMemo(() => [...skylineExclusionSpans(placeId), ...neighbourSpans], [placeId, neighbourSpans])
   // World height of each mesh, for the apparent-size clamp (point 94).
   // Each species' gait read off its OWN legs (point 300): a long-legged giraffe
   // takes long, slow strides, a zebra shorter, quicker ones — the single shared
@@ -1858,39 +1865,6 @@ function PanoramaWildlife({
 }
 
 // --- Landscape backdrop --------------------------------------------------------
-
-/**
- * Giza behind Cairo (design.md §4.4, point 82): the great pyramids stand as
- * a fixed western-horizon silhouette — the real field lies ~13 km west of
- * the city across the Nile. Same pattern as Cape Town's Table Mountain.
- */
-function GizaSkyline({ placeId }: { placeId: string }) {
-  const show = placeId === 'cairo'
-  // The field at its skyline level: only the Sphinx's outline-bearing parts.
-  // The pyramids without the Sphinx, which is its own mesh (FieldSphinx, with
-  // the picture checks' probe); both from the field at its skyline level.
-  const geometry = useMemo(() => (show ? buildGizaPyramids('skyline', false) : null), [show])
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
-  useEffect(() => () => geometry?.dispose(), [geometry])
-  useEffect(() => () => material.dispose(), [material])
-  useEffect(() => {
-    if (!import.meta.env.DEV || !show) return
-    const w = window as unknown as Record<string, unknown>
-    w.__placeSkyline = 'giza-pyramids'
-    return () => {
-      delete w.__placeSkyline
-    }
-  }, [show])
-  if (!geometry) return null
-  // West of the town, scaled to a distant-monument silhouette under the
-  // §2.5 looming bound (peak ~26 at 130 out ≈ 11°).
-  return (
-    <group position={[-130, -1.2, 10]} rotation={[0, 0.35, 0]} scale={[13, 13, 13]}>
-      <mesh geometry={geometry} material={material} />
-      <FieldSphinx lod="skyline" material={material} probe="__gizaSkylineSphinx" />
-    </group>
-  )
-}
 
 /**
  * Table Mountain behind Cape Town (design.md §4.4 Part C): the flat-topped
@@ -2614,6 +2588,13 @@ export function PlaceScene() {
     void balanceVersion // read so the rebuild is the dependency it looks like
     return placeId ? buildLayout(placeId, seed) : null
   }, [placeId, seed, balanceVersion])
+  // Neighbours within sight on the horizon (design.md §2.5) and the arcs they
+  // keep clear of drifting wildlife.
+  const horizonNeighbours = useHorizonNeighbours(place, seed, layout)
+  const neighbourSpans = useMemo(
+    () => neighbourExclusionSpans(horizonNeighbours.map((n) => n.seat), balance.panoramaWildlife.landmarkMarginDeg),
+    [horizonNeighbours],
+  )
   const ground = useMemo<PlaceGround>(() => ({
     bank: layout?.bank ?? null,
     sites: layout?.digSites ?? [],
@@ -3434,8 +3415,8 @@ export function PlaceScene() {
       <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bank={layout.bank ?? null} bounds={layout} />
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
-      <GizaSkyline placeId={place.id} />
-      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bounds={layout} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
+      <HorizonNeighbours items={horizonNeighbours} place={place} seed={seed} layout={layout} />
+      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bounds={layout} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} neighbourSpans={neighbourSpans} />
 
       {/* Ground plate with procedural mottling. Many segments, not 48: a
           48-gon around a 74 m plateau puts 9.7 m straight chords on the ground

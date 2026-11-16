@@ -245,7 +245,10 @@ export const DOC_BUDGETS = [
     // silent tag game only, each on its own ground clear of that settlement's adult
     // vignettes (work-order 690) — a rule the criterion did not carry and one that
     // cannot be read off the concept list it did.
-    maxLines: 584,
+    // RAISED by the 2 measured lines criterion 31 owes the horizon neighbours: a
+    // place within sight stands on the other's horizon by one symmetric rule
+    // (point 380) — a rule the criterion did not carry.
+    maxLines: 586,
     // RAISED by the 19 measured words criterion 16 owes the step height: a
     // scattered stone below `balance.placeStepOverTop` is ground rather than an
     // obstacle (work-order 1149), which is a rule the criterion did not carry
@@ -255,7 +258,9 @@ export const DOC_BUDGETS = [
     // RAISED by the 22 measured words criterion 14 owes the horizon maps: the
     // bird's-eye terrain shades itself from DEM-baked maps at medium/high and
     // never fetches them at low (work-order 346) — a rule the criterion did not carry.
-    maxWords: 5703,
+    // RAISED by the 35 measured words of the criterion-31 horizon-neighbour rule
+    // above (point 380).
+    maxWords: 5738,
     // Forty words for thirty-two criteria — the destination of the §7.1 cut edits one
     // criterion at a time, and one criterion's rewording is well inside that.
     slackWords: 40,
