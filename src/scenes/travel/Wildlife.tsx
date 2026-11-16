@@ -87,6 +87,13 @@ import {
   committedFleeHeading,
   FLEE_COMMIT_MARGIN,
   crocodileTargetWeight,
+  crocodileChannelPrey,
+  channelEndingBank,
+  channelReturnExpired,
+  channelReturnPace,
+  channelReturnStep,
+  familyCrossing,
+  type ChannelReturn,
   prefersJuvenilePrey,
   killFlockActive,
   assignFlockClusters,
@@ -505,6 +512,10 @@ interface Animal {
    *  seasonal wade speed with a lowered body; cleared on landing (or by the
    *  resolve deadline — every started move ends, invariant I4). */
   crossing?: { tx: number; tz: number; time: number }
+  /** The swim back to a calf seized mid-channel (design.md §19.8, point 362):
+   *  the steered heading (capped turn) and the time spent, bounded by the
+   *  crossing deadline. Cleared once the calf's seizure has resolved. */
+  channelReturn?: ChannelReturn
   /** Sim time of this animal's last flight step (point 312): while recent, a
    *  flight that took it onto river/lake water keeps swimming and the
    *  backstop leaves it alone; once it lapses the swim-to-bank takes over. */
@@ -542,6 +553,9 @@ interface Animal {
     seizeX?: number
     seizeZ?: number
     retreat?: boolean
+    /** The victim was SWIMMING a crossing when seized (point 362): the
+     *  mid-channel ambush — its endings resolve on a bank, never a vigil. */
+    midChannel?: boolean
     /** A parent taken ALONGSIDE the catch (the too-late ending, point 319): the
      *  crocodile owns this body too, hauls it into the water beside the catch
      *  and holds it until it has sunk — never a body sinking on the bank alone. */
@@ -799,6 +813,23 @@ const FLEE_RADIUS = 14
 /** Base swim speed of a purposeful crossing (point 192) — slower than the walk,
  *  further braked by the seasonal flow via wadeSpeed. */
 const CROSS_SWIM_SPEED = 2.6
+
+/** Start a purposeful crossing toward a far bank (design.md §19.8, point 362):
+ *  a parent takes its free calf along on a parallel line at its flank — one
+ *  family crossing, not two — and a calf alone never starts one. Returns the
+ *  number of animals that entered the water. */
+function startFamilyCrossing(
+  a: Animal,
+  target: { tx: number; tz: number },
+  terrainTypeAt: (x: number, z: number) => string,
+): number {
+  const plan = familyCrossing(a, target, terrainTypeAt, CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds)
+  for (const p of plan) {
+    p.animal.crossing = { tx: p.tx, tz: p.tz, time: 0 }
+    p.animal.drink = undefined
+  }
+  return plan.length
+}
 /** Speed (units/sec) at which prey run from an active predator; the flee
  *  accumulates into the animal's position so it never teleports (design.md §19). */
 const FLEE_SPEED = 5
@@ -2232,7 +2263,10 @@ function Herds() {
     // the drown threshold. A staged water-drama check asserts this reading
     // instead of assuming a forced season arrived (point 502).
     w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, scavengers, scavengeGroups, restock, meshRefs, calfMeshRefs, elderMeshes: pool.elder, herdState,
-      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, raptor: RAPTOR_STATE, igniteFire: igniteFireAt, groundAt: (x: number, z: number) => { const l = worldToLatLon(x, z); return Math.max(0.02, sampleTerrain(l.lat, l.lon, useGame.getState().seed).height) }, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
+      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE,
+      // Stage a family crossing (point 362) — the live check seeds the herd's swim.
+      startCrossing: (a: Animal, tx: number, tz: number) =>
+        startFamilyCrossing(a, { tx, tz }, (x, z) => { const l = worldToLatLon(x, z); return sampleTerrain(l.lat, l.lon, useGame.getState().seed).type }), lion: LION_STATE, raptor: RAPTOR_STATE, igniteFire: igniteFireAt, groundAt: (x: number, z: number) => { const l = worldToLatLon(x, z); return Math.max(0.02, sampleTerrain(l.lat, l.lon, useGame.getState().seed).height) }, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
       waterDrama: (lat: number, lon: number) => {
         const bw = balance.waterDrama
         const wetness = CURRENT_WEATHER.wetness
@@ -2660,6 +2694,14 @@ function Herds() {
       if (predatorAbout && FLEES_LION[sp]) out.push({ x: LION_STATE.lx, z: LION_STATE.lz, r: FLEE_RADIUS * bankClear })
       return out
     }
+    // The end of a mid-channel drama (point 362): an animal it left in the
+    // water swims for the NEAREST bank — no vigil, no fall-in struggle — and
+    // the crossing deadline grounds it if it cannot land (I4).
+    const swimToChannelBank = (b: Animal) => {
+      const bank = channelEndingBank(b.x, b.z, terrainTypeAtWorld, CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds)
+      const land = bank ?? (() => { const l = findLandNear(b.x, b.z, seed); return { tx: l.x, tz: l.z } })()
+      if (land.tx !== b.x || land.tz !== b.z) b.crossing = { tx: land.tx, tz: land.tz, time: 0 }
+    }
     const swimOutBank = (a: Animal, sp: Species) =>
       safeBankTarget(
         a.x,
@@ -2798,8 +2840,14 @@ function Herds() {
         // A calf's drama owns its parent (point 312(d)): a swim for a bank
         // yields the moment the calf is seized, in the water or mired, so the
         // rescue drive — not the swim — moves the parent.
+        // The return to a calf seized mid-channel (point 362) lives only while
+        // that seizure does; once it has given up at the crossing deadline the
+        // parent's swim for the bank is no longer cut short here.
+        if (a.channelReturn !== undefined && !(a.child && !a.child.dead && a.child.caught !== undefined))
+          a.channelReturn = undefined
+        const returnGaveUp = channelReturnExpired(a.channelReturn, balance.waterCross.resolveSeconds)
         if (
-          a.crossing !== undefined && a.child && !a.child.dead &&
+          a.crossing !== undefined && a.child && !a.child.dead && !returnGaveUp &&
           (a.child.caught !== undefined || a.child.inWater !== undefined || a.child.mired !== undefined)
         )
           a.crossing = undefined
@@ -2846,11 +2894,19 @@ function Herds() {
             // A CROCODILE kill has been hauled into the river (point 383), so
             // the keeper stands at the WATERLINE its calf was seized from —
             // never out in the channel over a body the river has taken.
+            // Mid-channel (point 362) there is no vigil: the water has the body,
+            // so a too-late parent makes the nearest bank and rejoins its herd.
+            const midChannel = seized?.lunge?.midChannel === true
             const fate = releaseBereavedParent(a, {
               tooLateDist: PARENT_TOO_LATE_DIST,
               bereavedSeconds: balance.family.bereavedSeconds,
               vigilAt: { x: seized?.lunge?.seizeX ?? a.x, z: seized?.lunge?.seizeZ ?? a.z },
+              vigil: !midChannel,
             })
+            if (fate === 'bank' && par) {
+              par.channelReturn = undefined
+              swimToChannelBank(par)
+            }
             if (fate === 'taken' && par) {
               takeAnimal(par, croc ? 'crocodile' : 'predator', killer, croc ? { sink: true } : { stain: true })
               // The crocodile takes the too-late parent as well (point 319): it
@@ -2859,17 +2915,42 @@ function Herds() {
               if (seized?.lunge) seized.lunge.alongside = par
             }
           }
-        } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
+        } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0 && !returnGaveUp) {
           // A calf of ours is being eaten: charge the predator (at the calf). On
           // contact the defence roll decides — drive the predator off or kill it
           // and live, or be taken in the calf's place so it rises and escapes
           // (§19); a mired calf stays held.
           const calf = a.child
-          const toX = calf.x - a.x
-          const toZ = calf.z - a.z
-          const d = Math.hypot(toX, toZ) || 1
-          a.x += (toX / d) * RESCUE_SPEED * dt
-          a.z += (toZ / d) * RESCUE_SPEED * dt
+          // Seized mid-channel (point 362): the parent turns round — against
+          // its herd's direction — through the capped turn (§19.5), at the
+          // rescue burst braked by the seasonal flow in the water (point 122),
+          // and the crossing deadline bounds the return (I4).
+          const channelCroc = calf.caughtBy === 'crocodile'
+            ? herds.crocodile.find((k) => k.lunge?.victim === calf && k.lunge.midChannel === true)
+            : undefined
+          let gaveUp = false
+          if (channelCroc) {
+            const r = (a.channelReturn ??= { time: 0, heading: a.face ?? a.rot })
+            const flow = seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor)
+            const pace = channelReturnPace(terrainTypeAtWorld(a.x, a.z) === 'water', RESCUE_SPEED, flow)
+            const st = channelReturnStep(a.x, a.z, r, calf.x, calf.z, dt, FACE_TURN, pace, balance.waterCross.resolveSeconds)
+            r.time = st.time
+            r.heading = st.heading
+            if (st.expired) {
+              gaveUp = true
+              swimToChannelBank(a)
+            } else {
+              a.x = st.x
+              a.z = st.z
+            }
+          } else {
+            const toX0 = calf.x - a.x
+            const toZ0 = calf.z - a.z
+            const d0 = Math.hypot(toX0, toZ0) || 1
+            a.x += (toX0 / d0) * RESCUE_SPEED * dt
+            a.z += (toZ0 / d0) * RESCUE_SPEED * dt
+          }
+          const d = gaveUp ? Infinity : Math.hypot(calf.x - a.x, calf.z - a.z) || 1
           { // ground-follow (point 203(A)): a mover carries its own standing height
             const gfl = worldToLatLon(a.x, a.z)
             const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
@@ -2900,6 +2981,12 @@ function Herds() {
               // resumes herd behaviour — an attacker never stands vigil.
               calf.caught = undefined
               a.kick = PARENT_KICK_SECONDS
+              if (channelCroc) {
+                // Driven off mid-channel (point 362): both swim for the nearest bank.
+                a.channelReturn = undefined
+                swimToChannelBank(calf)
+                swimToChannelBank(a)
+              }
               if (calf.caughtBy === 'crocodile') {
                 // Driven off the seized calf (point 130): the crocodile lets
                 // go and slinks back to its water. Kill is structurally
@@ -2950,6 +3037,8 @@ function Herds() {
                 // this frame — a re-parented calf walks back to its new parent
                 // past the feeding predator instead of fleeing.
                 calf.escape = balance.family.escapeSeconds
+                // Spared mid-channel (point 362): it swims out, never a fall-in.
+                if (channelCroc) swimToChannelBank(calf)
                 // …and it grieves what it just watched (point 369): the parent
                 // dies below, so the sweep in the family pass — which reads a
                 // DEAD parent through a link this branch has already cut — can
@@ -4063,6 +4152,7 @@ function Herds() {
           // best (nearer breaks a same-weight tie), rather than the first found.
           let bestVictim: Animal | null = null
           let bestScore = -Infinity
+          let bestMidChannel = false
           for (const sp of CALF_HUNT_SPECIES) {
             for (const a of herds[sp]) {
               // Skip any animal already owned by another drama or otherwise
@@ -4070,15 +4160,29 @@ function Herds() {
               // victim (§19.16 — the two systems never claim one animal), a
               // fleeing/dodging/crossing/vigil/fire-trapped animal. The croc waits
               // for prey genuinely at the bank; it never chases across open land.
+              // A crossing CALF stays in reach (point 362): the mid-channel case.
+              const swimmingCalf = a.crossing !== undefined && a.young === true
               if (
                 a.dead || a.dodgeHeading !== undefined || a.vigil !== undefined ||
-                a.crossing !== undefined || a.fireTrapped !== undefined ||
-                claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim })
+                (a.crossing !== undefined && !swimmingCalf) || a.fireTrapped !== undefined ||
+                claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim, crossing: undefined })
               )
                 continue
               let eligible = false
               let d = Infinity
-              if (a.drink) {
+              let midChannel = false
+              if (swimmingCalf) {
+                // (3) The calf SWIMMING a crossing (design.md §19.8, point 362):
+                // the crocodile's deadliest case — on the water, inside the reach.
+                const dSelf = Math.hypot(a.x - c.x, a.z - c.z)
+                const cll = worldToLatLon(a.x, a.z)
+                const wet = sampleTerrain(cll.lat, cll.lon, seed).type === 'water'
+                if (crocodileChannelPrey(dSelf, true, true, wet, bc.strikeRadius)) {
+                  eligible = true
+                  midChannel = true
+                  d = dSelf
+                }
+              } else if (a.drink) {
                 // (1) The formal drinker: eligible only while its drink cycle has
                 // it rendered standing at the water (the stale-target guard).
                 const cycle = ((clock.elapsedTime + a.phase * 40) % 75) / 75
@@ -4104,14 +4208,18 @@ function Herds() {
               if (!eligible) continue
               // Weight dominates (gap ≥ 1); the tiny distance term only breaks
               // ties between two same-age prey, so a juvenile always wins.
-              const score = crocodileTargetWeight(a.young === true, balance.family.juvenileDrinkCrocBias) - d * 1e-3
+              const score =
+                crocodileTargetWeight(
+                  a.young === true, balance.family.juvenileDrinkCrocBias, midChannel, balance.family.midChannelCalfCrocWeight,
+                ) - d * 1e-3
               if (score > bestScore) {
                 bestScore = score
                 bestVictim = a
+                bestMidChannel = midChannel
               }
             }
           }
-          if (bestVictim) c.lunge = { victim: bestVictim, timer: 0, homeX: c.x, homeZ: c.z, gripped: false }
+          if (bestVictim) c.lunge = { victim: bestVictim, timer: 0, homeX: c.x, homeZ: c.z, gripped: false, midChannel: bestMidChannel }
           }
         } else if (
           c.lunge.retreat ||
@@ -4159,6 +4267,8 @@ function Herds() {
             v.x = tx
             v.z = tz
             v.drink = undefined
+            // Seized mid-swim (point 362): the crossing ends in the jaws.
+            v.crossing = undefined
             v.caught = CAUGHT_DURATION
             v.caughtBy = 'crocodile'
             c.lunge.dragging = true
@@ -5535,11 +5645,12 @@ function Herds() {
             familyHeld = true
           } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
             // Charging the predator eating our calf (movement in the pre-pass):
-            // face the calf while rushing in.
+            // face the calf while rushing in. The mid-channel return (point 362)
+            // faces its STEERED heading, so the reversal draws as a turning arc.
             px = a.x
             pz = a.z
             bodyY = a.y // resync off any drink slide (see the kick branch)
-            yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
+            yaw = a.channelReturn ? a.channelReturn.heading : Math.atan2(a.child.x - a.x, a.child.z - a.z)
             pitch = 0
             familyHeld = true
           } else if (a.young && a.inWater !== undefined && !a.rescued) {
