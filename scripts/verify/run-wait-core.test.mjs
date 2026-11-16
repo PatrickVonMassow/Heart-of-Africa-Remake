@@ -176,7 +176,7 @@ describe('the measured constants stay in lockstep with docs/picture-check-cost.m
     // by its five theme suites, whose frames are counted and whose runtime is
     // named unmeasured.
     const large = [...DEV_SUITES, 'preview']
-    expect(expectedFrames(large).frames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication)
+    expect(expectedFrames(large).frames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication + COUNTED_SUITE_FRAMES.wildlife)
     expect(Math.round(expectedRuntimeMs(large).ms / 100) / 10).toBe(Math.round((2536.0 - SUITE_RUNTIME_S.polish) * 10) / 10)
   })
 })
@@ -190,7 +190,7 @@ describe('planRun — what the command will really do', () => {
     // split `polish` row)
     // and the render-only WebGPU pass.
     expect(plan.expectedMs).toBeGreaterThan(2_536_000)
-    expect(plan.expectedFrames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication)
+    expect(plan.expectedFrames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication + COUNTED_SUITE_FRAMES.wildlife)
   })
 
   it('reports the LANE a suite really opens, not the pass it sits in', () => {

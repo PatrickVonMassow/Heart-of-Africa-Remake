@@ -694,6 +694,7 @@ export const de: Strings = {
     crocMouthOffset: 'Krokodil: Maul-Ankerabstand',
     juvenilePreyBias: 'Bevorzugung von Jungtieren als Beute',
     juvenileDrinkCrocBias: 'Krokodil: Vorzug trinkender Jungtiere',
+    midChannelCalfCrocWeight: 'Krokodil: Vorzug schwimmender Jungtiere in der Flussmitte',
     calfAdoptionRadius: 'Adoptionsradius für Waisen',
     calfEscapeSeconds: 'Fluchtdauer des befreiten Jungtiers (s)',
     calfReunionSeconds: 'Trennungsfenster des Jungtiers (s)',

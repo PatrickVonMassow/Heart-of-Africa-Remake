@@ -77,7 +77,7 @@ describe('--plan: the decision that belongs BEFORE the run', () => {
     expect(res.status).toBe(0)
     expect(res.stdout).toMatch(/BACKGROUND/)
     expect(res.stdout).toMatch(/notification/)
-    expect(res.stdout).toContain(`${94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication} expected`)
+    expect(res.stdout).toContain(`${94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication + COUNTED_SUITE_FRAMES.wildlife} expected`)
   })
 
   it('lets a single measured suite be one blocking foreground call', () => {

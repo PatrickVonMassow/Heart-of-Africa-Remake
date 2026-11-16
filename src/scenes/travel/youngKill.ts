@@ -50,19 +50,27 @@ export interface KillFamilyMember<C = unknown> {
  */
 export function releaseBereavedParent<A extends KillFamilyMember<A>>(
   young: A,
-  opts: { tooLateDist: number; bereavedSeconds: number; vigilAt: { x: number; z: number } },
-): 'taken' | 'vigil' | null {
+  opts: {
+    tooLateDist: number
+    bereavedSeconds: number
+    vigilAt: { x: number; z: number }
+    /** false for a mid-channel kill (point 362): the water took the body, so
+     *  there is nothing to keep — the parent is released to the 'bank'. */
+    vigil?: boolean
+  },
+): 'taken' | 'vigil' | 'bank' | null {
   const par = young.parent as A | undefined
   if (!par || par.dead) return null
   if (Math.hypot(par.x - young.x, par.z - young.z) < opts.tooLateDist) {
     par.child = undefined
     return 'taken'
   }
-  par.vigil = { x: opts.vigilAt.x, z: opts.vigilAt.z, carcass: young, time: 0 }
+  const keeps = opts.vigil !== false
+  if (keeps) par.vigil = { x: opts.vigilAt.x, z: opts.vigilAt.z, carcass: young, time: 0 }
   par.child = undefined
   par.bereaved = opts.bereavedSeconds
   young.parent = undefined
-  return 'vigil'
+  return keeps ? 'vigil' : 'bank'
 }
 
 /** The vigil follows the remains (point 121 (f)): every living keeper whose

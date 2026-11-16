@@ -22,7 +22,7 @@ export const POLISH_THEME_SUITES = ['polish-panorama', 'polish-speech', 'polish-
  */
 export const DEV_SUITES = [
   'docs', 'board-layout', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
-  ...POLISH_THEME_SUITES, 'communication', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
+  ...POLISH_THEME_SUITES, 'communication', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'wildlife', 'invariants',
   'benchmark', 'report',
 ]
 

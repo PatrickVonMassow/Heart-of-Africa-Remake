@@ -72,6 +72,14 @@ import {
   committedFleeHeading,
   FLEE_COMMIT_MARGIN,
   crocodileTargetWeight,
+  crocodileChannelPrey,
+  crossingStep,
+  familyCrossing,
+  channelReturnPace,
+  channelReturnStep,
+  channelReturnExpired,
+  channelEndingBank,
+  type ChannelReturn,
   prefersJuvenilePrey,
   type FlightState,
   killFlockMayDescend,
@@ -165,6 +173,7 @@ import {
   PREDATOR_PREY,
   REGION_PREY,
 } from './wildlifeBehavior'
+import { releaseBereavedParent } from './youngKill'
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
 import { dramaCurrent, riverFlow } from '../../world/geoIndex'
@@ -5298,5 +5307,166 @@ describe('natural death of old age (design.md §19.18)', () => {
     expect(elephantDyingTarget(0, 0, water, graveyard, 60)).toEqual({ x: 0, z: 8, kind: 'water' })
     expect(elephantDyingTarget(0, 0, null, graveyard, 60)).toBeNull()
     expect(elephantDyingTarget(100, 0, null, graveyard, 0)).toEqual({ x: 100, z: 0, kind: 'graveyard' })
+  })
+})
+
+// The crossing turned back (design.md §19.8, point 362): a family in open water.
+describe('the crossing turned back (point 362)', () => {
+  // A north-south river: water for 2 < x < 5, land elsewhere.
+  const river = (x: number) => (x > 2 && x < 5 ? 'water' : 'savanna')
+  const terrain = (x: number) => river(x)
+  const onLand = (x: number, z: number) => terrain(x) !== 'water' && z === z
+  const resolve = balance.waterCross.resolveSeconds
+  const swimToEnd = (x: number, z: number, t: { tx: number; tz: number }) => {
+    const c = { tx: t.tx, tz: t.tz, time: 0 }
+    for (let i = 0; i < 10000; i++) {
+      const s = crossingStep(x, z, c, 1 / 60, 1.5, onLand, resolve, balance.waterCross.arriveUnits)
+      x = s.x
+      z = s.z
+      c.time = s.time
+      if (s.end !== null) return { x, z, end: s.end }
+    }
+    return { x, z, end: null }
+  }
+
+  it("a parent's crossing takes its calf and only its calf; a calf alone never starts one", () => {
+    const calf = { x: 0.4, z: -1.2, young: true }
+    const other = { x: 0.2, z: 1, young: true }
+    const mate = { x: -0.5, z: 0.5 }
+    const parent = { x: 0, z: 0, child: calf }
+    const plan = familyCrossing(parent, { tx: 5.5, tz: 0 }, terrain, 6)
+    expect(plan.map((p) => p.animal)).toEqual([parent, calf])
+    expect(plan.some((p) => p.animal === (other as unknown) || p.animal === (mate as unknown))).toBe(false)
+    // The calf's line runs parallel at its flank and lands on the far bank.
+    const calfPlan = plan[1]
+    expect(terrain(calfPlan.tx)).not.toBe('water')
+    expect(calfPlan.tx).toBeGreaterThan(5)
+    expect(calfPlan.tz).toBeCloseTo(calf.z, 5)
+    expect(familyCrossing(calf, { tx: 5.5, tz: 0 }, terrain, 6)).toEqual([])
+    // A calf already in a drama keeps it: the parent crosses alone.
+    const seized = { x: 0.4, z: -1, young: true, caught: 3 }
+    expect(familyCrossing({ x: 0, z: 0, child: seized }, { tx: 5.5, tz: 0 }, terrain, 6).map((p) => p.animal)).toHaveLength(1)
+    const dead = { x: 0.4, z: -1, young: true, dead: true }
+    expect(familyCrossing({ x: 0, z: 0, child: dead }, { tx: 5.5, tz: 0 }, terrain, 6)).toHaveLength(1)
+  })
+
+  it('a calf whose flank meets the sea never swims through ocean', () => {
+    // River x 1..5; an ocean inlet below z = -1.3 from x = 2 on.
+    const coast = (x: number, z: number) => (z < -1.3 && x > 2 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
+    // Flank in the inlet, parent's line clear: the calf follows the parent's line.
+    const calf = { x: 0.4, z: -1.5, young: true }
+    const plan = familyCrossing({ x: 0, z: 0, child: calf }, { tx: 5.5, tz: 0 }, coast, 6)
+    expect(plan[1]).toMatchObject({ animal: calf, tx: 5.5, tz: 0 })
+    // The parent's line meets the sea too: the calf stays ashore.
+    const deep = (x: number, z: number) => (x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
+    const calf2 = { x: 0.4, z: -1.5, young: true }
+    expect(familyCrossing({ x: 0, z: 0, child: calf2 }, { tx: 5.5, tz: 0 }, deep, 6)).toHaveLength(1)
+    // Its flank stays dry (no water, no sea) but the diagonal to the parent's
+    // target crosses ocean: the fallback is checked too, so the calf stays.
+    const diag = (x: number, z: number) => (z > 1 && z < 3 && x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 && z < 1 ? 'water' : 'grass')
+    const calf3 = { x: 0.4, z: 4, young: true }
+    expect(familyCrossing({ x: 0, z: 0, child: calf3 }, { tx: 5.5, tz: 0 }, diag, 6)).toHaveLength(1)
+  })
+
+  it('the mid-channel weight beats every bank case', () => {
+    const bias = balance.family.juvenileDrinkCrocBias
+    const w = balance.family.midChannelCalfCrocWeight
+    const swimming = crocodileTargetWeight(true, bias, true, w)
+    expect(swimming).toBe(w)
+    expect(swimming).toBeGreaterThan(crocodileTargetWeight(true, bias)) // drinking/waterline calf
+    expect(swimming).toBeGreaterThan(crocodileTargetWeight(false, bias)) // any adult at the bank
+    // The distance tie-break (≤ strikeRadius·1e-3) can never flip it.
+    expect(swimming - balance.crocodile.strikeRadius * 1e-3).toBeGreaterThan(crocodileTargetWeight(true, bias))
+    // Only the swimming CALF is the channel case: an adult swimmer stays 1.
+    expect(crocodileTargetWeight(false, bias, true, w)).toBe(1)
+    expect(crocodileChannelPrey(3, true, true, true, 5)).toBe(true)
+    expect(crocodileChannelPrey(3, false, true, true, 5)).toBe(false) // adult
+    expect(crocodileChannelPrey(3, true, false, true, 5)).toBe(false) // not crossing
+    expect(crocodileChannelPrey(3, true, true, false, 5)).toBe(false) // already ashore
+    expect(crocodileChannelPrey(6, true, true, true, 5)).toBe(false) // out of reach
+  })
+
+  it('the reversal respects the turn cap and reaches the calf', () => {
+    // The parent is ahead on the far side, heading on (+x); the calf is seized behind it.
+    let x = 5.2
+    let z = 0
+    const r: ChannelReturn = { time: 0, heading: Math.PI / 2 }
+    const calf = { x: 3, z: 0.3 }
+    const dt = 1 / 60
+    const cap = 7
+    const pace = channelReturnPace(true, rescueSpeed(balance.family.rescueBurst), 2)
+    expect(pace).toBeLessThan(rescueSpeed(balance.family.rescueBurst)) // braked in the swell
+    let reached = false
+    for (let i = 0; i < 600 && !reached; i++) {
+      const s = channelReturnStep(x, z, r, calf.x, calf.z, dt, cap, pace, resolve)
+      let dh = s.heading - r.heading
+      while (dh > Math.PI) dh -= Math.PI * 2
+      while (dh < -Math.PI) dh += Math.PI * 2
+      expect(Math.abs(dh)).toBeLessThanOrEqual(cap * dt + 1e-9)
+      x = s.x
+      z = s.z
+      r.heading = s.heading
+      r.time = s.time
+      reached = Math.hypot(calf.x - x, calf.z - z) < 1.3
+    }
+    expect(reached).toBe(true)
+    // It turned round: it now faces back toward the near bank (−x).
+    expect(Math.sin(r.heading)).toBeLessThan(0)
+  })
+
+  it('every defence outcome resolves on a bank, and a too-late parent never stays in the channel', () => {
+    const weights = balance.parentDefense
+    const outcomes = new Set([0, 0.2, 0.5, 0.999].map((roll) => parentAttackOutcome('zebra', 'crocodile', roll, weights)))
+    expect(outcomes.has('taken')).toBe(true)
+    // drive-off and taken-in-place: the survivors in the water swim for the nearest bank.
+    for (const at of [{ x: 3.5, z: 0 }, { x: 2.4, z: 1 }, { x: 4.8, z: -2 }]) {
+      const bank = channelEndingBank(at.x, at.z, terrain, 30)
+      expect(bank).not.toBeNull()
+      const end = swimToEnd(at.x, at.z, bank!)
+      expect(end.end).not.toBeNull()
+      expect(terrain(end.x)).not.toBe('water')
+    }
+    // Too late: the kill completes with the parent far off in the channel — no
+    // vigil (the water has the body); it is released to the bank instead.
+    const calf: { x: number; z: number; parent?: unknown } = { x: 3.5, z: 0 }
+    const parent: { x: number; z: number; child?: unknown; vigil?: unknown; bereaved?: number; dead?: boolean } = { x: 4.6, z: 4, child: calf }
+    calf.parent = parent
+    const fate = releaseBereavedParent(calf as never, { tooLateDist: 3.2, bereavedSeconds: 90, vigilAt: calf, vigil: false })
+    expect(fate).toBe('bank')
+    expect(parent.vigil).toBeUndefined()
+    expect(parent.child).toBeUndefined()
+    const bank = channelEndingBank(parent.x, parent.z, terrain, 30)!
+    const end = swimToEnd(parent.x, parent.z, bank)
+    expect(terrain(end.x)).not.toBe('water')
+    // A parent already ashore stays where it stands.
+    expect(channelEndingBank(6, 1, terrain, 30)).toEqual({ tx: 6, tz: 1 })
+  })
+
+  it('no branch leaves the return running past the crossing deadline', () => {
+    // A calf the parent can never reach (dragged away faster than it swims).
+    let x = 3
+    const r: ChannelReturn = { time: 0, heading: 0 }
+    const dt = 1 / 30
+    let expiredAt = -1
+    for (let i = 0; i < 2000; i++) {
+      const s = channelReturnStep(x, 0, r, x + 50, 0, dt, 7, 1, resolve)
+      r.time = s.time
+      r.heading = s.heading
+      if (s.expired) {
+        expiredAt = s.time
+        expect(s.x).toBe(x) // nothing moves once expired
+        break
+      }
+      x = s.x
+    }
+    expect(expiredAt).toBeGreaterThanOrEqual(resolve)
+    expect(expiredAt).toBeLessThanOrEqual(resolve + dt + 1e-9)
+    // AT the deadline it has expired — no last stroke on the deadline itself.
+    const atDeadline = channelReturnStep(0, 0, { time: resolve - 1, heading: 0 }, 50, 0, 1, 7, 1, resolve)
+    expect(atDeadline).toMatchObject({ x: 0, z: 0, expired: true })
+    expect(channelReturnExpired({ time: resolve, heading: 0 }, resolve)).toBe(true)
+    expect(channelReturnExpired(r, resolve)).toBe(true)
+    expect(channelReturnExpired(undefined, resolve)).toBe(false)
+    expect(channelReturnExpired({ time: resolve - 1, heading: 0 }, resolve)).toBe(false)
   })
 })

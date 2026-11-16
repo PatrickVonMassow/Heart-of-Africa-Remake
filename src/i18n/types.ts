@@ -718,6 +718,7 @@ export interface Strings {
     crocMouthOffset: string
     juvenilePreyBias: string
     juvenileDrinkCrocBias: string
+    midChannelCalfCrocWeight: string
     calfAdoptionRadius: string
     calfEscapeSeconds: string
     calfReunionSeconds: string

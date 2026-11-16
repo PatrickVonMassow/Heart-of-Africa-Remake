@@ -695,6 +695,7 @@ export const en: Strings = {
     crocMouthOffset: 'Crocodile: mouth anchor offset',
     juvenilePreyBias: 'Juvenile prey preference',
     juvenileDrinkCrocBias: 'Crocodile: drinking-juvenile preference',
+    midChannelCalfCrocWeight: 'Crocodile: swimming-calf preference mid-channel',
     calfAdoptionRadius: 'Orphan adoption radius',
     calfEscapeSeconds: 'Freed calf escape run (s)',
     calfReunionSeconds: 'Calf separation window (s)',
