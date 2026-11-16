@@ -62,5 +62,9 @@ it('names one walker by one index: carries[k] and group(k) are the same walker',
   // and the drawn group k is the one that renders def k's head load
   const draw = source.slice(source.indexOf('{defs.map((def, i) => (', end), source.indexOf('\n      ))}', end))
   expect(draw).toMatch(/refs\.current\[i\] = el/)
-  expect(draw).toMatch(/def\.carries \? \(/)
+  // The basket is mounted on every walker and shown on whoever carries it now
+  // (a meeting may hand it over, encounters.ts); the carriers start as defs say.
+  expect(draw).toMatch(/baskets\.current\[i\] = el/)
+  expect(draw).toMatch(/visible=\{loads\.current\[i\] \?\? false\}/)
+  expect(source).toMatch(/loads\.current = defs\.map\(\(d\) => d\.carries\)/)
 })

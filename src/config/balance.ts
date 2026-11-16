@@ -1582,6 +1582,32 @@ interface BalanceConfig {
       /** A child moving faster than this (m/s) is in the chase and stays in it. */
       childMaxSpeed: number
     }
+    /** The inhabitants take notice of each other (design.md §19.10): a
+     *  meeting, a handover of the head load, and a gathering at the fire. */
+    encounters: {
+      /** Distance (m) inside which two walking villagers may meet. */
+      radius: number
+      /** Seconds a meeting holds before both resume their errands. */
+      meetSeconds: number
+      /** Seconds before the same pair may meet again. */
+      pairCooldownSeconds: number
+      /** Seconds after any meeting before a walker may meet anyone. */
+      walkerRestSeconds: number
+      /** Chance (0..1) that a pair coming into range actually meets. */
+      meetChance: number
+      /** Chance (0..1) that a meeting with exactly one carrier hands the load over. */
+      handoverChance: number
+      /** Peak forward lean (rad) of the greeting bow. */
+      bowLean: number
+      /** No meeting where either figure stands this close (m) to a doorway. */
+      doorClearance: number
+      /** Figures beside the kneeling tender in the fire gathering. */
+      gatherCompanions: number
+      /** Radius (m) of the gathering's ring around the fire. */
+      gatherRing: number
+      /** A slot is refused this close (m) to another figure's fixed spot. */
+      gatherAvoid: number
+    }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {
       /** Body radius of a figure drawn at scale 1; a child's is this times its
@@ -2879,6 +2905,24 @@ export const balance: BalanceConfig = {
       goatShyStep: 0.6,
       goatShySeconds: 0.8,
       childMaxSpeed: 0.6,
+    },
+    // The inhabitants take notice of each other (design.md §19.10). Calibratable
+    // starting values (educated guess, CLAUDE.md §2): a greeting distance of a
+    // couple of metres, a pause of a few seconds, a pair cooldown long enough
+    // that two figures never greet in a loop, and a meeting chance well under
+    // one so most crossings stay plain passing and the errands keep arriving.
+    encounters: {
+      radius: 2.2,
+      meetSeconds: 4,
+      pairCooldownSeconds: 45,
+      walkerRestSeconds: 12,
+      meetChance: 0.55,
+      handoverChance: 0.5,
+      bowLean: 0.22,
+      doorClearance: 1.6,
+      gatherCompanions: 2,
+      gatherRing: 1.5,
+      gatherAvoid: 0.9,
     },
   },
   communication: {
