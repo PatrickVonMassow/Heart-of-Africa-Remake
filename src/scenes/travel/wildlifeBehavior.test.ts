@@ -5350,6 +5350,19 @@ describe('the crossing turned back (point 362)', () => {
     expect(familyCrossing({ x: 0, z: 0, child: dead }, { tx: 5.5, tz: 0 }, terrain, 6)).toHaveLength(1)
   })
 
+  it('a calf whose flank meets the sea never swims through ocean', () => {
+    // River x 1..5; an ocean inlet below z = -1.3 from x = 2 on.
+    const coast = (x: number, z: number) => (z < -1.3 && x > 2 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
+    // Flank in the inlet, parent's line clear: the calf follows the parent's line.
+    const calf = { x: 0.4, z: -1.5, young: true }
+    const plan = familyCrossing({ x: 0, z: 0, child: calf }, { tx: 5.5, tz: 0 }, coast, 6)
+    expect(plan[1]).toMatchObject({ animal: calf, tx: 5.5, tz: 0 })
+    // The parent's line meets the sea too: the calf stays ashore.
+    const deep = (x: number, z: number) => (x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
+    const calf2 = { x: 0.4, z: -1.5, young: true }
+    expect(familyCrossing({ x: 0, z: 0, child: calf2 }, { tx: 5.5, tz: 0 }, deep, 6)).toHaveLength(1)
+  })
+
   it('the mid-channel weight beats every bank case', () => {
     const bias = balance.family.juvenileDrinkCrocBias
     const w = balance.family.midChannelCalfCrocWeight
@@ -5441,8 +5454,12 @@ describe('the crossing turned back (point 362)', () => {
       }
       x = s.x
     }
-    expect(expiredAt).toBeGreaterThan(resolve)
+    expect(expiredAt).toBeGreaterThanOrEqual(resolve)
     expect(expiredAt).toBeLessThanOrEqual(resolve + dt + 1e-9)
+    // AT the deadline it has expired — no last stroke on the deadline itself.
+    const atDeadline = channelReturnStep(0, 0, { time: resolve - 1, heading: 0 }, 50, 0, 1, 7, 1, resolve)
+    expect(atDeadline).toMatchObject({ x: 0, z: 0, expired: true })
+    expect(channelReturnExpired({ time: resolve, heading: 0 }, resolve)).toBe(true)
     expect(channelReturnExpired(r, resolve)).toBe(true)
     expect(channelReturnExpired(undefined, resolve)).toBe(false)
     expect(channelReturnExpired({ time: resolve - 1, heading: 0 }, resolve)).toBe(false)

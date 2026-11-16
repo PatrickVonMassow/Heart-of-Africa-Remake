@@ -1258,20 +1258,40 @@ export function familyCrossing<A extends CrossingFamilyMember>(
     const sz = (target.tz - starter.z) / (span || 1)
     let own: { tx: number; tz: number } | null = null
     let wet = false
+    let sea = false
     for (let i = 1; i * 0.5 <= span + maxUnits; i++) {
       const px = c.x + sx * i * 0.5
       const pz = c.z + sz * i * 0.5
       const t = terrainTypeAt(px, pz)
-      if (t === 'ocean') break
+      if (t === 'ocean') {
+        sea = true
+        break
+      }
       if (t === 'water') wet = true
       else if (wet) {
         own = { tx: px, tz: pz }
         break
       }
     }
-    out.push({ animal: c, tx: own?.tx ?? target.tx, tz: own?.tz ?? target.tz })
+    // Its flank meets the sea: the calf follows the parent's own line instead,
+    // never a route through ocean — if that line meets the sea too, it stays.
+    if (own !== null || !sea || !segmentMeetsOcean(c.x, c.z, target.tx, target.tz, terrainTypeAt))
+      out.push({ animal: c, tx: own?.tx ?? target.tx, tz: own?.tz ?? target.tz })
   }
   return out
+}
+
+/** Does the straight line between two points cross ocean (0.5-unit probe)? */
+function segmentMeetsOcean(
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  terrainTypeAt: (x: number, z: number) => string,
+): boolean {
+  const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.5)
+  for (let i = 1; i <= n; i++) if (terrainTypeAt(x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n) === 'ocean') return true
+  return false
 }
 
 /** The parent's swim back to its seized calf (point 362), carried per frame. */
@@ -1292,7 +1312,7 @@ export function channelReturnPace(onWater: boolean, rescue: number, flowFactor: 
 
 /** Has the return outlived the crossing deadline (§19.5 — nothing is left swimming)? */
 export function channelReturnExpired(r: ChannelReturn | undefined, resolveSeconds: number): boolean {
-  return r !== undefined && r.time > resolveSeconds
+  return r !== undefined && r.time >= resolveSeconds
 }
 
 /**
@@ -1314,7 +1334,7 @@ export function channelReturnStep(
   resolveSeconds: number,
 ): { x: number; z: number; heading: number; time: number; expired: boolean } {
   const time = r.time + dt
-  if (time > resolveSeconds) return { x, z, heading: r.heading, time, expired: true }
+  if (time >= resolveSeconds) return { x, z, heading: r.heading, time, expired: true }
   const dx = calfX - x
   const dz = calfZ - z
   const d = Math.hypot(dx, dz)

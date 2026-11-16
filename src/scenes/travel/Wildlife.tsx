@@ -516,6 +516,10 @@ interface Animal {
    *  the steered heading (capped turn) and the time spent, bounded by the
    *  crossing deadline. Cleared once the calf's seizure has resolved. */
   channelReturn?: ChannelReturn
+  /** Crossing time already spent when a mid-channel drama cut the crossing
+   *  short (point 362): the return and the swim for the bank keep counting
+   *  against the SAME deadline instead of starting a fresh one (I4). */
+  crossingSpent?: number
   /** Sim time of this animal's last flight step (point 312): while recent, a
    *  flight that took it onto river/lake water keeps swimming and the
    *  backstop leaves it alone; once it lapses the swim-to-bank takes over. */
@@ -2700,7 +2704,9 @@ function Herds() {
     const swimToChannelBank = (b: Animal) => {
       const bank = channelEndingBank(b.x, b.z, terrainTypeAtWorld, CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds)
       const land = bank ?? (() => { const l = findLandNear(b.x, b.z, seed); return { tx: l.x, tz: l.z } })()
-      if (land.tx !== b.x || land.tz !== b.z) b.crossing = { tx: land.tx, tz: land.tz, time: 0 }
+      const spent = Math.max(b.channelReturn?.time ?? 0, b.crossingSpent ?? 0)
+      b.crossingSpent = undefined
+      if (land.tx !== b.x || land.tz !== b.z) b.crossing = { tx: land.tx, tz: land.tz, time: spent }
     }
     const swimOutBank = (a: Animal, sp: Species) =>
       safeBankTarget(
@@ -2849,8 +2855,10 @@ function Herds() {
         if (
           a.crossing !== undefined && a.child && !a.child.dead && !returnGaveUp &&
           (a.child.caught !== undefined || a.child.inWater !== undefined || a.child.mired !== undefined)
-        )
+        ) {
+          a.crossingSpent = a.crossing.time
           a.crossing = undefined
+        }
         // The defence kick's pose window runs down here so it always resolves
         // (point 124) — the render loop below only draws it.
         if (a.kick !== undefined) {
@@ -2904,8 +2912,8 @@ function Herds() {
               vigil: !midChannel,
             })
             if (fate === 'bank' && par) {
-              par.channelReturn = undefined
               swimToChannelBank(par)
+              par.channelReturn = undefined
             }
             if (fate === 'taken' && par) {
               takeAnimal(par, croc ? 'crocodile' : 'predator', killer, croc ? { sink: true } : { stain: true })
@@ -2930,7 +2938,7 @@ function Herds() {
             : undefined
           let gaveUp = false
           if (channelCroc) {
-            const r = (a.channelReturn ??= { time: 0, heading: a.face ?? a.rot })
+            const r = (a.channelReturn ??= { time: a.crossingSpent ?? 0, heading: a.face ?? a.rot })
             const flow = seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor)
             const pace = channelReturnPace(terrainTypeAtWorld(a.x, a.z) === 'water', RESCUE_SPEED, flow)
             const st = channelReturnStep(a.x, a.z, r, calf.x, calf.z, dt, FACE_TURN, pace, balance.waterCross.resolveSeconds)
@@ -2983,9 +2991,9 @@ function Herds() {
               a.kick = PARENT_KICK_SECONDS
               if (channelCroc) {
                 // Driven off mid-channel (point 362): both swim for the nearest bank.
-                a.channelReturn = undefined
                 swimToChannelBank(calf)
                 swimToChannelBank(a)
+                a.channelReturn = undefined
               }
               if (calf.caughtBy === 'crocodile') {
                 // Driven off the seized calf (point 130): the crocodile lets
@@ -4268,6 +4276,7 @@ function Herds() {
             v.z = tz
             v.drink = undefined
             // Seized mid-swim (point 362): the crossing ends in the jaws.
+            if (v.crossing !== undefined) v.crossingSpent = v.crossing.time
             v.crossing = undefined
             v.caught = CAUGHT_DURATION
             v.caughtBy = 'crocodile'
