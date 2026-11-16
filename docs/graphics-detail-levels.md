@@ -63,6 +63,8 @@ device pixel ratio is kept (no cap).
 | `sunGlare` | off | off | on |
 | `sunDiscGain` | 3 | 3 | 14 |
 | `horizonMaps` | off | on | on |
+| `rainImpacts` | 0 | 250 | 500 |
+| `rainLitDrops` | off | on | on |
 
 ## What each setting does
 
@@ -380,6 +382,20 @@ added.
   fetches them once and applies them when they arrive. Settlements are
   untouched. Quarter resolution (`--scale 4`, 0.65 + 0.57 MB) is the fallback
   if the download budget bites; the picture decides.
+- **`rainImpacts`** — Settlement rain impacts (design.md §19.13,
+  `src/scenes/place/rainMaterials.ts`): how many of the 700 drops bloom a
+  short-lived splash where they arrive — one quad shape, a flat ring on the
+  river's water, a small standing puff on ground, none on a roofed floor. The
+  impact replays the drop's own fall in the shader (no CPU spawn); one
+  instanced, alpha-blended draw. Low draws none. Climbs 0 → 250 → 500.
+- **`rainLitDrops`** — Lit settlement rain drops: a streak's brightness
+  follows the sun and the view angle (bright against dark walls and ground,
+  nearly gone against the bright sky, glinting toward the sun) with a per-drop
+  spread. Off keeps the plain one-colour streak. On every level, unpriced: the
+  drops end on the ground or water under their own x/z (sampled on the CPU
+  once per wrap of the column, plus a full refresh per second while it rains)
+  and the built fabric takes the ground's wetness (one uniform read).
+  Low off, medium and high on.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 

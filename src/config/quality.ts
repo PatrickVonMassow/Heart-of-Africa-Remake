@@ -160,6 +160,14 @@ export interface QualityPreset {
   /** Gain of the sky dome's sun disc. Above the bloom threshold on every level;
    *  the glare level lifts it so the disc blooms on its own. */
   sunDiscGain: number
+  /** Splash impacts of the settlement rain (design.md §19.13): how many of its
+   *  drops bloom a ring (water) or a puff (ground) where they arrive. One
+   *  instanced, alpha-blended draw; 0 draws none. */
+  rainImpacts: number
+  /** Lit settlement rain drops: brightness follows the sun and the view angle
+   *  (bright against dark walls, nearly gone against the sky) with per-drop
+   *  variation. Off keeps the plain one-colour streaks. */
+  rainLitDrops: boolean
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -206,6 +214,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sunGlare: false, // no bloom to build it on
     sunDiscGain: 3, // the disc before point 344
     horizonMaps: false, // not even fetched: the download and video memory are what a weak device cannot afford
+    rainImpacts: 0, // plain streaks only: no splash draw
+    rainLitDrops: false, // the plain one-colour streak
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -246,6 +256,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sunGlare: false,
     sunDiscGain: 3, // the disc before point 344
     horizonMaps: true, // one texture lookup per terrain fragment
+    rainImpacts: 250, // calibratable: of the 700 drops
+    rainLitDrops: true,
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -285,6 +297,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     sunGlare: true, // first person only
     sunDiscGain: 14, // calibratable: well above the 0.88 bloom threshold
     horizonMaps: true,
+    rainImpacts: 500, // calibratable: of the 700 drops
+    rainLitDrops: true,
   },
 }
 

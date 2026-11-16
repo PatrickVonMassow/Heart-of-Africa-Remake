@@ -248,7 +248,10 @@ export const DOC_BUDGETS = [
     // RAISED by the 2 measured lines criterion 31 owes the horizon neighbours: a
     // place within sight stands on the other's horizon by one symmetric rule
     // (point 380) — a rule the criterion did not carry.
-    maxLines: 586,
+    // RAISED by the 3 measured lines criterion 12 owes settlement rain touching
+    // the world (point 384): wet built fabric, drops ending on the surface under
+    // them — rules the criterion did not carry.
+    maxLines: 589,
     // RAISED by the 19 measured words criterion 16 owes the step height: a
     // scattered stone below `balance.placeStepOverTop` is ground rather than an
     // obstacle (work-order 1149), which is a rule the criterion did not carry
@@ -260,7 +263,8 @@ export const DOC_BUDGETS = [
     // never fetches them at low (work-order 346) — a rule the criterion did not carry.
     // RAISED by the 35 measured words of the criterion-31 horizon-neighbour rule
     // above (point 380).
-    maxWords: 5738,
+    // RAISED by the 29 measured words of the criterion-12 rain rule above (point 384).
+    maxWords: 5767,
     // Forty words for thirty-two criteria — the destination of the §7.1 cut edits one
     // criterion at a time, and one criterion's rewording is well inside that.
     slackWords: 40,
@@ -538,7 +542,10 @@ export const DOC_BUDGETS = [
     // RAISED by the 148 measured words of Abu Simbel (point 379): a ninth built
     // landmark in the §4.4 list with its 1890 state, and the enterable,
     // discovery-gated monument site — a genuine addition the point orders here.
-    maxWords: 31192,
+    // RAISED by 22 words: the 74 measured words of the §19.13 settlement-rain
+    // sentences (point 384: wet built fabric, drops arriving with an impact, lit
+    // drops), less the 52 of headroom that stood — new behaviour, no new line.
+    maxWords: 31214,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

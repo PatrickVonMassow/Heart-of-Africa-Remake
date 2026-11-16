@@ -1104,6 +1104,20 @@ Verifiable (`scripts/verify/settings.mjs`,
   herd at the lame pace with the parent beside it, and heals back to the
   herd, with screenshot 363. OPEN: grazer herds do not roam, so the gap
   behind the herd arises from a post-hunt scatter and is staged in the check.
+- Settlement rain touches the world (§19.13): roofs, walls, wood and cloth
+  read the ground's one `GROUND_WET_U` (albedo × (1 − `balance.rain.
+  fabricDarken`·wet), roughness × (1 − `fabricGloss`·wet); dry unchanged;
+  `wetFabric*` pinned with their CPU mirrors in
+  `src/render/seasonTint.test.ts`). Each drop holds a fixed world x/z tiled
+  by the column and ends on the footing sampler's ground — or the river's
+  water surface — under it, never the column's edge; its impact (one quad:
+  ring on water, puff on ground, none on a roofed floor) replays the fall in
+  the shader (`src/scenes/place/rainTouch.test.ts`). Lit drops (sun/view
+  angle, per-drop spread) and impacts are the medium/high levers
+  `rainLitDrops`/`rainImpacts`; low keeps the plain streak. Both materials
+  generate on WebGPU and WebGL 2 (`src/scenes/place/rainMaterials.test.ts`).
+  Picture check owed: no browser run in the authoring session. OPEN: a drop
+  still falls through a roof (only its impact is withheld there).
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item).
 The seasonal-dress reading the primitive figure could not show — a wrap
 worn DIFFERENTLY in the cold rather than in greater number (§19.13) —
