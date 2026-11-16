@@ -629,9 +629,10 @@ if (section('straggler')) {
         if (!calf.young || calf.dead || !parent || parent.dead || calf.inWater !== undefined || parent.inWater !== undefined) continue
         if (!land(calf.x, calf.z) || Math.hypot(calf.x - p0.x, calf.z - p0.z) < 10) continue
         const mates = (herds[sp] ?? []).filter((m) => m !== parent && !m.dead && !m.young && Math.hypot(m.x - calf.x, m.z - calf.z) < R * 0.6)
-        if (mates.length >= 2) { pick = { sp, calf, parent, mates }; break }
+        // The camera follows the traveller: the nearest qualifying calf keeps the scene in view.
+        const dp = Math.hypot(calf.x - p0.x, calf.z - p0.z)
+        if (mates.length >= 2 && (!pick || dp < pick.dp)) pick = { sp, calf, parent, mates, dp }
       }
-      if (pick) break
     }
     if (!pick) return { error: 'no calf with a parent and two herd-mates in reach' }
     const { calf, parent } = pick
@@ -661,14 +662,18 @@ if (section('straggler')) {
       const centroid = () => { const l = live(); return { x: l.reduce((a, m) => a + m.x, 0) / l.length, z: l.reduce((a, m) => a + m.z, 0) / l.length } }
       const c0 = centroid()
       const GAP = 14
+      // The camera follows the traveller, so the pair goes down on the open
+      // line whose end lies nearest a near-view distance from the traveller.
       let spot = null
-      for (let k = 0; k < 24 && !spot; k++) {
+      let best = Infinity
+      for (let k = 0; k < 24; k++) {
         const h = (k / 24) * Math.PI * 2
         const tx = c0.x + Math.sin(h) * GAP, tz = c0.z + Math.cos(h) * GAP
-        if (Math.hypot(tx - p0.x, tz - p0.z) < 10) continue
+        const dp = Math.hypot(tx - p0.x, tz - p0.z)
+        if (dp < 8) continue
         let clear = true
         for (let f = 0; f <= 1.0001; f += 0.05) if (!land(c0.x + Math.sin(h) * GAP * f, c0.z + Math.cos(h) * GAP * f)) { clear = false; break }
-        if (clear) spot = { x: tx, z: tz }
+        if (clear && Math.abs(dp - 10) < best) { best = Math.abs(dp - 10); spot = { x: tx, z: tz } }
       }
       if (!spot) return { error: 'no open land line behind the herd' }
       calf.x = spot.x; calf.z = spot.z
@@ -680,7 +685,7 @@ if (section('straggler')) {
       await window.__pollSim(2, () => false)
       const dtSim = window.__simTime() - t0
       const pace = Math.hypot(calf.x - p.x, calf.z - p.z) / Math.max(0.01, dtSim)
-      return { gap0: +g0.toFixed(2), gap2: +gap().toFixed(2), pace: +pace.toFixed(2), parentBeside: +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2), lame: calf.lame !== undefined, world: { x: (calf.x + centroid().x) / 2, z: (calf.z + centroid().z) / 2 } }
+      return { gap0: +g0.toFixed(2), gap2: +gap().toFixed(2), pace: +pace.toFixed(2), parentBeside: +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2), lame: calf.lame !== undefined, world: { x: calf.x, z: calf.z } }
     })
     if (!behind.error) await shot('363-straggler-behind-herd', { world: behind.world, label: 'a lame calf and its parent limping behind their herd', settle: false })
     const follow = await page.evaluate(() => window.__balance.family.followRadius)
