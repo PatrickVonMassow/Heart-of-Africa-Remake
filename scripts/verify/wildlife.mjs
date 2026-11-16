@@ -205,7 +205,7 @@ if (section('crossing-turned-back')) {
       const b = at(line.far + 0.5, lat)
       entered += window.__wildlife.startCrossing(a, b.x, b.z)
     }
-    window.__crossScene = { mates, parent, calf, croc, line }
+    window.__crossScene = { mates, parent, calf, croc, line, t0: window.__simTime() }
     // The recorder: positions every 50 ms against the sim clock, so the verdict
     // reads what the animals DID, not one sampled instant.
     const rec = []
@@ -255,13 +255,21 @@ if (section('crossing-turned-back')) {
       await shot('362-crossing-turned-back', { world: pos, label: 'the parent turned back mid-channel against its crossing herd', settle: false })
     }
     // Let every ending resolve: the crossing deadline bounds each swim (I4).
+    // The budget runs from the crossing's START, so an overdue ending cannot
+    // pass: the deadline plus the 5 s caught window (the seizure pauses the
+    // swim clock) plus the dev assert's 2 s slack.
     const resolveSeconds = await page.evaluate(() => window.__balance.waterCross.resolveSeconds)
-    const settled = await page.evaluate((budget) =>
-      window.__pollSim(budget, () => {
-        const s = window.__crossScene
+    const deadlineBudget = resolveSeconds + 5 + 2
+    const settled = await page.evaluate((budget) => {
+      const s = window.__crossScene
+      const left = budget - (window.__simTime() - s.t0)
+      if (left <= 0) return false
+      return window.__pollSim(left, () => {
         const all = [...s.mates, s.parent, s.calf].filter((a) => !a.dead)
         return all.every((a) => a.crossing === undefined && a.caught === undefined && a.channelReturn === undefined)
-      }), resolveSeconds + 15)
+      })
+    }, deadlineBudget)
+    const settledAfter = await page.evaluate(() => +(window.__simTime() - window.__crossScene.t0).toFixed(2))
     const verdict = await page.evaluate(() => {
       clearInterval(window.__crossRecTimer)
       const s = window.__crossScene
@@ -329,6 +337,8 @@ if (section('crossing-turned-back')) {
         turnedThrough: +turnedThrough.toFixed(2),
         survivorsOnBank: survivors.every((a) => !wet(a)),
         survivors: survivors.length,
+        parentAlive: !s.parent.dead,
+        calfAlive: !s.calf.dead,
       }
     })
     check('the rest of the herd never turns: every mate completes the crossing up the far bank (point 362)',
@@ -338,7 +348,10 @@ if (section('crossing-turned-back')) {
     check('the reversal goes through the capped turn — no body whips round (§19.5, point 362)',
       verdict.worstRate <= 7 * 1.05 + 0.05 && verdict.turnedThrough > Math.PI / 2, JSON.stringify(verdict))
     check('every ending resolves on a bank within the crossing deadline — nothing is left swimming (point 362)',
-      settled && verdict.survivorsOnBank, JSON.stringify(verdict))
+      settled && verdict.survivorsOnBank, JSON.stringify({ ...verdict, settledAfter, deadlineBudget }))
+    // The defence is forced to the drive-off: parent AND calf live and land.
+    check('the forced drive-off leaves parent and calf alive, both on a bank (point 362)',
+      verdict.parentAlive && verdict.calfAlive && verdict.survivors === 2 && verdict.survivorsOnBank, JSON.stringify(verdict))
   }
   // Restore what the staging changed.
   await page.evaluate(() => {
