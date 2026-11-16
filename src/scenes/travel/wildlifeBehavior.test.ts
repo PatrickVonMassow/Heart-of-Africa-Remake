@@ -50,6 +50,8 @@ import {
   chaseSwimEscaped,
   flightBlocked,
   roamCrossing,
+  drinkBankCrossing,
+  herdCrossingRoll,
   nearestBankTarget,
   waterDramaOwns,
   waterExit,
@@ -739,6 +741,39 @@ describe('water-shy, not water-barred (design.md §19.5, point 312)', () => {
     expect(roamCrossing(0.1, 0.3, 0, 0, 0, 6, wideLake)).toBeNull() // too wide
     const toSea = (_x: number, z: number) => (z > 0 && z <= 2 ? 'water' : 'ocean')
     expect(roamCrossing(0, 1, 0, 0, 0, 6, toSea)).toBeNull() // never the ocean
+  })
+
+  // The herd mover's drink walk (point 1527): anchor at z = -3, bank at z = -0.2.
+  it('a drinker at its bank starts a crossing below the chance, never at or above it', () => {
+    const t = drinkBankCrossing(0.29, 0.3, 0, -3, 0, -0.2, 6, riverThenLand)
+    expect(t).not.toBeNull()
+    expect(t!.tz).toBeGreaterThan(3) // the FAR bank, not the near one
+    expect(riverThenLand(t!.tx, t!.tz)).toBe('savanna')
+    expect(drinkBankCrossing(0.3, 0.3, 0, -3, 0, -0.2, 6, riverThenLand)).toBeNull()
+    expect(drinkBankCrossing(0, 0, 0, -3, 0, -0.2, 6, riverThenLand)).toBeNull() // chance 0: never
+  })
+
+  it('a drinker far from the water never crosses, whatever the roll', () => {
+    // The same walk, but its bank spot stands 2 units short of the waterline.
+    expect(drinkBankCrossing(0, 1, 0, -5, 0, -2, 6, riverThenLand)).toBeNull()
+    // Too wide a lake, or the ocean beyond the bank: no crossing either.
+    expect(drinkBankCrossing(0, 1, 0, -3, 0, -0.2, 6, wideLake)).toBeNull()
+    expect(drinkBankCrossing(0, 1, 0, -3, 0, -0.2, 6, coast)).toBeNull()
+  })
+
+  it('the herd roll is shared by the whole herd per window and passes at the configured rate', () => {
+    expect(herdCrossingRoll('3,4:zebra', 7)).toBe(herdCrossingRoll('3,4:zebra', 7))
+    const chance = 0.3
+    let pass = 0
+    const N = 4000
+    for (let w = 0; w < N; w++) {
+      const r = herdCrossingRoll('3,4:zebra', w)
+      expect(r).toBeGreaterThanOrEqual(0)
+      expect(r).toBeLessThan(1)
+      if (drinkBankCrossing(r, chance, 0, -3, 0, -0.2, 6, riverThenLand)) pass++
+    }
+    expect(pass / N).toBeGreaterThan(chance - 0.03)
+    expect(pass / N).toBeLessThan(chance + 0.03)
   })
 
   it('an idle animal on water heads for the NEAREST bank, not the far one', () => {
@@ -5358,7 +5393,7 @@ describe('the crossing turned back (point 362)', () => {
     const plan = familyCrossing({ x: 0, z: 0, child: calf }, { tx: 5.5, tz: 0 }, coast, 6)
     expect(plan[1]).toMatchObject({ animal: calf, tx: 5.5, tz: 0 })
     // The parent's line meets the sea too: the calf stays ashore.
-    const deep = (x: number, z: number) => (x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
+    const deep = (x: number, _z: number) => (x > 2 && x < 4 ? 'ocean' : x > 1 && x < 5 ? 'water' : 'grass')
     const calf2 = { x: 0.4, z: -1.5, young: true }
     expect(familyCrossing({ x: 0, z: 0, child: calf2 }, { tx: 5.5, tz: 0 }, deep, 6)).toHaveLength(1)
     // Its flank stays dry (no water, no sea) but the diagonal to the parent's

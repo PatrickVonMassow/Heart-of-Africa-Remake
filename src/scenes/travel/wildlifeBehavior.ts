@@ -461,9 +461,57 @@ export function roamCrossing(
   heading: number,
   maxUnits: number,
   terrainTypeAt: (x: number, z: number) => string,
+  step = 1,
 ): { tx: number; tz: number } | null {
   if (!(roll < chance)) return null
-  return crossingTarget(x, z, heading, maxUnits, terrainTypeAt)
+  return crossingTarget(x, z, heading, maxUnits, terrainTypeAt, step)
+}
+
+/**
+ * The herd's crossing roll for one drink window (point 1527): one value in
+ * [0, 1) per herd (`groupKey`, its birth chunk + species) and window, so every
+ * member standing at the bank in that window shares the decision and the herd
+ * crosses together rather than one animal at a time.
+ */
+export function herdCrossingRoll(groupKey: string, window: number): number {
+  let h = 0x811c9dc5
+  const s = `${groupKey}#${window}`
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  h ^= h >>> 15
+  h = Math.imul(h, 0x2c1b3c6d)
+  h ^= h >>> 12
+  return (h >>> 0) / 4294967296
+}
+
+/**
+ * The drink-walk crossing (point 1527): a grazer standing at its drink bank
+ * (`bankX/bankZ`, reached from its anchor `x/z`) is the herd mover's "near
+ * water" moment. It asks roamCrossing on the line anchor → bank, probed from
+ * the bank in half-unit strides, so only a channel right at that bank — never
+ * water further off — can be crossed.
+ */
+export function drinkBankCrossing(
+  roll: number,
+  chance: number,
+  x: number,
+  z: number,
+  bankX: number,
+  bankZ: number,
+  maxUnits: number,
+  terrainTypeAt: (x: number, z: number) => string,
+): { tx: number; tz: number } | null {
+  const dx = bankX - x
+  const dz = bankZ - z
+  if (Math.hypot(dx, dz) < 1e-3) return null
+  if (!(roll < chance)) return null // cheap first: the probe below samples terrain
+  const heading = Math.atan2(dx, dz)
+  // The first half-unit stride must already be wet: a bank that is not at the
+  // water has no channel to cross.
+  if (terrainTypeAt(bankX + Math.sin(heading) * 0.5, bankZ + Math.cos(heading) * 0.5) !== 'water') return null
+  return roamCrossing(roll, chance, bankX, bankZ, heading, maxUnits, terrainTypeAt, 0.5)
 }
 
 /**

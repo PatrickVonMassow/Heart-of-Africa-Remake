@@ -106,6 +106,8 @@ import {
   channelDriftStep,
   ambientSavannaSpecies,
   claimedByAnotherDrama,
+  drinkBankCrossing,
+  herdCrossingRoll,
   drinkCatchment,
   mireFate,
   mireRoll,
@@ -5499,6 +5501,26 @@ function Herds() {
             if (cycle >= 0.12 && cycle < 0.38) {
               if (a.bathe) bodyY += Math.sin(t * 3 + a.phase) * 0.05 // wallow/splash
               else pitch = 0.42 + Math.sin(t * 1.4 + a.phase) * 0.08
+              // The herd crosses on its own (design.md §19.5/§19.8, point 1527):
+              // at the bank its herd's roll for this drink window may send it
+              // across — from the bank spot it stands on, taking its calf along.
+              const groupKey = a.origin ?? a.chunk
+              if (
+                groupKey !== undefined && !a.young && !a.dead && !lionActive &&
+                a.dodgeHeading === undefined && a.vigil === undefined &&
+                !claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim })
+              ) {
+                const far = drinkBankCrossing(
+                  herdCrossingRoll(`${groupKey}:${sp}`, Math.floor(t / 75)), balance.waterCross.chance,
+                  a.x, a.z, a.drink.tx, a.drink.tz, balance.waterCross.maxUnits, terrainTypeAtWorld,
+                )
+                if (far) {
+                  a.x = a.drink.tx
+                  a.z = a.drink.tz
+                  a.bathe = undefined
+                  startFamilyCrossing(a, far, terrainTypeAtWorld)
+                }
+              }
             }
           }
         }
