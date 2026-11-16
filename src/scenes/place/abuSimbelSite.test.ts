@@ -11,6 +11,7 @@ import {
   buildAbuSimbelLayout,
   cliffToSite,
   driftCrestAt,
+  driftHeightAt,
   fallenFragments,
   siteToCliff,
 } from './abuSimbelSite'
@@ -65,6 +66,22 @@ describe('Abu Simbel site — the Great Temple and the small temple (point 379)'
     const layout = buildAbuSimbelLayout(0)
     expect(standingClear(layout.colliders, layout.spawnX!, layout.spawnZ, WALKER_RADIUS)).toBe(true)
     expect(Math.hypot(layout.spawnX!, layout.spawnZ)).toBeLessThan(layout.radius)
+  })
+
+  it('blocks the colossi out to their toes and the drift wherever it stands above wading height', () => {
+    const colliders = abuSimbelColliders()
+    for (const c of GREAT_COLOSSI) {
+      // The rendered feet run out to THRONE_DEPTH + 0.1 * height.
+      const toe = cliffToSite(c.u, THRONE_DEPTH + 0.095 * c.height)
+      expect(standingClear(colliders, toe.x, toe.z, 0)).toBe(false)
+    }
+    for (let u = S.drift.uFrom; u <= S.drift.uTo; u += 0.5) {
+      for (let v = 0; v <= S.drift.reach; v += 0.5) {
+        if (driftHeightAt(u, v) <= 1.2) continue
+        const p = cliffToSite(u, v)
+        expect(standingClear(colliders, p.x, p.z, 0), `drift ${u},${v}`).toBe(false)
+      }
+    }
   })
 
   it('is the layout the monument map point builds, with no trade, elder or crowd', () => {

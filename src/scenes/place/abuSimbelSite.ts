@@ -88,6 +88,8 @@ export function driftHeightAt(u: number, v: number): number {
 /** The drift's solid part: where it stands higher than a walker could wade
  *  (DRIFT_SOLID_H), as one box in the cliff frame. */
 const DRIFT_SOLID_H = 1.2
+/** Width along the face of one drift collider strip, metres. */
+const DRIFT_STEP = 2
 
 /**
  * The collidable masses (design.md §2.6, the point-378 rule: the collider is
@@ -114,16 +116,18 @@ export function abuSimbelColliders(): Collider[] {
   box(su + sHalf, uMax, 0, cheek)
   // The colossi: throne plus legs and feet.
   for (const c of GREAT_COLOSSI) {
-    box(c.u - THRONE_WIDTH / 2, c.u + THRONE_WIDTH / 2, 0, THRONE_DEPTH + 0.06 * c.height)
+    box(c.u - THRONE_WIDTH / 2, c.u + THRONE_WIDTH / 2, 0, THRONE_DEPTH + 0.1 * c.height)
     if (c.fallen) for (const f of fallenFragments(c)) box(f.u - f.w / 2, f.u + f.w / 2, f.v - f.d / 2, f.v + f.d / 2)
   }
   // The small temple's standing figures and buttresses.
   box(su - sHalf, su + sHalf, 0, 0.25 * S.small.statueHeight * S.scale)
-  // The drift where it is a slope, not ankle sand.
-  const crestMax = Math.max(...S.drift.crest.map(([, h]) => h))
-  const solidReach = S.drift.reach * (1 - DRIFT_SOLID_H / crestMax)
-  const firstSolid = S.drift.crest.find(([, h]) => h >= DRIFT_SOLID_H * 2)?.[0] ?? S.drift.uFrom
-  box(firstSolid, S.drift.uTo, 0, solidReach * 0.6)
+  // The drift where it is a slope, not ankle sand: one strip per step along
+  // the face, out to where the higher end of the step falls below wading height.
+  for (let u0 = S.drift.uFrom; u0 < S.drift.uTo; u0 += DRIFT_STEP) {
+    const u1 = Math.min(u0 + DRIFT_STEP, S.drift.uTo)
+    const h = Math.max(driftCrestAt(u0), driftCrestAt(u1))
+    if (h > DRIFT_SOLID_H) box(u0, u1, 0, S.drift.reach * (1 - DRIFT_SOLID_H / h))
+  }
   return out
 }
 
