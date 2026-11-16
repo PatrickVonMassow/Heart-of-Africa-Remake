@@ -14603,3 +14603,11 @@ to land than a mechanism that needs a review.
   Test: a Vitest case stepping the channel return at a low frame rate, plus the two wildlife sections green on WebGL 2 and WebGPU.
   Source: finding of the 362 session, 16.11.2026 04:00.
   Bundle: Tierverhalten.
+
+- [ ] 1533. The full polish-settlement pass hangs on WebGPU after its inhabitants section
+  Measured 17.11.2026 on main 579e7c4e6, WebGPU, no other local job: `VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish-settlement` wrote its frames up to 356-inhabitant-glance (00:25), then wrote nothing for 20 min and was KILLED at the 45 min wall timeout. The three sections after it pass alone on the same SHA and backend: fire-smoke 1m 28s, walker-dust 2m 19s, kraal-cattle 3m 05s (local/verify-logs/2026-11-16T23-45-35-035-polish-settlement.log and its two successors).
+  Player impact: none directly; the settlement render changes of 384 (and every later settlement point) cannot get a covering both-backend run, so the render-verify guard stays red.
+  Final state: the cause of the stall inside the long pass is named (state carried from an earlier section, a wait that never resolves, GPU resource exhaustion, ...) and fixed, or the suite is split so each part finishes inside its timeout; a full polish-settlement pass completes on WebGPU and WebGL 2.
+  Test: the full polish-settlement pass green on both backends; if a wait is the cause, a bounded wait that fails loud instead of hanging.
+  Source: finding of the 1529 session, 17.11.2026 00:53.
+  Bundle: Testinfrastruktur.
