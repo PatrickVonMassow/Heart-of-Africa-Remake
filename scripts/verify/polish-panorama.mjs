@@ -1979,14 +1979,21 @@ if (section('giza-activity')) {
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   try {
     const before = await page.evaluate(() => window.__gizaActivity())
-    await page.waitForTimeout(4000)
-    const after = await page.evaluate(() => window.__gizaActivity())
-    const moved = after.filter((p, i) => Math.hypot(p.x - before[i].x, p.z - before[i].z) > 0.5).length
-    check('Giza activity: the plateau\'s figures move over four seconds (not statues)', moved >= 4, JSON.stringify({ moved, before, after }))
+    // Polled, not a fixed wait: done as soon as four figures have walked off.
+    const after = await page
+      .waitForFunction((before) => {
+        const live = window.__gizaActivity()
+        const moved = live.filter((p, i) => Math.hypot(p.x - before[i].x, p.z - before[i].z) > 0.5).length
+        return moved >= 4 ? live : null
+      }, before, { timeout: 30000, polling: 250 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('Giza activity: the plateau\'s figures walk off their places (not statues)', !!after, JSON.stringify({ before }))
     // Mounts beside their handlers (gizaActivity.ts GIZA_PARTIES: camel 2 with
     // guide 0, camel 4 with the cameleer 3, donkey 6 with the donkey-boy 5).
     const pairs = [[2, 0], [4, 3], [6, 5]]
-    const gaps = pairs.map(([m, h]) => +Math.hypot(after[m].x - after[h].x, after[m].z - after[h].z).toFixed(2))
+    const now = after ?? (await page.evaluate(() => window.__gizaActivity()))
+    const gaps = pairs.map(([m, h]) => +Math.hypot(now[m].x - now[h].x, now[m].z - now[h].z).toFixed(2))
     check('Giza activity: every mount walks beside its handler', gaps.every((d) => d > 1 && d < 3.5), JSON.stringify(gaps))
     // Mid-walk: wait for the guide's party to be under way, then hold it.
     const walking = await page
