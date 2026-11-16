@@ -46,6 +46,8 @@ async function sphinxLayers(key) {
   }
   return { probe, k, W, H, px, isMask, drawn, hidden }
 }
+// Surfaces a horizon neighbour may stand on (point 380): the drawn terrain.
+const NEIGHBOUR_GROUND = new Set(['landscape-backdrop', 'panorama-band', 'ground-disc'])
 const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
 const sat = ([r, g, b]) => (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(1, Math.max(r, g, b))
 
@@ -225,12 +227,15 @@ if (section('giza-sees-cairo')) {
       const root = scene.getObjectByName('horizon-neighbour-cairo')
       if (!root || !root.visible) return { drawn: false }
       const pts = []
+      let topY = -Infinity
       root.traverseVisible((o) => {
         if (!o.isMesh) return
         o.geometry.computeBoundingBox()
         const b = o.geometry.boundingBox
         for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
-          pts.push(camera.position.clone().set(x, y, z).applyMatrix4(o.matrixWorld).project(camera))
+          const w = camera.position.clone().set(x, y, z).applyMatrix4(o.matrixWorld)
+          topY = Math.max(topY, w.y)
+          pts.push(w.project(camera))
         }
       })
       if (!pts.length) return { drawn: false }
@@ -238,9 +243,15 @@ if (section('giza-sees-cairo')) {
       const ys = pts.map((p) => p.y)
       const box = { left: Math.min(...xs), right: Math.max(...xs), bottom: Math.min(...ys), top: Math.max(...ys) }
       const front = pts.every((p) => p.z > -1 && p.z < 1)
-      // The base, as drawn: the first surface on the sight line to the base
-      // point must be no further than the base itself (the point-181 gate).
-      const hit = window.__placeRayHit ? window.__placeRayHit(n.x, n.y, n.z) : null
+      // The base, as drawn: with the neighbour itself hidden, the first surface
+      // on the sight line to its base must be GROUND no further than the base
+      // (the point-181 gate) — a nearer pyramid or wall is no footing — and the
+      // sight line to its middle must stay clear, so it shows above that ground.
+      const ray = (y) => (window.__placeRayHit ? window.__placeRayHit(n.x, y, n.z) : null)
+      root.visible = false
+      const hit = ray(n.y)
+      const mid = ray((n.y + topY) / 2)
+      root.visible = true
       return {
         drawn: true,
         front,
@@ -249,6 +260,8 @@ if (section('giza-sees-cairo')) {
         widthPx: ((box.right - box.left) * window.innerWidth) / 2,
         baseRatio: hit && hit.hitDistance != null ? hit.hitDistance / hit.targetDistance : Infinity,
         baseHit: hit?.hitName ?? 'sky',
+        midRatio: mid && mid.hitDistance != null ? mid.hitDistance / mid.targetDistance : Infinity,
+        midHit: mid?.hitName ?? 'sky',
       }
     })
     const onScreen = !!seen?.drawn && seen.front &&
@@ -261,14 +274,31 @@ if (section('giza-sees-cairo')) {
       JSON.stringify(seen && { heightPx: seen.heightPx, widthPx: seen.widthPx }),
     )
     check(
-      'the Cairo neighbour stands on drawn ground — the surface at its base is no further than the base (point 181/380)',
-      !!seen?.drawn && seen.baseRatio <= 1.05,
+      'the Cairo neighbour stands on drawn GROUND — the surface at its base is terrain no further than the base (point 181/380)',
+      !!seen?.drawn && seen.baseRatio <= 1.05 && NEIGHBOUR_GROUND.has(seen.baseHit),
       JSON.stringify(seen && { baseRatio: seen.baseRatio, baseHit: seen.baseHit }),
     )
+    check(
+      'the Cairo neighbour shows ABOVE that ground — nothing nearer covers the sight line to its middle',
+      !!seen?.drawn && seen.midRatio >= 0.98,
+      JSON.stringify(seen && { midRatio: seen.midRatio, midHit: seen.midHit }),
+    )
     const buf = await frame('100b-giza-sees-cairo', { place: 'giza', label: 'Cairo on the eastern horizon of the Giza site' })
-    // Not a black sliver: the neighbour's pixels read as lit, hazed plaster.
+    // Not a black sliver: the neighbour's OWN pixels — where the frame changes
+    // when it is hidden — read as lit, hazed plaster, not the box around it.
     if (buf && seen?.drawn) {
-      const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+      const layer = async (shown) => {
+        await page.evaluate((v) => {
+          const root = window.__placeScene?.getObjectByName('horizon-neighbour-cairo')
+          if (root) root.visible = v
+        }, shown)
+        await nextFrames(4)
+        return sharp(await capturePixels(page, `Cairo neighbour, ${shown ? 'drawn' : 'hidden'} layer`)).raw().toBuffer({ resolveWithObject: true })
+      }
+      const drawn = await layer(true)
+      const hidden = await layer(false)
+      await layer(true)
+      const { data, info } = drawn
       const px = (nx, ny) => [Math.round(((nx + 1) / 2) * (info.width - 1)), Math.round(((1 - ny) / 2) * (info.height - 1))]
       const [x0, y1] = px(Math.max(-1, seen.box.left), Math.max(-1, seen.box.bottom))
       const [x1, y0] = px(Math.min(1, seen.box.right), Math.min(1, seen.box.top))
@@ -276,11 +306,18 @@ if (section('giza-sees-cairo')) {
       let n = 0
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
         const i = (y * info.width + x) * info.channels
-        if (lum([data[i], data[i + 1], data[i + 2]]) < 25) dark++
+        const own = [data[i], data[i + 1], data[i + 2]]
+        const behind = [hidden.data[i], hidden.data[i + 1], hidden.data[i + 2]]
+        if (Math.max(...own.map((c, k) => Math.abs(c - behind[k]))) < 12) continue
+        if (lum(own) < 25) dark++
         n++
       }
       const frac = n ? dark / n : 1
-      check('the Cairo neighbour is not a black sliver (< 25 % near-black pixels in its projected box)', n > 0 && frac < 0.25, `${dark} of ${n} px near-black`)
+      check(
+        'the Cairo neighbour is not a black sliver (>= 60 own px, < 25 % of them near-black)',
+        n >= 60 && frac < 0.25,
+        `${dark} of ${n} own px near-black`,
+      )
     }
     await page.evaluate(() => {
       const p = window.__placePlayer
