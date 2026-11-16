@@ -77,43 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 380. The surroundings show the neighbour that is really there (user 27.07.2026,
-  reported from the deployed build). Standing at the Giza monument site the traveller
-  does NOT see Cairo on the horizon, while standing in Cairo he does see the pyramids —
-  and in 1890 the two are barely fifteen kilometres apart, in flat desert, in plain
-  view of each other. The asymmetry is the report; the rule it breaks is §2.5, which
-  promises the surroundings panorama of the real map landscape.
-  DIAGNOSE BEFORE BUILDING, because the two directions probably have DIFFERENT causes:
-  the backdrop band (`src/scenes/place/backdrop.ts`) is built from `sampleTerrain`
-  alone — relief, no settlements and no monuments — so it cannot be what shows the
-  pyramids from Cairo; that view is far more likely Cairo's own local dressing. Confirm
-  which mechanism draws each side before deciding where the fix belongs. A fix in the
-  wrong one produces a pyramid that hangs in the sky, which is exactly the class points
-  92/94/181 already paid for.
-  THE TARGET: a settlement or monument that is genuinely within sight distance reads on
-  the horizon from the other, at the right BEARING and the right apparent size, sitting
-  on the ground the backdrop draws (`panoramaStandY`/`discHorizonY`, the point-181
-  footing rule) — never floating, never a black sliver. Sight distance is a
-  calibratable balance value, debug-editable, and the rule is symmetric by construction
-  rather than by two hand-written cases.
-  SCOPE HONESTLY: if the research shows the general case (every neighbouring place
-  within sight) costs far more than the Giza↔Cairo pair the user reported, say so with
-  the measured reason and deliver the general mechanism only if it is affordable —
-  a hard-coded pair is NOT an acceptable substitute, because the next pair reopens it.
-  VERIFIABLE: pure Vitest on the bearing/size/footing computation for a neighbour at a
-  given distance (present within sight, absent beyond it, correct bearing on both
-  sides — the symmetry pinned as a property, not as two examples); plus one Playwright
-  frame from each side, judged by PROJECTING the neighbour into the picture per §7.2,
-  never by an assumed radius.
-  ORDER: point 381 (the torn seam at that very site) is FIXED FIRST — adding a
-  neighbour to a horizon that is itself broken would build on sand.
-  THE ORDER CONDITION IS ALREADY MET (carried 20.08.2026 from the 10.08.2026 four-eyes
-  work-order analysis, not a fresh finding): the ORDER clause above makes this point wait on
-  point 381, and 381 is ticked and archived — the torn horizon at the Giza site is repaired.
-  This point is unblocked and builds on a horizon that holds.
-  DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
-  and CLAUDE.md §7.1 pt 31 with its evidence section.
-
 - [ ] 384. Rain that touches the world — wet roofs and walls, impacts, lit drops (user 27.07.2026,
   after looking at the settlement rain on the deployed build: "the rain is simply painted
   over the picture — it has no effect on the optics at all"). Measured against the code,
