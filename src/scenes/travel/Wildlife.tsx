@@ -1056,7 +1056,9 @@ const YOUNG_FOLLOW_SPEED = 4.5
  *  phase and position like the defence roll. */
 function lameAfterHunt(calf: Animal) {
   if (calf.dead || !calf.young) return
-  const roll = Math.abs(Math.sin(calf.phase * 91.3 + calf.x * 57.1 + calf.z * 211.9)) % 1
+  // fract(sin·43758) spreads near-uniformly on [0, 1); |sin| alone would skew the chance low.
+  const h = Math.sin(calf.phase * 91.3 + calf.x * 57.1 + calf.z * 211.9) * 43758.5453
+  const roll = h - Math.floor(h)
   if (lamenessRoll(true, balance.straggler.lameChance, roll)) calf.lame = 0
 }
 const GUARD_RADIUS = 12
