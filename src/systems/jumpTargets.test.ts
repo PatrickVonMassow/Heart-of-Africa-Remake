@@ -29,7 +29,7 @@ describe('jumpTargetPlaceId (design.md §21.3)', () => {
     }
     expect(PICKER.ports.length).toBe(10)
     expect(PICKER.villages.length).toBe(22)
-    expect(PICKER.monuments).toEqual(['giza'])
+    expect(PICKER.monuments).toEqual(['giza', 'abu-simbel'])
   })
 
   it('leaves every landmark, the graveyard and the tomb a bird\'s-eye jump', () => {
@@ -39,9 +39,9 @@ describe('jumpTargetPlaceId (design.md §21.3)', () => {
       ...PICKER.lakes,
       ...PICKER.natural,
       ...PICKER.other,
-      // The cultural landmarks EXCEPT Giza, which is the same site as the
-      // enterable monument map point (geo.ts landmarkLabelHiddenByMapPoint).
-      ...PICKER.cultural.filter((id) => id !== 'giza'),
+      // The cultural landmarks EXCEPT Giza and Abu Simbel, each the same site
+      // as an enterable monument map point (geo.ts landmarkLabelHiddenByMapPoint).
+      ...PICKER.cultural.filter((id) => id !== 'giza' && id !== 'abu-simbel'),
     ]
     for (const id of birdsEye) expect(jumpTargetPlaceId(id)).toBeNull()
     expect(birdsEye.length).toBeGreaterThan(20)
