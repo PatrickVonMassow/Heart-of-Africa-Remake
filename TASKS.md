@@ -77,39 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 363. The straggler — a lame calf the herd leaves behind (user 26.07.2026;
-  design.md §19.8 states the target). Every §19 drama is fast: a charge, a seizure,
-  a plunge. This one is slow, and nothing is scripted to kill — it is the only
-  scene in the game whose tension is WAITING.
-  THE LAMENESS. With a calibratable chance (§21.2, debug-editable) a calf that
-  SURVIVES a hunt — the parent drove the predator off (points 124/125/145c), or the
-  chase simply broke off — is left lame: a calibratable speed penalty for a
-  calibratable healing window. Keep the chance low; a drive-off that always cost
-  something would turn the successful defence into a second sacrifice.
-  THE HERD DRAWS AWAY. A lame calf cannot hold the group pace, and its parent does
-  not leave it (the §19.8 constant, already implemented for the mire vigil of point
-  123 — reuse that stay-behind, do not write a second one). The herd keeps its
-  ordinary roaming; the pair simply falls behind and stands alone in the open.
-  NO PREDATOR IS SENT. Do not spawn or steer one. The existing juvenile hunt bias
-  now has an easier target because the pair is isolated and slow; that is the whole
-  mechanism. If a hunt does find them the ORDINARY grammar runs (shield, charge,
-  roll) — the parent does not surrender, because nothing has died.
-  IT ALWAYS RESOLVES (the point-118 lesson): on the healing window the limp ends and
-  the pair rejoins the herd; a streamed-away herd is the adoption/regroup case that
-  already exists. A lame calf must never be left permanently detached.
-  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (the hunt outcome/drive-off
-  resolution, the mire stay-behind, the leash and group pacing), `Wildlife.tsx` for
-  the per-frame speed, `src/config/balance.ts` `waterDrama`'s neighbourhood (add the
-  values beside the family-drama block), `src/i18n/{de,en}.ts` labels.
-  VERIFIABLE: pure — the lameness fires only after a SURVIVED hunt and only on its
-  chance; the penalty applies to the calf and the parent's stay-behind mirrors it;
-  the pair falls measurably behind a roaming herd; the window heals and the pair
-  rejoins; no state leaves a calf detached past the window. Live
-  (`scripts/verify/wildlife.mjs`, ONE backend): with the chance forced to 1 a
-  post-hunt pair is measurably behind the herd's centroid and later back with it.
-  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
-  acceptance-evidence line under §12.
-
 - [ ] 379. Abu Simbel becomes a walkable site (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
   eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
