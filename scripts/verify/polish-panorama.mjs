@@ -1456,14 +1456,24 @@ if (section('abu-simbel-site')) {
   )
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await waitForStable(page)
-  const abuSite = await page.evaluate(() => ({
-    mode: window.__game.getState().mode,
-    colliders: window.__placeLayout?.colliders?.length ?? 0,
-    interactives: window.__placeLayout?.interactives?.length ?? 0,
-  }))
+  const abuSite = await page.evaluate(async () => {
+    const { GREAT_COLOSSI, THRONE_DEPTH, cliffToSite } = await import('/src/scenes/place/abuSimbelSite.ts')
+    const { standingClear, WALKER_RADIUS } = await import('/src/scenes/place/collision.ts')
+    const layout = window.__placeLayout
+    // A walker standing on each colossus's lap must be refused by the live layout.
+    const colossiBlocked = GREAT_COLOSSI.filter((c) => {
+      const p = cliffToSite(c.u, THRONE_DEPTH / 2)
+      return !standingClear(layout?.colliders ?? [], p.x, p.z, WALKER_RADIUS)
+    }).length
+    return {
+      mode: window.__game.getState().mode,
+      colossiBlocked,
+      interactives: layout?.interactives?.length ?? 0,
+    }
+  })
   check(
-    'Space enters the walkable Abu Simbel site: collidable temples, no trade, no chief',
-    abuSite.mode === 'place' && abuSite.colliders >= 5 && abuSite.interactives === 0,
+    'Space enters the walkable Abu Simbel site: every colossus blocks, no trade, no chief',
+    abuSite.mode === 'place' && abuSite.colossiBlocked === 4 && abuSite.interactives === 0,
     JSON.stringify(abuSite),
   )
   for (const [name, yaw, label] of [
