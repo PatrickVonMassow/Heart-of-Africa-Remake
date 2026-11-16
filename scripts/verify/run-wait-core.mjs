@@ -95,18 +95,18 @@ export const SUITE_FRAMES = Object.freeze({
 
 /**
  * Suites whose RUNTIME the cost measurement never recorded: `docs` opens no
- * browser, `board-layout` and `communication` were added after the measurement,
+ * browser, `board-layout`, `communication` and `wildlife` were added after the measurement,
  * and `startup`/`report`/`crossbrowser` predate the recording window. They are NAMED
  * rather than silently treated as zero — an estimate that quietly omits a suite
  * is how a wait comes out too short and the poll loop returns.
  */
-export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup', 'report', 'crossbrowser', 'communication', ...POLISH_THEME_SUITES])
+export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup', 'report', 'crossbrowser', 'communication', 'wildlife', ...POLISH_THEME_SUITES])
 
 /**
  * Their FRAME counts, which — unlike their runtimes — can be established by
  * reading the suite: `startup` takes exactly one shutter frame
  * (`142-startup-picture-live`, scripts/verify/startup.mjs), `communication`
- * takes 48, and `docs`, `board-layout`, `report` and `crossbrowser` take none. Kept apart from
+ * takes 48, `wildlife` one (`362-crossing-turned-back`), and `docs`, `board-layout`, `report` and `crossbrowser` take none. Kept apart from
  * SUITE_RUNTIME_S's
  * table so the lockstep test can hold that table to the document verbatim
  * while these stay counted from the source.
@@ -121,7 +121,7 @@ export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup
  * August table measured for the whole `polish` — the suite had grown since.
  */
 export const COUNTED_SUITE_FRAMES = Object.freeze({
-  docs: 0, 'board-layout': 0, startup: 1, report: 0, crossbrowser: 0, communication: 48,
+  docs: 0, 'board-layout': 0, startup: 1, report: 0, crossbrowser: 0, communication: 48, wildlife: 1,
   'polish-panorama': 13, 'polish-speech': 9, 'polish-settlement': 18, 'polish-children': 15, 'polish-villagers': 23,
 })
 

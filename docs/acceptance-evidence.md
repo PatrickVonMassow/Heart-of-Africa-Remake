@@ -1073,6 +1073,25 @@ Verifiable (`scripts/verify/settings.mjs`,
   catches a regression. Live in `scripts/verify/enrichments.mjs`: a
   staged feed whose terrain is read back under BOTH bodies through
   struggle, kill and sink, with screenshot 383.
+- The crossing turned back (§19.8, point 362): a parent's crossing takes
+  its free calf on a parallel line at its flank (`familyCrossing`; a calf
+  alone never starts one); the crocodile ambushes the SWIMMING calf
+  mid-channel as its strongest case
+  (`balance.family.midChannelCalfCrocWeight`, debug-editable, above the
+  drinking-juvenile bias); the parent swims back through the capped turn
+  at the rescue burst braked by the seasonal flow (`channelReturnStep`,
+  `channelReturnPace`), rolls the same defence, and every ending makes the
+  nearest bank — no vigil mid-channel (`releaseBereavedParent` with
+  `vigil: false`, `channelEndingBank`), the crossing deadline ending a
+  return that cannot arrive (`channelReturnExpired`). Pure-tested in
+  `src/scenes/travel/wildlifeBehavior.test.ts`. Live in
+  `scripts/verify/wildlife.mjs` (one backend, behaviour): a seeded herd
+  crossing whose recorded positions show every mate completing the
+  crossing while the parent reverses under the turn cap, every survivor
+  ending on a bank, with screenshot 362. OPEN: no ambient herd crossing
+  starts in play — `roamCrossing` (`balance.waterCross.chance`) is not
+  wired into the herd movement, so the scene is reached only through the
+  staged start.
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item).
 The seasonal-dress reading the primitive figure could not show — a wrap
 worn DIFFERENTLY in the cold rather than in greater number (§19.13) —
