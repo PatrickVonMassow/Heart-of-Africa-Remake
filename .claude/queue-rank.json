@@ -1915,6 +1915,30 @@
       "why": "a WebGL-2-only defect may wait (CLAUDE.md §7.2); it ranks behind the queued bundle work",
       "origin": "machine",
       "place": "last"
+    },
+    "1529": {
+      "at": "2026-11-16T16:42:31.015Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1530": {
+      "at": "2026-11-16T16:42:31.123Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1531": {
+      "at": "2026-11-16T16:42:31.236Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1532": {
+      "at": "2026-11-16T16:42:31.343Z",
+      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
