@@ -701,11 +701,14 @@ if (section('straggler')) {
       const heal = window.__balance.straggler.healSeconds
       const ok = await window.__pollSim(heal + 4, () => calf.lame === undefined)
       const live = mates.filter((m) => !m.dead)
-      const c = { x: live.reduce((a, m) => a + m.x, 0) / live.length, z: live.reduce((a, m) => a + m.z, 0) / live.length }
-      return { healed: ok, calfAlive: !calf.dead, gap: +Math.hypot(calf.x - c.x, calf.z - c.z).toFixed(2), parentBeside: +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2) }
+      const gapNow = () => { const c = { x: live.reduce((a, m) => a + m.x, 0) / live.length, z: live.reduce((a, m) => a + m.z, 0) / live.length }; return Math.hypot(calf.x - c.x, calf.z - c.z) }
+      // Healed is not enough: the pair must actually close on the herd.
+      const follow = window.__balance.family.followRadius
+      const back = ok && await window.__pollSim(12, () => gapNow() < follow)
+      return { healed: ok, back, calfAlive: !calf.dead, parentAlive: !parent.dead, gap: +gapNow().toFixed(2), follow, parentBeside: +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2) }
     })
     check('the limp heals on its window and the pair is back with its herd (point 363)',
-      healed.healed && healed.calfAlive && healed.gap < behind.gap0 - 4, JSON.stringify({ healed, gap0: behind.gap0 }))
+      healed.healed && healed.back && healed.calfAlive && healed.parentAlive && healed.gap < healed.follow && healed.parentBeside < 3.5, JSON.stringify({ healed, gap0: behind.gap0 }))
   }
   await page.evaluate(() => {
     const B = window.__balance
