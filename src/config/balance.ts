@@ -508,6 +508,15 @@ interface BalanceConfig {
      *  river carries past a village. */
     flotsamMix: { foam: number; leaf: number; grass: number; twig: number }
   }
+  /** The straggler: a calf left lame by a survived hunt (design.md §19.8, point 363). */
+  straggler: {
+    /** Chance a calf that SURVIVED a hunt is left lame (0..1). Kept low. */
+    lameChance: number
+    /** Speed factor of the lame calf; its staying parent mirrors it (<1). */
+    speedFactor: number
+    /** Seconds until the limp heals and the pair rejoins the herd. */
+    healSeconds: number
+  }
   /** The vigil at a calf's carcass (design.md §19.8, point 121). */
   vigil: {
     /** Seconds the bereaved parent holds the vigil before rejoining the herd. */
@@ -1978,6 +1987,11 @@ export const balance: BalanceConfig = {
   riverCurrent: {
     driftBaseSpeed: 1.3, // calibratable: m/s at season factor 1 (was a fixed 0.85)
     flotsamMix: { foam: 0.5, leaf: 0.2, grass: 0.15, twig: 0.15 }, // calibratable art shares
+  },
+  straggler: {
+    lameChance: 0.12, // calibratable: low, so a successful defence rarely costs a second price
+    speedFactor: 0.45, // calibratable: well under the herd's pace, so the pair visibly falls behind
+    healSeconds: 90, // calibratable: the limp always heals — the drama resolves
   },
   vigil: {
     seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd
