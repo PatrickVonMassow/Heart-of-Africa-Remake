@@ -418,6 +418,64 @@ if (section('crossing-turned-back')) {
   })
 }
 
+if (section('herd-crosses-on-its-own')) {
+  // Point 1527: no staging — the herd mover itself starts the crossing. Only
+  // the calibratable chance is raised to 1 so the wait is one drink window,
+  // not minutes; the natural herds at the Zambezi do the rest.
+  await page.evaluate(() => {
+    window.__ownPrev = { chance: window.__balance.waterCross.chance, drift: window.__balance.currentDrift }
+    window.__balance.waterCross.chance = 1
+    window.__balance.currentDrift = 0
+    window.__game.getState().debugJumpTo(-17.9, 25.9)
+    window.__ui.getState().setWheelZoomEnabled(true)
+    window.__ui.getState().setTravelZoom(1)
+  })
+  await page.waitForFunction(() => !!window.__wildlife?.restock, null, { timeout: 60000 })
+  await page.evaluate(() => window.__wildlife.restock())
+  await page.waitForFunction(() => {
+    const h = window.__wildlife?.herdsRef?.current
+    return !!h && Object.values(h).some((l) => l.some((a) => a.chunk && !a.dead))
+  }, null, { timeout: 60000 }).catch(() => {})
+  const drinkers = await page.evaluate(() => {
+    const h = window.__wildlife.herdsRef.current
+    return Object.entries(h).filter(([sp]) => sp !== 'elephant' && sp !== 'crocodile')
+      .reduce((n, [, l]) => n + l.filter((a) => a.drink && !a.dead && !a.young).length, 0)
+  })
+  // One full drink window (75 s) plus slack: every drinker reaches its bank in it.
+  const found = await page.evaluate(() => window.__pollSim(90, () => {
+    const seed = window.__game.getState().seed
+    const U = 10
+    const h = window.__wildlife.herdsRef.current
+    for (const [sp, l] of Object.entries(h)) {
+      if (sp === 'elephant' || sp === 'crocodile') continue
+      for (const a of l) {
+        if (a.dead || a.crossing === undefined || a.origin === undefined) continue
+        if (window.__terrainType(-a.z / U, a.x / U, seed) !== 'water') continue
+        window.__ownSwimmer = { sp, a }
+        return true
+      }
+    }
+    return false
+  }))
+  const swimmer = await page.evaluate(() => {
+    const s = window.__ownSwimmer
+    if (!s) return null
+    const h = window.__wildlife.herdsRef.current
+    const crossing = Object.values(h).flat().filter((a) => a.crossing !== undefined && a.origin !== undefined && !a.dead).length
+    return { sp: s.sp, x: +s.a.x.toFixed(2), z: +s.a.z.toFixed(2), young: !!s.a.young, crossing }
+  })
+  check('an unstaged herd at its drink bank starts a water crossing on its own (point 1527)',
+    found && swimmer !== null, JSON.stringify({ drinkers, swimmer }))
+  if (found && swimmer) {
+    await shot('1527-herd-crosses-on-its-own', { world: { x: swimmer.x, z: swimmer.z }, label: `a ${swimmer.sp} of a natural herd swimming its river crossing`, settle: false })
+  }
+  await page.evaluate(() => {
+    window.__balance.waterCross.chance = window.__ownPrev.chance
+    window.__balance.currentDrift = window.__ownPrev.drift
+    window.__ownSwimmer = undefined
+  })
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass.
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)

@@ -627,7 +627,8 @@ interface BalanceConfig {
     /** Farthest swimmable channel width in world units — a wider water reads
      *  as a barrier and the mover deflects along the bank instead. */
     maxUnits: number
-    /** Chance a roam blocked by water starts a crossing instead of turning. */
+    /** Chance per herd and drink window that its drinkers at the bank cross
+     *  the channel there instead of walking back (point 1527). */
     chance: number
     /** Hard resolve deadline in seconds (invariant I4): a crossing that has
      *  not landed by then ends where it stands and the setback grounds it. */
@@ -2163,7 +2164,7 @@ export const balance: BalanceConfig = {
   },
   waterCross: {
     maxUnits: 6, // calibratable: swimmable channel width (point 192) — the widened rivers span ~2-4 units
-    chance: 0.3, // calibratable: how often a water-blocked roam crosses instead of turning
+    chance: 0.08, // calibratable: chance per herd and 75 s drink window that a herd at its bank crosses (point 1527) — rare, as a crossed herd stops drinking
     resolveSeconds: 25, // calibratable: crossing hard deadline (I4) — a normal swim needs ~3-6 s
     fleeBankClearance: 1.5, // calibratable: swim-out bank clearance as a multiple of the threat ring — 1.5 = the shy flight's exit ring
     arriveUnits: 0.1, // calibratable: swim arrival radius — above one frame's swim step (~0.04 at 60 fps), far below a body length
