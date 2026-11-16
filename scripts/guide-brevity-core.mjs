@@ -623,7 +623,9 @@ export const LIMITS = {
   // reviewed fix sat only on origin (point 1514). Net: +4 lines. 718 -> 722.
   // 15.11.2026, a genuinely new tip (retrospective 3.111): a measurement that cannot separate
   // the hypotheses, or a success the user may have clicked through, proves nothing. Net: +5 lines. 722 -> 727.
-  maxLines: 727,
+  // 16.11.2026, a genuinely new tip (backlog 14.11.2026): a delegated author without a
+  // browser never sees its picture, so render work stays where the picture is made. Net: +4 lines. 727 -> 731.
+  maxLines: 731,
   // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
   // perform is measured and filed as its own visible task, not carried as a footnote, reached
   // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
@@ -957,7 +959,8 @@ export const LIMITS = {
   // 22.10.2026: the queued-means-pushed tip justified beside maxLines measures 33 words: 7038 -> 7071.
   // 13.11.2026: the stale-local-branch tip justified beside maxLines measures 54 words: 7071 -> 7125.
   // 15.11.2026: the measured-but-undistinguished tip justified beside maxLines measures 56 words: 7125 -> 7181.
-  maxWords: 7181,
+  // 16.11.2026: the author-never-sees-its-picture tip justified beside maxLines measures 43 words: 7181 -> 7224.
+  maxWords: 7224,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
