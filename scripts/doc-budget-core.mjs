@@ -542,10 +542,7 @@ export const DOC_BUDGETS = [
     // RAISED by the 148 measured words of Abu Simbel (point 379): a ninth built
     // landmark in the §4.4 list with its 1890 state, and the enterable,
     // discovery-gated monument site — a genuine addition the point orders here.
-    // RAISED by 22 words: the 74 measured words of the §19.13 settlement-rain
-    // sentences (point 384: wet built fabric, drops arriving with an impact, lit
-    // drops), less the 52 of headroom that stood — new behaviour, no new line.
-    maxWords: 31214,
+    maxWords: 31192,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
