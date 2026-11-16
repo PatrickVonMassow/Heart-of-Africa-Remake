@@ -460,15 +460,15 @@ if (section('map-point-labels')) {
 }
 
 // --- Cultural landmarks (§7.1.3, design.md §4.4) -----------------------------
-// The eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela,
-// Kilwa, Aksum, Gondar, Bandiagara) mount into the travel scene (dev hook)
+// The nine built cultural landmarks (Meroë, Giza, Abu Simbel, Great Zimbabwe,
+// Lalibela, Kilwa, Aksum, Gondar, Bandiagara) mount into the travel scene (dev hook)
 // and their labels reveal on sighting.
 if (section('cultural-landmarks')) {
   const cultural = await page.evaluate(() => window.__culturalLandmarks)
   check(
-    'eight cultural landmarks are placed in the travel world',
-    cultural?.count === 8 &&
-      ['meroe', 'giza', 'great-zimbabwe', 'lalibela', 'kilwa', 'aksum', 'gondar', 'bandiagara'].every((id) =>
+    'nine cultural landmarks are placed in the travel world',
+    cultural?.count === 9 &&
+      ['meroe', 'giza', 'abu-simbel', 'great-zimbabwe', 'lalibela', 'kilwa', 'aksum', 'gondar', 'bandiagara'].every((id) =>
         cultural.ids.includes(id),
       ),
     JSON.stringify(cultural),
@@ -548,6 +548,24 @@ if (section('cultural-landmarks')) {
   )
   check('the Ngorongoro crater reveals its name once sighted', ngoroRevealed, '')
   await shot('95-natural-site-ngorongoro', { world: { lat: -3.16, lon: 35.58 }, label: 'the Ngorongoro crater' })
+
+  // Abu Simbel (point 379): one site, one label. The landmark and the enterable
+  // map point share one coordinate; once sighted, exactly ONE label names it.
+  const abu = await page.evaluate(async () => {
+    const { placeById } = await import('/src/world/geo.ts')
+    const p = placeById('abu-simbel')
+    return { lat: p.lat, lon: p.lon }
+  })
+  await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon - 0.25), abu)
+  await page.evaluate(() =>
+    window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'abu-simbel'] }),
+  )
+  await page.waitForTimeout(1800)
+  const abuLabels = await page.evaluate(() =>
+    [...document.querySelectorAll('.map-label')].filter((l) => /Abu Simbel/.test(l.textContent)).map((l) => l.textContent.trim()),
+  )
+  check('Abu Simbel carries exactly one label once sighted', abuLabels.length === 1, JSON.stringify(abuLabels))
+  await shot('96-cultural-landmark-abu-simbel', { world: abu, label: 'the rock temples of Abu Simbel on the Nubian Nile' })
 }
 
 // --- Exploration map: parchment look + fog of war (§7.1.3, design.md §19) -----
