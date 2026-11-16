@@ -1909,6 +1909,12 @@
       "why": "visual polish of a landed feature; no blocker",
       "origin": "machine",
       "place": "last"
+    },
+    "1528": {
+      "at": "2026-11-16T05:52:33.045Z",
+      "why": "a WebGL-2-only defect may wait (CLAUDE.md §7.2); it ranks behind the queued bundle work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1937,7 +1943,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-16T05:02:27.759Z",
+    "at": "2026-11-16T05:52:33.052Z",
     "points": [
       184,
       200,
@@ -2388,7 +2394,7 @@
       1522,
       1525,
       1526,
-      1527
+      1528
     ]
   }
 }

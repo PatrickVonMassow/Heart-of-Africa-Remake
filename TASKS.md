@@ -14738,3 +14738,10 @@ to land than a mechanism that needs a review.
   Source: picture check of the 359 session, 15.11.2026 21:34.
   Bundle: Dorfleben.
 
+- [ ] 1528. WebGL 2: a driven-off crossing pair is not on a bank at the crossing deadline
+  Measured 16.11.2026: `VERIFY_GL=webgl npm test -- wildlife` on main 36e83d5: 5 pass, 2 fail — "every ending resolves on a bank within the crossing deadline" and "the forced drive-off leaves parent and calf alive, both on a bank" fail with survivorsOnBank=false, survivors=2, parentAlive=true; WebGPU at the same HEAD 7/7 green. Likely a frame-rate dependent return or landing in point 362's channel return.
+  Player impact: a parent and its calf can be left swimming past the crossing deadline.
+  Final state: the driven-off pair reaches a bank within the crossing deadline at WebGL 2 frame rates; the cause is named (frame-rate dependence in the return step or the check's budget).
+  Test: a Vitest case stepping the channel return at a low frame rate, plus the two wildlife sections green on WebGL 2 and WebGPU.
+  Source: finding of the 362 session, 16.11.2026 04:00.
+  Bundle: Tierverhalten.
