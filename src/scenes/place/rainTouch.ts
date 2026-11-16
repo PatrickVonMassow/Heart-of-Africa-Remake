@@ -203,6 +203,20 @@ export interface StreakCamera {
 /** A world point in NDC (x, y) and its view depth (+ in front), like the
  *  shader's `cameraProjectionMatrix · cameraViewMatrix` divided by w. */
 export function projectPoint(cam: StreakCamera, p: readonly [number, number, number]): [number, number, number] {
+  const [x, y, depth] = clipPoint(cam, p)
+  return [x / depth, y / depth, depth]
+}
+
+/** Screen length of the segment a→b as a fraction of the frame height (NDC
+ *  spans 2 per frame height; x is scaled by the aspect into height units). */
+export function screenFraction(a: readonly [number, number, number], b: readonly [number, number, number], aspect: number): number {
+  return Math.hypot((b[0] - a[0]) * aspect, b[1] - a[1]) / 2
+}
+
+/** A world point in clip-like coordinates (X, Y, W): linear in the point, so
+ *  NDC = (X/W, Y/W) and W is the view depth — the shader's clip position.
+ *  Computed without a divide, so it stays finite at depth 0. */
+export function clipPoint(cam: StreakCamera, p: readonly [number, number, number]): [number, number, number] {
   const vx = p[0] - cam.eye[0]
   const vy = p[1] - cam.eye[1]
   const vz = p[2] - cam.eye[2]
@@ -217,20 +231,7 @@ export function projectPoint(cam: StreakCamera, p: readonly [number, number, num
   const depth = vx * f[0] + vy * f[1] + vz * f[2]
   const x = vx * r[0] + vy * r[1] + vz * r[2]
   const y = vx * u[0] + vy * u[1] + vz * u[2]
-  return [x / (depth * cam.tanHalfFov * cam.aspect), y / (depth * cam.tanHalfFov), depth]
-}
-
-/** Screen length of the segment a→b as a fraction of the frame height (NDC
- *  spans 2 per frame height; x is scaled by the aspect into height units). */
-export function screenFraction(a: readonly [number, number, number], b: readonly [number, number, number], aspect: number): number {
-  return Math.hypot((b[0] - a[0]) * aspect, b[1] - a[1]) / 2
-}
-
-/** A world point in clip-like coordinates (X, Y, W): linear in the point, so
- *  NDC = (X/W, Y/W) and W is the view depth — the shader's clip position. */
-export function clipPoint(cam: StreakCamera, p: readonly [number, number, number]): [number, number, number] {
-  const [nx, ny, depth] = projectPoint(cam, p)
-  return [nx * depth, ny * depth, depth]
+  return [x / (cam.tanHalfFov * cam.aspect), y / cam.tanHalfFov, depth]
 }
 
 /**

@@ -232,6 +232,13 @@ describe('an impact is a small crown that fades out near the eye', () => {
     expect(impactSizeScale(cam, [0, 0, 0.5], r, frac)).toBe(0)
     expect(impactSizeScale(cam, [0, 0, -30], r, frac)).toBe(1)
   })
+  it('stays finite when an axis sample lands at the eye depth', () => {
+    // The z-axis sample of a centre 1 m ahead has depth 0; clip space has no divide.
+    const cam: StreakCamera = { eye: [0, 1.6, 0], yaw: 0, pitch: 0, tanHalfFov, aspect: 1440 / 900 }
+    const s = impactSizeScale(cam, [0.5, 1.4, -1], r, frac)
+    expect(Number.isFinite(s)).toBe(true)
+    expect(s).toBeGreaterThan(0)
+  })
   it('fades 0 inside the near distance, 1 beyond the full one, monotone between', () => {
     expect(full).toBeGreaterThan(near)
     expect(dropNearFade(near, near, full)).toBe(0)
