@@ -1427,6 +1427,63 @@ if (section('giza-site')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- The walkable Abu Simbel site (point 379, design.md §4.4) ---------------
+// Same entry as Giza: sighted, on the marker, Space enters; the temples are
+// collidable and the site has no trade. Two frames from the arrival point.
+if (section('abu-simbel-site')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
+  const abu = await page.evaluate(async () => {
+    const { placeById } = await import('/src/world/geo.ts')
+    const p = placeById('abu-simbel')
+    const g = window.__game
+    g.setState({ landmarksSeen: [...g.getState().landmarksSeen, 'abu-simbel'] })
+    g.getState().debugJumpTo(p.lat, p.lon)
+    return { lat: p.lat, lon: p.lon }
+  })
+  await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'abu-simbel', null, { timeout: 15000 })
+  const abuPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
+  check('the enter hint arms and names Abu Simbel once sighted', /Abu Simbel/.test(abuPrompt), abuPrompt)
+  await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), abu)
+  await page.keyboard.press('Space')
+  await page.waitForFunction(
+    () => window.__game.getState().placeId === 'abu-simbel' && !!window.__placeLayout,
+    null,
+    { timeout: 30000 },
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await waitForStable(page)
+  const abuSite = await page.evaluate(() => ({
+    mode: window.__game.getState().mode,
+    colliders: window.__placeLayout?.colliders?.length ?? 0,
+    interactives: window.__placeLayout?.interactives?.length ?? 0,
+  }))
+  check(
+    'Space enters the walkable Abu Simbel site: collidable temples, no trade, no chief',
+    abuSite.mode === 'place' && abuSite.colliders >= 5 && abuSite.interactives === 0,
+    JSON.stringify(abuSite),
+  )
+  for (const [name, yaw, label] of [
+    ['379-abu-simbel-site-north', 0, 'the rock temples seen north from the arrival point'],
+    ['379-abu-simbel-site-facades', Math.PI / 4, 'the Great Temple facade and its four colossi'],
+  ]) {
+    await page.evaluate((y) => {
+      const p = window.__placePlayer
+      p.x = window.__placeLayout?.spawnX ?? 0
+      p.z = window.__placeLayout?.spawnZ ?? 50
+      p.yaw = y
+      p.pitch = 0
+    }, yaw)
+    await waitForStable(page)
+    await frame(name, { place: 'abu-simbel', label })
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 // --- The monumental first-person scale at Giza (design.md §4.4) --------------
 // Three standpoints, both backends: at the foot of Khufu's south face looking
 // level north (the apex must stand far above the frame top), from the arrival
