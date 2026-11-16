@@ -46,6 +46,7 @@ const PLACES: Record<string, string> = {
   'zulu-village': 'Zulu Village',
   'san-village': 'San Village',
   giza: 'The Pyramids of Giza',
+  'abu-simbel': 'The Temples of Abu Simbel',
 }
 
 const PEOPLES: Record<string, string> = {
@@ -85,6 +86,7 @@ const LANDMARKS: Record<string, string> = {
   'elephant-graveyard': 'Elephant Graveyard',
   meroe: 'Pyramids of Meroë',
   giza: 'Pyramids of Giza',
+  'abu-simbel': 'Abu Simbel',
   'great-zimbabwe': 'Great Zimbabwe',
   lalibela: 'Lalibela',
   kilwa: 'Kilwa',
@@ -904,6 +906,7 @@ export const en: Strings = {
           grave: 'Where the Elephants Die',
           pyramids: `The ${name}`,
           'giza-pyramids': `The Great ${name}`,
+          'rock-temples': `The Rock Temples of ${name}`,
           'stone-city': `The Stone Walls of ${name}`,
           'rock-churches': `The Rock Churches of ${name}`,
           'coastal-ruins': `The Ruins of ${name}`,
@@ -1002,6 +1005,10 @@ export const en: Strings = {
         giza: flood
           ? `[awe]The inundation is out, and the pyramids stand on an island.[/awe] From the desert edge I looked back over a sheet of brown water reaching to the palms of Cairo, the causeway across it like a dike and every village sitting up on its mound. [pause][awe]Khufu is a mountain of tawny steps with its apex broken off flat; Khafre beside it still carries a pale smooth cap of its old casing near the peak,[pause] as though a second and finer summit had been set upon the first.[/awe] [somber]Of the Sphinx only the head, a little of the breast and the long ridge of the back stand clear — paws, body and enclosure lie under the sand, the shoulders showing through the drift like a sleeper under a blanket, and the face has been noseless these many centuries.[/somber] [pause]The donkey-boys of the hotel take their fares out by boat in this season, and are none the poorer for it.`
           : `[awe]I stood at last beneath the Great Pyramid, and no engraving prepares a man for it:[pause] a mountain of tawny steps, the apex broken off flat, the courses so deep that one must be hauled up each of them.[/awe] Khafre beside it carries a pale smooth cap of its old casing near the peak, [emph]as though a second and finer summit had been set upon the first.[/emph] [pause][somber]Of the Sphinx only the head, a little of the breast and the ridge of the back are free; the paws, the body and the whole enclosure lie under the sand, the shoulders showing through the drift, and the face has been noseless these many centuries.[/somber] [pause]Below the plateau the fields lie dry and cracked, and Cook's people ride up from the hotel on donkeys while the guides quarrel over them for backsheesh.`,
+        // The ORIGINAL riverside site before the 1960s relocation, in its 1890
+        // state (docs/205-world-accuracy-findings.md §F): the drift from the
+        // north, the fallen head of the second colossus, the open doorway.
+        'abu-simbel': `[awe]I climbed up from the river, and the four colossi of the great temple sat above me, hands on their knees, each taller than a house of five storeys.[/awe] [somber]The second from the south has lost his head and breast; they lie broken at his feet, as an earthquake left them long before any traveller came.[/somber] [pause]The sand pours down the cliff from the north and has buried the northern giant to the breast, yet the doorway between them stands open, [emph]as Belzoni dug it out in 1817[/emph], and the drift has never quite closed it again. [pause][awe]A little way downstream the smaller temple of the queen is cut into the same rock, its six tall figures stepping out of the cliff toward the water.[/awe]`,
       }
       return (
         texts[p.place as string] ??
@@ -1156,6 +1163,7 @@ export const en: Strings = {
         lake: `[awe]A great water opened before me —[pause] ${name}, stretching away to the horizon like a sea.[/awe] [somber]I marked its shore upon my map.[/somber]`,
         grave: `[whisper]I walk among bleached bones and mighty tusks —[pause] the graveyard of the elephants.[/whisper] [awe]So the old tales told the truth after all.[/awe]`,
         'giza-pyramids': `[awe]There they stood across the river as the morning haze lifted —[pause] the three great ${name}, and the lion-bodied guardian crouched before them.[/awe] [excited]Raised by African hands four thousand years before any European empire —[pause] the oldest of all the wonders, and it stands in Africa.[/excited]`,
+        'rock-temples': `[awe]Four seated giants look out over the Nile from the face of the cliff —[pause] the rock temples of ${name}, and a smaller temple beside them with its standing figures.[/awe] [excited]A whole hill of Nubian sandstone carved into a kingdom's own monument, hall behind hall cut into the living rock —[pause] African masons made this, and it has watched over the river for three thousand years.[/excited]`,
         pyramids: `[awe]Steep pyramids crowd the Nile's east bank —[pause] ${name}, the royal city of Kush.[/awe] [excited]A kingdom that raised these tombs and wrote in its own script —[pause] an African realm in its own right, no shadow of Egypt.[/excited]`,
         'stone-city': `[awe]Mortarless walls of fitted granite curve across the hill, crowned by a great conical tower —[pause] ${name}.[/awe] [somber]African hands raised this capital, whatever the settlers back home care to claim.[/somber]`,
         'rock-churches': `[awe]Churches hewn downward out of the living rock, cross upon cross sunk into the stone —[pause] ${name}.[/awe] [excited]The work of a Christian Ethiopian kingdom,[pause] and worshippers kneel in them still.[/excited]`,

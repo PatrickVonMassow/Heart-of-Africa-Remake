@@ -8,6 +8,7 @@
 import { RIVER_WIDTH_DEG } from '../riverWidth'
 import { clearedOfRiversBy } from '../riverClearance'
 import { GIZA_FIELD_RADIUS_DEG, GIZA_PLATEAU } from './gizaPlateau'
+import { ABU_SIMBEL, ABU_SIMBEL_FIELD_RADIUS_DEG } from './abuSimbel'
 
 interface MountainDef {
   /** Landmark id; display names come from the language files (i18n). */
@@ -61,7 +62,7 @@ export const ELEPHANT_GRAVEYARD = { id: 'elephant-graveyard', lon: 36.6, lat: -4
 
 // Built cultural landmarks (design.md §4.4): achievements of African
 // civilisations — the Nubian pyramids of Meroë (kingdom of Kush), the
-// pyramids and Sphinx of Giza, Great
+// pyramids and Sphinx of Giza, the rock temples of Abu Simbel, Great
 // Zimbabwe, the Zagwe-era rock-hewn churches of Lalibela, the coastal
 // ruins of the Swahili Kilwa Sultanate, the towering stelae of the Aksumite
 // kingdom, the Gondarine castles of Fasil Ghebbi (imperial Ethiopia), and
@@ -78,6 +79,7 @@ export interface CulturalLandmarkDef {
   kind:
     | 'pyramids'
     | 'giza-pyramids'
+    | 'rock-temples'
     | 'stone-city'
     | 'rock-churches'
     | 'coastal-ruins'
@@ -107,6 +109,9 @@ const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
   // the shared ./gizaPlateau constant, which the ENTERABLE monument map point
   // reads too — the plateau is one site and must have one coordinate.
   { id: 'giza', lon: GIZA_PLATEAU.lon, lat: GIZA_PLATEAU.lat, kind: 'giza-pyramids' },
+  // The Nubian rock temples of Ramesses II, at their ORIGINAL west-bank place
+  // (pre-1964); shared with the enterable monument map point like Giza's.
+  { id: 'abu-simbel', lon: ABU_SIMBEL.lon, lat: ABU_SIMBEL.lat, kind: 'rock-temples' },
   { id: 'great-zimbabwe', lon: 30.93, lat: -20.27, kind: 'stone-city' },
   { id: 'lalibela', lon: 39.04, lat: 12.03, kind: 'rock-churches' },
   { id: 'kilwa', lon: 39.51, lat: -8.96, kind: 'coastal-ruins' },
@@ -127,6 +132,8 @@ const LANDMARK_FIELD_RADIUS_DEG: Record<string, number> = {
   // so the pass below finds it clear and returns it unchanged — which is what
   // keeps the landmark and the monument map point bit-identical.
   giza: GIZA_FIELD_RADIUS_DEG,
+  // Resolved in ./abuSimbel against the same clearance, so it returns unchanged.
+  'abu-simbel': ABU_SIMBEL_FIELD_RADIUS_DEG,
 }
 const LANDMARK_DEFAULT_RADIUS_DEG = 0.3
 export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = CULTURAL_LANDMARK_DEFS.map((c) => ({

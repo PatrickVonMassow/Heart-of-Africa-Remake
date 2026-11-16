@@ -13,6 +13,7 @@ import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS,
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
+import { buildAbuSimbelLayout } from './abuSimbelSite'
 import { CLIMB_ROCK_SCALE, deriveClimbRock, looseRockIsGround, looseRockRadius } from './looseRocks'
 import { pinchesPassage } from './wedgeCarve'
 import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
@@ -881,8 +882,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
   // Monument sites (design.md §4.4, point 273) are a bare walkable disc with the
   // giant collidable monuments and a handful of ambient anchors — no trade,
-  // elder, dwellings, lanes or props. Their fixed layout lives in gizaSite.ts.
-  if (place.kind === 'monument') return buildGizaLayout(seed)
+  // elder, dwellings, lanes or props. Their fixed layouts live in gizaSite.ts
+  // and abuSimbelSite.ts.
+  if (place.kind === 'monument') return place.id === 'abu-simbel' ? buildAbuSimbelLayout(seed) : buildGizaLayout(seed)
   const style = REGION_PLACE_STYLES[place.region]
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0

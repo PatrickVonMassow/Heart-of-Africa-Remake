@@ -17,7 +17,7 @@ import { SPHINX_SITE_LOD, sphinxCrownHeight, sphinxDriftHeight, sphinxLodSpec, s
 import { buildSphinxGeometry } from './sphinx'
 
 /** Paint a geometry with a base color plus deterministic per-vertex jitter. */
-function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): THREE.BufferGeometry {
+export function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): THREE.BufferGeometry {
   const base = new THREE.Color(hex)
   const rand = mulberry32(seed)
   const count = geo.attributes.position.count
@@ -32,7 +32,7 @@ function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): 
   return geo
 }
 
-function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+export function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   // Some landmark builds mix flora parts (papyrus, with the point-144 foliage
   // attribute) into plain parts — mergeGeometries demands the attribute on all
   // or none, so fill the plain ones with 0 (= never collapses; the landmark

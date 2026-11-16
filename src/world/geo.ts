@@ -8,6 +8,7 @@
 
 import { RIVERS_DATA, type RiverDef } from './data/rivers'
 import { GIZA_PLATEAU } from './data/gizaPlateau'
+import { ABU_SIMBEL } from './data/abuSimbel'
 import { riverDistanceExact } from './hydro'
 import { RIVER_WIDTH_DEG } from './riverWidth'
 
@@ -284,7 +285,16 @@ const CLEARED_PORTS: PlaceDef[] = PORTS.map((p) => ({
 // and the bird's-eye view drew the plateau twice).
 const MONUMENT_SITES: PlaceDef[] = [
   { id: 'giza', kind: 'monument', lat: GIZA_PLATEAU.lat, lon: GIZA_PLATEAU.lon, region: 'north' },
+  // The rock temples of Abu Simbel on the Nubian Nile (point 379), at the
+  // SHARED ./data/abuSimbel constant — one site, one position, like Giza.
+  { id: 'abu-simbel', kind: 'monument', lat: ABU_SIMBEL.lat, lon: ABU_SIMBEL.lon, region: 'north' },
 ]
+
+/** Monument sites every ~1890 explorer already knew from the outset: Giza
+ *  beside Cairo. Abu Simbel is NOT one — far up the Nubian Nile it is a
+ *  landmark to be reached and reported, so it stays discovery-gated and its
+ *  first sighting earns the §10 bounty like every other landmark. */
+const KNOWN_MONUMENTS: readonly string[] = ['giza']
 const MONUMENTS: PlaceDef[] = MONUMENT_SITES.map((m) => ({
   ...m,
   ...clearedOfRivers(m.lat, m.lon),
@@ -304,15 +314,16 @@ export function placeById(id: string): PlaceDef {
  * player can act on (it names the enterable place and obeys the §17.2 discovery
  * gate). The rule keys on shared IDENTITY, never on proximity: a distance
  * heuristic would silently swallow a genuinely neighbouring landmark, while two
- * records of one site already share their id (Giza is the only such pair today,
- * and a sweep in world.test.ts holds that true).
+ * records of one site already share their id (Giza and Abu Simbel are the
+ * pairs today, and a sweep in world.test.ts holds that list exact).
  */
 export function landmarkLabelHiddenByMapPoint(landmarkId: string): boolean {
   return PLACES.some((p) => p.id === landmarkId)
 }
 
 // Places an ~1890 explorer already knew and could name from the outset
-// (design.md §3.2/§17.2): the ten port cities and the Giza monument site. They
+// (design.md §3.2/§17.2): the ten port cities and the Giza monument site
+// (Abu Simbel, the second monument site, is discovery-gated). They
 // start DISCOVERED — their map labels show their names from the start (never a
 // placeholder, §17.2) and returning to them credits no discovery bounty
 // (design.md §10). Every period-famous inland centre in the model is itself one
@@ -320,8 +331,23 @@ export function landmarkLabelHiddenByMapPoint(landmarkId: string): boolean {
 // world-famous and beside Cairo. The ordinary ethnic villages stay
 // discovery-gated.
 export const KNOWN_FROM_START_PLACES: readonly string[] = PLACES.filter(
-  (p) => p.kind === 'port' || p.kind === 'monument',
+  (p) => p.kind === 'port' || KNOWN_MONUMENTS.includes(p.id),
 ).map((p) => p.id)
+
+/**
+ * Whether a map point counts as DISCOVERED for its §17.2 label and enter hint:
+ * visited, or — for a map point that is also a landmark (Abu Simbel) — the
+ * landmark of the same id already sighted. The sighting comes first (its
+ * discover radius is far wider than the enter radius), so the one label of the
+ * site names it from the moment the journal does.
+ */
+export function placeDiscovered(
+  placeId: string,
+  visitedPlaces: readonly string[],
+  landmarksSeen: readonly string[],
+): boolean {
+  return visitedPlaces.includes(placeId) || landmarksSeen.includes(placeId)
+}
 
 /** Every settlement the player can walk into — the ports and the villages, not
  *  the monument sites, which carry their own sparse crowd instead of the §19.10

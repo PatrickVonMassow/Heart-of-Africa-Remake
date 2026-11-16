@@ -44,6 +44,7 @@ import {
   landmarkLabelHiddenByMapPoint,
   latLonToWorld,
   placeById,
+  placeDiscovered,
   worldToLatLon,
   type PlaceDef,
 } from '../../world/geo'
@@ -122,6 +123,7 @@ import {
   splitFoliage,
 } from '../../render/flora'
 import { buildGraveyardRemains, graveyardLayout, type GraveyardLayout } from '../../render/graveyardRemains'
+import { buildRockTemples } from '../../render/abuSimbel'
 import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurches, buildCoastalRuins,
   buildStelae,
   buildCastles,
@@ -1971,7 +1973,7 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   const seed = useGame((s) => s.seed)
   // A place's name is revealed only once it has been visited (design.md §17);
   // until then it shows a localized placeholder for its kind.
-  const discovered = useGame((s) => s.visitedPlaces.includes(place.id))
+  const discovered = useGame((s) => placeDiscovered(place.id, s.visitedPlaces, s.landmarksSeen))
   // While the traveller stands within this settlement's enter radius, the
   // "Space to enter" hint takes over and the name-label is hidden (design.md §2.3).
   const enterHintShown = useUi((s) => s.enterPlaceId === place.id)
@@ -2280,8 +2282,8 @@ function CommunicationRock() {
  * Built cultural landmarks (design.md §4.4): the pyramids of Meroë, Great
  * Zimbabwe, the rock-hewn churches of Lalibela, the coastal ruins of Kilwa,
  * the stelae of Aksum, the Gondarine castles, the Bandiagara cliff dwellings
- * and the pyramids of Giza, each placed at its real ~1890 position with a
- * per-run yaw jitter (Giza and Bandiagara excepted). Achievements of African civilisations — the discovery journal
+ * the pyramids of Giza and the rock temples of Abu Simbel, each placed at its real ~1890 position with a
+ * per-run yaw jitter (Giza, Abu Simbel and Bandiagara excepted). Achievements of African civilisations — the discovery journal
  * (§16) carries that framing.
  */
 function CulturalLandmarks() {
@@ -2292,6 +2294,7 @@ function CulturalLandmarks() {
       pyramids: buildMeroePyramids(),
       // The Sphinx is its own mesh below (FieldSphinx, the picture checks' probe).
       'giza-pyramids': buildGizaPyramids('landmark', false),
+      'rock-temples': buildRockTemples(),
       'stone-city': buildStoneCity(),
       'rock-churches': buildRockChurches(),
       'coastal-ruins': buildCoastalRuins(),
@@ -2312,8 +2315,9 @@ function CulturalLandmarks() {
         // east-facing Sphinx are real geography the geometry encodes, and the
         // west-bank footprint clearance assumes the unrotated extent. The
         // Bandiagara cliff is held unrotated too; its talus socket is built for
-        // that orientation.
-        const yaw = (c.kind === 'giza-pyramids' || c.id === 'bandiagara') ? 0 : mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
+        // that orientation. Abu Simbel's facades face the river (the turn is
+        // in its geometry), so it is held unrotated as well.
+        const yaw = (c.kind === 'giza-pyramids' || c.kind === 'rock-temples' || c.id === 'bandiagara') ? 0 : mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
         return { id: c.id, kind: c.kind, x: w.x, z: w.z, y, yaw }
       }),
     [seed],
@@ -3190,11 +3194,11 @@ export function TravelScene() {
     // The enter hint takes precedence over the camp prompt when both are in range.
     // An UNDISCOVERED settlement's name stays hidden (point 287): the hint reads
     // its localized KIND placeholder to match its §17.2 map label (point 318),
-    // using the SAME discovery flag (visitedPlaces) the map-label gate reads.
+    // using the SAME discovery flag (placeDiscovered) the map-label gate reads.
     const prompt = enterId
       ? strings.prompts.enterPlace(
           enterHintName(
-            s.visitedPlaces.includes(enterId),
+            placeDiscovered(enterId, s.visitedPlaces, s.landmarksSeen),
             strings.places[enterId],
             strings.unknownPlaces[placeById(enterId).kind],
           ),

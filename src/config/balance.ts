@@ -3216,6 +3216,53 @@ export const GIZA_CAST = {
 } as const
 
 /**
+ * The walkable Abu Simbel site (design.md §4.4, point 379; research:
+ * docs/205-world-accuracy-findings.md §F). Built in a CLIFF frame — `u` along
+ * the rock face (+u downstream = north-east), `v` out of it toward the river —
+ * that is turned by `yaw` into the site's world frame (+x east, +z south). The
+ * real facades face east-south-east; turning them to face south-east (`yaw`
+ * π/4, a 30° compression) lets the north-facing arrival (design.md §2.3) see
+ * both temples three-quarter-on. The temples stand at REAL size (`scale` 1:
+ * colossi ~20 m, Great Temple facade ~38 × 31 m, small temple ~28 × 12 m with
+ * ~10 m standing figures); only their ~150 m spacing is compressed to fit the
+ * walkable disc. The 1890 sand drift pours from the north and buries the
+ * northern colossus to the breast; the second colossus from the south lacks
+ * head and torso, which lie at its feet. All values calibratable.
+ */
+export const ABU_SIMBEL_SITE = {
+  radius: 90, // calibratable: walkable disc (m), leaving it exits
+  spawn: { x: 25, z: 55 }, // calibratable: arrival, south-east of the facades, facing north
+  yaw: Math.PI / 4, // cliff frame → site frame
+  scale: 1, // calibratable: fraction of real size the figures are drawn at
+  /** The rock the temples are cut into: runs past the disc rim at both ends and
+   *  behind, so the walkable ground is the half-disc in front of the face. */
+  cliff: { uMin: -130, uMax: 130, depth: 70, height: 34, cheek: 5 },
+  great: {
+    width: 38, // facade width (m)
+    height: 31, // facade height (m)
+    colossusHeight: 20, // seated colossus, crown included
+    colossusU: [-13.5, -5.5, 5.5, 13.5] as readonly number[], // south → north
+    fallen: 1, // index into colossusU: the second from the south
+    door: { width: 4, height: 8 },
+  },
+  small: {
+    u: 55, // centre along the face, downstream (real ~150 m, compressed)
+    width: 28,
+    height: 13,
+    statueHeight: 10,
+    statueU: [-11.5, -7, -2.5, 2.5, 7, 11.5] as readonly number[],
+    door: { width: 2.4, height: 5 },
+  },
+  /** The 1890 drift: a wedge against the face from `uFrom` north, its crest
+   *  height on the face rising along `crest` [u, h] stations, running out to
+   *  nothing `reach` metres in front of the face. */
+  drift: { uFrom: 3, uTo: 34, reach: 22, crest: [[3, 0.5], [10, 9], [16, 13.5], [34, 17]] as ReadonlyArray<readonly [number, number]> },
+  tones: { rock: '#b98552', face: '#c8955f', figure: '#cf9f68', dark: '#2b1e15', sand: '#dcb67a' },
+  /** Bird's-eye landmark: the same site build cut to `field` and scaled. */
+  field: { uMin: -32, uMax: 78, depth: 22, scale: 0.035 },
+} as const
+
+/**
  * Monumental first-person scale of the walkable Giza site (design.md §4.4):
  * the pyramids are drawn at ONE fraction of their real side and height, i.e.
  * on their real ~52° profile (docs/giza-1890.md §1.1). The ceiling is the

@@ -45,6 +45,7 @@ const PLACES: Record<string, string> = {
   'zulu-village': 'Dorf der Zulu',
   'san-village': 'Dorf der San',
   giza: 'Die Pyramiden von Gizeh',
+  'abu-simbel': 'Die Tempel von Abu Simbel',
 }
 
 const PEOPLES: Record<string, string> = {
@@ -84,6 +85,7 @@ const LANDMARKS: Record<string, string> = {
   'elephant-graveyard': 'Elefantenfriedhof',
   meroe: 'Pyramiden von Meroë',
   giza: 'Pyramiden von Gizeh',
+  'abu-simbel': 'Abu Simbel',
   'great-zimbabwe': 'Groß-Simbabwe',
   lalibela: 'Lalibela',
   kilwa: 'Kilwa',
@@ -903,6 +905,7 @@ export const de: Strings = {
           grave: 'Wo die Elefanten sterben',
           pyramids: `Die ${name}`,
           'giza-pyramids': `Die großen ${name}`,
+          'rock-temples': `Die Felsentempel von ${name}`,
           'stone-city': `Die Steinmauern von ${name}`,
           'rock-churches': `Die Felsenkirchen von ${name}`,
           'coastal-ruins': `Die Ruinen von ${name}`,
@@ -1001,6 +1004,9 @@ export const de: Strings = {
         giza: flood
           ? `[awe]Die Überschwemmung steht, und die Pyramiden stehen auf einer Insel.[/awe] Vom Wüstenrand blickte ich zurück über eine braune Wasserfläche, die bis an die Palmen von Kairo reicht, den Damm quer hindurch wie einen Deich und jedes Dorf oben auf seinem Hügel. [pause][awe]Chufu ist ein Berg aus lohfarbenen Stufen mit flach abgebrochener Spitze; Chephren daneben trägt nahe dem Gipfel noch eine blasse, glatte Kappe seiner alten Verkleidung,[pause] als hätte man dem ersten Gipfel einen zweiten, feineren aufgesetzt.[/awe] [somber]Von der Sphinx ragen nur der Kopf, ein wenig der Brust und der lange Grat des Rückens heraus – Pranken, Leib und die ganze Grube liegen unter dem Sand, die Schultern zeichnen sich unter der Wehe ab wie ein Schläfer unter einer Decke, und das Gesicht ist seit Jahrhunderten ohne Nase.[/somber] [pause]Die Eseljungen vom Hotel fahren ihre Gäste in dieser Jahreszeit mit dem Boot hinaus und stehen sich nicht schlechter dabei.`
           : `[awe]Endlich stand ich unter der Großen Pyramide, und kein Stich bereitet einen Menschen darauf vor:[pause] ein Berg aus lohfarbenen Stufen, die Spitze flach abgebrochen, die Lagen so hoch, dass man über jede einzelne hinaufgezogen werden muss.[/awe] Chephren daneben trägt nahe dem Gipfel eine blasse, glatte Kappe seiner alten Verkleidung, [emph]als hätte man dem ersten Gipfel einen zweiten, feineren aufgesetzt.[/emph] [pause][somber]Von der Sphinx sind nur der Kopf, ein wenig der Brust und der Grat des Rückens frei; Pranken, Leib und die ganze Grube liegen unter dem Sand, die Schultern zeichnen sich unter der Wehe ab, und das Gesicht ist seit Jahrhunderten ohne Nase.[/somber] [pause]Unterhalb des Plateaus liegen die Felder trocken und rissig, und Cooks Leute reiten vom Hotel herauf auf Eseln, während die Führer sich um sie zanken, des Bakschischs wegen.`,
+        // The ORIGINAL riverside site before the 1960s relocation, in its 1890
+        // state (docs/205-world-accuracy-findings.md §F).
+        'abu-simbel': `[awe]Ich stieg vom Fluss herauf, und über mir saßen die vier Kolosse des großen Tempels, die Hände auf den Knien, jeder höher als ein Haus von fünf Stockwerken.[/awe] [somber]Dem zweiten von Süden fehlen Kopf und Brust; sie liegen zerbrochen zu seinen Füßen, wie ein Erdbeben sie hinterließ, lange bevor je ein Reisender kam.[/somber] [pause]Von Norden rinnt der Sand die Klippe herab und hat den nördlichen Riesen bis zur Brust begraben, doch die Pforte zwischen ihnen steht offen, [emph]wie Belzoni sie 1817 freigrub[/emph], und die Wehe hat sie nie ganz wieder geschlossen. [pause][awe]Ein Stück stromab ist der kleinere Tempel der Königin in denselben Fels gehauen, seine sechs hohen Gestalten treten aus der Wand dem Wasser entgegen.[/awe]`,
       }
       return (
         texts[p.place as string] ??
@@ -1155,6 +1161,7 @@ export const de: Strings = {
         lake: `[awe]Ein großes Wasser öffnete sich vor mir –[pause] ${name}, bis zum Horizont gedehnt wie ein Meer.[/awe] [somber]Ich habe sein Ufer auf meiner Karte vermerkt.[/somber]`,
         grave: `[whisper]Ich gehe zwischen gebleichten Knochen und mächtigen Stoßzähnen –[pause] der Friedhof der Elefanten.[/whisper] [awe]Die alten Geschichten haben also die Wahrheit gesagt.[/awe]`,
         'giza-pyramids': `[awe]Da standen sie jenseits des Stroms, als der Morgendunst sich hob –[pause] die drei großen ${name}, und davor kauerte der löwenleibige Wächter.[/awe] [excited]Von afrikanischen Händen errichtet, viertausend Jahre vor jedem europäischen Reich –[pause] das älteste aller Weltwunder, und es steht in Afrika.[/excited]`,
+        'rock-temples': `[awe]Vier sitzende Riesen blicken aus der Felswand über den Nil –[pause] die Felsentempel von ${name}, und daneben ein kleinerer Tempel mit seinen stehenden Gestalten.[/awe] [excited]Ein ganzer Berg nubischen Sandsteins zum Denkmal eines Reiches gehauen, Halle hinter Halle in den lebenden Fels getrieben –[pause] afrikanische Steinmetzen haben das geschaffen, und es wacht seit dreitausend Jahren über den Strom.[/excited]`,
         pyramids: `[awe]Steile Pyramiden drängen sich am Ostufer des Nils –[pause] ${name}, die Königsstadt von Kusch.[/awe] [excited]Ein Reich, das diese Gräber errichtete und in eigener Schrift schrieb –[pause] ein afrikanisches Reich aus eigenem Recht, kein Schatten Ägyptens.[/excited]`,
         'stone-city': `[awe]Fugenlose Mauern aus behauenem Granit schwingen über den Hügel, überragt von einem großen Kegelturm –[pause] ${name}.[/awe] [somber]Afrikanische Hände errichteten diese Hauptstadt, was die Siedler daheim auch behaupten mögen.[/somber]`,
         'rock-churches': `[awe]In den lebenden Fels hinabgehauene Kirchen, Kreuz um Kreuz in den Stein gesenkt –[pause] ${name}.[/awe] [excited]Das Werk eines christlichen äthiopischen Königreichs,[pause] und noch heute knien Gläubige darin.[/excited]`,

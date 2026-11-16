@@ -107,6 +107,7 @@ import {
   seatFootOnGround,
   type GoatLeg,
 } from '../../render/fauna'
+import { AbuSimbelMonuments } from './AbuSimbelMonuments'
 import { MONUMENT_GROUND, PORT_GROUND, REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { DigSites } from './DigSites'
@@ -2659,6 +2660,7 @@ export function PlaceScene() {
   }, [groundPlate])
   const isPort = place?.kind === 'port'
   const isMonument = place?.kind === 'monument'
+  const isGiza = place?.id === 'giza'
   const isVillage = place?.kind === 'village'
   // The monument plateau takes the port's sandy treatment — sky, light, flora
   // and scatter (design.md §4.4) — not a village's; its ground material stays
@@ -3497,9 +3499,11 @@ export function PlaceScene() {
       {/* The walkable Giza plateau (design.md §4.4, point 273): the three great
           pyramids and the buried Sphinx as giant collidable monuments, and the
           sparse Thomas-Cook-era ambient life around them. */}
-      {isMonument && <GizaMonuments />}
-      {isMonument && <GizaSphinx />}
-      {isMonument && (
+      {isGiza && <GizaMonuments />}
+      {isGiza && <GizaSphinx />}
+      {/* The rock temples of Abu Simbel (point 379, abuSimbelSite.ts). */}
+      {place.id === 'abu-simbel' && <AbuSimbelMonuments />}
+      {isGiza && (
         <PlaceDumpGroup id="giza-ambient" kind="giza-ambient">
           <GizaAmbient
             anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist', sex: GIZA_AMBIENT[i]?.sex, dragoman: GIZA_AMBIENT[i]?.dragoman }))}
