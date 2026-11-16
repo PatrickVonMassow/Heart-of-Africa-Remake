@@ -1184,10 +1184,160 @@ export function committedFleeHeading(
  * sacrifice/rescue drama fires more often — its weight is `bias` (≫ 1), an
  * adult's is 1. Eligibility (a bank drinker, or any prey at the waterline —
  * point 275) is decided by the caller, so the sole discriminator here is
- * young-vs-adult.
+ * young-vs-adult — plus, for the crossing turned back (§19.8, point 362), the
+ * calf SWIMMING mid-channel, whose `channelWeight` is the strongest case. The
+ * caller keeps that weight above `bias` (debug floor), so it beats every bank case.
  */
-export function crocodileTargetWeight(isJuvenile: boolean, bias: number): number {
+export function crocodileTargetWeight(
+  isJuvenile: boolean,
+  bias: number,
+  swimming = false,
+  channelWeight = bias,
+): number {
+  if (isJuvenile && swimming) return channelWeight
   return isJuvenile ? bias : 1
+}
+
+/**
+ * The mid-channel ambush case (design.md §19.8, point 362): a JUVENILE on a
+ * crossing swim, on river/lake water, inside the strike radius. Adult swimmers
+ * stay out of reach — the bank cases (drinker, waterline prey) decide them.
+ */
+export function crocodileChannelPrey(
+  dist: number,
+  isJuvenile: boolean,
+  crossing: boolean,
+  onWater: boolean,
+  strikeRadius: number,
+): boolean {
+  return isJuvenile && crossing && onWater && dist <= strikeRadius
+}
+
+/** The family fields a crossing start reads (point 362). */
+export interface CrossingFamilyMember {
+  x: number
+  z: number
+  young?: boolean
+  dead?: boolean
+  child?: CrossingFamilyMember
+  caught?: number
+  inWater?: number
+  mired?: number
+  fireTrapped?: number
+  crossing?: unknown
+  vigil?: unknown
+  rescued?: boolean
+}
+
+/**
+ * Who swims when a crossing starts (design.md §19.8, point 362): a family
+ * crosses TOGETHER. An adult's crossing takes its living, free calf along —
+ * the calf on its own line parallel to the parent's (its flank), probed for the
+ * far bank from where it stands, else the parent's bank — and nobody else. A
+ * calf alone never starts one (empty result). A calf already in a drama or
+ * swim keeps it.
+ */
+export function familyCrossing<A extends CrossingFamilyMember>(
+  starter: A,
+  target: { tx: number; tz: number },
+  terrainTypeAt: (x: number, z: number) => string,
+  maxUnits: number,
+): Array<{ animal: A; tx: number; tz: number }> {
+  if (starter.young === true || starter.dead) return []
+  const out: Array<{ animal: A; tx: number; tz: number }> = [{ animal: starter, tx: target.tx, tz: target.tz }]
+  const c = starter.child as A | undefined
+  if (
+    c && !c.dead && c.young === true && c.caught === undefined && c.inWater === undefined &&
+    c.mired === undefined && c.fireTrapped === undefined && c.crossing === undefined &&
+    c.vigil === undefined && c.rescued !== true
+  ) {
+    // The calf's own line, parallel to the parent's: walk to the water, then
+    // across it to the first land beyond (the far bank on its flank).
+    const span = Math.hypot(target.tx - starter.x, target.tz - starter.z)
+    const sx = (target.tx - starter.x) / (span || 1)
+    const sz = (target.tz - starter.z) / (span || 1)
+    let own: { tx: number; tz: number } | null = null
+    let wet = false
+    for (let i = 1; i * 0.5 <= span + maxUnits; i++) {
+      const px = c.x + sx * i * 0.5
+      const pz = c.z + sz * i * 0.5
+      const t = terrainTypeAt(px, pz)
+      if (t === 'ocean') break
+      if (t === 'water') wet = true
+      else if (wet) {
+        own = { tx: px, tz: pz }
+        break
+      }
+    }
+    out.push({ animal: c, tx: own?.tx ?? target.tx, tz: own?.tz ?? target.tz })
+  }
+  return out
+}
+
+/** The parent's swim back to its seized calf (point 362), carried per frame. */
+export interface ChannelReturn {
+  /** Time spent on the return — bounded by the crossing deadline (I4). */
+  time: number
+  /** The steered heading: it turns at the capped rate, never whips round. */
+  heading: number
+}
+
+/**
+ * The rescue pace of the return (design.md §19.8, points 127/122): the burst,
+ * braked by the seasonal flow in the water (wadeSpeed); unbraked ashore.
+ */
+export function channelReturnPace(onWater: boolean, rescue: number, flowFactor: number): number {
+  return onWater ? wadeSpeed(rescue, flowFactor) : rescue
+}
+
+/** Has the return outlived the crossing deadline (§19.5 — nothing is left swimming)? */
+export function channelReturnExpired(r: ChannelReturn | undefined, resolveSeconds: number): boolean {
+  return r !== undefined && r.time > resolveSeconds
+}
+
+/**
+ * One frame of the parent's return to its calf (design.md §19.8, §19.5,
+ * point 362): the heading turns toward the calf by at most `maxTurnRate * dt`
+ * (the ordinary capped turn — the reversal is an arc, never a flip), then the
+ * body steps along that heading, never past the calf. At or past the deadline
+ * nothing moves and `expired` is set: the caller ends the return on a bank.
+ */
+export function channelReturnStep(
+  x: number,
+  z: number,
+  r: ChannelReturn,
+  calfX: number,
+  calfZ: number,
+  dt: number,
+  maxTurnRate: number,
+  pace: number,
+  resolveSeconds: number,
+): { x: number; z: number; heading: number; time: number; expired: boolean } {
+  const time = r.time + dt
+  if (time > resolveSeconds) return { x, z, heading: r.heading, time, expired: true }
+  const dx = calfX - x
+  const dz = calfZ - z
+  const d = Math.hypot(dx, dz)
+  const heading = d > 1e-6 ? turnToward(r.heading, Math.atan2(dx, dz), maxTurnRate * dt) : r.heading
+  const step = Math.min(d, pace * dt)
+  return { x: x + Math.sin(heading) * step, z: z + Math.cos(heading) * step, heading, time, expired: false }
+}
+
+/**
+ * Where a parent ends a mid-channel drama that left it in the water (point
+ * 362): no vigil — the water has the body — so it makes the NEAREST bank and
+ * rejoins its herd. Ashore already: it stays where it stands. `null` only
+ * when no bank lies within reach (the caller grounds it, I4).
+ */
+export function channelEndingBank(
+  x: number,
+  z: number,
+  terrainTypeAt: (x: number, z: number) => string,
+  maxUnits: number,
+): { tx: number; tz: number } | null {
+  const here = terrainTypeAt(x, z)
+  if (here !== 'water' && here !== 'ocean') return { tx: x, tz: z }
+  return nearestBankTarget(x, z, terrainTypeAt, maxUnits)
 }
 
 /**

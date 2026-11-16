@@ -692,6 +692,10 @@ interface BalanceConfig {
      *  (weight, ≫ 1 = an adult's), so the §19.8 sacrifice/rescue drama fires
      *  more often. Calibratable/debug-editable. */
     juvenileDrinkCrocBias: number
+    /** Crocodile weight of a calf SWIMMING mid-channel on a crossing (design.md
+     *  §19.8, point 362): the strongest ambush case — kept above
+     *  juvenileDrinkCrocBias so it beats every bank case. Calibratable/debug-editable. */
+    midChannelCalfCrocWeight: number
     /** Orphan adoption reach (design.md §19.8/§21.2, point 262): when a
      *  juvenile's parent dies (any cause), the nearest eligible ADULT of its
      *  own kind within this radius (world units) adopts it and becomes its new
@@ -2058,6 +2062,9 @@ export const balance: BalanceConfig = {
     // Calibratable (point 245): a drinking calf is 6× the lunge weight of an
     // adult drinker, so the crocodile ambush overwhelmingly picks the juvenile.
     juvenileDrinkCrocBias: 6,
+    // Calibratable (point 362): a calf swimming mid-channel is the crocodile's
+    // strongest case — above the drinking-juvenile 6, so it wins every bank pick.
+    midChannelCalfCrocWeight: 10,
     // Calibratable (point 262): a bereaved juvenile is taken in by an adult of
     // its kind within this reach. Sized above the calf leash (followRadius 8.1)
     // so a nearby herd-mate — not only the dead parent's immediate neighbour —

@@ -592,6 +592,8 @@ export function DebugMenu() {
         (v) => { balance.family.juvenilePreyBias = Math.max(0, Math.min(1, v)); bump() }, 0.05),
       num(t.debug.juvenileDrinkCrocBias, balance.family.juvenileDrinkCrocBias,
         (v) => { balance.family.juvenileDrinkCrocBias = Math.max(1, v); bump() }, 0.5),
+      num(t.debug.midChannelCalfCrocWeight, balance.family.midChannelCalfCrocWeight,
+        (v) => { balance.family.midChannelCalfCrocWeight = Math.max(1, v); bump() }, 0.5),
       num(t.debug.calfAdoptionRadius, balance.family.adoptionRadius,
         (v) => { balance.family.adoptionRadius = Math.max(0, v); bump() }, 1),
       num(t.debug.calfEscapeSeconds, balance.family.escapeSeconds,
