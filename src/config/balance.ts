@@ -516,6 +516,8 @@ interface BalanceConfig {
     speedFactor: number
     /** Seconds until the limp heals and the pair rejoins the herd. */
     healSeconds: number
+    /** Radius (world units) of the herd-mates whose centroid the lame calf limps after. */
+    herdRadius: number
   }
   /** The vigil at a calf's carcass (design.md §19.8, point 121). */
   vigil: {
@@ -1992,6 +1994,7 @@ export const balance: BalanceConfig = {
     lameChance: 0.12, // calibratable: low, so a successful defence rarely costs a second price
     speedFactor: 0.45, // calibratable: well under the herd's pace, so the pair visibly falls behind
     healSeconds: 90, // calibratable: the limp always heals — the drama resolves
+    herdRadius: 30, // calibratable: about two flee radii, so a post-hunt scatter is still its herd
   },
   vigil: {
     seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd

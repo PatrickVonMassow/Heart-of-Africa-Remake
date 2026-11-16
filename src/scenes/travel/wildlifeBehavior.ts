@@ -2727,6 +2727,32 @@ export function lameFate(secondsLame: number, healSeconds: number): 'lame' | 'he
 }
 
 /**
+ * Where a lame calf limps to (point 363): the centroid of its LIVING herd-mates
+ * within `radius`, skipping itself and its own parent (the stay-behind pair must
+ * not chase its own position). Null when no mate is in reach — the pair then
+ * stands; a streamed-away herd is the existing adoption/regroup case.
+ */
+export function herdCentroid(
+  mates: readonly { x: number; z: number; dead?: boolean }[],
+  x: number,
+  z: number,
+  radius: number,
+  skip: (m: { x: number; z: number; dead?: boolean }) => boolean,
+): { x: number; z: number } | null {
+  let sx = 0
+  let sz = 0
+  let n = 0
+  for (const m of mates) {
+    if (m.dead || skip(m)) continue
+    if (Math.hypot(m.x - x, m.z - z) > radius) continue
+    sx += m.x
+    sz += m.z
+    n++
+  }
+  return n === 0 ? null : { x: sx / n, z: sz / n }
+}
+
+/**
  * The vicinity-seeding bounds (point 102 hardened by point 135a): the seeder
  * counts and places against a radius SHRUNK by `margin`, so the guarantee
  * "at least N region-typical animals within `radius`" keeps holding when

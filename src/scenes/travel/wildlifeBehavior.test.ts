@@ -6,6 +6,7 @@ import {
   drinkCatchment,
   mireFate,
   lamenessRoll,
+  herdCentroid,
   lamePaceFactor,
   lameFate,
   LAME_SPEED_MAX,
@@ -5541,5 +5542,14 @@ describe('the straggler (design.md §19.8, point 363)', () => {
     expect(balance.straggler.lameChance).toBeLessThanOrEqual(0.25)
     expect(Number.isFinite(balance.straggler.healSeconds)).toBe(true)
     expect(balance.straggler.healSeconds).toBeGreaterThan(0)
+  })
+  it('the limp aims at the living herd-mates in reach, never at the pair itself', () => {
+    const calf = { x: 0, z: 0 }
+    const parent = { x: 1, z: 0 }
+    const mates = [calf, parent, { x: 20, z: 0 }, { x: 30, z: 10 }, { x: 25, z: 0, dead: true }, { x: 500, z: 0 }]
+    const c = herdCentroid(mates, 0, 0, 80, (m) => m === calf || m === parent)
+    expect(c).toEqual({ x: 25, z: 5 })
+    // No mate in reach: the pair stands (null), it never limps at nothing.
+    expect(herdCentroid([calf, parent, { x: 500, z: 0 }], 0, 0, 80, (m) => m === calf || m === parent)).toBeNull()
   })
 })
