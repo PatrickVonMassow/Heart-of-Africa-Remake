@@ -77,47 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 362. The crossing turned back — the crocodile takes a calf mid-channel
-  (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
-  never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
-  in `src/scenes/travel/wildlifeBehavior.ts`, point 192) and the crocodile ambush
-  (§19.16, `crocodileTargetWeight` and the hunt core). Join them into the one scene
-  §19.8 is missing — a family in open water.
-  A CROSSING TAKES THE FAMILY. When a parent with a living calf starts a crossing,
-  the calf enters with it and swims at its flank (the existing leash, at the wade
-  speed both already use); the pair is one crossing, not two. A calf alone never
-  starts one.
-  THE AMBUSH FIRES MID-CHANNEL. The crocodile's target weighting, today biased to
-  drinkers and juveniles AT the bank, gains the swimming calf as its strongest
-  case — a calibratable weight beside the existing ones (§21.2, debug-editable).
-  THE REVERSAL IS THE PICTURE. On the seizure the parent turns round — against the
-  direction the rest of the herd is taking — and swims back. Its heading reversal
-  goes through the ordinary capped turn rate (§19.5: no body ever whips round), and
-  the rest of the herd does NOT turn: it completes the crossing and walks up the far
-  bank. That contrast is what the scene is for; a verification that cannot see it is
-  not passing.
-  THE ENDINGS ARE THE EXISTING ONES, not new: the return is a RESCUE, so it takes
-  the rescue burst braked by `seasonFlowFactor` (`wadeSpeed`) and rolls the SAME
-  §19.8 defence matrix used at the waterline — drive-off, taken-in-the-calf's-place,
-  or too late. NO vigil exists here (the water takes the body, §19.8); a too-late
-  parent makes the NEAREST bank and rejoins its herd. Every branch resolves on a
-  bank — reuse the crossing deadline so nothing is left swimming (§19.5).
-  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (crossing, crocodile weighting,
-  defence resolution, `wadeSpeed`), `src/scenes/travel/Wildlife.tsx` ~2373–2500
-  (the water-drama frame code and its `seasonFlowFactor` calls) and ~3855 (the
-  crossing swim speed), `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`
-  for the debug label.
-  VERIFIABLE: pure (`wildlifeBehavior.test.ts`) — a parent's crossing takes its calf
-  and only its calf; the mid-channel weight beats the bank cases; the reversal
-  respects the turn cap; each defence outcome reaches a terminal state and a
-  too-late parent ends on a bank, never in the channel; no branch can leave the
-  water-drama state set past the deadline. Live (`scripts/verify/wildlife.mjs`, ONE
-  backend — this is behaviour, not shading; the reversal is judged on the recorded
-  positions plus one screenshot): a seeded crossing produces a herd that finishes
-  while one animal reverses.
-  DOCS: design.md §19.8 + §21.2 already state it; add the balance value's comment
-  and the acceptance-evidence line under §12.
-
 - [ ] 363. The straggler — a lame calf the herd leaves behind (user 26.07.2026;
   design.md §19.8 states the target). Every §19 drama is fast: a charge, a seizure,
   a plunge. This one is slow, and nothing is scripted to kill — it is the only
