@@ -177,6 +177,11 @@ if (section('crossing-turned-back')) {
     // the hashed |sin| roll crowds near 1, so a weight alone let 'taken' through.
     window.__crossPrev.force = window.__balance.parentDefense.forceOutcome
     window.__balance.parentDefense.forceOutcome = 'driveOff'
+    // The rainy-season current (flow 1.8, wadeSpeed = rescue / flow) brakes the
+    // return so the reversal outlasts the shutter's capture lag.
+    const wd = window.__balance.waterDrama
+    window.__crossPrev.flow = [wd.dryFlowFactor, wd.wetFlowFactor]
+    wd.dryFlowFactor = wd.wetFlowFactor
     // A short strike reach, so the ambush fires only once the calf is IN the
     // channel and its parent, which entered ahead of it, is well out ahead.
     window.__balance.crocodile.strikeRadius = 1.6
@@ -271,8 +276,14 @@ if (section('crossing-turned-back')) {
         const rec = window.__crossRec
         const i0 = rec.findIndex((r) => r.calf.caught)
         if (i0 < 0) return false
-        const peak = Math.max(...rec.slice(i0).map((r) => r.parent.p))
-        return peak - rec.at(-1).parent.p > 0.8
+        // The shutter fires at the turn's onset (heading past a right angle):
+        // the return is short, and the capture lags the trigger.
+        const h = window.__crossScene.parent.channelReturn?.heading
+        if (h === undefined) return false
+        let d = h - Math.atan2(window.__crossScene.line.sx, window.__crossScene.line.sz)
+        while (d > Math.PI) d -= Math.PI * 2
+        while (d < -Math.PI) d += Math.PI * 2
+        return Math.abs(d) > Math.PI / 2
       }),
     ))
     if (turned) {
@@ -394,6 +405,7 @@ if (section('crossing-turned-back')) {
     if (prev) {
       window.__balance.family.adoptionRadius = prev.adoption
       window.__balance.parentDefense.forceOutcome = prev.force
+      ;[window.__balance.waterDrama.dryFlowFactor, window.__balance.waterDrama.wetFlowFactor] = prev.flow
       window.__balance.crocodile.strikeRadius = prev.strike
     }
     if (window.__crossPrevDrift !== undefined) window.__balance.currentDrift = window.__crossPrevDrift
