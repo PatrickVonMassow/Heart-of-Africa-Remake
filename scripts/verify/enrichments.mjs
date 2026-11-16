@@ -562,7 +562,11 @@ if (section('cultural-landmarks')) {
   await page.evaluate(() =>
     window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'abu-simbel'] }),
   )
-  await page.waitForTimeout(1800)
+  await page
+    .waitForFunction(() => [...document.querySelectorAll('.map-label')].some((l) => /Abu Simbel/.test(l.textContent)), null, {
+      timeout: 15000,
+    })
+    .catch(() => {})
   const abuLabels = await page.evaluate(() =>
     [...document.querySelectorAll('.map-label')].filter((l) => /Abu Simbel/.test(l.textContent)).map((l) => l.textContent.trim()),
   )
