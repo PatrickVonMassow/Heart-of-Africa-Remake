@@ -11,8 +11,8 @@ import { balance } from '../../config/balance'
 import type { PlaceDef } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { FieldSphinx } from '../../render/sphinxProbe'
-import { BACKDROP_DISC_OVERLAP, panoramaStandY } from './backdrop'
-import { neighbourBaseY } from './horizonNeighbours'
+import { BACKDROP_DISC_OVERLAP, backdropHeightAt, discHorizonY } from './backdrop'
+import { footprintSamples, neighbourBaseY } from './horizonNeighbours'
 import type { PlaceLayout } from './layout'
 import { EYE_HEIGHT } from './roofClearance'
 import { discEdgeAt, type HorizonNeighbourItem } from './useHorizonNeighbours'
@@ -57,17 +57,27 @@ export function HorizonNeighbours({ items, place, seed, layout }: {
     }
   }, [items])
 
+  // The camera-free half of the footing (`panoramaStandY`'s relief), once per
+  // footprint sample: the dense samples would cost a terrain read each frame.
+  const footing = useMemo(() => items.map((it) => {
+    const samples = footprintSamples(it.seat)
+    const r0 = samples.map(([x, z]) => discEdgeAt(layout, x, z) - BACKDROP_DISC_OVERLAP)
+    const relief = samples.map(([x, z], k) => backdropHeightAt(x, z, place.lat, place.lon, seed, centerH, r0[k]))
+    return { samples, r0, relief }
+  }), [items, layout, place, seed, centerH])
+
   useFrame(({ camera }) => {
     const sink = balance.panoramaWildlife.sinkEpsilon
     items.forEach((it, i) => {
       const g = refs.current[i]
-      if (!g) return
+      const f = footing[i]
+      if (!g || !f) return
       // The footing follows the live camera like the wildlife's (point 181):
       // the disc-edge sight line drops as the player walks toward the rim.
       const y = neighbourBaseY(
-        it.seat,
-        (x, z) => panoramaStandY(x, z, place.lat, place.lon, seed, centerH,
-          discEdgeAt(layout, x, z) - BACKDROP_DISC_OVERLAP, camera.position.x, camera.position.z, EYE_HEIGHT),
+        f.samples,
+        (x, z, k) => Math.max(f.relief[k], discHorizonY(x, z, camera.position.x, camera.position.z, EYE_HEIGHT,
+          f.r0[k] + BACKDROP_DISC_OVERLAP)),
         sink * it.seat.scale * it.silhouette.metresPerUnit,
       )
       baseY.current[i] = y

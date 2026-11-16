@@ -6,6 +6,7 @@ import { sampleTerrain } from '../../world/terrain'
 import { PANORAMA_RADIUS, PANORAMA_RING_CLEARANCE, panoramaStandY } from './backdrop'
 import {
   bearingDirection,
+  footingStep,
   footprintSamples,
   mapBearing,
   mapDistanceDeg,
@@ -201,13 +202,42 @@ describe('horizon neighbours: footing on the drawn ground (point 181)', () => {
     for (const [camX, camZ] of [[0, 0], [60, 0], [-80, 30], [20, -90]]) {
       const stand = (x: number, z: number) => panoramaStandY(x, z, giza.lat, giza.lon, seed, centerH, r0, camX, camZ, 1.5)
       const sink = 0.3
-      const y = neighbourBaseY(seat, stand, sink)
-      const samples = footprintSamples(seat).map(([x, z]) => stand(x, z))
-      for (const s of samples) expect(y).toBeLessThanOrEqual(s - sink + 1e-9)
-      expect(y).toBeCloseTo(Math.min(...samples) - sink, 9)
+      const samples = footprintSamples(seat)
+      const y = neighbourBaseY(samples, stand, sink)
+      expect(y).toBeCloseTo(Math.min(...samples.map(([x, z]) => stand(x, z))) - sink, 9)
+      // Judged on a grid FOUR times finer than the samples, independent of
+      // them: no point under the footprint has ground below the base.
+      const radial = { x: Math.sin(seat.bearing), z: -Math.cos(seat.bearing) }
+      const g = footingStep(seat) / 4
+      for (let u = -seat.footprint; u <= seat.footprint; u += g) {
+        for (let v = -seat.footprint * seat.depth; v <= seat.footprint * seat.depth; v += g) {
+          if ((u / seat.footprint) ** 2 + (v / (seat.footprint * seat.depth)) ** 2 > 1) continue
+          const x = seat.x - radial.z * u + radial.x * v
+          const z = seat.z + radial.x * u + radial.z * v
+          expect(y).toBeLessThanOrEqual(stand(x, z))
+        }
+      }
     }
   })
 })
+  it('a dip as narrow as one backdrop mesh cell anywhere under the footprint pulls the base down', () => {
+    const r = mulberry32(11)
+    const seat = { x: 0, z: -150, radius: 150, bearing: 0, footprint: 60, depth: 0.55 }
+    const cell = 2 * footingStep(seat) // the backdrop's vertex arc at the seat
+    const depthOfDip = 10
+    const sink = 0.3
+    for (let n = 0; n < 40; n++) {
+      // A cone-shaped dip one mesh cell wide, somewhere inside the outline.
+      const a = r() * Math.PI * 2
+      const t = Math.sqrt(r()) * 0.98
+      const cx = seat.x + Math.cos(a) * seat.footprint * t
+      const cz = seat.z + Math.sin(a) * seat.footprint * seat.depth * t
+      const stand = (x: number, z: number) => -depthOfDip * Math.max(0, 1 - Math.hypot(x - cx, z - cz) / cell)
+      const y = neighbourBaseY(footprintSamples(seat), stand, sink)
+      expect(y).toBeLessThanOrEqual(-depthOfDip / 2 - sink + 1e-9)
+    }
+  })
+
 
 describe('horizon neighbour silhouettes', () => {
   it('a monument site shows its bird\'s-eye landmark, sized by its walkable site', () => {

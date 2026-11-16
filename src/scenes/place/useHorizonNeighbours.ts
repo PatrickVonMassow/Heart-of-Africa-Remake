@@ -20,11 +20,17 @@ export interface HorizonNeighbourItem {
 
 // A settlement neighbour's dwellings come from its full layout build — the
 // expensive half (a large port's layout takes about a second), so each is built
-// once per (place, seed, balance version) and kept for later visits.
+// once per (place, seed) and kept for later visits. A balance edit drops the
+// whole cache: only the current version's layouts are ever held.
 const dwellingCache = new Map<string, readonly DwellingDef[]>()
-function dwellingsFor(seed: number, balanceVersion: number) {
+let dwellingCacheVersion = -1
+export function dwellingsFor(seed: number, balanceVersion: number) {
+  if (balanceVersion !== dwellingCacheVersion) {
+    dwellingCache.clear()
+    dwellingCacheVersion = balanceVersion
+  }
   return (id: string) => {
-    const key = `${id}:${seed}:${balanceVersion}`
+    const key = `${id}:${seed}`
     let d = dwellingCache.get(key)
     if (!d) {
       d = buildLayout(id, seed).dwellings

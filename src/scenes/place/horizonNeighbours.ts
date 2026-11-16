@@ -16,7 +16,7 @@
 // of the silhouette's true height over that distance — falling as 1/distance.
 
 import type { PlaceKind } from '../../world/geo'
-import { BACKDROP_SCALE, PANORAMA_RADIUS, PANORAMA_RING_CLEARANCE } from './backdrop'
+import { BACKDROP_SCALE, BACKDROP_SEGS, PANORAMA_RADIUS, PANORAMA_RING_CLEARANCE } from './backdrop'
 import { excludedAzimuthSpan, type AzimuthSpan } from './panoramaWildlife'
 
 /** A map point that can be seen from another (a `PlaceDef` satisfies it). */
@@ -174,39 +174,53 @@ export function seatNeighbour(
   }
 }
 
-type FootprintSeat = Pick<NeighbourSeat, 'x' | 'z' | 'footprint' | 'depth' | 'bearing'>
+type FootprintSeat = Pick<NeighbourSeat, 'x' | 'z' | 'footprint' | 'depth' | 'bearing' | 'radius'>
 
-/** Sample points of a seat's footprint: its origin and a ring on its outline —
- *  an ellipse, `footprint` across the line of sight and `footprint·depth`
- *  along it. */
-export function footprintSamples(seat: FootprintSeat, ring = 12): Array<[number, number]> {
+/** Spacing of the footing samples: half the backdrop mesh's arc between two
+ *  vertices at the seat, so no dip of the drawn relief falls between samples. */
+export function footingStep(seat: Pick<NeighbourSeat, 'radius'>): number {
+  return (Math.PI * seat.radius) / BACKDROP_SEGS
+}
+
+/** Sample points covering a seat's footprint: its origin and concentric rings
+ *  out to its outline — an ellipse, `footprint` across the line of sight and
+ *  `footprint·depth` along it — no two neighbours further apart than `step`. */
+export function footprintSamples(seat: FootprintSeat, step = footingStep(seat)): Array<[number, number]> {
   const radial = bearingDirection(seat.bearing)
   const across = { x: -radial.z, z: radial.x }
   const pts: Array<[number, number]> = [[seat.x, seat.z]]
-  for (let i = 0; i < ring; i++) {
-    const a = (i / ring) * Math.PI * 2
-    const u = Math.cos(a) * seat.footprint
-    const v = Math.sin(a) * seat.footprint * seat.depth
-    pts.push([seat.x + across.x * u + radial.x * v, seat.z + across.z * u + radial.z * v])
+  const rings = Math.max(1, Math.ceil(seat.footprint / step))
+  for (let k = 1; k <= rings; k++) {
+    const t = k / rings
+    const n = Math.max(6, Math.ceil((2 * Math.PI * t * seat.footprint) / step))
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2
+      const u = Math.cos(a) * seat.footprint * t
+      const v = Math.sin(a) * seat.footprint * seat.depth * t
+      pts.push([seat.x + across.x * u + radial.x * v, seat.z + across.z * u + radial.z * v])
+    }
   }
   return pts
 }
 
 /**
  * The base height of a neighbour silhouette: the LOWEST drawn ground under its
- * footprint (`standY` is `panoramaStandY` — the higher of the backdrop relief
- * and the eye's line over the disc edge, the point-181 footing rule), less a
- * sink. Taking the lowest means no part of the base hangs above the ground it
- * covers; a rise elsewhere under it only hides part of it, a normal depth
- * relationship.
+ * footprint samples (`standY` is the point-181 footing rule — the higher of
+ * the backdrop relief and the eye's line over the disc edge; it gets the
+ * sample's index so a caller can keep the camera-free relief per sample),
+ * less a sink. Taking the lowest means no part of the base hangs above the
+ * ground it covers; a rise elsewhere under it only hides part of it, a normal
+ * depth relationship.
  */
 export function neighbourBaseY(
-  seat: FootprintSeat,
-  standY: (x: number, z: number) => number,
+  samples: ReadonlyArray<readonly [number, number]>,
+  standY: (x: number, z: number, i: number) => number,
   sink: number,
 ): number {
   let lowest = Infinity
-  for (const [x, z] of footprintSamples(seat)) lowest = Math.min(lowest, standY(x, z))
+  samples.forEach(([x, z], i) => {
+    lowest = Math.min(lowest, standY(x, z, i))
+  })
   return lowest - Math.max(0, sink)
 }
 
