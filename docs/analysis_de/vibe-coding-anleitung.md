@@ -165,6 +165,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Beweis, frag, welche Frage **keiner** von ihnen stellt — jeder kann recht haben und alle
   zusammen blind sein. Und das Bild sagt nicht nur ‚stimmt
   es?‘, sondern **wozu die Figur das tut?“ *(Sieht das richtig aus?)*
+- **Der Autor sieht sein Bild nie.** Ein ausgelagerter Autor ohne Browser baut Darstellung
+  blind; jede Runde rät neu.
+  → *Prompt:* „Bildarbeit nur dort, wo das **Bild entsteht**. Bewegt sich nach einer Runde
+  nichts, wechsle **Ort oder Ansatz** — nicht nur den Versuch.“
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
   Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt er
   weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer Prüfling nicht.
@@ -725,4 +729,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 05d6ae5eb714a572c16fc720fe8870a61a9a524fc060a4ef9b40df7049200c3a -->
+<!-- GUIDE-FINGERPRINT: c86b7cc19cb65c154b74768ec9a43f6a0c15bee908b44cc14a767e3032f4190c -->
