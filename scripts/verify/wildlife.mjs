@@ -482,6 +482,7 @@ if (section('herd-crosses-on-its-own')) {
     }
   })
   // One full drink window (75 s) plus slack: every drinker reaches its bank in it.
+  await page.evaluate(() => { window.__ownT0 = window.__simTime() })
   const found = await page.evaluate(() => window.__pollSim(90, () => {
     const seed = window.__game.getState().seed
     const U = 10
@@ -540,9 +541,11 @@ if (section('herd-crosses-on-its-own')) {
     found && swimmer !== null, JSON.stringify({ drinkers, swimmer, after }))
   if (found && swimmer) {
     await shot('1527-herd-crosses-on-its-own', { world: { x: swimmer.x, z: swimmer.z }, label: `a ${swimmer.sp} of a natural herd swimming its river crossing`, settle: false })
-    // The rest of the swimmer's drink window: herd-mates reach their bank
-    // spots at their own pace and share the herd's roll.
-    await page.evaluate(() => window.__pollSim(40, () => { window.__ownNoteCrossers(); return false }))
+    // The rest of the drink window, anchored at its start rather than at the
+    // swimmer: herd-mates reach their bank spots at their own pace and share
+    // the herd's roll.
+    await page.evaluate(() => window.__pollSim(Math.max(5, window.__ownT0 + 90 - window.__simTime()),
+      () => { window.__ownNoteCrossers(); return false }))
     const herd = await page.evaluate(() => {
       const s = window.__ownSwimmer.a
       const group = window.__ownCrossers.get(s)
@@ -572,6 +575,7 @@ if (section('herd-crosses-on-its-own')) {
     window.__ownSwimmer = undefined
     window.__ownCrossers = undefined
     window.__ownNoteCrossers = undefined
+    window.__ownT0 = undefined
   })
 }
 
