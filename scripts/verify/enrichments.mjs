@@ -556,7 +556,9 @@ if (section('cultural-landmarks')) {
     const p = placeById('abu-simbel')
     return { lat: p.lat, lon: p.lon }
   })
-  await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon - 0.25), abu)
+  // Outside the 0.25° enter radius: inside it the "Space to enter" hint
+  // replaces the label by design (§2.3), so the label is judged from beyond it.
+  await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon - 0.45), abu)
   await page.evaluate(() =>
     window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'abu-simbel'] }),
   )
