@@ -34,8 +34,8 @@ export const RAIN_COUNT = 770
 export const RAIN_RADIUS = 16 // a tight column around the head, not the travel 55
 export const RAIN_HEIGHT = 16.5 // from the ground under each drop upward
 export const RAIN_FALL_SPEED = 22
-const STREAK_WIDTH = 0.03
-const STREAK_LENGTH = 1.1 // longer than the travel scene's so they read at eye height
+const STREAK_WIDTH = 0.02
+const STREAK_LENGTH = balance.rain.dropLengthM
 const RAIN_COLOR: [number, number, number] = [0.66, 0.72, 0.8]
 const PUFF_COLOR: [number, number, number] = [0.55, 0.47, 0.37] // splashed wet earth
 const RING_LIFT = 0.012 // the ring sits just above the water, never inside it
@@ -63,6 +63,8 @@ export function createRainUniforms() {
     eye: uniform(new THREE.Vector2()),
     sun: uniform(new THREE.Vector3(0, 1, 0)),
     light: uniform(1),
+    /** tan of the camera's vertical half-FOV (the place camera's fov 50). */
+    tanHalfFov: uniform(Math.tan((25 * Math.PI) / 180)),
   }
 }
 export type RainUniforms = ReturnType<typeof createRainUniforms>
@@ -95,17 +97,18 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean) {
   dm.depthWrite = false
   dm.side = THREE.DoubleSide
   dm.fog = false
-  // Near the eye a streak thins (its projected width capped at the width it has
-  // at dropWidthCapM) and fades out (rainTouch.ts dropWidthScale/dropNearFade).
+  // Near the eye a streak shortens to at most dropMaxFrameFraction of the frame,
+  // thins to its width at dropWidthCapM and fades out before its full length
+  // fits (rainTouch.ts: streakFitDistance, dropLengthScale, dropWidthScale,
+  // dropNearFade), so none reads as a pole.
   const base = vec3(spot.x, spot.y.add(fall), spot.z)
   const centreDist = base.add(vec3(0, STREAK_LENGTH / 2, 0)).sub(cameraPosition).length()
+  const fit = float(STREAK_LENGTH).div(uniforms.tanHalfFov.mul(2 * balance.rain.dropMaxFrameFraction))
+  const shorten = centreDist.div(fit).clamp(0, 1)
   const thin = centreDist.div(balance.rain.dropWidthCapM).clamp(0.05, 1)
-  dm.positionNode = positionLocal.mul(vec3(thin, 1, thin)).add(base)
-  const nearFade = smoothstep(
-    float(balance.rain.dropNearFadeM),
-    float(balance.rain.dropNearFullM),
-    positionWorld.sub(cameraPosition).length(),
-  )
+  dm.positionNode = positionLocal.mul(vec3(thin, shorten, thin)).add(base)
+  const nearFade = smoothstep(float(balance.rain.dropNearFadeM), fit, centreDist)
+  const dropAlpha = uniforms.opacity.mul(edgeFade).mul(nearFade).mul(balance.rain.dropOpacity)
   if (lit) {
     // Lit streak: dim against the bright sky behind an upward glance, bright
     // against the dark huts and ground at eye level, glinting toward the sun.
@@ -114,15 +117,10 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean) {
     const visible = mix(float(1), float(balance.rain.dropSkyVisibility), skyBehind)
     const glint = max(dot(view, uniforms.sun), float(0)).pow(6).mul(balance.rain.dropSunGlint)
     dm.colorNode = rainCol.mul(uniforms.light).mul(glint.add(0.8)).mul(variation)
-    dm.opacityNode = uniforms.opacity
-      .mul(edgeFade)
-      .mul(nearFade)
-      .mul(0.8)
-      .mul(visible)
-      .mul(variation.mul(0.4).add(0.6))
+    dm.opacityNode = dropAlpha.mul(visible).mul(variation.mul(0.4).add(0.6))
   } else {
     dm.colorNode = rainCol
-    dm.opacityNode = uniforms.opacity.mul(edgeFade).mul(nearFade).mul(0.8)
+    dm.opacityNode = dropAlpha
   }
   const dg = crossedStreak()
   dg.setAttribute('rainSpot', spots)

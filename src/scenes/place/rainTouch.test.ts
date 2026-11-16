@@ -8,8 +8,11 @@ import {
   dropArrival,
   dropBases,
   dropFall,
+  dropLengthScale,
   dropNearFade,
   dropWidthScale,
+  streakFitDistance,
+  streakFrameFraction,
   impactAge,
   impactFlag,
   impactShape,
@@ -125,10 +128,23 @@ describe('drops keep a fixed world x/z while the column follows the eye', () => 
   })
 })
 
-describe('a drop near the eye thins and fades out (no streak reads as a pole)', () => {
-  const { dropNearFadeM: near, dropNearFullM: far, dropWidthCapM: cap } = balance.rain
+describe('a drop near the eye shortens, thins and fades out (no streak reads as a pole)', () => {
+  const { dropNearFadeM: near, dropWidthCapM: cap, dropLengthM: len, dropMaxFrameFraction: frac } = balance.rain
+  const tanHalfFov = Math.tan((25 * Math.PI) / 180) // the place camera's fov 50
+  const far = streakFitDistance(len, tanHalfFov, frac)
 
-  it('fades 0 at and inside the near distance, 1 beyond the far one, monotone between', () => {
+  it('projects every streak within ~60 px of a 900 px frame at any distance', () => {
+    expect(frac * 900).toBeLessThanOrEqual(60 + 1e-9)
+    for (let d = 0.2; d <= 40; d += 0.1) {
+      const px = streakFrameFraction(len * dropLengthScale(d, far), d, tanHalfFov) * 900
+      expect(px).toBeLessThanOrEqual(60 + 1e-6)
+    }
+    // the unshortened streak exceeds 60 px exactly inside the fit distance
+    expect(streakFrameFraction(len, far * 0.9, tanHalfFov) * 900).toBeGreaterThan(60)
+    expect(streakFrameFraction(len, far, tanHalfFov) * 900).toBeCloseTo(60, 6)
+  })
+
+  it('fades 0 at and inside the near distance, 1 from the fit distance on, monotone between', () => {
     expect(near).toBeGreaterThan(0)
     expect(far).toBeGreaterThan(near)
     for (const d of [0, near / 2, near]) expect(dropNearFade(d, near, far)).toBe(0)
@@ -142,11 +158,12 @@ describe('a drop near the eye thins and fades out (no streak reads as a pole)', 
     }
   })
 
-  it('never projects wider than at the cap distance', () => {
+  it('never projects wider than at the cap distance, and one streak is never near-solid', () => {
     expect(dropWidthScale(cap * 2, cap)).toBe(1)
     for (const d of [0.3, 1, 2.5, cap * 0.9]) {
       // projected width ∝ scale / d stays at or below its value at the cap
       expect(dropWidthScale(d, cap) / d).toBeLessThanOrEqual(1 / cap + 1e-9)
     }
+    expect(balance.rain.dropOpacity).toBeLessThanOrEqual(0.5)
   })
 })

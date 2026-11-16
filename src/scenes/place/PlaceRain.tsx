@@ -79,6 +79,9 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
     uniforms.eye.value.set(camera.position.x, camera.position.z)
     uniforms.sun.value.set(sun.light[0], sun.light[1], sun.light[2]).normalize()
     uniforms.light.value = sunDimFactor(wetness.current, balance.season.weatherStrength)
+    if (camera instanceof THREE.PerspectiveCamera) {
+      uniforms.tanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+    }
     // Arrivals: a drop is re-sampled when it wraps to a new tile, and all of
     // them once a second (or on a fresh start) so growing spoil is followed.
     const st = state.current

@@ -394,9 +394,10 @@ added.
   spread. Off keeps the plain one-colour streak. On every level, unpriced: the
   drops end on the ground or water under their own x/z (sampled on the CPU
   once per wrap of the column, plus a full refresh per second while it rains)
-  and the built fabric takes the ground's wetness (one uniform read); near
-  the eye a streak thins and fades out (`balance.rain.dropNear*`,
-  `dropWidthCapM`), so none reads as a solid pole.
+  and the built fabric takes the ground's wetness (one uniform read). Each
+  streak is faint (`balance.rain.dropOpacity`); near the eye it shortens to at
+  most `dropMaxFrameFraction` of the frame, thins and fades out
+  (`dropNearFadeM` to its FOV-derived fit distance), so none reads as a pole.
   Low off, medium and high on.
 
 ## Profiling the low preset (F8 benchmark, point 293)

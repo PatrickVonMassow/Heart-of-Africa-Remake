@@ -1015,13 +1015,18 @@ interface BalanceConfig {
     dropSunGlint: number
     /** Per-drop brightness spread, 0 (all alike) .. 1. */
     dropVariation: number
+    /** World length (m) of a drop streak (its motion blur). */
+    dropLengthM: number
+    /** Longest projected streak as a fraction of the frame height: a nearer
+     *  drop is shortened to it, and fully opaque only where its full length fits. */
+    dropMaxFrameFraction: number
     /** Eye distance (m) at and inside which a drop streak is fully faded out. */
     dropNearFadeM: number
-    /** Eye distance (m) at and beyond which a drop streak is fully opaque. */
-    dropNearFullM: number
     /** Eye distance (m) inside which a streak thins: its projected width never
      *  exceeds the width it has at this distance (no streak reads as a pole). */
     dropWidthCapM: number
+    /** Peak opacity of one streak (low: rain reads as many faint threads). */
+    dropOpacity: number
   }
   /** The village cooking fire's response to rain (design.md §19.10, point 256). */
   fire: {
@@ -2296,11 +2301,15 @@ export const balance: BalanceConfig = {
     dropSkyVisibility: 0.25, // nearly vanishing against the bright sky
     dropSunGlint: 1.4,
     dropVariation: 0.45,
-    // Near the eye a 3 cm streak projects ~10 px wide and reads as a post:
-    // fade it out inside ~1–3.5 m and cap its width at the 6 m width (~4 px).
-    dropNearFadeM: 1,
-    dropNearFullM: 3.5,
-    dropWidthCapM: 6,
+    // A near streak read as a post (owner picture check). 0.35 m ≈ the blur of a
+    // 22 m/s drop over 1/60 s. At fov 50 / 900 px a streak spans 60 px at
+    // d = 0.35 / (2·tan 25° · 60/900) ≈ 5.6 m: nearer it is shortened to 60 px
+    // and fades out between dropNearFadeM and that distance (rainTouch.ts).
+    dropLengthM: 0.35,
+    dropMaxFrameFraction: 60 / 900,
+    dropNearFadeM: 1.5,
+    dropWidthCapM: 6, // 2 cm wide: ≤ ~3 px at 900 px
+    dropOpacity: 0.45,
   },
   fire: {
     // The cooking fire keeps burning through the rains under its thatch cook-shelter

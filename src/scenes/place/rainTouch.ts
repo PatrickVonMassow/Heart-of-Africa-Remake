@@ -81,10 +81,28 @@ export function impactShape(age: number, life: number, radius: number): { radius
   return { radius: radius * (0.25 + 0.75 * t), alpha: age < life ? (1 - t) * (1 - t) : 0 }
 }
 
-/** A drop's opacity factor by its eye distance `d` (m): 0 at and inside
- *  `near`, 1 at and beyond `far`, a smoothstep between — the shader's
- *  `smoothstep(near, far, d)`, so a streak at the eye fades instead of
- *  standing as an opaque bar. */
+/** Projected length of a streak `len` m long at eye distance `d` m, as a
+ *  fraction of the frame height, with `tanHalfFov` the vertical half-FOV's tan. */
+export function streakFrameFraction(len: number, d: number, tanHalfFov: number): number {
+  return len / (2 * tanHalfFov * Math.max(1e-6, d))
+}
+
+/** Eye distance (m) beyond which a streak `len` m long projects within
+ *  `maxFraction` of the frame height: len / (2·tan(fov/2)·maxFraction). */
+export function streakFitDistance(len: number, tanHalfFov: number, maxFraction: number): number {
+  return len / (2 * tanHalfFov * maxFraction)
+}
+
+/** A drop's length factor by eye distance `d`: 1 where its full length fits,
+ *  else d / fit, so a near drop is a short dash of at most `maxFraction` of
+ *  the frame. The shader's `clamp(d / fit, 0, 1)`. */
+export function dropLengthScale(d: number, fit: number): number {
+  return Math.min(1, Math.max(0, d / fit))
+}
+
+/** A drop's opacity factor by eye distance `d` (m): 0 at and inside `near`,
+ *  1 at and beyond `far` (the fit distance), a smoothstep between — the
+ *  shader's `smoothstep(near, far, d)`. */
 export function dropNearFade(d: number, near: number, far: number): number {
   const t = Math.min(1, Math.max(0, (d - near) / Math.max(1e-6, far - near)))
   return t * t * (3 - 2 * t)
