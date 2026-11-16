@@ -14637,6 +14637,7 @@ to land than a mechanism that needs a review.
   Final state: the hanging section is named from a logged run (`npm test -- polish-settlement`, with progress) and fixed or charged; a full polish-settlement run completes on WebGPU and on WebGL 2.
   Test: one full polish-settlement run per backend, completed within the suite timeout, with its frames inspected.
   Source: finding of the 358 session, 15.11.2026 21:16; restated at the 359 landing.
+  Measured 16.11.2026 on feat/384 9e30eb37d (WebGPU, logged): one run KILLED at 45m07s with 35 frames while still writing (kraal-cattle: 359-zulu-kraal-1890 at 21:06, -1893 at 21:16); the re-run with VERIFY_SUITE_TIMEOUT_MS=7200000 wrote its last frame 356-inhabitant-glance at 21:43 and then nothing for 35 min with a 4 GB Chrome renderer — the hang sits at the start of `fire-smoke` (after `inhabitants-glance`); killed by hand. Logs local/verify-logs/2026-11-16T19-31-52-913- and 2026-11-16T20-18-07-151-polish-settlement.log.
   Bundle: Testinfrastruktur.
 
 - [ ] 1526. Kraal cattle read as antelope
