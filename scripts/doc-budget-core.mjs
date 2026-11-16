@@ -306,7 +306,8 @@ export const DOC_BUDGETS = [
     // RAISED by 2 measured lines for the §19.10 glance at the traveller (point 356).
     // RAISED by 2 measured lines for the §19.10 kraal cattle paragraph (point 359).
     // RAISED by 2 measured lines for the §19.10 villager encounters paragraph (point 360).
-    maxLines: 874,
+    // RAISED by 2 measured lines for the §4.4 Abu Simbel monument site paragraph (point 379).
+    maxLines: 876,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -529,7 +530,10 @@ export const DOC_BUDGETS = [
     // (point 360): the meeting, the exactly-once basket handover, the
     // eligibility and cooldown rules and the fire gathering — new behaviour
     // the document did not describe; the point orders it written here.
-    maxWords: 31044,
+    // RAISED by the 148 measured words of Abu Simbel (point 379): a ninth built
+    // landmark in the §4.4 list with its 1890 state, and the enterable,
+    // discovery-gated monument site — a genuine addition the point orders here.
+    maxWords: 31192,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
