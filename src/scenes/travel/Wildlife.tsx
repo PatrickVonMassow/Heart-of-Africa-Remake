@@ -4198,7 +4198,9 @@ function Herds() {
                 d = Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z)
                 eligible = crocodileLungeReady(d, atBank, bc.strikeRadius)
               }
-              if (!eligible) {
+              // A crossing calf is prey only in the water (point 362): on its
+              // walk to the waterline it is no bank-stander, as no crossing was.
+              if (!eligible && !swimmingCalf) {
                 // (2) The broadened waterline catch (point 275): a prey standing
                 // on LAND within the ambush band of the croc is at the bank and
                 // catchable even without a drink pose. Sample its own cell so an

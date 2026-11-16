@@ -75,7 +75,7 @@ if (section('crossing-turned-back')) {
     window.__balance.currentDrift = 0
     window.__game.getState().debugJumpTo(-17.9, 25.9)
     window.__ui.getState().setWheelZoomEnabled(true)
-    window.__ui.getState().setTravelZoom(2)
+    window.__ui.getState().setTravelZoom(1) // near enough that the reversal reads in the frame
   })
   // The wildlife dev hook exists only once the travel view has mounted.
   await page.waitForFunction(() => !!window.__wildlife?.restock, null, { timeout: 60000 })
@@ -222,11 +222,19 @@ if (section('crossing-turned-back')) {
           heading: s.parent.channelReturn?.heading ?? null, returning: s.parent.channelReturn !== undefined,
           crossing: s.parent.crossing !== undefined,
         },
-        calf: { p: proj(s.calf), x: s.calf.x, z: s.calf.z, dead: !!s.calf.dead, caught: s.calf.caught !== undefined, crossing: s.calf.crossing !== undefined },
+        calf: {
+          p: proj(s.calf), x: s.calf.x, z: s.calf.z, dead: !!s.calf.dead, caught: s.calf.caught !== undefined, crossing: s.calf.crossing !== undefined,
+          // The drama fields set on the calf, so a swim that ends early names what ended it.
+          flags: ['caught', 'caughtBy', 'inWater', 'dodgeHeading', 'fleeAt', 'chaseSwim', 'escape', 'hop', 'rescued', 'mired', 'kick'].filter((k) => s.calf[k] !== undefined),
+        },
         midChannel: s.croc.lunge?.midChannel === true,
       })
     }, 50)
-    return { staged: true, entered, calfCrossing: calf.crossing !== undefined, width: +(line.far - line.wetFrom).toFixed(2) }
+    const projT = (c) => (c ? +((c.tx - line.ax) * line.sx + (c.tz - line.az) * line.sz).toFixed(2) : null)
+    return {
+      staged: true, entered, calfCrossing: calf.crossing !== undefined, width: +(line.far - line.wetFrom).toFixed(2),
+      wetFrom: line.wetFrom, far: line.far, calfTarget: projT(calf.crossing), parentTarget: projT(parent.crossing),
+    }
   })
   check(
     "a seeded crossing starts for the herd, and the parent's start takes its calf (point 362)",
@@ -240,7 +248,22 @@ if (section('crossing-turned-back')) {
       window.__pollSim(30, () => window.__crossScene.calf.caught !== undefined && window.__crossScene.croc.lunge?.midChannel === true),
     )
     check('the crocodile seizes the calf mid-channel, on its crossing swim (point 362)', seized,
-      JSON.stringify(await page.evaluate(() => ({ calf: window.__crossRec.at(-1)?.calf, lunge: !!window.__crossScene.croc.lunge }))))
+      JSON.stringify(await page.evaluate(() => {
+        // Where the calf's swim ended, if it did, and how near the crocodile it came.
+        const s = window.__crossScene
+        const rec = window.__crossRec
+        const iEnd = rec.findIndex((r) => !r.calf.crossing)
+        const closest = Math.min(...rec.map((r) => Math.hypot(r.calf.x - s.croc.x, r.calf.z - s.croc.z)))
+        return {
+          calf: rec.at(-1)?.calf, lunge: !!s.croc.lunge,
+          calfSwimEnd: iEnd < 0 ? null : {
+            t: +(rec[iEnd].t - s.t0).toFixed(2), p: +rec[iEnd].calf.p.toFixed(2),
+            flagsBefore: rec[Math.max(0, iEnd - 1)].calf.flags, flagsAt: rec[iEnd].calf.flags,
+            parentP: +rec[iEnd].parent.p.toFixed(2), parentCrossing: rec[iEnd].parent.crossing,
+          },
+          closestToCroc: +closest.toFixed(2),
+        }
+      })) + ` staged ${JSON.stringify(staged)}`)
     const turned = seized && (await page.evaluate(() =>
       window.__pollSim(10, () => {
         const rec = window.__crossRec
