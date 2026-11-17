@@ -1064,6 +1064,44 @@ interface BalanceConfig {
     /** Linear colour of a ground impact's crown: wet earth, near the ground's own. */
     impactGroundColor: [number, number, number]
   }
+  /** Depth of the settlement rain (design.md §19.13, rainLayers.ts): per-layer
+   *  values indexed near, mid, far (two layers use near and far). */
+  rainDepth: {
+    /** Half-width (m) of each layer's column around the eye. */
+    layerRadiusM: [number, number, number]
+    /** Horizontal eye distance (m) inside which a layer's drops fade out. */
+    layerInnerFadeM: [number, number, number]
+    /** Fall speed (m/s) of each layer. */
+    layerFallSpeed: [number, number, number]
+    /** Opacity of each layer relative to the near one. */
+    layerOpacity: [number, number, number]
+    /** Exposure (s) a streak's length covers: length = relative speed × exposure. */
+    exposureS: number
+    /** Shortest and longest world streak (m), whatever the camera does. */
+    streakMinM: number
+    streakMaxM: number
+    /** Camera speed (m/s) above which a frame's move counts as a jump, not motion. */
+    maxCameraSpeed: number
+    /** Time constant (s) the camera velocity eases with. */
+    cameraVelocityTauS: number
+    /** Soft head and tail of a streak, as fractions of its length. */
+    headSoft: number
+    tailSoft: number
+  }
+  /** The rain's damping of the settlement light (design.md §19.13, rainLight.ts),
+   *  at full rain, on top of the wetness dim. */
+  rainLight: {
+    /** Master factor, 0 (off) .. 1. */
+    strength: number
+    /** Share of the sun's intensity full rain takes away. */
+    sunDamp: number
+    /** Share of the sky (hemisphere) light full rain takes away. */
+    hemiDamp: number
+    /** Share of the fog distance full rain takes away (the view closes in). */
+    fogRangeCut: number
+    /** Extra mix of the fog colour toward the rain gray at full rain. */
+    hazeMix: number
+  }
   /** The village cooking fire's response to rain (design.md §19.10, point 256). */
   fire: {
     /** How much full rain damps the SHELTERED flame under the cook-shelter (0..1, small: it burns on). */
@@ -2360,6 +2398,30 @@ export const balance: BalanceConfig = {
     impactNearFadeM: 1,
     impactNearFullM: 3,
     impactGroundColor: [0.09, 0.07, 0.05], // linear: a dark wet-earth tint
+  },
+  // Rain with depth and weather (design.md §19.13). CALIBRATABLE — educated
+  // guesses, read when the rain materials are built (next visit) and per frame.
+  rainDepth: {
+    // Near / mid / far: the near layer is a tight column of fast drops, the far
+    // one a wide curtain of smaller, slower, fainter drops beyond the near ones.
+    layerRadiusM: [10, 20, 36],
+    layerInnerFadeM: [0, 5, 12],
+    layerFallSpeed: [24, 19, 15],
+    layerOpacity: [1, 0.75, 0.5],
+    exposureS: 0.35 / 22, // a standing eye sees the earlier 0.35 m streak at 22 m/s
+    streakMinM: 0.12,
+    streakMaxM: 0.6,
+    maxCameraSpeed: 8, // above a run; a place change or teleport is clamped to it
+    cameraVelocityTauS: 0.12,
+    headSoft: 0.15,
+    tailSoft: 0.6,
+  },
+  rainLight: {
+    strength: 1,
+    sunDamp: 0.5, // with the wetness dim (×0.6) a downpour's sun sits near 30 %
+    hemiDamp: 0.3,
+    fogRangeCut: 0.45, // the 42–320 m fog closes to ~23–176 m
+    hazeMix: 0.3,
   },
   fire: {
     // The cooking fire keeps burning through the rains under its thatch cook-shelter
