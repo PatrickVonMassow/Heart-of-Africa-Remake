@@ -423,7 +423,9 @@ added.
   follow the drop's velocity relative to the eased camera velocity
   (`exposureS`, clamped to `streakMinM`–`streakMaxM`; a paused frame reads as
   standing, a jump is clamped to `maxCameraSpeed`) and its ends are soft
-  (`headSoft`/`tailSoft`); a standing eye sees the earlier 0.35 m streak.
+  (`headSoft`/`tailSoft`); a standing eye sees the earlier 0.35 m streak in
+  low's 22 m/s curtain; the depth layers scale it with their speed (about 0.38 / 0.30 /
+  0.24 m at 24 / 19 / 15 m/s).
   Low keeps the single 16 m curtain at 22 m/s. Climbs 1 → 2 → 3.
 - **`rainLightDamping`** — The rain damps the settlement light
   (`src/scenes/place/rainLight.ts`, `balance.rainLight`): with the rain amount

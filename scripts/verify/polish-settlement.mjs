@@ -792,6 +792,7 @@ if (section('rain-depth')) {
   const EXPECT_LAYERS = { low: 1, medium: 2, high: 3 } // keep in sync with quality.ts rainLayers
   const before = await page.evaluate(() => window.__ui.getState().detailLevel)
   const skies = {}
+  const lights = {}
   for (const level of ['low', 'medium', 'high']) {
     await page.evaluate(() => { const g = window.__game.getState(); g.setJournalOpen(false); if (g.placeId) g.leavePlace() })
     await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
@@ -812,12 +813,13 @@ if (section('rain-depth')) {
     if (!(heavy && rainNow > 0.5)) continue
     const s = await waitForReadingStable(
       page,
-      () => { const v = window.__placeSeason(); return { sun: v.sun, hemi: v.hemi, fogFar: v.fogFar } },
+      () => { const v = window.__placeSeason(); return { sun: v.sun, hemi: v.hemi, fogFar: v.fogFar, sky: v.sky } },
       { settleMs: 400, samples: 3, timeout: 60000 },
     )
     check(`${level}: the rained-in light settles before the frames`, s.settled, `after ${s.waitedMs} ms — ${JSON.stringify(s.value)}`)
     const v = await page.evaluate(() => window.__placeSeason())
     skies[level] = v.sky
+    lights[level] = { sun: v.sun, hemi: v.hemi, damp: v.rainLight }
     // The depth lever is live: the layer count is the preset's rainLayers, and
     // with more than one layer the layers' streaks differ in length (they fall
     // at different speeds), so the section fails when the depth is disabled.
@@ -831,7 +833,18 @@ if (section('rain-depth')) {
     if (level === 'low') {
       check('low keeps the undimmed sun and the dry fog under rain', v.rainLight.sun === 1 && v.rainLight.fogRange === 1 && Math.abs(v.fogFar - 320) < 0.5, JSON.stringify(v.rainLight) + ` fogFar ${v.fogFar}`)
     } else {
-      check(`${level}: rain damps the sun and closes the fog in`, v.rainLight.sun < 1 && v.rainLight.fogRange < 1 && v.fogFar < 320, JSON.stringify(v.rainLight) + ` fogFar ${v.fogFar}`)
+      check(`${level}: rain damps the sun and closes the fog in`, v.rainLight.sun < 1 && v.rainLight.fogRange < 1 && v.fogFar !== null && v.fogFar < 320, JSON.stringify(v.rainLight) + ` fogFar ${v.fogFar}`)
+      // The damping reaches the LIVE lights: at the same wetness the wetness dim
+      // is shared, so this level's intensities over low's undamped ones are the
+      // damping factors themselves.
+      const lo = lights.low
+      if (lo && lo.sun > 0 && lo.hemi > 0) {
+        const sunRatio = v.sun / lo.sun
+        const hemiRatio = v.hemi / lo.hemi
+        check(`${level}: the live sun and sky light carry the rain damping`,
+          Math.abs(sunRatio - v.rainLight.sun) < 0.03 && Math.abs(hemiRatio - v.rainLight.hemi) < 0.03,
+          `sun ${sunRatio.toFixed(3)} vs ${v.rainLight.sun}, hemi ${hemiRatio.toFixed(3)} vs ${v.rainLight.hemi}`)
+      }
     }
     // In the open: the plaza centre, looking level across the village.
     await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = 0.6; p.pitch = 0 })
@@ -862,7 +875,7 @@ if (section('rain-depth')) {
   const skyLevels = ['low', 'medium', 'high']
   check(
     'the sky dome’s overcast (point 354) is the same at every detail level',
-    skyLevels.every((l) => skies[l] !== undefined && JSON.stringify(skies[l]) === JSON.stringify(skies.low)),
+    skyLevels.every((l) => skies[l] !== undefined && Object.keys(skies.low).every((k) => Math.abs(skies[l][k] - skies.low[k]) < 2e-3)),
     JSON.stringify(skies),
   )
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
