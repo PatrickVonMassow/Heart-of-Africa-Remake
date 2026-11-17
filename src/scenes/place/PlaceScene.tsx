@@ -2864,6 +2864,9 @@ export function PlaceScene() {
       wetness: placeWetness.current,
       sun: sunRef.current?.intensity ?? 0,
       hemi: hemiRef.current?.intensity ?? 0,
+      // The eased intensities without the lightning flash on top.
+      sunBase: placeSunBase.current,
+      hemiBase: placeHemiBase.current,
       sky: skyOvercast(),
       rain: rainAmount(placeWetness.current, balance.season.weatherStrength),
       tint: SEASON_TINT_U.value,

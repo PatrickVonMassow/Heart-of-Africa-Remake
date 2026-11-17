@@ -813,13 +813,13 @@ if (section('rain-depth')) {
     if (!(heavy && rainNow > 0.5)) continue
     const s = await waitForReadingStable(
       page,
-      () => { const v = window.__placeSeason(); return { sun: v.sun, hemi: v.hemi, fogFar: v.fogFar, sky: v.sky } },
+      () => { const v = window.__placeSeason(); return { sun: v.sunBase, hemi: v.hemiBase, fogFar: v.fogFar, sky: v.sky } },
       { settleMs: 400, samples: 3, timeout: 60000 },
     )
     check(`${level}: the rained-in light settles before the frames`, s.settled, `after ${s.waitedMs} ms — ${JSON.stringify(s.value)}`)
     const v = await page.evaluate(() => window.__placeSeason())
     skies[level] = v.sky
-    lights[level] = { sun: v.sun, hemi: v.hemi, damp: v.rainLight }
+    lights[level] = { sun: v.sunBase, hemi: v.hemiBase, damp: v.rainLight }
     // The depth lever is live: the layer count is the preset's rainLayers, and
     // with more than one layer the layers' streaks differ in length (they fall
     // at different speeds), so the section fails when the depth is disabled.
@@ -840,8 +840,9 @@ if (section('rain-depth')) {
       const lo = lights.low
       check(`${level}: low's live sun and sky light are lit to compare against`, !!lo && lo.sun > 0 && lo.hemi > 0, JSON.stringify(lo))
       if (lo && lo.sun > 0 && lo.hemi > 0) {
-        const sunRatio = v.sun / lo.sun
-        const hemiRatio = v.hemi / lo.hemi
+        // Flash-free bases: a lightning bolt adds onto the live intensity.
+        const sunRatio = v.sunBase / lo.sun
+        const hemiRatio = v.hemiBase / lo.hemi
         check(`${level}: the live sun and sky light carry the rain damping`,
           Math.abs(sunRatio - v.rainLight.sun) < 0.03 && Math.abs(hemiRatio - v.rainLight.hemi) < 0.03,
           `sun ${sunRatio.toFixed(3)} vs ${v.rainLight.sun}, hemi ${hemiRatio.toFixed(3)} vs ${v.rainLight.hemi}`)
