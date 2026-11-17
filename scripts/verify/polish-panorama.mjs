@@ -372,45 +372,47 @@ if (section('backdrop-backlight')) {
   await backdropVisible(false)
   const hidden = await luma('backdrop hidden')
   await backdropVisible(true)
-  // Consecutive frames: one requestAnimationFrame between the two captures.
+  // TRAA needs its history back after every switch before a pair means anything.
+  await nextFrames(60)
+  // Consecutive frames: one requestAnimationFrame between the two captures,
+  // averaged over three pairs so one unlucky jitter phase cannot decide.
   const tremble = async (label) => {
-    const a = await luma(`${label}, frame A`)
-    await nextFrames(1)
-    const b = await luma(`${label}, frame B`)
     let s = 0
     let n = 0
     let cs = 0
     let cn = 0
-    const lowRow = Math.floor(a.length * 0.6) // the ground disc's lower frame
-    for (let i = 0; i < a.length; i++) {
-      if (i > lowRow && i < a.length * 0.9) {
-        cn++
-        cs += Math.abs(a[i] - b[i])
+    for (let pair = 0; pair < 3; pair++) {
+      const a = await luma(`${label}, pair ${pair} frame A`)
+      await nextFrames(1)
+      const b = await luma(`${label}, pair ${pair} frame B`)
+      const lowRow = Math.floor(a.length * 0.6) // the ground disc's lower frame
+      for (let i = 0; i < a.length; i++) {
+        if (i > lowRow && i < a.length * 0.9) {
+          cn++
+          cs += Math.abs(a[i] - b[i])
+        }
+        if (Math.abs(a[i] - hidden[i]) < 8) continue // not the backdrop's own pixel
+        n++
+        s += Math.abs(a[i] - b[i])
       }
-      if (Math.abs(a[i] - hidden[i]) < 8) continue // not the backdrop's own pixel
-      n++
-      s += Math.abs(a[i] - b[i])
     }
-    return { px: n, meanDiff: +(s / Math.max(1, n)).toFixed(3), groundDiff: +(cs / Math.max(1, cn)).toFixed(3) }
+    return { px: Math.round(n / 3), meanDiff: +(s / Math.max(1, n)).toFixed(3), groundDiff: +(cs / Math.max(1, cn)).toFixed(3) }
   }
-  const faded = await tremble('fade on')
+  const fadedFirst = await tremble('fade on')
   await setRock({ fadeStartCyclesPerPx: 1e6, fadeEndCyclesPerPx: 2e6 })
+  await nextFrames(60)
   await frame('1532-backdrop-backlit-unfaded', { place: 'giza', label: 'the same backlit hills with the rock fade switched off (the old streaks)' })
   const unfaded = await tremble('fade off')
   await setRock(rock)
-  // Diagnostic: the same pair with the backdrop out of the shadow map.
-  await page.evaluate(() => {
-    const m = window.__placeScene?.getObjectByName('landscape-backdrop')
-    if (m) { m.receiveShadow = false; m.material.needsUpdate = true }
-  })
-  await nextFrames(30)
-  await frame('1532-backdrop-backlit-noshadow', { place: 'giza', label: 'the same backlit hills, backdrop out of the shadow map (diagnostic)' })
-  const noShadow = await tremble('no shadow')
-  await page.evaluate(() => {
-    const m = window.__placeScene?.getObjectByName('landscape-backdrop')
-    if (m) { m.receiveShadow = true; m.material.needsUpdate = true }
-  })
-  console.log('1532 tremble', JSON.stringify({ faded, unfaded, noShadow }))
+  await nextFrames(60)
+  // Measured again after the comparison, so frame order cannot favour either.
+  const fadedAgain = await tremble('fade on again')
+  const faded = {
+    px: fadedFirst.px,
+    meanDiff: +((fadedFirst.meanDiff + fadedAgain.meanDiff) / 2).toFixed(3),
+    groundDiff: +((fadedFirst.groundDiff + fadedAgain.groundDiff) / 2).toFixed(3),
+  }
+  console.log('1532 tremble', JSON.stringify({ fadedFirst, fadedAgain, unfaded }))
   check(
     'backdrop backlight: the hills cover a measurable share of the frame',
     faded.px > 5000,

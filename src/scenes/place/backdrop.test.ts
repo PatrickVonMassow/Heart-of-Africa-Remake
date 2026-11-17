@@ -27,7 +27,7 @@ import {
 import { bandHeightAt } from '../travel/panoramaMath'
 import { balance } from '../../config/balance'
 import { pitchLimit } from '../../systems/lookPitch'
-import { createBackdropMaterial, rockOctaveWeight } from './backdropMaterial'
+import { createBackdropMaterial, rockCyclesPerPx, rockOctaveWeight } from './backdropMaterial'
 import { GIZA_SITE_RADIUS } from './gizaSite'
 import { PLACE_RADIUS } from './layout'
 import { PLACES, placeById } from '../../world/geo'
@@ -644,5 +644,20 @@ describe('backdrop rock noise fades with screen frequency (point 1532)', () => {
     expect(w[0]).toBe(1)
     expect(w[3]).toBe(0)
     expect(w[2]).toBeLessThan(0.5)
+  })
+})
+
+describe('backdrop rock footprint estimate (point 1532)', () => {
+  const projY = 1 / Math.tan((25 * Math.PI) / 180)
+  it('grows with distance and with a grazing view, and stays finite edge-on', () => {
+    const head = rockCyclesPerPx(300, 1, projY, 984)
+    expect(rockCyclesPerPx(600, 1, projY, 984)).toBeCloseTo(2 * head, 9)
+    expect(rockCyclesPerPx(300, 0.5, projY, 984)).toBeCloseTo(2 * head, 9)
+    expect(rockCyclesPerPx(300, -0.5, projY, 984)).toBeCloseTo(2 * head, 9)
+    expect(Number.isFinite(rockCyclesPerPx(300, 0, projY, 984))).toBe(true)
+  })
+  it('matches the head-on footprint the fade test assumes', () => {
+    const footprint = (2 * 300 * Math.tan((25 * Math.PI) / 180)) / 984
+    expect(rockCyclesPerPx(300, 1, projY, 984)).toBeCloseTo(footprint * Math.hypot(0.16, 0.28, 0.16), 9)
   })
 })

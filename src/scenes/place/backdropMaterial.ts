@@ -6,10 +6,11 @@
 import * as THREE from 'three/webgpu'
 import {
   attribute,
+  cameraPosition,
+  cameraProjectionMatrix,
   cameraViewMatrix,
   color,
   float,
-  fwidth,
   max,
   mix,
   mx_fractal_noise_float,
@@ -17,6 +18,7 @@ import {
   normalWorldGeometry,
   positionLocal,
   positionWorld,
+  screenSize,
   smoothstep,
   uniform,
   vec3,
@@ -53,6 +55,21 @@ export function rockOctaveWeight(
   return 1 - t * t * (3 - 2 * t)
 }
 
+/** Steepest view angle the footprint estimate follows; flatter grazes clamp here. */
+const MIN_VIEW_COS = 0.1
+
+/**
+ * Cycles of the lowest rock octave one pixel spans: the pixel's footprint
+ * (distance times pixel angle, stretched by the grazing angle) times the
+ * octave's frequency vector length. Derivative-free on purpose: fwidth is
+ * constant per triangle and moves with the TRAA jitter, so weights built on
+ * it stepped at facet edges and flickered (point 1532). The shader mirrors it.
+ */
+export function rockCyclesPerPx(distance: number, viewCos: number, projY: number, heightPx: number): number {
+  const pixelAngle = 2 / (projY * heightPx)
+  return (Math.hypot(...ROCK_FREQ) * distance * pixelAngle) / Math.max(Math.abs(viewCos), MIN_VIEW_COS)
+}
+
 /**
  * The rock fractal with its upper octaves faded by screen frequency. At full
  * weight it is the 4-octave fBm it replaces, mapped to 0..1; a faded octave
@@ -62,7 +79,11 @@ export function rockOctaveWeight(
 function screenFadedRock(p: typeof positionWorld) {
   const freq = vec3(...ROCK_FREQ)
   // Lowest octave's cycles per pixel; octave i spans 2^i times as many.
-  const cpp0 = fwidth(p).mul(freq).length()
+  // Geometry normal, not normalView: the bump normal is itself built on rock.
+  const toEye = cameraPosition.sub(p)
+  const viewCos = max(normalWorldGeometry.dot(toEye.normalize()).abs(), float(MIN_VIEW_COS))
+  const pixelAngle = float(2).div(cameraProjectionMatrix.element(1).element(1).mul(screenSize.y))
+  const cpp0 = float(Math.hypot(...ROCK_FREQ)).mul(toEye.length()).mul(pixelAngle).div(viewCos)
   // Read from balance every render, so a debug edit takes effect live.
   const start = uniform(0).onRenderUpdate(() => balance.backdropRock.fadeStartCyclesPerPx)
   const end = uniform(1).onRenderUpdate(() => balance.backdropRock.fadeEndCyclesPerPx)
