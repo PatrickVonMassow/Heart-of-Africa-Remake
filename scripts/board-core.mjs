@@ -1599,7 +1599,7 @@ function dropDoneCards(html, point) {
 }
 
 /** Where the Erledigt section's cards sit, or null when there is no section. */
-function doneBounds(html) {
+export function doneBounds(html) {
   try {
     return sectionBounds(String(html ?? ''), 'done')
   } catch {
@@ -2774,7 +2774,7 @@ export function archiveLinkParagraph(key, archived, pageUrl = ARCHIVE_PAGE_URL) 
  *  are taken right after each closing `</h2>` (a newline there is skipped), so a
  *  single-line archive places its cards inside their section too (cross-vendor
  *  review 29.09.2026: a next-newline lookup returned 0 there). */
-function archiveSpans(archive) {
+export function archiveSpans(archive) {
   const doneHead = archive.indexOf('<h2>')
   const logHead = archive.indexOf(ARCHIVE_LOG_HEAD)
   const tail = [archive.indexOf('<footer', logHead), archive.indexOf('</main>', logHead)].filter((i) => i > logHead)
