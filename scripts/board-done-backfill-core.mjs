@@ -39,18 +39,17 @@ export function hasMeasures(card) {
  * the note off, because the note must never claim a check nobody made.
  */
 export function recordedCheck(statusText) {
-  // A negated or still pending sentence ("nicht geprüft", "wird später geprüft") records no check.
-  const pending = /\b(?:nicht|kein\w*|noch|später|offen|ausstehend|aus|wird|werden|soll\w*|muss)\b/i
-  const sentences = String(statusText ?? '').split(/(?<=[.!?;])\s+/).filter((s) => !pending.test(s))
-  for (const label of ['beide Backends', 'WebGPU']) if (sentences.some((s) => checkLabel(s) === label)) return label
-  return ''
-}
-
-function checkLabel(t) {
-  if (/beide[nm]?\s+Backends|WebGPU\s*(?:und|\+|&|\/|sowie)\s*WebGL\s*2?|WebGL\s*2?\s*(?:und|\+|&|\/|sowie)\s*WebGPU/i.test(t)) {
+  // A sentence counts only with an explicit completion word and without a
+  // negated or pending one ("nicht geprüft", "wird später geprüft", "geplant").
+  const done = /(?<![\p{L}])(?:geprüft|grün|sauber|bestanden|abgenommen)(?![\p{L}])/iu
+  const pending = /(?<![\p{L}])(?:nicht|kein\w*|noch|später|offen|ausstehend|aus|geplant|wird|werden|soll\w*|muss)(?![\p{L}])/iu
+  const sentences = String(statusText ?? '')
+    .split(/(?<=[.!?;])\s+/)
+    .filter((s) => done.test(s) && !pending.test(s))
+  if (sentences.some((s) => /beide[nm]?\s+Backends|WebGPU\s*(?:und|\+|&|\/|sowie)\s*WebGL|WebGL\s*2?\s*(?:und|\+|&|\/|sowie)\s*WebGPU/i.test(s))) {
     return 'beide Backends'
   }
-  if (/(?:geprüft|Bildprüfung|Bild\s*geprüft)[^.]*\bWebGPU\b|\bWebGPU\b[^.]*(?:geprüft|Bildprüfung)/i.test(t)) return 'WebGPU'
+  if (sentences.some((s) => /\bWebGPU\b/.test(s))) return 'WebGPU'
   return ''
 }
 
