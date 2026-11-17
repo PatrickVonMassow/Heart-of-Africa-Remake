@@ -1976,7 +1976,9 @@ if (section('giza-figures')) {
       const cam = window.__placeCamera
       cam.updateMatrixWorld(true)
       const bodies = []
-      window.__placeScene.traverse((o) => {
+      // traverseVisible: a hidden body (or one under a hidden ancestor) is not
+      // in the picture, so it must not satisfy the match.
+      window.__placeScene.traverseVisible((o) => {
         const kind = o.userData?.actor?.kind
         if (o.name === 'inhabitant' || kind === 'camel' || kind === 'donkey') bodies.push(o)
       })
