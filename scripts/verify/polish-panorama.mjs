@@ -2146,8 +2146,20 @@ if (section('giza-camel')) {
         .waitForFunction((swept) => (swept ? (window.__camelModel?.radial ?? 0) > 0 : !window.__camelModel), swept, { timeout: 15000 })
         .then(() => true)
         .catch(() => false)
-      check(`Giza camel (${lvl}): ${swept ? 'the swept dromedary' : 'the primitive camel'} is drawn`, ok,
-        JSON.stringify(await page.evaluate(() => window.__camelModel ?? null)))
+      // A missing camel must not pass for the primitive: count the visible
+      // meshes under the 'camel' groups at this level.
+      const meshes = await page.evaluate(() => {
+        let n = 0
+        window.__placeScene.traverseVisible((o) => {
+          if (o.name !== 'camel') return
+          o.traverseVisible((m) => {
+            if (m.isMesh) n++
+          })
+        })
+        return n
+      })
+      check(`Giza camel (${lvl}): ${swept ? 'the swept dromedary' : 'the primitive camel'} is drawn`, ok && meshes > 0,
+        JSON.stringify({ model: await page.evaluate(() => window.__camelModel ?? null), meshes }))
     }
     // The cameleer's camel (GIZA_AMBIENT index 4), seen in profile from 4.5 m:
     // the stand is off its flank, perpendicular to its heading.
