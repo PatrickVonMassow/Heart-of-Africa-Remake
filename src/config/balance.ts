@@ -3322,16 +3322,30 @@ export const GIZA_ACTIVITY = {
   pauseSpread: 0.5,
   /** How far behind its leader along the way a companion walks (m): a
    *  tourist at the guide's elbow, a mount on its lead rope. */
-  lag: { companion: 1.3, mount: 1.9 },
+  lag: { companion: 1.3, mount: 2.4 },
   /** Sideways offset off the way (m): the tourist walks beside, the led
    *  animal a little to the side of the handler's track. */
-  side: { companion: 0.7, mount: 0.4 },
+  side: { companion: 0.8, mount: 0.7 },
   /** How much faster than its party's pace a companion or mount may close on
    *  its place beside the leader (factor): it swings round a corner by
    *  walking, never by a jump. */
   catchUp: 1.6,
   /** How fast a figure turns toward its heading or what it looks at (rad/s). */
   turnRate: 2.2,
+  /** Half-length of the way (m) over which a companion's heading turns at a
+   *  corner, so its sideways offset swings round instead of jumping. */
+  turnWindow: 1.5,
+  /** Collision radius of a led animal's body (m); a person keeps the
+   *  villagers' walker radius. Bodies keep clear of each other by these. */
+  bodyRadius: { camel: 0.9, donkey: 0.55 },
+  /** Fixed simulation substep (s): the routine advances in steps of exactly
+   *  this length whatever the frame rate, so the same elapsed time gives the
+   *  same positions at 5 or 120 FPS. */
+  step: 0.05,
+  /** Most elapsed time one frame may advance the routine (s): a sustained
+   *  low frame rate is followed in full, only a long hitch (a background tab)
+   *  is walked as this much. */
+  maxFrame: 0.5,
 } as const
 
 /**

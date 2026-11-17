@@ -34,7 +34,7 @@ import {
   effectiveFigureLimbSegments,
   effectiveSphinxSiteDetail,
 } from '../../state/ui'
-import { balance, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
+import { balance, GIZA_ACTIVITY, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor, yardFireOut } from '../../systems/cookShelter'
@@ -2433,9 +2433,10 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
   useFrame((_, delta) => {
     const state = activity.current
     if (!state) return
-    // The dev life freeze holds them like every inhabitant (lifeFreeze.ts); a
-    // long frame hitch is walked as a short one, not jumped.
-    if (!isLifeFrozen()) stepGizaActivity(state, Math.min(delta, 0.1))
+    // The dev life freeze holds them like every inhabitant (lifeFreeze.ts).
+    // The routine consumes the whole elapsed time in fixed substeps, so a low
+    // frame rate does not slow it; only a long hitch is bounded (maxFrame).
+    if (!isLifeFrozen()) stepGizaActivity(state, Math.min(delta, GIZA_ACTIVITY.maxFrame))
     anchors.forEach((a, i) => {
       const g = refs.current[i]
       const p = state.poses[i]

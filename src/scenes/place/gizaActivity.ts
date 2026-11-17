@@ -12,7 +12,7 @@
 // applied on top, so no body can stand inside a pyramid or the Sphinx.
 
 import { GIZA_ACTIVITY } from '../../config/balance'
-import { resolveMove, WALKER_RADIUS, type Collider } from './collision'
+import { resolveMove, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
 import { GIZA_AMBIENT, GIZA_PYRAMIDS, GIZA_SPHINX, gizaColliders } from './gizaSite'
 
 /** A stop on a party's way: where the leader stands, what the party looks at,
@@ -67,16 +67,18 @@ export const GIZA_PARTIES: readonly GizaParty[] = [
     ],
     offset: 0,
   },
-  // The dragoman with the lady: Khufu from the approach, Khafre, Menkaure.
+  // The dragoman with the lady: Khufu from the approach, Khafre, Menkaure —
+  // a short round of the approach between the donkey's ground (west) and the
+  // cameleer's (north-east), so the parties seldom meet.
   {
     leader: 8,
     companions: [{ index: 7, mount: false, side: 1 }],
     pace: 'stroll',
     route: [
       { x: 16, z: 58, kind: 'view', look: KHUFU },
-      { x: -4, z: 48, kind: 'view', look: KHAFRE },
-      { x: -6, z: 60, kind: 'view', look: MENKAURE },
-      { x: 6, z: 72, kind: 'view', look: KHAFRE },
+      { x: 6, z: 48, kind: 'view', look: KHAFRE },
+      { x: 0, z: 56, kind: 'view', look: MENKAURE },
+      { x: 10, z: 60, kind: 'pass' },
     ],
     offset: 4,
   },
@@ -87,22 +89,23 @@ export const GIZA_PARTIES: readonly GizaParty[] = [
     pace: 'camel',
     route: [
       { x: 4, z: 64, kind: 'tend' },
-      { x: 26, z: 70, kind: 'pass' },
-      { x: 36, z: 50, kind: 'tend' },
-      { x: 22, z: 44, kind: 'pass' },
+      { x: 8, z: 76, kind: 'pass' },
+      { x: 30, z: 74, kind: 'tend' },
+      { x: 34, z: 62, kind: 'pass' },
     ],
     offset: 2,
   },
-  // The donkey-boy walks his donkey below Menkaure and back.
+  // The donkey-boy walks his donkey below Menkaure and back, west of the
+  // dragoman's round.
   {
     leader: 5,
     companions: [{ index: 6, mount: true, side: -1 }],
     pace: 'donkey',
     route: [
       { x: -10, z: 60, kind: 'tend' },
-      { x: -8, z: 46, kind: 'tend' },
-      { x: 6, z: 52, kind: 'pass' },
-      { x: 2, z: 68, kind: 'tend' },
+      { x: -11, z: 45, kind: 'tend' },
+      { x: -5, z: 46, kind: 'pass' },
+      { x: -6, z: 56, kind: 'tend' },
     ],
     offset: 6,
   },
@@ -120,8 +123,8 @@ export interface GizaPose {
 /** The collision radius a figure of the plateau stands with (m). */
 export function gizaBodyRadius(index: number): number {
   const role = GIZA_AMBIENT[index]?.role
-  if (role === 'camel') return 0.9
-  if (role === 'donkey') return 0.55
+  if (role === 'camel') return GIZA_ACTIVITY.bodyRadius.camel
+  if (role === 'donkey') return GIZA_ACTIVITY.bodyRadius.donkey
   return WALKER_RADIUS
 }
 
@@ -190,9 +193,6 @@ export function partyCycle(party: GizaParty): { period: number; arcAt: (t: numbe
   return { period, arcAt }
 }
 
-/** Half-length of the way (m) over which a companion's heading turns. */
-const TURN_WINDOW = 1.5
-
 const shapes = new Map<GizaParty, { legs: Leg[]; total: number; arcAt: (t: number) => { s: number; stop: number | null } }>()
 
 /** Every party member's slot at time `t` (s), before collision and turning. */
@@ -211,8 +211,8 @@ function partyPoses(party: GizaParty, t: number, out: Map<number, GizaPose>): vo
     // of the way around its trailing point, which turns smoothly through a
     // corner (the way's own heading flips there, and the sideways offset with
     // it would jump the body — a jump drops the stride, figureWalk).
-    const a = atArc(legs, total, s - lag - TURN_WINDOW)
-    const b = atArc(legs, total, s - lag + TURN_WINDOW)
+    const a = atArc(legs, total, s - lag - GIZA_ACTIVITY.turnWindow)
+    const b = atArc(legs, total, s - lag + GIZA_ACTIVITY.turnWindow)
     const chord = Math.hypot(b.x - a.x, b.z - a.z)
     const ux = chord > 1e-6 ? (b.x - a.x) / chord : Math.sin(p.yaw)
     const uz = chord > 1e-6 ? (b.z - a.z) / chord : Math.cos(p.yaw)
@@ -270,52 +270,75 @@ export function turnToward(yaw: number, target: number, dt: number, rate: number
   return yaw + Math.max(-rate * dt, Math.min(rate * dt, lag))
 }
 
-/** The plateau's live figures: the clock and every figure's pose. */
+/** The plateau's live figures: the simulated clock (a whole number of
+ *  GIZA_ACTIVITY.step), elapsed time not yet simulated, and every figure's pose. */
 export interface GizaActivity {
   t: number
+  /** Elapsed time carried to the next frame, under one step (s). */
+  pending: number
   poses: GizaPose[]
 }
 
-/** Each figure's party pace (m/s) and whether it leads, indexed like GIZA_AMBIENT. */
-const MEMBERSHIP = GIZA_AMBIENT.map((_, i) => {
+/** Each figure's party pace (m/s), indexed like GIZA_AMBIENT. */
+const PACE = GIZA_AMBIENT.map((_, i) => {
   const party = GIZA_PARTIES.find((p) => p.leader === i || p.companions.some((c) => c.index === i))
-  return { pace: party ? GIZA_ACTIVITY.pace[party.pace] : 0, leads: party?.leader === i }
+  return party ? GIZA_ACTIVITY.pace[party.pace] : 0
 })
 
 /** The plateau's figures standing in their slots at time `t0` (s). */
 export function startGizaActivity(t0 = 0): GizaActivity {
-  return { t: t0, poses: gizaActivityAt(t0).map((p) => ({ ...p })) }
+  return { t: t0, pending: 0, poses: gizaActivityAt(t0).map((p) => ({ ...p })) }
+}
+
+/** Rounding slack when the carried time is compared with a whole step. */
+const STEP_SLACK = 1e-9
+
+/**
+ * Advance the plateau by `dt` (s) of elapsed time, in fixed substeps of
+ * GIZA_ACTIVITY.step (the remainder is carried to the next call), so the same
+ * elapsed time gives the same poses whatever the frame cadence. Mutates `state`.
+ */
+export function stepGizaActivity(state: GizaActivity, dt: number, colliders: Collider[] = plateauColliders()): void {
+  const h = GIZA_ACTIVITY.step
+  state.pending += Math.max(0, dt)
+  while (state.pending >= h - STEP_SLACK) {
+    state.pending -= h
+    substep(state, h, colliders)
+  }
 }
 
 /**
- * Advance the plateau by `dt` (s): a leader walks his way; a companion or mount
- * follows its slot no faster than its party's pace × `catchUp`, so a corner the
- * slot swings round is walked, never jumped (a jump drops the stride,
- * figureWalk). Every step is the settlement collision's swept move, so no body
- * crosses into a monument; every heading turns at a bounded rate. Mutates `state`.
+ * One fixed substep: every figure follows its slot no faster than its party's
+ * pace × `catchUp` (a leader walks exactly on it; a companion swings round a
+ * corner by walking, never by a jump, which would drop the stride,
+ * figureWalk). Each move is the settlement collision's swept move against the
+ * monuments AND the other bodies where they stand, so no body crosses into a
+ * monument or into another body; every heading turns at a bounded rate.
  */
-export function stepGizaActivity(state: GizaActivity, dt: number, colliders: Collider[] = plateauColliders()): void {
+function substep(state: GizaActivity, dt: number, colliders: Collider[]): void {
   state.t += dt
   const slots = gizaActivityAt(state.t, colliders)
+  const bodies: CircleCollider[] = state.poses.map((p, i) => ({ x: p.x, z: p.z, r: gizaBodyRadius(i) }))
   slots.forEach((slot, i) => {
     const cur = state.poses[i]
-    const { pace, leads } = MEMBERSHIP[i]
+    const pace = PACE[i]
     let tx = slot.x
     let tz = slot.z
-    if (!leads) {
-      const d = Math.hypot(tx - cur.x, tz - cur.z)
-      const cap = pace * GIZA_ACTIVITY.catchUp * dt
-      if (d > cap) {
-        tx = cur.x + ((tx - cur.x) * cap) / d
-        tz = cur.z + ((tz - cur.z) * cap) / d
-      }
+    const d = Math.hypot(tx - cur.x, tz - cur.z)
+    const cap = pace * GIZA_ACTIVITY.catchUp * dt
+    if (d > cap) {
+      tx = cur.x + ((tx - cur.x) * cap) / d
+      tz = cur.z + ((tz - cur.z) * cap) / d
     }
-    const [x, z] = resolveMove(colliders, tx, tz, gizaBodyRadius(i), [cur.x, cur.z])
-    // Facing: a companion still catching up faces where it goes; otherwise
-    // the slot's heading (the way, the monument, the one he walks with).
+    const others = bodies.filter((_, j) => j !== i)
+    const [x, z] = resolveMove([...colliders, ...others], tx, tz, gizaBodyRadius(i), [cur.x, cur.z])
+    bodies[i].x = x
+    bodies[i].z = z
+    // Facing: a body still catching up faces where it goes; otherwise the
+    // slot's heading (the way, the monument, the one he walks with).
     const walked = Math.hypot(x - cur.x, z - cur.z)
     const behind = Math.hypot(slot.x - x, slot.z - z)
-    const want = !leads && walked > pace * dt * 0.5 && behind > 0.2 ? Math.atan2(x - cur.x, z - cur.z) : slot.yaw
+    const want = walked > pace * dt * 0.5 && behind > 0.2 ? Math.atan2(x - cur.x, z - cur.z) : slot.yaw
     state.poses[i] = { x, z, yaw: turnToward(cur.yaw, want, dt), moving: slot.moving }
   })
 }

@@ -173,7 +173,7 @@ describe('Giza activity: mounts move with their handlers', () => {
       for (const { t, poses } of live) {
         const d = Math.hypot(poses[c.index].x - poses[p.leader].x, poses[c.index].z - poses[p.leader].z)
         expect(d, `${GIZA_AMBIENT[c.index].role} #${c.index} at t=${t.toFixed(1)}`).toBeLessThan(GIZA_ACTIVITY.lag.mount + GIZA_ACTIVITY.side.mount + 1)
-        expect(d, `${GIZA_AMBIENT[c.index].role} #${c.index} at t=${t.toFixed(1)}`).toBeGreaterThan(1)
+        expect(d, `${GIZA_AMBIENT[c.index].role} #${c.index} at t=${t.toFixed(1)}`).toBeGreaterThan(gizaBodyRadius(c.index) + gizaBodyRadius(p.leader))
       }
     }
   })
@@ -191,6 +191,60 @@ describe('Giza activity: mounts move with their handlers', () => {
       }
       expect(walkedTogether).toBeGreaterThan(100)
     }
+  })
+})
+
+describe('Giza activity: bodies keep clear of each other', () => {
+  it('keeps every pair of bodies apart, within and across parties, over four cycles of the slowest party', () => {
+    // The parties' cycles differ in length, so the plateau as a whole never
+    // repeats exactly; four cycles of the slowest party pass every party
+    // through many phases against the others.
+    const state = startGizaActivity()
+    const n = GIZA_AMBIENT.length
+    const worst = new Map<string, number>()
+    while (state.t < 4 * longest) {
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const a = state.poses[i]
+          const b = state.poses[j]
+          const clearance = Math.hypot(a.x - b.x, a.z - b.z) - gizaBodyRadius(i) - gizaBodyRadius(j)
+          const key = `${GIZA_AMBIENT[i].role} #${i} / ${GIZA_AMBIENT[j].role} #${j}`
+          worst.set(key, Math.min(worst.get(key) ?? Infinity, clearance))
+        }
+      }
+      stepGizaActivity(state, DT)
+    }
+    expect(worst.size).toBe((n * (n - 1)) / 2)
+    for (const [pair, clearance] of worst) expect(clearance, pair).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('Giza activity: frame-rate independence', () => {
+  /** The plateau after `elapsed` seconds fed in frames of `frame` seconds. */
+  const after = (elapsed: number, frame: number) => {
+    const state = startGizaActivity()
+    for (let k = 0; k < Math.round(elapsed / frame); k++) stepGizaActivity(state, frame)
+    return state
+  }
+
+  it('advances the same under coarse and fine frame intervals', () => {
+    for (const elapsed of [30, 120]) {
+      const fine = after(elapsed, 1 / 120)
+      for (const frame of [0.2, 1 / 30, GIZA_ACTIVITY.step]) {
+        const other = after(elapsed, frame)
+        expect(other.t, `${frame} s frames, ${elapsed} s`).toBeCloseTo(fine.t, 6)
+        other.poses.forEach((p, i) => {
+          const q = fine.poses[i]
+          expect(Math.hypot(p.x - q.x, p.z - q.z), `#${i}, ${frame} s frames, ${elapsed} s`).toBeLessThan(1e-6)
+          expect(Math.abs(Math.atan2(Math.sin(p.yaw - q.yaw), Math.cos(p.yaw - q.yaw)))).toBeLessThan(1e-6)
+        })
+      }
+    }
+  })
+
+  it('loses no time at a sustained low frame rate', () => {
+    // 5 FPS for a minute: the whole minute is simulated, not half of it.
+    expect(after(60, 0.2).t).toBeCloseTo(60, 6)
   })
 })
 
