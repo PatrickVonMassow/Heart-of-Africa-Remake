@@ -11,6 +11,7 @@ import {
   float,
   floor,
   hash,
+  mod,
   instanceIndex,
   max,
   mix,
@@ -25,6 +26,7 @@ import {
   vec4,
 } from 'three/tsl'
 import { balance } from '../../config/balance'
+import { rainLayerSpecs, type RainLayerSpec } from './rainLayers'
 
 // The column rises from the ground under each drop, so it is 1.5 m (the eye
 // height) taller than the old eye-based 15 m one. RAIN_COUNT is the low
@@ -34,6 +36,8 @@ export const RAIN_RADIUS = 16 // a tight column around the head, not the travel 
 export const RAIN_HEIGHT = 16.5 // from the ground under each drop upward
 export const RAIN_FALL_SPEED = 22
 const STREAK_WIDTH = 0.02
+// The geometry's modelled length; the drawn length follows the drop's velocity
+// relative to the camera (rainLayers.ts streakVector).
 const STREAK_LENGTH = balance.rain.dropLengthM
 const RAIN_COLOR: [number, number, number] = [0.66, 0.72, 0.8]
 const RING_LIFT = 0.012 // the ring sits just above the water, never inside it
@@ -65,6 +69,8 @@ export function createRainUniforms() {
     tanHalfFov: uniform(Math.tan((25 * Math.PI) / 180)),
     /** The camera's aspect (width / height), to measure screen length in frame heights. */
     aspect: uniform(16 / 9),
+    /** The camera's eased velocity (m/s), for the streak's relative motion. */
+    camVel: uniform(new THREE.Vector3()),
   }
 }
 export type RainUniforms = ReturnType<typeof createRainUniforms>
@@ -78,17 +84,41 @@ function createRainSpots(count: number): THREE.InstancedBufferAttribute {
 }
 
 /** Drop and impact materials and geometries over one fresh spot buffer (so a
- *  rebuild disposes its own buffer only); `lit` is the quality lever. */
-export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count = RAIN_COUNT) {
+ *  rebuild disposes its own buffer only); `lit` is the quality lever, `specs`
+ *  the depth layers (rainLayers.ts; drop k is in layer k mod n). */
+export function buildRainMaterials(
+  uniforms: RainUniforms,
+  lit: boolean,
+  count = RAIN_COUNT,
+  specs: readonly RainLayerSpec[] = rainLayerSpecs(1),
+) {
   const spots = createRainSpots(count)
   const spot = attribute('rainSpot', 'vec4') as unknown as ReturnType<typeof vec4>
   const i = instanceIndex.toFloat()
+  const n = specs.length
+  // The drop's layer, and a per-layer constant picked by a select chain (one
+  // node graph, no backend branch).
+  const li = n === 1 ? float(0) : mod(i, float(n))
+  const pick = (values: number[]) => {
+    let acc = float(values[0])
+    for (let j = 1; j < values.length; j++) acc = li.greaterThan(j - 0.5).select(float(values[j]), acc) as unknown as typeof acc
+    return acc
+  }
+  const speed = pick(specs.map((l) => l.fallSpeed))
+  const radius = pick(specs.map((l) => l.radiusM))
+  const layerOpacity = pick(specs.map((l) => l.opacity))
   const phase = hash(i.mul(3))
   // (phase·H − t·speed) mod H, written out: a floored mod on both backends.
-  const v = phase.mul(RAIN_HEIGHT).sub(time.mul(RAIN_FALL_SPEED))
+  const v = phase.mul(RAIN_HEIGHT).sub(time.mul(speed))
   const fall = v.sub(floor(v.div(RAIN_HEIGHT)).mul(RAIN_HEIGHT))
-  const edge = max(spot.x.sub(uniforms.eye.x).abs(), spot.z.sub(uniforms.eye.y).abs()).div(RAIN_RADIUS)
+  const ex = spot.x.sub(uniforms.eye.x)
+  const ez = spot.z.sub(uniforms.eye.y)
+  const edge = max(ex.abs(), ez.abs()).div(radius)
   const edgeFade = smoothstep(float(1), float(0.4), edge)
+  // A far layer fades out inside its inner distance, so it reads behind the near one.
+  const inner = pick(specs.map((l) => l.innerFadeM))
+  const innerFade =
+    n === 1 ? float(1) : inner.greaterThan(0).select(smoothstep(inner.mul(0.6), inner, ex.mul(ex).add(ez.mul(ez)).sqrt()), float(1))
   const variation = float(1).sub(hash(i.mul(7.13).add(0.5)).mul(balance.rain.dropVariation))
   const rainCol = vec3(...RAIN_COLOR)
 
@@ -102,12 +132,20 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count =
   // space, rainTouch.ts streakScreenScale's closed form), thins to its width at
   // dropWidthCapM and fades out before its full length fits by depth alone
   // (streakFitDistance, dropNearFade), so none reads as a pole.
+  // The streak is the segment the lower tip swept over the exposure, seen from
+  // the moving camera (rainLayers.ts streakVector): its length and direction
+  // follow the drop's velocity relative to the camera, clamped.
+  const D = balance.rainDepth
+  const rel = vec3(uniforms.camVel.x.negate(), speed.negate().sub(uniforms.camVel.y), uniforms.camVel.z.negate())
+  const relSpeed = rel.length()
+  const len = relSpeed.mul(D.exposureS).clamp(D.streakMinM, D.streakMaxM)
+  const dir = rel.negate().div(max(relSpeed, float(1e-6)))
   const base = vec3(spot.x, spot.y.add(fall), spot.z)
-  const centreDist = base.add(vec3(0, STREAK_LENGTH / 2, 0)).sub(cameraPosition).length()
-  const fit = float(STREAK_LENGTH).div(uniforms.tanHalfFov.mul(2 * balance.rain.dropMaxFrameFraction))
+  const centreDist = base.add(dir.mul(len.mul(0.5))).sub(cameraPosition).length()
+  const fit = len.div(uniforms.tanHalfFov.mul(2 * balance.rain.dropMaxFrameFraction))
   const viewProj = cameraProjectionMatrix.mul(cameraViewMatrix)
   const c0 = viewProj.mul(vec4(base, 1))
-  const c1 = viewProj.mul(vec4(base.add(vec3(0, STREAK_LENGTH, 0)), 1))
+  const c1 = viewProj.mul(vec4(base.add(dir.mul(len)), 1))
   const dc = c1.sub(c0)
   const w0 = c0.w
   const maxFrac = float(balance.rain.dropMaxFrameFraction)
@@ -119,9 +157,19 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count =
   const inFront = c0.w.greaterThan(balance.rain.streakMinDepthM).and(c1.w.greaterThan(balance.rain.streakMinDepthM))
   const shorten = inFront.select(den.greaterThan(0).select(solved, float(1)), float(0))
   const thin = centreDist.div(balance.rain.dropWidthCapM).clamp(0.05, 1)
-  dm.positionNode = positionLocal.mul(vec3(thin, shorten, thin)).add(base)
+  const along = positionLocal.y.div(STREAK_LENGTH).mul(len).mul(shorten)
+  dm.positionNode = base.add(dir.mul(along)).add(vec3(positionLocal.x, 0, positionLocal.z).mul(thin))
   const nearFade = smoothstep(float(balance.rain.dropNearFadeM), fit, centreDist)
-  const dropAlpha = uniforms.opacity.mul(edgeFade).mul(nearFade).mul(balance.rain.dropOpacity)
+  // Soft ends (rainLayers.ts streakEndFade): a short soft head, a long tail fade.
+  const t = uv().y
+  const endFade = smoothstep(float(0), float(D.headSoft), t).mul(smoothstep(float(1), float(1 - D.tailSoft), t))
+  const dropAlpha = uniforms.opacity
+    .mul(edgeFade)
+    .mul(innerFade)
+    .mul(nearFade)
+    .mul(endFade)
+    .mul(layerOpacity)
+    .mul(balance.rain.dropOpacity)
   if (lit) {
     // Lit streak: dim against the bright sky behind an upward glance, bright
     // against the dark huts and ground at eye level, glinting toward the sun.
@@ -150,9 +198,9 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count =
   // w: 1 water ring, 0 ground crown, −1 none (under a roof).
   const water = spot.w.max(0)
   const splashes = spot.w.greaterThanEqual(0).select(float(1), float(0))
-  const age = float(RAIN_HEIGHT).sub(fall).div(RAIN_FALL_SPEED)
+  const age = float(RAIN_HEIGHT).sub(fall).div(speed)
   const life = balance.rain.impactLife
-  const t = age.div(life).clamp(0, 1)
+  const it = age.div(life).clamp(0, 1)
   const eyeDist = vec3(spot.x, spot.y, spot.z).sub(cameraPosition).length()
   // Projected-size bound (rainTouch.ts impactSizeScale): the Frobenius norm of
   // the projection's Jacobian over world x and z at the ring's centre.
@@ -168,18 +216,19 @@ export function buildRainMaterials(uniforms: RainUniforms, lit: boolean, count =
   const perMetre = jxx.mul(jxx).add(jxy.mul(jxy)).add(jzx.mul(jzx)).add(jzy.mul(jzy)).sqrt().mul(0.5).div(iw.mul(iw))
   const fits = float(balance.rain.impactMaxFrameFraction).div(max(perMetre.mul(2 * balance.rain.impactRadiusM), float(1e-9)))
   const sizeCap = iw.greaterThan(balance.rain.streakMinDepthM).select(fits.clamp(0, 1), float(0))
-  const radius = t.mul(0.75).add(0.25).mul(balance.rain.impactRadiusM).mul(sizeCap)
+  const ringR = it.mul(0.75).add(0.25).mul(balance.rain.impactRadiusM).mul(sizeCap)
   const p = positionLocal // a unit quad in x/y, [-1, 1]
-  im.positionNode = vec3(spot.x, spot.y.add(RING_LIFT), spot.z).add(vec3(p.x, float(0), p.y).mul(radius))
+  im.positionNode = vec3(spot.x, spot.y.add(RING_LIFT), spot.z).add(vec3(p.x, float(0), p.y).mul(ringR))
   const d = uv().sub(0.5).length().mul(2)
   const ring = smoothstep(float(0.6), float(0.82), d).mul(smoothstep(float(1), float(0.84), d))
   const eyeFade = smoothstep(float(balance.rain.impactNearFadeM), float(balance.rain.impactNearFullM), eyeDist)
-  const fade = float(1).sub(t).pow(2).mul(age.lessThan(life).select(float(1), float(0))).mul(splashes)
+  const fade = float(1).sub(it).pow(2).mul(age.lessThan(life).select(float(1), float(0))).mul(splashes)
   im.colorNode = mix(vec3(...balance.rain.impactGroundColor), rainCol.mul(0.7), water).mul(uniforms.light)
   im.opacityNode = ring
     .mul(fade)
     .mul(eyeFade)
     .mul(edgeFade)
+    .mul(innerFade)
     .mul(uniforms.opacity)
     .mul(balance.rain.impactOpacity)
   const ig = new THREE.PlaneGeometry(2, 2)

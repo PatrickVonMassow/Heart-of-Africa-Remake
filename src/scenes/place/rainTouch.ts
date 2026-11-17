@@ -152,7 +152,8 @@ export function stepRainSpots(
   drawn: number,
   eyeX: number,
   eyeZ: number,
-  period: number,
+  /** The column's wrap period: one for all drops, or one per drop (rain layers). */
+  period: number | Float32Array,
   dt: number,
   refreshS: number,
   sample: (x: number, z: number) => { y: number; flag: number },
@@ -172,19 +173,21 @@ export function stepRainSpots(
   for (let k = 0; k < drawn; k++) {
     const bx = bases[k * 2]
     const bz = bases[k * 2 + 1]
-    const tx = Math.round((eyeX - bx) / period)
-    const tz = Math.round((eyeZ - bz) / period)
+    const pk = typeof period === 'number' ? period : period[k]
+    const tx = Math.round((eyeX - bx) / pk)
+    const tz = Math.round((eyeZ - bz) / pk)
     if (!all && tiles[k * 2] === tx && tiles[k * 2 + 1] === tz) continue
     tiles[k * 2] = tx
     tiles[k * 2 + 1] = tz
-    put(k, bx + period * tx, bz + period * tz)
+    put(k, bx + pk * tx, bz + pk * tz)
   }
   if (!all && drawn > 0) {
     const n = Math.min(drawn, Math.ceil((drawn * Math.max(0, dt)) / refreshS))
     for (let i = 0; i < n; i++) {
       const k = st.cursor % drawn
       st.cursor = k + 1
-      put(k, bases[k * 2] + period * tiles[k * 2], bases[k * 2 + 1] + period * tiles[k * 2 + 1])
+      const pk = typeof period === 'number' ? period : period[k]
+      put(k, bases[k * 2] + pk * tiles[k * 2], bases[k * 2 + 1] + pk * tiles[k * 2 + 1])
     }
   }
   return dirty

@@ -66,6 +66,8 @@ device pixel ratio is kept (no cap).
 | `rainImpacts` | 0 | 250 | 500 |
 | `rainLitDrops` | off | on | on |
 | `rainDrops` | 770 | 2200 | 3300 |
+| `rainLayers` | 1 | 2 | 3 |
+| `rainLightDamping` | off | on | on |
 
 ## What each setting does
 
@@ -411,6 +413,27 @@ added.
   faintest), so heavy rain is a dense veil of faint short streaks and light
   rain stays sparse. Low keeps the earlier 770, so it pays nothing extra.
   Climbs 770 → 2200 → 3300.
+- **`rainLayers`** — Depth of the settlement rain (design.md §19.13,
+  `src/scenes/place/rainLayers.ts`): the preset's drops are shared among
+  1–3 layers at growing distance and falling speed (near, mid, far:
+  `balance.rainDepth.layer*`; drop k is in layer k mod n), a far layer fading
+  out inside its inner distance so it reads behind the near one. The drop
+  count does not change, so depth costs no extra particle — only a short
+  select chain per vertex. On every level each streak's length and slant
+  follow the drop's velocity relative to the eased camera velocity
+  (`exposureS`, clamped to `streakMinM`–`streakMaxM`; a paused frame reads as
+  standing, a jump is clamped to `maxCameraSpeed`) and its ends are soft
+  (`headSoft`/`tailSoft`); a standing eye sees the earlier 0.35 m streak.
+  Low keeps the single 16 m curtain at 22 m/s. Climbs 1 → 2 → 3.
+- **`rainLightDamping`** — The rain damps the settlement light
+  (`src/scenes/place/rainLight.ts`, `balance.rainLight`): with the rain amount
+  the sun and the sky light dim on top of the wetness dim, the fog colour
+  grays a step further and the fog planes close in (42–320 m at full rain to
+  ~23–176 m), so a downpour reads as one from inside a hut too and the fire is
+  the brightest thing in the village. Lights and fog only — the sky dome's
+  overcast (point 354) is unchanged and the dome draws fog-free. Rain 0 is
+  the dry light exactly. No cost (a few uniforms). Low off (the undimmed sun),
+  medium and high on.
 
 ## Profiling the low preset (F8 benchmark, point 293)
 

@@ -3,7 +3,8 @@
 // only, through three's own node builder (no GPU needed).
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three/webgpu'
-import { buildRainMaterials, createRainUniforms, RAIN_COUNT } from './rainMaterials'
+import { buildRainMaterials, createRainUniforms, RAIN_COUNT, RAIN_FALL_SPEED, RAIN_RADIUS } from './rainMaterials'
+import { BASE_FALL_SPEED, BASE_LAYER_RADIUS_M, rainLayerSpecs } from './rainLayers'
 
 function shaders(geometry: THREE.BufferGeometry, material: THREE.Material, forceWebGL: boolean) {
   const mesh = new THREE.InstancedMesh(geometry, material, RAIN_COUNT)
@@ -52,6 +53,25 @@ describe('settlement rain materials (design.md §19.13)', () => {
     const lit = shaders(...pick(buildRainMaterials(u, true)), true)
     expect(lit.fs.length).toBeGreaterThan(plain.fs.length)
   })
+
+  it('the single layer is the earlier curtain (rainLayers.ts mirrors these constants)', () => {
+    expect(BASE_LAYER_RADIUS_M).toBe(RAIN_RADIUS)
+    expect(BASE_FALL_SPEED).toBe(RAIN_FALL_SPEED)
+  })
+
+  for (const forceWebGL of [false, true]) {
+    for (const layers of [2, 3]) {
+      it(`the ${layers}-layer rain builds on ${forceWebGL ? 'WebGL 2' : 'WebGPU'} from the same node graph`, () => {
+        const m = buildRainMaterials(createRainUniforms(), true, RAIN_COUNT, rainLayerSpecs(layers))
+        const drop = shaders(m.dropGeometry, m.dropMaterial, forceWebGL)
+        const impact = shaders(m.impactGeometry, m.impactMaterial, forceWebGL)
+        for (const s of [drop, impact]) {
+          expect(s.vs).toContain('rainSpot')
+          expect(s.fs.length).toBeGreaterThan(0)
+        }
+      })
+    }
+  }
 })
 
 function pick(m: ReturnType<typeof buildRainMaterials>): [THREE.BufferGeometry, THREE.Material] {
