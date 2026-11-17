@@ -805,15 +805,22 @@ if (section('herd-walk')) {
     const first = await page.evaluate(() => window.__hwPose())
     await shot('414-herd-walk-a', { world: { x: first.x ?? 0, z: first.z ?? 0 }, label: `a walking ${staged.sp} at bird's-eye zoom on HIGH, legs at one point of the stride`, settle: false })
     // A quarter stride further on: a leg at neutral is now at full reach.
-    const second = await page.evaluate(async () => {
+    // The target is anchored to the FIRST frame's stride distance (rig units),
+    // not to whenever this call starts: the shutter above takes time, so the
+    // gap is d0 + a quarter stride plus whole strides (the same pose phase),
+    // the smallest such target still ahead of the walker.
+    const second = await page.evaluate(async (d0) => {
       const { sp } = window.__hw
       const g = window.__wildlife.gaitMeshes[sp]
       const scale = window.__hw.a.scale || 1
-      const quarterStride = (Math.PI / 2 / g.cadence) * scale
-      const d0 = window.__hw.a.gaitDist ?? 0
-      await window.__pollSim(quarterStride / 1.5 + 2, () => ((window.__hw.a.gaitDist ?? 0) - d0) * scale >= quarterStride)
-      return window.__hwPose()
-    })
+      const fullStride = (2 * Math.PI) / g.cadence
+      const quarter = fullStride / 4
+      const now = window.__hw.a.gaitDist ?? 0
+      const n = Math.max(0, Math.floor((now - d0 - quarter) / fullStride) + 1)
+      const target = d0 + quarter + n * fullStride
+      await window.__pollSim(((target - now) * scale) / 1.5 + 2, () => (window.__hw.a.gaitDist ?? 0) >= target)
+      return { ...window.__hwPose(), target: +target.toFixed(3) }
+    }, first.gaitDist ?? 0)
     await shot('414-herd-walk-b', { world: { x: second.x ?? 0, z: second.z ?? 0 }, label: `the same ${staged.sp} a quarter stride later — the legs have swung`, settle: false })
     const swing = first.inPool && second.inPool ? Math.max(...first.angles.map((v, k) => Math.abs(v - second.angles[k]))) : 0
     check('the walking animal is drawn on pivoted legs and its legs moved between two frames a quarter stride apart (work-order 414)',
