@@ -91,6 +91,7 @@
   "628": "Die Strg-Namensschilder verschmelzen nicht mehr zu unlesbaren Kästen, ein bereits stehender Name wird nicht wiederholt, und das eigene Boot bleibt unbenannt.",
   "629": "Ein Arbeitsbaum wird beim Aufräumen jetzt nur noch gelöscht, wenn nachgewiesen ist, dass er zum Vorgang gehört und nicht mehr aktiv ist.",
   "631": "Der Abschluss eines Laufs ist jetzt eine geordnete Schrittfolge mit blind-parallelem Aufräumen, und jeder Nachweis muss sich auf den abzuschließenden Stand beziehen.",
+  "634": "Bei blind-parallelen Arbeitsschritten wird die vereinte Liste beider Durchgänge jetzt nachgezählt statt übernommen, und das Modell, das beide Listen vereint, wird festgehalten.",
   "640": "Ein fehlgeschlagener Prüflauf gilt jetzt erst als erledigt, wenn seine Ursache behoben oder zugeordnet ist, nicht durch einen späteren grünen Wiederholungslauf.",
   "641": "Die Prüfung des Siedlungsrandes lässt sich nicht mehr von Regenstreifen täuschen und verwirft Aufnahmen, bei denen sich die Szene bewegt hat.",
   "642": "Zeitabhängige Prüfungen messen jetzt das tatsächliche Bildtempo und werden erst nach dem Lauf bewertet; auf langsamen Maschinen nicht messbare Prüfungen werden als solche ausgewiesen.",
