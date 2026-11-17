@@ -14581,5 +14581,6 @@ to land than a mechanism that needs a review.
   Player impact: a hard-edged striped band sits between the walkable ground and the panorama hills.
   Final state: the band's cause is named by measurement (switching colour, steepness and normal terms off at the report spot) and fixed; the band's edges read smooth at the report spot.
   Test: Vitest for any changed colour or height blending; a Playwright frame at the report's spot on both backends, picture-checked.
+  Also: where the near backdrop hill crosses the far hill, the overlap edge reads as a stair-stepped dark silhouette line (verification/1532-backdrop-backlit.png, x~720-850 y~400-465, both backends); geometry/silhouette aliasing, not rock noise. Measure and fix it in the same pass.
   Source: point 1532 side finding, user report 16.11.2026.
   Bundle: Siedlungsgeometrie.
