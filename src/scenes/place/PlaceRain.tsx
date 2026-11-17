@@ -33,7 +33,7 @@ import { effectiveRainDrops, effectiveRainImpacts, effectiveRainLayers, effectiv
 import { rainAmount, sunDimFactor } from '../../systems/season'
 import { PlaceGroundContext } from './PlaceGroundContext'
 import { buildRainMaterials, createRainUniforms } from './rainMaterials'
-import { cameraVelocity, easeVelocity, layeredDropBases, layeredPeriods, rainLayerSpecs, type Vec3 } from './rainLayers'
+import { cameraVelocity, easeVelocity, layeredDropBases, layeredPeriods, rainLayerSpecs, streakVector, type Vec3 } from './rainLayers'
 import { shelterCoverAt } from '../../render/shelterWetness'
 import { createRainSpotState, dropArrival, impactFlag, rainDropCount, stepRainSpots } from './rainTouch'
 
@@ -76,6 +76,28 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
     },
     [dropMaterial, dropGeometry, impactMaterial, impactGeometry],
   )
+
+  // Dev-only hook for the headless verification (CLAUDE.md §7.2): the live
+  // layer set and each layer's streak length at the current camera velocity.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeRain = () => {
+      const D = balance.rainDepth
+      return {
+        layers: specs.length,
+        presetLayers: layers,
+        fallSpeeds: specs.map((l) => l.fallSpeed),
+        radii: specs.map((l) => l.radiusM),
+        streakLengths: specs.map((l) => streakVector(l.fallSpeed, camVel.current, D.exposureS, D.streakMinM, D.streakMaxM).length),
+        camVel: [...camVel.current],
+        opacity: uniforms.opacity.value,
+      }
+    }
+    return () => {
+      delete w.__placeRain
+    }
+  }, [specs, uniforms, layers])
 
   // A new ground record (place change, dig layout) or a fresh spot buffer
   // re-samples every arrival.

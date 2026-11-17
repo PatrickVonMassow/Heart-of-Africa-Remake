@@ -789,6 +789,7 @@ if (section('shelter-wetness')) {
 if (section('rain-depth')) {
   const PLACE = 'zulu-village'
   const HUT_CONE_EAVE = 1.45 // keep in sync with roofClearance.ts HUT_CONE_EAVE
+  const EXPECT_LAYERS = { low: 1, medium: 2, high: 3 } // keep in sync with quality.ts rainLayers
   const before = await page.evaluate(() => window.__ui.getState().detailLevel)
   const skies = {}
   for (const level of ['low', 'medium', 'high']) {
@@ -817,6 +818,16 @@ if (section('rain-depth')) {
     check(`${level}: the rained-in light settles before the frames`, s.settled, `after ${s.waitedMs} ms — ${JSON.stringify(s.value)}`)
     const v = await page.evaluate(() => window.__placeSeason())
     skies[level] = v.sky
+    // The depth lever is live: the layer count is the preset's rainLayers, and
+    // with more than one layer the layers' streaks differ in length (they fall
+    // at different speeds), so the section fails when the depth is disabled.
+    const want = EXPECT_LAYERS[level]
+    const r = await page.evaluate(() => window.__placeRain?.() ?? null)
+    check(`${level}: the rain draws the preset's depth layers`, !!r && r.layers === want && r.presetLayers === want, `layers ${r?.layers}, preset ${r?.presetLayers}, expected ${want}`)
+    if (r && r.layers > 1) {
+      const lens = r.streakLengths
+      check(`${level}: the depth layers' streak lengths differ`, new Set(lens.map((x) => x.toFixed(4))).size === lens.length, JSON.stringify(lens))
+    }
     if (level === 'low') {
       check('low keeps the undimmed sun and the dry fog under rain', v.rainLight.sun === 1 && v.rainLight.fogRange === 1 && Math.abs(v.fogFar - 320) < 0.5, JSON.stringify(v.rainLight) + ` fogFar ${v.fogFar}`)
     } else {
