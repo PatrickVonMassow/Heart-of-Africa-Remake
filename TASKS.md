@@ -77,34 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 385. Rain with depth and weather — layers, streak shape, dimmed sun (user
-  27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
-  point 379). Point 384 makes the rain touch the world; this makes the rain itself read
-  as weather rather than as particles.
-  (4) DEPTH INSTEAD OF ONE CURTAIN: two or three layers at different distances and
-  speeds, with the streak LENGTH following the drop's velocity relative to the camera
-  and soft, faded ends rather than hard rectangles. That is the classic way volume is
-  suggested without more particles — the count stays where it is or falls.
-  (5) THE WEATHER CHANGES THE LIGHT: while it rains the sun is damped, the haze rises
-  and the view distance shortens, so a downpour looks like one from inside a hut as well
-  as from the open. This is where the rain stops being an overlay: the scene gets darker
-  and flatter, and the fire is suddenly the brightest thing in the village.
-  BOUNDARY: the blue sky under rain is work-order point 354 and stays there — this point
-  changes the LIGHT, not the sky dome, and the two must be built so neither undoes the
-  other. Read 354 before starting; if it is still open when this begins, say in the
-  commit how the two interact.
-  QUALITY LEVELS, as in 384: every lever gets its low/medium/high entry and its doc row;
-  the layered rain and the light damping are medium/high, low keeps one layer and the
-  undimmed sun.
-  BOTH BACKENDS, ONE PATH: TSL only, no backend branch.
-  VERIFIABLE: pure Vitest on the layer/velocity mapping (streak length follows relative
-  speed; a stalled camera does not stretch a drop) and on the light damping (rain 0 →
-  today's sun and haze exactly; rain 1 → the damped set; monotone in between); live, one
-  first-person frame per backend in the open and one from under a roof, judged by the
-  picture, at each detail level.
-  DOCS in the same commit: design.md §19.13, `docs/graphics-detail-levels.md`, CLAUDE.md
-  §7.1 pt 12 and its evidence section.
-
 - [ ] 414. The bird's-eye animals get the walk the settlement ones have (29.07.2026,
   user asked after seeing the settlement gait: "could this walk be carried over to the
   bird's-eye view?"). Yes — and the hard part is already built and tested. `src/render/
