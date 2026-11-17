@@ -88,6 +88,7 @@ put it is the mistake this line exists to stop.
   Four eyes (user 17.11.2026): ONLY for the logic change (board/done/archive code and anything that reads the done-card status), as convergent cross-vendor review via `scripts/cross-review.mjs`. The review checks explicitly: (1) nothing existing breaks (readers of the status paragraph such as statusOf/cardBodyText, guards, archive rotation, publish), (2) no new blockade or refusal beyond the single missing-argument refusal above. The backfill texts are written by one author without four eyes.
   Queue position: front of the open work order (user order 17.11.2026), before point 1532's successors.
   Source: user request 17.11.2026 (findings carrier, session c83d07ce).
+  Bundle: Chat & Tafel.
 
 - [ ] 385. Rain with depth and weather — layers, streak shape, dimmed sun (user
   27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
