@@ -721,6 +721,124 @@ if (section('straggler')) {
   })
 }
 
+// herd-walk (work-order 414, design.md §19.5): on HIGH a near bird's-eye
+// herd animal of a rigged species walks on pivoted legs. One adult is driven
+// along its facing at a fixed pace and photographed twice, a quarter stride
+// apart (half a stride would only trade the diagonal pairs, which can read as
+// the same pose): it must be drawn in the walking pool (body + four legs), its legs must
+// have swung between the frames, and the same animal held still must settle
+// to neutral legs (the stride follows distance, not the clock).
+if (section('herd-walk')) {
+  await page.evaluate(() => {
+    window.__hwPrev = { level: window.__ui.getState().detailLevel }
+    window.__ui.getState().setDetailLevel('high')
+    window.__game.getState().debugJumpTo(-17.9, 25.9)
+    window.__ui.getState().setWheelZoomEnabled(true)
+    window.__ui.getState().setTravelZoom(0.5) // DEFAULT_TRAVEL_ZOOM: the game's own bird's-eye distance
+  })
+  await page.waitForFunction(() => !!window.__wildlife?.restock && !!window.__wildlife?.gaitMeshes, null, { timeout: 60000 })
+  await page.evaluate(() => {
+    const lion = window.__lionHunt.state
+    lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
+    window.__wildlife.restock()
+  })
+  await page.waitForFunction(() => {
+    const h = window.__wildlife?.herdsRef?.current
+    return !!h && ['zebra', 'antelope', 'giraffe'].some((sp) => (h[sp] ?? []).some((a) => a.chunk && !a.dead && !a.young))
+  }, null, { timeout: 60000 }).catch(() => {})
+
+  const SPEED = 1.5
+  const staged = await page.evaluate(async (SPEED) => {
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    const ter = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const land = (x, z) => { const t = ter(x, z); return t !== 'water' && t !== 'ocean' }
+    const p0 = window.__game.getState().pos
+    let pick = null
+    for (const sp of ['zebra', 'antelope', 'giraffe']) {
+      for (const a of herds[sp] ?? []) {
+        if (a.dead || a.young || a.elderly || a.inWater !== undefined || !land(a.x, a.z)) continue
+        const dp = Math.hypot(a.x - p0.x, a.z - p0.z)
+        if (dp > 6 && dp < 25 && (!pick || dp < pick.dp)) pick = { sp, a, dp }
+      }
+    }
+    if (!pick) return { error: 'no grown rigged animal on land near the traveller' }
+    const { a } = pick
+    const heading = a.rot
+    const pin = { on: true, walk: true, x: a.x, z: a.z }
+    const hold = () => {
+      if (!pin.on) return
+      if (pin.walk) { pin.x += Math.sin(heading) * SPEED / 60; pin.z += Math.cos(heading) * SPEED / 60 }
+      a.x = pin.x; a.z = pin.z; a.rot = heading; a.heading = heading; a.wobAmp = 0
+      requestAnimationFrame(hold)
+    }
+    hold()
+    window.__hw = { sp: pick.sp, a, pin }
+    await window.__pollSim(1, () => false)
+    return { sp: pick.sp, dp: +pick.dp.toFixed(1) }
+  }, SPEED)
+  check('a grown zebra, antelope or giraffe stands near the traveller for the walk frames (work-order 414)', !staged.error, JSON.stringify(staged))
+
+  if (!staged.error) {
+    // The drawn pose: the animal's instance in its species' walking pool, and
+    // each leg's swing angle read back from (body⁻¹ · leg).
+    await page.evaluate(() => {
+      window.__hwPose = () => {
+        const { sp, a } = window.__hw
+        const g = window.__wildlife.gaitMeshes[sp]
+        const M4 = g.body.matrixWorld.constructor
+        const arr = g.body.instanceMatrix.array
+        let idx = -1
+        for (let i = 0; i < g.body.count; i++) {
+          if (Math.hypot(arr[i * 16 + 12] - a.x, arr[i * 16 + 14] - a.z) < 1.2) { idx = i; break }
+        }
+        if (idx < 0) return { inPool: false, bodyCount: g.body.count }
+        const body = new M4().fromArray(arr, idx * 16)
+        const inv = body.clone().invert()
+        const angles = g.legs.map((leg) => {
+          const local = inv.clone().multiply(new M4().fromArray(leg.instanceMatrix.array, idx * 16))
+          return +Math.atan2(local.elements[6], local.elements[5]).toFixed(4)
+        })
+        return { inPool: true, angles, gaitDist: +(a.gaitDist ?? 0).toFixed(3), x: a.x, z: a.z }
+      }
+    })
+    const first = await page.evaluate(() => window.__hwPose())
+    await shot('414-herd-walk-a', { world: { x: first.x ?? 0, z: first.z ?? 0 }, label: `a walking ${staged.sp} at bird's-eye zoom on HIGH, legs at one point of the stride`, settle: false })
+    // A quarter stride further on: a leg at neutral is now at full reach.
+    const second = await page.evaluate(async () => {
+      const { sp } = window.__hw
+      const g = window.__wildlife.gaitMeshes[sp]
+      const scale = window.__hw.a.scale || 1
+      const quarterStride = (Math.PI / 2 / g.cadence) * scale
+      const d0 = window.__hw.a.gaitDist ?? 0
+      await window.__pollSim(quarterStride / 1.5 + 2, () => ((window.__hw.a.gaitDist ?? 0) - d0) * scale >= quarterStride)
+      return window.__hwPose()
+    })
+    await shot('414-herd-walk-b', { world: { x: second.x ?? 0, z: second.z ?? 0 }, label: `the same ${staged.sp} a quarter stride later — the legs have swung`, settle: false })
+    const swing = first.inPool && second.inPool ? Math.max(...first.angles.map((v, k) => Math.abs(v - second.angles[k]))) : 0
+    check('the walking animal is drawn on pivoted legs and its legs moved between two frames a quarter stride apart (work-order 414)',
+      first.inPool && second.inPool && swing > 0.15 && second.gaitDist > first.gaitDist, JSON.stringify({ first, second, swing }))
+
+    // Standing still: the legs settle to neutral and the stride stops.
+    const still = await page.evaluate(async () => {
+      window.__hw.pin.walk = false
+      await window.__pollSim(1, () => false)
+      const a = window.__hwPose()
+      await window.__pollSim(1, () => false)
+      const b = window.__hwPose()
+      return { a, b }
+    })
+    check('a standing animal does not walk on the spot: its legs settle to neutral and its stride stops (work-order 414)',
+      still.a.inPool && still.b.inPool && Math.abs(still.b.gaitDist - still.a.gaitDist) < 0.05 && Math.max(...still.b.angles.map(Math.abs)) < 0.05,
+      JSON.stringify(still))
+  }
+  await page.evaluate(() => {
+    if (window.__hw) window.__hw.pin.on = false
+    window.__ui.getState().setDetailLevel(window.__hwPrev.level)
+    window.__hw = undefined
+  })
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass.
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)
