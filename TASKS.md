@@ -77,6 +77,18 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1535. Done cards on the board show what was done ("Umgesetzte Maßnahmen") instead of "Stand der Umsetzung".
+  Final state:
+  - A card in the board's "Erledigt" section (and in `.batch-dashboard-archive.html`) shows, below the divider, the heading "Umgesetzte Maßnahmen" instead of "Stand der Umsetzung". Open and current cards keep "Stand der Umsetzung" unchanged.
+  - Its body is 1-3 German sentences from the player's/user's point of view describing what was changed (for a bugfix: the remedy, not the problem). Not technical: no commit shas, suite names, file paths, branch or process words ("zusammengeführt", "abgehakt", "gepusht", "Abschlussarbeiten").
+  - The verification remark becomes one small trailing note on the card, e.g. "✓ geprüft: beide Backends" / "✓ geprüft: WebGPU", not its own section; it is omitted when no picture check is recorded.
+  - `node scripts/board.mjs done <N> ...` requires the measures text as an argument; a missing one is refused once with a message that prints the exact accepted syntax. No content heuristic (no boilerplate detector, no word filter): the change must not add a blockade that has to be worked around expensively at every landing (user 17.11.2026). Existing description/status split (`renderCardSections`, `STATUS_SECTION_TITLE` in `scripts/board-core.mjs`) is reused: the done move swaps the heading and content; no new section mechanism, guard, ledger field or router (infrastructure freeze).
+  - Backfill: every done card currently on the board and in the archive (178 status heads there on 17.11.2026) gets a measures text derived from its merged branch's commit subjects / merge on main (`git log` of `feat/<N>-*` merge). A card whose work cannot be attributed unambiguously gets "Maßnahmen nicht mehr nachvollziehbar." rather than a guessed text.
+  - Tests: Vitest for the heading swap, the refusal of a missing measures text, the backfill transform on fixtures, and that every existing board/dashboard guard and the landing path (`scripts/land-point.mjs` post-merge gate, dashboard guards) still pass unchanged on a done card in the new form; existing board tests that assert "Stand der Umsetzung" on done cards are updated.
+  Four eyes (user 17.11.2026): ONLY for the logic change (board/done/archive code and anything that reads the done-card status), as convergent cross-vendor review via `scripts/cross-review.mjs`. The review checks explicitly: (1) nothing existing breaks (readers of the status paragraph such as statusOf/cardBodyText, guards, archive rotation, publish), (2) no new blockade or refusal beyond the single missing-argument refusal above. The backfill texts are written by one author without four eyes.
+  Queue position: front of the open work order (user order 17.11.2026), before point 1532's successors.
+  Source: user request 17.11.2026 (findings carrier, session c83d07ce).
+
 - [ ] 385. Rain with depth and weather — layers, streak shape, dimmed sun (user
   27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
   point 379). Point 384 makes the rain touch the world; this makes the rain itself read
