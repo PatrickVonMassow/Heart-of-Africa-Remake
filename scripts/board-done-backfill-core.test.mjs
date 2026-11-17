@@ -79,6 +79,10 @@ describe('backfill of done cards (point 1535)', () => {
     const out = backfillCard(legacy, 'M.')
     expect(out).toContain(`<p class="status-head">${MEASURES_SECTION_TITLE}</p>`)
     expect(out).not.toContain('Alter Text.')
+    const marked = legacy.replace('<p>Alter Text.</p>', '<p class="desc">Was er liefert.</p>\n    <p>Alter Text.</p>')
+    const kept = backfillCard(marked, 'M.')
+    expect(kept).toContain('<p class="desc">Was er liefert.</p>')
+    expect(kept).not.toContain('Alter Text.')
   })
 
   it('keeps every status reader working on the new form', () => {

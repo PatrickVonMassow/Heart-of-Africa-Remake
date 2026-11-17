@@ -42,8 +42,13 @@ export function backfillCard(card, measures, { checked = '' } = {}) {
   const body =
     at >= 0
       ? `${inner.slice(0, at).replace(/\s*$/, '')}\n${renderStatusSection({ status: measures, title: MEASURES_SECTION_TITLE, checked })}`
-      : `\n${renderCardSections({ description: '', status: measures, title: MEASURES_SECTION_TITLE, checked })}`
+      : `\n${renderCardSections({ description: splitlessDescription(inner), status: measures, title: MEASURES_SECTION_TITLE, checked })}`
   return card.slice(0, m.index) + open + body + close
+}
+
+/** A splitless card's marked description paragraphs; its unmarked old status is dropped. */
+function splitlessDescription(inner) {
+  return [...inner.matchAll(/<p class="desc">([\s\S]*?)<\/p>/g)].map((p) => p[1]).join('\n\n')
 }
 
 /**
