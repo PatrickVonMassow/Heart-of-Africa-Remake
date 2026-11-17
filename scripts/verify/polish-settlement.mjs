@@ -838,6 +838,7 @@ if (section('rain-depth')) {
       // is shared, so this level's intensities over low's undamped ones are the
       // damping factors themselves.
       const lo = lights.low
+      check(`${level}: low's live sun and sky light are lit to compare against`, !!lo && lo.sun > 0 && lo.hemi > 0, JSON.stringify(lo))
       if (lo && lo.sun > 0 && lo.hemi > 0) {
         const sunRatio = v.sun / lo.sun
         const hemiRatio = v.hemi / lo.hemi
