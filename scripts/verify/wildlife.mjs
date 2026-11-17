@@ -778,11 +778,24 @@ if (section('herd-walk')) {
     // A dedicated grown zebra (the point-1498 staging shape), inside the drawn capacity.
     const a = { x: x0, z: z0, y: window.__wildlife.groundAt(x0, z0), rot: heading, heading, scale: 1, phase: 0.3, chunk: undefined, grounded: true }
     herds.zebra.unshift(a)
-    const pin = { on: true, walk: true, x: x0, z: z0 }
+    const pin = { on: true, walk: true, x: x0, z: z0, y: a.y }
+    // The position is pinned by ACCESSORS, not by a reset in the rAF loop:
+    // R3F re-requests its frame at the start of its callback, so it always runs
+    // BEFORE `hold` — a reset there let the sim shift the animal for the frame
+    // it was drawn in, and frame-time jitter turned that shift into a drawn
+    // back-and-forth the gait counted as walking (the staged zebra "walked on
+    // the spot"). With accessors the sim cannot move it; only the pin does.
+    for (const k of ['x', 'z', 'y']) {
+      Object.defineProperty(a, k, { get: () => pin[k], set: () => {}, enumerable: true, configurable: true })
+    }
     const hold = () => {
       if (!pin.on) return
-      if (pin.walk) { pin.x += Math.sin(heading) * SPEED / 60; pin.z += Math.cos(heading) * SPEED / 60 }
-      a.x = pin.x; a.z = pin.z; a.y = window.__wildlife.groundAt(pin.x, pin.z); a.rot = heading; a.heading = heading; a.wobAmp = 0
+      if (pin.walk) {
+        pin.x += Math.sin(heading) * SPEED / 60
+        pin.z += Math.cos(heading) * SPEED / 60
+        pin.y = window.__wildlife.groundAt(pin.x, pin.z)
+      }
+      a.rot = heading; a.heading = heading; a.wobAmp = 0
       requestAnimationFrame(hold)
     }
     hold()
