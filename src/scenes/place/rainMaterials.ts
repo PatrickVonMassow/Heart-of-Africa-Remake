@@ -114,7 +114,9 @@ export function buildRainMaterials(
   const ex = spot.x.sub(uniforms.eye.x)
   const ez = spot.z.sub(uniforms.eye.y)
   const edge = max(ex.abs(), ez.abs()).div(radius)
-  const edgeFade = smoothstep(float(1), float(0.4), edge)
+  // Ordered smoothstep edges only (edge0 < edge1): a reversed pair is undefined
+  // in GLSL, so a falling ramp is written 1 − smoothstep(lo, hi, x).
+  const edgeFade = float(1).sub(smoothstep(float(0.4), float(1), edge))
   // A far layer fades out inside its inner distance, so it reads behind the near one.
   const inner = pick(specs.map((l) => l.innerFadeM))
   const innerFade =
@@ -162,7 +164,7 @@ export function buildRainMaterials(
   const nearFade = smoothstep(float(balance.rain.dropNearFadeM), fit, centreDist)
   // Soft ends (rainLayers.ts streakEndFade): a short soft head, a long tail fade.
   const t = uv().y
-  const endFade = smoothstep(float(0), float(D.headSoft), t).mul(smoothstep(float(1), float(1 - D.tailSoft), t))
+  const endFade = smoothstep(float(0), float(D.headSoft), t).mul(float(1).sub(smoothstep(float(1 - D.tailSoft), float(1), t)))
   const dropAlpha = uniforms.opacity
     .mul(edgeFade)
     .mul(innerFade)
@@ -220,7 +222,7 @@ export function buildRainMaterials(
   const p = positionLocal // a unit quad in x/y, [-1, 1]
   im.positionNode = vec3(spot.x, spot.y.add(RING_LIFT), spot.z).add(vec3(p.x, float(0), p.y).mul(ringR))
   const d = uv().sub(0.5).length().mul(2)
-  const ring = smoothstep(float(0.6), float(0.82), d).mul(smoothstep(float(1), float(0.84), d))
+  const ring = smoothstep(float(0.6), float(0.82), d).mul(float(1).sub(smoothstep(float(0.84), float(1), d)))
   const eyeFade = smoothstep(float(balance.rain.impactNearFadeM), float(balance.rain.impactNearFullM), eyeDist)
   const fade = float(1).sub(it).pow(2).mul(age.lessThan(life).select(float(1), float(0))).mul(splashes)
   im.colorNode = mix(vec3(...balance.rain.impactGroundColor), rainCol.mul(0.7), water).mul(uniforms.light)

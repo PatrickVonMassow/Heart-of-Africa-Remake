@@ -122,5 +122,6 @@ export function streakEndFade(t: number, headSoft: number, tailSoft: number): nu
     const c = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
     return c * c * (3 - 2 * c)
   }
-  return ss(0, headSoft, t) * ss(1, 1 - tailSoft, t)
+  // Ordered edges, as in the shader (a reversed smoothstep is undefined in GLSL).
+  return ss(0, headSoft, t) * (1 - ss(1 - tailSoft, 1, t))
 }
