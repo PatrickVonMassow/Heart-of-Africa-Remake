@@ -801,7 +801,14 @@ if (section('rain-depth')) {
       { timeout: 40000 },
     )
     await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
-    await page.waitForFunction(() => window.__placeSeason().rain > 0.5, null, { timeout: 15000 }).catch(() => {})
+    const heavy = await page
+      .waitForFunction(() => window.__placeSeason().rain > 0.5, null, { timeout: 15000 })
+      .then(() => true, () => false)
+    const rainNow = await page.evaluate(() => window.__placeSeason().rain)
+    // The heavy-rain staging is the prerequisite of every frame below: without
+    // it the section would photograph dry weather as rain evidence.
+    check(`${level}: heavy rain is staged before any frame (rain > 0.5)`, heavy && rainNow > 0.5, `rain ${rainNow}`)
+    if (!(heavy && rainNow > 0.5)) continue
     const s = await waitForReadingStable(
       page,
       () => { const v = window.__placeSeason(); return { sun: v.sun, hemi: v.hemi, fogFar: v.fogFar } },
@@ -841,7 +848,12 @@ if (section('rain-depth')) {
       await frame(`385-rain-roof-${level}`, { place: PLACE, label: `heavy rain seen from under a hut eave, ${level} detail` })
     }
   }
-  check('the sky dome’s overcast (point 354) is the same at every detail level', JSON.stringify(skies.low) === JSON.stringify(skies.high), JSON.stringify(skies))
+  const skyLevels = ['low', 'medium', 'high']
+  check(
+    'the sky dome’s overcast (point 354) is the same at every detail level',
+    skyLevels.every((l) => skies[l] !== undefined && JSON.stringify(skies[l]) === JSON.stringify(skies.low)),
+    JSON.stringify(skies),
+  )
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
   await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), before)
 }
