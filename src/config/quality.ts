@@ -105,8 +105,10 @@ export interface QualityPreset {
   /** The bird's-eye herds walk (work-order 414): rigged species near the
    *  traveller draw pivoted legs driven by the distance they cover, a middle
    *  band only the body-lift cue (bands in `HERD_GAIT`, balance.ts). Off draws
-   *  every herd animal as one merged body, as before. Prices up to four extra
-   *  instanced leg draws per rigged species plus their matrices. */
+   *  every herd animal as one merged body, as before. Prices up to five extra
+   *  instanced draws per rigged species (split body + four legs, beside the
+   *  merged draw; each plus its shadow passes) and four leg matrices per
+   *  articulated animal. */
   herdGait: boolean
   /** Ring resolution of the villagers' code-built skinned body and its dress
    *  (work-order "villager dress"); 0 keeps the primitive cone-and-sphere

@@ -179,8 +179,9 @@ added.
   one steps faster. Inside a level that carries it, the walk degrades by
   DISTANCE from the traveller (`HERD_GAIT`, balance.ts, calibratable):
   articulated legs within 60 world units, the body-lift cue only out to 140,
-  the plain merged body beyond. Cost: up to four extra instanced leg draws per
-  rigged species (plus their shadow passes) and four leg matrices per
+  the plain merged body beyond. Cost: with animals in both pools, up to FIVE extra
+  instanced draws per rigged species — the split body plus four legs, beside
+  the merged draw — each with its shadow passes, and four leg matrices per
   articulated animal. Low never carries it and high always does (user decision
   29.07.2026); medium is OFF until the F8 benchmark on the player's own
   hardware prices it — an open measurement, not a settled value. Species
