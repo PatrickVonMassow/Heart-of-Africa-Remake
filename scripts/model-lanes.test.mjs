@@ -87,6 +87,13 @@ describe('resolving designations', () => {
     }
   })
 
+  it('holds the cross aliases that historic fixtures read by position at their index', () => {
+    // cross-review-core and four-eyes-artefacts tests read GPT-5.6 Sol by position;
+    // new retired spellings are appended, never prepended.
+    expect(CROSS.retired[2]).toBe('GPT-5.6 Sol')
+    expect(CROSS.retired.filter((name) => /\s/.test(name))[1]).toBe('GPT-5.6 Sol')
+  })
+
   it('reads the context suffix the harness writes as the same model', () => {
     expect(identityKey(`${MAIN.trailerName} (1M context)`)).toBe('main')
   })
