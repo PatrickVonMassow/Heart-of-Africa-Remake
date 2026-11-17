@@ -20,8 +20,21 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
-import { effectiveFaunaBodySegments, effectiveGrassFireFlames, effectiveGrassFireSmoke, effectiveOffscreenBehaviourInterval, useUi } from '../../state/ui'
+import { effectiveFaunaBodySegments, effectiveGrassFireFlames, effectiveHerdGait, effectiveGrassFireSmoke, effectiveOffscreenBehaviourInterval, useUi } from '../../state/ui'
 import { behaviourStepDue, isAmbientForThrottle } from './offscreenThrottle'
+import {
+  advanceHerdGait,
+  buildHerdParts,
+  composeLegMatrix,
+  herdBodyLift,
+  herdGaitBand,
+  isRiggedHerdSpecies,
+  RIGGED_HERD_SPECIES,
+  type HerdGaitCarrier,
+  type RiggedHerdSpecies,
+} from './herdGait'
+import { gaitRig } from '../../render/fauna'
+import type { GoatLeg } from '../../render/faunaGeometry'
 import { setAmbienceAnimals, playTrampleCrunch, proximityGain, trampleCrunchFires } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
 import {
@@ -355,7 +368,7 @@ const DYING_FLOCK_CIRCLE_Y = 3.2
  *  a few body lengths over the whole decline, so it stays where it was seen. */
 const DYING_WALK_SPEED = 0.8
 
-interface Animal {
+interface Animal extends HerdGaitCarrier {
   x: number
   z: number
   y: number
@@ -1993,8 +2006,35 @@ interface WildlifeMeshPool {
   vultureFlareGeo: THREE.BufferGeometry
   /** The body tessellation the detailed ungulates are currently built at. */
   bodySegments: number
+  /** The walking herds (work-order 414): per rigged species a body-only mesh
+   *  and one instanced mesh per pivoted leg, from the settlement part builders.
+   *  Only adults inside the articulated band draw here; everyone else keeps
+   *  the merged body in `adult`. */
+  gait: Record<RiggedHerdSpecies, HerdGaitPool>
+}
+interface HerdGaitPool {
+  body: THREE.InstancedMesh
+  legs: THREE.InstancedMesh[]
+  legDefs: GoatLeg[]
+  legLength: number
+  cadence: number
+}
+function buildHerdGaitPool(sp: RiggedHerdSpecies, material: THREE.MeshStandardNodeMaterial, capacity: number): HerdGaitPool {
+  const parts = buildHerdParts(sp)
+  const rig = gaitRig(parts.legs)
+  const mk = (geo: THREE.BufferGeometry) => {
+    const m = new THREE.InstancedMesh(geo, material, capacity)
+    m.castShadow = true
+    m.frustumCulled = false
+    m.count = 0
+    m.visible = false
+    return m
+  }
+  return { body: mk(parts.body), legs: parts.legs.map((l) => mk(l.geo)), legDefs: parts.legs, legLength: rig.legLength, cadence: rig.cadence }
 }
 let wildlifeMeshCache: WildlifeMeshPool | null = null
+/** Scratch for the walking herds' leg matrices (work-order 414). */
+const LEG_MTX = new THREE.Matrix4()
 function getWildlifeMeshes(): WildlifeMeshPool {
   if (wildlifeMeshCache) return wildlifeMeshCache
   const geometries: Record<Species, THREE.BufferGeometry> = {
@@ -2073,7 +2113,9 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.visible = false
     elder[sp] = m
   }
-  wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), vultureLandedGeo: buildVultureLanded(), vultureFlareGeo: buildVulture(balance.vultureLanding.flareDihedral), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
+  const gait = {} as Record<RiggedHerdSpecies, HerdGaitPool>
+  for (const sp of RIGGED_HERD_SPECIES) gait[sp] = buildHerdGaitPool(sp, material, herdCapacity(sp))
+  wildlifeMeshCache = { adult, calf, elder, material, crocStrike, vultureGeo: buildVulture(), vultureLandedGeo: buildVultureLanded(), vultureFlareGeo: buildVulture(balance.vultureLanding.flareDihedral), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS, gait }
   return wildlifeMeshCache
 }
 
@@ -2096,6 +2138,14 @@ function applyFaunaBodySegments(segments: number): void {
   swap(pool.calf.antelope, buildAntelopeCalf(segments))
   swap(pool.elder.zebra, ELDER_BUILDERS.zebra(segments))
   swap(pool.elder.antelope, ELDER_BUILDERS.antelope(segments))
+  // The walking bodies follow the same tessellation (work-order 414).
+  for (const sp of ['zebra', 'antelope'] as const) {
+    const parts = buildHerdParts(sp, segments)
+    const g = pool.gait[sp]
+    swap(g.body, parts.body)
+    parts.legs.forEach((l, k) => swap(g.legs[k], l.geo))
+    g.legDefs = parts.legs
+  }
 }
 
 // Lion-hunt predator/prey geometries, module-cached for the same reason: the
@@ -2286,7 +2336,7 @@ function Herds() {
     // debug override), the drama current there and the effective flow against
     // the drown threshold. A staged water-drama check asserts this reading
     // instead of assuming a forced season arrived (point 502).
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, scavengers, scavengeGroups, restock, meshRefs, calfMeshRefs, elderMeshes: pool.elder, herdState,
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, scavengers, scavengeGroups, restock, meshRefs, calfMeshRefs, elderMeshes: pool.elder, gaitMeshes: pool.gait, herdState,
       colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE,
       // Stage a family crossing (point 362) — the live check seeds the herd's swim.
       startCrossing: (a: Animal, tx: number, tz: number) =>
@@ -5323,6 +5373,9 @@ function Herds() {
     // Off-screen behaviour throttle (point 310, offscreenThrottle.ts): 1 on
     // medium/high, so everyone steps every frame there.
     const offscreenInterval = effectiveOffscreenBehaviourInterval(useUi.getState())
+    // The herd walk (work-order 414): the level decides, the distance band
+    // from the traveller refines inside it (herdGait.ts).
+    const herdWalkOn = effectiveHerdGait(useUi.getState())
     for (const sp of SPECIES) {
       const mesh = meshRefs.current[sp]
       if (!mesh) continue
@@ -5341,7 +5394,11 @@ function Herds() {
       // dying and as a carcass alike, so the body that falls is the old one.
       const elderMesh = isElderRenderSpecies(sp) ? pool.elder[sp] : undefined
       let oIdx = 0
-      const write = (a: Animal) => {
+      // A walking adult of a rigged species inside the articulated band draws
+      // as body + pivoted legs (work-order 414) instead of the merged body.
+      const gaitPool = isRiggedHerdSpecies(sp) ? pool.gait[sp] : undefined
+      let gIdx = 0
+      const write = (a: Animal, legPhase?: number) => {
         if (a.young && calfMesh) {
           // Over the calf budget: this juvenile is NOT drawn this frame, so it
           // must not be stamped either — an undrawn body may never leave a
@@ -5354,6 +5411,12 @@ function Herds() {
           elderMesh.setMatrixAt(oIdx++, mtx)
         } else if (crocStrikeThis) {
           pool.crocStrike.setMatrixAt(sIdx++, mtx)
+        } else if (legPhase !== undefined && gaitPool) {
+          gaitPool.body.setMatrixAt(gIdx, mtx)
+          for (let k = 0; k < gaitPool.legs.length; k++) {
+            gaitPool.legs[k].setMatrixAt(gIdx, composeLegMatrix(LEG_MTX, mtx, gaitPool.legDefs[k], legPhase))
+          }
+          gIdx++
         } else {
           mesh.setMatrixAt(aIdx++, mtx)
         }
@@ -6458,6 +6521,20 @@ function Herds() {
         // frames had one of the two on land.
         const crocOwnsFacing = sp === 'crocodile' && a.lunge !== undefined
         if (sp !== 'elephant' && !thrashing && !crocOwnsFacing && yaw !== idleYaw) a.rot = face
+        // The walk (work-order 414): the stride advances with the ground this
+        // drawn body covered — shuffle included, since that moves the body
+        // too — never with the clock. Calves have no rig of their own and keep
+        // the merged body; elders take the body-lift cue on the adult rig.
+        let legPhase: number | undefined
+        if (gaitPool) {
+          const canStep = !thrashing && !a.dying && a.inWater === undefined && !isAirborne(a.air)
+          const gp = advanceHerdGait(a, px, pz, a.scale, gaitPool.cadence, dt, canStep)
+          const band = a.young ? 'none' : herdGaitBand(Math.hypot(px - pos.x, pz - pos.z), herdWalkOn)
+          if (band !== 'none') {
+            bodyY += herdBodyLift(gp, gaitPool.legLength, a.scale)
+            if (band === 'articulated' && !a.elderly) legPhase = gp
+          }
+        }
         vpos.set(px, bodyY, pz)
         if (pitch !== 0 || roll !== 0) {
           euler.set(pitch, face, roll, 'YXZ')
@@ -6520,7 +6597,7 @@ function Herds() {
           mtx.toArray(a.heldPose)
           a.heldPoseFrame = drawFrame
         }
-        write(a)
+        write(a, legPhase)
       }
       mesh.count = aIdx
       // An empty pool still costs a draw per pass and cascade (point 1524).
@@ -6531,6 +6608,16 @@ function Herds() {
         pool.crocStrike.count = sIdx
         pool.crocStrike.visible = sIdx > 0
         pool.crocStrike.instanceMatrix.needsUpdate = true
+      }
+      if (gaitPool) {
+        gaitPool.body.count = gIdx
+        gaitPool.body.visible = gIdx > 0
+        gaitPool.body.instanceMatrix.needsUpdate = true
+        for (const leg of gaitPool.legs) {
+          leg.count = gIdx
+          leg.visible = gIdx > 0
+          leg.instanceMatrix.needsUpdate = true
+        }
       }
       if (calfMesh) {
         calfMesh.count = cIdx
@@ -6620,6 +6707,14 @@ function Herds() {
     <>
       {SPECIES.map((sp) => (
         <primitive key={sp} object={pool.adult[sp]} dispose={null} />
+      ))}
+      {RIGGED_HERD_SPECIES.map((sp) => (
+        <group key={`${sp}-gait`}>
+          <primitive object={pool.gait[sp].body} dispose={null} />
+          {pool.gait[sp].legs.map((leg, k) => (
+            <primitive key={k} object={leg} dispose={null} />
+          ))}
+        </group>
       ))}
       {CALF_SPECIES.map((sp) => (
         <primitive key={`${sp}-calf`} object={pool.calf[sp]} dispose={null} />
