@@ -265,7 +265,7 @@
   "1053": "Eine neu gestartete Sitzung übernimmt den Batch nur noch, wenn sie dazu eingeladen wurde; eine fremde Sitzung lässt die Startfreigabe für den eingeladenen Nachfolger unangetastet.",
   "1056": "Der Grabungsfortschritt wird jetzt bei jedem Spatenstich und beim Abschluss gespeichert. Der Aushubhügel endet sauber am Fuß des Hügels, und der gemeinsame Gang zur Grabung wird abgesichert, bevor sich der Zustand des Auslösers ändert.",
   "1058": "Die Kamera folgt bei der Prüfaufnahme einer Sprechblase jetzt dem sprechenden Dorfbewohner, sodass das Bild tatsächlich den Sprecher und seine Äußerung zeigt.",
-  "1061": "Die OpenAI-Modell-Linie heißt jetzt durchgängig Astra; Befehle, Kennung, Dokumentation und Reviewplanung verwenden den neuen Namen, und frühere Aufzeichnungen unter dem alten Namen bleiben lesbar.",
+  "1061": "Die herstellerfremde Modell-Linie heißt jetzt durchgängig Astra; Befehle, Kennung, Dokumentation und Reviewplanung verwenden den neuen Namen, und frühere Aufzeichnungen unter dem alten Namen bleiben lesbar.",
   "1064": "Ein gefundenes Artefakt wird jetzt durch eine Handlung mit dem Gegenstand vor dem Häuptling übergeben; der Botengang zum Findling wird über diese Übergabe abgeschlossen.",
   "1065": "Ein erneutes Zeichnen setzt die Arme der Figuren nicht mehr in die Ruhehaltung zurück, sodass die lehrende Klopfgeste am Stein sichtbar bleibt. Ein Gang, der die letzten Zentimeter nicht schließen kann, wird jetzt freigegeben statt hängen zu bleiben.",
   "1068": "Für die Prüfaufnahme des Kinderspiels wird das Spiel kurz angehalten und danach auf jedem Weg wieder freigegeben; steht ein Kind direkt vor der Kamera, sucht die Kamera einen freien Standpunkt statt steil nach unten zu schauen.",
